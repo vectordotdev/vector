@@ -13,8 +13,13 @@ components: sources: stdin: {
 	}
 
 	features: {
+		auto_generated:   true
+		acknowledgements: false
 		multiline: enabled: false
-		codecs: enabled:    true
+		codecs: {
+			enabled:         true
+			default_framing: "`newline_delimited` for codecs other than `native`, which defaults to `length_delimited`"
+		}
 		receive: {
 			from: {
 				service: services.stdin
@@ -26,16 +31,6 @@ components: sources: stdin: {
 	}
 
 	support: {
-		targets: {
-			"aarch64-unknown-linux-gnu":      true
-			"aarch64-unknown-linux-musl":     true
-			"armv7-unknown-linux-gnueabihf":  true
-			"armv7-unknown-linux-musleabihf": true
-			"x86_64-apple-darwin":            true
-			"x86_64-pc-windows-msv":          true
-			"x86_64-unknown-linux-gnu":       true
-			"x86_64-unknown-linux-musl":      true
-		}
 		requirements: []
 		warnings: []
 		notices: []
@@ -45,32 +40,7 @@ components: sources: stdin: {
 		platform_name: null
 	}
 
-	configuration: {
-		host_key: {
-			category:    "Context"
-			common:      false
-			description: """
-				The key name added to each event representing the current host. This can also be globally set via the
-				[global `host_key` option](\(urls.vector_configuration)/global-options#log_schema.host_key).
-				"""
-			required:    false
-			warnings: []
-			type: string: {
-				default: "host"
-				syntax:  "literal"
-			}
-		}
-		max_length: {
-			common:      false
-			description: "The maximum bytes size of a message before rest of it will be discarded."
-			required:    false
-			warnings: []
-			type: uint: {
-				default: 102400
-				unit:    "bytes"
-			}
-		}
-	}
+	configuration: base.components.sources.stdin.configuration
 
 	output: logs: line: {
 		description: "An individual event from STDIN."
@@ -78,6 +48,13 @@ components: sources: stdin: {
 			host:      fields._local_host
 			message:   fields._raw_line
 			timestamp: fields._current_timestamp
+			source_type: {
+				description: "The name of the source type."
+				required:    true
+				type: string: {
+					examples: ["stdin"]
+				}
+			}
 		}
 	}
 
@@ -90,9 +67,10 @@ components: sources: stdin: {
 			configuration: {}
 			input: _line
 			output: log: {
-				timestamp: _values.current_timestamp
-				message:   _line
-				host:      _values.local_host
+				timestamp:   _values.current_timestamp
+				message:     _line
+				host:        _values.local_host
+				source_type: "stdin"
 			}
 		},
 	]
@@ -107,10 +85,14 @@ components: sources: stdin: {
 	}
 
 	telemetry: metrics: {
-		events_in_total:                 components.sources.internal_metrics.output.metrics.events_in_total
-		processed_bytes_total:           components.sources.internal_metrics.output.metrics.processed_bytes_total
-		processed_events_total:          components.sources.internal_metrics.output.metrics.processed_events_total
-		component_received_events_total: components.sources.internal_metrics.output.metrics.component_received_events_total
-		stdin_reads_failed_total:        components.sources.internal_metrics.output.metrics.stdin_reads_failed_total
+		events_in_total:                      components.sources.internal_metrics.output.metrics.events_in_total
+		processed_bytes_total:                components.sources.internal_metrics.output.metrics.processed_bytes_total
+		processed_events_total:               components.sources.internal_metrics.output.metrics.processed_events_total
+		component_discarded_events_total:     components.sources.internal_metrics.output.metrics.component_discarded_events_total
+		component_errors_total:               components.sources.internal_metrics.output.metrics.component_errors_total
+		component_received_bytes_total:       components.sources.internal_metrics.output.metrics.component_received_bytes_total
+		component_received_event_bytes_total: components.sources.internal_metrics.output.metrics.component_received_event_bytes_total
+		component_received_events_total:      components.sources.internal_metrics.output.metrics.component_received_events_total
+		stdin_reads_failed_total:             components.sources.internal_metrics.output.metrics.stdin_reads_failed_total
 	}
 }

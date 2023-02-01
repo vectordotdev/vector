@@ -38,18 +38,20 @@ remap: functions: parse_syslog: {
 				)
 				"""
 			return: {
-				severity:                        "notice"
-				facility:                        "user"
-				timestamp:                       "2020-03-13T20:45:38.119Z"
-				hostname:                        "dynamicwireless.name"
-				appname:                         "non"
-				procid:                          2426
-				msgid:                           "ID931"
-				message:                         "Try to override the THX port, maybe it will reboot the neural interface!"
-				"exampleSDID@32473.eventID":     "1011"
-				"exampleSDID@32473.eventSource": "Application"
-				"exampleSDID@32473.iut":         "3"
-				version:                         1
+				severity:  "notice"
+				facility:  "user"
+				timestamp: "2020-03-13T20:45:38.119Z"
+				hostname:  "dynamicwireless.name"
+				appname:   "non"
+				procid:    2426
+				msgid:     "ID931"
+				message:   "Try to override the THX port, maybe it will reboot the neural interface!"
+				"exampleSDID@32473": {
+					eventID:     "1011"
+					eventSource: "Application"
+					iut:         "3"
+				}
+				version: 1
 			}
 		},
 	]

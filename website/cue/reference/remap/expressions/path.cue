@@ -33,7 +33,7 @@ remap: expressions: path: {
 						description: """
 							Array elements can be accessed by their index:
 
-							```vrl
+							```coffee
 							.array[0]
 							```
 							"""
@@ -45,7 +45,7 @@ remap: expressions: path: {
 							particularly useful when working with
 							[externally tagged](\(urls.externally_tagged_representation)) data:
 
-							```vrl
+							```coffee
 							.grand_parent.(parent1 | parent2).child
 							```
 							"""
@@ -61,7 +61,7 @@ remap: expressions: path: {
 						description: """
 							Nested object values are accessed by delimiting each ancestor path with `.`:
 
-							```vrl
+							```coffee
 							.parent.child
 							```
 							"""
@@ -78,7 +78,7 @@ remap: expressions: path: {
 							Path segments can be quoted to include special characters, such as spaces, periods, and
 							others:
 
-							```vrl
+							```coffee
 							."parent.key.with.special \"characters\"".child
 							```
 							"""#

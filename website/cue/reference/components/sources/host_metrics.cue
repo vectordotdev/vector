@@ -19,6 +19,7 @@ components: sources: host_metrics: {
 	}
 
 	features: {
+		acknowledgements: false
 		collect: {
 			checkpoint: enabled: false
 			from: service:       services.host
@@ -27,16 +28,6 @@ components: sources: host_metrics: {
 	}
 
 	support: {
-		targets: {
-			"aarch64-unknown-linux-gnu":      true
-			"aarch64-unknown-linux-musl":     true
-			"armv7-unknown-linux-gnueabihf":  true
-			"armv7-unknown-linux-musleabihf": true
-			"x86_64-apple-darwin":            true
-			"x86_64-pc-windows-msv":          true
-			"x86_64-unknown-linux-gnu":       true
-			"x86_64-unknown-linux-musl":      true
-		}
 		notices: []
 		requirements: []
 		warnings: [
@@ -63,7 +54,6 @@ components: sources: host_metrics: {
 			type: string: {
 				default: null
 				examples: ["/mnt/host/proc"]
-				syntax: "literal"
 			}
 		}
 
@@ -72,338 +62,11 @@ components: sources: host_metrics: {
 			type: string: {
 				default: null
 				examples: ["/mnt/host/sys"]
-				syntax: "literal"
 			}
 		}
 	}
 
-	configuration: {
-		collectors: {
-			description: "The list of host metric collector services to use. Defaults to all collectors."
-			common:      true
-			required:    false
-			type: array: {
-				default: ["cgroups", "cpu", "disk", "filesystem", "load", "host", "memory", "network"]
-				items: type: string: {
-					enum: {
-						cgroups:    "Metrics related to Linux control groups."
-						cpu:        "Metrics related to CPU utilization."
-						disk:       "Metrics related to disk I/O utilization."
-						filesystem: "Metrics related to filesystem space utilization."
-						load:       "Load average metrics (UNIX only)."
-						host:       "Metrics related to host"
-						memory:     "Metrics related to memory utilization."
-						network:    "Metrics related to network utilization."
-					}
-					syntax: "literal"
-				}
-			}
-		}
-		namespace: {
-			description: "The namespace of metrics. Disabled if empty."
-			common:      false
-			required:    false
-			type: string: {
-				default: "host"
-				syntax:  "literal"
-			}
-		}
-		scrape_interval_secs: {
-			description: "The interval between metric gathering, in seconds."
-			common:      true
-			required:    false
-			type: uint: {
-				default: 15
-				unit:    "seconds"
-			}
-		}
-		cgroups: {
-			common: false
-			description: #"""
-				Options for the "cgroups" (controller groups) metrics collector.
-
-				Note: this collector is only available on Linux systems, and only supports either version 2 or hybrid cgroups.
-				"""#
-			required: false
-			type: object: options: {
-				base: {
-					common:      false
-					required:    false
-					description: "The base cgroup name to provide metrics for"
-					type: string: {
-						default: null
-						examples: ["/", "system.slice/snapd.service"]
-						syntax: "literal"
-					}
-				}
-				groups: {
-					common:      false
-					required:    false
-					description: "Lists of group name patterns to include or exclude."
-					type: object: options: {
-						includes: {
-							required: false
-							common:   false
-							description: """
-								The list of cgroup name patterns for which to gather metrics.
-								Defaults to including all cgroups.
-								The patterns are matched using [globbing](#globbing).
-								"""
-							type: array: {
-								default: ["*"]
-								items: type: string: {
-									examples: ["user.slice/*", "*.service"]
-									syntax: "literal"
-								}
-							}
-						}
-						excludes: {
-							required: false
-							common:   false
-							description: """
-								The list of cgroup name patterns for which to gather metrics.
-								Defaults to excluding no cgroups.
-								The patterns are matched using [globbing](#globbing).
-								"""
-							type: array: {
-								default: []
-								items: type: string: {
-									examples: ["user.slice/*", "*.service"]
-									syntax: "literal"
-								}
-							}
-						}
-					}
-				}
-				levels: {
-					common:      false
-					required:    false
-					description: "The number of levels of the cgroups hierarchy for which to report metrics. A value of `1` means just the root or named cgroup."
-					type: uint: {
-						unit:    null
-						default: 100
-						examples: [1, 3]
-					}
-				}
-			}
-		}
-		disk: {
-			common:      false
-			description: #"Options for the "disk" metrics collector."#
-			required:    false
-			type: object: options: {
-				devices: {
-					common:      false
-					required:    false
-					description: "Lists of device name patterns to include or exclude."
-					type: object: options: {
-						includes: {
-							required: false
-							common:   false
-							description: """
-								The list of device name patterns for which to gather I/O utilization metrics.
-								Defaults to including all devices.
-								The patterns are matched using [globbing](#globbing).
-								"""
-							type: array: {
-								default: ["*"]
-								items: type: string: {
-									examples: ["sda", "dm-*"]
-									syntax: "literal"
-								}
-							}
-						}
-						excludes: {
-							required: false
-							common:   false
-							description: """
-								The list of device name patterns for which to gather I/O utilization metrics.
-								Defaults to excluding no devices.
-								The patterns are matched using [globbing](#globbing).
-								"""
-							type: array: {
-								default: []
-								items: type: string: {
-									examples: ["sda", "dm-*"]
-									syntax: "literal"
-								}
-							}
-						}
-					}
-				}
-			}
-		}
-		filesystem: {
-			common:      false
-			description: #"Options for the "filesystem" metrics collector."#
-			required:    false
-			type: object: options: {
-				devices: {
-					common:      false
-					required:    false
-					description: "Lists of device name patterns to include or exclude."
-					type: object: options: {
-						includes: {
-							required: false
-							common:   false
-							description: """
-								The list of device name patterns for which to gather usage metrics.
-								Defaults to including all devices.
-								The patterns are matched using [globbing](#globbing).
-								"""
-							type: array: {
-								default: ["*"]
-								items: type: string: {
-									examples: ["sda", "dm-*"]
-									syntax: "literal"
-								}
-							}
-						}
-						excludes: {
-							required: false
-							common:   false
-							description: """
-								The list of device name patterns for which to gather usage metrics.
-								Defaults to excluding no devices.
-								The patterns are matched using [globbing](#globbing).
-								"""
-							type: array: {
-								default: []
-								items: type: string: {
-									examples: ["sda", "dm-*"]
-									syntax: "literal"
-								}
-							}
-						}
-					}
-				}
-				filesystems: {
-					common:      false
-					required:    false
-					description: "Lists of filesystem name patterns to include or exclude."
-					type: object: options: {
-						includes: {
-							required: false
-							common:   false
-							description: """
-								The list of filesystem name patterns for which to gather usage metrics.
-								Defaults to including all filesystems.
-								The patterns are matched using [globbing](#globbing).
-								"""
-							type: array: {
-								default: ["*"]
-								items: type: string: {
-									examples: ["ntfs", "ext*"]
-									syntax: "literal"
-								}
-							}
-						}
-						excludes: {
-							required: false
-							common:   false
-							description: """
-								The list of filesystem name patterns for which to gather usage metrics.
-								Defaults to excluding no filesystems.
-								The patterns are matched using [globbing](#globbing).
-								"""
-							type: array: {
-								default: []
-								items: type: string: {
-									examples: ["ntfs", "ext*"]
-									syntax: "literal"
-								}
-							}
-						}
-					}
-				}
-				mountpoints: {
-					common:      false
-					required:    false
-					description: "Lists of mount point path patterns to include or exclude."
-					type: object: options: {
-						includes: {
-							required: false
-							common:   false
-							description: """
-								The list of mount point path patterns for which to gather usage metrics.
-								Defaults to including all mount points.
-								The patterns are matched using [globbing](#globbing).
-								"""
-							type: array: {
-								default: ["*"]
-								items: type: string: {
-									examples: ["/home", "/raid*"]
-									syntax: "literal"
-								}
-							}
-						}
-						excludes: {
-							required: false
-							common:   false
-							description: """
-								The list of mount point path patterns for which to gather usage metrics.
-								Defaults to excluding no mount points.
-								The patterns are matched using [globbing](#globbing).
-								"""
-							type: array: {
-								default: []
-								items: type: string: {
-									examples: ["/home", "/raid*"]
-									syntax: "literal"
-								}
-							}
-						}
-					}
-				}
-			}
-		}
-		network: {
-			common:      false
-			description: #"Options for the "network" metrics collector."#
-			required:    false
-			type: object: options: {
-				devices: {
-					common:      false
-					required:    false
-					description: "Lists of device name patterns to include or exclude."
-					type: object: options: {
-						includes: {
-							required: false
-							common:   false
-							description: """
-								The list of device name patterns for which to gather network utilization metrics.
-								Defaults to including all devices.
-								The patterns are matched using [globbing](#globbing).
-								"""
-							type: array: {
-								default: ["*"]
-								items: type: string: {
-									examples: ["sda", "dm-*"]
-									syntax: "literal"
-								}
-							}
-						}
-						excludes: {
-							required: false
-							common:   false
-							description: """
-								The list of device name patterns for which to gather network utilization metrics.
-								Defaults to excluding no devices.
-								The patterns are matched using [globbing](#globbing).
-								"""
-							type: array: {
-								default: []
-								items: type: string: {
-									examples: ["sda", "dm-*"]
-									syntax: "literal"
-								}
-							}
-						}
-					}
-				}
-			}
-		}
-	}
+	configuration: base.components.sources.host_metrics.configuration
 
 	output: metrics: {
 		_host_metrics_tags: {
@@ -432,9 +95,17 @@ components: sources: host_metrics: {
 				mode: {
 					description: "Which mode the CPU was running in during the given time."
 					required:    true
-					examples: ["idle", "system", "user", "nice"]
+					examples: ["idle", "system", "user", "nice", "io_wait"]
 				}
 			}
+		}
+		host_logical_cpus: _host & {
+			description: "The number of logical CPUs."
+			type:        "gauge"
+		}
+		host_physical_cpus: _host & {
+			description: "The number of physical CPUs."
+			type:        "gauge"
 		}
 
 		// Host cgroups
@@ -458,9 +129,9 @@ components: sources: host_metrics: {
 		filesystem_used_ratio:  _host & _filesystem_bytes & {description: "The ratio between used and total bytes on the named filesystem."}
 
 		// Host load
-		load1:  _host & _loadavg & {description: "System load averaged over the last 1 second."}
-		load5:  _host & _loadavg & {description: "System load averaged over the last 5 seconds."}
-		load15: _host & _loadavg & {description: "System load averaged over the last 15 seconds."}
+		load1:  _host & _loadavg & {description: "System load averaged over the last 1 minute."}
+		load5:  _host & _loadavg & {description: "System load averaged over the last 5 minutes."}
+		load15: _host & _loadavg & {description: "System load averaged over the last 15 minutes."}
 
 		// Host time
 		uptime:    _host & _host_metric & {description: "The number of seconds since the last boot."}
@@ -476,7 +147,7 @@ components: sources: host_metrics: {
 		memory_shared_bytes:           _host & _memory_linux & {description:                 "The number of bytes of main memory shared between processes."}
 		memory_swap_free_bytes:        _host & _memory_gauge & {description:                 "The number of free bytes of swap space."}
 		memory_swapped_in_bytes_total: _host & _memory_counter & _memory_nowin & {
-			description: "The number of bytes that have been swapped in to main memory."
+			description: "The number of bytes that have been swapped into main memory."
 		}
 		memory_swapped_out_bytes_total: _host & _memory_counter & _memory_nowin & {
 			description: "The number of bytes that have been swapped out from main memory."
@@ -588,6 +259,11 @@ components: sources: host_metrics: {
 	}
 
 	telemetry: metrics: {
-		processed_events_total: components.sources.internal_metrics.output.metrics.processed_events_total
+		processed_events_total:               components.sources.internal_metrics.output.metrics.processed_events_total
+		component_errors_total:               components.sources.internal_metrics.output.metrics.component_errors_total
+		component_discarded_events_total:     components.sources.internal_metrics.output.metrics.component_discarded_events_total
+		component_received_bytes_total:       components.sources.internal_metrics.output.metrics.component_received_bytes_total
+		component_received_events_total:      components.sources.internal_metrics.output.metrics.component_received_events_total
+		component_received_event_bytes_total: components.sources.internal_metrics.output.metrics.component_received_event_bytes_total
 	}
 }

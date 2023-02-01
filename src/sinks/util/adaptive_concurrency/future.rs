@@ -1,18 +1,18 @@
 //! Future types
 //!
-use super::controller::Controller;
-use super::instant_now;
-use crate::sinks::util::retries::RetryLogic;
-use futures::ready;
-use pin_project::pin_project;
 use std::{
     future::Future,
     pin::Pin,
     sync::Arc,
-    task::{Context, Poll},
+    task::{ready, Context, Poll},
     time::Instant,
 };
+
+use pin_project::pin_project;
 use tokio::sync::OwnedSemaphorePermit;
+
+use super::{controller::Controller, instant_now};
+use crate::sinks::util::retries::RetryLogic;
 
 /// Future for the `AdaptiveConcurrencyLimit` service.
 ///
@@ -26,7 +26,6 @@ use tokio::sync::OwnedSemaphorePermit;
 /// spawning it) to prevent extraneous delays from causing discrepancies
 /// in the measurements.
 #[pin_project]
-#[derive(Debug)]
 pub struct ResponseFuture<F, L> {
     #[pin]
     inner: F,

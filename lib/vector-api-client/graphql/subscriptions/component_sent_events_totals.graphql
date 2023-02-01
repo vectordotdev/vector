@@ -1,7 +1,12 @@
 subscription ComponentSentEventsTotalsSubscription($interval: Int!) {
     componentSentEventsTotals(interval: $interval) {
-        pipelineId
         componentId
+        outputs {
+            outputId
+            sentEventsTotal {
+                sentEventsTotal
+            }
+        }
         metric {
             sentEventsTotal
         }

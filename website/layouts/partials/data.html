@@ -39,10 +39,10 @@
           {{ end }}
 
           {{ with $v.syntax }}
-          {{ if eq . "remap_boolean_expression" }}
-          {{ partial "badge.html" (dict "word" . "color" "gray" "href" "/docs/reference/vrl#boolean-expressions") }}
-          {{ else if eq . "remap_program" }}
+          {{ if eq . "remap_program" }}
           {{ partial "badge.html" (dict "word" . "color" "gray" "href" "/docs/reference/vrl#program") }}
+          {{ else if eq . "template" }}
+          {{ partial "badge.html" (dict "word" . "color" "gray" "href" "/docs/reference/configuration/template-syntax/") }}
           {{ else }}
           {{ partial "badge.html" (dict "word" . "color" "gray") }}
           {{ end }}
@@ -55,11 +55,66 @@
         </span>
       </span>
 
+      {{ if $v.deprecated }}
+      <div class="mt-3 border-2 rounded-md border-yellow-400 flex flex-col space-y-1.5 py-2 px-3">
+        <span>
+          {{ partial "heading.html" (dict "text" "Deprecated" "level" 4 "toc_hide" true) }}
+        </span>
+        <div class="flex space-x-5 items-center">
+          <div class="flex-shrink-0">
+            {{/* Heroicon: outline/exclamation-circle */}}
+            <svg xmlns="http://www.w3.org/2000/svg" class="text-yellow-500 h-5 w-5" fill="none" viewBox="0 0 24 24"
+              stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+
+          <div class="prose dark:prose-dark max-w-none leading-snug">
+            {{ if $v.deprecated_message }}
+            {{ $v.deprecated_message | markdownify }}
+            {{ else }}
+            This field is deprecated.
+            {{ end }}
+          </div>
+        </div>
+      </div>
+      {{ end }}
+
       <div class="mt-6 prose dark:prose-dark max-w-none leading-snug text-gray-600 dark:text-gray-300">
         {{ $v.description | markdownify }}
       </div>
 
+      {{ with $v.warnings }}
+      <div class="mt-3 border-2 rounded-md border-yellow-400 flex flex-col space-y-1.5 py-2 px-3">
+        <span>
+          {{ partial "heading.html" (dict "text" "Warning" "level" 4 "toc_hide" true) }}
+        </span>
+
+        {{ range . }}
+        <div class="flex space-x-5 items-center">
+          <div class="flex-shrink-0">
+            {{/* Heroicon: outline/exclamation-circle */}}
+            <svg xmlns="http://www.w3.org/2000/svg" class="text-yellow-500 h-5 w-5" fill="none" viewBox="0 0 24 24"
+              stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+
+          <div class="prose dark:prose-dark max-w-none leading-snug">
+            {{ . | markdownify }}
+          </div>
+        </div>
+        {{ end }}
+      </div>
+      {{ end }}
+
       {{ range $k, $v := $v.type }}
+      {{ if eq $k "condition" }}
+      {{ template "config-condition" (dict "name" $name "condition" $v) }}
+      {{ end }}
+
       {{ if eq $k "object" }} {{/* Object (with sub-configs) */}}
       <div class="mt-4">
         {{ template "config-object" (dict "name" $name "config" $v "level" 4) }}
@@ -209,6 +264,25 @@
   </div>
   {{ end }}
 
+  {{/* Source/transform outputs */}}
+  {{ with .component_outputs }}
+    <div class="flex flex-col divide-y dark:divide-gray-700">
+      {{ range . }}
+      <div class="py-3 px-5">
+        <span class="flex justify-between items-center">
+          <span class="font-mono">
+            {{ partial "heading.html" (dict "text" .name "level" 3 "anchor" true "icon" false) }}
+          </span>
+        </span>
+
+        <div class="my-3 prose dark:prose-dark max-w-none">
+          {{ .description | markdownify }}
+        </div>
+      </div>
+      {{ end }}
+      </div>
+  {{ end }}
+
   {{/* Source/transform/sink examples */}}
   {{ with .component_examples }}
   {{ $formats := slice "toml" "yaml" "json" }}
@@ -342,26 +416,53 @@
 
           {{ range $k, $v := $v.type }}
           {{ partial "badge.html" (dict "word" $k "color" "gray") }}
-          {{ partial "badge.html" (dict "word" $v.syntax "color" "gray") }}
+
+          {{ with $v.syntax }}
+          {{ partial "badge.html" (dict "word" . "color" "gray") }}
+          {{ end }}
+
+          {{ if $v.enum }}
+          {{ partial "badge.html" (dict "word" "enum" "color" "yellow") }}
+          {{ end }}
           {{ end }}
         </span>
       </span>
 
-      <div class="my-4 prose prose-sm dark:prose-dark max-w-none">
+      <div class="mt-4 prose prose-sm dark:prose-dark max-w-none">
         {{ $v.description | markdownify }}
       </div>
 
       {{ range $k, $v := $v.type }}
       {{ with $v.default }}
-      <span>
+      <span class="mt-2 text-sm">
         Default: <code>{{ . }}</code>
       </span>
       {{ end }}
       {{ end }}
 
       {{ range $k, $v := $v.type }}
+      {{/* Enum */}}
+      {{ with $v.enum }}
+      <div class="mt-3 border rounded py-2 px-3 dark:border-gray-700">
+        <span class="flex justify-between items-center">
+          <span class="font-semibold">
+            Enum options
+          </span>
+
+          <span class="flex items-center space-x-1">
+            {{ partial "badge.html" (dict "word" $k "color" "gray") }}
+            {{ partial "badge.html" (dict "word" $v.syntax "color" "gray") }}
+          </span>
+        </span>
+
+        <div class="mt-4 prose dark:prose-dark max-w-none">
+          {{ template "enum-options-table" . }}
+        </div>
+      </div>
+      {{ end }}
+
       {{ with $v.examples }}
-      <div x-data="{ open: false }" class="border rounded py-2 px-3 dark:border-gray-700">
+      <div x-data="{ open: false }" class="mt-3 border rounded py-2 px-3 dark:border-gray-700">
         <span class="flex justify-between items-center">
           <span class="font-semibold">
             Examples
@@ -548,10 +649,11 @@
 
         {{/* Badges */}}
         <span class="flex space-x-1">
+          {{ $href := "/docs/reference/vrl/expressions/#function-call-characteristics" | relURL }}
           {{ if $infallible }}
-          {{ partial "badge.html" (dict "word" "infallible" "color" "blue") }}
+          {{ partial "badge.html" (dict "word" "infallible" "color" "blue" "inline" true "href" $href) }}
           {{ else }}
-          {{ partial "badge.html" (dict "word" "fallible" "color" "yellow") }}
+          {{ partial "badge.html" (dict "word" "fallible" "color" "yellow" "inline" true "href" $href) }}
           {{ end }}
         </span>
       </span>
@@ -703,9 +805,9 @@
   {{ with .vrl_real_world_examples }}
   <div class="flex flex-col divide-y dark:divide-gray-700">
     {{ range . }}
-    {{ $input := dict "message" .input.log.message | jsonify (dict "indent" " ") }}
+    {{ $input := dict "message" .input.log.message | jsonify (dict "indent" "  ") }}
     {{ $vrlSourceCode := highlight .source "toml" "" }}
-    {{ $output := .output | jsonify (dict "indent" " ") }}
+    {{ $output := .output | jsonify (dict "indent" "  ") }}
     {{ $outputCode := highlight $output "json" "" }}
     <div class="py-3 px-5">
       <span class="font-semibold tracking-tight">
@@ -715,7 +817,7 @@
 
       <div class="mt-3 flex flex-col space-y-2">
         {{ with .input.log }}
-        {{ $json := . | jsonify (dict "indent" " ") }}
+        {{ $json := . | jsonify (dict "indent" "  ") }}
         {{ $code := highlight $json "json" "" }}
         <span>
           Given this <a href="/docs/about/under-the-hood/architecture/data-model/log">Vector log event</a>...
@@ -724,7 +826,7 @@
         {{ end }}
 
         {{ with .input.metric }}
-        {{ $json := . | jsonify (dict "indent" " ") }}
+        {{ $json := . | jsonify (dict "indent" "  ") }}
         {{ $code := highlight $json "json" "" }}
         <span>
           Given this <a href="/docs/about/under-the-hood/architecture/data-model/metric">Vector metric event</a>...
@@ -858,7 +960,7 @@
               {{/* Example event (log or metric) */}}
               {{ with .input }}
               {{ with .log }} {{/* Log event */}}
-              {{ $json := . | jsonify (dict "indent" " ") }}
+              {{ $json := . | jsonify (dict "indent" "  ") }}
               <div>
                 <span class="tracking-tighter font-semibold text-sm">
                   Log event
@@ -869,7 +971,7 @@
               {{ end }}
 
               {{ with .metric }} {{/* Metric event */}}
-              {{ $json := . | jsonify (dict "indent" " ") }}
+              {{ $json := . | jsonify (dict "indent" "  ") }}
               <div>
                 <span class="tracking-tighter font-semibold text-sm">
                   Metric event
@@ -980,6 +1082,41 @@
         <div class="mt-3 no-prose border rounded-md flex flex-col divide-y dark:border-gray-700 dark:divide-gray-700">
           {{ range . }}
           {{ template "vrl-data-example" (dict "name" $k "ctx" .) }}
+          {{ end }}
+        </div>
+      </div>
+      {{ end }}
+
+      {{ with $v.characteristics }}
+      {{ $id := printf "%s-characteristics" ($v.title | urlize) }}
+      <div class="mt-4">
+        <span>
+          {{ partial "heading.html" (dict "text" "Characteristics" "level" 4 "id" $id) }}
+        </span>
+
+        <div class="mt-2 flex flex-col divide-y dark:divide-gray-700 border dark:border-gray-700">
+          {{ range . }}
+          <div class="py-1.5 px-3">
+            {{ partial "heading.html" (dict "text" .title "level" 5 "icon" false) }}
+
+            {{ with .description }}
+            <div class="mt-1 prose prose-sm dark:prose-dark max-w-none">
+              {{ . | markdownify }}
+            </div>
+            {{ end }}
+
+            {{ with .enum }}
+            <div class="mt-2">
+              <span>
+                Enum options
+              </span>
+
+              <div class="prose dark:prose-dark max-w-none">
+                {{ template "enum-options-table" . }}
+              </div>
+            </div>
+            {{ end }}
+          </div>
           {{ end }}
         </div>
       </div>
@@ -1441,7 +1578,7 @@
 
   <div x-show="open" class="mt-3 text-sm flex flex-col space-y-2">
     {{ range .examples }}
-    {{ $json := . | jsonify (dict "indent" " ") }}
+    {{ $json := . | jsonify (dict "indent" "  ") }}
     {{ highlight $json "json" "" }}
     {{ end }}
   </div>
@@ -1449,7 +1586,7 @@
 {{ end }}
 
 {{ define "config-array-examples" }}
-{{ $json := .examples | jsonify (dict "indent" " ") }}
+{{ $json := .examples | jsonify (dict "indent" "  ") }}
 <div x-data="{ open: false }" class="mt-2.5 border rounded py-2 px-3 dark:border-gray-700">
   <span class="flex justify-between items-center">
     <span class="text-sm">
@@ -1638,9 +1775,7 @@
           </span>
 
           <span>
-            {{ if $v.required }}
-            {{ partial "badge.html" (dict "word" "required" "color" "red") }}
-            {{ else }}
+            {{ if not $v.required }}
             {{ partial "badge.html" (dict "word" "optional" "color" "blue") }}
             {{ end }}
           </span>
@@ -1830,11 +1965,11 @@
       </span>
 
       <span class="flex space-x-1">
-        {{ if .config.common }}
+        {{ if $v.common }}
         {{ partial "badge.html" (dict "word" "common" "color" "blue") }}
         {{ end }}
 
-        {{ if .config.required }}
+        {{ if $v.required }}
         {{ partial "badge.html" (dict "word" "required" "color" "red") }}
         {{ else }}
         {{ partial "badge.html" (dict "word" "optional" "color" "blue") }}
@@ -1852,10 +1987,10 @@
         {{ end }}
 
         {{ with $v.syntax }}
-        {{ if eq . "remap_boolean_expression" }}
-        {{ partial "badge.html" (dict "word" . "color" "gray" "href" "/docs/reference/vrl#boolean-expressions") }}
-        {{ else if eq . "remap_program" }}
+        {{ if eq . "remap_program" }}
         {{ partial "badge.html" (dict "word" . "color" "gray" "href" "/docs/reference/vrl#program") }}
+        {{ else if eq . "template" }}
+        {{ partial "badge.html" (dict "word" . "color" "gray" "href" "/docs/reference/configuration/template-syntax/") }}
         {{ else }}
         {{ partial "badge.html" (dict "word" . "color" "gray") }}
         {{ end }}
@@ -1872,6 +2007,14 @@
       {{ $v.description | markdownify }}
     </div>
 
+    {{ if eq $v.type.string.syntax "template" }}
+    <div class="mt-4 text-sm">
+      <strong>Note</strong>: This parameter supports Vector's
+      <a href="/docs/reference/configuration/template-syntax">template syntax</a>, which enables you to use
+      dynamic per-event values.
+    </div>
+    {{ end }}
+
     {{ with $v.relevant_when }}
     <div class="mt-2">
       <span>
@@ -1885,6 +2028,10 @@
     <div class="mt-4">
       {{ template "config-object" (dict "name" $name "config" $v "level" $innerLevel) }}
     </div>
+    {{ end }}
+
+    {{ if eq $k "condition" }}
+    {{ template "config-condition" (dict "name" "*" "condition" $v) }}
     {{ end }}
 
     {{ with $v.enum }}
@@ -1916,7 +2063,7 @@
 
 {{ define "code" }}
 {{ if reflect.IsMap . }} {{/* If a map or array, highlight as JSON */}}
-{{ $json := . | jsonify (dict "indent" " ") }}
+{{ $json := . | jsonify (dict "indent" "  ") }}
 {{ highlight $json "json" "" }}
 {{ else if reflect.IsSlice . }}
 {{ $json := . | jsonify }}
@@ -1926,4 +2073,124 @@
 {{ else }} {{/* If just a plain old string, use Ruby syntax highlighting as a best guess */}}
 {{ highlight . "ruby" "" }}
 {{ end }}
+{{ end }}
+
+{{ define "config-condition" }}
+{{ $configName := .name }}
+<div class="mt-4">
+  <div class="border rounded dark:border-gray-700 divide-y dark:divide-gray-700">
+    {{ range $k, $v := .condition.options }}
+    {{ $id := printf "%s.%s" $configName $k }}
+    <div class="py-3 px-5">
+      <div>
+        {{ partial "heading.html" (dict "text" $id "level" 4 "mono" true) }}
+      </div>
+
+      <div class="mt-2 prose dark:prose-dark max-w-none">
+        {{ $v.description | markdownify }}
+      </div>
+    </div>
+    {{ end }}
+  </div>
+
+  <div class="my-4 ml-2">
+    <span>
+      {{ partial "heading.html" (dict "text" "Available syntaxes" "level" 3 "icon" false "toc_hide" true) }}
+    </span>
+
+    <table class="table-auto">
+      <thead>
+        <tr>
+          <th>
+            Syntax
+          </th>
+          <th>
+            Description
+          </th>
+          <th>
+            Example
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        {{ range .condition.syntaxes }}
+        <tr>
+          <td>
+            <code>
+              {{ .name }}
+            </code>
+          </td>
+          <td>
+            {{ .description | markdownify }}
+          </td>
+          <td>
+            <code>{{ .example }}</code>
+          </td>
+        </tr>
+        {{ end }}
+      </tbody>
+    </table>
+
+    <div class="py-3 px-5 border rounded-md border-green-500">
+      <span>
+        {{ partial "heading.html" (dict "text" .condition.shorthand_explainer.title "level" 3 "icon" false "toc_hide" true) }}
+      </span>
+
+      <div class="mt-2 prose dark:prose-dark max-w-none">
+        {{ .condition.shorthand_explainer.description | markdownify }}
+      </div>
+    </div>
+
+    <div class="mt-4">
+      <span>
+        {{ partial "heading.html" (dict "text" "Condition config examples" "level" 3) }}
+      </span>
+
+      <div class="mt-2 flex flex-col space-y-2">
+        {{ range .condition.condition_examples }}
+        {{ $name := .name }}
+        {{ $example := .example }}
+        {{ $vrlOnly := .vrl_only }}
+        <div class="flex flex-col space-y-2">
+          <span>
+            {{ partial "heading.html" (dict "text" .title "level" 4) }}
+          </span>
+
+          {{ $formats := slice "toml" "yaml" "json" }}
+          <div class="flex space-x-2">
+            {{ range $formats }}
+            <button @click="$store.global.setFormat('{{ . }}')"
+              :class="{ 'text-secondary dark:text-primary': $store.global.isFormat('{{ . }}') }" class="font-semibold">
+              {{ . | upper }}
+            </button>
+            {{ end }}
+          </div>
+
+          {{ range $formats }}
+          {{ $code := "" }}
+          {{ $shorthand := "" }}
+          {{ if eq . "toml" }}
+          {{ $code = printf "%s = { type = \"%s\", source = \"%s\" }" $configName $name $example }}
+          {{ $shorthand = printf "%s = \"%s\"" $configName $example }}
+          {{ else if eq . "yaml" }}
+          {{ $code = printf "%s:\n  type: \"%s\"\n  source: \"%s\"" $configName $name $example }}
+          {{ $shorthand = printf "%s: \"%s\"" $configName $example }}
+          {{ else if eq . "json" }}
+          {{ $code = printf "\"%s\": {\n  \"type\": \"%s\",\n  \"source\": \"%s\"\n}" $configName $name $example }}
+          {{ $shorthand = printf "\"%s\": \"%s\"" $configName $example }}
+          {{ end }}
+          <div x-show="$store.global.isFormat('{{ . }}')" class="mt-2">
+            {{ if $vrlOnly }}
+            {{ highlight $shorthand . "" }}
+            {{ else }}
+            {{ highlight $code . "" }}
+            {{ end }}
+          </div>
+          {{ end }}
+        </div>
+        {{ end }}
+      </div>
+    </div>
+  </div>
+</div>
 {{ end }}

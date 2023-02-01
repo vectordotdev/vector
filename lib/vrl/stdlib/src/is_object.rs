@@ -38,13 +38,13 @@ impl Function for IsObject {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
-        mut arguments: ArgumentList,
+        _state: &state::TypeState,
+        _ctx: &mut FunctionCompileContext,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
 
-        Ok(Box::new(IsObjectFn { value }))
+        Ok(IsObjectFn { value }.as_expr())
     }
 }
 
@@ -53,13 +53,13 @@ struct IsObjectFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for IsObjectFn {
+impl FunctionExpression for IsObjectFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         self.value.resolve(ctx).map(|v| value!(v.is_object()))
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new().infallible().boolean()
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
+        TypeDef::boolean().infallible()
     }
 }
 
@@ -73,13 +73,13 @@ mod tests {
         bytes {
             args: func_args![value: value!("foobar")],
             want: Ok(value!(false)),
-            tdef: TypeDef::new().infallible().boolean(),
+            tdef: TypeDef::boolean().infallible(),
         }
 
         object {
             args: func_args![value: value!({"foo": "bar"})],
             want: Ok(value!(true)),
-            tdef: TypeDef::new().infallible().boolean(),
+            tdef: TypeDef::boolean().infallible(),
         }
     ];
 }

@@ -1,5 +1,6 @@
-use crate::Result;
 use log::info;
+
+use crate::Result;
 
 pub async fn run_command(mut command: tokio::process::Command) -> Result<()> {
     info!("Running command `{:?}`", command);

@@ -1,41 +1,64 @@
+#![allow(clippy::print_stdout)] // tests
+#![allow(clippy::print_stderr)] // tests
+
 mod test_enrichment;
 
+use std::{str::FromStr, time::Instant};
+
+use ::value::Value;
 use ansi_term::Colour;
 use chrono::{DateTime, SecondsFormat, Utc};
 use chrono_tz::Tz;
+use clap::Parser;
 use glob::glob;
-use shared::TimeZone;
-use std::str::FromStr;
-use structopt::StructOpt;
-use vrl::{diagnostic::Formatter, state, Runtime, Terminate, Value};
-
+use value::Secrets;
+use vector_common::TimeZone;
+use vrl::{
+    diagnostic::Formatter,
+    prelude::{BTreeMap, VrlValueConvert},
+    state, CompilationResult, CompileConfig, Runtime, SecretTarget, TargetValueRef, Terminate,
+    VrlRuntime,
+};
 use vrl_tests::{docs, Test};
 
-#[derive(Debug, StructOpt)]
-#[structopt(name = "VRL Tests", about = "Vector Remap Language Tests")]
+#[cfg(not(target_env = "msvc"))]
+#[global_allocator]
+static ALLOC: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
+
+#[derive(Parser, Debug)]
+#[clap(name = "VRL Tests", about = "Vector Remap Language Tests")]
 pub struct Cmd {
-    #[structopt(short, long)]
+    #[clap(short, long)]
     pattern: Option<String>,
 
-    #[structopt(short, long)]
+    #[clap(short, long)]
     fail_early: bool,
 
-    #[structopt(short, long)]
+    #[clap(short, long)]
     verbose: bool,
 
-    #[structopt(short, long)]
+    #[clap(short, long)]
     no_diff: bool,
-
-    #[structopt(long)]
-    skip_functions: bool,
 
     /// When enabled, any log output at the INFO or above level is printed
     /// during the test run.
-    #[structopt(short, long)]
+    #[clap(short, long)]
     logging: bool,
 
-    #[structopt(short = "tz", long)]
+    /// When enabled, show run duration for each individual test.
+    #[clap(short, long)]
+    timings: bool,
+
+    #[clap(short = 'z', long)]
     timezone: Option<String>,
+
+    /// Should we use the VM to evaluate the VRL
+    #[clap(short, long = "runtime", default_value_t)]
+    runtime: VrlRuntime,
+
+    /// Ignore the Cue tests (to speed up run)
+    #[clap(long)]
+    ignore_cue: bool,
 }
 
 impl Cmd {
@@ -48,7 +71,7 @@ impl Cmd {
     }
 }
 
-fn should_run(name: &str, pat: &Option<String>) -> bool {
+fn should_run(name: &str, pat: &Option<String>, _runtime: VrlRuntime) -> bool {
     if name == "tests/example.vrl" {
         return false;
     }
@@ -63,7 +86,7 @@ fn should_run(name: &str, pat: &Option<String>) -> bool {
 }
 
 fn main() {
-    let cmd = Cmd::from_args();
+    let cmd = Cmd::parse();
 
     if cmd.logging {
         tracing_subscriber::fmt::init();
@@ -85,6 +108,23 @@ fn main() {
                 .into_iter()
                 .chain(enrichment::vrl_functions())
                 .for_each(|function| {
+                    if let Some(closure) = function.closure() {
+                        closure.inputs.iter().for_each(|input| {
+                            let test = Test::from_example(
+                                format!("{} (closure)", function.identifier()),
+                                &input.example,
+                            );
+
+                            if let Some(pat) = &cmd.pattern {
+                                if !format!("{}/{}", test.category, test.name).contains(pat) {
+                                    return;
+                                }
+                            }
+
+                            tests.push(test);
+                        });
+                    }
+
                     function.examples().iter().for_each(|example| {
                         let test = Test::from_example(function.identifier(), example);
 
@@ -100,8 +140,14 @@ fn main() {
 
             tests.into_iter()
         })
-        .chain(docs::tests().into_iter())
-        .filter(|test| should_run(&format!("{}/{}", test.category, test.name), &cmd.pattern))
+        .chain(docs::tests(cmd.ignore_cue).into_iter())
+        .filter(|test| {
+            should_run(
+                &format!("{}/{}", test.category, test.name),
+                &cmd.pattern,
+                cmd.runtime,
+            )
+        })
         .collect::<Vec<_>>();
 
     for mut test in tests {
@@ -117,31 +163,69 @@ fn main() {
             continue;
         }
 
-        let dots = 60 - test.name.len();
-        print!(
-            "  {}{}",
-            test.name,
-            Colour::Fixed(240).paint(".".repeat(dots))
-        );
+        let mut name = test.name.clone();
+        name.truncate(58);
+
+        let dots = if name.len() >= 60 { 0 } else { 60 - name.len() };
+
+        print!("  {}{}", name, Colour::Fixed(240).paint(".".repeat(dots)));
 
         if test.skip {
             println!("{}", Colour::Yellow.bold().paint("SKIPPED"));
         }
 
         let state = state::Runtime::default();
-        let mut runtime = Runtime::new(state);
+        let runtime = Runtime::new(state);
         let mut functions = stdlib::all();
         functions.append(&mut enrichment::vrl_functions());
-        let test_enrichment = Box::new(test_enrichment::test_enrichment_table());
-        let program = vrl::compile(&test.source, &functions, Some(test_enrichment.clone()));
-        test_enrichment.finish_load();
+        functions.append(&mut vector_vrl_functions::vrl_functions());
+        let test_enrichment = test_enrichment::test_enrichment_table();
+
+        let external_env = vrl::state::ExternalEnv::default();
+        let mut config = CompileConfig::default();
+        config.set_custom(test_enrichment.clone());
+
+        // Set some read-only paths that can be tested
+        for (path, recursive) in &test.read_only_paths {
+            config.set_read_only_path(path.clone(), *recursive);
+        }
+
+        let compile_start = Instant::now();
+        let result = vrl::compile_with_external(&test.source, &functions, &external_env, config);
+        let compile_end = compile_start.elapsed();
 
         let want = test.result.clone();
         let timezone = cmd.timezone();
 
-        match program {
-            Ok(program) => {
-                let result = runtime.resolve(&mut test.object, &program, &timezone);
+        let compile_timing_fmt = cmd
+            .timings
+            .then(|| format!("comp: {:>9.3?}", compile_end))
+            .unwrap_or_default();
+
+        match result {
+            Ok(CompilationResult {
+                program,
+                warnings,
+                config: _,
+            }) if warnings.is_empty() => {
+                let run_start = Instant::now();
+                let result = run_vrl(
+                    runtime,
+                    program,
+                    &mut test,
+                    timezone,
+                    cmd.runtime,
+                    test_enrichment,
+                );
+                let run_end = run_start.elapsed();
+
+                let timings_fmt = cmd
+                    .timings
+                    .then(|| format!(" ({}, run: {:>9.3?})", compile_timing_fmt, run_end))
+                    .unwrap_or_default();
+
+                let timings_color = if run_end.as_millis() > 10 { 1 } else { 245 };
+                let timings = Colour::Fixed(timings_color).paint(timings_fmt);
 
                 match result {
                     Ok(got) => {
@@ -174,11 +258,10 @@ fn main() {
                                     }
                                 }
                             };
-
                             if got == want {
-                                println!("{}", Colour::Green.bold().paint("OK"));
+                                print!("{}{}", Colour::Green.bold().paint("OK"), timings,);
                             } else {
-                                println!("{} (expectation)", Colour::Red.bold().paint("FAILED"));
+                                print!("{} (expectation)", Colour::Red.bold().paint("FAILED"));
                                 failed_count += 1;
 
                                 if !cmd.no_diff {
@@ -191,6 +274,8 @@ fn main() {
 
                                 failed = true;
                             }
+
+                            println!();
                         }
 
                         if cmd.verbose {
@@ -210,7 +295,7 @@ fn main() {
                             if (test.result_approx && compare_partial_diagnostic(&got, &want))
                                 || got == want
                             {
-                                println!("{}", Colour::Green.bold().paint("OK"));
+                                println!("{}{}", Colour::Green.bold().paint("OK"), timings);
                             } else if matches!(err, Terminate::Abort { .. }) {
                                 let want =
                                     match serde_json::from_str::<'_, serde_json::Value>(&want) {
@@ -223,7 +308,7 @@ fn main() {
 
                                 let got = vrl_value_to_json_value(test.object.clone());
                                 if got == want {
-                                    println!("{} (abort)", Colour::Green.bold().paint("OK"));
+                                    println!("{}{}", Colour::Green.bold().paint("OK"), timings);
                                 } else {
                                     println!("{} (abort)", Colour::Red.bold().paint("FAILED"));
                                     failed_count += 1;
@@ -260,7 +345,12 @@ fn main() {
                     }
                 }
             }
-            Err(diagnostics) => {
+            Ok(CompilationResult {
+                program: _,
+                warnings: diagnostics,
+                config: _,
+            })
+            | Err(diagnostics) => {
                 let mut failed = false;
                 let mut formatter = Formatter::new(&test.source, diagnostics);
                 if !test.skip {
@@ -270,7 +360,13 @@ fn main() {
                     if (test.result_approx && compare_partial_diagnostic(&got, &want))
                         || got == want
                     {
-                        println!("{}", Colour::Green.bold().paint("OK"));
+                        let timings_fmt = cmd
+                            .timings
+                            .then(|| format!(" ({})", compile_timing_fmt))
+                            .unwrap_or_default();
+                        let timings = Colour::Fixed(245).paint(timings_fmt);
+
+                        println!("{}{}", Colour::Green.bold().paint("OK"), timings);
                     } else {
                         println!("{} (compilation)", Colour::Red.bold().paint("FAILED"));
                         failed_count += 1;
@@ -299,6 +395,34 @@ fn main() {
     print_result(failed_count)
 }
 
+#[allow(clippy::too_many_arguments)]
+fn run_vrl(
+    mut runtime: Runtime,
+    program: vrl::Program,
+    test: &mut Test,
+    timezone: TimeZone,
+    vrl_runtime: VrlRuntime,
+    test_enrichment: enrichment::TableRegistry,
+) -> Result<Value, Terminate> {
+    let mut metadata = Value::from(BTreeMap::new());
+    let mut target = TargetValueRef {
+        value: &mut test.object,
+        metadata: &mut metadata,
+        secrets: &mut Secrets::new(),
+    };
+
+    // Insert a dummy secret for examples to use
+    target.insert_secret("my_secret", "secret value");
+    target.insert_secret("datadog_api_key", "secret value");
+
+    match vrl_runtime {
+        VrlRuntime::Ast => {
+            test_enrichment.finish_load();
+            runtime.resolve(&mut target, &program, &timezone)
+        }
+    }
+}
+
 fn compare_partial_diagnostic(got: &str, want: &str) -> bool {
     got.lines()
         .filter(|line| line.trim().starts_with("error[E"))
@@ -307,7 +431,7 @@ fn compare_partial_diagnostic(got: &str, want: &str) -> bool {
 }
 
 fn print_result(failed_count: usize) {
-    let code = if failed_count > 0 { 1 } else { 0 };
+    let code = i32::from(failed_count > 0);
 
     println!("\n");
 

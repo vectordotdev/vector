@@ -25,16 +25,6 @@ components: transforms: lua: {
 	}
 
 	support: {
-		targets: {
-			"aarch64-unknown-linux-gnu":      true
-			"aarch64-unknown-linux-musl":     true
-			"armv7-unknown-linux-gnueabihf":  true
-			"armv7-unknown-linux-musleabihf": true
-			"x86_64-apple-darwin":            true
-			"x86_64-pc-windows-msv":          true
-			"x86_64-unknown-linux-gnu":       true
-			"x86_64-unknown-linux-musl":      true
-		}
 		requirements: []
 		warnings: [
 			"""
@@ -48,176 +38,7 @@ components: transforms: lua: {
 		notices: []
 	}
 
-	configuration: {
-		hooks: {
-			description: "Configures hooks handlers."
-			required:    true
-			warnings: []
-			type: object: {
-				examples: []
-				options: {
-					init: {
-						common:      false
-						description: "A function which is called when the first event comes, before calling `hooks.process`"
-						required:    false
-						warnings: []
-						type: string: {
-							default: null
-							examples: [
-								"""
-				                function (emit)
-				                	-- Custom Lua code here
-				                end
-				                """,
-								"init",
-							]
-							syntax: "literal"
-						}
-					}
-					process: {
-						description: "A function which is called for each incoming event. It can produce new events using `emit` function."
-						required:    true
-						warnings: []
-						type: string: {
-							examples: [
-								"""
-				                function (event, emit)
-				                	event.log.field = "value" -- set value of a field
-				                	event.log.another_field = nil -- remove field
-				                	event.log.first, event.log.second = nil, event.log.first -- rename field
-				                	-- Very important! Emit the processed event.
-				                	emit(event)
-				                end
-				                """,
-								"process",
-							]
-							syntax: "literal"
-						}
-					}
-					shutdown: {
-						common:      false
-						description: "A function which is called when Vector is stopped. It can produce new events using `emit` function."
-						required:    false
-						warnings: []
-						type: string: {
-							default: null
-							examples: [
-								"""
-				                function (emit)
-				                	-- Custom Lua code here
-				                end
-				                """,
-								"shutdown",
-							]
-							syntax: "literal"
-						}
-					}
-				}
-			}
-		}
-		search_dirs: {
-			common:      false
-			description: "A list of directories to search when loading a Lua file via the `require` function. If not specified, the modules are looked up in the directories of Vector's configs."
-			required:    false
-			warnings: []
-			type: array: {
-				default: null
-				items: type: string: {
-					examples: ["/etc/vector/lua"]
-					syntax: "literal"
-				}
-			}
-		}
-		source: {
-			common:      false
-			description: "The source which is evaluated when the transform is created."
-			required:    false
-			warnings: []
-			type: string: {
-				default: null
-				examples: [
-					"""
-						function init()
-							count = 0
-						end
-
-						function process()
-							count = count + 1
-						end
-
-						function timer_handler(emit)
-							emit(make_counter(counter))
-							counter = 0
-						end
-
-						function shutdown(emit)
-							emit(make_counter(counter))
-						end
-
-						function make_counter(value)
-							return metric = {
-								name = "event_counter",
-								kind = "incremental",
-								timestamp = os.date("!*t"),
-								counter = {
-									value = value
-									syntax: "literal"
-								}
-						 	}
-						end
-						""",
-					"""
-						-- external file with hooks and timers defined
-						require('custom_module')
-						""",
-				]
-				syntax: "literal"
-			}
-		}
-		timers: {
-			common:      false
-			description: "Configures timers which are executed periodically at given interval."
-			required:    false
-			warnings: []
-			type: array: {
-				default: null
-				items: type: object: {
-					options: {
-						handler: {
-							description: "Defines a handler function which is executed periodically at `interval_seconds`. It can produce new events using `emit` function."
-							required:    true
-							warnings: []
-							type: string: {
-								examples: ["timer_handler"]
-								syntax: "literal"
-							}
-						}
-						interval_seconds: {
-							description: "Defines the interval at which the timer handler would be executed."
-							required:    true
-							warnings: []
-							type: uint: {
-								examples: [1, 10, 30]
-								unit: "seconds"
-							}
-						}
-					}
-				}
-			}
-		}
-		version: {
-			description: "Transform API version. Specifying this version ensures that Vector does not break backward compatibility."
-			required:    true
-			warnings: []
-			type: string: {
-				enum: {
-					"1": "Lua transform API version 1"
-					"2": "Lua transform API version 2"
-				}
-				syntax: "literal"
-			}
-		}
-	}
+	configuration: base.components.transforms.lua.configuration
 
 	input: {
 		logs: true
@@ -229,6 +50,7 @@ components: transforms: lua: {
 			set:          true
 			summary:      true
 		}
+		traces: false
 	}
 
 	examples: [
@@ -346,31 +168,31 @@ components: transforms: lua: {
 			configuration: {
 				version: "2"
 				hooks: {
-					source: """
-						  timestamp_pattern = "(%d%d%d%d)[-](%d%d)[-](%d%d) (%d%d):(%d%d):(%d%d).?(%d*)"
-						  function parse_timestamp(str)
-							local year, month, day, hour, min, sec, millis = string.match(str, timestamp_pattern)
-							local ms = 0
-							if millis and millis ~= "" then
-								ms = tonumber(millis)
-							end
-							return {
-								year    = tonumber(year),
-								month   = tonumber(month),
-								day     = tonumber(day),
-								hour    = tonumber(hour),
-								min     = tonumber(min),
-								sec     = tonumber(sec),
-								nanosec = ms * 1000000
-							}
-						  end
-						  function process(event, emit)
-							event.log.timestamp = parse_timestamp(event.log.timestamp_string)
-							emit(event)
-						  end
-						"""
 					process: "process"
 				}
+				source: """
+					  timestamp_pattern = "(%d%d%d%d)[-](%d%d)[-](%d%d) (%d%d):(%d%d):(%d%d).?(%d*)"
+					  function parse_timestamp(str)
+						local year, month, day, hour, min, sec, millis = string.match(str, timestamp_pattern)
+						local ms = 0
+						if millis and millis ~= "" then
+							ms = tonumber(millis)
+						end
+						return {
+							year    = tonumber(year),
+							month   = tonumber(month),
+							day     = tonumber(day),
+							hour    = tonumber(hour),
+							min     = tonumber(min),
+							sec     = tonumber(sec),
+							nanosec = ms * 1000000
+						}
+					  end
+					  function process(event, emit)
+						event.log.timestamp = parse_timestamp(event.log.timestamp_string)
+						emit(event)
+					  end
+					"""
 			}
 			input: log: {
 				timestamp_string: "2020-04-07 06:26:02.643"

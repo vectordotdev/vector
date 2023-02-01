@@ -21,7 +21,7 @@
       </span>
     </div>
 
-    <div class="">
+    <div class="w-min">
       {{/* Targets (ARM, x86_64, etc.) */}}
       <div class="flex space-x-1">
         {{ range .options }}
@@ -54,7 +54,7 @@
 {{ $version = cond (eq $version "nightly") "nightly/latest" $version }}
 {{ $link := printf "https://packages.timber.io/vector/%s" $version }}
 <div class="mt-8">
-  <a href="{{ $link }}" class="text-sm text-gray-500 hover:text-dark dark:text-gray-300" target="_blank">
+  <a href="{{ $link }}" class="text-sm dark:text-gray-300 hover:text-primary-dark dark:hover:text-secondary dark:text-primary text-secondary" rel="noopener" target="_blank">
     browse all files...
   </a>
 </div>

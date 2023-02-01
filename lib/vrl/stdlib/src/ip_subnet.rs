@@ -1,11 +1,44 @@
-use lazy_static::lazy_static;
-use regex::Regex;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+
+use ::value::Value;
+use once_cell::sync::Lazy;
+use regex::Regex;
 use vrl::prelude::*;
 
-lazy_static! {
-    static ref RE: Regex = Regex::new(r"/(?P<subnet>\d*)").unwrap();
+fn ip_subnet(value: Value, mask: Value) -> Resolved {
+    let value: IpAddr = value
+        .try_bytes_utf8_lossy()?
+        .parse()
+        .map_err(|err| format!("unable to parse IP address: {err}"))?;
+    let mask = mask.try_bytes_utf8_lossy()?;
+    let mask = if mask.starts_with('/') {
+        // The parameter is a subnet.
+        let subnet = parse_subnet(&mask)?;
+        match value {
+            IpAddr::V4(_) => {
+                if subnet > 32 {
+                    return Err("subnet cannot be greater than 32 for ipv4 addresses".into());
+                }
+
+                ipv4_mask(subnet)
+            }
+            IpAddr::V6(_) => {
+                if subnet > 128 {
+                    return Err("subnet cannot be greater than 128 for ipv6 addresses".into());
+                }
+
+                ipv6_mask(subnet)
+            }
+        }
+    } else {
+        // The parameter is a mask.
+        mask.parse()
+            .map_err(|err| format!("unable to parse mask: {err}"))?
+    };
+    Ok(mask_ips(value, mask)?.to_string().into())
 }
+
+static RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"/(?P<subnet>\d*)").unwrap());
 
 #[derive(Clone, Copy, Debug)]
 pub struct IpSubnet;
@@ -40,14 +73,14 @@ impl Function for IpSubnet {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
-        mut arguments: ArgumentList,
+        _state: &state::TypeState,
+        _ctx: &mut FunctionCompileContext,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
         let subnet = arguments.required("subnet");
 
-        Ok(Box::new(IpSubnetFn { value, subnet }))
+        Ok(IpSubnetFn { value, subnet }.as_expr())
     }
 }
 
@@ -57,48 +90,16 @@ struct IpSubnetFn {
     subnet: Box<dyn Expression>,
 }
 
-impl Expression for IpSubnetFn {
+impl FunctionExpression for IpSubnetFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let value: IpAddr = self
-            .value
-            .resolve(ctx)?
-            .try_bytes_utf8_lossy()?
-            .parse()
-            .map_err(|err| format!("unable to parse IP address: {}", err))?;
-
+        let value = self.value.resolve(ctx)?;
         let mask = self.subnet.resolve(ctx)?;
-        let mask = mask.try_bytes_utf8_lossy()?;
 
-        let mask = if mask.starts_with('/') {
-            // The parameter is a subnet.
-            let subnet = parse_subnet(&mask)?;
-            match value {
-                IpAddr::V4(_) => {
-                    if subnet > 32 {
-                        return Err("subnet cannot be greater than 32 for ipv4 addresses".into());
-                    }
-
-                    ipv4_mask(subnet)
-                }
-                IpAddr::V6(_) => {
-                    if subnet > 128 {
-                        return Err("subnet cannot be greater than 128 for ipv6 addresses".into());
-                    }
-
-                    ipv6_mask(subnet)
-                }
-            }
-        } else {
-            // The parameter is a mask.
-            mask.parse()
-                .map_err(|err| format!("unable to parse mask: {}", err))?
-        };
-
-        Ok(mask_ips(value, mask)?.to_string().into())
+        ip_subnet(value, mask)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new().fallible().bytes()
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
+        TypeDef::bytes().fallible()
     }
 }
 
@@ -106,7 +107,7 @@ impl Expression for IpSubnetFn {
 fn parse_subnet(subnet: &str) -> Result<u32> {
     let subnet = RE
         .captures(subnet)
-        .ok_or_else(|| format!("{} is not a valid subnet", subnet))?;
+        .ok_or_else(|| format!("{subnet} is not a valid subnet"))?;
 
     let subnet = subnet["subnet"].parse().expect("digits ensured by regex");
 
@@ -165,35 +166,35 @@ mod tests {
             args: func_args![value: "192.168.10.23",
                              subnet: "255.255.0.0"],
             want: Ok(value!("192.168.0.0")),
-            tdef: TypeDef::new().fallible().bytes(),
+            tdef: TypeDef::bytes().fallible(),
         }
 
         ipv6 {
             args: func_args![value: "2404:6800:4003:c02::64",
                              subnet: "ff00::"],
             want: Ok(value!("2400::")),
-            tdef: TypeDef::new().fallible().bytes(),
+            tdef: TypeDef::bytes().fallible(),
         }
 
         ipv4_subnet {
             args: func_args![value: "192.168.10.23",
                              subnet: "/16"],
             want: Ok(value!("192.168.0.0")),
-            tdef: TypeDef::new().fallible().bytes(),
+            tdef: TypeDef::bytes().fallible(),
         }
 
         ipv4_smaller_subnet {
             args: func_args![value: "192.168.10.23",
                              subnet: "/12"],
             want: Ok(value!("192.160.0.0")),
-            tdef: TypeDef::new().fallible().bytes(),
+            tdef: TypeDef::bytes().fallible(),
         }
 
         ipv6_subnet {
             args: func_args![value: "2404:6800:4003:c02::64",
                              subnet: "/32"],
             want: Ok(value!("2404:6800::")),
-            tdef: TypeDef::new().fallible().bytes(),
+            tdef: TypeDef::bytes().fallible(),
         }
     ];
 }

@@ -4,7 +4,7 @@
 
 {{ $default := .Params.default | urlize }}
 <div x-data="{ selected: '{{ $default }}' }" class="tabs no-prose border rounded-md py-3 px-4 shadow dark:border-gray-700">
-  <div class="flex space-x-2.5">
+  <div class="flex flex-wrap gap-2.5">
     {{ .Inner }}
   </div>
 

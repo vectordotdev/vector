@@ -1,12 +1,11 @@
 transforms:
   add_fields_nested_yml:
     inputs: []
-    type: add_fields
-    fields:
-      a.b: 123
-      x:
-        y: 456
-      x.z: 789
+    type: remap
+    source: |
+      .a.b = 123
+      .x.y = 456
+      .x.z = 789
 
 tests:
   - name: add_fields_nested_yml
@@ -17,5 +16,5 @@ tests:
     outputs:
       - extract_from: add_fields_nested_yml
         conditions:
-           - type: vrl
-             source: ".a.b == 123 && .x.y == 456 && .x.z == 789"
+          - type: vrl
+            source: ".a.b == 123 && .x.y == 456 && .x.z == 789"

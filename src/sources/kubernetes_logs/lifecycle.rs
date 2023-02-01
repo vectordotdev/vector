@@ -1,16 +1,18 @@
-use crate::shutdown::{ShutdownSignal, ShutdownSignalToken};
-use futures::{
-    channel::oneshot,
-    future::{select, BoxFuture, Either},
-    pin_mut, ready,
-    stream::FuturesUnordered,
-    FutureExt, StreamExt,
-};
 use std::{
     future::Future,
     pin::Pin,
-    task::{Context, Poll},
+    task::{ready, Context, Poll},
 };
+
+use futures::{
+    channel::oneshot,
+    future::{select, BoxFuture, Either},
+    pin_mut,
+    stream::FuturesOrdered,
+    FutureExt, StreamExt,
+};
+
+use crate::shutdown::{ShutdownSignal, ShutdownSignalToken};
 
 /// Lifecycle encapsulates logic for managing a lifecycle of multiple futures
 /// that are bounded together by a shared shutdown condition.
@@ -20,7 +22,7 @@ use std::{
 /// completing their work.
 #[derive(Debug)]
 pub struct Lifecycle<'bound> {
-    futs: FuturesUnordered<BoxFuture<'bound, ()>>,
+    futs: FuturesOrdered<BoxFuture<'bound, ()>>,
     fut_shutdowns: Vec<oneshot::Sender<()>>,
 }
 
@@ -41,7 +43,7 @@ impl<'bound> Lifecycle<'bound> {
     /// Create a new [`Lifecycle`].
     pub fn new() -> Self {
         Self {
-            futs: FuturesUnordered::new(),
+            futs: FuturesOrdered::new(),
             fut_shutdowns: Vec::new(),
         }
     }
@@ -116,7 +118,7 @@ impl<'bound, 'lc> Slot<'bound, 'lc> {
     /// shutdown via the signal passed from the corresponding
     /// [`ShutdownHandle`].
     pub fn bind(self, future: BoxFuture<'bound, ()>) {
-        self.lifecycle.futs.push(future);
+        self.lifecycle.futs.push_back(future);
         self.lifecycle.fut_shutdowns.push(self.shutdown_trigger);
     }
 }

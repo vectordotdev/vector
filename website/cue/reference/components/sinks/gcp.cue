@@ -13,7 +13,6 @@ components: sinks: [Name=string]: {
 				type: string: {
 					default: null
 					examples: ["/path/to/credentials.json"]
-					syntax: "literal"
 				}
 			}
 		}

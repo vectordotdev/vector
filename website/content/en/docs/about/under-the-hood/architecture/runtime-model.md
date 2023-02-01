@@ -7,7 +7,7 @@ tags: ["runtime", "concurrency", "state", "scheduler"]
 
 {{< svg "img/runtime-model.svg" >}}
 
-Vector's runtime is a futures-based asynchronous runtime where nodes in Vector's [DAG topology model][pipeline] roughly map to asynchonous [tasks](#tasks) that communicate via channels, all [scheduled](#scheduler) by the [Tokio][tokio] runtime.
+Vector's runtime is a futures-based asynchronous runtime where nodes in Vector's [DAG topology model][pipeline] roughly map to asynchronous [tasks](#tasks) that communicate via channels, all [scheduled](#scheduler) by the [Tokio][tokio] runtime.
 
 ## Tasks
 
@@ -23,7 +23,7 @@ Nodes in Vector's [topology][pipeline] roughly map to asynchronous tasks, with t
 
 #### Stateless function transforms
 
-Stateless function transforms are single operation transforms that do not maintain state across multiple events. For example, the [`remap` transform][remap] performs individual operations on events as they are received and immediately returns. This function-like simplificity allows them to be inlined at the source level to achieve our [concurrency model][concurrency].
+Stateless function transforms are single operation transforms that do not maintain state across multiple events. For example, the [`remap` transform][remap] performs individual operations on events as they are received and immediately returns. This function-like simplicity allows them to be inlined at the source level to achieve our [concurrency model][concurrency].
 
 #### Task transforms
 

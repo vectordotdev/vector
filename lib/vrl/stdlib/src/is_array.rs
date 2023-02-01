@@ -38,13 +38,13 @@ impl Function for IsArray {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
-        mut arguments: ArgumentList,
+        _state: &state::TypeState,
+        _ctx: &mut FunctionCompileContext,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
 
-        Ok(Box::new(IsArrayFn { value }))
+        Ok(IsArrayFn { value }.as_expr())
     }
 }
 
@@ -53,13 +53,13 @@ struct IsArrayFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for IsArrayFn {
+impl FunctionExpression for IsArrayFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         self.value.resolve(ctx).map(|v| value!(v.is_array()))
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new().infallible().boolean()
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
+        TypeDef::boolean().infallible()
     }
 }
 
@@ -73,13 +73,13 @@ mod tests {
         array {
             args: func_args![value: value!([1, 2, 3])],
             want: Ok(value!(true)),
-            tdef: TypeDef::new().infallible().boolean(),
+            tdef: TypeDef::boolean().infallible(),
         }
 
         integer {
             args: func_args![value: value!(1789)],
             want: Ok(value!(false)),
-            tdef: TypeDef::new().infallible().boolean(),
+            tdef: TypeDef::boolean().infallible(),
         }
     ];
 }

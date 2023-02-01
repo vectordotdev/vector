@@ -1,6 +1,7 @@
+use std::process::Command;
+
 use super::Result;
 use crate::util::{run_command, run_command_blocking};
-use std::process::Command;
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum CommandToBuild {

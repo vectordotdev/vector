@@ -1,104 +1,116 @@
-// ## skip check-events ##
+use metrics::counter;
 
-use crate::sources::apache_metrics;
-use metrics::{counter, histogram};
-use std::time::Instant;
+use vector_common::internal_event::{error_stage, error_type};
 use vector_core::internal_event::InternalEvent;
 
+use super::prelude::http_error_code;
+use crate::sources::apache_metrics;
+
 #[derive(Debug)]
-pub struct ApacheMetricsEventReceived<'a> {
+pub struct ApacheMetricsEventsReceived<'a> {
     pub byte_size: usize,
     pub count: usize,
-    pub uri: &'a str,
+    pub endpoint: &'a str,
 }
 
-impl<'a> InternalEvent for ApacheMetricsEventReceived<'a> {
-    fn emit_logs(&self) {
-        debug!(message = "Scraped events.", count = ?self.count);
-    }
-
-    fn emit_metrics(&self) {
+impl<'a> InternalEvent for ApacheMetricsEventsReceived<'a> {
+    fn emit(self) {
+        trace!(message = "Events received.", count = %self.count, byte_size = %self.byte_size, endpoint = %self.endpoint);
         counter!(
             "component_received_events_total", self.count as u64,
-            "uri" => self.uri.to_owned(),
+            "endpoint" => self.endpoint.to_owned(),
+        );
+        counter!(
+            "component_received_event_bytes_total", self.byte_size as u64,
+            "endpoint" => self.endpoint.to_owned(),
         );
         counter!(
             "events_in_total", self.count as u64,
-            "uri" => self.uri.to_owned(),
+            "uri" => self.endpoint.to_owned(),
         );
-        counter!(
-            "processed_bytes_total", self.byte_size as u64,
-            "uri" => self.uri.to_owned(),
-        );
-    }
-}
-
-#[derive(Debug)]
-pub struct ApacheMetricsRequestCompleted {
-    pub start: Instant,
-    pub end: Instant,
-}
-
-impl InternalEvent for ApacheMetricsRequestCompleted {
-    fn emit_logs(&self) {
-        debug!(message = "Request completed.");
-    }
-
-    fn emit_metrics(&self) {
-        counter!("requests_completed_total", 1);
-        histogram!("request_duration_seconds", self.end - self.start);
     }
 }
 
 #[derive(Debug)]
 pub struct ApacheMetricsParseError<'a> {
     pub error: apache_metrics::ParseError,
-    pub url: &'a str,
+    pub endpoint: &'a str,
 }
 
 impl InternalEvent for ApacheMetricsParseError<'_> {
-    fn emit_logs(&self) {
-        error!(message = "Parsing error.", url = %self.url, error = ?self.error);
+    fn emit(self) {
+        error!(
+            message = "Parsing error.",
+            error = ?self.error,
+            stage = error_stage::PROCESSING,
+            error_type = error_type::PARSER_FAILED,
+            endpoint = %self.endpoint,
+            internal_log_rate_limit = true,
+        );
         debug!(
             message = %format!("Parse error:\n\n{}\n\n", self.error),
-            url = %self.url,
-            internal_log_rate_secs = 10
+            endpoint = %self.endpoint,
+            internal_log_rate_limit = true
         );
-    }
-
-    fn emit_metrics(&self) {
         counter!("parse_errors_total", 1);
+        counter!(
+            "component_errors_total", 1,
+            "stage" => error_stage::PROCESSING,
+            "error_type" => error_type::PARSER_FAILED,
+            "endpoint" => self.endpoint.to_owned(),
+        );
     }
 }
 
 #[derive(Debug)]
-pub struct ApacheMetricsErrorResponse<'a> {
+pub struct ApacheMetricsResponseError<'a> {
     pub code: hyper::StatusCode,
-    pub url: &'a str,
+    pub endpoint: &'a str,
 }
 
-impl InternalEvent for ApacheMetricsErrorResponse<'_> {
-    fn emit_logs(&self) {
-        error!(message = "HTTP error response.", url = %self.url, code = %self.code);
-    }
-
-    fn emit_metrics(&self) {
+impl InternalEvent for ApacheMetricsResponseError<'_> {
+    fn emit(self) {
+        error!(
+            message = "HTTP error response.",
+            stage = error_stage::RECEIVING,
+            error_type = error_type::REQUEST_FAILED,
+            error_code = %http_error_code(self.code.as_u16()),
+            endpoint = %self.endpoint,
+            internal_log_rate_limit = true,
+        );
         counter!("http_error_response_total", 1);
+        counter!(
+            "component_errors_total", 1,
+            "stage" => error_stage::RECEIVING,
+            "error_type" => error_type::REQUEST_FAILED,
+            "error_code" => http_error_code(self.code.as_u16()),
+            "endpoint" => self.endpoint.to_owned(),
+        );
     }
 }
 
 #[derive(Debug)]
 pub struct ApacheMetricsHttpError<'a> {
     pub error: crate::Error,
-    pub url: &'a str,
+    pub endpoint: &'a str,
 }
 
 impl InternalEvent for ApacheMetricsHttpError<'_> {
-    fn emit_logs(&self) {
-        error!(message = "HTTP request processing error.", url = %self.url, error = ?self.error);
-    }
-
-    fn emit_metrics(&self) {
+    fn emit(self) {
+        error!(
+            message = "HTTP request processing error.",
+            error = ?self.error,
+            stage = error_stage::RECEIVING,
+            error_type = error_type::REQUEST_FAILED,
+            endpoint = %self.endpoint,
+            internal_log_rate_limit = true,
+        );
         counter!("http_request_errors_total", 1);
+        counter!(
+            "component_errors_total", 1,
+            "stage" => error_stage::RECEIVING,
+            "error_type" => error_type::REQUEST_FAILED,
+            "endpoint" => self.endpoint.to_owned(),
+        );
     }
 }

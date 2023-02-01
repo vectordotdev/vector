@@ -1,33 +1,82 @@
+use codecs::{
+    encoding::{Framer, FramingConfig},
+    TextSerializerConfig,
+};
+use vector_config::configurable_component;
+
 #[cfg(unix)]
 use crate::sinks::util::unix::UnixSinkConfig;
 use crate::{
-    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
-    sinks::util::{
-        encode_log, encoding::EncodingConfig, tcp::TcpSinkConfig, udp::UdpSinkConfig, Encoding,
-    },
+    codecs::{Encoder, EncodingConfig, EncodingConfigWithFraming, SinkType},
+    config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext},
+    sinks::util::{tcp::TcpSinkConfig, udp::UdpSinkConfig},
 };
-use serde::{Deserialize, Serialize};
 
-#[derive(Deserialize, Serialize, Debug)]
-// TODO: add back when serde-rs/serde#1358 is addressed
-// #[serde(deny_unknown_fields)]
+/// Configuration for the `socket` sink.
+#[configurable_component(sink("socket"))]
+#[derive(Clone, Debug)]
 pub struct SocketSinkConfig {
     #[serde(flatten)]
     pub mode: Mode,
-    pub encoding: EncodingConfig<Encoding>,
+
+    #[configurable(derived)]
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    pub acknowledgements: AcknowledgementsConfig,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// Socket mode.
+#[configurable_component]
+#[derive(Clone, Debug)]
 #[serde(tag = "mode", rename_all = "snake_case")]
+#[configurable(metadata(docs::enum_tag_description = "The type of socket to use."))]
 pub enum Mode {
-    Tcp(TcpSinkConfig),
-    Udp(UdpSinkConfig),
+    /// Send over TCP.
+    Tcp(TcpMode),
+
+    /// Send over UDP.
+    Udp(UdpMode),
+
+    /// Send over a Unix domain socket (UDS).
     #[cfg(unix)]
-    Unix(UnixSinkConfig),
+    Unix(UnixMode),
 }
 
-inventory::submit! {
-    SinkDescription::new::<SocketSinkConfig>("socket")
+/// TCP configuration.
+#[configurable_component]
+#[derive(Clone, Debug)]
+pub struct TcpMode {
+    #[serde(flatten)]
+    config: TcpSinkConfig,
+
+    #[serde(flatten)]
+    encoding: EncodingConfigWithFraming,
+}
+
+/// UDP configuration.
+#[configurable_component]
+#[derive(Clone, Debug)]
+pub struct UdpMode {
+    #[serde(flatten)]
+    config: UdpSinkConfig,
+
+    #[configurable(derived)]
+    encoding: EncodingConfig,
+}
+
+/// Unix Domain Socket configuration.
+#[cfg(unix)]
+#[configurable_component]
+#[derive(Clone, Debug)]
+pub struct UnixMode {
+    #[serde(flatten)]
+    config: UnixSinkConfig,
+
+    #[serde(flatten)]
+    encoding: EncodingConfigWithFraming,
 }
 
 impl GenerateConfig for SocketSinkConfig {
@@ -42,64 +91,98 @@ impl GenerateConfig for SocketSinkConfig {
 }
 
 impl SocketSinkConfig {
-    pub const fn new(mode: Mode, encoding: EncodingConfig<Encoding>) -> Self {
-        SocketSinkConfig { mode, encoding }
+    pub const fn new(mode: Mode, acknowledgements: AcknowledgementsConfig) -> Self {
+        SocketSinkConfig {
+            mode,
+            acknowledgements,
+        }
     }
 
-    pub fn make_basic_tcp_config(address: String) -> Self {
+    pub fn make_basic_tcp_config(
+        address: String,
+        acknowledgements: AcknowledgementsConfig,
+    ) -> Self {
         Self::new(
-            Mode::Tcp(TcpSinkConfig::from_address(address)),
-            EncodingConfig::from(Encoding::Text),
+            Mode::Tcp(TcpMode {
+                config: TcpSinkConfig::from_address(address),
+                encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
+            }),
+            acknowledgements,
         )
     }
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "socket")]
 impl SinkConfig for SocketSinkConfig {
     async fn build(
         &self,
-        cx: SinkContext,
+        _cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
-        let encoding = self.encoding.clone();
-        let encode_event = move |event| encode_log(event, &encoding);
         match &self.mode {
-            Mode::Tcp(config) => config.build(cx, encode_event),
-            Mode::Udp(config) => config.build(cx, encode_event),
+            Mode::Tcp(TcpMode { config, encoding }) => {
+                let transformer = encoding.transformer();
+                let (framer, serializer) = encoding.build(SinkType::StreamBased)?;
+                let encoder = Encoder::<Framer>::new(framer, serializer);
+                config.build(transformer, encoder)
+            }
+            Mode::Udp(UdpMode { config, encoding }) => {
+                let transformer = encoding.transformer();
+                let serializer = encoding.build()?;
+                let encoder = Encoder::<()>::new(serializer);
+                config.build(transformer, encoder)
+            }
             #[cfg(unix)]
-            Mode::Unix(config) => config.build(cx, encode_event),
+            Mode::Unix(UnixMode { config, encoding }) => {
+                let transformer = encoding.transformer();
+                let (framer, serializer) = encoding.build(SinkType::StreamBased)?;
+                let encoder = Encoder::<Framer>::new(framer, serializer);
+                config.build(transformer, encoder)
+            }
         }
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        let encoder_input_type = match &self.mode {
+            Mode::Tcp(TcpMode { encoding, .. }) => encoding.config().1.input_type(),
+            Mode::Udp(UdpMode { encoding, .. }) => encoding.config().input_type(),
+            #[cfg(unix)]
+            Mode::Unix(UnixMode { encoding, .. }) => encoding.config().1.input_type(),
+        };
+        Input::new(encoder_input_type & DataType::Log)
     }
 
-    fn sink_type(&self) -> &'static str {
-        "socket"
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
     }
 }
 
 #[cfg(test)]
 mod test {
-    use super::*;
-    use crate::{
-        config::SinkContext,
-        event::Event,
-        test_util::{next_addr, next_addr_v6, random_lines_with_stream, trace_init, CountReceiver},
-    };
-    use futures::stream::{self, StreamExt};
-    use serde_json::Value;
     use std::{
         future::ready,
         net::{SocketAddr, UdpSocket},
     };
+
+    use codecs::JsonSerializerConfig;
+    use futures::stream::StreamExt;
+    use futures_util::stream;
+    use serde_json::Value;
     use tokio::{
         net::TcpListener,
         time::{sleep, timeout, Duration},
     };
     use tokio_stream::wrappers::TcpListenerStream;
     use tokio_util::codec::{FramedRead, LinesCodec};
+
+    use super::*;
+    use crate::{
+        config::SinkContext,
+        event::{Event, LogEvent},
+        test_util::{
+            components::{assert_sink_compliance, run_and_assert_sink_compliance, SINK_TAGS},
+            next_addr, next_addr_v6, random_lines_with_stream, trace_init, CountReceiver,
+        },
+    };
 
     #[test]
     fn generate_config() {
@@ -110,14 +193,22 @@ mod test {
         let receiver = UdpSocket::bind(addr).unwrap();
 
         let config = SocketSinkConfig {
-            mode: Mode::Udp(UdpSinkConfig::from_address(addr.to_string())),
-            encoding: Encoding::Json.into(),
+            mode: Mode::Udp(UdpMode {
+                config: UdpSinkConfig::from_address(addr.to_string()),
+                encoding: JsonSerializerConfig::default().into(),
+            }),
+            acknowledgements: Default::default(),
         };
-        let context = SinkContext::new_test();
-        let (sink, _healthcheck) = config.build(context).await.unwrap();
 
-        let event = Event::from("raw log line");
-        sink.run(stream::once(ready(event))).await.unwrap();
+        let context = SinkContext::new_test();
+        assert_sink_compliance(&SINK_TAGS, async move {
+            let (sink, _healthcheck) = config.build(context).await.unwrap();
+
+            let event = Event::Log(LogEvent::from("raw log line"));
+            sink.run(stream::once(ready(event.into()))).await
+        })
+        .await
+        .expect("Running sink failed");
 
         let mut buf = [0; 256];
         let (size, _src_addr) = receiver
@@ -152,17 +243,25 @@ mod test {
 
         let addr = next_addr();
         let config = SocketSinkConfig {
-            mode: Mode::Tcp(TcpSinkConfig::from_address(addr.to_string())),
-            encoding: Encoding::Json.into(),
+            mode: Mode::Tcp(TcpMode {
+                config: TcpSinkConfig::from_address(addr.to_string()),
+                encoding: (None::<FramingConfig>, JsonSerializerConfig::default()).into(),
+            }),
+            acknowledgements: Default::default(),
         };
-
-        let context = SinkContext::new_test();
-        let (sink, _healthcheck) = config.build(context).await.unwrap();
 
         let mut receiver = CountReceiver::receive_lines(addr);
 
         let (lines, events) = random_lines_with_stream(10, 100, None);
-        sink.run(events).await.unwrap();
+
+        assert_sink_compliance(&SINK_TAGS, async move {
+            let context = SinkContext::new_test();
+            let (sink, _healthcheck) = config.build(context).await.unwrap();
+
+            sink.run(events).await
+        })
+        .await
+        .expect("Running sink failed");
 
         // Wait for output to connect
         receiver.connected().await;
@@ -185,11 +284,8 @@ mod test {
     //
     // If this test hangs that means somewhere we are not collecting the correct
     // events.
-    #[cfg(all(feature = "sources-utils-tls", feature = "listenfd"))]
     #[tokio::test]
     async fn tcp_stream_detects_disconnect() {
-        use crate::tls::{self, MaybeTlsIncomingStream, MaybeTlsSettings, TlsConfig, TlsOptions};
-        use futures::{channel::mpsc, future, FutureExt, SinkExt, StreamExt};
         use std::{
             pin::Pin,
             sync::{
@@ -198,6 +294,8 @@ mod test {
             },
             task::Poll,
         };
+
+        use futures::{channel::mpsc, FutureExt, SinkExt, StreamExt};
         use tokio::{
             io::{AsyncRead, AsyncWriteExt, ReadBuf},
             net::TcpStream,
@@ -206,35 +304,43 @@ mod test {
         };
         use tokio_stream::wrappers::IntervalStream;
 
+        use crate::event::EventArray;
+        use crate::tls::{
+            self, MaybeTlsIncomingStream, MaybeTlsSettings, TlsConfig, TlsEnableableConfig,
+        };
+
         trace_init();
 
         let addr = next_addr();
         let config = SocketSinkConfig {
-            mode: Mode::Tcp(TcpSinkConfig::new(
-                addr.to_string(),
-                None,
-                Some(TlsConfig {
-                    enabled: Some(true),
-                    options: TlsOptions {
-                        verify_certificate: Some(false),
-                        verify_hostname: Some(false),
-                        ca_file: Some(tls::TEST_PEM_CRT_PATH.into()),
-                        ..Default::default()
-                    },
-                }),
-                None,
-            )),
-            encoding: Encoding::Text.into(),
+            mode: Mode::Tcp(TcpMode {
+                config: TcpSinkConfig::new(
+                    addr.to_string(),
+                    None,
+                    Some(TlsEnableableConfig {
+                        enabled: Some(true),
+                        options: TlsConfig {
+                            verify_certificate: Some(false),
+                            verify_hostname: Some(false),
+                            ca_file: Some(tls::TEST_PEM_CRT_PATH.into()),
+                            ..Default::default()
+                        },
+                    }),
+                    None,
+                ),
+                encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
+            }),
+            acknowledgements: Default::default(),
         };
         let context = SinkContext::new_test();
         let (sink, _healthcheck) = config.build(context).await.unwrap();
-        let (mut sender, receiver) = mpsc::channel::<Option<Event>>(0);
+        let (mut sender, receiver) = mpsc::channel::<Option<EventArray>>(0);
         let jh1 = tokio::spawn(async move {
             let stream = receiver
                 .take_while(|event| ready(event.is_some()))
                 .map(|event| event.unwrap())
                 .boxed();
-            let _ = sink.run(stream).await.unwrap();
+            run_and_assert_sink_compliance(sink, stream, &SINK_TAGS).await
         });
 
         let msg_counter = Arc::new(AtomicUsize::new(0));
@@ -245,7 +351,7 @@ mod test {
         let (close_tx, close_rx) = tokio::sync::oneshot::channel::<()>();
         let mut close_rx = Some(close_rx.map(|x| x.unwrap()));
 
-        let config = Some(TlsConfig::test_config());
+        let config = Some(TlsEnableableConfig::test_config());
 
         // Only accept two connections.
         let jh2 = tokio::spawn(async move {
@@ -262,7 +368,7 @@ mod test {
 
                     let mut stream: MaybeTlsIncomingStream<TcpStream> = connection.unwrap();
 
-                    future::poll_fn(move |cx| loop {
+                    std::future::poll_fn(move |cx| loop {
                         if let Some(fut) = close_rx.as_mut() {
                             if let Poll::Ready(()) = fut.poll_unpin(cx) {
                                 stream
@@ -297,7 +403,7 @@ mod test {
 
         let (_, mut events) = random_lines_with_stream(10, 10, None);
         while let Some(event) = events.next().await {
-            let _ = sender.send(Some(event)).await.unwrap();
+            sender.send(Some(event)).await.unwrap();
         }
 
         // Loop and check for 10 events, we should always get 10 events. Once,
@@ -319,13 +425,13 @@ mod test {
         // Send another 10 events
         let (_, mut events) = random_lines_with_stream(10, 10, None);
         while let Some(event) = events.next().await {
-            let _ = sender.send(Some(event)).await.unwrap();
+            sender.send(Some(event)).await.unwrap();
         }
 
         // Wait for server task to be complete.
-        let _ = sender.send(None).await.unwrap();
-        let _ = jh1.await.unwrap();
-        let _ = jh2.await.unwrap();
+        sender.send(None).await.unwrap();
+        jh1.await.unwrap();
+        jh2.await.unwrap();
 
         // Check that there are exactly 20 events.
         assert_eq!(msg_counter.load(Ordering::SeqCst), 20);
@@ -339,15 +445,18 @@ mod test {
 
         let addr = next_addr();
         let config = SocketSinkConfig {
-            mode: Mode::Tcp(TcpSinkConfig::from_address(addr.to_string())),
-            encoding: Encoding::Text.into(),
+            mode: Mode::Tcp(TcpMode {
+                config: TcpSinkConfig::from_address(addr.to_string()),
+                encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
+            }),
+            acknowledgements: Default::default(),
         };
 
         let context = SinkContext::new_test();
         let (sink, _healthcheck) = config.build(context).await.unwrap();
 
         let (_, events) = random_lines_with_stream(1000, 10000, None);
-        let _ = tokio::spawn(sink.run(events));
+        let sink_handle = tokio::spawn(run_and_assert_sink_compliance(sink, events, &SINK_TAGS));
 
         // First listener
         let mut count = 20usize;
@@ -383,5 +492,7 @@ mod test {
         )
         .await
         .is_ok());
+
+        sink_handle.await.unwrap();
     }
 }

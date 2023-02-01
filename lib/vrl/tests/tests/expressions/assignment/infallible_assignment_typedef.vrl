@@ -1,0 +1,3 @@
+# result: { "array": { "0": { "integer": true } }, "bytes": true }
+maybe_array = if true {null} else { [] }
+type_def({x,err = push(maybe_array, 1)})

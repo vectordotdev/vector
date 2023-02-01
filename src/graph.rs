@@ -1,60 +1,50 @@
-use crate::config;
+use std::fmt::Write as _;
 use std::path::PathBuf;
-use structopt::StructOpt;
 
-#[derive(StructOpt, Debug)]
-#[structopt(rename_all = "kebab-case")]
+use clap::Parser;
+
+use crate::config;
+
+#[derive(Parser, Debug)]
+#[command(rename_all = "kebab-case")]
 pub struct Opts {
     /// Read configuration from one or more files. Wildcard paths are supported.
     /// File format is detected from the file name.
     /// If zero files are specified the default config path
     /// `/etc/vector/vector.toml` will be targeted.
-    #[structopt(
-        name = "config",
+    #[arg(
+        id = "config",
         short,
         long,
         env = "VECTOR_CONFIG",
-        use_delimiter(true)
+        value_delimiter(',')
     )]
     paths: Vec<PathBuf>,
 
     /// Vector config files in TOML format.
-    #[structopt(name = "config-toml", long, use_delimiter(true))]
+    #[arg(id = "config-toml", long, value_delimiter(','))]
     paths_toml: Vec<PathBuf>,
 
     /// Vector config files in JSON format.
-    #[structopt(name = "config-json", long, use_delimiter(true))]
+    #[arg(id = "config-json", long, value_delimiter(','))]
     paths_json: Vec<PathBuf>,
 
     /// Vector config files in YAML format.
-    #[structopt(name = "config-yaml", long, use_delimiter(true))]
+    #[arg(id = "config-yaml", long, value_delimiter(','))]
     paths_yaml: Vec<PathBuf>,
 
     /// Read configuration from files in one or more directories.
     /// File format is detected from the file name.
     ///
     /// Files not ending in .toml, .json, .yaml, or .yml will be ignored.
-    #[structopt(
-        name = "config-dir",
-        short = "C",
+    #[arg(
+        id = "config-dir",
+        short = 'C',
         long,
         env = "VECTOR_CONFIG_DIR",
-        use_delimiter(true)
+        value_delimiter(',')
     )]
     pub config_dirs: Vec<PathBuf>,
-
-    /// Read pipeline configuration from files in one or more directories.
-    /// File format is detected from the file name.
-    ///
-    /// Files not ending in .toml, .json, .yaml, or .yml will be ignored.
-    #[structopt(
-        name = "pipeline-dir",
-        short = "P",
-        long,
-        env = "VECTOR_PIPELINE_DIR",
-        use_delimiter(true)
-    )]
-    pub pipeline_dirs: Vec<PathBuf>,
 }
 
 impl Opts {
@@ -75,16 +65,17 @@ impl Opts {
     }
 }
 
-pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
+pub(crate) fn cmd(opts: &Opts) -> exitcode::ExitCode {
     let paths = opts.paths_with_formats();
     let paths = match config::process_paths(&paths) {
         Some(paths) => paths,
         None => return exitcode::CONFIG,
     };
 
-    let config = match config::load_from_paths(&paths, &opts.pipeline_dirs) {
+    let config = match config::load_from_paths(&paths) {
         Ok(config) => config,
         Err(errs) => {
+            #[allow(clippy::print_stderr)]
             for err in errs {
                 eprintln!("{}", err);
             }
@@ -94,29 +85,52 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
 
     let mut dot = String::from("digraph {\n");
 
-    for (id, _source) in &config.sources {
-        dot += &format!("  \"{}\" [shape=trapezium]\n", id);
+    for (id, _source) in config.sources() {
+        writeln!(dot, "  \"{}\" [shape=trapezium]", id).expect("write to String never fails");
     }
 
-    for (id, transform) in &config.transforms {
-        dot += &format!("  \"{}\" [shape=diamond]\n", id);
+    for (id, transform) in config.transforms() {
+        writeln!(dot, "  \"{}\" [shape=diamond]", id).expect("write to String never fails");
 
         for input in transform.inputs.iter() {
-            dot += &format!("  \"{}\" -> \"{}\"\n", input, id);
+            if let Some(port) = &input.port {
+                writeln!(
+                    dot,
+                    "  \"{}\" -> \"{}\" [label=\"{}\"]",
+                    input.component, id, port
+                )
+                .expect("write to String never fails");
+            } else {
+                writeln!(dot, "  \"{}\" -> \"{}\"", input, id)
+                    .expect("write to String never fails");
+            }
         }
     }
 
-    for (id, sink) in &config.sinks {
-        dot += &format!("  \"{}\" [shape=invtrapezium]\n", id);
+    for (id, sink) in config.sinks() {
+        writeln!(dot, "  \"{}\" [shape=invtrapezium]", id).expect("write to String never fails");
 
         for input in &sink.inputs {
-            dot += &format!("  \"{}\" -> \"{}\"\n", input, id);
+            if let Some(port) = &input.port {
+                writeln!(
+                    dot,
+                    "  \"{}\" -> \"{}\" [label=\"{}\"]",
+                    input.component, id, port
+                )
+                .expect("write to String never fails");
+            } else {
+                writeln!(dot, "  \"{}\" -> \"{}\"", input, id)
+                    .expect("write to String never fails");
+            }
         }
     }
 
     dot += "}";
 
-    println!("{}", dot);
+    #[allow(clippy::print_stdout)]
+    {
+        println!("{}", dot);
+    }
 
     exitcode::OK
 }

@@ -1,3 +1,5 @@
+use std::convert::TryFrom;
+
 use nom::{
     bytes::complete::{tag, take_while_m_n},
     combinator::{all_consuming, map_res},
@@ -5,9 +7,8 @@ use nom::{
     sequence::{preceded, terminated, tuple},
 };
 use snafu::Snafu;
-use std::convert::TryFrom;
 
-#[derive(Debug, Snafu, PartialEq)]
+#[derive(Debug, Snafu, PartialEq, Eq)]
 pub enum ParseError {
     #[snafu(display("failed to parse NginxStubStatus, kind: `{:?}`", kind))]
     NginxStubStatusParseError { kind: ErrorKind },
@@ -26,7 +27,7 @@ pub struct NginxStubStatus {
 
 fn get_usize(input: &str) -> nom::IResult<&str, usize, nom::error::Error<&str>> {
     map_res(
-        take_while_m_n(1, 20, |c: char| c.is_digit(10)),
+        take_while_m_n(1, 20, |c: char| c.is_ascii_digit()),
         |s: &str| s.parse::<usize>(),
     )(input)
 }

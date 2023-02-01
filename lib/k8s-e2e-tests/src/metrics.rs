@@ -1,3 +1,6 @@
+#![allow(clippy::print_stderr)] // test framework
+#![allow(clippy::print_stdout)] // test framework
+
 use std::collections::HashSet;
 
 /// This helper function issues an HTTP request to the Prometheus-exposition
@@ -18,15 +21,17 @@ fn metrics_regex() -> regex::Regex {
     .expect("invalid regex")
 }
 
-/// This helper function extracts the sum of `processed_events`-ish metrics
+/// This helper function extracts the sum of `component_sent_events_total`-ish metrics
 /// across all labels.
-pub fn extract_processed_events_sum(metrics: &str) -> Result<u64, Box<dyn std::error::Error>> {
+pub fn extract_component_sent_events_total_sum(
+    metrics: &str,
+) -> Result<u64, Box<dyn std::error::Error>> {
     metrics_regex()
         .captures_iter(metrics)
         .filter_map(|captures| {
             let metric_name = &captures["name"];
             let value = &captures["value"];
-            if !metric_name.contains("processed_events") {
+            if !metric_name.contains("component_sent_events_total") {
                 return None;
             }
             Some(value.to_owned())
@@ -48,10 +53,10 @@ pub fn extract_vector_started(metrics: &str) -> bool {
 }
 
 /// This helper function performs an HTTP request to the specified URL and
-/// extracts the sum of `processed_events`-ish metrics across all labels.
-pub async fn get_processed_events(url: &str) -> Result<u64, Box<dyn std::error::Error>> {
+/// extracts the sum of `component_sent_events_total`-ish metrics across all labels.
+pub async fn get_component_sent_events_total(url: &str) -> Result<u64, Box<dyn std::error::Error>> {
     let metrics = load(url).await?;
-    extract_processed_events_sum(&metrics)
+    extract_component_sent_events_total_sum(&metrics)
 }
 
 /// This helper function performs an HTTP request to the specified URL and
@@ -66,7 +71,7 @@ pub async fn assert_vector_started(url: &str) -> Result<(), Box<dyn std::error::
 
 /// This helper function performs HTTP requests to the specified URL and
 /// waits for the presence of `vector_started`-ish metric until the deadline
-/// with even dealys between attempts.
+/// with even delays between attempts.
 pub async fn wait_for_vector_started(
     url: &str,
     next_attempt_delay: std::time::Duration,
@@ -93,18 +98,28 @@ pub async fn wait_for_vector_started(
     Ok(())
 }
 
+pub const HOST_METRICS: &[&str] = &[
+    "host_load1",
+    "host_load5",
+    "host_cpu_seconds_total",
+    "host_filesystem_total_bytes",
+];
+
+pub const SOURCE_COMPLIANCE_METRICS: &[&str] = &[
+    "vector_component_received_events_total",
+    "vector_component_received_event_bytes_total",
+    "vector_component_sent_events_total",
+    "vector_component_sent_event_bytes_total",
+];
+
 /// This helper function performs an HTTP request to the specified URL and
-/// validates the presence of the host metrics.
-pub async fn assert_host_metrics_present(url: &str) -> Result<(), Box<dyn std::error::Error>> {
+/// validates the presence of the specified metrics.
+pub async fn assert_metrics_present(
+    url: &str,
+    metrics_list: &[&str],
+) -> Result<(), Box<dyn std::error::Error>> {
     let metrics = load(url).await?;
-    let mut required_metrics: HashSet<_> = vec![
-        "host_load1",
-        "host_load5",
-        "host_cpu_seconds_total",
-        "host_filesystem_total_bytes",
-    ]
-    .into_iter()
-    .collect();
+    let mut required_metrics: HashSet<_> = HashSet::from_iter(metrics_list.iter().cloned());
     for captures in metrics_regex().captures_iter(&metrics) {
         let metric_name = &captures["name"];
         required_metrics.remove(metric_name);
@@ -120,25 +135,28 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_extract_processed_events_sum() {
+    fn test_extract_component_sent_events_total_sum() {
         let cases = vec![
             (vec![r#""#], 0),
-            (vec![r#"processed_events 123"#], 123),
-            (vec![r#"processed_events{} 123"#], 123),
-            (vec![r#"processed_events{method="POST"} 456"#], 456),
-            (vec![r#"processed_events{a="b",c="d"} 456"#], 456),
+            (vec![r#"component_sent_events_total 123"#], 123),
+            (vec![r#"component_sent_events_total{} 123"#], 123),
+            (
+                vec![r#"component_sent_events_total{method="POST"} 456"#],
+                456,
+            ),
+            (vec![r#"component_sent_events_total{a="b",c="d"} 456"#], 456),
             (
                 vec![
-                    r#"processed_events 123"#,
-                    r#"processed_events{method="POST"} 456"#,
+                    r#"component_sent_events_total 123"#,
+                    r#"component_sent_events_total{method="POST"} 456"#,
                 ],
                 123 + 456,
             ),
             (vec![r#"other{} 789"#], 0),
             (
                 vec![
-                    r#"processed_events{} 123"#,
-                    r#"processed_events{method="POST"} 456"#,
+                    r#"component_sent_events_total{} 123"#,
+                    r#"component_sent_events_total{method="POST"} 456"#,
                     r#"other{} 789"#,
                 ],
                 123 + 456,
@@ -146,28 +164,24 @@ mod tests {
             // Prefixes and suffixes
             (
                 vec![
-                    r#"processed_events 1"#,
-                    r#"processed_events_total 2"#,
-                    r#"vector_processed_events 3"#,
-                    r#"vector_processed_events_total 4"#,
+                    r#"component_sent_events_total 1"#,
+                    r#"vector_component_sent_events_total 3"#,
                 ],
-                1 + 2 + 3 + 4,
+                1 + 3,
             ),
             // Prefixes and suffixes with timestamps
             (
                 vec![
-                    r#"processed_events 1 1607985729161"#,
-                    r#"processed_events_total 2 1607985729161"#,
-                    r#"vector_processed_events 3 1607985729161"#,
-                    r#"vector_processed_events_total 4 1607985729161"#,
+                    r#"component_sent_events_total 1 1607985729161"#,
+                    r#"vector_component_sent_events_total 3 1607985729161"#,
                 ],
-                1 + 2 + 3 + 4,
+                1 + 3,
             ),
         ];
 
         for (input, expected_value) in cases {
             let input = input.join("\n");
-            let actual_value = extract_processed_events_sum(&input).unwrap();
+            let actual_value = extract_component_sent_events_total_sum(&input).unwrap();
             assert_eq!(expected_value, actual_value);
         }
     }

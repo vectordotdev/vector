@@ -1,4 +1,11 @@
+use ::value::Value;
 use vrl::prelude::*;
+
+fn match_(value: Value, pattern: Value) -> Resolved {
+    let string = value.try_bytes_utf8_lossy()?;
+    let pattern = pattern.try_regex()?;
+    Ok(pattern.is_match(&string).into())
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct Match;
@@ -40,14 +47,14 @@ impl Function for Match {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
-        mut arguments: ArgumentList,
+        _state: &state::TypeState,
+        _ctx: &mut FunctionCompileContext,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
         let pattern = arguments.required("pattern");
 
-        Ok(Box::new(MatchFn { value, pattern }))
+        Ok(MatchFn { value, pattern }.as_expr())
     }
 }
 
@@ -57,26 +64,25 @@ pub(crate) struct MatchFn {
     pattern: Box<dyn Expression>,
 }
 
-impl Expression for MatchFn {
+impl FunctionExpression for MatchFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
-        let string = value.try_bytes_utf8_lossy()?;
+        let pattern = self.pattern.resolve(ctx)?;
 
-        let pattern = self.pattern.resolve(ctx)?.try_regex()?;
-
-        Ok(pattern.is_match(&string).into())
+        match_(value, pattern)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new().infallible().boolean()
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
+        TypeDef::boolean().infallible()
     }
 }
 
 #[cfg(test)]
 #[allow(clippy::trivial_regex)]
 mod tests {
-    use super::*;
     use regex::Regex;
+
+    use super::*;
 
     test_function![
         r#match => Match;
@@ -85,14 +91,14 @@ mod tests {
             args: func_args![value: "foobar",
                              pattern: Value::Regex(Regex::new("\\s\\w+").unwrap().into())],
             want: Ok(value!(false)),
-            tdef: TypeDef::new().infallible().boolean(),
+            tdef: TypeDef::boolean().infallible(),
         }
 
         no {
             args: func_args![value: "foo 2 bar",
                              pattern: Value::Regex(Regex::new("foo \\d bar").unwrap().into())],
             want: Ok(value!(true)),
-            tdef: TypeDef::new().infallible().boolean(),
+            tdef: TypeDef::boolean().infallible(),
         }
     ];
 }

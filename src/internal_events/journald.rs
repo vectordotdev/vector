@@ -1,38 +1,124 @@
-// ## skip check-events ##
-
+use codecs::decoding::BoxedFramingError;
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
-#[derive(Debug)]
-pub struct JournaldEventReceived {
-    pub byte_size: usize,
-}
-
-impl InternalEvent for JournaldEventReceived {
-    fn emit_logs(&self) {
-        trace!(message = "Received line.", byte_size = %self.byte_size);
-    }
-
-    fn emit_metrics(&self) {
-        counter!("component_received_events_total", 1);
-        counter!("events_in_total", 1);
-        counter!("processed_bytes_total", self.byte_size as u64);
-    }
-}
+use vector_common::internal_event::{error_stage, error_type};
 
 #[derive(Debug)]
-pub struct JournaldInvalidRecord {
+pub struct JournaldInvalidRecordError {
     pub error: serde_json::Error,
     pub text: String,
 }
 
-impl InternalEvent for JournaldInvalidRecord {
-    fn emit_logs(&self) {
-        error!(message = "Invalid record from journald, discarding.", error = ?self.error, text = %self.text);
+impl InternalEvent for JournaldInvalidRecordError {
+    fn emit(self) {
+        error!(
+            message = "Invalid record from journald, discarding.",
+            error = ?self.error,
+            text = %self.text,
+            error_type = error_type::PARSER_FAILED,
+            stage = error_stage::PROCESSING,
+            internal_log_rate_limit = true,
+        );
+        counter!(
+            "component_errors_total", 1,
+            "stage" => error_stage::PROCESSING,
+            "error_type" => error_type::PARSER_FAILED,
+        );
+        counter!("invalid_record_total", 1); // deprecated
+        counter!("invalid_record_bytes_total", self.text.len() as u64); // deprecated
     }
+}
 
-    fn emit_metrics(&self) {
-        counter!("invalid_record_total", 1);
-        counter!("invalid_record_bytes_total", self.text.len() as u64);
+#[derive(Debug)]
+pub struct JournaldStartJournalctlError {
+    pub error: crate::Error,
+}
+
+impl InternalEvent for JournaldStartJournalctlError {
+    fn emit(self) {
+        error!(
+            message = "Error starting journalctl process.",
+            error = %self.error,
+            error_type = error_type::COMMAND_FAILED,
+            stage = error_stage::RECEIVING,
+            internal_log_rate_limit = true,
+        );
+        counter!(
+            "component_errors_total", 1,
+            "stage" => error_stage::RECEIVING,
+            "error_type" => error_type::COMMAND_FAILED,
+        );
+    }
+}
+
+#[derive(Debug)]
+pub struct JournaldReadError {
+    pub error: BoxedFramingError,
+}
+
+impl InternalEvent for JournaldReadError {
+    fn emit(self) {
+        error!(
+            message = "Could not read from journald.",
+            error = %self.error,
+            error_type = error_type::READER_FAILED,
+            stage = error_stage::PROCESSING,
+            internal_log_rate_limit = true,
+        );
+        counter!(
+            "component_errors_total",
+            1,
+            "stage" => error_stage::PROCESSING,
+            "error_type" => error_type::READER_FAILED,
+        );
+    }
+}
+
+#[derive(Debug)]
+pub struct JournaldCheckpointSetError {
+    pub error: std::io::Error,
+    pub filename: String,
+}
+
+impl InternalEvent for JournaldCheckpointSetError {
+    fn emit(self) {
+        error!(
+            message = "Could not set journald checkpoint.",
+            filename = ?self.filename,
+            error = %self.error,
+            error_type = error_type::IO_FAILED,
+            stage = error_stage::PROCESSING,
+            internal_log_rate_limit = true,
+        );
+        counter!(
+            "component_errors_total", 1,
+            "stage" => error_stage::PROCESSING,
+            "error_type" => error_type::IO_FAILED,
+        );
+    }
+}
+
+#[derive(Debug)]
+pub struct JournaldCheckpointFileOpenError {
+    pub error: std::io::Error,
+    pub path: String,
+}
+
+impl InternalEvent for JournaldCheckpointFileOpenError {
+    fn emit(self) {
+        error!(
+            message = "Unable to open checkpoint file.",
+            path = ?self.path,
+            error = %self.error,
+            error_type = error_type::IO_FAILED,
+            stage = error_stage::RECEIVING,
+            internal_log_rate_limit = true,
+        );
+        counter!(
+            "component_errors_total", 1,
+            "stage" => error_stage::RECEIVING,
+            "error_type" => error_type::IO_FAILED,
+        );
     }
 }

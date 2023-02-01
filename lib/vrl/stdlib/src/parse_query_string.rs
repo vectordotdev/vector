@@ -1,6 +1,35 @@
 use std::collections::BTreeMap;
+
+use ::value::Value;
 use url::form_urlencoded;
 use vrl::prelude::*;
+
+fn parse_query_string(bytes: Value) -> Resolved {
+    let bytes = bytes.try_bytes()?;
+    let mut query_string = bytes.as_ref();
+    if !query_string.is_empty() && query_string[0] == b'?' {
+        query_string = &query_string[1..];
+    }
+    let mut result = BTreeMap::new();
+    let parsed = form_urlencoded::parse(query_string);
+    for (k, value) in parsed {
+        let value = value.as_ref();
+        result
+            .entry(k.into_owned())
+            .and_modify(|v| {
+                match v {
+                    Value::Array(v) => {
+                        v.push(value.into());
+                    }
+                    v => {
+                        *v = Value::Array(vec![v.clone(), value.into()]);
+                    }
+                };
+            })
+            .or_insert_with(|| value.into());
+    }
+    Ok(result.into())
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct ParseQueryString;
@@ -25,12 +54,12 @@ impl Function for ParseQueryString {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
-        mut arguments: ArgumentList,
+        _state: &state::TypeState,
+        _ctx: &mut FunctionCompileContext,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
-        Ok(Box::new(ParseQueryStringFn { value }))
+        Ok(ParseQueryStringFn { value }.as_expr())
     }
 
     fn parameters(&self) -> &'static [Parameter] {
@@ -47,45 +76,19 @@ struct ParseQueryStringFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for ParseQueryStringFn {
+impl FunctionExpression for ParseQueryStringFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let bytes = self.value.resolve(ctx)?.try_bytes()?;
-
-        let mut query_string = bytes.as_ref();
-        if !query_string.is_empty() && query_string[0] == b'?' {
-            query_string = &query_string[1..];
-        }
-
-        let mut result = BTreeMap::new();
-        let parsed = form_urlencoded::parse(query_string);
-        for (k, value) in parsed {
-            let value = value.as_ref();
-            result
-                .entry(k.into_owned())
-                .and_modify(|v| {
-                    match v {
-                        Value::Array(v) => {
-                            v.push(value.into());
-                        }
-                        v => {
-                            *v = Value::Array(vec![v.to_owned(), value.into()]);
-                        }
-                    };
-                })
-                .or_insert_with(|| value.into());
-        }
-        Ok(result.into())
+        let bytes = self.value.resolve(ctx)?;
+        parse_query_string(bytes)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new().infallible().object::<(), Kind>(type_def())
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
+        TypeDef::object(inner_kind())
     }
 }
 
-fn type_def() -> BTreeMap<(), Kind> {
-    map! {
-        (): Kind::Bytes | Kind::Array,
-    }
+fn inner_kind() -> Collection<Field> {
+    Collection::from_unknown(Kind::bytes().or_array(Collection::any()))
 }
 
 #[cfg(test)]
@@ -103,7 +106,7 @@ mod tests {
                 xyz: "",
                 abc: "",
             })),
-            tdef: TypeDef::new().infallible().object::<(), Kind>(type_def()),
+            tdef: TypeDef::object(inner_kind()),
         }
 
         multiple_values {
@@ -111,7 +114,7 @@ mod tests {
             want: Ok(value!({
                 foo: ["bar", "xyz"],
             })),
-            tdef: TypeDef::new().infallible().object::<(), Kind>(type_def()),
+            tdef: TypeDef::object(inner_kind()),
         }
 
         ruby_on_rails_multiple_values {
@@ -119,7 +122,7 @@ mod tests {
             want: Ok(value!({
                 "foo[]": ["bar", "xyz"],
             })),
-            tdef: TypeDef::new().infallible().object::<(), Kind>(type_def()),
+            tdef: TypeDef::object(inner_kind()),
         }
 
         empty_key {
@@ -127,7 +130,7 @@ mod tests {
             want: Ok(value!({
                 "": ["", ""],
             })),
-            tdef: TypeDef::new().infallible().object::<(), Kind>(type_def()),
+            tdef: TypeDef::object(inner_kind()),
         }
 
         single_key {
@@ -135,13 +138,13 @@ mod tests {
             want: Ok(value!({
                 foo: "",
             })),
-            tdef: TypeDef::new().infallible().object::<(), Kind>(type_def()),
+            tdef: TypeDef::object(inner_kind()),
         }
 
         empty {
             args: func_args![value: value!("")],
             want: Ok(value!({})),
-            tdef: TypeDef::new().infallible().object::<(), Kind>(type_def()),
+            tdef: TypeDef::object(inner_kind()),
         }
 
         starts_with_question_mark {
@@ -149,7 +152,7 @@ mod tests {
             want: Ok(value!({
                 foo: "bar",
             })),
-            tdef: TypeDef::new().infallible().object::<(), Kind>(type_def()),
+            tdef: TypeDef::object(inner_kind()),
         }
     ];
 }

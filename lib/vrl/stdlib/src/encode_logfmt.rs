@@ -1,5 +1,7 @@
-use crate::encode_key_value::EncodeKeyValueFn;
+use vrl::prelude::expression::FunctionExpression;
 use vrl::prelude::*;
+
+use crate::encode_key_value::EncodeKeyValueFn;
 
 #[derive(Clone, Copy, Debug)]
 pub struct EncodeLogfmt;
@@ -26,9 +28,9 @@ impl Function for EncodeLogfmt {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
-        mut arguments: ArgumentList,
+        _state: &state::TypeState,
+        _ctx: &mut FunctionCompileContext,
+        arguments: ArgumentList,
     ) -> Compiled {
         // The encode_logfmt function is just an alias for `encode_key_value` with the following
         // parameters for the delimiters.
@@ -39,13 +41,14 @@ impl Function for EncodeLogfmt {
         let value = arguments.required("value");
         let fields = arguments.optional("fields_ordering");
 
-        Ok(Box::new(EncodeKeyValueFn {
+        Ok(EncodeKeyValueFn {
             value,
             fields,
             key_value_delimiter,
             field_delimiter,
             flatten_boolean,
-        }))
+        }
+        .as_expr())
     }
 
     fn examples(&self) -> &'static [Example] {

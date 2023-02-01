@@ -1,5 +1,4 @@
-use chrono::serde::ts_milliseconds;
-use chrono::{DateTime, Utc};
+use chrono::{serde::ts_milliseconds, DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 /// Represents an AWS Kinesis Firehose request
@@ -10,6 +9,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FirehoseRequest {
+    pub access_key: Option<String>,
     pub request_id: String,
 
     #[serde(with = "ts_milliseconds")]

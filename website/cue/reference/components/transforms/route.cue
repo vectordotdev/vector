@@ -3,8 +3,6 @@ package metadata
 components: transforms: route: {
 	title: "Route"
 
-	alias: "swimlanes"
-
 	description: """
 		Splits a stream of events into multiple sub-streams based on a set of
 		conditions.
@@ -22,49 +20,12 @@ components: transforms: route: {
 	}
 
 	support: {
-		targets: {
-			"aarch64-unknown-linux-gnu":      true
-			"aarch64-unknown-linux-musl":     true
-			"armv7-unknown-linux-gnueabihf":  true
-			"armv7-unknown-linux-musleabihf": true
-			"x86_64-apple-darwin":            true
-			"x86_64-pc-windows-msv":          true
-			"x86_64-unknown-linux-gnu":       true
-			"x86_64-unknown-linux-musl":      true
-		}
 		requirements: []
 		warnings: []
 		notices: []
 	}
 
-	configuration: {
-		route: {
-			description: """
-				A table of route identifiers to logical conditions representing the filter of the route. Each route
-				can then be referenced as an input by other components with the name `<transform_name>.<route_id>`.
-				"""
-			required: true
-			warnings: []
-			type: object: {
-				options: {
-					"*": {
-						description: """
-							The condition to be matched against every input event. Only messages that pass the
-							condition will be included in this route.
-							"""
-						required: true
-						warnings: []
-						type: string: {
-							examples: [
-								#".status_code != 200 && !includes(["info", "debug"], .severity)"#,
-							]
-							syntax: "remap_boolean_expression"
-						}
-					}
-				}
-			}
-		}
-	}
+	configuration: base.components.transforms.route.configuration
 
 	input: {
 		logs: true
@@ -76,6 +37,7 @@ components: transforms: route: {
 			set:          true
 			summary:      true
 		}
+		traces: true
 	}
 
 	examples: [
@@ -127,7 +89,10 @@ components: transforms: route: {
 		},
 	]
 
-	telemetry: metrics: {
-		events_discarded_total: components.sources.internal_metrics.output.metrics.events_discarded_total
-	}
+	outputs: [
+		{
+			name:        "<route_id>"
+			description: "Each route can be referenced as an input by other components with the name `<transform_name>.<route_id>`."
+		},
+	]
 }

@@ -8,4 +8,4 @@ data:
         type = "console"
         inputs = ["kubernetes_logs", "internal_metrics"]
         target = "stdout"
-        encoding = "json"
+        encoding.codec = "json"

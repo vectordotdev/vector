@@ -1,8 +1,11 @@
 //! Read process output.
 
 use std::process::{ExitStatus, Stdio};
-use tokio::io::{AsyncBufReadExt, BufReader};
-use tokio::process::{Child, ChildStdout, Command};
+
+use tokio::{
+    io::{AsyncBufReadExt, BufReader},
+    process::{Child, ChildStdout, Command},
+};
 
 /// Keeps track of the command invocation, proving the interface to
 /// read the output and send a termination signal.
@@ -32,7 +35,7 @@ impl Reader {
 
     /// Wait for the `kubectl logs` process to exit and return the exit code.
     pub async fn wait(&mut self) -> std::io::Result<ExitStatus> {
-        (&mut self.child).wait().await
+        self.child.wait().await
     }
 
     /// Send a termination signal to the `kubectl logs` process.

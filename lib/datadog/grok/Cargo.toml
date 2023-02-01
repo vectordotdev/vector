@@ -1,31 +1,41 @@
 [package]
 name = "datadog-grok"
 version = "0.1.0"
-authors = ["Vector Contributors <vector@timber.io>"]
-edition = "2018"
+authors = ["Vector Contributors <vector@datadoghq.com>"]
+edition = "2021"
 build = "build.rs" # LALRPOP preprocessing
+license = "MPL-2.0"
 
 [dependencies]
-serde = { version = "1.0.130", default-features = false, features = ["derive"] }
+bytes = { version = "1.3.0", default-features = false }
+chrono = { version = "0.4.19", default-features = false }
+chrono-tz = { version = "0.8.1", default-features = false }
 lalrpop-util = { version = "0.19", default-features = false }
+nom = { version = "7.1.3", default-features = false, features = ["std"] }
+once_cell = { version = "1.17", default-features = false, features = ["std"] }
+onig = { version = "6.4", default-features = false }
+ordered-float = { version = "3", default-features = false }
+peeking_take_while = { version = "1.0.0", default-features = false }
+regex = { version = "1.7", default-features = false, features = ["perf"] }
+serde_json = { version = "1.0.91", default-features = false }
 thiserror = { version = "1", default-features = false }
-lazy_static = { version = "1.3.0", default-features = false }
-regex = { version = "1", default-features = false }
-grok = { version = "1", default-features = false }
-derivative = { version = "2.2.0", default-features = false }
-itertools = { version = "0.10.1", default-features = false }
-serde_json = { version = "1.0.68", default-features = false }
-percent-encoding = { version = "2.1.0", default-features = false }
-bytes = { version = "1.1.0", default-features = false }
-strum_macros = { version = "0.21", default-features = false }
-tracing = { version = "0.1.29", default-features = false }
-snafu = { version = "0.6", default-features = false }
-ordered-float = { version = "2", default-features = false }
+tracing = { version = "0.1.34", default-features = false }
 
 # Internal
 lookup = { path = "../../lookup" }
-shared = { path = "../../shared" }
+value = {path = "../../value", features = ["json", "test"]}
+vector-common = { path = "../../vector-common" }
 vrl-compiler = { path = "../../vrl/compiler" }
 
+[dev-dependencies]
+vrl-compiler = { path = "../../vrl/compiler" }
+criterion = { version = "0.4.0" }
+tracing-test = { version = "0.2", default-features = false }
+
 [build-dependencies]
-lalrpop = { version = "0.19", default-features = false }
+lalrpop = { version = "0.19.8", default-features = false }
+
+[[bench]]
+name = "filters"
+path = "benches/filters/main.rs"
+harness = false

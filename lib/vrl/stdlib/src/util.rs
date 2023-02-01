@@ -8,11 +8,11 @@ where
     F: Fn(f64) -> f64,
 {
     let multiplier = 10_f64.powf(precision as f64);
-    fun(num * multiplier as f64) / multiplier
+    fun(num * multiplier) / multiplier
 }
 
 /// Takes a set of captures that have resulted from matching a regular expression
-/// against some text and fills a BTreeMap with the result.
+/// against some text and fills a `BTreeMap` with the result.
 ///
 /// All captures are inserted with a key as the numeric index of that capture
 /// "0" is the overall match.
@@ -21,9 +21,9 @@ where
 #[cfg(any(feature = "parse_regex", feature = "parse_regex_all"))]
 pub(crate) fn capture_regex_to_map(
     regex: &regex::Regex,
-    capture: regex::Captures,
+    capture: &regex::Captures,
     numeric_groups: bool,
-) -> std::collections::BTreeMap<String, vrl::Value> {
+) -> std::collections::BTreeMap<String, ::value::Value> {
     let names = regex.capture_names().flatten().map(|name| {
         (
             name.to_owned(),
@@ -45,31 +45,31 @@ pub(crate) fn capture_regex_to_map(
 }
 
 #[cfg(any(feature = "parse_regex", feature = "parse_regex_all"))]
-pub(crate) fn regex_type_def(
+pub(crate) fn regex_kind(
     regex: &regex::Regex,
-) -> std::collections::BTreeMap<String, vrl::value::Kind> {
+) -> std::collections::BTreeMap<vrl::value::kind::Field, vrl::value::Kind> {
     let mut inner_type = std::collections::BTreeMap::new();
 
     // Add typedefs for each capture by numerical index.
     for num in 0..regex.captures_len() {
         inner_type.insert(
-            num.to_string(),
-            vrl::value::Kind::Bytes | vrl::value::Kind::Null,
+            num.to_string().into(),
+            vrl::value::Kind::bytes() | vrl::value::Kind::null(),
         );
     }
 
     // Add a typedef for each capture name.
     for name in regex.capture_names().flatten() {
-        inner_type.insert(name.to_owned(), vrl::value::Kind::Bytes);
+        inner_type.insert(name.to_owned().into(), vrl::value::Kind::bytes());
     }
 
     inner_type
 }
 
 #[cfg(any(feature = "is_nullish", feature = "compact"))]
-pub(crate) fn is_nullish(value: &vrl::Value) -> bool {
+pub(crate) fn is_nullish(value: &::value::Value) -> bool {
     match value {
-        vrl::Value::Bytes(v) => {
+        ::value::Value::Bytes(v) => {
             let s = &String::from_utf8_lossy(v)[..];
 
             match s {
@@ -77,7 +77,7 @@ pub(crate) fn is_nullish(value: &vrl::Value) -> bool {
                 _ => s.chars().all(char::is_whitespace),
             }
         }
-        vrl::Value::Null => true,
+        ::value::Value::Null => true,
         _ => false,
     }
 }
@@ -97,13 +97,13 @@ impl Default for Base64Charset {
 }
 
 #[cfg(any(feature = "decode_base64", feature = "encode_base64"))]
-impl From<Base64Charset> for base64::CharacterSet {
-    fn from(charset: Base64Charset) -> base64::CharacterSet {
-        use Base64Charset::*;
+impl From<Base64Charset> for base64::alphabet::Alphabet {
+    fn from(charset: Base64Charset) -> base64::alphabet::Alphabet {
+        use Base64Charset::{Standard, UrlSafe};
 
         match charset {
-            Standard => base64::CharacterSet::Standard,
-            UrlSafe => base64::CharacterSet::UrlSafe,
+            Standard => base64::alphabet::STANDARD,
+            UrlSafe => base64::alphabet::URL_SAFE,
         }
     }
 }
@@ -113,7 +113,7 @@ impl std::str::FromStr for Base64Charset {
     type Err = &'static str;
 
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        use Base64Charset::*;
+        use Base64Charset::{Standard, UrlSafe};
 
         match s {
             "standard" => Ok(Standard),

@@ -1,8 +1,12 @@
-// ## skip check-events ##
+use std::{io::Error, path::Path};
 
 use metrics::counter;
-use std::{io::Error, path::Path};
+use vector_common::internal_event::{
+    error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL,
+};
 use vector_core::internal_event::InternalEvent;
+
+use crate::{emit, internal_events::SocketOutgoingConnectionError};
 
 #[derive(Debug)]
 pub struct UnixSocketConnectionEstablished<'a> {
@@ -10,58 +14,79 @@ pub struct UnixSocketConnectionEstablished<'a> {
 }
 
 impl InternalEvent for UnixSocketConnectionEstablished<'_> {
-    fn emit_logs(&self) {
+    fn emit(self) {
         debug!(message = "Connected.", path = ?self.path);
-    }
-
-    fn emit_metrics(&self) {
         counter!("connection_established_total", 1, "mode" => "unix");
     }
 }
 
 #[derive(Debug)]
-pub struct UnixSocketConnectionFailed<'a, E> {
+pub struct UnixSocketOutgoingConnectionError<E> {
     pub error: E,
-    pub path: &'a std::path::Path,
 }
 
-impl<E> InternalEvent for UnixSocketConnectionFailed<'_, E>
-where
-    E: std::error::Error,
-{
-    fn emit_logs(&self) {
-        error!(
-            message = "Unable to connect.",
-            error = %self.error,
-            path = ?self.path,
-        );
-    }
-
-    fn emit_metrics(&self) {
+impl<E: std::error::Error> InternalEvent for UnixSocketOutgoingConnectionError<E> {
+    fn emit(self) {
+        // ## skip check-duplicate-events ##
+        // ## skip check-validity-events ##
+        emit!(SocketOutgoingConnectionError { error: self.error });
+        // deprecated
         counter!("connection_failed_total", 1, "mode" => "unix");
     }
 }
 
 #[derive(Debug)]
 pub struct UnixSocketError<'a, E> {
-    pub error: &'a E,
+    pub(crate) error: &'a E,
     pub path: &'a std::path::Path,
 }
 
-impl<E> InternalEvent for UnixSocketError<'_, E>
-where
-    E: From<std::io::Error> + std::fmt::Debug + std::fmt::Display,
-{
-    fn emit_logs(&self) {
-        debug!(
+impl<E: std::fmt::Display> InternalEvent for UnixSocketError<'_, E> {
+    fn emit(self) {
+        error!(
             message = "Unix socket error.",
             error = %self.error,
             path = ?self.path,
+            error_type = error_type::CONNECTION_FAILED,
+            stage = error_stage::PROCESSING,
+            internal_log_rate_limit = true,
         );
-    }
-
-    fn emit_metrics(&self) {
+        counter!(
+            "component_errors_total", 1,
+            "error_type" => error_type::CONNECTION_FAILED,
+            "stage" => error_stage::PROCESSING,
+        );
+        // deprecated
         counter!("connection_errors_total", 1, "mode" => "unix");
+    }
+}
+
+#[derive(Debug)]
+pub struct UnixSocketSendError<'a, E> {
+    pub(crate) error: &'a E,
+    pub path: &'a std::path::Path,
+}
+
+impl<E: std::fmt::Display> InternalEvent for UnixSocketSendError<'_, E> {
+    fn emit(self) {
+        let reason = "Unix socket send error.";
+        error!(
+            message = reason,
+            error = %self.error,
+            path = ?self.path,
+            error_type = error_type::WRITER_FAILED,
+            stage = error_stage::SENDING,
+            internal_log_rate_limit = true,
+        );
+        counter!(
+            "component_errors_total", 1,
+            "error_type" => error_type::WRITER_FAILED,
+            "stage" => error_stage::SENDING,
+        );
+        // deprecated
+        counter!("connection_errors_total", 1, "mode" => "unix");
+
+        emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
     }
 }
 
@@ -72,11 +97,21 @@ pub struct UnixSocketFileDeleteError<'a> {
 }
 
 impl<'a> InternalEvent for UnixSocketFileDeleteError<'a> {
-    fn emit_logs(&self) {
-        warn!(
+    fn emit(self) {
+        error!(
             message = "Failed in deleting unix socket file.",
             path = %self.path.display(),
             error = %self.error,
+            error_code = "delete_socket_file",
+            error_type = error_type::WRITER_FAILED,
+            stage = error_stage::PROCESSING,
+            internal_log_rate_limit = true,
+        );
+        counter!(
+            "component_errors_total", 1,
+            "error_code" => "delete_socket_file",
+            "error_type" => error_type::WRITER_FAILED,
+            "stage" => error_stage::PROCESSING,
         );
     }
 }

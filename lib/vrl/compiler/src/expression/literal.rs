@@ -1,13 +1,17 @@
-use crate::expression::Resolved;
-use crate::{value::Regex, Context, Expression, Span, State, TypeDef, Value};
+use std::{borrow::Cow, convert::TryFrom, fmt, sync::Arc};
+
 use bytes::Bytes;
 use chrono::{DateTime, SecondsFormat, Utc};
-use diagnostic::{DiagnosticError, Label, Note, Urls};
+use diagnostic::{DiagnosticMessage, Label, Note, Urls};
 use ordered_float::NotNan;
-use parser::ast::{self, Node};
-use std::borrow::Cow;
-use std::convert::TryFrom;
-use std::fmt;
+use regex::Regex;
+use value::{Value, ValueRegex};
+
+use crate::{
+    expression::Resolved,
+    state::{TypeInfo, TypeState},
+    Context, Expression, Span, TypeDef,
+};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Literal {
@@ -15,49 +19,30 @@ pub enum Literal {
     Integer(i64),
     Float(NotNan<f64>),
     Boolean(bool),
-    Regex(Regex),
+    Regex(ValueRegex),
     Timestamp(DateTime<Utc>),
     Null,
 }
 
 impl Literal {
+    /// Get a `Value` type stored in the literal.
+    ///
+    /// This differs from `Expression::as_value` insofar as this *always*
+    /// returns a `Value`, whereas `as_value` returns `Option<Value>` which, in
+    /// the case of `Literal` means it always returns `Some(Value)`, requiring
+    /// an extra `unwrap()`.
     pub fn to_value(&self) -> Value {
-        use Literal::*;
+        use Literal::{Boolean, Float, Integer, Null, Regex, String, Timestamp};
 
         match self {
             String(v) => Value::Bytes(v.clone()),
             Integer(v) => Value::Integer(*v),
-            Float(v) => Value::Float(v.to_owned()),
+            Float(v) => Value::Float(*v),
             Boolean(v) => Value::Boolean(*v),
             Regex(v) => Value::Regex(v.clone()),
-            Timestamp(v) => Value::Timestamp(v.to_owned()),
+            Timestamp(v) => Value::Timestamp(*v),
             Null => Value::Null,
         }
-    }
-}
-
-impl TryFrom<Node<ast::Literal>> for Literal {
-    type Error = Error;
-
-    fn try_from(node: Node<ast::Literal>) -> Result<Self, Self::Error> {
-        use ast::Literal::*;
-
-        let (span, lit) = node.take();
-
-        let literal = match lit {
-            String(v) => Literal::String(Bytes::from(v)),
-            Integer(v) => Literal::Integer(v),
-            Float(v) => Literal::Float(v),
-            Boolean(v) => Literal::Boolean(v),
-            Regex(v) => regex::Regex::new(&v)
-                .map_err(|err| (span, err))
-                .map(|r| Literal::Regex(r.into()))?,
-            // TODO: support more formats (similar to Vector's `Convert` logic)
-            Timestamp(v) => Literal::Timestamp(v.parse().map_err(|err| (span, err))?),
-            Null => Literal::Null,
-        };
-
-        Ok(literal)
     }
 }
 
@@ -70,26 +55,26 @@ impl Expression for Literal {
         Some(self.to_value())
     }
 
-    fn type_def(&self, _: &State) -> TypeDef {
-        use Literal::*;
+    fn type_info(&self, state: &TypeState) -> TypeInfo {
+        use Literal::{Boolean, Float, Integer, Null, Regex, String, Timestamp};
 
         let type_def = match self {
-            String(_) => TypeDef::new().bytes(),
-            Integer(_) => TypeDef::new().integer(),
-            Float(_) => TypeDef::new().float(),
-            Boolean(_) => TypeDef::new().boolean(),
-            Regex(_) => TypeDef::new().regex(),
-            Timestamp(_) => TypeDef::new().timestamp(),
-            Null => TypeDef::new().null(),
+            String(_) => TypeDef::bytes(),
+            Integer(_) => TypeDef::integer(),
+            Float(_) => TypeDef::float(),
+            Boolean(_) => TypeDef::boolean(),
+            Regex(_) => TypeDef::regex(),
+            Timestamp(_) => TypeDef::timestamp(),
+            Null => TypeDef::null(),
         };
 
-        type_def.infallible()
+        TypeInfo::new(state, type_def.infallible())
     }
 }
 
 impl fmt::Display for Literal {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use Literal::*;
+        use Literal::{Boolean, Float, Integer, Null, Regex, String, Timestamp};
 
         match self {
             String(v) => write!(f, r#""{}""#, std::string::String::from_utf8_lossy(v)),
@@ -145,19 +130,19 @@ impl From<&str> for Literal {
 
 impl From<i8> for Literal {
     fn from(v: i8) -> Self {
-        Literal::Integer(v as i64)
+        Literal::Integer(i64::from(v))
     }
 }
 
 impl From<i16> for Literal {
     fn from(v: i16) -> Self {
-        Literal::Integer(v as i64)
+        Literal::Integer(i64::from(v))
     }
 }
 
 impl From<i32> for Literal {
     fn from(v: i32) -> Self {
-        Literal::Integer(v as i64)
+        Literal::Integer(i64::from(v))
     }
 }
 
@@ -169,13 +154,13 @@ impl From<i64> for Literal {
 
 impl From<u16> for Literal {
     fn from(v: u16) -> Self {
-        Literal::Integer(v as i64)
+        Literal::Integer(i64::from(v))
     }
 }
 
 impl From<u32> for Literal {
     fn from(v: u32) -> Self {
-        Literal::Integer(v as i64)
+        Literal::Integer(i64::from(v))
     }
 }
 
@@ -220,15 +205,15 @@ impl From<bool> for Literal {
 
 // Literal::Regex --------------------------------------------------------------
 
-impl From<Regex> for Literal {
-    fn from(regex: Regex) -> Self {
-        Literal::Regex(regex)
+impl From<Arc<Regex>> for Literal {
+    fn from(regex: Arc<Regex>) -> Self {
+        Literal::Regex(ValueRegex::new(regex))
     }
 }
 
-impl From<regex::Regex> for Literal {
-    fn from(regex: regex::Regex) -> Self {
-        Literal::Regex(regex.into())
+impl From<ValueRegex> for Literal {
+    fn from(regex: ValueRegex) -> Self {
+        Literal::Regex(regex)
     }
 }
 
@@ -266,7 +251,7 @@ pub struct Error {
 }
 
 #[derive(thiserror::Error, Debug)]
-pub enum ErrorVariant {
+pub(crate) enum ErrorVariant {
     #[error("invalid regular expression")]
     InvalidRegex(#[from] regex::Error),
 
@@ -289,9 +274,9 @@ impl std::error::Error for Error {
     }
 }
 
-impl DiagnosticError for Error {
+impl DiagnosticMessage for Error {
     fn code(&self) -> usize {
-        use ErrorVariant::*;
+        use ErrorVariant::{InvalidRegex, InvalidTimestamp, NanFloat};
 
         match &self.variant {
             InvalidRegex(..) => 101,
@@ -301,7 +286,7 @@ impl DiagnosticError for Error {
     }
 
     fn labels(&self) -> Vec<Label> {
-        use ErrorVariant::*;
+        use ErrorVariant::{InvalidRegex, InvalidTimestamp, NanFloat};
 
         match &self.variant {
             InvalidRegex(err) => {
@@ -320,12 +305,12 @@ impl DiagnosticError for Error {
                     .join(": ");
 
                 vec![Label::primary(
-                    format!("regex parse error: {}", error),
+                    format!("regex parse error: {error}"),
                     self.span,
                 )]
             }
             InvalidTimestamp(err) => vec![Label::primary(
-                format!("invalid timestamp format: {}", err),
+                format!("invalid timestamp format: {err}"),
                 self.span,
             )],
 
@@ -334,7 +319,7 @@ impl DiagnosticError for Error {
     }
 
     fn notes(&self) -> Vec<Note> {
-        use ErrorVariant::*;
+        use ErrorVariant::{InvalidRegex, InvalidTimestamp, NanFloat};
 
         match &self.variant {
             InvalidRegex(_) => vec![Note::SeeDocs(
@@ -378,12 +363,12 @@ mod tests {
     test_type_def![
         bytes {
             expr: |_| expr!("foo"),
-            want: TypeDef::new().bytes(),
+            want: TypeDef::bytes(),
         }
 
         integer {
             expr: |_| expr!(12),
-            want: TypeDef::new().integer(),
+            want: TypeDef::integer(),
         }
     ];
 }

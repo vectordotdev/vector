@@ -1,7 +1,7 @@
 ---
 date: "2020-04-16"
 title: "New Tag Cardinality Limit Transform"
-description: "Protect downstream metric storage sytems from metric tag explosion"
+description: "Protect downstream metric storage systems from metric tag explosion"
 authors: ["binarylogic"]
 pr_numbers: [1959]
 release: "0.9.0"
@@ -12,7 +12,7 @@ badges:
   transforms: ["tag_cardinality_limit"]
 ---
 
-High cardinality metric tags can severly disrupt downstream metrics storages. To
+High cardinality metric tags can severely disrupt downstream metrics storages. To
 protect against this we built a new
 [`tag_cardinality_limit` transform][docs.transforms.tag_cardinality_limit].
 

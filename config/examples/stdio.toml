@@ -11,4 +11,4 @@
 [sinks.out]
     inputs = ["in"]
     type = "console"
-    encoding = "text"
+    encoding.codec = "text"

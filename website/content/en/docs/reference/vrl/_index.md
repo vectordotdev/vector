@@ -92,7 +92,7 @@ Conditions can also be more multifaceted. This condition would filter out all
 events for which the `severity` field is `"info"`, the `status_code` field is
 greater than or equal to 400, and the `host` field isn't set:
 
-```vrl
+```coffee
 condition = '.severity != "info" && .status_code < 400 && exists(.host)
 ```
 
@@ -115,12 +115,19 @@ acquainted with Vector and VRL:
 {{< jump "/docs/setup/quickstart" >}} {{< jump "/guides/level-up/transformation"
 >}}
 
+{{< info title="VRL playground" >}} There is an online [VRL playground](https://playground.vrl.dev),
+where you can experiment with VRL.
+
+Some functions are currently unsupported on the playground. Functions that are currently not supported can be found with
+this [issue filter](https://github.com/vectordotdev/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22vrl%3A+playground%22+wasm+compatible)
+{{< /info >}}
+
 ## The goals of VRL {#goals}
 
 VRL is built by the Vector team and its development is guided by two core goals,
 [safety](#safety) and [performance](#performance), without compromising on
 flexibility. This makes VRL ideal for critical, performance-sensitive
-infrastructure, like observabiity pipelines. To illustrate how we achieve these,
+infrastructure, like observability pipelines. To illustrate how we achieve these,
 below is a VRL feature matrix across these principles:
 
 | Feature                                       | Safety | Performance |

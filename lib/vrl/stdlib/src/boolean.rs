@@ -1,4 +1,13 @@
+use ::value::Value;
+use vrl::prelude::expression::FunctionExpression;
 use vrl::prelude::*;
+
+fn boolean(value: Value) -> Resolved {
+    match value {
+        v @ Value::Boolean(_) => Ok(v),
+        v => Err(format!("expected boolean, got {}", v.kind()).into()),
+    }
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct Boolean;
@@ -27,7 +36,7 @@ impl Function for Boolean {
                 title: "invalid",
                 source: "bool!(42)",
                 result: Err(
-                    r#"function call error for "bool" at (0:9): expected "boolean", got "integer""#,
+                    r#"function call error for "bool" at (0:9): expected boolean, got integer"#,
                 ),
             },
         ]
@@ -35,13 +44,13 @@ impl Function for Boolean {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
-        mut arguments: ArgumentList,
+        _state: &state::TypeState,
+        _ctx: &mut FunctionCompileContext,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
 
-        Ok(Box::new(BooleanFn { value }))
+        Ok(BooleanFn { value }.as_expr())
     }
 }
 
@@ -50,18 +59,14 @@ struct BooleanFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for BooleanFn {
+impl FunctionExpression for BooleanFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        match self.value.resolve(ctx)? {
-            v @ Value::Boolean(_) => Ok(v),
-            v => Err(format!(r#"expected "boolean", got {}"#, v.kind()).into()),
-        }
+        boolean(self.value.resolve(ctx)?)
     }
 
-    fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        self.value
-            .type_def(state)
-            .fallible_unless(Kind::Boolean)
-            .boolean()
+    fn type_def(&self, state: &state::TypeState) -> TypeDef {
+        let non_boolean = !self.value.type_def(state).is_boolean();
+
+        TypeDef::boolean().with_fallibility(non_boolean)
     }
 }

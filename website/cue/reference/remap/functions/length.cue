@@ -2,8 +2,14 @@ package metadata
 
 remap: functions: length: {
 	category: "Enumerate"
+	// the `return` rules below aren't rendered so we copy them here
 	description: """
 		Returns the length of the `value`.
+
+		* If `value` is an array, returns the number of elements.
+		* If `value` is an object, returns the number of top-level keys.
+		* If `value` is a string, returns the number of bytes in the string. If
+		  you want the number of characters, see `strlen`.
 		"""
 
 	arguments: [
@@ -18,9 +24,9 @@ remap: functions: length: {
 	return: {
 		types: ["integer"]
 		rules: [
-			"Returns the size of the array if `value` is an array.",
-			"Returns the size of the string if `value` is a string.",
-			"Returns the number of map keys if `value` is a map (nested keys are ignored)",
+			"If `value` is an array, returns the number of elements.",
+			"If `value` is an object, returns the number of top-level keys.",
+			"If `value` is a string, returns the number of bytes in the string.",
 		]
 	}
 

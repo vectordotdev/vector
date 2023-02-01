@@ -1,4 +1,27 @@
+use ::value::Value;
+use vrl::prelude::expression::FunctionExpression;
 use vrl::prelude::*;
+
+fn contains(value: Value, substring: Value, case_sensitive: bool) -> Resolved {
+    let substring = {
+        let bytes = substring.try_bytes()?;
+        let string = String::from_utf8_lossy(&bytes);
+
+        match case_sensitive {
+            true => string.into_owned(),
+            false => string.to_lowercase(),
+        }
+    };
+    let value = {
+        let string = value.try_bytes_utf8_lossy()?;
+
+        match case_sensitive {
+            true => string.into_owned(),
+            false => string.to_lowercase(),
+        }
+    };
+    Ok(value.contains(&substring).into())
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct Contains;
@@ -30,19 +53,20 @@ impl Function for Contains {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
-        mut arguments: ArgumentList,
+        _state: &state::TypeState,
+        _ctx: &mut FunctionCompileContext,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
         let substring = arguments.required("substring");
         let case_sensitive = arguments.optional("case_sensitive").unwrap_or(expr!(true));
 
-        Ok(Box::new(ContainsFn {
+        Ok(ContainsFn {
             value,
             substring,
             case_sensitive,
-        }))
+        }
+        .as_expr())
     }
 
     fn examples(&self) -> &'static [Example] {
@@ -68,35 +92,17 @@ struct ContainsFn {
     case_sensitive: Box<dyn Expression>,
 }
 
-impl Expression for ContainsFn {
+impl FunctionExpression for ContainsFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
+        let value = self.value.resolve(ctx)?;
+        let substring = self.substring.resolve(ctx)?;
         let case_sensitive = self.case_sensitive.resolve(ctx)?.try_boolean()?;
 
-        let substring = {
-            let bytes = self.substring.resolve(ctx)?.try_bytes()?;
-            let string = String::from_utf8_lossy(&bytes);
-
-            match case_sensitive {
-                true => string.into_owned(),
-                false => string.to_lowercase(),
-            }
-        };
-
-        let value = {
-            let value = self.value.resolve(ctx)?;
-            let string = value.try_bytes_utf8_lossy()?;
-
-            match case_sensitive {
-                true => string.into_owned(),
-                false => string.to_lowercase(),
-            }
-        };
-
-        Ok(value.contains(&substring).into())
+        contains(value, substring, case_sensitive)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new().boolean().infallible()
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
+        TypeDef::boolean().infallible()
     }
 }
 
@@ -111,42 +117,42 @@ mod tests {
             args: func_args![value: value!("foo"),
                              substring: value!("bar")],
             want: Ok(value!(false)),
-            tdef: TypeDef::new().boolean().infallible(),
+            tdef: TypeDef::boolean().infallible(),
         }
 
         yes {
             args: func_args![value: value!("foobar"),
                              substring: value!("foo")],
             want: Ok(value!(true)),
-            tdef: TypeDef::new().boolean().infallible(),
+            tdef: TypeDef::boolean().infallible(),
         }
 
         entirely {
             args: func_args![value: value!("foo"),
                              substring: value!("foo")],
             want: Ok(value!(true)),
-            tdef: TypeDef::new().boolean().infallible(),
+            tdef: TypeDef::boolean().infallible(),
         }
 
         middle {
             args: func_args![value: value!("foobar"),
                              substring: value!("oba")],
             want: Ok(value!(true)),
-            tdef: TypeDef::new().boolean().infallible(),
+            tdef: TypeDef::boolean().infallible(),
         }
 
         start {
             args: func_args![value: value!("foobar"),
                              substring: value!("foo")],
             want: Ok(value!(true)),
-            tdef: TypeDef::new().boolean().infallible(),
+            tdef: TypeDef::boolean().infallible(),
         }
 
         end {
             args: func_args![value: value!("foobar"),
                              substring: value!("bar")],
             want: Ok(value!(true)),
-            tdef: TypeDef::new().boolean().infallible(),
+            tdef: TypeDef::boolean().infallible(),
         }
 
         case_sensitive_yes {
@@ -154,7 +160,7 @@ mod tests {
                              substring: value!("BAR"),
             ],
             want: Ok(value!(true)),
-            tdef: TypeDef::new().boolean().infallible(),
+            tdef: TypeDef::boolean().infallible(),
         }
 
          case_sensitive_yes_lowercase {
@@ -163,7 +169,7 @@ mod tests {
                              case_sensitive: true
             ],
             want: Ok(value!(false)),
-            tdef: TypeDef::new().boolean().infallible(),
+            tdef: TypeDef::boolean().infallible(),
         }
 
         case_sensitive_no_uppercase {
@@ -171,7 +177,7 @@ mod tests {
                              substring: value!("BAR"),
             ],
             want: Ok(value!(false)),
-            tdef: TypeDef::new().boolean().infallible(),
+            tdef: TypeDef::boolean().infallible(),
         }
 
         case_insensitive_yes_uppercase {
@@ -180,7 +186,7 @@ mod tests {
                              case_sensitive: false
             ],
             want: Ok(value!(true)),
-            tdef: TypeDef::new().boolean().infallible(),
+            tdef: TypeDef::boolean().infallible(),
         }
     ];
 }

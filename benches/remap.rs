@@ -1,25 +1,23 @@
+use std::collections::HashMap;
+
 use chrono::{DateTime, Utc};
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 use indexmap::IndexMap;
-use shared::TimeZone;
-use vector::transforms::{
-    add_fields::AddFields,
-    coercer::CoercerConfig,
-    json_parser::{JsonParser, JsonParserConfig},
-    remap::{Remap, RemapConfig},
-    FunctionTransform,
-};
 use vector::{
-    config::{TransformConfig, TransformContext},
-    event::{Event, Value},
-    test_util::runtime,
+    config::{DataType, Output},
+    event::{Event, LogEvent, Value},
+    transforms::{
+        remap::{Remap, RemapConfig},
+        SyncTransform, TransformOutputsBuf,
+    },
 };
+use vector_common::TimeZone;
 use vrl::prelude::*;
 
 criterion_group!(
     name = benches;
     // encapsulates CI noise we saw in
-    // https://github.com/timberio/vector/issues/5394
+    // https://github.com/vectordotdev/vector/issues/5394
     config = Criterion::default().noise_threshold(0.02);
     targets = benchmark_remap
 );
@@ -28,11 +26,12 @@ criterion_main!(benches);
 fn benchmark_remap(c: &mut Criterion) {
     let mut group = c.benchmark_group("remap");
 
-    let rt = runtime();
-    let add_fields_runner = |tform: &mut Box<dyn FunctionTransform>, event: Event| {
-        let mut result = Vec::with_capacity(1);
-        tform.transform(&mut result, event);
-        let output_1 = result[0].as_log();
+    let add_fields_runner = |tform: &mut Box<dyn SyncTransform>, event: Event| {
+        let mut outputs =
+            TransformOutputsBuf::new_with_capacity(vec![Output::default(DataType::all())], 1);
+        tform.transform(event, &mut outputs);
+        let result = outputs.take_primary();
+        let output_1 = result.first().unwrap().as_log();
 
         debug_assert_eq!(output_1.get("foo").unwrap().to_string_lossy(), "bar");
         debug_assert_eq!(output_1.get("bar").unwrap().to_string_lossy(), "baz");
@@ -42,8 +41,8 @@ fn benchmark_remap(c: &mut Criterion) {
     };
 
     group.bench_function("add_fields/remap", |b| {
-        let mut tform: Box<dyn FunctionTransform> = Box::new(
-            Remap::new(
+        let mut tform: Box<dyn SyncTransform> = Box::new(
+            Remap::new_ast(
                 RemapConfig {
                     source: Some(
                         indoc! {r#".foo = "bar"
@@ -56,14 +55,16 @@ fn benchmark_remap(c: &mut Criterion) {
                     timezone: TimeZone::default(),
                     drop_on_error: true,
                     drop_on_abort: true,
+                    ..Default::default()
                 },
                 &Default::default(),
             )
-            .unwrap(),
+            .unwrap()
+            .0,
         );
 
         let event = {
-            let mut event = Event::from("augment me");
+            let mut event = Event::Log(LogEvent::from("augment me"));
             event.as_mut_log().insert("copy_from", "buz".to_owned());
             event
         };
@@ -75,31 +76,12 @@ fn benchmark_remap(c: &mut Criterion) {
         );
     });
 
-    group.bench_function("add_fields/native", |b| {
-        let mut fields = IndexMap::new();
-        fields.insert("foo".into(), String::from("bar").into());
-        fields.insert("bar".into(), String::from("baz").into());
-        fields.insert("copy".into(), String::from("{{ copy_from }}").into());
-
-        let mut tform: Box<dyn FunctionTransform> = Box::new(AddFields::new(fields, true).unwrap());
-
-        let event = {
-            let mut event = Event::from("augment me");
-            event.as_mut_log().insert("copy_from", "buz".to_owned());
-            event
-        };
-
-        b.iter_batched(
-            || event.clone(),
-            |event| add_fields_runner(&mut tform, event),
-            BatchSize::SmallInput,
-        );
-    });
-
-    let json_parser_runner = |tform: &mut Box<dyn FunctionTransform>, event: Event| {
-        let mut result = Vec::with_capacity(1);
-        tform.transform(&mut result, event);
-        let output_1 = result[0].as_log();
+    let json_parser_runner = |tform: &mut Box<dyn SyncTransform>, event: Event| {
+        let mut outputs =
+            TransformOutputsBuf::new_with_capacity(vec![Output::default(DataType::all())], 1);
+        tform.transform(event, &mut outputs);
+        let result = outputs.take_primary();
+        let output_1 = result.first().unwrap().as_log();
 
         debug_assert_eq!(
             output_1.get("foo").unwrap().to_string_lossy(),
@@ -114,46 +96,24 @@ fn benchmark_remap(c: &mut Criterion) {
     };
 
     group.bench_function("parse_json/remap", |b| {
-        let mut tform: Box<dyn FunctionTransform> = Box::new(
-            Remap::new(
+        let mut tform: Box<dyn SyncTransform> = Box::new(
+            Remap::new_ast(
                 RemapConfig {
                     source: Some(".bar = parse_json!(string!(.foo))".to_owned()),
                     file: None,
                     timezone: TimeZone::default(),
                     drop_on_error: true,
                     drop_on_abort: true,
+                    ..Default::default()
                 },
                 &Default::default(),
             )
-            .unwrap(),
+            .unwrap()
+            .0,
         );
 
         let event = {
-            let mut event = Event::from("parse me");
-            event
-                .as_mut_log()
-                .insert("foo", r#"{"key": "value"}"#.to_owned());
-            event
-        };
-
-        b.iter_batched(
-            || event.clone(),
-            |event| json_parser_runner(&mut tform, event),
-            BatchSize::SmallInput,
-        );
-    });
-
-    group.bench_function("parse_json/native", |b| {
-        let mut tform: Box<dyn FunctionTransform> = Box::new(JsonParser::from(JsonParserConfig {
-            field: Some("foo".to_string()),
-            target_field: Some("bar".to_owned()),
-            drop_field: false,
-            drop_invalid: false,
-            overwrite_target: None,
-        }));
-
-        let event = {
-            let mut event = Event::from("parse me");
+            let mut event = Event::Log(LogEvent::from("parse me"));
             event
                 .as_mut_log()
                 .insert("foo", r#"{"key": "value"}"#.to_owned());
@@ -168,10 +128,12 @@ fn benchmark_remap(c: &mut Criterion) {
     });
 
     let coerce_runner =
-        |tform: &mut Box<dyn FunctionTransform>, event: Event, timestamp: DateTime<Utc>| {
-            let mut result = Vec::with_capacity(1);
-            tform.transform(&mut result, event);
-            let output_1 = result[0].as_log();
+        |tform: &mut Box<dyn SyncTransform>, event: Event, timestamp: DateTime<Utc>| {
+            let mut outputs =
+                TransformOutputsBuf::new_with_capacity(vec![Output::default(DataType::all())], 1);
+            tform.transform(event, &mut outputs);
+            let result = outputs.take_primary();
+            let output_1 = result.first().unwrap().as_log();
 
             debug_assert_eq!(output_1.get("number").unwrap(), &Value::Integer(1234));
             debug_assert_eq!(output_1.get("bool").unwrap(), &Value::Boolean(true));
@@ -184,8 +146,8 @@ fn benchmark_remap(c: &mut Criterion) {
         };
 
     group.bench_function("coerce/remap", |b| {
-        let mut tform: Box<dyn FunctionTransform> = Box::new(
-            Remap::new(RemapConfig {
+        let mut tform: Box<dyn SyncTransform> = Box::new(
+            Remap::new_ast(RemapConfig {
                 source: Some(indoc! {r#"
                     .number = to_int!(.number)
                     .bool = to_bool!(.bool)
@@ -196,50 +158,13 @@ fn benchmark_remap(c: &mut Criterion) {
                 timezone: TimeZone::default(),
                 drop_on_error: true,
                 drop_on_abort: true,
+                    ..Default::default()
             }, &Default::default())
-            .unwrap(),
+            .unwrap()
+            .0,
         );
 
-        let mut event = Event::from("coerce me");
-        for &(key, value) in &[
-            ("number", "1234"),
-            ("bool", "yes"),
-            ("timestamp", "19/06/2019:17:20:49 -0400"),
-        ] {
-            event.as_mut_log().insert(key, value.to_owned());
-        }
-
-        let timestamp =
-            DateTime::parse_from_str("19/06/2019:17:20:49 -0400", "%d/%m/%Y:%H:%M:%S %z")
-                .unwrap()
-                .with_timezone(&Utc);
-
-        b.iter_batched(
-            || event.clone(),
-            |event| coerce_runner(&mut tform, event, timestamp),
-            BatchSize::SmallInput,
-        );
-    });
-
-    group.bench_function("coerce/native", |b| {
-        let mut tform: Box<dyn FunctionTransform> = rt
-            .block_on(async move {
-                toml::from_str::<CoercerConfig>(indoc! {r#"
-                        drop_unspecified = false
-
-                        [types]
-                        number = "int"
-                        bool = "bool"
-                        timestamp = "timestamp|%d/%m/%Y:%H:%M:%S %z"
-                   "#})
-                .unwrap()
-                .build(&TransformContext::default())
-                .await
-                .unwrap()
-            })
-            .into_function();
-
-        let mut event = Event::from("coerce me");
+        let mut event = Event::Log(LogEvent::from("coerce me"));
         for &(key, value) in &[
             ("number", "1234"),
             ("bool", "yes"),

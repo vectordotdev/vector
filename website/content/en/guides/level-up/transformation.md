@@ -38,8 +38,8 @@ choice for transforming data in Vector:
   ensure that your VRL code is sound, meaning no dead code, no unhandled errors,
   and no type mismatches.
 
-In cases where VRL doesn't fit your use case, Vector also offers two [runtime
-transforms](#runtime-transforms) that offer a bit more flexibility than VRL but
+In cases where VRL doesn't fit your use case, Vector also offers a [Lua runtime
+transform](#lua-runtime-transform) that offer a bit more flexibility than VRL but
 also come with downsides (listed below) that should always be borne in mind.
 
 ## Transforming data using VRL
@@ -47,7 +47,7 @@ also come with downsides (listed below) that should always be borne in mind.
 Let's jump straight into an example of using VRL to modify some data. We'll
 create a simple topology consisting of three components:
 
-1. A [`generator`][docs.sources.generator] source produces random [Syslog][urls.syslog]
+1. A [`demo_logs`][docs.sources.demo_logs] source produces random [Syslog][urls.syslog]
    messages at a rate of 10 per second.
 2. A [`remap`][docs.transforms.remap] transform uses VRL to parse incoming Syslog lines
    into named fields (`severity`, `timestamp`, etc.).
@@ -58,7 +58,7 @@ This configuration defines that topology:
 
 ```toml title="vector.toml"
 [sources.logs]
-  type = "generator"
+  type = "demo_logs"
   format = "syslog"
   interval = 0.1
 
@@ -173,7 +173,7 @@ recommend checking out the following documentation:
 * [VRL expressions][docs.vrl.expressions], which describes things VRL's syntax
   and type system in great detail
 
-## Runtime transforms
+## Lua runtime transform
 
 If VRL doesn't cover your use case—and that should happen rarely—Vector also
 offers a [`lua`][docs.lua] **runtime transform** that you can use instead of
@@ -195,7 +195,7 @@ using it only when truly necessary, for several reasons:
 [docs.lua]: /docs/reference/configuration/transforms/lua/
 [docs.setup.quickstart]: /docs/setup/quickstart/
 [docs.sinks.console]: /docs/reference/configuration/sinks/console/
-[docs.sources.generator]: /docs/reference/configuration/sources/generator/
+[docs.sources.demo_logs]: /docs/reference/configuration/sources/demo_logs/
 [docs.transforms.remap]: /docs/reference/configuration/transforms/remap/
 [docs.transforms]: /docs/reference/configuration/transforms/
 [docs.vrl.examples]: /docs/reference/vrl/examples/

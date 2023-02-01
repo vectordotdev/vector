@@ -1,5 +1,19 @@
 use std::collections::BTreeMap;
+
+use ::value::Value;
 use vrl::prelude::*;
+
+fn parse_aws_vpc_flow_log(value: Value, format: Option<Value>) -> Resolved {
+    let bytes = value.try_bytes()?;
+    let input = String::from_utf8_lossy(&bytes);
+    if let Some(expr) = format {
+        let bytes = expr.try_bytes()?;
+        parse_log(&input, Some(&String::from_utf8_lossy(&bytes)))
+    } else {
+        parse_log(&input, None)
+    }
+    .map_err(Into::into)
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct ParseAwsVpcFlowLog;
@@ -48,14 +62,14 @@ impl Function for ParseAwsVpcFlowLog {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
-        mut arguments: ArgumentList,
+        _state: &state::TypeState,
+        _ctx: &mut FunctionCompileContext,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
         let format = arguments.optional("format");
 
-        Ok(Box::new(ParseAwsVpcFlowLogFn::new(value, format)))
+        Ok(ParseAwsVpcFlowLogFn::new(value, format).as_expr())
     }
 
     fn parameters(&self) -> &'static [Parameter] {
@@ -86,55 +100,54 @@ impl ParseAwsVpcFlowLogFn {
     }
 }
 
-impl Expression for ParseAwsVpcFlowLogFn {
+impl FunctionExpression for ParseAwsVpcFlowLogFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let bytes = self.value.resolve(ctx)?.try_bytes()?;
-        let input = String::from_utf8_lossy(&bytes);
+        let value = self.value.resolve(ctx)?;
+        let format = self
+            .format
+            .as_ref()
+            .map(|expr| expr.resolve(ctx))
+            .transpose()?;
 
-        if let Some(expr) = &self.format {
-            let bytes = expr.resolve(ctx)?.try_bytes()?;
-            parse_log(&input, Some(&String::from_utf8_lossy(&bytes)))
-        } else {
-            parse_log(&input, None)
-        }
-        .map_err(Into::into)
+        parse_aws_vpc_flow_log(value, format)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new()
-            .fallible() // Log parsing error
-            .object::<&str, Kind>(inner_type_def())
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
+        TypeDef::object(inner_kind()).fallible(/* log parsing error */)
     }
 }
 
-fn inner_type_def() -> BTreeMap<&'static str, Kind> {
-    map! {
-        "account_id": Kind::Integer | Kind::Null,
-        "action": Kind::Bytes | Kind::Null,
-        "az_id": Kind::Bytes | Kind::Null,
-        "bytes": Kind::Integer | Kind::Null,
-        "dstaddr": Kind::Bytes | Kind::Null,
-        "dstport": Kind::Integer | Kind::Null,
-        "end": Kind::Integer | Kind::Null,
-        "instance_id": Kind::Bytes | Kind::Null,
-        "interface_id": Kind::Bytes | Kind::Null,
-        "log_status": Kind::Bytes | Kind::Null,
-        "packets": Kind::Integer | Kind::Null,
-        "pkt_dstaddr": Kind::Bytes | Kind::Null,
-        "pkt_srcaddr": Kind::Bytes | Kind::Null,
-        "protocol": Kind::Integer | Kind::Null,
-        "region": Kind::Bytes | Kind::Null,
-        "srcaddr": Kind::Bytes | Kind::Null,
-        "srcport": Kind::Integer | Kind::Null,
-        "start": Kind::Integer | Kind::Null,
-        "sublocation_id": Kind::Bytes | Kind::Null,
-        "sublocation_type": Kind::Bytes | Kind::Null,
-        "subnet_id": Kind::Bytes | Kind::Null,
-        "tcp_flags": Kind::Integer | Kind::Null,
-        "type": Kind::Bytes | Kind::Null,
-        "version": Kind::Integer | Kind::Null,
-        "vpc_id": Kind::Bytes | Kind::Null,
-    }
+fn inner_kind() -> BTreeMap<Field, Kind> {
+    BTreeMap::from([
+        (Field::from("account_id"), Kind::integer() | Kind::null()),
+        (Field::from("action"), Kind::bytes() | Kind::null()),
+        (Field::from("az_id"), Kind::bytes() | Kind::null()),
+        (Field::from("bytes"), Kind::integer() | Kind::null()),
+        (Field::from("dstaddr"), Kind::bytes() | Kind::null()),
+        (Field::from("dstport"), Kind::integer() | Kind::null()),
+        (Field::from("end"), Kind::integer() | Kind::null()),
+        (Field::from("instance_id"), Kind::bytes() | Kind::null()),
+        (Field::from("interface_id"), Kind::bytes() | Kind::null()),
+        (Field::from("log_status"), Kind::bytes() | Kind::null()),
+        (Field::from("packets"), Kind::integer() | Kind::null()),
+        (Field::from("pkt_dstaddr"), Kind::bytes() | Kind::null()),
+        (Field::from("pkt_srcaddr"), Kind::bytes() | Kind::null()),
+        (Field::from("protocol"), Kind::integer() | Kind::null()),
+        (Field::from("region"), Kind::bytes() | Kind::null()),
+        (Field::from("srcaddr"), Kind::bytes() | Kind::null()),
+        (Field::from("srcport"), Kind::integer() | Kind::null()),
+        (Field::from("start"), Kind::integer() | Kind::null()),
+        (Field::from("sublocation_id"), Kind::bytes() | Kind::null()),
+        (
+            Field::from("sublocation_type"),
+            Kind::bytes() | Kind::null(),
+        ),
+        (Field::from("subnet_id"), Kind::bytes() | Kind::null()),
+        (Field::from("tcp_flags"), Kind::integer() | Kind::null()),
+        (Field::from("type"), Kind::bytes() | Kind::null()),
+        (Field::from("version"), Kind::integer() | Kind::null()),
+        (Field::from("vpc_id"), Kind::bytes() | Kind::null()),
+    ])
 }
 
 type ParseResult<T> = std::result::Result<T, String>;
@@ -147,7 +160,7 @@ fn identity<'a>(_key: &'a str, value: &'a str) -> ParseResult<&'a str> {
 fn parse_i64(key: &str, value: &str) -> ParseResult<i64> {
     value
         .parse()
-        .map_err(|_| format!("failed to parse value as i64 (key: `{}`): `{}`", key, value))
+        .map_err(|_| format!("failed to parse value as i64 (key: `{key}`): `{value}`"))
 }
 
 macro_rules! create_match {
@@ -209,8 +222,8 @@ fn parse_log(input: &str, format: Option<&str>) -> ParseResult<Value> {
 
                 continue;
             }
-            (None, Some(value)) => Err(format!("no key for value: `{}`", value)),
-            (Some(key), None) => Err(format!("no item for key: `{}`", key)),
+            (None, Some(value)) => Err(format!("no key for value: `{value}`")),
+            (Some(key), None) => Err(format!("no item for key: `{key}`")),
             (None, None) => Ok(log.into()),
         };
     }
@@ -279,34 +292,34 @@ mod tests {
         default {
              args: func_args![value: "2 123456789010 eni-1235b8ca123456789 172.31.16.139 172.31.16.21 20641 22 6 20 4249 1418530010 1418530070 ACCEPT OK"],
              want: Ok(value!({
-                 "account_id": 123456789010_i64,
+                 "account_id": 123_456_789_010_i64,
                  "action": "ACCEPT",
                  "bytes": 4249,
                  "dstaddr": "172.31.16.21",
                  "dstport": 22,
-                 "end": 1418530070,
+                 "end": 1_418_530_070,
                  "interface_id": "eni-1235b8ca123456789",
                  "log_status": "OK",
                  "packets": 20,
                  "protocol": 6,
                  "srcaddr": "172.31.16.139",
                  "srcport": 20641,
-                 "start": 1418530010,
+                 "start": 1_418_530_010,
                  "version": 2
              })),
-             tdef: TypeDef::new().fallible().object::<&str, Kind>(inner_type_def()),
+             tdef: TypeDef::object(inner_kind()).fallible(),
          }
 
         fields {
              args: func_args![value: "3 vpc-abcdefab012345678 subnet-aaaaaaaa012345678 i-01234567890123456 eni-1235b8ca123456789 123456789010 IPv4 52.213.180.42 10.0.0.62 43416 5001 52.213.180.42 10.0.0.62 6 568 8 1566848875 1566848933 ACCEPT 2 OK",
                               format: "version vpc_id subnet_id instance_id interface_id account_id type srcaddr dstaddr srcport dstport pkt_srcaddr pkt_dstaddr protocol bytes packets start end action tcp_flags log_status"],
              want: Ok(value!({
-                 "account_id": 123456789010_i64,
+                 "account_id": 123_456_789_010_i64,
                  "action": "ACCEPT",
                  "bytes": 568,
                  "dstaddr": "10.0.0.62",
                  "dstport": 5001,
-                 "end": 1566848933,
+                 "end": 1_566_848_933,
                  "instance_id": "i-01234567890123456",
                  "interface_id": "eni-1235b8ca123456789",
                  "log_status": "OK",
@@ -316,14 +329,14 @@ mod tests {
                  "protocol": 6,
                  "srcaddr": "52.213.180.42",
                  "srcport": 43416,
-                 "start": 1566848875,
+                 "start": 1_566_848_875,
                  "subnet_id": "subnet-aaaaaaaa012345678",
                  "tcp_flags": 2,
                  "type": "IPv4",
                  "version": 3,
                  "vpc_id": "vpc-abcdefab012345678"
              })),
-             tdef: TypeDef::new().fallible().object::<&str, Kind>(inner_type_def()),
+             tdef: TypeDef::object(inner_kind()).fallible(),
          }
     ];
 }

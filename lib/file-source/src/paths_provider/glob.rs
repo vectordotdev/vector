@@ -1,12 +1,12 @@
 //! [`Glob`] paths provider.
 
-use super::PathsProvider;
-use crate::FileSourceInternalEvents;
-
-use glob::Pattern;
 use std::path::PathBuf;
 
 pub use glob::MatchOptions;
+use glob::Pattern;
+
+use super::PathsProvider;
+use crate::FileSourceInternalEvents;
 
 /// A glob-based path provider.
 ///
@@ -36,8 +36,7 @@ impl<E: FileSourceInternalEvents> Glob<E> {
 
         let exclude_patterns = exclude_patterns
             .iter()
-            .map(|path| path.to_str().map(|path| Pattern::new(path).ok()))
-            .flatten()
+            .filter_map(|path| path.to_str().map(|path| Pattern::new(path).ok()))
             .collect::<Option<Vec<_>>>()?;
 
         Some(Self {

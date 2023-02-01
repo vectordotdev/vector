@@ -4,14 +4,15 @@ description: Parse structured application logs in CSV format using Lua transform
 authors: ["binarylogic"]
 domain: transforms
 transforms: ["lua"]
-weight: 6
+weight: 4
 tags: ["lua", "csv", "logs", "transform", "advanced", "guides", "guide"]
 ---
 
 {{< requirement title="Pre-requisites" >}}
 
-* You understand the [basic Lua concepts][docs.transforms.lua].
-* You understand the [basic Vector concepts][docs.about.concepts] and understand [how to set up a pipeline][docs.setup.quickstart].
+* You understand the <a href="/docs/reference/configuration/transforms/lua">basic Lua concepts</a>.
+* You understand the <a href="/docs/about/concepts">basic Vector concepts</a> and understand <a href="/docs/setup/quickstart/">how to set up a pipeline</a>
+
 {{< /requirement >}}
 
 Vector has many built-in [parsers][urls.vector_parsing_transforms] for structured logs formats. However, when you need
@@ -57,7 +58,7 @@ data_dir = "."
 [sinks.console]
   inputs = ["lua"]
   type = "console"
-  encoding = "json"
+  encoding.codec = "json"
 ```
 
 This config sets up a [pipeline][docs.meta.glossary#pipeline] that reads log files, pipes them through the parsing
@@ -236,9 +237,7 @@ built-in functions, such as [`tonumber`][urls.lua_tonumber]. Alternatively, it i
 [`coercer`][docs.transforms.coercer] transform after the `lua` transform, for example, to
 [parse timestamps][docs.transforms.coercer#timestamps].
 
-[docs.about.concepts]: /docs/about/concepts
 [docs.meta.glossary#pipeline]: /docs/reference/glossary/#pipeline
-[docs.setup.quickstart]: /docs/setup/quickstart/
 [docs.sinks.console]: /docs/reference/configuration/sinks/console/
 [docs.sources.file#multiline]: /docs/reference/configuration/sources/file/#multiline
 [docs.sources.file]: /docs/reference/configuration/sources/file/

@@ -1,7 +1,7 @@
 ---
 date: "2020-03-31"
 title: "ARMv7 and ARM64 Support on Linux"
-description: "These architectures are widely used in embeded devices and servers"
+description: "These architectures are widely used in embedded devices and servers"
 authors: ["binarylogic"]
 pr_numbers: [1054, 1292]
 release: "0.6.0"
@@ -55,7 +55,7 @@ price/performance over current generation `M5`, `C5`, and `R5` instances".
 ### Raspbian, IoT, and embedded devices
 
 ARM architectures are widely used on IoT devices. Vector is the perfect
-candidate for resource constrainted environments like this, especially given
+candidate for resource constrained environments like this, especially given
 Vector's superior memory efficiency.
 
 ## The case for Vector

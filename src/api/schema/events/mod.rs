@@ -1,19 +1,47 @@
 mod encoding;
-mod log;
-mod notification;
-mod output;
+pub mod log;
+pub mod metric;
+pub mod notification;
+pub mod output;
+pub mod trace;
 
+use std::collections::HashSet;
+
+use async_graphql::{Context, Subscription};
 use encoding::EventEncodingType;
+use futures::{stream, Stream, StreamExt};
 use output::OutputEventsPayload;
-
-use crate::{api::tap::TapController, topology::WatchRx};
-
-use async_graphql::{validators::IntRange, Context, Subscription};
-use futures::Stream;
-use itertools::Itertools;
 use rand::{rngs::SmallRng, Rng, SeedableRng};
 use tokio::{select, sync::mpsc, time};
 use tokio_stream::wrappers::ReceiverStream;
+
+use crate::{api::tap::TapController, topology::WatchRx};
+
+/// Patterns (glob) used by tap to match against components and access events
+/// flowing into (for_inputs) or out of (for_outputs) specified components
+#[derive(Debug)]
+pub struct TapPatterns {
+    pub for_outputs: HashSet<String>,
+    pub for_inputs: HashSet<String>,
+}
+
+impl TapPatterns {
+    pub const fn new(for_outputs: HashSet<String>, for_inputs: HashSet<String>) -> Self {
+        Self {
+            for_outputs,
+            for_inputs,
+        }
+    }
+
+    /// Get all user-specified patterns
+    pub fn all_patterns(&self) -> HashSet<String> {
+        self.for_outputs
+            .iter()
+            .cloned()
+            .chain(self.for_inputs.iter().cloned())
+            .collect()
+    }
+}
 
 #[derive(Debug, Default)]
 pub struct EventsSubscription;
@@ -24,12 +52,17 @@ impl EventsSubscription {
     pub async fn output_events_by_component_id_patterns<'a>(
         &'a self,
         ctx: &'a Context<'a>,
-        patterns: Vec<String>,
+        outputs_patterns: Vec<String>,
+        inputs_patterns: Option<Vec<String>>,
         #[graphql(default = 500)] interval: u32,
-        #[graphql(default = 100, validator(IntRange(min = "1", max = "10_000")))] limit: u32,
+        #[graphql(default = 100, validator(minimum = 1, maximum = 10_000))] limit: u32,
     ) -> impl Stream<Item = Vec<OutputEventsPayload>> + 'a {
         let watch_rx = ctx.data_unchecked::<WatchRx>().clone();
 
+        let patterns = TapPatterns {
+            for_outputs: outputs_patterns.into_iter().collect(),
+            for_inputs: inputs_patterns.unwrap_or_default().into_iter().collect(),
+        };
         // Client input is confined to `u32` to provide sensible bounds.
         create_events_stream(watch_rx, patterns, interval as u64, limit as usize)
     }
@@ -38,15 +71,17 @@ impl EventsSubscription {
 /// Creates an events stream based on component ids, and a provided interval. Will emit
 /// control messages that bubble up the application if the sink goes away. The stream contains
 /// all matching events; filtering should be done at the caller level.
-fn create_events_stream(
+pub(crate) fn create_events_stream(
     watch_rx: WatchRx,
-    component_id_patterns: Vec<String>,
+    patterns: TapPatterns,
     interval: u64,
     limit: usize,
 ) -> impl Stream<Item = Vec<OutputEventsPayload>> {
     // Channel for receiving individual tap payloads. Since we can process at most `limit` per
     // interval, this is capped to the same value.
-    let (tap_tx, mut tap_rx) = mpsc::channel(limit);
+    let (tap_tx, tap_rx) = mpsc::channel(limit);
+    let mut tap_rx = ReceiverStream::new(tap_rx)
+        .flat_map(|payload| stream::iter(<Vec<OutputEventsPayload>>::from(payload)));
 
     // The resulting vector of `Event` sent to the client. Only one result set will be streamed
     // back to the client at a time. This value is set higher than `1` to prevent blocking the event
@@ -56,7 +91,7 @@ fn create_events_stream(
     tokio::spawn(async move {
         // Create a tap controller. When this drops out of scope, clean up will be performed on the
         // event handlers and topology observation that the tap controller provides.
-        let _tap_controller = TapController::new(watch_rx, tap_tx, &component_id_patterns);
+        let _tap_controller = TapController::new(watch_rx, tap_tx, patterns);
 
         // A tick interval to represent when to 'cut' the results back to the client.
         let mut interval = time::interval(time::Duration::from_millis(interval));
@@ -84,9 +119,7 @@ fn create_events_stream(
                 // Process `TapPayload`s. A tap payload could contain log/metric events or a
                 // notification. Notifications are emitted immediately; events buffer until
                 // the next `interval`.
-                Some(payload) = tap_rx.recv() => {
-                    let payload = payload.into();
-
+                Some(payload) = tap_rx.next() => {
                     // Emit notifications immediately; these don't count as a 'batch'.
                     if let OutputEventsPayload::Notification(_) = payload {
                         // If an error occurs when sending, the subscription has likely gone
@@ -124,9 +157,8 @@ fn create_events_stream(
 
                         // Since events will appear out of order per the random sampling
                         // strategy, drain the existing results and sort by timestamp.
-                        let results = results
-                            .drain(..)
-                            .sorted_by_key(|r| r.batch)
+                        results.sort_by_key(|r| r.batch);
+                        let results = results.drain(..)
                             .map(|r| r.payload)
                             .collect();
 

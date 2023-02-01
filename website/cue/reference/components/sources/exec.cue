@@ -13,8 +13,13 @@ components: sources: exec: {
 	}
 
 	features: {
+		auto_generated:   true
+		acknowledgements: false
 		multiline: enabled: false
-		codecs: enabled:    true
+		codecs: {
+			enabled:         true
+			default_framing: "`newline_delimited` for codecs other than `native`, which defaults to `length_delimited`"
+		}
 		receive: {
 			from: {
 				service: services.exec
@@ -25,16 +30,6 @@ components: sources: exec: {
 	}
 
 	support: {
-		targets: {
-			"aarch64-unknown-linux-gnu":      true
-			"aarch64-unknown-linux-musl":     true
-			"armv7-unknown-linux-gnueabihf":  true
-			"armv7-unknown-linux-musleabihf": true
-			"x86_64-apple-darwin":            true
-			"x86_64-pc-windows-msv":          true
-			"x86_64-unknown-linux-gnu":       true
-			"x86_64-unknown-linux-musl":      true
-		}
 		requirements: []
 		warnings: []
 		notices: []
@@ -44,110 +39,7 @@ components: sources: exec: {
 		platform_name: null
 	}
 
-	configuration: {
-		mode: {
-			description: "The type of exec mechanism."
-			required:    true
-			type: string: {
-				enum: {
-					scheduled: "Scheduled exec mechanism."
-					streaming: "Streaming exec mechanism."
-				}
-				syntax: "literal"
-			}
-		}
-		command: {
-			required:    true
-			description: "The command to be run, plus any arguments required."
-			type: array: {
-				examples: [["echo", "Hello World!"], ["ls", "-la"]]
-				items: type: string: {
-					syntax: "literal"
-				}
-			}
-		}
-		working_directory: {
-			common:      false
-			required:    false
-			description: "The directory in which to run the command."
-			warnings: []
-			type: string: {
-				default: null
-				syntax:  "literal"
-			}
-		}
-		include_stderr: {
-			common:      false
-			description: "Include the output of stderr when generating events."
-			required:    false
-			type: bool: default: true
-		}
-		event_per_line: {
-			common:      false
-			description: "Determine if events should be generated per line or buffered and output as a single event when script execution finishes."
-			required:    false
-			type: bool: default: true
-		}
-		maximum_buffer_size_bytes: {
-			common:      false
-			description: "The maximum buffer size allowed before a log event will be generated."
-			required:    false
-			type: uint: {
-				default: 1000000
-				unit:    "bytes"
-			}
-		}
-		scheduled: {
-			common:      true
-			description: "The scheduled options."
-			required:    false
-			warnings: []
-			type: object: {
-				examples: []
-				options: {
-					exec_interval_secs: {
-						common:        true
-						description:   "The interval in seconds between scheduled command runs. The command will be killed if it takes longer than exec_interval_secs to run."
-						relevant_when: "mode = `scheduled`"
-						required:      false
-						type: uint: {
-							default: 60
-							unit:    "seconds"
-						}
-					}
-				}
-			}
-		}
-		streaming: {
-			common:      true
-			description: "The streaming options."
-			required:    false
-			warnings: []
-			type: object: {
-				examples: []
-				options: {
-					respawn_on_exit: {
-						common:        true
-						description:   "Determine if a streaming command should be restarted if it exits."
-						relevant_when: "mode = `streaming`"
-						required:      false
-						type: bool: default: true
-					}
-					respawn_interval_secs: {
-						common:        false
-						description:   "The interval in seconds between restarting streaming commands if needed."
-						relevant_when: "mode = `streaming`"
-						required:      false
-						warnings: []
-						type: uint: {
-							default: 5
-							unit:    "seconds"
-						}
-					}
-				}
-			}
-		}
-	}
+	configuration: base.components.sources.exec.configuration
 
 	output: logs: line: {
 		description: "An individual event from exec."
@@ -160,9 +52,8 @@ components: sources: exec: {
 				description: "The data stream from which the event originated."
 				required:    false
 				type: string: {
-					examples: ["stdout", "stderr"]
 					default: null
-					syntax:  "literal"
+					examples: ["stdout", "stderr"]
 				}
 			}
 			pid: {
@@ -179,8 +70,14 @@ components: sources: exec: {
 				type: array: {
 					items: type: string: {
 						examples: ["echo", "Hello World!", "ls", "-la"]
-						syntax: "literal"
 					}
+				}
+			}
+			source_type: {
+				description: "The name of the source type."
+				required:    true
+				type: string: {
+					examples: ["exec"]
 				}
 			}
 		}
@@ -199,6 +96,7 @@ components: sources: exec: {
 				timestamp:   _timestamp
 				host:        _values.local_host
 				message:     _line
+				source_type: "exec"
 			}
 		},
 	]
@@ -211,15 +109,32 @@ components: sources: exec: {
 				[`maximum_buffer_size_bytes`](#maximum_buffer_size_bytes) is reached.
 				"""
 		}
+		shutdown: {
+			title: "Shutting Down"
+			body: """
+				When Vector begins shutting down (typically due to a SIGTERM), this source will
+				signal to the child process to terminate, if it is running, to shut down.
+
+				On *nix platforms, Vector will issue a SIGTERM to the child process, allowing it to
+				gracefully shutdown, and the source will continue reading until the process exits or
+				Vector's shutdown grace period expires.
+
+				On Windows, the subprocess will be issued a SIGKILL and terminate abruptly. In the
+				future we hope to support graceful shutdown of Windows processes as well.
+				"""
+		}
 	}
 
 	telemetry: metrics: {
-		command_executed_total:             components.sources.internal_metrics.output.metrics.command_executed_total
-		command_execution_duration_seconds: components.sources.internal_metrics.output.metrics.command_execution_duration_seconds
-		events_in_total:                    components.sources.internal_metrics.output.metrics.events_in_total
-		processed_bytes_total:              components.sources.internal_metrics.output.metrics.processed_bytes_total
-		processed_events_total:             components.sources.internal_metrics.output.metrics.processed_events_total
-		processing_errors_total:            components.sources.internal_metrics.output.metrics.processing_errors_total
-		component_received_events_total:    components.sources.internal_metrics.output.metrics.component_received_events_total
+		command_executed_total:               components.sources.internal_metrics.output.metrics.command_executed_total
+		command_execution_duration_seconds:   components.sources.internal_metrics.output.metrics.command_execution_duration_seconds
+		events_in_total:                      components.sources.internal_metrics.output.metrics.events_in_total
+		processed_bytes_total:                components.sources.internal_metrics.output.metrics.processed_bytes_total
+		processed_events_total:               components.sources.internal_metrics.output.metrics.processed_events_total
+		processing_errors_total:              components.sources.internal_metrics.output.metrics.processing_errors_total
+		component_discarded_events_total:     components.sources.internal_metrics.output.metrics.component_discarded_events_total
+		component_errors_total:               components.sources.internal_metrics.output.metrics.component_errors_total
+		component_received_events_total:      components.sources.internal_metrics.output.metrics.component_received_events_total
+		component_received_event_bytes_total: components.sources.internal_metrics.output.metrics.component_received_event_bytes_total
 	}
 }

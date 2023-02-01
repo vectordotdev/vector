@@ -1,168 +1,61 @@
-use indoc::formatdoc;
+use indoc::{formatdoc, indoc};
 use k8s_e2e_tests::*;
 use k8s_test_framework::{
     lock, namespace, test_pod, vector::Config as VectorConfig, wait_for_resource::WaitFor,
 };
 
-fn helm_values_stdout_sink(aggregator_override_name: &str, agent_override_name: &str) -> String {
-    if is_multinode() {
-        formatdoc!(
-            r#"
-    global:
-      vector:
-        commonEnvKV:
-          VECTOR_REQUIRE_HEALTHY: true
-
-    vector-agent:
-      fullnameOverride: "{}"
-      kubernetesLogsSource:
-        rawConfig: |
-          glob_minimum_cooldown_ms = 5000
-      vectorSink:
-        host: "{}"
-      dataVolume:
-        hostPath:
-          path: /var/lib/{}-vector/
-
-      extraVolumeMounts:
-        - name: var-lib
-          mountPath: /var/writablelib
-          readOnly: false
-
-      lifecycle:
-        preStop:
-          exec:
-            command:
-              - sh
-              - -c
-              - rm -rf /var/writablelib/{}-vector
-
-    vector-aggregator:
-      fullnameOverride: "{}"
-      vectorSource:
-        sourceId: vector
-
+fn helm_values_stdout_sink(agent_override_name: &str) -> String {
+    formatdoc!(
+        r#"
+    role: Agent
+    fullnameOverride: "{}"
+    env:
+    - name: VECTOR_REQUIRE_HEALTHY
+      value: true
+    customConfig:
+      data_dir: "/vector-data-dir"
+      api:
+        enabled: true
+        address: 127.0.0.1:8686
+      sources:
+        kubernetes_logs:
+          type: kubernetes_logs
       sinks:
-        stdout:
-          type: "console"
-          inputs: ["vector"]
-          target: "stdout"
-          encoding: "json"
+        vector:
+          type: vector
+          inputs: [kubernetes_logs]
+          address: aggregator-vector:6000
+          version: "2"
     "#,
-            agent_override_name,
-            aggregator_override_name,
-            agent_override_name,
-            agent_override_name,
-            aggregator_override_name
-        )
-    } else {
-        formatdoc!(
-            r#"
-    global:
-      vector:
-        commonEnvKV:
-          VECTOR_REQUIRE_HEALTHY: true
-
-    vector-agent:
-      fullnameOverride: "{}"
-      kubernetesLogsSource:
-        rawConfig: |
-          glob_minimum_cooldown_ms = 5000
-      vectorSink:
-        host: "{}"
-
-    vector-aggregator:
-      fullnameOverride: "{}"
-      vectorSource:
-        sourceId: vector
-
-      sinks:
-        stdout:
-          type: "console"
-          inputs: ["vector"]
-          target: "stdout"
-          encoding: "json"
-    "#,
-            agent_override_name,
-            aggregator_override_name,
-            aggregator_override_name
-        )
-    }
+        agent_override_name,
+    )
 }
 
-fn helm_values_haproxy(aggregator_override_name: &str, agent_override_name: &str) -> String {
-    if is_multinode() {
-        formatdoc!(
-            r#"
-    global:
-      vector:
-        commonEnvKV:
-          VECTOR_REQUIRE_HEALTHY: true
-
-    vector-agent:
-      fullnameOverride: "{}"
-      kubernetesLogsSource:
-        rawConfig: |
-          glob_minimum_cooldown_ms = 5000
-      vectorSink:
-        host: "{}-haproxy"
-      dataVolume:
-        hostPath:
-          path: /var/lib/{}-vector/
-
-    vector-aggregator:
-      fullnameOverride: "{}"
-      vectorSource:
-        sourceId: vector
-
-      sinks:
-        stdout:
-          type: "console"
-          inputs: ["vector"]
-          target: "stdout"
-          encoding: "json"
-
-      haproxy:
+fn helm_values_haproxy(agent_override_name: &str) -> String {
+    formatdoc!(
+        r#"
+    role: Agent
+    fullnameOverride: "{}"
+    env:
+    - name: VECTOR_REQUIRE_HEALTHY
+      value: true
+    customConfig:
+      data_dir: "/vector-data-dir"
+      api:
         enabled: true
-    "#,
-            agent_override_name,
-            aggregator_override_name,
-            agent_override_name,
-            aggregator_override_name
-        )
-    } else {
-        formatdoc!(
-            r#"
-    global:
-      vector:
-        commonEnvKV:
-          VECTOR_REQUIRE_HEALTHY: true
-
-    vector-agent:
-      fullnameOverride: "{}"
-      vectorSink:
-        host: "{}-haproxy"
-
-    vector-aggregator:
-      fullnameOverride: "{}"
-      vectorSource:
-        sourceId: vector
-
+        address: 127.0.0.1:8686
+      sources:
+        kubernetes_logs:
+          type: kubernetes_logs
       sinks:
-        stdout:
-          type: "console"
-          inputs: ["vector"]
-          target: "stdout"
-          encoding: "json"
-
-      haproxy:
-        enabled: true
+        vector:
+          type: vector
+          inputs: [kubernetes_logs]
+          address: aggregator-vector-haproxy:6000
+          version: "2"
     "#,
-            agent_override_name,
-            aggregator_override_name,
-            aggregator_override_name
-        )
-    }
+        agent_override_name,
+    )
 }
 
 /// This test validates that vector picks up logs with an agent and
@@ -175,19 +68,36 @@ async fn logs() -> Result<(), Box<dyn std::error::Error>> {
     let namespace = get_namespace();
     let pod_namespace = get_namespace_appended(&namespace, "test-pod");
     let framework = make_framework();
-    let aggregator_override_name = get_override_name(&namespace, "vector-aggregator");
     let agent_override_name = get_override_name(&namespace, "vector-agent");
 
-    let vector = framework
+    let vector_aggregator = framework
         .helm_chart(
             &namespace,
             "vector",
-            "https://packages.timber.io/helm/nightly/",
+            "aggregator",
+            "https://helm.vector.dev",
             VectorConfig {
-                custom_helm_values: vec![&helm_values_stdout_sink(
-                    &aggregator_override_name,
-                    &agent_override_name,
-                )],
+                ..Default::default()
+            },
+        )
+        .await?;
+
+    framework
+        .wait_for_rollout(
+            &namespace,
+            &format!("statefulset/aggregator-vector"),
+            vec!["--timeout=60s"],
+        )
+        .await?;
+
+    let vector_agent = framework
+        .helm_chart(
+            &namespace,
+            "vector",
+            "agent",
+            "https://helm.vector.dev",
+            VectorConfig {
+                custom_helm_values: vec![&helm_values_stdout_sink(&agent_override_name)],
                 ..Default::default()
             },
         )
@@ -197,14 +107,6 @@ async fn logs() -> Result<(), Box<dyn std::error::Error>> {
         .wait_for_rollout(
             &namespace,
             &format!("daemonset/{}", agent_override_name),
-            vec!["--timeout=60s"],
-        )
-        .await?;
-
-    framework
-        .wait_for_rollout(
-            &namespace,
-            &format!("statefulset/{}", aggregator_override_name),
             vec!["--timeout=60s"],
         )
         .await?;
@@ -234,10 +136,7 @@ async fn logs() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
 
-    let mut log_reader = framework.logs(
-        &namespace,
-        &format!("statefulset/{}", aggregator_override_name),
-    )?;
+    let mut log_reader = framework.logs(&namespace, &format!("statefulset/aggregator-vector"))?;
     smoke_check_first_line(&mut log_reader).await;
 
     // Read the rest of the log lines.
@@ -270,33 +169,65 @@ async fn logs() -> Result<(), Box<dyn std::error::Error>> {
 
     drop(test_pod);
     drop(test_namespace);
-    drop(vector);
+    drop(vector_agent);
+    drop(vector_aggregator);
     Ok(())
 }
 
 /// This test validates that vector picks up logs with an agent and
 /// delivers them to the aggregator through an HAProxy load balancer.
 #[tokio::test]
-async fn logs_haproxy() -> Result<(), Box<dyn std::error::Error>> {
+async fn haproxy() -> Result<(), Box<dyn std::error::Error>> {
     let _guard = lock();
     init();
 
     let namespace = get_namespace();
     let pod_namespace = get_namespace_appended(&namespace, "test-pod");
     let framework = make_framework();
-    let aggregator_override_name = get_override_name(&namespace, "vector-aggregator");
     let agent_override_name = get_override_name(&namespace, "vector-agent");
 
-    let vector = framework
+    const CONFIG: &str = indoc! {r#"
+        haproxy:
+          enabled: true
+    "#};
+
+    let vector_aggregator = framework
         .helm_chart(
             &namespace,
             "vector",
-            "https://packages.timber.io/helm/nightly/",
+            "aggregator",
+            "https://helm.vector.dev",
             VectorConfig {
-                custom_helm_values: vec![&helm_values_haproxy(
-                    &aggregator_override_name,
-                    &agent_override_name,
-                )],
+                custom_helm_values: vec![CONFIG],
+                ..Default::default()
+            },
+        )
+        .await?;
+
+    framework
+        .wait_for_rollout(
+            &namespace,
+            &format!("statefulset/aggregator-vector"),
+            vec!["--timeout=60s"],
+        )
+        .await?;
+
+    framework
+        .wait_for_rollout(
+            &namespace,
+            &format!("deployment/aggregator-vector-haproxy"),
+            vec!["--timeout=60s"],
+        )
+        .await?;
+
+    let vector_agent = framework
+        .helm_chart(
+            &namespace,
+            "vector",
+            "agent",
+            "https://helm.vector.dev",
+            VectorConfig {
+                custom_helm_values: vec![&helm_values_haproxy(&agent_override_name)],
                 ..Default::default()
             },
         )
@@ -306,14 +237,6 @@ async fn logs_haproxy() -> Result<(), Box<dyn std::error::Error>> {
         .wait_for_rollout(
             &namespace,
             &format!("daemonset/{}", agent_override_name),
-            vec!["--timeout=60s"],
-        )
-        .await?;
-
-    framework
-        .wait_for_rollout(
-            &namespace,
-            &format!("statefulset/{}", aggregator_override_name),
             vec!["--timeout=60s"],
         )
         .await?;
@@ -343,10 +266,7 @@ async fn logs_haproxy() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
 
-    let mut log_reader = framework.logs(
-        &namespace,
-        &format!("statefulset/{}", aggregator_override_name),
-    )?;
+    let mut log_reader = framework.logs(&namespace, &format!("statefulset/aggregator-vector"))?;
     smoke_check_first_line(&mut log_reader).await;
 
     // Read the rest of the log lines.
@@ -379,6 +299,7 @@ async fn logs_haproxy() -> Result<(), Box<dyn std::error::Error>> {
 
     drop(test_pod);
     drop(test_namespace);
-    drop(vector);
+    drop(vector_agent);
+    drop(vector_aggregator);
     Ok(())
 }

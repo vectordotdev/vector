@@ -1,12 +1,16 @@
 //! Perform a port forward from a port listening on a local system to the
 //! a port exposed from a cluster-deployed resource.
 
-use super::Result;
+#![allow(clippy::print_stdout)] // test framework
+
 use std::process::{ExitStatus, Stdio};
+
 use tokio::{
     io::{AsyncBufReadExt, BufReader},
     process::{Child, ChildStdout, Command},
 };
+
+use super::Result;
 
 /// Initiate a port forward (`kubectl port-forward`) with the specified
 /// `kubectl_command` for the specified `resource` at the specified `namespace`
@@ -45,7 +49,7 @@ pub fn port_forward(
     })
 }
 
-/// Keeps track of the continiously running `kubectl port-forward` command,
+/// Keeps track of the continuously running `kubectl port-forward` command,
 /// exposing the API to terminate it when needed.
 #[derive(Debug)]
 pub struct PortForwarder {
@@ -116,7 +120,7 @@ impl PortForwarder {
     /// Wait for the `kubectl port-forward` process to exit and return the exit
     /// code.
     pub async fn wait(&mut self) -> std::io::Result<ExitStatus> {
-        (&mut self.child).wait().await
+        self.child.wait().await
     }
 
     /// Send a termination signal to the `kubectl port-forward` process.

@@ -1,4 +1,29 @@
+use ::value::Value;
 use vrl::prelude::*;
+
+fn split(value: Value, limit: Value, pattern: Value) -> Resolved {
+    let string = value.try_bytes_utf8_lossy()?;
+    let limit = limit.try_integer()? as usize;
+    match pattern {
+        Value::Regex(pattern) => Ok(pattern
+            .splitn(string.as_ref(), limit)
+            .collect::<Vec<_>>()
+            .into()),
+        Value::Bytes(bytes) => {
+            let pattern = String::from_utf8_lossy(&bytes);
+
+            Ok(string
+                .splitn(limit, pattern.as_ref())
+                .collect::<Vec<_>>()
+                .into())
+        }
+        value => Err(value::Error::Expected {
+            got: value.kind(),
+            expected: Kind::regex() | Kind::bytes(),
+        }
+        .into()),
+    }
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct Split;
@@ -50,19 +75,20 @@ impl Function for Split {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
-        mut arguments: ArgumentList,
+        _state: &state::TypeState,
+        _ctx: &mut FunctionCompileContext,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
         let pattern = arguments.required("pattern");
-        let limit = arguments.optional("limit").unwrap_or(expr!(999999999));
+        let limit = arguments.optional("limit").unwrap_or(expr!(999_999_999));
 
-        Ok(Box::new(SplitFn {
+        Ok(SplitFn {
             value,
             pattern,
             limit,
-        }))
+        }
+        .as_expr())
     }
 }
 
@@ -73,37 +99,17 @@ pub(crate) struct SplitFn {
     limit: Box<dyn Expression>,
 }
 
-impl Expression for SplitFn {
+impl FunctionExpression for SplitFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
-        let string = value.try_bytes_utf8_lossy()?;
-        let limit = self.limit.resolve(ctx)?.try_integer()? as usize;
+        let limit = self.limit.resolve(ctx)?;
+        let pattern = self.pattern.resolve(ctx)?;
 
-        self.pattern.resolve(ctx).and_then(|pattern| match pattern {
-            Value::Regex(pattern) => Ok(pattern
-                .splitn(string.as_ref(), limit as usize)
-                .collect::<Vec<_>>()
-                .into()),
-            Value::Bytes(bytes) => {
-                let pattern = String::from_utf8_lossy(&bytes);
-
-                Ok(string
-                    .splitn(limit, pattern.as_ref())
-                    .collect::<Vec<_>>()
-                    .into())
-            }
-            value => Err(value::Error::Expected {
-                got: value.kind(),
-                expected: Kind::Regex | Kind::Bytes,
-            }
-            .into()),
-        })
+        split(value, limit, pattern)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new()
-            .infallible()
-            .array_mapped::<(), Kind>(map! {(): Kind::Bytes})
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
+        TypeDef::array(Collection::from_unknown(Kind::bytes())).infallible()
     }
 }
 
@@ -120,9 +126,7 @@ mod test {
                              pattern: " "
             ],
             want: Ok(value!([""])),
-            tdef: TypeDef::new()
-                .infallible()
-                .array_mapped::<(), Kind>(map! {(): Kind::Bytes}),
+            tdef: TypeDef::array(Collection::from_unknown(Kind::bytes())),
         }
 
         single {
@@ -130,9 +134,7 @@ mod test {
                              pattern: " "
             ],
             want: Ok(value!(["foo"])),
-            tdef: TypeDef::new()
-                .infallible()
-                .array_mapped::<(), Kind>(map! {(): Kind::Bytes}),
+            tdef: TypeDef::array(Collection::from_unknown(Kind::bytes())),
         }
 
         long {
@@ -140,9 +142,7 @@ mod test {
                              pattern: " "
             ],
             want: Ok(value!(["This", "is", "a", "long", "string."])),
-            tdef: TypeDef::new()
-                .infallible()
-                .array_mapped::<(), Kind>(map! {(): Kind::Bytes}),
+            tdef: TypeDef::array(Collection::from_unknown(Kind::bytes())),
         }
 
         regex {
@@ -151,9 +151,7 @@ mod test {
                              limit: 2
             ],
             want: Ok(value!(["This", "is a long string"])),
-            tdef: TypeDef::new()
-                .infallible()
-                .array_mapped::<(), Kind>(map! {(): Kind::Bytes}),
+            tdef: TypeDef::array(Collection::from_unknown(Kind::bytes())),
         }
 
         non_space {
@@ -161,9 +159,7 @@ mod test {
                              pattern: Value::Regex(regex::Regex::new("(?i)a").unwrap().into())
             ],
             want: Ok(value!(["This", "is", "long", "string."])),
-            tdef: TypeDef::new()
-                .infallible()
-                .array_mapped::<(), Kind>(map! {(): Kind::Bytes}),
+            tdef: TypeDef::array(Collection::from_unknown(Kind::bytes())),
         }
 
         unicode {
@@ -171,9 +167,7 @@ mod test {
                               pattern: " "
              ],
              want: Ok(value!(["˙ƃuᴉɹʇs", "ƃuol", "ɐ", "sᴉ", "sᴉɥ┴"])),
-             tdef: TypeDef::new()
-                .infallible()
-                .array_mapped::<(), Kind>(map! {(): Kind::Bytes}),
+             tdef: TypeDef::array(Collection::from_unknown(Kind::bytes())),
          }
 
     ];

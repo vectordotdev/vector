@@ -15,7 +15,7 @@ remap: expressions: function_call: {
 
 	grammar: {
 		source: """
-			function ~ abort? ~ "(" ~ arguments? ~ ")"
+			function ~ abort? ~ "(" ~ arguments? ~ ")" ~ closure?
 			"""
 		definitions: {
 			function: {
@@ -28,13 +28,13 @@ remap: expressions: function_call: {
 					`abort` represents a literal `!` that can optionally be used with fallible functions to abort
 					the program when the function fails:
 
-					```vrl
+					```coffee
 					result = f!()
 					```
 
 					Otherwise, errors must be handled:
 
-					```vrl
+					```coffee
 					result, err = f()
 					```
 
@@ -55,7 +55,7 @@ remap: expressions: function_call: {
 							_All_ function arguments in VRL are assigned names, including required leading arguments.
 							Named arguments are suffixed with a colon (`:`), with the value proceeding the name:
 
-							```vrl
+							```coffee
 							argument_name: "value"
 							argument_name: (1 + 2)
 							```
@@ -69,7 +69,7 @@ remap: expressions: function_call: {
 							Function calls support nameless positional arguments. Arguments must be supplied in the order
 							they are documented:
 
-							```vrl
+							```coffee
 							f(1, 2)
 							```
 							"""
@@ -79,13 +79,13 @@ remap: expressions: function_call: {
 						description: """
 							Function arguments enforce type safety when the type of the value supplied is known:
 
-							```vrl
+							```coffee
 							round("not a number") # fails at compile time
 							```
 
 							If the type of the value is not known, you need to handle the potential argument error:
 
-							```vrl
+							```coffee
 							number = int(.message) ?? 0
 							round(number)
 							```
@@ -95,6 +95,44 @@ remap: expressions: function_call: {
 					}
 				}
 			}
+			closure: {
+				description: """
+					The `closure` is an optional piece of code resolved by the function call. It is primarily used in functions that iterate over collections. Its syntax is as follows:
+
+					```coffee
+					for_each([]) -> |index, value| { ... }
+					```
+					"""
+			}
+		}
+	}
+
+	characteristics: {
+		fallibility: {
+			title: "Function Fallibility"
+			description: """
+				VRL functions can be marked as "fallible" or
+				"infallible". When a function is defined as
+				fallible, it can fail at runtime, requiring the
+				error to be handled before the program can be
+				compiled.
+
+				If a function is defined as infallible, it means
+				that **given the correct function arguments**,
+				the function can never fail at runtime, and thus
+				no error handling is needed.
+
+				Note that even if a function is defined as
+				infallible, if any of its arguments can fail at
+				runtime, the function is considered to be
+				fallible, and thus the error case needs to be
+				handled in this case.
+
+				The VRL compiler ensures all potential errors in
+				a program are handled, so there's no need to
+				worry about missing any potential runtime
+				failures.
+				"""
 		}
 	}
 

@@ -40,7 +40,7 @@
 <div class="prose flex items-center space-x-1.5 text-md lg:text-lg">
   <ion-icon name="logo-{{ .Params.icon }}" class="text-{{ .Params.color }}{{ with .Params.dark }} dark:text-{{ . }}{{ end }}"></ion-icon>
 
-  <a href="{{ .URL }}" class="hover:underline text-gray-400 tracking-tight" target="_blank">
+  <a href="{{ .URL }}" class="hover:underline text-gray-400 tracking-tight" rel="noopener" target="_blank">
     {{ .Name }}
   </a>
 </div>

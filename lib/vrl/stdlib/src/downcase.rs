@@ -1,4 +1,10 @@
+use ::value::Value;
+use vrl::prelude::expression::FunctionExpression;
 use vrl::prelude::*;
+
+fn downcase(value: Value) -> Resolved {
+    Ok(value.try_bytes_utf8_lossy()?.to_lowercase().into())
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct Downcase;
@@ -18,13 +24,13 @@ impl Function for Downcase {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
-        mut arguments: ArgumentList,
+        _state: &state::TypeState,
+        _ctx: &mut FunctionCompileContext,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
 
-        Ok(Box::new(DowncaseFn { value }))
+        Ok(DowncaseFn { value }.as_expr())
     }
 
     fn examples(&self) -> &'static [Example] {
@@ -41,15 +47,14 @@ struct DowncaseFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for DowncaseFn {
+impl FunctionExpression for DowncaseFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let bytes = self.value.resolve(ctx)?.try_bytes()?;
-
-        Ok(String::from_utf8_lossy(&bytes).to_lowercase().into())
+        let value = self.value.resolve(ctx)?;
+        downcase(value)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new().bytes().infallible()
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
+        TypeDef::bytes().infallible()
     }
 }
 
@@ -63,7 +68,7 @@ mod tests {
         simple {
             args: func_args![value: "FOO 2 bar"],
             want: Ok(value!("foo 2 bar")),
-            tdef: TypeDef::new().bytes(),
+            tdef: TypeDef::bytes(),
         }
     ];
 }

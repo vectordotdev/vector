@@ -1,3 +1,7 @@
+use std::cmp;
+
+use async_graphql::{Enum, InputObject, Object};
+
 use super::{source, state, transform, Component};
 use crate::{
     api::schema::{
@@ -5,17 +9,15 @@ use crate::{
         metrics::{self, IntoSinkMetrics},
         sort,
     },
-    config::ComponentKey,
+    config::{ComponentKey, Inputs, OutputId},
     filter_check,
 };
-use async_graphql::{Enum, InputObject, Object};
-use std::cmp;
 
 #[derive(Debug, Clone)]
 pub struct Data {
     pub component_key: ComponentKey,
     pub component_type: String,
-    pub inputs: Vec<ComponentKey>,
+    pub inputs: Inputs<OutputId>,
 }
 
 #[derive(Debug, Clone)]
@@ -82,14 +84,9 @@ impl Sink {
         self.get_component_key().id()
     }
 
-    /// Sink component_id
-    pub async fn pipeline_id(&self) -> Option<&str> {
-        self.get_component_key().pipeline_str()
-    }
-
     /// Sink type
     pub async fn component_type(&self) -> &str {
-        &*self.get_component_type()
+        self.get_component_type()
     }
 
     /// Source inputs
@@ -97,12 +94,10 @@ impl Sink {
         self.0
             .inputs
             .iter()
-            .filter_map(
-                |component_key| match state::component_by_component_key(component_key) {
-                    Some(Component::Source(s)) => Some(s),
-                    _ => None,
-                },
-            )
+            .filter_map(|output_id| match state::component_by_output_id(output_id) {
+                Some(Component::Source(s)) => Some(s),
+                _ => None,
+            })
             .collect()
     }
 
@@ -111,12 +106,10 @@ impl Sink {
         self.0
             .inputs
             .iter()
-            .filter_map(
-                |component_key| match state::component_by_component_key(component_key) {
-                    Some(Component::Transform(t)) => Some(t),
-                    _ => None,
-                },
-            )
+            .filter_map(|output_id| match state::component_by_output_id(output_id) {
+                Some(Component::Transform(t)) => Some(t),
+                _ => None,
+            })
             .collect()
     }
 
@@ -136,17 +129,17 @@ mod tests {
             Sink(Data {
                 component_key: ComponentKey::from("webserver"),
                 component_type: "http".to_string(),
-                inputs: vec![],
+                inputs: Inputs::default(),
             }),
             Sink(Data {
                 component_key: ComponentKey::from("db"),
                 component_type: "clickhouse".to_string(),
-                inputs: vec![],
+                inputs: Inputs::default(),
             }),
             Sink(Data {
                 component_key: ComponentKey::from("zip_drive"),
                 component_type: "file".to_string(),
-                inputs: vec![],
+                inputs: Inputs::default(),
             }),
         ]
     }

@@ -1,4 +1,11 @@
+use ::value::Value;
 use vrl::prelude::*;
+
+fn push(list: Value, item: Value) -> Resolved {
+    let mut list = list.try_array()?;
+    list.push(item);
+    Ok(list.into())
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct Push;
@@ -40,14 +47,14 @@ impl Function for Push {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
-        mut arguments: ArgumentList,
+        _state: &state::TypeState,
+        _ctx: &mut FunctionCompileContext,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
         let item = arguments.required("item");
 
-        Ok(Box::new(PushFn { value, item }))
+        Ok(PushFn { value, item }.as_expr())
     }
 }
 
@@ -57,29 +64,36 @@ struct PushFn {
     item: Box<dyn Expression>,
 }
 
-impl Expression for PushFn {
+impl FunctionExpression for PushFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let mut list = self.value.resolve(ctx)?.try_array()?;
+        let list = self.value.resolve(ctx)?;
         let item = self.item.resolve(ctx)?;
 
-        list.push(item);
-
-        Ok(list.into())
+        push(list, item)
     }
 
-    fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        let item = TypeDef::new()
-            .infallible()
-            .array_mapped::<i32, TypeDef>(map! {
-                0: self.item.type_def(state),
-            });
+    fn type_def(&self, state: &state::TypeState) -> TypeDef {
+        let item = self.item.type_def(state).kind().clone().upgrade_undefined();
+        let mut typedef = self.value.type_def(state).restrict_array();
 
-        self.value.type_def(state).merge(item).infallible()
+        let array = typedef.as_array_mut().expect("must be an array");
+
+        if let Some(exact_len) = array.exact_length() {
+            // The exact array length is known, so just add the item to the correct index.
+            array.known_mut().insert(exact_len.into(), item);
+        } else {
+            // We don't know where the item will be inserted, so just add it to the unknown.
+            array.set_unknown(array.unknown_kind().union(item));
+        }
+
+        typedef.infallible()
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use vector_common::btreemap;
+
     use super::*;
 
     test_function![
@@ -88,30 +102,30 @@ mod tests {
         empty_array {
             args: func_args![value: value!([]), item: value!("foo")],
             want: Ok(value!(["foo"])),
-            tdef: TypeDef::new().array_mapped::<i32, Kind>(map! {
-                0: Kind::Bytes,
+            tdef: TypeDef::array(btreemap! {
+                Index::from(0) => Kind::bytes(),
             }),
         }
 
         new_item {
             args: func_args![value: value!([11, false, 42.5]), item: value!("foo")],
             want: Ok(value!([11, false, 42.5, "foo"])),
-            tdef: TypeDef::new().array_mapped::<i32, Kind>(map! {
-                0: Kind::Integer,
-                1: Kind::Boolean,
-                2: Kind::Float,
-                3: Kind::Bytes,
+            tdef: TypeDef::array(btreemap! {
+                Index::from(0) => Kind::integer(),
+                Index::from(1) => Kind::boolean(),
+                Index::from(2) => Kind::float(),
+                Index::from(3) => Kind::bytes(),
             }),
         }
 
         already_exists_item {
             args: func_args![value: value!([11, false, 42.5]), item: value!(42.5)],
             want: Ok(value!([11, false, 42.5, 42.5])),
-            tdef: TypeDef::new().array_mapped::<i32, Kind>(map! {
-                0: Kind::Integer,
-                1: Kind::Boolean,
-                2: Kind::Float,
-                3: Kind::Float,
+            tdef: TypeDef::array(btreemap! {
+                Index::from(0) => Kind::integer(),
+                Index::from(1) => Kind::boolean(),
+                Index::from(2) => Kind::float(),
+                Index::from(3) => Kind::float(),
             }),
         }
     ];

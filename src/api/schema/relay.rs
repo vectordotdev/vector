@@ -1,7 +1,10 @@
+use std::convert::Infallible;
+
 use async_graphql::{
     connection::{self, Connection, CursorType, Edge, EmptyFields},
     Result, SimpleObject,
 };
+use base64::prelude::{Engine as _, BASE64_URL_SAFE_NO_PAD};
 
 /// Base64 invalid states, used by `Base64Cursor`.
 pub enum Base64CursorError {
@@ -34,15 +37,13 @@ impl Base64Cursor {
 
     /// Returns a base64 string representation of the cursor
     fn encode(&self) -> String {
-        base64::encode_config(
-            format!("{}:{}", self.name, self.index),
-            base64::URL_SAFE_NO_PAD,
-        )
+        BASE64_URL_SAFE_NO_PAD.encode(format!("{}:{}", self.name, self.index))
     }
 
     /// Decodes a base64 string into a cursor result
     fn decode(s: &str) -> Result<Self, Base64CursorError> {
-        let bytes = base64::decode_config(s, base64::URL_SAFE_NO_PAD)
+        let bytes = BASE64_URL_SAFE_NO_PAD
+            .decode(s)
             .map_err(Base64CursorError::DecodeError)?;
 
         let cursor = String::from_utf8(bytes).map_err(|_| Base64CursorError::Invalid)?;
@@ -118,12 +119,12 @@ impl Params {
 
 /// Creates a new Relay-compliant connection. Iterator must implement `ExactSizeIterator` to
 /// determine page position in the total result set.
-pub async fn query<T, I: ExactSizeIterator<Item = T>>(
+pub async fn query<T: async_graphql::OutputType, I: ExactSizeIterator<Item = T>>(
     iter: I,
     p: Params,
     default_page_size: usize,
 ) -> ConnectionResult<T> {
-    connection::query::<Base64Cursor, T, ConnectionFields, _, _, _>(
+    connection::query::<_, _, Base64Cursor, T, ConnectionFields, _, _, _, Infallible>(
         p.after,
         p.before,
         p.first,
@@ -155,7 +156,7 @@ pub async fn query<T, I: ExactSizeIterator<Item = T>>(
                     total_count: iter_len,
                 },
             );
-            connection.append(
+            connection.edges.extend(
                 (start..end)
                     .into_iter()
                     .zip(iter.skip(start))

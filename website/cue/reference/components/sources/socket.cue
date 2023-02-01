@@ -15,8 +15,12 @@ components: sources: socket: {
 	}
 
 	features: {
+		acknowledgements: false
 		multiline: enabled: false
-		codecs: enabled:    true
+		codecs: {
+			enabled:         true
+			default_framing: "`newline_delimited` for TCP and Unix stream modes when using codecs other than `native` (which defaults to `length_delimited`), `bytes` for UDP and Unix datagram modes"
+		}
 		receive: {
 			from: {
 				service: services.socket_client
@@ -33,25 +37,16 @@ components: sources: socket: {
 			}
 			keepalive: enabled: true
 			tls: {
-				enabled:                true
-				can_enable:             true
-				can_verify_certificate: true
-				enabled_default:        false
+				enabled:                 true
+				can_verify_certificate:  true
+				can_add_client_metadata: true
+				enabled_default:         false
 			}
 		}
+		auto_generated: true
 	}
 
 	support: {
-		targets: {
-			"aarch64-unknown-linux-gnu":      true
-			"aarch64-unknown-linux-musl":     true
-			"armv7-unknown-linux-gnueabihf":  true
-			"armv7-unknown-linux-musleabihf": true
-			"x86_64-apple-darwin":            true
-			"x86_64-pc-windows-msv":          true
-			"x86_64-unknown-linux-gnu":       true
-			"x86_64-unknown-linux-musl":      true
-		}
 		requirements: []
 		warnings: []
 		notices: []
@@ -61,85 +56,38 @@ components: sources: socket: {
 		platform_name: null
 	}
 
-	configuration: {
-		address: {
-			description:   "The address to listen for connections on, or `systemd#N` to use the Nth socket passed by systemd socket activation. If an address is used it _must_ include a port."
-			relevant_when: "mode = `tcp` or `udp`"
-			required:      true
-			warnings: []
-			type: string: {
-				examples: ["0.0.0.0:\(_port)", "systemd", "systemd#3"]
-				syntax: "literal"
-			}
-		}
-		host_key: {
-			category:    "Context"
-			common:      false
-			description: """
-				The key name added to each event representing the current host. This can also be globally set via the
-				[global `host_key` option](\(urls.vector_configuration)/global-options#log_schema.host_key).
-				"""
-			required:    false
-			warnings: []
-			type: string: {
-				default: "host"
-				syntax:  "literal"
-			}
-		}
-		max_length: {
-			common:        true
-			description:   "The maximum bytes size of incoming messages before they are discarded."
-			relevant_when: "mode = `unix_datagram`"
-			required:      false
-			warnings: []
-			type: uint: {
-				default: 102400
-				unit:    "bytes"
-			}
-		}
-		mode: {
-			description: "The type of socket to use."
-			required:    true
-			warnings: []
-			type: string: {
-				enum: {
-					tcp:           "TCP socket."
-					udp:           "UDP socket."
-					unix_datagram: "Unix domain datagram socket."
-					unix_stream:   "Unix domain stream socket."
-				}
-				syntax: "literal"
-			}
-		}
-		path: {
-			description:   "The unix socket path. *This should be an absolute path*."
-			relevant_when: "mode = `unix_datagram` or `unix_stream`"
-			required:      true
-			warnings: []
-			type: string: {
-				examples: ["/path/to/socket"]
-				syntax: "literal"
-			}
-		}
-		shutdown_timeout_secs: {
-			common:        false
-			description:   "The timeout before a connection is forcefully closed during shutdown."
-			relevant_when: "mode = `tcp`"
-			required:      false
-			warnings: []
-			type: uint: {
-				default: 30
-				unit:    "seconds"
-			}
-		}
-	}
+	configuration: base.components.sources.socket.configuration
 
 	output: logs: line: {
 		description: "A single socket event."
 		fields: {
-			host:      fields._local_host
+			host: {
+				description: "The peer host IP address."
+				required:    true
+				type: string: {
+					examples: ["129.21.31.122"]
+				}
+			}
 			message:   fields._raw_line
 			timestamp: fields._current_timestamp
+			source_type: {
+				description: "The name of the source type."
+				required:    true
+				type: string: {
+					examples: ["socket"]
+				}
+			}
+			port: {
+				description: "The peer source port."
+				required:    false
+				common:      true
+				type: uint: {
+					default: null
+					unit:    null
+					examples: [2838]
+				}
+			}
+			client_metadata: fields._client_metadata
 		}
 	}
 
@@ -154,22 +102,27 @@ components: sources: socket: {
 
 			input: "\( _line )"
 			output: log: {
-				timestamp: _values.current_timestamp
-				message:   _line
-				host:      _values.local_host
+				timestamp:   _values.current_timestamp
+				message:     _line
+				host:        _values.local_host
+				source_type: "socket"
 			}
 		},
 	]
 
 	telemetry: metrics: {
-		events_in_total:                  components.sources.internal_metrics.output.metrics.events_in_total
-		connection_errors_total:          components.sources.internal_metrics.output.metrics.connection_errors_total
-		connection_failed_total:          components.sources.internal_metrics.output.metrics.connection_failed_total
-		connection_established_total:     components.sources.internal_metrics.output.metrics.connection_established_total
-		connection_failed_total:          components.sources.internal_metrics.output.metrics.connection_failed_total
-		connection_send_errors_total:     components.sources.internal_metrics.output.metrics.connection_send_errors_total
-		connection_send_ack_errors_total: components.sources.internal_metrics.output.metrics.connection_send_ack_errors_total
-		connection_shutdown_total:        components.sources.internal_metrics.output.metrics.connection_shutdown_total
-		component_received_events_total:  components.sources.internal_metrics.output.metrics.component_received_events_total
+		events_in_total:                      components.sources.internal_metrics.output.metrics.events_in_total
+		connection_errors_total:              components.sources.internal_metrics.output.metrics.connection_errors_total
+		connection_failed_total:              components.sources.internal_metrics.output.metrics.connection_failed_total
+		connection_established_total:         components.sources.internal_metrics.output.metrics.connection_established_total
+		connection_failed_total:              components.sources.internal_metrics.output.metrics.connection_failed_total
+		connection_send_errors_total:         components.sources.internal_metrics.output.metrics.connection_send_errors_total
+		connection_send_ack_errors_total:     components.sources.internal_metrics.output.metrics.connection_send_ack_errors_total
+		connection_shutdown_total:            components.sources.internal_metrics.output.metrics.connection_shutdown_total
+		component_discarded_events_total:     components.sources.internal_metrics.output.metrics.component_discarded_events_total
+		component_errors_total:               components.sources.internal_metrics.output.metrics.component_errors_total
+		component_received_bytes_total:       components.sources.internal_metrics.output.metrics.component_received_bytes_total
+		component_received_event_bytes_total: components.sources.internal_metrics.output.metrics.component_received_event_bytes_total
+		component_received_events_total:      components.sources.internal_metrics.output.metrics.component_received_events_total
 	}
 }

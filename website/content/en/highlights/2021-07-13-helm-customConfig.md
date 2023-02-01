@@ -191,16 +191,16 @@ extraContainerPorts:
 
 ## Using `customConfig`
 
-The `customConfig` key is mututally exclusive with the now deprecated configuration
+The `customConfig` key is mutually exclusive with the now deprecated configuration
 keys, if any values are provided to `customConfig` any pre-generated config we provide
 by default will not be templated. Please review the sections above to see example
-converstions between the deprecated keys and the new `customConfig` based options.
+conversions between the deprecated keys and the new `customConfig` based options.
 
 With `customConfig` a Vector configuration can be provided in raw YAML and is passed
 through a `tpl` function to allow for the evaluation of Helm templates contained within.
 Below is an example of values using `customConfig` and templating.
 
-```yaml title="cusomConfig.yaml"
+```yaml title="customConfig.yaml"
 customConfig:
   data_dir: "/custom-data-dir"
   healthchecks:

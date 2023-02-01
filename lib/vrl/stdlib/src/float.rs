@@ -1,4 +1,12 @@
+use ::value::Value;
 use vrl::prelude::*;
+
+fn float(value: Value) -> Resolved {
+    match value {
+        v @ Value::Float(_) => Ok(v),
+        v => Err(format!("expected float, got {}", v.kind()).into()),
+    }
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct Float;
@@ -27,7 +35,7 @@ impl Function for Float {
                 title: "invalid",
                 source: "float!(true)",
                 result: Err(
-                    r#"function call error for "float" at (0:12): expected "float", got "boolean""#,
+                    r#"function call error for "float" at (0:12): expected float, got boolean"#,
                 ),
             },
         ]
@@ -35,13 +43,13 @@ impl Function for Float {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
-        mut arguments: ArgumentList,
+        _state: &state::TypeState,
+        _ctx: &mut FunctionCompileContext,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
 
-        Ok(Box::new(FloatFn { value }))
+        Ok(FloatFn { value }.as_expr())
     }
 }
 
@@ -50,18 +58,14 @@ struct FloatFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for FloatFn {
+impl FunctionExpression for FloatFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        match self.value.resolve(ctx)? {
-            v @ Value::Float(_) => Ok(v),
-            v => Err(format!(r#"expected "float", got {}"#, v.kind()).into()),
-        }
+        float(self.value.resolve(ctx)?)
     }
 
-    fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        self.value
-            .type_def(state)
-            .fallible_unless(Kind::Float)
-            .float()
+    fn type_def(&self, state: &state::TypeState) -> TypeDef {
+        let non_float = !self.value.type_def(state).is_float();
+
+        TypeDef::float().with_fallibility(non_float)
     }
 }

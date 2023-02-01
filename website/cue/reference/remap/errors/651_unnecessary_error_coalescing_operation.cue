@@ -10,7 +10,7 @@ remap: errors: "651": {
 		Error coalescing operations are useful when you want to specify what happens if an operation
 		fails. Here's an example:
 
-		```vrl
+		```coffee
 		result = op1 ?? op2
 		```
 

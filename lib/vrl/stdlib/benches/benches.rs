@@ -1,31 +1,37 @@
+use ::value::Value;
 use chrono::{DateTime, Datelike, TimeZone, Utc};
 use criterion::{criterion_group, criterion_main, Criterion};
 use regex::Regex;
-use shared::btreemap;
+use vector_common::btreemap;
 use vrl::prelude::*;
 
 criterion_group!(
     name = benches;
     // encapsulates CI noise we saw in
-    // https://github.com/timberio/vector/pull/6408
+    // https://github.com/vectordotdev/vector/pull/6408
     config = Criterion::default().noise_threshold(0.05);
     targets = array,
               assert,
               assert_eq,
               r#bool,
               ceil,
+              chunks,
               compact,
               contains,
+              decode_base16,
               decode_base64,
               decode_percent,
+              decrypt,
               // TODO: Cannot pass a Path to bench_function
               //del,
               downcase,
+              encode_base16,
               encode_base64,
               encode_key_value,
               encode_json,
               encode_logfmt,
               encode_percent,
+              encrypt,
               ends_with,
               // TODO: Cannot pass a Path to bench_function
               //exists
@@ -44,13 +50,19 @@ criterion_group!(
               ip_aton,
               ip_cidr_contains,
               ip_ntoa,
+              ip_ntop,
+              ip_pton,
               ip_subnet,
               ip_to_ipv6,
               ipv6_to_ipv4,
               is_array,
               is_boolean,
+              is_empty,
               is_float,
               is_integer,
+              is_ipv4,
+              is_ipv6,
+              is_json,
               is_null,
               is_nullish,
               is_object,
@@ -58,6 +70,7 @@ criterion_group!(
               is_string,
               is_timestamp,
               join,
+              keys,
               length,
               log,
               r#match,
@@ -66,6 +79,7 @@ criterion_group!(
               match_datadog_query,
               md5,
               merge,
+              r#mod,
               // TODO: value is dynamic so we cannot assert equality
               //now,
               object,
@@ -78,6 +92,7 @@ criterion_group!(
               parse_duration,
               parse_glog,
               parse_grok,
+              parse_groks,
               parse_key_value,
               parse_klog,
               parse_int,
@@ -109,7 +124,9 @@ criterion_group!(
               string,
               strip_ansi_escape_codes,
               strip_whitespace,
+              strlen,
               tally,
+              tally_value,
               timestamp,
               to_bool,
               to_float,
@@ -127,9 +144,28 @@ criterion_group!(
               //unnest
               // TODO: value is dynamic so we cannot assert equality
               //uuidv4,
-              upcase
+              upcase,
+              values,
 );
 criterion_main!(benches);
+
+bench_function! {
+    encrypt => vrl_stdlib::Encrypt;
+
+    test {
+        args: func_args![algorithm: value!("AES-128-OFB"), plaintext: value!("plaintext"), key: value!("1234567890123456"), iv: value!("1234567890123456") ],
+        want: Ok(value!(b"\x05\x10\xace\xb2(\xf5\x92\xaf")),
+    }
+}
+
+bench_function! {
+    decrypt => vrl_stdlib::Decrypt;
+
+    test {
+        args: func_args![algorithm: value!("AES-128-OFB"), ciphertext: value!(b"\x05\x10\xace\xb2(\xf5\x92\xaf"), key: value!("1234567890123456"), iv: value!("1234567890123456") ],
+        want: Ok(value!("plaintext")),
+    }
+}
 
 bench_function! {
     append => vrl_stdlib::Append;
@@ -186,6 +222,15 @@ bench_function! {
 }
 
 bench_function! {
+    chunks => vrl_stdlib::Chunks;
+
+    literal {
+        args: func_args![value: "abcdefgh", chunk_size: 4],
+        want: Ok(value!(["abcd", "efgh"])),
+    }
+}
+
+bench_function! {
     compact => vrl_stdlib::Compact;
 
     array {
@@ -218,6 +263,15 @@ bench_function! {
 }
 
 bench_function! {
+    decode_base16 => vrl_stdlib::DecodeBase16;
+
+    literal {
+        args: func_args![value: "736f6d652b3d737472696e672f76616c7565"],
+        want: Ok("some+=string/value"),
+    }
+}
+
+bench_function! {
     decode_base64 => vrl_stdlib::DecodeBase64;
 
     literal {
@@ -236,11 +290,34 @@ bench_function! {
 }
 
 bench_function! {
+    decode_mime_q => vrl_stdlib::DecodeMimeQ;
+
+    base_64 {
+        args: func_args![value: "=?utf-8?b?SGVsbG8sIFdvcmxkIQ==?="],
+        want: Ok("Hello, World!"),
+    }
+
+    quoted_printable {
+        args: func_args![value: "Subject: =?iso-8859-1?Q?=A1Hola,_se=F1or!?="],
+        want: Ok("Subject: ¡Hola, señor!"),
+    }
+}
+
+bench_function! {
     downcase => vrl_stdlib::Downcase;
 
     literal {
         args: func_args![value: "FOO"],
         want: Ok("foo")
+    }
+}
+
+bench_function! {
+    encode_base16 => vrl_stdlib::EncodeBase16;
+
+    literal {
+        args: func_args![value: "some+=string/value"],
+        want: Ok("736f6d652b3d737472696e672f76616c7565"),
     }
 }
 
@@ -443,7 +520,7 @@ bench_function! {
         want: Ok("42"),
     }
 
-    hexidecimal {
+    hexadecimal {
         args: func_args![value: 42, base: 16],
         want: Ok(value!("2a")),
     }
@@ -467,7 +544,7 @@ bench_function! {
     format_timestamp => vrl_stdlib::FormatTimestamp;
 
     iso_6801 {
-        args: func_args![value: Utc.timestamp(10, 0), format: "%+"],
+        args: func_args![value: Utc.timestamp_opt(10, 0).single().expect("invalid timestamp"), format: "%+"],
         want: Ok("1970-01-01T00:00:10+00:00"),
     }
 }
@@ -561,6 +638,34 @@ bench_function! {
 }
 
 bench_function! {
+    ip_ntop => vrl_stdlib::IpNtop;
+
+    ipv4 {
+        args: func_args![value: "1.2.3.4"],
+        want: Ok(value!("\x01\x02\x03\x04")),
+    }
+
+    ipv6 {
+        args: func_args![value: "102:304:506:708:90a:b0c:d0e:f10"],
+        want: Ok(value!("\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x0c\x0d\x0e\x0f\x10")),
+    }
+}
+
+bench_function! {
+    ip_pton => vrl_stdlib::IpPton;
+
+    ipv4 {
+        args: func_args![value: "\x01\x02\x03\x04"],
+        want: Ok(value!("1.2.3.4")),
+    }
+
+    ipv6 {
+        args: func_args![value: "\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x0c\x0d\x0e\x0f\x10"],
+        want: Ok(value!("102:304:506:708:90a:b0c:d0e:f10")),
+    }
+}
+
+bench_function! {
     ip_subnet => vrl_stdlib::IpSubnet;
 
     ipv4_mask {
@@ -641,6 +746,35 @@ bench_function! {
 }
 
 bench_function! {
+    is_empty => vrl_stdlib::IsEmpty;
+
+    empty_array {
+        args: func_args![value: value!([])],
+        want: Ok(true),
+    }
+
+    non_empty_array {
+        args: func_args![value: value!([1, 2, 3])],
+        want: Ok(false),
+    }
+
+    empty_object {
+        args: func_args![value: value!({})],
+        want: Ok(true),
+    }
+
+    non_empty_object {
+        args: func_args![value: value!({"foo": "bar"})],
+        want: Ok(false),
+    }
+
+    string {
+        args: func_args![value: "foo"],
+        want: Ok(false),
+    }
+}
+
+bench_function! {
     is_float => vrl_stdlib::IsFloat;
 
     array {
@@ -665,6 +799,73 @@ bench_function! {
     object {
         args: func_args![value: value!({"foo": "bar"})],
         want: Ok(false),
+    }
+}
+
+bench_function! {
+    is_ipv4 => vrl_stdlib::IsIpv4;
+
+    not_string {
+        args: func_args![value: 42],
+        want: Ok(false),
+    }
+
+    ipv4 {
+        args: func_args![value: "192.168.0.1"],
+        want: Ok(true),
+    }
+
+    invalid_ipv4 {
+        args: func_args![value: "192.168.0.299"],
+        want: Ok(false),
+    }
+
+    ipv6 {
+        args: func_args![value: "2404:6800:4003:c02::64"],
+        want: Ok(false),
+    }
+}
+
+bench_function! {
+    is_ipv6 => vrl_stdlib::IsIpv6;
+
+    not_string {
+        args: func_args![value: 42],
+        want: Ok(false),
+    }
+
+    ipv4 {
+        args: func_args![value: "192.168.0.1"],
+        want: Ok(false),
+    }
+
+    ipv6 {
+        args: func_args![value: "2404:6800:4003:c02::64"],
+        want: Ok(true),
+    }
+
+    invalid_ipv6 {
+        args: func_args![value: "2404:6800:goat:c02::64"],
+        want: Ok(false),
+    }
+}
+
+bench_function! {
+    is_json => vrl_stdlib::IsJson;
+
+    map {
+        args: func_args![value: r#"{"key": "value"}"#],
+        want: Ok(true),
+    }
+
+    invalid_map {
+        args: func_args![value: r#"{"key": "value""#],
+        want: Ok(false),
+    }
+
+    exact_variant {
+        args: func_args![value: r#"{"key": "value""#, variant: "object"],
+        want: Ok(true),
     }
 }
 
@@ -768,6 +969,15 @@ bench_function! {
     literal {
         args: func_args![value: value!(["hello", "world"]), separator: " "],
         want: Ok("hello world"),
+    }
+}
+
+bench_function! {
+    keys => vrl_stdlib::Keys;
+
+    literal {
+        args: func_args![value: value!({"key1": "val1", "key2": "val2"})],
+        want: Ok(value!(["key1", "key2"])),
     }
 }
 
@@ -972,6 +1182,18 @@ bench_function! {
 }
 
 bench_function! {
+    r#mod => vrl_stdlib::Mod;
+
+    simple {
+        args: func_args![
+            value: value!(5),
+            modulus: value!(2),
+        ],
+        want: Ok(value!(1))
+    }
+}
+
+bench_function! {
     merge => vrl_stdlib::Merge;
 
     simple {
@@ -1113,11 +1335,11 @@ bench_function! {
             "subscription_filters":  ["Destination"],
             "log_events": [{
                 "id":  "35683658089614582423604394983260738922885519999578275840",
-                "timestamp":  (Utc.timestamp(1600110569, 39000000)),
+                "timestamp":  (Utc.timestamp_opt(1600110569, 39000000).single().expect("invalid timestamp")),
                 "message":  r#"{"bytes":26780,"datetime":"14/Sep/2020:11:45:41 -0400","host":"157.130.216.193","method":"PUT","protocol":"HTTP/1.0","referer":"https://www.principalcross-platform.io/markets/ubiquitous","request":"/expedite/convergence","source_type":"stdin","status":301,"user-identifier":"-"}"#,
             }, {
                 "id":  "35683658089659183914001456229543810359430816722590236673",
-                "timestamp":  (Utc.timestamp(1600110569, 41000000)),
+                "timestamp":  (Utc.timestamp_opt(1600110569, 41000000).single().expect("invalid timestamp")),
                 "message":  r#"{"bytes":17707,"datetime":"14/Sep/2020:11:45:41 -0400","host":"109.81.244.252","method":"GET","protocol":"HTTP/2.0","referer":"http://www.investormission-critical.io/24/7/vortals","request":"/scale/functionalities/optimize","source_type":"stdin","status":502,"user-identifier":"feeney1708"}"#,
             }]
         }))
@@ -1151,6 +1373,75 @@ bench_function! {
             "version": 3,
             "vpc_id": "vpc-abcdefab012345678",
         })),
+    }
+}
+
+bench_function! {
+    parse_cef => vrl_stdlib::ParseCef;
+
+    simple {
+        args: func_args! [
+            value: r#"CEF:0|CyberArk|PTA|12.6|1|Suspected credentials theft|8|suser=mike2@prod1.domain.com shost=prod1.domain.com src=1.1.1.1"#
+        ],
+        want: Ok(value!({
+            "cefVersion": "0",
+            "deviceVendor": "CyberArk",
+            "deviceProduct": "PTA",
+            "deviceVersion": "12.6",
+            "deviceEventClassId": "1",
+            "name": "Suspected credentials theft",
+            "severity": "8",
+            "suser": "mike2@prod1.domain.com",
+            "shost": "prod1.domain.com",
+            "src": "1.1.1.1"
+        }))
+    }
+
+    complex {
+        args: func_args! [
+            value: r#"CEF:0|Check Point|VPN-1 & FireWall-1|Check Point|Log|https|Unknown|act=Accept destinationTranslatedAddress=0.0.0.0 destinationTranslatedPort=0 deviceDirection=0 rt=1543270652000 sourceTranslatedAddress=192.168.103.254 sourceTranslatedPort=35398 spt=49363 dpt=443 cs2Label=Rule Name layer_name=Network layer_uuid=b406b732-2437-4848-9741-6eae1f5bf112 match_id=4 parent_rule=0 rule_action=Accept rule_uid=9e5e6e74-aa9a-4693-b9fe-53712dd27bea ifname=eth0 logid=0 loguid={0x5bfc70fc,0x1,0xfe65a8c0,0xc0000001} origin=192.168.101.254 originsicname=CN\=R80,O\=R80_M..6u6bdo sequencenum=1 version=5 dst=52.173.84.157 inzone=Internal nat_addtnl_rulenum=1 nat_rulenum=4 outzone=External product=VPN-1 & FireWall-1 proto=6 service_id=https src=192.168.101.100"#,
+        ],
+        want: Ok(value!({
+            "cefVersion":"0",
+            "deviceVendor":"Check Point",
+            "deviceProduct":"VPN-1 & FireWall-1",
+            "deviceVersion":"Check Point",
+            "deviceEventClassId":"Log",
+            "name":"https",
+            "severity":"Unknown",
+            "act": "Accept",
+            "destinationTranslatedAddress": "0.0.0.0",
+            "destinationTranslatedPort": "0",
+            "deviceDirection": "0",
+            "rt": "1543270652000",
+            "sourceTranslatedAddress": "192.168.103.254",
+            "sourceTranslatedPort": "35398",
+            "spt": "49363",
+            "dpt": "443",
+            "cs2Label": "Rule Name",
+            "layer_name": "Network",
+            "layer_uuid": "b406b732-2437-4848-9741-6eae1f5bf112",
+            "match_id": "4",
+            "parent_rule": "0",
+            "rule_action": "Accept",
+            "rule_uid": "9e5e6e74-aa9a-4693-b9fe-53712dd27bea",
+            "ifname": "eth0",
+            "logid": "0",
+            "loguid": "{0x5bfc70fc,0x1,0xfe65a8c0,0xc0000001}",
+            "origin": "192.168.101.254",
+            "originsicname": "CN=R80,O=R80_M..6u6bdo",
+            "sequencenum": "1",
+            "version": "5",
+            "dst": "52.173.84.157",
+            "inzone": "Internal",
+            "nat_addtnl_rulenum": "1",
+            "nat_rulenum": "4",
+            "outzone": "External",
+            "product": "VPN-1 & FireWall-1",
+            "proto": "6",
+            "service_id": "https",
+            "src": "192.168.101.100",
+        }))
     }
 }
 
@@ -1273,13 +1564,38 @@ bench_function! {
         args: func_args![
             value: "2020-10-02T23:22:12.223222Z info Hello world",
             pattern: "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}",
-            remove_empty: false,
         ],
         want: Ok(value!({
             "timestamp": "2020-10-02T23:22:12.223222Z",
             "level": "info",
             "message": "Hello world",
         })),
+    }
+}
+
+bench_function! {
+    parse_groks => vrl_stdlib::ParseGroks;
+
+    simple {
+        args: func_args![
+            value: r##"2020-10-02T23:22:12.223222Z info hello world"##,
+            patterns: Value::Array(vec![
+                "%{common_prefix} %{_status} %{_message}".into(),
+                "%{common_prefix} %{_message}".into(),
+                ]),
+            aliases: value!({
+                common_prefix: "%{_timestamp} %{_loglevel}",
+                _timestamp: "%{TIMESTAMP_ISO8601:timestamp}",
+                _loglevel: "%{LOGLEVEL:level}",
+                _status: "%{POSINT:status}",
+                _message: "%{GREEDYDATA:message}"
+            })
+        ],
+        want: Ok(Value::from(btreemap! {
+            "timestamp" => "2020-10-02T23:22:12.223222Z",
+            "level" => "info",
+            "message" => "hello world"
+        }))
     }
 }
 
@@ -1308,6 +1624,26 @@ bench_function! {
     map {
         args: func_args![value: r#"{"key": "value"}"#],
         want: Ok(value!({key: "value"})),
+    }
+
+    map_max_depth {
+        args: func_args![value: r#"{"key": "value"}"#, max_depth: 10],
+        want: Ok(value!({key: "value"})),
+    }
+
+    nested {
+        args: func_args![value: r#"{"1":{"2":{"3":{"4":{"5":{"6":"end"}}}}}}"#],
+        want: Ok(value!({"1":{"2":{"3":{"4":{"5":{"6":"end"}}}}}})),
+    }
+
+    nested_max_depth_1 {
+        args: func_args![value: r#"{"1":{"2":{"3":{"4":{"5":{"6":"end"}}}}}}"#, max_depth: 1],
+        want: Ok(value!({"1":"{\"2\":{\"3\":{\"4\":{\"5\":{\"6\":\"end\"}}}}}"})),
+    }
+
+    nested_max_depth_10 {
+        args: func_args![value: r#"{"1":{"2":{"3":{"4":{"5":{"6":"end"}}}}}}"#, max_depth: 10],
+        want: Ok(value!({"1":{"2":{"3":{"4":{"5":{"6":"end"}}}}}})),
     }
 }
 
@@ -1526,9 +1862,11 @@ bench_function! {
             "appname": "non",
             "procid": 2426,
             "msgid": "ID931",
-            "exampleSDID@32473.iut": "3",
-            "exampleSDID@32473.eventSource": "Application",
-            "exampleSDID@32473.eventID": "1011",
+            "exampleSDID@32473": {
+                "iut": "3",
+                "eventSource": "Application",
+                "eventID": "1011",
+            },
             "message": "Try to override the THX port, maybe it will reboot the neural interface!",
             "version": 1,
         }))
@@ -1969,6 +2307,15 @@ bench_function! {
 }
 
 bench_function! {
+    strlen => vrl_stdlib::Strlen;
+
+    literal {
+        args: func_args![value: "ñandú"],
+        want: Ok(5)
+    }
+}
+
+bench_function! {
     tag_types_externally => vrl_stdlib::TagTypesExternally;
 
     tag_bytes {
@@ -2045,6 +2392,18 @@ bench_function! {
             value: value!(["bar", "foo", "baz", "foo"]),
         ],
         want: Ok(value!({"bar": 1, "foo": 2, "baz": 1})),
+    }
+}
+
+bench_function! {
+    tally_value => vrl_stdlib::TallyValue;
+
+    default {
+        args: func_args![
+            array: value!(["bar", "foo", "baz", "foo"]),
+            value: "foo",
+        ],
+        want: Ok(value!(2)),
     }
 }
 
@@ -2263,5 +2622,14 @@ bench_function! {
     literal {
         args: func_args![value: "foo"],
         want: Ok("FOO")
+    }
+}
+
+bench_function! {
+    values => vrl_stdlib::Values;
+
+    literal {
+        args: func_args![value: value!({"key1": "val1", "key2": "val2"})],
+        want: Ok(value!(["val1", "val2"])),
     }
 }

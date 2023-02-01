@@ -24,8 +24,8 @@ can lead to error prone and inefficient transforms.
 
 See issues:
 
-[#2418](https://github.com/timberio/vector/issues/2418)
-[#1477](https://github.com/timberio/vector/issues/1477)
+[#2418](https://github.com/vectordotdev/vector/issues/2418)
+[#1477](https://github.com/vectordotdev/vector/issues/1477)
 
 ## Doc-level Proposal
 
@@ -213,7 +213,7 @@ Incremental steps that execute this change. Generally this is in the form of:
 
 - [ ] Add `else if` to the remap language parser and add multiple branches to
       the `IfStatement` struct to handle multiple conditions.
-      (Already in progress, see [#4814](https://github.com/timberio/vector/pull/4814))
+      (Already in progress, see [#4814](https://github.com/vectordotdev/vector/pull/4814))
 - [ ] Enhance the parser to allow for multiple statements in the condition.
 - [ ] Adapt the Evaluation code to run with multiple statements. (It is very
       possible very little work will be needed to do this.)

@@ -1,9 +1,10 @@
-use super::handlers::RecordDecodeError;
 use snafu::Snafu;
 use warp::http::StatusCode;
 
+use super::handlers::RecordDecodeError;
+
 #[derive(Debug, Snafu)]
-#[snafu(visibility = "pub")]
+#[snafu(visibility(pub(crate)))]
 pub enum RequestError {
     #[snafu(display(
         "Missing access key. X-Amz-Firehose-Access-Key required for request: {}",
@@ -40,7 +41,7 @@ pub enum RequestError {
         source
     ))]
     ShuttingDown {
-        source: crate::pipeline::ClosedError,
+        source: crate::source_sender::ClosedError,
         request_id: String,
     },
     #[snafu(display("Unsupported encoding: {}", encoding))]
@@ -50,6 +51,10 @@ pub enum RequestError {
     },
     #[snafu(display("Unsupported protocol version: {}", version))]
     UnsupportedProtocolVersion { version: String },
+    #[snafu(display("Delivery errored"))]
+    DeliveryErrored { request_id: String },
+    #[snafu(display("Delivery failed"))]
+    DeliveryFailed { request_id: String },
 }
 
 impl warp::reject::Reject for RequestError {}
@@ -66,6 +71,8 @@ impl RequestError {
             Decode { .. } => StatusCode::BAD_REQUEST,
             ShuttingDown { .. } => StatusCode::SERVICE_UNAVAILABLE,
             UnsupportedProtocolVersion { .. } => StatusCode::BAD_REQUEST,
+            DeliveryErrored { .. } => StatusCode::INTERNAL_SERVER_ERROR,
+            DeliveryFailed { .. } => StatusCode::NOT_ACCEPTABLE,
         }
     }
 
@@ -80,6 +87,8 @@ impl RequestError {
             Decode { ref request_id, .. } => Some(request_id),
             ShuttingDown { ref request_id, .. } => Some(request_id),
             UnsupportedProtocolVersion { .. } => None,
+            DeliveryErrored { ref request_id } => Some(request_id),
+            DeliveryFailed { ref request_id } => Some(request_id),
         }
     }
 }

@@ -1,6 +1,17 @@
-use chrono::format::{strftime::StrftimeItems, Item};
-use chrono::{DateTime, Utc};
+use ::value::Value;
+use chrono::{
+    format::{strftime::StrftimeItems, Item},
+    DateTime, Utc,
+};
 use vrl::prelude::*;
+
+fn format_timestamp(bytes: Value, ts: Value) -> Resolved {
+    let bytes = bytes.try_bytes()?;
+    let format = String::from_utf8_lossy(&bytes);
+    let ts = ts.try_timestamp()?;
+
+    try_format(&ts, &format).map(Into::into)
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct FormatTimestamp;
@@ -27,14 +38,14 @@ impl Function for FormatTimestamp {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
-        mut arguments: ArgumentList,
+        _state: &state::TypeState,
+        _ctx: &mut FunctionCompileContext,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
         let format = arguments.required("format");
 
-        Ok(Box::new(FormatTimestampFn { value, format }))
+        Ok(FormatTimestampFn { value, format }.as_expr())
     }
 
     fn examples(&self) -> &'static [Example] {
@@ -52,17 +63,16 @@ struct FormatTimestampFn {
     format: Box<dyn Expression>,
 }
 
-impl Expression for FormatTimestampFn {
+impl FunctionExpression for FormatTimestampFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let bytes = self.format.resolve(ctx)?.try_bytes()?;
-        let format = String::from_utf8_lossy(&bytes);
-        let ts = self.value.resolve(ctx)?.try_timestamp()?;
+        let bytes = self.format.resolve(ctx)?;
+        let ts = self.value.resolve(ctx)?;
 
-        try_format(&ts, &format).map(Into::into)
+        format_timestamp(bytes, ts)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new().fallible().bytes()
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
+        TypeDef::bytes().fallible()
     }
 }
 
@@ -79,31 +89,32 @@ fn try_format(dt: &DateTime<Utc>, format: &str) -> Result<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use chrono::TimeZone;
+
+    use super::*;
 
     test_function![
         format_timestamp => FormatTimestamp;
 
         invalid {
-            args: func_args![value: Utc.timestamp(10, 0),
+            args: func_args![value: Utc.timestamp_opt(10, 0).single().expect("invalid timestamp"),
                              format: "%Q INVALID"],
             want: Err("invalid format"),
-            tdef: TypeDef::new().fallible().bytes(),
+            tdef: TypeDef::bytes().fallible(),
         }
 
         valid_secs {
-            args: func_args![value: Utc.timestamp(10, 0),
+            args: func_args![value: Utc.timestamp_opt(10, 0).single().expect("invalid timestamp"),
                              format: "%s"],
             want: Ok(value!("10")),
-            tdef: TypeDef::new().fallible().bytes(),
+            tdef: TypeDef::bytes().fallible(),
         }
 
         date {
-            args: func_args![value: Utc.timestamp(10, 0),
+            args: func_args![value: Utc.timestamp_opt(10, 0).single().expect("invalid timestamp"),
                              format: "%+"],
             want: Ok(value!("1970-01-01T00:00:10+00:00")),
-            tdef: TypeDef::new().fallible().bytes(),
+            tdef: TypeDef::bytes().fallible(),
         }
     ];
 }

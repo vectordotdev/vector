@@ -19,23 +19,23 @@ impl Function for Now {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _state: &state::TypeState,
+        _ctx: &mut FunctionCompileContext,
         _: ArgumentList,
     ) -> Compiled {
-        Ok(Box::new(NowFn))
+        Ok(NowFn.as_expr())
     }
 }
 
 #[derive(Debug, Clone)]
 struct NowFn;
 
-impl Expression for NowFn {
+impl FunctionExpression for NowFn {
     fn resolve(&self, _: &mut Context) -> Resolved {
         Ok(Utc::now().into())
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new().timestamp()
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
+        TypeDef::timestamp()
     }
 }

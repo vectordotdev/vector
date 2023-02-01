@@ -1,5 +1,6 @@
+use vector_common::TimeZone;
+
 use crate::{state::Runtime, Target};
-use shared::TimeZone;
 
 pub struct Context<'a> {
     target: &'a mut dyn Target,
@@ -18,6 +19,7 @@ impl<'a> Context<'a> {
     }
 
     /// Get a reference to the [`Target`].
+    #[must_use]
     pub fn target(&self) -> &dyn Target {
         self.target
     }
@@ -28,16 +30,18 @@ impl<'a> Context<'a> {
     }
 
     /// Get a reference to the [`runtime state`](Runtime).
+    #[must_use]
     pub fn state(&self) -> &Runtime {
         self.state
     }
 
     /// Get a mutable reference to the [`runtime state`](Runtime).
     pub fn state_mut(&mut self) -> &mut Runtime {
-        &mut self.state
+        self.state
     }
 
     /// Get a reference to the [`TimeZone`]
+    #[must_use]
     pub fn timezone(&self) -> &TimeZone {
         self.timezone
     }

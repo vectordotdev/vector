@@ -108,7 +108,7 @@ We want Vector to become the backbone of observability in Kubernetes. If you sha
 [arc]: /blog/adaptive-request-concurrency
 [chat]: https://chat.vector.dev
 [clickhouse]: /docs/reference/configuration/sinks/clickhouse
-[enriching]: /docs/reference/configuration/sources/kubernetes_logs/#output
+[enriching]: /docs/reference/configuration/sources/kubernetes_logs/#output-data
 [elasticsearch]: /docs/reference/configuration/sinks/elasticsearch
 [helm]: https://helm.sh
 [install]: /docs/setup/installation/platforms/kubernetes/#install

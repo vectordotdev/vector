@@ -1,20 +1,37 @@
-use crate::config::{EnrichmentTableConfig, EnrichmentTableDescription};
+use std::{
+    collections::{BTreeMap, HashMap},
+    fs,
+    hash::Hasher,
+    path::PathBuf,
+    time::SystemTime,
+};
+
 use bytes::Bytes;
 use enrichment::{Case, Condition, IndexHandle, Table};
-use serde::{Deserialize, Serialize};
-use shared::{conversion::Conversion, datetime::TimeZone};
-use std::collections::{BTreeMap, HashMap};
-use std::hash::Hasher;
-use std::path::PathBuf;
 use tracing::trace;
-use vrl::Value;
+use value::Value;
+use vector_common::{conversion::Conversion, datetime::TimeZone};
+use vector_config::configurable_component;
 
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
+use crate::config::EnrichmentTableConfig;
+
+/// File encoding options.
+#[configurable_component]
+#[derive(Clone, Debug, Eq, PartialEq)]
 #[serde(tag = "type", rename_all = "snake_case")]
 enum Encoding {
+    /// Comma-separated values.
     Csv {
+        /// Whether or not the file contains column headers.
+        ///
+        /// When set to `true`, the first row of the CSV file will be read as the header row, and
+        /// the values will be used for the names of each column. This is the default behavior.
+        ///
+        /// When set to `false`, columns are referred to by their numerical index.
         #[serde(default = "crate::serde::default_true")]
         include_headers: bool,
+
+        /// The delimiter used to separate fields in each row of the CSV file.
         #[serde(default = "default_delimiter")]
         delimiter: char,
     },
@@ -29,28 +46,73 @@ impl Default for Encoding {
     }
 }
 
-#[derive(Deserialize, Serialize, Default, Debug, Eq, PartialEq, Clone)]
-struct FileC {
+/// File-specific settings.
+#[configurable_component]
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+struct FileSettings {
+    /// The path of the enrichment table file.
+    ///
+    /// Currently, only [CSV][csv] files are supported.
+    ///
+    /// [csv]: https://en.wikipedia.org/wiki/Comma-separated_values
     path: PathBuf,
+
+    #[configurable(derived)]
     encoding: Encoding,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
-#[serde(rename_all = "snake_case")]
-enum SchemaType {
-    String,
-    Date,
-    DateTime,
-    Integer,
-    Float,
-    Boolean,
-}
+/// Configuration for the `file` enrichment table.
+#[configurable_component(enrichment_table("file"))]
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct FileConfig {
+    #[configurable(derived)]
+    file: FileSettings,
 
-#[derive(Serialize, Deserialize, Default, Debug, Clone, PartialEq)]
-struct FileConfig {
-    file: FileC,
+    /// Key/value pairs representing mapped log field names and types.
+    ///
+    /// This is used to coerce log fields from strings into their proper types. The available types are listed in the `Types` list below.
+    ///
+    /// Timestamp coercions need to be prefaced with `timestamp|`, for example `"timestamp|%F"`. Timestamp specifiers can use either of the following:
+    ///
+    /// 1. One of the built-in-formats listed in the `Timestamp Formats` table below.
+    /// 2. The [time format specifiers][chrono_fmt] from Rust’s `chrono` library.
+    ///
+    /// ### Types
+    ///
+    /// - **`bool`**
+    /// - **`string`**
+    /// - **`float`**
+    /// - **`integer`**
+    /// - **`date`**
+    /// - **`timestamp`** (see the table below for formats)
+    ///
+    /// ### Timestamp Formats
+    ///
+    /// | Format               | Description                                                                      | Example                          |
+    /// |----------------------|----------------------------------------------------------------------------------|----------------------------------|
+    /// | `%F %T`              | `YYYY-MM-DD HH:MM:SS`                                                            | `2020-12-01 02:37:54`            |
+    /// | `%v %T`              | `DD-Mmm-YYYY HH:MM:SS`                                                           | `01-Dec-2020 02:37:54`           |
+    /// | `%FT%T`              | [ISO 8601][iso8601]/[RFC 3339][rfc3339], without time zone                       | `2020-12-01T02:37:54`            |
+    /// | `%FT%TZ`             | [ISO 8601][iso8601]/[RFC 3339][rfc3339], UTC                                     | `2020-12-01T09:37:54Z`           |
+    /// | `%+`                 | [ISO 8601][iso8601]/[RFC 3339][rfc3339], UTC, with time zone                     | `2020-12-01T02:37:54-07:00`      |
+    /// | `%a, %d %b %Y %T`    | [RFC 822][rfc822]/[RFC 2822][rfc2822], without time zone                         | `Tue, 01 Dec 2020 02:37:54`      |
+    /// | `%a %b %e %T %Y`     | [ctime][ctime] format                                                            | `Tue Dec 1 02:37:54 2020`        |
+    /// | `%s`                 | [UNIX timestamp][unix_ts]                                                        | `1606790274`                     |
+    /// | `%a %d %b %T %Y`     | [date][date] command, without time zone                                          | `Tue 01 Dec 02:37:54 2020`       |
+    /// | `%a %d %b %T %Z %Y`  | [date][date] command, with time zone                                             | `Tue 01 Dec 02:37:54 PST 2020`   |
+    /// | `%a %d %b %T %z %Y`  | [date][date] command, with numeric time zone                                     | `Tue 01 Dec 02:37:54 -0700 2020` |
+    /// | `%a %d %b %T %#z %Y` | [date][date] command, with numeric time zone (minutes can be missing or present) | `Tue 01 Dec 02:37:54 -07 2020`   |
+    ///
+    /// [date]: https://man7.org/linux/man-pages/man1/date.1.html
+    /// [ctime]: https://www.cplusplus.com/reference/ctime
+    /// [unix_ts]: https://en.wikipedia.org/wiki/Unix_time
+    /// [rfc822]: https://tools.ietf.org/html/rfc822#section-5
+    /// [rfc2822]: https://tools.ietf.org/html/rfc2822#section-3.3
+    /// [iso8601]: https://en.wikipedia.org/wiki/ISO_8601
+    /// [rfc3339]: https://tools.ietf.org/html/rfc3339
+    /// [chrono_fmt]: https://docs.rs/chrono/latest/chrono/format/strftime/index.html#specifiers
     #[serde(default)]
-    schema: HashMap<String, SchemaType>,
+    schema: HashMap<String, String>,
 }
 
 const fn default_delimiter() -> char {
@@ -68,41 +130,61 @@ impl FileConfig {
         use chrono::TimeZone;
 
         Ok(match self.schema.get(column) {
-            Some(SchemaType::Date) => Value::Timestamp(
-                chrono::FixedOffset::east(0)
-                    .from_utc_datetime(
-                        &chrono::NaiveDate::parse_from_str(value, "%Y-%m-%d")
+            Some(format) => {
+                let mut split = format.splitn(2, '|').map(|segment| segment.trim());
+
+                match (split.next(), split.next()) {
+                    (Some("date"), None) => Value::Timestamp(
+                        chrono::FixedOffset::east_opt(0)
+                            .expect("invalid timestamp")
+                            .from_utc_datetime(
+                                &chrono::NaiveDate::parse_from_str(value, "%Y-%m-%d")
+                                    .map_err(|_| {
+                                        format!(
+                                            "unable to parse date {} found in row {}",
+                                            value, row
+                                        )
+                                    })?
+                                    .and_hms_opt(0, 0, 0)
+                                    .expect("invalid timestamp"),
+                            )
+                            .into(),
+                    ),
+                    (Some("date"), Some(format)) => Value::Timestamp(
+                        chrono::FixedOffset::east_opt(0)
+                            .expect("invalid timestamp")
+                            .from_utc_datetime(
+                                &chrono::NaiveDate::parse_from_str(value, format)
+                                    .map_err(|_| {
+                                        format!(
+                                            "unable to parse date {} found in row {}",
+                                            value, row
+                                        )
+                                    })?
+                                    .and_hms_opt(0, 0, 0)
+                                    .expect("invalid timestamp"),
+                            )
+                            .into(),
+                    ),
+                    _ => {
+                        let conversion =
+                            Conversion::parse(format, timezone).map_err(|err| err.to_string())?;
+                        conversion
+                            .convert(Bytes::copy_from_slice(value.as_bytes()))
                             .map_err(|_| {
-                                format!("unable to parse date {} found in row {}", value, row)
+                                format!("unable to parse {} found in row {}", value, row)
                             })?
-                            .and_hms(0, 0, 0),
-                    )
-                    .into(),
-            ),
-            Some(SchemaType::DateTime) => Conversion::Timestamp(timezone)
-                .convert(Bytes::copy_from_slice(value.as_bytes()))
-                .map_err(|_| format!("unable to parse datetime {} found in row {}", value, row))?,
-            Some(SchemaType::Integer) => Conversion::Integer
-                .convert(Bytes::copy_from_slice(value.as_bytes()))
-                .map_err(|_| format!("unable to parse integer {} found in row {}", value, row))?,
-            Some(SchemaType::Float) => Conversion::Boolean
-                .convert(Bytes::copy_from_slice(value.as_bytes()))
-                .map_err(|_| format!("unable to parse integer {} found in row {}", value, row))?,
-            Some(SchemaType::Boolean) => Conversion::Boolean
-                .convert(Bytes::copy_from_slice(value.as_bytes()))
-                .map_err(|_| format!("unable to parse integer {} found in row {}", value, row))?,
-            Some(SchemaType::String) | None => value.into(),
+                    }
+                }
+            }
+            None => value.into(),
         })
     }
-}
 
-#[async_trait::async_trait]
-#[typetag::serde(name = "file")]
-impl EnrichmentTableConfig for FileConfig {
-    async fn build(
+    fn load_file(
         &self,
-        globals: &crate::config::GlobalOptions,
-    ) -> crate::Result<Box<dyn Table + Send + Sync>> {
+        timezone: TimeZone,
+    ) -> crate::Result<(Vec<String>, Vec<Vec<Value>>, SystemTime)> {
         let Encoding::Csv {
             include_headers,
             delimiter,
@@ -134,7 +216,7 @@ impl EnrichmentTableConfig for FileConfig {
                 Ok(row?
                     .iter()
                     .enumerate()
-                    .map(|(idx, col)| self.parse_column(globals.timezone, &headers[idx], idx, col))
+                    .map(|(idx, col)| self.parse_column(timezone, &headers[idx], idx, col))
                     .collect::<Result<Vec<_>, String>>()?)
             })
             .collect::<crate::Result<Vec<_>>>()?;
@@ -145,18 +227,30 @@ impl EnrichmentTableConfig for FileConfig {
             headers
         );
 
-        Ok(Box::new(File::new(data, headers)))
+        let modified = fs::metadata(&self.file.path)?.modified()?;
+
+        Ok((headers, data, modified))
     }
 }
 
-inventory::submit! {
-    EnrichmentTableDescription::new::<FileConfig>("file")
+#[async_trait::async_trait]
+impl EnrichmentTableConfig for FileConfig {
+    async fn build(
+        &self,
+        globals: &crate::config::GlobalOptions,
+    ) -> crate::Result<Box<dyn Table + Send + Sync>> {
+        let (headers, data, modified) = self.load_file(globals.timezone())?;
+
+        Ok(Box::new(File::new(self.clone(), modified, data, headers)))
+    }
 }
 
 impl_generate_config_from_default!(FileConfig);
 
 #[derive(Clone)]
 pub struct File {
+    config: FileConfig,
+    last_modified: SystemTime,
     data: Vec<Vec<Value>>,
     headers: Vec<String>,
     indexes: Vec<(
@@ -167,8 +261,15 @@ pub struct File {
 }
 
 impl File {
-    pub fn new(data: Vec<Vec<Value>>, headers: Vec<String>) -> Self {
+    pub fn new(
+        config: FileConfig,
+        last_modified: SystemTime,
+        data: Vec<Vec<Value>>,
+        headers: Vec<String>,
+    ) -> Self {
         Self {
+            config,
+            last_modified,
             data,
             headers,
             indexes: Vec::new(),
@@ -298,8 +399,8 @@ impl File {
         I: Iterator<Item = &'a Vec<Value>> + 'a,
     {
         data.filter_map(move |row| {
-            if self.row_equals(case, condition, &*row) {
-                Some(self.add_columns(select, &*row))
+            if self.row_equals(case, condition, row) {
+                Some(self.add_columns(select, row))
             } else {
                 None
             }
@@ -446,6 +547,30 @@ impl Table for File {
             }
         }
     }
+
+    /// Returns a list of the field names that are in each index
+    fn index_fields(&self) -> Vec<(Case, Vec<String>)> {
+        self.indexes
+            .iter()
+            .map(|index| {
+                let (case, fields, _) = index;
+                (
+                    *case,
+                    fields
+                        .iter()
+                        .map(|idx| self.headers[*idx].clone())
+                        .collect::<Vec<_>>(),
+                )
+            })
+            .collect::<Vec<_>>()
+    }
+
+    /// Checks the modified timestamp of the data file to see if data has changed.
+    fn needs_reload(&self) -> bool {
+        matches!(fs::metadata(&self.config.file.path)
+            .and_then(|metadata| metadata.modified()),
+            Ok(modified) if modified > self.last_modified)
+    }
 }
 
 impl std::fmt::Debug for File {
@@ -461,9 +586,89 @@ impl std::fmt::Debug for File {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use chrono::TimeZone;
-    use shared::btreemap;
+
+    use super::*;
+
+    #[test]
+    fn parse_column() {
+        let mut schema = HashMap::new();
+        schema.insert("col1".to_string(), " string ".to_string());
+        schema.insert("col2".to_string(), " date ".to_string());
+        schema.insert("col3".to_string(), "date|%m/%d/%Y".to_string());
+        schema.insert("col3-spaces".to_string(), "date | %m %d %Y".to_string());
+        schema.insert("col4".to_string(), "timestamp|%+".to_string());
+        schema.insert("col4-spaces".to_string(), "timestamp | %+".to_string());
+        schema.insert("col5".to_string(), "int".to_string());
+        let config = FileConfig {
+            file: Default::default(),
+            schema,
+        };
+
+        assert_eq!(
+            Ok(Value::from("zork")),
+            config.parse_column(Default::default(), "col1", 1, "zork")
+        );
+
+        assert_eq!(
+            Ok(Value::from(
+                chrono::Utc
+                    .ymd(2020, 3, 5)
+                    .and_hms_opt(0, 0, 0)
+                    .expect("invalid timestamp")
+            )),
+            config.parse_column(Default::default(), "col2", 1, "2020-03-05")
+        );
+
+        assert_eq!(
+            Ok(Value::from(
+                chrono::Utc
+                    .ymd(2020, 3, 5)
+                    .and_hms_opt(0, 0, 0)
+                    .expect("invalid timestamp")
+            )),
+            config.parse_column(Default::default(), "col3", 1, "03/05/2020")
+        );
+
+        assert_eq!(
+            Ok(Value::from(
+                chrono::Utc
+                    .ymd(2020, 3, 5)
+                    .and_hms_opt(0, 0, 0)
+                    .expect("invalid timestamp")
+            )),
+            config.parse_column(Default::default(), "col3-spaces", 1, "03 05 2020")
+        );
+
+        assert_eq!(
+            Ok(Value::from(
+                chrono::Utc.ymd(2001, 7, 7).and_hms_micro(15, 4, 0, 26490)
+            )),
+            config.parse_column(
+                Default::default(),
+                "col4",
+                1,
+                "2001-07-08T00:34:00.026490+09:30"
+            )
+        );
+
+        assert_eq!(
+            Ok(Value::from(
+                chrono::Utc.ymd(2001, 7, 7).and_hms_micro(15, 4, 0, 26490)
+            )),
+            config.parse_column(
+                Default::default(),
+                "col4-spaces",
+                1,
+                "2001-07-08T00:34:00.026490+09:30"
+            )
+        );
+
+        assert_eq!(
+            Ok(Value::from(42)),
+            config.parse_column(Default::default(), "col5", 1, "42")
+        );
+    }
 
     #[test]
     fn seahash() {
@@ -484,6 +689,8 @@ mod tests {
     #[test]
     fn finds_row() {
         let file = File::new(
+            Default::default(),
+            SystemTime::now(),
             vec![
                 vec!["zip".into(), "zup".into()],
                 vec!["zirp".into(), "zurp".into()],
@@ -497,10 +704,10 @@ mod tests {
         };
 
         assert_eq!(
-            Ok(btreemap! {
-                "field1" => "zirp",
-                "field2" => "zurp",
-            }),
+            Ok(BTreeMap::from([
+                (String::from("field1"), Value::from("zirp")),
+                (String::from("field2"), Value::from("zurp")),
+            ])),
             file.find_table_row(Case::Sensitive, &[condition], None, None)
         );
     }
@@ -508,6 +715,8 @@ mod tests {
     #[test]
     fn duplicate_indexes() {
         let mut file = File::new(
+            Default::default(),
+            SystemTime::now(),
             Vec::new(),
             vec![
                 "field1".to_string(),
@@ -526,6 +735,8 @@ mod tests {
     #[test]
     fn errors_on_missing_columns() {
         let mut file = File::new(
+            Default::default(),
+            SystemTime::now(),
             Vec::new(),
             vec![
                 "field1".to_string(),
@@ -544,6 +755,8 @@ mod tests {
     #[test]
     fn finds_row_with_index() {
         let mut file = File::new(
+            Default::default(),
+            SystemTime::now(),
             vec![
                 vec!["zip".into(), "zup".into()],
                 vec!["zirp".into(), "zurp".into()],
@@ -559,10 +772,10 @@ mod tests {
         };
 
         assert_eq!(
-            Ok(btreemap! {
-                "field1" => "zirp",
-                "field2" => "zurp",
-            }),
+            Ok(BTreeMap::from([
+                (String::from("field1"), Value::from("zirp")),
+                (String::from("field2"), Value::from("zurp")),
+            ])),
             file.find_table_row(Case::Sensitive, &[condition], None, Some(handle))
         );
     }
@@ -570,6 +783,8 @@ mod tests {
     #[test]
     fn finds_rows_with_index_case_sensitive() {
         let mut file = File::new(
+            Default::default(),
+            SystemTime::now(),
             vec![
                 vec!["zip".into(), "zup".into()],
                 vec!["zirp".into(), "zurp".into()],
@@ -582,14 +797,14 @@ mod tests {
 
         assert_eq!(
             Ok(vec![
-                btreemap! {
-                    "field1" => "zip",
-                    "field2" => "zup",
-                },
-                btreemap! {
-                    "field1" => "zip",
-                    "field2" => "zoop",
-                }
+                BTreeMap::from([
+                    (String::from("field1"), Value::from("zip")),
+                    (String::from("field2"), Value::from("zup")),
+                ]),
+                BTreeMap::from([
+                    (String::from("field1"), Value::from("zip")),
+                    (String::from("field2"), Value::from("zoop")),
+                ]),
             ]),
             file.find_table_rows(
                 Case::Sensitive,
@@ -619,6 +834,8 @@ mod tests {
     #[test]
     fn selects_columns() {
         let mut file = File::new(
+            Default::default(),
+            SystemTime::now(),
             vec![
                 vec!["zip".into(), "zup".into(), "zoop".into()],
                 vec!["zirp".into(), "zurp".into(), "zork".into()],
@@ -640,14 +857,14 @@ mod tests {
 
         assert_eq!(
             Ok(vec![
-                btreemap! {
-                    "field1" => "zip",
-                    "field3" => "zoop",
-                },
-                btreemap! {
-                    "field1" => "zip",
-                    "field3" => "zibble",
-                }
+                BTreeMap::from([
+                    (String::from("field1"), Value::from("zip")),
+                    (String::from("field3"), Value::from("zoop")),
+                ]),
+                BTreeMap::from([
+                    (String::from("field1"), Value::from("zip")),
+                    (String::from("field3"), Value::from("zibble")),
+                ]),
             ]),
             file.find_table_rows(
                 Case::Sensitive,
@@ -661,6 +878,8 @@ mod tests {
     #[test]
     fn finds_rows_with_index_case_insensitive() {
         let mut file = File::new(
+            Default::default(),
+            SystemTime::now(),
             vec![
                 vec!["zip".into(), "zup".into()],
                 vec!["zirp".into(), "zurp".into()],
@@ -673,14 +892,14 @@ mod tests {
 
         assert_eq!(
             Ok(vec![
-                btreemap! {
-                    "field1" => "zip",
-                    "field2" => "zup",
-                },
-                btreemap! {
-                    "field1" => "zip",
-                    "field2" => "zoop",
-                }
+                BTreeMap::from([
+                    (String::from("field1"), Value::from("zip")),
+                    (String::from("field2"), Value::from("zup")),
+                ]),
+                BTreeMap::from([
+                    (String::from("field1"), Value::from("zip")),
+                    (String::from("field2"), Value::from("zoop")),
+                ]),
             ]),
             file.find_table_rows(
                 Case::Insensitive,
@@ -695,14 +914,14 @@ mod tests {
 
         assert_eq!(
             Ok(vec![
-                btreemap! {
-                    "field1" => "zip",
-                    "field2" => "zup",
-                },
-                btreemap! {
-                    "field1" => "zip",
-                    "field2" => "zoop",
-                }
+                BTreeMap::from([
+                    (String::from("field1"), Value::from("zip")),
+                    (String::from("field2"), Value::from("zup")),
+                ]),
+                BTreeMap::from([
+                    (String::from("field1"), Value::from("zip")),
+                    (String::from("field2"), Value::from("zoop")),
+                ]),
             ]),
             file.find_table_rows(
                 Case::Insensitive,
@@ -719,14 +938,26 @@ mod tests {
     #[test]
     fn finds_row_with_dates() {
         let mut file = File::new(
+            Default::default(),
+            SystemTime::now(),
             vec![
                 vec![
                     "zip".into(),
-                    Value::Timestamp(chrono::Utc.ymd(2015, 12, 7).and_hms(0, 0, 0)),
+                    Value::Timestamp(
+                        chrono::Utc
+                            .ymd(2015, 12, 7)
+                            .and_hms_opt(0, 0, 0)
+                            .expect("invalid timestamp"),
+                    ),
                 ],
                 vec![
                     "zip".into(),
-                    Value::Timestamp(chrono::Utc.ymd(2016, 12, 7).and_hms(0, 0, 0)),
+                    Value::Timestamp(
+                        chrono::Utc
+                            .ymd(2016, 12, 7)
+                            .and_hms_opt(0, 0, 0)
+                            .expect("invalid timestamp"),
+                    ),
                 ],
             ],
             vec!["field1".to_string(), "field2".to_string()],
@@ -741,16 +972,30 @@ mod tests {
             },
             Condition::BetweenDates {
                 field: "field2",
-                from: chrono::Utc.ymd(2016, 1, 1).and_hms(0, 0, 0),
-                to: chrono::Utc.ymd(2017, 1, 1).and_hms(0, 0, 0),
+                from: chrono::Utc
+                    .ymd(2016, 1, 1)
+                    .and_hms_opt(0, 0, 0)
+                    .expect("invalid timestamp"),
+                to: chrono::Utc
+                    .ymd(2017, 1, 1)
+                    .and_hms_opt(0, 0, 0)
+                    .expect("invalid timestamp"),
             },
         ];
 
         assert_eq!(
-            Ok(btreemap! {
-                "field1" => "zip",
-                "field2" => Value::Timestamp(chrono::Utc.ymd(2016, 12, 7).and_hms(0, 0, 0)),
-            }),
+            Ok(BTreeMap::from([
+                (String::from("field1"), Value::from("zip")),
+                (
+                    String::from("field2"),
+                    Value::Timestamp(
+                        chrono::Utc
+                            .ymd(2016, 12, 7)
+                            .and_hms_opt(0, 0, 0)
+                            .expect("invalid timestamp")
+                    )
+                )
+            ])),
             file.find_table_row(Case::Sensitive, &conditions, None, Some(handle))
         );
     }
@@ -758,6 +1003,8 @@ mod tests {
     #[test]
     fn doesnt_find_row() {
         let file = File::new(
+            Default::default(),
+            SystemTime::now(),
             vec![
                 vec!["zip".into(), "zup".into()],
                 vec!["zirp".into(), "zurp".into()],
@@ -779,6 +1026,8 @@ mod tests {
     #[test]
     fn doesnt_find_row_with_index() {
         let mut file = File::new(
+            Default::default(),
+            SystemTime::now(),
             vec![
                 vec!["zip".into(), "zup".into()],
                 vec!["zirp".into(), "zurp".into()],

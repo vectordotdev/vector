@@ -65,10 +65,6 @@ if .x_route == "sessions_show" || .x_route == "sessions_delete" {
     .uri = "/manage/v1/sessions/REDACTED"
 }
 
-if (status_class, err = .status / 100; err == null) {
-    .status_class = to_string(to_int(floor(status_class))) + "xx"
-} else {
-    .status_class = "???"
-}
+.status_class = to_string(to_int(floor(.status / 100))) + "xx"
 
 .

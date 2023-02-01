@@ -1,10 +1,12 @@
-use super::error::ErrorMessage;
-use crate::internal_events::HttpDecompressError;
+use std::io::Read;
+
 use bytes::{Buf, Bytes};
 use flate2::read::{MultiGzDecoder, ZlibDecoder};
 use snap::raw::Decoder as SnappyDecoder;
-use std::io::Read;
 use warp::http::StatusCode;
+
+use super::error::ErrorMessage;
+use crate::internal_events::HttpDecompressError;
 
 pub fn decode(header: &Option<String>, mut body: Bytes) -> Result<Bytes, ErrorMessage> {
     if let Some(encodings) = header {
@@ -43,7 +45,7 @@ pub fn decode(header: &Option<String>, mut body: Bytes) -> Result<Bytes, ErrorMe
 }
 
 fn handle_decode_error(encoding: &str, error: impl std::error::Error) -> ErrorMessage {
-    emit!(&HttpDecompressError {
+    emit!(HttpDecompressError {
         encoding,
         error: &error
     });

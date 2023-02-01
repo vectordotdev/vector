@@ -1,35 +1,29 @@
+use std::pin::Pin;
+
 use criterion::{criterion_group, BatchSize, Criterion, Throughput};
 use futures::{stream, SinkExt, Stream, StreamExt};
-use indexmap::IndexMap;
 use indoc::indoc;
-use std::pin::Pin;
 use transforms::lua::v2::LuaConfig;
 use vector::{
-    config::{TransformConfig, TransformContext},
-    event::Event,
-    test_util::{collect_ready, runtime},
-    transforms::{self, Transform},
+    event::{Event, LogEvent},
+    test_util::collect_ready,
+    transforms::{self, OutputBuffer, Transform},
 };
 
 fn bench_add_fields(c: &mut Criterion) {
-    let event = Event::new_empty_log();
+    let event = Event::from(LogEvent::default());
 
-    let key = "the key";
+    let key = "the_key";
     let value = "this is the value";
 
     let mut group = c.benchmark_group("lua/add_fields");
     group.throughput(Throughput::Elements(1));
 
     let benchmarks: Vec<(&str, Transform)> = vec![
-        ("native", {
-            let mut map = IndexMap::new();
-            map.insert(String::from(key), value.to_owned().into());
-            Transform::function(transforms::add_fields::AddFields::new(map, true).unwrap())
-        }),
         ("v1", {
             let source = format!("event['{}'] = '{}'", key, value);
 
-            Transform::task(transforms::lua::v1::Lua::new(source, vec![]).unwrap())
+            Transform::event_task(transforms::lua::v1::Lua::new(source, vec![]).unwrap())
         }),
         ("v2", {
             let config = format!(
@@ -44,7 +38,7 @@ fn bench_add_fields(c: &mut Criterion) {
                 "#},
                 key, value
             );
-            Transform::task(
+            Transform::event_task(
                 transforms::lua::v2::Lua::new(&toml::from_str::<LuaConfig>(&config).unwrap())
                     .unwrap(),
             )
@@ -58,12 +52,15 @@ fn bench_add_fields(c: &mut Criterion) {
             Transform::Function(t) => {
                 let mut t = t.clone();
                 Box::pin(rx.flat_map(move |v| {
-                    let mut buf = Vec::with_capacity(1);
+                    let mut buf = OutputBuffer::with_capacity(1);
                     t.transform(&mut buf, v);
-                    stream::iter(buf.into_iter())
+                    stream::iter(buf.into_events())
                 }))
             }
-            Transform::Task(t) => t.transform(Box::pin(rx)),
+            Transform::Synchronous(_t) => {
+                unreachable!("no sync transform used in these benches");
+            }
+            Transform::Task(t) => t.transform_events(Box::pin(rx)),
         };
 
         group.bench_function(name.to_owned(), |b| {
@@ -89,9 +86,9 @@ fn bench_field_filter(c: &mut Criterion) {
     let num_events = 10;
     let events = (0..num_events)
         .map(|i| {
-            let mut event = Event::new_empty_log();
-            event.as_mut_log().insert("the_field", (i % 10).to_string());
-            event
+            let mut event = LogEvent::default();
+            event.insert("the_field", (i % 10).to_string());
+            Event::from(event)
         })
         .collect::<Vec<_>>();
 
@@ -99,25 +96,13 @@ fn bench_field_filter(c: &mut Criterion) {
     group.throughput(Throughput::Elements(num_events));
 
     let benchmarks: Vec<(&str, Transform)> = vec![
-        ("native", {
-            let rt = runtime();
-            rt.block_on(async move {
-                transforms::field_filter::FieldFilterConfig {
-                    field: "the_field".to_string(),
-                    value: "0".to_string(),
-                }
-                .build(&TransformContext::default())
-                .await
-                .unwrap()
-            })
-        }),
         ("v1", {
             let source = String::from(indoc! {r#"
                 if event["the_field"] ~= "0" then
                     event = nil
                 end
             "#});
-            Transform::task(transforms::lua::v1::Lua::new(source, vec![]).unwrap())
+            Transform::event_task(transforms::lua::v1::Lua::new(source, vec![]).unwrap())
         }),
         ("v2", {
             let config = indoc! {r#"
@@ -130,7 +115,7 @@ fn bench_field_filter(c: &mut Criterion) {
                 end
                 """
             "#};
-            Transform::task(
+            Transform::event_task(
                 transforms::lua::v2::Lua::new(&toml::from_str(config).unwrap()).unwrap(),
             )
         }),
@@ -143,12 +128,15 @@ fn bench_field_filter(c: &mut Criterion) {
             Transform::Function(t) => {
                 let mut t = t.clone();
                 Box::pin(rx.flat_map(move |v| {
-                    let mut buf = Vec::with_capacity(1);
+                    let mut buf = OutputBuffer::with_capacity(1);
                     t.transform(&mut buf, v);
-                    stream::iter(buf.into_iter())
+                    stream::iter(buf.into_events())
                 }))
             }
-            Transform::Task(t) => t.transform(Box::pin(rx)),
+            Transform::Synchronous(_t) => {
+                unreachable!("no sync transform used in these benches");
+            }
+            Transform::Task(t) => t.transform_events(Box::pin(rx)),
         };
 
         group.bench_function(name.to_owned(), |b| {
@@ -178,7 +166,7 @@ fn bench_field_filter(c: &mut Criterion) {
 criterion_group!(
     name = benches;
     // encapsulates CI noise we saw in
-    // https://github.com/timberio/vector/issues/5394
+    // https://github.com/vectordotdev/vector/issues/5394
     config = Criterion::default().noise_threshold(0.05);
     targets = bench_add_fields, bench_field_filter
 );

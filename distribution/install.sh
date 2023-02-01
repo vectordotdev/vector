@@ -12,7 +12,7 @@ set -u
 
 # If PACKAGE_ROOT is unset or empty, default it.
 PACKAGE_ROOT="${PACKAGE_ROOT:-"https://packages.timber.io/vector"}"
-VECTOR_VERSION="0.16.1"
+VECTOR_VERSION="0.27.0"
 _divider="--------------------------------------------------------------------------------"
 _prompt=">>>"
 _indent="   "
@@ -47,6 +47,8 @@ USAGE:
 
 FLAGS:
     -y                      Disable confirmation prompt.
+        --prefix            The directory where the files should be placed, default: "$HOME/.vector"
+                            Note: This option automatically assumes the \`--no-modify-path\` flag
         --no-modify-path    Don't configure the PATH environment variable
     -h, --help              Prints help information
 EOF
@@ -58,11 +60,19 @@ main() {
 
     local prompt=yes
     local modify_path=yes
+    local prefix="$HOME/.vector"
+    local use_new_directory_structure=no
     for arg in "$@"; do
         case "$arg" in
             -h|--help)
                 usage
                 exit 0
+                ;;
+            --prefix)
+                prefix="$2"
+                use_new_directory_structure=yes
+                modify_path=no
+                shift 2
                 ;;
             --no-modify-path)
                 modify_path=no
@@ -104,10 +114,13 @@ main() {
         echo ""
     fi
 
-    install_from_archive $modify_path
+    install_from_archive "$modify_path" "$prefix" "$use_new_directory_structure"
 }
 
 install_from_archive() {
+    need_cmd dirname
+    need_cmd pwd
+    need_cmd basename
     need_cmd cp
     need_cmd mktemp
     need_cmd mkdir
@@ -120,6 +133,8 @@ install_from_archive() {
 
     get_architecture || return 1
     local modify_path="$1"
+    local prefix="$2"
+    local use_new_directory_structure="$3"
     local _arch="$RETVAL"
     assert_nz "$_arch" "arch"
 
@@ -161,23 +176,42 @@ install_from_archive() {
     ensure downloader "$_url" "$_file"
     printf " ✓\n"
 
-    printf "%s Unpacking archive to $HOME/.vector ..." "$_prompt"
-    ensure mkdir -p "$HOME/.vector"
-    ensure tar -xzf "$_file" --directory="$HOME/.vector" --strip-components=2
+    ensure mkdir -p "$prefix"
+
+    if [ "$use_new_directory_structure" = "no" ]; then
+        printf "%s Unpacking archive to $prefix ..." "$_prompt"
+        ensure tar -xzf "$_file" --directory="$prefix" --strip-components=2
+    else
+        # https://github.com/vectordotdev/vector/pull/13613#pullrequestreview-1045524132.
+        # We will unpack the archive to a temporary directory and then copy the files to
+        # their corresponding locations according to the new directory structure.
+        printf "%s Using new directory structure since --prefix was specified...\n" "$_prompt"
+        local _unpack_dir
+        _unpack_dir="$(mktemp -d 2>/dev/null || ensure mktemp -d -t vector-install)"
+        ensure tar -xzf "$_file" --directory="$_unpack_dir" --strip-components=2
+        # copy all files (including hidden), ref: https://askubuntu.com/a/86891
+        ensure cp -r "$_unpack_dir/bin/." "$prefix/bin"
+        ensure cp -r "$_unpack_dir/etc/." "$prefix/etc"
+        ensure mkdir -p "$prefix/share/vector/config"
+        ensure cp -r "$_unpack_dir/config/." "$prefix/share/vector/config"
+        ensure cp "$_unpack_dir"/README.md "$prefix/share/vector/"
+        ensure cp "$_unpack_dir"/LICENSE "$prefix/share/vector/"
+        # all files have been moved, we can safely remove the unpack directory
+        ignore rm -rf "$_unpack_dir"
+    fi
 
     printf " ✓\n"
 
     if [ "$modify_path" = "yes" ]; then
-      local _path="export PATH=\"\$HOME/.vector/bin:\$PATH\""
+      local _path="export PATH=$PATH:$prefix/bin"
       add_to_path "${HOME}/.zprofile" "${_path}"
       add_to_path "${HOME}/.profile" "${_path}"
-      printf " ✓\n"
     fi
 
     printf "%s Install succeeded! 🚀\n" "$_prompt"
     printf "%s To start Vector:\n" "$_prompt"
     printf "\n"
-    printf "%s vector --config ~/.vector/config/vector.toml\n" "$_indent"
+    printf "%s vector --config $prefix/config/vector.toml\n" "$_indent"
     printf "\n"
     printf "%s More information at https://vector.dev/docs/\n" "$_prompt"
 
@@ -200,6 +234,8 @@ add_to_path() {
   else
     grep -qxF "${new_path}" "${file}" || echo "${new_path}" >> "${file}"
   fi
+
+  printf " ✓\n"
 }
 
 # ------------------------------------------------------------------------------
@@ -213,22 +249,23 @@ get_gnu_musl_glibc() {
   need_cmd awk
   # Detect both gnu and musl
   # Also detect glibc versions older than 2.18 and return musl for these
-  # Required until we address https://github.com/timberio/vector/issues/5412.
+  # Required until we identify minimum supported version
+  # TODO: https://github.com/vectordotdev/vector/issues/10807
   local _ldd_version
   local _glibc_version
-  _ldd_version=$(ldd --version)
-  if [[ $_ldd_version =~ "GNU" ]]; then
+  _ldd_version=$(ldd --version 2>&1)
+  if [[ $_ldd_version =~ "GNU" ]] || [[ $_ldd_version =~ "GLIBC" ]]; then
     _glibc_version=$(echo "$_ldd_version" | awk '/ldd/{print $NF}')
     if [ 1 -eq "$(echo "${_glibc_version} < 2.18" | bc)" ]; then
       echo "musl"
     else
       echo "gnu"
     fi
-elif [[ $_ldd_version =~ "musl" ]]; then
-  echo "musl"
-else
-  err "Unknown architecture from ldd: ${_ldd_version}"
-fi
+  elif [[ $_ldd_version =~ "musl" ]]; then
+    echo "musl"
+  else
+    err "Unknown architecture from ldd: ${_ldd_version}"
+  fi
 }
 
 get_bitness() {

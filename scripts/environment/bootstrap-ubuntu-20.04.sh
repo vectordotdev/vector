@@ -1,6 +1,13 @@
 #! /usr/bin/env bash
 set -e -o verbose
 
+if [ -n "$RUSTFLAGS" ]
+then
+  # shellcheck disable=SC2016
+  echo '$RUSTFLAGS MUST NOT be set in CI configs as it overrides settings in `.cargo/config.toml`.'
+  exit 1
+fi
+
 export DEBIAN_FRONTEND=noninteractive
 export ACCEPT_EULA=Y
 
@@ -23,6 +30,7 @@ apt install --yes \
     cmake \
     cmark-gfm \
     curl \
+    docker-compose \
     gawk \
     gnupg2 \
     gnupg-agent \
@@ -42,16 +50,17 @@ apt install --yes \
     ruby-bundler \
     shellcheck \
     sudo \
+    unzip \
     wget \
     yarn
 
 # Cue
 TEMP=$(mktemp -d)
 curl \
-    -L https://github.com/cue-lang/cue/releases/download/v0.4.0/cue_v0.4.0_linux_amd64.tar.gz \
-    -o "${TEMP}/cue_v0.4.0_linux_amd64.tar.gz"
+    -L https://github.com/cue-lang/cue/releases/download/v0.4.2/cue_v0.4.2_linux_amd64.tar.gz \
+    -o "${TEMP}/cue_v0.4.2_linux_amd64.tar.gz"
 tar \
-    -xvf "${TEMP}/cue_v0.4.0_linux_amd64.tar.gz" \
+    -xvf "${TEMP}/cue_v0.4.2_linux_amd64.tar.gz" \
     -C "${TEMP}"
 cp "${TEMP}/cue" /usr/bin/cue
 
@@ -59,7 +68,7 @@ cp "${TEMP}/cue" /usr/bin/cue
 # Grease is used for the `make release-github` task.
 TEMP=$(mktemp -d)
 curl \
-    -L https://github.com/timberio/grease/releases/download/v1.0.1/grease-1.0.1-linux-amd64.tar.gz \
+    -L https://github.com/vectordotdev/grease/releases/download/v1.0.1/grease-1.0.1-linux-amd64.tar.gz \
     -o "${TEMP}/grease-1.0.1-linux-amd64.tar.gz"
 tar \
     -xvf "${TEMP}/grease-1.0.1-linux-amd64.tar.gz" \
@@ -80,6 +89,8 @@ fi
 # by our own Ubuntu 20.04 images, so this is really just make sure the path is configured.
 if [ -n "${CI-}" ] ; then
     echo "${HOME}/.cargo/bin" >> "${GITHUB_PATH}"
+    # we often run into OOM issues in CI due to the low memory vs. CPU ratio on c5 instances
+    echo "CARGO_BUILD_JOBS=$(($(nproc) /2))" >> "${GITHUB_ENV}"
 else
     echo "export PATH=\"$HOME/.cargo/bin:\$PATH\"" >> "${HOME}/.bash_profile"
 fi
@@ -99,5 +110,53 @@ if ! [ -x "$(command -v docker)" ]; then
     usermod --append --groups docker ubuntu || true
 fi
 
+bash scripts/environment/install-protoc.sh
+
 # Apt cleanup
 apt clean
+
+# Set up the default "deny all warnings" build flags
+CARGO_OVERRIDE_DIR="${HOME}/.cargo"
+CARGO_OVERRIDE_CONF="${CARGO_OVERRIDE_DIR}/config.toml"
+cat <<EOF >>"$CARGO_OVERRIDE_CONF"
+[target.'cfg(linux)']
+rustflags = [ "-D", "warnings" ]
+EOF
+
+# Install mold, because the system linker wastes a bunch of time.
+#
+# Notably, we don't install/configure it when we're going to do anything with `cross`, as `cross` takes the Cargo
+# configuration from the host system and ships it over...  which isn't good when we're overriding the `rustc-wrapper`
+# and all of that.
+if [ -z "${DISABLE_MOLD:-""}" ] ; then
+    # We explicitly put `mold-wrapper.so` right beside `mold` itself because it's hard-coded to look in the same directory
+    # first when trying to load the shared object, so we can dodge having to care about the "right" lib folder to put it in.
+    TEMP=$(mktemp -d)
+    MOLD_VERSION=1.2.1
+    MOLD_TARGET=mold-${MOLD_VERSION}-x86_64-linux
+    curl -fsSL "https://github.com/rui314/mold/releases/download/v${MOLD_VERSION}/${MOLD_TARGET}.tar.gz" \
+        --output "$TEMP/${MOLD_TARGET}.tar.gz"
+    tar \
+        -xvf "${TEMP}/${MOLD_TARGET}.tar.gz" \
+        -C "${TEMP}"
+    cp "${TEMP}/${MOLD_TARGET}/bin/mold" /usr/bin/mold
+    cp "${TEMP}/${MOLD_TARGET}/lib/mold/mold-wrapper.so" /usr/bin/mold-wrapper.so
+
+    # Create our rustc wrapper script that we'll use to actually invoke `rustc` such that `mold` will wrap it and intercept
+    # anything linking calls to use `mold` instead of `ld`, etc.
+    CARGO_BIN_DIR="${CARGO_OVERRIDE_DIR}/bin"
+    mkdir -p "$CARGO_BIN_DIR"
+
+    RUSTC_WRAPPER="${CARGO_BIN_DIR}/wrap-rustc"
+    cat <<EOF >"$RUSTC_WRAPPER"
+#!/bin/sh
+exec mold -run "\$@"
+EOF
+    chmod +x "$RUSTC_WRAPPER"
+
+    # Now configure Cargo to use our rustc wrapper script.
+    cat <<EOF >>"$CARGO_OVERRIDE_CONF"
+[build]
+rustc-wrapper = "$RUSTC_WRAPPER"
+EOF
+fi

@@ -1,7 +1,7 @@
 ---
 date: "2021-08-20"
 title: "Improved defaults for sink rate limits"
-description: "Removing artifical restrictions by default"
+description: "Removing artificial restrictions by default"
 authors: ["jszwedko"]
 pr_numbers: [8472]
 release: "0.16.0"
@@ -16,7 +16,7 @@ limiting and concurrency.
 
 Previously, many sinks were defaulting to a limit of 5 requests / second (for
 example the `http` sink) with a maximum number of concurrent requests of `5`,
-but these limits were rather arbitrary and artifically constrained throughput.
+but these limits were rather arbitrary and artificially constrained throughput.
 With this release, we've updated the default for most HTTP-based components to
 have no rate limiting and a maximum number of concurrent requests of 1024.
 

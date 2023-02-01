@@ -1,20 +1,23 @@
 mod vec_stream;
 
-use crate::{event::Event, transform::TaskTransform};
+use std::{future::ready, pin::Pin, time::Duration};
+
 use futures::{
     stream::{self, BoxStream},
     FutureExt, Stream, StreamExt,
 };
-use std::{future::ready, pin::Pin};
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
 use vec_stream::VecStreamExt;
+
+use super::{OutputBuffer, TaskTransform};
+use crate::event::Event;
 
 /// A structure representing user-defined timer.
 #[derive(Clone, Copy, Debug)]
 pub struct Timer {
     pub id: u32,
-    pub interval_seconds: u64,
+    pub interval: Duration,
 }
 
 /// A trait representing a runtime running user-defined code.
@@ -50,13 +53,14 @@ pub trait RuntimeTransform {
         Vec::new()
     }
 
-    fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
+    fn transform(&mut self, output: &mut OutputBuffer, event: Event) {
         let mut maybe = None;
         self.hook_process(event, |event| maybe = Some(event));
         output.extend(maybe.into_iter());
     }
 }
 
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug)]
 enum Message {
     Init,
@@ -65,9 +69,9 @@ enum Message {
     Timer(Timer),
 }
 
-impl<T> TaskTransform for T
+impl<T> TaskTransform<Event> for T
 where
-    T: RuntimeTransform + Send,
+    T: RuntimeTransform + Send + 'static,
 {
     fn transform(
         mut self: Box<Self>,
@@ -141,8 +145,7 @@ where
 
 fn make_timer_msgs_stream(timers: Vec<Timer>) -> BoxStream<'static, Message> {
     let streams = timers.into_iter().map(|timer| {
-        let period = time::Duration::from_secs(timer.interval_seconds);
-        IntervalStream::new(time::interval(period)).map(move |_| Message::Timer(timer))
+        IntervalStream::new(time::interval(timer.interval)).map(move |_| Message::Timer(timer))
     });
     stream::select_all(streams).boxed()
 }

@@ -141,7 +141,7 @@ export const RotatingGlobe: React.FC<{ size: number; duration?: number }> = ({
     setOrientation({ lat: 0, long: 0, degrees: 360 });
   }, []);
 
-  // restart the animation every {duration} miliseconds
+  // restart the animation every {duration} milliseconds
   useInterval(() => {
     setOrientation({
       lat: Math.floor(Math.random() * size),

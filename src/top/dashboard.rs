@@ -1,4 +1,4 @@
-use super::{events::capture_key_press, state};
+use crate::internal_telemetry::is_allocation_tracking_enabled;
 use crossterm::{
     cursor::Show,
     event::{DisableMouseCapture, EnableMouseCapture, KeyCode},
@@ -10,6 +10,7 @@ use crossterm::{
 use num_format::{Locale, ToFormattedString};
 use number_prefix::NumberPrefix;
 use std::io::stdout;
+use tokio::sync::oneshot;
 use tui::{
     backend::{Backend, CrosstermBackend},
     layout::{Alignment, Constraint, Layout, Rect},
@@ -17,6 +18,11 @@ use tui::{
     text::{Span, Spans},
     widgets::{Block, Borders, Cell, Paragraph, Row, Table, Wrap},
     Frame, Terminal,
+};
+
+use super::{
+    events::capture_key_press,
+    state::{self, ConnectionStatus},
 };
 
 /// Format metrics, with thousands separation
@@ -83,15 +89,38 @@ impl HumanFormatter for i64 {
     }
 }
 
-static HEADER: [&str; 8] = [
+fn format_metric(total: i64, throughput: i64, human_metrics: bool) -> String {
+    match total {
+        0 => "N/A".to_string(),
+        v => format!(
+            "{} ({}/s)",
+            if human_metrics {
+                v.human_format()
+            } else {
+                v.thousands_format()
+            },
+            throughput.human_format()
+        ),
+    }
+}
+
+const NUM_COLUMNS: usize = if is_allocation_tracking_enabled() {
+    9
+} else {
+    8
+};
+
+static HEADER: [&str; NUM_COLUMNS] = [
     "ID",
-    "Pipeline",
+    "Output",
     "Kind",
     "Type",
     "Events In",
     "Events Out",
     "Bytes",
     "Errors",
+    #[cfg(feature = "allocation-tracing")]
+    "Mem Usage Bytes",
 ];
 
 struct Widgets<'a> {
@@ -117,13 +146,20 @@ impl<'a> Widgets<'a> {
     }
 
     /// Renders a title showing 'Vector', and the URL the dashboard is currently connected to.
-    fn title<B: Backend>(&'a self, f: &mut Frame<B>, area: Rect) {
+    fn title<B: Backend>(
+        &'a self,
+        f: &mut Frame<B>,
+        area: Rect,
+        connection_status: &ConnectionStatus,
+    ) {
         let text = vec![Spans::from(vec![
             Span::from(self.url_string),
             Span::styled(
                 format!(" | Sampling @ {}ms", self.opts.interval.thousands_format()),
                 Style::default().fg(Color::Gray),
             ),
+            Span::from(" | "),
+            Span::styled(connection_status.to_string(), connection_status.style()),
         ])];
 
         let block = Block::default().borders(Borders::ALL).title(Span::styled(
@@ -147,77 +183,93 @@ impl<'a> Widgets<'a> {
             .collect::<Vec<_>>();
 
         // Data columns
-        let items = state.iter().map(|(_, r)| {
+        let mut items = Vec::new();
+        for (_, r) in state.components.iter() {
             let mut data = vec![
                 r.key.id().to_string(),
-                r.key.pipeline_str().unwrap_or_default().into(),
+                (!r.has_displayable_outputs())
+                    .then_some("--")
+                    .unwrap_or_default()
+                    .to_string(),
                 r.kind.clone(),
                 r.component_type.clone(),
             ];
 
             let formatted_metrics = [
-                match r.received_events_total {
-                    0 => "N/A".to_string(),
-                    v => format!(
-                        "{} ({}/s)",
-                        if self.opts.human_metrics {
-                            v.human_format()
-                        } else {
-                            v.thousands_format()
-                        },
-                        r.received_events_throughput_sec.human_format()
-                    ),
-                },
-                match r.sent_events_total {
-                    0 => "N/A".to_string(),
-                    v => format!(
-                        "{} ({}/s)",
-                        if self.opts.human_metrics {
-                            v.human_format()
-                        } else {
-                            v.thousands_format()
-                        },
-                        r.sent_events_throughput_sec.human_format()
-                    ),
-                },
-                match r.processed_bytes_total {
-                    0 => "N/A".to_string(),
-                    v => format!(
-                        "{} ({}/s)",
-                        if self.opts.human_metrics {
-                            v.human_format_bytes()
-                        } else {
-                            v.thousands_format()
-                        },
-                        r.processed_bytes_throughput_sec.human_format_bytes()
-                    ),
-                },
+                format_metric(
+                    r.received_events_total,
+                    r.received_events_throughput_sec,
+                    self.opts.human_metrics,
+                ),
+                format_metric(
+                    r.sent_events_total,
+                    r.sent_events_throughput_sec,
+                    self.opts.human_metrics,
+                ),
+                format_metric(
+                    r.processed_bytes_total,
+                    r.processed_bytes_throughput_sec,
+                    self.opts.human_metrics,
+                ),
                 if self.opts.human_metrics {
                     r.errors.human_format()
                 } else {
                     r.errors.thousands_format()
                 },
+                #[cfg(feature = "allocation-tracing")]
+                r.allocated_bytes.human_format(),
             ];
 
             data.extend_from_slice(&formatted_metrics);
-            Row::new(data).style(Style::default())
-        });
+            items.push(Row::new(data).style(Style::default()));
+
+            // Add output rows
+            if r.has_displayable_outputs() {
+                for (id, output) in r.outputs.iter() {
+                    let sent_events_metric = format_metric(
+                        output.sent_events_total,
+                        output.sent_events_throughput_sec,
+                        self.opts.human_metrics,
+                    );
+                    let mut data = [""; NUM_COLUMNS]
+                        .into_iter()
+                        .map(Cell::from)
+                        .collect::<Vec<_>>();
+                    data[1] = Cell::from(id.as_ref());
+                    data[5] = Cell::from(sent_events_metric);
+                    items.push(Row::new(data).style(Style::default()));
+                }
+            }
+        }
 
         let w = Table::new(items)
             .header(Row::new(header).bottom_margin(1))
             .block(Block::default().borders(Borders::ALL).title("Components"))
             .column_spacing(2)
-            .widths(&[
-                Constraint::Percentage(19),
-                Constraint::Percentage(14),
-                Constraint::Percentage(8),
-                Constraint::Percentage(8),
-                Constraint::Percentage(18),
-                Constraint::Percentage(18),
-                Constraint::Percentage(18),
-                Constraint::Percentage(8),
-            ]);
-
+            .widths(if is_allocation_tracking_enabled() {
+                &[
+                    Constraint::Percentage(15), // ID
+                    Constraint::Percentage(6),  // Output
+                    Constraint::Percentage(8),  // Kind
+                    Constraint::Percentage(10), // Type
+                    Constraint::Percentage(10), // Events In
+                    Constraint::Percentage(10), // Events Out
+                    Constraint::Percentage(10), // Bytes
+                    Constraint::Percentage(5),  // Errors
+                    Constraint::Percentage(16), // Allocated Bytes
+                ]
+            } else {
+                &[
+                    Constraint::Percentage(15), // ID
+                    Constraint::Percentage(15), // Output
+                    Constraint::Percentage(10), // Kind
+                    Constraint::Percentage(10), // Type
+                    Constraint::Percentage(10), // Events In
+                    Constraint::Percentage(10), // Events Out
+                    Constraint::Percentage(10), // Bytes
+                    Constraint::Percentage(10), // Errors
+                ]
+            });
         f.render_widget(w, area);
     }
 
@@ -250,10 +302,10 @@ impl<'a> Widgets<'a> {
     fn draw<B: Backend>(&self, f: &mut Frame<B>, state: state::State) {
         let size = f.size();
         let rects = Layout::default()
-            .constraints(self.constraints.as_ref())
+            .constraints(self.constraints.clone())
             .split(size);
 
-        self.title(f, rects[0]);
+        self.title(f, rects[0], &state.connection_status);
 
         // Require a minimum of 80 chars of line width to display the table
         if size.width >= 80 {
@@ -279,6 +331,7 @@ pub async fn init_dashboard<'a>(
     url: &'a str,
     opts: &'a super::Opts,
     mut state_rx: state::StateRx,
+    mut shutdown_rx: oneshot::Receiver<()>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     // Capture key presses, to determine when to quit
     let (mut key_press_rx, key_press_kill_tx) = capture_key_press();
@@ -311,6 +364,10 @@ pub async fn init_dashboard<'a>(
                     let _ = key_press_kill_tx.send(());
                     break
                 }
+            }
+            _ = &mut shutdown_rx => {
+                let _ = key_press_kill_tx.send(());
+                break
             }
         }
     }

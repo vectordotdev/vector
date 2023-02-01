@@ -6,24 +6,20 @@ of your most sensitive data, and therefore, Vector strives to be as transparent
 as possible with our privacy efforts. This document clarifies how the Vector
 project thinks about privacy now and in the future.
 
-<!-- MarkdownTOC autolink="true" style="ordered" indent="   " -->
-
-1. [Vector Itself](#vector-itself)
-   1. [Downloads](#downloads)
-   1. [Phoning Home](#phoning-home)
-1. [Vector Website & Docs](#vector-website--docs)
-1. [Vector Community](#vector-community)
-   1. [Vector Repository](#vector-repository)
-   1. [Vector Chat](#vector-chat)
-
-<!-- /MarkdownTOC -->
+- [Vector Itself](#vector-itself)
+  - [Downloads](#downloads)
+  - [Phoning Home](#phoning-home)
+- [Vector Website & Docs](#vector-website--docs)
+- [Vector Community](#vector-community)
+  - [Vector Repository](#vector-repository)
+  - [Vector Chat](#vector-chat)
 
 ## Vector Itself
 
 ### Downloads
 
-Vector uses AWS S3, Github assets, [Cloudsmith][cloudsmith], and Docker Hub to host
-release artifacts. Vector does track download counts in aggregate. For Github, Cloudsmith,
+Vector uses AWS S3, GitHub assets, [Cloudsmith][cloudsmith], and Docker Hub to host
+release artifacts. Vector does track download counts in aggregate. For GitHub, Cloudsmith,
 and Docker this data is anonymous, but for AWS S3 IP addresses are logged. There is no
 way to disable IP address tracking within the AWS S3 logs. If you are concerned about
 sharing your IP address we recommend using a proxy, or downloading Vector from a
@@ -45,9 +41,9 @@ derived from backend server logs which are anonymized. Vector uses
 
 ### Vector Repository
 
-The Vector repository is hosted on Github. You can review their privacy policy
+The Vector repository is hosted on GitHub. You can review their privacy policy
 [here][github_pp]. Additionally, Vector will not attempt to mine information
-about users that interact with Vector on Github. Vector team members will
+about users that interact with Vector on GitHub. Vector team members will
 occasionally reach out to active users offer help debugging or learn about
 ways Vector can improve.
 

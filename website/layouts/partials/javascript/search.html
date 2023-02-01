@@ -4,7 +4,8 @@
 {{ $index := cond hugo.IsProduction $params.algolia_index_prod $params.algolia_index_staging }}
 {{ $index = printf `"%s"` $index }}
 {{ $searchJs := "js/search.tsx" }}
-{{ $jsOpts := dict "defines" (dict "process.env.NODE_ENV" "\"development\""
+{{ $jsOpts := dict "sourceMap" "inline"
+  "defines" (dict "process.env.NODE_ENV" "\"development\""
   "process.env.ALGOLIA_APP_ID" $appId
   "process.env.ALGOLIA_PUBLIC_API_KEY" $apiKey
   "process.env.ALGOLIA_INDEX_NAME" $index) }}

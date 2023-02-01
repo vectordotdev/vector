@@ -1,7 +1,18 @@
-use dns_lookup::lookup_addr;
 use std::net::IpAddr;
 
+use ::value::Value;
+use dns_lookup::lookup_addr;
 use vrl::prelude::*;
+
+fn reverse_dns(value: Value) -> Resolved {
+    let ip: IpAddr = value
+        .try_bytes_utf8_lossy()?
+        .parse()
+        .map_err(|err| format!("unable to parse IP address: {err}"))?;
+    let host = lookup_addr(&ip).map_err(|err| format!("unable to perform a lookup : {err}"))?;
+
+    Ok(host.into())
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct ReverseDns;
@@ -29,13 +40,13 @@ impl Function for ReverseDns {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _info: &FunctionCompileContext,
-        mut arguments: ArgumentList,
+        _state: &state::TypeState,
+        _ctx: &mut FunctionCompileContext,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
 
-        Ok(Box::new(ReverseDnsFn { value }))
+        Ok(ReverseDnsFn { value }.as_expr())
     }
 }
 
@@ -44,23 +55,14 @@ struct ReverseDnsFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for ReverseDnsFn {
+impl FunctionExpression for ReverseDnsFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let ip: IpAddr = self
-            .value
-            .resolve(ctx)?
-            .try_bytes_utf8_lossy()?
-            .parse()
-            .map_err(|err| format!("unable to parse IP address: {}", err))?;
-
-        let host =
-            lookup_addr(&ip).map_err(|err| format!("unable to perform a lookup : {}", err))?;
-
-        Ok(host.into())
+        let value = self.value.resolve(ctx)?;
+        reverse_dns(value)
     }
 
-    fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        self.value.type_def(state).fallible().bytes()
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
+        TypeDef::bytes().fallible()
     }
 }
 
@@ -74,25 +76,25 @@ mod tests {
         invalid_ip {
             args: func_args![value: value!("999.999.999.999")],
             want: Err("unable to parse IP address: invalid IP address syntax"),
-            tdef: TypeDef::new().fallible().bytes(),
+            tdef: TypeDef::bytes().fallible(),
         }
 
         google_ipv4 {
             args: func_args![value: value!("8.8.8.8")],
             want: Ok(value!("dns.google")),
-            tdef: TypeDef::new().fallible().bytes(),
+            tdef: TypeDef::bytes().fallible(),
         }
 
         google_ipv6 {
             args: func_args![value: value!("2001:4860:4860::8844")],
             want: Ok(value!("dns.google")),
-            tdef: TypeDef::new().fallible().bytes(),
+            tdef: TypeDef::bytes().fallible(),
         }
 
         invalid_type {
             args: func_args![value: value!(1)],
-            want: Err("expected \"string\", got \"integer\""),
-            tdef: TypeDef::new().fallible().bytes(),
+            want: Err("expected string, got integer"),
+            tdef: TypeDef::bytes().fallible(),
         }
     ];
 }

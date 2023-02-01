@@ -114,9 +114,9 @@ source = '''
 Let's pretend we have a nice well behaved application piping Vector logs like the following:
 
 ```json
-{ "id": "user1", "gdpr": false, "email": "us-user1@timber.io" }
-{ "id": "user2", "gdpr": false, "email": "us-user2@timber.io" }
-{ "id": "user3", "gdpr": true, "email": "eu-user3@timber.io" }
+{ "id": "user1", "gdpr": false, "email": "us-user1@datadoghq.com" }
+{ "id": "user2", "gdpr": false, "email": "us-user2@datadoghq.com" }
+{ "id": "user3", "gdpr": true, "email": "eu-user3@datadoghq.com" }
 ```
 
 In our theoretical product, we're expanding into the EU and want to comply with the GDPR. In our case, that means our
@@ -142,14 +142,12 @@ type = "json_parser"
 [transforms.not_gdpr]
 type = "filter"
 inputs = ["parse"]
-condition.type = "check_fields"
-condition."gdpr.eq" = "false"
+condition = ".gdpr == false"
 
 [transforms.gdpr_to_strip]
 type = "filter"
 inputs = ["parse"]
-condition.type = "check_fields"
-condition."gdpr.eq" = "true"
+condition = ".gdpr == true"
 
 [transforms.gdpr_stripped]
 type = "remap"
@@ -160,7 +158,7 @@ source = "del(.email)"
 healthcheck = true
 inputs = ["not_gdpr", "gdpr_stripped"]
 type = "console"
-encoding = "json"
+encoding.codec = "json"
 [sinks.console.buffer]
 type = "memory"
 max_events = 500
@@ -171,18 +169,18 @@ Let's have a look:
 
 ```bash
 $ cat <<-EOF | cargo run -- --config test.toml
-{ "id": "user1", "gdpr": false, "email": "us-user1@timber.io" }
-{ "id": "user2", "gdpr": false, "email": "us-user2@timber.io" }
-{ "id": "user3", "gdpr": true, "email": "eu-user3@timber.io" }
+{ "id": "user1", "gdpr": false, "email": "us-user1@datadoghq.com" }
+{ "id": "user2", "gdpr": false, "email": "us-user2@datadoghq.com" }
+{ "id": "user3", "gdpr": true, "email": "eu-user3@datadoghq.com" }
 EOF
 Feb 05 16:13:59.241  INFO source{name=application type=stdin}: vector::sources::stdin: finished sending
-{"id":"user1","timestamp":"2020-02-06T00:13:59.241801798Z","host":"obsidian","email":"us-user1@timber.io","gdpr":false}
-{"gdpr":false,"host":"obsidian","email":"us-user2@timber.io","timestamp":"2020-02-06T00:13:59.241815255Z","id":"user2"}
+{"id":"user1","timestamp":"2020-02-06T00:13:59.241801798Z","host":"obsidian","email":"us-user1@datadoghq.com","gdpr":false}
+{"gdpr":false,"host":"obsidian","email":"us-user2@datadoghq.com","timestamp":"2020-02-06T00:13:59.241815255Z","id":"user2"}
 {"id":"user3","gdpr":true,"host":"obsidian","timestamp":"2020-02-06T00:13:59.241816010Z"}
 Feb 05 16:15:27.945  INFO vector: Shutting down.
 ```
 
-Don't know where events are coming from? You can use the `geoip` transform an `ipv4` field and get a grip on that!
+Don't know where events are coming from? You can do a geo ip lookup using VRL [enrichment functions][docs.enrichment_functions] to transform an `ipv4` field and get a grip on that!
 
 
 ## Sink field filtering
@@ -203,7 +201,7 @@ Lets take a look at what that might look like:
 
 ```toml title="vector.toml"
 [sinks.output]
-  inputs = ["demo"]
+  inputs = ["demo_logs"]
   type = "kafka"
 
   # Put events in the host specific topic.
@@ -254,14 +252,6 @@ and a `last_name` field coming from a source, and we'd like to output a `name` f
     del(.first_name, .last_name)
   '''
 ```
-
-{{< info >}}
-What if you had to do this in reverse? Try using the [`regex_parser`][docs.transforms.regex_parser] or
-[`split`][docs.transforms.split] transforms.
-
-[docs.transforms.regex_parser]: /docs/reference/vrl/functions/#parse_regex
-[docs.transforms.split]: /docs/reference/vrl/functions/#split
-{{< /info >}}
 
 ## Coercing Data Types
 
@@ -317,11 +307,11 @@ output format
   type = "console"
   inputs = ["source0"]
   target = "stdout"
-  encoding = "json"
+  encoding.codec = "json"
 ```
 
-You can also use a transform like [`json_parser`][docs.transforms.json_parser] or
-[`grok_parser`][docs.transforms.grok_parser] to parse out data in a given field.
+You can also use a transform like [`remap`][docs.transforms.remap] or to parse out
+data in a given field.
 
 ## Parting thoughts
 
@@ -341,4 +331,5 @@ Where are you deploying Vector? Let us know, maybe we can help optimize it!
 [docs.transforms.grok_parser]: /docs/reference/vrl/functions/#parse_grok
 [docs.transforms.json_parser]: /docs/reference/vrl/functions/#parse_json
 [docs.transforms.remap]: /docs/reference/configuration/transforms/remap/
+[docs.enrichment_functions]: /docs/reference/vrl/functions/#enrichment-functions
 

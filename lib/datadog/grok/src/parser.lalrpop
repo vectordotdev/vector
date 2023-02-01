@@ -2,7 +2,7 @@ use crate::ast::*;
 use crate::lexer::*;
 use lookup::{LookupBuf, SegmentBuf, FieldBuf};
 use ordered_float::NotNan;
-use vrl_compiler::Value;
+use value::Value;
 grammar<'err, 'input>(input: &'input str);
 
 extern {
@@ -12,7 +12,7 @@ extern {
     enum Tok<'input> {
         "identifier" => Token::Identifier(<&'input str>),
         "extended identifier" => Token::ExtendedIdentifier(<&'input str>),
-        "string literal" => Token::StringLiteral(<StringLiteral<&'input str>>),
+        "string literal" => Token::StringLiteral(<String>),
         "integer literal" => Token::IntegerLiteral(<i64>),
         "float literal" => Token::FloatLiteral(<NotNan<f64>>),
 
@@ -32,9 +32,15 @@ extern {
     }
 }
 
-pub GrokFilter: GrokPattern = "%{" <match_fn:FunctionOrRef> <fp:(DestinationAndFilter)?> "}" => GrokPattern{ match_fn, destination: fp };
+pub GrokFilter: GrokPattern = {
+ "%{" <match_fn:FunctionOrRef> <fp:(DestinationAndFilter)?> "}" => GrokPattern{ match_fn, destination: fp },
+ "%{" <match_fn:FunctionOrRef> ":" "}" => GrokPattern{ match_fn, destination: None },
+}
 
-DestinationAndFilter: Destination = ":" <path:Lookup> <filter_fn:(FilterFn)?> => Destination {path: path, filter_fn};
+DestinationAndFilter: Destination = {
+    ":" <path:Lookup> <filter_fn:(FilterFn)?> => Destination {path: path, filter_fn},
+    ":" <filter_fn:(FilterFn)> => Destination {path: LookupBuf::root(), filter_fn: Some(filter_fn)}
+}
 
 FilterFn: Function = ":" <FunctionOrRef>;
 
@@ -80,14 +86,14 @@ Arg: FunctionArgument = {
 Literal: Value = {
     Integer => Value::Integer(<>),
     Float => Value::Float(<>),
-    String => Value::Bytes(<>.to_string().into()),
+    String => Value::Bytes(<>.into()),
     Boolean => Value::Boolean(<>),
     Null => Value::Null,
 };
 
 Integer: i64 = "integer literal";
 Float: NotNan<f64> = "float literal";
-String: String = "string literal" => <>.unescape();
+String: String = "string literal";
 ExtendedIdentifier: &'input str = "extended identifier";
 Identifier: &'input str = "identifier";
 Boolean: bool = { "true" => true, "false" => false };

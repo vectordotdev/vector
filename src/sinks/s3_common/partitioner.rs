@@ -1,33 +1,58 @@
-use crate::{internal_events::TemplateRenderingFailed, template::Template};
 use vector_core::{event::Event, partition::Partitioner};
 
-/// Partitions items based on the generated S3 object key for the given event.
-///
-/// TODO: Realistically, this could be a generic "template partitioner", since
-/// I'm guessing other sinks might want to partition based on a key generated
-/// from event data.
-pub struct KeyPartitioner(Template);
+use crate::{internal_events::TemplateRenderingError, template::Template};
 
-impl KeyPartitioner {
-    pub const fn new(template: Template) -> Self {
-        Self(template)
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct S3PartitionKey {
+    pub key_prefix: String,
+    pub ssekms_key_id: Option<String>,
+}
+
+/// Partitions items based on the generated key for the given event.
+pub struct S3KeyPartitioner(Template, Option<Template>);
+
+impl S3KeyPartitioner {
+    pub const fn new(
+        key_prefix_template: Template,
+        ssekms_key_id_template: Option<Template>,
+    ) -> Self {
+        Self(key_prefix_template, ssekms_key_id_template)
     }
 }
 
-impl Partitioner for KeyPartitioner {
+impl Partitioner for S3KeyPartitioner {
     type Item = Event;
-    type Key = Option<String>;
+    type Key = Option<S3PartitionKey>;
 
     fn partition(&self, item: &Self::Item) -> Self::Key {
-        self.0
+        let key_prefix = self
+            .0
             .render_string(item)
             .map_err(|error| {
-                emit!(&TemplateRenderingFailed {
+                emit!(TemplateRenderingError {
                     error,
                     field: Some("key_prefix"),
                     drop_event: true,
                 });
             })
-            .ok()
+            .ok()?;
+        let ssekms_key_id = self
+            .1
+            .as_ref()
+            .map(|ssekms_key_id| {
+                ssekms_key_id.render_string(item).map_err(|error| {
+                    emit!(TemplateRenderingError {
+                        error,
+                        field: Some("ssekms_key_id"),
+                        drop_event: true,
+                    });
+                })
+            })
+            .transpose()
+            .ok()?;
+        Some(S3PartitionKey {
+            key_prefix,
+            ssekms_key_id,
+        })
     }
 }

@@ -13,14 +13,14 @@ components: sinks: gcp_cloud_storage: {
 	}
 
 	features: {
-		buffer: enabled:      true
+		acknowledgements: true
 		healthcheck: enabled: true
 		send: {
 			batch: {
 				enabled:      true
 				common:       false
-				max_bytes:    10485760
-				timeout_secs: 300
+				max_bytes:    10_000_000
+				timeout_secs: 300.0
 			}
 			compression: {
 				enabled: true
@@ -32,23 +32,22 @@ components: sinks: gcp_cloud_storage: {
 				enabled: true
 				codec: {
 					enabled: true
-					batched: true
-					enum: ["ndjson", "text"]
+					framing: true
+					enum: ["json", "text"]
 				}
 			}
 			proxy: enabled: true
 			request: {
 				enabled:        true
-				concurrency:    25
 				rate_limit_num: 1000
 				headers:        false
 			}
 			tls: {
 				enabled:                true
-				can_enable:             false
 				can_verify_certificate: true
 				can_verify_hostname:    true
-				enabled_default:        false
+				enabled_default:        true
+				enabled_by_scheme:      true
 			}
 			to: {
 				service: services.gcp_cloud_storage
@@ -69,16 +68,6 @@ components: sinks: gcp_cloud_storage: {
 	}
 
 	support: {
-		targets: {
-			"aarch64-unknown-linux-gnu":      true
-			"aarch64-unknown-linux-musl":     true
-			"armv7-unknown-linux-gnueabihf":  true
-			"armv7-unknown-linux-musleabihf": true
-			"x86_64-apple-darwin":            true
-			"x86_64-pc-windows-msv":          true
-			"x86_64-unknown-linux-gnu":       true
-			"x86_64-unknown-linux-musl":      true
-		}
 		requirements: []
 		warnings: []
 		notices: []
@@ -90,7 +79,6 @@ components: sinks: gcp_cloud_storage: {
 			common:      false
 			description: "Predefined ACL to apply to the created objects. For more information, see [Predefined ACLs](\(urls.gcs_predefined_acl)). If this is not set, GCS will apply a default ACL when the object is created."
 			required:    false
-			warnings: []
 			type: string: {
 				default: null
 				enum: {
@@ -101,16 +89,14 @@ components: sinks: gcp_cloud_storage: {
 					"project-private":           "Gives permission to the project team based on their roles. Anyone who is part of the team has READER permission. Project owners and project editors have OWNER permission. This the default."
 					"public-read":               "Gives the bucket or object owner OWNER permission, and gives all users, both authenticated and anonymous, READER permission. When you apply this to an object, anyone on the Internet can read the object without authenticating."
 				}
-				syntax: "literal"
 			}
 		}
+		api_key: configuration._gcp_api_key
 		bucket: {
 			description: "The GCS bucket name."
 			required:    true
-			warnings: []
 			type: string: {
 				examples: ["my-bucket"]
-				syntax: "literal"
 			}
 		}
 		credentials_path: {
@@ -118,11 +104,9 @@ components: sinks: gcp_cloud_storage: {
 			common:      true
 			description: "The filename for a Google Cloud service account credentials JSON file used to authenticate access to the Cloud Storage API. If this is unset, Vector checks the `GOOGLE_APPLICATION_CREDENTIALS` environment variable for a filename.\n\nIf no filename is named, Vector will attempt to fetch an instance service account for the compute instance the program is running on. If Vector is not running on a GCE instance, you must define a credentials file as above."
 			required:    false
-			warnings: []
 			type: string: {
 				default: null
 				examples: ["/path/to/credentials.json"]
-				syntax: "literal"
 			}
 		}
 		filename_append_uuid: {
@@ -130,7 +114,6 @@ components: sinks: gcp_cloud_storage: {
 			common:      false
 			description: "Whether or not to append a UUID v4 token to the end of the file. This ensures there are no name collisions high volume use cases."
 			required:    false
-			warnings: []
 			type: bool: default: true
 		}
 		filename_extension: {
@@ -138,10 +121,8 @@ components: sinks: gcp_cloud_storage: {
 			common:      false
 			description: "The filename extension to use in the object name."
 			required:    false
-			warnings: []
 			type: string: {
 				default: "log"
-				syntax:  "literal"
 			}
 		}
 		filename_time_format: {
@@ -149,10 +130,8 @@ components: sinks: gcp_cloud_storage: {
 			common:      false
 			description: "The format of the resulting object file name. [`strftime` specifiers](\(urls.strptime_specifiers)) are supported."
 			required:    false
-			warnings: []
 			type: string: {
 				default: "%s"
-				syntax:  "literal"
 			}
 		}
 		key_prefix: {
@@ -160,7 +139,6 @@ components: sinks: gcp_cloud_storage: {
 			common:      true
 			description: "A prefix to apply to all object key names. This should be used to partition your objects, and it's important to end this value with a `/` if you want this to be the root GCS \"folder\"."
 			required:    false
-			warnings: []
 			type: string: {
 				default: "date=%F/"
 				examples: ["date=%F/", "date=%F/hour=%H/", "year=%Y/month=%m/day=%d/", "application_id={{ application_id }}/date=%F/"]
@@ -171,11 +149,9 @@ components: sinks: gcp_cloud_storage: {
 			common:      false
 			description: "The set of metadata `key:value` pairs for the created objects. See the [GCS custom metadata](\(urls.gcs_custom_metadata)) documentation for more details."
 			required:    false
-			warnings: []
 			type: string: {
 				default: null
 				examples: []
-				syntax: "literal"
 			}
 		}
 		storage_class: {
@@ -183,7 +159,6 @@ components: sinks: gcp_cloud_storage: {
 			common:      false
 			description: "The storage class for the created objects. See [the GCP storage classes](\(urls.gcs_storage_classes)) for more details."
 			required:    false
-			warnings: []
 			type: string: {
 				default: null
 				enum: {
@@ -192,7 +167,6 @@ components: sinks: gcp_cloud_storage: {
 					COLDLINE: "Coldline Storage is a very-low-cost, highly durable storage service for storing infrequently accessed data."
 					ARCHIVE:  "Archive Storage is the lowest-cost, highly durable storage service for data archiving, online backup, and disaster recovery."
 				}
-				syntax: "literal"
 			}
 		}
 	}
@@ -200,6 +174,7 @@ components: sinks: gcp_cloud_storage: {
 	input: {
 		logs:    true
 		metrics: null
+		traces:  false
 	}
 
 	how_it_works: {
@@ -292,7 +267,9 @@ components: sinks: gcp_cloud_storage: {
 	]
 
 	telemetry: metrics: {
-		events_discarded_total:  components.sources.internal_metrics.output.metrics.events_discarded_total
-		processing_errors_total: components.sources.internal_metrics.output.metrics.processing_errors_total
+		component_sent_events_total:      components.sources.internal_metrics.output.metrics.component_sent_events_total
+		component_sent_event_bytes_total: components.sources.internal_metrics.output.metrics.component_sent_event_bytes_total
+		events_discarded_total:           components.sources.internal_metrics.output.metrics.events_discarded_total
+		processing_errors_total:          components.sources.internal_metrics.output.metrics.processing_errors_total
 	}
 }

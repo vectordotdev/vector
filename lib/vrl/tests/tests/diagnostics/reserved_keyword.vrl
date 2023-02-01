@@ -10,5 +10,6 @@
 #   │ use a different name instead
 #   │
 #   = see language documentation at https://vrl.dev
+#   = try your code in the VRL REPL, learn more at https://vrl.dev/examples
 
 array = []

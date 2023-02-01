@@ -1,38 +1,71 @@
+use bytes::Bytes;
+use futures::{FutureExt, SinkExt};
+use http::{Request, StatusCode, Uri};
+use serde_json::json;
+use vector_common::sensitive_string::SensitiveString;
+use vector_config::configurable_component;
+
 use crate::{
-    config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
+    codecs::Transformer,
+    config::{log_schema, AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     event::{Event, Value},
     http::HttpClient,
     sinks::util::{
-        http::{BatchedHttpSink, HttpSink},
-        BatchConfig, BatchSettings, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig,
+        http::{BatchedHttpSink, HttpEventEncoder, HttpSink},
+        BatchConfig, BoxedRawValue, JsonArrayBuffer, SinkBatchSettings, TowerRequestConfig,
     },
 };
-use futures::{FutureExt, SinkExt};
-use http::{Request, StatusCode, Uri};
-use serde::{Deserialize, Serialize};
-use serde_json::json;
 
-lazy_static::lazy_static! {
-    static ref HOST: Uri = Uri::from_static("https://api.honeycomb.io/1/batch");
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
+/// Configuration for the `honeycomb` sink.
+#[configurable_component(sink("honeycomb"))]
+#[derive(Clone, Debug)]
 pub struct HoneycombConfig {
-    api_key: String,
+    #[serde(skip, default = "default_endpoint")]
+    endpoint: String,
 
+    /// The team key that will be used to authenticate against Honeycomb.
+    api_key: SensitiveString,
+
+    /// The dataset to which logs are sent.
     // TODO: we probably want to make this a template
     // but this limits us in how we can do our healthcheck.
     dataset: String,
 
+    #[configurable(derived)]
     #[serde(default)]
-    batch: BatchConfig,
+    batch: BatchConfig<HoneycombDefaultBatchSettings>,
 
+    #[configurable(derived)]
     #[serde(default)]
     request: TowerRequestConfig,
+
+    #[configurable(derived)]
+    #[serde(
+        default,
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    encoding: Transformer,
+
+    #[configurable(derived)]
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    acknowledgements: AcknowledgementsConfig,
 }
 
-inventory::submit! {
-    SinkDescription::new::<HoneycombConfig>("honeycomb")
+fn default_endpoint() -> String {
+    "https://api.honeycomb.io/1/batch".to_string()
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+struct HoneycombDefaultBatchSettings;
+
+impl SinkBatchSettings for HoneycombDefaultBatchSettings {
+    const MAX_EVENTS: Option<usize> = None;
+    const MAX_BYTES: Option<usize> = Some(100_000);
+    const TIMEOUT_SECS: f64 = 1.0;
 }
 
 impl GenerateConfig for HoneycombConfig {
@@ -46,50 +79,48 @@ impl GenerateConfig for HoneycombConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "honeycomb")]
 impl SinkConfig for HoneycombConfig {
     async fn build(
         &self,
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let request_settings = self.request.unwrap_with(&TowerRequestConfig::default());
-        let batch_settings = BatchSettings::default()
-            .bytes(bytesize::kib(100u64))
-            .timeout(1)
-            .parse_config(self.batch)?;
+        let batch_settings = self.batch.into_batch_settings()?;
+
+        let buffer = JsonArrayBuffer::new(batch_settings.size);
 
         let client = HttpClient::new(None, cx.proxy())?;
 
         let sink = BatchedHttpSink::new(
             self.clone(),
-            JsonArrayBuffer::new(batch_settings.size),
+            buffer,
             request_settings,
             batch_settings.timeout,
             client.clone(),
-            cx.acker(),
         )
         .sink_map_err(|error| error!(message = "Fatal honeycomb sink error.", %error));
 
         let healthcheck = healthcheck(self.clone(), client).boxed();
 
-        Ok((super::VectorSink::Sink(Box::new(sink)), healthcheck))
+        Ok((super::VectorSink::from_event_sink(sink), healthcheck))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
-    fn sink_type(&self) -> &'static str {
-        "honeycomb"
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
     }
 }
 
-#[async_trait::async_trait]
-impl HttpSink for HoneycombConfig {
-    type Input = serde_json::Value;
-    type Output = Vec<BoxedRawValue>;
+pub struct HoneycombEventEncoder {
+    transformer: Transformer,
+}
 
-    fn encode_event(&self, event: Event) -> Option<Self::Input> {
+impl HttpEventEncoder<serde_json::Value> for HoneycombEventEncoder {
+    fn encode_event(&mut self, mut event: Event) -> Option<serde_json::Value> {
+        self.transformer.transform(&mut event);
         let mut log = event.into_log();
 
         let timestamp = if let Some(Value::Timestamp(ts)) = log.remove(log_schema().timestamp_key())
@@ -100,29 +131,40 @@ impl HttpSink for HoneycombConfig {
         };
 
         let data = json!({
-            "timestamp": timestamp.to_rfc3339_opts(chrono::SecondsFormat::Nanos, true),
-            "data": log.all_fields(),
+            "time": timestamp.to_rfc3339_opts(chrono::SecondsFormat::Nanos, true),
+            "data": log.convert_to_fields(),
         });
 
         Some(data)
     }
+}
 
-    async fn build_request(&self, events: Self::Output) -> crate::Result<http::Request<Vec<u8>>> {
+#[async_trait::async_trait]
+impl HttpSink for HoneycombConfig {
+    type Input = serde_json::Value;
+    type Output = Vec<BoxedRawValue>;
+    type Encoder = HoneycombEventEncoder;
+
+    fn build_encoder(&self) -> Self::Encoder {
+        HoneycombEventEncoder {
+            transformer: self.encoding.clone(),
+        }
+    }
+
+    async fn build_request(&self, events: Self::Output) -> crate::Result<Request<Bytes>> {
         let uri = self.build_uri();
-        let request = Request::post(uri).header("X-Honeycomb-Team", self.api_key.clone());
+        let request = Request::post(uri).header("X-Honeycomb-Team", self.api_key.inner());
+        let body = crate::serde::json::to_bytes(&events).unwrap().freeze();
 
-        let buf = serde_json::to_vec(&events).unwrap();
-
-        request.body(buf).map_err(Into::into)
+        request.body(body).map_err(Into::into)
     }
 }
 
 impl HoneycombConfig {
     fn build_uri(&self) -> Uri {
-        let uri = format!("{}/{}", HOST.clone(), self.dataset);
+        let uri = format!("{}/{}", self.endpoint, self.dataset);
 
-        uri.parse::<http::Uri>()
-            .expect("This should be a valid uri")
+        uri.parse::<Uri>().expect("This should be a valid uri")
     }
 }
 
@@ -165,8 +207,37 @@ async fn healthcheck(config: HoneycombConfig, client: HttpClient) -> crate::Resu
 }
 #[cfg(test)]
 mod test {
+    use futures::{future::ready, stream};
+    use vector_core::event::{Event, LogEvent};
+
+    use crate::{
+        config::{GenerateConfig, SinkConfig, SinkContext},
+        test_util::{
+            components::{run_and_assert_sink_compliance, HTTP_SINK_TAGS},
+            http::{always_200_response, spawn_blackhole_http_server},
+        },
+    };
+
+    use super::HoneycombConfig;
+
     #[test]
     fn generate_config() {
-        crate::test_util::test_generate_config::<super::HoneycombConfig>();
+        crate::test_util::test_generate_config::<HoneycombConfig>();
+    }
+
+    #[tokio::test]
+    async fn component_spec_compliance() {
+        let mock_endpoint = spawn_blackhole_http_server(always_200_response).await;
+
+        let config = HoneycombConfig::generate_config().to_string();
+        let mut config =
+            toml::from_str::<HoneycombConfig>(&config).expect("config should be valid");
+        config.endpoint = mock_endpoint.to_string();
+
+        let context = SinkContext::new_test();
+        let (sink, _healthcheck) = config.build(context).await.unwrap();
+
+        let event = Event::Log(LogEvent::from("simple message"));
+        run_and_assert_sink_compliance(sink, stream::once(ready(event)), &HTTP_SINK_TAGS).await;
     }
 }

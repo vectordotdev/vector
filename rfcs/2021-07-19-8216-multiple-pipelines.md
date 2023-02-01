@@ -4,7 +4,7 @@ Large Vector users often require complex Vector topologies to facilitate the col
 
 ## Context
 
-- [RFC 2064](https://github.com/timberio/vector/blob/master/rfcs/2020-03-17-2064-event-driven-observability.md) Event driven observability.
+- [RFC 2064](https://github.com/vectordotdev/vector/blob/master/rfcs/2020-03-17-2064-event-driven-observability.md) Event driven observability.
 
 ## Scope
 
@@ -103,9 +103,9 @@ The `outputs` option is made to forward the events from inside the pipeline to a
 
 #### From configuration to topology
 
-If we look deeper at the configuration building process, the configuration compiler will require the pipelines to build the [configuration](https://github.com/timberio/vector/blob/v0.15.0/src/config/builder.rs#L71).
+If we look deeper at the configuration building process, the configuration compiler will require the pipelines to build the [configuration](https://github.com/vectordotdev/vector/blob/v0.15.0/src/config/builder.rs#L71).
 
-To do so, we'll need to implement a `Pipeline` from the previous section. We'll then update [the `compile` function](https://github.com/timberio/vector/blob/v0.15.0/src/config/compiler.rs#L4) to build a `Config` containing the required pipelines components. The compiler will load the pipelines' transforms and add the `outputs` to the corresponding `sinks`.
+To do so, we'll need to implement a `Pipeline` from the previous section. We'll then update [the `compile` function](https://github.com/vectordotdev/vector/blob/v0.15.0/src/config/compiler.rs#L4) to build a `Config` containing the required pipelines components. The compiler will load the pipelines' transforms and add the `outputs` to the corresponding `sinks`.
 
 The components coming from the pipeline will be cloned inside the final `Config`, in the `IndexMap` containing the `transforms` and the `outputs` from the pipeline components will be added to the referring components input field.
 
@@ -158,11 +158,11 @@ That way, if a transform `foo` is defined in the pipeline `bar` and in the pipel
 
 Users should be able to observe and monitor individual pipelines.
 This means relevant metrics coming from the `internal_metrics` source must contain a `pipeline_id` tag referring to the pipeline's `id`.
-This approach would extend the [RFC 2064](https://github.com/timberio/vector/blob/master/rfcs/2020-03-17-2064-event-driven-observability.md#collecting-uniform-context-data) by _just_ adding `pipeline_id` to the context.
+This approach would extend the [RFC 2064](https://github.com/vectordotdev/vector/blob/master/rfcs/2020-03-17-2064-event-driven-observability.md#collecting-uniform-context-data) by _just_ adding `pipeline_id` to the context.
 
-In Vector, once [the topology is built from the configuration](https://github.com/timberio/vector/blob/v0.15.0/src/topology/builder.rs#L106), every component is encapsulated in a `Task` that intercepts an incoming event and processes it accordingly. This task also keeps track of its internal metrics and finally emits `internal_metrics` events.
+In Vector, once [the topology is built from the configuration](https://github.com/vectordotdev/vector/blob/v0.15.0/src/topology/builder.rs#L106), every component is encapsulated in a `Task` that intercepts an incoming event and processes it accordingly. This task also keeps track of its internal metrics and finally emits `internal_metrics` events.
 
-To add the pipeline information to the task, we need to change the `name` parameter to `id: ComponentId` in the [`Task::new`](https://github.com/timberio/vector/blob/v0.15.0/src/topology/task.rs#L29) method.
+To add the pipeline information to the task, we need to change the `name` parameter to `id: ComponentId` in the [`Task::new`](https://github.com/vectordotdev/vector/blob/v0.15.0/src/topology/task.rs#L29) method.
 
 ```rust
 pub struct Task {
@@ -187,7 +187,7 @@ impl Task {
 }
 ````
 
-That way, when vector [spawns a new transform task](https://github.com/timberio/vector/blob/v0.15.0/src/topology/mod.rs#L574), it will be able to add the optional pipeline information to the span.
+That way, when vector [spawns a new transform task](https://github.com/vectordotdev/vector/blob/v0.15.0/src/topology/mod.rs#L574), it will be able to add the optional pipeline information to the span.
 
 ```rust
 let span = error_span!(

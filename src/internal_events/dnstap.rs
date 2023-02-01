@@ -1,41 +1,45 @@
-// ## skip check-events ##
-
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
-#[derive(Debug)]
-pub struct DnstapEventReceived {
-    pub byte_size: usize,
-}
-
-impl InternalEvent for DnstapEventReceived {
-    fn emit_logs(&self) {
-        trace!(message = "Received line.", byte_size = %self.byte_size);
-    }
-
-    fn emit_metrics(&self) {
-        counter!("processed_events_total", 1);
-        counter!("component_received_events_total", 1);
-        counter!("events_in_total", 1);
-        counter!("processed_bytes_total", self.byte_size as u64);
-    }
-}
+use vector_common::internal_event::{error_stage, error_type};
 
 #[derive(Debug)]
-pub struct DnstapParseDataError<'a> {
-    pub error: &'a str,
+pub(crate) struct DnstapParseError<E> {
+    pub error: E,
 }
 
-impl<'a> InternalEvent for DnstapParseDataError<'a> {
-    fn emit_logs(&self) {
+impl<E: std::fmt::Display> InternalEvent for DnstapParseError<E> {
+    fn emit(self) {
         error!(
-            target = "dnstap event",
             message = "Error occurred while parsing dnstap data.",
-            error = ?self.error,
-            internal_log_rate_secs = 10);
-    }
-
-    fn emit_metrics(&self) {
+            error = %self.error,
+            stage = error_stage::PROCESSING,
+            error_type = error_type::PARSER_FAILED,
+            internal_log_rate_limit = true,
+        );
+        counter!(
+            "component_errors_total", 1,
+            "stage" => error_stage::PROCESSING,
+            "error_type" => error_type::PARSER_FAILED,
+        );
+        // deprecated
         counter!("parse_errors_total", 1);
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct DnstapParseWarning<E> {
+    pub error: E,
+}
+
+impl<E: std::fmt::Display> InternalEvent for DnstapParseWarning<E> {
+    fn emit(self) {
+        warn!(
+            message = "Recoverable error occurred while parsing dnstap data.",
+            error = %self.error,
+            stage = error_stage::PROCESSING,
+            error_type = error_type::PARSER_FAILED,
+            internal_log_rate_limit = true,
+        );
     }
 }

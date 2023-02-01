@@ -13,7 +13,7 @@ components: sinks: aws_sqs: components._aws & {
 	}
 
 	features: {
-		buffer: enabled:      true
+		acknowledgements: true
 		healthcheck: enabled: true
 		send: {
 			compression: enabled: false
@@ -27,7 +27,6 @@ components: sinks: aws_sqs: components._aws & {
 			proxy: enabled: true
 			request: {
 				enabled:                    true
-				concurrency:                5
 				rate_limit_duration_secs:   1
 				rate_limit_num:             5
 				retry_initial_backoff_secs: 1
@@ -35,7 +34,13 @@ components: sinks: aws_sqs: components._aws & {
 				timeout_secs:               30
 				headers:                    false
 			}
-			tls: enabled: false
+			tls: {
+				enabled:                true
+				can_verify_certificate: true
+				can_verify_hostname:    true
+				enabled_default:        true
+				enabled_by_scheme:      true
+			}
 			to: {
 				service: services.aws_sqs
 
@@ -55,16 +60,6 @@ components: sinks: aws_sqs: components._aws & {
 	}
 
 	support: {
-		targets: {
-			"aarch64-unknown-linux-gnu":      true
-			"aarch64-unknown-linux-musl":     true
-			"armv7-unknown-linux-gnueabihf":  true
-			"armv7-unknown-linux-musleabihf": true
-			"x86_64-apple-darwin":            true
-			"x86_64-pc-windows-msv":          true
-			"x86_64-unknown-linux-gnu":       true
-			"x86_64-unknown-linux-musl":      true
-		}
 		requirements: []
 		warnings: []
 		notices: []
@@ -74,17 +69,14 @@ components: sinks: aws_sqs: components._aws & {
 		queue_url: {
 			description: "The URL of the Amazon SQS queue to which messages are sent."
 			required:    true
-			warnings: []
 			type: string: {
 				examples: ["https://sqs.us-east-2.amazonaws.com/123456789012/MyQueue"]
-				syntax: "literal"
 			}
 		}
 		message_group_id: {
 			common:      false
 			description: "The tag that specifies that a message belongs to a specific message group. Can be applied only to FIFO queues."
 			required:    false
-			warnings: []
 			type: string: {
 				default: null
 				examples: ["vector", "vector-%Y-%m-%d"]
@@ -101,7 +93,6 @@ components: sinks: aws_sqs: components._aws & {
 			deduplication.
 			"""
 			required:    false
-			warnings: []
 			type: string: {
 				default: null
 				examples: ["{{ transaction_id }}"]
@@ -113,6 +104,7 @@ components: sinks: aws_sqs: components._aws & {
 	input: {
 		logs:    true
 		metrics: null
+		traces:  false
 	}
 
 	permissions: iam: [
@@ -134,9 +126,11 @@ components: sinks: aws_sqs: components._aws & {
 	]
 
 	telemetry: metrics: {
-		events_discarded_total:  components.sources.internal_metrics.output.metrics.events_discarded_total
-		processed_bytes_total:   components.sources.internal_metrics.output.metrics.processed_bytes_total
-		processed_events_total:  components.sources.internal_metrics.output.metrics.processed_events_total
-		processing_errors_total: components.sources.internal_metrics.output.metrics.processing_errors_total
+		component_sent_events_total:      components.sources.internal_metrics.output.metrics.component_sent_events_total
+		component_sent_event_bytes_total: components.sources.internal_metrics.output.metrics.component_sent_event_bytes_total
+		events_discarded_total:           components.sources.internal_metrics.output.metrics.events_discarded_total
+		processed_bytes_total:            components.sources.internal_metrics.output.metrics.processed_bytes_total
+		processed_events_total:           components.sources.internal_metrics.output.metrics.processed_events_total
+		processing_errors_total:          components.sources.internal_metrics.output.metrics.processing_errors_total
 	}
 }

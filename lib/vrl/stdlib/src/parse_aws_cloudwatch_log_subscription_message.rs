@@ -1,6 +1,44 @@
-use shared::aws_cloudwatch_logs_subscription::AwsCloudWatchLogsSubscriptionMessage;
 use std::collections::BTreeMap;
+
+use ::value::Value;
+use vector_common::aws_cloudwatch_logs_subscription::AwsCloudWatchLogsSubscriptionMessage;
 use vrl::prelude::*;
+
+fn parse_aws_cloudwatch_log_subscription_message(bytes: Value) -> Resolved {
+    let bytes = bytes.try_bytes()?;
+    let message = serde_json::from_slice::<AwsCloudWatchLogsSubscriptionMessage>(&bytes)
+        .map_err(|e| format!("unable to parse: {e}"))?;
+    let map = Value::from(BTreeMap::from([
+        (String::from("owner"), Value::from(message.owner)),
+        (
+            String::from("message_type"),
+            Value::from(message.message_type.as_str()),
+        ),
+        (String::from("log_group"), Value::from(message.log_group)),
+        (String::from("log_stream"), Value::from(message.log_stream)),
+        (
+            String::from("subscription_filters"),
+            Value::from(message.subscription_filters),
+        ),
+        (
+            String::from("log_events"),
+            Value::Array(
+                message
+                    .log_events
+                    .into_iter()
+                    .map(|event| {
+                        Value::from(BTreeMap::from([
+                            (String::from("id"), Value::from(event.id)),
+                            (String::from("timestamp"), Value::from(event.timestamp)),
+                            (String::from("message"), Value::from(event.message)),
+                        ]))
+                    })
+                    .collect::<Vec<Value>>(),
+            ),
+        ),
+    ]));
+    Ok(map)
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct ParseAwsCloudWatchLogSubscriptionMessage;
@@ -48,15 +86,13 @@ impl Function for ParseAwsCloudWatchLogSubscriptionMessage {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
-        mut arguments: ArgumentList,
+        _state: &state::TypeState,
+        _ctx: &mut FunctionCompileContext,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
 
-        Ok(Box::new(ParseAwsCloudWatchLogSubscriptionMessageFn {
-            value,
-        }))
+        Ok(ParseAwsCloudWatchLogSubscriptionMessageFn { value }.as_expr())
     }
 
     fn parameters(&self) -> &'static [Parameter] {
@@ -73,56 +109,47 @@ struct ParseAwsCloudWatchLogSubscriptionMessageFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for ParseAwsCloudWatchLogSubscriptionMessageFn {
+impl FunctionExpression for ParseAwsCloudWatchLogSubscriptionMessageFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let bytes = self.value.resolve(ctx)?.try_bytes()?;
-
-        let message = serde_json::from_slice::<AwsCloudWatchLogsSubscriptionMessage>(&bytes)
-            .map_err(|e| format!("unable to parse: {}", e))?;
-
-        Ok(map![
-            "owner": message.owner,
-            "message_type": message.message_type.as_str(),
-            "log_group": message.log_group,
-            "log_stream": message.log_stream,
-            "subscription_filters": message.subscription_filters,
-            "log_events": message.log_events.into_iter().map(|event| map![
-                "id": event.id,
-                "timestamp": event.timestamp,
-                "message": event.message,
-            ]).collect::<Vec<_>>(),
-        ]
-        .into())
+        let bytes = self.value.resolve(ctx)?;
+        parse_aws_cloudwatch_log_subscription_message(bytes)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new()
-            .fallible() // Message parsing error
-            .object::<&str, TypeDef>(inner_type_def())
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
+        TypeDef::object(inner_kind()).fallible(/* message parsing error */)
     }
 }
 
-fn inner_type_def() -> BTreeMap<&'static str, TypeDef> {
-    map! {
-        "owner": Kind::Bytes,
-        "message_type": Kind::Bytes,
-        "log_group": Kind::Bytes,
-        "log_stream": Kind::Bytes,
-        "subscription_filters": TypeDef::new().array_mapped::<(), Kind>(map! {
-            (): Kind::Bytes
-        }),
-        "log_events": TypeDef::new().object::<&str, Kind>(map! {
-            "id": Kind::Bytes,
-            "timestamp": Kind::Timestamp,
-            "message": Kind::Bytes,
-        }),
-    }
+fn inner_kind() -> BTreeMap<Field, Kind> {
+    BTreeMap::from([
+        (Field::from("owner"), Kind::bytes()),
+        (Field::from("message_type"), Kind::bytes()),
+        (Field::from("log_group"), Kind::bytes()),
+        (Field::from("log_stream"), Kind::bytes()),
+        (
+            Field::from("subscription_filters"),
+            Kind::array({
+                let mut v = Collection::any();
+                v.set_unknown(Kind::bytes());
+                v
+            }),
+        ),
+        (
+            Field::from("log_events"),
+            Kind::array(Collection::from_unknown(Kind::object(BTreeMap::from([
+                (Field::from("id"), Kind::bytes()),
+                (Field::from("timestamp"), Kind::timestamp()),
+                (Field::from("message"), Kind::bytes()),
+            ])))),
+        ),
+    ])
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use chrono::{TimeZone, Utc};
+
+    use super::*;
 
     test_function![
         parse_aws_cloudwatch_log_subscription_message => ParseAwsCloudWatchLogSubscriptionMessage;
@@ -130,7 +157,7 @@ mod tests {
         invalid_type {
             args: func_args![value: "42"],
             want: Err("unable to parse: invalid type: integer `42`, expected struct AwsCloudWatchLogsSubscriptionMessage at line 1 column 2"),
-            tdef: TypeDef::new().fallible().object::<&str, TypeDef>(inner_type_def()),
+            tdef: TypeDef::object(inner_kind()).fallible(),
         }
 
         string {
@@ -157,29 +184,29 @@ mod tests {
          ]
      }
      "#],
-            want: Ok(map![
-                "owner": "071959437513",
-                "message_type": "DATA_MESSAGE",
-                "log_group": "/jesse/test",
-                "log_stream": "test",
-                "subscription_filters": vec!["Destination"],
-                "log_events": vec![map![
-                    "id": "35683658089614582423604394983260738922885519999578275840",
-                    "timestamp": Utc.timestamp(1600110569, 39000000),
-                    "message": "{\"bytes\":26780,\"datetime\":\"14/Sep/2020:11:45:41 -0400\",\"host\":\"157.130.216.193\",\"method\":\"PUT\",\"protocol\":\"HTTP/1.0\",\"referer\":\"https://www.principalcross-platform.io/markets/ubiquitous\",\"request\":\"/expedite/convergence\",\"source_type\":\"stdin\",\"status\":301,\"user-identifier\":\"-\"}",
-                ], map![
-                    "id": "35683658089659183914001456229543810359430816722590236673",
-                    "timestamp": Utc.timestamp(1600110569, 41000000),
-                    "message": "{\"bytes\":17707,\"datetime\":\"14/Sep/2020:11:45:41 -0400\",\"host\":\"109.81.244.252\",\"method\":\"GET\",\"protocol\":\"HTTP/2.0\",\"referer\":\"http://www.investormission-critical.io/24/7/vortals\",\"request\":\"/scale/functionalities/optimize\",\"source_type\":\"stdin\",\"status\":502,\"user-identifier\":\"feeney1708\"}",
-                ]],
-            ]),
-            tdef: TypeDef::new().fallible().object::<&str, TypeDef>(inner_type_def()),
+            want: Ok(Value::from(BTreeMap::from([
+                (String::from("owner"), Value::from("071959437513")),
+                (String::from("message_type"), Value::from("DATA_MESSAGE")),
+                (String::from("log_group"), Value::from("/jesse/test")),
+                (String::from("log_stream"), Value::from("test")),
+                (String::from("subscription_filters"), Value::from(vec![Value::from("Destination")])),
+                (String::from("log_events"), Value::from(vec![Value::from(BTreeMap::from([
+                    (String::from("id"), Value::from( "35683658089614582423604394983260738922885519999578275840")),
+                    (String::from("timestamp"), Value::from(Utc.timestamp_opt(1_600_110_569, 39_000_000).single().expect("invalid timestamp"))),
+                    (String::from("message"), Value::from("{\"bytes\":26780,\"datetime\":\"14/Sep/2020:11:45:41 -0400\",\"host\":\"157.130.216.193\",\"method\":\"PUT\",\"protocol\":\"HTTP/1.0\",\"referer\":\"https://www.principalcross-platform.io/markets/ubiquitous\",\"request\":\"/expedite/convergence\",\"source_type\":\"stdin\",\"status\":301,\"user-identifier\":\"-\"}")),
+                ])), Value::from(BTreeMap::from([
+                    (String::from("id"), Value::from("35683658089659183914001456229543810359430816722590236673")),
+                    (String::from("timestamp"), Value::from(Utc.timestamp_opt(1_600_110_569, 41_000_000).single().expect("invalid timestamp"))),
+                    (String::from("message"), Value::from("{\"bytes\":17707,\"datetime\":\"14/Sep/2020:11:45:41 -0400\",\"host\":\"109.81.244.252\",\"method\":\"GET\",\"protocol\":\"HTTP/2.0\",\"referer\":\"http://www.investormission-critical.io/24/7/vortals\",\"request\":\"/scale/functionalities/optimize\",\"source_type\":\"stdin\",\"status\":502,\"user-identifier\":\"feeney1708\"}")),
+                ]))])),
+                ]))),
+            tdef: TypeDef::object(inner_kind()).fallible(),
         }
 
         invalid_value {
             args: func_args![value: r#"{ INVALID }"#],
             want: Err("unable to parse: key must be a string at line 1 column 3"),
-            tdef: TypeDef::new().fallible().object::<&str, TypeDef>(inner_type_def()),
+            tdef: TypeDef::object(inner_kind()).fallible(),
         }
     ];
 }

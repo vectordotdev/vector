@@ -1,4 +1,10 @@
-use crate::sinks::util::batch::{Batch, BatchConfig, BatchError, BatchSettings, PushResult};
+use vector_core::ByteSizeOf;
+
+use super::super::{
+    batch::{Batch, BatchConfig, BatchError, PushResult},
+    ElementCount,
+};
+use crate::sinks::util::{Merged, SinkBatchSettings};
 
 pub trait Partition<K> {
     fn partition(&self) -> K;
@@ -29,11 +35,10 @@ where
     type Input = PartitionInnerBuffer<T::Input, K>;
     type Output = PartitionInnerBuffer<T::Output, K>;
 
-    fn get_settings_defaults(
-        config: BatchConfig,
-        defaults: BatchSettings<Self>,
-    ) -> Result<BatchSettings<Self>, BatchError> {
-        Ok(T::get_settings_defaults(config, defaults.into())?.into())
+    fn get_settings_defaults<D: SinkBatchSettings + Clone>(
+        config: BatchConfig<D, Merged>,
+    ) -> Result<BatchConfig<D, Merged>, BatchError> {
+        T::get_settings_defaults(config)
     }
 
     fn push(&mut self, item: Self::Input) -> PushResult<Self::Input> {
@@ -83,5 +88,22 @@ where
 {
     fn partition(&self) -> K {
         self.key.clone()
+    }
+}
+
+impl<T: ByteSizeOf, K> ByteSizeOf for PartitionInnerBuffer<T, K> {
+    // This ignores the size of the key, as it does not represent actual data size.
+    fn size_of(&self) -> usize {
+        self.inner.size_of()
+    }
+
+    fn allocated_bytes(&self) -> usize {
+        self.inner.allocated_bytes()
+    }
+}
+
+impl<T: ElementCount, K> ElementCount for PartitionInnerBuffer<T, K> {
+    fn element_count(&self) -> usize {
+        self.inner.element_count()
     }
 }

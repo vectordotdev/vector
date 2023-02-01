@@ -1,6 +1,10 @@
-use crate::expression::{Expr, Resolved};
-use crate::{Context, Expression, State, TypeDef};
 use std::fmt;
+
+use crate::state::{TypeInfo, TypeState};
+use crate::{
+    expression::{Expr, Resolved},
+    Context, Expression,
+};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Group {
@@ -20,8 +24,8 @@ impl Expression for Group {
         self.inner.resolve(ctx)
     }
 
-    fn type_def(&self, state: &State) -> TypeDef {
-        self.inner.type_def(state)
+    fn type_info(&self, state: &TypeState) -> TypeInfo {
+        self.inner.type_info(state)
     }
 }
 

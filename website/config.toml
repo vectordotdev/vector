@@ -34,8 +34,8 @@ subtagline = "Vector is deployed over 1,000,000 times per month by Fortune 500 c
 alpine_js_version = "2.8.2"
 ionicons_version = "5.4.0"
 site_logo = "img/vector-open-graph.png"
-favicon = "favicon.ico"
 display_banner = false # Whether to display the top banner in layouts/partials/banner.html
+favicon = "favicon.ico"
 
 # Update this every time there's a new "generation" of the site. Incrementing this forces the browser to refresh any
 # state persisted in localStorage. You should do that whenever there's some change in the front-end logic that requires
@@ -119,7 +119,6 @@ weight = 3
 [[languages.en.menus.navbar]]
 name = "Docs"
 url = "/docs"
-params = { flyout = true }
 weight = 1
 
 [[languages.en.menus.navbar]]
@@ -142,6 +141,11 @@ name = "Blog"
 url = "/blog"
 weight = 5
 
+[[languages.en.menus.navbar]]
+name = "Support"
+url = "https://www.datadoghq.com/product/observability-pipelines"
+weight = 6
+
 # Footer menu
 [[languages.en.menus.footer]]
 name = "About"
@@ -159,6 +163,12 @@ name = "Contact us"
 url = "/community"
 parent = "about"
 weight = 2
+
+[[languages.en.menus.footer]]
+name = "Privacy"
+url = "https://www.datadoghq.com/legal/privacy/"
+parent = "about"
+weight = 3
 
 [[languages.en.menus.footer]]
 name = "Components"
@@ -215,6 +225,12 @@ parent = "setup"
 weight = 4
 
 [[languages.en.menus.footer]]
+name = "Going to Prod"
+url = "/docs/setup/going-to-prod"
+parent = "setup"
+weight = 5
+
+[[languages.en.menus.footer]]
 name = "Community"
 url = "/community"
 identifier = "community"
@@ -240,24 +256,19 @@ weight = 3
 
 # Extra links under the "Meta" section in the docs
 [[languages.en.menus.meta]]
-name = "Privacy"
-url = "https://github.com/vectordotdev/vector/blob/master/PRIVACY.md"
-weight = 1
-
-[[languages.en.menus.meta]]
 name = "Security"
 url = "https://github.com/vectordotdev/vector/security/policy"
-weight = 2
+weight = 1
 
 [[languages.en.menus.meta]]
 name = "Releases"
 url = "https://github.com/vectordotdev/vector/blob/master/RELEASES.md"
-weight = 3
+weight = 2
 
 [[languages.en.menus.meta]]
 name = "Versioning"
 url = "https://github.com/vectordotdev/vector/blob/master/VERSIONING.md"
-weight = 4
+weight = 3
 
 # Buttons in "community" section on main page
 [[languages.en.menus.community]]
@@ -298,102 +309,15 @@ params = { color = "rss-orange", icon = "rss" }
 url = "/blog/index.xml"
 weight = 4
 
-# Links in subfooter
-[[languages.en.menus.subfooter]]
-name = "Security policy"
-url = "https://github.com/vectordotdev/vector/blob/master/PRIVACY.md"
-weight = 1
+[security]
+  enableInlineShortcodes = false
+  [security.exec]
+    allow = ['^babel$', '^dart-sass-embedded$', '^go$', '^npx$', '^postcss$']
+    osEnv = ['(?i)^(PATH|PATHEXT|APPDATA|TMP|TEMP|TERM)$']
 
-[[languages.en.menus.subfooter]]
-name = "Privacy policy"
-url = "https://github.com/vectordotdev/vector/blob/master/PRIVACY.md"
-weight = 2
+  [security.funcs]
+    getenv = ['^HUGO_']
 
-[[languages.en.menus.flyout]]
-name = "Documentation"
-identifier = "docs"
-url = "/docs"
-weight = 1
-
-[[languages.en.menus.flyout]]
-name = "Quickstart"
-parent = "docs"
-url = "/docs/setup/quickstart"
-weight = 1
-
-[[languages.en.menus.flyout]]
-name = "Components"
-identifier = "components"
-url = "/components"
-weight = 2
-
-[[languages.en.menus.flyout]]
-name = "Sources"
-parent = "components"
-url = "/docs/reference/configuration/sources"
-weight = 1
-
-[[languages.en.menus.flyout]]
-name = "Transforms"
-parent = "components"
-url = "/docs/reference/configuration/transforms"
-weight = 2
-
-[[languages.en.menus.flyout]]
-name = "Sinks"
-parent = "components"
-url = "/docs/reference/configuration/sinks"
-weight = 3
-
-[[languages.en.menus.flyout]]
-name = "Vector Remap Language"
-identifier = "vrl"
-url = "/docs/reference/vrl"
-weight = 3
-
-[[languages.en.menus.flyout]]
-name = "Functions"
-parent = "vrl"
-url = "/docs/reference/vrl/functions"
-weight = 1
-
-[[languages.en.menus.flyout]]
-name = "Errors"
-parent = "vrl"
-url = "/docs/reference/vrl/errors"
-weight = 2
-
-[[languages.en.menus.flyout]]
-name = "Examples"
-parent = "vrl"
-url = "/docs/reference/vrl/examples"
-weight = 3
-
-[[languages.en.menus.flyout]]
-name = "Expressions"
-parent = "vrl"
-url = "/docs/reference/vrl/expressions"
-weight = 4
-
-[[languages.en.enus.flyout]]
-name = "Pages"
-identifier = "pages"
-weight = 4
-
-[[languages.en.menus.flyout]]
-name = "Download"
-parent = "pages"
-url = "/download"
-weight = 1
-
-[[languages.en.menus.flyout]]
-name = "Releases"
-parent = "pages"
-url = "/releases"
-weight = 2
-
-[[languages.en.menus.flyout]]
-name = "Highlights"
-parent = "pages"
-url = "/highlights"
-weight = 3
+  [security.http]
+    methods = ['(?i)GET|POST']
+    urls = ['.*']

@@ -16,12 +16,11 @@ components: sinks: prometheus_exporter: {
 	}
 
 	features: {
-		buffer: enabled:      false
+		acknowledgements: true
 		healthcheck: enabled: false
 		exposes: {
 			tls: {
 				enabled:                true
-				can_enable:             true
 				can_verify_certificate: true
 				enabled_default:        false
 			}
@@ -46,16 +45,6 @@ components: sinks: prometheus_exporter: {
 	}
 
 	support: {
-		targets: {
-			"aarch64-unknown-linux-gnu":      true
-			"aarch64-unknown-linux-musl":     true
-			"armv7-unknown-linux-gnueabihf":  true
-			"armv7-unknown-linux-musleabihf": true
-			"x86_64-apple-darwin":            true
-			"x86_64-pc-windows-msv":          true
-			"x86_64-unknown-linux-gnu":       true
-			"x86_64-unknown-linux-musl":      true
-		}
 		requirements: []
 		warnings: [
 			"""
@@ -70,14 +59,17 @@ components: sinks: prometheus_exporter: {
 
 	configuration: {
 		address: {
-			description: "The address to expose for scraping."
+			description: "The address to expose for scraping. The metrics are exposed at the typical Prometheus exporter path, `/metrics`"
 			required:    true
 			warnings: []
 			type: string: {
 				examples: ["0.0.0.0:\(_port)"]
-				syntax: "literal"
 			}
 		}
+		auth: configuration._http_auth & {_args: {
+			password_example: "${PROMETHEUS_PASSWORD}"
+			username_example: "${PROMETHEUS_USERNAME}"
+		}}
 		buckets: {
 			common:      false
 			description: """
@@ -85,7 +77,6 @@ components: sinks: prometheus_exporter: {
 				metrics into histograms.
 				"""
 			required:    false
-			warnings: []
 			type: array: {
 				default: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0]
 				items: type: float: examples: [0.005, 0.01]
@@ -93,9 +84,8 @@ components: sinks: prometheus_exporter: {
 		}
 		flush_period_secs: {
 			common:      false
-			description: "Time interval between [set](\(urls.vector_data_model)/metric#set) values are reset."
+			description: "Time interval on which metrics are flushed. On the flush interval, if a metric has not been seen since the last flush interval, it is considered expired and is removed. Be sure to configure this value higher than your client's scrape interval."
 			required:    false
-			warnings: []
 			type: uint: {
 				default: 60
 				unit:    "seconds"
@@ -110,11 +100,9 @@ components: sinks: prometheus_exporter: {
 				follow Prometheus [naming conventions](\(urls.prometheus_metric_naming)).
 				"""
 			required:    false
-			warnings: []
 			type: string: {
 				default: null
 				examples: ["service"]
-				syntax: "literal"
 			}
 		}
 		quantiles: {
@@ -124,11 +112,27 @@ components: sinks: prometheus_exporter: {
 				into a summary.
 				"""
 			required:    false
-			warnings: []
 			type: array: {
 				default: [0.5, 0.75, 0.9, 0.95, 0.99]
 				items: type: float: examples: [0.5, 0.75, 0.9, 0.95, 0.99]
 			}
+		}
+		distributions_as_summaries: {
+			common:      false
+			description: """
+				Whether or not to render [distributions](\(urls.vector_data_model)/metric#distribution) as a
+				[histogram](\(urls.vector_data_model)/metric#histogram) or
+				[summary](\(urls.vector_data_model)/metric#summary), which map one-to-one with the Prometheus
+				metric types of the same name.
+				"""
+			required:    false
+			type: bool: default: false
+		}
+		suppress_timestamp: {
+			common:      false
+			description: "Whether or not to strip metric timestamp in the response."
+			required:    false
+			type: bool: default: false
 		}
 	}
 
@@ -142,6 +146,7 @@ components: sinks: prometheus_exporter: {
 			set:          false
 			summary:      true
 		}
+		traces: false
 	}
 
 	examples: [
@@ -367,12 +372,21 @@ components: sinks: prometheus_exporter: {
 		memory_usage: {
 			title: "Memory Usage"
 			body: """
-				Like other Prometheus instances, the `prometheus` sink aggregates
+				Like other Prometheus instances, the `prometheus_exporter` sink aggregates
 				metrics in memory which keeps the memory footprint to a minimum if Prometheus
 				fails to scrape the Vector instance over an extended period of time. The
 				downside is that data will be lost if Vector is restarted. This is by design of
 				Prometheus' pull model approach, but is worth noting if restart Vector
 				frequently.
+				"""
+		}
+
+		duplicate_tag_names: {
+			title: "Duplicate tag names"
+			body: """
+				Multiple tags with the same name are invalid within Prometheus and Prometheus
+				will reject a metric with duplicate tag names. When sending a tag with multiple
+				values for each name, Vector will only send the last value specified.
 				"""
 		}
 	}

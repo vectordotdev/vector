@@ -1,7 +1,7 @@
 package metadata
 
 remap: functions: sha1: {
-	category:    "Hash"
+	category:    "Cryptography"
 	description: """
 		Calculates a [SHA-1](\(urls.sha1)) hash of the `value`.
 		"""

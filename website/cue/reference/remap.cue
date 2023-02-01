@@ -83,6 +83,7 @@ remap: #Remap & {
 			}
 			warnings: [
 				"All attributes are strings and will require manual type coercing.",
+				"Values of duplicate keys are grouped into an array.",
 			]
 		},
 		{
@@ -212,8 +213,8 @@ remap: #Remap & {
 				1 │ upcase(42)
 				  │        ^^
 				  │        │
-				  │        this expression resolves to the exact type "integer"
-				  │        but the parameter "value" expects the exact type "string"
+				  │        this expression resolves to the exact type integer
+				  │        but the parameter "value" expects the exact type string
 				  │
 				  = try: ensuring an appropriate type at runtime
 				  =
@@ -228,6 +229,7 @@ remap: #Remap & {
 				  = see documentation about error handling at https://errors.vrl.dev/#handling
 				  = learn more about error code 110 at https://errors.vrl.dev/110
 				  = see language documentation at https://vrl.dev
+				  = try your code in the VRL REPL, learn more at https://vrl.dev/examples
 				"""
 		},
 		{
@@ -251,6 +253,7 @@ remap: #Remap & {
 				  = see documentation about error handling at https://errors.vrl.dev/#handling
 				  = learn more about error code 103 at https://errors.vrl.dev/103
 				  = see language documentation at https://vrl.dev
+				  = try your code in the VRL REPL, learn more at https://vrl.dev/examples
 				"""
 		},
 	]

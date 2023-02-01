@@ -113,9 +113,8 @@ module.exports = {
               'border-bottom-color': theme('colors.gray.700'),
             },
             code: {
-              color: theme('colors.primary', 'currentColor'),
+              color: theme('colors.gray.100', 'currentColor'),
               '&:not([class^="language-"])': {
-                color: theme('colors.gray.100'),
                 'background-color': theme('colors.gray.700'),
               }
             },

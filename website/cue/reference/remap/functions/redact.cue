@@ -54,7 +54,7 @@ remap: functions: redact: {
 				This parameter must be a static expression. You cannot use variables or other dynamic expressions
 				with it. This allows us to validate the argument at compile-time to avoid runtime errors.
 				"""#
-			required: false
+			required: true
 			type: ["array"]
 		},
 	]

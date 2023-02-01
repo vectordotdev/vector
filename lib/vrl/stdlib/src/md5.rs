@@ -1,5 +1,11 @@
+use ::value::Value;
 use md5::Digest;
 use vrl::prelude::*;
+
+fn md5(value: Value) -> Resolved {
+    let value = value.try_bytes()?;
+    Ok(hex::encode(md5::Md5::digest(&value)).into())
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct Md5;
@@ -27,13 +33,13 @@ impl Function for Md5 {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
-        mut arguments: ArgumentList,
+        _state: &state::TypeState,
+        _ctx: &mut FunctionCompileContext,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
 
-        Ok(Box::new(Md5Fn { value }))
+        Ok(Md5Fn { value }.as_expr())
     }
 }
 
@@ -42,15 +48,14 @@ struct Md5Fn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for Md5Fn {
+impl FunctionExpression for Md5Fn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let value = self.value.resolve(ctx)?.try_bytes()?;
-
-        Ok(hex::encode(md5::Md5::digest(&value)).into())
+        let value = self.value.resolve(ctx)?;
+        md5(value)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new().infallible().bytes()
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
+        TypeDef::bytes().infallible()
     }
 }
 
@@ -64,7 +69,7 @@ mod tests {
         md5 {
             args: func_args![value: "foo"],
             want: Ok(value!("acbd18db4cc2f85cedef654fccc4a4d8")),
-            tdef: TypeDef::new().infallible().bytes(),
+            tdef: TypeDef::bytes().infallible(),
         }
     ];
 }

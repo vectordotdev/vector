@@ -9,5 +9,6 @@
 #   = see documentation about regular expressions at https://vrl.dev/expressions/#regular-expression
 #   = learn more about error code 101 at https://errors.vrl.dev/101
 #   = see language documentation at https://vrl.dev
+#   = try your code in the VRL REPL, learn more at https://vrl.dev/examples
 
 r'['

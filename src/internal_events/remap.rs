@@ -1,7 +1,10 @@
-// ## skip check-events ##
-
+use crate::emit;
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
+
+use vector_common::internal_event::{
+    error_stage, error_type, ComponentEventsDropped, INTENTIONAL, UNINTENTIONAL,
+};
 
 #[derive(Debug)]
 pub struct RemapMappingError {
@@ -12,23 +15,27 @@ pub struct RemapMappingError {
 }
 
 impl InternalEvent for RemapMappingError {
-    fn emit_logs(&self) {
-        let message = if self.event_dropped {
-            "Mapping failed with event; discarding event."
-        } else {
-            "Mapping failed with event."
-        };
-
-        warn!(
-            message,
+    fn emit(self) {
+        error!(
+            message = "Mapping failed with event.",
             error = ?self.error,
-            internal_log_rate_secs = 30
-        )
-    }
-
-    fn emit_metrics(&self) {
-        counter!("processing_errors_total", 1,
-                 "error_type" => "failed_mapping");
+            error_type = error_type::CONVERSION_FAILED,
+            stage = error_stage::PROCESSING,
+            internal_log_rate_limit = true,
+        );
+        counter!(
+            "component_errors_total", 1,
+            "error_type" => error_type::CONVERSION_FAILED,
+            "stage" => error_stage::PROCESSING,
+        );
+        if self.event_dropped {
+            emit!(ComponentEventsDropped::<UNINTENTIONAL> {
+                count: 1,
+                reason: "Mapping failed with event.",
+            });
+        }
+        // deprecated
+        counter!("processing_errors_total", 1);
     }
 }
 
@@ -40,13 +47,17 @@ pub struct RemapMappingAbort {
 }
 
 impl InternalEvent for RemapMappingAbort {
-    fn emit_logs(&self) {
-        let message = if self.event_dropped {
-            "Event mapping aborted; discarding event."
-        } else {
-            "Event mapping aborted."
-        };
+    fn emit(self) {
+        debug!(
+            message = "Event mapping aborted.",
+            internal_log_rate_limit = true
+        );
 
-        debug!(message, internal_log_rate_secs = 30)
+        if self.event_dropped {
+            emit!(ComponentEventsDropped::<INTENTIONAL> {
+                count: 1,
+                reason: "Event mapping aborted.",
+            });
+        }
     }
 }

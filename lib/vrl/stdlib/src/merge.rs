@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 
+use ::value::Value;
 use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
@@ -40,26 +41,26 @@ impl Function for Merge {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
-        mut arguments: ArgumentList,
+        _state: &state::TypeState,
+        _ctx: &mut FunctionCompileContext,
+        arguments: ArgumentList,
     ) -> Compiled {
         let to = arguments.required("to");
         let from = arguments.required("from");
         let deep = arguments.optional("deep").unwrap_or_else(|| expr!(false));
 
-        Ok(Box::new(MergeFn { to, from, deep }))
+        Ok(MergeFn { to, from, deep }.as_expr())
     }
 }
 
 #[derive(Debug, Clone)]
-pub struct MergeFn {
+pub(crate) struct MergeFn {
     to: Box<dyn Expression>,
     from: Box<dyn Expression>,
     deep: Box<dyn Expression>,
 }
 
-impl Expression for MergeFn {
+impl FunctionExpression for MergeFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let mut to_value = self.to.resolve(ctx)?.try_object()?;
         let from_value = self.from.resolve(ctx)?.try_object()?;
@@ -70,14 +71,17 @@ impl Expression for MergeFn {
         Ok(to_value.into())
     }
 
-    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+    fn type_def(&self, state: &state::TypeState) -> TypeDef {
+        // TODO: this has a known bug when deep is true
+        // see: https://github.com/vectordotdev/vector/issues/13597
         self.to
             .type_def(state)
-            .merge_shallow(self.from.type_def(state))
+            .restrict_object()
+            .merge_overwrite(self.from.type_def(state).restrict_object())
     }
 }
 
-/// Merges two BTreeMaps of Symbol’s value as variable is void: Values. The
+/// Merges two `BTreeMaps` of Symbol’s value as variable is void: Values. The
 /// second map is merged into the first one.
 ///
 /// If Symbol’s value as variable is void: deep is true, only the top level
@@ -113,8 +117,10 @@ where
 
 #[cfg(test)]
 mod tests {
+    use vector_common::btreemap;
+    use vrl::value::Kind;
+
     use super::*;
-    use value::Kind;
 
     test_function! [
         merge => Merge;
@@ -125,9 +131,9 @@ mod tests {
                 from: value!({ key2: "val2" })
             ],
             want: Ok(value!({ key1: "val1", key2: "val2" })),
-            tdef: TypeDef::new().object::<String, TypeDef>(map! {
-                "key1": Kind::Bytes,
-                "key2": Kind::Bytes,
+            tdef: TypeDef::object(btreemap! {
+                Field::from("key1") => Kind::bytes(),
+                Field::from("key2") => Kind::bytes(),
             }),
         }
 
@@ -147,11 +153,11 @@ mod tests {
                 key2: "val2",
                 child: { grandchild2: true },
             })),
-            tdef: TypeDef::new().object::<String, TypeDef>(map! {
-                "key1": Kind::Bytes,
-                "key2": Kind::Bytes,
-                "child": TypeDef::new().object::<String, TypeDef>(map! {
-                    "grandchild2": Kind::Boolean,
+            tdef: TypeDef::object(btreemap! {
+                Field::from("key1") => Kind::bytes(),
+                Field::from("key2") => Kind::bytes(),
+                Field::from("child") => TypeDef::object(btreemap! {
+                    Field::from("grandchild2") => Kind::boolean(),
                 }),
             }),
         }
@@ -176,11 +182,11 @@ mod tests {
                     grandchild2: true,
                 },
             })),
-            tdef: TypeDef::new().object::<String, TypeDef>(map! {
-                "key1": Kind::Bytes,
-                "key2": Kind::Bytes,
-                "child": TypeDef::new().object::<String, TypeDef>(map! {
-                    "grandchild2": Kind::Boolean,
+            tdef: TypeDef::object(btreemap! {
+                Field::from("key1") => Kind::bytes(),
+                Field::from("key2") => Kind::bytes(),
+                Field::from("child") => TypeDef::object(btreemap! {
+                    Field::from("grandchild2") => Kind::boolean(),
                 }),
             }),
 

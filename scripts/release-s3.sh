@@ -7,11 +7,13 @@ set -euo pipefail
 #
 #   Uploads archives and packages to S3
 
-CHANNEL="${CHANNEL:-"$(scripts/release-channel.sh)"}"
-VERSION="${VERSION:-"$(scripts/version.sh)"}"
+CHANNEL="${CHANNEL:-"$(cargo vdev release channel)"}"
+VERSION="${VECTOR_VERSION:-"$(cargo vdev version)"}"
 DATE="${DATE:-"$(date -u +%Y-%m-%d)"}"
 VERIFY_TIMEOUT="${VERIFY_TIMEOUT:-"30"}" # seconds
 VERIFY_RETRIES="${VERIFY_RETRIES:-"2"}"
+
+export AWS_REGION=us-east-1
 
 #
 # Setup

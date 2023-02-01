@@ -1,40 +1,52 @@
-use crate::http::HttpClient;
-use crate::sinks::util::retries::RetryLogic;
+use std::{
+    sync::Arc,
+    task::{Context, Poll},
+};
+
+use bytes::Bytes;
 use futures::future::BoxFuture;
-use http::{Request, StatusCode, Uri};
+use headers::HeaderName;
+use http::{
+    header::{CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE},
+    HeaderValue, Request, Uri,
+};
 use hyper::Body;
-use snafu::Snafu;
-use std::sync::Arc;
-use std::task::{Context, Poll};
+use indexmap::IndexMap;
 use tower::Service;
 use tracing::Instrument;
-use vector_core::event::{EventFinalizers, EventStatus, Finalizable};
+use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
+use vector_core::{
+    event::{EventFinalizers, EventStatus, Finalizable},
+    internal_event::CountByteSize,
+    stream::DriverResponse,
+};
+
+use crate::{
+    http::HttpClient,
+    sinks::util::{retries::RetryLogic, Compression},
+    sinks::{datadog::DatadogApiError, util::http::validate_headers},
+};
 
 #[derive(Debug, Default, Clone)]
 pub struct LogApiRetry;
 
 impl RetryLogic for LogApiRetry {
-    type Error = LogApiError;
+    type Error = DatadogApiError;
     type Response = LogApiResponse;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
-        match *error {
-            LogApiError::HttpError { .. }
-            | LogApiError::BadRequest
-            | LogApiError::PayloadTooLarge => false,
-            LogApiError::ServerError => true,
-        }
+        error.is_retriable()
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct LogApiRequest {
-    pub(crate) serialized_payload_bytes_len: usize,
-    pub(crate) payload_members_len: usize,
-    pub(crate) api_key: Arc<str>,
-    pub(crate) is_compressed: bool,
-    pub(crate) body: Vec<u8>,
-    pub(crate) finalizers: EventFinalizers,
+    pub api_key: Arc<str>,
+    pub compression: Compression,
+    pub body: Bytes,
+    pub finalizers: EventFinalizers,
+    pub uncompressed_size: usize,
+    pub metadata: RequestMetadata,
 }
 
 impl Finalizable for LogApiRequest {
@@ -43,32 +55,31 @@ impl Finalizable for LogApiRequest {
     }
 }
 
-#[derive(Debug, Snafu)]
-pub enum LogApiError {
-    #[snafu(display("Server responded with an error."))]
-    ServerError,
-    #[snafu(display("Failed to make HTTP(S) request: {}", error))]
-    HttpError { error: crate::http::HttpError },
-    #[snafu(display("Client sent a payload that is too large."))]
-    PayloadTooLarge,
-    #[snafu(display("Client request was not valid for unknown reasons."))]
-    BadRequest,
+impl MetaDescriptive for LogApiRequest {
+    fn get_metadata(&self) -> RequestMetadata {
+        self.metadata
+    }
 }
 
 #[derive(Debug)]
-pub enum LogApiResponse {
-    /// Client sent a request and all was well with it.
-    Ok,
-    /// Client request has likely invalid API key.
-    PermissionIssue,
+pub struct LogApiResponse {
+    event_status: EventStatus,
+    count: usize,
+    events_byte_size: usize,
+    raw_byte_size: usize,
 }
 
-impl AsRef<EventStatus> for LogApiResponse {
-    fn as_ref(&self) -> &EventStatus {
-        match self {
-            LogApiResponse::Ok => &EventStatus::Delivered,
-            LogApiResponse::PermissionIssue => &EventStatus::Errored,
-        }
+impl DriverResponse for LogApiResponse {
+    fn event_status(&self) -> EventStatus {
+        self.event_status
+    }
+
+    fn events_sent(&self) -> CountByteSize {
+        CountByteSize(self.count, self.events_byte_size)
+    }
+
+    fn bytes_sent(&self) -> Option<usize> {
+        Some(self.raw_byte_size)
     }
 }
 
@@ -81,77 +92,76 @@ impl AsRef<EventStatus> for LogApiResponse {
 pub struct LogApiService {
     client: HttpClient,
     uri: Uri,
-    enterprise: bool,
+    user_provided_headers: IndexMap<HeaderName, HeaderValue>,
 }
 
 impl LogApiService {
-    pub const fn new(client: HttpClient, uri: Uri, enterprise: bool) -> Self {
-        Self {
+    pub fn new(
+        client: HttpClient,
+        uri: Uri,
+        headers: IndexMap<String, String>,
+    ) -> crate::Result<Self> {
+        let headers = validate_headers(&headers)?;
+
+        Ok(Self {
             client,
             uri,
-            enterprise,
-        }
+            user_provided_headers: headers,
+        })
     }
 }
 
 impl Service<LogApiRequest> for LogApiService {
     type Response = LogApiResponse;
-    type Error = LogApiError;
+    type Error = DatadogApiError;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
+    // Emission of Error internal event is handled upstream by the caller
     fn poll_ready(&mut self, _cx: &mut Context) -> Poll<Result<(), Self::Error>> {
         Poll::Ready(Ok(()))
     }
 
+    // Emission of Error internal event is handled upstream by the caller
     fn call(&mut self, request: LogApiRequest) -> Self::Future {
         let mut client = self.client.clone();
         let http_request = Request::post(&self.uri)
-            .header("Content-Type", "application/json")
-            .header(
-                "DD-EVP-ORIGIN",
-                if self.enterprise {
-                    "vector-enterprise"
-                } else {
-                    "vector"
-                },
-            )
+            .header(CONTENT_TYPE, "application/json")
+            .header("DD-EVP-ORIGIN", "vector")
             .header("DD-EVP-ORIGIN-VERSION", crate::get_version())
             .header("DD-API-KEY", request.api_key.to_string());
-        let http_request = if request.is_compressed {
-            http_request.header("Content-Encoding", "gzip")
+
+        let http_request = if let Some(ce) = request.compression.content_encoding() {
+            http_request.header(CONTENT_ENCODING, ce)
         } else {
             http_request
         };
+
+        let count = request.get_metadata().event_count();
+        let events_byte_size = request.get_metadata().events_byte_size();
+        let raw_byte_size = request.uncompressed_size;
+
+        let mut http_request = http_request.header(CONTENT_LENGTH, request.body.len());
+
+        if let Some(headers) = http_request.headers_mut() {
+            for (name, value) in &self.user_provided_headers {
+                // Replace rather than append to any existing header values
+                headers.insert(name, value.clone());
+            }
+        }
+
         let http_request = http_request
-            .header("Content-Length", request.body.len())
             .body(Body::from(request.body))
-            .expect("TODO");
+            .expect("building HTTP request failed unexpectedly");
 
         Box::pin(async move {
-            match client.call(http_request).in_current_span().await {
-                Ok(response) => {
-                    let status = response.status();
-                    // From https://docs.datadoghq.com/api/latest/logs/:
-                    //
-                    // The status codes answered by the HTTP API are:
-                    // 200: OK (v1)
-                    // 202: Accepted (v2)
-                    // 400: Bad request (likely an issue in the payload
-                    //      formatting)
-                    // 403: Permission issue (likely using an invalid API Key)
-                    // 413: Payload too large (batch is above 5MB uncompressed)
-                    // 5xx: Internal error, request should be retried after some
-                    //      time
-                    match status {
-                        StatusCode::BAD_REQUEST => Err(LogApiError::BadRequest),
-                        StatusCode::FORBIDDEN => Ok(LogApiResponse::PermissionIssue),
-                        StatusCode::OK | StatusCode::ACCEPTED => Ok(LogApiResponse::Ok),
-                        StatusCode::PAYLOAD_TOO_LARGE => Err(LogApiError::PayloadTooLarge),
-                        _ => Err(LogApiError::ServerError),
-                    }
-                }
-                Err(error) => Err(LogApiError::HttpError { error }),
-            }
+            DatadogApiError::from_result(client.call(http_request).in_current_span().await).map(
+                |_| LogApiResponse {
+                    event_status: EventStatus::Delivered,
+                    count,
+                    events_byte_size,
+                    raw_byte_size,
+                },
+            )
         })
     }
 }

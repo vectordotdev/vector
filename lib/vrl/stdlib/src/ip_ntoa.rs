@@ -1,6 +1,16 @@
 use std::{convert::TryInto, net::Ipv4Addr};
 
+use ::value::Value;
 use vrl::prelude::*;
+
+fn ip_ntoa(value: Value) -> Resolved {
+    let i: u32 = value
+        .try_integer()?
+        .try_into()
+        .map_err(|_| String::from("cannot convert to bytes: integer does not fit in u32"))?;
+
+    Ok(Ipv4Addr::from(i).to_string().into())
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct IpNtoa;
@@ -28,13 +38,13 @@ impl Function for IpNtoa {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
-        mut arguments: ArgumentList,
+        _state: &state::TypeState,
+        _ctx: &mut FunctionCompileContext,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
 
-        Ok(Box::new(IpNtoaFn { value }))
+        Ok(IpNtoaFn { value }.as_expr())
     }
 }
 
@@ -43,20 +53,14 @@ struct IpNtoaFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for IpNtoaFn {
+impl FunctionExpression for IpNtoaFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let i: u32 = self
-            .value
-            .resolve(ctx)?
-            .try_integer()?
-            .try_into()
-            .map_err(|_| String::from("cannot convert to bytes: integer does not fit in u32"))?;
-
-        Ok(Ipv4Addr::from(i).to_string().into())
+        let value = self.value.resolve(ctx)?;
+        ip_ntoa(value)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new().fallible().bytes()
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
+        TypeDef::bytes().fallible()
     }
 }
 
@@ -68,15 +72,15 @@ mod tests {
         ip_ntoa => IpNtoa;
 
         invalid {
-            args: func_args![value: u32::MAX as i64 + 1],
+            args: func_args![value: i64::from(u32::MAX) + 1],
             want: Err("cannot convert to bytes: integer does not fit in u32"),
-            tdef: TypeDef::new().fallible().bytes(),
+            tdef: TypeDef::bytes().fallible(),
         }
 
         valid {
-            args: func_args![value: 16909060],
+            args: func_args![value: 16_909_060],
             want: Ok(value!("1.2.3.4")),
-            tdef: TypeDef::new().fallible().bytes(),
+            tdef: TypeDef::bytes().fallible(),
         }
     ];
 }

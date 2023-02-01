@@ -5,11 +5,12 @@ set -euo pipefail
 #
 # SUMMARY
 #
-#   Uploads target/artifacts to Github releases
+#   Uploads target/artifacts to GitHub releases
 
-VERSION="${VECTOR_VERSION:-"$(scripts/version.sh)"}"
+VERSION="${VECTOR_VERSION:-"$(cargo vdev version)"}"
 
-grease --debug create-release timberio/vector "v${VERSION}" "${SHA1}" \
-  --assets './target/artifacts/*' \
+gh release --repo "vectordotdev/vector" \
+  create "v${VERSION}" \
+  --title "v${VERSION}" \
   --notes "[View release notes](https://vector.dev/releases/${VERSION}/)" \
-  --name "v${VERSION}"
+  target/artifacts/*

@@ -19,6 +19,7 @@ components: sinks: humio_metrics: {
 			set:          true
 			summary:      true
 		}
+		traces: false
 	}
 
 	how_it_works: {

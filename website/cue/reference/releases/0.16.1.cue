@@ -12,7 +12,7 @@ releases: "0.16.1": {
 		* Fixing an issue where Vector would crash when loading disk buffers
 		* Fixing an issue where the `vector` sink would incorrectly try to use `http://` when `tls` was enabled
 
-		**Note:** Please see the release notes for [0.16.0](/releases/0.16.0/) for additional changes if upgrading from
+		**Note:** Please see the release notes for [0.16.0](/releases/0.16.0) for additional changes if upgrading from
 		0.15.X. In particular, the upgrade guide for breaking changes.
 		"""
 

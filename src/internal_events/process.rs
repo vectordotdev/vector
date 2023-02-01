@@ -1,23 +1,32 @@
-use crate::{built_info, config};
 use metrics::counter;
+use metrics::gauge;
 use vector_core::internal_event::InternalEvent;
+
+use crate::{built_info, config};
+use vector_common::internal_event::{error_stage, error_type};
 
 #[derive(Debug)]
 pub struct VectorStarted;
 
 impl InternalEvent for VectorStarted {
-    fn emit_logs(&self) {
+    fn emit(self) {
         info!(
             target: "vector",
             message = "Vector has started.",
             debug = built_info::DEBUG,
             version = built_info::PKG_VERSION,
             arch = built_info::TARGET_ARCH,
-            build_id = built_info::VECTOR_BUILD_DESC.unwrap_or("none"),
+            revision = built_info::VECTOR_BUILD_DESC.unwrap_or(""),
         );
-    }
-
-    fn emit_metrics(&self) {
+        gauge!(
+            "build_info",
+            1.0,
+            "debug" => built_info::DEBUG,
+            "version" => built_info::PKG_VERSION,
+            "rust_version" => built_info::RUST_VERSION,
+            "arch" => built_info::TARGET_ARCH,
+            "revision" => built_info::VECTOR_BUILD_DESC.unwrap_or("")
+        );
         counter!("started_total", 1);
     }
 }
@@ -28,15 +37,12 @@ pub struct VectorReloaded<'a> {
 }
 
 impl InternalEvent for VectorReloaded<'_> {
-    fn emit_logs(&self) {
+    fn emit(self) {
         info!(
             target: "vector",
             message = "Vector has reloaded.",
             path = ?self.config_paths
         );
-    }
-
-    fn emit_metrics(&self) {
         counter!("reloaded_total", 1);
     }
 }
@@ -45,14 +51,11 @@ impl InternalEvent for VectorReloaded<'_> {
 pub struct VectorStopped;
 
 impl InternalEvent for VectorStopped {
-    fn emit_logs(&self) {
+    fn emit(self) {
         info!(
             target: "vector",
             message = "Vector has stopped."
         );
-    }
-
-    fn emit_metrics(&self) {
         counter!("stopped_total", 1);
     }
 }
@@ -61,62 +64,80 @@ impl InternalEvent for VectorStopped {
 pub struct VectorQuit;
 
 impl InternalEvent for VectorQuit {
-    fn emit_logs(&self) {
+    fn emit(self) {
         info!(
             target: "vector",
             message = "Vector has quit."
         );
-    }
-
-    fn emit_metrics(&self) {
         counter!("quit_total", 1);
     }
 }
 
 #[derive(Debug)]
-pub struct VectorReloadFailed;
+pub struct VectorReloadError;
 
-impl InternalEvent for VectorReloadFailed {
-    fn emit_logs(&self) {
+impl InternalEvent for VectorReloadError {
+    fn emit(self) {
         error!(
-            target: "vector",
-            message = "Reload was not successful."
+            message = "Reload was not successful.",
+            error_code = "reload",
+            error_type = error_type::CONFIGURATION_FAILED,
+            stage = error_stage::PROCESSING,
+            internal_log_rate_limit = true,
         );
-    }
-
-    fn emit_metrics(&self) {
+        counter!(
+            "component_errors_total", 1,
+            "error_code" => "reload",
+            "error_type" => error_type::CONFIGURATION_FAILED,
+            "stage" => error_stage::PROCESSING,
+        );
+        // deprecated
         counter!("reload_errors_total", 1);
     }
 }
 
 #[derive(Debug)]
-pub struct VectorConfigLoadFailed;
+pub struct VectorConfigLoadError;
 
-impl InternalEvent for VectorConfigLoadFailed {
-    fn emit_logs(&self) {
+impl InternalEvent for VectorConfigLoadError {
+    fn emit(self) {
         error!(
-            target: "vector",
-            message = "Failed to load config files, reload aborted."
+            message = "Failed to load config files, reload aborted.",
+            error_code = "config_load",
+            error_type = error_type::CONFIGURATION_FAILED,
+            stage = error_stage::PROCESSING,
+            internal_log_rate_limit = true,
         );
-    }
-
-    fn emit_metrics(&self) {
+        counter!(
+            "component_errors_total", 1,
+            "error_code" => "config_load",
+            "error_type" => error_type::CONFIGURATION_FAILED,
+            "stage" => error_stage::PROCESSING,
+        );
+        // deprecated
         counter!("config_load_errors_total", 1);
     }
 }
 
 #[derive(Debug)]
-pub struct VectorRecoveryFailed;
+pub struct VectorRecoveryError;
 
-impl InternalEvent for VectorRecoveryFailed {
-    fn emit_logs(&self) {
+impl InternalEvent for VectorRecoveryError {
+    fn emit(self) {
         error!(
-            target: "vector",
-            message = "Vector has failed to recover from a failed reload."
+            message = "Vector has failed to recover from a failed reload.",
+            error_code = "recovery",
+            error_type = error_type::CONFIGURATION_FAILED,
+            stage = error_stage::PROCESSING,
+            internal_log_rate_limit = true,
         );
-    }
-
-    fn emit_metrics(&self) {
+        counter!(
+            "component_errors_total", 1,
+            "error_code" => "recovery",
+            "error_type" => error_type::CONFIGURATION_FAILED,
+            "stage" => error_stage::PROCESSING,
+        );
+        // deprecated
         counter!("recover_errors_total", 1);
     }
 }

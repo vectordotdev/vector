@@ -6,13 +6,6 @@ tags: ["logs", "events", "schema"]
 
 {{< svg "img/data-model-log.svg" >}}
 
-A **log event** in Vector is a structured representation of a point-in-time event. It contains an
-arbitrary set of fields that describe the event.
-
-A key tenet of Vector is **schema neutrality**. This ensures that Vector can work with any schema,
-supporting legacy and future schemas as your needs evolve. Vector doesn't require *any* specific
-fields and each [component][components] documents the fields it provides.
-
 Here's an example representation of a log event (as JSON):
 
 ```json
@@ -67,9 +60,8 @@ Timestamps are represented as [`DateTime` Rust structs][date_time] stored as UTC
 
 There are cases where Vector interacts with formats that don't have a formal timestamp definition,
 such as JSON. In these cases, Vector ingests the timestamp in its primitive form (string or
-integer). You can then coerce the field into a timestamp using the coercer transform. If you're
-parsing this data out of a string, all Vector parser transforms include a `types` option, allowing
-you to extract and coerce in one step.
+integer). You can then coerce the field into a timestamp using a `remap` transform with the
+`parse_timestamp` VRL function.
 
 #### Time zones
 

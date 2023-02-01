@@ -35,36 +35,23 @@ components: _kafka: {
 	}
 
 	support: {
-		targets: {
-			"aarch64-unknown-linux-gnu":      true
-			"aarch64-unknown-linux-musl":     true
-			"armv7-unknown-linux-gnueabihf":  true
-			"armv7-unknown-linux-musleabihf": true
-			"x86_64-apple-darwin":            true
-			"x86_64-pc-windows-msv":          true
-			"x86_64-unknown-linux-gnu":       true
-			"x86_64-unknown-linux-musl":      true
-		}
 		requirements: []
-		warnings: []
 		notices: []
+		warnings: []
 	}
 
 	configuration: {
 		bootstrap_servers: {
 			description: "A comma-separated list of host and port pairs that are the addresses of the Kafka brokers in a \"bootstrap\" Kafka cluster that a Kafka client connects to initially to bootstrap itself."
 			required:    true
-			warnings: []
 			type: string: {
 				examples: ["10.14.22.123:9092,10.14.23.332:9092"]
-				syntax: "literal"
 			}
 		}
 		librdkafka_options: {
 			common:      false
 			description: "Advanced options. See [librdkafka documentation](\(urls.librdkafka_config)) for details.\n"
 			required:    false
-			warnings: []
 			type: object: {
 				examples: [
 					{
@@ -80,7 +67,6 @@ components: _kafka: {
 			common:      false
 			description: "Default timeout for network requests.\n"
 			required:    false
-			warnings: []
 			type: uint: {
 				default: 60000
 				examples: [30000, 60000]
@@ -97,6 +83,26 @@ components: _kafka: {
 				is a battle-tested, high performance, and reliable library that facilitates
 				communication with Kafka. As Vector produces static MUSL builds,
 				this dependency is packaged with Vector, meaning you do not need to install it.
+				"""
+		}
+		azure_event_hubs: {
+			title: "Azure Event Hubs"
+			body:  """
+				It is possible to use the `kafka` source and sink with [Azure Event Hubs](\(urls.azure_event_hubs))
+				for all tiers other than the [Basic tier](\(urls.azure_event_hubs_tiers)). More details
+				can be found [here](\(urls.azure_event_hubs_kafka)). To configure the source and
+				sink to connect to Azure Event Hubs set the following options:
+				- `bootstrap_servers` - `<namespace name>.servicebus.windows.net:9093`
+				- `group_id` - The consumer group. Note that if the default group (`$Default`) is used it must
+				  be specified as `$$Default` to escape the `$` used for environment variables.
+				- `topics` - The event hub name.
+				- `sasl.enabled` - Set to `true`.
+				- `sasl.mechanism` - Set to `PLAIN`.
+				- `sasl.username` - Set to `$$ConnectionString` (note the double `$$`).
+				- `sasl.password` - Set to the connection string. See [here](\(urls.azure_event_hubs_connection_string)).
+				- `tls.enabled` - Set to `true`.
+				- `tls.ca_file` - The certificate authority file.
+				- `tls.verify_certificate` - Set to `true`.
 				"""
 		}
 	}

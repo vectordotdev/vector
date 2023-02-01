@@ -40,9 +40,9 @@ killall -s SIGHUP vector
 
 ### Linux
 
-#### APT, dpkg, RPM, YUM
+#### APT, dpkg, RPM, YUM, pacman
 
-If you've installed Vector using [APT], [dpkg], [RPM], or [YUM], you can manage it using [systemctl].
+If you've installed Vector using [APT], [dpkg], [RPM], [YUM] or [pacman], you can manage it using [systemctl].
 
 {{< tabs default="Start" >}}
 {{< tab title="Start" >}}
@@ -214,13 +214,9 @@ kubectl rollout restart --namespace vector statefulset/vector-aggregator
 
 As you can see above, many administrative interfaces for Vector enable you to trigger a restart of a Vector instance while it's running. There are a few things that you should know about reloading.
 
-### Automatic reloading on config change
+### Automatic reloading on configuration change
 
 You can make Vector automatically reload itself when its [configuration file][configuration] changes by setting the `--watch-config` or `-w` [flag][watch_config] when you first start your Vector instance.
-
-### Automatic reload on configuration change
-
-Vector provides an option
 
 ## How it works
 
@@ -230,7 +226,7 @@ Running Vector instances accept the IPC [signals](#signals) and produce the [exi
 
 [apt]: /docs/setup/installation/package-managers/apt
 [brew_services]: https://github.com/Homebrew/homebrew-services
-[bug]: https://github.com/timberio/vector/issues/new?labels=type%3A+bug
+[bug]: https://github.com/vectordotdev/vector/issues/new?labels=type%3A+bug
 [configuration]: /docs/reference/configuration
 [docker]: /docs/setup/installation/platforms/docker
 [dpkg]: /docs/setup/installation/package-managers/dpkg
@@ -241,6 +237,7 @@ Running Vector instances accept the IPC [signals](#signals) and produce the [exi
 [msi]: /docs/setup/installation/package-managers/msi
 [nix]: /docs/setup/installation/package-managers/nix
 [rpm]: /docs/setup/installation/package-managers/rpm
+[pacman]: /docs/setup/installation/package-managers/pacman
 [sources]: /docs/reference/configuration/sources
 [systemctl]: https://man7.org/linux/man-pages//man1/systemctl.1.html
 [watch_config]: /docs/reference/cli/#vector-watch-config

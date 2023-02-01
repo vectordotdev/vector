@@ -1,6 +1,9 @@
-use crate::grammar::{EventPlatformQuery, QueryVisitor, DEFAULT_FIELD};
-use crate::node::QueryNode;
 use pest::Parser;
+
+use crate::{
+    grammar::{EventPlatformQuery, QueryVisitor, DEFAULT_FIELD},
+    node::QueryNode,
+};
 
 pub type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
 

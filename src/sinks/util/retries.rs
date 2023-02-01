@@ -1,20 +1,23 @@
-use crate::Error;
-use futures::FutureExt;
 use std::{
+    borrow::Cow,
     cmp,
     future::Future,
     pin::Pin,
     task::{Context, Poll},
     time::Duration,
 };
+
+use futures::FutureExt;
 use tokio::time::{sleep, Sleep};
 use tower::{retry::Policy, timeout::error::Elapsed};
 
+use crate::Error;
+
 pub enum RetryAction {
     /// Indicate that this request should be retried with a reason
-    Retry(String),
+    Retry(Cow<'static, str>),
     /// Indicate that this request should not be retried with a reason
-    DontRetry(String),
+    DontRetry(Cow<'static, str>),
     /// Indicate that this request should not be retried but the request was successful
     Successful,
 }
@@ -46,7 +49,7 @@ pub struct RetryPolicyFuture<L: RetryLogic> {
 }
 
 impl<L: RetryLogic> FixedRetryPolicy<L> {
-    pub fn new(
+    pub const fn new(
         remaining_attempts: usize,
         initial_backoff: Duration,
         max_duration: Duration,
@@ -73,7 +76,7 @@ impl<L: RetryLogic> FixedRetryPolicy<L> {
         }
     }
 
-    fn backoff(&self) -> Duration {
+    const fn backoff(&self) -> Duration {
         self.current_duration
     }
 
@@ -93,6 +96,8 @@ where
 {
     type Future = RetryPolicyFuture<L>;
 
+    // NOTE: in the error cases- `Error` and `EventsDropped` internal events are emitted by the
+    // driver, so only need to log here.
     fn retry(&self, _: &Req, result: Result<&Res, &Error>) -> Option<Self::Future> {
         match result {
             Ok(response) => match self.logic.should_retry_response(response) {
@@ -100,17 +105,18 @@ where
                     if self.remaining_attempts == 0 {
                         error!(
                             message = "OK/retry response but retries exhausted; dropping the request.",
-                            reason = ?reason
+                            reason = ?reason,
+                            internal_log_rate_limit = true,
                         );
                         return None;
                     }
 
-                    warn!(message = "Retrying after response.", reason = %reason);
+                    warn!(message = "Retrying after response.", reason = %reason, internal_log_rate_limit = true);
                     Some(self.build_retry())
                 }
 
                 RetryAction::DontRetry(reason) => {
-                    error!(message = "Not retriable; dropping the request.", reason = ?reason);
+                    error!(message = "Not retriable; dropping the request.", reason = ?reason, internal_log_rate_limit = true);
                     None
                 }
 
@@ -118,28 +124,33 @@ where
             },
             Err(error) => {
                 if self.remaining_attempts == 0 {
-                    error!(message = "Retries exhausted; dropping the request.", %error);
+                    error!(message = "Retries exhausted; dropping the request.", %error, internal_log_rate_limit = true);
                     return None;
                 }
 
                 if let Some(expected) = error.downcast_ref::<L::Error>() {
                     if self.logic.is_retriable_error(expected) {
-                        warn!(message = "Retrying after error.", error = %expected);
+                        warn!(message = "Retrying after error.", error = %expected, internal_log_rate_limit = true);
                         Some(self.build_retry())
                     } else {
                         error!(
                             message = "Non-retriable error; dropping the request.",
-                            %error
+                            %error,
+                            internal_log_rate_limit = true,
                         );
                         None
                     }
                 } else if error.downcast_ref::<Elapsed>().is_some() {
-                    warn!("Request timed out. If this happens often while the events are actually reaching their destination, try decreasing `batch.max_bytes` and/or using `compression` if applicable. Alternatively `request.timeout_secs` can be increased.");
+                    warn!(
+                        message = "Request timed out. If this happens often while the events are actually reaching their destination, try decreasing `batch.max_bytes` and/or using `compression` if applicable. Alternatively `request.timeout_secs` can be increased.",
+                        internal_log_rate_limit = true
+                    );
                     Some(self.build_retry())
                 } else {
                     error!(
                         message = "Unexpected error type; dropping the request.",
-                        %error
+                        %error,
+                        internal_log_rate_limit = true
                     );
                     None
                 }
@@ -160,7 +171,7 @@ impl<L: RetryLogic> Future for RetryPolicyFuture<L> {
     type Output = FixedRetryPolicy<L>;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        futures::ready!(self.delay.poll_unpin(cx));
+        std::task::ready!(self.delay.poll_unpin(cx));
         Poll::Ready(self.policy.clone())
     }
 }
@@ -224,6 +235,11 @@ impl ExponentialBackoff {
         self.max_delay = Some(duration);
         self
     }
+
+    /// Resents the exponential back-off strategy to its initial state.
+    pub fn reset(&mut self) {
+        self.current = self.base;
+    }
 }
 
 impl Iterator for ExponentialBackoff {
@@ -256,13 +272,15 @@ impl Iterator for ExponentialBackoff {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::test_util::trace_init;
     use std::{fmt, time::Duration};
+
     use tokio::time;
     use tokio_test::{assert_pending, assert_ready_err, assert_ready_ok, task};
     use tower::retry::RetryLayer;
     use tower_test::{assert_request_eq, mock};
+
+    use super::*;
+    use crate::test_util::trace_init;
 
     #[tokio::test]
     async fn service_error_retry() {

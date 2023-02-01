@@ -3,7 +3,8 @@
 #          false, false, false, false, false, false, false, false, false, false,
 #          true, true,
 #          false, false, false, false, false, false, false, false, false, false,
-#          false, false, false, false, false, false, false, false, false, false]
+#          false, false, false, false, false, false, false, false, false, false,
+#          false, false, false, 42, 42, 42, 42, 42, 42]
 
 [
  (.foo == "this" || match(.bar, r'')) ?? false,
@@ -52,4 +53,14 @@
  match(.bar, r'') ?? false && .zub == true && .foo == "thunk",
  .zub == true && match(.bar, r'') ?? false && .foo == "thunk",
  .zub == true && .foo == "thunk" && match(.bar, r'') ?? false,
+
+ length(.blob) + length(.bloob) ?? false,
+ length(.foo) + length(.bloob) ?? false,
+ length(.blob) + length(.foo) ?? false,
+ length(.blob) == length(.bloob) ?? 42,
+ length(.foo) == length(.bloob) ?? 42,
+ length(.blob) == length(.foo) ?? 42,
+ length(.blob) != length(.bloob) ?? 42,
+ length(.foo) != length(.bloob) ?? 42,
+ length(.blob) != length(.foo) ?? 42,
  ]

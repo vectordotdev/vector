@@ -1,20 +1,21 @@
-use crate::http::Auth;
+use std::{fmt, str::FromStr};
+
 use http::uri::{Authority, PathAndQuery, Scheme, Uri};
 use percent_encoding::percent_decode_str;
-use serde::{
-    de::{Error, Visitor},
-    Deserialize, Deserializer, Serialize, Serializer,
-};
-use std::fmt;
-use std::str::FromStr;
+use vector_config::configurable_component;
 
-/// A wrapper for `http::Uri` that implements the serde traits.
-/// Authorization credentials, if exist, will be removed from the URI and stored in `auth`.
-/// For example: `http://user:password@example.com`.
+use crate::http::Auth;
+
+/// A wrapper for `http::Uri` that implements `Deserialize` and `Serialize`.
+///
+/// Authorization credentials, if they exist, will be removed from the URI and stored separately in `auth`.
+#[configurable_component]
+#[configurable(title = "The URI component of a request.", description = "")]
 #[derive(Default, Debug, Clone)]
+#[serde(try_from = "String", into = "String")]
 pub struct UriSerde {
     pub uri: Uri,
-    pub auth: Option<Auth>,
+    pub(crate) auth: Option<Auth>,
 }
 
 impl UriSerde {
@@ -40,20 +41,38 @@ impl UriSerde {
             auth: self.auth.clone(),
         }
     }
-}
 
-impl Serialize for UriSerde {
-    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        serializer.serialize_str(&self.to_string())
+    /// Creates a new instance of `UriSerde` by appending a path to the existing one.
+    pub fn append_path(&self, path: &str) -> crate::Result<Self> {
+        let uri = self.uri.to_string();
+        let self_path = uri.trim_end_matches('/');
+        let other_path = path.trim_start_matches('/');
+        let path = format!("{}/{}", self_path, other_path);
+        let uri = path.parse::<Uri>()?;
+        Ok(Self {
+            uri,
+            auth: self.auth.clone(),
+        })
+    }
+
+    #[allow(clippy::missing_const_for_fn)] // constant functions cannot evaluate destructors
+    pub fn with_auth(mut self, auth: Option<Auth>) -> Self {
+        self.auth = auth;
+        self
     }
 }
 
-impl<'a> Deserialize<'a> for UriSerde {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'a>,
-    {
-        deserializer.deserialize_str(UriVisitor)
+impl TryFrom<String> for UriSerde {
+    type Error = <Uri as FromStr>::Err;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        value.as_str().parse()
+    }
+}
+
+impl From<UriSerde> for String {
+    fn from(uri: UriSerde) -> Self {
+        uri.to_string()
     }
 }
 
@@ -70,23 +89,6 @@ impl fmt::Display for UriSerde {
             }
             _ => self.uri.fmt(f),
         }
-    }
-}
-
-struct UriVisitor;
-
-impl<'a> Visitor<'a> for UriVisitor {
-    type Value = UriSerde;
-
-    fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "a string containing a valid HTTP Uri")
-    }
-
-    fn visit_str<E>(self, s: &str) -> Result<Self::Value, E>
-    where
-        E: Error,
-    {
-        s.parse().map_err(Error::custom)
     }
 }
 
@@ -140,28 +142,62 @@ fn get_basic_auth(authority: &Authority) -> (Authority, Option<Auth>) {
             .expect("unexpected empty authority")
             .clone();
 
-        (authority, Some(Auth::Basic { user, password }))
+        (
+            authority,
+            Some(Auth::Basic {
+                user,
+                password: password.into(),
+            }),
+        )
     } else {
         (authority.clone(), None)
     }
+}
+
+/// Simplify the URI into a protocol and endpoint by removing the
+/// "query" portion of the `path_and_query`.
+pub fn protocol_endpoint(uri: Uri) -> (String, String) {
+    let mut parts = uri.into_parts();
+
+    // Drop any username and password
+    parts.authority = parts.authority.map(|auth| {
+        let host = auth.host();
+        match auth.port() {
+            None => host.to_string(),
+            Some(port) => format!("{}:{}", host, port),
+        }
+        .parse()
+        .unwrap_or_else(|_| unreachable!())
+    });
+
+    // Drop the query and fragment
+    parts.path_and_query = parts.path_and_query.map(|pq| {
+        pq.path()
+            .parse::<PathAndQuery>()
+            .unwrap_or_else(|_| unreachable!())
+    });
+
+    (
+        parts.scheme.clone().unwrap_or(Scheme::HTTP).as_str().into(),
+        Uri::from_parts(parts)
+            .unwrap_or_else(|_| unreachable!())
+            .to_string(),
+    )
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn test_parse(input: &str, expected_uri: &str, expected_auth: Option<(&str, &str)>) {
+    fn test_parse(input: &str, expected_uri: &'static str, expected_auth: Option<(&str, &str)>) {
         let UriSerde { uri, auth } = input.parse().unwrap();
-        assert_eq!(
-            uri,
-            Uri::from_maybe_shared(expected_uri.to_owned()).unwrap()
-        );
+        assert_eq!(uri, Uri::from_static(expected_uri));
         assert_eq!(
             auth,
             expected_auth.map(|(user, password)| {
                 Auth::Basic {
                     user: user.to_owned(),
-                    password: password.to_owned(),
+                    password: password.to_owned().into(),
                 }
             })
         );
@@ -192,5 +228,23 @@ mod tests {
         );
 
         test_parse("user@example.com", "example.com", Some(("user", "")));
+    }
+
+    #[test]
+    fn protocol_endpoint_parses_urls() {
+        let parse = |uri: &str| protocol_endpoint(uri.parse().unwrap());
+
+        assert_eq!(
+            parse("http://example.com/"),
+            ("http".into(), "http://example.com/".into())
+        );
+        assert_eq!(
+            parse("https://user:pass@example.org:123/path?query"),
+            ("https".into(), "https://example.org:123/path".into())
+        );
+        assert_eq!(
+            parse("gopher://example.net:123/path?query#frag,emt"),
+            ("gopher".into(), "gopher://example.net:123/path".into())
+        );
     }
 }

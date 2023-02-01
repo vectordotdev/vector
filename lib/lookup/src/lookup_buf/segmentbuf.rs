@@ -1,8 +1,10 @@
-use crate::{field, LookSegment, Segment};
+use std::fmt::{Display, Formatter};
+
 use inherent::inherent;
 #[cfg(any(test, feature = "arbitrary"))]
 use quickcheck::{Arbitrary, Gen};
-use std::fmt::{Display, Formatter};
+
+use crate::{field, LookSegment, Segment};
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash)]
 pub struct FieldBuf {
@@ -62,7 +64,7 @@ impl Arbitrary for FieldBuf {
         let name = (0..len)
             .map(|_| chars[usize::arbitrary(g) % chars.len()])
             .collect::<String>()
-            .replace(r#"""#, r#"\""#);
+            .replace('"', r#"\""#);
         FieldBuf::from(name)
     }
 
@@ -72,7 +74,7 @@ impl Arbitrary for FieldBuf {
                 .shrink()
                 .filter(|name| !name.is_empty())
                 .map(|name| {
-                    let name = name.replace(r#"""#, r#"/""#);
+                    let name = name.replace('"', r#"/""#);
                     FieldBuf::from(name)
                 }),
         )
@@ -83,11 +85,12 @@ impl Arbitrary for FieldBuf {
 ///
 /// They represent either a field or an index. A sequence of `SegmentBuf`s can become a `LookupBuf`.
 ///
-/// This is the owned, allocated side of a `Segement` for `LookupBuf.` It owns its fields unlike `Lookup`. Think of `String` to `&str` or `PathBuf` to `Path`.
+/// This is the owned, allocated side of a `Segment` for `LookupBuf.` It owns its fields unlike `Lookup`. Think of `String` to `&str` or `PathBuf` to `Path`.
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash)]
 pub enum SegmentBuf {
     Field(FieldBuf),
-    Index(isize), // Indexes can be negative.
+    Index(isize),
+    // Indexes can be negative.
     // Coalesces hold multiple possible fields.
     Coalesce(Vec<FieldBuf>),
 }

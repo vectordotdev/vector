@@ -1,25 +1,24 @@
-use super::EventEncodingType;
-use crate::config::ComponentKey;
-use crate::event::{self, Value};
+use std::borrow::Cow;
 
 use async_graphql::Object;
 use chrono::{DateTime, Utc};
+use vector_common::encode_logfmt;
 
-#[derive(Debug)]
+use super::EventEncodingType;
+use crate::{event, topology::TapOutput};
+
+#[derive(Debug, Clone)]
 pub struct Log {
-    component_key: ComponentKey,
+    output: TapOutput,
     event: event::LogEvent,
 }
 
 impl Log {
-    pub const fn new(component_key: ComponentKey, event: event::LogEvent) -> Self {
-        Self {
-            component_key,
-            event,
-        }
+    pub const fn new(output: TapOutput, event: event::LogEvent) -> Self {
+        Self { output, event }
     }
 
-    pub fn get_message(&self) -> Option<String> {
+    pub fn get_message(&self) -> Option<Cow<'_, str>> {
         Some(self.event.get("message")?.to_string_lossy())
     }
 
@@ -33,17 +32,22 @@ impl Log {
 impl Log {
     /// Id of the component associated with the log event
     async fn component_id(&self) -> &str {
-        self.component_key.id()
+        self.output.output_id.component.id()
     }
 
-    /// Id of the pipeline associated with the log event
-    async fn pipeline_id(&self) -> Option<&str> {
-        self.component_key.pipeline_str()
+    /// Type of component associated with the log event
+    async fn component_type(&self) -> &str {
+        self.output.component_type.as_ref()
+    }
+
+    /// Kind of component associated with the log event
+    async fn component_kind(&self) -> &str {
+        self.output.component_kind
     }
 
     /// Log message
     async fn message(&self) -> Option<String> {
-        self.get_message()
+        self.get_message().map(Into::into)
     }
 
     /// Log timestamp
@@ -58,11 +62,16 @@ impl Log {
                 .expect("JSON serialization of log event failed. Please report."),
             EventEncodingType::Yaml => serde_yaml::to_string(&self.event)
                 .expect("YAML serialization of log event failed. Please report."),
+            EventEncodingType::Logfmt => encode_logfmt::encode_value(self.event.value())
+                .expect("logfmt serialization of log event failed. Please report."),
         }
     }
 
     /// Get JSON field data on the log event, by field name
-    async fn json(&self, field: String) -> Option<&Value> {
-        self.event.get(field)
+    async fn json(&self, field: String) -> Option<String> {
+        self.event.get(field.as_str()).map(|field| {
+            serde_json::to_string(field)
+                .expect("JSON serialization of trace event field failed. Please report.")
+        })
     }
 }

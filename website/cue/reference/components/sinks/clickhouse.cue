@@ -13,14 +13,15 @@ components: sinks: clickhouse: {
 	}
 
 	features: {
-		buffer: enabled:      true
+		auto_generated:   true
+		acknowledgements: true
 		healthcheck: enabled: true
 		send: {
 			batch: {
 				enabled:      true
 				common:       false
-				max_bytes:    10485760
-				timeout_secs: 1
+				max_bytes:    10_000_000
+				timeout_secs: 1.0
 			}
 			compression: {
 				enabled: true
@@ -39,10 +40,10 @@ components: sinks: clickhouse: {
 			}
 			tls: {
 				enabled:                true
-				can_enable:             false
 				can_verify_certificate: true
 				can_verify_hostname:    true
 				enabled_default:        false
+				enabled_by_scheme:      true
 			}
 			to: {
 				service: services.clickhouse
@@ -63,17 +64,6 @@ components: sinks: clickhouse: {
 	}
 
 	support: {
-		targets: {
-			"aarch64-unknown-linux-gnu":      true
-			"aarch64-unknown-linux-musl":     true
-			"armv7-unknown-linux-gnueabihf":  true
-			"armv7-unknown-linux-musleabihf": true
-			"x86_64-apple-darwin":            true
-			"x86_64-pc-windows-msv":          true
-			"x86_64-unknown-linux-gnu":       true
-			"x86_64-unknown-linux-musl":      true
-		}
-
 		requirements: [
 			"""
 				[Clickhouse](\(urls.clickhouse)) version `>= 1.1.54378` is required.
@@ -83,50 +73,12 @@ components: sinks: clickhouse: {
 		notices: []
 	}
 
-	configuration: {
-		auth: configuration._http_auth & {_args: {
-			password_example: "${CLICKHOUSE_PASSWORD}"
-			username_example: "${CLICKHOUSE_USERNAME}"
-		}}
-		database: {
-			common:      true
-			description: "The database that contains the stable that data will be inserted into."
-			required:    false
-			warnings: []
-			type: string: {
-				default: null
-				examples: ["mydatabase"]
-				syntax: "literal"
-			}
-		}
-		endpoint: {
-			description: "The endpoint of the [Clickhouse](\(urls.clickhouse)) server."
-			required:    true
-			type: string: {
-				examples: ["http://localhost:8123"]
-				syntax: "literal"
-			}
-		}
-		table: {
-			description: "The table that data will be inserted into."
-			required:    true
-			warnings: []
-			type: string: {
-				examples: ["mytable"]
-				syntax: "literal"
-			}
-		}
-		skip_unknown_fields: {
-			common:      true
-			description: "Sets `input_format_skip_unknown_fields`, allowing Clickhouse to discard fields not present in the table schema."
-			required:    false
-			type: bool: default: false
-		}
-	}
+	configuration: base.components.sinks.clickhouse.configuration
 
 	input: {
 		logs:    true
 		metrics: null
+		traces:  false
 	}
 
 	telemetry: metrics: {

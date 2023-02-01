@@ -1,0 +1,1 @@
+{"metric":{"name":"u","namespace":"m","tags":{"_":"t","k":"m","x":"u"},"timestamp":"1969-12-31T20:20:35.000003620Z","kind":"absolute","aggregated_histogram":{"buckets":[{"upper_limit":485760.0,"count":561506969},{"upper_limit":110454.8247,"count":2305688860},{"upper_limit":-94272.0,"count":584814721},{"upper_limit":338688.0,"count":2287269019}],"count":306227025,"sum":878400.0}}}

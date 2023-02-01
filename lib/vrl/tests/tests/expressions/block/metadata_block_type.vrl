@@ -1,0 +1,6 @@
+# result: {"object": {"foo": {"bytes": true}}}
+% = {}
+type_def({
+  %foo = "string"
+  %
+})

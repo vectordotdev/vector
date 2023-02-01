@@ -1,28 +1,39 @@
+use core::TargetValue;
+use std::borrow::Cow::{self, Borrowed, Owned};
+
+use ::value::Value;
 use indoc::indoc;
-use lazy_static::lazy_static;
+use lookup::{owned_value_path, OwnedTargetPath};
+use once_cell::sync::Lazy;
 use prettytable::{format, Cell, Row, Table};
 use regex::Regex;
-use rustyline::completion::Completer;
-use rustyline::error::ReadlineError;
-use rustyline::highlight::{Highlighter, MatchingBracketHighlighter};
-use rustyline::hint::{Hinter, HistoryHinter};
-use rustyline::validate::{self, ValidationResult, Validator};
-use rustyline::{Context, Editor, Helper};
-use shared::TimeZone;
-use std::borrow::Cow::{self, Borrowed, Owned};
-use vrl::{diagnostic::Formatter, state, value, Runtime, Target, Value};
+use rustyline::{
+    completion::Completer,
+    error::ReadlineError,
+    highlight::{Highlighter, MatchingBracketHighlighter},
+    hint::{Hinter, HistoryHinter},
+    validate::{self, ValidationResult, Validator},
+    Context, Editor, Helper,
+};
+use value::Secrets;
+use vector_common::TimeZone;
+use vector_vrl_functions::vrl_functions;
+use vrl::state::TypeState;
+use vrl::{
+    diagnostic::Formatter, prelude::BTreeMap, state, CompileConfig, Runtime, Target, VrlRuntime,
+};
 
 // Create a list of all possible error values for potential docs lookup
-lazy_static! {
-    static ref ERRORS: Vec<String> = [
-        100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 203, 204, 205, 206, 207, 208, 209,
-        601, 300, 301, 302, 303, 304, 305, 306, 307, 308, 309, 310, 311, 312, 313, 314, 400, 401,
-        601, 620, 630, 640, 650, 660
+static ERRORS: Lazy<Vec<String>> = Lazy::new(|| {
+    [
+        100, 101, 102, 103, 104, 105, 106, 107, 108, 110, 203, 204, 205, 206, 207, 208, 209, 300,
+        301, 302, 303, 304, 305, 306, 307, 308, 309, 310, 311, 312, 313, 314, 400, 401, 402, 403,
+        601, 620, 630, 640, 650, 651, 652, 660, 701,
     ]
     .iter()
-    .map(|i| i.to_string())
-    .collect();
-}
+    .map(std::string::ToString::to_string)
+    .collect()
+});
 
 const DOCS_URL: &str = "https://vector.dev/docs/reference/vrl";
 const ERRORS_URL_ROOT: &str = "https://errors.vrl.dev";
@@ -38,17 +49,25 @@ const RESERVED_TERMS: &[&str] = &[
     "help docs",
 ];
 
-pub(crate) fn run(mut objects: Vec<Value>, timezone: &TimeZone) {
+pub(crate) fn run(
+    mut objects: Vec<TargetValue>,
+    timezone: TimeZone,
+    vrl_runtime: VrlRuntime,
+) -> Result<(), rustyline::error::ReadlineError> {
     let mut index = 0;
     let func_docs_regex = Regex::new(r"^help\sdocs\s(\w{1,})$").unwrap();
     let error_docs_regex = Regex::new(r"^help\serror\s(\w{1,})$").unwrap();
 
-    let mut compiler_state = state::Compiler::default();
+    let mut state = TypeState::default();
+
     let mut rt = Runtime::new(state::Runtime::default());
-    let mut rl = Editor::<Repl>::new();
+    let mut rl = Editor::<Repl>::new()?;
     rl.set_helper(Some(Repl::new()));
 
-    println!("{}", BANNER_TEXT);
+    #[allow(clippy::print_stdout)]
+    {
+        println!("{BANNER_TEXT}");
+    }
 
     loop {
         let readline = rl.readline("$ ");
@@ -69,13 +88,19 @@ pub(crate) fn run(mut objects: Vec<Value>, timezone: &TimeZone) {
                 let command = match line {
                     "next" => {
                         // allow adding one new object at a time
-                        if index < objects.len() && objects.last() != Some(&Value::Null) {
+                        if index < objects.len()
+                            && objects.last().map(|x| &x.value) != Some(&Value::Null)
+                        {
                             index = index.saturating_add(1);
                         }
 
                         // add new object
                         if index == objects.len() {
-                            objects.push(Value::Null)
+                            objects.push(TargetValue {
+                                value: Value::Null,
+                                metadata: Value::Object(BTreeMap::new()),
+                                secrets: Secrets::new(),
+                            });
                         }
 
                         "."
@@ -84,8 +109,8 @@ pub(crate) fn run(mut objects: Vec<Value>, timezone: &TimeZone) {
                         index = index.saturating_sub(1);
 
                         // remove empty last object
-                        if objects.last() == Some(&Value::Null) {
-                            let _ = objects.pop();
+                        if objects.last().map(|x| &x.value) == Some(&Value::Null) {
+                            let _last = objects.pop();
                         }
 
                         "."
@@ -95,11 +120,12 @@ pub(crate) fn run(mut objects: Vec<Value>, timezone: &TimeZone) {
                 };
 
                 let result = resolve(
-                    objects.get_mut(index),
+                    objects.get_mut(index).expect("object should exist"),
                     &mut rt,
                     command,
-                    &mut compiler_state,
+                    &mut state,
                     timezone,
+                    vrl_runtime,
                 );
 
                 let string = match result {
@@ -107,39 +133,62 @@ pub(crate) fn run(mut objects: Vec<Value>, timezone: &TimeZone) {
                     Err(v) => v.to_string(),
                 };
 
-                println!("{}\n", string);
+                #[allow(clippy::print_stdout)]
+                {
+                    println!("{string}\n");
+                }
             }
-            Err(ReadlineError::Interrupted) => break,
-            Err(ReadlineError::Eof) => break,
+            Err(ReadlineError::Interrupted | ReadlineError::Eof) => break,
             Err(err) => {
-                println!("unable to read line: {}", err);
+                #[allow(clippy::print_stdout)]
+                {
+                    println!("unable to read line: {err}");
+                }
                 break;
             }
         }
     }
+    Ok(())
 }
 
 fn resolve(
-    object: Option<&mut impl Target>,
+    target: &mut TargetValue,
     runtime: &mut Runtime,
     program: &str,
-    state: &mut state::Compiler,
-    timezone: &TimeZone,
+    state: &mut TypeState,
+    timezone: TimeZone,
+    vrl_runtime: VrlRuntime,
 ) -> Result<Value, String> {
-    let mut empty = value!({});
-    let object = match object {
-        None => &mut empty as &mut dyn Target,
-        Some(object) => object,
+    let mut functions = stdlib::all();
+    functions.extend(vector_vrl_functions::vrl_functions());
+
+    let mut config = CompileConfig::default();
+    // The CLI should be moved out of the "vrl" module, and then it can use the `vector-core::compile_vrl` function which includes this automatically
+    config.set_read_only_path(OwnedTargetPath::metadata(owned_value_path!("vector")), true);
+
+    let program = match vrl::compile_with_state(program, &functions, state, config) {
+        Ok(result) => result.program,
+        Err(diagnostics) => {
+            return Err(Formatter::new(program, diagnostics).colored().to_string());
+        }
     };
 
-    let program = match vrl::compile_with_state(program, &stdlib::all(), state) {
-        Ok(program) => program,
-        Err(diagnostics) => return Err(Formatter::new(program, diagnostics).colored().to_string()),
-    };
+    *state = program.final_type_state();
+    execute(runtime, &program, target, timezone, vrl_runtime)
+}
 
-    runtime
-        .resolve(object, &program, timezone)
-        .map_err(|err| err.to_string())
+fn execute(
+    runtime: &mut Runtime,
+    program: &vrl::Program,
+    object: &mut dyn Target,
+    timezone: TimeZone,
+    vrl_runtime: VrlRuntime,
+) -> Result<Value, String> {
+    match vrl_runtime {
+        VrlRuntime::Ast => runtime
+            .resolve(object, program, &timezone)
+            .map_err(|err| err.to_string()),
+    }
 }
 
 struct Repl {
@@ -163,6 +212,7 @@ impl Repl {
 fn initial_hints() -> Vec<&'static str> {
     stdlib::all()
         .into_iter()
+        .chain(vrl_functions())
         .map(|f| f.identifier())
         .chain(RESERVED_TERMS.iter().copied())
         .collect()
@@ -239,11 +289,24 @@ impl Validator for Repl {
         ctx: &mut validate::ValidationContext,
     ) -> rustyline::Result<ValidationResult> {
         let timezone = TimeZone::default();
-        let mut compiler_state = state::Compiler::default();
+        let mut state = TypeState::default();
         let mut rt = Runtime::new(state::Runtime::default());
-        let target: Option<&mut Value> = None;
+        let mut target = TargetValue {
+            value: Value::Null,
+            metadata: Value::Object(BTreeMap::new()),
+            secrets: Secrets::new(),
+        };
 
-        let result = match resolve(target, &mut rt, ctx.input(), &mut compiler_state, &timezone) {
+        let result = resolve(
+            &mut target,
+            &mut rt,
+            ctx.input(),
+            &mut state,
+            timezone,
+            VrlRuntime::Ast,
+        );
+
+        let result = match result {
             Err(error) => {
                 // TODO: Ideally we'd used typed errors for this, but
                 // that requires some more work to the VRL compiler.
@@ -293,16 +356,22 @@ fn print_function_list() {
 }
 
 fn print_help_text() {
-    println!("{}", HELP_TEXT);
+    #[allow(clippy::print_stdout)]
+    {
+        println!("{HELP_TEXT}");
+    }
 }
 
 fn open_url(url: &str) {
     if let Err(err) = webbrowser::open(url) {
-        println!(
-            "couldn't open default web browser: {}\n\
+        #[allow(clippy::print_stdout)]
+        {
+            println!(
+                "couldn't open default web browser: {}\n\
             you can access the desired documentation at {}",
-            err, url
-        );
+                err, url
+            );
+        }
     }
 }
 
@@ -313,10 +382,13 @@ fn show_func_docs(line: &str, pattern: &Regex) {
     let func_name = matches.get(1).unwrap().as_str();
 
     if stdlib::all().iter().any(|f| f.identifier() == func_name) {
-        let func_url = format!("{}/functions/#{}", DOCS_URL, func_name);
+        let func_url = format!("{DOCS_URL}/functions/#{func_name}");
         open_url(&func_url);
     } else {
-        println!("function name {} not recognized", func_name);
+        #[allow(clippy::print_stdout)]
+        {
+            println!("function name {func_name} not recognized");
+        }
     }
 }
 
@@ -326,10 +398,13 @@ fn show_error_docs(line: &str, pattern: &Regex) {
     let error_code = matches.get(1).unwrap().as_str();
 
     if ERRORS.iter().any(|e| e == error_code) {
-        let error_code_url = format!("{}/{}", ERRORS_URL_ROOT, error_code);
+        let error_code_url = format!("{ERRORS_URL_ROOT}/{error_code}");
         open_url(&error_code_url);
     } else {
-        println!("error code {} not recognized", error_code);
+        #[allow(clippy::print_stdout)]
+        {
+            println!("error code {error_code} not recognized");
+        }
     }
 }
 

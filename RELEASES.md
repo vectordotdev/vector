@@ -37,9 +37,9 @@ experimental or breaking changes.
 
 ### Stable channel
 
-* Go to our [Github repository] and click the "watch" button in the top right.
+* Go to our [GitHub repository] and click the "watch" button in the top right.
   Click "Custom" and then "Releases" to only be notified for new releases.
-  See the [Github subscription docs] for more info.
+  See the [GitHub subscription docs] for more info.
 * Subscribe to the [Vector public calendar], release events are added.
 * Follow [@vectordotdev] on Twitter.
 * Head to our [chat], watch the `#announcements` channel, and configure
@@ -60,7 +60,7 @@ Please head over to Vector's [download page].
 ### Stable channel
 
 * **Every 6 weeks**
-* Release patch fixes as needed to fix high-priority bugs and regressions
+* Release patch fixes as needed to fix high-priority bugs and regressions from the last major or minor release
 * Release daily builds representing the latest state of Vector for feedback
 
 ### Nightly channel
@@ -86,8 +86,13 @@ for the next nightly release. For example, you could choose to run the nightly
 version in your development environments and save stable for production.
 Otherwise, the stable release is your best bet.
 
+[Vector public calendar]: https://calendar.vector.dev
+[chat]: https://chat.vector.dev
+[package manager]: https://vector.dev/docs/setup/installation/package-managers/
+[download page]: https://vector.dev/download/
+[nightly artifact list]: https://packages.timber.io/vector/nightly/
 [@vectordotdev]: https://twitter.com/vectordotdev
-[Github repository]: https://github.com/timberio/vector
-[Github subscription docs]: https://docs.github.com/en/github/managing-subscriptions-and-notifications-on-github/managing-subscriptions-for-activity-on-github/viewing-your-subscriptions
-[`master` branch]: https://github.com/timberio/vector/tree/master
-[versioning policy]: https://github.com/timberio/vector/blob/master/RELEASES.md
+[GitHub repository]: https://github.com/vectordotdev/vector
+[GitHub subscription docs]: https://docs.github.com/en/github/managing-subscriptions-and-notifications-on-github/managing-subscriptions-for-activity-on-github/viewing-your-subscriptions
+[`master` branch]: https://github.com/vectordotdev/vector/tree/master
+[versioning policy]: https://github.com/vectordotdev/vector/blob/master/VERSIONING.md

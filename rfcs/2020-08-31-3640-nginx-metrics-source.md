@@ -26,7 +26,7 @@ observe how their webserver's are performing.
 ## Internal Proposal
 
 I expect to largely copy the existing [prometheus
-source](https://github.com/timberio/vector/blob/61e806d01d4cc6d2a527b52aa9388d4547f1ebc2/src/sources/prometheus/mod.rs)
+source](https://github.com/vectordotdev/vector/blob/61e806d01d4cc6d2a527b52aa9388d4547f1ebc2/src/sources/prometheus/mod.rs)
 and modify it to parse the output of the Nginx stub status page which looks like:
 
 ```text
@@ -120,7 +120,7 @@ the likelihood that a user will not be able to ingest metrics from their tools.
 We could not add the source directly to Vector and instead instruct users to run
 Telegraf and point Vector at the exposed Prometheus scrape endpoint. This would
 leverage the already supported [telegraf Nginx input
-plugin](hhttps://github.com/influxdata/telegraf/tree/release-1.15/plugins/inputs/nginx)
+plugin](https://github.com/influxdata/telegraf/tree/release-1.15/plugins/inputs/nginx)
 
 Or someone could use the Prometheus Nginx exporter directly and the `prometheus` sink.
 

@@ -1,7 +1,3 @@
-use crate::buffers::{Acker, EventStream};
-use crate::config::{ComponentKey, ComponentScope};
-use futures::{future::BoxFuture, FutureExt};
-use pin_project::pin_project;
 use std::{
     fmt,
     future::Future,
@@ -9,19 +5,59 @@ use std::{
     task::{Context, Poll},
 };
 
-pub enum TaskOutput {
+use futures::{future::BoxFuture, FutureExt};
+use pin_project::pin_project;
+use snafu::Snafu;
+use tokio::task::JoinError;
+use vector_buffers::topology::channel::BufferReceiverStream;
+use vector_core::event::EventArray;
+
+use crate::{config::ComponentKey, utilization::Utilization};
+
+#[allow(clippy::large_enum_variant)]
+pub(crate) enum TaskOutput {
     Source,
     Transform,
     /// Buffer of sink
-    Sink(Pin<EventStream>, Acker),
+    Sink(Utilization<BufferReceiverStream<EventArray>>),
     Healthcheck,
 }
 
+#[derive(Debug, Snafu)]
+pub(crate) enum TaskError {
+    #[snafu(display("the task was cancelled before it completed"))]
+    Cancelled,
+    #[snafu(display("the task panicked and was aborted"))]
+    Panicked,
+    #[snafu(display("the task completed with an error"))]
+    Opaque,
+    #[snafu(display("{}", source))]
+    Wrapped { source: crate::Error },
+}
+
+impl TaskError {
+    pub fn wrapped(e: crate::Error) -> Self {
+        Self::Wrapped { source: e }
+    }
+}
+
+impl From<JoinError> for TaskError {
+    fn from(e: JoinError) -> Self {
+        if e.is_cancelled() {
+            Self::Cancelled
+        } else {
+            Self::Panicked
+        }
+    }
+}
+
+pub(crate) type TaskResult = Result<TaskOutput, TaskError>;
+
 /// High level topology task.
 #[pin_project]
-pub struct Task {
+pub(crate) struct Task {
     #[pin]
-    inner: BoxFuture<'static, Result<TaskOutput, ()>>,
+    inner: BoxFuture<'static, TaskResult>,
     key: ComponentKey,
     typetag: String,
 }
@@ -30,7 +66,7 @@ impl Task {
     pub fn new<S, Fut>(key: ComponentKey, typetag: S, inner: Fut) -> Self
     where
         S: Into<String>,
-        Fut: Future<Output = Result<TaskOutput, ()>> + Send + 'static,
+        Fut: Future<Output = TaskResult> + Send + 'static,
     {
         Self {
             inner: inner.boxed(),
@@ -39,16 +75,8 @@ impl Task {
         }
     }
 
-    pub const fn key(&self) -> &ComponentKey {
-        &self.key
-    }
-
     pub fn id(&self) -> &str {
         self.key.id()
-    }
-
-    pub const fn scope(&self) -> &ComponentScope {
-        self.key.scope()
     }
 
     pub fn typetag(&self) -> &str {
@@ -57,7 +85,7 @@ impl Task {
 }
 
 impl Future for Task {
-    type Output = Result<TaskOutput, ()>;
+    type Output = TaskResult;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this: &mut Task = self.get_mut();
@@ -69,7 +97,6 @@ impl fmt::Debug for Task {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Task")
             .field("id", &self.key.id().to_string())
-            .field("scope", &self.scope().to_string())
             .field("typetag", &self.typetag)
             .finish()
     }

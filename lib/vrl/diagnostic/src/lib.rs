@@ -1,3 +1,21 @@
+#![deny(
+    warnings,
+    clippy::all,
+    clippy::pedantic,
+    unreachable_pub,
+    unused_allocation,
+    unused_extern_crates,
+    unused_assignments,
+    unused_comparisons
+)]
+#![allow(
+    clippy::match_bool, // allowed in initial deny commit
+    clippy::missing_errors_doc, // allowed in initial deny commit
+    clippy::module_name_repetitions, // allowed in initial deny commit
+    clippy::semicolon_if_nothing_returned,  // allowed in initial deny commit
+    clippy::needless_pass_by_value,  // allowed in initial deny commit
+)]
+
 mod diagnostic;
 mod formatter;
 mod label;
@@ -18,7 +36,7 @@ const VRL_FUNCS_ROOT_URL: &str = "https://functions.vrl.dev";
 
 /// A trait that can be implemented by error types to provide diagnostic
 /// information about the given error.
-pub trait DiagnosticError: std::error::Error {
+pub trait DiagnosticMessage: std::error::Error {
     fn code(&self) -> usize;
 
     /// The subject message of the error.
@@ -41,6 +59,13 @@ pub trait DiagnosticError: std::error::Error {
     fn notes(&self) -> Vec<Note> {
         vec![]
     }
+
+    /// The severity of the message.
+    ///
+    /// Defaults to `error`.
+    fn severity(&self) -> Severity {
+        Severity::Error
+    }
 }
 
 pub struct Urls;
@@ -50,19 +75,25 @@ impl Urls {
         VRL_DOCS_ROOT_URL.into()
     }
 
+    #[must_use]
     pub fn func_docs(ident: &str) -> String {
-        format!("{}/{}", VRL_FUNCS_ROOT_URL, ident)
+        format!("{VRL_FUNCS_ROOT_URL}/{ident}")
     }
 
     fn error_handling_url() -> String {
-        format!("{}/#handling", VRL_ERROR_DOCS_ROOT_URL)
+        format!("{VRL_ERROR_DOCS_ROOT_URL}/#handling")
     }
 
-    fn error_code_url(code: &usize) -> String {
-        format!("{}/{}", VRL_ERROR_DOCS_ROOT_URL, code)
+    fn error_code_url(code: usize) -> String {
+        format!("{VRL_ERROR_DOCS_ROOT_URL}/{code}")
     }
 
+    #[must_use]
     pub fn expression_docs_url(expr: &str) -> String {
-        format!("{}/expressions/{}", VRL_DOCS_ROOT_URL, expr)
+        format!("{VRL_DOCS_ROOT_URL}/expressions/{expr}")
+    }
+
+    fn example_docs() -> String {
+        format!("{VRL_DOCS_ROOT_URL}/examples")
     }
 }

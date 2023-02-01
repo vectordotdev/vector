@@ -1,11 +1,77 @@
-use vrl::prelude::*;
-
-use regex::{Regex, RegexBuilder};
-use roxmltree::{Document, Node, NodeType};
 use std::{
     borrow::Cow,
     collections::{btree_map::Entry, BTreeMap},
 };
+
+use ::value::Value;
+use once_cell::sync::Lazy;
+use regex::{Regex, RegexBuilder};
+use roxmltree::{Document, Node, NodeType};
+use rust_decimal::prelude::Zero;
+use vrl::prelude::*;
+
+/// Used to keep Clippy's `too_many_argument` check happy.
+#[derive(Debug)]
+struct ParseOptions {
+    trim: Option<Value>,
+    include_attr: Option<Value>,
+    attr_prefix: Option<Value>,
+    text_key: Option<Value>,
+    always_use_text_key: Option<Value>,
+    parse_bool: Option<Value>,
+    parse_null: Option<Value>,
+    parse_number: Option<Value>,
+}
+
+fn parse_xml(value: Value, options: ParseOptions) -> Resolved {
+    let string = value.try_bytes_utf8_lossy()?;
+    let trim = match options.trim {
+        Some(value) => value.try_boolean()?,
+        None => true,
+    };
+    let include_attr = match options.include_attr {
+        Some(value) => value.try_boolean()?,
+        None => true,
+    };
+    let attr_prefix = match options.attr_prefix {
+        Some(value) => Cow::from(value.try_bytes_utf8_lossy()?.into_owned()),
+        None => Cow::from("@"),
+    };
+    let text_key = match options.text_key {
+        Some(value) => Cow::from(value.try_bytes_utf8_lossy()?.into_owned()),
+        None => Cow::from("text"),
+    };
+    let always_use_text_key = match options.always_use_text_key {
+        Some(value) => value.try_boolean()?,
+        None => false,
+    };
+    let parse_bool = match options.parse_bool {
+        Some(value) => value.try_boolean()?,
+        None => true,
+    };
+    let parse_null = match options.parse_null {
+        Some(value) => value.try_boolean()?,
+        None => true,
+    };
+    let parse_number = match options.parse_number {
+        Some(value) => value.try_boolean()?,
+        None => true,
+    };
+    let config = ParseXmlConfig {
+        include_attr,
+        attr_prefix,
+        text_key,
+        always_use_text_key,
+        parse_bool,
+        parse_null,
+        parse_number,
+    };
+    // Trim whitespace around XML elements, if applicable.
+    let parse = if trim { trim_xml(&string) } else { string };
+    let doc = Document::parse(&parse).map_err(|e| format!("unable to parse xml: {e}"))?;
+    let value = process_node(doc.root(), &config);
+    Ok(value)
+}
 
 struct ParseXmlConfig<'a> {
     /// Include XML attributes. Default: true,
@@ -48,9 +114,9 @@ impl Function for ParseXml {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
-        mut arguments: ArgumentList,
+        _state: &state::TypeState,
+        _ctx: &mut FunctionCompileContext,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
 
@@ -63,7 +129,7 @@ impl Function for ParseXml {
         let parse_null = arguments.optional("parse_null");
         let parse_number = arguments.optional("parse_number");
 
-        Ok(Box::new(ParseXmlFn {
+        Ok(ParseXmlFn {
             value,
             trim,
             include_attr,
@@ -73,7 +139,8 @@ impl Function for ParseXml {
             parse_bool,
             parse_null,
             parse_number,
-        }))
+        }
+        .as_expr())
     }
 
     fn parameters(&self) -> &'static [Parameter] {
@@ -141,84 +208,76 @@ struct ParseXmlFn {
     parse_number: Option<Box<dyn Expression>>,
 }
 
-impl Expression for ParseXmlFn {
+impl FunctionExpression for ParseXmlFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
-        let string = value.try_bytes_utf8_lossy()?;
 
-        let trim = match &self.trim {
-            Some(expr) => expr.resolve(ctx)?.try_boolean()?,
-            None => true,
+        let options = ParseOptions {
+            trim: self
+                .trim
+                .as_ref()
+                .map(|expr| expr.resolve(ctx))
+                .transpose()?,
+
+            include_attr: self
+                .include_attr
+                .as_ref()
+                .map(|expr| expr.resolve(ctx))
+                .transpose()?,
+
+            attr_prefix: self
+                .attr_prefix
+                .as_ref()
+                .map(|expr| expr.resolve(ctx))
+                .transpose()?,
+
+            text_key: self
+                .text_key
+                .as_ref()
+                .map(|expr| expr.resolve(ctx))
+                .transpose()?,
+
+            always_use_text_key: self
+                .always_use_text_key
+                .as_ref()
+                .map(|expr| expr.resolve(ctx))
+                .transpose()?,
+
+            parse_bool: self
+                .parse_bool
+                .as_ref()
+                .map(|expr| expr.resolve(ctx))
+                .transpose()?,
+
+            parse_null: self
+                .parse_null
+                .as_ref()
+                .map(|expr| expr.resolve(ctx))
+                .transpose()?,
+
+            parse_number: self
+                .parse_number
+                .as_ref()
+                .map(|expr| expr.resolve(ctx))
+                .transpose()?,
         };
 
-        let include_attr = match &self.include_attr {
-            Some(expr) => expr.resolve(ctx)?.try_boolean()?,
-            None => true,
-        };
-
-        let attr_prefix = match &self.attr_prefix {
-            Some(expr) => Cow::from(expr.resolve(ctx)?.try_bytes_utf8_lossy()?.into_owned()),
-            None => Cow::from("@"),
-        };
-
-        let text_key = match &self.text_key {
-            Some(expr) => Cow::from(expr.resolve(ctx)?.try_bytes_utf8_lossy()?.into_owned()),
-            None => Cow::from("text"),
-        };
-
-        let always_use_text_key = match &self.always_use_text_key {
-            Some(expr) => expr.resolve(ctx)?.try_boolean()?,
-            None => false,
-        };
-
-        let parse_bool = match &self.parse_bool {
-            Some(expr) => expr.resolve(ctx)?.try_boolean()?,
-            None => true,
-        };
-
-        let parse_null = match &self.parse_null {
-            Some(expr) => expr.resolve(ctx)?.try_boolean()?,
-            None => true,
-        };
-
-        let parse_number = match &self.parse_number {
-            Some(expr) => expr.resolve(ctx)?.try_boolean()?,
-            None => true,
-        };
-
-        let config = ParseXmlConfig {
-            include_attr,
-            attr_prefix,
-            text_key,
-            always_use_text_key,
-            parse_bool,
-            parse_null,
-            parse_number,
-        };
-
-        // Trim whitespace around XML elements, if applicable.
-        let parse = if trim { trim_xml(&string) } else { string };
-
-        let doc = Document::parse(&parse).map_err(|e| format!("unable to parse xml: {}", e))?;
-        let value = process_node(doc.root(), &config);
-
-        Ok(value)
+        parse_xml(value, options)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         type_def()
     }
 }
 
-fn inner_kind() -> Kind {
-    Kind::Object
+fn type_def() -> TypeDef {
+    TypeDef::bytes()
+        .or_object(Collection::from_unknown(inner_kind()))
+        .fallible()
 }
 
-fn type_def() -> TypeDef {
-    TypeDef::new()
-        .fallible()
-        .bytes()
-        .add_object::<(), Kind>(map! { (): inner_kind() })
+fn inner_kind() -> Kind {
+    Kind::object(Collection::any())
 }
 
 /// Process an XML node, and return a VRL `Value`.
@@ -227,12 +286,25 @@ fn process_node<'a>(node: Node, config: &ParseXmlConfig<'a>) -> Value {
     let recurse = |node: Node| -> BTreeMap<String, Value> {
         let mut map = BTreeMap::new();
 
-        for n in node.children().into_iter().filter(|n| !n.is_comment()) {
-            // Use the default tag name if blank.
-            let name = if n.tag_name().name() == "" {
-                config.text_key.to_string()
-            } else {
-                n.tag_name().name().to_string()
+        // Expand attributes, if required.
+        if config.include_attr {
+            for attr in node.attributes() {
+                map.insert(
+                    format!("{}{}", config.attr_prefix, attr.name()),
+                    attr.value().into(),
+                );
+            }
+        }
+
+        for n in node
+            .children()
+            .into_iter()
+            .filter(|n| n.is_element() || n.is_text())
+        {
+            let name = match n.node_type() {
+                NodeType::Element => n.tag_name().name().to_string(),
+                NodeType::Text => config.text_key.to_string(),
+                _ => unreachable!("shouldn't be other XML nodes"),
             };
 
             // Transform the node into a VRL `Value`.
@@ -267,24 +339,12 @@ fn process_node<'a>(node: Node, config: &ParseXmlConfig<'a>) -> Value {
         NodeType::Root => Value::Object(recurse(node)),
 
         NodeType::Element => {
-            let mut map = BTreeMap::new();
-
-            // Expand attributes, if required.
-            if config.include_attr {
-                for attr in node.attributes() {
-                    map.insert(
-                        format!("{}{}", config.attr_prefix, attr.name()),
-                        attr.value().into(),
-                    );
-                }
-            }
-
-            match (config.always_use_text_key, map.is_empty()) {
-                // If the map isn't empty, *always* recurse to expand default keys.
-                (_, false) => {
-                    map.extend(recurse(node));
-                    Value::Object(map)
-                }
+            match (
+                config.always_use_text_key,
+                node.attributes().len().is_zero(),
+            ) {
+                // If the node has attributes, *always* recurse to expand default keys.
+                (_, false) if config.include_attr => Value::Object(recurse(node)),
                 // If a text key should be used, always recurse.
                 (true, true) => Value::Object(recurse(node)),
                 // Otherwise, check the node count to determine what to do.
@@ -301,6 +361,7 @@ fn process_node<'a>(node: Node, config: &ParseXmlConfig<'a>) -> Value {
                         // If the node is an element, treat it as an object.
                         if node.is_element() {
                             let mut map = BTreeMap::new();
+
                             map.insert(
                                 node.tag_name().name().to_string(),
                                 Value::Object(recurse(node)),
@@ -341,7 +402,7 @@ fn process_text<'a>(text: &'a str, config: &ParseXmlConfig<'a>) -> Value {
 
             // Then a float.
             if let Ok(v) = text.parse::<f64>() {
-                return v.into();
+                return Value::from_f64_or_zero(v);
             }
 
             // Fall back to string.
@@ -350,15 +411,16 @@ fn process_text<'a>(text: &'a str, config: &ParseXmlConfig<'a>) -> Value {
     }
 }
 
-fn trim_xml(xml: &str) -> Cow<str> {
-    lazy_static::lazy_static! {
-        static ref RE: Regex = RegexBuilder::new(r">\s+?<")
-            .multi_line(true)
-            .build()
-            .expect("trim regex failed");
-    }
+static XML_RE: Lazy<Regex> = Lazy::new(|| {
+    RegexBuilder::new(r">\s+?<")
+        .multi_line(true)
+        .build()
+        .expect("trim regex failed")
+});
 
-    RE.replace_all(xml, "><")
+#[inline]
+fn trim_xml(xml: &str) -> Cow<str> {
+    XML_RE.replace_all(xml, "><")
 }
 
 #[cfg(test)]
@@ -392,9 +454,23 @@ mod tests {
             tdef: type_def(),
         }
 
+        // https://github.com/vectordotdev/vector/issues/11901
+        include_attributes_if_single_node {
+            args: func_args![ value: r#"<root><node attr="value"><message>foo</message></node></root>"# ],
+            want: Ok(value!({ "root": { "node": { "@attr": "value", "message": "foo" } } })),
+            tdef: type_def(),
+        }
+
+        // https://github.com/vectordotdev/vector/issues/11901
+        include_attributes_multiple_children {
+            args: func_args![ value: r#"<root><node attr="value"><message>bar</message></node><node attr="value"><message>baz</message></node></root>"#],
+            want: Ok(value!({"root":{ "node":[ { "@attr": "value", "message": "bar" }, { "@attr": "value", "message": "baz" } ] } })),
+            tdef: type_def(),
+        }
+
         nested_object {
-            args: func_args![ value: r#"<a><b>one</b><c>two</c></a>"# ],
-            want: Ok(value!({ "a": { "b": "one", "c": "two" } })),
+            args: func_args![ value: r#"<a attr="value"><b>one</b><c>two</c></a>"# ],
+            want: Ok(value!({ "a": { "@attr": "value", "b": "one", "c": "two" } })),
             tdef: type_def(),
         }
 
@@ -425,6 +501,18 @@ mod tests {
                         "from": "Jani",
                         "heading": "Reminder",
                         "body": "Don't forget me this weekend!"
+                    }
+                }
+            )),
+            tdef: type_def(),
+        }
+
+        header_inside_element {
+            args: func_args![ value: r#"<p><?xml?>text123</p>"# ],
+            want: Ok(value!(
+                {
+                    "p": {
+                        "text": "text123"
                     }
                 }
             )),
@@ -611,4 +699,38 @@ mod tests {
             tdef: type_def(),
         }
     ];
+
+    #[test]
+    fn test_kind() {
+        let state = state::TypeState::default();
+
+        let func = ParseXmlFn {
+            value: value!(true).into_expression(),
+            trim: None,
+            include_attr: None,
+            attr_prefix: None,
+            text_key: None,
+            always_use_text_key: None,
+            parse_bool: None,
+            parse_null: None,
+            parse_number: None,
+        };
+
+        let type_def = func.type_def(&state);
+
+        assert!(type_def.is_fallible());
+        assert!(!type_def.is_exact());
+        assert!(type_def.contains_bytes());
+        assert!(type_def.contains_object());
+
+        let object1 = type_def.as_object().unwrap();
+
+        assert!(object1.known().is_empty());
+        assert!(object1.unknown_kind().contains_object());
+
+        let object2 = object1.unknown_kind().as_object().cloned().unwrap();
+
+        assert!(object2.known().is_empty());
+        assert!(object2.unknown_kind().is_any());
+    }
 }

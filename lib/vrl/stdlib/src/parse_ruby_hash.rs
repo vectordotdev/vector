@@ -1,3 +1,6 @@
+use std::num::ParseIntError;
+
+use ::value::Value;
 use nom::{
     branch::alt,
     bytes::complete::{escaped, tag, take_while, take_while1},
@@ -9,9 +12,12 @@ use nom::{
     sequence::{preceded, separated_pair, terminated, tuple},
     AsChar, IResult, InputTakeAtPosition,
 };
-use std::num::ParseIntError;
 use vrl::prelude::*;
-use vrl::Value;
+
+fn parse_ruby_hash(value: Value) -> Resolved {
+    let input = value.try_bytes_utf8_lossy()?;
+    parse(&input)
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct ParseRubyHash;
@@ -40,12 +46,12 @@ impl Function for ParseRubyHash {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
-        mut arguments: ArgumentList,
+        _state: &state::TypeState,
+        _ctx: &mut FunctionCompileContext,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
-        Ok(Box::new(ParseRubyHashFn { value }))
+        Ok(ParseRubyHashFn { value }.as_expr())
     }
 
     fn parameters(&self) -> &'static [Parameter] {
@@ -62,26 +68,24 @@ struct ParseRubyHashFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for ParseRubyHashFn {
+impl FunctionExpression for ParseRubyHashFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
-        let input = value.try_bytes_utf8_lossy()?;
-        parse(&input)
+        parse_ruby_hash(value)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        type_def()
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
+        TypeDef::object(Collection::from_unknown(inner_kinds())).fallible()
     }
 }
 
-fn kinds() -> Kind {
-    Kind::Null | Kind::Bytes | Kind::Float | Kind::Boolean | Kind::Array | Kind::Object
-}
-
-fn type_def() -> TypeDef {
-    TypeDef::new()
-        .fallible()
-        .add_object::<(), Kind>(map! { (): kinds() })
+fn inner_kinds() -> Kind {
+    Kind::null()
+        | Kind::bytes()
+        | Kind::float()
+        | Kind::boolean()
+        | Kind::array(Collection::any())
+        | Kind::object(Collection::any())
 }
 
 trait HashParseError<T>: ParseError<T> + ContextError<T> + FromExternalError<T, ParseIntError> {}
@@ -244,6 +248,7 @@ fn parse_value<'a, E: HashParseError<&'a str>>(input: &'a str) -> IResult<&'a st
             parse_nil,
             parse_hash,
             parse_array,
+            map(parse_colon_key, Value::from),
             map(parse_bytes, Value::Bytes),
             map(double, |value| Value::Float(NotNan::new(value).unwrap())),
             map(parse_boolean, Value::Boolean),
@@ -258,12 +263,12 @@ fn parse(input: &str) -> Result<Value> {
                 // Create a descriptive error message if possible.
                 nom::error::convert_error(input, err)
             }
-            _ => err.to_string(),
+            nom::Err::Incomplete(_) => err.to_string(),
         })
         .and_then(|(rest, result)| {
             rest.trim()
                 .is_empty()
-                .then(|| result)
+                .then_some(result)
                 .ok_or_else(|| "could not parse whole line successfully".into())
         })?;
 
@@ -283,6 +288,16 @@ mod tests {
     #[test]
     fn test_parse_arrow_empty_array() {
         parse("{ :array => [] }").unwrap();
+    }
+
+    #[test]
+    fn test_parse_symbol_value() {
+        let result = parse(r#"{ "key" => :foo }"#).unwrap();
+        assert!(result.is_object());
+        let result = result.as_object().unwrap();
+        let value = result.get("key").unwrap();
+        assert!(value.is_bytes());
+        assert_eq!(value.as_bytes().unwrap(), ":foo");
     }
 
     #[test]
@@ -400,7 +415,7 @@ mod tests {
                     testBool: true
                 }
             })),
-            tdef: type_def(),
+            tdef: TypeDef::object(Collection::from_unknown(inner_kinds())).fallible(),
         }
     ];
 }

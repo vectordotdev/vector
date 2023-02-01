@@ -14,6 +14,8 @@ components: sources: prometheus_scrape: {
 	}
 
 	features: {
+		auto_generated:   true
+		acknowledgements: false
 		collect: {
 			checkpoint: enabled: false
 			from: {
@@ -32,26 +34,16 @@ components: sources: prometheus_scrape: {
 			proxy: enabled: true
 			tls: {
 				enabled:                true
-				can_enable:             false
 				can_verify_certificate: true
 				can_verify_hostname:    true
 				enabled_default:        false
+				enabled_by_scheme:      true
 			}
 		}
 		multiline: enabled: false
 	}
 
 	support: {
-		targets: {
-			"aarch64-unknown-linux-gnu":      true
-			"aarch64-unknown-linux-musl":     true
-			"armv7-unknown-linux-gnueabihf":  true
-			"armv7-unknown-linux-musleabihf": true
-			"x86_64-apple-darwin":            true
-			"x86_64-pc-windows-msv":          true
-			"x86_64-unknown-linux-gnu":       true
-			"x86_64-unknown-linux-musl":      true
-		}
 		requirements: []
 		warnings: []
 		notices: []
@@ -61,75 +53,19 @@ components: sources: prometheus_scrape: {
 		platform_name: null
 	}
 
-	configuration: {
-		endpoints: {
-			description: "Endpoints to scrape metrics from."
-			required:    true
-			warnings: ["You must explicitly add the path to your endpoints. Vector will _not_ automatically add `/metics`."]
-			type: array: {
-				items: type: string: {
-					examples: ["http://localhost:9090/metrics"]
-					syntax: "literal"
-				}
-			}
-		}
-		scrape_interval_secs: {
-			common:      true
-			description: "The interval between scrapes, in seconds."
-			required:    false
-			warnings: []
-			type: uint: {
-				default: 15
-				unit:    "seconds"
-			}
-		}
-		instance_tag: {
-			category: "Context"
-			common:   true
-			description: """
-				The tag name added to each event representing the scraped instance's host:port.
+	configuration: base.components.sources.prometheus_scrape.configuration & {
+		endpoints: warnings: ["You must explicitly add the path to your endpoints. Vector will _not_ automatically add `/metrics`."]
+	}
+
+	how_it_works: {
+		duplicate_tag_names: {
+			title: "Duplicate tag names"
+			body: """
+				Multiple tags with the same name are invalid within Prometheus. Prometheus
+				itself will reject a metric with duplicate tags. Vector will accept the metric,
+				but will only take the last value for each tag name specified.
 				"""
-			required: false
-			warnings: []
-			type: string: {
-				default: null
-				syntax:  "literal"
-				examples: ["instance"]
-			}
 		}
-		endpoint_tag: {
-			category: "Context"
-			common:   true
-			description: """
-				The tag name added to each event representing the scraped instance's endpoint.
-				"""
-			required: false
-			warnings: []
-			type: string: {
-				default: null
-				syntax:  "literal"
-				examples: ["endpoint"]
-			}
-		}
-		honor_labels: {
-			category: "Context"
-			common:   true
-			description: """
-				Controls how tag conflicts are handled if the scraped source has tags that Vector would add. If true,
-				Vector will not add the new tag if the scraped metric has the tag already. If false, Vector will rename
-				the conflicting tag by adding `exported_` to it.  This matches Prometheus's `honor_labels`
-				configuration.
-				"""
-			required: false
-			warnings: []
-			type: bool: {
-				default: false
-			}
-		}
-		auth: configuration._http_auth & {_args: {
-			password_example: "${PROMETHEUS_PASSWORD}"
-			username_example: "${PROMETHEUS_USERNAME}"
-		}}
 	}
 
 	output: metrics: {
@@ -161,14 +97,18 @@ components: sources: prometheus_scrape: {
 	}
 
 	telemetry: metrics: {
-		events_in_total:                 components.sources.internal_metrics.output.metrics.events_in_total
-		http_error_response_total:       components.sources.internal_metrics.output.metrics.http_error_response_total
-		http_request_errors_total:       components.sources.internal_metrics.output.metrics.http_request_errors_total
-		parse_errors_total:              components.sources.internal_metrics.output.metrics.parse_errors_total
-		processed_bytes_total:           components.sources.internal_metrics.output.metrics.processed_bytes_total
-		processed_events_total:          components.sources.internal_metrics.output.metrics.processed_events_total
-		component_received_events_total: components.sources.internal_metrics.output.metrics.component_received_events_total
-		requests_completed_total:        components.sources.internal_metrics.output.metrics.requests_completed_total
-		request_duration_seconds:        components.sources.internal_metrics.output.metrics.request_duration_seconds
+		events_in_total:                      components.sources.internal_metrics.output.metrics.events_in_total
+		http_error_response_total:            components.sources.internal_metrics.output.metrics.http_error_response_total
+		http_request_errors_total:            components.sources.internal_metrics.output.metrics.http_request_errors_total
+		parse_errors_total:                   components.sources.internal_metrics.output.metrics.parse_errors_total
+		processed_bytes_total:                components.sources.internal_metrics.output.metrics.processed_bytes_total
+		processed_events_total:               components.sources.internal_metrics.output.metrics.processed_events_total
+		component_discarded_events_total:     components.sources.internal_metrics.output.metrics.component_discarded_events_total
+		component_errors_total:               components.sources.internal_metrics.output.metrics.component_errors_total
+		component_received_bytes_total:       components.sources.internal_metrics.output.metrics.component_received_bytes_total
+		component_received_event_bytes_total: components.sources.internal_metrics.output.metrics.component_received_event_bytes_total
+		component_received_events_total:      components.sources.internal_metrics.output.metrics.component_received_events_total
+		requests_completed_total:             components.sources.internal_metrics.output.metrics.requests_completed_total
+		request_duration_seconds:             components.sources.internal_metrics.output.metrics.request_duration_seconds
 	}
 }

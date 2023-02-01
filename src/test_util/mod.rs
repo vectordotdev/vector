@@ -1,16 +1,3 @@
-use crate::{
-    config::{Config, ConfigDiff, GenerateConfig},
-    topology::{self, RunningTopology},
-    trace,
-};
-use flate2::read::MultiGzDecoder;
-use futures::{
-    ready, stream, task::noop_waker_ref, FutureExt, SinkExt, Stream, StreamExt, TryStreamExt,
-};
-use openssl::ssl::{SslConnector, SslMethod, SslVerifyMode};
-use portpicker::pick_unused_port;
-use rand::{thread_rng, Rng};
-use rand_distr::Alphanumeric;
 use std::{
     collections::HashMap,
     convert::Infallible,
@@ -25,11 +12,18 @@ use std::{
         atomic::{AtomicUsize, Ordering},
         Arc,
     },
-    task::{Context, Poll},
+    task::{ready, Context, Poll},
 };
+
+use flate2::read::MultiGzDecoder;
+use futures::{stream, task::noop_waker_ref, FutureExt, SinkExt, Stream, StreamExt, TryStreamExt};
+use openssl::ssl::{SslConnector, SslFiletype, SslMethod, SslVerifyMode};
+use portpicker::pick_unused_port;
+use rand::{thread_rng, Rng};
+use rand_distr::Alphanumeric;
 use tokio::{
     io::{AsyncRead, AsyncWrite, AsyncWriteExt, Result as IoResult},
-    net::{TcpListener, TcpStream},
+    net::{TcpListener, TcpStream, ToSocketAddrs},
     runtime,
     sync::oneshot,
     task::JoinHandle,
@@ -39,13 +33,33 @@ use tokio_stream::wrappers::TcpListenerStream;
 #[cfg(unix)]
 use tokio_stream::wrappers::UnixListenerStream;
 use tokio_util::codec::{Encoder, FramedRead, FramedWrite, LinesCodec};
-use vector_core::event::{BatchNotifier, Event, LogEvent};
+use vector_buffers::topology::channel::LimitedReceiver;
+use vector_core::event::{BatchNotifier, Event, EventArray, LogEvent};
+#[cfg(test)]
+use zstd::Decoder as ZstdDecoder;
+
+use crate::{
+    config::{Config, ConfigDiff, GenerateConfig},
+    topology::{self, RunningTopology},
+    trace,
+};
 
 const WAIT_FOR_SECS: u64 = 5; // The default time to wait in `wait_for`
 const WAIT_FOR_MIN_MILLIS: u64 = 5; // The minimum time to pause before retrying
 const WAIT_FOR_MAX_MILLIS: u64 = 500; // The maximum time to pause before retrying
 
+#[cfg(test)]
 pub mod components;
+
+#[cfg(test)]
+pub mod http;
+
+#[cfg(test)]
+pub mod metrics;
+
+#[cfg(test)]
+pub mod mock;
+
 pub mod stats;
 
 #[macro_export]
@@ -63,7 +77,7 @@ macro_rules! log_event {
     ($($key:expr => $value:expr),*  $(,)?) => {
         #[allow(unused_variables)]
         {
-            let mut event = crate::event::Event::Log(crate::event::LogEvent::default());
+            let mut event = $crate::event::Event::Log($crate::event::LogEvent::default());
             let log = event.as_mut_log();
             $(
                 log.insert($key, $value);
@@ -78,7 +92,8 @@ where
     for<'de> T: GenerateConfig + serde::Deserialize<'de>,
 {
     let cfg = T::generate_config().to_string();
-    toml::from_str::<T>(&cfg).expect("Invalid config generated");
+    toml::from_str::<T>(&cfg)
+        .unwrap_or_else(|_| panic!("Invalid config generated from string:\n'{}'\n", cfg));
 }
 
 pub fn open_fixture(path: impl AsRef<Path>) -> crate::Result<serde_json::Value> {
@@ -113,13 +128,16 @@ pub fn trace_init() {
 
     let levels = std::env::var("TEST_LOG").unwrap_or_else(|_| "error".to_string());
 
-    trace::init(color, false, &levels);
+    trace::init(color, false, &levels, 10);
+
+    // Initialize metrics as well
+    vector_core::metrics::init_test();
 }
 
 pub async fn send_lines(
     addr: SocketAddr,
     lines: impl IntoIterator<Item = String>,
-) -> Result<(), Infallible> {
+) -> Result<SocketAddr, Infallible> {
     send_encodable(addr, LinesCodec::new(), lines).await
 }
 
@@ -127,8 +145,11 @@ pub async fn send_encodable<I, E: From<std::io::Error> + std::fmt::Debug>(
     addr: SocketAddr,
     encoder: impl Encoder<I, Error = E>,
     lines: impl IntoIterator<Item = I>,
-) -> Result<(), Infallible> {
+) -> Result<SocketAddr, Infallible> {
     let stream = TcpStream::connect(&addr).await.unwrap();
+
+    let local_addr = stream.local_addr().unwrap();
+
     let mut sink = FramedWrite::new(stream, encoder);
 
     let mut lines = stream::iter(lines.into_iter()).map(Ok);
@@ -137,7 +158,7 @@ pub async fn send_encodable<I, E: From<std::io::Error> + std::fmt::Debug>(
     let stream = sink.get_mut();
     stream.shutdown().await.unwrap();
 
-    Ok(())
+    Ok(local_addr)
 }
 
 pub async fn send_lines_tls(
@@ -145,14 +166,28 @@ pub async fn send_lines_tls(
     host: String,
     lines: impl Iterator<Item = String>,
     ca: impl Into<Option<&Path>>,
-) -> Result<(), Infallible> {
+    client_cert: impl Into<Option<&Path>>,
+    client_key: impl Into<Option<&Path>>,
+) -> Result<SocketAddr, Infallible> {
     let stream = TcpStream::connect(&addr).await.unwrap();
+
+    let local_addr = stream.local_addr().unwrap();
 
     let mut connector = SslConnector::builder(SslMethod::tls()).unwrap();
     if let Some(ca) = ca.into() {
         connector.set_ca_file(ca).unwrap();
     } else {
         connector.set_verify(SslVerifyMode::NONE);
+    }
+
+    if let Some(cert_file) = client_cert.into() {
+        connector.set_certificate_chain_file(cert_file).unwrap();
+    }
+
+    if let Some(key_file) = client_key.into() {
+        connector
+            .set_private_key_file(key_file, SslFiletype::PEM)
+            .unwrap();
     }
 
     let ssl = connector
@@ -172,7 +207,7 @@ pub async fn send_lines_tls(
     let stream = sink.get_mut().get_mut();
     stream.shutdown().await.unwrap();
 
-    Ok(())
+    Ok(local_addr)
 }
 
 pub fn temp_file() -> PathBuf {
@@ -187,36 +222,85 @@ pub fn temp_dir() -> PathBuf {
     path.join(dir_name)
 }
 
+pub fn map_event_batch_stream(
+    stream: impl Stream<Item = Event>,
+    batch: Option<BatchNotifier>,
+) -> impl Stream<Item = EventArray> {
+    stream.map(move |event| event.with_batch_notifier_option(&batch).into())
+}
+
+// TODO refactor to have a single implementation for `Event`, `LogEvent` and `Metric`.
 fn map_batch_stream(
     stream: impl Stream<Item = LogEvent>,
-    batch: Option<Arc<BatchNotifier>>,
-) -> impl Stream<Item = Event> {
-    stream.map(move |log| {
-        match &batch {
-            None => log,
-            Some(batch) => log.with_batch_notifier(batch),
-        }
-        .into()
-    })
+    batch: Option<BatchNotifier>,
+) -> impl Stream<Item = EventArray> {
+    stream.map(move |log| vec![log.with_batch_notifier_option(&batch)].into())
+}
+
+pub fn generate_lines_with_stream<Gen: FnMut(usize) -> String>(
+    generator: Gen,
+    count: usize,
+    batch: Option<BatchNotifier>,
+) -> (Vec<String>, impl Stream<Item = EventArray>) {
+    let lines = (0..count).map(generator).collect::<Vec<_>>();
+    let stream = map_batch_stream(
+        stream::iter(lines.clone()).map(LogEvent::from_str_legacy),
+        batch,
+    );
+    (lines, stream)
 }
 
 pub fn random_lines_with_stream(
     len: usize,
     count: usize,
-    batch: Option<Arc<BatchNotifier>>,
-) -> (Vec<String>, impl Stream<Item = Event>) {
-    let lines = (0..count).map(|_| random_string(len)).collect::<Vec<_>>();
-    let stream = map_batch_stream(stream::iter(lines.clone()).map(LogEvent::from), batch);
-    (lines, stream)
+    batch: Option<BatchNotifier>,
+) -> (Vec<String>, impl Stream<Item = EventArray>) {
+    let generator = move |_| random_string(len);
+    generate_lines_with_stream(generator, count, batch)
+}
+
+pub fn generate_events_with_stream<Gen: FnMut(usize) -> Event>(
+    generator: Gen,
+    count: usize,
+    batch: Option<BatchNotifier>,
+) -> (Vec<Event>, impl Stream<Item = EventArray>) {
+    let events = (0..count).map(generator).collect::<Vec<_>>();
+    let stream = map_batch_stream(
+        stream::iter(events.clone()).map(|event| event.into_log()),
+        batch,
+    );
+    (events, stream)
 }
 
 pub fn random_events_with_stream(
     len: usize,
     count: usize,
-    batch: Option<Arc<BatchNotifier>>,
-) -> (Vec<Event>, impl Stream<Item = Event>) {
+    batch: Option<BatchNotifier>,
+) -> (Vec<Event>, impl Stream<Item = EventArray>) {
     let events = (0..count)
-        .map(|_| Event::from(random_string(len)))
+        .map(|_| Event::from(LogEvent::from_str_legacy(random_string(len))))
+        .collect::<Vec<_>>();
+    let stream = map_batch_stream(
+        stream::iter(events.clone()).map(|event| event.into_log()),
+        batch,
+    );
+    (events, stream)
+}
+
+pub fn random_updated_events_with_stream<F>(
+    len: usize,
+    count: usize,
+    batch: Option<BatchNotifier>,
+    update_fn: F,
+) -> (Vec<Event>, impl Stream<Item = EventArray>)
+where
+    F: Fn((usize, LogEvent)) -> LogEvent,
+{
+    let events = (0..count)
+        .map(|_| LogEvent::from_str_legacy(random_string(len)))
+        .enumerate()
+        .map(update_fn)
+        .map(Event::Log)
         .collect::<Vec<_>>();
     let stream = map_batch_stream(
         stream::iter(events.clone()).map(|event| event.into_log()),
@@ -234,7 +318,7 @@ pub fn random_string(len: usize) -> String {
 }
 
 pub fn random_lines(len: usize) -> impl Iterator<Item = String> {
-    std::iter::repeat(()).map(move |_| random_string(len))
+    iter::repeat_with(move || random_string(len))
 }
 
 pub fn random_map(max_size: usize, field_len: usize) -> HashMap<String, String> {
@@ -249,18 +333,18 @@ pub fn random_maps(
     max_size: usize,
     field_len: usize,
 ) -> impl Iterator<Item = HashMap<String, String>> {
-    iter::repeat(()).map(move |_| random_map(max_size, field_len))
+    iter::repeat_with(move || random_map(max_size, field_len))
 }
 
 pub async fn collect_n<S>(rx: S, n: usize) -> Vec<S::Item>
 where
-    S: Stream + Unpin,
+    S: Stream,
 {
     rx.take(n).collect().await
 }
 
 pub async fn collect_n_stream<T, S: Stream<Item = T> + Unpin>(stream: &mut S, n: usize) -> Vec<T> {
-    let mut events = Vec::new();
+    let mut events = Vec::with_capacity(n);
 
     while events.len() < n {
         let e = stream.next().await.unwrap();
@@ -285,6 +369,25 @@ where
     }
 }
 
+pub async fn collect_limited<T: Send + 'static>(mut rx: LimitedReceiver<T>) -> Vec<T> {
+    let mut items = Vec::new();
+    while let Some(item) = rx.next().await {
+        items.push(item);
+    }
+    items
+}
+
+pub async fn collect_n_limited<T: Send + 'static>(mut rx: LimitedReceiver<T>, n: usize) -> Vec<T> {
+    let mut items = Vec::new();
+    while items.len() < n {
+        match rx.next().await {
+            Some(item) => items.push(item),
+            None => break,
+        }
+    }
+    items
+}
+
 pub fn lines_from_file<P: AsRef<Path>>(path: P) -> Vec<String> {
     trace!(message = "Reading file.", path = %path.as_ref().display());
     let mut file = File::open(path).unwrap();
@@ -305,13 +408,12 @@ pub fn lines_from_gzip_file<P: AsRef<Path>>(path: P) -> Vec<String> {
     output.lines().map(|s| s.to_owned()).collect()
 }
 
-pub fn lines_from_zst_file<P: AsRef<Path>>(path: P) -> Vec<String> {
-    trace!(message = "Reading zst file.", path = %path.as_ref().display());
-    let mut file = File::open(path).unwrap();
-    let mut zst_bytes = Vec::new();
-    file.read_to_end(&mut zst_bytes).unwrap();
+#[cfg(test)]
+pub fn lines_from_zstd_file<P: AsRef<Path>>(path: P) -> Vec<String> {
+    trace!(message = "Reading zstd file.", path = %path.as_ref().display());
+    let file = File::open(path).unwrap();
     let mut output = String::new();
-    zstd::stream::Decoder::new(&zst_bytes[..])
+    ZstdDecoder::new(file)
         .unwrap()
         .read_to_string(&mut output)
         .unwrap();
@@ -353,8 +455,15 @@ where
 }
 
 // Wait (for 5 secs) for a TCP socket to be reachable
-pub async fn wait_for_tcp(addr: SocketAddr) {
-    wait_for(|| async move { TcpStream::connect(addr).await.is_ok() }).await
+pub async fn wait_for_tcp<A>(addr: A)
+where
+    A: ToSocketAddrs + Clone + Send + 'static,
+{
+    wait_for(move || {
+        let addr = addr.clone();
+        async move { TcpStream::connect(addr).await.is_ok() }
+    })
+    .await
 }
 
 // Allows specifying a custom duration to wait for a TCP socket to be reachable
@@ -393,11 +502,12 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::retry_until;
     use std::{
         sync::{Arc, RwLock},
         time::Duration,
     };
+
+    use super::retry_until;
 
     // helper which errors the first 3x, and succeeds on the 4th
     async fn retry_until_helper(count: Arc<RwLock<i32>>) -> Result<(), ()> {
@@ -455,6 +565,23 @@ impl<T: Send + 'static> CountReceiver<T> {
             connected: Some(connected),
             handle: tokio::spawn(make_fut(count, tripwire, trigger_connected)),
         }
+    }
+
+    pub fn receive_items_stream<S, F, Fut>(make_stream: F) -> CountReceiver<T>
+    where
+        S: Stream<Item = T> + Send + 'static,
+        F: FnOnce(oneshot::Receiver<()>, oneshot::Sender<()>) -> Fut + Send + 'static,
+        Fut: Future<Output = S> + Send + 'static,
+    {
+        CountReceiver::new(|count, tripwire, connected| async move {
+            let stream = make_stream(tripwire, connected).await;
+            stream
+                .inspect(move |_| {
+                    count.fetch_add(1, Ordering::Relaxed);
+                })
+                .collect::<Vec<T>>()
+                .await
+        })
     }
 }
 
@@ -551,7 +678,13 @@ impl CountReceiver<Event> {
 pub async fn start_topology(
     mut config: Config,
     require_healthy: impl Into<Option<bool>>,
-) -> (RunningTopology, tokio::sync::mpsc::UnboundedReceiver<()>) {
+) -> (
+    RunningTopology,
+    (
+        tokio::sync::mpsc::UnboundedSender<()>,
+        tokio::sync::mpsc::UnboundedReceiver<()>,
+    ),
+) {
     config.healthchecks.set_require_healthy(require_healthy);
     let diff = ConfigDiff::initial(&config);
     let pieces = topology::build_or_log_errors(&config, &diff, HashMap::new())
@@ -570,8 +703,12 @@ pub async fn start_topology(
 pub async fn spawn_collect_n<F, S>(future: F, stream: S, n: usize) -> Vec<Event>
 where
     F: Future<Output = ()> + Send + 'static,
-    S: Stream<Item = Event> + Unpin,
+    S: Stream<Item = Event>,
 {
+    // TODO: Switch to using `select!` so that we can drive `future` to completion while also driving `collect_n`,
+    // such that if `future` panics, we break out and don't continue driving `collect_n`. In most cases, `future`
+    // completing successfully is what actually drives events into `stream`, so continuing to wait for all N events when
+    // the catalyst has failed is.... almost never the desired behavior.
     let sender = tokio::spawn(future);
     let events = collect_n(stream, n).await;
     sender.await.expect("Failed to send data");

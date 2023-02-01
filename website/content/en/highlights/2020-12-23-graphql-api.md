@@ -40,15 +40,8 @@ For a more in-depth look at the API, check out:
 * Our [official documentation]
 * The [Rust code][code] behind the API
 
-## Try it out
-
-To give the GraphQL API a spin, check out the [Vector GraphQL
-Playground][playground], which lets you run queries against a hosted Vector
-instance.
-
 [code]: https://github.com/vectordotdev/vector/tree/master/src/api
 [docs]: https://vector.dev/docs/reference/api
 [graphql]: https://graphql.org
 [lee]: https://github.com/LeeBenson
-[playground]: https://playground.vector.dev:8686/playground
 [post]: https://vector.dev/blog/graphql-api

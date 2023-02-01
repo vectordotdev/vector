@@ -1,6 +1,25 @@
+use std::collections::{BTreeMap, HashMap};
+
+use ::value::Value;
 use vrl::prelude::*;
 
-use std::collections::{BTreeMap, HashMap};
+fn tally(value: Value) -> Resolved {
+    let value = value.try_array()?;
+    #[allow(clippy::mutable_key_type)] // false positive due to bytes::Bytes
+    let mut map: HashMap<Bytes, usize> = HashMap::new();
+    for value in value {
+        if let Value::Bytes(value) = value {
+            *map.entry(value).or_insert(0) += 1;
+        } else {
+            return Err(format!("all values must be strings, found: {value:?}").into());
+        }
+    }
+    let map: BTreeMap<_, _> = map
+        .into_iter()
+        .map(|(k, v)| (String::from_utf8_lossy(&k).into_owned(), Value::from(v)))
+        .collect();
+    Ok(map.into())
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct Tally;
@@ -20,13 +39,13 @@ impl Function for Tally {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
-        mut arguments: ArgumentList,
+        _state: &state::TypeState,
+        _ctx: &mut FunctionCompileContext,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
 
-        Ok(Box::new(TallyFn { value }))
+        Ok(TallyFn { value }.as_expr())
     }
 
     fn parameters(&self) -> &'static [Parameter] {
@@ -43,32 +62,14 @@ pub(crate) struct TallyFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for TallyFn {
+impl FunctionExpression for TallyFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let value = self.value.resolve(ctx)?.try_array()?;
-
-        #[allow(clippy::mutable_key_type)] // false positive due to bytes::Bytes
-        let mut map: HashMap<Bytes, usize> = HashMap::new();
-        for value in value.into_iter() {
-            if let Value::Bytes(value) = value {
-                *map.entry(value).or_insert(0) += 1;
-            } else {
-                return Err(format!("all values must be strings, found: {:?}", value).into());
-            }
-        }
-
-        let map: BTreeMap<_, _> = map
-            .into_iter()
-            .map(|(k, v)| (String::from_utf8_lossy(&k).into_owned(), Value::from(v)))
-            .collect();
-
-        Ok(map.into())
+        let value = self.value.resolve(ctx)?;
+        tally(value)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new()
-            .object::<(), Kind>(map! { (): Kind::Integer })
-            .fallible()
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
+        TypeDef::object(Collection::from_unknown(Kind::integer())).fallible()
     }
 }
 
@@ -84,7 +85,7 @@ mod tests {
                 value: value!(["bar", "foo", "baz", "foo"]),
             ],
             want: Ok(value!({"bar": 1, "foo": 2, "baz": 1})),
-            tdef: TypeDef::new().object::<(), Kind>(map! { (): Kind::Integer }).fallible(),
+            tdef: TypeDef::object(Collection::from_unknown(Kind::integer())).fallible(),
         }
 
         non_string_values {
@@ -92,7 +93,7 @@ mod tests {
                 value: value!(["foo", [1,2,3], "123abc", 1, true, [1,2,3], "foo", true, 1]),
             ],
             want: Err("all values must be strings, found: Array([Integer(1), Integer(2), Integer(3)])"),
-            tdef: TypeDef::new().object::<(), Kind>(map! { (): Kind::Integer }).fallible(),
+            tdef: TypeDef::object(Collection::from_unknown(Kind::integer())).fallible(),
         }
     ];
 }

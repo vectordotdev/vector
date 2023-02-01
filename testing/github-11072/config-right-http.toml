@@ -1,0 +1,18 @@
+data_dir = "/tmp/vector/github-11072"
+
+[sources.stdin]
+type = "stdin"
+
+[sinks.http_tarpit]
+type = "http"
+inputs = ["stdin"]
+uri = "http://localhost:7777/foo"
+framing.method = "newline_delimited"
+encoding.codec = "json"
+
+[sinks.http_tarpit.buffer]
+type = "disk"
+max_size = 10000000 # Roughly 10MB.
+
+[sinks.http_tarpit.request]
+timeout_secs = 3600 # Plenty of time to make sure we can verify behavior.

@@ -1,4 +1,28 @@
-use vrl::prelude::*;
+use ::value::Value;
+use vrl::prelude::expression::FunctionExpression;
+use vrl::{diagnostic::Note, prelude::*};
+
+fn assert(condition: Value, message: Option<Value>, format: Option<String>) -> Resolved {
+    match condition.try_boolean()? {
+        true => Ok(true.into()),
+        false => {
+            if let Some(message) = message {
+                let message = message.try_bytes_utf8_lossy()?.into_owned();
+                Err(ExpressionError::Error {
+                    message: message.clone(),
+                    labels: vec![],
+                    notes: vec![Note::UserErrorMessage(message)],
+                })
+            } else {
+                let message = match format {
+                    Some(string) => format!("assertion failed: {string}"),
+                    None => "assertion failed".to_owned(),
+                };
+                Err(ExpressionError::from(message))
+            }
+        }
+    }
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct Assert;
@@ -45,14 +69,14 @@ impl Function for Assert {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
-        mut arguments: ArgumentList,
+        _state: &state::TypeState,
+        _ctx: &mut FunctionCompileContext,
+        arguments: ArgumentList,
     ) -> Compiled {
         let condition = arguments.required("condition");
         let message = arguments.optional("message");
 
-        Ok(Box::new(AssertFn { condition, message }))
+        Ok(AssertFn { condition, message }.as_expr())
     }
 }
 
@@ -62,28 +86,17 @@ struct AssertFn {
     message: Option<Box<dyn Expression>>,
 }
 
-impl Expression for AssertFn {
+impl FunctionExpression for AssertFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        match self.condition.resolve(ctx)?.try_boolean()? {
-            true => Ok(true.into()),
-            false => Err(self
-                .message
-                .as_ref()
-                .map(|m| {
-                    m.resolve(ctx)
-                        .and_then(|v| Ok(v.try_bytes_utf8_lossy()?.into_owned()))
-                })
-                .transpose()?
-                .unwrap_or_else(|| match self.condition.format() {
-                    Some(string) => format!("assertion failed: {}", string),
-                    None => "assertion failed".to_owned(),
-                })
-                .into()),
-        }
+        let condition = self.condition.resolve(ctx)?;
+        let format = self.condition.format();
+        let message = self.message.as_ref().map(|m| m.resolve(ctx)).transpose()?;
+
+        assert(condition, message, format)
     }
 
-    fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        self.condition.type_def(state).fallible().boolean()
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
+        TypeDef::boolean().fallible()
     }
 }
 

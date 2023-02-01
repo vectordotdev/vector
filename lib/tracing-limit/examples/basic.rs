@@ -1,7 +1,4 @@
-#[macro_use]
-extern crate tracing;
-
-use tracing::Dispatch;
+use tracing::{info, trace, Dispatch};
 use tracing_limit::RateLimitedLayer;
 use tracing_subscriber::layer::SubscriberExt;
 
@@ -15,12 +12,12 @@ fn main() {
     let dispatch = Dispatch::new(subscriber);
 
     tracing::dispatcher::with_default(&dispatch, || {
-        for i in 0..40 {
+        for i in 0..40usize {
             trace!("This field is not rate limited!");
             info!(
                 message = "This message is rate limited",
                 count = &i,
-                internal_log_rate_secs = 5,
+                internal_log_rate_limit = true,
             );
             std::thread::sleep(std::time::Duration::from_millis(1000));
         }

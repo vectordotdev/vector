@@ -1,5 +1,24 @@
-use crate::util::round_to_precision;
+use ::value::Value;
 use vrl::prelude::*;
+
+use crate::util::round_to_precision;
+
+fn round(precision: Value, value: Value) -> Resolved {
+    let precision = precision.try_integer()?;
+    match value {
+        Value::Float(f) => Ok(Value::from_f64_or_zero(round_to_precision(
+            f.into_inner(),
+            precision,
+            f64::round,
+        ))),
+        value @ Value::Integer(_) => Ok(value),
+        value => Err(value::Error::Expected {
+            got: value.kind(),
+            expected: Kind::float() | Kind::integer(),
+        }
+        .into()),
+    }
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct Round;
@@ -46,14 +65,14 @@ impl Function for Round {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
-        mut arguments: ArgumentList,
+        _state: &state::TypeState,
+        _ctx: &mut FunctionCompileContext,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
         let precision = arguments.optional("precision").unwrap_or(expr!(0));
 
-        Ok(Box::new(RoundFn { value, precision }))
+        Ok(RoundFn { value, precision }.as_expr())
     }
 }
 
@@ -63,23 +82,16 @@ struct RoundFn {
     precision: Box<dyn Expression>,
 }
 
-impl Expression for RoundFn {
+impl FunctionExpression for RoundFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let precision = self.precision.resolve(ctx)?.try_integer()?;
+        let precision = self.precision.resolve(ctx)?;
+        let value = self.value.resolve(ctx)?;
 
-        match self.value.resolve(ctx)? {
-            Value::Float(f) => Ok(round_to_precision(f.into_inner(), precision, f64::round).into()),
-            value @ Value::Integer(_) => Ok(value),
-            value => Err(value::Error::Expected {
-                got: value.kind(),
-                expected: Kind::Float | Kind::Integer,
-            }
-            .into()),
-        }
+        round(precision, value)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new().infallible().integer()
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
+        TypeDef::integer().infallible()
     }
 }
 
@@ -93,19 +105,19 @@ mod tests {
         down {
              args: func_args![value: 1234.2],
              want: Ok(1234.0),
-             tdef: TypeDef::new().infallible().integer(),
+             tdef: TypeDef::integer().infallible(),
          }
 
         up {
              args: func_args![value: 1234.8],
              want: Ok(1235.0),
-             tdef: TypeDef::new().infallible().integer(),
+             tdef: TypeDef::integer().infallible(),
          }
 
         integer {
              args: func_args![value: 1234],
              want: Ok(1234),
-             tdef: TypeDef::new().infallible().integer(),
+             tdef: TypeDef::integer().infallible(),
          }
 
         precision {
@@ -113,7 +125,7 @@ mod tests {
                               precision: 1
              ],
              want: Ok(1234.4),
-             tdef: TypeDef::new().infallible().integer(),
+             tdef: TypeDef::integer().infallible(),
          }
 
         bigger_precision  {
@@ -121,15 +133,15 @@ mod tests {
                              precision: 4
             ],
             want: Ok(1234.5679),
-            tdef: TypeDef::new().infallible().integer(),
+            tdef: TypeDef::integer().infallible(),
         }
 
         huge {
-             args: func_args![value: 9876543210123456789098765432101234567890987654321.987654321,
+             args: func_args![value: 9_876_543_210_123_456_789_098_765_432_101_234_567_890_987_654_321.987_654_321,
                               precision: 5
              ],
-             want: Ok(9876543210123456789098765432101234567890987654321.98765),
-             tdef: TypeDef::new().infallible().integer(),
+             want: Ok(9_876_543_210_123_456_789_098_765_432_101_234_567_890_987_654_321.987_65),
+             tdef: TypeDef::integer().infallible(),
          }
     ];
 }

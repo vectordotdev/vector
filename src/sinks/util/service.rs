@@ -1,30 +1,53 @@
-use crate::buffers::Acker;
-use crate::sinks::util::adaptive_concurrency::{
-    AdaptiveConcurrencyLimit, AdaptiveConcurrencyLimitLayer, AdaptiveConcurrencySettings,
-};
-use crate::sinks::util::retries::{FixedRetryPolicy, RetryLogic};
-pub use crate::sinks::util::service::concurrency::{concurrency_is_none, Concurrency};
-pub use crate::sinks::util::service::map::Map;
-use crate::sinks::util::service::map::MapLayer;
-use crate::sinks::util::sink::{Response, ServiceLogic};
-use crate::sinks::util::{Batch, BatchSink, Partition, PartitionBatchSink};
-use serde::{Deserialize, Serialize};
-use std::{hash::Hash, sync::Arc, time::Duration};
+use std::{hash::Hash, marker::PhantomData, pin::Pin, sync::Arc, time::Duration};
+
+use futures_util::stream::{self, BoxStream};
+use serde_with::serde_as;
 use tower::{
+    balance::p2c::Balance,
+    buffer::{Buffer, BufferLayer},
+    discover::Change,
     layer::{util::Stack, Layer},
     limit::RateLimit,
     retry::Retry,
     timeout::Timeout,
-    util::BoxService,
     Service, ServiceBuilder,
+};
+use vector_config::configurable_component;
+
+pub use crate::sinks::util::service::{
+    concurrency::{concurrency_is_none, Concurrency},
+    health::{HealthConfig, HealthLogic, HealthService},
+    map::Map,
+};
+use crate::{
+    internal_events::OpenGauge,
+    sinks::util::{
+        adaptive_concurrency::{
+            AdaptiveConcurrencyLimit, AdaptiveConcurrencyLimitLayer, AdaptiveConcurrencySettings,
+        },
+        retries::{FixedRetryPolicy, RetryLogic},
+        service::map::MapLayer,
+        sink::Response,
+        Batch, BatchSink, Partition, PartitionBatchSink,
+    },
 };
 
 mod concurrency;
+mod health;
 mod map;
 
 pub type Svc<S, L> = RateLimit<AdaptiveConcurrencyLimit<Retry<FixedRetryPolicy<L>, Timeout<S>>, L>>;
-pub type TowerBatchedSink<S, B, RL, SL> = BatchSink<Svc<S, RL>, B, SL>;
-pub type TowerPartitionSink<S, B, RL, K, SL> = PartitionBatchSink<Svc<S, RL>, B, K, SL>;
+pub type TowerBatchedSink<S, B, RL> = BatchSink<Svc<S, RL>, B>;
+pub type TowerPartitionSink<S, B, RL, K> = PartitionBatchSink<Svc<S, RL>, B, K>;
+
+// Distributed service types
+pub type DistributedService<S, RL, HL, K, Req> = RateLimit<
+    Retry<FixedRetryPolicy<RL>, Buffer<Balance<DiscoveryService<S, RL, HL, K>, Req>, Req>>,
+>;
+pub type DiscoveryService<S, RL, HL, K> =
+    BoxStream<'static, Result<Change<K, SingleDistributedService<S, RL, HL>>, crate::Error>>;
+pub type SingleDistributedService<S, RL, HL> =
+    AdaptiveConcurrencyLimit<HealthService<Timeout<S>, HL>, RL>;
 
 pub trait ServiceBuilderExt<L> {
     fn map<R1, R2, F>(self, f: F) -> ServiceBuilder<Stack<MapLayer<R1, R2>, L>>
@@ -59,64 +82,121 @@ impl<L> ServiceBuilderExt<L> for ServiceBuilder<L> {
     }
 }
 
-/// Tower Request based configuration
-#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
+/// Middleware settings for outbound requests.
+///
+/// Various settings can be configured, such as concurrency and rate limits, timeouts, etc.
+#[serde_as]
+#[configurable_component]
+#[derive(Clone, Copy, Debug)]
 pub struct TowerRequestConfig {
-    #[serde(default)]
+    #[configurable(derived)]
+    #[serde(default = "default_concurrency")]
     #[serde(skip_serializing_if = "concurrency_is_none")]
-    pub concurrency: Concurrency, // 1024
-    /// The same as concurrency but with old deprecated name.
-    /// Alias couldn't be used because of <https://github.com/serde-rs/serde/issues/1504>
-    #[serde(default)]
-    #[serde(skip_serializing_if = "concurrency_is_none")]
-    pub in_flight_limit: Concurrency, // 1024
-    pub timeout_secs: Option<u64>,             // 1 minute
-    pub rate_limit_duration_secs: Option<u64>, // 1 second
-    pub rate_limit_num: Option<u64>,           // i64::MAX
-    pub retry_attempts: Option<usize>,         // isize::MAX
+    pub concurrency: Concurrency,
+
+    /// The time a request can take before being aborted.
+    ///
+    /// It is highly recommended that you do not lower this value below the service’s internal timeout, as this could
+    /// create orphaned requests, pile on retries, and result in duplicate data downstream.
+    #[configurable(metadata(docs::type_unit = "seconds"))]
+    #[serde(default = "default_timeout_secs")]
+    pub timeout_secs: Option<u64>,
+
+    /// The time window used for the `rate_limit_num` option.
+    #[configurable(metadata(docs::type_unit = "seconds"))]
+    #[serde(default = "default_rate_limit_duration_secs")]
+    pub rate_limit_duration_secs: Option<u64>,
+
+    /// The maximum number of requests allowed within the `rate_limit_duration_secs` time window.
+    #[configurable(metadata(docs::type_unit = "requests"))]
+    #[serde(default = "default_rate_limit_num")]
+    pub rate_limit_num: Option<u64>,
+
+    /// The maximum number of retries to make for failed requests.
+    ///
+    /// The default, for all intents and purposes, represents an infinite number of retries.
+    #[configurable(metadata(docs::type_unit = "retries"))]
+    #[serde(default = "default_retry_attempts")]
+    pub retry_attempts: Option<usize>,
+
+    /// The maximum amount of time to wait between retries.
+    #[configurable(metadata(docs::type_unit = "seconds"))]
+    #[serde(default = "default_retry_max_duration_secs")]
     pub retry_max_duration_secs: Option<u64>,
-    pub retry_initial_backoff_secs: Option<u64>, // 1
+
+    /// The amount of time to wait before attempting the first retry for a failed request.
+    ///
+    /// After the first retry has failed, the fibonacci sequence will be used to select future backoffs.
+    #[configurable(metadata(docs::type_unit = "seconds"))]
+    #[serde(default = "default_retry_initial_backoff_secs")]
+    pub retry_initial_backoff_secs: Option<u64>,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub adaptive_concurrency: AdaptiveConcurrencySettings,
 }
 
-pub const CONCURRENCY_DEFAULT: Concurrency = Concurrency::None;
-pub const RATE_LIMIT_DURATION_SECONDS_DEFAULT: u64 = 1; // one second
-pub const RATE_LIMIT_NUM_DEFAULT: u64 = i64::max_value() as u64; // i64 avoids TOML deserialize issue
-pub const RETRY_ATTEMPTS_DEFAULT: usize = isize::max_value() as usize; // isize avoids TOML deserialize issue
-pub const RETRY_MAX_DURATION_SECONDS_DEFAULT: u64 = 3_600; // one hour
-pub const RETRY_INITIAL_BACKOFF_SECONDS_DEFAULT: u64 = 1; // one second
-pub const TIMEOUT_SECONDS_DEFAULT: u64 = 60; // one minute
+const fn default_concurrency() -> Concurrency {
+    Concurrency::None
+}
+
+const fn default_timeout_secs() -> Option<u64> {
+    Some(60)
+}
+
+const fn default_rate_limit_duration_secs() -> Option<u64> {
+    Some(1)
+}
+
+const fn default_rate_limit_num() -> Option<u64> {
+    // i64 avoids TOML deserialize issue
+    Some(i64::max_value() as u64)
+}
+
+const fn default_retry_attempts() -> Option<usize> {
+    // i64 avoids TOML deserialize issue
+    Some(isize::max_value() as usize)
+}
+
+const fn default_retry_max_duration_secs() -> Option<u64> {
+    Some(3_600)
+}
+
+const fn default_retry_initial_backoff_secs() -> Option<u64> {
+    Some(1)
+}
 
 impl Default for TowerRequestConfig {
     fn default() -> Self {
         Self {
-            concurrency: CONCURRENCY_DEFAULT,
-            in_flight_limit: CONCURRENCY_DEFAULT,
-            timeout_secs: Some(TIMEOUT_SECONDS_DEFAULT),
-            rate_limit_duration_secs: Some(RATE_LIMIT_DURATION_SECONDS_DEFAULT),
-            rate_limit_num: Some(RATE_LIMIT_NUM_DEFAULT),
-            retry_attempts: Some(RETRY_ATTEMPTS_DEFAULT),
-            retry_max_duration_secs: Some(RETRY_MAX_DURATION_SECONDS_DEFAULT),
-            retry_initial_backoff_secs: Some(RETRY_INITIAL_BACKOFF_SECONDS_DEFAULT),
+            concurrency: default_concurrency(),
+            timeout_secs: default_timeout_secs(),
+            rate_limit_duration_secs: default_rate_limit_duration_secs(),
+            rate_limit_num: default_rate_limit_num(),
+            retry_attempts: default_retry_attempts(),
+            retry_max_duration_secs: default_retry_max_duration_secs(),
+            retry_initial_backoff_secs: default_retry_initial_backoff_secs(),
             adaptive_concurrency: AdaptiveConcurrencySettings::default(),
         }
     }
 }
 
 impl TowerRequestConfig {
-    pub const fn const_new(concurrency: Concurrency, in_flight_limit: Concurrency) -> Self {
+    pub fn new(concurrency: Concurrency) -> Self {
         Self {
             concurrency,
-            in_flight_limit,
-            timeout_secs: Some(TIMEOUT_SECONDS_DEFAULT),
-            rate_limit_duration_secs: Some(RATE_LIMIT_DURATION_SECONDS_DEFAULT),
-            rate_limit_num: Some(RATE_LIMIT_NUM_DEFAULT),
-            retry_attempts: Some(RETRY_ATTEMPTS_DEFAULT),
-            retry_max_duration_secs: Some(RETRY_MAX_DURATION_SECONDS_DEFAULT),
-            retry_initial_backoff_secs: Some(RETRY_INITIAL_BACKOFF_SECONDS_DEFAULT),
-            adaptive_concurrency: AdaptiveConcurrencySettings::const_default(),
+            ..Default::default()
         }
+    }
+
+    pub const fn timeout_secs(mut self, timeout_secs: u64) -> Self {
+        self.timeout_secs = Some(timeout_secs);
+        self
+    }
+
+    pub const fn rate_limit_duration_secs(mut self, rate_limit_duration_secs: u64) -> Self {
+        self.rate_limit_duration_secs = Some(rate_limit_duration_secs);
+        self
     }
 
     pub const fn rate_limit_num(mut self, rate_limit_num: u64) -> Self {
@@ -124,52 +204,60 @@ impl TowerRequestConfig {
         self
     }
 
+    pub const fn retry_attempts(mut self, retry_attempts: usize) -> Self {
+        self.retry_attempts = Some(retry_attempts);
+        self
+    }
+
+    pub const fn retry_max_duration_secs(mut self, retry_max_duration_secs: u64) -> Self {
+        self.retry_max_duration_secs = Some(retry_max_duration_secs);
+        self
+    }
+
+    pub const fn retry_initial_backoff_secs(mut self, retry_initial_backoff_secs: u64) -> Self {
+        self.retry_initial_backoff_secs = Some(retry_initial_backoff_secs);
+        self
+    }
+
     pub fn unwrap_with(&self, defaults: &Self) -> TowerRequestSettings {
+        // the unwrap() calls below are safe because the final defaults are always Some<>
         TowerRequestSettings {
-            concurrency: self.concurrency().parse_concurrency(defaults.concurrency()),
+            concurrency: self.concurrency.parse_concurrency(defaults.concurrency),
             timeout: Duration::from_secs(
                 self.timeout_secs
                     .or(defaults.timeout_secs)
-                    .unwrap_or(TIMEOUT_SECONDS_DEFAULT),
+                    .or(default_timeout_secs())
+                    .unwrap(),
             ),
             rate_limit_duration: Duration::from_secs(
                 self.rate_limit_duration_secs
                     .or(defaults.rate_limit_duration_secs)
-                    .unwrap_or(RATE_LIMIT_DURATION_SECONDS_DEFAULT),
+                    .or(default_rate_limit_duration_secs())
+                    .unwrap(),
             ),
             rate_limit_num: self
                 .rate_limit_num
                 .or(defaults.rate_limit_num)
-                .unwrap_or(RATE_LIMIT_NUM_DEFAULT),
+                .or(default_rate_limit_num())
+                .unwrap(),
             retry_attempts: self
                 .retry_attempts
                 .or(defaults.retry_attempts)
-                .unwrap_or(RETRY_ATTEMPTS_DEFAULT),
+                .or(default_retry_attempts())
+                .unwrap(),
             retry_max_duration_secs: Duration::from_secs(
                 self.retry_max_duration_secs
                     .or(defaults.retry_max_duration_secs)
-                    .unwrap_or(RETRY_MAX_DURATION_SECONDS_DEFAULT),
+                    .or(default_retry_max_duration_secs())
+                    .unwrap(),
             ),
             retry_initial_backoff_secs: Duration::from_secs(
                 self.retry_initial_backoff_secs
                     .or(defaults.retry_initial_backoff_secs)
-                    .unwrap_or(RETRY_INITIAL_BACKOFF_SECONDS_DEFAULT),
+                    .or(default_retry_initial_backoff_secs())
+                    .unwrap(),
             ),
             adaptive_concurrency: self.adaptive_concurrency,
-        }
-    }
-
-    pub fn concurrency(&self) -> &Concurrency {
-        match (
-            concurrency_is_none(&self.concurrency),
-            concurrency_is_none(&self.in_flight_limit),
-        ) {
-            (_, true) => &self.concurrency,
-            (true, false) => &self.in_flight_limit,
-            (false, false) => {
-                warn!("Option `in_flight_limit` has been renamed to `concurrency`. Ignoring `in_flight_limit` and using `concurrency` option.");
-                &self.concurrency
-            }
         }
     }
 }
@@ -187,7 +275,7 @@ pub struct TowerRequestSettings {
 }
 
 impl TowerRequestSettings {
-    pub fn retry_policy<L: RetryLogic>(&self, logic: L) -> FixedRetryPolicy<L> {
+    pub const fn retry_policy<L: RetryLogic>(&self, logic: L) -> FixedRetryPolicy<L> {
         FixedRetryPolicy::new(
             self.retry_attempts,
             self.retry_initial_backoff_secs,
@@ -196,15 +284,14 @@ impl TowerRequestSettings {
         )
     }
 
-    pub fn partition_sink<B, RL, S, K, SL>(
+    /// Note: This has been deprecated, please do not use when creating new Sinks.
+    pub fn partition_sink<B, RL, S, K>(
         &self,
         retry_logic: RL,
         service: S,
         batch: B,
         batch_timeout: Duration,
-        acker: Acker,
-        service_logic: SL,
-    ) -> TowerPartitionSink<S, B, RL, K, SL>
+    ) -> TowerPartitionSink<S, B, RL, K>
     where
         RL: RetryLogic<Response = S::Response>,
         S: Service<B::Output> + Clone + Send + 'static,
@@ -215,26 +302,21 @@ impl TowerRequestSettings {
         B::Input: Partition<K>,
         B::Output: Send + Clone + 'static,
         K: Hash + Eq + Clone + Send + 'static,
-        SL: ServiceLogic<Response = S::Response> + Send + 'static,
     {
-        PartitionBatchSink::new_with_logic(
-            self.service(retry_logic, service),
-            batch,
-            batch_timeout,
-            acker,
-            service_logic,
-        )
+        let service = ServiceBuilder::new()
+            .settings(self.clone(), retry_logic)
+            .service(service);
+        PartitionBatchSink::new(service, batch, batch_timeout)
     }
 
-    pub fn batch_sink<B, RL, S, SL>(
+    /// Note: This has been deprecated, please do not use when creating new Sinks.
+    pub fn batch_sink<B, RL, S>(
         &self,
         retry_logic: RL,
         service: S,
         batch: B,
         batch_timeout: Duration,
-        acker: Acker,
-        service_logic: SL,
-    ) -> TowerBatchedSink<S, B, RL, SL>
+    ) -> TowerBatchedSink<S, B, RL>
     where
         RL: RetryLogic<Response = S::Response>,
         S: Service<B::Output> + Clone + Send + 'static,
@@ -243,37 +325,69 @@ impl TowerRequestSettings {
         S::Future: Send + 'static,
         B: Batch,
         B::Output: Send + Clone + 'static,
-        SL: ServiceLogic<Response = S::Response> + Send + 'static,
     {
-        BatchSink::new_with_logic(
-            self.service(retry_logic, service),
-            batch,
-            batch_timeout,
-            acker,
-            service_logic,
-        )
+        let service = ServiceBuilder::new()
+            .settings(self.clone(), retry_logic)
+            .service(service);
+        BatchSink::new(service, batch, batch_timeout)
     }
 
-    pub fn service<RL, S, Request>(&self, retry_logic: RL, service: S) -> Svc<S, RL>
+    /// Distributes requests to services [(Endpoint, service, healthcheck)]
+    pub fn distributed_service<Req, RL, HL, S>(
+        self,
+        retry_logic: RL,
+        services: Vec<(String, S)>,
+        health_config: HealthConfig,
+        health_logic: HL,
+    ) -> DistributedService<S, RL, HL, usize, Req>
     where
+        Req: Clone + Send + 'static,
         RL: RetryLogic<Response = S::Response>,
-        S: Service<Request> + Clone + Send + 'static,
+        HL: HealthLogic<Response = S::Response, Error = crate::Error>,
+        S: Service<Req> + Clone + Send + 'static,
         S::Error: Into<crate::Error> + Send + Sync + 'static,
-        S::Response: Send + Response,
+        S::Response: Send,
         S::Future: Send + 'static,
-        Request: Send + Clone + 'static,
     {
         let policy = self.retry_policy(retry_logic.clone());
+        let settings = self.clone();
+
+        // Build services
+        let open = OpenGauge::new();
+        let max_concurrency = services.len() * AdaptiveConcurrencySettings::max_concurrency();
+        let services = services
+            .into_iter()
+            .map(|(endpoint, inner)| {
+                // Build individual service
+                ServiceBuilder::new()
+                    .layer(AdaptiveConcurrencyLimitLayer::new(
+                        settings.concurrency,
+                        settings.adaptive_concurrency,
+                        retry_logic.clone(),
+                    ))
+                    .service(
+                        health_config.build(
+                            health_logic.clone(),
+                            ServiceBuilder::new()
+                                .timeout(settings.timeout)
+                                .service(inner),
+                            open.clone(),
+                            endpoint,
+                        ), // NOTE: there is a version conflict for crate `tracing` between `tracing_tower` crate
+                           // and Vector. Once that is resolved, this can be used instead of passing endpoint everywhere.
+                           // .trace_service(|_| info_span!("endpoint", %endpoint)),
+                    )
+            })
+            .enumerate()
+            .map(|(i, service)| Ok(Change::Insert(i, service)))
+            .collect::<Vec<_>>();
+
+        // Build sink service
         ServiceBuilder::new()
             .rate_limit(self.rate_limit_num, self.rate_limit_duration)
-            .layer(AdaptiveConcurrencyLimitLayer::new(
-                self.concurrency,
-                self.adaptive_concurrency,
-                retry_logic,
-            ))
             .retry(policy)
-            .timeout(self.timeout)
-            .service(service)
+            .layer(BufferLayer::new(max_concurrency))
+            .service(Balance::new(Box::pin(stream::iter(services)) as Pin<Box<_>>))
     }
 }
 
@@ -281,54 +395,53 @@ impl TowerRequestSettings {
 pub struct TowerRequestLayer<L, Request> {
     settings: TowerRequestSettings,
     retry_logic: L,
-    _pd: std::marker::PhantomData<Request>,
+    _pd: PhantomData<Request>,
 }
 
 impl<S, RL, Request> Layer<S> for TowerRequestLayer<RL, Request>
 where
-    S: Service<Request> + Send + Clone + 'static,
+    S: Service<Request> + Send + 'static,
     S::Response: Send + 'static,
     S::Error: Into<crate::Error> + Send + Sync + 'static,
     S::Future: Send + 'static,
     RL: RetryLogic<Response = S::Response> + Send + 'static,
     Request: Clone + Send + 'static,
 {
-    type Service = BoxService<Request, S::Response, crate::Error>;
+    type Service = Svc<S, RL>;
 
     fn layer(&self, inner: S) -> Self::Service {
         let policy = self.settings.retry_policy(self.retry_logic.clone());
-
-        let l = ServiceBuilder::new()
-            .concurrency_limit(self.settings.concurrency.unwrap_or(5))
+        ServiceBuilder::new()
             .rate_limit(
                 self.settings.rate_limit_num,
                 self.settings.rate_limit_duration,
             )
+            .layer(AdaptiveConcurrencyLimitLayer::new(
+                self.settings.concurrency,
+                self.settings.adaptive_concurrency,
+                self.retry_logic.clone(),
+            ))
             .retry(policy)
             .timeout(self.settings.timeout)
-            .service(inner);
-
-        BoxService::new(l)
+            .service(inner)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::{
-        buffers::Acker,
-        sinks::util::{
-            retries::{RetryAction, RetryLogic},
-            sink::StdServiceLogic,
-            BatchSettings, EncodedEvent, PartitionBuffer, PartitionInnerBuffer, VecBuffer,
-        },
-    };
-    use futures::{future, stream, FutureExt, SinkExt, StreamExt};
     use std::sync::{
         atomic::{AtomicBool, Ordering::AcqRel},
         Arc, Mutex,
     };
+
+    use futures::{future, stream, FutureExt, SinkExt, StreamExt};
     use tokio::time::Duration;
+
+    use super::*;
+    use crate::sinks::util::{
+        retries::{RetryAction, RetryLogic},
+        BatchSettings, EncodedEvent, PartitionBuffer, PartitionInnerBuffer, VecBuffer,
+    };
 
     const TIMEOUT: Duration = Duration::from_secs(10);
 
@@ -360,10 +473,10 @@ mod tests {
     }
 
     #[test]
-    fn backward_compatibility_with_in_flight_limit_param_works() {
-        let cfg = toml::from_str::<TowerRequestConfig>("in_flight_limit = 10")
-            .expect("Fixed concurrency failed for in_flight_limit param");
-        assert_eq!(cfg.concurrency(), &Concurrency::Fixed(10));
+    fn config_merging_defaults_concurrency_to_none_if_unset() {
+        let cfg = TowerRequestConfig::default().unwrap_with(&TowerRequestConfig::default());
+
+        assert_eq!(cfg.concurrency, None);
     }
 
     #[tokio::test]
@@ -374,7 +487,6 @@ mod tests {
         };
         let settings = cfg.unwrap_with(&TowerRequestConfig::default());
 
-        let (acker, _) = Acker::new_for_testing();
         let sent_requests = Arc::new(Mutex::new(Vec::new()));
 
         let svc = {
@@ -392,20 +504,21 @@ mod tests {
             })
         };
 
-        let batch = BatchSettings::default().bytes(9999).events(10);
+        let mut batch_settings = BatchSettings::default();
+        batch_settings.size.bytes = 9999;
+        batch_settings.size.events = 10;
+
         let mut sink = settings.partition_sink(
             RetryAlways,
             svc,
-            PartitionBuffer::new(VecBuffer::new(batch.size)),
+            PartitionBuffer::new(VecBuffer::new(batch_settings.size)),
             TIMEOUT,
-            acker,
-            StdServiceLogic::default(),
         );
         sink.ordered();
 
         let input = (0..20).into_iter().map(|i| PartitionInnerBuffer::new(i, 0));
         sink.sink_map_err(drop)
-            .send_all(&mut stream::iter(input).map(|item| Ok(EncodedEvent::new(item))))
+            .send_all(&mut stream::iter(input).map(|item| Ok(EncodedEvent::new(item, 0))))
             .await
             .unwrap();
 

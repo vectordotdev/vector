@@ -1,6 +1,12 @@
+use ::value::Value;
+use indexmap::IndexSet;
 use vrl::prelude::*;
 
-use indexmap::IndexSet;
+fn unique(value: Value) -> Resolved {
+    let value = value.try_array()?;
+    let set: IndexSet<_> = value.into_iter().collect();
+    Ok(set.into_iter().collect())
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct Unique;
@@ -20,13 +26,13 @@ impl Function for Unique {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
-        mut arguments: ArgumentList,
+        _state: &state::TypeState,
+        _ctx: &mut FunctionCompileContext,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
 
-        Ok(Box::new(UniqueFn { value }))
+        Ok(UniqueFn { value }.as_expr())
     }
 
     fn parameters(&self) -> &'static [Parameter] {
@@ -43,17 +49,14 @@ pub(crate) struct UniqueFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for UniqueFn {
+impl FunctionExpression for UniqueFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let value = self.value.resolve(ctx)?.try_array()?;
-
-        let set: IndexSet<_> = value.into_iter().collect();
-
-        Ok(set.into_iter().collect())
+        let value = self.value.resolve(ctx)?;
+        unique(value)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new().array_mapped::<(), Kind>(map! { (): Kind::all() })
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
+        TypeDef::array(Collection::any())
     }
 }
 
@@ -69,7 +72,7 @@ mod tests {
                 value: value!(["bar", "foo", "baz", "foo"]),
             ],
             want: Ok(value!(["bar", "foo", "baz"])),
-            tdef: TypeDef::new().array_mapped::<(), Kind>(map! { (): Kind::all() }),
+            tdef: TypeDef::array(Collection::any()),
         }
 
         mixed_values {
@@ -77,7 +80,7 @@ mod tests {
                 value: value!(["foo", [1,2,3], "123abc", 1, true, [1,2,3], "foo", true, 1]),
             ],
             want: Ok(value!(["foo", [1,2,3], "123abc", 1, true])),
-            tdef: TypeDef::new().array_mapped::<(), Kind>(map! { (): Kind::all() }),
+            tdef: TypeDef::array(Collection::any()),
         }
     ];
 }

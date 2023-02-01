@@ -7,6 +7,7 @@ layout: components
 weight: 2
 tags: ["components", "transforms"]
 aliases: ["/transforms"]
+no_toc: true
 ---
 
 ## Available transforms

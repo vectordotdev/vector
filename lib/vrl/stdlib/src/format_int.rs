@@ -1,6 +1,28 @@
 use std::collections::VecDeque;
 
+use ::value::Value;
 use vrl::prelude::*;
+
+fn format_int(value: Value, base: Option<Value>) -> Resolved {
+    let value = value.try_integer()?;
+    let base = match base {
+        Some(base) => {
+            let value = base.try_integer()?;
+            if !(2..=36).contains(&value) {
+                return Err(format!(
+                    "invalid base {}: must be be between 2 and 36 (inclusive)",
+                    value
+                )
+                .into());
+            }
+
+            value as u32
+        }
+        None => 10u32,
+    };
+    let converted = format_radix(value, base);
+    Ok(converted.into())
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct FormatInt;
@@ -27,14 +49,14 @@ impl Function for FormatInt {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
-        mut arguments: ArgumentList,
+        _state: &state::TypeState,
+        _ctx: &mut FunctionCompileContext,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
         let base = arguments.optional("base");
 
-        Ok(Box::new(FormatIntFn { value, base }))
+        Ok(FormatIntFn { value, base }.as_expr())
     }
 
     fn examples(&self) -> &'static [Example] {
@@ -46,12 +68,12 @@ impl Function for FormatInt {
                 result: Ok("\"42\""),
             },
             Example {
-                title: "format hexidecimal integer",
+                title: "format hexadecimal integer",
                 source: r#"format_int!(42, 16)"#,
                 result: Ok("2a"),
             },
             Example {
-                title: "format negative hexidecimal integer",
+                title: "format negative hexadecimal integer",
                 source: r#"format_int!(-42, 16)"#,
                 result: Ok("-2a"),
             },
@@ -65,34 +87,21 @@ struct FormatIntFn {
     base: Option<Box<dyn Expression>>,
 }
 
-impl Expression for FormatIntFn {
+impl FunctionExpression for FormatIntFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let value = self.value.resolve(ctx)?.try_integer()?;
-        let base = match &self.base {
-            Some(base) => base
-                .resolve(ctx)
-                .and_then(|value| value.try_integer().map_err(Into::into))
-                .and_then(|value| {
-                    if !(2..=36).contains(&value) {
-                        return Err(format!(
-                            "invalid base {}: must be be between 2 and 36 (inclusive)",
-                            value
-                        )
-                        .into());
-                    }
+        let value = self.value.resolve(ctx)?;
 
-                    Ok(value as u32)
-                }),
-            None => Ok(10u32),
-        }?;
+        let base = self
+            .base
+            .as_ref()
+            .map(|expr| expr.resolve(ctx))
+            .transpose()?;
 
-        let converted = format_radix(value, base as u32);
-
-        Ok(converted.into())
+        format_int(value, base)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new().fallible().integer()
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
+        TypeDef::integer().fallible()
     }
 }
 
@@ -109,8 +118,8 @@ fn format_radix(x: i64, radix: u32) -> String {
     };
 
     loop {
-        let m = (x % radix as u64) as u32; // max of 35
-        x /= radix as u64;
+        let m = (x % u64::from(radix)) as u32; // max of 35
+        x /= u64::from(radix);
 
         result.push_front(std::char::from_digit(m, radix).unwrap());
         if x == 0 {
@@ -135,19 +144,19 @@ mod tests {
         decimal {
             args: func_args![value: 42],
             want: Ok(value!("42")),
-            tdef: TypeDef::new().fallible().integer(),
+            tdef: TypeDef::integer().fallible(),
         }
 
         hexidecimal {
             args: func_args![value: 42, base: 16],
             want: Ok(value!("2a")),
-            tdef: TypeDef::new().fallible().integer(),
+            tdef: TypeDef::integer().fallible(),
         }
 
         negative_hexidecimal {
             args: func_args![value: -42, base: 16],
             want: Ok(value!("-2a")),
-            tdef: TypeDef::new().fallible().integer(),
+            tdef: TypeDef::integer().fallible(),
         }
     ];
 }

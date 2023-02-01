@@ -1,7 +1,18 @@
+use ::value::Value;
 use regex::Regex;
 use vrl::prelude::*;
 
 use crate::util;
+
+fn parse_regex(value: Value, numeric_groups: bool, pattern: &Regex) -> Resolved {
+    let bytes = value.try_bytes()?;
+    let value = String::from_utf8_lossy(&bytes);
+    let parsed = pattern
+        .captures(&value)
+        .map(|capture| util::capture_regex_to_map(pattern, &capture, numeric_groups))
+        .ok_or("could not find any pattern matches")?;
+    Ok(parsed.into())
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct ParseRegex;
@@ -33,9 +44,9 @@ impl Function for ParseRegex {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
-        mut arguments: ArgumentList,
+        _state: &state::TypeState,
+        _ctx: &mut FunctionCompileContext,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
         let pattern = arguments.required_regex("pattern")?;
@@ -43,11 +54,12 @@ impl Function for ParseRegex {
             .optional("numeric_groups")
             .unwrap_or_else(|| expr!(false));
 
-        Ok(Box::new(ParseRegexFn {
+        Ok(ParseRegexFn {
             value,
             pattern,
             numeric_groups,
-        }))
+        }
+        .as_expr())
     }
 
     fn examples(&self) -> &'static [Example] {
@@ -82,31 +94,25 @@ pub(crate) struct ParseRegexFn {
     numeric_groups: Box<dyn Expression>,
 }
 
-impl Expression for ParseRegexFn {
+impl FunctionExpression for ParseRegexFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let bytes = self.value.resolve(ctx)?.try_bytes()?;
-        let value = String::from_utf8_lossy(&bytes);
-        let numeric_groups = self.numeric_groups.resolve(ctx)?.try_boolean()?;
+        let value = self.value.resolve(ctx)?;
+        let numeric_groups = self.numeric_groups.resolve(ctx)?;
+        let pattern = &self.pattern;
 
-        let parsed = self
-            .pattern
-            .captures(&value)
-            .map(|capture| util::capture_regex_to_map(&self.pattern, capture, numeric_groups))
-            .ok_or("could not find any pattern matches")?;
-
-        Ok(parsed.into())
+        parse_regex(value, numeric_groups.try_boolean()?, pattern)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new()
-            .fallible()
-            .object(util::regex_type_def(&self.pattern))
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
+        TypeDef::object(util::regex_kind(&self.pattern)).fallible()
     }
 }
 
 #[cfg(test)]
 #[allow(clippy::trivial_regex)]
 mod tests {
+    use vector_common::btreemap;
+
     use super::*;
 
     test_function![
@@ -137,27 +143,25 @@ mod tests {
                              "7": "201",
                              "8": "20574",
             })),
-            tdef: TypeDef::new()
-                .fallible()
-                .object::<&str, Kind>(map! {
-                    "bytes_in": Kind::Bytes,
-                    "host": Kind::Bytes,
-                    "user": Kind::Bytes,
-                    "timestamp": Kind::Bytes,
-                    "method": Kind::Bytes,
-                    "path": Kind::Bytes,
-                    "status": Kind::Bytes,
-                    "bytes_out": Kind::Bytes,
-                    "0": Kind::Bytes | Kind::Null,
-                    "1": Kind::Bytes | Kind::Null,
-                    "2": Kind::Bytes | Kind::Null,
-                    "3": Kind::Bytes | Kind::Null,
-                    "4": Kind::Bytes | Kind::Null,
-                    "5": Kind::Bytes | Kind::Null,
-                    "6": Kind::Bytes | Kind::Null,
-                    "7": Kind::Bytes | Kind::Null,
-                    "8": Kind::Bytes | Kind::Null,
-                }),
+            tdef: TypeDef::object(btreemap! {
+                    Field::from("bytes_in") => Kind::bytes(),
+                    Field::from("host") => Kind::bytes(),
+                    Field::from("user") => Kind::bytes(),
+                    Field::from("timestamp") => Kind::bytes(),
+                    Field::from("method") => Kind::bytes(),
+                    Field::from("path") => Kind::bytes(),
+                    Field::from("status") => Kind::bytes(),
+                    Field::from("bytes_out") => Kind::bytes(),
+                    Field::from("0") => Kind::bytes() | Kind::null(),
+                    Field::from("1") => Kind::bytes() | Kind::null(),
+                    Field::from("2") => Kind::bytes() | Kind::null(),
+                    Field::from("3") => Kind::bytes() | Kind::null(),
+                    Field::from("4") => Kind::bytes() | Kind::null(),
+                    Field::from("5") => Kind::bytes() | Kind::null(),
+                    Field::from("6") => Kind::bytes() | Kind::null(),
+                    Field::from("7") => Kind::bytes() | Kind::null(),
+                    Field::from("8") => Kind::bytes() | Kind::null(),
+                }).fallible(),
         }
 
         single_match {
@@ -166,13 +170,11 @@ mod tests {
                 pattern: Regex::new(r#"(?P<number>.*?) group"#).unwrap()
             ],
             want: Ok(value!({"number": "first"})),
-            tdef: TypeDef::new()
-                .fallible()
-                .object::<&str, Kind>(map! {
-                        "number": Kind::Bytes,
-                        "0": Kind::Bytes | Kind::Null,
-                        "1": Kind::Bytes | Kind::Null,
-                }),
+            tdef: TypeDef::object(btreemap! {
+                        Field::from("number") => Kind::bytes(),
+                        Field::from("0") => Kind::bytes() | Kind::null(),
+                        Field::from("1") => Kind::bytes() | Kind::null(),
+                }).fallible(),
         }
 
         no_match {
@@ -182,27 +184,25 @@ mod tests {
                             .unwrap()
             ],
             want: Err("could not find any pattern matches"),
-            tdef: TypeDef::new()
-                .fallible()
-                .object::<&str, Kind>(map! {
-                    "host": Kind::Bytes,
-                    "user": Kind::Bytes,
-                    "bytes_in": Kind::Bytes,
-                    "timestamp": Kind::Bytes,
-                    "method": Kind::Bytes,
-                    "path": Kind::Bytes,
-                    "status": Kind::Bytes,
-                    "bytes_out": Kind::Bytes,
-                    "0": Kind::Bytes | Kind::Null,
-                    "1": Kind::Bytes | Kind::Null,
-                    "2": Kind::Bytes | Kind::Null,
-                    "3": Kind::Bytes | Kind::Null,
-                    "4": Kind::Bytes | Kind::Null,
-                    "5": Kind::Bytes | Kind::Null,
-                    "6": Kind::Bytes | Kind::Null,
-                    "7": Kind::Bytes | Kind::Null,
-                    "8": Kind::Bytes | Kind::Null,
-                }),
+            tdef: TypeDef::object(btreemap! {
+                    Field::from("host") => Kind::bytes(),
+                    Field::from("user") => Kind::bytes(),
+                    Field::from("bytes_in") => Kind::bytes(),
+                    Field::from("timestamp") => Kind::bytes(),
+                    Field::from("method") => Kind::bytes(),
+                    Field::from("path") => Kind::bytes(),
+                    Field::from("status") => Kind::bytes(),
+                    Field::from("bytes_out") => Kind::bytes(),
+                    Field::from("0") => Kind::bytes() | Kind::null(),
+                    Field::from("1") => Kind::bytes() | Kind::null(),
+                    Field::from("2") => Kind::bytes() | Kind::null(),
+                    Field::from("3") => Kind::bytes() | Kind::null(),
+                    Field::from("4") => Kind::bytes() | Kind::null(),
+                    Field::from("5") => Kind::bytes() | Kind::null(),
+                    Field::from("6") => Kind::bytes() | Kind::null(),
+                    Field::from("7") => Kind::bytes() | Kind::null(),
+                    Field::from("8") => Kind::bytes() | Kind::null(),
+                }).fallible(),
         }
     ];
 }

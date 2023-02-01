@@ -1,10 +1,14 @@
 //! Manage namespaces.
 
+use std::{
+    collections::BTreeMap,
+    process::{Command, Stdio},
+};
+
+use k8s_openapi::{api::core::v1::Namespace, apimachinery::pkg::apis::meta::v1::ObjectMeta};
+
 use super::{resource_file::ResourceFile, Result};
 use crate::up_down;
-use k8s_openapi::{api::core::v1::Namespace, apimachinery::pkg::apis::meta::v1::ObjectMeta};
-use std::collections::BTreeMap;
-use std::process::{Command, Stdio};
 
 /// A config that holds a test `Namespace` resource file.
 #[derive(Debug)]
@@ -43,7 +47,7 @@ impl up_down::CommandBuilder for CommandBuilder {
                 up_down::CommandToBuild::Down => "delete",
             })
             .arg("--filename")
-            .arg(&self.config.test_namespace_resource_file.path());
+            .arg(self.config.test_namespace_resource_file.path());
 
         if matches!(command_to_build, up_down::CommandToBuild::Down) {
             // We don't need a graceful shutdown

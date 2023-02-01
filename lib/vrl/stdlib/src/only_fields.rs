@@ -20,20 +20,20 @@ impl Function for OnlyFields {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _state: &state::TypeState,
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let mut paths = vec![];
         paths.push(arguments.required_path("1")?);
 
         for i in 2..=16 {
-            if let Some(path) = arguments.optional_path(&format!("{}", i))? {
+            if let Some(path) = arguments.optional_path(&i.to_string())? {
                 paths.push(path)
             }
         }
 
-        Ok(Box::new(OnlyFieldsFn { paths }))
+        Ok(OnlyFieldsFn { paths }.as_expr())
     }
 }
 
@@ -42,7 +42,7 @@ pub struct OnlyFieldsFn {
     paths: Vec<Path>,
 }
 
-impl Expression for OnlyFieldsFn {
+impl FunctionExpression for OnlyFieldsFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let paths = self.paths.iter().map(Path::to_string).collect::<Vec<_>>();
 
@@ -56,10 +56,10 @@ impl Expression for OnlyFieldsFn {
         Ok(Value::Null)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         TypeDef {
             fallible: true,
-            kind: value::Kind::Null,
+            kind: value::Kind::null(),
             ..Default::default()
         }
     }
@@ -75,7 +75,7 @@ mod tests {
         },
         def: TypeDef {
             fallible: true,
-            kind: value::Kind::Null,
+            kind: value::Kind::null(),
             ..Default::default()
         },
     }];

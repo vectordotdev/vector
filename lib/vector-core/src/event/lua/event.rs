@@ -1,13 +1,34 @@
-use crate::event::{Event, LogEvent, Metric};
 use mlua::prelude::*;
 
-impl<'a> ToLua<'a> for Event {
+use crate::event::lua::metric::LuaMetric;
+use crate::event::{Event, LogEvent, Metric};
+
+pub struct LuaEvent {
+    pub event: Event,
+    pub metric_multi_value_tags: bool,
+}
+
+impl<'a> ToLua<'a> for LuaEvent {
     #![allow(clippy::wrong_self_convention)] // this trait is defined by mlua
     fn to_lua(self, lua: &'a Lua) -> LuaResult<LuaValue> {
         let table = lua.create_table()?;
-        match self {
+        match self.event {
             Event::Log(log) => table.raw_set("log", log.to_lua(lua)?)?,
-            Event::Metric(metric) => table.raw_set("metric", metric.to_lua(lua)?)?,
+            Event::Metric(metric) => table.raw_set(
+                "metric",
+                LuaMetric {
+                    metric,
+                    multi_value_tags: self.metric_multi_value_tags,
+                }
+                .to_lua(lua)?,
+            )?,
+            Event::Trace(_) => {
+                return Err(LuaError::ToLuaConversionError {
+                    from: "Event",
+                    to: "table",
+                    message: Some("Trace are not supported".to_string()),
+                })
+            }
         }
         Ok(LuaValue::Table(table))
     }
@@ -55,7 +76,15 @@ mod test {
 
     fn assert_event(event: Event, assertions: Vec<&'static str>) {
         let lua = Lua::new();
-        lua.globals().set("event", event).unwrap();
+        lua.globals()
+            .set(
+                "event",
+                LuaEvent {
+                    event,
+                    metric_multi_value_tags: false,
+                },
+            )
+            .unwrap();
         for assertion in assertions {
             assert!(
                 lua.load(assertion).eval::<bool>().expect(assertion),
@@ -67,8 +96,8 @@ mod test {
 
     #[test]
     fn to_lua_log() {
-        let mut event = Event::new_empty_log();
-        event.as_mut_log().insert("field", "value");
+        let mut event = LogEvent::default();
+        event.insert("field", "value");
 
         let assertions = vec![
             "type(event) == 'table'",
@@ -77,7 +106,7 @@ mod test {
             "event.log.field == 'value'",
         ];
 
-        assert_event(event, assertions);
+        assert_event(event.into(), assertions);
     }
 
     #[test]
@@ -139,7 +168,7 @@ mod test {
         ));
 
         let event = Lua::new().load(lua_event).eval::<Event>().unwrap();
-        shared::assert_event_data_eq!(event, expected);
+        vector_common::assert_event_data_eq!(event, expected);
     }
 
     #[test]

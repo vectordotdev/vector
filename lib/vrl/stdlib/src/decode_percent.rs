@@ -1,6 +1,15 @@
+use ::value::Value;
+use percent_encoding::percent_decode;
+use vrl::prelude::expression::FunctionExpression;
 use vrl::prelude::*;
 
-use percent_encoding::percent_decode;
+fn decode_percent(value: Value) -> Resolved {
+    let value = value.try_bytes()?;
+    Ok(percent_decode(&value)
+        .decode_utf8_lossy()
+        .to_string()
+        .into())
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct DecodePercent;
@@ -20,13 +29,13 @@ impl Function for DecodePercent {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
-        mut arguments: ArgumentList,
+        _state: &state::TypeState,
+        _ctx: &mut FunctionCompileContext,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
 
-        Ok(Box::new(DecodePercentFn { value }))
+        Ok(DecodePercentFn { value }.as_expr())
     }
 
     fn examples(&self) -> &'static [Example] {
@@ -43,18 +52,15 @@ struct DecodePercentFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for DecodePercentFn {
+impl FunctionExpression for DecodePercentFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let value = self.value.resolve(ctx)?.try_bytes()?;
+        let value = self.value.resolve(ctx)?;
 
-        Ok(percent_decode(&value)
-            .decode_utf8_lossy()
-            .to_string()
-            .into())
+        decode_percent(value)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new().bytes().infallible()
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
+        TypeDef::bytes().infallible()
     }
 }
 
@@ -68,7 +74,7 @@ mod test {
         decode {
             args: func_args![value: value!("foo%20%23%22%3C%3E%3F%60%7B%7D%2F%3A%3B%3D%40%5B%5C%5D%5E%7C%24%25%26%2B%2C%21%27%28%29%7Ebar")],
             want: Ok(value!(r#"foo #"<>?`{}/:;=@[\]^|$%&+,!'()~bar"#)),
-            tdef: TypeDef::new().bytes().infallible(),
+            tdef: TypeDef::bytes().infallible(),
         }
     ];
 }

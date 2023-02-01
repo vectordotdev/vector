@@ -1,22 +1,21 @@
-use super::{controller::Controller, future::ResponseFuture, AdaptiveConcurrencySettings};
-use crate::sinks::util::retries::RetryLogic;
-
-use tower::Service;
-
-use futures::{future::BoxFuture, ready};
 use std::{
     fmt,
     future::Future,
     mem,
     sync::Arc,
-    task::{Context, Poll},
+    task::{ready, Context, Poll},
 };
+
+use futures::future::BoxFuture;
 use tokio::sync::OwnedSemaphorePermit;
+use tower::{load::Load, Service};
+
+use super::{controller::Controller, future::ResponseFuture, AdaptiveConcurrencySettings};
+use crate::sinks::util::retries::RetryLogic;
 
 /// Enforces a limit on the concurrent number of requests the underlying
 /// service can handle. Automatically expands and contracts the actual
 /// concurrency limit depending on observed request response behavior.
-#[derive(Debug)]
 pub struct AdaptiveConcurrencyLimit<S, L> {
     inner: S,
     pub(super) controller: Arc<Controller<L>>,
@@ -87,6 +86,14 @@ where
     }
 }
 
+impl<S, L> Load for AdaptiveConcurrencyLimit<S, L> {
+    type Metric = f64;
+
+    fn load(&self) -> Self::Metric {
+        self.controller.load()
+    }
+}
+
 impl<S, L> Clone for AdaptiveConcurrencyLimit<S, L>
 where
     S: Clone,
@@ -116,17 +123,12 @@ impl fmt::Debug for State {
 
 #[cfg(test)]
 mod tests {
-    use super::super::{
-        controller::{ControllerStatistics, Inner},
-        AdaptiveConcurrencyLimitLayer,
-    };
-    use super::*;
-    use crate::assert_downcast_matches;
-    use snafu::Snafu;
     use std::{
         sync::{Mutex, MutexGuard},
         time::Duration,
     };
+
+    use snafu::Snafu;
     use tokio::time::{advance, pause};
     use tokio_test::{assert_pending, assert_ready_ok};
     use tower_test::{
@@ -135,6 +137,15 @@ mod tests {
             self, future::ResponseFuture as MockResponseFuture, Handle, Mock, SendResponse, Spawn,
         },
     };
+
+    use super::{
+        super::{
+            controller::{ControllerStatistics, Inner},
+            AdaptiveConcurrencyLimitLayer,
+        },
+        *,
+    };
+    use crate::assert_downcast_matches;
 
     #[derive(Clone, Copy, Debug, Snafu)]
     enum TestError {

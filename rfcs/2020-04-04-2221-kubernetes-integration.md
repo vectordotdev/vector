@@ -407,7 +407,7 @@ Everything we need to do to achieve this is outlined at the
 [The Chart Repository Guide].
 
 We can use a tool like [ChartMuseum] to manage our repo. Alternatively, we can
-use a bare HTTP server, like AWS S3 or Github Pages.
+use a bare HTTP server, like AWS S3 or GitHub Pages.
 [ChartMuseum] has the benefit of doing some things for us. It can use S3 for
 storage, and offers a convenient [helm plugin][helm_push] to release charts, so
 the release process should be very simple.
@@ -1093,7 +1093,7 @@ This is a very controversial question.
 
 Currently we have:
 
-- the Vector repo (with the Github Actions based CI flow)
+- the Vector repo (with the GitHub Actions based CI flow)
 - the test harness (also integrated with CI, but this is it's own thing)
 
 We don't necessarily have to choose one of those places: we can add a new
@@ -1193,7 +1193,7 @@ environment - like CNI driver, underlying network topology and so on - to
 understand the conditions we're testing. Reliability tests also require
 more careful designing the test environment.
 For this reason, the initial Kubernetes integration only focuses on correctness
-tests. Once we get som experience with correctness test we can expand our test
+tests. Once we get some experience with correctness test we can expand our test
 suite with tests from other categories.
 
 It is important that we do actually test correctness on all the configurations -
@@ -1309,7 +1309,7 @@ whatsoever, it's possible to just deploy Vector as a
 
 While nothing prevents users from manually configuring Vector for gathering data
 from the host OS, it's very hard for us to offer sane defaults that would work
-out-of-the-box for all clusters, since there's a miriad of configurations.
+out-of-the-box for all clusters, since there's a myriad of configurations.
 
 We can consider offering some kind of user-selectable presets for well known
 popular setups - like AWS and CGP.
@@ -1490,7 +1490,7 @@ We should also consider integrating with tools like [Vault] and [redoctober].
 - Suggest setting up proper RBAC rules for cluster operators and users;
   [`audit2rbac`](https://github.com/liggitt/audit2rbac) is a useful tool to
   help with this.
-- Suggest using [Pod Security Policies][k8s_docs_pod_security_policiy]
+- Suggest using [Pod Security Policies][k8s_docs_pod_security_policy]
   ([API][k8s_api_pod_security_policy]).
 - Suggest using [NetworkPolicy][k8s_api_network_policy].
 - Suggest running [kube-bench].
@@ -1578,18 +1578,18 @@ See [motivation](#motivation).
     - Ensure we are testing all supported minor versions. See
       [issue#2223].
   - Run `make test-integration-kubernetes` against AWS' EKS platform in
-    Vector's Github actions.
+    Vector's GitHub actions.
 - Finalize the `kubernetes` source.
   - Audit the code and ensure the base is high-quality and correct.
-  - Merge in the `kubernetes_pod_matadata` transform.
+  - Merge in the `kubernetes_pod_metadata` transform.
   - Implement origin filtering.
   - Merge split logs [pr#2134].
   - Use the `log_schema.kubernetes_key` setting for context fields.
     See [issue#1867].
 - Add `kubernetes` source reference documentation.
-- Prepare Heml Chart.
+- Prepare Helm Chart.
 - Prepare YAML deployment config.
-- Prepare Heml Chart Repository.
+- Prepare Helm Chart Repository.
 - Integrate kubernetes configuration snapshotting into the release process.
 - Add Kubernetes setup/integration guide.
 - Release `0.10.0` and announce.
@@ -1639,18 +1639,18 @@ See [motivation](#motivation).
 [helm_push]: https://github.com/chartmuseum/helm-push
 [honeycomb integration]: https://docs.honeycomb.io/getting-data-in/integrations/kubernetes/
 [influx helm charts]: https://github.com/influxdata/helm-charts
-[issue#1293]: https://github.com/timberio/vector/issues/1293
-[issue#1635]: https://github.com/timberio/vector/issues/1635
-[issue#1816]: https://github.com/timberio/vector/issues/1867
-[issue#1867]: https://github.com/timberio/vector/issues/1867
-[issue#2170]: https://github.com/timberio/vector/issues/2170
-[issue#2171]: https://github.com/timberio/vector/issues/2171
-[issue#2193]: https://github.com/timberio/vector/issues/2193
-[issue#2216]: https://github.com/timberio/vector/issues/2216
-[issue#2218]: https://github.com/timberio/vector/issues/2218
-[issue#2223]: https://github.com/timberio/vector/issues/2223
-[issue#2224]: https://github.com/timberio/vector/issues/2224
-[issue#2225]: https://github.com/timberio/vector/issues/2225
+[issue#1293]: https://github.com/vectordotdev/vector/issues/1293
+[issue#1635]: https://github.com/vectordotdev/vector/issues/1635
+[issue#1816]: https://github.com/vectordotdev/vector/issues/1867
+[issue#1867]: https://github.com/vectordotdev/vector/issues/1867
+[issue#2170]: https://github.com/vectordotdev/vector/issues/2170
+[issue#2171]: https://github.com/vectordotdev/vector/issues/2171
+[issue#2193]: https://github.com/vectordotdev/vector/issues/2193
+[issue#2216]: https://github.com/vectordotdev/vector/issues/2216
+[issue#2218]: https://github.com/vectordotdev/vector/issues/2218
+[issue#2223]: https://github.com/vectordotdev/vector/issues/2223
+[issue#2224]: https://github.com/vectordotdev/vector/issues/2224
+[issue#2225]: https://github.com/vectordotdev/vector/issues/2225
 [json file logging driver]: https://docs.docker.com/config/containers/logging/json-file/
 [jsonlines]: http://jsonlines.org/
 [k8s_api_capabilities]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#capabilities-v1-core
@@ -1693,7 +1693,7 @@ See [motivation](#motivation).
 [k8s_docs_operator]: https://kubernetes.io/docs/concepts/extend-kubernetes/operator/
 [k8s_docs_persistent_volumes]: https://kubernetes.io/docs/concepts/storage/persistent-volumes
 [k8s_docs_pod_lifecycle_container_probes]: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes
-[k8s_docs_pod_security_policiy]: https://kubernetes.io/docs/concepts/policy/pod-security-policy/
+[k8s_docs_pod_security_policy]: https://kubernetes.io/docs/concepts/policy/pod-security-policy/
 [k8s_docs_pod]: https://kubernetes.io/docs/concepts/workloads/pods/pod/
 [k8s_docs_priority_class]: https://kubernetes.io/docs/concepts/configuration/pod-priority-preemption/#priorityclass
 [k8s_docs_rbac]: https://kubernetes.io/docs/reference/access-authn-authz/rbac/
@@ -1709,15 +1709,15 @@ See [motivation](#motivation).
 [kube-bench]: https://github.com/aquasecurity/kube-bench
 [kubectl_rollout_restart]: https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#-em-restart-em-
 [kubernetes version and version skew support policy]: https://kubernetes.io/docs/setup/release/version-skew-policy/
-[kubernetes_version_comment]: https://github.com/timberio/vector/pull/2188#discussion_r403120481
+[kubernetes_version_comment]: https://github.com/vectordotdev/vector/pull/2188#discussion_r403120481
 [kustomize]: https://github.com/kubernetes-sigs/kustomize
 [logdna k8s integration]: https://docs.logdna.com/docs/kubernetes
 [logdna_daemonset]: https://raw.githubusercontent.com/logdna/logdna-agent/master/logdna-agent-ds.yaml
 [man_7_capabilities]: https://man7.org/linux/man-pages/man7/capabilities.7.html
 [metrics-server]: https://github.com/kubernetes-sigs/metrics-server
 [netdata]: https://github.com/netdata/netdata
-[pr#2134]: https://github.com/timberio/vector/pull/2134
-[pr#2188]: https://github.com/timberio/vector/pull/2188
+[pr#2134]: https://github.com/vectordotdev/vector/pull/2134
+[pr#2188]: https://github.com/vectordotdev/vector/pull/2188
 [prometheus_kubernetes_sd_config]: https://prometheus.io/docs/prometheus/latest/configuration/configuration/#kubernetes_sd_config
 [redoctober]: https://github.com/cloudflare/redoctober
 [sidecar_container]: https://github.com/kubernetes/enhancements/blob/a8262db2ce38b2ec7941bdb6810a8d81c5141447/keps/sig-apps/sidecarcontainers.md
@@ -1725,5 +1725,5 @@ See [motivation](#motivation).
 [the chart repository guide]: https://helm.sh/docs/topics/chart_repository/
 [vault]: https://www.vaultproject.io/
 [vector_daemonset]: 2020-04-04-2221-kubernetes-integration/vector-daemonset.yaml
-[why_so_much_configurations]: https://github.com/timberio/vector/pull/2134/files#r401634895
+[why_so_much_configurations]: https://github.com/vectordotdev/vector/pull/2134/files#r401634895
 [windows_in_kubernetes]: https://kubernetes.io/docs/setup/production-environment/windows/intro-windows-in-kubernetes/

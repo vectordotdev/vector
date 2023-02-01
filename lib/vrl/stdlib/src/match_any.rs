@@ -1,5 +1,11 @@
+use ::value::Value;
 use regex::bytes::RegexSet;
 use vrl::prelude::*;
+
+fn match_any(value: Value, pattern: &RegexSet) -> Resolved {
+    let bytes = value.try_bytes()?;
+    Ok(pattern.is_match(&bytes).into())
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct MatchAny;
@@ -41,9 +47,9 @@ impl Function for MatchAny {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
-        mut arguments: ArgumentList,
+        _state: &state::TypeState,
+        _ctx: &mut FunctionCompileContext,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
         let patterns = arguments.required_array("patterns")?;
@@ -59,13 +65,13 @@ impl Function for MatchAny {
 
             let re = value
                 .try_regex()
-                .map_err(|e| Box::new(e) as Box<dyn DiagnosticError>)?;
+                .map_err(|e| Box::new(e) as Box<dyn DiagnosticMessage>)?;
             re_strings.push(re.to_string());
         }
 
         let regex_set = RegexSet::new(re_strings).expect("regex were already valid");
 
-        Ok(Box::new(MatchAnyFn { value, regex_set }))
+        Ok(MatchAnyFn { value, regex_set }.as_expr())
     }
 }
 
@@ -75,24 +81,23 @@ struct MatchAnyFn {
     regex_set: RegexSet,
 }
 
-impl Expression for MatchAnyFn {
+impl FunctionExpression for MatchAnyFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
-        let bytes = value.try_bytes()?;
-
-        Ok(self.regex_set.is_match(&bytes).into())
+        match_any(value, &self.regex_set)
     }
 
-    fn type_def(&self, _state: &state::Compiler) -> TypeDef {
-        TypeDef::new().infallible().boolean()
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
+        TypeDef::boolean().infallible()
     }
 }
 
 #[cfg(test)]
 #[allow(clippy::trivial_regex)]
 mod tests {
-    use super::*;
     use regex::Regex;
+
+    use super::*;
 
     test_function![
         r#match_any => MatchAny;
@@ -105,7 +110,7 @@ mod tests {
                                  Value::Regex(Regex::new("baz").unwrap().into()),
                              ])],
             want: Ok(value!(true)),
-            tdef: TypeDef::new().infallible().boolean(),
+            tdef: TypeDef::boolean().infallible(),
         }
 
         no {
@@ -115,7 +120,7 @@ mod tests {
                                  Value::Regex(Regex::new("foobar").unwrap().into()),
                              ])],
             want: Ok(value!(false)),
-            tdef: TypeDef::new().infallible().boolean(),
+            tdef: TypeDef::boolean().infallible(),
         }
     ];
 }

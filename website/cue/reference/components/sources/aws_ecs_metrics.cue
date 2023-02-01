@@ -18,6 +18,8 @@ components: sources: aws_ecs_metrics: {
 	}
 
 	features: {
+		auto_generated:   true
+		acknowledgements: false
 		collect: {
 			checkpoint: enabled: false
 			from: {
@@ -40,16 +42,6 @@ components: sources: aws_ecs_metrics: {
 	}
 
 	support: {
-		targets: {
-			"aarch64-unknown-linux-gnu":      true
-			"aarch64-unknown-linux-musl":     true
-			"armv7-unknown-linux-gnueabihf":  true
-			"armv7-unknown-linux-musleabihf": true
-			"x86_64-apple-darwin":            true
-			"x86_64-pc-windows-msv":          true
-			"x86_64-unknown-linux-gnu":       true
-			"x86_64-unknown-linux-musl":      true
-		}
 		requirements: []
 		warnings: []
 		notices: []
@@ -59,58 +51,7 @@ components: sources: aws_ecs_metrics: {
 		platform_name: null
 	}
 
-	configuration: {
-		endpoint: {
-			description: """
-				Base URI of the task metadata endpoint.
-				If empty, the URI will be automatically discovered based on the latest version detected.
-				The version 2 endpoint base URI is `169.254.170.2/v2/`.
-				The version 3 endpoint base URI is stored in the environment variable `ECS_CONTAINER_METADATA_URI`.
-				The version 4 endpoint base URI is stored in the environment variable `ECS_CONTAINER_METADATA_URI_V4`.
-				"""
-			common:   false
-			required: false
-			type: string: {
-				default: "${ECS_CONTAINER_METADATA_URI_V4}"
-				syntax:  "literal"
-			}
-		}
-		namespace: {
-			description: "The namespace of the metric. Disabled if empty."
-			common:      true
-			required:    false
-			type: string: {
-				default: "awsecs"
-				syntax:  "literal"
-			}
-		}
-		scrape_interval_secs: {
-			description: "The interval between scrapes, in seconds."
-			common:      true
-			required:    false
-			type: uint: {
-				default: 15
-				unit:    "seconds"
-			}
-		}
-		version: {
-			description: """
-				The version of the metadata endpoint. If empty, the version is automatically discovered based on
-				environment variables.
-				"""
-			common:   false
-			required: false
-			type: string: {
-				default: "v4"
-				enum: {
-					v4: "When the environment variable `ECS_CONTAINER_METADATA_URI_V4` is defined."
-					v3: "When the v4 check fails but the environment variable `ECS_CONTAINER_METADATA_URI` is defined."
-					v2: "When the v4 and v3 checks fail."
-				}
-				syntax: "literal"
-			}
-		}
-	}
+	configuration: base.components.sources.aws_ecs_metrics.configuration
 
 	output: metrics: {
 		_awsecs: {
@@ -244,14 +185,20 @@ components: sources: aws_ecs_metrics: {
 	}
 
 	telemetry: metrics: {
-		events_in_total:                 components.sources.internal_metrics.output.metrics.events_in_total
-		http_error_response_total:       components.sources.internal_metrics.output.metrics.http_error_response_total
-		http_request_errors_total:       components.sources.internal_metrics.output.metrics.http_request_errors_total
-		parse_errors_total:              components.sources.internal_metrics.output.metrics.parse_errors_total
-		processed_bytes_total:           components.sources.internal_metrics.output.metrics.processed_bytes_total
-		processed_events_total:          components.sources.internal_metrics.output.metrics.processed_events_total
-		component_received_events_total: components.sources.internal_metrics.output.metrics.component_received_events_total
-		requests_completed_total:        components.sources.internal_metrics.output.metrics.requests_completed_total
-		request_duration_seconds:        components.sources.internal_metrics.output.metrics.request_duration_seconds
+		component_discarded_events_total:     components.sources.internal_metrics.output.metrics.component_discarded_events_total
+		component_errors_total:               components.sources.internal_metrics.output.metrics.component_errors_total
+		component_received_bytes_total:       components.sources.internal_metrics.output.metrics.component_received_bytes_total
+		component_received_events_total:      components.sources.internal_metrics.output.metrics.component_received_events_total
+		component_received_event_bytes_total: components.sources.internal_metrics.output.metrics.component_received_event_bytes_total
+		component_sent_events_total:          components.sources.internal_metrics.output.metrics.component_sent_events_total
+		component_sent_event_bytes_total:     components.sources.internal_metrics.output.metrics.component_sent_event_bytes_total
+		events_in_total:                      components.sources.internal_metrics.output.metrics.events_in_total
+		http_error_response_total:            components.sources.internal_metrics.output.metrics.http_error_response_total
+		http_request_errors_total:            components.sources.internal_metrics.output.metrics.http_request_errors_total
+		parse_errors_total:                   components.sources.internal_metrics.output.metrics.parse_errors_total
+		processed_bytes_total:                components.sources.internal_metrics.output.metrics.processed_bytes_total
+		processed_events_total:               components.sources.internal_metrics.output.metrics.processed_events_total
+		requests_completed_total:             components.sources.internal_metrics.output.metrics.requests_completed_total
+		request_duration_seconds:             components.sources.internal_metrics.output.metrics.request_duration_seconds
 	}
 }

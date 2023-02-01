@@ -34,7 +34,6 @@ is_kubectl_context_kind() {
   return 1
 }
 
-
 # Whether to use `minikube cache` to pass image to the k8s cluster.
 # After we build vector docker image, instead of pushing to the remote repo,
 # we'll be using `minikube cache` to make image available to the cluster.
@@ -79,7 +78,7 @@ if [[ -z "${CONTAINER_IMAGE:-}" ]]; then
     CONTAINER_IMAGE_REPO="${CONTAINER_IMAGE_REPO:-"localhost/vector-test"}"
   else
     # If not using `minikube cache`, it's mandatory to have a push access to the
-    # repo, so we don't offer a default value and explicilty require the user to
+    # repo, so we don't offer a default value and explicitly require the user to
     # specify a `CONTAINER_IMAGE_REPO`.
     CONTAINER_IMAGE_REPO="${CONTAINER_IMAGE_REPO:?"You have to specify CONTAINER_IMAGE_REPO to upload the test image to."}"
   fi
@@ -88,9 +87,6 @@ if [[ -z "${CONTAINER_IMAGE:-}" ]]; then
   TEST_RUN_ID="${TEST_RUN_ID:-"$(date +%s)-$(random-string)"}"
 
   if [[ "${QUICK_BUILD:-"false"}" == "true" ]]; then
-    # Build in debug mode.
-    cargo build
-
     # Prepare test image parameters.
     VERSION_TAG="test-$TEST_RUN_ID"
 
@@ -98,8 +94,7 @@ if [[ -z "${CONTAINER_IMAGE:-}" ]]; then
     CONTAINER_IMAGE="$CONTAINER_IMAGE_REPO:$VERSION_TAG-debug"
 
     # Build docker image.
-    scripts/skaffold-dockerignore.sh
-    docker build --tag "$CONTAINER_IMAGE" -f skaffold/docker/Dockerfile target/debug
+    docker build --build-arg RUST_VERSION="${RUST_VERSION}" --tag "$CONTAINER_IMAGE" -f tilt/Dockerfile .
   else
     # Package a .deb file to build a docker container, unless skipped.
     if [[ -z "${SKIP_PACKAGE_DEB:-}" ]]; then
@@ -110,7 +105,7 @@ if [[ -z "${CONTAINER_IMAGE:-}" ]]; then
     VERSION_TAG="test-$TEST_RUN_ID"
     BASE_TAG="debian"
 
-    # Build docker image with Vector - the same way it's done for releses. Don't
+    # Build docker image with Vector - the same way it's done for releases. Don't
     # do the push - we'll handle it later.
     REPO="$CONTAINER_IMAGE_REPO" \
       CHANNEL="test" \

@@ -119,7 +119,7 @@ Differences are:
 
 The `LogEvent` API implements a pseudo- `Flatmap` API. It uses special `PathIter` types to parse `String` or `Atom` keys provided to the APIs (`get`, `insert`, etc).
 
-The `Atom` type is deprecated, please use `String` and adapt any `Atom` usages to `String` where possible. See [#1891](https://github.com/timberio/vector/pull/1891).
+The `Atom` type is deprecated, please use `String` and adapt any `Atom` usages to `String` where possible. See [#1891](https://github.com/vectordotdev/vector/pull/1891).
 
 The current `LogEvent` API is as follows *(documentation, if it exists, is included)*:
 
@@ -176,7 +176,7 @@ Enum, must be one of: "bool" "float" "int" "string" "timestamp", "bytes"
 
 ## Prior Art
 
-In the [WASM transform](https://github.com/timberio/vector/pull/2006/files) our demo POC was using protobufs, which by their nature are not always UTF-8. We had to patch Vector to support Bytes during this time. It currently does so via a fallback when non-UTF-8 bytes are found.
+In the [WASM transform](https://github.com/vectordotdev/vector/pull/2006/files) our demo POC was using protobufs, which by their nature are not always UTF-8. We had to patch Vector to support Bytes during this time. It currently does so via a fallback when non-UTF-8 bytes are found.
 
 ## Sales Pitch
 

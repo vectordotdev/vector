@@ -1,5 +1,6 @@
-use crate::parse_key_value::{ParseKeyValueFn, Whitespace};
 use vrl::prelude::*;
+
+use crate::parse_key_value::{ParseKeyValueFn, Whitespace};
 
 #[derive(Clone, Copy, Debug)]
 pub struct ParseLogFmt;
@@ -34,9 +35,9 @@ impl Function for ParseLogFmt {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
-        mut arguments: ArgumentList,
+        _state: &state::TypeState,
+        _ctx: &mut FunctionCompileContext,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
 
@@ -47,12 +48,13 @@ impl Function for ParseLogFmt {
         let whitespace = Whitespace::Lenient;
         let standalone_key = expr!(true);
 
-        Ok(Box::new(ParseKeyValueFn {
+        Ok(ParseKeyValueFn {
             value,
             key_value_delimiter,
             field_delimiter,
             whitespace,
             standalone_key,
-        }))
+        }
+        .as_expr())
     }
 }

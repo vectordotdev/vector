@@ -29,79 +29,12 @@ components: transforms: "remap": {
 	}
 
 	support: {
-		targets: {
-			"aarch64-unknown-linux-gnu":      true
-			"aarch64-unknown-linux-musl":     true
-			"armv7-unknown-linux-gnueabihf":  true
-			"armv7-unknown-linux-musleabihf": true
-			"x86_64-apple-darwin":            true
-			"x86_64-pc-windows-msv":          true
-			"x86_64-unknown-linux-gnu":       true
-			"x86_64-unknown-linux-musl":      true
-		}
 		requirements: []
 		warnings: []
 		notices: []
 	}
 
-	configuration: {
-		source: {
-			description: """
-				The [Vector Remap Language](\(urls.vrl_reference)) (VRL) program to execute for each event.
-
-				Required if `file` is missing.
-				"""
-			common:      true
-			required:    false
-			type: string: {
-				examples: [
-					"""
-						. = parse_json!(.message)
-						.new_field = "new value"
-						.status = to_int!(.status)
-						.duration = parse_duration!(.duration, "s")
-						.new_name = del(.old_name)
-						""",
-				]
-				syntax:  "remap_program"
-				default: null
-			}
-		}
-		file: {
-			description: """
-				File path to the [Vector Remap Language](\(urls.vrl_reference)) (VRL) program to execute for each event.
-
-				If a relative path is provided, its root is the current working directory.
-
-				Required if `source` is missing.
-				"""
-			common:      true
-			required:    false
-			type: string: {
-				examples: [
-					"./my/program.vrl",
-				]
-				syntax:  "literal"
-				default: null
-			}
-		}
-		drop_on_error: {
-			common:   false
-			required: false
-			description: """
-				Drop the event if the VRL program returns an error at runtime.
-				"""
-			type: bool: default: false
-		}
-		drop_on_abort: {
-			common:   false
-			required: false
-			description: """
-				Drop the event if the VRL program is manually aborted through the `abort` statement.
-				"""
-			type: bool: default: true
-		}
-	}
+	configuration: base.components.transforms.remap.configuration
 
 	input: {
 		logs: true
@@ -113,6 +46,7 @@ components: transforms: "remap": {
 			set:          true
 			summary:      true
 		}
+		traces: false
 	}
 
 	examples: [
@@ -145,17 +79,27 @@ components: transforms: "remap": {
 		event_data_model: {
 			title: "Event Data Model"
 			body:  """
-				You can use the `remap` transform with both log and metric events.
+				You can use the `remap` transform to handle both log and metric events.
 
 				Log events in the `remap` transform correspond directly to Vector's [log schema](\(urls.vector_log)),
-				which means that the transform has access to the whole event.
+				which means that the transform has access to the whole event and no restrictions on how the event can be
+				modified.
 
-				With metric events the remap transform has:
+				With [metric events](\(urls.vector_metric)), VRL is much more restrictive. Below is a field-by-field
+				breakdown of VRL's access to metrics:
 
-				* read-only access to the event's`.type`
-				* read/write access to `kind`, but it can only be set to one of `incremental` or `absolute` and cannot be deleted
-				* read/write access to `name`, but it cannot be deleted
-				* read/write/delete access to `namespace`, `timestamp`, and keys in `tags`
+				Field | Access | Specific restrictions (if any)
+				:-----|:-------|:------------------------------
+				`type` | Read only |
+				`kind` | Read/write | You can set `kind` to either `incremental` or `absolute` but not to an arbitrary value.
+				`name` | Read/write |
+				`timestamp` | Read/write/delete | You assign only a valid [VRL timestamp](\(urls.vrl_expressions)/#timestamp) value, not a [VRL string](\(urls.vrl_expressions)/#string).
+				`namespace` | Read/write/delete |
+				`tags` | Read/write/delete | The `tags` field must be a [VRL object](\(urls.vrl_expressions)/#object) in which all keys and values are strings.
+
+				It's important to note that if you try to perform a disallowed action, such as deleting the `type`
+				field using `del(.type)`, Vector doesn't abort the VRL program or throw an error. Instead, it ignores
+				the disallowed action.
 				"""
 		}
 		lazy_event_mutation: {
@@ -193,6 +137,23 @@ components: transforms: "remap": {
 				"""#
 		}
 	}
+
+	outputs: [
+		components._default_output,
+		{
+			name: "dropped"
+			description: """
+				This transform also implements an additional `dropped` output. When the
+				`drop_on_error` or `drop_on_abort` configuration values are set to `true`
+				and `reroute_dropped` is also set to `true`, events that result in runtime
+				errors or aborts will be dropped from the default output stream and sent to
+				the `dropped` output instead. For a transform component named `foo`, this
+				output can be accessed by specifying `foo.dropped` as the input to another
+				component. Events sent to this output will be in their original form,
+				omitting any partial modification that took place before the error or abort.
+				"""
+		},
+	]
 
 	telemetry: metrics: {
 		processing_errors_total: components.sources.internal_metrics.output.metrics.processing_errors_total

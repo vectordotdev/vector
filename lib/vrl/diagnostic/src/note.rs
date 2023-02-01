@@ -1,20 +1,24 @@
+use std::{convert::Into, fmt};
+
 use crate::Urls;
-use std::convert::Into;
-use std::fmt;
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum Note {
     Hint(String),
+    Example(String),
     CoerceValue,
     SeeFunctionDocs(&'static str),
     SeeErrorDocs,
     SeeCodeDocs(usize),
     SeeLangDocs,
+    SeeRepl,
 
     #[doc(hidden)]
     SeeDocs(String, String),
     #[doc(hidden)]
     Basic(String),
+    #[doc(hidden)]
+    UserErrorMessage(String),
 }
 
 impl Note {
@@ -32,11 +36,17 @@ impl Note {
 
 impl fmt::Display for Note {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use Note::*;
+        use Note::{
+            Basic, CoerceValue, Example, Hint, SeeCodeDocs, SeeDocs, SeeErrorDocs, SeeFunctionDocs,
+            SeeLangDocs, SeeRepl, UserErrorMessage,
+        };
 
         match self {
             Hint(hint) => {
-                write!(f, "hint: {}", hint)
+                write!(f, "hint: {hint}")
+            }
+            Example(example) => {
+                write!(f, "example: {example}")
             }
             CoerceValue => {
                 Hint("coerce the value to the required type using a coercion function".to_owned())
@@ -53,16 +63,22 @@ impl fmt::Display for Note {
             SeeLangDocs => {
                 let url = Urls::vrl_root_url();
 
-                write!(f, "see language documentation at {}", url)
+                write!(f, "see language documentation at {url}")
+            }
+            SeeRepl => {
+                let url = Urls::example_docs();
+
+                write!(f, "try your code in the VRL REPL, learn more at {url}")
             }
             SeeCodeDocs(code) => {
-                let url = Urls::error_code_url(code);
-                write!(f, "learn more about error code {} at {}", code, url)
+                let url = Urls::error_code_url(*code);
+                write!(f, "learn more about error code {code} at {url}")
             }
             SeeDocs(kind, url) => {
-                write!(f, "see documentation about {} at {}", kind, url)
+                write!(f, "see documentation about {kind} at {url}")
             }
-            Basic(string) => write!(f, "{}", string),
+            Basic(string) => write!(f, "{string}"),
+            UserErrorMessage(message) => write!(f, "{message}"),
         }
     }
 }

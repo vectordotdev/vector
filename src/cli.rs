@@ -1,34 +1,30 @@
-use crate::{config, generate, get_version, graph, list, unit_test, validate};
 use std::path::PathBuf;
-use structopt::{clap::AppSettings, StructOpt};
 
+use clap::{ArgAction, CommandFactory, FromArgMatches, Parser};
+
+#[cfg(windows)]
+use crate::service;
 #[cfg(feature = "api-client")]
 use crate::tap;
 #[cfg(feature = "api-client")]
 use crate::top;
+use crate::{config, generate, get_version, graph, list, unit_test, validate};
 
-#[cfg(windows)]
-use crate::service;
-
-#[derive(StructOpt, Debug)]
-#[structopt(rename_all = "kebab-case")]
+#[derive(Parser, Debug)]
+#[command(rename_all = "kebab-case")]
 pub struct Opts {
-    #[structopt(flatten)]
+    #[command(flatten)]
     pub root: RootOpts,
 
-    #[structopt(subcommand)]
+    #[command(subcommand)]
     pub sub_command: Option<SubCommand>,
 }
 
 impl Opts {
-    pub fn get_matches() -> Self {
+    pub fn get_matches() -> Result<Self, clap::Error> {
         let version = get_version();
-        let app = Opts::clap().version(version.as_str()).global_settings(&[
-            AppSettings::ColoredHelp,
-            AppSettings::InferSubcommands,
-            AppSettings::DeriveDisplayOrder,
-        ]);
-        Opts::from_clap(&app.get_matches())
+        let app = Opts::command().version(version);
+        Opts::from_arg_matches(&app.get_matches())
     }
 
     pub const fn log_level(&self) -> &'static str {
@@ -36,7 +32,8 @@ impl Opts {
             Some(SubCommand::Validate(_))
             | Some(SubCommand::Graph(_))
             | Some(SubCommand::Generate(_))
-            | Some(SubCommand::List(_)) => {
+            | Some(SubCommand::List(_))
+            | Some(SubCommand::Test(_)) => {
                 if self.root.verbose == 0 {
                     (self.root.quiet + 1, self.root.verbose)
                 } else {
@@ -58,19 +55,19 @@ impl Opts {
     }
 }
 
-#[derive(StructOpt, Debug)]
-#[structopt(rename_all = "kebab-case")]
+#[derive(Parser, Debug)]
+#[command(rename_all = "kebab-case")]
 pub struct RootOpts {
     /// Read configuration from one or more files. Wildcard paths are supported.
     /// File format is detected from the file name.
     /// If zero files are specified the default config path
     /// `/etc/vector/vector.toml` will be targeted.
-    #[structopt(
-        name = "config",
+    #[arg(
+        id = "config",
         short,
         long,
         env = "VECTOR_CONFIG",
-        use_delimiter(true)
+        value_delimiter(',')
     )]
     pub config_paths: Vec<PathBuf>,
 
@@ -78,76 +75,63 @@ pub struct RootOpts {
     /// File format is detected from the file name.
     ///
     /// Files not ending in .toml, .json, .yaml, or .yml will be ignored.
-    #[structopt(
-        name = "config-dir",
-        short = "C",
+    #[arg(
+        id = "config-dir",
+        short = 'C',
         long,
         env = "VECTOR_CONFIG_DIR",
-        use_delimiter(true)
+        value_delimiter(',')
     )]
     pub config_dirs: Vec<PathBuf>,
 
     /// Read configuration from one or more files. Wildcard paths are supported.
     /// TOML file format is expected.
-    #[structopt(
-        name = "config-toml",
+    #[arg(
+        id = "config-toml",
         long,
         env = "VECTOR_CONFIG_TOML",
-        use_delimiter(true)
+        value_delimiter(',')
     )]
     pub config_paths_toml: Vec<PathBuf>,
 
     /// Read configuration from one or more files. Wildcard paths are supported.
     /// JSON file format is expected.
-    #[structopt(
-        name = "config-json",
+    #[arg(
+        id = "config-json",
         long,
         env = "VECTOR_CONFIG_JSON",
-        use_delimiter(true)
+        value_delimiter(',')
     )]
     pub config_paths_json: Vec<PathBuf>,
 
     /// Read configuration from one or more files. Wildcard paths are supported.
     /// YAML file format is expected.
-    #[structopt(
-        name = "config-yaml",
+    #[arg(
+        id = "config-yaml",
         long,
         env = "VECTOR_CONFIG_YAML",
-        use_delimiter(true)
+        value_delimiter(',')
     )]
     pub config_paths_yaml: Vec<PathBuf>,
 
-    /// Read pipeline configuration from files in one or more directories.
-    /// File format is detected from the file name.
-    ///
-    /// Files not ending in .toml, .json, .yaml, or .yml will be ignored.
-    #[structopt(
-        name = "pipeline-dir",
-        short = "P",
-        long,
-        env = "VECTOR_PIPELINE_DIR",
-        use_delimiter(true)
-    )]
-    pub pipeline_dirs: Vec<PathBuf>,
-
     /// Exit on startup if any sinks fail healthchecks
-    #[structopt(short, long, env = "VECTOR_REQUIRE_HEALTHY")]
+    #[arg(short, long, env = "VECTOR_REQUIRE_HEALTHY")]
     pub require_healthy: Option<bool>,
 
     /// Number of threads to use for processing (default is number of available cores)
-    #[structopt(short, long, env = "VECTOR_THREADS")]
+    #[arg(short, long, env = "VECTOR_THREADS")]
     pub threads: Option<usize>,
 
     /// Enable more detailed internal logging. Repeat to increase level. Overridden by `--quiet`.
-    #[structopt(short, long, parse(from_occurrences))]
+    #[arg(short, long, action = ArgAction::Count)]
     pub verbose: u8,
 
     /// Reduce detail of internal logging. Repeat to reduce further. Overrides `--verbose`.
-    #[structopt(short, long, parse(from_occurrences))]
+    #[arg(short, long, action = ArgAction::Count)]
     pub quiet: u8,
 
     /// Set the logging format
-    #[structopt(long, default_value = "text", env = "VECTOR_LOG_FORMAT", possible_values = &["text", "json"])]
+    #[arg(long, default_value = "text", env = "VECTOR_LOG_FORMAT")]
     pub log_format: LogFormat,
 
     /// Control when ANSI terminal formatting is used.
@@ -157,12 +141,35 @@ pub struct RootOpts {
     /// the `--color always` option will always enable ANSI terminal formatting. `--color never`
     /// will disable all ANSI terminal formatting. `--color auto` will attempt
     /// to detect it automatically.
-    #[structopt(long, default_value = "auto", env = "VECTOR_COLOR", possible_values = &["auto", "always", "never"])]
+    #[arg(long, default_value = "auto", env = "VECTOR_COLOR")]
     pub color: Color,
 
     /// Watch for changes in configuration file, and reload accordingly.
-    #[structopt(short, long, env = "VECTOR_WATCH_CONFIG")]
+    #[arg(short, long, env = "VECTOR_WATCH_CONFIG")]
     pub watch_config: bool,
+
+    /// Set the internal log rate limit
+    #[arg(
+        short,
+        long,
+        env = "VECTOR_INTERNAL_LOG_RATE_LIMIT",
+        default_value = "10"
+    )]
+    pub internal_log_rate_limit: u64,
+
+    /// Set runtime allocation tracing
+    #[cfg(feature = "allocation-tracing")]
+    #[arg(long, env = "ALLOCATION_TRACING", default_value = "false")]
+    pub allocation_tracing: bool,
+
+    /// Set allocation tracing reporting rate in milliseconds.
+    #[cfg(feature = "allocation-tracing")]
+    #[arg(
+        long,
+        env = "ALLOCATION_TRACING_REPORTING_INTERVAL_MS",
+        default_value = "5000"
+    )]
+    pub allocation_tracing_reporting_interval_ms: u64,
 }
 
 impl RootOpts {
@@ -182,20 +189,28 @@ impl RootOpts {
         )
         .collect()
     }
-
-    pub const fn pipeline_paths(&self) -> &Vec<PathBuf> {
-        &self.pipeline_dirs
-    }
 }
 
-#[derive(StructOpt, Debug)]
-#[structopt(rename_all = "kebab-case")]
+#[derive(Parser, Debug)]
+#[command(rename_all = "kebab-case")]
 pub enum SubCommand {
     /// Validate the target config, then exit.
     Validate(validate::Opts),
 
     /// Generate a Vector configuration containing a list of components.
     Generate(generate::Opts),
+
+    /// Generate the configuration schema for this version of Vector. (experimental)
+    ///
+    /// A JSON Schema document will be written to stdout that represents the valid schema for a
+    /// Vector configuration. This schema is based on the "full" configuration, such that for usages
+    /// where a configuration is split into multiple files, the schema would apply to those files
+    /// only when concatenated together.
+    GenerateSchema,
+
+    /// Output a provided Vector configuration file/dir as a single JSON object, useful for checking in to version control.
+    #[command(hide = true)]
+    Config(config::Opts),
 
     /// List available components, then exit.
     List(list::Opts),
@@ -211,7 +226,7 @@ pub enum SubCommand {
     #[cfg(feature = "api-client")]
     Top(top::Opts),
 
-    /// Observe log events from topology components
+    /// Observe output log events from source or transform components. Logs are sampled at a specified interval.
     #[cfg(feature = "api-client")]
     Tap(tap::Opts),
 
@@ -224,48 +239,17 @@ pub enum SubCommand {
     Vrl(vrl_cli::Opts),
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(clap::ValueEnum, Debug, Clone, PartialEq, Eq)]
 pub enum Color {
     Auto,
     Always,
     Never,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(clap::ValueEnum, Debug, Clone, PartialEq, Eq)]
 pub enum LogFormat {
     Text,
     Json,
-}
-
-impl std::str::FromStr for Color {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "auto" => Ok(Color::Auto),
-            "always" => Ok(Color::Always),
-            "never" => Ok(Color::Never),
-            s => Err(format!(
-                "{} is not a valid option, expected `auto`, `always` or `never`",
-                s
-            )),
-        }
-    }
-}
-
-impl std::str::FromStr for LogFormat {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "text" => Ok(LogFormat::Text),
-            "json" => Ok(LogFormat::Json),
-            s => Err(format!(
-                "{} is not a valid option, expected `text` or `json`",
-                s
-            )),
-        }
-    }
 }
 
 pub fn handle_config_errors(errors: Vec<String>) -> exitcode::ExitCode {

@@ -1,10 +1,20 @@
+use std::{path::PathBuf, pin::Pin, time::Duration};
+
+use async_trait::async_trait;
+use bytes::{Bytes, BytesMut};
+use futures::{stream::BoxStream, SinkExt, StreamExt};
+use snafu::{ResultExt, Snafu};
+use tokio::{net::UnixStream, time::sleep};
+use tokio_util::codec::Encoder;
+use vector_config::configurable_component;
+use vector_core::ByteSizeOf;
+
 use crate::{
-    buffers::Acker,
-    config::SinkContext,
-    event::Event,
+    codecs::Transformer,
+    event::{Event, Finalizable},
     internal_events::{
         ConnectionOpen, OpenGauge, SocketMode, UnixSocketConnectionEstablished,
-        UnixSocketConnectionFailed, UnixSocketError,
+        UnixSocketOutgoingConnectionError, UnixSocketSendError,
     },
     sink::VecSinkExt,
     sinks::{
@@ -16,23 +26,24 @@ use crate::{
         Healthcheck, VectorSink,
     },
 };
-use async_trait::async_trait;
-use bytes::Bytes;
-use futures::{stream::BoxStream, SinkExt, StreamExt};
-use serde::{Deserialize, Serialize};
-use snafu::{ResultExt, Snafu};
-use std::{path::PathBuf, pin::Pin, sync::Arc, time::Duration};
-use tokio::{net::UnixStream, time::sleep};
 
 #[derive(Debug, Snafu)]
 pub enum UnixError {
-    #[snafu(display("Connect error: {}", source))]
-    ConnectError { source: tokio::io::Error },
+    #[snafu(display("Failed connecting to socket at path {}: {}", path.display(), source))]
+    ConnectionError {
+        source: tokio::io::Error,
+        path: PathBuf,
+    },
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
-#[serde(deny_unknown_fields)]
+/// A Unix Domain Socket sink.
+#[configurable_component]
+#[derive(Clone, Debug)]
 pub struct UnixSinkConfig {
+    /// The Unix socket path.
+    ///
+    /// This should be an absolute path.
+    #[configurable(metadata(docs::examples = "/path/to/socket"))]
     pub path: PathBuf,
 }
 
@@ -43,13 +54,13 @@ impl UnixSinkConfig {
 
     pub fn build(
         &self,
-        cx: SinkContext,
-        encode_event: impl Fn(Event) -> Option<Bytes> + Send + Sync + 'static,
+        transformer: Transformer,
+        encoder: impl Encoder<Event, Error = codecs::encoding::Error> + Clone + Send + Sync + 'static,
     ) -> crate::Result<(VectorSink, Healthcheck)> {
         let connector = UnixConnector::new(self.path.clone());
-        let sink = UnixSink::new(connector.clone(), cx.acker(), encode_event);
+        let sink = UnixSink::new(connector.clone(), transformer, encoder);
         Ok((
-            VectorSink::Stream(Box::new(sink)),
+            VectorSink::from_event_streamsink(sink),
             Box::pin(async move { connector.healthcheck().await }),
         ))
     }
@@ -73,7 +84,11 @@ impl UnixConnector {
     }
 
     async fn connect(&self) -> Result<UnixStream, UnixError> {
-        UnixStream::connect(&self.path).await.context(ConnectError)
+        UnixStream::connect(&self.path)
+            .await
+            .context(ConnectionSnafu {
+                path: self.path.clone(),
+            })
     }
 
     async fn connect_backoff(&self) -> UnixStream {
@@ -81,14 +96,11 @@ impl UnixConnector {
         loop {
             match self.connect().await {
                 Ok(stream) => {
-                    emit!(&UnixSocketConnectionEstablished { path: &self.path });
+                    emit!(UnixSocketConnectionEstablished { path: &self.path });
                     return stream;
                 }
                 Err(error) => {
-                    emit!(&UnixSocketConnectionFailed {
-                        error,
-                        path: &self.path
-                    });
+                    emit!(UnixSocketOutgoingConnectionError { error });
                     sleep(backoff.next().unwrap()).await;
                 }
             }
@@ -100,64 +112,76 @@ impl UnixConnector {
     }
 }
 
-struct UnixSink {
+struct UnixSink<E>
+where
+    E: Encoder<Event, Error = codecs::encoding::Error> + Clone + Send + Sync,
+{
     connector: UnixConnector,
-    acker: Acker,
-    encode_event: Arc<dyn Fn(Event) -> Option<Bytes> + Send + Sync>,
+    transformer: Transformer,
+    encoder: E,
 }
 
-impl UnixSink {
-    pub fn new(
-        connector: UnixConnector,
-        acker: Acker,
-        encode_event: impl Fn(Event) -> Option<Bytes> + Send + Sync + 'static,
-    ) -> Self {
+impl<E> UnixSink<E>
+where
+    E: Encoder<Event, Error = codecs::encoding::Error> + Clone + Send + Sync,
+{
+    pub const fn new(connector: UnixConnector, transformer: Transformer, encoder: E) -> Self {
         Self {
             connector,
-            acker,
-            encode_event: Arc::new(encode_event),
+            transformer,
+            encoder,
         }
     }
 
     async fn connect(&mut self) -> BytesSink<UnixStream> {
         let stream = self.connector.connect_backoff().await;
-        BytesSink::new(
-            stream,
-            |_| ShutdownCheck::Alive,
-            self.acker.clone(),
-            SocketMode::Unix,
-        )
+        BytesSink::new(stream, |_| ShutdownCheck::Alive, SocketMode::Unix)
     }
 }
 
 #[async_trait]
-impl StreamSink for UnixSink {
+impl<E> StreamSink<Event> for UnixSink<E>
+where
+    E: Encoder<Event, Error = codecs::encoding::Error> + Clone + Send + Sync,
+{
     // Same as TcpSink, more details there.
     async fn run(mut self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
-        let encode_event = Arc::clone(&self.encode_event);
+        let mut encoder = self.encoder.clone();
+        let transformer = self.transformer.clone();
         let mut input = input
             .map(|mut event| {
-                let finalizers = event.metadata_mut().take_finalizers();
-                encode_event(event)
-                    .map(|item| EncodedEvent { item, finalizers })
-                    .unwrap_or_else(|| EncodedEvent::new(Bytes::new()))
+                let byte_size = event.size_of();
+
+                transformer.transform(&mut event);
+
+                let finalizers = event.take_finalizers();
+                let mut bytes = BytesMut::new();
+
+                // Errors are handled by `Encoder`.
+                if encoder.encode(event, &mut bytes).is_ok() {
+                    let item = bytes.freeze();
+                    EncodedEvent {
+                        item,
+                        finalizers,
+                        byte_size,
+                    }
+                } else {
+                    EncodedEvent::new(Bytes::new(), 0)
+                }
             })
             .peekable();
 
         while Pin::new(&mut input).peek().await.is_some() {
             let mut sink = self.connect().await;
-            let _open_token = OpenGauge::new().open(|count| emit!(&ConnectionOpen { count }));
+            let _open_token = OpenGauge::new().open(|count| emit!(ConnectionOpen { count }));
 
-            let result = match sink
-                .send_all_peekable(&mut (&mut input).map(|item| item.item).peekable())
-                .await
-            {
+            let result = match sink.send_all_peekable(&mut (&mut input).peekable()).await {
                 Ok(()) => sink.close().await,
                 Err(error) => Err(error),
             };
 
             if let Err(error) = result {
-                emit!(&UnixSocketError {
+                emit!(UnixSocketSendError {
                     error: &error,
                     path: &self.connector.path
                 });
@@ -170,10 +194,17 @@ impl StreamSink for UnixSink {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::sinks::util::{encode_log, Encoding};
-    use crate::test_util::{random_lines_with_stream, CountReceiver};
+    use codecs::{encoding::Framer, NewlineDelimitedEncoder, TextSerializerConfig};
     use tokio::net::UnixListener;
+
+    use super::*;
+    use crate::{
+        codecs::Encoder,
+        test_util::{
+            components::{assert_sink_compliance, SINK_TAGS},
+            random_lines_with_stream, CountReceiver,
+        },
+    };
 
     fn temp_uds_path(name: &str) -> PathBuf {
         tempfile::tempdir().unwrap().into_path().join(name)
@@ -184,7 +215,10 @@ mod tests {
         let good_path = temp_uds_path("valid_uds");
         let _listener = UnixListener::bind(&good_path).unwrap();
         assert!(UnixSinkConfig::new(good_path)
-            .build(SinkContext::new_test(), |_| None)
+            .build(
+                Default::default(),
+                Encoder::<()>::new(TextSerializerConfig::default().build().into())
+            )
             .unwrap()
             .1
             .await
@@ -192,7 +226,10 @@ mod tests {
 
         let bad_path = temp_uds_path("no_one_listening");
         assert!(UnixSinkConfig::new(bad_path)
-            .build(SinkContext::new_test(), |_| None)
+            .build(
+                Default::default(),
+                Encoder::<()>::new(TextSerializerConfig::default().build().into())
+            )
             .unwrap()
             .1
             .await
@@ -209,15 +246,22 @@ mod tests {
 
         // Set up Sink
         let config = UnixSinkConfig::new(out_path);
-        let cx = SinkContext::new_test();
-        let encoding = Encoding::Text.into();
         let (sink, _healthcheck) = config
-            .build(cx, move |event| encode_log(event, &encoding))
+            .build(
+                Default::default(),
+                Encoder::<Framer>::new(
+                    NewlineDelimitedEncoder::new().into(),
+                    TextSerializerConfig::default().build().into(),
+                ),
+            )
             .unwrap();
 
         // Send the test data
         let (input_lines, events) = random_lines_with_stream(100, num_lines, None);
-        sink.run(events).await.unwrap();
+
+        assert_sink_compliance(&SINK_TAGS, async move { sink.run(events).await })
+            .await
+            .expect("Running sink failed");
 
         // Wait for output to connect
         receiver.connected().await;

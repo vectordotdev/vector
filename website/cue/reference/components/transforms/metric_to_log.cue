@@ -20,35 +20,12 @@ components: transforms: metric_to_log: {
 	}
 
 	support: {
-		targets: {
-			"aarch64-unknown-linux-gnu":      true
-			"aarch64-unknown-linux-musl":     true
-			"armv7-unknown-linux-gnueabihf":  true
-			"armv7-unknown-linux-musleabihf": true
-			"x86_64-apple-darwin":            true
-			"x86_64-pc-windows-msv":          true
-			"x86_64-unknown-linux-gnu":       true
-			"x86_64-unknown-linux-musl":      true
-		}
 		requirements: []
 		warnings: []
 		notices: []
 	}
 
-	configuration: {
-		host_tag: {
-			common:      true
-			description: "Tag key that identifies the source host."
-			required:    false
-			warnings: []
-			type: string: {
-				default: "hostname"
-				examples: ["host", "hostname"]
-				syntax: "literal"
-			}
-		}
-		timezone: configuration._timezone
-	}
+	configuration: base.components.transforms.metric_to_log.configuration
 
 	input: {
 		logs: false
@@ -60,6 +37,7 @@ components: transforms: metric_to_log: {
 			set:          true
 			summary:      true
 		}
+		traces: false
 	}
 
 	examples: [

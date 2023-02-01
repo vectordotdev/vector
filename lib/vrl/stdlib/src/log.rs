@@ -1,5 +1,34 @@
+use ::value::Value;
 use tracing::{debug, error, info, trace, warn};
 use vrl::prelude::*;
+
+fn log(
+    rate_limit_secs: Value,
+    level: &Bytes,
+    value: Value,
+    span: vrl::diagnostic::Span,
+) -> Resolved {
+    let rate_limit_secs = rate_limit_secs.try_integer()?;
+    let res = value.to_string_lossy();
+    match level.as_ref() {
+        b"trace" => {
+            trace!(message = %res, internal_log_rate_secs = rate_limit_secs, vrl_position = span.start())
+        }
+        b"debug" => {
+            debug!(message = %res, internal_log_rate_secs = rate_limit_secs, vrl_position = span.start())
+        }
+        b"warn" => {
+            warn!(message = %res, internal_log_rate_secs = rate_limit_secs, vrl_position = span.start())
+        }
+        b"error" => {
+            error!(message = %res, internal_log_rate_secs = rate_limit_secs, vrl_position = span.start())
+        }
+        _ => {
+            info!(message = %res, internal_log_rate_secs = rate_limit_secs, vrl_position = span.start())
+        }
+    }
+    Ok(Value::Null)
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct Log;
@@ -46,9 +75,9 @@ impl Function for Log {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        info: &FunctionCompileContext,
-        mut arguments: ArgumentList,
+        _state: &state::TypeState,
+        ctx: &mut FunctionCompileContext,
+        arguments: ArgumentList,
     ) -> Compiled {
         let levels = vec![
             "trace".into(),
@@ -66,12 +95,13 @@ impl Function for Log {
             .expect("log level not bytes");
         let rate_limit_secs = arguments.optional("rate_limit_secs");
 
-        Ok(Box::new(LogFn {
-            span: info.span,
+        Ok(LogFn {
+            span: ctx.span(),
             value,
             level,
             rate_limit_secs,
-        }))
+        }
+        .as_expr())
     }
 }
 
@@ -83,42 +113,28 @@ struct LogFn {
     rate_limit_secs: Option<Box<dyn Expression>>,
 }
 
-impl Expression for LogFn {
+impl FunctionExpression for LogFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         let rate_limit_secs = match &self.rate_limit_secs {
-            Some(expr) => expr.resolve(ctx)?.try_integer()?,
-            None => 1,
+            Some(expr) => expr.resolve(ctx)?,
+            None => value!(1),
         };
 
-        match self.level.as_ref() {
-            b"trace" => {
-                trace!(message = %value, internal_log_rate_secs = rate_limit_secs, vrl_position = self.span.start())
-            }
-            b"debug" => {
-                debug!(message = %value, internal_log_rate_secs = rate_limit_secs, vrl_position = self.span.start())
-            }
-            b"warn" => {
-                warn!(message = %value, internal_log_rate_secs = rate_limit_secs, vrl_position = self.span.start())
-            }
-            b"error" => {
-                error!(message = %value, internal_log_rate_secs = rate_limit_secs, vrl_position = self.span.start())
-            }
-            _ => {
-                info!(message = %value, internal_log_rate_secs = rate_limit_secs, vrl_position = self.span.start())
-            }
-        }
+        let span = self.span;
 
-        Ok(Value::Null)
+        log(rate_limit_secs, &self.level, value, span)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new().infallible().null()
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
+        TypeDef::null().infallible()
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use tracing_test::traced_test;
+
     use super::*;
 
     test_function![
@@ -129,7 +145,23 @@ mod tests {
                                level: value!("warn"),
                                rate_limit_secs: value!(5) ],
             want: Ok(Value::Null),
-            tdef: TypeDef::new().infallible().null(),
+            tdef: TypeDef::null().infallible(),
         }
     ];
+
+    #[traced_test]
+    #[test]
+    fn output_quotes() {
+        // Check that a message is logged without additional quotes
+        log(
+            value!(1),
+            &Bytes::from("warn"),
+            value!("simple test message"),
+            Default::default(),
+        )
+        .unwrap();
+
+        assert!(!logs_contain("\"simple test message\""));
+        assert!(logs_contain("simple test message"));
+    }
 }

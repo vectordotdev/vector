@@ -1,28 +1,31 @@
-use super::{healthcheck_response, GcpAuthConfig, GcpCredentials, Scope};
-use crate::template::TemplateRenderingError;
-use crate::{
-    config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
-    event::{Event, Value},
-    http::HttpClient,
-    internal_events::TemplateRenderingFailed,
-    sinks::{
-        util::{
-            encoding::{EncodingConfigWithDefault, EncodingConfiguration},
-            http::{BatchedHttpSink, HttpSink},
-            BatchConfig, BatchSettings, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig,
-        },
-        Healthcheck, VectorSink,
-    },
-    template::Template,
-    tls::{TlsOptions, TlsSettings},
-};
+use std::collections::HashMap;
+
+use bytes::Bytes;
 use futures::{FutureExt, SinkExt};
 use http::{Request, Uri};
 use hyper::Body;
-use serde::{Deserialize, Serialize};
 use serde_json::{json, map};
 use snafu::Snafu;
-use std::collections::HashMap;
+use vector_config::configurable_component;
+
+use crate::{
+    codecs::Transformer,
+    config::{log_schema, AcknowledgementsConfig, Input, SinkConfig, SinkContext},
+    event::{Event, Value},
+    gcp::{GcpAuthConfig, GcpAuthenticator, Scope},
+    http::HttpClient,
+    sinks::{
+        gcs_common::config::healthcheck_response,
+        util::{
+            http::{BatchedHttpSink, HttpEventEncoder, HttpSink},
+            BatchConfig, BoxedRawValue, JsonArrayBuffer, RealtimeSizeBasedDefaultBatchSettings,
+            TowerRequestConfig,
+        },
+        Healthcheck, VectorSink,
+    },
+    template::{Template, TemplateRenderingError},
+    tls::{TlsConfig, TlsSettings},
+};
 
 #[derive(Debug, Snafu)]
 enum HealthcheckError {
@@ -30,139 +33,208 @@ enum HealthcheckError {
     NotFound,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone, Default)]
+/// Configuration for the `gcp_stackdriver_logs` sink.
+#[configurable_component(sink("gcp_stackdriver_logs"))]
+#[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct StackdriverConfig {
+    #[serde(skip, default = "default_endpoint")]
+    endpoint: String,
+
     #[serde(flatten)]
     pub log_name: StackdriverLogName,
+
+    /// The log ID to which to publish logs.
+    ///
+    /// This is a name you create to identify this log stream.
     pub log_id: Template,
 
+    /// The monitored resource to associate the logs with.
     pub resource: StackdriverResource,
+
+    /// The field of the log event from which to take the outgoing log’s `severity` field.
+    ///
+    /// The named field is removed from the log event if present, and must be either an integer
+    /// between 0 and 800 or a string containing one of the [severity level names][sev_names] (case
+    /// is ignored) or a common prefix such as `err`.
+    ///
+    /// If no severity key is specified, the severity of outgoing records is set to 0 (`DEFAULT`).
+    ///
+    /// See the [GCP Stackdriver Logging LogSeverity description][logsev_docs] for more details on
+    /// the value of the `severity` field.
+    ///
+    /// [sev_names]: https://cloud.google.com/logging/docs/reference/v2/rest/v2/LogEntry#logseverity
+    /// [logsev_docs]: https://cloud.google.com/logging/docs/reference/v2/rest/v2/LogEntry#logseverity
     pub severity_key: Option<String>,
 
     #[serde(flatten)]
     pub auth: GcpAuthConfig,
-    #[serde(
-        skip_serializing_if = "crate::serde::skip_serializing_if_default",
-        default
-    )]
-    pub encoding: EncodingConfigWithDefault<Encoding>,
 
+    #[configurable(derived)]
+    #[serde(
+        default,
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    pub encoding: Transformer,
+
+    #[configurable(derived)]
     #[serde(default)]
-    pub batch: BatchConfig,
+    pub batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
 
-    pub tls: Option<TlsOptions>,
+    #[configurable(derived)]
+    pub tls: Option<TlsConfig>,
+
+    #[configurable(derived)]
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    acknowledgements: AcknowledgementsConfig,
+}
+
+fn default_endpoint() -> String {
+    "https://logging.googleapis.com/v2/entries:write".to_string()
 }
 
 #[derive(Clone, Debug)]
 struct StackdriverSink {
     config: StackdriverConfig,
-    creds: Option<GcpCredentials>,
+    auth: GcpAuthenticator,
     severity_key: Option<String>,
     uri: Uri,
 }
 
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
-#[serde(rename_all = "snake_case")]
-#[derivative(Default)]
-pub enum Encoding {
-    #[derivative(Default)]
-    Default,
-}
+// 10MB limit for entries.write: https://cloud.google.com/logging/quotas#api-limits
+const MAX_BATCH_PAYLOAD_SIZE: usize = 10_000_000;
 
-#[derive(Clone, Debug, Derivative, Deserialize, Serialize)]
+/// Logging locations.
+#[configurable_component]
+#[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
 pub enum StackdriverLogName {
+    /// The billing account ID to which to publish logs.
     #[serde(rename = "billing_account_id")]
     BillingAccount(String),
+
+    /// The folder ID to which to publish logs.
+    ///
+    /// See the [Google Cloud Platform folder documentation][folder_docs] for more details.
+    ///
+    /// [folder_docs]: https://cloud.google.com/resource-manager/docs/creating-managing-folders
     #[serde(rename = "folder_id")]
     Folder(String),
+
+    /// The organization ID to which to publish logs.
+    ///
+    /// This would be the identifier assigned to your organization on Google Cloud Platform.
     #[serde(rename = "organization_id")]
     Organization(String),
+
+    /// The project ID to which to publish logs.
+    ///
+    /// See the [Google Cloud Platform project management documentation][project_docs] for more details.
+    ///
+    /// [project_docs]: https://cloud.google.com/resource-manager/docs/creating-managing-projects
     #[derivative(Default)]
     #[serde(rename = "project_id")]
     Project(String),
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone, Default)]
+/// A monitored resource.
+///
+/// Monitored resources in GCP allow associating logs and metrics specifically with native resources
+/// within Google Cloud Platform. This takes the form of a "type" field which identifies the
+/// resource, and a set of type-specific labels to uniquely identify a resource of that type.
+///
+/// See [Monitored resource types][mon_docs] for more information.
+///
+/// [mon_docs]: https://cloud.google.com/monitoring/api/resources
+// TODO: this type is specific to the stackdrivers log sink because it allows for template-able
+// label values, but we should consider replacing `sinks::gcp::GcpTypedResource` with this so both
+// the stackdriver metrics _and_ logs sink can have template-able label values, and less duplication
+#[configurable_component]
+#[derive(Clone, Debug, Default)]
 pub struct StackdriverResource {
+    /// The monitored resource type.
+    ///
+    /// For example, the type of a Compute Engine VM instance is `gce_instance`.
     #[serde(rename = "type")]
     pub type_: String,
-    #[serde(flatten)]
-    pub labels: HashMap<String, Template>,
-}
 
-inventory::submit! {
-    SinkDescription::new::<StackdriverConfig>("gcp_stackdriver_logs")
+    /// Type-specific labels.
+    #[serde(flatten)]
+    #[configurable(metadata(docs::additional_props_description = "A type-specific label."))]
+    pub labels: HashMap<String, Template>,
 }
 
 impl_generate_config_from_default!(StackdriverConfig);
 
-const ENDPOINT_URI: &str = "https://logging.googleapis.com/v2/entries:write";
-
 #[async_trait::async_trait]
-#[typetag::serde(name = "gcp_stackdriver_logs")]
 impl SinkConfig for StackdriverConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let creds = self.auth.make_credentials(Scope::LoggingWrite).await?;
+        let auth = self.auth.build(Scope::LoggingWrite).await?;
 
-        let batch = BatchSettings::default()
-            .bytes(bytesize::kib(5000u64))
-            .timeout(1)
-            .parse_config(self.batch)?;
-        let request = self.request.unwrap_with(&TowerRequestConfig {
-            rate_limit_num: Some(1000),
-            rate_limit_duration_secs: Some(1),
-            ..Default::default()
-        });
+        let batch = self
+            .batch
+            .validate()?
+            .limit_max_bytes(MAX_BATCH_PAYLOAD_SIZE)?
+            .into_batch_settings()?;
+        let request = self.request.unwrap_with(
+            &TowerRequestConfig::default()
+                .rate_limit_duration_secs(1)
+                .rate_limit_num(1000),
+        );
         let tls_settings = TlsSettings::from_options(&self.tls)?;
         let client = HttpClient::new(tls_settings, cx.proxy())?;
 
         let sink = StackdriverSink {
             config: self.clone(),
-            creds,
+            auth: auth.clone(),
             severity_key: self.severity_key.clone(),
-            uri: ENDPOINT_URI.parse().unwrap(),
+            uri: self.endpoint.parse().unwrap(),
         };
 
         let healthcheck = healthcheck(client.clone(), sink.clone()).boxed();
-
+        auth.spawn_regenerate_token();
         let sink = BatchedHttpSink::new(
             sink,
             JsonArrayBuffer::new(batch.size),
             request,
             batch.timeout,
             client,
-            cx.acker(),
         )
         .sink_map_err(|error| error!(message = "Fatal gcp_stackdriver_logs sink error.", %error));
 
-        Ok((VectorSink::Sink(Box::new(sink)), healthcheck))
+        Ok((VectorSink::from_event_sink(sink), healthcheck))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
-    fn sink_type(&self) -> &'static str {
-        "gcp_stackdriver_logs"
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
     }
 }
 
-#[async_trait::async_trait]
-impl HttpSink for StackdriverSink {
-    type Input = serde_json::Value;
-    type Output = Vec<BoxedRawValue>;
+struct StackdriverEventEncoder {
+    config: StackdriverConfig,
+    severity_key: Option<String>,
+}
 
-    fn encode_event(&self, event: Event) -> Option<Self::Input> {
+impl HttpEventEncoder<serde_json::Value> for StackdriverEventEncoder {
+    fn encode_event(&mut self, event: Event) -> Option<serde_json::Value> {
         let mut labels = HashMap::with_capacity(self.config.resource.labels.len());
         for (key, template) in &self.config.resource.labels {
             let value = template
                 .render_string(&event)
                 .map_err(|error| {
-                    emit!(&TemplateRenderingFailed {
+                    emit!(crate::internal_events::TemplateRenderingError {
                         error,
                         field: Some("resource.labels"),
                         drop_event: true,
@@ -175,7 +247,7 @@ impl HttpSink for StackdriverSink {
             .config
             .log_name(&event)
             .map_err(|error| {
-                emit!(&TemplateRenderingFailed {
+                emit!(crate::internal_events::TemplateRenderingError {
                     error,
                     field: Some("log_id"),
                     drop_event: true,
@@ -187,12 +259,12 @@ impl HttpSink for StackdriverSink {
         let severity = self
             .severity_key
             .as_ref()
-            .and_then(|key| log.remove(key))
+            .and_then(|key| log.remove(key.as_str()))
             .map(remap_severity)
             .unwrap_or_else(|| 0.into());
 
         let mut event = Event::Log(log);
-        self.config.encoding.apply_rules(&mut event);
+        self.config.encoding.transform(&mut event);
 
         let log = event.into_log();
 
@@ -215,20 +287,31 @@ impl HttpSink for StackdriverSink {
 
         Some(json!(entry))
     }
+}
 
-    async fn build_request(&self, events: Self::Output) -> crate::Result<Request<Vec<u8>>> {
+#[async_trait::async_trait]
+impl HttpSink for StackdriverSink {
+    type Input = serde_json::Value;
+    type Output = Vec<BoxedRawValue>;
+    type Encoder = StackdriverEventEncoder;
+
+    fn build_encoder(&self) -> Self::Encoder {
+        StackdriverEventEncoder {
+            config: self.config.clone(),
+            severity_key: self.severity_key.clone(),
+        }
+    }
+
+    async fn build_request(&self, events: Self::Output) -> crate::Result<Request<Bytes>> {
         let events = serde_json::json!({ "entries": events });
 
-        let body = serde_json::to_vec(&events).unwrap();
+        let body = crate::serde::json::to_bytes(&events).unwrap().freeze();
 
         let mut request = Request::post(self.uri.clone())
             .header("Content-Type", "application/json")
             .body(body)
             .unwrap();
-
-        if let Some(creds) = &self.creds {
-            creds.apply(&mut request);
-        }
+        self.auth.apply(&mut request);
 
         Ok(request)
     }
@@ -245,7 +328,7 @@ fn remap_severity(severity: Value) -> Value {
                     s if s.starts_with("EMERG") || s.starts_with("FATAL") => 800,
                     s if s.starts_with("ALERT") => 700,
                     s if s.starts_with("CRIT") => 600,
-                    s if s.starts_with("ERR") => 500,
+                    s if s.starts_with("ERR") || s == "ER" => 500,
                     s if s.starts_with("WARN") => 400,
                     s if s.starts_with("NOTICE") => 300,
                     s if s.starts_with("INFO") => 200,
@@ -255,7 +338,7 @@ fn remap_severity(severity: Value) -> Value {
                         warn!(
                             message = "Unknown severity value string, using DEFAULT.",
                             value = %s,
-                            internal_log_rate_secs = 10
+                            internal_log_rate_limit = true
                         );
                         0
                     }
@@ -266,7 +349,7 @@ fn remap_severity(severity: Value) -> Value {
             warn!(
                 message = "Unknown severity value type, using DEFAULT.",
                 ?value,
-                internal_log_rate_secs = 10
+                internal_log_rate_limit = true
             );
             0
         }
@@ -278,7 +361,7 @@ async fn healthcheck(client: HttpClient, sink: StackdriverSink) -> crate::Result
     let request = sink.build_request(vec![]).await?.map(Body::from);
 
     let response = client.send(request).await?;
-    healthcheck_response(sink.creds.clone(), HealthcheckError::NotFound.into())(response)
+    healthcheck_response(response, HealthcheckError::NotFound.into())
 }
 
 impl StackdriverConfig {
@@ -298,15 +381,45 @@ impl StackdriverConfig {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::event::{LogEvent, Value};
     use chrono::{TimeZone, Utc};
+    use futures::{future::ready, stream};
     use indoc::indoc;
     use serde_json::value::RawValue;
+
+    use super::*;
+    use crate::{
+        config::{GenerateConfig, SinkConfig, SinkContext},
+        event::{LogEvent, Value},
+        test_util::{
+            components::{run_and_assert_sink_compliance, SINK_TAGS},
+            http::{always_200_response, spawn_blackhole_http_server},
+        },
+    };
 
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<StackdriverConfig>();
+    }
+
+    #[tokio::test]
+    async fn component_spec_compliance() {
+        let mock_endpoint = spawn_blackhole_http_server(always_200_response).await;
+
+        let config = StackdriverConfig::generate_config().to_string();
+        let mut config =
+            toml::from_str::<StackdriverConfig>(&config).expect("config should be valid");
+
+        // If we don't override the credentials path/API key, it tries to directly call out to the Google Instance
+        // Metadata API, which we clearly don't have in unit tests. :)
+        config.auth.credentials_path = None;
+        config.auth.api_key = Some("fake".to_string().into());
+        config.endpoint = mock_endpoint.to_string();
+
+        let context = SinkContext::new_test();
+        let (sink, _healthcheck) = config.build(context).await.unwrap();
+
+        let event = Event::Log(LogEvent::from("simple message"));
+        run_and_assert_sink_compliance(sink, stream::once(ready(event)), &SINK_TAGS).await;
     }
 
     #[test]
@@ -323,10 +436,11 @@ mod tests {
 
         let sink = StackdriverSink {
             config,
-            creds: None,
+            auth: GcpAuthenticator::None,
             severity_key: Some("anumber".into()),
-            uri: ENDPOINT_URI.parse().unwrap(),
+            uri: default_endpoint().parse().unwrap(),
         };
+        let mut encoder = sink.build_encoder();
 
         let log = [
             ("message", "hello world"),
@@ -337,7 +451,7 @@ mod tests {
         .iter()
         .copied()
         .collect::<LogEvent>();
-        let json = sink.encode_event(Event::from(log)).unwrap();
+        let json = encoder.encode_event(Event::from(log)).unwrap();
         assert_eq!(
             json,
             serde_json::json!({
@@ -364,20 +478,25 @@ mod tests {
 
         let sink = StackdriverSink {
             config,
-            creds: None,
+            auth: GcpAuthenticator::None,
             severity_key: Some("anumber".into()),
-            uri: ENDPOINT_URI.parse().unwrap(),
+            uri: default_endpoint().parse().unwrap(),
         };
+        let mut encoder = sink.build_encoder();
 
         let mut log = LogEvent::default();
         log.insert("message", Value::Bytes("hello world".into()));
         log.insert("anumber", Value::Bytes("100".into()));
         log.insert(
             "timestamp",
-            Value::Timestamp(Utc.ymd(2020, 1, 1).and_hms(12, 30, 0)),
+            Value::Timestamp(
+                Utc.ymd(2020, 1, 1)
+                    .and_hms_opt(12, 30, 0)
+                    .expect("invalid timestamp"),
+            ),
         );
 
-        let json = sink.encode_event(Event::from(log)).unwrap();
+        let json = encoder.encode_event(Event::from(log)).unwrap();
         assert_eq!(
             json,
             serde_json::json!({
@@ -432,15 +551,16 @@ mod tests {
 
         let sink = StackdriverSink {
             config,
-            creds: None,
+            auth: GcpAuthenticator::None,
             severity_key: None,
-            uri: ENDPOINT_URI.parse().unwrap(),
+            uri: default_endpoint().parse().unwrap(),
         };
+        let mut encoder = sink.build_encoder();
 
         let log1 = [("message", "hello")].iter().copied().collect::<LogEvent>();
         let log2 = [("message", "world")].iter().copied().collect::<LogEvent>();
-        let event1 = sink.encode_event(Event::from(log1)).unwrap();
-        let event2 = sink.encode_event(Event::from(log2)).unwrap();
+        let event1 = encoder.encode_event(Event::from(log1)).unwrap();
+        let event2 = encoder.encode_event(Event::from(log2)).unwrap();
 
         let json1 = serde_json::to_string(&event1).unwrap();
         let json2 = serde_json::to_string(&event2).unwrap();

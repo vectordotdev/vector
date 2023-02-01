@@ -1,3 +1,4 @@
+use vrl::prelude::expression::FunctionExpression;
 use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
@@ -33,46 +34,56 @@ impl Function for Exists {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
-        mut arguments: ArgumentList,
+        _state: &state::TypeState,
+        _ctx: &mut FunctionCompileContext,
+        arguments: ArgumentList,
     ) -> Compiled {
         let query = arguments.required_query("field")?;
 
-        Ok(Box::new(ExistsFn { query }))
+        Ok(ExistsFn { query }.as_expr())
     }
 }
 
 #[derive(Clone, Debug)]
-pub struct ExistsFn {
+pub(crate) struct ExistsFn {
     query: expression::Query,
 }
 
-impl Expression for ExistsFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let path = self.query.path();
+fn exists(query: &expression::Query, ctx: &mut Context) -> Resolved {
+    let path = query.path();
 
-        if self.query.is_external() {
-            return Ok(ctx.target_mut().get(path).ok().flatten().is_some().into());
-        }
-
-        if let Some(ident) = self.query.variable_ident() {
-            return match ctx.state().variable(ident) {
-                Some(value) => Ok(value.get_by_path(path).is_some().into()),
-                None => Ok(false.into()),
-            };
-        }
-
-        if let Some(expr) = self.query.expression_target() {
-            let value = expr.resolve(ctx)?;
-
-            return Ok(value.get_by_path(path).is_some().into());
-        }
-
-        Ok(false.into())
+    if let Some(target_path) = query.external_path() {
+        return Ok(ctx
+            .target_mut()
+            .target_get(&target_path)
+            .ok()
+            .flatten()
+            .is_some()
+            .into());
     }
 
-    fn type_def(&self, _state: &state::Compiler) -> TypeDef {
-        TypeDef::new().infallible().boolean()
+    if let Some(ident) = query.variable_ident() {
+        return match ctx.state().variable(ident) {
+            Some(value) => Ok(value.get(path).is_some().into()),
+            None => Ok(false.into()),
+        };
+    }
+
+    if let Some(expr) = query.expression_target() {
+        let value = expr.resolve(ctx)?;
+
+        return Ok(value.get(path).is_some().into());
+    }
+
+    Ok(false.into())
+}
+
+impl FunctionExpression for ExistsFn {
+    fn resolve(&self, ctx: &mut Context) -> Resolved {
+        exists(&self.query, ctx)
+    }
+
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
+        TypeDef::boolean().infallible()
     }
 }

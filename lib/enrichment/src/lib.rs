@@ -1,3 +1,5 @@
+#![deny(warnings)]
+
 pub mod find_enrichment_table_records;
 pub mod get_enrichment_table_record;
 pub mod tables;
@@ -5,16 +7,16 @@ pub mod tables;
 #[cfg(test)]
 mod test_util;
 mod vrl_util;
-use dyn_clone::DynClone;
 use std::collections::BTreeMap;
-use vrl_core::Value;
 
+use dyn_clone::DynClone;
 pub use tables::{TableRegistry, TableSearch};
+use value::Value;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct IndexHandle(pub usize);
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Condition<'a> {
     /// Condition exactly matches the field value.
     Equals { field: &'a str, value: Value },
@@ -46,7 +48,7 @@ pub trait Table: DynClone {
         condition: &'a [Condition<'a>],
         select: Option<&[String]>,
         index: Option<IndexHandle>,
-    ) -> Result<BTreeMap<String, vrl_core::Value>, String>;
+    ) -> Result<BTreeMap<String, Value>, String>;
 
     /// Search the enrichment table data with the given condition.
     /// All conditions must match (AND).
@@ -57,7 +59,7 @@ pub trait Table: DynClone {
         condition: &'a [Condition<'a>],
         select: Option<&[String]>,
         index: Option<IndexHandle>,
-    ) -> Result<Vec<BTreeMap<String, vrl_core::Value>>, String>;
+    ) -> Result<Vec<BTreeMap<String, Value>>, String>;
 
     /// Hints to the enrichment table what data is going to be searched to allow it to index the
     /// data in advance.
@@ -65,15 +67,19 @@ pub trait Table: DynClone {
     /// # Errors
     /// Errors if the fields are not in the table.
     fn add_index(&mut self, case: Case, fields: &[&str]) -> Result<IndexHandle, String>;
+
+    /// Returns a list of the field names that are in each index
+    fn index_fields(&self) -> Vec<(Case, Vec<String>)>;
+
+    /// Returns true if the underlying data has changed and the table needs reloading.
+    fn needs_reload(&self) -> bool;
 }
 
 dyn_clone::clone_trait_object!(Table);
 
-pub fn vrl_functions() -> Vec<Box<dyn vrl_core::Function>> {
+pub fn vrl_functions() -> Vec<Box<dyn vrl::Function>> {
     vec![
-        Box::new(get_enrichment_table_record::GetEnrichmentTableRecord)
-            as Box<dyn vrl_core::Function>,
-        Box::new(find_enrichment_table_records::FindEnrichmentTableRecords)
-            as Box<dyn vrl_core::Function>,
+        Box::new(get_enrichment_table_record::GetEnrichmentTableRecord) as _,
+        Box::new(find_enrichment_table_records::FindEnrichmentTableRecords) as _,
     ]
 }

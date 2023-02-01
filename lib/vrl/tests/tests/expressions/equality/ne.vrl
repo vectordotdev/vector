@@ -1,3 +1,4 @@
 # result: [false, true, true, true]
 
-[1 != 1, 0 != 1, "true" != true, (5 / 4 ?? 0) != 0]
+foo = 4
+[1 != 1, 0 != 1, "true" != true, (5 / foo ?? 0) != 0]

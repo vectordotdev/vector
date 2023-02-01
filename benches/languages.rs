@@ -8,7 +8,7 @@ use vector::{
 criterion_group!(
     name = benches;
     // encapsulates CI noise we saw in
-    // https://github.com/timberio/vector/issues/5394
+    // https://github.com/vectordotdev/vector/issues/5394
     config = Criterion::default().noise_threshold(0.05);
     targets = benchmark_add_fields, benchmark_multifaceted, benchmark_parse_json, benchmark_parse_syslog
 );
@@ -27,16 +27,6 @@ fn benchmark_add_fields(c: &mut Criterion) {
                   .four = 4
                   .five = 5
                   """
-            "#},
-        ),
-        (
-            "native",
-            indoc! {r#"
-                [transforms.last]
-                  type = "add_fields"
-                  inputs = ["in"]
-                  fields.four = 4
-                  fields.five = 5
             "#},
         ),
         (
@@ -75,15 +65,6 @@ fn benchmark_parse_json(c: &mut Criterion) {
                   source = """
                   . = parse_json!(string!(.message))
                   """
-            "#},
-        ),
-        (
-            "native",
-            indoc! {r#"
-                [transforms.last]
-                  type = "json_parser"
-                  inputs = ["in"]
-                  field = "message"
             "#},
         ),
         (
@@ -128,23 +109,6 @@ fn benchmark_parse_syslog(c: &mut Criterion) {
             "#},
         ),
         (
-            "native",
-            indoc! {r#"
-                [transforms.last]
-                  type = "regex_parser"
-                  inputs = ["in"]
-                  field = "message"
-                  patterns = ['^<(?P<priority>\d+)>(?P<version>\d+) (?P<timestamp>\S+) (?P<hostname>\S+) (?P<appname>\S+) (?P<procid>\S+) (?P<msgid>\S+) (?P<sdata>\S+) (?P<message>.+)$']
-                  types.appname = "string"
-                  types.hostname = "string"
-                  types.level = "string"
-                  types.message = "string"
-                  types.msgid = "string"
-                  types.procid = "int"
-                  types.timestamp = "timestamp|%Y-%m-%dT%H:%M:%S%.fZ"
-            "#},
-        ),
-        (
             "lua",
             indoc! {r#"
                 [transforms.last]
@@ -156,7 +120,7 @@ fn benchmark_parse_syslog(c: &mut Criterion) {
                     local pattern = "^<(%d+)>(%d+) (%S+) (%S+) (%S+) (%S+) (%S+) (%S+) (.+)$"
                     local priority, version, timestamp, hostname, appname, procid, msgid, sdata, message = string.match(message, pattern)
 
-                    return {priority = priority, version = version, timestamp = timestamp, hostname = hostname, appname = appname, procid = tonumber(procid), msgid = msgid, sdata = sdata, message = message}
+                    return {priority = priority, version = tonumber(version), timestamp = timestamp, hostname = hostname, appname = appname, procid = tonumber(procid), msgid = msgid, sdata = sdata, message = message}
                   end
 
                   function process(event, emit)
@@ -170,8 +134,6 @@ fn benchmark_parse_syslog(c: &mut Criterion) {
     ];
 
     let input = r#"<12>3 2020-12-19T21:48:09.004Z initech.io su 4015 ID81 - TPS report missing cover sheet"#;
-    // intentionally leaves out facility and severity as the native implementation, using
-    // `regex_parser`, is not able to capture this
     let output = serde_json::from_str(r#"{ "appname": "su", "hostname": "initech.io", "message": "TPS report missing cover sheet", "msgid": "ID81", "procid": 4015, "timestamp": "2020-12-19T21:48:09.004Z", "version": 3 }"#).unwrap();
 
     benchmark_configs(c, "parse_syslog", configs, "in", "last", input, &output);
@@ -287,7 +249,7 @@ fn benchmark_configs(
 ) {
     vector::test_util::trace_init();
 
-    // only used for debug assertions so assigned to supress unused warning
+    // only used for debug assertions so assigned to suppress unused warning
     let _ = output;
 
     let num_lines = 10_000;
@@ -331,12 +293,8 @@ fn benchmark_configs(
                     config.push_str(&transform_config);
                     config.push_str(&sink_config);
 
-                    let config = config::load_from_str(
-                        &config,
-                        Some(config::Format::Toml),
-                        Default::default(),
-                    )
-                    .expect(&format!("invalid TOML configuration: {}", &config));
+                    let config = config::load_from_str(&config, config::Format::Toml)
+                        .expect(&format!("invalid TOML configuration: {}", &config));
                     let rt = runtime();
                     let (output_lines, topology) = rt.block_on(async move {
                         let output_lines = CountReceiver::receive_lines(out_addr);
@@ -361,7 +319,7 @@ fn benchmark_configs(
                             for output_line in &output_lines {
                                 let actual: serde_json::map::Map<String, serde_json::Value> =
                                     serde_json::from_str(output_line).unwrap();
-                                // avoids asserting the actual == expected as the socket trasform
+                                // avoids asserting the actual == expected as the socket transform
                                 // adds dynamic keys like timestamp
                                 for (key, value) in output.iter() {
                                     assert_eq!(Some(value), actual.get(key), "for key {}", key,);

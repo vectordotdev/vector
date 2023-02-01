@@ -13,6 +13,7 @@ components: sources: apache_metrics: {
 	}
 
 	features: {
+		acknowledgements: false
 		multiline: enabled: false
 		collect: {
 			checkpoint: enabled: false
@@ -36,16 +37,6 @@ components: sources: apache_metrics: {
 	}
 
 	support: {
-		targets: {
-			"aarch64-unknown-linux-gnu":      true
-			"aarch64-unknown-linux-musl":     true
-			"armv7-unknown-linux-gnueabihf":  true
-			"armv7-unknown-linux-musleabihf": true
-			"x86_64-apple-darwin":            true
-			"x86_64-pc-windows-msv":          true
-			"x86_64-unknown-linux-gnu":       true
-			"x86_64-unknown-linux-musl":      true
-		}
 		requirements: [
 			"""
 			The [Apache Status module](\(urls.apache_mod_status)) must be enabled.
@@ -59,37 +50,7 @@ components: sources: apache_metrics: {
 		platform_name: null
 	}
 
-	configuration: {
-		endpoints: {
-			description: "`mod_status` endpoints to scrape metrics from."
-			required:    true
-			type: array: {
-				items: type: string: {
-					examples: ["http://localhost:8080/server-status/?auto"]
-					syntax: "literal"
-				}
-			}
-		}
-		scrape_interval_secs: {
-			description: "The interval between scrapes."
-			common:      true
-			required:    false
-			type: uint: {
-				default: 15
-				unit:    "seconds"
-			}
-		}
-		namespace: {
-			description: "The namespace of the metric. Disabled if empty."
-			required:    false
-			common:      false
-			warnings: []
-			type: string: {
-				default: "apache"
-				syntax:  "literal"
-			}
-		}
-	}
+	configuration: base.components.sources.apache_metrics.configuration
 
 	output: metrics: {
 		// Default Apache metrics tags
@@ -200,14 +161,18 @@ components: sources: apache_metrics: {
 	how_it_works: {}
 
 	telemetry: metrics: {
-		events_in_total:                 components.sources.internal_metrics.output.metrics.events_in_total
-		http_error_response_total:       components.sources.internal_metrics.output.metrics.http_error_response_total
-		http_request_errors_total:       components.sources.internal_metrics.output.metrics.http_request_errors_total
-		parse_errors_total:              components.sources.internal_metrics.output.metrics.parse_errors_total
-		processed_bytes_total:           components.sources.internal_metrics.output.metrics.processed_bytes_total
-		processed_events_total:          components.sources.internal_metrics.output.metrics.processed_events_total
-		component_received_events_total: components.sources.internal_metrics.output.metrics.component_received_events_total
-		requests_completed_total:        components.sources.internal_metrics.output.metrics.requests_completed_total
-		request_duration_seconds:        components.sources.internal_metrics.output.metrics.request_duration_seconds
+		component_discarded_events_total:     components.sources.internal_metrics.output.metrics.component_discarded_events_total
+		component_errors_total:               components.sources.internal_metrics.output.metrics.component_errors_total
+		component_received_bytes_total:       components.sources.internal_metrics.output.metrics.component_received_bytes_total
+		component_received_events_total:      components.sources.internal_metrics.output.metrics.component_received_events_total
+		component_received_event_bytes_total: components.sources.internal_metrics.output.metrics.component_received_event_bytes_total
+		events_in_total:                      components.sources.internal_metrics.output.metrics.events_in_total
+		http_error_response_total:            components.sources.internal_metrics.output.metrics.http_error_response_total
+		http_request_errors_total:            components.sources.internal_metrics.output.metrics.http_request_errors_total
+		parse_errors_total:                   components.sources.internal_metrics.output.metrics.parse_errors_total
+		processed_bytes_total:                components.sources.internal_metrics.output.metrics.processed_bytes_total
+		processed_events_total:               components.sources.internal_metrics.output.metrics.processed_events_total
+		requests_completed_total:             components.sources.internal_metrics.output.metrics.requests_completed_total
+		request_duration_seconds:             components.sources.internal_metrics.output.metrics.request_duration_seconds
 	}
 }

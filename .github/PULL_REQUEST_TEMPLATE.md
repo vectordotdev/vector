@@ -5,7 +5,7 @@
 
   * `type` = chore, enhancement, feat, fix, docs
   * `!` = OPTIONAL: signals a breaking change
-  * `scope` = Optional when `type` is "chore" or "docs", available scopes https://github.com/timberio/vector/blob/master/.github/semantic.yml#L20
+  * `scope` = Optional when `type` is "chore" or "docs", available scopes https://github.com/vectordotdev/vector/blob/master/.github/semantic.yml#L20
   * `description` = short description of the change
 
 Examples:

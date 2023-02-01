@@ -1,13 +1,14 @@
 package metadata
 
 components: sinks: statsd: {
-	title: "Statsd"
+	title: "StatsD"
 
 	classes: sinks.socket.classes
 
 	features: {
-		buffer:      sinks.socket.features.buffer
-		healthcheck: sinks.socket.features.healthcheck
+		acknowledgements: sinks.socket.features.acknowledgements
+		auto_generated:   true
+		healthcheck:      sinks.socket.features.healthcheck
 		send: {
 			compression: sinks.socket.features.send.compression
 			encoding: enabled: false
@@ -43,27 +44,14 @@ components: sinks: statsd: {
 			set:          true
 			summary:      false
 		}
+		traces: false
 	}
 
-	configuration: sinks.socket.configuration & {
-		"type": "type": string: enum: statsd: "The type of this component."
-		default_namespace: {
-			common: true
-			description: """
-				Used as a namespace for metrics that don't have it.
-				A namespace will be prefixed to a metric's name.
-				"""
-			required: false
-			warnings: []
-			type: string: {
-				default: null
-				examples: ["service"]
-				syntax: "literal"
-			}
-		}
-	}
+	configuration: base.components.sinks.statsd.configuration
 
 	telemetry: metrics: {
-		processing_errors_total: components.sources.internal_metrics.output.metrics.processing_errors_total
+		component_sent_events_total:      components.sources.internal_metrics.output.metrics.component_sent_events_total
+		component_sent_event_bytes_total: components.sources.internal_metrics.output.metrics.component_sent_event_bytes_total
+		processing_errors_total:          components.sources.internal_metrics.output.metrics.processing_errors_total
 	}
 }

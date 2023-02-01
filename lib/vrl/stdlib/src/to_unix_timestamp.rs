@@ -1,5 +1,17 @@
 use std::str::FromStr;
+
+use ::value::Value;
 use vrl::prelude::*;
+
+fn to_unix_timestamp(value: Value, unit: Unit) -> Resolved {
+    let ts = value.try_timestamp()?;
+    let time = match unit {
+        Unit::Seconds => ts.timestamp(),
+        Unit::Milliseconds => ts.timestamp_millis(),
+        Unit::Nanoseconds => ts.timestamp_nanos(),
+    };
+    Ok(time.into())
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct ToUnixTimestamp;
@@ -46,9 +58,9 @@ impl Function for ToUnixTimestamp {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
-        mut arguments: ArgumentList,
+        _state: &state::TypeState,
+        _ctx: &mut FunctionCompileContext,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
 
@@ -60,7 +72,7 @@ impl Function for ToUnixTimestamp {
             })
             .unwrap_or_default();
 
-        Ok(Box::new(ToUnixTimestampFn { value, unit }))
+        Ok(ToUnixTimestampFn { value, unit }.as_expr())
     }
 }
 
@@ -73,7 +85,7 @@ enum Unit {
 
 impl Unit {
     fn all_value() -> Vec<Value> {
-        use Unit::*;
+        use Unit::{Milliseconds, Nanoseconds, Seconds};
 
         vec![Seconds, Milliseconds, Nanoseconds]
             .into_iter()
@@ -82,7 +94,7 @@ impl Unit {
     }
 
     const fn as_str(self) -> &'static str {
-        use Unit::*;
+        use Unit::{Milliseconds, Nanoseconds, Seconds};
 
         match self {
             Seconds => "seconds",
@@ -102,7 +114,7 @@ impl FromStr for Unit {
     type Err = &'static str;
 
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        use Unit::*;
+        use Unit::{Milliseconds, Nanoseconds, Seconds};
 
         match s {
             "seconds" => Ok(Seconds),
@@ -119,28 +131,24 @@ struct ToUnixTimestampFn {
     unit: Unit,
 }
 
-impl Expression for ToUnixTimestampFn {
+impl FunctionExpression for ToUnixTimestampFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let ts = self.value.resolve(ctx)?.try_timestamp()?;
+        let value = self.value.resolve(ctx)?;
+        let unit = self.unit;
 
-        let time = match self.unit {
-            Unit::Seconds => ts.timestamp(),
-            Unit::Milliseconds => ts.timestamp_millis(),
-            Unit::Nanoseconds => ts.timestamp_nanos(),
-        };
-
-        Ok(time.into())
+        to_unix_timestamp(value, unit)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new().infallible().integer()
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
+        TypeDef::integer().infallible()
     }
 }
 
 #[cfg(test)]
 mod test {
-    use super::*;
     use chrono::TimeZone;
+
+    use super::*;
 
     test_function![
         to_unix_timestamp => ToUnixTimestamp;
@@ -149,24 +157,24 @@ mod test {
             args: func_args![value: chrono::Utc.ymd(2021, 1, 1).and_hms_milli(0, 0, 0, 0),
                              unit: "seconds"
             ],
-            want: Ok(1609459200i64),
-            tdef: TypeDef::new().infallible().integer(),
+            want: Ok(1_609_459_200_i64),
+            tdef: TypeDef::integer().infallible(),
         }
 
         milliseconds {
             args: func_args![value: chrono::Utc.ymd(2021, 1, 1).and_hms_milli(0, 0, 0, 0),
                              unit: "milliseconds"
             ],
-            want: Ok(1609459200000i64),
-            tdef: TypeDef::new().infallible().integer(),
+            want: Ok(1_609_459_200_000_i64),
+            tdef: TypeDef::integer().infallible(),
         }
 
         nanoseconds {
              args: func_args![value: chrono::Utc.ymd(2021, 1, 1).and_hms_milli(0, 0, 0, 0),
                               unit: "nanoseconds"
              ],
-             want: Ok(1609459200000000000i64),
-             tdef: TypeDef::new().infallible().integer(),
+             want: Ok(1_609_459_200_000_000_000_i64),
+             tdef: TypeDef::integer().infallible(),
          }
     ];
 }

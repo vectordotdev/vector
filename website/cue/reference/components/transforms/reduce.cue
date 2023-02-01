@@ -20,144 +20,17 @@ components: transforms: reduce: {
 	}
 
 	support: {
-		targets: {
-			"aarch64-unknown-linux-gnu":      true
-			"aarch64-unknown-linux-musl":     true
-			"armv7-unknown-linux-gnueabihf":  true
-			"armv7-unknown-linux-musleabihf": true
-			"x86_64-apple-darwin":            true
-			"x86_64-pc-windows-msv":          true
-			"x86_64-unknown-linux-gnu":       true
-			"x86_64-unknown-linux-musl":      true
-		}
 		requirements: []
 		warnings: []
 		notices: []
 	}
 
-	configuration: {
-		ends_when: {
-			common: false
-			description: """
-				A condition used to distinguish the final event of a transaction. If this condition resolves to `true`
-				for an event, the current transaction is immediately flushed with this event.
-				"""
-			required: false
-			warnings: []
-			type: string: {
-				default: null
-				examples: [
-					#".status_code != 200 && !includes(["info", "debug"], .severity)"#,
-				]
-				syntax: "literal"
-			}
-		}
-		expire_after_ms: {
-			common:      false
-			description: "A maximum period of time to wait after the last event is received before a combined event should be considered complete."
-			required:    false
-			warnings: []
-			type: uint: {
-				default: 30000
-				unit:    "milliseconds"
-			}
-		}
-		flush_period_ms: {
-			common:      false
-			description: "Controls the frequency that Vector checks for (and flushes) expired events."
-			required:    false
-			warnings: []
-			type: uint: {
-				default: 1000
-				unit:    "milliseconds"
-			}
-		}
-		group_by: {
-			common:      true
-			description: "An ordered list of fields by which to group events. Each group is combined independently, allowing you to keep independent events separate. When no fields are specified, all events will be combined in a single group. Events missing a specified field will be combined in their own group."
-			required:    false
-			warnings: []
-			type: array: {
-				default: []
-				items: type: string: {
-					examples: ["request_id", "user_id", "transaction_id"]
-					syntax: "literal"
-				}
-			}
-		}
-		merge_strategies: {
-			common: false
-			description: """
-				A map of field names to custom merge strategies. For each
-				field specified this strategy will be used for combining
-				events rather than the default behavior.
-
-				The default behavior is as follows:
-
-				1. The first value of a string field is kept, subsequent
-				   values are discarded.
-				2. For timestamp fields the first is kept and a new field
-				   `[field-name]_end` is added with the last received
-				   timestamp value.
-				3. Numeric values are summed.
-				"""
-			required: false
-			warnings: []
-			type: object: {
-				examples: [
-					{
-						method:      "discard"
-						path:        "discard"
-						duration_ms: "sum"
-						query:       "array"
-					},
-				]
-				options: {
-					"*": {
-						description: "The custom merge strategy to use for a field."
-						required:    true
-						warnings: []
-						type: string: {
-							enum: {
-								array:          "Each value is appended to an array."
-								longest_array:  "Retains the longest array seen"
-								shortest_array: "Retains the shortest array seen"
-								concat:         "Concatenate each string value (delimited with a space)."
-								concat_newline: "Concatenate each string value (delimited with a newline)."
-								discard:        "Discard all but the first value found."
-								retain:         "Discard all but the last value found. Works as a coalesce by not retaining null."
-								sum:            "Sum all numeric values."
-								max:            "The maximum of all numeric values."
-								min:            "The minimum of all numeric values."
-								flat_unique:    "Create a flattened array of all the unique values."
-							}
-							syntax: "literal"
-						}
-					}
-				}
-			}
-		}
-		starts_when: {
-			common: false
-			description: """
-				A condition used to distinguish the first event of a transaction. If this condition resolves to `true`
-				for an event, the previous transaction is flushed (without this event) and a new transaction is started.
-				"""
-			required: false
-			warnings: []
-			type: string: {
-				default: null
-				examples: [
-					#".status_code != 200 && !includes(["info", "debug"], .severity)"#,
-				]
-				syntax: "literal"
-			}
-		}
-	}
+	configuration: base.components.transforms.reduce.configuration
 
 	input: {
 		logs:    true
 		metrics: null
+		traces:  false
 	}
 
 	examples: [
@@ -216,7 +89,7 @@ components: transforms: reduce: {
 				merge_strategies: {
 					message: "concat_newline"
 				}
-				starts_when: #"match(.message, /^[^\s]/)"#
+				starts_when: #"match(string!(.message), r'^[^\s]')"#
 			}
 
 			output: [

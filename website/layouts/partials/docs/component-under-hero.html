@@ -2,6 +2,7 @@
 {{ $type := .CurrentSection.Params.component_type }}
 {{ $config := index (index site.Data.docs.components $type) $tag }}
 {{ $classes := $config.classes }}
+{{ $features := $config.features }}
 {{ $output := $config.output }}
 {{ $alias := $config.alias }}
 
@@ -24,6 +25,14 @@
 
   {{ if eq $classes.delivery "at_least_once" }}
   {{ partial "badge.html" (dict "prefix" "delivery" "word" "at-least-once" "color" "blue" "inline" true) }}
+  {{ end }}
+
+  {{ if eq $features.acknowledgements true }}
+  {{ partial "badge.html" (dict "prefix" "acknowledgements" "word" "yes" "color" "green" "inline" true) }}
+  {{ end }}
+
+  {{ if eq $features.acknowledgements false }}
+  {{ partial "badge.html" (dict "prefix" "acknowledgements" "word" "no" "color" "yellow" "inline" true) }}
   {{ end }}
 
   {{ with $classes.egress_method }}

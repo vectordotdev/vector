@@ -1,18 +1,12 @@
-use super::Result;
-use crate::util::run_command_output;
 use std::{ffi::OsStr, process::Stdio};
+
 use tokio::process::Command;
 
-#[derive(Debug)]
-pub struct Config {
-    pod_name: String,
-}
+use super::Result;
+use crate::util::run_command_output;
 
 #[derive(Debug)]
-pub struct CommandBuilder {
-    kubctl_command: String,
-    config: Config,
-}
+pub struct CommandBuilder {}
 
 fn prepare_base_command<Cmd, NS, Pod>(
     kubectl_command: Cmd,
@@ -58,6 +52,24 @@ where
         .ok_or("nodename must be a string")?;
 
     Ok(node.to_string())
+}
+
+/// Set label on all nodes to discover this label from the pod.
+pub async fn label_nodes<Cmd, Label>(kubectl_command: Cmd, label: Label) -> Result<String>
+where
+    Cmd: AsRef<OsStr>,
+    Label: AsRef<OsStr>,
+{
+    let mut command = Command::new(&kubectl_command);
+    command
+        .arg("label")
+        .arg("node")
+        .arg(label)
+        .arg("--all")
+        .arg("--overwrite");
+
+    let res = run_command_output(command).await?;
+    Ok(res)
 }
 
 pub async fn get_pod_on_node<Cmd, NS>(

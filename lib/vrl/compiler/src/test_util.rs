@@ -5,7 +5,7 @@
 macro_rules! expr {
     ($($v:tt)*) => {{
         let value = $crate::value!($($v)*);
-        value.into_expression()
+        $crate::value::VrlValueConvert::into_expression(value)
     }};
 }
 
@@ -18,7 +18,7 @@ macro_rules! test_type_def {
             $(
                 #[test]
                 fn $name() {
-                    let mut state = $crate::state::Compiler::default();
+                    let mut state = $crate::state::TypeState::default();
                     let expression = Box::new($expr(&mut state));
 
                     assert_eq!(expression.type_def(&state), $def);
@@ -31,12 +31,12 @@ macro_rules! test_type_def {
 #[macro_export]
 macro_rules! func_args {
     () => (
-        ::std::collections::HashMap::<&'static str, $crate::Value>::default()
+        ::std::collections::HashMap::<&'static str, ::value::Value>::default()
     );
     ($($k:tt: $v:expr),+ $(,)?) => {
         vec![$((stringify!($k), $v.into())),+]
             .into_iter()
-            .collect::<::std::collections::HashMap<&'static str, $crate::Value>>()
+            .collect::<::std::collections::HashMap<&'static str, ::value::Value>>()
     };
 }
 
@@ -47,13 +47,14 @@ macro_rules! bench_function {
             let mut group = c.benchmark_group(&format!("vrl_stdlib/functions/{}", stringify!($name)));
             group.throughput(criterion::Throughput::Elements(1));
             $(
-                group.bench_function(&format!("{}", stringify!($case)), |b| {
-                    let mut compiler_state = $crate::state::Compiler::default();
-                    let (expression, want) = $crate::__prep_bench_or_test!($func, compiler_state, $args, $(Ok($crate::Value::from($ok)))? $(Err($err.to_owned()))?);
+                group.bench_function(&stringify!($case).to_string(), |b| {
+                    let mut state = $crate::state::TypeState::default();
+
+                    let (expression, want) = $crate::__prep_bench_or_test!($func, &state, $args, $(Ok(::value::Value::from($ok)))? $(Err($err.to_owned()))?);
                     let expression = expression.unwrap();
                     let mut runtime_state = $crate::state::Runtime::default();
-                    let mut target: $crate::Value = ::std::collections::BTreeMap::default().into();
-                    let tz = shared::TimeZone::Named(chrono_tz::Tz::UTC);
+                    let mut target: ::value::Value = ::std::collections::BTreeMap::default().into();
+                    let tz = vector_common::TimeZone::Named(chrono_tz::Tz::UTC);
                     let mut ctx = $crate::Context::new(&mut target, &mut runtime_state, &tz);
 
                     b.iter(|| {
@@ -71,7 +72,7 @@ macro_rules! bench_function {
 macro_rules! test_function {
 
     ($name:tt => $func:path; $($case:ident { args: $args:expr, want: $(Ok($ok:expr))? $(Err($err:expr))?, tdef: $tdef:expr,  $(,)* })+) => {
-        test_function!($name => $func; before_each => {} $($case { args: $args, want: $(Ok($ok))? $(Err($err))?, tdef: $tdef, tz: shared::TimeZone::Named(chrono_tz::Tz::UTC), })+);
+        test_function!($name => $func; before_each => {} $($case { args: $args, want: $(Ok($ok))? $(Err($err))?, tdef: $tdef, tz: vector_common::TimeZone::Named(chrono_tz::Tz::UTC), })+);
     };
 
     ($name:tt => $func:path; $($case:ident { args: $args:expr, want: $(Ok($ok:expr))? $(Err($err:expr))?, tdef: $tdef:expr, tz: $tz:expr,  $(,)* })+) => {
@@ -79,7 +80,7 @@ macro_rules! test_function {
     };
 
     ($name:tt => $func:path; before_each => $before:block $($case:ident { args: $args:expr, want: $(Ok($ok:expr))? $(Err($err:expr))?, tdef: $tdef:expr,  $(,)* })+) => {
-        test_function!($name => $func; before_each => $before $($case { args: $args, want: $(Ok($ok))? $(Err($err))?, tdef: $tdef, tz: shared::TimeZone::Named(chrono_tz::Tz::UTC), })+);
+        test_function!($name => $func; before_each => $before $($case { args: $args, want: $(Ok($ok))? $(Err($err))?, tdef: $tdef, tz: vector_common::TimeZone::Named(chrono_tz::Tz::UTC), })+);
     };
 
     ($name:tt => $func:path; before_each => $before:block $($case:ident { args: $args:expr, want: $(Ok($ok:expr))? $(Err($err:expr))?, tdef: $tdef:expr, tz: $tz:expr,  $(,)* })+) => {
@@ -87,21 +88,21 @@ macro_rules! test_function {
             #[test]
             fn [<$name _ $case:snake:lower>]() {
                 $before
-                let mut compiler_state = $crate::state::Compiler::default();
-                let (expression, want) = $crate::__prep_bench_or_test!($func, compiler_state, $args, $(Ok($crate::Value::from($ok)))? $(Err($err.to_owned()))?);
+                let mut state = $crate::state::TypeState::default();
+
+                let (expression, want) = $crate::__prep_bench_or_test!($func, &state, $args, $(Ok(::value::Value::from($ok)))? $(Err($err.to_owned()))?);
                 match expression {
                     Ok(expression) => {
                         let mut runtime_state = $crate::state::Runtime::default();
-                        let mut target: $crate::Value = ::std::collections::BTreeMap::default().into();
+                        let mut target: ::value::Value = ::std::collections::BTreeMap::default().into();
                         let tz = $tz;
                         let mut ctx = $crate::Context::new(&mut target, &mut runtime_state, &tz);
 
                         let got_value = expression.resolve(&mut ctx)
                             .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
 
-                        assert_eq!(got_value, want);
-                        let got_tdef = expression.type_def(&compiler_state);
-
+                        assert!(got_value == want, "assertion failed for `{}` case:\n  got:    {:?}\n  wanted: {:?}", stringify!($case), got_value, want);
+                        let got_tdef = expression.type_def(&state);
                         assert_eq!(got_tdef, $tdef);
                     }
                     err@Err(_) => {
@@ -109,7 +110,7 @@ macro_rules! test_function {
                         assert_eq!(err
                                    // We have to map to a value just to make sure the types match even though
                                    // it will never be used.
-                                   .map(|_| Value::Null)
+                                   .map(|_| ::value::Value::Null)
                                    .map_err(|e| format!("{:#}", e.message())), want);
                     }
                 }
@@ -122,12 +123,14 @@ macro_rules! test_function {
 #[macro_export]
 macro_rules! __prep_bench_or_test {
     ($func:path, $state:expr, $args:expr, $want:expr) => {{
+        let config = $crate::CompileConfig::default();
         (
             $func.compile(
-                &$state,
-                &$crate::function::FunctionCompileContext {
-                    span: vrl::diagnostic::Span::new(0, 0),
-                },
+                $state,
+                &mut $crate::function::FunctionCompileContext::new(
+                    vrl::diagnostic::Span::new(0, 0),
+                    config,
+                ),
                 $args.into(),
             ),
             $want,
@@ -136,46 +139,36 @@ macro_rules! __prep_bench_or_test {
 }
 
 #[macro_export]
-macro_rules! map {
-    () => (
-        ::std::collections::BTreeMap::new()
-    );
-    ($($k:tt: $v:expr),+ $(,)?) => {
-        vec![$(($k.into(), $v.into())),+]
-            .into_iter()
-            .collect::<::std::collections::BTreeMap<_, _>>()
-    };
-}
-
-#[macro_export]
 macro_rules! type_def {
     (unknown) => {
-        TypeDef::new().unknown()
+        TypeDef::any()
     };
 
     (bytes) => {
-        TypeDef::new().bytes()
+        TypeDef::bytes()
     };
 
-    (object { $($key:expr => $value:expr,)+ }) => {
-        TypeDef::new().object::<&'static str, TypeDef>(btreemap! (
-            $($key => $value,)+
-        ))
-    };
+    (object {$(unknown => $unknown:expr,)? $($key:literal => $value:expr,)+ }) => {{
+        let mut v = value::kind::Collection::from(::std::collections::BTreeMap::from([$(($key.into(), $value.into()),)+]));
+        $(v.set_unknown(value::Kind::from($unknown)))?;
 
-    (array [ $($value:expr,)+ ]) => {
-        TypeDef::new().array_mapped::<(), TypeDef>(btreemap! (
-            $(() => $value,)+
-        ))
-    };
+        TypeDef::object(v)
+    }};
 
-    (array { $($idx:expr => $value:expr,)+ }) => {
-        TypeDef::new().array_mapped::<Index, TypeDef>(btreemap! (
-            $($idx => $value,)+
-        ))
-    };
+    (array [ $($value:expr,)+ ]) => {{
+        $(let v = value::kind::Collection::from_unknown(value::Kind::from($value));)+
+
+        TypeDef::array(v)
+    }};
+
+    (array { $(unknown => $unknown:expr,)? $($idx:literal => $value:expr,)+ }) => {{
+        let mut v = value::kind::Collection::from(::std::collections::BTreeMap::from([$(($idx.into(), $value.into()),)+]));
+        $(v.set_unknown(value::Kind::from($unknown)))?;
+
+        TypeDef::array(v)
+    }};
 
     (array) => {
-        TypeDef::new().array_mapped::<i32, TypeDef>(btreemap! ())
+        TypeDef::array(value::kind::Collection::any())
     };
 }

@@ -1,7 +1,9 @@
+use std::time::Duration;
+
 use criterion::{
     criterion_group, measurement::WallTime, BatchSize, BenchmarkGroup, Criterion, SamplingMode,
 };
-use std::time::Duration;
+use lookup::event_path;
 use vector_core::event::LogEvent;
 
 fn rename_key_flat(c: &mut Criterion) {
@@ -19,7 +21,7 @@ fn rename_key_flat(c: &mut Criterion) {
                 log_event
             },
             |mut log_event| {
-                log_event.rename_key_flat("one", "1");
+                log_event.rename_key(event_path!("one"), event_path!("1"));
             },
             BatchSize::SmallInput,
         )
@@ -35,7 +37,7 @@ fn rename_key_flat(c: &mut Criterion) {
                 log_event
             },
             |mut log_event| {
-                log_event.rename_key_flat("four", "4");
+                log_event.rename_key(event_path!("four"), event_path!("4"));
             },
             BatchSize::SmallInput,
         )

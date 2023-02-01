@@ -28,5 +28,5 @@ minikube config set container-runtime "$CONTAINER_RUNTIME"
 
 # Start minikube, try again once if fails and print logs if the second
 # attempt fails too.
-minikube start || { minikube delete && minikube start; } || minikube logs
+minikube start --wait=all || { minikube delete && minikube start --wait=all; } || minikube logs
 kubectl cluster-info

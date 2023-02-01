@@ -1,9 +1,11 @@
 //! Wait for a resource rollout to complete.
 
+use std::{ffi::OsStr, process::Stdio};
+
+use tokio::process::Command;
+
 use super::Result;
 use crate::util::run_command;
-use std::{ffi::OsStr, process::Stdio};
-use tokio::process::Command;
 
 /// Wait for a rollout of a `resource` within a `namespace` to complete via
 /// the specified `kubectl_command`.

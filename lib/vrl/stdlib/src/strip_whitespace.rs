@@ -38,13 +38,13 @@ impl Function for StripWhitespace {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
-        mut arguments: ArgumentList,
+        _state: &state::TypeState,
+        _ctx: &mut FunctionCompileContext,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
 
-        Ok(Box::new(StripWhitespaceFn { value }))
+        Ok(StripWhitespaceFn { value }.as_expr())
     }
 }
 
@@ -53,15 +53,15 @@ struct StripWhitespaceFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for StripWhitespaceFn {
+impl FunctionExpression for StripWhitespaceFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
 
         Ok(value.try_bytes_utf8_lossy()?.trim().into())
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new().infallible().bytes()
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
+        TypeDef::bytes().infallible()
     }
 }
 
@@ -75,31 +75,31 @@ mod tests {
         empty {
             args: func_args![value: ""],
             want: Ok(""),
-            tdef: TypeDef::new().infallible().bytes(),
+            tdef: TypeDef::bytes().infallible(),
         }
 
         just_spaces {
             args: func_args![value: "      "],
             want: Ok(""),
-            tdef: TypeDef::new().infallible().bytes(),
+            tdef: TypeDef::bytes().infallible(),
         }
 
         no_spaces {
             args: func_args![value: "hi there"],
             want: Ok("hi there"),
-            tdef: TypeDef::new().infallible().bytes(),
+            tdef: TypeDef::bytes().infallible(),
         }
 
         spaces {
             args: func_args![value: "           hi there        "],
             want: Ok("hi there"),
-            tdef: TypeDef::new().infallible().bytes(),
+            tdef: TypeDef::bytes().infallible(),
         }
 
         unicode_whitespace {
             args: func_args![value: " \u{3000}\u{205F}\u{202F}\u{A0}\u{9} ❤❤ hi there ❤❤  \u{9}\u{A0}\u{202F}\u{205F}\u{3000} "],
             want: Ok("❤❤ hi there ❤❤"),
-            tdef: TypeDef::new().infallible().bytes(),
+            tdef: TypeDef::bytes().infallible(),
         }
     ];
 }

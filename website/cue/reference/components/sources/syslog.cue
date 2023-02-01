@@ -8,8 +8,9 @@ components: sources: syslog: {
 	classes: sources.socket.classes
 
 	features: {
-		multiline: sources.socket.features.multiline
-
+		auto_generated:   true
+		acknowledgements: sources.socket.features.acknowledgements
+		multiline:        sources.socket.features.multiline
 		receive: {
 			from: {
 				service: services.syslog
@@ -46,65 +47,7 @@ components: sources: syslog: {
 		platform_name: null
 	}
 
-	configuration: {
-		address: {
-			description:   "The address to listen for connections on, or `systemd#N` to use the Nth socket passed by systemd socket activation. If an address is used it _must_ include a port."
-			relevant_when: "mode = `tcp` or `udp`"
-			required:      true
-			warnings: []
-			type: string: {
-				examples: ["0.0.0.0:\(_port)", "systemd", "systemd#3"]
-				syntax: "literal"
-			}
-		}
-		host_key: {
-			category:    "Context"
-			common:      false
-			description: """
-				The key name added to each event representing the current host. This can also be globally set via the
-				[global `host_key` option](\(urls.vector_configuration)/global-options#log_schema.host_key).
-				"""
-			required:    false
-			warnings: []
-			type: string: {
-				default: "host"
-				syntax:  "literal"
-			}
-		}
-		max_length: {
-			common:      true
-			description: "The maximum bytes size of incoming messages before they are discarded."
-			required:    false
-			warnings: []
-			type: uint: {
-				default: 102400
-				unit:    "bytes"
-			}
-		}
-		mode: {
-			description: "The type of socket to use."
-			required:    true
-			warnings: []
-			type: string: {
-				enum: {
-					tcp:  "TCP socket."
-					udp:  "UDP socket."
-					unix: "Unix domain stream socket."
-				}
-				syntax: "literal"
-			}
-		}
-		path: {
-			description:   "The unix socket path. *This should be an absolute path*."
-			relevant_when: "mode = `unix`"
-			required:      true
-			warnings: []
-			type: string: {
-				examples: ["/path/to/socket"]
-				syntax: "literal"
-			}
-		}
-	}
+	configuration: base.components.sources.syslog.configuration
 
 	output: logs: line: {
 		description: "An individual Syslog event"
@@ -114,7 +57,6 @@ components: sources: syslog: {
 				required:    true
 				type: string: {
 					examples: ["app-name"]
-					syntax: "literal"
 				}
 			}
 			host: fields._local_host
@@ -123,7 +65,6 @@ components: sources: syslog: {
 				required:    true
 				type: string: {
 					examples: ["my.host.com"]
-					syntax: "literal"
 				}
 			}
 			facility: {
@@ -131,7 +72,6 @@ components: sources: syslog: {
 				required:    true
 				type: string: {
 					examples: ["1"]
-					syntax: "literal"
 				}
 			}
 			message: {
@@ -139,7 +79,6 @@ components: sources: syslog: {
 				required:    true
 				type: string: {
 					examples: ["Hello world"]
-					syntax: "literal"
 				}
 			}
 			msgid: {
@@ -147,7 +86,6 @@ components: sources: syslog: {
 				required:    true
 				type: string: {
 					examples: ["ID47"]
-					syntax: "literal"
 				}
 			}
 			procid: {
@@ -155,7 +93,6 @@ components: sources: syslog: {
 				required:    true
 				type: string: {
 					examples: ["8710"]
-					syntax: "literal"
 				}
 			}
 			severity: {
@@ -163,7 +100,6 @@ components: sources: syslog: {
 				required:    true
 				type: string: {
 					examples: ["notice"]
-					syntax: "literal"
 				}
 			}
 			source_ip: {
@@ -171,7 +107,13 @@ components: sources: syslog: {
 				required:    true
 				type: string: {
 					examples: ["127.0.0.1"]
-					syntax: "literal"
+				}
+			}
+			source_type: {
+				description: "The name of the source type."
+				required:    true
+				type: string: {
+					examples: ["syslog"]
 				}
 			}
 			timestamp: {
@@ -187,12 +129,12 @@ components: sources: syslog: {
 					unit: null
 				}
 			}
+			client_metadata: fields._client_metadata
 			"*": {
-				description: "In addition to the defined fields, any Syslog 5424 structured fields are parsed and inserted as root level fields."
+				description: "In addition to the defined fields, any [Syslog 5424 structured fields](https://datatracker.ietf.org/doc/html/rfc5424#section-6.3) are parsed and inserted, namespaced under the name of each structured data section."
 				required:    true
 				type: string: {
 					examples: ["hello world"]
-					syntax: "literal"
 				}
 			}
 		}
@@ -220,14 +162,17 @@ components: sources: syslog: {
 				timestamp:   _timestamp
 				host:        _values.local_host
 				source_ip:   _values.remote_host
+				source_type: "syslog"
 				hostname:    _hostname
 				appname:     _app_name
 				procid:      _procid
 				msgid:       _msgid
-				iut:         _iut
-				eventSource: _event_source
-				eventID:     _event_id
-				message:     _message
+				"exampleSDID@32473": {
+					iut:         _iut
+					eventSource: _event_source
+					eventID:     _event_id
+				}
+				message: _message
 			}
 		},
 	]
@@ -249,11 +194,11 @@ components: sources: syslog: {
 				Syslog style). It's unfortunate that the Syslog specification isn't more
 				accurately followed, but we hope that Vector insulates you from these deviations.
 
-				If parsing fails, Vector includes the entire Syslog line in the `message`
-				key. If you find this happening often, we recommend using the
-				[`socket` source](\(urls.vector_socket_source)) combined with
+				If parsing fails, Vector will raise an error. If you find this happening often,
+				we recommend using the [`socket` source](\(urls.vector_socket_source)) combined with
 				[regex parsing](\(urls.vrl_functions)/#parse_regex) to implement your own custom
-				ingestion and parsing scheme. Alternatively, you can [open an
+				ingestion and parsing scheme, or [syslog parsing](\(urls.vrl_functions)/#parse_syslog) and
+				manually handle any errors. Alternatively, you can [open an
 				issue](\(urls.new_feature_request)) to request support for your specific format.
 				"""
 		}
@@ -264,6 +209,7 @@ components: sources: syslog: {
 		connection_read_errors_total:    components.sources.internal_metrics.output.metrics.connection_read_errors_total
 		processed_bytes_total:           components.sources.internal_metrics.output.metrics.processed_bytes_total
 		processed_events_total:          components.sources.internal_metrics.output.metrics.processed_events_total
+		component_received_bytes_total:  components.sources.internal_metrics.output.metrics.component_received_bytes_total
 		component_received_events_total: components.sources.internal_metrics.output.metrics.component_received_events_total
 		utf8_convert_errors_total:       components.sources.internal_metrics.output.metrics.utf8_convert_errors_total
 	}
