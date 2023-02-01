@@ -211,34 +211,36 @@ pub trait ContainerTestRunner: TestRunner {
     }
 
     fn create(&self) -> Result<()> {
-        let network_args = match self.network_name() {
-            Some(name) => vec!["--network".into(), name],
-            None => vec![],
-        };
+        let network_name = self.network_name().unwrap_or_else(|| "host".into());
         let docker_sock = format!("{}:/var/run/docker.sock", DOCKER_SOCK.display());
         let docker_args = self
             .needs_docker_sock()
             .then(|| vec!["--volume", &docker_sock])
             .unwrap_or_default();
         dockercmd(
-            ["create", "--name", &self.container_name()]
-                .chain_args(network_args)
-                .chain_args([
-                    "--hostname",
-                    RUNNER_HOSTNAME,
-                    "--workdir",
-                    MOUNT_PATH,
-                    "--volume",
-                    &format!("{}:{MOUNT_PATH}", app::path()),
-                    "--volume",
-                    &format!("{VOLUME_TARGET}:{TARGET_PATH}"),
-                    "--volume",
-                    &format!("{VOLUME_CARGO_GIT}:/usr/local/cargo/git"),
-                    "--volume",
-                    &format!("{VOLUME_CARGO_REGISTRY}:/usr/local/cargo/registry"),
-                ])
-                .chain_args(docker_args)
-                .chain_args([&self.image_name(), "/bin/sleep", "infinity"]),
+            [
+                "create",
+                "--name",
+                &self.container_name(),
+                "--network",
+                &network_name,
+                "--hostname",
+                RUNNER_HOSTNAME,
+                "--workdir",
+                MOUNT_PATH,
+                "--volume",
+                &format!("{}:{MOUNT_PATH}", app::path()),
+                "--volume",
+                &format!("{VOLUME_TARGET}:{TARGET_PATH}"),
+                "--volume",
+                &format!("{VOLUME_CARGO_GIT}:/usr/local/cargo/git"),
+                "--volume",
+                &format!("{VOLUME_CARGO_REGISTRY}:/usr/local/cargo/registry"),
+                "--volume",
+                "/tmp:/tmp",
+            ]
+            .chain_args(docker_args)
+            .chain_args([&self.image_name(), "/bin/sleep", "infinity"]),
         )
         .wait(format!("Creating container {}", self.container_name()))
     }
