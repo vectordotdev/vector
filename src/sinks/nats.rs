@@ -62,6 +62,14 @@ pub struct NatsSinkConfig {
 
     /// The NATS subject to publish messages to.
     #[configurable(metadata(docs::templateable))]
+    #[configurable(metadata(
+        docs::examples = "{{ host }}",
+        docs::examples = "foo",
+        docs::examples = "time.us.east",
+        docs::examples = "time.*.east",
+        docs::examples = "time.>",
+        docs::examples = ">"
+    ))]
     subject: String,
 
     /// The NATS URL to connect to.
