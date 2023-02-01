@@ -80,6 +80,9 @@ pub struct IntegrationRunnerConfig {
     /// the runner.
     #[serde(default)]
     pub env: Environment,
+    /// The set of volumes that need to be mounted into the runner.
+    #[serde(default)]
+    pub volumes: BTreeMap<String, String>,
     /// Does the test runner need access to the host's docker socket?
     #[serde(default)]
     pub needs_docker_sock: bool,

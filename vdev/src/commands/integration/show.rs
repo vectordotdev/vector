@@ -45,6 +45,14 @@ impl Cli {
                 println!("Runner:");
                 println!("  Environment:");
                 print_env("    ", &config.runner.env);
+                println!("  Volumes:");
+                if config.runner.volumes.is_empty() {
+                    println!("    N/A");
+                } else {
+                    for (target, mount) in &config.runner.volumes {
+                        println!("    {target} => {mount}");
+                    }
+                }
                 println!("  Needs docker socket: {}", config.runner.needs_docker_sock);
 
                 println!("Environments:");

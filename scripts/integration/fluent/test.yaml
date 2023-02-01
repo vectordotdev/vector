@@ -6,6 +6,8 @@ args:
 
 runner:
   needs_docker_sock: true
+  volumes:
+    /tmp: /tmp
 
 matrix:
   default: ["default"]

@@ -87,6 +87,8 @@ pub trait ContainerTestRunner: TestRunner {
 
     fn needs_docker_sock(&self) -> bool;
 
+    fn volumes(&self) -> Vec<String>;
+
     fn stop(&self) -> Result<()> {
         dockercmd(["stop", "--time", "0", &self.container_name()])
             .wait(format!("Stopping container {}", self.container_name()))
@@ -217,6 +219,11 @@ pub trait ContainerTestRunner: TestRunner {
             .needs_docker_sock()
             .then(|| vec!["--volume", &docker_sock])
             .unwrap_or_default();
+        let volumes = self.volumes();
+        let volumes: Vec<_> = volumes
+            .iter()
+            .flat_map(|volume| ["--volume", volume])
+            .collect();
         dockercmd(
             [
                 "create",
@@ -236,9 +243,8 @@ pub trait ContainerTestRunner: TestRunner {
                 &format!("{VOLUME_CARGO_GIT}:/usr/local/cargo/git"),
                 "--volume",
                 &format!("{VOLUME_CARGO_REGISTRY}:/usr/local/cargo/registry"),
-                "--volume",
-                "/tmp:/tmp",
             ]
+            .chain_args(volumes)
             .chain_args(docker_args)
             .chain_args([&self.image_name(), "/bin/sleep", "infinity"]),
         )
@@ -290,6 +296,7 @@ pub struct IntegrationTestRunner {
     integration: String,
     needs_docker_sock: bool,
     needs_network: bool,
+    volumes: Vec<String>,
 }
 
 impl IntegrationTestRunner {
@@ -302,6 +309,11 @@ impl IntegrationTestRunner {
             integration,
             needs_docker_sock: config.needs_docker_sock,
             needs_network,
+            volumes: config
+                .volumes
+                .iter()
+                .map(|(a, b)| format!("{a}:{b}"))
+                .collect(),
         })
     }
 
@@ -345,6 +357,10 @@ impl ContainerTestRunner for IntegrationTestRunner {
     fn needs_docker_sock(&self) -> bool {
         self.needs_docker_sock
     }
+
+    fn volumes(&self) -> Vec<String> {
+        self.volumes.clone()
+    }
 }
 
 pub struct DockerTestRunner;
@@ -364,6 +380,10 @@ impl ContainerTestRunner for DockerTestRunner {
 
     fn needs_docker_sock(&self) -> bool {
         false
+    }
+
+    fn volumes(&self) -> Vec<String> {
+        Vec::default()
     }
 }
 
