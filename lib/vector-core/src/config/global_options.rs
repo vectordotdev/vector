@@ -35,7 +35,6 @@ pub(crate) enum DataDirError {
 // function!
 #[configurable_component]
 #[derive(Clone, Debug, Default, PartialEq)]
-#[serde(default)]
 pub struct GlobalOptions {
     /// The directory used for persisting Vector state data.
     ///

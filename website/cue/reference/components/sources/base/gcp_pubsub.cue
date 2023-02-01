@@ -155,6 +155,13 @@ base: components: sources: gcp_pubsub: configuration: {
 																The maximum length of the byte buffer.
 
 																This length does *not* include the trailing delimiter.
+
+																By default, there is no maximum length enforced. If events are malformed, this can lead to
+																additional resource usage as events continued to be buffered in memory, and can potentially
+																lead to memory exhaustion in extreme cases.
+
+																Consider setting this to a reasonable value, based on the expected maximum buffer length, if
+																there is a risk of malformed data, such as if user-controlled data is consumed.
 																"""
 						required: false
 						type: uint: {}
@@ -188,6 +195,13 @@ base: components: sources: gcp_pubsub: configuration: {
 						The maximum length of the byte buffer.
 
 						This length does *not* include the trailing delimiter.
+
+						By default, there is no maximum length enforced. If events are malformed, this can lead to
+						additional resource usage as events continued to be buffered in memory, and can potentially
+						lead to memory exhaustion in extreme cases.
+
+						Consider setting this to a reasonable value, based on the expected maximum buffer length, if
+						there is a risk of malformed data, such as if user-controlled data is consumed.
 						"""
 					required: false
 					type: uint: {}
