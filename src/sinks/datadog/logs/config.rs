@@ -119,10 +119,6 @@ impl GenerateConfig for DatadogLogsConfig {
 }
 
 impl DatadogLogsConfig {
-    fn get_base(&self) -> &str {
-        get_base_domain_region(self.site.as_str(), self.region)
-    }
-
     // TODO: We should probably hoist this type of base URI generation so that all DD sinks can
     // utilize it, since it all follows the same pattern.
     fn get_uri(&self) -> http::Uri {
@@ -179,7 +175,10 @@ impl DatadogLogsConfig {
     }
 
     pub fn build_healthcheck(&self, client: HttpClient) -> crate::Result<Healthcheck> {
-        let validate_endpoint = get_api_validate_endpoint(self.endpoint.as_ref(), self.get_base())?;
+        let validate_endpoint = get_api_validate_endpoint(
+            self.endpoint.as_ref(),
+            get_base_domain_region(self.site.as_str(), self.region),
+        )?;
         Ok(healthcheck(
             client,
             validate_endpoint,

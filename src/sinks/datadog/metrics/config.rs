@@ -166,10 +166,6 @@ impl SinkConfig for DatadogMetricsConfig {
 }
 
 impl DatadogMetricsConfig {
-    fn get_base(&self) -> &str {
-        get_base_domain_region(self.site.as_str(), self.region)
-    }
-
     /// Gets the base URI of the Datadog agent API.
     ///
     /// Per the Datadog agent convention, we should include a unique identifier as part of the
@@ -181,7 +177,11 @@ impl DatadogMetricsConfig {
     fn get_base_agent_endpoint(&self) -> String {
         self.endpoint.clone().unwrap_or_else(|| {
             let version = str::replace(crate::built_info::PKG_VERSION, ".", "-");
-            format!("https://{}-vector.agent.{}", version, self.get_base())
+            format!(
+                "https://{}-vector.agent.{}",
+                version,
+                get_base_domain_region(self.site.as_str(), self.region)
+            )
         })
     }
 
@@ -213,7 +213,10 @@ impl DatadogMetricsConfig {
     }
 
     fn build_healthcheck(&self, client: HttpClient) -> crate::Result<Healthcheck> {
-        let validate_endpoint = get_api_validate_endpoint(self.endpoint.as_ref(), self.get_base())?;
+        let validate_endpoint = get_api_validate_endpoint(
+            self.endpoint.as_ref(),
+            get_base_domain_region(self.site.as_str(), self.region),
+        )?;
         Ok(healthcheck(
             client,
             validate_endpoint,

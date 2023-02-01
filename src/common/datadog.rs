@@ -51,7 +51,10 @@ pub enum Region {
 /// This is a helper function for Datadog component configs using the deprecated `region` field.
 ///
 /// If `region` is not specified, we fallback to `site`.
-pub(crate) fn get_base_domain_region(site: &str, region: Option<Region>) -> &str {
+///
+/// TODO: This should be deleted when the deprecated `region` config option is fully removed,
+///       and the callers will replace the result of this function call with just `site`.
+pub(crate) const fn get_base_domain_region(site: &str, region: Option<Region>) -> &str {
     if let Some(region) = region {
         match region {
             Region::Eu => DD_EU_SITE,
@@ -62,21 +65,10 @@ pub(crate) fn get_base_domain_region(site: &str, region: Option<Region>) -> &str
     }
 }
 
-//    site.map(|s| s.as_str()).unwrap_or_else(|| match region {
-//site.map(|s| s.as_str()).unwrap_or_else(|| match region {
-//    Some(Region::Eu) => "datadoghq.eu",
-//    None | Some(Region::Us) => DD_US_SITE,
-//})
-//}
-
 /// Gets the base API endpoint to use for any calls to Datadog.
 ///
 /// If `endpoint` is not specified, we fallback to `site`.
-pub(crate) fn get_api_base_endpoint(
-    endpoint: Option<&String>,
-    site: &str,
-    //region: Option<Region>,
-) -> String {
+pub(crate) fn get_api_base_endpoint(endpoint: Option<&String>, site: &str) -> String {
     endpoint
         .cloned()
         .unwrap_or_else(|| format!("https://api.{}", site))
