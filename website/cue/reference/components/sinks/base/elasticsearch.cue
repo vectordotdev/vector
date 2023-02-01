@@ -34,7 +34,9 @@ base: components: sinks: elasticsearch: configuration: {
 			default: "auto"
 			enum: {
 				auto: """
-					Auto-detect the API version. Fails if the [cluster state version endpoint][es_version] isn't reachable.
+					Auto-detect the API version.
+
+					Fails if the [cluster state version endpoint][es_version] isn't reachable.
 
 					[es_version]: https://www.elastic.co/guide/en/elasticsearch/reference/current/cluster-state.html#cluster-state-api-path-params
 					"""
@@ -261,7 +263,7 @@ base: components: sinks: elasticsearch: configuration: {
 					"""
 				none: "No compression."
 				zlib: """
-					[Zlib]][zlib] compression.
+					[Zlib][zlib] compression.
 
 					[zlib]: https://zlib.net/
 					"""
