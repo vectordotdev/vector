@@ -19,12 +19,11 @@ use tokio::{sync::oneshot, task::spawn_blocking};
 use tracing::{Instrument, Span};
 use value::Kind;
 use vector_common::finalizer::OrderedFinalizer;
-use vector_common::internal_event::{ByteSize, CountByteSize, InternalEventHandle};
+use vector_common::internal_event::{ByteSize, CountByteSize, InternalEventHandle, Registered};
 use vector_config::{configurable_component, NamedComponent};
 use vector_core::config::{LegacyKey, LogNamespace};
 
 use super::util::{EncodingConfig, MultilineConfig};
-use crate::internal_events::{FileBytesReceivedHandle, FileEventsReceivedHandle};
 use crate::{
     config::{
         log_schema, DataType, Output, SourceAcknowledgementsConfig, SourceConfig, SourceContext,
@@ -582,8 +581,10 @@ pub fn file_source(
 
         let mut encoding_decoder = encoding_charset.map(Decoder::new);
 
-        let mut file_id_to_metrics_mapping: HashMap<FileFingerprint, FileBytesReceivedHandle> =
-            HashMap::new();
+        let mut file_id_to_metrics_mapping: HashMap<
+            FileFingerprint,
+            Registered<FileBytesReceived>,
+        > = HashMap::new();
 
         // sizing here is just a guess
         let (tx, rx) = futures::channel::mpsc::channel::<Vec<Line>>(2);
@@ -630,7 +631,7 @@ pub fn file_source(
         // logs in the queue.
         let mut file_id_to_event_metrics_mapping: HashMap<
             FileFingerprint,
-            FileEventsReceivedHandle,
+            Registered<FileEventsReceived>,
         > = HashMap::new();
         let span = Span::current();
         let mut messages = messages.map(move |line| {

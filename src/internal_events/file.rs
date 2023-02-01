@@ -86,10 +86,7 @@ mod source {
 
     use super::{FileOpen, InternalEvent};
     use crate::emit;
-    use vector_common::internal_event::{
-        error_stage, error_type, ByteSize, CountByteSize, InternalEventHandle,
-        RegisterInternalEvent,
-    };
+    use vector_common::internal_event::{error_stage, error_type, ByteSize, CountByteSize};
     use vector_common::registered_event;
 
     registered_event!(
@@ -106,36 +103,17 @@ mod source {
         }
     );
 
-    #[derive(Debug)]
-    pub struct FileEventsReceived {
-        pub file: String,
-    }
-
-    impl RegisterInternalEvent for FileEventsReceived {
-        type Handle = FileEventsReceivedHandle;
-
-        fn register(self) -> Self::Handle {
-            FileEventsReceivedHandle {
-                component_received_event_bytes_total: register_counter!("component_received_event_bytes_total", "file" => self.file.clone()),
-                component_received_events_total: register_counter!("component_received_events_total", "file" => self.file.clone()),
-                events_in_total: register_counter!("events_in_total", "file" => self.file.clone()),
-                file: self.file,
-            }
+    registered_event!(
+        FileEventsReceived {
+            file: String,
+        } => {
+            component_received_event_bytes_total: Counter = register_counter!("component_received_event_bytes_total", "file" => self.file.clone()),
+            component_received_events_total: Counter = register_counter!("component_received_events_total", "file" => self.file.clone()),
+            events_in_total: Counter = register_counter!("events_in_total", "file" => self.file.clone()),
+            file: String = self.file,
         }
-    }
 
-    #[derive(Clone)]
-    pub struct FileEventsReceivedHandle {
-        component_received_event_bytes_total: Counter,
-        component_received_events_total: Counter,
-        events_in_total: Counter,
-        file: String,
-    }
-
-    impl InternalEventHandle for FileEventsReceivedHandle {
-        type Data = CountByteSize;
-
-        fn emit(&self, data: Self::Data) {
+        fn emit(&self, data: CountByteSize) {
             self.component_received_event_bytes_total
                 .increment(data.1 as u64);
             self.component_received_events_total
@@ -148,7 +126,7 @@ mod source {
                 file = %self.file
             );
         }
-    }
+    );
 
     #[derive(Debug)]
     pub struct FileChecksumFailed<'a> {
