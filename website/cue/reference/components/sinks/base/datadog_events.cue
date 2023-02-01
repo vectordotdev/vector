@@ -54,12 +54,8 @@ base: components: sinks: datadog_events: configuration: {
 	region: {
 		deprecated:         true
 		deprecated_message: "This option has been deprecated, use the `site` option instead."
-		description: """
-			The Datadog region to send events to.
-
-			This option is deprecated, and the `site` field should be used instead.
-			"""
-		required: false
+		description:        "The Datadog region to send events to."
+		required:           false
 		type: string: enum: {
 			eu: "EU region."
 			us: "US region."
