@@ -112,20 +112,21 @@ impl IntegrationTest {
 
     pub fn test(self, extra_args: Vec<String>) -> Result<()> {
         let active = self.envs_dir.check_active(&self.environment)?;
+        self.config.check_required()?;
 
         if !active {
             self.start()?;
         }
 
-        let mut env_vars = self.config.env.clone().unwrap_or_default();
+        let mut env_vars = self.config.env.clone();
         // Make sure the test runner has the same config environment vars as the services do.
         if let Some((key, value)) = self.config_env(&self.env_config) {
-            env_vars.insert(key, value);
+            env_vars.insert(key, Some(value));
         }
         let mut args = self.config.args.clone();
         args.extend(extra_args);
         self.runner
-            .test(&Some(env_vars), &self.config.runner_env, &args)?;
+            .test(&env_vars, &self.config.runner_env, &args)?;
 
         if !active {
             self.runner.remove()?;
@@ -135,6 +136,7 @@ impl IntegrationTest {
     }
 
     pub fn start(&self) -> Result<()> {
+        self.config.check_required()?;
         if let Some(compose_path) = &self.compose_path {
             self.runner.ensure_network()?;
 
@@ -184,18 +186,11 @@ impl IntegrationTest {
             if let Some(network_name) = self.runner.network_name() {
                 command.env(NETWORK_ENV_VAR, network_name);
             }
-            if let Some(env_vars) = &self.config.env {
-                command.envs(env_vars);
+            for (key, value) in &self.config.env {
+                if let Some(value) = value {
+                    command.env(key, value);
+                }
             }
-            // TODO: Export all config variables, not just `version`
-            if let Some(version) = config.get("version") {
-                let version_env = format!(
-                    "{}_VERSION",
-                    self.integration.replace('-', "_").to_uppercase()
-                );
-                command.env(version_env, version);
-            }
-
             command.envs(self.config_env(config));
 
             waiting!("{action} environment {}", self.environment);
@@ -207,15 +202,16 @@ impl IntegrationTest {
 
     fn config_env(&self, config: &Environment) -> Option<(String, String)> {
         // TODO: Export all config variables, not just `version`
-        config.get("version").map(|version| {
-            (
+        match config.get("version") {
+            Some(Some(version)) => Some((
                 format!(
                     "{}_VERSION",
                     self.integration.replace('-', "_").to_uppercase()
                 ),
                 version.to_string(),
-            )
-        })
+            )),
+            _ => None,
+        }
     }
 }
 
