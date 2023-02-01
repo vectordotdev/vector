@@ -133,7 +133,7 @@ pub struct DatadogMetricsConfig {
     /// precedence over this setting.
     ///
     /// [api_key]: https://docs.datadoghq.com/api/?lang=bash#authentication
-    #[serde(alias = "api_key", default)]
+    #[serde(alias = "api_key")]
     #[configurable(metadata(docs::examples = "${DATADOG_API_KEY_ENV_VAR}"))]
     #[configurable(metadata(docs::examples = "ef8d5de700e7989468166c40fc8a0ccd"))]
     pub default_api_key: SensitiveString,
