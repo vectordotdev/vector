@@ -150,7 +150,12 @@ impl ElasticsearchCommon {
                         // to make the transition smoother.
                         Err(error) => {
                             // For now, estimate version.
-                            let assumed_version = if config.suppress_type_name { 8 } else { 6 };
+                            // The `suppress_type_name` option is only valid up to V6, so if a user
+                            // specified that is true, then we will assume they need API V6.
+                            // Otherwise, assume the latest version (V8).
+                            // This is by no means a perfect assumption but it's the best we can
+                            // make with the data we have.
+                            let assumed_version = if config.suppress_type_name { 6 } else { 8 };
                             warn!(message = "Failed to determine Elasticsearch version from `/_cluster/state/version`. Please fix the reported error or set an API version explicitly via `api_version`.",%assumed_version, %error);
                             assumed_version
                         }
