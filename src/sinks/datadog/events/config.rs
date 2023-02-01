@@ -6,16 +6,17 @@ use vector_config::configurable_component;
 use vector_core::config::proxy::ProxyConfig;
 
 use crate::{
-    common::datadog::{get_base_domain_region, DD_US_SITE},
+    common::datadog::{get_base_domain_region, Region},
     config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     http::HttpClient,
     sinks::{
         datadog::{
+            default_site,
             events::{
                 service::{DatadogEventsResponse, DatadogEventsService},
                 sink::DatadogEventsSink,
             },
-            get_api_base_endpoint, get_api_validate_endpoint, healthcheck, Region,
+            get_api_base_endpoint, get_api_validate_endpoint, healthcheck,
         },
         util::{http::HttpStatusRetryLogic, ServiceBuilderExt, TowerRequestConfig},
         Healthcheck, VectorSink,
@@ -65,10 +66,6 @@ pub struct DatadogEventsConfig {
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     acknowledgements: AcknowledgementsConfig,
-}
-
-fn default_site() -> String {
-    DD_US_SITE.to_owned()
 }
 
 impl GenerateConfig for DatadogEventsConfig {

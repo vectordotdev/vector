@@ -15,12 +15,11 @@ use super::{
     service::TraceApiRetry,
 };
 use crate::{
-    common::datadog::DD_US_SITE,
     config::{GenerateConfig, Input, SinkConfig, SinkContext},
     http::HttpClient,
     sinks::{
         datadog::{
-            get_api_validate_endpoint, healthcheck,
+            default_site, get_api_validate_endpoint, healthcheck,
             traces::{
                 request_builder::DatadogTracesRequestBuilder, service::TraceApiService,
                 sink::TracesSink,
@@ -114,10 +113,6 @@ pub struct DatadogTracesConfig {
     pub acknowledgements: AcknowledgementsConfig,
 }
 
-fn default_site() -> String {
-    DD_US_SITE.to_owned()
-}
-
 impl GenerateConfig for DatadogTracesConfig {
     fn generate_config() -> toml::Value {
         toml::from_str(indoc! {r#"
@@ -155,7 +150,7 @@ impl DatadogTracesConfig {
     fn get_base_uri(&self) -> String {
         self.endpoint
             .clone()
-            .unwrap_or_else(|| format!("https://trace.agent.{}", self.site.as_ref()))
+            .unwrap_or_else(|| format!("https://trace.agent.{}", self.site))
     }
 
     fn generate_traces_endpoint_configuration(
@@ -233,7 +228,7 @@ impl DatadogTracesConfig {
 
     pub fn build_healthcheck(&self, client: HttpClient) -> crate::Result<Healthcheck> {
         let validate_endpoint =
-            get_api_validate_endpoint(self.endpoint.as_ref(), self.site.as_ref(), None)?;
+            get_api_validate_endpoint(self.endpoint.as_ref(), self.site.as_ref())?;
         Ok(healthcheck(
             client,
             validate_endpoint,

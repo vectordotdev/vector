@@ -11,16 +11,19 @@ use super::{
     service::{DatadogMetricsRetryLogic, DatadogMetricsService},
     sink::DatadogMetricsSink,
 };
-use crate::tls::{MaybeTlsSettings, TlsEnableableConfig};
 use crate::{
     common::datadog::get_base_domain_region,
     config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext},
     http::HttpClient,
     sinks::{
-        datadog::{get_api_validate_endpoint, healthcheck, Region},
+        datadog::{get_api_validate_endpoint, healthcheck},
         util::{batch::BatchConfig, ServiceBuilderExt, SinkBatchSettings, TowerRequestConfig},
         Healthcheck, UriParseSnafu, VectorSink,
     },
+};
+use crate::{
+    common::datadog::Region,
+    tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
 
 // This default is centered around "series" data, which should be the lion's share of what we
@@ -163,6 +166,10 @@ impl SinkConfig for DatadogMetricsConfig {
 }
 
 impl DatadogMetricsConfig {
+    fn get_base(&self) -> &str {
+        get_base_domain_region(self.site.as_str(), self.region)
+    }
+
     /// Gets the base URI of the Datadog agent API.
     ///
     /// Per the Datadog agent convention, we should include a unique identifier as part of the
@@ -174,11 +181,7 @@ impl DatadogMetricsConfig {
     fn get_base_agent_endpoint(&self) -> String {
         self.endpoint.clone().unwrap_or_else(|| {
             let version = str::replace(crate::built_info::PKG_VERSION, ".", "-");
-            format!(
-                "https://{}-vector.agent.{}",
-                version,
-                get_base_domain_region(self.site.as_ref(), self.region)
-            )
+            format!("https://{}-vector.agent.{}", version, self.get_base())
         })
     }
 
@@ -210,8 +213,7 @@ impl DatadogMetricsConfig {
     }
 
     fn build_healthcheck(&self, client: HttpClient) -> crate::Result<Healthcheck> {
-        let validate_endpoint =
-            get_api_validate_endpoint(self.endpoint.as_ref(), self.site.as_ref(), self.region)?;
+        let validate_endpoint = get_api_validate_endpoint(self.endpoint.as_ref(), self.get_base())?;
         Ok(healthcheck(
             client,
             validate_endpoint,

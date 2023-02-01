@@ -3,7 +3,7 @@ use hyper::body::Body;
 use snafu::Snafu;
 
 use crate::{
-    common::datadog::{get_api_base_endpoint, Region},
+    common::datadog::{get_api_base_endpoint, DD_US_SITE},
     http::{HttpClient, HttpError},
     sinks::HealthcheckError,
 };
@@ -16,6 +16,10 @@ pub mod logs;
 pub mod metrics;
 #[cfg(feature = "sinks-datadog_traces")]
 pub mod traces;
+
+pub fn default_site() -> String {
+    DD_US_SITE.to_owned()
+}
 
 /// Gets the API endpoint for validating credentials.
 ///
