@@ -10,4 +10,4 @@ env:
   SQUID_ADDRESS: http://squid:3128
 
 matrix:
-- version: [1.19.4]
+  version: [1.19.4]

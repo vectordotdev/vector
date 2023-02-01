@@ -6,4 +6,4 @@ args:
 - '::eventstoredb_metrics::'
 
 matrix:
-- version: [latest]
+  version: [latest]

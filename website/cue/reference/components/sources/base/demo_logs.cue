@@ -65,23 +65,28 @@ base: components: sources: demo_logs: configuration: {
 		type: string: enum: {
 			apache_common: """
 				Randomly generated logs in [Apache common][apache_common] format.
+
 				[apache_common]: https://httpd.apache.org/docs/current/logs.html#common
 				"""
 			apache_error: """
 				Randomly generated logs in [Apache error][apache_error] format.
+
 				[apache_error]: https://httpd.apache.org/docs/current/logs.html#errorlog
 				"""
 			bsd_syslog: """
 				Randomly generated logs in Syslog format ([RFC 3164][syslog_3164]).
+
 				[syslog_3164]: https://tools.ietf.org/html/rfc3164
 				"""
 			json: """
 				Randomly generated HTTP server logs in [JSON][json] format.
+
 				[json]: https://en.wikipedia.org/wiki/JSON
 				"""
 			shuffle: "Lines are chosen at random from the list specified using `lines`."
 			syslog: """
 				Randomly generated logs in Syslog format ([RFC 5424][syslog_5424]).
+
 				[syslog_5424]: https://tools.ietf.org/html/rfc5424
 				"""
 		}

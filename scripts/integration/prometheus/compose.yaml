@@ -1,19 +1,19 @@
 version: '3'
 
 services:
-  influxdb:
-    image: docker.io/influxdb:${PROMETHEUS_VERSION}
+  influxdb-v1:
+    image: docker.io/influxdb:1.8
     environment:
     - INFLUXDB_REPORTING_DISABLED=true
-  influxdb-tls:
-    image: docker.io/influxdb:${PROMETHEUS_VERSION}
+  influxdb-v1-tls:
+    image: docker.io/influxdb:1.8
     environment:
     - INFLUXDB_REPORTING_DISABLED=true
     - INFLUXDB_HTTP_HTTPS_ENABLED=true
     - INFLUXDB_HTTP_BIND_ADDRESS=:8087
     - INFLUXDB_BIND_ADDRESS=:8089
-    - INFLUXDB_HTTP_HTTPS_CERTIFICATE=/etc/ssl/intermediate_server/certs/localhost-chain.cert.pem
-    - INFLUXDB_HTTP_HTTPS_PRIVATE_KEY=/etc/ssl/intermediate_server/private/localhost.key.pem
+    - INFLUXDB_HTTP_HTTPS_CERTIFICATE=/etc/ssl/intermediate_server/certs/influxdb-v1-tls-chain.cert.pem
+    - INFLUXDB_HTTP_HTTPS_PRIVATE_KEY=/etc/ssl/intermediate_server/private/influxdb-v1-tls.key.pem
     volumes:
     - ../../../tests/data/ca:/etc/ssl:ro
   prometheus:

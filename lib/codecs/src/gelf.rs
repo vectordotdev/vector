@@ -3,10 +3,10 @@
 use once_cell::sync::Lazy;
 use regex::Regex;
 
-/// GELF Message fields. Definitions from https://docs.graylog.org/docs/gelf
+/// GELF Message fields. Definitions from <https://docs.graylog.org/docs/gelf>.
 pub mod gelf_fields {
 
-    /// <not a field> The latest version of the GELF specification.
+    /// (not a field) The latest version of the GELF specification.
     pub const GELF_VERSION: &str = "1.1";
 
     /// (required) GELF spec version

@@ -14,4 +14,4 @@ env:
   NATS_USERPASS_ADDRESS: nats://nats-userpass:4222
 
 matrix:
-- version: [latest]
+  version: [latest]

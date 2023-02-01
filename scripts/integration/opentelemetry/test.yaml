@@ -9,4 +9,4 @@ env:
   OTEL_OTLPHTTP_URL: http://opentelemetry-collector:9876
 
 matrix:
-- version: [0.56.0]
+  version: [0.56.0]

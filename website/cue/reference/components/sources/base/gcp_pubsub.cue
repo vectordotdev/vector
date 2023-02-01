@@ -265,11 +265,6 @@ base: components: sources: gcp_pubsub: configuration: {
 			unit:    "seconds"
 		}
 	}
-	skip_authentication: {
-		description: "Skip all authentication handling. For use with integration tests only."
-		required:    false
-		type: bool: default: false
-	}
 	subscription: {
 		description: "The subscription within the project which is configured to receive logs."
 		required:    true

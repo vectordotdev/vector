@@ -23,79 +23,105 @@ base: components: sources: journald: configuration: {
 		}
 	}
 	batch_size: {
-		description: "The `systemd` journal is read in batches, and a checkpoint is set at the end of each batch. This option limits the size of the batch."
-		required:    false
-		type: uint: {}
+		description: """
+			The systemd journal is read in batches, and a checkpoint is set at the end of each batch.
+
+			This option limits the size of the batch.
+			"""
+		required: false
+		type: uint: {
+			default: 16
+			unit:    "events"
+		}
 	}
 	current_boot_only: {
 		description: "Only include entries that occurred after the current boot of the system."
 		required:    false
-		type: bool: {}
+		type: bool: default: true
 	}
 	data_dir: {
 		description: """
 			The directory used to persist file checkpoint positions.
 
-			By default, the global `data_dir` option is used. Make sure the running user has write permissions to this directory.
+			By default, the global `data_dir` option is used. Make sure the running user has write
+			permissions to this directory.
 			"""
 		required: false
-		type: string: {}
+		type: string: examples: ["/var/lib/vector"]
 	}
 	exclude_matches: {
 		description: """
-			A list of sets of field/value pairs that, if any are present in a journal entry, will cause the entry to be excluded from this source.
+			A list of sets of field/value pairs that, if any are present in a journal entry, will cause
+			the entry to be excluded from this source.
 
 			If `exclude_units` is specified, it will be merged into this list.
 			"""
 		required: false
-		type: object: options: "*": {
-			description: "A field/value pair."
-			required:    true
-			type: array: items: type: string: {}
+		type: object: {
+			examples: [{
+				"_SYSTEMD_UNIT": ["sshd.service", "ntpd.service"]
+				"_TRANSPORT": ["kernel"]
+			}]
+			options: "*": {
+				description: "The set of field values to match in journal entries that are to be excluded."
+				required:    true
+				type: array: items: type: string: {}
+			}
 		}
 	}
 	exclude_units: {
 		description: """
 			A list of unit names to exclude from monitoring.
 
-			Unit names lacking a "." will have ".service" appended to make them a valid service unit name.
+			Unit names lacking a `.` will have `.service` appended to make them a valid service unit
+			name.
 			"""
 		required: false
 		type: array: {
 			default: []
-			items: type: string: {}
+			items: type: string: examples: ["badservice", "sysinit.target"]
 		}
 	}
 	include_matches: {
 		description: """
 			A list of sets of field/value pairs to monitor.
 
-			If empty or not present, all journal fields are accepted. If `include_units` is specified, it will be merged into this list.
+			If empty or not present, all journal fields are accepted.
+
+			If `include_units` is specified, it will be merged into this list.
 			"""
 		required: false
-		type: object: options: "*": {
-			description: "A field/value pair."
-			required:    true
-			type: array: items: type: string: {}
+		type: object: {
+			examples: [{
+				"_SYSTEMD_UNIT": ["sshd.service", "ntpd.service"]
+				"_TRANSPORT": ["kernel"]
+			}]
+			options: "*": {
+				description: "The set of field values to match in journal entries that are to be included."
+				required:    true
+				type: array: items: type: string: {}
+			}
 		}
 	}
 	include_units: {
 		description: """
 			A list of unit names to monitor.
 
-			If empty or not present, all units are accepted. Unit names lacking a "." will have ".service" appended to make them a valid service unit name.
+			If empty or not present, all units are accepted.
+
+			Unit names lacking a `.` will have `.service` appended to make them a valid service unit name.
 			"""
 		required: false
 		type: array: {
 			default: []
-			items: type: string: {}
+			items: type: string: examples: ["ntpd", "sysinit.target"]
 		}
 	}
 	journal_directory: {
 		description: """
 			The full path of the journal directory.
 
-			If not set, `journalctl` will use the default system journal paths.
+			If not set, `journalctl` will use the default system journal path.
 			"""
 		required: false
 		type: string: {}
@@ -104,14 +130,14 @@ base: components: sources: journald: configuration: {
 		description: """
 			The full path of the `journalctl` executable.
 
-			If not set, a search is done for the journalctl` path.
+			If not set, a search is done for the `journalctl` path.
 			"""
 		required: false
 		type: string: {}
 	}
 	remap_priority: {
 		deprecated:         true
-		deprecated_message: "This option has been deprecated. Please use the `remap` transform and function `to_syslog_level` instead."
+		deprecated_message: "This option has been deprecated, use the `remap` transform and `to_syslog_level` function instead."
 		description: """
 			Enables remapping the `PRIORITY` field from an integer to string value.
 
@@ -123,20 +149,6 @@ base: components: sources: journald: configuration: {
 	since_now: {
 		description: "Only include entries that appended to the journal after the entries have been read."
 		required:    false
-		type: bool: {}
-	}
-	units: {
-		deprecated:         true
-		deprecated_message: "This option has been deprecated, use `include_units` instead."
-		description: """
-			The list of unit names to monitor.
-
-			If empty or not present, all units are accepted. Unit names lacking a "." will have ".service" appended to make them a valid service unit name.
-			"""
-		required: false
-		type: array: {
-			default: []
-			items: type: string: {}
-		}
+		type: bool: default: false
 	}
 }

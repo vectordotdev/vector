@@ -57,6 +57,7 @@ impl ComposeConfig {
 }
 
 #[derive(Deserialize, Clone, Debug)]
+#[serde(deny_unknown_fields)]
 pub struct IntegrationTestConfig {
     /// The list of arguments to add to the docker command line for the runner
     pub args: Vec<String>,
@@ -67,7 +68,10 @@ pub struct IntegrationTestConfig {
     /// the runner.
     pub(super) runner_env: EnvConfig,
     /// The matrix of environment configurations values.
-    matrix: Vec<LinkedHashMap<String, Vec<String>>>,
+    matrix: LinkedHashMap<String, Vec<String>>,
+    /// Does the test runner need access to the host's docker socket?
+    #[serde(default)]
+    pub needs_docker_sock: bool,
 }
 
 impl IntegrationTestConfig {
@@ -85,20 +89,20 @@ impl IntegrationTestConfig {
     }
 
     pub fn environments(&self) -> LinkedHashMap<String, Environment> {
-        let mut environments = LinkedHashMap::new();
-
-        for matrix in &self.matrix {
-            for product in matrix.values().multi_cartesian_product() {
-                let config: Environment = matrix
+        self.matrix
+            .values()
+            .multi_cartesian_product()
+            .map(|product| {
+                let key = product.iter().join("-");
+                let config: Environment = self
+                    .matrix
                     .keys()
-                    .zip(product.iter())
-                    .map(|(variable, &value)| (variable.clone(), value.clone()))
+                    .zip(product.into_iter())
+                    .map(|(variable, value)| (variable.clone(), value.clone()))
                     .collect();
-                environments.insert(product.iter().join("-"), config);
-            }
-        }
-
-        environments
+                (key, config)
+            })
+            .collect()
     }
 
     pub fn load(integration: &str) -> Result<(PathBuf, Self)> {

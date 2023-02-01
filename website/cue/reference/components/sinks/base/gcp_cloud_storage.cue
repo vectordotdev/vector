@@ -527,11 +527,6 @@ base: components: sinks: gcp_cloud_storage: configuration: {
 			}
 		}
 	}
-	skip_authentication: {
-		description: "Skip all authentication handling. For use with integration tests only."
-		required:    false
-		type: bool: default: false
-	}
 	storage_class: {
 		description: """
 			The storage class for created objects.
