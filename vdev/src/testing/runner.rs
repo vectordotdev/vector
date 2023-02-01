@@ -213,24 +213,28 @@ pub trait ContainerTestRunner: TestRunner {
     }
 
     fn create(&self) -> Result<()> {
-        let network_name = self.network_name().unwrap_or_else(|| "host".into());
+        let network_name = self.network_name();
+        let network_name = network_name.as_deref().unwrap_or("host");
+
         let docker_sock = format!("{}:/var/run/docker.sock", DOCKER_SOCK.display());
         let docker_args = self
             .needs_docker_sock()
             .then(|| vec!["--volume", &docker_sock])
             .unwrap_or_default();
+
         let volumes = self.volumes();
         let volumes: Vec<_> = volumes
             .iter()
             .flat_map(|volume| ["--volume", volume])
             .collect();
+
         dockercmd(
             [
                 "create",
                 "--name",
                 &self.container_name(),
                 "--network",
-                &network_name,
+                network_name,
                 "--hostname",
                 RUNNER_HOSTNAME,
                 "--workdir",
