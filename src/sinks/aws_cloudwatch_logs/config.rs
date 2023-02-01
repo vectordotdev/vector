@@ -58,9 +58,9 @@ pub struct CloudwatchLogsSinkConfig {
 
     /// The [stream name][stream_name] of the target CloudWatch Logs stream.
     ///
-    /// Note that there can only be one writer to a log stream at a time. If you have multiple
-    /// instances of Vector writing to the same log group, you must include an identifier in the
-    /// stream name that is guaranteed to be unique per Vector instance.
+    /// There can only be one writer to a log stream at a time. If you have multiple
+    /// instances writing to the same log group, you must include an identifier in the
+    /// stream name that is guaranteed to be unique per instance.
     ///
     /// For example, you might choose `host`.
     ///
@@ -108,6 +108,7 @@ pub struct CloudwatchLogsSinkConfig {
     ///
     /// [iam_role]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles.html
     #[configurable(deprecated)]
+    #[configurable(metadata(docs::hidden))]
     pub assume_role: Option<String>,
 
     #[configurable(derived)]
@@ -200,7 +201,7 @@ impl SinkConfig for CloudwatchLogsSinkConfig {
 
 impl GenerateConfig for CloudwatchLogsSinkConfig {
     fn generate_config() -> toml::Value {
-        toml::Value::try_from(default_config(JsonSerializerConfig::new().into())).unwrap()
+        toml::Value::try_from(default_config(JsonSerializerConfig::default().into())).unwrap()
     }
 }
 

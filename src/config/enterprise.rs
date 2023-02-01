@@ -26,7 +26,7 @@ use crate::{
     http::{HttpClient, HttpError},
     sinks::{
         datadog::{logs::DatadogLogsConfig, metrics::DatadogMetricsConfig},
-        util::retries::ExponentialBackoff,
+        util::{http::RequestConfig, retries::ExponentialBackoff},
     },
     sources::{
         host_metrics::{Collector, HostMetricsConfig},
@@ -482,7 +482,13 @@ fn setup_logs_reporting(
         endpoint: datadog.endpoint.clone(),
         site: datadog.site.clone(),
         region: datadog.region,
-        enterprise: true,
+        request: RequestConfig {
+            headers: IndexMap::from([(
+                "DD-EVP-ORIGIN".to_string(),
+                "vector-enterprise".to_string(),
+            )]),
+            ..Default::default()
+        },
         ..Default::default()
     };
 
@@ -524,7 +530,7 @@ fn setup_metrics_reporting(
     // systems' performance. To avoid this, we explicitly set `collectors`.
     let host_metrics = HostMetricsConfig {
         namespace: Some("vector.host".to_owned()),
-        scrape_interval_secs: datadog.reporting_interval_secs,
+        scrape_interval_secs: Duration::from_secs_f64(datadog.reporting_interval_secs),
         collectors: Some(vec![
             Collector::Cpu,
             Collector::Disk,
@@ -540,8 +546,8 @@ fn setup_metrics_reporting(
         // While the default namespace for internal metrics is already "vector",
         // setting the namespace here is meant for clarity and resistance
         // against any future or accidental changes.
-        namespace: Some("vector".to_owned()),
-        scrape_interval_secs: datadog.reporting_interval_secs,
+        namespace: "vector".to_owned(),
+        scrape_interval_secs: Duration::from_secs_f64(datadog.reporting_interval_secs),
         ..Default::default()
     };
 

@@ -178,7 +178,7 @@ mod tests {
     use std::convert::TryFrom;
 
     use bytes::BytesMut;
-    use codecs::JsonSerializer;
+    use codecs::JsonSerializerConfig;
     use futures::{future::ready, stream};
     use tokio_util::codec::Encoder as _;
     use vector_core::event::{Event, LogEvent};
@@ -222,7 +222,7 @@ mod tests {
             pid: 0,
             process: Some(Template::try_from("{{ process }}").unwrap()),
             transformer: Transformer::new(None, Some(vec!["magic".into()]), None).unwrap(),
-            encoder: Encoder::<()>::new(JsonSerializer::new().into()),
+            encoder: Encoder::<()>::new(JsonSerializerConfig::default().build().into()),
         };
 
         let mut bytes = BytesMut::new();

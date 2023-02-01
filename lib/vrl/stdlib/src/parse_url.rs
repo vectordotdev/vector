@@ -97,7 +97,7 @@ impl FunctionExpression for ParseUrlFn {
         let default_known_ports = self.default_known_ports.resolve(ctx)?.try_boolean()?;
 
         Url::parse(&string)
-            .map_err(|e| format!("unable to parse url: {}", e).into())
+            .map_err(|e| format!("unable to parse url: {e}").into())
             .map(|url| url_to_value(url, default_known_ports))
     }
 

@@ -12,7 +12,7 @@ base: components: sources: nats: configuration: {
 				type: object: options: path: {
 					description: "Path to credentials file."
 					required:    true
-					type: string: syntax: "literal"
+					type: string: examples: ["/etc/nats/nats.creds"]
 				}
 			}
 			nkey: {
@@ -27,7 +27,7 @@ base: components: sources: nats: configuration: {
 																Conceptually, this is equivalent to a public key.
 																"""
 						required: true
-						type: string: syntax: "literal"
+						type: string: {}
 					}
 					seed: {
 						description: """
@@ -36,29 +36,26 @@ base: components: sources: nats: configuration: {
 																Conceptually, this is equivalent to a private key.
 																"""
 						required: true
-						type: string: syntax: "literal"
+						type: string: {}
 					}
 				}
 			}
 			strategy: {
+				description: """
+					The strategy used to authenticate with the NATS server.
+
+					More information on NATS authentication, and the various authentication strategies, can be found in the
+					NATS [documentation][nats_auth_docs]. For TLS client certificate authentication specifically, see the
+					`tls` settings.
+
+					[nats_auth_docs]: https://docs.nats.io/running-a-nats-service/configuration/securing_nats/auth_intro
+					"""
 				required: true
 				type: string: enum: {
-					credentials_file: """
-						Credentials file authentication.
-						([documentation](https://docs.nats.io/running-a-nats-service/configuration/securing_nats/auth_intro/jwt))
-						"""
-					nkey: """
-						NKey authentication.
-						([documentation](https://docs.nats.io/running-a-nats-service/configuration/securing_nats/auth_intro/nkey_auth))
-						"""
-					token: """
-						Token authentication.
-						([documentation](https://docs.nats.io/running-a-nats-service/configuration/securing_nats/auth_intro/tokens))
-						"""
-					user_password: """
-						Username and password authentication.
-						([documentation](https://docs.nats.io/running-a-nats-service/configuration/securing_nats/auth_intro/username_password))
-						"""
+					credentials_file: "Credentials file authentication. (JWT-based)"
+					nkey:             "NKey authentication."
+					token:            "Token authentication."
+					user_password:    "Username/password authentication."
 				}
 			}
 			token: {
@@ -68,7 +65,7 @@ base: components: sources: nats: configuration: {
 				type: object: options: value: {
 					description: "Token."
 					required:    true
-					type: string: syntax: "literal"
+					type: string: {}
 				}
 			}
 			user_password: {
@@ -79,27 +76,34 @@ base: components: sources: nats: configuration: {
 					password: {
 						description: "Password."
 						required:    true
-						type: string: syntax: "literal"
+						type: string: {}
 					}
 					user: {
 						description: "Username."
 						required:    true
-						type: string: syntax: "literal"
+						type: string: {}
 					}
 				}
 			}
 		}
 	}
 	connection_name: {
-		description: "A name assigned to the NATS connection."
-		required:    true
-		type: string: syntax: "literal"
+		description: """
+			A [name][nats_connection_name] assigned to the NATS connection.
+
+			[nats_connection_name]: https://docs.nats.io/using-nats/developer/connecting/name
+			"""
+		required: true
+		type: string: examples: [
+			"vector",
+		]
 	}
 	decoding: {
 		description: "Configures how events are decoded from raw bytes."
 		required:    false
 		type: object: options: codec: {
-			required: false
+			description: "The codec to use for decoding events."
+			required:    false
 			type: string: {
 				default: "bytes"
 				enum: {
@@ -115,13 +119,17 @@ base: components: sources: nats: configuration: {
 						[json]: https://www.json.org/
 						"""
 					native: """
-						Decodes the raw bytes as Vector’s [native Protocol Buffers format][vector_native_protobuf] ([EXPERIMENTAL][experimental]).
+						Decodes the raw bytes as Vector’s [native Protocol Buffers format][vector_native_protobuf].
+
+						This codec is **[experimental][experimental]**.
 
 						[vector_native_protobuf]: https://github.com/vectordotdev/vector/blob/master/lib/vector-core/proto/event.proto
 						[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
 						"""
 					native_json: """
-						Decodes the raw bytes as Vector’s [native JSON format][vector_native_json] ([EXPERIMENTAL][experimental]).
+						Decodes the raw bytes as Vector’s [native JSON format][vector_native_json].
+
+						This codec is **[experimental][experimental]**.
 
 						[vector_native_json]: https://github.com/vectordotdev/vector/blob/master/lib/codecs/tests/data/native_encoding/schema.cue
 						[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
@@ -171,7 +179,8 @@ base: components: sources: nats: configuration: {
 				}
 			}
 			method: {
-				required: false
+				description: "The framing method."
+				required:    false
 				type: string: {
 					default: "bytes"
 					enum: {
@@ -216,12 +225,21 @@ base: components: sources: nats: configuration: {
 	queue: {
 		description: "NATS Queue Group to join."
 		required:    false
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	subject: {
-		description: "The NATS subject to publish messages to."
-		required:    true
-		type: string: syntax: "template"
+		description: """
+			The NATS [subject][nats_subject] to pull messages from.
+
+			[nats_subject]: https://docs.nats.io/nats-concepts/subjects
+			"""
+		required: true
+		type: string: examples: ["foo", "time.us.east", "time.*.east", "time.>", ">"]
+	}
+	subject_key_field: {
+		description: "The `NATS` subject key."
+		required:    false
+		type: string: default: "subject"
 	}
 	tls: {
 		description: "Configures the TLS options for incoming/outgoing connections."
@@ -235,7 +253,7 @@ base: components: sources: nats: configuration: {
 					they are defined.
 					"""
 				required: false
-				type: array: items: type: string: syntax: "literal"
+				type: array: items: type: string: examples: ["h2"]
 			}
 			ca_file: {
 				description: """
@@ -244,7 +262,7 @@ base: components: sources: nats: configuration: {
 					The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: examples: ["/path/to/certificate_authority.crt"]
 			}
 			crt_file: {
 				description: """
@@ -256,7 +274,7 @@ base: components: sources: nats: configuration: {
 					If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: examples: ["/path/to/host_certificate.crt"]
 			}
 			enabled: {
 				description: """
@@ -275,7 +293,7 @@ base: components: sources: nats: configuration: {
 					The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: examples: ["/path/to/host_certificate.key"]
 			}
 			key_pass: {
 				description: """
@@ -284,7 +302,7 @@ base: components: sources: nats: configuration: {
 					This has no effect unless `key_file` is set.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: examples: ["${KEY_PASS_ENV_VAR}", "PassWord1"]
 			}
 			verify_certificate: {
 				description: """
@@ -322,9 +340,10 @@ base: components: sources: nats: configuration: {
 		description: """
 			The NATS URL to connect to.
 
-			The URL must take the form of `nats://server:port`.
+			The URL takes the form of `nats://server:port`.
+			If the port is not specified it defaults to 4222.
 			"""
 		required: true
-		type: string: syntax: "literal"
+		type: string: examples: ["nats://demo.nats.io", "nats://127.0.0.1:4242"]
 	}
 }

@@ -105,10 +105,10 @@ pub enum ConditionConfig {
     IsTrace,
 
     /// Matches an event with a [Vector Remap Language](https://vector.dev/docs/reference/vrl) (VRL) [boolean expression](https://vector.dev/docs/reference/vrl#boolean-expressions).
-    Vrl(#[configurable(derived)] VrlConfig),
+    Vrl(VrlConfig),
 
     /// Matches an event with a [Datadog Search](https://docs.datadoghq.com/logs/explorer/search_syntax/) query.
-    DatadogSearch(#[configurable(derived)] DatadogSearchConfig),
+    DatadogSearch(DatadogSearchConfig),
 }
 
 impl ConditionConfig {
@@ -173,10 +173,10 @@ dyn_clone::clone_trait_object!(ConditionalConfig);
 #[serde(untagged)]
 pub enum AnyCondition {
     /// A [Vector Remap Language](https://vector.dev/docs/reference/vrl) (VRL) [boolean expression](https://vector.dev/docs/reference/vrl#boolean-expressions).
-    String(#[configurable(transparent)] String),
+    String(String),
 
     /// A fully-specified condition.
-    Map(#[configurable(derived)] ConditionConfig),
+    Map(ConditionConfig),
 }
 
 impl AnyCondition {

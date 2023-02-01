@@ -5,7 +5,7 @@ base: components: sinks: nats: configuration: {
 		description: """
 			Controls how acknowledgements are handled for this sink.
 
-			See [End-to-end Acknowledgements][e2e_acks] for more information on how Vector handles event acknowledgement.
+			See [End-to-end Acknowledgements][e2e_acks] for more information on how event acknowledgement is handled.
 
 			[e2e_acks]: https://vector.dev/docs/about/under-the-hood/architecture/end-to-end-acknowledgements/
 			"""
@@ -38,7 +38,7 @@ base: components: sinks: nats: configuration: {
 				type: object: options: path: {
 					description: "Path to credentials file."
 					required:    true
-					type: string: syntax: "literal"
+					type: string: examples: ["/etc/nats/nats.creds"]
 				}
 			}
 			nkey: {
@@ -53,7 +53,7 @@ base: components: sinks: nats: configuration: {
 																Conceptually, this is equivalent to a public key.
 																"""
 						required: true
-						type: string: syntax: "literal"
+						type: string: {}
 					}
 					seed: {
 						description: """
@@ -62,29 +62,26 @@ base: components: sinks: nats: configuration: {
 																Conceptually, this is equivalent to a private key.
 																"""
 						required: true
-						type: string: syntax: "literal"
+						type: string: {}
 					}
 				}
 			}
 			strategy: {
+				description: """
+					The strategy used to authenticate with the NATS server.
+
+					More information on NATS authentication, and the various authentication strategies, can be found in the
+					NATS [documentation][nats_auth_docs]. For TLS client certificate authentication specifically, see the
+					`tls` settings.
+
+					[nats_auth_docs]: https://docs.nats.io/running-a-nats-service/configuration/securing_nats/auth_intro
+					"""
 				required: true
 				type: string: enum: {
-					credentials_file: """
-						Credentials file authentication.
-						([documentation](https://docs.nats.io/running-a-nats-service/configuration/securing_nats/auth_intro/jwt))
-						"""
-					nkey: """
-						NKey authentication.
-						([documentation](https://docs.nats.io/running-a-nats-service/configuration/securing_nats/auth_intro/nkey_auth))
-						"""
-					token: """
-						Token authentication.
-						([documentation](https://docs.nats.io/running-a-nats-service/configuration/securing_nats/auth_intro/tokens))
-						"""
-					user_password: """
-						Username and password authentication.
-						([documentation](https://docs.nats.io/running-a-nats-service/configuration/securing_nats/auth_intro/username_password))
-						"""
+					credentials_file: "Credentials file authentication. (JWT-based)"
+					nkey:             "NKey authentication."
+					token:            "Token authentication."
+					user_password:    "Username/password authentication."
 				}
 			}
 			token: {
@@ -94,7 +91,7 @@ base: components: sinks: nats: configuration: {
 				type: object: options: value: {
 					description: "Token."
 					required:    true
-					type: string: syntax: "literal"
+					type: string: {}
 				}
 			}
 			user_password: {
@@ -105,12 +102,12 @@ base: components: sinks: nats: configuration: {
 					password: {
 						description: "Password."
 						required:    true
-						type: string: syntax: "literal"
+						type: string: {}
 					}
 					user: {
 						description: "Username."
 						required:    true
-						type: string: syntax: "literal"
+						type: string: {}
 					}
 				}
 			}
@@ -119,13 +116,10 @@ base: components: sinks: nats: configuration: {
 	connection_name: {
 		description: "A name assigned to the NATS connection."
 		required:    false
-		type: string: {
-			default: "vector"
-			syntax:  "literal"
-		}
+		type: string: default: "vector"
 	}
 	encoding: {
-		description: "Encoding configuration."
+		description: "Configures how events are encoded into raw bytes."
 		required:    true
 		type: object: options: {
 			avro: {
@@ -135,11 +129,12 @@ base: components: sinks: nats: configuration: {
 				type: object: options: schema: {
 					description: "The Avro schema."
 					required:    true
-					type: string: syntax: "literal"
+					type: string: examples: ["{ \"type\": \"record\", \"name\": \"log\", \"fields\": [{ \"name\": \"message\", \"type\": \"string\" }] }"]
 				}
 			}
 			codec: {
-				required: true
+				description: "The codec to use for encoding events."
+				required:    true
 				type: string: enum: {
 					avro: """
 						Encodes an event as an [Apache Avro][apache_avro] message.
@@ -162,13 +157,17 @@ base: components: sinks: nats: configuration: {
 						[logfmt]: https://brandur.org/logfmt
 						"""
 					native: """
-						Encodes an event in Vector’s [native Protocol Buffers format][vector_native_protobuf]([EXPERIMENTAL][experimental]).
+						Encodes an event in Vector’s [native Protocol Buffers format][vector_native_protobuf].
+
+						This codec is **[experimental][experimental]**.
 
 						[vector_native_protobuf]: https://github.com/vectordotdev/vector/blob/master/lib/vector-core/proto/event.proto
 						[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
 						"""
 					native_json: """
-						Encodes an event in Vector’s [native JSON format][vector_native_json]([EXPERIMENTAL][experimental]).
+						Encodes an event in Vector’s [native JSON format][vector_native_json].
+
+						This codec is **[experimental][experimental]**.
 
 						[vector_native_json]: https://github.com/vectordotdev/vector/blob/master/lib/codecs/tests/data/native_encoding/schema.cue
 						[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
@@ -183,9 +182,10 @@ base: components: sinks: nats: configuration: {
 						could lead to the encoding emitting empty strings for the given event.
 						"""
 					text: """
-						Plaintext encoding.
+						Plain text encoding.
 
-						This "encoding" simply uses the `message` field of a log event.
+						This "encoding" simply uses the `message` field of a log event. For metrics, it uses an
+						encoding that resembles the Prometheus export format.
 
 						Users should take care if they're modifying their log events (such as by using a `remap`
 						transform, etc) and removing the message field while doing additional parsing on it, as this
@@ -196,12 +196,33 @@ base: components: sinks: nats: configuration: {
 			except_fields: {
 				description: "List of fields that will be excluded from the encoded event."
 				required:    false
-				type: array: items: type: string: syntax: "literal"
+				type: array: items: type: string: {}
+			}
+			metric_tag_values: {
+				description: """
+					Controls how metric tag values are encoded.
+
+					When set to `single`, only the last non-bare value of tags will be displayed with the
+					metric.  When set to `full`, all metric tags will be exposed as separate assignments.
+					"""
+				relevant_when: "codec = \"json\" or codec = \"text\""
+				required:      false
+				type: string: {
+					default: "single"
+					enum: {
+						full: "All tags will be exposed as arrays of either string or null values."
+						single: """
+															Tag values will be exposed as single strings, the same as they were before this config
+															option. Tags with multiple values will show the last assigned value, and null values will be
+															ignored.
+															"""
+					}
+				}
 			}
 			only_fields: {
 				description: "List of fields that will be included in the encoded event."
 				required:    false
-				type: array: items: type: string: syntax: "literal"
+				type: array: items: type: string: {}
 			}
 			timestamp_format: {
 				description: "Format used for timestamp fields."
@@ -230,7 +251,7 @@ base: components: sinks: nats: configuration: {
 					they are defined.
 					"""
 				required: false
-				type: array: items: type: string: syntax: "literal"
+				type: array: items: type: string: examples: ["h2"]
 			}
 			ca_file: {
 				description: """
@@ -239,7 +260,7 @@ base: components: sinks: nats: configuration: {
 					The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: examples: ["/path/to/certificate_authority.crt"]
 			}
 			crt_file: {
 				description: """
@@ -251,7 +272,7 @@ base: components: sinks: nats: configuration: {
 					If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: examples: ["/path/to/host_certificate.crt"]
 			}
 			enabled: {
 				description: """
@@ -270,7 +291,7 @@ base: components: sinks: nats: configuration: {
 					The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: examples: ["/path/to/host_certificate.key"]
 			}
 			key_pass: {
 				description: """
@@ -279,7 +300,7 @@ base: components: sinks: nats: configuration: {
 					This has no effect unless `key_file` is set.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: examples: ["${KEY_PASS_ENV_VAR}", "PassWord1"]
 			}
 			verify_certificate: {
 				description: """
@@ -320,6 +341,6 @@ base: components: sinks: nats: configuration: {
 			The URL must take the form of `nats://server:port`.
 			"""
 		required: true
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 }

@@ -101,7 +101,7 @@ impl DiagnosticMessage for Error {
             NonBoolean(kind) => vec![
                 Label::primary("negation only works on boolean values", self.not_span),
                 Label::context(
-                    format!("this expression resolves to {}", kind),
+                    format!("this expression resolves to {kind}"),
                     self.expr_span,
                 ),
             ],

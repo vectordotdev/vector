@@ -59,6 +59,14 @@ where
     // the original value is a flag, or the value being added to an existing key is a flag, as
     // having a flag declared multiple times, or mixing a flag with a KV pair, doesn't make sense.
     let mut custom_map = Map::new();
+
+    if let Some(message) = metadata.deprecated_message() {
+        custom_map.insert(
+            "deprecated_message".to_string(),
+            serde_json::Value::String(message.to_string()),
+        );
+    }
+
     for attribute in metadata.custom_attributes() {
         match attribute {
             CustomAttribute::Flag(key) => {
@@ -75,23 +83,22 @@ where
             CustomAttribute::KeyValue { key, value } => {
                 custom_map.entry(key.to_string())
                     .and_modify(|existing_value| match existing_value {
-                        // When we have an existing KV pair, convert it to a multi-value KV pair.
-                        Value::String(_) => {
-                            let existing_str = std::mem::replace(existing_value, Value::Null);
-                            *existing_value = Value::Array(vec![existing_str, Value::String(value.to_string())]);
-                        },
-                        // This is already a multi-value KV pair, so just append the value.
-                        Value::Array(items) => {
-                            items.push(Value::String(value.to_string()));
-                        },
-                        // We have an unexpected value for this existing key, which is unallowed.
+                        // We already have a flag entry for this key, which we cannot turn into an
+                        // array, so we panic in this particular case to signify the weirdness.
                         Value::Bool(_) => {
-                            panic!("Tried to set metadata key/value pair '{}' but already existed in schema metadata for `{}` as a flag.", key, std::any::type_name::<T>());
+                            panic!("Tried to overwrite metadata flag '{}' but already existed in schema metadata for `{}` as a flag.", key, std::any::type_name::<T>());
                         },
-                        // The existing value had an entirely unexpected value type... uh oh!
-                        _ => panic!("Tried to set metadata key/value pair '{}' but already existed in schema metadata for `{}` as unexpected value type.", key, std::any::type_name::<T>()),
+                        // The entry is already a multi-value KV pair, so just append the value.
+                        Value::Array(items) => {
+                            items.push(value.clone());
+                        },
+                        // The entry is not already a multi-value KV pair, so turn it into one.
+                        _ => {
+                            let taken_existing_value = std::mem::replace(existing_value, Value::Null);
+                            *existing_value = Value::Array(vec![taken_existing_value, value.clone()]);
+                        },
                     })
-                    .or_insert(Value::String(value.to_string()));
+                    .or_insert(value.clone());
             }
         }
     }
@@ -170,7 +177,7 @@ where
     };
 
     // If the actual numeric type we're generating the schema for is a nonzero variant, and its constraint can't be
-    // represently solely by the normal minimum/maximum bounds, we explicitly add an exclusion for the appropriate zero
+    // represented solely by the normal minimum/maximum bounds, we explicitly add an exclusion for the appropriate zero
     // value of the given numeric type.
     if N::requires_nonzero_exclusion() {
         schema.subschemas = Some(Box::new(SubschemaValidation {
@@ -285,32 +292,51 @@ pub fn generate_struct_schema(
     }
 }
 
-#[allow(dead_code)]
-pub fn generate_optional_schema<T>(
-    gen: &mut SchemaGenerator,
-    metadata: Metadata<T>,
-) -> Result<SchemaObject, GenerateError>
-where
-    T: Configurable + Serialize,
-{
-    // We generate the schema for `T` itself, and then apply any of `T`'s metadata to the given schema.
-    let mut schema = get_or_generate_schema::<T>(gen, metadata)?;
-
+pub fn make_schema_optional(schema: &mut SchemaObject) -> Result<(), GenerateError> {
     // We do a little dance here to add an additional instance type of "null" to the schema to
     // signal it can be "X or null", achieving the functional behavior of "this is optional".
     match schema.instance_type.as_mut() {
-        // If this schema has no instance type, see if it's a reference schema.  If so, then we'd simply switch to
-        // generating a composite schema with this schema reference and a generic null schema.
-        None => match schema.is_ref() {
-            false => panic!("tried to generate optional schema, but `T` had no instance type and was not a referenceable schema"),
-            true => {
-                let null = generate_null_schema();
+        // If the schema has no instance type, this would generally imply an issue. The one
+        // exception to this rule is if the schema represents a composite schema, or in other words,
+        // does all validation via a set of subschemas.
+        //
+        // If we're dealing with one-of or any-of, we insert a subschema that allows for `null`. If
+        // we're dealing with all-of, we wrap the existing all-of subschemas in a new schema object,
+        // and then change this schema to be a one-of, with two subschemas: a null subschema, and
+        // the wrapped all-of subschemas.
+        //
+        // Anything else like if/then/else... we can't reasonably encode optionality in such a
+        // schema, and we have to bail.
+        None => match schema.subschemas.as_mut() {
+            None => return Err(GenerateError::InvalidOptionalSchema),
+            Some(subschemas) => {
+                if let Some(any_of) = subschemas.any_of.as_mut() {
+                    any_of.push(Schema::Object(generate_null_schema()));
+                } else if let Some(one_of) = subschemas.one_of.as_mut() {
+                    one_of.push(Schema::Object(generate_null_schema()));
+                } else if subschemas.all_of.is_some() {
+                    // If we're dealing with an all-of schema, we have to build a new one-of schema
+                    // where the two choices are either the `null` schema, or a subschema comprised of
+                    // the all-of subschemas.
+                    let all_of = subschemas
+                        .all_of
+                        .take()
+                        .expect("all-of subschemas must be present here");
+                    let new_all_of_schema = SchemaObject {
+                        subschemas: Some(Box::new(SubschemaValidation {
+                            all_of: Some(all_of),
+                            ..Default::default()
+                        })),
+                        ..Default::default()
+                    };
 
-                // Drop the description from our generated schema if we're here, because it's going to exist on the
-                // outer field wrapping this schema, and it looks wonky to have it nested within the composite schema.
-                schema.metadata().description = None;
-
-                return Ok(generate_one_of_schema(&[null, schema]))
+                    subschemas.one_of = Some(vec![
+                        Schema::Object(generate_null_schema()),
+                        Schema::Object(new_all_of_schema),
+                    ]);
+                } else {
+                    return Err(GenerateError::InvalidOptionalSchema);
+                }
             }
         },
         Some(sov) => match sov {
@@ -324,7 +350,7 @@ where
         },
     }
 
-    Ok(schema)
+    Ok(())
 }
 
 pub fn generate_one_of_schema(subschemas: &[SchemaObject]) -> SchemaObject {
@@ -407,6 +433,9 @@ pub fn generate_root_schema<T>() -> Result<RootSchema, GenerateError>
 where
     T: Configurable + Serialize,
 {
+    // Set env variable to enable generating all schemas, including platform-specific ones.
+    std::env::set_var("VECTOR_GENERATE_SCHEMA", "true");
+
     let mut schema_gen = SchemaSettings::draft2019_09().into_generator();
 
     let schema = get_or_generate_schema::<T>(&mut schema_gen, T::metadata())?;
@@ -424,6 +453,7 @@ pub fn get_or_generate_schema<T>(
 where
     T: Configurable + Serialize,
 {
+    // Ensure the given override metadata is valid for `T`.
     T::validate_metadata(&overrides)?;
 
     let mut schema = match T::referenceable_name() {
@@ -449,8 +479,7 @@ where
                 // want to specify a default value, whereas `T` should not have a default at all..
                 // so if we applied that override metadata, we'd be unwittingly applying a default
                 // for all usages of `T` that didn't override the default themselves.
-                let mut schema = T::generate_schema(gen)?;
-                apply_metadata(&mut schema, T::metadata());
+                let schema = generate_baseline_schema::<T>(gen, T::metadata())?;
 
                 gen.definitions_mut()
                     .insert(name.to_string(), Schema::Object(schema));
@@ -469,6 +498,20 @@ where
     // would actually be setting the title/description for a field itself, etc, so even if `T` has a
     // title/description, we can specify a more contextual title/description at the point of use.
     apply_metadata(&mut schema, overrides);
+
+    Ok(schema)
+}
+
+pub fn generate_baseline_schema<T>(
+    gen: &mut SchemaGenerator,
+    metadata: Metadata<T>,
+) -> Result<SchemaObject, GenerateError>
+where
+    T: Configurable + Serialize,
+{
+    // Generate the schema and apply its metadata.
+    let mut schema = T::generate_schema(gen)?;
+    apply_metadata(&mut schema, metadata);
 
     Ok(schema)
 }

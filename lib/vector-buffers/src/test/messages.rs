@@ -57,7 +57,7 @@ pub struct EncodeError;
 
 impl fmt::Display for EncodeError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:?}", self)
+        write!(f, "{self:?}")
     }
 }
 
@@ -68,7 +68,7 @@ pub struct DecodeError;
 
 impl fmt::Display for DecodeError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:?}", self)
+        write!(f, "{self:?}")
     }
 }
 
@@ -277,10 +277,6 @@ impl FixedEncodable for MultiEventRecord {
 message_wrapper!(PoisonPillMultiEventRecord: u32, |m: &Self| m.0);
 
 impl PoisonPillMultiEventRecord {
-    pub fn poisoned() -> Self {
-        Self::new(42)
-    }
-
     pub fn encoded_size(&self) -> usize {
         usize::try_from(self.0).unwrap_or(usize::MAX) + std::mem::size_of::<u32>()
     }

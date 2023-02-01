@@ -23,17 +23,24 @@ use super::http_sink::build_http_sink;
 pub struct ClickhouseConfig {
     /// The endpoint of the Clickhouse server.
     #[serde(alias = "host")]
+    #[configurable(metadata(docs::examples = "http://localhost:8123"))]
     pub endpoint: UriSerde,
 
     /// The table that data will be inserted into.
+    #[configurable(metadata(docs::examples = "mytable"))]
     pub table: String,
 
     /// The database that contains the table that data will be inserted into.
+    #[configurable(metadata(docs::examples = "mydatabase"))]
     pub database: Option<String>,
 
     /// Sets `input_format_skip_unknown_fields`, allowing Clickhouse to discard fields not present in the table schema.
     #[serde(default)]
     pub skip_unknown_fields: bool,
+
+    /// Sets `date_time_input_format` to `best_effort`, allowing ClickHouse to properly parse RFC3339/ISO 8601.
+    #[serde(default)]
+    pub date_time_best_effort: bool,
 
     #[configurable(derived)]
     #[serde(default = "Compression::gzip_default")]

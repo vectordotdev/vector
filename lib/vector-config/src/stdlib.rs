@@ -17,9 +17,9 @@ use vector_config_common::{attributes::CustomAttribute, validation::Validation};
 use crate::{
     num::ConfigurableNumber,
     schema::{
-        assert_string_schema_for_map, generate_array_schema, generate_bool_schema,
-        generate_map_schema, generate_number_schema, generate_set_schema, generate_string_schema,
-        get_or_generate_schema,
+        assert_string_schema_for_map, generate_array_schema, generate_baseline_schema,
+        generate_bool_schema, generate_map_schema, generate_number_schema, generate_set_schema,
+        generate_string_schema, make_schema_optional,
     },
     str::ConfigurableString,
     Configurable, GenerateError, Metadata,
@@ -38,6 +38,13 @@ impl<T> Configurable for Option<T>
 where
     T: Configurable + Serialize,
 {
+    fn referenceable_name() -> Option<&'static str> {
+        match T::referenceable_name() {
+            None => None,
+            Some(_) => Some(std::any::type_name::<Self>()),
+        }
+    }
+
     fn is_optional() -> bool {
         true
     }
@@ -50,14 +57,35 @@ where
         // Said another way, this allows callers to use `#[configurable(derived)]` on a field of `Option<T>` so long as
         // `T` has a description, and both the optional field and the schema for `T` will get the description... but the
         // description for the optional field can still be overridden independently, etc.
-        T::metadata().convert().as_subschema()
+        T::metadata().convert()
+    }
+
+    fn validate_metadata(metadata: &Metadata<Self>) -> Result<(), GenerateError> {
+        // We have to convert from `Metadata<Self>` to `Metadata<T>` which erases the default value.
+        let converted = metadata.convert::<T>();
+        T::validate_metadata(&converted)
     }
 
     fn generate_schema(gen: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
+        // Instead of the normal approach of using `get_or_generate_schema`, we manually generate
+        // the schema here. We do this because if `T` isn't a referenceable schema, we'd be
+        // generating the schema directly anyways (i.e. we wouldn't memoize it and return a schema
+        // reference) and if it _is_ a referenceable schema, we need to generate it directly so that
+        // when someone calls `get_or_generate_schema::<Option<T>>`, they get back a schema for `T`
+        // that allows for `null`.
+        //
+        // If we just used `get_or_generate_schema::<T>`, it would generate and memoize the schema
+        // for `T`, and we wouldn't be able to add the optionality (via allowing `null`) to it...
+        // and from testing, it seems like JSON Schema validators don't observe setting `type` on a
+        // schema reference, and we want to avoid composite schemas here if we can because they're
+        // annoying to utilize for non-validation purposes (i.e. configuration documentation).
         let mut inner_metadata = T::metadata();
         inner_metadata.set_transparent();
 
-        get_or_generate_schema(gen, inner_metadata)
+        let mut inner_schema = generate_baseline_schema(gen, inner_metadata)?;
+        make_schema_optional(&mut inner_schema)?;
+
+        Ok(inner_schema)
     }
 }
 
@@ -90,7 +118,7 @@ impl Configurable for char {
 }
 
 // Numbers.
-macro_rules! impl_configuable_numeric {
+macro_rules! impl_configurable_numeric {
 	($($ty:ty),+) => {
 		$(
 			impl Configurable for $ty {
@@ -114,7 +142,7 @@ macro_rules! impl_configuable_numeric {
 	};
 }
 
-impl_configuable_numeric!(
+impl_configurable_numeric!(
     u8,
     u16,
     u32,

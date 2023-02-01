@@ -5,7 +5,7 @@ base: components: sinks: datadog_traces: configuration: {
 		description: """
 			Controls how acknowledgements are handled for this sink.
 
-			See [End-to-end Acknowledgements][e2e_acks] for more information on how Vector handles event acknowledgement.
+			See [End-to-end Acknowledgements][e2e_acks] for more information on how event acknowledgement is handled.
 
 			[e2e_acks]: https://vector.dev/docs/about/under-the-hood/architecture/end-to-end-acknowledgements/
 			"""
@@ -39,17 +39,26 @@ base: components: sinks: datadog_traces: configuration: {
 					serialized / compressed.
 					"""
 				required: false
-				type: uint: {}
+				type: uint: {
+					default: 3000000
+					unit:    "bytes"
+				}
 			}
 			max_events: {
-				description: "The maximum size of a batch, in events, before it is flushed."
+				description: "The maximum size of a batch before it is flushed."
 				required:    false
-				type: uint: {}
+				type: uint: {
+					default: 1000
+					unit:    "events"
+				}
 			}
 			timeout_secs: {
-				description: "The maximum age of a batch, in seconds, before it is flushed."
+				description: "The maximum age of a batch before it is flushed."
 				required:    false
-				type: float: {}
+				type: float: {
+					default: 10.0
+					unit:    "seconds"
+				}
 			}
 		}
 	}
@@ -84,12 +93,12 @@ base: components: sinks: datadog_traces: configuration: {
 			[api_key]: https://docs.datadoghq.com/api/?lang=bash#authentication
 			"""
 		required: true
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	endpoint: {
 		description: "The endpoint to send traces to."
 		required:    false
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	request: {
 		description: """
@@ -107,15 +116,9 @@ base: components: sinks: datadog_traces: configuration: {
 					unstable performance and sink behavior. Proceed with caution.
 					"""
 				required: false
-				type: object: {
-					default: {
-						decrease_ratio:      0.9
-						ewma_alpha:          0.4
-						rtt_deviation_scale: 2.5
-					}
-					options: {
-						decrease_ratio: {
-							description: """
+				type: object: options: {
+					decrease_ratio: {
+						description: """
 																The fraction of the current value to set the new concurrency limit when decreasing the limit.
 
 																Valid values are greater than `0` and less than `1`. Smaller values cause the algorithm to scale back rapidly
@@ -123,11 +126,11 @@ base: components: sinks: datadog_traces: configuration: {
 
 																Note that the new limit is rounded down after applying this ratio.
 																"""
-							required: false
-							type: float: default: 0.9
-						}
-						ewma_alpha: {
-							description: """
+						required: false
+						type: float: default: 0.9
+					}
+					ewma_alpha: {
+						description: """
 																The weighting of new measurements compared to older measurements.
 
 																Valid values are greater than `0` and less than `1`.
@@ -136,11 +139,11 @@ base: components: sinks: datadog_traces: configuration: {
 																the current RTT. Smaller values cause this reference to adjust more slowly, which may be useful if a service has
 																unusually high response variability.
 																"""
-							required: false
-							type: float: default: 0.4
-						}
-						rtt_deviation_scale: {
-							description: """
+						required: false
+						type: float: default: 0.4
+					}
+					rtt_deviation_scale: {
+						description: """
 																Scale of RTT deviations which are not considered anomalous.
 
 																Valid values are greater than or equal to `0`, and we expect reasonable values to range from `1.0` to `3.0`.
@@ -150,9 +153,8 @@ base: components: sinks: datadog_traces: configuration: {
 																can ignore increases in RTT that are within an expected range. This factor is used to scale up the deviation to
 																an appropriate range.  Larger values cause the algorithm to ignore larger increases in the RTT.
 																"""
-							required: false
-							type: float: default: 2.5
-						}
+						required: false
+						type: float: default: 2.5
 					}
 				}
 			}
@@ -161,21 +163,38 @@ base: components: sinks: datadog_traces: configuration: {
 				required:    false
 				type: {
 					string: {
-						const:   "adaptive"
 						default: "none"
+						enum: {
+							adaptive: """
+															Concurrency will be managed by Vector's [Adaptive Request Concurrency][arc] feature.
+
+															[arc]: https://vector.dev/docs/about/under-the-hood/networking/arc/
+															"""
+							none: """
+															A fixed concurrency of 1.
+
+															Only one request can be outstanding at any given time.
+															"""
+						}
 					}
 					uint: {}
 				}
 			}
 			rate_limit_duration_secs: {
-				description: "The time window, in seconds, used for the `rate_limit_num` option."
+				description: "The time window used for the `rate_limit_num` option."
 				required:    false
-				type: uint: default: 1
+				type: uint: {
+					default: 1
+					unit:    "seconds"
+				}
 			}
 			rate_limit_num: {
 				description: "The maximum number of requests allowed within the `rate_limit_duration_secs` time window."
 				required:    false
-				type: uint: default: 9223372036854775807
+				type: uint: {
+					default: 9223372036854775807
+					unit:    "requests"
+				}
 			}
 			retry_attempts: {
 				description: """
@@ -184,7 +203,10 @@ base: components: sinks: datadog_traces: configuration: {
 					The default, for all intents and purposes, represents an infinite number of retries.
 					"""
 				required: false
-				type: uint: default: 9223372036854775807
+				type: uint: {
+					default: 9223372036854775807
+					unit:    "retries"
+				}
 			}
 			retry_initial_backoff_secs: {
 				description: """
@@ -193,22 +215,31 @@ base: components: sinks: datadog_traces: configuration: {
 					After the first retry has failed, the fibonacci sequence will be used to select future backoffs.
 					"""
 				required: false
-				type: uint: default: 1
+				type: uint: {
+					default: 1
+					unit:    "seconds"
+				}
 			}
 			retry_max_duration_secs: {
-				description: "The maximum amount of time, in seconds, to wait between retries."
+				description: "The maximum amount of time to wait between retries."
 				required:    false
-				type: uint: default: 3600
+				type: uint: {
+					default: 3600
+					unit:    "seconds"
+				}
 			}
 			timeout_secs: {
 				description: """
-					The maximum time a request can take before being aborted.
+					The time a request can take before being aborted.
 
 					It is highly recommended that you do not lower this value below the service’s internal timeout, as this could
 					create orphaned requests, pile on retries, and result in duplicate data downstream.
 					"""
 				required: false
-				type: uint: default: 60
+				type: uint: {
+					default: 60
+					unit:    "seconds"
+				}
 			}
 		}
 	}
@@ -219,7 +250,7 @@ base: components: sinks: datadog_traces: configuration: {
 			[dd_site]: https://docs.datadoghq.com/getting_started/site
 			"""
 		required: false
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	tls: {
 		description: "Configures the TLS options for incoming/outgoing connections."
@@ -233,7 +264,7 @@ base: components: sinks: datadog_traces: configuration: {
 					they are defined.
 					"""
 				required: false
-				type: array: items: type: string: syntax: "literal"
+				type: array: items: type: string: examples: ["h2"]
 			}
 			ca_file: {
 				description: """
@@ -242,7 +273,7 @@ base: components: sinks: datadog_traces: configuration: {
 					The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: examples: ["/path/to/certificate_authority.crt"]
 			}
 			crt_file: {
 				description: """
@@ -254,7 +285,7 @@ base: components: sinks: datadog_traces: configuration: {
 					If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: examples: ["/path/to/host_certificate.crt"]
 			}
 			enabled: {
 				description: """
@@ -273,7 +304,7 @@ base: components: sinks: datadog_traces: configuration: {
 					The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: examples: ["/path/to/host_certificate.key"]
 			}
 			key_pass: {
 				description: """
@@ -282,7 +313,7 @@ base: components: sinks: datadog_traces: configuration: {
 					This has no effect unless `key_file` is set.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: examples: ["${KEY_PASS_ENV_VAR}", "PassWord1"]
 			}
 			verify_certificate: {
 				description: """

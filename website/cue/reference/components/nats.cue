@@ -48,23 +48,6 @@ components: _nats: {
 				examples: ["nats://demo.nats.io", "nats://127.0.0.1:4222"]
 			}
 		}
-		subject: {
-			description: "The NATS subject to publish messages to."
-			required:    true
-			type: string: {
-				examples: ["{{ host }}", "foo", "time.us.east", "time.*.east", "time.>", ">"]
-				syntax: "template"
-			}
-		}
-		connection_name: {
-			common:      false
-			description: "A name assigned to the NATS connection."
-			required:    false
-			type: string: {
-				default: "vector"
-				examples: ["foo", "API Name Option Example"]
-			}
-		}
 		auth: {
 			common:      false
 			description: "Configuration for how Vector should authenticate to NATS."
@@ -72,7 +55,7 @@ components: _nats: {
 			type: object: options: {
 				strategy: {
 					common:      false
-					description: "The strategy used to authenticate with the NATS server. See https://docs.nats.io/running-a-nats-service/configuration/securing_nats/auth_intro. For TLS Client Certiificate Auth, use the TLS configuration."
+					description: "The strategy used to authenticate with the NATS server. See https://docs.nats.io/running-a-nats-service/configuration/securing_nats/auth_intro. For TLS Client Certificate Auth, use the TLS configuration."
 					required:    false
 					type: string: {
 						default: "user_password"

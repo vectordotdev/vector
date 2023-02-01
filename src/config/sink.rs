@@ -78,9 +78,7 @@ where
         for stage in self.buffer.stages() {
             match stage {
                 BufferType::Memory { .. } => {}
-                BufferType::DiskV1 { .. } | BufferType::DiskV2 { .. } => {
-                    resources.push(Resource::DiskBuffer(id.to_string()))
-                }
+                BufferType::DiskV2 { .. } => resources.push(Resource::DiskBuffer(id.to_string())),
             }
         }
         resources

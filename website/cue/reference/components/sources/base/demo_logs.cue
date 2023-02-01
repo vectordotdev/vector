@@ -13,11 +13,12 @@ base: components: sources: demo_logs: configuration: {
 	decoding: {
 		description: "Configures how events are decoded from raw bytes."
 		required:    false
-		type: object: {
-			default: codec: "bytes"
-			options: codec: {
-				required: true
-				type: string: enum: {
+		type: object: options: codec: {
+			description: "The codec to use for decoding events."
+			required:    false
+			type: string: {
+				default: "bytes"
+				enum: {
 					bytes: "Uses the raw bytes as-is."
 					gelf: """
 						Decodes the raw bytes as a [GELF][gelf] message.
@@ -30,13 +31,17 @@ base: components: sources: demo_logs: configuration: {
 						[json]: https://www.json.org/
 						"""
 					native: """
-						Decodes the raw bytes as Vector’s [native Protocol Buffers format][vector_native_protobuf] ([EXPERIMENTAL][experimental]).
+						Decodes the raw bytes as Vector’s [native Protocol Buffers format][vector_native_protobuf].
+
+						This codec is **[experimental][experimental]**.
 
 						[vector_native_protobuf]: https://github.com/vectordotdev/vector/blob/master/lib/vector-core/proto/event.proto
 						[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
 						"""
 					native_json: """
-						Decodes the raw bytes as Vector’s [native JSON format][vector_native_json] ([EXPERIMENTAL][experimental]).
+						Decodes the raw bytes as Vector’s [native JSON format][vector_native_json].
+
+						This codec is **[experimental][experimental]**.
 
 						[vector_native_json]: https://github.com/vectordotdev/vector/blob/master/lib/codecs/tests/data/native_encoding/schema.cue
 						[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
@@ -55,17 +60,35 @@ base: components: sources: demo_logs: configuration: {
 		}
 	}
 	format: {
-		required: false
-		type: string: {
-			default: "json"
-			enum: {
-				apache_common: "Randomly generated logs in [Apache common](\\(urls.apache_common)) format."
-				apache_error:  "Randomly generated logs in [Apache error](\\(urls.apache_error)) format."
-				bsd_syslog:    "Randomly generated logs in Syslog format ([RFC 3164](\\(urls.syslog_3164)))."
-				json:          "Randomly generated HTTP server logs in [JSON](\\(urls.json)) format."
-				shuffle:       "Lines are chosen at random from the list specified using `lines`."
-				syslog:        "Randomly generated logs in Syslog format ([RFC 5424](\\(urls.syslog_5424)))."
-			}
+		description: "The format of the randomly generated output."
+		required:    true
+		type: string: enum: {
+			apache_common: """
+				Randomly generated logs in [Apache common][apache_common] format.
+
+				[apache_common]: https://httpd.apache.org/docs/current/logs.html#common
+				"""
+			apache_error: """
+				Randomly generated logs in [Apache error][apache_error] format.
+
+				[apache_error]: https://httpd.apache.org/docs/current/logs.html#errorlog
+				"""
+			bsd_syslog: """
+				Randomly generated logs in Syslog format ([RFC 3164][syslog_3164]).
+
+				[syslog_3164]: https://tools.ietf.org/html/rfc3164
+				"""
+			json: """
+				Randomly generated HTTP server logs in [JSON][json] format.
+
+				[json]: https://en.wikipedia.org/wiki/JSON
+				"""
+			shuffle: "Lines are chosen at random from the list specified using `lines`."
+			syslog: """
+				Randomly generated logs in Syslog format ([RFC 5424][syslog_5424]).
+
+				[syslog_5424]: https://tools.ietf.org/html/rfc5424
+				"""
 		}
 	}
 	framing: {
@@ -77,33 +100,34 @@ base: components: sources: demo_logs: configuration: {
 			ends within the byte stream.
 			"""
 		required: false
-		type: object: {
-			default: method: "bytes"
-			options: {
-				character_delimited: {
-					description:   "Options for the character delimited decoder."
-					relevant_when: "method = \"character_delimited\""
-					required:      true
-					type: object: options: {
-						delimiter: {
-							description: "The character that delimits byte sequences."
-							required:    true
-							type: uint: {}
-						}
-						max_length: {
-							description: """
+		type: object: options: {
+			character_delimited: {
+				description:   "Options for the character delimited decoder."
+				relevant_when: "method = \"character_delimited\""
+				required:      true
+				type: object: options: {
+					delimiter: {
+						description: "The character that delimits byte sequences."
+						required:    true
+						type: uint: {}
+					}
+					max_length: {
+						description: """
 																The maximum length of the byte buffer.
 
 																This length does *not* include the trailing delimiter.
 																"""
-							required: false
-							type: uint: {}
-						}
+						required: false
+						type: uint: {}
 					}
 				}
-				method: {
-					required: true
-					type: string: enum: {
+			}
+			method: {
+				description: "The framing method."
+				required:    false
+				type: string: {
+					default: "bytes"
+					enum: {
 						bytes:               "Byte frames are passed through as-is according to the underlying I/O boundaries (e.g. split between messages or stream segments)."
 						character_delimited: "Byte frames which are delimited by a chosen character."
 						length_delimited:    "Byte frames which are prefixed by an unsigned big-endian 32-bit integer indicating the length."
@@ -115,29 +139,29 @@ base: components: sources: demo_logs: configuration: {
 															"""
 					}
 				}
-				newline_delimited: {
-					description:   "Options for the newline delimited decoder."
-					relevant_when: "method = \"newline_delimited\""
-					required:      false
-					type: object: options: max_length: {
-						description: """
-																The maximum length of the byte buffer.
+			}
+			newline_delimited: {
+				description:   "Options for the newline delimited decoder."
+				relevant_when: "method = \"newline_delimited\""
+				required:      false
+				type: object: options: max_length: {
+					description: """
+						The maximum length of the byte buffer.
 
-																This length does *not* include the trailing delimiter.
-																"""
-						required: false
-						type: uint: {}
-					}
+						This length does *not* include the trailing delimiter.
+						"""
+					required: false
+					type: uint: {}
 				}
-				octet_counting: {
-					description:   "Options for the octet counting decoder."
-					relevant_when: "method = \"octet_counting\""
-					required:      false
-					type: object: options: max_length: {
-						description: "The maximum length of the byte buffer."
-						required:    false
-						type: uint: {}
-					}
+			}
+			octet_counting: {
+				description:   "Options for the octet counting decoder."
+				relevant_when: "method = \"octet_counting\""
+				required:      false
+				type: object: options: max_length: {
+					description: "The maximum length of the byte buffer."
+					required:    false
+					type: uint: {}
 				}
 			}
 		}
@@ -150,13 +174,17 @@ base: components: sources: demo_logs: configuration: {
 			`interval` to `0.0`.
 			"""
 		required: false
-		type: float: default: 1.0
+		type: float: {
+			default: 1.0
+			examples: [1.0, 0.1, 0.01]
+			unit: "seconds"
+		}
 	}
 	lines: {
 		description:   "The list of lines to output."
 		relevant_when: "format = \"shuffle\""
 		required:      true
-		type: array: items: type: string: syntax: "literal"
+		type: array: items: type: string: examples: ["line1", "line2"]
 	}
 	sequence: {
 		description:   "If `true`, each output line starts with an increasing sequence number, beginning with 0."

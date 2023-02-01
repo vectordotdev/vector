@@ -85,6 +85,15 @@ components: sinks: azure_blob: {
 				examples: ["mylogstorage"]
 			}
 		}
+		endpoint: {
+			description: "The Azure Blob Endpoint URL. This is used to override the default that is used when passing in the storage_account. Ignored if connection_string is used."
+			required:    false
+			common:      false
+			type: string: {
+				default: ""
+				examples: ["https://test.blob.core.usgovcloudapi.net/", "https://test.blob.core.windows.net/"]
+			}
+		}
 		container_name: {
 			description: "The Azure Blob Storage Account container name."
 			required:    true

@@ -14,6 +14,7 @@ components: sources: http_client: {
 
 	features: {
 		acknowledgements: false
+		auto_generated:   true
 		codecs: {
 			enabled:         true
 			default_framing: "`bytes`"
@@ -51,83 +52,8 @@ components: sources: http_client: {
 		platform_name: null
 	}
 
-	configuration: {
-		auth: configuration._http_auth & {_args: {
-			password_example: "${PASSWORD}"
-			username_example: "${USERNAME}"
-		}}
-		endpoint: {
-			description: "Endpoint to collect observability data from."
-			required:    true
-			warnings: ["You must explicitly add the path to your endpoint."]
-			type: string: {
-				examples: ["http://127.0.0.1:9898/logs"]
-			}
-		}
-		headers: {
-			common:      false
-			description: "A list of HTTP headers to include in request."
-			required:    false
-			type: object: {
-				examples: [{"Your-Custom-Header": "it's-value"}]
-			}
-		}
-		method: {
-			common:      false
-			description: "Specifies the action of the HTTP request."
-			required:    false
-			type: string: {
-				default: "GET"
-				enum: {
-					"HEAD":   "HTTP HEAD method."
-					"GET":    "HTTP GET method."
-					"PUT":    "HTTP PUT method."
-					"POST":   "HTTP POST method."
-					"PATCH":  "HTTP PATCH method."
-					"DELETE": "HTTP DELETE method."
-				}
-			}
-		}
-		query: {
-			common: false
-			description: """
-				Custom parameters for the HTTP request query string.
-				One or more values for the same parameter key can be provided.
-				The parameters provided in this option are appended to the `endpoint` option.
-				"""
-			required: false
-			type: object: {
-				examples: [{"key1": ["value1", "value2"]}]
-				options: {
-					"*": {
-						common:      false
-						description: "Any query key"
-						required:    false
-						type: array: {
-							default: null
-							examples: [[
-								"value1", "value2",
-							]]
-							items: type: string: {
-								examples: [
-									"key1", "key2",
-								]
-								syntax: "literal"
-							}
-						}
-					}
-				}
-			}
-		}
-		scrape_interval_secs: {
-			common:      true
-			description: "The interval between calls, in seconds."
-			required:    false
-			type: uint: {
-				default: 15
-				unit:    "seconds"
-			}
-		}
+	configuration: base.components.sources.http_client.configuration & {
+		endpoint: warnings: ["You must explicitly add the path to your endpoint."]
 	}
 
 	output: {
@@ -136,7 +62,7 @@ components: sources: http_client: {
 				description: "An individual line from a `text/plain` HTTP request"
 				fields: {
 					message: {
-						description:   "The raw line line from the incoming payload."
+						description:   "The raw line from the incoming payload."
 						relevant_when: "encoding == \"text\""
 						required:      true
 						type: string: {

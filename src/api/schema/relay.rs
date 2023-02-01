@@ -4,6 +4,7 @@ use async_graphql::{
     connection::{self, Connection, CursorType, Edge, EmptyFields},
     Result, SimpleObject,
 };
+use base64::prelude::{Engine as _, BASE64_URL_SAFE_NO_PAD};
 
 /// Base64 invalid states, used by `Base64Cursor`.
 pub enum Base64CursorError {
@@ -36,15 +37,13 @@ impl Base64Cursor {
 
     /// Returns a base64 string representation of the cursor
     fn encode(&self) -> String {
-        base64::encode_config(
-            format!("{}:{}", self.name, self.index),
-            base64::URL_SAFE_NO_PAD,
-        )
+        BASE64_URL_SAFE_NO_PAD.encode(format!("{}:{}", self.name, self.index))
     }
 
     /// Decodes a base64 string into a cursor result
     fn decode(s: &str) -> Result<Self, Base64CursorError> {
-        let bytes = base64::decode_config(s, base64::URL_SAFE_NO_PAD)
+        let bytes = BASE64_URL_SAFE_NO_PAD
+            .decode(s)
             .map_err(Base64CursorError::DecodeError)?;
 
         let cursor = String::from_utf8(bytes).map_err(|_| Base64CursorError::Invalid)?;

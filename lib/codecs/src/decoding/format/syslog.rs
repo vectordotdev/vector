@@ -214,7 +214,7 @@ impl Deserializer for SyslogDeserializer {
         let log = match (self.source, log_namespace) {
             (Some(source), LogNamespace::Vector) => {
                 let mut log = LogEvent::from(Value::Bytes(Bytes::from(parsed.msg.to_string())));
-                insert_metatdata_fields_from_syslog(&mut log, source, parsed, log_namespace);
+                insert_metadata_fields_from_syslog(&mut log, source, parsed, log_namespace);
                 log
             }
             _ => {
@@ -244,7 +244,7 @@ fn resolve_year((month, _date, _hour, _min, _sec): IncompleteDate) -> i32 {
     }
 }
 
-fn insert_metatdata_fields_from_syslog(
+fn insert_metadata_fields_from_syslog(
     log: &mut LogEvent,
     source: &'static str,
     parsed: Message<&str>,

@@ -70,6 +70,9 @@ pub struct KafkaSinkConfig {
     ///
     /// [config_props_docs]: https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md
     #[serde(default)]
+    #[configurable(metadata(
+        docs::additional_props_description = "A librdkafka configuration option."
+    ))]
     pub librdkafka_options: HashMap<String, String>,
 
     /// The log field name to use for the Kafka headers.
@@ -201,7 +204,7 @@ impl GenerateConfig for KafkaSinkConfig {
             bootstrap_servers: "10.14.22.123:9092,10.14.23.332:9092".to_owned(),
             topic: "topic-1234".to_owned(),
             key_field: Some("user_id".to_owned()),
-            encoding: JsonSerializerConfig::new().into(),
+            encoding: JsonSerializerConfig::default().into(),
             batch: Default::default(),
             compression: KafkaCompression::None,
             auth: Default::default(),

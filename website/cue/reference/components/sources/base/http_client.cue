@@ -6,13 +6,14 @@ base: components: sources: http_client: configuration: {
 		required:    false
 		type: object: options: {
 			password: {
-				description:   "The password to send."
+				description:   "The basic authentication password."
 				relevant_when: "strategy = \"basic\""
 				required:      true
-				type: string: syntax: "literal"
+				type: string: examples: ["${PASSWORD}", "password"]
 			}
 			strategy: {
-				required: true
+				description: "The authentication strategy to use."
+				required:    true
 				type: string: enum: {
 					basic: """
 						Basic authentication.
@@ -29,16 +30,16 @@ base: components: sources: http_client: configuration: {
 				}
 			}
 			token: {
-				description:   "The bearer token to send."
+				description:   "The bearer authentication token."
 				relevant_when: "strategy = \"bearer\""
 				required:      true
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			user: {
-				description:   "The username to send."
+				description:   "The basic authentication username."
 				relevant_when: "strategy = \"basic\""
 				required:      true
-				type: string: syntax: "literal"
+				type: string: examples: ["${USERNAME}", "username"]
 			}
 		}
 	}
@@ -46,7 +47,8 @@ base: components: sources: http_client: configuration: {
 		description: "Decoder to use on the HTTP responses."
 		required:    false
 		type: object: options: codec: {
-			required: false
+			description: "The codec to use for decoding events."
+			required:    false
 			type: string: {
 				default: "bytes"
 				enum: {
@@ -62,13 +64,17 @@ base: components: sources: http_client: configuration: {
 						[json]: https://www.json.org/
 						"""
 					native: """
-						Decodes the raw bytes as Vector’s [native Protocol Buffers format][vector_native_protobuf] ([EXPERIMENTAL][experimental]).
+						Decodes the raw bytes as Vector’s [native Protocol Buffers format][vector_native_protobuf].
+
+						This codec is **[experimental][experimental]**.
 
 						[vector_native_protobuf]: https://github.com/vectordotdev/vector/blob/master/lib/vector-core/proto/event.proto
 						[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
 						"""
 					native_json: """
-						Decodes the raw bytes as Vector’s [native JSON format][vector_native_json] ([EXPERIMENTAL][experimental]).
+						Decodes the raw bytes as Vector’s [native JSON format][vector_native_json].
+
+						This codec is **[experimental][experimental]**.
 
 						[vector_native_json]: https://github.com/vectordotdev/vector/blob/master/lib/codecs/tests/data/native_encoding/schema.cue
 						[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
@@ -88,11 +94,12 @@ base: components: sources: http_client: configuration: {
 	}
 	endpoint: {
 		description: """
-			Endpoint to collect events from. The full path must be specified.
-			Example: "http://127.0.0.1:9898/logs"
+			The HTTP endpoint to collect events from.
+
+			The full path must be specified.
 			"""
 		required: true
-		type: string: syntax: "literal"
+		type: string: examples: ["http://127.0.0.1:9898/logs"]
 	}
 	framing: {
 		description: "Framing to use in the decoding."
@@ -120,7 +127,8 @@ base: components: sources: http_client: configuration: {
 				}
 			}
 			method: {
-				required: false
+				description: "The framing method."
+				required:    false
 				type: string: {
 					default: "bytes"
 					enum: {
@@ -165,20 +173,24 @@ base: components: sources: http_client: configuration: {
 	headers: {
 		description: """
 			Headers to apply to the HTTP requests.
+
 			One or more values for the same header can be provided.
 			"""
 		required: false
-		type: object: options: "*": {
-			description: """
-				Headers to apply to the HTTP requests.
-				One or more values for the same header can be provided.
-				"""
-			required: true
-			type: array: items: type: string: syntax: "literal"
+		type: object: {
+			examples: [{
+				Accept: ["text/plain", "text/html"]
+				"X-My-Custom-Header": ["a", "vector", "of", "values"]
+			}]
+			options: "*": {
+				description: "An HTTP request header and it's value(s)."
+				required:    true
+				type: array: items: type: string: {}
+			}
 		}
 	}
 	method: {
-		description: "Specifies the action of the HTTP request."
+		description: "Specifies the method of the HTTP request."
 		required:    false
 		type: string: {
 			default: "GET"
@@ -196,25 +208,31 @@ base: components: sources: http_client: configuration: {
 		description: """
 			Custom parameters for the HTTP request query string.
 
-			One or more values for the same parameter key can be provided. The parameters provided in this option are
-			appended to any parameters manually provided in the `endpoint` option.
+			One or more values for the same parameter key can be provided.
+
+			The parameters provided in this option are appended to any parameters
+			manually provided in the `endpoint` option.
 			"""
 		required: false
-		type: object: options: "*": {
-			description: """
-				Custom parameters for the HTTP request query string.
-
-				One or more values for the same parameter key can be provided. The parameters provided in this option are
-				appended to any parameters manually provided in the `endpoint` option.
-				"""
-			required: true
-			type: array: items: type: string: syntax: "literal"
+		type: object: {
+			examples: [{
+				field: ["value"]
+				fruit: ["mango", "papaya", "kiwi"]
+			}]
+			options: "*": {
+				description: "A query string parameter and it's value(s)."
+				required:    true
+				type: array: items: type: string: {}
+			}
 		}
 	}
 	scrape_interval_secs: {
-		description: "The interval between calls, in seconds."
+		description: "The interval between calls."
 		required:    false
-		type: uint: default: 15
+		type: uint: {
+			default: 15
+			unit:    "seconds"
+		}
 	}
 	tls: {
 		description: "TLS configuration."
@@ -228,7 +246,7 @@ base: components: sources: http_client: configuration: {
 					they are defined.
 					"""
 				required: false
-				type: array: items: type: string: syntax: "literal"
+				type: array: items: type: string: examples: ["h2"]
 			}
 			ca_file: {
 				description: """
@@ -237,7 +255,7 @@ base: components: sources: http_client: configuration: {
 					The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: examples: ["/path/to/certificate_authority.crt"]
 			}
 			crt_file: {
 				description: """
@@ -249,7 +267,7 @@ base: components: sources: http_client: configuration: {
 					If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: examples: ["/path/to/host_certificate.crt"]
 			}
 			key_file: {
 				description: """
@@ -258,7 +276,7 @@ base: components: sources: http_client: configuration: {
 					The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: examples: ["/path/to/host_certificate.key"]
 			}
 			key_pass: {
 				description: """
@@ -267,7 +285,7 @@ base: components: sources: http_client: configuration: {
 					This has no effect unless `key_file` is set.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: examples: ["${KEY_PASS_ENV_VAR}", "PassWord1"]
 			}
 			verify_certificate: {
 				description: """

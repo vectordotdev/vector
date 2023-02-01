@@ -369,6 +369,9 @@ async fn enterprise_headers_inner(api_status: ApiStatus) {
     let (mut config, cx) = load_sink::<DatadogLogsConfig>(indoc! {r#"
             default_api_key = "atoken"
             compression = "none"
+
+            [request]
+            headers.DD-EVP-ORIGIN = "vector-enterprise"
         "#})
     .unwrap();
 
@@ -377,7 +380,6 @@ async fn enterprise_headers_inner(api_status: ApiStatus) {
     let endpoint = format!("http://{}", addr);
     config.endpoint = Some(endpoint.clone());
 
-    config.enterprise = true;
     let (sink, _) = config.build(cx).await.unwrap();
 
     let (rx, _trigger, server) = test_server(addr, api_status);

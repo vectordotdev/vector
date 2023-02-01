@@ -5,7 +5,8 @@ base: components: sources: file_descriptor: configuration: {
 		description: "Configures how events are decoded from raw bytes."
 		required:    false
 		type: object: options: codec: {
-			required: false
+			description: "The codec to use for decoding events."
+			required:    false
 			type: string: {
 				default: "bytes"
 				enum: {
@@ -21,13 +22,17 @@ base: components: sources: file_descriptor: configuration: {
 						[json]: https://www.json.org/
 						"""
 					native: """
-						Decodes the raw bytes as Vector’s [native Protocol Buffers format][vector_native_protobuf] ([EXPERIMENTAL][experimental]).
+						Decodes the raw bytes as Vector’s [native Protocol Buffers format][vector_native_protobuf].
+
+						This codec is **[experimental][experimental]**.
 
 						[vector_native_protobuf]: https://github.com/vectordotdev/vector/blob/master/lib/vector-core/proto/event.proto
 						[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
 						"""
 					native_json: """
-						Decodes the raw bytes as Vector’s [native JSON format][vector_native_json] ([EXPERIMENTAL][experimental]).
+						Decodes the raw bytes as Vector’s [native JSON format][vector_native_json].
+
+						This codec is **[experimental][experimental]**.
 
 						[vector_native_json]: https://github.com/vectordotdev/vector/blob/master/lib/codecs/tests/data/native_encoding/schema.cue
 						[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
@@ -48,7 +53,9 @@ base: components: sources: file_descriptor: configuration: {
 	fd: {
 		description: "The file descriptor number to read from."
 		required:    true
-		type: uint: {}
+		type: uint: examples: [
+			10,
+		]
 	}
 	framing: {
 		description: """
@@ -82,7 +89,8 @@ base: components: sources: file_descriptor: configuration: {
 				}
 			}
 			method: {
-				required: true
+				description: "The framing method."
+				required:    true
 				type: string: enum: {
 					bytes:               "Byte frames are passed through as-is according to the underlying I/O boundaries (e.g. split between messages or stream segments)."
 					character_delimited: "Byte frames which are delimited by a chosen character."
@@ -125,12 +133,10 @@ base: components: sources: file_descriptor: configuration: {
 		description: """
 			Overrides the name of the log field used to add the current hostname to each event.
 
-			The value will be the current hostname for wherever Vector is running.
-
 			By default, the [global `host_key` option](https://vector.dev/docs/reference/configuration//global-options#log_schema.host_key) is used.
 			"""
 		required: false
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	max_length: {
 		description: """
@@ -139,6 +145,9 @@ base: components: sources: file_descriptor: configuration: {
 			Messages larger than this are truncated.
 			"""
 		required: false
-		type: uint: default: 102400
+		type: uint: {
+			default: 102400
+			unit:    "bytes"
+		}
 	}
 }

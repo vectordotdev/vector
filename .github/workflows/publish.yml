@@ -313,7 +313,14 @@ jobs:
       VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
     strategy:
       matrix:
-        container: ["ubuntu:16.04","ubuntu:18.04","ubuntu:20.04","ubuntu:22.04","debian:9","debian:10","debian:11"]
+        container:
+          - ubuntu:14.04
+          - ubuntu:16.04
+          - ubuntu:18.04
+          - ubuntu:20.04
+          - ubuntu:22.04
+          - debian:10
+          - debian:11
     container:
       image: ${{ matrix.container }}
     steps:
@@ -358,6 +365,7 @@ jobs:
         container:
           - "quay.io/centos/centos:stream8"
           - "quay.io/centos/centos:stream9"
+          - "amazonlinux:1"
           - "amazonlinux:2"
           - "fedora:34"
           - "fedora:35"
@@ -452,7 +460,7 @@ jobs:
           platforms: all
       - name: Set up Docker Buildx
         id: buildx
-        uses: docker/setup-buildx-action@v2.2.1
+        uses: docker/setup-buildx-action@v2.4.0
         with:
           version: latest
           install: true
@@ -569,8 +577,8 @@ jobs:
         run: make release-s3
 
   publish-github:
-    name: Publish to Github
-    # We only publish to Github for versioned releases, not nightlies.
+    name: Publish to GitHub
+    # We only publish to GitHub for versioned releases, not nightlies.
     if: ${{ inputs.mode == 'Release' }}
     runs-on: ubuntu-20.04
     needs:
@@ -633,7 +641,7 @@ jobs:
         with:
           name: vector-${{ env.VECTOR_VERSION }}-armv7-unknown-linux-musleabihf
           path: target/artifacts
-      - name: Publish release to Github
+      - name: Publish release to GitHub
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: make release-github

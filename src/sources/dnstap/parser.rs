@@ -5,6 +5,7 @@ use std::{
     net::{IpAddr, Ipv4Addr, Ipv6Addr},
 };
 
+use base64::prelude::{Engine as _, BASE64_STANDARD};
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
 use once_cell::sync::Lazy;
@@ -172,7 +173,7 @@ impl<'a> DnstapParser<'a> {
         if need_raw_data {
             self.insert(
                 self.event_schema.dnstap_root_data_schema().raw_data(),
-                base64::encode(&frame),
+                BASE64_STANDARD.encode(&frame),
             );
         }
 
@@ -351,14 +352,17 @@ impl<'a> DnstapParser<'a> {
                 "ns",
             );
 
-            let timestamp = Utc.timestamp(time_sec.try_into().unwrap(), query_time_nsec);
+            let timestamp = Utc
+                .timestamp_opt(time_sec.try_into().unwrap(), query_time_nsec)
+                .single()
+                .expect("invalid timestamp");
             self.insert(
                 self.event_schema.dnstap_root_data_schema().timestamp(),
                 timestamp,
             );
         }
 
-        if message != None {
+        if message.is_none() {
             self.parent_key_path.push_field(message_key);
 
             let time_key_name = if dnstap_message_type_id <= MAX_DNSTAP_QUERY_MESSAGE_TYPE_ID {
@@ -468,7 +472,7 @@ impl<'a> DnstapParser<'a> {
 
         self.insert(
             self.event_schema.dns_query_message_schema().raw_data(),
-            base64::encode(raw_dns_message),
+            BASE64_STANDARD.encode(raw_dns_message),
         );
 
         self.parent_key_path.segments.pop();
@@ -532,7 +536,7 @@ impl<'a> DnstapParser<'a> {
             self.event_schema
                 .dns_query_message_schema()
                 .opt_pseudo_section(),
-            &msg.opt_pserdo_section,
+            &msg.opt_pseudo_section,
         );
 
         self.parent_key_path.segments.pop();
@@ -556,35 +560,17 @@ impl<'a> DnstapParser<'a> {
 
         self.insert(self.event_schema.dns_query_header_schema().qr(), header.qr);
 
-        self.insert(
-            self.event_schema.dns_query_header_schema().aa(),
-            header.aa as bool,
-        );
+        self.insert(self.event_schema.dns_query_header_schema().aa(), header.aa);
 
-        self.insert(
-            self.event_schema.dns_query_header_schema().tc(),
-            header.tc as bool,
-        );
+        self.insert(self.event_schema.dns_query_header_schema().tc(), header.tc);
 
-        self.insert(
-            self.event_schema.dns_query_header_schema().rd(),
-            header.rd as bool,
-        );
+        self.insert(self.event_schema.dns_query_header_schema().rd(), header.rd);
 
-        self.insert(
-            self.event_schema.dns_query_header_schema().ra(),
-            header.ra as bool,
-        );
+        self.insert(self.event_schema.dns_query_header_schema().ra(), header.ra);
 
-        self.insert(
-            self.event_schema.dns_query_header_schema().ad(),
-            header.ad as bool,
-        );
+        self.insert(self.event_schema.dns_query_header_schema().ad(), header.ad);
 
-        self.insert(
-            self.event_schema.dns_query_header_schema().cd(),
-            header.cd as bool,
-        );
+        self.insert(self.event_schema.dns_query_header_schema().cd(), header.cd);
 
         self.insert(
             self.event_schema.dns_query_header_schema().question_count(),
@@ -803,7 +789,7 @@ impl<'a> DnstapParser<'a> {
                 self.event_schema
                     .dns_message_opt_pseudo_section_schema()
                     .do_flag(),
-                edns.dnssec_ok as bool,
+                edns.dnssec_ok,
             );
             self.insert(
                 self.event_schema
@@ -890,7 +876,7 @@ impl<'a> DnstapParser<'a> {
         if let Some(rdata_bytes) = &record.rdata_bytes {
             self.insert(
                 self.event_schema.dns_record_schema().rdata_bytes(),
-                base64::encode(rdata_bytes),
+                BASE64_STANDARD.encode(rdata_bytes),
             );
         };
     }
@@ -970,7 +956,9 @@ mod tests {
         let raw_dnstap_data = "ChVqYW1lcy1WaXJ0dWFsLU1hY2hpbmUSC0JJTkQgOS4xNi4zcnoIAxACGAEiEAAAAAAAAA\
         AAAAAAAAAAAAAqECABBQJwlAAAAAAAAAAAADAw8+0CODVA7+zq9wVNMU3WNlI2kwIAAAABAAAAAAABCWZhY2Vib29rMQNjb\
         20AAAEAAQAAKQIAAACAAAAMAAoACOxjCAG9zVgzWgUDY29tAHgB";
-        let dnstap_data = base64::decode(raw_dnstap_data).expect("Invalid base64 encoded data.");
+        let dnstap_data = BASE64_STANDARD
+            .decode(raw_dnstap_data)
+            .expect("Invalid base64 encoded data.");
         let parse_result = parser.parse_dnstap_data(Bytes::from(dnstap_data));
         assert!(parse_result.is_ok());
         assert!(log_event
@@ -1020,7 +1008,9 @@ mod tests {
         let raw_dnstap_data = "ChVqYW1lcy1WaXJ0dWFsLU1hY2hpbmUSC0JJTkQgOS4xNi4zcmsIDhABGAEiBH8AAA\
         EqBH8AAAEwrG44AEC+iu73BU14gfofUh1wi6gAAAEAAAAAAAAHZXhhbXBsZQNjb20AAAYAAWC+iu73BW0agDwvch1wi6gAA\
         AEAAAAAAAAHZXhhbXBsZQNjb20AAAYAAXgB";
-        let dnstap_data = base64::decode(raw_dnstap_data).expect("Invalid base64 encoded data.");
+        let dnstap_data = BASE64_STANDARD
+            .decode(raw_dnstap_data)
+            .expect("Invalid base64 encoded data.");
         let parse_result = parser.parse_dnstap_data(Bytes::from(dnstap_data));
         assert!(parse_result.is_ok());
         assert!(log_event

@@ -233,7 +233,7 @@ impl EventEncoder {
             labels = vec![("agent".to_string(), "vector".to_string())]
         }
 
-        let partition = PartitionKey::new(tenant_id, &mut labels);
+        let partition = PartitionKey { tenant_id };
 
         Some(LokiRecord {
             labels,
@@ -334,7 +334,7 @@ impl LokiSink {
     pub fn new(config: LokiConfig, client: HttpClient) -> crate::Result<Self> {
         let compression = config.compression;
 
-        // if Vector is configured to allow events with out of order timestamps, then then we can
+        // if Vector is configured to allow events with out of order timestamps, then we can
         // safely enable concurrency settings.
         //
         // For rewritten timestamps, we use a static concurrency of 1 to avoid out-of-order
@@ -469,7 +469,7 @@ mod tests {
         convert::TryFrom,
     };
 
-    use codecs::JsonSerializer;
+    use codecs::JsonSerializerConfig;
     use futures::stream::StreamExt;
     use vector_core::event::{Event, LogEvent, Value};
 
@@ -484,7 +484,7 @@ mod tests {
         let mut encoder = EventEncoder {
             key_partitioner: KeyPartitioner::new(None),
             transformer: Default::default(),
-            encoder: Encoder::<()>::new(JsonSerializer::new().into()),
+            encoder: Encoder::<()>::new(JsonSerializerConfig::default().build().into()),
             labels: HashMap::default(),
             remove_label_fields: false,
             remove_timestamp: false,
@@ -523,7 +523,7 @@ mod tests {
         let mut encoder = EventEncoder {
             key_partitioner: KeyPartitioner::new(None),
             transformer: Default::default(),
-            encoder: Encoder::<()>::new(JsonSerializer::new().into()),
+            encoder: Encoder::<()>::new(JsonSerializerConfig::default().build().into()),
             labels,
             remove_label_fields: false,
             remove_timestamp: false,
@@ -555,7 +555,7 @@ mod tests {
         let mut encoder = EventEncoder {
             key_partitioner: KeyPartitioner::new(None),
             transformer: Default::default(),
-            encoder: Encoder::<()>::new(JsonSerializer::new().into()),
+            encoder: Encoder::<()>::new(JsonSerializerConfig::default().build().into()),
             labels: HashMap::default(),
             remove_label_fields: false,
             remove_timestamp: true,
@@ -583,7 +583,7 @@ mod tests {
         let mut encoder = EventEncoder {
             key_partitioner: KeyPartitioner::new(None),
             transformer: Default::default(),
-            encoder: Encoder::<()>::new(JsonSerializer::new().into()),
+            encoder: Encoder::<()>::new(JsonSerializerConfig::default().build().into()),
             labels,
             remove_label_fields: true,
             remove_timestamp: false,
@@ -602,7 +602,7 @@ mod tests {
         let mut encoder = EventEncoder {
             key_partitioner: KeyPartitioner::new(None),
             transformer: Default::default(),
-            encoder: Encoder::<()>::new(JsonSerializer::new().into()),
+            encoder: Encoder::<()>::new(JsonSerializerConfig::default().build().into()),
             labels: HashMap::default(),
             remove_label_fields: false,
             remove_timestamp: false,

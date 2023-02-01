@@ -1,6 +1,6 @@
-use std::net::SocketAddr;
 #[cfg(unix)]
 use std::path::PathBuf;
+use std::{net::SocketAddr, time::Duration};
 
 use bytes::Bytes;
 use chrono::Utc;
@@ -45,6 +45,7 @@ pub struct SyslogConfig {
     ///
     /// Messages larger than this are truncated.
     #[serde(default = "crate::serde::default_max_length")]
+    #[configurable(metadata(docs::type_unit = "bytes"))]
     max_length: usize,
 
     /// Overrides the name of the log field used to add the peer host to each event.
@@ -67,10 +68,11 @@ pub struct SyslogConfig {
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(tag = "mode", rename_all = "snake_case")]
+#[configurable(metadata(docs::enum_tag_description = "The type of socket to use."))]
 pub enum Mode {
     /// Listen on TCP.
     Tcp {
-        /// The address to listen for connections on.
+        #[configurable(derived)]
         address: SocketListenAddr,
 
         #[configurable(derived)]
@@ -79,9 +81,10 @@ pub enum Mode {
         #[configurable(derived)]
         tls: Option<TlsSourceConfig>,
 
-        /// The size, in bytes, of the receive buffer used for each connection.
+        /// The size of the receive buffer used for each connection.
         ///
         /// This should not typically needed to be changed.
+        #[configurable(metadata(docs::type_unit = "bytes"))]
         receive_buffer_bytes: Option<usize>,
 
         /// The maximum number of TCP connections that will be allowed at any given time.
@@ -90,12 +93,13 @@ pub enum Mode {
 
     /// Listen on UDP.
     Udp {
-        /// The address to listen for messages on.
+        #[configurable(derived)]
         address: SocketListenAddr,
 
-        /// The size, in bytes, of the receive buffer used for the listening socket.
+        /// The size of the receive buffer used for the listening socket.
         ///
         /// This should not typically needed to be changed.
+        #[configurable(metadata(docs::type_unit = "bytes"))]
         receive_buffer_bytes: Option<usize>,
     },
 
@@ -105,6 +109,7 @@ pub enum Mode {
         /// The Unix socket path.
         ///
         /// This should be an absolute path.
+        #[configurable(metadata(docs::examples = "/path/to/socket"))]
         path: PathBuf,
 
         /// Unix file mode bits to be applied to the unix socket file as its designated file permissions.
@@ -172,10 +177,12 @@ impl SourceConfig for SyslogConfig {
                     host_key,
                     log_namespace,
                 };
-                let shutdown_secs = 30;
+                let shutdown_secs = Duration::from_secs(30);
                 let tls_config = tls.as_ref().map(|tls| tls.tls_config.clone());
-                let tls_client_metadata_key =
-                    tls.as_ref().and_then(|tls| tls.client_metadata_key.clone());
+                let tls_client_metadata_key = tls
+                    .as_ref()
+                    .and_then(|tls| tls.client_metadata_key.clone())
+                    .and_then(|k| k.path);
                 let tls = MaybeTlsSettings::from_config(&tls_config, true)?;
                 source.run(
                     address,
@@ -766,7 +773,9 @@ mod test {
             let expected = expected.as_mut_log();
             expected.insert(
                 log_schema().timestamp_key(),
-                Utc.ymd(2019, 2, 13).and_hms(19, 48, 34),
+                Utc.ymd(2019, 2, 13)
+                    .and_hms_opt(19, 48, 34)
+                    .expect("invalid timestamp"),
             );
             expected.insert(log_schema().source_type_key(), "syslog");
             expected.insert("host", "74794bfb6795");
@@ -804,7 +813,9 @@ mod test {
             let expected = expected.as_mut_log();
             expected.insert(
                 log_schema().timestamp_key(),
-                Utc.ymd(2019, 2, 13).and_hms(19, 48, 34),
+                Utc.ymd(2019, 2, 13)
+                    .and_hms_opt(19, 48, 34)
+                    .expect("invalid timestamp"),
             );
             expected.insert(log_schema().host_key(), "74794bfb6795");
             expected.insert("hostname", "74794bfb6795");
@@ -915,7 +926,11 @@ mod test {
             let year = value.as_timestamp().unwrap().naive_local().year();
 
             let expected = expected.as_mut_log();
-            let expected_date: DateTime<Utc> = Local.ymd(year, 2, 13).and_hms(20, 7, 26).into();
+            let expected_date: DateTime<Utc> = Local
+                .ymd(year, 2, 13)
+                .and_hms_opt(20, 7, 26)
+                .expect("invalid timestamp")
+                .into();
             expected.insert(log_schema().timestamp_key(), expected_date);
             expected.insert(log_schema().host_key(), "74794bfb6795");
             expected.insert(log_schema().source_type_key(), "syslog");
@@ -944,7 +959,11 @@ mod test {
             let year = value.as_timestamp().unwrap().naive_local().year();
 
             let expected = expected.as_mut_log();
-            let expected_date: DateTime<Utc> = Local.ymd(year, 2, 13).and_hms(21, 31, 56).into();
+            let expected_date: DateTime<Utc> = Local
+                .ymd(year, 2, 13)
+                .and_hms_opt(21, 31, 56)
+                .expect("invalid timestamp")
+                .into();
             expected.insert(log_schema().timestamp_key(), expected_date);
             expected.insert(log_schema().source_type_key(), "syslog");
             expected.insert("host", "74794bfb6795");

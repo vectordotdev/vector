@@ -108,197 +108,193 @@ enum BuildError {
 pub enum Sources {
     /// AMQP.
     #[cfg(feature = "sources-amqp")]
-    Amqp(#[configurable(derived)] amqp::AmqpSourceConfig),
+    Amqp(amqp::AmqpSourceConfig),
 
     /// Apache HTTP Server (HTTPD) Metrics.
     #[cfg(feature = "sources-apache_metrics")]
-    ApacheMetrics(#[configurable(derived)] apache_metrics::ApacheMetricsConfig),
+    ApacheMetrics(apache_metrics::ApacheMetricsConfig),
 
     /// AWS ECS Metrics.
     #[cfg(feature = "sources-aws_ecs_metrics")]
-    AwsEcsMetrics(#[configurable(derived)] aws_ecs_metrics::AwsEcsMetricsSourceConfig),
+    AwsEcsMetrics(aws_ecs_metrics::AwsEcsMetricsSourceConfig),
 
     /// AWS Kinesis Firehose.
     #[cfg(feature = "sources-aws_kinesis_firehose")]
-    AwsKinesisFirehose(#[configurable(derived)] aws_kinesis_firehose::AwsKinesisFirehoseConfig),
+    AwsKinesisFirehose(aws_kinesis_firehose::AwsKinesisFirehoseConfig),
 
     /// AWS S3.
     #[cfg(feature = "sources-aws_s3")]
-    AwsS3(#[configurable(derived)] aws_s3::AwsS3Config),
+    AwsS3(aws_s3::AwsS3Config),
 
     /// AWS SQS.
     #[cfg(feature = "sources-aws_sqs")]
-    AwsSqs(#[configurable(derived)] aws_sqs::AwsSqsConfig),
+    AwsSqs(aws_sqs::AwsSqsConfig),
 
     /// Datadog Agent.
     #[cfg(feature = "sources-datadog_agent")]
-    DatadogAgent(#[configurable(derived)] datadog_agent::DatadogAgentConfig),
+    DatadogAgent(datadog_agent::DatadogAgentConfig),
 
     /// Demo logs.
     #[cfg(feature = "sources-demo_logs")]
-    DemoLogs(#[configurable(derived)] demo_logs::DemoLogsConfig),
+    DemoLogs(demo_logs::DemoLogsConfig),
 
     /// DNSTAP.
     #[cfg(all(unix, feature = "sources-dnstap"))]
-    Dnstap(#[configurable(derived)] dnstap::DnstapConfig),
+    Dnstap(dnstap::DnstapConfig),
 
     /// Docker Logs.
     #[cfg(feature = "sources-docker_logs")]
-    DockerLogs(#[configurable(derived)] docker_logs::DockerLogsConfig),
+    DockerLogs(docker_logs::DockerLogsConfig),
 
     /// EventStoreDB Metrics.
     #[cfg(feature = "sources-eventstoredb_metrics")]
-    EventstoredbMetrics(#[configurable(derived)] eventstoredb_metrics::EventStoreDbConfig),
+    EventstoredbMetrics(eventstoredb_metrics::EventStoreDbConfig),
 
     /// Exec.
     #[cfg(feature = "sources-exec")]
-    Exec(#[configurable(derived)] exec::ExecConfig),
+    Exec(exec::ExecConfig),
 
     /// File.
     #[cfg(feature = "sources-file")]
-    File(#[configurable(derived)] file::FileConfig),
+    File(file::FileConfig),
 
     /// File descriptor.
     #[cfg(all(unix, feature = "sources-file-descriptor"))]
-    FileDescriptor(
-        #[configurable(derived)] file_descriptors::file_descriptor::FileDescriptorSourceConfig,
-    ),
+    FileDescriptor(file_descriptors::file_descriptor::FileDescriptorSourceConfig),
 
     /// Fluent.
     #[cfg(feature = "sources-fluent")]
-    Fluent(#[configurable(derived)] fluent::FluentConfig),
+    Fluent(fluent::FluentConfig),
 
     /// GCP Pub/Sub.
     #[cfg(feature = "sources-gcp_pubsub")]
-    GcpPubsub(#[configurable(derived)] gcp_pubsub::PubsubConfig),
+    GcpPubsub(gcp_pubsub::PubsubConfig),
 
     /// Heroku Logs.
     #[cfg(feature = "sources-heroku_logs")]
-    HerokuLogs(#[configurable(derived)] heroku_logs::LogplexConfig),
+    HerokuLogs(heroku_logs::LogplexConfig),
 
     /// Host Metrics.
     #[cfg(feature = "sources-host_metrics")]
-    HostMetrics(#[configurable(derived)] host_metrics::HostMetricsConfig),
+    HostMetrics(host_metrics::HostMetricsConfig),
 
     /// HTTP.
     #[cfg(feature = "sources-http_server")]
-    Http(#[configurable(derived)] http_server::HttpConfig),
+    Http(http_server::HttpConfig),
 
     /// HTTP Client.
     #[cfg(feature = "sources-http_client")]
-    HttpClient(#[configurable(derived)] http_client::HttpClientConfig),
+    HttpClient(http_client::HttpClientConfig),
 
     /// HTTP Server.
     #[cfg(feature = "sources-http_server")]
-    HttpServer(#[configurable(derived)] http_server::SimpleHttpConfig),
+    HttpServer(http_server::SimpleHttpConfig),
 
     /// Internal Logs.
     #[cfg(feature = "sources-internal_logs")]
-    InternalLogs(#[configurable(derived)] internal_logs::InternalLogsConfig),
+    InternalLogs(internal_logs::InternalLogsConfig),
 
     /// Internal Metrics.
     #[cfg(feature = "sources-internal_metrics")]
-    InternalMetrics(#[configurable(derived)] internal_metrics::InternalMetricsConfig),
+    InternalMetrics(internal_metrics::InternalMetricsConfig),
 
     /// Journald.
     #[cfg(all(unix, feature = "sources-journald"))]
-    Journald(#[configurable(derived)] journald::JournaldConfig),
+    Journald(journald::JournaldConfig),
 
     /// Kafka.
     #[cfg(feature = "sources-kafka")]
-    Kafka(#[configurable(derived)] kafka::KafkaSourceConfig),
+    Kafka(kafka::KafkaSourceConfig),
 
     /// Kubernetes Logs.
     #[cfg(feature = "sources-kubernetes_logs")]
-    KubernetesLogs(#[configurable(derived)] kubernetes_logs::Config),
+    KubernetesLogs(kubernetes_logs::Config),
 
     /// Logstash.
     #[cfg(all(feature = "sources-logstash"))]
-    Logstash(#[configurable(derived)] logstash::LogstashConfig),
+    Logstash(logstash::LogstashConfig),
 
     /// MongoDB Metrics.
     #[cfg(feature = "sources-mongodb_metrics")]
-    MongodbMetrics(#[configurable(derived)] mongodb_metrics::MongoDbMetricsConfig),
+    MongodbMetrics(mongodb_metrics::MongoDbMetricsConfig),
 
     /// NATS.
     #[cfg(all(feature = "sources-nats"))]
-    Nats(#[configurable(derived)] nats::NatsSourceConfig),
+    Nats(nats::NatsSourceConfig),
 
     /// NGINX Metrics.
     #[cfg(feature = "sources-nginx_metrics")]
-    NginxMetrics(#[configurable(derived)] nginx_metrics::NginxMetricsConfig),
+    NginxMetrics(nginx_metrics::NginxMetricsConfig),
 
     /// OpenTelemetry.
     #[cfg(feature = "sources-opentelemetry")]
-    Opentelemetry(#[configurable(derived)] opentelemetry::OpentelemetryConfig),
+    Opentelemetry(opentelemetry::OpentelemetryConfig),
 
     /// PostgreSQL Metrics.
     #[cfg(feature = "sources-postgresql_metrics")]
-    PostgresqlMetrics(#[configurable(derived)] postgresql_metrics::PostgresqlMetricsConfig),
+    PostgresqlMetrics(postgresql_metrics::PostgresqlMetricsConfig),
 
     /// Prometheus Scrape.
     #[cfg(feature = "sources-prometheus")]
-    PrometheusScrape(#[configurable(derived)] prometheus::PrometheusScrapeConfig),
+    PrometheusScrape(prometheus::PrometheusScrapeConfig),
 
     /// Prometheus Remote Write.
     #[cfg(feature = "sources-prometheus")]
-    PrometheusRemoteWrite(#[configurable(derived)] prometheus::PrometheusRemoteWriteConfig),
+    PrometheusRemoteWrite(prometheus::PrometheusRemoteWriteConfig),
 
     /// Redis.
     #[cfg(feature = "sources-redis")]
-    Redis(#[configurable(derived)] redis::RedisSourceConfig),
+    Redis(redis::RedisSourceConfig),
 
     /// Test (backpressure).
     #[cfg(test)]
-    TestBackpressure(
-        #[configurable(derived)] crate::test_util::mock::sources::BackpressureSourceConfig,
-    ),
+    TestBackpressure(crate::test_util::mock::sources::BackpressureSourceConfig),
 
     /// Test (basic).
     #[cfg(test)]
-    TestBasic(#[configurable(derived)] crate::test_util::mock::sources::BasicSourceConfig),
+    TestBasic(crate::test_util::mock::sources::BasicSourceConfig),
 
     /// Test (error).
     #[cfg(test)]
-    TestError(#[configurable(derived)] crate::test_util::mock::sources::ErrorSourceConfig),
+    TestError(crate::test_util::mock::sources::ErrorSourceConfig),
 
     /// Test (panic).
     #[cfg(test)]
-    TestPanic(#[configurable(derived)] crate::test_util::mock::sources::PanicSourceConfig),
+    TestPanic(crate::test_util::mock::sources::PanicSourceConfig),
 
     /// Test (tripwire).
     #[cfg(test)]
-    TestTripwire(#[configurable(derived)] crate::test_util::mock::sources::TripwireSourceConfig),
+    TestTripwire(crate::test_util::mock::sources::TripwireSourceConfig),
 
     /// Socket.
     #[cfg(feature = "sources-socket")]
-    Socket(#[configurable(derived)] socket::SocketConfig),
+    Socket(socket::SocketConfig),
 
     /// Splunk HEC.
     #[cfg(feature = "sources-splunk_hec")]
-    SplunkHec(#[configurable(derived)] splunk_hec::SplunkConfig),
+    SplunkHec(splunk_hec::SplunkConfig),
 
-    /// Statsd.
+    /// StatsD.
     #[cfg(feature = "sources-statsd")]
-    Statsd(#[configurable(derived)] statsd::StatsdConfig),
+    Statsd(statsd::StatsdConfig),
 
     /// Stdin.
     #[cfg(feature = "sources-stdin")]
-    Stdin(#[configurable(derived)] file_descriptors::stdin::StdinConfig),
+    Stdin(file_descriptors::stdin::StdinConfig),
 
     /// Syslog.
     #[cfg(feature = "sources-syslog")]
-    Syslog(#[configurable(derived)] syslog::SyslogConfig),
+    Syslog(syslog::SyslogConfig),
 
     /// Unit test.
-    UnitTest(#[configurable(derived)] UnitTestSourceConfig),
+    UnitTest(UnitTestSourceConfig),
 
     /// Unit test stream.
-    UnitTestStream(#[configurable(derived)] UnitTestStreamSourceConfig),
+    UnitTestStream(UnitTestStreamSourceConfig),
 
     /// Vector.
     #[cfg(feature = "sources-vector")]
-    Vector(#[configurable(derived)] vector::VectorConfig),
+    Vector(vector::VectorConfig),
 }
 
 // We can't use `enum_dispatch` here because it doesn't support associated constants.

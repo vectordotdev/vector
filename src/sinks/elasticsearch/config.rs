@@ -83,9 +83,8 @@ pub struct ElasticsearchConfig {
 
     /// The name of the event key that should map to Elasticsearch’s [`_id` field][es_id].
     ///
-    /// By default, Vector does not set the `_id` field, which allows Elasticsearch to set this
-    /// automatically. You should think carefully about setting your own Elasticsearch IDs, since
-    /// this can [hinder performance][perf_doc].
+    /// By default, the `_id` field is not set, which allows Elasticsearch to set this
+    /// automatically. Setting your own Elasticsearch IDs can [hinder performance][perf_doc].
     ///
     /// [es_id]: https://www.elastic.co/guide/en/elasticsearch/reference/current/mapping-id-field.html
     /// [perf_doc]: https://www.elastic.co/guide/en/elasticsearch/reference/master/tune-for-indexing-speed.html#_use_auto_generated_ids
@@ -121,6 +120,7 @@ pub struct ElasticsearchConfig {
     pub auth: Option<ElasticsearchAuth>,
 
     /// Custom parameters to add to the query string of each request sent to Elasticsearch.
+    #[configurable(metadata(docs::additional_props_description = "A query string parameter."))]
     pub query: Option<HashMap<String, String>>,
 
     #[configurable(derived)]
