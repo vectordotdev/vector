@@ -21,14 +21,14 @@ pub struct Cli {
     env: Option<Vec<String>>,
 }
 
-fn parse_env(env: Vec<String>) -> BTreeMap<String, String> {
+fn parse_env(env: Vec<String>) -> BTreeMap<String, Option<String>> {
     env.into_iter()
         .map(|entry| {
-            let split = entry.split_once('=');
-            #[allow(clippy::map_unwrap_or)]
-            split
-                .map(|(k, v)| (k.to_owned(), v.to_owned()))
-                .unwrap_or_else(|| (entry, String::new()))
+            #[allow(clippy::map_unwrap_or)] // Can't use map_or due to borrowing entry
+            entry
+                .split_once('=')
+                .map(|(k, v)| (k.to_owned(), Some(v.to_owned())))
+                .unwrap_or_else(|| (entry, None))
         })
         .collect()
 }
@@ -47,6 +47,10 @@ impl Cli {
             }
         }
 
-        runner.test(&self.env.map(parse_env), &None, &args)
+        runner.test(
+            &parse_env(self.env.unwrap_or_default()),
+            &BTreeMap::default(),
+            &args,
+        )
     }
 }
