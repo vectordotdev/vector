@@ -114,6 +114,7 @@ impl InternalEvent for KafkaReadError {
 #[derive(Debug)]
 pub struct KafkaStatisticsReceived<'a> {
     pub statistics: &'a rdkafka::Statistics,
+    pub expose_lag_metrics: bool,
 }
 
 impl InternalEvent for KafkaStatisticsReceived<'_> {
@@ -150,9 +151,11 @@ impl InternalEvent for KafkaStatisticsReceived<'_> {
             self.statistics.rxmsg_bytes as u64
         );
 
-        for (topic_id, topic) in &self.statistics.topics {
-            for (partition_id, partition) in &topic.partitions {
-                gauge!("kafka_consumer_lag", partition.consumer_lag as f64, "topic_id" => topic_id.clone(), "partition_id" => partition_id.to_string());
+        if self.expose_lag_metrics {
+            for (topic_id, topic) in &self.statistics.topics {
+                for (partition_id, partition) in &topic.partitions {
+                    gauge!("kafka_consumer_lag", partition.consumer_lag as f64, "topic_id" => topic_id.clone(), "partition_id" => partition_id.to_string());
+                }
             }
         }
     }
