@@ -156,7 +156,14 @@ impl ElasticsearchCommon {
                             // This is by no means a perfect assumption but it's the best we can
                             // make with the data we have.
                             let assumed_version = if config.suppress_type_name { 6 } else { 8 };
-                            warn!(message = "Failed to determine Elasticsearch version from `/_cluster/state/version`. Please fix the reported error or set an API version explicitly via `api_version`.",%assumed_version, %error);
+                            debug!(message = "Assumed ElasticsearchApi based on config setting suppress_type_name.",
+                                   %assumed_version,
+                                   %config.suppress_type_name
+                            );
+                            warn!(message = "Failed to determine Elasticsearch version from `/_cluster/state/version`. Please fix the reported error or set an API version explicitly via `api_version`.",
+                                  %assumed_version,
+                                  %error
+                            );
                             assumed_version
                         }
                     }
