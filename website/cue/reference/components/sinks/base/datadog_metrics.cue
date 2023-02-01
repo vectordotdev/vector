@@ -248,7 +248,7 @@ base: components: sinks: datadog_metrics: configuration: {
 
 			[dd_site]: https://docs.datadoghq.com/getting_started/site
 			"""
-		required: false
+		required: true
 		type: string: {}
 	}
 	tls: {
