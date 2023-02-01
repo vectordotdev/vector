@@ -15,7 +15,7 @@ use super::{
     service::TraceApiRetry,
 };
 use crate::{
-    common::datadog::get_base_domain,
+    common::datadog::DD_US_SITE,
     config::{GenerateConfig, Input, SinkConfig, SinkContext},
     http::HttpClient,
     sinks::{
@@ -63,27 +63,34 @@ impl SinkBatchSettings for DatadogTracesDefaultBatchSettings {
 pub struct DatadogTracesConfig {
     /// The endpoint to send traces to.
     ///
-    /// This should include the protocol and host, and port.
+    /// This should include the protocol, host, and port.
     ///
     /// If set, overrides to `site` option.
     #[configurable(metadata(docs::examples = "http://127.0.0.1:8080"))]
     #[configurable(metadata(docs::examples = "http://example.com:12345"))]
+    #[serde(default)]
     pub(crate) endpoint: Option<String>,
 
     /// The Datadog [site][dd_site] to send traces to.
     ///
     /// [dd_site]: https://docs.datadoghq.com/getting_started/site
-    pub site: Option<String>,
+    #[configurable(metadata(docs::examples = "us3.datadoghq.com"))]
+    #[configurable(metadata(docs::examples = "datadoghq.eu"))]
+    #[serde(default = "default_site")]
+    pub site: String,
 
     /// The default Datadog [API key][api_key] to send traces with.
     ///
     /// If a trace has a Datadog [API key][api_key] set explicitly in its metadata, it will take
-    /// precedence over the default.
+    /// precedence over this setting.
     ///
     /// [api_key]: https://docs.datadoghq.com/api/?lang=bash#authentication
+    #[configurable(metadata(docs::examples = "${DATADOG_API_KEY_ENV_VAR}"))]
+    #[configurable(metadata(docs::examples = "ef8d5de700e7989468166c40fc8a0ccd"))]
     pub default_api_key: SensitiveString,
 
     #[configurable(derived)]
+    #[serde(default)]
     pub tls: Option<TlsEnableableConfig>,
 
     #[configurable(derived)]
@@ -105,6 +112,10 @@ pub struct DatadogTracesConfig {
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     pub acknowledgements: AcknowledgementsConfig,
+}
+
+fn default_site() -> String {
+    DD_US_SITE.to_owned()
 }
 
 impl GenerateConfig for DatadogTracesConfig {
@@ -142,12 +153,9 @@ impl DatadogTracesEndpointConfiguration {
 
 impl DatadogTracesConfig {
     fn get_base_uri(&self) -> String {
-        self.endpoint.clone().unwrap_or_else(|| {
-            format!(
-                "https://trace.agent.{}",
-                get_base_domain(self.site.as_ref(), None)
-            )
-        })
+        self.endpoint
+            .clone()
+            .unwrap_or_else(|| format!("https://trace.agent.{}", self.site.as_ref()))
     }
 
     fn generate_traces_endpoint_configuration(

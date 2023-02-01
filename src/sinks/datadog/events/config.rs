@@ -6,6 +6,7 @@ use vector_config::configurable_component;
 use vector_core::config::proxy::ProxyConfig;
 
 use crate::{
+    common::datadog::{get_base_domain_region, DD_US_SITE},
     config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     http::HttpClient,
     sinks::{
@@ -39,7 +40,8 @@ pub struct DatadogEventsConfig {
     /// The Datadog [site][dd_site] to send events to.
     ///
     /// [dd_site]: https://docs.datadoghq.com/getting_started/site
-    pub site: Option<String>,
+    #[serde(default = "default_site")]
+    pub site: String,
 
     /// The default Datadog [API key][api_key] to send events with.
     ///
@@ -65,6 +67,10 @@ pub struct DatadogEventsConfig {
     acknowledgements: AcknowledgementsConfig,
 }
 
+fn default_site() -> String {
+    DD_US_SITE.to_owned()
+}
+
 impl GenerateConfig for DatadogEventsConfig {
     fn generate_config() -> toml::Value {
         toml::from_str(indoc! {r#"
@@ -75,9 +81,12 @@ impl GenerateConfig for DatadogEventsConfig {
 }
 
 impl DatadogEventsConfig {
+    fn get_base(&self) -> &str {
+        get_base_domain_region(self.site.as_str(), self.region)
+    }
+
     fn get_api_events_endpoint(&self) -> http::Uri {
-        let api_base_endpoint =
-            get_api_base_endpoint(self.endpoint.as_ref(), self.site.as_ref(), self.region);
+        let api_base_endpoint = get_api_base_endpoint(self.endpoint.as_ref(), self.get_base());
 
         // We know this URI will be valid since we have just built it up ourselves.
         http::Uri::try_from(format!("{}/api/v1/events", api_base_endpoint)).expect("URI not valid")
@@ -90,8 +99,7 @@ impl DatadogEventsConfig {
     }
 
     fn build_healthcheck(&self, client: HttpClient) -> crate::Result<Healthcheck> {
-        let validate_endpoint =
-            get_api_validate_endpoint(self.endpoint.as_ref(), self.site.as_ref(), self.region)?;
+        let validate_endpoint = get_api_validate_endpoint(self.endpoint.as_ref(), self.get_base())?;
         Ok(healthcheck(
             client,
             validate_endpoint,

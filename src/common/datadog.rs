@@ -5,6 +5,9 @@
 use serde::{Deserialize, Serialize};
 use vector_config::configurable_component;
 
+pub const DD_US_SITE: &str = "datadoghq.com";
+pub const DD_EU_SITE: &str = "datadoghq.eu";
+
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub(crate) struct DatadogSeriesMetric {
     pub(crate) metric: String,
@@ -45,26 +48,36 @@ pub enum Region {
 
 /// Gets the base domain to use for any calls to Datadog.
 ///
-/// If `site` is not specified, we fallback to `region`, and if that is not specified, we
-/// fallback to the Datadog US domain.
-pub(crate) fn get_base_domain(site: Option<&String>, region: Option<Region>) -> &str {
-    site.map(|s| s.as_str()).unwrap_or_else(|| match region {
-        Some(Region::Eu) => "datadoghq.eu",
-        None | Some(Region::Us) => "datadoghq.com",
-    })
+/// This is a helper function for Datadog component configs using the deprecated `region` field.
+///
+/// If `region` is not specified, we fallback to `site`.
+pub(crate) fn get_base_domain_region(site: &str, region: Option<Region>) -> &str {
+    if let Some(region) = region {
+        match region {
+            Region::Eu => DD_EU_SITE,
+            Region::Us => DD_US_SITE,
+        }
+    } else {
+        site
+    }
 }
+
+//    site.map(|s| s.as_str()).unwrap_or_else(|| match region {
+//site.map(|s| s.as_str()).unwrap_or_else(|| match region {
+//    Some(Region::Eu) => "datadoghq.eu",
+//    None | Some(Region::Us) => DD_US_SITE,
+//})
+//}
 
 /// Gets the base API endpoint to use for any calls to Datadog.
 ///
-/// If `site` is not specified, we fallback to `region`, and if that is not specified, we fallback
-/// to the Datadog US domain.
+/// If `endpoint` is not specified, we fallback to `site`.
 pub(crate) fn get_api_base_endpoint(
     endpoint: Option<&String>,
-    site: Option<&String>,
-    region: Option<Region>,
+    site: &str,
+    //region: Option<Region>,
 ) -> String {
-    endpoint.cloned().unwrap_or_else(|| {
-        let base = get_base_domain(site, region);
-        format!("https://api.{}", base)
-    })
+    endpoint
+        .cloned()
+        .unwrap_or_else(|| format!("https://api.{}", site))
 }

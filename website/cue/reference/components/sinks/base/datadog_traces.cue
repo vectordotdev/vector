@@ -96,9 +96,15 @@ base: components: sinks: datadog_traces: configuration: {
 		type: string: {}
 	}
 	endpoint: {
-		description: "The endpoint to send traces to."
-		required:    false
-		type: string: {}
+		description: """
+			The endpoint to send traces to.
+
+			This should include the protocol, host, and port.
+
+			If set, overrides to `site` option.
+			"""
+		required: false
+		type: string: examples: ["http://127.0.0.1:8080", "http://example.com:12345"]
 	}
 	request: {
 		description: """
@@ -250,7 +256,7 @@ base: components: sinks: datadog_traces: configuration: {
 			[dd_site]: https://docs.datadoghq.com/getting_started/site
 			"""
 		required: false
-		type: string: {}
+		type: string: default: "datadoghq.com"
 	}
 	tls: {
 		description: "Configures the TLS options for incoming/outgoing connections."

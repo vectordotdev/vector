@@ -13,7 +13,7 @@ use super::{
 };
 use crate::tls::{MaybeTlsSettings, TlsEnableableConfig};
 use crate::{
-    common::datadog::get_base_domain,
+    common::datadog::get_base_domain_region,
     config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext},
     http::HttpClient,
     sinks::{
@@ -110,7 +110,7 @@ pub struct DatadogMetricsConfig {
     /// The Datadog [site][dd_site] to send metrics to.
     ///
     /// [dd_site]: https://docs.datadoghq.com/getting_started/site
-    pub site: Option<String>,
+    pub site: String,
 
     /// The default Datadog [API key][api_key] to send metrics with.
     ///
@@ -177,7 +177,7 @@ impl DatadogMetricsConfig {
             format!(
                 "https://{}-vector.agent.{}",
                 version,
-                get_base_domain(self.site.as_ref(), self.region)
+                get_base_domain_region(self.site.as_ref(), self.region)
             )
         })
     }
