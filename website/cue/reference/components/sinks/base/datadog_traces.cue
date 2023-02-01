@@ -102,7 +102,7 @@ base: components: sinks: datadog_traces: configuration: {
 			The endpoint must contain an HTTP scheme, and may specify a
 			hostname or IP address and port.
 
-			If set, overrides to `site` option.
+			If set, overrides the `site` option.
 			"""
 		required: false
 		type: string: examples: ["http://127.0.0.1:8080", "http://example.com:12345"]
