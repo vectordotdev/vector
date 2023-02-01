@@ -116,7 +116,7 @@ acquainted with Vector and VRL:
 >}}
 
 {{< info title="VRL playground" >}} There is an online [VRL playground](https://playground.vrl.dev),
-where you can experiment with VRL. 
+where you can experiment with VRL.
 
 Some functions are currently unsupported on the playground. Functions that are currently not supported can be found with
 this [issue filter](https://github.com/vectordotdev/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22vrl%3A+playground%22+wasm+compatible)
