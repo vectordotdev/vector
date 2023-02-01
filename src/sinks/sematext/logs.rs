@@ -84,7 +84,7 @@ impl SinkConfig for SematextLogsConfig {
         let (sink, healthcheck) = ElasticsearchConfig {
             endpoints: vec![endpoint],
             compression: Compression::None,
-            doc_type: r"\
+            doc_type: "\
                 logs"
                 .to_string(),
             bulk: Some(BulkConfig {
