@@ -40,6 +40,7 @@ const CUSTOM_RESOURCE_VECTOR_CONFIG: &str = indoc! {r#"
             enabled = false
         [sources.kubernetes_logs]
             type = "kubernetes_logs"
+            ingestion_timestamp_field = ".ingest_timestamp"
         [sinks.stdout]
             type = "console"
             inputs = ["kubernetes_logs"]

@@ -8,4 +8,4 @@ env:
   LOKI_ADDRESS: http://loki:3100
 
 matrix:
-- version: [2.4.1]
+  version: [2.4.1]

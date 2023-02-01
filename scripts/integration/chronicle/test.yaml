@@ -8,4 +8,4 @@ env:
   CHRONICLE_ADDRESS: http://chronicle-emulator:3000
 
 matrix:
-- version: [latest]
+  version: [latest]

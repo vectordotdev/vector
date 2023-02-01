@@ -1,9 +1,7 @@
-use std::collections::HashSet;
-
 use anyhow::Result;
 use clap::Args;
 
-use crate::testing::{config::IntegrationTestConfig, state};
+use crate::testing::{config::Environment, config::IntegrationTestConfig, state};
 
 /// Show information about integrations
 #[derive(Args, Debug)]
@@ -25,11 +23,11 @@ impl Cli {
                 println!("{:width$}  -------------------", "----------------");
                 for (integration, config) in entries {
                     let envs_dir = state::EnvsDir::new(&integration);
-                    let active_envs = envs_dir.list_active()?;
+                    let active_env = envs_dir.active()?;
                     let environments = config
                         .environments()
                         .keys()
-                        .map(|environment| format(&active_envs, environment))
+                        .map(|environment| format(&active_env, environment))
                         .collect::<Vec<_>>()
                         .join("  ");
                     println!("{integration:width$}  {environments}");
@@ -38,18 +36,18 @@ impl Cli {
             Some(integration) => {
                 let (_test_dir, config) = IntegrationTestConfig::load(&integration)?;
                 let envs_dir = state::EnvsDir::new(&integration);
-                let active_envs = envs_dir.list_active()?;
+                let active_env = envs_dir.active()?;
 
                 println!("Test args: {}", config.args.join(" "));
 
+                println!("Environment:");
+                print_env(&config.env);
+                println!("Runner environment:");
+                print_env(&config.runner_env);
+
                 println!("Environments:");
                 for environment in config.environments().keys() {
-                    let active = if active_envs.contains(environment) {
-                        " (active)"
-                    } else {
-                        ""
-                    };
-                    println!("  {environment}{active}");
+                    println!("  {}", format(&active_env, environment));
                 }
             }
         }
@@ -57,10 +55,22 @@ impl Cli {
     }
 }
 
-fn format(active_envs: &HashSet<String>, environment: &str) -> String {
-    if active_envs.contains(environment) {
-        format!("{environment} (active)")
+fn format(active_env: &Option<String>, environment: &str) -> String {
+    match active_env {
+        Some(active) if active == environment => format!("{environment} (active)"),
+        _ => environment.into(),
+    }
+}
+
+fn print_env(environment: &Environment) {
+    if environment.is_empty() {
+        println!("  N/A");
     } else {
-        environment.into()
+        for (key, value) in environment {
+            match value {
+                Some(value) => println!("  {key}={value:?}"),
+                None => println!("  {key} (passthrough)"),
+            }
+        }
     }
 }

@@ -31,15 +31,20 @@ pub struct AwsSqsConfig {
     pub auth: AwsAuthentication,
 
     /// The URL of the SQS queue to poll for messages.
+    #[configurable(metadata(
+        docs::examples = "https://sqs.us-east-2.amazonaws.com/123456789012/MyQueue"
+    ))]
     pub queue_url: String,
 
     /// How long to wait while polling the queue for new messages, in seconds.
     ///
-    /// Generally should not be changed unless instructed to do so, as if messages are available, they will always be
-    /// consumed, regardless of the value of `poll_secs`.
-    // NOTE: We restrict this to u32 for safe conversion to i64 later.
+    /// Generally should not be changed unless instructed to do so, as if messages are available,
+    /// they will always be consumed, regardless of the value of `poll_secs`.
+    // NOTE: We restrict this to u32 for safe conversion to i32 later.
+    // NOTE: This value isn't used as a `Duration` downstream, so we don't bother using `serde_with`
     #[serde(default = "default_poll_secs")]
     #[derivative(Default(value = "default_poll_secs()"))]
+    #[configurable(metadata(docs::type_unit = "seconds"))]
     pub poll_secs: u32,
 
     /// The visibility timeout to use for messages, in seconds.
@@ -48,10 +53,11 @@ pub struct AwsSqsConfig {
     /// takes longer than `visibility_timeout_secs` to process and delete the message from the queue, it is made available again for another consumer.
     ///
     /// This can happen if there is an issue between consuming a message and deleting it.
-    // NOTE: We restrict this to u32 for safe conversion to i64 later.
-    // restricted to u32 for safe conversion to i64 later
+    // NOTE: We restrict this to u32 for safe conversion to i32 later.
+    // NOTE: This value isn't used as a `Duration` downstream, so we don't bother using `serde_with`
     #[serde(default = "default_visibility_timeout_secs")]
     #[derivative(Default(value = "default_visibility_timeout_secs()"))]
+    #[configurable(metadata(docs::type_unit = "seconds"))]
     pub(super) visibility_timeout_secs: u32,
 
     /// Whether to delete the message once it is processed.
@@ -65,10 +71,11 @@ pub struct AwsSqsConfig {
     ///
     /// Defaults to the number of available CPUs on the system.
     ///
-    /// Should not typically need to be changed, but it can sometimes be beneficial to raise this value when there is a
-    /// high rate of messages being pushed into the queue and the messages being fetched are small. In these cases,
-    /// System resources may not be fully utilized without fetching more messages per second, as it spends more time
-    /// fetching the messages than processing them.
+    /// Should not typically need to be changed, but it can sometimes be beneficial to raise this
+    /// value when there is a high rate of messages being pushed into the queue and the messages
+    /// being fetched are small. In these cases, system resources may not be fully utilized without
+    /// fetching more messages per second, as it spends more time fetching the messages than
+    /// processing them.
     pub client_concurrency: Option<NonZeroUsize>,
 
     #[configurable(derived)]

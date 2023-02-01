@@ -2,8 +2,14 @@ package metadata
 
 base: components: sources: gcp_pubsub: configuration: {
 	ack_deadline_seconds: {
-		description: "Deprecated, old name of `ack_deadline_secs`."
-		required:    false
+		deprecated:         true
+		deprecated_message: "This option has been deprecated, use `ack_deadline_secs` instead."
+		description: """
+			The acknowledgement deadline, in seconds, to use for this stream.
+
+			Messages that are not acknowledged when this deadline expires may be retransmitted.
+			"""
+		required: false
 		type: uint: {}
 	}
 	ack_deadline_secs: {
@@ -19,6 +25,7 @@ base: components: sources: gcp_pubsub: configuration: {
 		}
 	}
 	acknowledgements: {
+		deprecated: true
 		description: """
 			Controls how acknowledgements are handled by this source.
 
@@ -244,8 +251,10 @@ base: components: sources: gcp_pubsub: configuration: {
 		type: string: {}
 	}
 	retry_delay_seconds: {
-		description: "Deprecated, old name of `retry_delay_secs`."
-		required:    false
+		deprecated:         true
+		deprecated_message: "This option has been deprecated, use `retry_delay_secs` instead."
+		description:        "The amount of time, in seconds, to wait between retry attempts after an error."
+		required:           false
 		type: float: {}
 	}
 	retry_delay_secs: {
@@ -255,11 +264,6 @@ base: components: sources: gcp_pubsub: configuration: {
 			default: 1.0
 			unit:    "seconds"
 		}
-	}
-	skip_authentication: {
-		description: "Skip all authentication handling. For use with integration tests only."
-		required:    false
-		type: bool: default: false
 	}
 	subscription: {
 		description: "The subscription within the project which is configured to receive logs."

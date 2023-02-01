@@ -18,6 +18,7 @@ use lookup::{
     metadata_path, owned_value_path, path, OwnedValuePath, PathPrefix,
 };
 use once_cell::sync::Lazy;
+use serde_with::serde_as;
 use tokio::sync::mpsc;
 use tracing_futures::Instrument;
 use value::{kind::Collection, Kind};
@@ -60,24 +61,32 @@ static STDOUT: Lazy<Bytes> = Lazy::new(|| "stdout".into());
 static CONSOLE: Lazy<Bytes> = Lazy::new(|| "console".into());
 
 /// Configuration for the `docker_logs` source.
+#[serde_as]
 #[configurable_component(source("docker_logs"))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields, default)]
 pub struct DockerLogsConfig {
     /// Overrides the name of the log field used to add the current hostname to each event.
     ///
-    ///
     /// By default, the [global `log_schema.host_key` option][global_host_key] is used.
     ///
     /// [global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
-    #[serde(default = "host_key")]
+    #[serde(default = "default_host_key")]
     host_key: OptionalValuePath,
 
     /// Docker host to connect to.
     ///
     /// Use an HTTPS URL to enable TLS encryption.
     ///
-    /// If absent, the `DOCKER_HOST` environment variable is used. If `DOCKER_HOST` is also absent, the default Docker local socket (`/var/run/docker.sock` on Unix platforms, `//./pipe/docker_engine` on Windows) is used.
+    /// If absent, the `DOCKER_HOST` environment variable is used. If `DOCKER_HOST` is also absent,
+    /// the default Docker local socket (`/var/run/docker.sock` on Unix platforms,
+    /// `//./pipe/docker_engine` on Windows) is used.
+    #[configurable(metadata(docs::examples = "http://localhost:2375"))]
+    #[configurable(metadata(docs::examples = "https://localhost:2376"))]
+    #[configurable(metadata(docs::examples = "unix:///var/run/docker.sock"))]
+    #[configurable(metadata(docs::examples = "npipe:////./pipe/docker_engine"))]
+    #[configurable(metadata(docs::examples = "/var/run/docker.sock"))]
+    #[configurable(metadata(docs::examples = "//./pipe/docker_engine"))]
     docker_host: Option<String>,
 
     /// A list of container IDs or names of containers to exclude from log collection.
@@ -91,6 +100,11 @@ pub struct DockerLogsConfig {
     /// corresponding entry in `include_containers` e.g. excluding `foo` by attempting to include `foo-specific-id`.
     ///
     /// This can be used in conjunction with `include_containers`.
+    #[configurable(metadata(
+        docs::examples = "exclude_",
+        docs::examples = "exclude_me_0",
+        docs::examples = "ad08cc418cf9"
+    ))]
     exclude_containers: Option<Vec<String>>, // Starts with actually, not exclude
 
     /// A list of container IDs or names of containers to include in log collection.
@@ -101,36 +115,48 @@ pub struct DockerLogsConfig {
     /// By default, the source will collect logs for all containers. If `include_containers` is configured, only
     /// containers that match a configured inclusion and are also not excluded will be matched.
     ///
-    /// This can be used in conjunction with `include_containers`.
+    /// This can be used in conjunction with `exclude_containers`.
+    #[configurable(metadata(
+        docs::examples = "include_",
+        docs::examples = "include_me_0",
+        docs::examples = "ad08cc418cf9"
+    ))]
     include_containers: Option<Vec<String>>, // Starts with actually, not include
 
     /// A list of container object labels to match against when filtering running containers.
     ///
     /// Labels should follow the syntax described in the [Docker object labels](https://docs.docker.com/config/labels-custom-metadata/) documentation.
+    #[configurable(metadata(
+        docs::examples = "org.opencontainers.image.vendor=Vector",
+        docs::examples = "com.mycorp.internal.animal=fish",
+    ))]
     include_labels: Option<Vec<String>>,
 
     /// A list of image names to match against.
     ///
     /// If not provided, all images will be included.
+    #[configurable(metadata(docs::examples = "httpd", docs::examples = "redis",))]
     include_images: Option<Vec<String>>,
 
     /// Overrides the name of the log field used to mark an event as partial.
     ///
     /// If `auto_partial_merge` is disabled, partial events will be emitted with a log field, controlled by this
     /// configuration value, is set, indicating that the event is not complete.
-    ///
-    /// By default, `"_partial"` is used.
+    #[serde(default = "default_partial_event_marker_field")]
     partial_event_marker_field: Option<String>,
 
     /// Enables automatic merging of partial events.
     auto_partial_merge: bool,
 
-    /// The amount of time, in seconds, to wait before retrying after an error.
-    retry_backoff_secs: u64,
+    /// The amount of time to wait before retrying after an error.
+    #[serde_as(as = "serde_with::DurationSeconds<u64>")]
+    #[serde(default = "default_retry_backoff_secs")]
+    retry_backoff_secs: Duration,
 
     /// Multiline aggregation configuration.
     ///
     /// If not specified, multiline aggregation is disabled.
+    #[configurable(derived)]
     multiline: Option<MultilineConfig>,
 
     #[configurable(derived)]
@@ -145,24 +171,32 @@ pub struct DockerLogsConfig {
 impl Default for DockerLogsConfig {
     fn default() -> Self {
         Self {
-            host_key: host_key(),
+            host_key: default_host_key(),
             docker_host: None,
             tls: None,
             exclude_containers: None,
             include_containers: None,
             include_labels: None,
             include_images: None,
-            partial_event_marker_field: Some(event::PARTIAL.to_string()),
+            partial_event_marker_field: default_partial_event_marker_field(),
             auto_partial_merge: true,
             multiline: None,
-            retry_backoff_secs: 2,
+            retry_backoff_secs: default_retry_backoff_secs(),
             log_namespace: None,
         }
     }
 }
 
-fn host_key() -> OptionalValuePath {
+fn default_host_key() -> OptionalValuePath {
     OptionalValuePath::from(owned_value_path!(log_schema().host_key()))
+}
+
+fn default_partial_event_marker_field() -> Option<String> {
+    Some(event::PARTIAL.to_string())
+}
+
+const fn default_retry_backoff_secs() -> Duration {
+    Duration::from_secs(2)
 }
 
 impl DockerLogsConfig {
@@ -469,7 +503,7 @@ impl DockerLogsSource {
             containers: HashMap::new(),
             main_recv,
             hostname,
-            backoff_duration: Duration::from_secs(backoff_secs),
+            backoff_duration: backoff_secs,
         })
     }
 

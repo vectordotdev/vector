@@ -3,7 +3,7 @@ use clap::Args;
 use std::collections::BTreeMap;
 
 use crate::platform;
-use crate::testing::{config::RustToolchainConfig, runner::get_agent_test_runner};
+use crate::testing::runner::get_agent_test_runner;
 
 /// Execute tests
 #[derive(Args, Debug)]
@@ -21,22 +21,21 @@ pub struct Cli {
     env: Option<Vec<String>>,
 }
 
-fn parse_env(env: Vec<String>) -> BTreeMap<String, String> {
+fn parse_env(env: Vec<String>) -> BTreeMap<String, Option<String>> {
     env.into_iter()
         .map(|entry| {
-            let split = entry.split_once('=');
-            #[allow(clippy::map_unwrap_or)]
-            split
-                .map(|(k, v)| (k.to_owned(), v.to_owned()))
-                .unwrap_or_else(|| (entry, String::new()))
+            #[allow(clippy::map_unwrap_or)] // Can't use map_or due to borrowing entry
+            entry
+                .split_once('=')
+                .map(|(k, v)| (k.to_owned(), Some(v.to_owned())))
+                .unwrap_or_else(|| (entry, None))
         })
         .collect()
 }
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
-        let toolchain_config = RustToolchainConfig::parse()?;
-        let runner = get_agent_test_runner(self.container, toolchain_config.channel);
+        let runner = get_agent_test_runner(self.container)?;
 
         let mut args = vec!["--workspace".to_string()];
         if let Some(extra_args) = &self.args {
@@ -48,6 +47,10 @@ impl Cli {
             }
         }
 
-        runner.test(&parse_env(self.env.unwrap_or_default()), &args)
+        runner.test(
+            &parse_env(self.env.unwrap_or_default()),
+            &BTreeMap::default(),
+            &args,
+        )
     }
 }

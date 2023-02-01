@@ -2,6 +2,7 @@ package metadata
 
 base: components: sources: prometheus_remote_write: configuration: {
 	acknowledgements: {
+		deprecated: true
 		description: """
 			Controls how acknowledgements are handled by this source.
 

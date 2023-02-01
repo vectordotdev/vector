@@ -8,4 +8,4 @@ env:
   AXIOM_URL: http://axiom-core
 
 matrix:
-- version: [13-alpine]
+  version: [13-alpine]
