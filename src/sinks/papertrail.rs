@@ -21,7 +21,8 @@ use crate::{
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct PapertrailConfig {
-    /// The endpoint to send logs to.
+    /// The TCP endpoint to send logs to.
+    #[configurable(metadata(docs::examples = "logs.papertrailapp.com:12345"))]
     endpoint: UriSerde,
 
     #[configurable(derived)]
@@ -37,7 +38,9 @@ pub struct PapertrailConfig {
     send_buffer_bytes: Option<usize>,
 
     /// The value to use as the `process` in Papertrail.
-    process: Option<Template>,
+    #[configurable(metadata(docs::examples = "{{ process }}", docs::examples = "my-process",))]
+    #[serde(default = "default_process")]
+    process: Template,
 
     #[configurable(derived)]
     #[serde(
@@ -46,6 +49,10 @@ pub struct PapertrailConfig {
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     acknowledgements: AcknowledgementsConfig,
+}
+
+fn default_process() -> Template {
+    Template::try_from("vector").unwrap()
 }
 
 impl GenerateConfig for PapertrailConfig {
@@ -115,7 +122,7 @@ impl SinkConfig for PapertrailConfig {
 #[derive(Debug, Clone)]
 struct PapertrailEncoder {
     pid: u32,
-    process: Option<Template>,
+    process: Template,
     transformer: Transformer,
     encoder: Encoder<()>,
 }
@@ -135,18 +142,15 @@ impl tokio_util::codec::Encoder<Event> for PapertrailEncoder {
 
         let process = self
             .process
-            .as_ref()
-            .and_then(|t| {
-                t.render_string(&event)
-                    .map_err(|error| {
-                        emit!(TemplateRenderingError {
-                            error,
-                            field: Some("process"),
-                            drop_event: false,
-                        })
-                    })
-                    .ok()
+            .render_string(&event)
+            .map_err(|error| {
+                emit!(TemplateRenderingError {
+                    error,
+                    field: Some("process"),
+                    drop_event: false,
+                })
             })
+            .ok()
             .unwrap_or_else(|| String::from("vector"));
 
         let formatter = Formatter3164 {
@@ -220,7 +224,7 @@ mod tests {
 
         let mut encoder = PapertrailEncoder {
             pid: 0,
-            process: Some(Template::try_from("{{ process }}").unwrap()),
+            process: Template::try_from("{{ process }}").unwrap(),
             transformer: Transformer::new(None, Some(vec!["magic".into()]), None).unwrap(),
             encoder: Encoder::<()>::new(JsonSerializerConfig::default().build().into()),
         };
