@@ -1,10 +1,11 @@
+use codecs::encoding::Framer;
 use futures::future::FutureExt;
 use tower::ServiceBuilder;
-use vector_config::configurable_component;
+use vector_config::{component::GenerateConfig, configurable_component};
 use vector_core::tls::TlsSettings;
 
 use crate::{
-    codecs::Transformer,
+    codecs::{Encoder, EncodingConfigWithFraming, SinkType},
     config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext},
     http::{Auth, HttpClient, MaybeAuth},
     sinks::{
@@ -19,14 +20,13 @@ use crate::{
 
 use super::{
     api::{DatabendAPIClient, DatabendHttpRequest},
-    event_encoder::DatabendEventEncoder,
     service::{DatabendRetryLogic, DatabendService},
-    sink::DatabendSink,
+    sink::{DatabendRequestBuilder, DatabendSink},
 };
 
 /// Configuration for the `databend` sink.
 #[configurable_component(sink("databend"))]
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct DatabendConfig {
     /// The endpoint of the Databend server.
@@ -35,7 +35,6 @@ pub struct DatabendConfig {
 
     /// The table that data will be inserted into.
     #[configurable(metadata(docs::examples = "mytable"))]
-    #[serde(default)]
     pub table: String,
 
     /// The database that contains the table that data will be inserted into.
@@ -47,12 +46,8 @@ pub struct DatabendConfig {
     #[serde(default = "Compression::gzip_default")]
     pub compression: Compression,
 
-    #[configurable(derived)]
-    #[serde(
-        default,
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
-    )]
-    pub encoding: Transformer,
+    #[serde(flatten)]
+    pub encoding: EncodingConfigWithFraming,
 
     #[configurable(derived)]
     #[serde(default)]
@@ -77,7 +72,18 @@ pub struct DatabendConfig {
     pub acknowledgements: AcknowledgementsConfig,
 }
 
-impl_generate_config_from_default!(DatabendConfig);
+impl GenerateConfig for DatabendConfig {
+    fn generate_config() -> toml::Value {
+        toml::from_str(
+            r#"endpoint = "http://localhost:8000"
+            encoding.codec = "json"
+            table = "default"
+            database = "default"
+        "#,
+        )
+        .unwrap()
+    }
+}
 
 impl DatabendConfig {
     pub(super) fn build_client(&self, cx: &SinkContext) -> crate::Result<HttpClient> {
@@ -115,11 +121,14 @@ impl SinkConfig for DatabendConfig {
             .settings(request_settings, DatabendRetryLogic)
             .service(service);
 
-        let encoder = DatabendEventEncoder {
-            transformer: self.encoding.clone(),
-        };
+        let transformer = self.encoding.transformer();
+        let (framer, serializer) = self.encoding.build(SinkType::StreamBased)?;
+        let encoder = Encoder::<Framer>::new(framer, serializer);
 
-        let sink = DatabendSink::new(encoder, batch_settings, service);
+        let request_builder =
+            DatabendRequestBuilder::new(config.compression, (transformer, encoder));
+
+        let sink = DatabendSink::new(batch_settings, request_builder, service);
 
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
     }
@@ -141,6 +150,8 @@ async fn select_one(client: DatabendAPIClient) -> crate::Result<()> {
 
 #[cfg(test)]
 mod tests {
+    use codecs::encoding::Serializer;
+
     use super::*;
 
     #[test]
@@ -153,12 +164,24 @@ mod tests {
         let cfg = toml::from_str::<DatabendConfig>(
             r#"
             endpoint = "http://localhost:8000"
+            table = "mytable"
             database = "mydatabase"
+            encoding.codec = "json"
         "#,
         )
         .unwrap();
         assert_eq!(cfg.endpoint.uri, "http://localhost:8000");
+        assert_eq!(cfg.table, "mytable");
         assert_eq!(cfg.database, "mydatabase");
-        assert_eq!(cfg.table, "");
+
+        let (framer, serializer) = cfg.encoding.build(SinkType::StreamBased).unwrap();
+        match framer {
+            Framer::NewlineDelimited(_) => (),
+            _ => panic!("Unexpected framer"),
+        }
+        match serializer {
+            Serializer::Json(_) => (),
+            _ => panic!("Unexpected serializer"),
+        }
     }
 }

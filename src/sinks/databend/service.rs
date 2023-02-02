@@ -14,6 +14,7 @@ use vector_common::internal_event::CountByteSize;
 use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
 use vector_core::stream::DriverResponse;
 
+use crate::sinks::util::Compression;
 use crate::{internal_events::EndpointBytesSent, sinks::util::retries::RetryLogic};
 
 use super::{
@@ -65,7 +66,8 @@ pub struct DatabendService {
 }
 
 #[derive(Clone)]
-pub(crate) struct DatabendRequest {
+pub struct DatabendRequest {
+    pub compression: Compression,
     pub data: Bytes,
     pub finalizers: EventFinalizers,
     pub metadata: RequestMetadata,
