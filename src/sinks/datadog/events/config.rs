@@ -6,15 +6,17 @@ use vector_config::configurable_component;
 use vector_core::config::proxy::ProxyConfig;
 
 use crate::{
+    common::datadog::{get_base_domain_region, Region},
     config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     http::HttpClient,
     sinks::{
         datadog::{
+            default_site,
             events::{
                 service::{DatadogEventsResponse, DatadogEventsService},
                 sink::DatadogEventsSink,
             },
-            get_api_base_endpoint, get_api_validate_endpoint, healthcheck, Region,
+            get_api_base_endpoint, get_api_validate_endpoint, healthcheck,
         },
         util::{http::HttpStatusRetryLogic, ServiceBuilderExt, TowerRequestConfig},
         Healthcheck, VectorSink,
@@ -39,7 +41,8 @@ pub struct DatadogEventsConfig {
     /// The Datadog [site][dd_site] to send events to.
     ///
     /// [dd_site]: https://docs.datadoghq.com/getting_started/site
-    pub site: Option<String>,
+    #[serde(default = "default_site")]
+    pub site: String,
 
     /// The default Datadog [API key][api_key] to send events with.
     ///
@@ -76,8 +79,10 @@ impl GenerateConfig for DatadogEventsConfig {
 
 impl DatadogEventsConfig {
     fn get_api_events_endpoint(&self) -> http::Uri {
-        let api_base_endpoint =
-            get_api_base_endpoint(self.endpoint.as_ref(), self.site.as_ref(), self.region);
+        let api_base_endpoint = get_api_base_endpoint(
+            self.endpoint.as_ref(),
+            get_base_domain_region(self.site.as_str(), self.region),
+        );
 
         // We know this URI will be valid since we have just built it up ourselves.
         http::Uri::try_from(format!("{}/api/v1/events", api_base_endpoint)).expect("URI not valid")
@@ -90,8 +95,10 @@ impl DatadogEventsConfig {
     }
 
     fn build_healthcheck(&self, client: HttpClient) -> crate::Result<Healthcheck> {
-        let validate_endpoint =
-            get_api_validate_endpoint(self.endpoint.as_ref(), self.site.as_ref(), self.region)?;
+        let validate_endpoint = get_api_validate_endpoint(
+            self.endpoint.as_ref(),
+            get_base_domain_region(self.site.as_str(), self.region),
+        )?;
         Ok(healthcheck(
             client,
             validate_endpoint,

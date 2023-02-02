@@ -55,23 +55,34 @@ impl ComposeConfig {
     }
 }
 
-#[derive(Deserialize, Clone, Debug)]
+#[derive(Clone, Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct IntegrationTestConfig {
-    /// The list of arguments to add to the docker command line for the runner
+    /// The list of arguments to add to the command line for the test runner
     pub args: Vec<String>,
     /// The set of environment variables to set in both the services and the runner. Variables with
     /// no value are treated as "passthrough" -- they must be set by the caller of `vdev` and are
     /// passed into the containers.
     #[serde(default)]
     pub env: Environment,
+    /// The matrix of environment configurations values.
+    matrix: LinkedHashMap<String, Vec<String>>,
+    /// Configuration specific to the compose services.
+    #[serde(default)]
+    pub runner: IntegrationRunnerConfig,
+}
+
+#[derive(Clone, Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct IntegrationRunnerConfig {
     /// The set of environment variables to set in just the runner. This is used for settings that
     /// might otherwise affect the operation of either docker or docker-compose but are needed in
     /// the runner.
     #[serde(default)]
-    pub runner_env: Environment,
-    /// The matrix of environment configurations values.
-    matrix: LinkedHashMap<String, Vec<String>>,
+    pub env: Environment,
+    /// The set of volumes that need to be mounted into the runner.
+    #[serde(default)]
+    pub volumes: BTreeMap<String, String>,
     /// Does the test runner need access to the host's docker socket?
     #[serde(default)]
     pub needs_docker_sock: bool,
@@ -143,7 +154,7 @@ impl IntegrationTestConfig {
         let missing: Vec<_> = self
             .env
             .iter()
-            .chain(self.runner_env.iter())
+            .chain(self.runner.env.iter())
             .filter_map(|(key, value)| value.is_none().then_some(key))
             .filter(|var| env::var(var).is_err())
             .collect();

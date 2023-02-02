@@ -4,8 +4,9 @@ args:
 - --lib
 - '::datadog::metrics::'
 
-runner_env:
-  TEST_DATADOG_API_KEY:
+runner:
+  env:
+    TEST_DATADOG_API_KEY:
 
 matrix:
   version: [latest]

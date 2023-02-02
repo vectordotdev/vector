@@ -358,15 +358,6 @@ test-integration-aws-cloudwatch-metrics: ## Runs AWS Cloudwatch Metrics integrat
 test-integration-aws-kinesis: ## Runs AWS Kinesis integration tests
 	FILTER=::aws_kinesis make test-integration-aws
 
-.PHONY: test-integration-datadog-agent
-test-integration-datadog-agent: ## Runs Datadog Agent integration tests
-	@test $${TEST_DATADOG_API_KEY?TEST_DATADOG_API_KEY must be set}
-	RUST_VERSION=${RUST_VERSION} ${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.datadog-agent.yml build
-	RUST_VERSION=${RUST_VERSION} ${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.datadog-agent.yml run --rm runner
-ifeq ($(AUTODESPAWN), true)
-	make test-integration-datadog-agent-cleanup
-endif
-
 test-integration-%-cleanup:
 	cargo vdev --verbose integration stop $*
 

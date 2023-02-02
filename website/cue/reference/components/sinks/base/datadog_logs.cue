@@ -298,7 +298,7 @@ base: components: sinks: datadog_logs: configuration: {
 			[dd_site]: https://docs.datadoghq.com/getting_started/site
 			"""
 		required: false
-		type: string: {}
+		type: string: default: "datadoghq.com"
 	}
 	tls: {
 		description: "Configures the TLS options for incoming/outgoing connections."

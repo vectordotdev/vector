@@ -11,16 +11,19 @@ use super::{
     service::{DatadogMetricsRetryLogic, DatadogMetricsService},
     sink::DatadogMetricsSink,
 };
-use crate::tls::{MaybeTlsSettings, TlsEnableableConfig};
 use crate::{
-    common::datadog::get_base_domain,
+    common::datadog::get_base_domain_region,
     config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext},
     http::HttpClient,
     sinks::{
-        datadog::{get_api_validate_endpoint, healthcheck, Region},
+        datadog::{default_site, get_api_validate_endpoint, healthcheck},
         util::{batch::BatchConfig, ServiceBuilderExt, SinkBatchSettings, TowerRequestConfig},
         Healthcheck, UriParseSnafu, VectorSink,
     },
+};
+use crate::{
+    common::datadog::Region,
+    tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
 
 // This default is centered around "series" data, which should be the lion's share of what we
@@ -110,7 +113,8 @@ pub struct DatadogMetricsConfig {
     /// The Datadog [site][dd_site] to send metrics to.
     ///
     /// [dd_site]: https://docs.datadoghq.com/getting_started/site
-    pub site: Option<String>,
+    #[serde(default = "default_site")]
+    pub site: String,
 
     /// The default Datadog [API key][api_key] to send metrics with.
     ///
@@ -177,7 +181,7 @@ impl DatadogMetricsConfig {
             format!(
                 "https://{}-vector.agent.{}",
                 version,
-                get_base_domain(self.site.as_ref(), self.region)
+                get_base_domain_region(self.site.as_str(), self.region)
             )
         })
     }
@@ -210,8 +214,10 @@ impl DatadogMetricsConfig {
     }
 
     fn build_healthcheck(&self, client: HttpClient) -> crate::Result<Healthcheck> {
-        let validate_endpoint =
-            get_api_validate_endpoint(self.endpoint.as_ref(), self.site.as_ref(), self.region)?;
+        let validate_endpoint = get_api_validate_endpoint(
+            self.endpoint.as_ref(),
+            get_base_domain_region(self.site.as_str(), self.region),
+        )?;
         Ok(healthcheck(
             client,
             validate_endpoint,
