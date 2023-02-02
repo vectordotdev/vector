@@ -1,5 +1,5 @@
 crate::cli_subcommands! {
-    "Check parts of the Vector code base"
+    "Check parts of the Vector code base..."
     component_docs,
     mod component_features,
     mod deny,
