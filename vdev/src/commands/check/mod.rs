@@ -15,7 +15,7 @@ crate::cli_subcommands! {
 // These should eventually be migrated to Rust code
 
 crate::script_wrapper! {
-    component_docs = "Check component documentation is up-to-date"
+    component_docs = "Check that component documentation is up-to-date"
         => "check-component-docs.sh"
 }
 
