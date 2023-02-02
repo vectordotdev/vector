@@ -92,37 +92,50 @@ impl DatadogMetricsEndpointConfiguration {
 
 /// Configuration for the `datadog_metrics` sink.
 #[configurable_component(sink("datadog_metrics"))]
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct DatadogMetricsConfig {
     /// Sets the default namespace for any metrics sent.
     ///
     /// This namespace is only used if a metric has no existing namespace. When a namespace is
     /// present, it is used as a prefix to the metric name, and separated with a period (`.`).
+    #[configurable(metadata(docs::examples = "myservice"))]
+    #[serde(default)]
     pub default_namespace: Option<String>,
 
     /// The endpoint to send metrics to.
+    ///
+    /// The endpoint must contain an HTTP scheme, and may specify a
+    /// hostname or IP address and port.
+    ///
+    /// If set, overrides the `site` option.
+    #[configurable(metadata(docs::examples = "http://127.0.0.1:8080"))]
+    #[configurable(metadata(docs::examples = "http://example.com:12345"))]
+    #[serde(default)]
     pub(crate) endpoint: Option<String>,
 
     /// The Datadog region to send metrics to.
-    ///
-    /// This option is deprecated, and the `site` field should be used instead.
-    #[configurable(deprecated)]
+    #[configurable(deprecated = "This option has been deprecated, use the `site` option instead.")]
+    #[serde(default)]
     pub region: Option<Region>,
 
     /// The Datadog [site][dd_site] to send metrics to.
     ///
     /// [dd_site]: https://docs.datadoghq.com/getting_started/site
     #[serde(default = "default_site")]
+    #[configurable(metadata(docs::examples = "us3.datadoghq.com"))]
+    #[configurable(metadata(docs::examples = "datadoghq.eu"))]
     pub site: String,
 
     /// The default Datadog [API key][api_key] to send metrics with.
     ///
     /// If a metric has a Datadog [API key][api_key] set explicitly in its metadata, it will take
-    /// precedence over the default.
+    /// precedence over this setting.
     ///
     /// [api_key]: https://docs.datadoghq.com/api/?lang=bash#authentication
     #[serde(alias = "api_key")]
+    #[configurable(metadata(docs::examples = "${DATADOG_API_KEY_ENV_VAR}"))]
+    #[configurable(metadata(docs::examples = "ef8d5de700e7989468166c40fc8a0ccd"))]
     pub default_api_key: SensitiveString,
 
     #[configurable(derived)]
@@ -146,6 +159,22 @@ pub struct DatadogMetricsConfig {
 }
 
 impl_generate_config_from_default!(DatadogMetricsConfig);
+
+impl Default for DatadogMetricsConfig {
+    fn default() -> Self {
+        Self {
+            default_namespace: None,
+            endpoint: None,
+            region: None,
+            site: default_site(),
+            default_api_key: Default::default(),
+            batch: BatchConfig::default(),
+            request: TowerRequestConfig::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
+            tls: None,
+        }
+    }
+}
 
 #[async_trait::async_trait]
 impl SinkConfig for DatadogMetricsConfig {

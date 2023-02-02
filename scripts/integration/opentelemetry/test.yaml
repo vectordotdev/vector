@@ -2,11 +2,12 @@ args:
 - --features
 - opentelemetry-integration-tests
 - --lib
-- 'sources::opentelemetry::integration_tests::'
+- '::opentelemetry::'
 
-env:
-  OTEL_HEALTH_URL: http://opentelemetry-collector:13133
-  OTEL_OTLPHTTP_URL: http://opentelemetry-collector:9876
+runner:
+  env:
+    OTEL_HEALTH_URL: http://opentelemetry-collector:13133
+    OTEL_OTLPHTTP_URL: http://opentelemetry-collector:9876
 
 matrix:
   version: [0.56.0]

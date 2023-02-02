@@ -51,34 +51,46 @@ impl SinkBatchSettings for DatadogLogsDefaultBatchSettings {
 
 /// Configuration for the `datadog_logs` sink.
 #[configurable_component(sink("datadog_logs"))]
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct DatadogLogsConfig {
     /// The endpoint to send logs to.
+    ///
+    /// The endpoint must contain an HTTP scheme, and may specify a
+    /// hostname or IP address and port.
+    ///
+    /// If set, overrides the `site` option.
+    #[configurable(metadata(docs::examples = "http://127.0.0.1:8080"))]
+    #[configurable(metadata(docs::examples = "http://example.com:12345"))]
+    #[serde(default)]
     pub(crate) endpoint: Option<String>,
 
     /// The Datadog region to send logs to.
-    ///
-    /// This option is deprecated, and the `site` field should be used instead.
-    #[configurable(deprecated)]
+    #[configurable(deprecated = "This option has been deprecated, use the `site` option instead.")]
+    #[serde(default)]
     pub region: Option<Region>,
 
     /// The Datadog [site][dd_site] to send logs to.
     ///
     /// [dd_site]: https://docs.datadoghq.com/getting_started/site
+    #[configurable(metadata(docs::examples = "us3.datadoghq.com"))]
+    #[configurable(metadata(docs::examples = "datadoghq.eu"))]
     #[serde(default = "default_site")]
     pub site: String,
 
     /// The default Datadog [API key][api_key] to send logs with.
     ///
     /// If a log has a Datadog [API key][api_key] set explicitly in its metadata, it will take
-    /// precedence over the default.
+    /// precedence over this setting.
     ///
     /// [api_key]: https://docs.datadoghq.com/api/?lang=bash#authentication
     #[serde(alias = "api_key")]
+    #[configurable(metadata(docs::examples = "${DATADOG_API_KEY_ENV_VAR}"))]
+    #[configurable(metadata(docs::examples = "ef8d5de700e7989468166c40fc8a0ccd"))]
     pub default_api_key: SensitiveString,
 
     #[configurable(derived)]
+    #[serde(default)]
     pub tls: Option<TlsEnableableConfig>,
 
     #[configurable(derived)]
@@ -107,6 +119,23 @@ pub struct DatadogLogsConfig {
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     pub acknowledgements: AcknowledgementsConfig,
+}
+
+impl Default for DatadogLogsConfig {
+    fn default() -> Self {
+        Self {
+            endpoint: None,
+            region: None,
+            site: default_site(),
+            default_api_key: Default::default(),
+            tls: None,
+            compression: None,
+            encoding: Transformer::default(),
+            batch: BatchConfig::default(),
+            request: RequestConfig::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
+        }
+    }
 }
 
 impl GenerateConfig for DatadogLogsConfig {
