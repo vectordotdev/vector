@@ -87,6 +87,7 @@ impl<L> ServiceBuilderExt<L> for ServiceBuilder<L> {
 /// Various settings can be configured, such as concurrency and rate limits, timeouts, etc.
 #[serde_as]
 #[configurable_component]
+#[configurable(metadata(docs::advanced))]
 #[derive(Clone, Copy, Debug)]
 pub struct TowerRequestConfig {
     #[configurable(derived)]

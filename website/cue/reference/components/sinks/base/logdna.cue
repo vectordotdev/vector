@@ -30,7 +30,7 @@ base: components: sinks: logdna: configuration: {
 	api_key: {
 		description: "The Ingestion API key."
 		required:    true
-		type: string: {}
+		type: string: examples: ["${LOGDNA_API_KEY}", "ef8d5de700e7989468166c40fc8a0ccd"]
 	}
 	batch: {
 		description: "Event batching behavior."
@@ -67,12 +67,20 @@ base: components: sinks: logdna: configuration: {
 	default_app: {
 		description: "The default app that will be set for events that do not contain a `file` or `app` field."
 		required:    false
-		type: string: {}
+		type: string: {
+			default: "vector"
+			examples: [
+				"my-app",
+			]
+		}
 	}
 	default_env: {
 		description: "The default environment that will be set for events that do not contain an `env` field."
 		required:    false
-		type: string: {}
+		type: string: {
+			default: "production"
+			examples: ["staging"]
+		}
 	}
 	encoding: {
 		description: "Transformations to prepare an event for serialization."
@@ -99,24 +107,34 @@ base: components: sinks: logdna: configuration: {
 		}
 	}
 	endpoint: {
-		description: "The endpoint to send logs to."
-		required:    false
-		type: string: {}
+		description: """
+			The HTTP endpoint to send logs to.
+
+			Both IP address and hostname are accepted formats.
+			"""
+		required: false
+		type: string: {
+			default: "https://logs.logdna.com/"
+			examples: ["http://127.0.0.1", "http://example.com"]
+		}
 	}
 	hostname: {
 		description: "The hostname that will be attached to each batch of events."
 		required:    true
-		type: string: syntax: "template"
+		type: string: {
+			examples: ["${HOSTNAME}", "my-local-machine"]
+			syntax: "template"
+		}
 	}
 	ip: {
 		description: "The IP address that will be attached to each batch of events."
 		required:    false
-		type: string: {}
+		type: string: examples: ["0.0.0.0"]
 	}
 	mac: {
 		description: "The MAC address that will be attached to each batch of events."
 		required:    false
-		type: string: {}
+		type: string: examples: ["my-mac-address"]
 	}
 	request: {
 		description: """
@@ -264,6 +282,9 @@ base: components: sinks: logdna: configuration: {
 	tags: {
 		description: "The tags that will be attached to each batch of events."
 		required:    false
-		type: array: items: type: string: syntax: "template"
+		type: array: items: type: string: {
+			examples: ["tag1", "tag2"]
+			syntax: "template"
+		}
 	}
 }
