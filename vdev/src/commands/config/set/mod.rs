@@ -1,4 +1,4 @@
 crate::cli_subcommands! {
-    "Modify the config file"
+    "Modify the config file..."
     mod repo,
 }

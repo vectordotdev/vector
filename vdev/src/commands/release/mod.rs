@@ -1,5 +1,5 @@
 crate::cli_subcommands! {
-    "Manage the release process"
+    "Manage the release process..."
     generate_cue,
     mod channel,
     commit,
