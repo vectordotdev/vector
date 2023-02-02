@@ -51,12 +51,10 @@ impl DatabendHttpRequest {
     }
 }
 
+#[cfg(all(test, feature = "databend-integration-tests"))]
 #[derive(Deserialize, Debug)]
 pub(super) struct DatabendHttpResponseSchemaField {
-    #[allow(dead_code)]
     pub name: String,
-    #[allow(dead_code)]
-    pub r#type: String,
 }
 
 #[derive(Deserialize, Debug)]
@@ -67,7 +65,7 @@ pub(super) struct DatabendHttpResponseError {
 
 #[derive(Deserialize, Debug)]
 pub(super) struct DatabendHttpResponse {
-    #[allow(dead_code)]
+    #[cfg(all(test, feature = "databend-integration-tests"))]
     pub schema: Vec<DatabendHttpResponseSchemaField>,
     pub data: Vec<Vec<String>>,
     pub error: Option<DatabendHttpResponseError>,
@@ -76,9 +74,7 @@ pub(super) struct DatabendHttpResponse {
 
 #[derive(Debug)]
 pub(super) struct DatabendPresignedResponse {
-    #[allow(dead_code)]
     pub method: String,
-    #[allow(dead_code)]
     pub headers: BTreeMap<String, String>,
     pub url: String,
 }
@@ -196,7 +192,18 @@ impl DatabendAPIClient {
         data: Bytes,
     ) -> Result<(), DatabendError> {
         let req_body = Body::from(data);
-        let request = Request::put(presigned.url).body(req_body)?;
+        let mut req_builder = match presigned.method.as_str() {
+            "PUT" => Ok(Request::put(presigned.url)),
+            "POST" => Ok(Request::post(presigned.url)),
+            _ => Err(DatabendError::Server {
+                code: 0,
+                message: "Unsupported Presigned Method".to_string(),
+            }),
+        }?;
+        for (k, v) in presigned.headers {
+            req_builder = req_builder.header(k, v);
+        }
+        let request = req_builder.body(req_body)?;
         let response = self.client.send(request).await?;
         let status = response.status();
         match status {

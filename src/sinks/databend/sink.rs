@@ -28,7 +28,7 @@ pub struct DatabendRequestBuilder {
 }
 
 impl DatabendRequestBuilder {
-    pub fn new(compression: Compression, encoder: (Transformer, Encoder<Framer>)) -> Self {
+    pub const fn new(compression: Compression, encoder: (Transformer, Encoder<Framer>)) -> Self {
         Self {
             compression,
             encoder,
