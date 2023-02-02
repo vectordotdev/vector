@@ -206,11 +206,15 @@ impl DatabendAPIClient {
         let request = req_builder.body(req_body)?;
         let response = self.client.send(request).await?;
         let status = response.status();
+        let body = hyper::body::to_bytes(response.into_body()).await?;
         match status {
             StatusCode::OK => Ok(()),
             _ => Err(DatabendError::Server {
                 code: status.as_u16(),
-                message: "Presigned Upload Failed".to_string(),
+                message: format!(
+                    "Presigned Upload Failed: {}",
+                    String::from_utf8_lossy(&body)
+                ),
             }),
         }
     }
