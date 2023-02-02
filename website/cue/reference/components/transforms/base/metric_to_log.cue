@@ -20,6 +20,8 @@ base: components: transforms: metric_to_log: configuration: {
 			When set to `single`, only the last non-bare value of tags will be displayed with the
 			metric.  When set to `full`, all metric tags will be exposed as separate assignments as
 			described by [the `native_json` codec][vector_native_json].
+
+			[vector_native_json]: https://github.com/vectordotdev/vector/blob/master/lib/codecs/tests/data/native_encoding/schema.cue
 			"""
 		required: false
 		type: string: {

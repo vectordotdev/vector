@@ -113,7 +113,7 @@ pub struct Output {
     ///
     /// For *sources*, a `None` schema is identical to a `Some(Definition::source_default())`.
     ///
-    /// For a *transform*, a schema [`Definition`] is required if `Datatype` is Log.
+    /// For a *transform*, a schema [`schema::Definition`] is required if `Datatype` is Log.
     pub log_schema_definition: Option<schema::Definition>,
 }
 

@@ -1,20 +1,23 @@
 //! This mod implements `kubernetes_logs` source.
-//! The scope of this source is to consume the log files that `kubelet` keeps
-//! at `/var/log/pods` at the host of the k8s node when `vector` itself is
-//! running inside the cluster as a `DaemonSet`.
+//! The scope of this source is to consume the log files that a kubelet keeps
+//! at "/var/log/pods" on the host of the Kubernetes Node when Vector itself is
+//! running inside the cluster as a DaemonSet.
 
 #![deny(missing_docs)]
 
-use std::{convert::TryInto, path::PathBuf, time::Duration};
+use std::{path::PathBuf, time::Duration};
 
 use bytes::Bytes;
 use chrono::Utc;
+use codecs::{BytesDeserializer, BytesDeserializerConfig};
 use file_source::{
     calculate_ignore_before, Checkpointer, FileServer, FileServerShutdown, FingerprintStrategy,
     Fingerprinter, Line, ReadFrom, ReadFromConfig,
 };
+use futures::{future::FutureExt, stream::StreamExt};
 use futures_util::Stream;
 use k8s_openapi::api::core::v1::{Namespace, Node, Pod};
+use k8s_paths_provider::K8sPathsProvider;
 use kube::{
     api::{Api, ListParams},
     config::{self, KubeConfigOptions},
@@ -24,10 +27,18 @@ use kube::{
     },
     Client, Config as ClientConfig,
 };
-use vector_common::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
-use vector_common::TimeZone;
+use lifecycle::Lifecycle;
+use lookup::{lookup_v2::OptionalTargetPath, owned_value_path, path, OwnedTargetPath};
+use serde_with::serde_as;
+use value::{kind::Collection, Kind};
+use vector_common::{
+    internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol},
+    TimeZone,
+};
 use vector_config::{configurable_component, NamedComponent};
-use vector_core::{config::LegacyKey, transform::TaskTransform, EstimatedJsonEncodedSizeOf};
+use vector_core::{
+    config::LegacyKey, config::LogNamespace, transform::TaskTransform, EstimatedJsonEncodedSizeOf,
+};
 
 use crate::{
     config::{
@@ -63,13 +74,6 @@ use self::namespace_metadata_annotator::NamespaceMetadataAnnotator;
 use self::node_metadata_annotator::NodeMetadataAnnotator;
 use self::parser::Parser;
 use self::pod_metadata_annotator::PodMetadataAnnotator;
-use codecs::{BytesDeserializer, BytesDeserializerConfig};
-use futures::{future::FutureExt, stream::StreamExt};
-use k8s_paths_provider::K8sPathsProvider;
-use lifecycle::Lifecycle;
-use lookup::{owned_value_path, path, PathPrefix};
-use value::{kind::Collection, Kind};
-use vector_core::config::LogNamespace;
 
 /// The key we use for `file` field.
 const FILE_KEY: &str = "file";
@@ -78,30 +82,67 @@ const FILE_KEY: &str = "file";
 const SELF_NODE_NAME_ENV_KEY: &str = "VECTOR_SELF_NODE_NAME";
 
 /// Configuration for the `kubernetes_logs` source.
+#[serde_as]
 #[configurable_component(source("kubernetes_logs"))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields, default)]
 pub struct Config {
-    /// Specifies the label selector to filter `Pod`s with, to be used in addition to the built-in `exclude` filter.
+    /// Specifies the [label selector][label_selector] to filter [Pods][pods] with, to be used in
+    /// addition to the built-in [exclude][exclude] filter.
+    ///
+    /// [label_selector]: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors
+    /// [pods]: https://kubernetes.io/docs/concepts/workloads/pods/
+    /// [exclude]: https://vector.dev/docs/reference/configuration/sources/kubernetes_logs/#pod-exclusion
+    #[configurable(metadata(docs::examples = "my_custom_label!=my_value"))]
+    #[configurable(metadata(
+        docs::examples = "my_custom_label!=my_value,my_other_custom_label=my_value"
+    ))]
     extra_label_selector: String,
 
-    /// Specifies the label selector to filter `Namespace`s with, to be used in addition to the built-in `exclude` filter.
+    /// Specifies the [label selector][label_selector] to filter [Namespaces][namespaces] with, to
+    /// be used in addition to the built-in [exclude][exclude] filter.
+    ///
+    /// [label_selector]: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors
+    /// [namespaces]: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
+    /// [exclude]: https://vector.dev/docs/reference/configuration/sources/kubernetes_logs/#namespace-exclusion
+    #[configurable(metadata(docs::examples = "my_custom_label!=my_value"))]
+    #[configurable(metadata(
+        docs::examples = "my_custom_label!=my_value,my_other_custom_label=my_value"
+    ))]
     extra_namespace_label_selector: String,
 
-    /// The `name` of the Kubernetes `Node` that is running.
+    /// The name of the Kubernetes [Node][node] that is running.
     ///
-    /// Configured to use an environment var by default, to be evaluated to a value provided by Kubernetes at `Pod` deploy time.
+    /// Configured to use an environment variable by default, to be evaluated to a value provided by
+    /// Kubernetes at Pod creation.
+    ///
+    /// [node]: https://kubernetes.io/docs/concepts/architecture/nodes/
     self_node_name: String,
 
-    /// Specifies the field selector to filter `Pod`s with, to be used in addition to the built-in `Node` filter.
+    /// Specifies the [field selector][field_selector] to filter Pods with, to be used in addition
+    /// to the built-in [Node][node] filter.
+    ///
+    /// The built-in Node filter uses `self_node_name` to only watch Pods located on the same Node.
+    ///
+    /// [field_selector]: https://kubernetes.io/docs/concepts/overview/working-with-objects/field-selectors/
+    /// [node]: https://kubernetes.io/docs/concepts/architecture/nodes/
+    #[configurable(metadata(docs::examples = "metadata.name!=pod-name-to-exclude"))]
+    #[configurable(metadata(
+        docs::examples = "metadata.name!=pod-name-to-exclude,metadata.name=mypod"
+    ))]
     extra_field_selector: String,
 
     /// Whether or not to automatically merge partial events.
+    ///
+    /// Partial here is in respect to messages that were split by the Kubernetes Container Runtime
+    /// log driver.
     auto_partial_merge: bool,
 
     /// The directory used to persist file checkpoint positions.
     ///
-    /// By default, the global `data_dir` option is used. Make sure the running user has write permissions to this directory.
+    /// By default, the global `data_dir` option is used. Make sure the running user has write
+    /// permissions to this directory.
+    #[configurable(metadata(docs::examples = "/var/local/lib/vector/"))]
     data_dir: Option<PathBuf>,
 
     #[configurable(derived)]
@@ -115,6 +156,7 @@ pub struct Config {
     node_annotation_fields: node_metadata_annotator::FieldsSpec,
 
     /// A list of glob patterns to exclude from reading the files.
+    #[configurable(metadata(docs::examples = "**/exclude/**"))]
     exclude_paths_glob_patterns: Vec<PathBuf>,
 
     #[configurable(derived)]
@@ -123,50 +165,68 @@ pub struct Config {
 
     /// Ignore files with a data modification date older than the specified number of seconds.
     #[serde(default)]
+    #[configurable(metadata(docs::type_unit = "seconds"))]
+    #[configurable(metadata(docs::examples = 600))]
     ignore_older_secs: Option<u64>,
 
     /// Max amount of bytes to read from a single file before switching over
     /// to the next file.
+    ///
     /// This allows distributing the reads more or less evenly across
     /// the files.
+    #[configurable(metadata(docs::type_unit = "bytes"))]
     max_read_bytes: usize,
 
-    /// The maximum number of bytes a line can contain before being discarded. This protects
-    /// against malformed lines or tailing incorrect files.
+    /// The maximum number of bytes a line can contain before being discarded.
+    ///
+    /// This protects against malformed lines or tailing incorrect files.
+    #[configurable(metadata(docs::type_unit = "bytes"))]
     max_line_bytes: usize,
 
-    /// How many first lines in a file are used for fingerprinting.
+    /// The number of lines to read for generating the checksum.
+    ///
+    /// If your files share a common header that is not always a fixed size,
+    ///
+    /// If the file has less than this amount of lines, it won’t be read at all.
+    #[configurable(metadata(docs::type_unit = "lines"))]
     fingerprint_lines: usize,
 
-    /// This value specifies not exactly the globbing, but interval
-    /// between the polling the files to watch from the `paths_provider`.
+    /// The interval at which the file system is polled to identify new files to read from.
+    ///
     /// This is quite efficient, yet might still create some load of the
     /// file system; in addition, it is currently coupled with checksum dumping
     /// in the underlying file server, so setting it too low may introduce
     /// a significant overhead.
-    glob_minimum_cooldown_ms: usize,
+    #[serde_as(as = "serde_with::DurationMilliSeconds<u64>")]
+    glob_minimum_cooldown_ms: Duration,
 
     /// Overrides the name of the log field used to add the ingestion timestamp to each event.
     ///
     /// This is useful to compute the latency between important event processing
     /// stages. For example, the time delta between when a log line was written and when it was
     /// processed by the `kubernetes_logs` source.
-    ///
-    /// By default, the [global `log_schema.timestamp_key` option][global_timestamp_key] is used.
-    ///
-    /// [global_timestamp_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.timestamp_key
-    ingestion_timestamp_field: Option<String>,
+    #[configurable(metadata(docs::examples = ".ingest_timestamp", docs::examples = "ingest_ts"))]
+    ingestion_timestamp_field: Option<OptionalTargetPath>,
 
     /// The default time zone for timestamps without an explicit zone.
     timezone: Option<TimeZone>,
 
-    /// Optional path to a readable kubeconfig file. If not set,
-    /// a connection to Kubernetes is made using the in-cluster configuration.
+    /// Optional path to a readable [kubeconfig][kubeconfig] file.
+    ///
+    /// If not set, a connection to Kubernetes is made using the in-cluster configuration.
+    ///
+    /// [kubeconfig]: https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/
+    #[configurable(metadata(docs::examples = "/path/to/.kube/config"))]
     kube_config_file: Option<PathBuf>,
 
-    /// How long to delay removing entries from our map when we receive a deletion
-    /// event from the watched stream.
-    delay_deletion_ms: usize,
+    /// How long to delay removing metadata entries from the cache when a pod deletion event
+    /// event is received from the watch stream.
+    ///
+    /// A longer delay will allow for continued enrichment of logs after the originating Pod is
+    /// removed. If relevant metadata has been removed, the log will be forwarded un-enriched and a
+    /// warning will be emitted.
+    #[serde_as(as = "serde_with::DurationMilliSeconds<u64>")]
+    delay_deletion_ms: Duration,
 
     /// The namespace to use for logs. This overrides the global setting.
     #[configurable(metadata(docs::hidden))]
@@ -457,7 +517,7 @@ struct Source {
     max_line_bytes: usize,
     fingerprint_lines: usize,
     glob_minimum_cooldown: Duration,
-    ingestion_timestamp_field: Option<String>,
+    ingestion_timestamp_field: Option<OwnedTargetPath>,
     delay_deletion: Duration,
 }
 
@@ -505,17 +565,14 @@ impl Source {
 
         let exclude_paths = prepare_exclude_paths(config)?;
 
-        let glob_minimum_cooldown =
-            Duration::from_millis(config.glob_minimum_cooldown_ms.try_into().expect(
-                "unable to convert glob_minimum_cooldown_ms from usize to u64 without data loss",
-            ));
+        let glob_minimum_cooldown = config.glob_minimum_cooldown_ms;
 
-        let delay_deletion = Duration::from_millis(
-            config
-                .delay_deletion_ms
-                .try_into()
-                .expect("unable to convert delay_deletion_ms from usize to u64 without data loss"),
-        );
+        let delay_deletion = config.delay_deletion_ms;
+
+        let ingestion_timestamp_field = config
+            .ingestion_timestamp_field
+            .clone()
+            .and_then(|k| k.path);
 
         Ok(Self {
             client,
@@ -536,7 +593,7 @@ impl Source {
             max_line_bytes: config.max_line_bytes,
             fingerprint_lines: config.fingerprint_lines,
             glob_minimum_cooldown,
-            ingestion_timestamp_field: config.ingestion_timestamp_field.clone(),
+            ingestion_timestamp_field,
             delay_deletion,
         })
     }
@@ -718,7 +775,7 @@ impl Source {
             let mut event = create_event(
                 line.text,
                 &line.filename,
-                ingestion_timestamp_field.as_deref(),
+                ingestion_timestamp_field.as_ref(),
                 log_namespace,
             );
             let file_info = annotator.annotate(&mut event, &line.filename);
@@ -816,7 +873,7 @@ impl Source {
 fn create_event(
     line: Bytes,
     file: &str,
-    ingestion_timestamp_field: Option<&str>,
+    ingestion_timestamp_field: Option<&OwnedTargetPath>,
     log_namespace: LogNamespace,
 ) -> Event {
     let deserializer = BytesDeserializer::new();
@@ -845,7 +902,7 @@ fn create_event(
         }
         // When LogNamespace::Legacy, only set when the `ingestion_timestamp_field` is configured.
         (LogNamespace::Legacy, Some(ingestion_timestamp_field)) => {
-            log.try_insert((PathPrefix::Event, ingestion_timestamp_field), Utc::now())
+            log.try_insert(ingestion_timestamp_field, Utc::now())
         }
         // The CRI/Docker parsers handle inserting the `log_schema().timestamp_key()` value.
         (LogNamespace::Legacy, None) => (),
@@ -881,16 +938,16 @@ const fn default_max_line_bytes() -> usize {
     32 * 1024 // 32 KiB
 }
 
-const fn default_glob_minimum_cooldown_ms() -> usize {
-    60_000
+const fn default_glob_minimum_cooldown_ms() -> Duration {
+    Duration::from_millis(60_000)
 }
 
 const fn default_fingerprint_lines() -> usize {
     1
 }
 
-const fn default_delay_deletion_ms() -> usize {
-    60_000
+const fn default_delay_deletion_ms() -> Duration {
+    Duration::from_millis(60_000)
 }
 
 // This function constructs the patterns we exclude from file watching, created

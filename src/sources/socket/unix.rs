@@ -44,12 +44,12 @@ pub struct UnixConfig {
     /// The maximum buffer size of incoming messages.
     ///
     /// Messages larger than this are truncated.
-    ///
-    /// This option is deprecated. Configure `max_length` on the framing config instead.
     // TODO: this option is noted as deprecated in the source build function in mod.rs , but
     // behaviorally there are inconsistencies when adapting the new() function to use framing
     // instead of max_length. Merits further investigation.
-    #[configurable(deprecated)]
+    #[configurable(
+        deprecated = "This option has been deprecated. Configure `max_length` on the framing config instead."
+    )]
     #[serde(default = "default_max_length")]
     #[configurable(metadata(docs::type_unit = "bytes"))]
     pub max_length: Option<usize>,

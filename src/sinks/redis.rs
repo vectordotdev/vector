@@ -502,7 +502,7 @@ mod integration_tests {
             }),
             batch: BatchConfig::default(),
             request: TowerRequestConfig {
-                rate_limit_num: Option::from(u64::MAX),
+                rate_limit_num: Some(u64::MAX),
                 ..Default::default()
             },
             acknowledgements: Default::default(),
@@ -565,7 +565,7 @@ mod integration_tests {
             }),
             batch: BatchConfig::default(),
             request: TowerRequestConfig {
-                rate_limit_num: Option::from(u64::MAX),
+                rate_limit_num: Some(u64::MAX),
                 ..Default::default()
             },
             acknowledgements: Default::default(),
@@ -642,7 +642,7 @@ mod integration_tests {
             list_option: None,
             batch: BatchConfig::default(),
             request: TowerRequestConfig {
-                rate_limit_num: Option::from(u64::MAX),
+                rate_limit_num: Some(u64::MAX),
                 ..Default::default()
             },
             acknowledgements: Default::default(),

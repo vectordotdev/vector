@@ -179,7 +179,7 @@ base: components: sources: splunk_hec: configuration: {
 	}
 	token: {
 		deprecated:         true
-		deprecated_message: "This option has been deprecated, the *valid_tokens* option should be used."
+		deprecated_message: "This option has been deprecated, use `valid_tokens` instead."
 		description: """
 			Optional authorization token.
 

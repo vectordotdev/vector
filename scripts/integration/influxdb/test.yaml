@@ -10,4 +10,4 @@ env:
   INFLUXDB_V2_ADDRESS: http://influxdb-v2:8086
 
 matrix:
-- version: ['1.8']
+  version: ['1.8']
