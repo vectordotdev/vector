@@ -16,5 +16,8 @@ env:
   SQS_ADDRESS: http://mock-localstack:4566
   WATCHLOGS_ADDRESS: http://mock-watchlogs:6000
 
+runner:
+  needs_docker_sock: true
+
 matrix:
   version: [latest]
