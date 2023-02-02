@@ -139,13 +139,105 @@ base: components: sinks: databend: configuration: {
 		}
 	}
 	encoding: {
-		description: "Transformations to prepare an event for serialization."
-		required:    false
+		description: "Configures how events are encoded into raw bytes."
+		required:    true
 		type: object: options: {
+			avro: {
+				description:   "Apache Avro-specific encoder options."
+				relevant_when: "codec = \"avro\""
+				required:      true
+				type: object: options: schema: {
+					description: "The Avro schema."
+					required:    true
+					type: string: examples: ["{ \"type\": \"record\", \"name\": \"log\", \"fields\": [{ \"name\": \"message\", \"type\": \"string\" }] }"]
+				}
+			}
+			codec: {
+				description: "The codec to use for encoding events."
+				required:    true
+				type: string: enum: {
+					avro: """
+						Encodes an event as an [Apache Avro][apache_avro] message.
+
+						[apache_avro]: https://avro.apache.org/
+						"""
+					gelf: """
+						Encodes an event as a [GELF][gelf] message.
+
+						[gelf]: https://docs.graylog.org/docs/gelf
+						"""
+					json: """
+						Encodes an event as [JSON][json].
+
+						[json]: https://www.json.org/
+						"""
+					logfmt: """
+						Encodes an event as a [logfmt][logfmt] message.
+
+						[logfmt]: https://brandur.org/logfmt
+						"""
+					native: """
+						Encodes an event in Vector’s [native Protocol Buffers format][vector_native_protobuf].
+
+						This codec is **[experimental][experimental]**.
+
+						[vector_native_protobuf]: https://github.com/vectordotdev/vector/blob/master/lib/vector-core/proto/event.proto
+						[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
+						"""
+					native_json: """
+						Encodes an event in Vector’s [native JSON format][vector_native_json].
+
+						This codec is **[experimental][experimental]**.
+
+						[vector_native_json]: https://github.com/vectordotdev/vector/blob/master/lib/codecs/tests/data/native_encoding/schema.cue
+						[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
+						"""
+					raw_message: """
+						No encoding.
+
+						This "encoding" simply uses the `message` field of a log event.
+
+						Users should take care if they're modifying their log events (such as by using a `remap`
+						transform, etc) and removing the message field while doing additional parsing on it, as this
+						could lead to the encoding emitting empty strings for the given event.
+						"""
+					text: """
+						Plain text encoding.
+
+						This "encoding" simply uses the `message` field of a log event. For metrics, it uses an
+						encoding that resembles the Prometheus export format.
+
+						Users should take care if they're modifying their log events (such as by using a `remap`
+						transform, etc) and removing the message field while doing additional parsing on it, as this
+						could lead to the encoding emitting empty strings for the given event.
+						"""
+				}
+			}
 			except_fields: {
 				description: "List of fields that will be excluded from the encoded event."
 				required:    false
 				type: array: items: type: string: {}
+			}
+			metric_tag_values: {
+				description: """
+					Controls how metric tag values are encoded.
+
+					When set to `single`, only the last non-bare value of tags will be displayed with the
+					metric.  When set to `full`, all metric tags will be exposed as separate assignments.
+					"""
+				relevant_when: "codec = \"json\" or codec = \"text\""
+				required:      false
+				type: string: {
+					default: "single"
+					enum: {
+						full: "All tags will be exposed as arrays of either string or null values."
+						single: """
+															Tag values will be exposed as single strings, the same as they were before this config
+															option. Tags with multiple values will show the last assigned value, and null values will be
+															ignored.
+															"""
+					}
+				}
 			}
 			only_fields: {
 				description: "List of fields that will be included in the encoded event."
@@ -166,6 +258,36 @@ base: components: sinks: databend: configuration: {
 		description: "The endpoint of the Databend server."
 		required:    true
 		type: string: examples: ["http://localhost:8000"]
+	}
+	framing: {
+		description: "Framing configuration."
+		required:    false
+		type: object: options: {
+			character_delimited: {
+				description:   "Options for the character delimited encoder."
+				relevant_when: "method = \"character_delimited\""
+				required:      true
+				type: object: options: delimiter: {
+					description: "The ASCII (7-bit) character that delimits byte sequences."
+					required:    true
+					type: uint: {}
+				}
+			}
+			method: {
+				description: "The framing method."
+				required:    true
+				type: string: enum: {
+					bytes:               "Event data is not delimited at all."
+					character_delimited: "Event data is delimited by a single ASCII (7-bit) character."
+					length_delimited: """
+						Event data is prefixed with its length in bytes.
+
+						The prefix is a 32-bit unsigned integer, little endian.
+						"""
+					newline_delimited: "Event data is delimited by a newline (LF) character."
+				}
+			}
+		}
 	}
 	request: {
 		description: """
@@ -248,14 +370,20 @@ base: components: sinks: databend: configuration: {
 				}
 			}
 			rate_limit_duration_secs: {
-				description: "The time window, in seconds, used for the `rate_limit_num` option."
+				description: "The time window used for the `rate_limit_num` option."
 				required:    false
-				type: uint: default: 1
+				type: uint: {
+					default: 1
+					unit:    "seconds"
+				}
 			}
 			rate_limit_num: {
 				description: "The maximum number of requests allowed within the `rate_limit_duration_secs` time window."
 				required:    false
-				type: uint: default: 9223372036854775807
+				type: uint: {
+					default: 9223372036854775807
+					unit:    "requests"
+				}
 			}
 			retry_attempts: {
 				description: """
@@ -264,7 +392,10 @@ base: components: sinks: databend: configuration: {
 					The default, for all intents and purposes, represents an infinite number of retries.
 					"""
 				required: false
-				type: uint: default: 9223372036854775807
+				type: uint: {
+					default: 9223372036854775807
+					unit:    "retries"
+				}
 			}
 			retry_initial_backoff_secs: {
 				description: """
@@ -273,32 +404,38 @@ base: components: sinks: databend: configuration: {
 					After the first retry has failed, the fibonacci sequence will be used to select future backoffs.
 					"""
 				required: false
-				type: uint: default: 1
+				type: uint: {
+					default: 1
+					unit:    "seconds"
+				}
 			}
 			retry_max_duration_secs: {
-				description: "The maximum amount of time, in seconds, to wait between retries."
+				description: "The maximum amount of time to wait between retries."
 				required:    false
-				type: uint: default: 3600
+				type: uint: {
+					default: 3600
+					unit:    "seconds"
+				}
 			}
 			timeout_secs: {
 				description: """
-					The maximum time a request can take before being aborted.
+					The time a request can take before being aborted.
 
 					It is highly recommended that you do not lower this value below the service’s internal timeout, as this could
 					create orphaned requests, pile on retries, and result in duplicate data downstream.
 					"""
 				required: false
-				type: uint: default: 60
+				type: uint: {
+					default: 60
+					unit:    "seconds"
+				}
 			}
 		}
 	}
 	table: {
 		description: "The table that data will be inserted into."
-		required:    false
-		type: string: {
-			default: ""
-			examples: ["mytable"]
-		}
+		required:    true
+		type: string: examples: ["mytable"]
 	}
 	tls: {
 		description: "TLS configuration."
