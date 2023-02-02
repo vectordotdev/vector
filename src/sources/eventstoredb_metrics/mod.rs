@@ -154,7 +154,7 @@ mod integration_tests {
     use super::*;
     use crate::test_util::components::{run_and_assert_source_compliance, SOURCE_TAGS};
 
-    const EVENTSTOREDB_SCRAPE_ADDRESS: &str = "http://localhost:2113/stats";
+    const EVENTSTOREDB_SCRAPE_ADDRESS: &str = "http://eventstoredb:2113/stats";
 
     #[tokio::test]
     async fn scrape_something() {
