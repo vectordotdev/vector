@@ -54,7 +54,7 @@ pub struct HumioMetricsConfig {
     /// The scheme (`http` or `https`) must be specified. No path should be included since the paths defined
     /// by the [`Splunk`][splunk] api are used.
     ///
-    /// [splunk]: "https://docs.splunk.com/Documentation/Splunk/8.0.0/Data/HECRESTendpoints"
+    /// [splunk]: https://docs.splunk.com/Documentation/Splunk/8.0.0/Data/HECRESTendpoints
     #[serde(alias = "host")]
     #[serde(default = "default_endpoint")]
     #[configurable(metadata(
