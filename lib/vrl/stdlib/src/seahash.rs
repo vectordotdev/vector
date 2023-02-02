@@ -1,6 +1,7 @@
 use ::value::Value;
 use vrl::prelude::*;
 
+#[allow(clippy::cast_possible_wrap)]
 fn seahash(value: Value) -> Resolved {
     let value = value.try_bytes()?;
     Ok(Value::Integer(seahash::hash(&value) as i64))
@@ -74,13 +75,13 @@ mod tests {
 
         seahash {
              args: func_args![value: "foo"],
-             want: Ok(4413582353838009230 as i64),
+             want: Ok(4_413_582_353_838_009_230_i64),
              tdef: TypeDef::integer().infallible(),
         }
 
         seahash_buffer_overflow {
              args: func_args![value: "bar"],
-             want: Ok(-2796170501982571315 as i64),
+             want: Ok(-2_796_170_501_982_571_315_i64),
              tdef: TypeDef::integer().infallible(),
         }
     ];

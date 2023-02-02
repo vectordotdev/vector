@@ -583,7 +583,7 @@ bench_function! {
 
     literal {
         args: func_args![value: "foo"],
-        want: Ok(4413582353838009230 as i64),
+        want: Ok(4_413_582_353_838_009_230_i64),
     }
 }
 
