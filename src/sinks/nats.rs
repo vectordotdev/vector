@@ -56,11 +56,11 @@ pub struct NatsSinkConfig {
     )]
     pub acknowledgements: AcknowledgementsConfig,
 
-    /// A [name][nats_connection_name] assigned to the NATS connection.
+    /// A NATS [name][nats_connection_name] assigned to the NATS connection.
     ///
     /// [nats_connection_name]: https://docs.nats.io/using-nats/developer/connecting/name
     #[serde(default = "default_name", alias = "name")]
-    #[configurable(metadata(docs::examples = "foo",))]
+    #[configurable(metadata(docs::examples = "foo"))]
     connection_name: String,
 
     /// The NATS [subject][nats_subject] to publish messages to.
@@ -77,10 +77,12 @@ pub struct NatsSinkConfig {
     ))]
     subject: String,
 
-    /// The NATS URL to connect to.
+    /// The NATS [URL][nats_url] to connect to.
     ///
     /// The URL must take the form of `nats://server:port`.
     /// If the port is not specified it defaults to 4222.
+    ///
+    /// [nats_url]: https://docs.nats.io/using-nats/developer/connecting#nats-url
     #[configurable(metadata(docs::examples = "nats://demo.nats.io"))]
     #[configurable(metadata(docs::examples = "nats://127.0.0.1:4242"))]
     url: String,
