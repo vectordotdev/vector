@@ -1,4 +1,4 @@
-#![deny(clippy::pedantic)]
+#![deny(clippy::pedantic, warnings)]
 #![allow(
     clippy::module_name_repetitions,
     clippy::print_stdout,

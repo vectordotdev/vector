@@ -144,9 +144,9 @@ base: components: sinks: papertrail: configuration: {
 		}
 	}
 	endpoint: {
-		description: "The endpoint to send logs to."
+		description: "The TCP endpoint to send logs to."
 		required:    true
-		type: string: {}
+		type: string: examples: ["logs.papertrailapp.com:12345"]
 	}
 	keepalive: {
 		description: "TCP keepalive settings for socket-based components."
@@ -160,7 +160,11 @@ base: components: sinks: papertrail: configuration: {
 	process: {
 		description: "The value to use as the `process` in Papertrail."
 		required:    false
-		type: string: syntax: "template"
+		type: string: {
+			default: "vector"
+			examples: ["{{ process }}", "my-process"]
+			syntax: "template"
+		}
 	}
 	send_buffer_bytes: {
 		description: "Configures the send buffer size using the `SO_SNDBUF` option on the socket."
