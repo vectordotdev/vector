@@ -60,7 +60,6 @@ base: components: sources: syslog: configuration: {
 		type: string: enum: {
 			tcp:  "Listen on TCP."
 			udp:  "Listen on UDP."
-			unix: "Listen on UDS. (Unix domain socket)"
 		}
 	}
 	path: {
@@ -69,7 +68,6 @@ base: components: sources: syslog: configuration: {
 
 			This should be an absolute path.
 			"""
-		relevant_when: "mode = \"unix\""
 		required:      true
 		type: string: examples: ["/path/to/socket"]
 	}
@@ -90,7 +88,6 @@ base: components: sources: syslog: configuration: {
 			Note that the file mode value can be specified in any numeric format supported by your configuration
 			language, but it is most intuitive to use an octal number.
 			"""
-		relevant_when: "mode = \"unix\""
 		required:      false
 		type: uint: {}
 	}
