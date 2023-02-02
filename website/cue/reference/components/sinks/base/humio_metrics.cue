@@ -84,11 +84,18 @@ base: components: sinks: humio_metrics: configuration: {
 		}
 	}
 	endpoint: {
-		description: "The base URL of the Humio instance. The scheme (`http` or `https`) must be specified."
-		required:    false
+		description: """
+			The base URL of the Humio instance.
+
+			The scheme (`http` or `https`) must be specified. No path should be included since the paths defined
+			by the [`Splunk`][splunk] api are used.
+
+			[splunk]: "https://docs.splunk.com/Documentation/Splunk/8.0.0/Data/HECRESTendpoints"
+			"""
+		required: false
 		type: string: {
 			default: "https://cloud.humio.com"
-			examples: ["http://127.0.0.1", "http://example.com"]
+			examples: ["http://127.0.0.1", "https://example.com"]
 		}
 	}
 	event_type: {

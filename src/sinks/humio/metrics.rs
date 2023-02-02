@@ -49,12 +49,17 @@ pub struct HumioMetricsConfig {
     ))]
     token: SensitiveString,
 
-    /// The base URL of the Humio instance. The scheme (`http` or `https`) must be specified.
+    /// The base URL of the Humio instance.
+    ///
+    /// The scheme (`http` or `https`) must be specified. No path should be included since the paths defined
+    /// by the [`Splunk`][splunk] api are used.
+    ///
+    /// [splunk]: "https://docs.splunk.com/Documentation/Splunk/8.0.0/Data/HECRESTendpoints"
     #[serde(alias = "host")]
     #[serde(default = "default_endpoint")]
     #[configurable(metadata(
         docs::examples = "http://127.0.0.1",
-        docs::examples = "http://example.com",
+        docs::examples = "https://example.com",
     ))]
     pub(super) endpoint: String,
 
