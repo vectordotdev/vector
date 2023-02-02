@@ -2,10 +2,11 @@ args:
 - --features
 - axiom-integration-tests
 - --lib
-- 'sinks::axiom::'
+- '::axiom::'
 
-env:
-  AXIOM_URL: http://axiom-core
+runner:
+  env:
+    AXIOM_URL: http://axiom-core
 
 matrix:
   version: [13-alpine]
