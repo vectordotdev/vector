@@ -88,17 +88,24 @@ base: components: sinks: datadog_traces: configuration: {
 			The default Datadog [API key][api_key] to send traces with.
 
 			If a trace has a Datadog [API key][api_key] set explicitly in its metadata, it will take
-			precedence over the default.
+			precedence over this setting.
 
 			[api_key]: https://docs.datadoghq.com/api/?lang=bash#authentication
 			"""
 		required: true
-		type: string: {}
+		type: string: examples: ["${DATADOG_API_KEY_ENV_VAR}", "ef8d5de700e7989468166c40fc8a0ccd"]
 	}
 	endpoint: {
-		description: "The endpoint to send traces to."
-		required:    false
-		type: string: {}
+		description: """
+			The endpoint to send traces to.
+
+			The endpoint must contain an HTTP scheme, and may specify a
+			hostname or IP address and port.
+
+			If set, overrides the `site` option.
+			"""
+		required: false
+		type: string: examples: ["http://127.0.0.1:8080", "http://example.com:12345"]
 	}
 	request: {
 		description: """
@@ -250,7 +257,10 @@ base: components: sinks: datadog_traces: configuration: {
 			[dd_site]: https://docs.datadoghq.com/getting_started/site
 			"""
 		required: false
-		type: string: {}
+		type: string: {
+			default: "datadoghq.com"
+			examples: ["us3.datadoghq.com", "datadoghq.eu"]
+		}
 	}
 	tls: {
 		description: "Configures the TLS options for incoming/outgoing connections."

@@ -11,11 +11,14 @@ use vector_core::config::proxy::ProxyConfig;
 use super::{service::LogApiRetry, sink::LogSinkBuilder};
 use crate::{
     codecs::Transformer,
+    common::datadog::{get_base_domain_region, Region},
     config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     http::HttpClient,
     schema,
     sinks::{
-        datadog::{get_api_validate_endpoint, healthcheck, logs::service::LogApiService, Region},
+        datadog::{
+            default_site, get_api_validate_endpoint, healthcheck, logs::service::LogApiService,
+        },
         util::{
             http::RequestConfig, service::ServiceBuilderExt, BatchConfig, Compression,
             SinkBatchSettings,
@@ -63,7 +66,8 @@ pub struct DatadogLogsConfig {
     /// The Datadog [site][dd_site] to send logs to.
     ///
     /// [dd_site]: https://docs.datadoghq.com/getting_started/site
-    pub site: Option<String>,
+    #[serde(default = "default_site")]
+    pub site: String,
 
     /// The default Datadog [API key][api_key] to send logs with.
     ///
@@ -122,9 +126,10 @@ impl DatadogLogsConfig {
             .endpoint
             .clone()
             .or_else(|| {
-                self.site
-                    .as_ref()
-                    .map(|s| format!("https://http-intake.logs.{}/api/v2/logs", s))
+                Some(format!(
+                    "https://http-intake.logs.{}/api/v2/logs",
+                    self.site
+                ))
             })
             .unwrap_or_else(|| match self.region {
                 Some(Region::Eu) => "https://http-intake.logs.datadoghq.eu/api/v2/logs".to_string(),
@@ -170,8 +175,10 @@ impl DatadogLogsConfig {
     }
 
     pub fn build_healthcheck(&self, client: HttpClient) -> crate::Result<Healthcheck> {
-        let validate_endpoint =
-            get_api_validate_endpoint(self.endpoint.as_ref(), self.site.as_ref(), self.region)?;
+        let validate_endpoint = get_api_validate_endpoint(
+            self.endpoint.as_ref(),
+            get_base_domain_region(self.site.as_str(), self.region),
+        )?;
         Ok(healthcheck(
             client,
             validate_endpoint,
