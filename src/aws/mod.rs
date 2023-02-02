@@ -10,6 +10,7 @@ use std::time::{Duration, SystemTime};
 
 pub use auth::{AwsAuthentication, ImdsAuthentication};
 use aws_config::meta::region::ProvideRegion;
+use aws_credential_types::provider::{ProvideCredentials, SharedCredentialsProvider};
 use aws_sigv4::http_request::{SignableRequest, SigningSettings};
 use aws_sigv4::SigningParams;
 use aws_smithy_async::rt::sleep::{AsyncSleep, Sleep};
@@ -17,11 +18,9 @@ use aws_smithy_client::bounds::SmithyMiddleware;
 use aws_smithy_client::erase::{DynConnector, DynMiddleware};
 use aws_smithy_client::{Builder, SdkError};
 use aws_smithy_http::callback::BodyCallback;
-use aws_smithy_http::endpoint::Endpoint;
 use aws_smithy_http::event_stream::BoxError;
 use aws_smithy_http::operation::{Request, Response};
 use aws_smithy_types::retry::RetryConfig;
-use aws_types::credentials::{ProvideCredentials, SharedCredentialsProvider};
 use aws_types::region::Region;
 use aws_types::SdkConfig;
 use bytes::Bytes;
@@ -134,7 +133,7 @@ pub async fn resolve_region(region: Option<Region>) -> crate::Result<Region> {
 pub async fn create_client<T: ClientBuilder>(
     auth: &AwsAuthentication,
     region: Option<Region>,
-    endpoint: Option<Endpoint>,
+    endpoint: Option<String>,
     proxy: &ProxyConfig,
     tls_options: &Option<TlsConfig>,
     is_sink: bool,
@@ -152,7 +151,7 @@ pub async fn create_client<T: ClientBuilder>(
         .retry_config(retry_config.clone());
 
     if let Some(endpoint_override) = endpoint {
-        config_builder = config_builder.endpoint_resolver(endpoint_override);
+        config_builder = config_builder.endpoint_url(endpoint_override);
     }
 
     let config = config_builder.build();

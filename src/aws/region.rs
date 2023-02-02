@@ -1,6 +1,5 @@
 use std::str::FromStr;
 
-use aws_smithy_http::endpoint::Endpoint;
 use aws_types::region::Region;
 use http::Uri;
 use vector_config::configurable_component;
@@ -36,9 +35,9 @@ impl RegionOrEndpoint {
         }
     }
 
-    pub fn endpoint(&self) -> crate::Result<Option<Endpoint>> {
+    pub fn endpoint(&self) -> crate::Result<Option<Uri>> {
         let uri = self.endpoint.as_deref().map(Uri::from_str).transpose()?;
-        Ok(uri.map(Endpoint::immutable))
+        Ok(uri)
     }
 
     pub fn region(&self) -> Option<Region> {
