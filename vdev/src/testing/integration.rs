@@ -94,7 +94,7 @@ impl IntegrationTest {
             .then_some(compose_path);
         let runner = IntegrationTestRunner::new(
             integration.clone(),
-            config.needs_docker_sock,
+            &config.runner,
             compose_path.is_some(),
         )?;
 
@@ -112,20 +112,21 @@ impl IntegrationTest {
 
     pub fn test(self, extra_args: Vec<String>) -> Result<()> {
         let active = self.envs_dir.check_active(&self.environment)?;
+        self.config.check_required()?;
 
         if !active {
             self.start()?;
         }
 
-        let mut env_vars = self.config.env.clone().unwrap_or_default();
+        let mut env_vars = self.config.env.clone();
         // Make sure the test runner has the same config environment vars as the services do.
         if let Some((key, value)) = self.config_env(&self.env_config) {
-            env_vars.insert(key, value);
+            env_vars.insert(key, Some(value));
         }
         let mut args = self.config.args.clone();
         args.extend(extra_args);
         self.runner
-            .test(&Some(env_vars), &self.config.runner_env, &args)?;
+            .test(&env_vars, &self.config.runner.env, &args)?;
 
         if !active {
             self.runner.remove()?;
@@ -135,15 +136,14 @@ impl IntegrationTest {
     }
 
     pub fn start(&self) -> Result<()> {
-        if let Some(compose_path) = &self.compose_path {
+        self.config.check_required()?;
+        if self.compose_path.is_some() {
             self.runner.ensure_network()?;
 
             if self.envs_dir.check_active(&self.environment)? {
                 bail!("environment is already up");
             }
 
-            #[cfg(unix)]
-            unix::prepare_compose_volumes(compose_path, &self.test_dir)?;
             self.run_compose("Starting", &["up", "--detach"], &self.env_config)?;
 
             self.envs_dir.save(&self.environment, &self.env_config)
@@ -172,6 +172,13 @@ impl IntegrationTest {
 
     fn run_compose(&self, action: &str, args: &[&'static str], config: &Environment) -> Result<()> {
         if let Some(compose_path) = &self.compose_path {
+            #[cfg(unix)]
+            if args[0] == "up" {
+                // This preparation step is safe to do every time compose is run, but is only really
+                // necessary when bring up the volumes.
+                unix::prepare_compose_volumes(compose_path, &self.test_dir)?;
+            }
+
             let mut command = CONTAINER_TOOL.clone();
             command.push("-compose");
             let mut command = Command::new(command);
@@ -184,18 +191,11 @@ impl IntegrationTest {
             if let Some(network_name) = self.runner.network_name() {
                 command.env(NETWORK_ENV_VAR, network_name);
             }
-            if let Some(env_vars) = &self.config.env {
-                command.envs(env_vars);
+            for (key, value) in &self.config.env {
+                if let Some(value) = value {
+                    command.env(key, value);
+                }
             }
-            // TODO: Export all config variables, not just `version`
-            if let Some(version) = config.get("version") {
-                let version_env = format!(
-                    "{}_VERSION",
-                    self.integration.replace('-', "_").to_uppercase()
-                );
-                command.env(version_env, version);
-            }
-
             command.envs(self.config_env(config));
 
             waiting!("{action} environment {}", self.environment);
@@ -207,15 +207,16 @@ impl IntegrationTest {
 
     fn config_env(&self, config: &Environment) -> Option<(String, String)> {
         // TODO: Export all config variables, not just `version`
-        config.get("version").map(|version| {
-            (
+        match config.get("version") {
+            Some(Some(version)) => Some((
                 format!(
                     "{}_VERSION",
                     self.integration.replace('-', "_").to_uppercase()
                 ),
                 version.to_string(),
-            )
-        })
+            )),
+            _ => None,
+        }
     }
 }
 

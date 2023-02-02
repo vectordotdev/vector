@@ -1,11 +1,13 @@
 args:
 - --features
-- docker-logs-integration-tests
+- fluent-integration-tests
 - --lib
-- "::docker_logs::"
+- "::fluent::"
 
 runner:
   needs_docker_sock: true
+  volumes:
+    /tmp: /tmp
 
 matrix:
   default: ["default"]
