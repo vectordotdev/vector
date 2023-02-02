@@ -1,4 +1,6 @@
-use codecs::encoding::Framer;
+use std::collections::BTreeMap;
+
+use codecs::encoding::{Framer, Serializer};
 use futures::future::FutureExt;
 use tower::ServiceBuilder;
 use vector_config::{component::GenerateConfig, configurable_component};
@@ -116,15 +118,37 @@ impl SinkConfig for DatabendConfig {
         let database = config.database;
         let table = config.table;
         let client = DatabendAPIClient::new(self.build_client(&cx)?, endpoint, auth);
-        let service = DatabendService::new(client, database, table)?;
+
+        let (framer, serializer) = self.encoding.build(SinkType::StreamBased)?;
+        let mut file_format_options = BTreeMap::new();
+        match serializer {
+            Serializer::Json(_) => {
+                file_format_options.insert("type".to_string(), "NDJSON".to_string());
+            }
+            _ => return Err(format!("Unsupported encoding: {:?}", &serializer).into()),
+        }
+        match config.compression {
+            Compression::Gzip(_) => {
+                file_format_options.insert("compression".to_string(), "gzip".to_string());
+            }
+            _ => {
+                return Err(
+                    format!("Unsupported compression format: {:?}", &config.compression).into(),
+                )
+            }
+        }
+
+        let mut copy_options = BTreeMap::new();
+        copy_options.insert("purge".to_string(), "true".to_string());
+
+        let service =
+            DatabendService::new(client, database, table, file_format_options, copy_options)?;
         let service = ServiceBuilder::new()
             .settings(request_settings, DatabendRetryLogic)
             .service(service);
 
         let transformer = self.encoding.transformer();
-        let (framer, serializer) = self.encoding.build(SinkType::StreamBased)?;
         let encoder = Encoder::<Framer>::new(framer, serializer);
-
         let request_builder =
             DatabendRequestBuilder::new(config.compression, (transformer, encoder));
 
@@ -150,8 +174,6 @@ async fn select_one(client: DatabendAPIClient) -> crate::Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use codecs::encoding::Serializer;
-
     use super::*;
 
     #[test]

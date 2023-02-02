@@ -68,9 +68,7 @@ impl RequestBuilder<Vec<Event>> for DatabendRequestBuilder {
         metadata: RequestMetadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
-        let compression = self.compression;
         DatabendRequest {
-            compression,
             finalizers,
             data: payload.into_payload(),
             metadata,

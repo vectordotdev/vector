@@ -4,7 +4,6 @@ use std::task::{Context, Poll};
 use bytes::Bytes;
 use chrono::Utc;
 use futures::future::BoxFuture;
-use once_cell::sync::Lazy;
 use rand::{thread_rng, Rng};
 use rand_distr::Alphanumeric;
 use snafu::Snafu;
@@ -14,25 +13,12 @@ use vector_common::internal_event::CountByteSize;
 use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
 use vector_core::stream::DriverResponse;
 
-use crate::sinks::util::Compression;
 use crate::{internal_events::EndpointBytesSent, sinks::util::retries::RetryLogic};
 
 use super::{
     api::{DatabendAPIClient, DatabendHttpRequest, DatabendPresignedResponse},
     error::DatabendError,
 };
-
-static DEFAULT_FILE_FORMAT_OPTIONS: Lazy<BTreeMap<String, String>> = Lazy::new(|| {
-    let mut m = BTreeMap::new();
-    m.insert("type".to_string(), "NDJSON".to_string());
-    m
-});
-
-static DEFAULT_COPY_OPTIONS: Lazy<BTreeMap<String, String>> = Lazy::new(|| {
-    let mut m = BTreeMap::new();
-    m.insert("purge".to_string(), "true".to_string());
-    m
-});
 
 #[derive(Clone)]
 pub struct DatabendRetryLogic;
@@ -63,11 +49,12 @@ pub struct DatabendService {
     client: DatabendAPIClient,
     database: String,
     table: String,
+    file_format_options: BTreeMap<String, String>,
+    copy_options: BTreeMap<String, String>,
 }
 
 #[derive(Clone)]
 pub struct DatabendRequest {
-    pub compression: Compression,
     pub data: Bytes,
     pub finalizers: EventFinalizers,
     pub metadata: RequestMetadata,
@@ -112,6 +99,8 @@ impl DatabendService {
         client: DatabendAPIClient,
         database: String,
         table: String,
+        file_format_options: BTreeMap<String, String>,
+        copy_options: BTreeMap<String, String>,
     ) -> Result<Self, DatabendError> {
         if database.is_empty() {
             return Err(DatabendError::InvalidConfig {
@@ -127,6 +116,8 @@ impl DatabendService {
             client,
             database,
             table,
+            file_format_options,
+            copy_options,
         })
     }
 
@@ -191,12 +182,10 @@ impl DatabendService {
             "INSERT INTO `{}`.`{}` VALUES",
             self.database, self.table
         ));
-        let file_format_options = DEFAULT_FILE_FORMAT_OPTIONS.clone();
-        let copy_options = DEFAULT_COPY_OPTIONS.clone();
         req.add_stage_attachment(
             stage_location,
-            Some(file_format_options),
-            Some(copy_options),
+            Some(self.file_format_options.clone()),
+            Some(self.copy_options.clone()),
         );
         let _ = self.client.query(req).await?;
         Ok(())
