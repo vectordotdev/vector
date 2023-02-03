@@ -38,6 +38,7 @@ quoted_printable = {version = "0.4.6", optional = true }
 rand = { version = "0.8.5", optional = true }
 regex = { version = "1", optional = true }
 rust_decimal = { version = "1", optional = true }
+seahash = { version = "4.1.0", optional = true }
 serde = { version = "1", default-features = false, features = ["derive"], optional = true }
 serde_json = { version = "1", optional = true }
 sha-1 = { version = "0.10", optional = true }
@@ -191,6 +192,7 @@ default = [
     "replace",
     "reverse_dns",
     "round",
+    "seahash",
     "set",
     "sha1",
     "sha2",
@@ -343,6 +345,7 @@ remove = ["dep:lookup_lib"]
 replace = ["dep:regex"]
 reverse_dns = ["dep:dns-lookup"]
 round = []
+seahash = ["dep:seahash"]
 set = ["dep:lookup_lib"]
 sha1 = ["dep:sha-1", "dep:hex"]
 sha2 = ["dep:sha-2", "dep:hex"]

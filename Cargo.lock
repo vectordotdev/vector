@@ -9670,6 +9670,7 @@ dependencies = [
  "regex",
  "roxmltree",
  "rust_decimal",
+ "seahash",
  "serde",
  "serde_json",
  "sha-1",
