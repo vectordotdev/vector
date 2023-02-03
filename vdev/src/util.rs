@@ -38,7 +38,7 @@ pub fn git_head() -> Result<Output> {
 }
 
 /// Calculate the release channel from `git describe`
-pub fn release_channel<'a>(mode: Option<&'a String>) -> Result<&'a str> {
+pub fn release_channel(mode: Option<&String>) -> Result<&str> {
     if let Some(mode) = mode {
         Ok(mode)
     } else {
