@@ -7,7 +7,7 @@ args:
 runner:
   env:
     BIND_SOCKET: /run/bind/socket
-  needs_docker_sock: true
+  needs_docker_socket: true
   volumes:
     dnstap_dnstap-sockets: /run/bind/socket
 
