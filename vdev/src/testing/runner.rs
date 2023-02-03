@@ -295,7 +295,7 @@ where
     }
 }
 
-pub struct IntegrationTestRunner {
+pub(super) struct IntegrationTestRunner {
     integration: String,
     needs_docker_socket: bool,
     network: Option<String>,
@@ -303,12 +303,11 @@ pub struct IntegrationTestRunner {
 }
 
 impl IntegrationTestRunner {
-    pub fn new(
+    pub(super) fn new(
         integration: String,
         config: &IntegrationRunnerConfig,
-        needs_network: bool,
+        network: Option<String>,
     ) -> Result<Self> {
-        let network = needs_network.then(|| format!("vector-integration-tests-{integration}"));
         Ok(Self {
             integration,
             needs_docker_socket: config.needs_docker_socket,
