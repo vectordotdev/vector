@@ -1,8 +1,6 @@
-use futures::FutureExt;
 use http::Uri;
 use snafu::ResultExt;
 use tower::ServiceBuilder;
-use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
 use vector_core::config::proxy::ProxyConfig;
 
@@ -12,17 +10,14 @@ use super::{
     sink::DatadogMetricsSink,
 };
 use crate::{
-    common::datadog::get_base_domain_region,
+    common::datadog::{get_base_domain_region, Region},
     config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext},
     http::HttpClient,
     sinks::{
-        datadog::{default_site, get_api_validate_endpoint, healthcheck},
+        datadog::DatadogCommonConfig,
         util::{batch::BatchConfig, ServiceBuilderExt, SinkBatchSettings, TowerRequestConfig},
         Healthcheck, UriParseSnafu, VectorSink,
     },
-};
-use crate::{
-    common::datadog::Region,
     tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
 
@@ -92,9 +87,12 @@ impl DatadogMetricsEndpointConfiguration {
 
 /// Configuration for the `datadog_metrics` sink.
 #[configurable_component(sink("datadog_metrics"))]
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct DatadogMetricsConfig {
+    #[serde(flatten)]
+    pub dd_common: DatadogCommonConfig,
+
     /// Sets the default namespace for any metrics sent.
     ///
     /// This namespace is only used if a metric has no existing namespace. When a namespace is
@@ -103,40 +101,10 @@ pub struct DatadogMetricsConfig {
     #[serde(default)]
     pub default_namespace: Option<String>,
 
-    /// The endpoint to send metrics to.
-    ///
-    /// The endpoint must contain an HTTP scheme, and may specify a
-    /// hostname or IP address and port.
-    ///
-    /// If set, overrides the `site` option.
-    #[configurable(metadata(docs::examples = "http://127.0.0.1:8080"))]
-    #[configurable(metadata(docs::examples = "http://example.com:12345"))]
-    #[serde(default)]
-    pub(crate) endpoint: Option<String>,
-
     /// The Datadog region to send metrics to.
     #[configurable(deprecated = "This option has been deprecated, use the `site` option instead.")]
     #[serde(default)]
     pub region: Option<Region>,
-
-    /// The Datadog [site][dd_site] to send metrics to.
-    ///
-    /// [dd_site]: https://docs.datadoghq.com/getting_started/site
-    #[serde(default = "default_site")]
-    #[configurable(metadata(docs::examples = "us3.datadoghq.com"))]
-    #[configurable(metadata(docs::examples = "datadoghq.eu"))]
-    pub site: String,
-
-    /// The default Datadog [API key][api_key] to send metrics with.
-    ///
-    /// If a metric has a Datadog [API key][api_key] set explicitly in its metadata, it will take
-    /// precedence over this setting.
-    ///
-    /// [api_key]: https://docs.datadoghq.com/api/?lang=bash#authentication
-    #[serde(alias = "api_key")]
-    #[configurable(metadata(docs::examples = "${DATADOG_API_KEY_ENV_VAR}"))]
-    #[configurable(metadata(docs::examples = "ef8d5de700e7989468166c40fc8a0ccd"))]
-    pub default_api_key: SensitiveString,
 
     #[configurable(derived)]
     #[serde(default)]
@@ -145,42 +113,18 @@ pub struct DatadogMetricsConfig {
     #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
-
-    #[configurable(derived)]
-    #[serde(
-        default,
-        deserialize_with = "crate::serde::bool_or_struct",
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
-    )]
-    pub acknowledgements: AcknowledgementsConfig,
-
-    #[configurable(derived)]
-    pub tls: Option<TlsEnableableConfig>,
 }
 
 impl_generate_config_from_default!(DatadogMetricsConfig);
-
-impl Default for DatadogMetricsConfig {
-    fn default() -> Self {
-        Self {
-            default_namespace: None,
-            endpoint: None,
-            region: None,
-            site: default_site(),
-            default_api_key: Default::default(),
-            batch: BatchConfig::default(),
-            request: TowerRequestConfig::default(),
-            acknowledgements: AcknowledgementsConfig::default(),
-            tls: None,
-        }
-    }
-}
 
 #[async_trait::async_trait]
 impl SinkConfig for DatadogMetricsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let client = self.build_client(&cx.proxy)?;
-        let healthcheck = self.build_healthcheck(client.clone())?;
+        let healthcheck = self
+            .dd_common
+            .build_healthcheck(client.clone(), self.region.as_ref())
+            .await?;
         let sink = self.build_sink(client)?;
 
         Ok((sink, healthcheck))
@@ -191,7 +135,7 @@ impl SinkConfig for DatadogMetricsConfig {
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
-        &self.acknowledgements
+        &self.dd_common.acknowledgements
     }
 }
 
@@ -205,12 +149,12 @@ impl DatadogMetricsConfig {
     ///
     /// The `endpoint` configuration field will be used here if it is present.
     fn get_base_agent_endpoint(&self) -> String {
-        self.endpoint.clone().unwrap_or_else(|| {
+        self.dd_common.endpoint.clone().unwrap_or_else(|| {
             let version = str::replace(crate::built_info::PKG_VERSION, ".", "-");
             format!(
                 "https://{}-vector.agent.{}",
                 version,
-                get_base_domain_region(self.site.as_str(), self.region)
+                get_base_domain_region(self.dd_common.site.as_str(), self.region.as_ref())
             )
         })
     }
@@ -232,7 +176,8 @@ impl DatadogMetricsConfig {
     fn build_client(&self, proxy: &ProxyConfig) -> crate::Result<HttpClient> {
         let tls_settings = MaybeTlsSettings::from_config(
             &Some(
-                self.tls
+                self.dd_common
+                    .tls
                     .clone()
                     .unwrap_or_else(TlsEnableableConfig::enabled),
             ),
@@ -242,24 +187,11 @@ impl DatadogMetricsConfig {
         Ok(client)
     }
 
-    fn build_healthcheck(&self, client: HttpClient) -> crate::Result<Healthcheck> {
-        let validate_endpoint = get_api_validate_endpoint(
-            self.endpoint.as_ref(),
-            get_base_domain_region(self.site.as_str(), self.region),
-        )?;
-        Ok(healthcheck(
-            client,
-            validate_endpoint,
-            self.default_api_key.inner().to_string(),
-        )
-        .boxed())
-    }
-
     fn build_sink(&self, client: HttpClient) -> crate::Result<VectorSink> {
         let batcher_settings = self.batch.into_batcher_settings()?;
 
         // TODO: revisit our concurrency and batching defaults
-        let request_limits = self.request.unwrap_with(
+        let request_limits = self.dd_common.request.unwrap_with(
             &TowerRequestConfig::default().retry_attempts(DEFAULT_REQUEST_RETRY_ATTEMPTS),
         );
 
@@ -268,7 +200,7 @@ impl DatadogMetricsConfig {
             .settings(request_limits, DatadogMetricsRetryLogic)
             .service(DatadogMetricsService::new(
                 client,
-                self.default_api_key.inner(),
+                self.dd_common.default_api_key.inner(),
             ));
 
         let request_builder = DatadogMetricsRequestBuilder::new(

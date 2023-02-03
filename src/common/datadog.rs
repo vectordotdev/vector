@@ -54,7 +54,7 @@ pub enum Region {
 ///
 /// TODO: This should be deleted when the deprecated `region` config option is fully removed,
 ///       and the callers will replace the result of this function call with just `site`.
-pub(crate) const fn get_base_domain_region(site: &str, region: Option<Region>) -> &str {
+pub(crate) const fn get_base_domain_region<'a>(site: &'a str, region: Option<&Region>) -> &'a str {
     if let Some(region) = region {
         match region {
             Region::Eu => DD_EU_SITE,

@@ -1,24 +1,20 @@
 use std::{convert::TryFrom, sync::Arc};
 
-use futures::FutureExt;
 use indoc::indoc;
 use tower::ServiceBuilder;
 use value::Kind;
-use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
 use vector_core::config::proxy::ProxyConfig;
 
 use super::{service::LogApiRetry, sink::LogSinkBuilder};
 use crate::{
     codecs::Transformer,
-    common::datadog::{get_base_domain_region, Region},
+    common::datadog::Region,
     config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     http::HttpClient,
     schema,
     sinks::{
-        datadog::{
-            default_site, get_api_validate_endpoint, healthcheck, logs::service::LogApiService,
-        },
+        datadog::{logs::service::LogApiService, DatadogCommonConfig},
         util::{
             http::RequestConfig, service::ServiceBuilderExt, BatchConfig, Compression,
             SinkBatchSettings,
@@ -51,47 +47,16 @@ impl SinkBatchSettings for DatadogLogsDefaultBatchSettings {
 
 /// Configuration for the `datadog_logs` sink.
 #[configurable_component(sink("datadog_logs"))]
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct DatadogLogsConfig {
-    /// The endpoint to send logs to.
-    ///
-    /// The endpoint must contain an HTTP scheme, and may specify a
-    /// hostname or IP address and port.
-    ///
-    /// If set, overrides the `site` option.
-    #[configurable(metadata(docs::examples = "http://127.0.0.1:8080"))]
-    #[configurable(metadata(docs::examples = "http://example.com:12345"))]
-    #[serde(default)]
-    pub(crate) endpoint: Option<String>,
+    #[serde(flatten)]
+    pub dd_common: DatadogCommonConfig,
 
     /// The Datadog region to send logs to.
     #[configurable(deprecated = "This option has been deprecated, use the `site` option instead.")]
     #[serde(default)]
     pub region: Option<Region>,
-
-    /// The Datadog [site][dd_site] to send logs to.
-    ///
-    /// [dd_site]: https://docs.datadoghq.com/getting_started/site
-    #[configurable(metadata(docs::examples = "us3.datadoghq.com"))]
-    #[configurable(metadata(docs::examples = "datadoghq.eu"))]
-    #[serde(default = "default_site")]
-    pub site: String,
-
-    /// The default Datadog [API key][api_key] to send logs with.
-    ///
-    /// If a log has a Datadog [API key][api_key] set explicitly in its metadata, it will take
-    /// precedence over this setting.
-    ///
-    /// [api_key]: https://docs.datadoghq.com/api/?lang=bash#authentication
-    #[serde(alias = "api_key")]
-    #[configurable(metadata(docs::examples = "${DATADOG_API_KEY_ENV_VAR}"))]
-    #[configurable(metadata(docs::examples = "ef8d5de700e7989468166c40fc8a0ccd"))]
-    pub default_api_key: SensitiveString,
-
-    #[configurable(derived)]
-    #[serde(default)]
-    pub tls: Option<TlsEnableableConfig>,
 
     #[configurable(derived)]
     #[serde(default)]
@@ -111,31 +76,6 @@ pub struct DatadogLogsConfig {
     #[configurable(derived)]
     #[serde(default)]
     pub request: RequestConfig,
-
-    #[configurable(derived)]
-    #[serde(
-        default,
-        deserialize_with = "crate::serde::bool_or_struct",
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
-    )]
-    pub acknowledgements: AcknowledgementsConfig,
-}
-
-impl Default for DatadogLogsConfig {
-    fn default() -> Self {
-        Self {
-            endpoint: None,
-            region: None,
-            site: default_site(),
-            default_api_key: Default::default(),
-            tls: None,
-            compression: None,
-            encoding: Transformer::default(),
-            batch: BatchConfig::default(),
-            request: RequestConfig::default(),
-            acknowledgements: AcknowledgementsConfig::default(),
-        }
-    }
 }
 
 impl GenerateConfig for DatadogLogsConfig {
@@ -152,12 +92,13 @@ impl DatadogLogsConfig {
     // utilize it, since it all follows the same pattern.
     fn get_uri(&self) -> http::Uri {
         let endpoint = self
+            .dd_common
             .endpoint
             .clone()
             .or_else(|| {
                 Some(format!(
                     "https://http-intake.logs.{}/api/v2/logs",
-                    self.site
+                    self.dd_common.site
                 ))
             })
             .unwrap_or_else(|| match self.region {
@@ -174,7 +115,7 @@ impl DatadogLogsConfig {
     }
 
     pub fn build_processor(&self, client: HttpClient) -> crate::Result<VectorSink> {
-        let default_api_key: Arc<str> = Arc::from(self.default_api_key.inner());
+        let default_api_key: Arc<str> = Arc::from(self.dd_common.default_api_key.inner());
         let request_limits = self.request.tower.unwrap_with(&Default::default());
 
         // We forcefully cap the provided batch configuration to the size/log line limits imposed by
@@ -196,6 +137,7 @@ impl DatadogLogsConfig {
 
         let encoding = self.encoding.clone();
         let protocol = self.get_protocol();
+
         let sink = LogSinkBuilder::new(encoding, service, default_api_key, batch, protocol)
             .compression(self.compression.unwrap_or_default())
             .build();
@@ -203,23 +145,11 @@ impl DatadogLogsConfig {
         Ok(VectorSink::from_event_streamsink(sink))
     }
 
-    pub fn build_healthcheck(&self, client: HttpClient) -> crate::Result<Healthcheck> {
-        let validate_endpoint = get_api_validate_endpoint(
-            self.endpoint.as_ref(),
-            get_base_domain_region(self.site.as_str(), self.region),
-        )?;
-        Ok(healthcheck(
-            client,
-            validate_endpoint,
-            self.default_api_key.inner().to_owned(),
-        )
-        .boxed())
-    }
-
     pub fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<HttpClient> {
         let tls_settings = MaybeTlsSettings::from_config(
             &Some(
-                self.tls
+                self.dd_common
+                    .tls
                     .clone()
                     .unwrap_or_else(TlsEnableableConfig::enabled),
             ),
@@ -233,8 +163,14 @@ impl DatadogLogsConfig {
 impl SinkConfig for DatadogLogsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let client = self.create_client(&cx.proxy)?;
-        let healthcheck = self.build_healthcheck(client.clone())?;
+
+        let healthcheck = self
+            .dd_common
+            .build_healthcheck(client.clone(), self.region.as_ref())
+            .await?;
+
         let sink = self.build_processor(client)?;
+
         Ok((sink, healthcheck))
     }
 
@@ -252,7 +188,7 @@ impl SinkConfig for DatadogLogsConfig {
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
-        &self.acknowledgements
+        &self.dd_common.acknowledgements
     }
 }
 
