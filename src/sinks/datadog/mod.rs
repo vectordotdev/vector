@@ -29,11 +29,12 @@ pub(crate) fn default_site() -> String {
 }
 
 /// Shared configuration for Datadog sinks.
+/// Contains the maximum set of common settings that applies to all DD sink components.
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct DatadogCommonConfig {
-    /// The endpoint to send traces to.
+    /// The endpoint to send observability data to.
     ///
     /// The endpoint must contain an HTTP scheme, and may specify a
     /// hostname or IP address and port.
@@ -44,7 +45,7 @@ pub struct DatadogCommonConfig {
     #[serde(default)]
     pub endpoint: Option<String>,
 
-    /// The Datadog [site][dd_site] to send traces to.
+    /// The Datadog [site][dd_site] to send observability data to.
     ///
     /// [dd_site]: https://docs.datadoghq.com/getting_started/site
     #[configurable(metadata(docs::examples = "us3.datadoghq.com"))]
@@ -52,9 +53,9 @@ pub struct DatadogCommonConfig {
     #[serde(default = "default_site")]
     pub site: String,
 
-    /// The default Datadog [API key][api_key] to send traces with.
+    /// The default Datadog [API key][api_key] to use in authentication of HTTP requests.
     ///
-    /// If a trace has a Datadog [API key][api_key] set explicitly in its metadata, it will take
+    /// If an event has a Datadog [API key][api_key] set explicitly in its metadata, it will take
     /// precedence over this setting.
     ///
     /// [api_key]: https://docs.datadoghq.com/api/?lang=bash#authentication
