@@ -2055,7 +2055,7 @@ dependencies = [
  "directories",
  "serde",
  "thiserror",
- "toml",
+ "toml 0.5.11",
 ]
 
 [[package]]
@@ -6094,7 +6094,7 @@ version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1d6ea3c4595b96363c13943497db34af4460fb474a95c43f4446ad341b8c9785"
 dependencies = [
- "toml",
+ "toml 0.5.11",
 ]
 
 [[package]]
@@ -6105,7 +6105,7 @@ checksum = "eda0fc3b0fb7c975631757e14d9049da17374063edb6ebbcbc54d880d4fe94e9"
 dependencies = [
  "once_cell",
  "thiserror",
- "toml",
+ "toml 0.5.11",
 ]
 
 [[package]]
@@ -7224,7 +7224,7 @@ version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d842a22544da00889e963dd7d8a22abbe6393ff992a3a83dafcb0bad776c82a5"
 dependencies = [
- "toml",
+ "toml 0.5.11",
 ]
 
 [[package]]
@@ -7341,6 +7341,15 @@ dependencies = [
  "proc-macro2 1.0.50",
  "quote 1.0.23",
  "syn 1.0.107",
+]
+
+[[package]]
+name = "serde_spanned"
+version = "0.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0efd8caf556a6cebd3b285caf480045fcc1ac04f6bd786b09a6f11af30c4fcf4"
+dependencies = [
+ "serde",
 ]
 
 [[package]]
@@ -8332,6 +8341,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "toml"
+version = "0.7.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "772c1426ab886e7362aedf4abc9c0d1348a979517efedfc25862944d10137af0"
+dependencies = [
+ "serde",
+ "serde_spanned",
+ "toml_datetime",
+]
+
+[[package]]
+name = "toml_datetime"
+version = "0.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3ab8ed2edee10b50132aed5f331333428b011c99402b5a534154ed15746f9622"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "tonic"
 version = "0.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9038,7 +9067,7 @@ dependencies = [
  "serde",
  "serde_json",
  "snafu",
- "toml",
+ "toml 0.7.1",
  "tracing 0.1.37",
 ]
 
@@ -9072,7 +9101,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_yaml 0.9.17",
- "toml",
+ "toml 0.7.1",
 ]
 
 [[package]]
@@ -9243,7 +9272,7 @@ dependencies = [
  "tokio-test",
  "tokio-tungstenite 0.18.0",
  "tokio-util",
- "toml",
+ "toml 0.7.1",
  "tonic",
  "tonic-build",
  "tower",
@@ -9392,7 +9421,7 @@ dependencies = [
  "serde_json",
  "serde_with 2.2.0",
  "snafu",
- "toml",
+ "toml 0.7.1",
  "url",
  "vector-config-common",
  "vector-config-macros",
@@ -9489,7 +9518,7 @@ dependencies = [
  "tokio-stream",
  "tokio-test",
  "tokio-util",
- "toml",
+ "toml 0.7.1",
  "tonic",
  "tower",
  "tracing 0.1.37",
