@@ -68,7 +68,7 @@ ofb = { version = "0.6.1", optional = true }
 anyhow = "1"
 chrono-tz = "0.8"
 criterion = "0.4"
-tracing-test = "0.1"
+tracing-test = "0.2"
 value = { path = "../../value", features = ["test"] }
 vrl-core = { path = "../../vrl/core", features = ["test"] }
 vector-common = { path = "../../vector-common", default-features = false, features = ["btreemap"] }
