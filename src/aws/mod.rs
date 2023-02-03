@@ -17,14 +17,15 @@ use aws_smithy_async::rt::sleep::{AsyncSleep, Sleep};
 use aws_smithy_client::bounds::SmithyMiddleware;
 use aws_smithy_client::erase::{DynConnector, DynMiddleware};
 use aws_smithy_client::{Builder, SdkError};
-use aws_smithy_http::callback::BodyCallback;
-use aws_smithy_http::event_stream::BoxError;
+use aws_smithy_http::body::SdkBody;
 use aws_smithy_http::operation::{Request, Response};
 use aws_smithy_types::retry::RetryConfig;
 use aws_types::region::Region;
 use aws_types::SdkConfig;
 use bytes::Bytes;
+use http_body::Body;
 use once_cell::sync::OnceCell;
+use pin_project::pin_project;
 use regex::RegexSet;
 pub use region::RegionOrEndpoint;
 use tower::{Layer, Service, ServiceBuilder};
@@ -249,8 +250,11 @@ where
         // sends the request out over the wire. We'll read the shared atomic counter, which will contain the number of
         // bytes "read", aka the bytes it actually sent, if and only if we get back a successful response.
         let maybe_bytes_sent = self.enabled.then(|| {
-            let (callback, shared_bytes_sent) = BodyCaptureCallback::new();
-            req.http_mut().body_mut().with_callback(Box::new(callback));
+            let shared_bytes_sent = Arc::new(AtomicUsize::new(0));
+
+            req.http_mut()
+                .body_mut()
+                .map(|body| MeasuredBody::new(body, shared_bytes_sent.clone()).inner);
 
             shared_bytes_sent
         });
@@ -282,69 +286,40 @@ where
     }
 }
 
-struct BodyCaptureCallback {
+#[pin_project]
+struct MeasuredBody {
+    #[pin]
+    inner: SdkBody,
     bytes_sent: usize,
     shared_bytes_sent: Arc<AtomicUsize>,
 }
 
-impl BodyCaptureCallback {
-    fn new() -> (Self, Arc<AtomicUsize>) {
-        let shared_bytes_sent = Arc::new(AtomicUsize::new(0));
-
-        (
-            Self {
-                bytes_sent: 0,
-                shared_bytes_sent: Arc::clone(&shared_bytes_sent),
-            },
-            shared_bytes_sent,
-        )
-    }
-}
-
-impl BodyCallback for BodyCaptureCallback {
-    fn update(&mut self, bytes: &[u8]) -> Result<(), BoxError> {
-        // This gets called every time a chunk is read from the request body, which includes both static chunks and
-        // streaming bodies. Just add the chunk's length to our running tally.
-        self.bytes_sent += bytes.len();
-        Ok(())
-    }
-
-    fn trailers(&self) -> Result<Option<headers::HeaderMap<headers::HeaderValue>>, BoxError> {
-        Ok(None)
-    }
-
-    fn make_new(&self) -> Box<dyn BodyCallback> {
-        // We technically don't use retries within the AWS side of the API clients, but we have to satisfy this trait
-        // method, because `aws_smithy_http` uses the retry layer from `tower`, which clones the request regardless
-        // before it even executes the first attempt... so there's no reason not to make it technically correct.
-        Box::new(Self {
+impl MeasuredBody {
+    fn new(body: SdkBody, shared_bytes_sent: Arc<AtomicUsize>) -> Self {
+        Self {
+            inner: body,
             bytes_sent: 0,
-            shared_bytes_sent: Arc::clone(&self.shared_bytes_sent),
-        })
+            shared_bytes_sent,
+        }
     }
-}
 
-impl Drop for BodyCaptureCallback {
-    fn drop(&mut self) {
-        // This is where we actually emit. We specifically emit here, and not in `trailers`, because despite the
-        // documentation that `trailers` is called after all chunks of the body are successfully read, `hyper` won't
-        // continue polling a body if it knows it's gotten all the available bytes i.e. it doesn't necessarily drive it
-        // until `poll_data` returns `None`. This means the only consistent place to know that the body is "done" is
-        // when it's dropped.
-        //
-        // We update our shared atomic counter with the total bytes sent that we accumulated, and it will read the
-        // atomic if the response indicates that the request was successful. Since we know the body will go out-of-scope
-        // before a response can possibly be generated, we know the atomic will in turn be updated before it is read.
-        //
-        // This design also copes with the fact that, technically, `aws_smithy_client` supports retries and could clone
-        // this callback for each copy of the request... which it already does at least once per request since the retry
-        // middleware has to clone the request before trying it. As requests are retried sequentially, only after the
-        // previous attempt failed, we know that we'll end up in a "last write wins" scenario, so this is still sound.
-        //
-        // In the future, we may track every single byte sent in order to generate "raw bytes over the wire, regardless
-        // of status" metrics, but right now, this is purely "how many bytes have we sent as part of _successful_
-        // sends?"
-        self.shared_bytes_sent
-            .store(self.bytes_sent, Ordering::Release);
+    fn poll_inner(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+    ) -> Poll<Option<Result<Bytes, aws_smithy_http::body::Error>>> {
+        let mut this = self.project();
+
+        match this.inner.poll_data(cx) {
+            Poll::Ready(Some(Ok(data))) => {
+                this.bytes_sent += data.len();
+
+                Poll::Ready(Some(Ok(data)))
+            }
+            Poll::Ready(None) => this
+                .shared_bytes_sent
+                .store(*this.bytes_sent, Ordering::Release),
+            Poll::Ready(Some(Err(e))) => Poll::Ready(Some(Err(e))),
+            Poll::Pending => Poll::Pending,
+        }
     }
 }
