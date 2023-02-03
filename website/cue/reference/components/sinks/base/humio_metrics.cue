@@ -84,9 +84,19 @@ base: components: sinks: humio_metrics: configuration: {
 		}
 	}
 	endpoint: {
-		description: "The base URL of the Humio instance."
-		required:    false
-		type: string: {}
+		description: """
+			The base URL of the Humio instance.
+
+			The scheme (`http` or `https`) must be specified. No path should be included since the paths defined
+			by the [`Splunk`][splunk] api are used.
+
+			[splunk]: https://docs.splunk.com/Documentation/Splunk/8.0.0/Data/HECRESTendpoints
+			"""
+		required: false
+		type: string: {
+			default: "https://cloud.humio.com"
+			examples: ["http://127.0.0.1", "https://example.com"]
+		}
 	}
 	event_type: {
 		description: """
@@ -95,7 +105,10 @@ base: components: sinks: humio_metrics: configuration: {
 			If unset, Humio will default it to none.
 			"""
 		required: false
-		type: string: syntax: "template"
+		type: string: {
+			examples: ["json", "none", "{{ event_type }}"]
+			syntax: "template"
+		}
 	}
 	host_key: {
 		description: """
@@ -133,7 +146,10 @@ base: components: sinks: humio_metrics: configuration: {
 			[humio_data_format]: https://docs.humio.com/integrations/data-shippers/hec/#format-of-data
 			"""
 		required: false
-		type: string: syntax: "template"
+		type: string: {
+			examples: ["{{ host }}", "custom_index"]
+			syntax: "template"
+		}
 	}
 	indexed_fields: {
 		description: """
@@ -428,6 +444,6 @@ base: components: sinks: humio_metrics: configuration: {
 	token: {
 		description: "The Humio ingestion token."
 		required:    true
-		type: string: {}
+		type: string: examples: ["${HUMIO_TOKEN}", "A94A8FE5CCB19BA61C4C08"]
 	}
 }
