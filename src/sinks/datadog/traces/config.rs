@@ -130,7 +130,7 @@ impl DatadogTracesConfig {
 
     pub fn build_sink(&self, client: HttpClient) -> crate::Result<VectorSink> {
         let default_api_key: Arc<str> = Arc::from(self.dd_common.default_api_key.inner());
-        let request_limits = self.dd_common.request.unwrap_with(
+        let request_limits = self.request.unwrap_with(
             &TowerRequestConfig::default()
                 .retry_attempts(DEFAULT_REQUEST_RETRY_ATTEMPTS)
                 .retry_max_duration_secs(DEFAULT_REQUEST_RETRY_MAX_DURATION_SECS),
@@ -214,10 +214,7 @@ impl DatadogTracesConfig {
 impl SinkConfig for DatadogTracesConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let client = self.build_client(&cx.proxy)?;
-        let healthcheck = self
-            .dd_common
-            .build_healthcheck(client.clone(), None)
-            .await?;
+        let healthcheck = self.dd_common.build_healthcheck(client.clone(), None)?;
         let sink = self.build_sink(client)?;
 
         Ok((sink, healthcheck))

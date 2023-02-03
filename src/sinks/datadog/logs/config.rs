@@ -166,8 +166,7 @@ impl SinkConfig for DatadogLogsConfig {
 
         let healthcheck = self
             .dd_common
-            .build_healthcheck(client.clone(), self.region.as_ref())
-            .await?;
+            .build_healthcheck(client.clone(), self.region.as_ref())?;
 
         let sink = self.build_processor(client)?;
 

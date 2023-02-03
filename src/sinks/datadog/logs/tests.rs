@@ -132,12 +132,12 @@ async fn start_test_error(
     start_test_detail(api_status, batch_status, true).await
 }
 
-#[tokio::test]
 /// Assert the basic functionality of the sink in good conditions
 ///
 /// This test rigs the sink to return OKv1 to responses, checks that all batches
 /// were delivered and then asserts that every message is able to be
 /// deserialized.
+#[tokio::test]
 async fn smoke() {
     let (expected, rx) = start_test_success(ApiStatus::OKv1, BatchStatus::Delivered).await;
 

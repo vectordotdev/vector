@@ -1,4 +1,3 @@
-use futures::future;
 use futures_util::FutureExt;
 use http::{Request, StatusCode, Uri};
 use hyper::body::Body;
@@ -13,7 +12,7 @@ use crate::{
     sinks::HealthcheckError,
 };
 
-use super::{util::TowerRequestConfig, Healthcheck};
+use super::Healthcheck;
 
 #[cfg(feature = "sinks-datadog_events")]
 pub mod events;
@@ -69,10 +68,6 @@ pub struct DatadogCommonConfig {
     pub tls: Option<TlsEnableableConfig>,
 
     #[configurable(derived)]
-    #[serde(default)]
-    pub request: TowerRequestConfig,
-
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -88,14 +83,15 @@ impl Default for DatadogCommonConfig {
             site: default_site(),
             default_api_key: Default::default(),
             tls: None,
-            request: TowerRequestConfig::default(),
             acknowledgements: AcknowledgementsConfig::default(),
         }
     }
 }
 
 impl DatadogCommonConfig {
-    async fn build_healthcheck(
+    /// Returns a `Healthcheck` which is a future that will be used to ensure the
+    /// <site>/api/v1/validate endpoint is reachable.
+    fn build_healthcheck(
         &self,
         client: HttpClient,
         region: Option<&Region>,
@@ -106,17 +102,26 @@ impl DatadogCommonConfig {
         )?;
         let api_key: String = self.default_api_key.clone().into();
 
-        let request = Request::get(validate_endpoint)
-            .header("DD-API-KEY", api_key)
-            .body(hyper::Body::empty())
-            .unwrap();
+        Ok(build_healthcheck_future(client, validate_endpoint, api_key).boxed())
+    }
+}
 
-        let response = client.send(request).await?;
+/// Makes a GET HTTP request to <site>/api/v1/validate using the provided client and API key.
+async fn build_healthcheck_future(
+    client: HttpClient,
+    validate_endpoint: Uri,
+    api_key: String,
+) -> crate::Result<()> {
+    let request = Request::get(validate_endpoint)
+        .header("DD-API-KEY", api_key)
+        .body(hyper::Body::empty())
+        .unwrap();
 
-        match response.status() {
-            StatusCode::OK => Ok(future::ok(()).boxed()),
-            other => Err(HealthcheckError::UnexpectedStatus { status: other }.into()),
-        }
+    let response = client.send(request).await?;
+
+    match response.status() {
+        StatusCode::OK => Ok(()),
+        other => Err(HealthcheckError::UnexpectedStatus { status: other }.into()),
     }
 }
 

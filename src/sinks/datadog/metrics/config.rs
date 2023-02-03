@@ -123,8 +123,7 @@ impl SinkConfig for DatadogMetricsConfig {
         let client = self.build_client(&cx.proxy)?;
         let healthcheck = self
             .dd_common
-            .build_healthcheck(client.clone(), self.region.as_ref())
-            .await?;
+            .build_healthcheck(client.clone(), self.region.as_ref())?;
         let sink = self.build_sink(client)?;
 
         Ok((sink, healthcheck))
@@ -191,7 +190,7 @@ impl DatadogMetricsConfig {
         let batcher_settings = self.batch.into_batcher_settings()?;
 
         // TODO: revisit our concurrency and batching defaults
-        let request_limits = self.dd_common.request.unwrap_with(
+        let request_limits = self.request.unwrap_with(
             &TowerRequestConfig::default().retry_attempts(DEFAULT_REQUEST_RETRY_ATTEMPTS),
         );
 

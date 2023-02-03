@@ -72,7 +72,7 @@ impl DatadogEventsConfig {
             client,
         );
 
-        let request_opts = self.dd_common.request;
+        let request_opts = self.request;
         let request_settings = request_opts.unwrap_with(&TowerRequestConfig::default());
         let retry_logic = HttpStatusRetryLogic::new(|req: &DatadogEventsResponse| req.http_status);
 
@@ -92,8 +92,7 @@ impl SinkConfig for DatadogEventsConfig {
         let client = self.build_client(cx.proxy())?;
         let healthcheck = self
             .dd_common
-            .build_healthcheck(client.clone(), self.region.as_ref())
-            .await?;
+            .build_healthcheck(client.clone(), self.region.as_ref())?;
         let sink = self.build_sink(client)?;
 
         Ok((sink, healthcheck))
