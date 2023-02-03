@@ -44,7 +44,7 @@ base: components: sinks: axiom: configuration: {
 					"""
 				none: "No compression."
 				zlib: """
-					[Zlib]][zlib] compression.
+					[Zlib][zlib] compression.
 
 					[zlib]: https://zlib.net/
 					"""
