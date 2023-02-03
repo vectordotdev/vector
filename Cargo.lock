@@ -271,7 +271,7 @@ version = "2.0.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9834fcc22e0874394a010230586367d4a3e9f11b560f469262678547e1d2575e"
 dependencies = [
- "bstr 1.1.0",
+ "bstr 1.2.0",
  "doc-comment",
  "predicates",
  "predicates-core",
@@ -1557,9 +1557,9 @@ dependencies = [
 
 [[package]]
 name = "bstr"
-version = "1.1.0"
+version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b45ea9b00a7b3f2988e9a65ad3917e62123c38dba709b666506207be96d1790b"
+checksum = "b7f0778972c64420fdedc63f09919c8a88bda7b25135357fd25a5d9f3257e832"
 dependencies = [
  "memchr",
  "once_cell",
@@ -3082,7 +3082,7 @@ dependencies = [
 name = "file-source"
 version = "0.1.0"
 dependencies = [
- "bstr 1.1.0",
+ "bstr 1.2.0",
  "bytes 1.4.0",
  "chrono",
  "crc",
