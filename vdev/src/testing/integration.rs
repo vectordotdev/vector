@@ -2,7 +2,7 @@ use std::{path::Path, path::PathBuf, process::Command};
 
 use anyhow::{bail, Context, Result};
 
-use super::config::{Environment, IntegrationTestConfig};
+use super::config::{ComposeConfig, Environment, IntegrationTestConfig};
 use super::runner::{
     ContainerTestRunner as _, IntegrationTestRunner, TestRunner as _, CONTAINER_TOOL, DOCKER_SOCKET,
 };
@@ -117,6 +117,7 @@ struct Compose {
     path: PathBuf,
     test_dir: PathBuf,
     env: Environment,
+    config: ComposeConfig,
     network: Option<String>,
 }
 
@@ -131,13 +132,17 @@ impl Compose {
         match path.try_exists() {
             Err(error) => Err(error).with_context(|| format!("Could not lookup {path:?}")),
             Ok(false) => Ok(None),
-            Ok(true) => Ok(Some(Self {
-                base,
-                path,
-                test_dir,
-                env,
-                network,
-            })),
+            Ok(true) => {
+                let config = ComposeConfig::parse(&path)?;
+                Ok(Some(Self {
+                    base,
+                    path,
+                    test_dir,
+                    env,
+                    config,
+                    network,
+                }))
+            }
         }
     }
 
@@ -180,7 +185,7 @@ impl Compose {
 
     fn prepare(&self) -> Result<()> {
         if cfg!(unix) {
-            unix::prepare_compose_volumes(&self.path, &self.test_dir)
+            unix::prepare_compose_volumes(&self.config, &self.test_dir)
         } else {
             Ok(())
         }
@@ -214,8 +219,7 @@ mod unix {
     const ALL_READ_DIR: u32 = 0o555;
 
     /// Fix up potential issues before starting a compose container
-    pub fn prepare_compose_volumes(compose_path: &Path, test_dir: &Path) -> Result<()> {
-        let config = ComposeConfig::parse(compose_path)?;
+    pub fn prepare_compose_volumes(config: &ComposeConfig, test_dir: &Path) -> Result<()> {
         for service in config.services.values() {
             // Make sure all volume files are world readable
             if let Some(volumes) = &service.volumes {
