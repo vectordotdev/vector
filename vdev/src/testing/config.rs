@@ -85,7 +85,7 @@ pub struct IntegrationRunnerConfig {
     pub volumes: BTreeMap<String, String>,
     /// Does the test runner need access to the host's docker socket?
     #[serde(default)]
-    pub needs_docker_sock: bool,
+    pub needs_docker_socket: bool,
 }
 
 impl IntegrationTestConfig {

@@ -4,7 +4,7 @@ use anyhow::{bail, Context, Result};
 
 use super::config::{Environment, IntegrationTestConfig, RustToolchainConfig};
 use super::runner::{
-    ContainerTestRunner as _, IntegrationTestRunner, TestRunner as _, CONTAINER_TOOL,
+    ContainerTestRunner as _, IntegrationTestRunner, TestRunner as _, CONTAINER_TOOL, DOCKER_SOCKET,
 };
 use super::state::EnvsDir;
 use crate::app::{self, CommandExt as _};
@@ -188,6 +188,7 @@ impl IntegrationTest {
 
             command.current_dir(&self.test_dir);
 
+            command.env("DOCKER_SOCKET", &*DOCKER_SOCKET);
             if let Some(network_name) = self.runner.network_name() {
                 command.env(NETWORK_ENV_VAR, network_name);
             }

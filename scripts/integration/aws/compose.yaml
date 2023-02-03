@@ -12,7 +12,7 @@ services:
   mock-ecs:
     image: docker.io/amazon/amazon-ecs-local-container-endpoints:latest
     volumes:
-    - /var/run/docker.sock:/var/run/docker.sock
+    - $DOCKER_SOCKET:/var/run/docker.sock
     - $HOME/.aws/:/home/.aws/
 
 networks:

@@ -30,7 +30,7 @@ const UPSTREAM_IMAGE: &str =
 pub static CONTAINER_TOOL: Lazy<OsString> =
     Lazy::new(|| env::var_os("CONTAINER_TOOL").unwrap_or_else(detect_container_tool));
 
-pub static DOCKER_SOCK: Lazy<PathBuf> = Lazy::new(detect_docker_sock);
+pub(super) static DOCKER_SOCKET: Lazy<PathBuf> = Lazy::new(detect_docker_socket);
 
 fn detect_container_tool() -> OsString {
     for tool in ["docker", "podman"] {
@@ -85,7 +85,7 @@ pub trait ContainerTestRunner: TestRunner {
 
     fn network_name(&self) -> Option<String>;
 
-    fn needs_docker_sock(&self) -> bool;
+    fn needs_docker_socket(&self) -> bool;
 
     fn volumes(&self) -> Vec<String>;
 
@@ -216,10 +216,10 @@ pub trait ContainerTestRunner: TestRunner {
         let network_name = self.network_name();
         let network_name = network_name.as_deref().unwrap_or("host");
 
-        let docker_sock = format!("{}:/var/run/docker.sock", DOCKER_SOCK.display());
+        let docker_socket = format!("{}:/var/run/docker.sock", DOCKER_SOCKET.display());
         let docker_args = self
-            .needs_docker_sock()
-            .then(|| vec!["--volume", &docker_sock])
+            .needs_docker_socket()
+            .then(|| vec!["--volume", &docker_socket])
             .unwrap_or_default();
 
         let volumes = self.volumes();
@@ -298,7 +298,7 @@ where
 
 pub struct IntegrationTestRunner {
     integration: String,
-    needs_docker_sock: bool,
+    needs_docker_socket: bool,
     needs_network: bool,
     volumes: Vec<String>,
 }
@@ -311,7 +311,7 @@ impl IntegrationTestRunner {
     ) -> Result<Self> {
         Ok(Self {
             integration,
-            needs_docker_sock: config.needs_docker_sock,
+            needs_docker_socket: config.needs_docker_socket,
             needs_network,
             volumes: config
                 .volumes
@@ -358,8 +358,8 @@ impl ContainerTestRunner for IntegrationTestRunner {
         format!("{}:latest", self.container_name())
     }
 
-    fn needs_docker_sock(&self) -> bool {
-        self.needs_docker_sock
+    fn needs_docker_socket(&self) -> bool {
+        self.needs_docker_socket
     }
 
     fn volumes(&self) -> Vec<String> {
@@ -382,7 +382,7 @@ impl ContainerTestRunner for DockerTestRunner {
         env::var("ENVIRONMENT_UPSTREAM").unwrap_or_else(|_| UPSTREAM_IMAGE.to_string())
     }
 
-    fn needs_docker_sock(&self) -> bool {
+    fn needs_docker_socket(&self) -> bool {
         false
     }
 
@@ -419,7 +419,7 @@ impl TestRunner for LocalTestRunner {
     }
 }
 
-fn detect_docker_sock() -> PathBuf {
+fn detect_docker_socket() -> PathBuf {
     match env::var_os("DOCKER_HOST") {
         Some(host) => host
             .into_string()
