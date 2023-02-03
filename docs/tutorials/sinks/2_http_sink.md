@@ -188,10 +188,10 @@ The request builder must implement the `RequestBuilder<>` trait:
 impl RequestBuilder<Event> for BasicRequestBuilder {
 ```
 
-There are a number of stages in the request builder process: 
+There are a number of stages in the request builder process:
 
 1. The input is split out into metadata and actual event data.
-2. This event data is encoded using the encoder we created earlier. 
+2. This event data is encoded using the encoder we created earlier.
 3. The results from the encoding are passed along with the metadata to create
    the final request that is passed to the `Tower` service.
 

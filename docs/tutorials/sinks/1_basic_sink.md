@@ -9,12 +9,21 @@ This tutorial covers writing an 'event stream' Sink.
 
 Create a new rust module in `src/sinks/` called `basic.rs`.
 
+# Doc comments
+
+It's always good to start with some module level comments to explain what the
+sink does.
+
+```rust
+//! `Basic` sink.
+//! A sink that will send it's output to standard out for pedalogical purposes.
+```
+
 # Imports
 
 Let's setup all the imports we will need for the tutorial:
 
 ```rust
-#![allow(unused_imports)]
 use super::Healthcheck;
 use crate::config::{GenerateConfig, SinkConfig, SinkContext};
 use futures::{stream::BoxStream, StreamExt};
@@ -30,7 +39,7 @@ use vector_core::{
 # Configuration
 
 The first step when developing a Sink is to create a struct that represents the
-configuration for that sink. The configuration file passed to Vector on startup 
+configuration for that sink. The configuration file passed to Vector on startup
 is deserialized to the fields in this struct so the user can customise the sinks
 behaviour.
 
