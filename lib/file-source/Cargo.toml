@@ -11,7 +11,7 @@ libc = "0.2"
 winapi = { version = "0.3", features = ["winioctl"] }
 
 [dependencies]
-crc = "3.0.0"
+crc = "3.0.1"
 glob = "0.3.1"
 scan_fmt = "0.2.6"
 vector-config = { path = "../vector-config", default-features = false }
