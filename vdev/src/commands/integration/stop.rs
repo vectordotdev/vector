@@ -1,8 +1,7 @@
 use anyhow::Result;
 use clap::Args;
 
-use crate::testing::integration::{self, IntegrationTest, OldIntegrationTest};
-use crate::testing::state::EnvsDir;
+use crate::testing::{integration::IntegrationTest, state::EnvsDir};
 
 /// Stop an integration test environment
 #[derive(Args, Debug)]
@@ -14,12 +13,6 @@ pub struct Cli {
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
-        // Temporary hack to run old-style integration tests
-        if integration::old_exists(&self.integration)? {
-            let integration = OldIntegrationTest::new(&self.integration);
-            return integration.stop();
-        }
-
         if let Some(active) = EnvsDir::new(&self.integration).active()? {
             IntegrationTest::new(self.integration, active)?.stop()
         } else {
