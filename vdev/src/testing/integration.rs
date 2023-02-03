@@ -248,7 +248,10 @@ mod unix {
                         .expect("Invalid volume in compose file")
                         .0;
                     // Only fixup relative paths, i.e. within our source tree.
-                    if !source.starts_with('/') && !source.starts_with('$') {
+                    if !compose_config.volumes.contains_key(source)
+                        && !source.starts_with('/')
+                        && !source.starts_with('$')
+                    {
                         let path: PathBuf = [test_dir, Path::new(source)].iter().collect();
                         add_read_permission(&path)?;
                     }

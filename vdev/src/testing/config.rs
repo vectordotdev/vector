@@ -6,6 +6,7 @@ use anyhow::{bail, Context, Result};
 use hashlink::LinkedHashMap;
 use itertools::{self, Itertools};
 use serde::Deserialize;
+use serde_yaml::Value;
 
 use crate::{app, util};
 
@@ -39,6 +40,8 @@ impl RustToolchainConfig {
 #[derive(Debug, Deserialize)]
 pub struct ComposeConfig {
     pub services: BTreeMap<String, ComposeService>,
+    #[serde(default)]
+    pub volumes: BTreeMap<String, Value>,
 }
 
 #[derive(Debug, Deserialize)]
