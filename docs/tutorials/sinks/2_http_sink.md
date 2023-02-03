@@ -398,7 +398,7 @@ impl DriverResponse for BasicResponse {
 ```
 
 Vector calls the methods in this trait to determine if the event was delivered successfully.
-This is used for metrics and the end to end acknowledgements.
+This is used to emit internal metrics and satisfy end to end acknowledgements.
 
 # Sink
 
