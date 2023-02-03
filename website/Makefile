@@ -4,11 +4,6 @@ clean:
 	rm -rf public resources data/docs.json
 
 setup:
-	apt-get update
-	apt-get install -y build-essential curl
-	curl https://sh.rustup.rs -sSf | bash -s -- -y
-	echo 'source $HOME/.cargo/env' >> $HOME/.bashrc
-	source $HOME/.bashrc
 	yarn
 
 # Build JSON from CUE sources
