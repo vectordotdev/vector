@@ -208,6 +208,7 @@ async fn healthcheck(config: HoneycombConfig, client: HttpClient) -> crate::Resu
 #[cfg(test)]
 mod test {
     use futures::{future::ready, stream};
+    use serde::Deserialize;
     use vector_core::event::{Event, LogEvent};
 
     use crate::{
@@ -230,8 +231,8 @@ mod test {
         let mock_endpoint = spawn_blackhole_http_server(always_200_response).await;
 
         let config = HoneycombConfig::generate_config().to_string();
-        let mut config =
-            toml::from_str::<HoneycombConfig>(&config).expect("config should be valid");
+        let mut config = HoneycombConfig::deserialize(toml::de::ValueDeserializer::new(&config))
+            .expect("config should be valid");
         config.endpoint = mock_endpoint.to_string();
 
         let context = SinkContext::new_test();
