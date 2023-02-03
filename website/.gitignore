@@ -3,6 +3,7 @@ public/
 resources/
 hugo_stats.json
 assets/jsconfig.json
+static/rustdocs/
 
 # JavaScript, Sass, CSS, etc.
 node_modules/

@@ -4,6 +4,11 @@ clean:
 	rm -rf public resources data/docs.json
 
 setup:
+	apt-get update
+	apt-get install -y build-essential curl
+	curl https://sh.rustup.rs -sSf | bash -s -- -y
+	echo 'source $HOME/.cargo/env' >> $HOME/.bashrc
+	source $HOME/.bashrc
 	yarn
 
 # Build JSON from CUE sources
@@ -28,8 +33,12 @@ cue-vet:
 
 config-examples:
 	yarn config-examples
+	
+rust-docs:
+	cargo doc
+	mv ../target/doc/ static/rustdocs/
 
-structured-data: cue-build config-examples
+structured-data: cue-build config-examples rust-docs
 
 serve: clean setup structured-data
 	hugo server \
