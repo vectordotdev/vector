@@ -127,8 +127,8 @@ impl IntegrationTest {
             let mut command = CONTAINER_TOOL.clone();
             command.push("-compose");
             let mut command = Command::new(command);
-            let compose_arg = compose_path.display().to_string();
-            command.args(["--file", &compose_arg]);
+            command.arg("--file");
+            command.arg(compose_path);
             command.args(args);
 
             command.current_dir(&self.test_dir);
