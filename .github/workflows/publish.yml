@@ -583,7 +583,7 @@ jobs:
   publish-github:
     name: Publish to GitHub
     # We only publish to GitHub for versioned releases, not nightlies.
-    if: ${{ inputs.mode == 'Release' }}
+    if: ${{ inputs.mode == 'release' }}
     runs-on: ubuntu-20.04
     needs:
       - generate-publish-metadata
@@ -653,7 +653,7 @@ jobs:
   publish-homebrew:
     name: Publish to Homebrew
     # We only publish to Homebrew for versioned releases, not nightlies.
-    if: ${{ inputs.mode == 'Release' }}
+    if: ${{ inputs.mode == 'release' }}
     runs-on: ubuntu-20.04
     needs:
       - generate-publish-metadata
@@ -673,7 +673,7 @@ jobs:
   publish-cloudsmith:
     name: Publish to Cloudsmith
     # We only publish to CloudSmith for versioned releases, not nightlies.
-    if: ${{ inputs.mode == 'Release' }}
+    if: ${{ inputs.mode == 'release' }}
     runs-on: ubuntu-20.04
     needs:
       - generate-publish-metadata
