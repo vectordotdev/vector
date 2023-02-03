@@ -6390,9 +6390,9 @@ dependencies = [
 
 [[package]]
 name = "quoted_printable"
-version = "0.4.6"
+version = "0.4.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "20f14e071918cbeefc5edc986a7aa92c425dae244e003a35e1cdddb5ca39b5cb"
+checksum = "a24039f627d8285853cc90dcddf8c1ebfaa91f834566948872b225b9a28ed1b6"
 
 [[package]]
 name = "radix_trie"
