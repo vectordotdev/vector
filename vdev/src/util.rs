@@ -38,14 +38,18 @@ pub fn git_head() -> Result<Output> {
 }
 
 /// Calculate the release channel from `git describe`
-pub fn release_channel() -> Result<&'static str> {
-    git_head().map(|output| {
-        if output.status.success() {
-            "latest"
-        } else {
-            "nightly"
-        }
-    })
+pub fn release_channel<'a>(mode: Option<&'a String>) -> Result<&'a str> {
+    if let Some(mode) = mode {
+        Ok(mode)
+    } else {
+        git_head().map(|output| {
+            if output.status.success() {
+                "latest"
+            } else {
+                "nightly"
+            }
+        })
+    }
 }
 
 pub fn exists(path: impl AsRef<Path> + Debug) -> Result<bool> {

@@ -38,7 +38,11 @@ jobs:
           ref: ${{ inputs.git_ref }}
       - name: Generate publish metadata
         id: generate-publish-metadata
-        run: make ci-generate-publish-metadata
+        run: |
+          # If set, MODE will be used to set the "channel", which is the dir/namespace packages are organized into.
+          # the Workflow of "custom_builds" utilizes this feature.
+          export MODE="${{ inputs.mode }}"
+          make ci-generate-publish-metadata
 
   build-x86_64-unknown-linux-musl-packages:
     name: Build Vector for x86_64-unknown-linux-musl (.tar.gz)
