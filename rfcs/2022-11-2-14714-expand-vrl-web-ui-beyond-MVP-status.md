@@ -148,7 +148,7 @@ in a rust web framework.
 
 ## Outstanding Questions
 
-- What would obersvablity pipelines team like to see in a VRL playground effort, npm modules?, more vrl-js docs?
+- What would observability pipelines team like to see in a VRL playground effort, npm modules?, more vrl-js docs?
 - What would customers like to see for the VRL playground?
 
 ## Plan Of Attack
