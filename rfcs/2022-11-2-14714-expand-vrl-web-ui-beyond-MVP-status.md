@@ -123,7 +123,7 @@ with a lot of css, familiarize with the build tools used, etc.
 Jean estimates a week or two of effort to strip down the graphiql
 mono repo to solely use code-mirror instead of code-mirror-graphql
 the difference between these two dependencies the latter has tight
-coupiling of syntax highlighting and autocompletion logic for
+coupling of syntax highlighting and autocompletion logic for
 graphql schemas.
 
 We already have an implementation of running VRL within the graphiql
