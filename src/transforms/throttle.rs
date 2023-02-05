@@ -7,6 +7,7 @@ use serde_with::serde_as;
 use snafu::Snafu;
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
+use vector_core::EstimatedJsonEncodedSizeOf;
 
 use crate::{
     conditions::{AnyCondition, Condition},
@@ -345,8 +346,8 @@ mode = "log_json_bytes"
         // 60 bytes after JSON serialization (message + timestamp)
         let event = Event::Log(LogEvent::from("test"));
 
-        tx.send(event.clone().into()).await.unwrap();
-        tx.send(event.clone().into()).await.unwrap();
+        tx.send(event.clone()).await.unwrap();
+        tx.send(event.clone()).await.unwrap();
 
         let mut count = 0_u8;
         while count < 2 {
@@ -360,14 +361,14 @@ mode = "log_json_bytes"
 
         clock.advance(Duration::from_secs(2));
 
-        tx.send(event.clone().into()).await.unwrap();
+        tx.send(event.clone()).await.unwrap();
 
         // We should be back to pending, having the second event dropped
         assert_eq!(Poll::Pending, futures::poll!(out_stream.next()));
 
         clock.advance(Duration::from_secs(3));
 
-        tx.send(event.clone().into()).await.unwrap();
+        tx.send(event.clone()).await.unwrap();
 
         // The rate limiter should now be refreshed and allow an additional event through
         if let Some(_event) = out_stream.next().await {
@@ -412,8 +413,8 @@ mode = "log_message_bytes"
         // 60 bytes after JSON serialization (message + timestamp)
         let event = Event::Log(LogEvent::from("test"));
 
-        tx.send(event.clone().into()).await.unwrap();
-        tx.send(event.clone().into()).await.unwrap();
+        tx.send(event.clone()).await.unwrap();
+        tx.send(event.clone()).await.unwrap();
 
         let mut count = 0_u8;
         while count < 2 {
@@ -427,14 +428,14 @@ mode = "log_message_bytes"
 
         clock.advance(Duration::from_secs(2));
 
-        tx.send(event.clone().into()).await.unwrap();
+        tx.send(event.clone()).await.unwrap();
 
         // We should be back to pending, having the second event dropped
         assert_eq!(Poll::Pending, futures::poll!(out_stream.next()));
 
         clock.advance(Duration::from_secs(3));
 
-        tx.send(event.clone().into()).await.unwrap();
+        tx.send(event.clone()).await.unwrap();
 
         // The rate limiter should now be refreshed and allow an additional event through
         if let Some(_event) = out_stream.next().await {
