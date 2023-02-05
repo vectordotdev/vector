@@ -127,7 +127,7 @@ pub enum Data<'a> {
 ///
 /// This is used to capture the value at the macro callsite without having to evaluate it, which
 /// lets us generate code where, for example, the value of a metadata key/value pair can be
-/// evaulated by an expression given in the attribute.
+/// evaluated by an expression given in the attribute.
 ///
 /// This is similar to how `serde` takes an expression for things like `#[serde(default =
 /// "exprhere")]`, and so on.

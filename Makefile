@@ -43,8 +43,8 @@ export CURRENT_DIR = $(shell pwd)
 export ENVIRONMENT ?= false
 # The upstream container we publish artifacts to on a successful master build.
 export ENVIRONMENT_UPSTREAM ?= docker.io/timberio/vector-dev:sha-3eadc96742a33754a5859203b58249f6a806972a
-# Override to disable building the container, having it pull from the Github packages repo instead
-# TODO: Disable this by default. Blocked by `docker pull` from Github Packages requiring authenticated login
+# Override to disable building the container, having it pull from the GitHub packages repo instead
+# TODO: Disable this by default. Blocked by `docker pull` from GitHub Packages requiring authenticated login
 export ENVIRONMENT_AUTOBUILD ?= true
 # Override this when appropriate to disable a TTY being available in commands with `ENVIRONMENT=true`
 export ENVIRONMENT_TTY ?= true
@@ -338,41 +338,11 @@ test-integration: test-integration-nginx test-integration-opentelemetry test-int
 test-integration: test-integration-redis test-integration-splunk test-integration-dnstap test-integration-datadog-agent test-integration-datadog-logs
 test-integration: test-integration-datadog-traces test-integration-shutdown
 
-.PHONY: test-integration-aws-s3
-test-integration-aws-s3: ## Runs AWS S3 integration tests
-	FILTER=::aws_s3 make test-integration-aws
-
-.PHONY: test-integration-aws-sqs
-test-integration-aws-sqs: ## Runs AWS SQS integration tests
-	FILTER=::aws_sqs make test-integration-aws
-
-.PHONY: test-integration-aws-cloudwatch-logs
-test-integration-aws-cloudwatch-logs: ## Runs AWS Cloudwatch Logs integration tests
-	FILTER=::aws_cloudwatch_logs make test-integration-aws
-
-.PHONY: test-integration-aws-cloudwatch-metrics
-test-integration-aws-cloudwatch-metrics: ## Runs AWS Cloudwatch Metrics integration tests
-	FILTER=::aws_cloudwatch_metrics make test-integration-aws
-
-.PHONY: test-integration-aws-kinesis
-test-integration-aws-kinesis: ## Runs AWS Kinesis integration tests
-	FILTER=::aws_kinesis make test-integration-aws
-
-.PHONY: test-integration-datadog-agent
-test-integration-datadog-agent: ## Runs Datadog Agent integration tests
-	@test $${TEST_DATADOG_API_KEY?TEST_DATADOG_API_KEY must be set}
-	RUST_VERSION=${RUST_VERSION} ${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.datadog-agent.yml build
-	RUST_VERSION=${RUST_VERSION} ${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.datadog-agent.yml run --rm runner
-ifeq ($(AUTODESPAWN), true)
-	make test-integration-datadog-agent-cleanup
-endif
-
 test-integration-%-cleanup:
-	${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.$*.yml rm --force --stop -v
+	cargo vdev --verbose integration stop $*
 
 test-integration-%:
-	RUST_VERSION=${RUST_VERSION} ${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.$*.yml build
-	RUST_VERSION=${RUST_VERSION} ${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.$*.yml run --rm runner
+	cargo vdev --verbose integration test $*
 ifeq ($(AUTODESPAWN), true)
 	make test-integration-$*-cleanup
 endif
@@ -445,7 +415,7 @@ check: ## Run prerequisite code checks
 
 .PHONY: check-all
 check-all: ## Check everything
-check-all: check-fmt check-clippy check-style check-docs
+check-all: check-fmt check-clippy check-docs
 check-all: check-version check-examples check-component-features
 check-all: check-scripts check-deny check-component-docs
 
@@ -465,10 +435,6 @@ check-docs: ## Check that all /docs file are valid
 check-fmt: ## Check that all files are formatted properly
 	${MAYBE_ENVIRONMENT_EXEC} cargo vdev check fmt
 
-.PHONY: check-style
-check-style: ## Check that all files are styled properly
-	${MAYBE_ENVIRONMENT_EXEC} cargo vdev check style
-
 .PHONY: check-markdown
 check-markdown: ## Check that markdown is styled properly
 	${MAYBE_ENVIRONMENT_EXEC} cargo vdev check markdown
@@ -482,7 +448,7 @@ check-examples: ## Check that the config/examples files are valid
 	${MAYBE_ENVIRONMENT_EXEC} cargo vdev check examples
 
 .PHONY: check-scripts
-check-scripts: ## Check that scipts do not have common mistakes
+check-scripts: ## Check that scripts do not have common mistakes
 	${MAYBE_ENVIRONMENT_EXEC} cargo vdev check scripts
 
 .PHONY: check-deny
@@ -607,7 +573,7 @@ release-docker: ## Release to Docker Hub
 	@cargo vdev release docker
 
 .PHONY: release-github
-release-github: ## Release to Github
+release-github: ## Release to GitHub
 	@cargo vdev release github
 
 .PHONY: release-homebrew
@@ -653,7 +619,6 @@ clean: environment-clean ## Clean everything
 .PHONY: fmt
 fmt: ## Format code
 	${MAYBE_ENVIRONMENT_EXEC} cargo fmt
-	${MAYBE_ENVIRONMENT_EXEC} cargo vdev check style --fix
 
 .PHONY: generate-kubernetes-manifests
 generate-kubernetes-manifests: ## Generate Kubernetes manifests from latest Helm chart

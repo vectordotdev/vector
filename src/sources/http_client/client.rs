@@ -5,21 +5,22 @@ use bytes::{Bytes, BytesMut};
 use chrono::Utc;
 use futures_util::FutureExt;
 use http::{response::Parts, Uri};
+use serde_with::serde_as;
 use snafu::ResultExt;
-use std::collections::HashMap;
+use std::{collections::HashMap, time::Duration};
 use tokio_util::codec::Decoder as _;
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
     config::{SourceConfig, SourceContext},
     http::Auth,
+    register_validatable_component,
     serde::{default_decoding, default_framing_message_based},
     sources,
     sources::util::{
         http::HttpMethod,
         http_client::{
-            build_url, call, default_scrape_interval_secs, GenericHttpClientInputs,
-            HttpClientBuilder,
+            build_url, call, default_interval, GenericHttpClientInputs, HttpClientBuilder,
         },
     },
     tls::{TlsConfig, TlsSettings},
@@ -37,23 +38,33 @@ use vector_core::{
 };
 
 /// Configuration for the `http_client` source.
+#[serde_as]
 #[configurable_component(source("http_client"))]
 #[derive(Clone, Debug)]
 pub struct HttpClientConfig {
-    /// Endpoint to collect events from. The full path must be specified.
-    /// Example: "http://127.0.0.1:9898/logs"
+    /// The HTTP endpoint to collect events from.
+    ///
+    /// The full path must be specified.
+    #[configurable(metadata(docs::examples = "http://127.0.0.1:9898/logs"))]
     pub endpoint: String,
 
-    /// The interval between calls, in seconds.
-    #[serde(default = "default_scrape_interval_secs")]
-    pub scrape_interval_secs: u64,
+    /// The interval between calls.
+    #[serde(default = "default_interval")]
+    #[serde_as(as = "serde_with::DurationSeconds<u64>")]
+    #[serde(rename = "scrape_interval_secs")]
+    pub interval: Duration,
 
     /// Custom parameters for the HTTP request query string.
     ///
-    /// One or more values for the same parameter key can be provided. The parameters provided in this option are
-    /// appended to any parameters manually provided in the `endpoint` option.
+    /// One or more values for the same parameter key can be provided.
+    ///
+    /// The parameters provided in this option are appended to any parameters
+    /// manually provided in the `endpoint` option.
     #[serde(default)]
-    #[configurable(metadata(docs::additional_props_description = "A query string parameter."))]
+    #[configurable(metadata(
+        docs::additional_props_description = "A query string parameter and it's value(s)."
+    ))]
+    #[configurable(metadata(docs::examples = "query_examples()"))]
     pub query: HashMap<String, Vec<String>>,
 
     /// Decoder to use on the HTTP responses.
@@ -70,10 +81,13 @@ pub struct HttpClientConfig {
     ///
     /// One or more values for the same header can be provided.
     #[serde(default)]
-    #[configurable(metadata(docs::additional_props_description = "An HTTP request header."))]
+    #[configurable(metadata(
+        docs::additional_props_description = "An HTTP request header and it's value(s)."
+    ))]
+    #[configurable(metadata(docs::examples = "headers_examples()"))]
     pub headers: HashMap<String, Vec<String>>,
 
-    /// Specifies the action of the HTTP request.
+    /// Specifies the method of the HTTP request.
     #[serde(default = "default_http_method")]
     pub method: HttpMethod,
 
@@ -95,12 +109,46 @@ const fn default_http_method() -> HttpMethod {
     HttpMethod::Get
 }
 
+fn query_examples() -> HashMap<String, Vec<String>> {
+    HashMap::<_, _>::from_iter(
+        [
+            ("field".to_owned(), vec!["value".to_owned()]),
+            (
+                "fruit".to_owned(),
+                vec!["mango".to_owned(), "papaya".to_owned(), "kiwi".to_owned()],
+            ),
+        ]
+        .into_iter(),
+    )
+}
+
+fn headers_examples() -> HashMap<String, Vec<String>> {
+    HashMap::<_, _>::from_iter(
+        [
+            (
+                "Accept".to_owned(),
+                vec!["text/plain".to_owned(), "text/html".to_owned()],
+            ),
+            (
+                "X-My-Custom-Header".to_owned(),
+                vec![
+                    "a".to_owned(),
+                    "vector".to_owned(),
+                    "of".to_owned(),
+                    "values".to_owned(),
+                ],
+            ),
+        ]
+        .into_iter(),
+    )
+}
+
 impl Default for HttpClientConfig {
     fn default() -> Self {
         Self {
             endpoint: "http://localhost:9898/logs".to_string(),
             query: HashMap::new(),
-            scrape_interval_secs: default_scrape_interval_secs(),
+            interval: default_interval(),
             decoding: default_decoding(),
             framing: default_framing_message_based(),
             headers: HashMap::new(),
@@ -142,7 +190,7 @@ impl SourceConfig for HttpClientConfig {
 
         let inputs = GenericHttpClientInputs {
             urls,
-            interval_secs: self.scrape_interval_secs,
+            interval: self.interval,
             headers: self.headers.clone(),
             content_type,
             auth: self.auth.clone(),
@@ -173,43 +221,29 @@ impl SourceConfig for HttpClientConfig {
 }
 
 impl ValidatableComponent for HttpClientConfig {
-    fn component_name(&self) -> &'static str {
-        Self::NAME
-    }
+    fn validation_configuration() -> ValidationConfiguration {
+        let uri = Uri::from_static("http://127.0.0.1:9898/logs");
 
-    fn component_type(&self) -> ComponentType {
-        ComponentType::Source
-    }
+        let config = Self {
+            endpoint: uri.to_string(),
+            interval: Duration::from_secs(1),
+            decoding: DeserializerConfig::Json,
+            ..Default::default()
+        };
 
-    fn component_configuration(&self) -> ComponentConfiguration {
-        ComponentConfiguration::Source(self.clone().into())
-    }
-
-    fn external_resource(&self) -> Option<ExternalResource> {
-        let uri = Uri::from_maybe_shared(self.endpoint.clone())
-            .expect("should not fail to build request URI");
-        let method = Some(self.method.into());
-        let decoding_config = self.get_decoding_config(None);
-
-        Some(ExternalResource::new(
+        let external_resource = ExternalResource::new(
             ResourceDirection::Pull,
-            HttpResourceConfig::from_parts(uri, method),
-            decoding_config,
-        ))
+            HttpResourceConfig::from_parts(uri, Some(config.method.into())),
+            config.get_decoding_config(None),
+        );
+
+        ValidationConfiguration::from_source(Self::NAME, config, Some(external_resource))
     }
 }
 
-impl HttpClientConfig {
-    #[cfg(test)]
-    pub fn validation() -> Self {
-        Self {
-            endpoint: "http://127.0.0.1:9898/logs".to_string(),
-            scrape_interval_secs: 1,
-            decoding: DeserializerConfig::Json,
-            ..Default::default()
-        }
-    }
+register_validatable_component!(HttpClientConfig);
 
+impl HttpClientConfig {
     fn get_decoding_config(&self, log_namespace: Option<LogNamespace>) -> DecodingConfig {
         let decoding = self.decoding.clone();
         let framing = self.framing.clone();

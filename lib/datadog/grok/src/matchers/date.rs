@@ -103,7 +103,7 @@ pub struct RegexResult {
 
 pub fn parse_timezone(tz: &str) -> Result<FixedOffset, String> {
     let tz = match tz {
-        "GMT" | "UTC" | "UT" | "Z" => FixedOffset::east(0),
+        "GMT" | "UTC" | "UT" | "Z" => FixedOffset::east_opt(0).expect("invalid timestamp"),
         _ if tz.starts_with('+') || tz.starts_with('-') => parse_offset(tz)?,
         _ if tz.contains('+') => parse_offset(&tz[tz.find('+').unwrap()..])?,
         _ if tz.contains('-') => parse_offset(&tz[tz.find('-').unwrap()..])?,
@@ -121,7 +121,7 @@ fn parse_offset(tz: &str) -> Result<FixedOffset, String> {
     if tz.len() <= 3 {
         // +5, -12
         let hours_diff = tz.parse::<i32>().map_err(|e| e.to_string())?;
-        return Ok(FixedOffset::east(hours_diff * 3600));
+        return Ok(FixedOffset::east_opt(hours_diff * 3600).expect("invalid timestamp"));
     }
     let offset_format = if tz.contains(':') { "%:z" } else { "%z" };
     // apparently the easiest way to parse tz offset is parsing the complete datetime
@@ -315,9 +315,12 @@ pub fn apply_date_filter(value: &Value, filter: &DateFilter) -> Result<Value, Gr
                         }
                     } else if let Ok(nt) = NaiveTime::parse_from_str(&value, &filter.strp_format) {
                         // try parsing as a naive time
-                        Ok(NaiveDateTime::new(NaiveDate::from_ymd(1970, 1, 1), nt)
-                            .timestamp_millis()
-                            .into())
+                        Ok(NaiveDateTime::new(
+                            NaiveDate::from_ymd_opt(1970, 1, 1).expect("invalid date"),
+                            nt,
+                        )
+                        .timestamp_millis()
+                        .into())
                     } else {
                         // try parsing as a naive date
                         let nd = NaiveDate::parse_from_str(&value, &filter.strp_format).map_err(
@@ -332,7 +335,7 @@ pub fn apply_date_filter(value: &Value, filter: &DateFilter) -> Result<Value, Gr
                         Ok(UTC
                             .from_local_datetime(&NaiveDateTime::new(
                                 nd,
-                                NaiveTime::from_hms(0, 0, 0),
+                                NaiveTime::from_hms_opt(0, 0, 0).expect("invalid timestamp"),
                             ))
                             .single()
                             .ok_or_else(|| {

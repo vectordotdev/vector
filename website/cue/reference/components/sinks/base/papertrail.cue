@@ -144,23 +144,27 @@ base: components: sinks: papertrail: configuration: {
 		}
 	}
 	endpoint: {
-		description: "The endpoint to send logs to."
+		description: "The TCP endpoint to send logs to."
 		required:    true
-		type: string: {}
+		type: string: examples: ["logs.papertrailapp.com:12345"]
 	}
 	keepalive: {
 		description: "TCP keepalive settings for socket-based components."
 		required:    false
 		type: object: options: time_secs: {
-			description: "The time to wait, in seconds, before starting to send TCP keepalive probes on an idle connection."
+			description: "The time to wait before starting to send TCP keepalive probes on an idle connection."
 			required:    false
-			type: uint: {}
+			type: uint: unit: "seconds"
 		}
 	}
 	process: {
 		description: "The value to use as the `process` in Papertrail."
 		required:    false
-		type: string: syntax: "template"
+		type: string: {
+			default: "vector"
+			examples: ["{{ process }}", "my-process"]
+			syntax: "template"
+		}
 	}
 	send_buffer_bytes: {
 		description: "Configures the send buffer size using the `SO_SNDBUF` option on the socket."

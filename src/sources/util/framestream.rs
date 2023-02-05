@@ -723,7 +723,7 @@ mod test {
         }
     }
 
-    fn init_framstream_unix(
+    fn init_framestream_unix(
         source_id: &str,
         frame_handler: impl FrameHandler + Send + Sync + Clone + 'static,
         pipeline: SourceSender,
@@ -828,7 +828,7 @@ mod test {
         let source_name = "test_source";
         let (tx, rx) = SourceSender::new_test();
         let (path, source_handle, mut shutdown) =
-            init_framstream_unix(source_name, create_frame_handler(false), tx);
+            init_framestream_unix(source_name, create_frame_handler(false), tx);
         let (mut sock_sink, mut sock_stream) = make_unix_stream(path).await.split();
 
         //1 - send READY frame (with content_type)
@@ -878,7 +878,7 @@ mod test {
         let source_name = "test_source";
         let (tx, rx) = SourceSender::new_test();
         let (path, source_handle, mut shutdown) =
-            init_framstream_unix(source_name, create_frame_handler(true), tx);
+            init_framestream_unix(source_name, create_frame_handler(true), tx);
         let (mut sock_sink, mut sock_stream) = make_unix_stream(path).await.split();
 
         //1 - send READY frame (with content_type)
@@ -926,7 +926,7 @@ mod test {
         let source_name = "test_source";
         let (tx, _) = SourceSender::new_test();
         let (path, source_handle, mut shutdown) =
-            init_framstream_unix(source_name, create_frame_handler(false), tx);
+            init_framestream_unix(source_name, create_frame_handler(false), tx);
         let (mut sock_sink, mut sock_stream) = make_unix_stream(path).await.split();
 
         //1 - send READY frame (with content_type)
@@ -956,7 +956,7 @@ mod test {
         let source_name = "test_source";
         let (tx, _) = SourceSender::new_test();
         let (path, source_handle, mut shutdown) =
-            init_framstream_unix(source_name, create_frame_handler(false), tx);
+            init_framestream_unix(source_name, create_frame_handler(false), tx);
         let (mut sock_sink, mut sock_stream) = make_unix_stream(path).await.split();
 
         //1 - send READY frame (with WRONG content_type)
@@ -991,7 +991,7 @@ mod test {
         let source_name = "test_source";
         let (tx, rx) = SourceSender::new_test();
         let (path, source_handle, mut shutdown) =
-            init_framstream_unix(source_name, create_frame_handler(false), tx);
+            init_framestream_unix(source_name, create_frame_handler(false), tx);
         let (mut sock_sink, mut sock_stream) = make_unix_stream(path).await.split();
 
         //1 - send data frame (too soon!)
@@ -1049,7 +1049,7 @@ mod test {
         let source_name = "test_source";
         let (tx, rx) = SourceSender::new_test();
         let (path, source_handle, mut shutdown) =
-            init_framstream_unix(source_name, create_frame_handler(false), tx);
+            init_framestream_unix(source_name, create_frame_handler(false), tx);
         let (mut sock_sink, _) = make_unix_stream(path).await.split();
 
         //1 - send START frame (with content_type)

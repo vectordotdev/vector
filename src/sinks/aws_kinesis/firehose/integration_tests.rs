@@ -16,6 +16,7 @@ use crate::{
         elasticsearch::{BulkConfig, ElasticsearchAuth, ElasticsearchCommon, ElasticsearchConfig},
         util::{BatchConfig, Compression, TowerRequestConfig},
     },
+    template::Template,
     test_util::{
         components::{run_and_assert_sink_compliance, AWS_SINK_TAGS},
         random_events_with_stream, random_string, wait_for_duration,
@@ -34,9 +35,9 @@ fn elasticsearch_address() -> String {
 async fn firehose_put_records() {
     let stream = gen_stream();
 
-    let elasticseacrh_arn = ensure_elasticsearch_domain(stream.clone()).await;
+    let elasticsearch_arn = ensure_elasticsearch_domain(stream.clone().to_string()).await;
 
-    ensure_elasticesarch_delivery_stream(stream.clone(), elasticseacrh_arn.clone()).await;
+    ensure_elasticsearch_delivery_stream(stream.clone(), elasticsearch_arn.clone()).await;
 
     let mut batch = BatchConfig::default();
     batch.max_events = Some(2);
@@ -77,8 +78,8 @@ async fn firehose_put_records() {
         })),
         endpoints: vec![elasticsearch_address()],
         bulk: Some(BulkConfig {
-            index: Some(stream.clone()),
-            action: None,
+            index: Template::try_from(stream.clone()).expect("unable to parse Template"),
+            ..Default::default()
         }),
         aws: Some(region),
         ..Default::default()
@@ -197,9 +198,9 @@ async fn ensure_elasticsearch_domain(domain_name: String) -> String {
 }
 
 /// creates Firehose delivery stream to ship to Elasticsearch
-async fn ensure_elasticesarch_delivery_stream(
+async fn ensure_elasticsearch_delivery_stream(
     delivery_stream_name: String,
-    elasticseacrh_arn: String,
+    elasticsearch_arn: String,
 ) {
     let client = firehose_client().await;
 
@@ -209,7 +210,7 @@ async fn ensure_elasticesarch_delivery_stream(
         .elasticsearch_destination_configuration(
             ElasticsearchDestinationConfiguration::builder()
                 .index_name(delivery_stream_name)
-                .domain_arn(elasticseacrh_arn)
+                .domain_arn(elasticsearch_arn)
                 .role_arn("doesn't matter")
                 .type_name("doesn't matter")
                 .build(),

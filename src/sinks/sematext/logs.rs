@@ -17,6 +17,7 @@ use crate::{
         },
         Healthcheck, VectorSink,
     },
+    template::Template,
 };
 
 /// Configuration for the `sematext_logs` sink.
@@ -83,14 +84,13 @@ impl SinkConfig for SematextLogsConfig {
         let (sink, healthcheck) = ElasticsearchConfig {
             endpoints: vec![endpoint],
             compression: Compression::None,
-            doc_type: Some(
-                "\
-            logs"
-                    .to_string(),
-            ),
+            doc_type: "\
+                logs"
+                .to_string(),
             bulk: Some(BulkConfig {
-                action: None,
-                index: Some(self.token.inner().to_owned()),
+                index: Template::try_from(self.token.inner())
+                    .expect("unable to parse token as Template"),
+                ..Default::default()
             }),
             batch: self.batch,
             request: RequestConfig {

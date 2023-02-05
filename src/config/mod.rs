@@ -238,8 +238,8 @@ impl Default for HealthcheckOptions {
 macro_rules! impl_generate_config_from_default {
     ($type:ty) => {
         impl $crate::config::GenerateConfig for $type {
-            fn generate_config() -> toml::Value {
-                toml::Value::try_from(&Self::default()).unwrap()
+            fn generate_config() -> toml::value::Value {
+                toml::value::Value::try_from(&Self::default()).unwrap()
             }
         }
     };
@@ -475,16 +475,16 @@ impl TestDefinition<OutputId> {
 #[serde(untagged)]
 pub enum TestInputValue {
     /// A string.
-    String(#[configurable(transparent)] String),
+    String(String),
 
     /// An integer.
-    Integer(#[configurable(transparent)] i64),
+    Integer(i64),
 
     /// A floating-point number.
-    Float(#[configurable(transparent)] f64),
+    Float(f64),
 
     /// A boolean.
-    Boolean(#[configurable(transparent)] bool),
+    Boolean(bool),
 }
 
 /// A unit test input.

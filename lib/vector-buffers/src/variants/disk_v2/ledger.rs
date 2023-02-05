@@ -74,7 +74,7 @@ pub enum LedgerLoadCreateError {
 
 /// Ledger state.
 ///
-/// Stores the relevant information related to both the reader and writer.  Gets serailized and
+/// Stores the relevant information related to both the reader and writer.  Gets serialized and
 /// stored on disk, and is managed via a memory-mapped file.
 ///
 /// # Warning

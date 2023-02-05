@@ -3,7 +3,6 @@ use std::time::SystemTime;
 use bytes::Bytes;
 use futures::{FutureExt, SinkExt};
 use http::{Request, StatusCode, Uri};
-use once_cell::sync::Lazy;
 use serde_json::json;
 use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
@@ -21,8 +20,6 @@ use crate::{
     template::{Template, TemplateRenderingError},
 };
 
-static HOST: Lazy<Uri> = Lazy::new(|| Uri::from_static("https://logs.logdna.com"));
-
 const PATH: &str = "/logs/ingest";
 
 /// Configuration for the `logdna` sink.
@@ -30,22 +27,35 @@ const PATH: &str = "/logs/ingest";
 #[derive(Clone, Debug)]
 pub struct LogdnaConfig {
     /// The Ingestion API key.
+    #[configurable(metadata(docs::examples = "${LOGDNA_API_KEY}"))]
+    #[configurable(metadata(docs::examples = "ef8d5de700e7989468166c40fc8a0ccd"))]
     api_key: SensitiveString,
 
-    /// The endpoint to send logs to.
+    /// The HTTP endpoint to send logs to.
+    ///
+    /// Both IP address and hostname are accepted formats.
     #[serde(alias = "host")]
-    endpoint: Option<UriSerde>,
+    #[serde(default = "default_endpoint")]
+    #[configurable(metadata(docs::examples = "http://127.0.0.1"))]
+    #[configurable(metadata(docs::examples = "http://example.com"))]
+    endpoint: UriSerde,
 
     /// The hostname that will be attached to each batch of events.
+    #[configurable(metadata(docs::examples = "${HOSTNAME}"))]
+    #[configurable(metadata(docs::examples = "my-local-machine"))]
     hostname: Template,
 
     /// The MAC address that will be attached to each batch of events.
+    #[configurable(metadata(docs::examples = "my-mac-address"))]
     mac: Option<String>,
 
     /// The IP address that will be attached to each batch of events.
+    #[configurable(metadata(docs::examples = "0.0.0.0"))]
     ip: Option<String>,
 
     /// The tags that will be attached to each batch of events.
+    #[configurable(metadata(docs::examples = "tag1"))]
+    #[configurable(metadata(docs::examples = "tag2"))]
     tags: Option<Vec<Template>>,
 
     #[configurable(derived)]
@@ -56,10 +66,14 @@ pub struct LogdnaConfig {
     pub encoding: Transformer,
 
     /// The default app that will be set for events that do not contain a `file` or `app` field.
-    default_app: Option<String>,
+    #[serde(default = "default_app")]
+    #[configurable(metadata(docs::examples = "my-app"))]
+    default_app: String,
 
     /// The default environment that will be set for events that do not contain an `env` field.
-    default_env: Option<String>,
+    #[serde(default = "default_env")]
+    #[configurable(metadata(docs::examples = "staging"))]
+    default_env: String,
 
     #[configurable(derived)]
     #[serde(default)]
@@ -76,6 +90,21 @@ pub struct LogdnaConfig {
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     acknowledgements: AcknowledgementsConfig,
+}
+
+fn default_endpoint() -> UriSerde {
+    UriSerde {
+        uri: Uri::from_static("https://logs.logdna.com"),
+        auth: None,
+    }
+}
+
+fn default_app() -> String {
+    "vector".to_owned()
+}
+
+fn default_env() -> String {
+    "production".to_owned()
 }
 
 impl GenerateConfig for LogdnaConfig {
@@ -131,8 +160,8 @@ pub struct LogdnaEventEncoder {
     hostname: Template,
     tags: Option<Vec<Template>>,
     transformer: Transformer,
-    default_app: Option<String>,
-    default_env: Option<String>,
+    default_app: String,
+    default_env: String,
 }
 
 impl LogdnaEventEncoder {
@@ -205,18 +234,11 @@ impl HttpEventEncoder<PartitionInnerBuffer<serde_json::Value, PartitionKey>>
         }
 
         if !map.contains_key("env") {
-            map.insert(
-                "env".to_string(),
-                json!(self.default_env.as_deref().unwrap_or("production")),
-            );
+            map.insert("env".to_string(), json!(self.default_env));
         }
 
         if !map.contains_key("app") && !map.contains_key("file") {
-            if let Some(default_app) = &self.default_app {
-                map.insert("app".to_string(), json!(default_app.as_str()));
-            } else {
-                map.insert("app".to_string(), json!("vector"));
-            }
+            map.insert("app".to_string(), json!(self.default_app.as_str()));
         }
 
         if !log.is_empty_object() {
@@ -298,11 +320,7 @@ impl HttpSink for LogdnaConfig {
 
 impl LogdnaConfig {
     fn build_uri(&self, query: &str) -> Uri {
-        let host = self
-            .endpoint
-            .clone()
-            .map(|endpoint| endpoint.uri)
-            .unwrap_or_else(|| HOST.clone());
+        let host = &self.endpoint.uri;
 
         let uri = format!("{}{}?{}", host, PATH, query);
 
@@ -418,8 +436,11 @@ mod tests {
         let addr = next_addr();
         // Swap out the host so we can force send it
         // to our local server
-        let endpoint = format!("http://{}", addr).parse::<http::Uri>().unwrap();
-        config.endpoint = Some(endpoint.into());
+        let endpoint = UriSerde {
+            uri: format!("http://{}", addr).parse::<http::Uri>().unwrap(),
+            auth: None,
+        };
+        config.endpoint = endpoint;
 
         let (sink, _) = config.build(cx).await.unwrap();
 

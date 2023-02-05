@@ -7,23 +7,43 @@ use vector_core::metric_tags;
 
 use crate::internal_events::{HostMetricsScrapeDetailError, HostMetricsScrapeFilesystemError};
 
-use super::{filter_result, FilterList, HostMetrics};
+use super::{default_all_devices, example_devices, filter_result, FilterList, HostMetrics};
 
 /// Options for the “filesystem” metrics collector.
 #[configurable_component]
 #[derive(Clone, Debug, Default)]
 pub struct FilesystemConfig {
-    /// Lists of device name patterns to include or exclude.
-    #[serde(default)]
+    /// Lists of device name patterns to include or exclude in gathering
+    /// usage metrics.
+    #[serde(default = "default_all_devices")]
+    #[configurable(metadata(docs::examples = "example_devices()"))]
     devices: FilterList,
 
-    /// Lists of filesystem name patterns to include or exclude.
-    #[serde(default)]
+    /// Lists of filesystem name patterns to include or exclude in gathering
+    /// usage metrics.
+    #[serde(default = "default_all_devices")]
+    #[configurable(metadata(docs::examples = "example_filesystems()"))]
     filesystems: FilterList,
 
-    /// Lists of mount point path patterns to include or exclude.
-    #[serde(default)]
+    /// Lists of mount point path patterns to include or exclude in gathering
+    /// usage metrics.
+    #[serde(default = "default_all_devices")]
+    #[configurable(metadata(docs::examples = "example_mountpoints()"))]
     mountpoints: FilterList,
+}
+
+fn example_filesystems() -> FilterList {
+    FilterList {
+        includes: Some(vec!["ntfs".try_into().unwrap()]),
+        excludes: Some(vec!["ext*".try_into().unwrap()]),
+    }
+}
+
+fn example_mountpoints() -> FilterList {
+    FilterList {
+        includes: Some(vec!["/home".try_into().unwrap()]),
+        excludes: Some(vec!["/raid*".try_into().unwrap()]),
+    }
 }
 
 impl HostMetrics {

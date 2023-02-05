@@ -216,6 +216,7 @@ impl Configurable for Compression {
         metadata.set_title("Compression configuration.");
         metadata.set_description("All compression algorithms use the default compression level unless otherwise specified.");
         metadata.add_custom_attribute(CustomAttribute::kv("docs::enum_tagging", "external"));
+        metadata.add_custom_attribute(CustomAttribute::flag("docs::advanced"));
         metadata
     }
 
@@ -252,7 +253,7 @@ impl Configurable for Compression {
         );
         let zlib_string_subschema = generate_string_schema(
             "Zlib",
-            Some("[Zlib]][zlib] compression."),
+            Some("[Zlib][zlib] compression."),
             "[zlib]: https://zlib.net/",
         );
 

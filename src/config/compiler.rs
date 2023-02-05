@@ -191,7 +191,7 @@ fn expand_globs_inner(inputs: &mut Inputs<String>, id: &str, candidates: &IndexS
             }
         }
         // If it didn't work as a glob pattern, leave it in the inputs as-is. This lets us give
-        // more accurate error messages about non-existent inputs.
+        // more accurate error messages about nonexistent inputs.
         if !matched {
             inputs.extend(Some(raw_input))
         }

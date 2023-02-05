@@ -44,6 +44,7 @@ pub struct StatsdSinkConfig {
     /// This namespace is only used if a metric has no existing namespace. When a namespace is
     /// present, it is used as a prefix to the metric name, and separated with a period (`.`).
     #[serde(alias = "namespace")]
+    #[configurable(metadata(docs::examples = "service"))]
     pub default_namespace: Option<String>,
 
     #[serde(flatten)]
@@ -65,14 +66,14 @@ pub struct StatsdSinkConfig {
 #[configurable(metadata(docs::enum_tag_description = "The type of socket to use."))]
 pub enum Mode {
     /// Send over TCP.
-    Tcp(#[configurable(transparent)] TcpSinkConfig),
+    Tcp(TcpSinkConfig),
 
     /// Send over UDP.
-    Udp(#[configurable(transparent)] StatsdUdpConfig),
+    Udp(StatsdUdpConfig),
 
     /// Send over a Unix domain socket (UDS).
     #[cfg(unix)]
-    Unix(#[configurable(transparent)] UnixSinkConfig),
+    Unix(UnixSinkConfig),
 }
 
 #[derive(Clone, Copy, Debug, Default)]

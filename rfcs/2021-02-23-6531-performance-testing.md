@@ -152,7 +152,7 @@ but that is very early days yet.
 We can see from [Motivating Examples](#motivating-examples) that this benchmark
 work is paying off and has acted as a backstop, disallowing serious regressions
 from making it into releases. A good deal of work has been done to make results
-stable in our Github Actions based CI. PR build times are, however, increasing
+stable in our GitHub Actions based CI. PR build times are, however, increasing
 at a steady clip, a drag on productivity and potentially a barrier to
 open-source contributors whose engagement with a change may not be as high as
 full-time employees on the Vector project.

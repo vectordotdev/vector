@@ -444,6 +444,7 @@ urls: {
 	rustup:                                     "https://rustup.rs"
 	redis:                                      "https://redis.io"
 	redis_rs:                                   "https://github.com/mitsuhiko/redis-rs"
+	seahash:                                    "https://docs.rs/seahash/latest/seahash/"
 	sematext:                                   "https://sematext.com"
 	sematext_create_logs_app:                   "https://apps.sematext.com/ui/integrations"
 	sematext_es:                                "https://sematext.com/docs/logs/index-events-via-elasticsearch-api/"

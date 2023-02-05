@@ -14,6 +14,7 @@ components: sinks: http: {
 
 	features: {
 		acknowledgements: true
+		auto_generated:   true
 		healthcheck: {
 			enabled:  true
 			uses_uri: true
@@ -76,60 +77,7 @@ components: sinks: http: {
 		notices: ["Input type support can depend on configured `encoding.codec`"]
 	}
 
-	configuration: {
-		auth: configuration._http_auth & {_args: {
-			password_example: "${HTTP_PASSWORD}"
-			username_example: "${HTTP_USERNAME}"
-		}}
-		uri: {
-			description: """
-				The full URI to make HTTP requests to. This should include the protocol and host,
-				but can also include the port, path, and any other valid part of a URI.
-				"""
-			required: true
-			type: string: {
-				examples: ["https://10.22.212.22:9000/endpoint"]
-			}
-		}
-		method: {
-			description: "The HTTP method to use."
-			required:    false
-			common:      false
-			type: string: {
-				default: "POST"
-				enum: {
-					PUT:  "PUT"
-					POST: "POST"
-				}
-			}
-		}
-		payload_prefix: {
-			description: """
-				A string to prefix the payload with.
-
-				This option is ignored if the encoding is not character delimited JSON.
-				If specified, the `payload_suffix`must also be specified and together they must produce a valid JSON object.
-				"""
-			required: false
-			type: string: {
-				default: ""
-				examples: ["{\"data\":"]
-			}
-		}
-		payload_suffix: {
-			description: """
-				A string to suffix the payload with.
-
-				This option is ignored if the encoding is not character delimited JSON.
-				If specified, the `payload_prefix`must also be specified and together they must produce a valid JSON object.
-				"""
-			required: false
-			type: string: {
-				default: ""
-				examples: ["}"]
-			}
-		}
-	}
+	configuration: base.components.sinks.http.configuration
 
 	input: {
 		logs: true

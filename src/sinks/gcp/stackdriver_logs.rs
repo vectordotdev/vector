@@ -119,7 +119,7 @@ const MAX_BATCH_PAYLOAD_SIZE: usize = 10_000_000;
 pub enum StackdriverLogName {
     /// The billing account ID to which to publish logs.
     #[serde(rename = "billing_account_id")]
-    BillingAccount(#[configurable(transparent)] String),
+    BillingAccount(String),
 
     /// The folder ID to which to publish logs.
     ///
@@ -127,13 +127,13 @@ pub enum StackdriverLogName {
     ///
     /// [folder_docs]: https://cloud.google.com/resource-manager/docs/creating-managing-folders
     #[serde(rename = "folder_id")]
-    Folder(#[configurable(transparent)] String),
+    Folder(String),
 
     /// The organization ID to which to publish logs.
     ///
     /// This would be the identifier assigned to your organization on Google Cloud Platform.
     #[serde(rename = "organization_id")]
-    Organization(#[configurable(transparent)] String),
+    Organization(String),
 
     /// The project ID to which to publish logs.
     ///
@@ -142,7 +142,7 @@ pub enum StackdriverLogName {
     /// [project_docs]: https://cloud.google.com/resource-manager/docs/creating-managing-projects
     #[derivative(Default)]
     #[serde(rename = "project_id")]
-    Project(#[configurable(transparent)] String),
+    Project(String),
 }
 
 /// A monitored resource.
@@ -184,23 +184,23 @@ impl SinkConfig for StackdriverConfig {
             .validate()?
             .limit_max_bytes(MAX_BATCH_PAYLOAD_SIZE)?
             .into_batch_settings()?;
-        let request = self.request.unwrap_with(&TowerRequestConfig {
-            rate_limit_num: Some(1000),
-            rate_limit_duration_secs: Some(1),
-            ..Default::default()
-        });
+        let request = self.request.unwrap_with(
+            &TowerRequestConfig::default()
+                .rate_limit_duration_secs(1)
+                .rate_limit_num(1000),
+        );
         let tls_settings = TlsSettings::from_options(&self.tls)?;
         let client = HttpClient::new(tls_settings, cx.proxy())?;
 
         let sink = StackdriverSink {
             config: self.clone(),
-            auth,
+            auth: auth.clone(),
             severity_key: self.severity_key.clone(),
             uri: self.endpoint.parse().unwrap(),
         };
 
         let healthcheck = healthcheck(client.clone(), sink.clone()).boxed();
-
+        auth.spawn_regenerate_token();
         let sink = BatchedHttpSink::new(
             sink,
             JsonArrayBuffer::new(batch.size),
@@ -361,11 +361,7 @@ async fn healthcheck(client: HttpClient, sink: StackdriverSink) -> crate::Result
     let request = sink.build_request(vec![]).await?.map(Body::from);
 
     let response = client.send(request).await?;
-    healthcheck_response(
-        response,
-        sink.auth.clone(),
-        HealthcheckError::NotFound.into(),
-    )
+    healthcheck_response(response, HealthcheckError::NotFound.into())
 }
 
 impl StackdriverConfig {
@@ -388,6 +384,7 @@ mod tests {
     use chrono::{TimeZone, Utc};
     use futures::{future::ready, stream};
     use indoc::indoc;
+    use serde::Deserialize;
     use serde_json::value::RawValue;
 
     use super::*;
@@ -410,8 +407,8 @@ mod tests {
         let mock_endpoint = spawn_blackhole_http_server(always_200_response).await;
 
         let config = StackdriverConfig::generate_config().to_string();
-        let mut config =
-            toml::from_str::<StackdriverConfig>(&config).expect("config should be valid");
+        let mut config = StackdriverConfig::deserialize(toml::de::ValueDeserializer::new(&config))
+            .expect("config should be valid");
 
         // If we don't override the credentials path/API key, it tries to directly call out to the Google Instance
         // Metadata API, which we clearly don't have in unit tests. :)
@@ -493,7 +490,11 @@ mod tests {
         log.insert("anumber", Value::Bytes("100".into()));
         log.insert(
             "timestamp",
-            Value::Timestamp(Utc.ymd(2020, 1, 1).and_hms(12, 30, 0)),
+            Value::Timestamp(
+                Utc.ymd(2020, 1, 1)
+                    .and_hms_opt(12, 30, 0)
+                    .expect("invalid timestamp"),
+            ),
         );
 
         let json = encoder.encode_event(Event::from(log)).unwrap();

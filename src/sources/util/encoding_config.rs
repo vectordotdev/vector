@@ -16,5 +16,7 @@ pub struct EncodingConfig {
     /// UTF-8) is replaced with the Unicode [REPLACEMENT
     /// CHARACTER](https://en.wikipedia.org/wiki/Specials_(Unicode_block)#Replacement_character) and warnings are
     /// logged.
+    #[configurable(metadata(docs::examples = "utf-16le"))]
+    #[configurable(metadata(docs::examples = "utf-16be"))]
     pub charset: &'static encoding_rs::Encoding,
 }

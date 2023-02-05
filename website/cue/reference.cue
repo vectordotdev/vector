@@ -309,6 +309,15 @@ _values: {
 	// via the key you use.
 	name: string
 
+	// `deprecated` sets if the given field has been deprecated.
+	deprecated: bool | *false
+
+	if deprecated {
+		// If a field has been deprecated we can optionally set a deprecated
+		// message to be displayed.
+		deprecated_message?: string
+	}
+
 	// `relevant_when` clarifies when an option is relevant.
 	//
 	// For example, if an option depends on the value of another option you can
@@ -329,7 +338,7 @@ _values: {
 	warnings: [...string] | *[]
 
 	if !required {
-		// `common` specifes that the option is commonly used. It will bring the
+		// `common` specifies that the option is commonly used. It will bring the
 		// option to the top of the documents, surfacing it from other
 		// less common, options.
 		common?: bool
@@ -613,7 +622,7 @@ _values: {
 	unit?: #Unit | null
 }
 
-#Unit: "bytes" | "events" | "milliseconds" | "nanoseconds" | "requests" | "seconds" | "lines" | "concurrency"
+#Unit: "bytes" | "events" | "milliseconds" | "nanoseconds" | "requests" | "seconds" | "lines" | "concurrency" | "connections" | "tasks" | "retries"
 
 administration: _
 components:     _

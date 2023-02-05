@@ -266,7 +266,7 @@ which will cause problems for users:
    tag has multiple values, and set up a secondary tags structure that exposes the arrays. This will
    lead to all kinds of confusion and conflicts when the same tag is assigned through different
    variables.
-1. Add functions specficially for manipulating tag sets. This continues to make metrics management
+1. Add functions specifically for manipulating tag sets. This continues to make metrics management
    look like a second-class afterthought, and doesn't ease any compatibility problems for existing
    scripts.
 

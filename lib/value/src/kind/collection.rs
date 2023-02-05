@@ -192,7 +192,7 @@ impl<T: Ord + Clone> Collection<T> {
     /// For *known fields*:
     ///
     /// - If a field exists in both collections, their `Kind`s are merged, or the `other` fields
-    ///   are used (depending on the configured [`Strategy`](merge::Strategy)).
+    ///   are used (depending on the configured [`Strategy`](crate::kind::merge::Strategy)).
     ///
     /// - If a field exists in one but not the other, the field is merged with the "unknown"
     ///   of the other if it exists, or just the field is used otherwise.

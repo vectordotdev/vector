@@ -32,25 +32,30 @@ base: components: sinks: datadog_events: configuration: {
 			The default Datadog [API key][api_key] to send events with.
 
 			If an event has a Datadog [API key][api_key] set explicitly in its metadata, it will take
-			precedence over the default.
+			precedence over this setting.
 
 			[api_key]: https://docs.datadoghq.com/api/?lang=bash#authentication
 			"""
 		required: true
-		type: string: {}
+		type: string: examples: ["${DATADOG_API_KEY_ENV_VAR}", "ef8d5de700e7989468166c40fc8a0ccd"]
 	}
 	endpoint: {
-		description: "The endpoint to send events to."
-		required:    false
-		type: string: {}
-	}
-	region: {
 		description: """
-			The Datadog region to send events to.
+			The endpoint to send events to.
 
-			This option is deprecated, and the `site` field should be used instead.
+			The endpoint must contain an HTTP scheme, and may specify a
+			hostname or IP address and port.
+
+			If set, overrides the `site` option.
 			"""
 		required: false
+		type: string: examples: ["http://127.0.0.1:8080", "http://example.com:12345"]
+	}
+	region: {
+		deprecated:         true
+		deprecated_message: "This option has been deprecated, use the `site` option instead."
+		description:        "The Datadog region to send events to."
+		required:           false
 		type: string: enum: {
 			eu: "EU region."
 			us: "US region."
@@ -137,14 +142,20 @@ base: components: sinks: datadog_events: configuration: {
 				}
 			}
 			rate_limit_duration_secs: {
-				description: "The time window, in seconds, used for the `rate_limit_num` option."
+				description: "The time window used for the `rate_limit_num` option."
 				required:    false
-				type: uint: default: 1
+				type: uint: {
+					default: 1
+					unit:    "seconds"
+				}
 			}
 			rate_limit_num: {
 				description: "The maximum number of requests allowed within the `rate_limit_duration_secs` time window."
 				required:    false
-				type: uint: default: 9223372036854775807
+				type: uint: {
+					default: 9223372036854775807
+					unit:    "requests"
+				}
 			}
 			retry_attempts: {
 				description: """
@@ -153,7 +164,10 @@ base: components: sinks: datadog_events: configuration: {
 					The default, for all intents and purposes, represents an infinite number of retries.
 					"""
 				required: false
-				type: uint: default: 9223372036854775807
+				type: uint: {
+					default: 9223372036854775807
+					unit:    "retries"
+				}
 			}
 			retry_initial_backoff_secs: {
 				description: """
@@ -162,22 +176,31 @@ base: components: sinks: datadog_events: configuration: {
 					After the first retry has failed, the fibonacci sequence will be used to select future backoffs.
 					"""
 				required: false
-				type: uint: default: 1
+				type: uint: {
+					default: 1
+					unit:    "seconds"
+				}
 			}
 			retry_max_duration_secs: {
-				description: "The maximum amount of time, in seconds, to wait between retries."
+				description: "The maximum amount of time to wait between retries."
 				required:    false
-				type: uint: default: 3600
+				type: uint: {
+					default: 3600
+					unit:    "seconds"
+				}
 			}
 			timeout_secs: {
 				description: """
-					The maximum time a request can take before being aborted.
+					The time a request can take before being aborted.
 
 					It is highly recommended that you do not lower this value below the service’s internal timeout, as this could
 					create orphaned requests, pile on retries, and result in duplicate data downstream.
 					"""
 				required: false
-				type: uint: default: 60
+				type: uint: {
+					default: 60
+					unit:    "seconds"
+				}
 			}
 		}
 	}
@@ -188,7 +211,10 @@ base: components: sinks: datadog_events: configuration: {
 			[dd_site]: https://docs.datadoghq.com/getting_started/site
 			"""
 		required: false
-		type: string: {}
+		type: string: {
+			default: "datadoghq.com"
+			examples: ["us3.datadoghq.com", "datadoghq.eu"]
+		}
 	}
 	tls: {
 		description: "Configures the TLS options for incoming/outgoing connections."

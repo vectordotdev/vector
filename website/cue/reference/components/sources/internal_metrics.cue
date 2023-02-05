@@ -36,61 +36,7 @@ components: sources: internal_metrics: {
 		platform_name: null
 	}
 
-	configuration: {
-		namespace: {
-			description: "The namespace of the metric."
-			common:      false
-			required:    false
-			type: string: {
-				default: "vector"
-			}
-		}
-		scrape_interval_secs: {
-			description: "The interval between metric gathering, in seconds."
-			common:      true
-			required:    false
-			type: float: {
-				default: 1.0
-				unit:    "seconds"
-			}
-		}
-		tags: {
-			common:      false
-			description: "Metric tag options."
-			required:    false
-
-			type: object: {
-				examples: []
-				options: {
-					host_key: {
-						category:    "Context"
-						common:      false
-						description: """
-							The key name added to each event representing the current host. This can also be globally set via the
-							[global `host_key` option](\(urls.vector_configuration)/global-options#log_schema.host_key).
-
-							Set to "" to suppress this key.
-							"""
-						required:    false
-						type: string: {
-							default: "host"
-						}
-					}
-					pid_key: {
-						category: "Context"
-						common:   false
-						description: """
-							If set, will add a tag using the provided key name with a value of the current the current process ID.
-							"""
-						required: false
-						type: string: {
-							default: null
-						}
-					}
-				}
-			}
-		}
-	}
+	configuration: base.components.sources.internal_metrics.configuration
 
 	output: metrics: {
 		// Default internal metrics tags
@@ -1247,7 +1193,7 @@ components: sources: internal_metrics: {
 				"glob_failed":                 "The glob pattern match operation failed."
 				"http_error":                  "The HTTP request resulted in an error code."
 				"invalid_metric":              "The metric was invalid."
-				"kafka_offset_update":         "The comsumer offset update failed."
+				"kafka_offset_update":         "The consumer offset update failed."
 				"kafka_read":                  "The message from Kafka was invalid."
 				"mapping_failed":              "The mapping failed."
 				"match_failed":                "The match operation failed."

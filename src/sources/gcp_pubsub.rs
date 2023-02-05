@@ -167,8 +167,12 @@ pub struct PubsubConfig {
     #[serde_as(as = "serde_with::DurationSeconds<u64>")]
     pub ack_deadline_secs: Duration,
 
-    /// Deprecated, old name of `ack_deadline_secs`.
-    #[configurable(deprecated)]
+    /// The acknowledgement deadline, in seconds, to use for this stream.
+    ///
+    /// Messages that are not acknowledged when this deadline expires may be retransmitted.
+    #[configurable(
+        deprecated = "This option has been deprecated, use `ack_deadline_secs` instead."
+    )]
     pub ack_deadline_seconds: Option<u16>,
 
     /// The amount of time, in seconds, to wait between retry attempts after an error.
@@ -176,8 +180,10 @@ pub struct PubsubConfig {
     #[serde_as(as = "serde_with::DurationSeconds<f64>")]
     pub retry_delay_secs: Duration,
 
-    /// Deprecated, old name of `retry_delay_secs`.
-    #[configurable(deprecated)]
+    /// The amount of time, in seconds, to wait between retry attempts after an error.
+    #[configurable(
+        deprecated = "This option has been deprecated, use `retry_delay_secs` instead."
+    )]
     pub retry_delay_seconds: Option<f64>,
 
     /// The amount of time, in seconds, with no received activity
@@ -657,7 +663,8 @@ impl PubsubSource {
             &message.data,
             message.publish_time.map(|dt| {
                 DateTime::from_utc(
-                    NaiveDateTime::from_timestamp(dt.seconds, dt.nanos as u32),
+                    NaiveDateTime::from_timestamp_opt(dt.seconds, dt.nanos as u32)
+                        .expect("invalid timestamp"),
                     Utc,
                 )
             }),
@@ -977,7 +984,10 @@ mod integration_tests {
     fn now_trunc() -> DateTime<Utc> {
         let start = Utc::now().timestamp();
         // Truncate the milliseconds portion, the hard way.
-        DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(start, 0), Utc)
+        DateTime::<Utc>::from_utc(
+            NaiveDateTime::from_timestamp_opt(start, 0).expect("invalid timestamp"),
+            Utc,
+        )
     }
 
     struct Tester {

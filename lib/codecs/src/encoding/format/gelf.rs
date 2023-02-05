@@ -68,7 +68,7 @@ impl GelfSerializerConfig {
 }
 
 /// Serializer that converts an `Event` to bytes using the GELF format.
-/// Spec: https://docs.graylog.org/docs/gelf
+/// Spec: <https://docs.graylog.org/docs/gelf>
 #[derive(Debug, Clone)]
 pub struct GelfSerializer;
 

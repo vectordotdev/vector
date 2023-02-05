@@ -63,7 +63,7 @@ pub struct TapResource {
     pub inputs: HashMap<ComponentKey, Inputs<OutputId>>,
     // Source component keys used to warn against invalid pattern matches
     pub source_keys: Vec<String>,
-    // Sink component keys used to warn against invalid pattern amtches
+    // Sink component keys used to warn against invalid pattern matches
     pub sink_keys: Vec<String>,
     // Components removed on a reload (used to drop TapSinks)
     pub removals: HashSet<ComponentKey>,

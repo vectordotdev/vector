@@ -625,8 +625,8 @@ mod integration_tests {
         tls::{self, TlsConfig},
     };
 
-    const HTTP_URL: &str = "http://localhost:8086";
-    const HTTPS_URL: &str = "https://localhost:8087";
+    const HTTP_URL: &str = "http://influxdb-v1:8086";
+    const HTTPS_URL: &str = "https://influxdb-v1-tls:8087";
 
     #[tokio::test]
     async fn insert_metrics_over_http() {

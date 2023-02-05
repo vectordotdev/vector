@@ -44,6 +44,13 @@ pub fn changed_files() -> Result<Vec<String>> {
     Ok(sorted)
 }
 
+pub fn list_files() -> Result<Vec<String>> {
+    Ok(capture_output(&["ls-files"])?
+        .lines()
+        .map(str::to_owned)
+        .collect())
+}
+
 fn capture_output(args: &[&str]) -> Result<String> {
     Command::new("git").in_repo().args(args).capture_output()
 }

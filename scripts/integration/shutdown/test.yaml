@@ -1,0 +1,17 @@
+args:
+- --features
+- shutdown-tests
+- --test
+- integration
+- --test-threads
+- '4'
+
+env:
+  KAFKA_HOST: kafka
+
+runner:
+  env:
+    DOCKER_HOST: "http://1.1.1.1:54321/"
+
+matrix:
+  version: [latest]
