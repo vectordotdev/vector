@@ -7,3 +7,6 @@ if [[ "$(wasm-pack --version)" != "wasm-pack 0.10.3" ]] ; then
 else
     echo "wasm-pack version 0.10.3 is installed already"
 fi
+
+brew install llvm
+export PATH="/opt/homebrew/opt/llvm/bin:$PATH"
