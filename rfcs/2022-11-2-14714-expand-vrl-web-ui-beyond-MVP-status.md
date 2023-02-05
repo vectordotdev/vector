@@ -51,7 +51,7 @@ concerns have to do with.
 
 - Timeline. There's six weeks left in Jonathan's internship
 
-- Lack of customizeability, current alternatives will provide bottlenecks in the long term future for adding more features
+- Lack of customizability, current alternatives will provide bottlenecks in the long term future for adding more features
 
 ## Proposal
 
