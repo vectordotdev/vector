@@ -4711,7 +4711,7 @@ device_parsers:
 
   ##########
   # Kindle
-  # @note: Needs to be after Sony Playstation Vita as this UA contains Silk/3.2
+  # @note: Needs to be after Sony PlayStation Vita as this UA contains Silk/3.2
   # @ref: https://developer.amazon.com/sdk/fire/specifications.html
   # @ref: http://amazonsilk.wordpress.com/useful-bits/silk-user-agent/
   ##########
