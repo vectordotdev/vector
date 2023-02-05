@@ -130,7 +130,7 @@ We already have an implementation of running VRL within the graphiql
 context but as mentioned earlier in the RFC, would likely introduce
 unnecessary tech-debt in the long term, Steve mentioned the
 graphiql-react library seems to be an implementation of another
-UI library, which we should at least expirement with first before
+UI library, which we should at least experiment with first before
 solely utilizing graphiql.
 
 - Utilize a rust web framework
