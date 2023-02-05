@@ -70,7 +70,7 @@ Each with the possibility to expand with features that will
 accomplish the stretch goals.
 
 - Live deploy => we would likely require a robust component for the editors, one that handles state and context so we can add additional logic to expand to live deployment to vector instances.
-- Auto completion => we can investigate adding the AST onto the monaco editors and keeping that logic in a seperate module similar to how graphiql created codemirror-graphql we can create monaco-vrl.
+- Auto completion => we can investigate adding the AST onto the monaco editors and keeping that logic in a separate module similar to how graphiql created codemirror-graphql we can create monaco-vrl.
 - UI building blocks => will allow us to implement tabs, docs, editor buttons (sharing, copy code, etc), toolbars
 
 ## Rationale
