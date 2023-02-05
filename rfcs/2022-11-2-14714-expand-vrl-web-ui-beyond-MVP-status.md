@@ -113,7 +113,7 @@ considered due to concerns about maintainability, scope,
 
 - Utilize graphiql as a front-end library and add run_vrl
 
-This would buy us a lot of front end componenets, but after
+This would buy us a lot of front end components, but after
 diving deep into the repository, some dependencies must be
 re-written, and stripped from the context of graphql. This means
 that the project will likely cause tech debt in the long term
