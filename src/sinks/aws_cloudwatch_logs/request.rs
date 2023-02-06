@@ -104,7 +104,7 @@ impl Future for CloudwatchFuture {
                         Err(err) => {
                             if let SdkError::ServiceError(err) = &err {
                                 if let DescribeLogStreamsErrorKind::ResourceNotFoundException(_) =
-                                    err.into_err().kind
+                                    err.err().kind
                                 {
                                     if self.create_missing_group {
                                         info!("Log group provided does not exist; creating a new one.");
@@ -150,7 +150,7 @@ impl Future for CloudwatchFuture {
                         Err(err) => {
                             let resource_already_exists = match &err {
                                 SdkError::ServiceError(err) => matches!(
-                                    err.into_err().kind,
+                                    err.err().kind,
                                     CreateLogGroupErrorKind::ResourceAlreadyExistsException(_)
                                 ),
                                 _ => false,
@@ -175,7 +175,7 @@ impl Future for CloudwatchFuture {
                         Err(err) => {
                             let resource_already_exists = match &err {
                                 SdkError::ServiceError(err) => matches!(
-                                    err.into_err().kind,
+                                    err.err().kind,
                                     CreateLogStreamErrorKind::ResourceAlreadyExistsException(_)
                                 ),
                                 _ => false,
@@ -228,26 +228,27 @@ impl Client {
         let group_name = self.group_name.clone();
         let stream_name = self.stream_name.clone();
         let headers = self.headers.clone();
+
         Box::pin(async move {
-            let op = PutLogEvents::builder()
+            let mut op = PutLogEvents::builder()
                 .set_log_events(Some(log_events))
                 .set_sequence_token(sequence_token)
                 .log_group_name(group_name)
                 .log_stream_name(stream_name)
                 .build()
-                .map_err(|err| SdkError::ConstructionFailure(err.into()))?
+                .map_err(|err| SdkError::construction_failure(err))?
                 .make_operation(cw_client.conf())
                 .await
-                .map_err(|err| SdkError::ConstructionFailure(err.into()))?;
+                .map_err(|err| SdkError::construction_failure(err))?;
 
             for (header, value) in headers.iter() {
                 let owned_header = header.clone();
                 let owned_value = value.clone();
                 op.request_mut().headers_mut().insert(
                     HeaderName::from_bytes(owned_header.as_bytes())
-                        .map_err(|err| SdkError::ConstructionFailure(err.into()))?,
+                        .map_err(|err| SdkError::construction_failure(err))?,
                     HeaderValue::from_str(owned_value.as_str())
-                        .map_err(|err| SdkError::ConstructionFailure(err.into()))?,
+                        .map_err(|err| SdkError::construction_failure(err))?,
                 );
             }
 

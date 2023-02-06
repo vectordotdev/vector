@@ -41,38 +41,15 @@ pub fn is_retriable_error<T>(error: &SdkError<T>) -> bool {
     match error {
         SdkError::TimeoutError(_) | SdkError::DispatchFailure(_) => true,
         SdkError::ConstructionFailure(_) => false,
-        SdkError::ResponseError { 0: inner } | SdkError::ServiceError { 0: inner } => {
-            let raw = inner.into_raw();
-            // This header is a direct indication that we should retry the request. Eventually it'd
-            // be nice to actually schedule the retry after the given delay, but for now we just
-            // check that it contains a positive value.
-            let retry_header = raw.http().headers().get("x-amz-retry-after").is_some();
+        SdkError::ResponseError(err) => {
+            let raw = err.raw();
 
-            // Certain 400-level responses will contain an error code indicating that the request
-            // should be retried. Since we don't retry 400-level responses by default, we'll look
-            // for these specifically before falling back to more general heuristics. Because AWS
-            // services use a mix of XML and JSON response bodies and the AWS SDK doesn't give us
-            // a parsed representation, we resort to a simple string match.
-            //
-            // S3: RequestTimeout
-            // SQS: RequestExpired, ThrottlingException
-            // ECS: RequestExpired, ThrottlingException
-            // Kinesis: RequestExpired, ThrottlingException
-            // Cloudwatch: RequestExpired, ThrottlingException
-            //
-            // Now just look for those when it's a client_error
-            let re = RETRIABLE_CODES.get_or_init(|| {
-                RegexSet::new(["RequestTimeout", "RequestExpired", "ThrottlingException"])
-                    .expect("invalid regex")
-            });
+            check_response(raw)
+        }
+        SdkError::ServiceError(err) => {
+            let raw = err.raw();
 
-            let status = raw.http().status();
-            let response_body = String::from_utf8_lossy(raw.http().body().bytes().unwrap_or(&[]));
-
-            retry_header
-                || status.is_server_error()
-                || status == http::StatusCode::TOO_MANY_REQUESTS
-                || (status.is_client_error() && re.is_match(response_body.as_ref()))
+            check_response(raw)
         }
         _ => {
             // TODO make sure this message is useful for users
@@ -80,6 +57,39 @@ pub fn is_retriable_error<T>(error: &SdkError<T>) -> bool {
             true
         }
     }
+}
+
+fn check_response(res: &Response) -> bool {
+    // This header is a direct indication that we should retry the request. Eventually it'd
+    // be nice to actually schedule the retry after the given delay, but for now we just
+    // check that it contains a positive value.
+    let retry_header = res.http().headers().get("x-amz-retry-after").is_some();
+
+    // Certain 400-level responses will contain an error code indicating that the request
+    // should be retried. Since we don't retry 400-level responses by default, we'll look
+    // for these specifically before falling back to more general heuristics. Because AWS
+    // services use a mix of XML and JSON response bodies and the AWS SDK doesn't give us
+    // a parsed representation, we resort to a simple string match.
+    //
+    // S3: RequestTimeout
+    // SQS: RequestExpired, ThrottlingException
+    // ECS: RequestExpired, ThrottlingException
+    // Kinesis: RequestExpired, ThrottlingException
+    // Cloudwatch: RequestExpired, ThrottlingException
+    //
+    // Now just look for those when it's a client_error
+    let re = RETRIABLE_CODES.get_or_init(|| {
+        RegexSet::new(["RequestTimeout", "RequestExpired", "ThrottlingException"])
+            .expect("invalid regex")
+    });
+
+    let status = res.http().status();
+    let response_body = String::from_utf8_lossy(res.http().body().bytes().unwrap_or(&[]));
+
+    retry_header
+        || status.is_server_error()
+        || status == http::StatusCode::TOO_MANY_REQUESTS
+        || (status.is_client_error() && re.is_match(response_body.as_ref()))
 }
 
 pub trait ClientBuilder {
@@ -313,7 +323,7 @@ impl MeasuredBody {
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
     ) -> Poll<Option<Result<Bytes, aws_smithy_http::body::Error>>> {
-        let mut this = self.project();
+        let this = self.project();
 
         match this.inner.poll_data(cx) {
             Poll::Ready(Some(Ok(data))) => {

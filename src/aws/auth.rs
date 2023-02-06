@@ -195,7 +195,8 @@ async fn default_credentials_provider(
         .build()
         .await;
 
-    let credentials_cache = CredentialsCache::lazy_builder()
+    // TODO
+    let _credentials_cache = CredentialsCache::lazy_builder()
         .load_timeout(
             load_timeout_secs
                 .map(Duration::from_secs)

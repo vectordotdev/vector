@@ -181,9 +181,7 @@ impl RetryLogic for KinesisRetryLogic {
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
         if let SdkError::ServiceError(err) = error {
-            if let PutRecordsErrorKind::ProvisionedThroughputExceededException(_) =
-                err.into_err().kind
-            {
+            if let PutRecordsErrorKind::ProvisionedThroughputExceededException(_) = err.err().kind {
                 return true;
             }
         }
