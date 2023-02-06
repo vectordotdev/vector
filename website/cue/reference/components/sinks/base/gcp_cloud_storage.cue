@@ -131,7 +131,7 @@ base: components: sinks: gcp_cloud_storage: configuration: {
 	bucket: {
 		description: "The GCS bucket name."
 		required:    true
-		type: string: {}
+		type: string: examples: ["my-bucket"]
 	}
 	compression: {
 		description: """
@@ -299,11 +299,15 @@ base: components: sinks: gcp_cloud_storage: configuration: {
 			object keys must be unique.
 			"""
 		required: false
-		type: bool: {}
+		type: bool: default: true
 	}
 	filename_extension: {
-		description: "The filename extension to use in the object key."
-		required:    false
+		description: """
+			The filename extension to use in the object key.
+
+			If not specified the extension will be determined by the compression scheme used.
+			"""
+		required: false
 		type: string: {}
 	}
 	filename_time_format: {
@@ -326,7 +330,7 @@ base: components: sinks: gcp_cloud_storage: configuration: {
 			[chrono_strftime_specifiers]: https://docs.rs/chrono/latest/chrono/format/strftime/index.html#specifiers
 			"""
 		required: false
-		type: string: {}
+		type: string: default: "%s"
 	}
 	framing: {
 		description: "Framing configuration."
@@ -367,7 +371,10 @@ base: components: sinks: gcp_cloud_storage: configuration: {
 			in `/` in order to act as a directory path: Vector will **not** add a trailing `/` automatically.
 			"""
 		required: false
-		type: string: syntax: "template"
+		type: string: {
+			examples: ["date=%F/", "date=%F/hour=%H/", "year=%Y/month=%m/day=%d/", "application_id={{ application_id }}/date=%F/"]
+			syntax: "template"
+		}
 	}
 	metadata: {
 		description: """
