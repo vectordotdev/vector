@@ -8,7 +8,7 @@ readme = "README.md"
 publish = false
 
 [dependencies]
-anyhow = "1.0.66"
+anyhow = "1.0.69"
 atty = "0.2.14"
 cached = "0.42.0"
 clap = { version = "4.1.4", features = ["derive"] }

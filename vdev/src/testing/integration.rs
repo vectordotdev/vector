@@ -31,12 +31,7 @@ impl IntegrationTest {
             bail!("Could not find environment named {environment:?}");
         };
         let network_name = format!("vector-integration-tests-{integration}");
-        let compose = Compose::new(
-            integration.clone(),
-            test_dir,
-            env_config.clone(),
-            Some(network_name.clone()),
-        )?;
+        let compose = Compose::new(test_dir, env_config.clone(), Some(network_name.clone()))?;
         let runner = IntegrationTestRunner::new(
             integration.clone(),
             &config.runner,
@@ -64,7 +59,7 @@ impl IntegrationTest {
 
         let mut env_vars = self.config.env.clone();
         // Make sure the test runner has the same config environment vars as the services do.
-        if let Some((key, value)) = config_env(&self.integration, &self.env_config) {
+        for (key, value) in config_env(&self.env_config) {
             env_vars.insert(key, Some(value));
         }
         let mut args = self.config.args.clone();
@@ -113,7 +108,6 @@ impl IntegrationTest {
 }
 
 struct Compose {
-    base: String,
     path: PathBuf,
     test_dir: PathBuf,
     env: Environment,
@@ -122,12 +116,7 @@ struct Compose {
 }
 
 impl Compose {
-    fn new(
-        base: String,
-        test_dir: PathBuf,
-        env: Environment,
-        network: Option<String>,
-    ) -> Result<Option<Self>> {
+    fn new(test_dir: PathBuf, env: Environment, network: Option<String>) -> Result<Option<Self>> {
         let path: PathBuf = [&test_dir, Path::new("compose.yaml")].iter().collect();
         match path.try_exists() {
             Err(error) => Err(error).with_context(|| format!("Could not lookup {path:?}")),
@@ -135,7 +124,6 @@ impl Compose {
             Ok(true) => {
                 let config = ComposeConfig::parse(&path)?;
                 Ok(Some(Self {
-                    base,
                     path,
                     test_dir,
                     env,
@@ -176,7 +164,7 @@ impl Compose {
             }
         }
         if let Some(config) = config {
-            command.envs(config_env(&self.base, config));
+            command.envs(config_env(config));
         }
 
         waiting!("{action} service environment");
@@ -192,15 +180,15 @@ impl Compose {
     }
 }
 
-fn config_env(name: &str, config: &Environment) -> Option<(String, String)> {
-    // TODO: Export all config variables, not just `version`
-    match config.get("version") {
-        Some(Some(version)) => Some((
-            format!("{}_VERSION", name.replace('-', "_").to_uppercase()),
-            version.to_string(),
-        )),
-        _ => None,
-    }
+fn config_env(config: &Environment) -> impl Iterator<Item = (String, String)> + '_ {
+    config.iter().filter_map(|(var, value)| {
+        value.as_ref().map(|value| {
+            (
+                format!("CONFIG_{}", var.replace('-', "_").to_uppercase()),
+                value.to_string(),
+            )
+        })
+    })
 }
 
 #[cfg(unix)]

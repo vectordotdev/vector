@@ -2,7 +2,7 @@ version: '3'
 
 services:
   clickhouse:
-    image: docker.io/yandex/clickhouse-server:${CLICKHOUSE_VERSION}
+    image: docker.io/yandex/clickhouse-server:${CONFIG_VERSION}
 
 networks:
   default:
