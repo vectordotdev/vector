@@ -15,3 +15,6 @@ services:
 networks:
   default:
     name: ${VECTOR_NETWORK}
+
+volumes:
+  socket: {}

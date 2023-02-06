@@ -6,6 +6,7 @@ use anyhow::{bail, Context, Result};
 use hashlink::LinkedHashMap;
 use itertools::{self, Itertools};
 use serde::Deserialize;
+use serde_yaml::Value;
 
 use crate::{app, util};
 
@@ -39,6 +40,8 @@ impl RustToolchainConfig {
 #[derive(Debug, Deserialize)]
 pub struct ComposeConfig {
     pub services: BTreeMap<String, ComposeService>,
+    #[serde(default)]
+    pub volumes: BTreeMap<String, Value>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -85,7 +88,7 @@ pub struct IntegrationRunnerConfig {
     pub volumes: BTreeMap<String, String>,
     /// Does the test runner need access to the host's docker socket?
     #[serde(default)]
-    pub needs_docker_sock: bool,
+    pub needs_docker_socket: bool,
 }
 
 impl IntegrationTestConfig {

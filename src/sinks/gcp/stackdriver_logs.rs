@@ -384,6 +384,7 @@ mod tests {
     use chrono::{TimeZone, Utc};
     use futures::{future::ready, stream};
     use indoc::indoc;
+    use serde::Deserialize;
     use serde_json::value::RawValue;
 
     use super::*;
@@ -406,8 +407,8 @@ mod tests {
         let mock_endpoint = spawn_blackhole_http_server(always_200_response).await;
 
         let config = StackdriverConfig::generate_config().to_string();
-        let mut config =
-            toml::from_str::<StackdriverConfig>(&config).expect("config should be valid");
+        let mut config = StackdriverConfig::deserialize(toml::de::ValueDeserializer::new(&config))
+            .expect("config should be valid");
 
         // If we don't override the credentials path/API key, it tries to directly call out to the Google Instance
         // Metadata API, which we clearly don't have in unit tests. :)

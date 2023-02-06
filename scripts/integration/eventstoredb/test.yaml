@@ -1,5 +1,4 @@
 args:
-- --no-default-features
 - --features
 - eventstoredb_metrics-integration-tests
 - --lib

@@ -6,8 +6,6 @@ services:
     environment:
       POSTGRES_USER: axiom
       POSTGRES_PASSWORD: axiom
-    volumes:
-    - postgres_data:/var/lib/postgresql/data
   axiom-db:
     image: axiomhq/axiom-db:latest
     restart: unless-stopped
