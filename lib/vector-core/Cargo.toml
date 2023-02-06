@@ -34,7 +34,7 @@ openssl = { version = "0.10.45", default-features = false, features = ["vendored
 ordered-float = { version = "3.4.0", default-features = false }
 parking_lot = { version = "0.12.1", default-features = false }
 pin-project = { version = "1.0.12", default-features = false }
-proptest = { version = "1.0", optional = true }
+proptest = { version = "1.1", optional = true }
 prost-types = { version = "0.11.6", default-features = false }
 prost = { version = "0.11.6", default-features = false, features = ["std"] }
 quanta = { version = "0.10.1", default-features = false }
@@ -86,7 +86,7 @@ criterion = { version = "0.4.0", features = ["html_reports"] }
 env-test-util = "1.0.1"
 quickcheck = "1"
 quickcheck_macros = "1"
-proptest = "1.0"
+proptest = "1.1"
 similar-asserts = "1.4.2"
 tokio-test = "0.4.2"
 ndarray = "0.15.6"
