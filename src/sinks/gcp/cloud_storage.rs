@@ -125,7 +125,7 @@ pub struct GcsSinkConfig {
 
     /// The filename extension to use in the object key.
     ///
-    /// If not specified the extension will be determined by the compression scheme used.
+    /// If not specified, the extension will be determined by the compression scheme used.
     filename_extension: Option<String>,
 
     #[serde(flatten)]

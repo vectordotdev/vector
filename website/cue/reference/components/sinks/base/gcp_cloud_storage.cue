@@ -305,7 +305,7 @@ base: components: sinks: gcp_cloud_storage: configuration: {
 		description: """
 			The filename extension to use in the object key.
 
-			If not specified the extension will be determined by the compression scheme used.
+			If not specified, the extension will be determined by the compression scheme used.
 			"""
 		required: false
 		type: string: {}
