@@ -3,6 +3,7 @@ use std::time::Duration;
 use aws_config::{
     default_provider::credentials::DefaultCredentialsChain, imds, sts::AssumeRoleProviderBuilder,
 };
+use aws_credential_types::cache::CredentialsCache;
 use aws_credential_types::{provider::SharedCredentialsProvider, Credentials};
 use aws_types::region::Region;
 use serde_with::serde_as;
@@ -188,16 +189,21 @@ async fn default_credentials_provider(
         .build()
         .await?;
 
-    let chain = DefaultCredentialsChain::builder()
+    let credentials_provider = DefaultCredentialsChain::builder()
         .region(region)
         .imds_client(client)
+        .build()
+        .await;
+
+    let credentials_cache = CredentialsCache::lazy_builder()
         .load_timeout(
             load_timeout_secs
                 .map(Duration::from_secs)
                 .unwrap_or(DEFAULT_LOAD_TIMEOUT),
-        );
+        )
+        .into_credentials_cache();
 
-    Ok(SharedCredentialsProvider::new(chain.build().await))
+    Ok(SharedCredentialsProvider::new(credentials_provider))
 }
 
 #[cfg(test)]

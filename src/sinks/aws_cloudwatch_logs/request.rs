@@ -101,9 +101,9 @@ impl Future for CloudwatchFuture {
                     let response = match ready!(fut.poll_unpin(cx)) {
                         Ok(response) => response,
                         Err(err) => {
-                            if let SdkError::ServiceError { err, raw: _ } = &err {
+                            if let SdkError::ServiceError(err) = &err {
                                 if let DescribeLogStreamsErrorKind::ResourceNotFoundException(_) =
-                                    err.kind
+                                    err.into_err().kind
                                 {
                                     if self.create_missing_group {
                                         info!("Log group provided does not exist; creating a new one.");
@@ -148,8 +148,8 @@ impl Future for CloudwatchFuture {
                         Ok(_) => {}
                         Err(err) => {
                             let resource_already_exists = match &err {
-                                SdkError::ServiceError { err, raw: _ } => matches!(
-                                    err.kind,
+                                SdkError::ServiceError(err) => matches!(
+                                    err.into_err().kind,
                                     CreateLogGroupErrorKind::ResourceAlreadyExistsException(_)
                                 ),
                                 _ => false,
@@ -173,8 +173,8 @@ impl Future for CloudwatchFuture {
                         Ok(_) => {}
                         Err(err) => {
                             let resource_already_exists = match &err {
-                                SdkError::ServiceError { err, raw: _ } => matches!(
-                                    err.kind,
+                                SdkError::ServiceError(err) => matches!(
+                                    err.into_err().kind,
                                     CreateLogStreamErrorKind::ResourceAlreadyExistsException(_)
                                 ),
                                 _ => false,
@@ -228,6 +228,7 @@ impl Client {
         let stream_name = self.stream_name.clone();
         let headers = self.headers.clone();
         Box::pin(async move {
+            // TODO this should be easier now
             // #12760 this is a relatively convoluted way of changing the headers of a request
             // about to be sent. https://github.com/awslabs/aws-sdk-rust/issues/537 should
             // eventually make this better.

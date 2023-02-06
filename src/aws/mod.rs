@@ -41,7 +41,8 @@ pub fn is_retriable_error<T>(error: &SdkError<T>) -> bool {
     match error {
         SdkError::TimeoutError(_) | SdkError::DispatchFailure(_) => true,
         SdkError::ConstructionFailure(_) => false,
-        SdkError::ResponseError { err: _, raw } | SdkError::ServiceError { err: _, raw } => {
+        SdkError::ResponseError { 0: inner } | SdkError::ServiceError { 0: inner } => {
+            let raw = inner.into_raw();
             // This header is a direct indication that we should retry the request. Eventually it'd
             // be nice to actually schedule the retry after the given delay, but for now we just
             // check that it contains a positive value.
@@ -72,6 +73,10 @@ pub fn is_retriable_error<T>(error: &SdkError<T>) -> bool {
                 || status.is_server_error()
                 || status == http::StatusCode::TOO_MANY_REQUESTS
                 || (status.is_client_error() && re.is_match(response_body.as_ref()))
+        }
+        _ => {
+            warn!("Unhandled SdkError please report this, retrying request");
+            true
         }
     }
 }
@@ -252,6 +257,8 @@ where
         let maybe_bytes_sent = self.enabled.then(|| {
             let shared_bytes_sent = Arc::new(AtomicUsize::new(0));
 
+            // let (request, bag) = req.into_parts();
+            // let (parts, sdkbody) = request.into_parts();
             req.http_mut()
                 .body_mut()
                 .map(|body| MeasuredBody::new(body, shared_bytes_sent.clone()).inner);
@@ -290,7 +297,6 @@ where
 struct MeasuredBody {
     #[pin]
     inner: SdkBody,
-    bytes_sent: usize,
     shared_bytes_sent: Arc<AtomicUsize>,
 }
 
@@ -298,7 +304,6 @@ impl MeasuredBody {
     fn new(body: SdkBody, shared_bytes_sent: Arc<AtomicUsize>) -> Self {
         Self {
             inner: body,
-            bytes_sent: 0,
             shared_bytes_sent,
         }
     }
@@ -311,13 +316,12 @@ impl MeasuredBody {
 
         match this.inner.poll_data(cx) {
             Poll::Ready(Some(Ok(data))) => {
-                this.bytes_sent += data.len();
+                this.shared_bytes_sent
+                    .fetch_add(data.len(), Ordering::Release);
 
                 Poll::Ready(Some(Ok(data)))
             }
-            Poll::Ready(None) => this
-                .shared_bytes_sent
-                .store(*this.bytes_sent, Ordering::Release),
+            Poll::Ready(None) => Poll::Ready(None),
             Poll::Ready(Some(Err(e))) => Poll::Ready(Some(Err(e))),
             Poll::Pending => Poll::Pending,
         }

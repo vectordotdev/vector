@@ -114,7 +114,7 @@ impl KinesisStreamsSinkConfig {
         create_client::<KinesisClientBuilder>(
             &self.base.auth,
             self.base.region.region(),
-            self.base.region.endpoint()?,
+            self.base.region.endpoint(),
             proxy,
             &self.base.tls,
             true,
@@ -180,8 +180,10 @@ impl RetryLogic for KinesisRetryLogic {
     type Response = KinesisResponse;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
-        if let SdkError::ServiceError { err, raw: _ } = error {
-            if let PutRecordsErrorKind::ProvisionedThroughputExceededException(_) = err.kind {
+        if let SdkError::ServiceError(err) = error {
+            if let PutRecordsErrorKind::ProvisionedThroughputExceededException(_) =
+                err.into_err().kind
+            {
                 return true;
             }
         }

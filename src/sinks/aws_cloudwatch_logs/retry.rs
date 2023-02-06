@@ -36,24 +36,30 @@ impl<T: Send + Sync + 'static> RetryLogic for CloudwatchRetryLogic<T> {
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
         match error {
             CloudwatchError::Put(err) => {
-                if let SdkError::ServiceError { err, raw: _ } = err {
-                    if let PutLogEventsErrorKind::ServiceUnavailableException(_) = err.kind {
+                if let SdkError::ServiceError(_) = err {
+                    if let PutLogEventsErrorKind::ServiceUnavailableException(_) =
+                        err.into_service_error().kind
+                    {
                         return true;
                     }
                 }
                 is_retriable_error(err)
             }
             CloudwatchError::Describe(err) => {
-                if let SdkError::ServiceError { err, raw: _ } = err {
-                    if let DescribeLogStreamsErrorKind::ServiceUnavailableException(_) = err.kind {
+                if let SdkError::ServiceError(_) = err {
+                    if let DescribeLogStreamsErrorKind::ServiceUnavailableException(_) =
+                        err.into_service_error().kind
+                    {
                         return true;
                     }
                 }
                 is_retriable_error(err)
             }
             CloudwatchError::CreateStream(err) => {
-                if let SdkError::ServiceError { err, raw: _ } = err {
-                    if let CreateLogStreamErrorKind::ServiceUnavailableException(_) = err.kind {
+                if let SdkError::ServiceError(_) = err {
+                    if let CreateLogStreamErrorKind::ServiceUnavailableException(_) =
+                        err.into_service_error().kind
+                    {
                         return true;
                     }
                 }

@@ -142,7 +142,7 @@ impl SqsSinkConfig {
         create_client::<SqsClientBuilder>(
             &self.auth,
             self.region.region(),
-            self.region.endpoint()?,
+            self.region.endpoint(),
             proxy,
             &self.tls,
             true,
