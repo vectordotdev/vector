@@ -24,6 +24,11 @@ A **metric** event represents a numerical operation performed on a time series. 
 
 {{< jump "/docs/about/under-the-hood/architecture/data-model/metric" >}}
 
+### Traces
+
+A **trace** event can be thought of as a special kind of log event. Currently Vector only supports trace events for the `datadog_agent` source, and the `datadog_traces` sink.
+Support for trace events in other components will be added on a case by case basis.
+
 ## Components
 
 **Component** is the generic term for [sources], [transforms], and [sinks]. Components ingest, transform, and route events. You compose components to create [topologies].
