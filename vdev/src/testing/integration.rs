@@ -2,7 +2,7 @@ use std::{path::Path, path::PathBuf, process::Command};
 
 use anyhow::{bail, Context, Result};
 
-use super::config::{Environment, IntegrationTestConfig};
+use super::config::{ComposeConfig, Environment, IntegrationTestConfig};
 use super::runner::{
     ContainerTestRunner as _, IntegrationTestRunner, TestRunner as _, CONTAINER_TOOL, DOCKER_SOCKET,
 };
@@ -14,11 +14,10 @@ const NETWORK_ENV_VAR: &str = "VECTOR_NETWORK";
 pub struct IntegrationTest {
     integration: String,
     environment: String,
-    test_dir: PathBuf,
     config: IntegrationTestConfig,
     envs_dir: EnvsDir,
     runner: IntegrationTestRunner,
-    compose_path: Option<PathBuf>,
+    compose: Option<Compose>,
     env_config: Environment,
 }
 
@@ -28,29 +27,24 @@ impl IntegrationTest {
         let environment = environment.into();
         let (test_dir, config) = IntegrationTestConfig::load(&integration)?;
         let envs_dir = EnvsDir::new(&integration);
-        let compose_path: PathBuf = [&test_dir, Path::new("compose.yaml")].iter().collect();
         let Some(env_config) = config.environments().get(&environment).map(Clone::clone) else {
             bail!("Could not find environment named {environment:?}");
         };
-        // TODO: Wrap up the optional compose logic in another type
-        let compose_path = compose_path
-            .try_exists()
-            .with_context(|| format!("Could not lookup {compose_path:?}"))?
-            .then_some(compose_path);
+        let network_name = format!("vector-integration-tests-{integration}");
+        let compose = Compose::new(test_dir, env_config.clone(), Some(network_name.clone()))?;
         let runner = IntegrationTestRunner::new(
             integration.clone(),
             &config.runner,
-            compose_path.is_some(),
+            compose.is_some().then_some(network_name),
         )?;
 
         Ok(Self {
             integration,
             environment,
-            test_dir,
             config,
             envs_dir,
             runner,
-            compose_path,
+            compose,
             env_config,
         })
     }
@@ -65,7 +59,7 @@ impl IntegrationTest {
 
         let mut env_vars = self.config.env.clone();
         // Make sure the test runner has the same config environment vars as the services do.
-        for (key, value) in Self::config_env(&self.env_config) {
+        for (key, value) in config_env(&self.env_config) {
             env_vars.insert(key, Some(value));
         }
         let mut args = self.config.args.clone();
@@ -82,14 +76,14 @@ impl IntegrationTest {
 
     pub fn start(&self) -> Result<()> {
         self.config.check_required()?;
-        if self.compose_path.is_some() {
+        if let Some(compose) = &self.compose {
             self.runner.ensure_network()?;
 
             if self.envs_dir.check_active(&self.environment)? {
                 bail!("environment is already up");
             }
 
-            self.run_compose("Starting", &["up", "--detach"], &self.env_config)?;
+            compose.start(&self.env_config)?;
 
             self.envs_dir.save(&self.environment, &self.env_config)
         } else {
@@ -98,69 +92,103 @@ impl IntegrationTest {
     }
 
     pub fn stop(&self) -> Result<()> {
-        if self.compose_path.is_some() {
-            let Some(state) = self.envs_dir.load()? else {
-                bail!("No environment for {} is up.",self.integration);
-            };
+        if let Some(compose) = &self.compose {
+            // TODO: Is this check really needed?
+            if self.envs_dir.load()?.is_none() {
+                bail!("No environment for {} is up.", self.integration);
+            }
 
             self.runner.remove()?;
-            self.run_compose(
-                "Stopping",
-                &["down", "--timeout", "0", "--volumes"],
-                &state.config,
-            )?;
+            compose.stop()?;
             self.envs_dir.remove()?;
         }
 
         Ok(())
     }
+}
 
-    fn run_compose(&self, action: &str, args: &[&'static str], config: &Environment) -> Result<()> {
-        if let Some(compose_path) = &self.compose_path {
-            #[cfg(unix)]
-            if args[0] == "up" {
-                // This preparation step is safe to do every time compose is run, but is only really
-                // necessary when bring up the volumes.
-                unix::prepare_compose_volumes(compose_path, &self.test_dir)?;
+struct Compose {
+    path: PathBuf,
+    test_dir: PathBuf,
+    env: Environment,
+    config: ComposeConfig,
+    network: Option<String>,
+}
+
+impl Compose {
+    fn new(test_dir: PathBuf, env: Environment, network: Option<String>) -> Result<Option<Self>> {
+        let path: PathBuf = [&test_dir, Path::new("compose.yaml")].iter().collect();
+        match path.try_exists() {
+            Err(error) => Err(error).with_context(|| format!("Could not lookup {path:?}")),
+            Ok(false) => Ok(None),
+            Ok(true) => {
+                let config = ComposeConfig::parse(&path)?;
+                Ok(Some(Self {
+                    path,
+                    test_dir,
+                    env,
+                    config,
+                    network,
+                }))
             }
+        }
+    }
 
-            let mut command = CONTAINER_TOOL.clone();
-            command.push("-compose");
-            let mut command = Command::new(command);
-            let compose_arg = compose_path.display().to_string();
-            command.args(["--file", &compose_arg]);
-            command.args(args);
+    fn start(&self, config: &Environment) -> Result<()> {
+        self.prepare()?;
+        self.run("Starting", &["up", "--detach"], Some(config))
+    }
 
-            command.current_dir(&self.test_dir);
+    fn stop(&self) -> Result<()> {
+        // The config settings are not needed when stopping a compose setup.
+        self.run("Stopping", &["down", "--timeout", "0", "--volumes"], None)
+    }
 
-            command.env("DOCKER_SOCKET", &*DOCKER_SOCKET);
-            if let Some(network_name) = self.runner.network_name() {
-                command.env(NETWORK_ENV_VAR, network_name);
+    fn run(&self, action: &str, args: &[&'static str], config: Option<&Environment>) -> Result<()> {
+        let mut command = CONTAINER_TOOL.clone();
+        command.push("-compose");
+        let mut command = Command::new(command);
+        command.arg("--file");
+        command.arg(&self.path);
+        command.args(args);
+
+        command.current_dir(&self.test_dir);
+
+        command.env("DOCKER_SOCKET", &*DOCKER_SOCKET);
+        if let Some(network_name) = &self.network {
+            command.env(NETWORK_ENV_VAR, network_name);
+        }
+        for (key, value) in &self.env {
+            if let Some(value) = value {
+                command.env(key, value);
             }
-            for (key, value) in &self.config.env {
-                if let Some(value) = value {
-                    command.env(key, value);
-                }
-            }
-            command.envs(Self::config_env(config));
+        }
+        if let Some(config) = config {
+            command.envs(config_env(config));
+        }
 
-            waiting!("{action} environment {}", self.environment);
-            command.check_run()
+        waiting!("{action} service environment");
+        command.check_run()
+    }
+
+    fn prepare(&self) -> Result<()> {
+        if cfg!(unix) {
+            unix::prepare_compose_volumes(&self.config, &self.test_dir)
         } else {
             Ok(())
         }
     }
+}
 
-    fn config_env(config: &Environment) -> impl Iterator<Item = (String, String)> + '_ {
-        config.iter().filter_map(|(var, value)| {
-            value.as_ref().map(|value| {
-                (
-                    format!("CONFIG_{}", var.replace('-', "_").to_uppercase()),
-                    value.to_string(),
-                )
-            })
+fn config_env(config: &Environment) -> impl Iterator<Item = (String, String)> + '_ {
+    config.iter().filter_map(|(var, value)| {
+        value.as_ref().map(|value| {
+            (
+                format!("CONFIG_{}", var.replace('-', "_").to_uppercase()),
+                value.to_string(),
+            )
         })
-    }
+    })
 }
 
 #[cfg(unix)]
@@ -179,9 +207,8 @@ mod unix {
     const ALL_READ_DIR: u32 = 0o555;
 
     /// Fix up potential issues before starting a compose container
-    pub fn prepare_compose_volumes(path: &Path, test_dir: &Path) -> Result<()> {
-        let compose_config = ComposeConfig::parse(path)?;
-        for service in compose_config.services.values() {
+    pub fn prepare_compose_volumes(config: &ComposeConfig, test_dir: &Path) -> Result<()> {
+        for service in config.services.values() {
             // Make sure all volume files are world readable
             if let Some(volumes) = &service.volumes {
                 for volume in volumes {
@@ -190,7 +217,7 @@ mod unix {
                         .expect("Invalid volume in compose file")
                         .0;
                     // Only fixup relative paths, i.e. within our source tree.
-                    if !compose_config.volumes.contains_key(source)
+                    if !config.volumes.contains_key(source)
                         && !source.starts_with('/')
                         && !source.starts_with('$')
                     {
