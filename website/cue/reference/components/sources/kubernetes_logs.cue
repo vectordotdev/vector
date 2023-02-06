@@ -43,9 +43,8 @@ components: sources: kubernetes_logs: {
 				[Kubernetes](\(urls.kubernetes)) version `\(services.kubernetes.versions)` is required.
 				""",
 			"""
-				This source reads log files from the host, *not* the Kubernetes API. If Vector is running within Kubernetes,
-				the directory `/var/log/pods` must be mounted into the Vector container using a `hostPath` volume. More information
-				about `hostPath` volumes can found [here](\(urls.kubernetes_host_path)).
+				This source requires read access to the `/var/log/pods` directory. When run in a
+				Kubernetes cluster this can be provided with a [hostPath](\(urls.kubernetes_host_path)) volume.
 				""",
 		]
 		warnings: []
