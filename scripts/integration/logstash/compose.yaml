@@ -2,7 +2,7 @@ version: '3'
 
 services:
   beats-heartbeat:
-    image: docker.elastic.co/beats/heartbeat:${LOGSTASH_VERSION}
+    image: docker.elastic.co/beats/heartbeat:${CONFIG_VERSION}
     command: -environment=container -strict.perms=false
     volumes:
     - ../../../tests/data/logstash/heartbeat.yml:/usr/share/heartbeat/heartbeat.yml:ro

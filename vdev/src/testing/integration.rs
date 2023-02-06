@@ -65,7 +65,7 @@ impl IntegrationTest {
 
         let mut env_vars = self.config.env.clone();
         // Make sure the test runner has the same config environment vars as the services do.
-        if let Some((key, value)) = self.config_env(&self.env_config) {
+        for (key, value) in Self::config_env(&self.env_config) {
             env_vars.insert(key, Some(value));
         }
         let mut args = self.config.args.clone();
@@ -142,7 +142,7 @@ impl IntegrationTest {
                     command.env(key, value);
                 }
             }
-            command.envs(self.config_env(config));
+            command.envs(Self::config_env(config));
 
             waiting!("{action} environment {}", self.environment);
             command.check_run()
@@ -151,18 +151,15 @@ impl IntegrationTest {
         }
     }
 
-    fn config_env(&self, config: &Environment) -> Option<(String, String)> {
-        // TODO: Export all config variables, not just `version`
-        match config.get("version") {
-            Some(Some(version)) => Some((
-                format!(
-                    "{}_VERSION",
-                    self.integration.replace('-', "_").to_uppercase()
-                ),
-                version.to_string(),
-            )),
-            _ => None,
-        }
+    fn config_env(config: &Environment) -> impl Iterator<Item = (String, String)> + '_ {
+        config.iter().filter_map(|(var, value)| {
+            value.as_ref().map(|value| {
+                (
+                    format!("CONFIG_{}", var.replace('-', "_").to_uppercase()),
+                    value.to_string(),
+                )
+            })
+        })
     }
 }
 
