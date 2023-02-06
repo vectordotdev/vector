@@ -434,7 +434,8 @@ impl HttpSource for SimpleHttpSource {
         let mut decoder = self.decoder.clone();
         let mut events = Vec::new();
         let mut bytes = BytesMut::new();
-        bytes.extend_from_slice(&body);
+        let body = String::from_utf8_lossy(&body);
+        bytes.extend_from_slice(body.as_bytes());
 
         loop {
             match decoder.decode_eof(&mut bytes) {
@@ -877,6 +878,42 @@ mod tests {
             let mut map = BTreeMap::new();
             map.insert("dotted.key2".to_string(), Value::from("value2"));
             assert_eq!(log["nested"], map.into());
+        }
+    }
+
+    #[tokio::test]
+    async fn http_json_non_utf8() {
+        let mut events = assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+            let (rx, addr) = source(
+                vec![],
+                vec![],
+                "http_path",
+                "/",
+                "POST",
+                true,
+                EventStatus::Delivered,
+                true,
+                None,
+                Some(JsonDeserializerConfig::new().into()),
+            )
+            .await;
+
+            spawn_collect_n(
+                async move {
+                    assert_eq!(200, send(addr, b"{\"key\": \"A non UTF8 character \xE4\"} ").await);
+                },
+                rx,
+                1,
+            )
+            .await
+        })
+        .await;
+
+        {
+            let event = events.remove(0);
+            let log = event.as_log();
+            assert_eq!(log["key"], "A non UTF8 character �".into());
+            assert_event_metadata(log).await;
         }
     }
 
