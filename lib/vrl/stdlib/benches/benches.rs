@@ -114,6 +114,7 @@ criterion_group!(
               replace,
               reverse_dns,
               round,
+              seahash,
               set,
               sha1,
               sha2,
@@ -574,6 +575,15 @@ bench_function! {
     mixed_included_string {
         args: func_args![value: value!(["foo", 1, true, [1,2,3]]), item: value!("foo")],
         want: Ok(value!(true)),
+    }
+}
+
+bench_function! {
+    seahash => vrl_stdlib::Seahash;
+
+    literal {
+        args: func_args![value: "foo"],
+        want: Ok(4_413_582_353_838_009_230_i64),
     }
 }
 

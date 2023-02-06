@@ -14,6 +14,11 @@ use crate::{
 };
 use lookup::owned_value_path;
 
+// helper to unwrap template strings for tests only
+fn parse_template(input: &str) -> Template {
+    Template::try_from(input).unwrap()
+}
+
 #[tokio::test]
 async fn sets_create_action_when_configured() {
     use chrono::{TimeZone, Utc};
@@ -22,8 +27,8 @@ async fn sets_create_action_when_configured() {
 
     let config = ElasticsearchConfig {
         bulk: Some(BulkConfig {
-            action: Some(String::from("{{ action }}te")),
-            index: Some(String::from("vector")),
+            action: parse_template("{{ action }}te"),
+            index: parse_template("vector"),
         }),
         endpoints: vec![String::from("https://example.com")],
         api_version: ElasticsearchApiVersion::V6,
@@ -72,8 +77,8 @@ async fn encode_datastream_mode() {
 
     let config = ElasticsearchConfig {
         bulk: Some(BulkConfig {
-            action: None,
-            index: Some(String::from("vector")),
+            index: parse_template("vector"),
+            ..Default::default()
         }),
         endpoints: vec![String::from("https://example.com")],
         mode: ElasticsearchMode::DataStream,
@@ -116,8 +121,8 @@ async fn encode_datastream_mode_no_routing() {
 
     let config = ElasticsearchConfig {
         bulk: Some(BulkConfig {
-            action: None,
-            index: Some(String::from("vector")),
+            index: parse_template("vector"),
+            ..Default::default()
         }),
         endpoints: vec![String::from("https://example.com")],
         mode: ElasticsearchMode::DataStream,
@@ -160,8 +165,8 @@ async fn encode_datastream_mode_no_routing() {
 async fn handle_metrics() {
     let config = ElasticsearchConfig {
         bulk: Some(BulkConfig {
-            action: Some(String::from("create")),
-            index: Some(String::from("vector")),
+            action: parse_template("create"),
+            index: parse_template("vector"),
         }),
         endpoints: vec![String::from("https://example.com")],
         api_version: ElasticsearchApiVersion::V6,
@@ -202,8 +207,8 @@ async fn handle_metrics() {
 async fn decode_bulk_action_error() {
     let config = ElasticsearchConfig {
         bulk: Some(BulkConfig {
-            action: Some(String::from("{{ action }}")),
-            index: Some(String::from("vector")),
+            action: parse_template("{{ action }}"),
+            index: parse_template("vector"),
         }),
         endpoints: vec![String::from("https://example.com")],
         api_version: ElasticsearchApiVersion::V7,
@@ -222,8 +227,8 @@ async fn decode_bulk_action_error() {
 async fn decode_bulk_action() {
     let config = ElasticsearchConfig {
         bulk: Some(BulkConfig {
-            action: Some(String::from("create")),
-            index: Some(String::from("vector")),
+            action: parse_template("create"),
+            index: parse_template("vector"),
         }),
         endpoints: vec![String::from("https://example.com")],
         api_version: ElasticsearchApiVersion::V7,
@@ -244,8 +249,8 @@ async fn encode_datastream_mode_no_sync() {
 
     let config = ElasticsearchConfig {
         bulk: Some(BulkConfig {
-            action: None,
-            index: Some(String::from("vector")),
+            index: parse_template("vector"),
+            ..Default::default()
         }),
         endpoints: vec![String::from("https://example.com")],
         mode: ElasticsearchMode::DataStream,
@@ -290,8 +295,8 @@ async fn encode_datastream_mode_no_sync() {
 async fn allows_using_except_fields() {
     let config = ElasticsearchConfig {
         bulk: Some(BulkConfig {
-            action: None,
-            index: Some(String::from("{{ idx }}")),
+            index: parse_template("{{ idx }}"),
+            ..Default::default()
         }),
         encoding: Transformer::new(
             None,
@@ -330,8 +335,8 @@ async fn allows_using_except_fields() {
 async fn allows_using_only_fields() {
     let config = ElasticsearchConfig {
         bulk: Some(BulkConfig {
-            action: None,
-            index: Some(String::from("{{ idx }}")),
+            index: parse_template("{{ idx }}"),
+            ..Default::default()
         }),
         encoding: Transformer::new(Some(vec![owned_value_path!("foo")]), None, None).unwrap(),
         endpoints: vec![String::from("https://example.com")],

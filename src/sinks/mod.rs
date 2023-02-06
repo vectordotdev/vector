@@ -181,7 +181,7 @@ pub enum Sinks {
     #[cfg(feature = "sinks-blackhole")]
     Blackhole(blackhole::BlackholeConfig),
 
-    /// Clickhouse.
+    /// ClickHouse.
     #[cfg(feature = "sinks-clickhouse")]
     Clickhouse(clickhouse::ClickhouseConfig),
 

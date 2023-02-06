@@ -45,6 +45,7 @@ impl NoProxyInterceptor {
 /// to use based on the type of traffic being proxied, as well as set specific hosts that
 /// should not be proxied.
 #[configurable_component]
+#[configurable(metadata(docs::advanced))]
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct ProxyConfig {

@@ -5,7 +5,7 @@ args:
 - "::fluent::"
 
 runner:
-  needs_docker_sock: true
+  needs_docker_socket: true
   volumes:
     /tmp: /tmp
 

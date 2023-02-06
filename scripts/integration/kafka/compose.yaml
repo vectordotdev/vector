@@ -2,7 +2,7 @@ version: '3'
 
 services:
   zookeeper:
-    image: docker.io/wurstmeister/zookeeper:${KAFKA_VERSION}
+    image: docker.io/wurstmeister/zookeeper:${CONFIG_VERSION}
     ports:
     - 2181:2181
   kafka:

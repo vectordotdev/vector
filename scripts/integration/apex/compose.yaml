@@ -2,7 +2,7 @@ version: '3'
 
 services:
   mock-apex:
-    image: mcasper/mock-apex:${APEX_VERSION}
+    image: mcasper/mock-apex:${CONFIG_VERSION}
     environment:
     - MOCK_API_TOKEN=token
     ports:
