@@ -75,6 +75,7 @@ pub fn is_retriable_error<T>(error: &SdkError<T>) -> bool {
                 || (status.is_client_error() && re.is_match(response_body.as_ref()))
         }
         _ => {
+            // TODO make sure this message is useful for users
             warn!("Unhandled SdkError please report this, retrying request");
             true
         }
