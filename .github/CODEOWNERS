@@ -1,3 +1,7 @@
+lib/vector-core/ @vectordotdev/core-team
+
+src/vrl/ @vectordotdev/processing-team
+
 src/sinks/ @vectordotdev/integrations-team
 src/sinks/amqp/ @StephenWakely
 src/sinks/apex/ @neuronull
@@ -79,3 +83,5 @@ src/sources/splunk_hec/ @StephenWakely
 src/sources/statsd/ @neuronull
 src/sources/syslog.rs @StephenWakely
 src/sources/vector/ @neuronull
+
+src/transforms/ @vectordotdev/processing-team
