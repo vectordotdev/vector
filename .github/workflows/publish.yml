@@ -90,37 +90,6 @@ jobs:
           name: vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-gnu
           path: target/artifacts/vector*
 
-  build-x86_64-unknown-linux-gnu-debug-tarball:
-    name: Build Vector (debug) for x86_64-unknown-linux-gnu (.tar.gz)
-    runs-on: [linux, release-builder]
-    needs: generate-publish-metadata
-    env:
-      VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
-      VECTOR_BUILD_DESC: ${{ needs.generate-publish-metadata.outputs.vector_build_desc }}
-      CHANNEL: ${{ needs.generate-publish-metadata.outputs.vector_release_channel }}
-    steps:
-      - name: Checkout Vector
-        uses: actions/checkout@v3
-        with:
-          ref: ${{ inputs.git_ref }}
-      - name: Bootstrap runner environment (Ubuntu-specific)
-        run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - name: Bootstrap runner environment (generic)
-        run: bash scripts/environment/prepare.sh
-      - name: Build Vector
-        env:
-          CARGO_PROFILE_RELEASE_DEBUG: 2 # https://doc.rust-lang.org/cargo/reference/profiles.html#debug
-        run: make package-x86_64-unknown-linux-gnu
-      - name: Rename tarball with the correct debug suffix
-        run: |
-          mv "target/artifacts/vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-gnu.tar.gz" \
-             "target/artifacts/vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-gnu-debug.tar.gz"
-      - name: Stage package artifacts for publish
-        uses: actions/upload-artifact@v3
-        with:
-          name: vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-gnu-debug
-          path: "target/artifacts/vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-gnu-debug.tar.gz"
-
   build-aarch64-unknown-linux-musl-packages:
     name: Build Vector for aarch64-unknown-linux-musl (.tar.gz)
     runs-on: [linux, release-builder]
