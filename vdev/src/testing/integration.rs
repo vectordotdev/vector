@@ -172,11 +172,9 @@ impl Compose {
     }
 
     fn prepare(&self) -> Result<()> {
-        if cfg!(unix) {
-            unix::prepare_compose_volumes(&self.config, &self.test_dir)
-        } else {
-            Ok(())
-        }
+        #[cfg(unix)]
+        unix::prepare_compose_volumes(&self.config, &self.test_dir)?;
+        Ok(())
     }
 }
 
