@@ -79,6 +79,7 @@ jobs:
           - test: 'logstash'
           - test: 'loki'
           - test: 'mongodb'
+          - test: 'mqtt'
           - test: 'nats'
           - test: 'nginx'
           - test: 'opentelemetry'
