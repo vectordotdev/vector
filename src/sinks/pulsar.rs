@@ -45,7 +45,8 @@ enum BuildError {
 #[configurable_component(sink("pulsar"))]
 #[derive(Clone, Debug)]
 pub struct PulsarSinkConfig {
-    /// The endpoint to which the Pulsar client should connect to.
+    /// The endpoint to which the Pulsar client should connect to. The endpoint should specify the
+    /// pulsar protocol and port.
     #[serde(alias = "address")]
     #[configurable(metadata(docs::examples = "pulsar://127.0.0.1:6650"))]
     endpoint: String,
