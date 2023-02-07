@@ -24,9 +24,12 @@ pub struct HoneycombConfig {
     endpoint: String,
 
     /// The team key that will be used to authenticate against Honeycomb.
+    #[configurable(metadata(docs::examples = "${HONEYCOMB_API_KEY}"))]
+    #[configurable(metadata(docs::examples = "some-api-key"))]
     api_key: SensitiveString,
 
     /// The dataset to which logs are sent.
+    #[configurable(metadata(docs::examples = "my-honeycomb-dataset"))]
     // TODO: we probably want to make this a template
     // but this limits us in how we can do our healthcheck.
     dataset: String,
