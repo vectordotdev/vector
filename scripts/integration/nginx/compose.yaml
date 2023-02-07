@@ -9,13 +9,13 @@ services:
     - default
     - proxy
   nginx:
-    image: docker.io/nginx:${NGINX_VERSION}
+    image: docker.io/nginx:${CONFIG_VERSION}
     volumes:
     - ../../../tests/data/nginx/:/etc/nginx:ro
     networks:
     - default
   nginx-proxy:
-    image: docker.io/nginx:${NGINX_VERSION}
+    image: docker.io/nginx:${CONFIG_VERSION}
     volumes:
     - ../../../tests/data/nginx/:/etc/nginx:ro
     networks:

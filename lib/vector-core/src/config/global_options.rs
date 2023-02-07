@@ -35,7 +35,6 @@ pub(crate) enum DataDirError {
 // function!
 #[configurable_component]
 #[derive(Clone, Debug, Default, PartialEq)]
-#[serde(default)]
 pub struct GlobalOptions {
     /// The directory used for persisting Vector state data.
     ///
@@ -50,7 +49,10 @@ pub struct GlobalOptions {
     ///
     /// This is used if a component does not have its own specific log schema. All events use a log
     /// schema, whether or not the default is used, to assign event fields on incoming events.
-    #[serde(skip_serializing_if = "crate::serde::skip_serializing_if_default")]
+    #[serde(
+        default,
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
     pub log_schema: LogSchema,
 
     /// The name of the timezone to apply to timestamp conversions that do not contain an explicit timezone.
@@ -59,11 +61,17 @@ pub struct GlobalOptions {
     /// local time.
     ///
     /// [tzdb]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
-    #[serde(skip_serializing_if = "crate::serde::skip_serializing_if_default")]
+    #[serde(
+        default,
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
     pub timezone: Option<TimeZone>,
 
     #[configurable(derived)]
-    #[serde(skip_serializing_if = "crate::serde::skip_serializing_if_default")]
+    #[serde(
+        default,
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
     pub proxy: ProxyConfig,
 
     /// Controls how acknowledgements are handled for all sinks by default.
@@ -88,7 +96,10 @@ pub struct GlobalOptions {
     /// captured, but not so long that they continue to build up indefinitely, as this will consume
     /// a small amount of memory for each metric.
     #[configurable(deprecated)]
-    #[serde(skip_serializing_if = "crate::serde::skip_serializing_if_default")]
+    #[serde(
+        default,
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
     pub expire_metrics: Option<Duration>,
 
     /// The amount of time, in seconds, that internal metrics will persist after having not been
@@ -99,7 +110,10 @@ pub struct GlobalOptions {
     /// setting this to a value that ensures that metrics live long enough to be emitted and
     /// captured, but not so long that they continue to build up indefinitely, as this will consume
     /// a small amount of memory for each metric.
-    #[serde(skip_serializing_if = "crate::serde::skip_serializing_if_default")]
+    #[serde(
+        default,
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
     pub expire_metrics_secs: Option<f64>,
 }
 
