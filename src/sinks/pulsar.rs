@@ -45,8 +45,9 @@ enum BuildError {
 #[configurable_component(sink("pulsar"))]
 #[derive(Clone, Debug)]
 pub struct PulsarSinkConfig {
-    /// The endpoint to which the Pulsar client should connect to. The endpoint should specify the
-    /// pulsar protocol and port.
+    /// The endpoint to which the Pulsar client should connect to.
+    ///
+    /// The endpoint should specify the pulsar protocol and port.
     #[serde(alias = "address")]
     #[configurable(metadata(docs::examples = "pulsar://127.0.0.1:6650"))]
     endpoint: String,
@@ -214,7 +215,7 @@ impl GenerateConfig for PulsarSinkConfig {
         toml::Value::try_from(Self {
             endpoint: "pulsar://127.0.0.1:6650".to_string(),
             topic: "topic-1234".to_string(),
-            partition_key_field: Some("message".to_string()),
+            partition_key_field: None,
             compression: Default::default(),
             encoding: TextSerializerConfig::default().into(),
             auth: None,
