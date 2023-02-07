@@ -54,6 +54,7 @@ base: components: sinks: splunk_hec_logs: configuration: {
 	auto_extract_timestamp: {
 		description: """
 			Passes the auto_extract_timestamp option to Splunk.
+
 			Note this option is only used by Version 8 and above of Splunk.
 			This will cause Splunk to extract the timestamp from the message text rather than use
 			the timestamp embedded in the event. The timestamp must be in the format yyyy-mm-dd hh:mm:ss.
@@ -244,9 +245,16 @@ base: components: sinks: splunk_hec_logs: configuration: {
 		}
 	}
 	endpoint: {
-		description: "The base URL of the Splunk instance."
-		required:    true
-		type: string: {}
+		description: """
+			The base URL of the Splunk instance.
+
+			The scheme (`http` or `https`) must be specified. No path should be included since the paths defined
+			by the [`Splunk`][splunk] api are used.
+
+			[splunk]: https://docs.splunk.com/Documentation/Splunk/8.0.0/Data/HECRESTendpoints
+			"""
+		required: true
+		type: string: examples: ["https://http-inputs-hec.splunkcloud.com", "https://hec.splunk.com:8088", "http://example.com"]
 	}
 	endpoint_target: {
 		description: "Splunk HEC endpoint configuration."
@@ -293,7 +301,10 @@ base: components: sinks: splunk_hec_logs: configuration: {
 			If not specified, the default index is used.
 			"""
 		required: false
-		type: string: syntax: "template"
+		type: string: {
+			examples: ["{{ host }}", "custom_index"]
+			syntax: "template"
+		}
 	}
 	indexed_fields: {
 		description: """
@@ -304,7 +315,7 @@ base: components: sinks: splunk_hec_logs: configuration: {
 		required: false
 		type: array: {
 			default: []
-			items: type: string: {}
+			items: type: string: examples: ["field1", "field2"]
 		}
 	}
 	request: {
@@ -459,7 +470,10 @@ base: components: sinks: splunk_hec_logs: configuration: {
 			If unset, the Splunk collector will set it.
 			"""
 		required: false
-		type: string: syntax: "template"
+		type: string: {
+			examples: ["{{ file }}", "/var/log/syslog", "UDP:514"]
+			syntax: "template"
+		}
 	}
 	sourcetype: {
 		description: """
@@ -468,7 +482,10 @@ base: components: sinks: splunk_hec_logs: configuration: {
 			If unset, Splunk will default to `httpevent`.
 			"""
 		required: false
-		type: string: syntax: "template"
+		type: string: {
+			examples: ["{{ sourcetype }}", "_json", "httpevent"]
+			syntax: "template"
+		}
 	}
 	timestamp_key: {
 		description: """
@@ -479,7 +496,10 @@ base: components: sinks: splunk_hec_logs: configuration: {
 			[global_timestamp_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.timestamp_key
 			"""
 		required: false
-		type: string: default: "timestamp"
+		type: string: {
+			default: "timestamp"
+			examples: ["timestamp", ""]
+		}
 	}
 	tls: {
 		description: "TLS configuration."
