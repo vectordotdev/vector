@@ -15,7 +15,7 @@ fn mqtt_broker_address() -> String {
 
 fn mqtt_broker_port() -> u16 {
     let result = std::env::var("MQTT_BROKER_PORT")
-        .unwrap_or_else(|_| "1883".into())
+        .unwrap_or_else(|_| "18083".into())
         .parse::<u16>()
         .expect("Cannot parse as u16");
     println!("{}", result);
@@ -63,10 +63,8 @@ async fn mqtt_happy() {
     while failures < 5 && out.len() < input.len() {
         if let Ok(try_msg) = tokio::time::timeout(Duration::from_secs(1), eventloop.poll()).await {
             let msg = try_msg.unwrap();
-            println!("Received = {:?}", msg);
-            out.push("test_str".to_string());
-            //let s = String::from_utf8_lossy(msg.data.as_slice()).into_owned();
-            //out.push(s);
+            let s = String::from_utf8_lossy(msg.data.as_slice()).into_owned();
+            out.push(s);
         } else {
             failures += 1;
             tokio::time::sleep(Duration::from_millis(50)).await;

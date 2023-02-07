@@ -73,7 +73,6 @@ pub struct MqttSink {
 
 impl MqttSink {
     pub fn new(config: &MqttSinkConfig, connector: MqttConnector) -> crate::Result<Self> {
-        println!("Create sink");
         let transformer = config.encoding.transformer();
         let serializer = config.encoding.build()?;
         let encoder = Encoder::<()>::new(serializer);
@@ -98,7 +97,6 @@ impl MqttSink {
     where
         I: Stream<Item = Event> + Unpin,
     {
-        println!("Handle sink");
         let events_sent = register!(EventsSent::from(Output(None)));
         let bytes_sent = register!(BytesSent::from(Protocol("mqtt".into())));
 
@@ -106,7 +104,6 @@ impl MqttSink {
             tokio::select! {
                 // handle connection errors
                 msg = connection.poll() => {
-                    println!("{:?}", msg);
                     match msg {
                         Ok(rumqttc::Event::Outgoing(rumqttc::Outgoing::PubRel(_))) => {
                             // publish has been acknowledged by the MQTT server
@@ -124,7 +121,6 @@ impl MqttSink {
 
                 // handle outgoing events
                 event = input.next() => {
-                    println!("Event sink");
                     let mut event = if let Some(event) = event {
                         event
                     } else {
@@ -165,14 +161,12 @@ impl MqttSink {
                     let retain = false;
                     match client.publish(&topic, self.quality_of_service.into(), retain, message).await {
                         Ok(()) => {
-                            println!("Event sent");
                             events_sent.emit(CountByteSize(1, event_byte_size));
                             bytes_sent.emit(ByteSize(message_len));
 
                             self.finalizers_queue.push_back(finalizers);
                         }
                         Err(error) => {
-                            println!("Event error");
                             emit!(MqttClientError { error });
                             finalizers.update_status(EventStatus::Errored);
                             return Err(());
@@ -191,7 +185,6 @@ impl MqttSink {
 #[async_trait]
 impl StreamSink<Event> for MqttSink {
     async fn run(mut self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
-        println!("Run sink");
         let input = input.fuse().peekable();
         pin_mut!(input);
 
@@ -199,7 +192,6 @@ impl StreamSink<Event> for MqttSink {
         pin_mut!(client);
         pin_mut!(connection);
         while input.as_mut().peek().await.is_some() {
-            println!("While sink");
             let _open_token = OpenGauge::new().open(|count| emit!(ConnectionOpen { count }));
 
             let _result = self
