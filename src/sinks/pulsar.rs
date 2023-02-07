@@ -90,6 +90,8 @@ pub struct PulsarSinkConfig {
 #[derive(Clone, Copy, Debug, Default)]
 pub struct BatchConfig {
     /// The maximum size of a batch, in events, before it is flushed.
+    #[configurable(metadata(docs::type_unit = "events"))]
+    #[configurable(metadata(docs::examples = 1000))]
     pub batch_size: Option<u32>,
 }
 
