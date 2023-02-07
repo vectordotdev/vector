@@ -209,8 +209,10 @@ base: components: sinks: gcp_pubsub: configuration: {
 	endpoint: {
 		description: """
 			The endpoint to which to publish events.
+
 			The scheme (`http` or `https`) must be specified. No path should be included since the paths defined
 			by the [`GCP Pub/Sub`][pubsub_api] api are used.
+
 			The trailing slash `/` must not be included.
 
 			[pubsub_api]: https://cloud.google.com/pubsub/docs/reference/rest
