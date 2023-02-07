@@ -125,17 +125,10 @@ where
                 .context(CallRequestSnafu)?;
 
             let (parts, body) = response.into_parts();
-            let mut data_buf: Option<Vec<u8>> = Some(Vec::new());
 
             let body = body
-                .map_data(move |data| {
-                    if let Some(buf) = &mut data_buf {
-                        buf.extend_from_slice(&data);
-                        if buf.len() >= 20 {
-                            emit!(http_client::HttpBodyDataReceived { buf });
-                            data_buf = None;
-                        }
-                    }
+                .map_data(|data| {
+                    emit!(http_client::HttpBodyDataReceived { buf: &data });
                     data
                 })
                 .boxed();
