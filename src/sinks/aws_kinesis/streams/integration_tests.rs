@@ -44,7 +44,7 @@ async fn kinesis_put_records() {
     };
 
     let config = KinesisStreamsSinkConfig {
-        partition_key_field: None,
+        partition_key_field: Some("partition_key".to_string()),
         batch,
         base,
     };
