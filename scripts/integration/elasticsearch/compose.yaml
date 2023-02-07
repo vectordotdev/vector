@@ -6,12 +6,12 @@ services:
     environment:
     - SERVICES=elasticsearch:4571
   elasticsearch:
-    image: docker.io/elasticsearch:${ELASTICSEARCH_VERSION}
+    image: docker.io/elasticsearch:${CONFIG_VERSION}
     environment:
     - discovery.type=single-node
     - ES_JAVA_OPTS=-Xms400m -Xmx400m
   elasticsearch-secure:
-    image: docker.io/elasticsearch:${ELASTICSEARCH_VERSION}
+    image: docker.io/elasticsearch:${CONFIG_VERSION}
     environment:
     - discovery.type=single-node
     - xpack.security.enabled=true

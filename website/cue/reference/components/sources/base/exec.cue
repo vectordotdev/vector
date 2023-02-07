@@ -80,6 +80,14 @@ base: components: sources: exec: configuration: {
 																The maximum length of the byte buffer.
 
 																This length does *not* include the trailing delimiter.
+
+																By default, there is no maximum length enforced. If events are malformed, this can lead to
+																additional resource usage as events continue to be buffered in memory, and can potentially
+																lead to memory exhaustion in extreme cases.
+
+																If there is a risk of processing malformed data, such as logs with user-controlled input,
+																consider setting the maximum length to a reasonably large value as a safety net. This will
+																ensure that processing is not truly unbounded.
 																"""
 						required: false
 						type: uint: {}
@@ -110,6 +118,14 @@ base: components: sources: exec: configuration: {
 						The maximum length of the byte buffer.
 
 						This length does *not* include the trailing delimiter.
+
+						By default, there is no maximum length enforced. If events are malformed, this can lead to
+						additional resource usage as events continue to be buffered in memory, and can potentially
+						lead to memory exhaustion in extreme cases.
+
+						If there is a risk of processing malformed data, such as logs with user-controlled input,
+						consider setting the maximum length to a reasonably large value as a safety net. This will
+						ensure that processing is not truly unbounded.
 						"""
 					required: false
 					type: uint: {}
