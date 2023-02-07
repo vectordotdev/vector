@@ -111,14 +111,18 @@ base: components: sinks: influxdb_logs: configuration: {
 		}
 	}
 	endpoint: {
-		description: "The endpoint to send data to."
-		required:    true
-		type: string: {}
+		description: """
+			The endpoint to send data to.
+
+			This should be a full HTTP URI, including the scheme, host, and port.
+			"""
+		required: true
+		type: string: examples: ["http://localhost:8086/"]
 	}
 	measurement: {
 		description: "The name of the InfluxDB measurement that will be written to."
 		required:    false
-		type: string: {}
+		type: string: examples: ["vector-logs"]
 	}
 	namespace: {
 		deprecated: true
@@ -130,7 +134,7 @@ base: components: sinks: influxdb_logs: configuration: {
 			This field is deprecated, and `measurement` should be used instead.
 			"""
 		required: false
-		type: string: {}
+		type: string: examples: ["service"]
 	}
 	org: {
 		description: """
@@ -307,7 +311,7 @@ base: components: sinks: influxdb_logs: configuration: {
 		required:    false
 		type: array: {
 			default: []
-			items: type: string: {}
+			items: type: string: examples: ["field1", "parent.child_field"]
 		}
 	}
 	tls: {
