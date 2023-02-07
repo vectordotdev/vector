@@ -85,18 +85,6 @@ base: components: transforms: remap: configuration: {
 		required: false
 		type: bool: default: false
 	}
-	runtime: {
-		description: "Available VRL runtimes."
-		required:    false
-		type: string: {
-			default: "ast"
-			enum: ast: """
-				Tree-walking runtime.
-
-				This is the only, and default, runtime.
-				"""
-		}
-	}
 	source: {
 		description: """
 			The [Vector Remap Language][vrl] (VRL) program to execute for each event.

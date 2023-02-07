@@ -1,7 +1,7 @@
 package metadata
 
 components: sinks: clickhouse: {
-	title: "Clickhouse"
+	title: "ClickHouse"
 
 	classes: {
 		commonly_used: true
@@ -51,7 +51,7 @@ components: sinks: clickhouse: {
 				interface: {
 					socket: {
 						api: {
-							title: "Clickhouse HTTP API"
+							title: "ClickHouse HTTP API"
 							url:   urls.clickhouse_http
 						}
 						direction: "outgoing"
@@ -66,7 +66,7 @@ components: sinks: clickhouse: {
 	support: {
 		requirements: [
 			"""
-				[Clickhouse](\(urls.clickhouse)) version `>= 1.1.54378` is required.
+				[ClickHouse](\(urls.clickhouse)) version `>= 1.1.54378` is required.
 				""",
 		]
 		warnings: []

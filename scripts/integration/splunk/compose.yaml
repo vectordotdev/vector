@@ -2,7 +2,7 @@ version: '3'
 
 services:
   splunk-hec:
-    image: docker.io/splunk/splunk:${SPLUNK_VERSION}
+    image: docker.io/splunk/splunk:${CONFIG_VERSION}
     environment:
     - SPLUNK_START_ARGS=--accept-license
     - SPLUNK_PASSWORD=password
