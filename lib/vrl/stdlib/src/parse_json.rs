@@ -8,7 +8,7 @@ use serde_json::{
 use vrl::prelude::*;
 
 fn parse_json(value: Value) -> Resolved {
-    let bytes = value.try_bytes()?;
+    let bytes = value.try_bytes_utf8_lossy()?;
     let value = serde_json::from_slice::<'_, Value>(&bytes)
         .map_err(|e| format!("unable to parse json: {e}"))?;
     Ok(value)
@@ -17,7 +17,7 @@ fn parse_json(value: Value) -> Resolved {
 // parse_json_with_depth method recursively traverses the value and returns raw JSON-formatted bytes
 // after reaching provided depth.
 fn parse_json_with_depth(value: Value, max_depth: Value) -> Resolved {
-    let bytes = value.try_bytes()?;
+    let bytes = value.try_bytes_utf8_lossy()?;
     let parsed_depth = validate_depth(max_depth)?;
 
     let raw_value = serde_json::from_slice::<'_, &RawValue>(&bytes)
@@ -253,6 +253,12 @@ mod tests {
         parses {
             args: func_args![ value: r#"{"field": "value"}"# ],
             want: Ok(value!({ field: "value" })),
+            tdef: type_def(),
+        }
+
+        non_utf8 {
+            args: func_args![ value: b"{\"field\": \"\xE4\"} " ],
+            want: Ok(value!({ field: "�" })),
             tdef: type_def(),
         }
 
