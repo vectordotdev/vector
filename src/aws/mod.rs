@@ -263,25 +263,31 @@ where
         self.inner.poll_ready(cx)
     }
 
-    fn call(&mut self, mut req: Request) -> Self::Future {
+    fn call(&mut self, req: Request) -> Self::Future {
         // Attach a body callback that will capture the bytes sent by interrogating the body chunks that get read as it
         // sends the request out over the wire. We'll read the shared atomic counter, which will contain the number of
         // bytes "read", aka the bytes it actually sent, if and only if we get back a successful response.
-        let maybe_bytes_sent = self.enabled.then(|| {
-            let shared_bytes_sent = Arc::new(AtomicUsize::new(0));
+        let shared_bytes_sent = Arc::new(AtomicUsize::new(0));
 
+        let (req, maybe_bytes_sent) = if self.enabled {
             let (request, properties) = req.into_parts();
             let (parts, body) = request.into_parts();
-            let body = body.map(move |body| {
-                let body = MeasuredBody::new(body, shared_bytes_sent.clone());
-                SdkBody::from_dyn(BoxBody::new(body))
-            });
 
-            let _measured_req =
-                Request::from_parts(http::Request::from_parts(parts, body), properties);
+            let body = {
+                let shared_bytes_sent = Arc::clone(&shared_bytes_sent);
 
-            shared_bytes_sent
-        });
+                body.map(move |body| {
+                    let body = MeasuredBody::new(body, Arc::clone(&shared_bytes_sent));
+                    SdkBody::from_dyn(BoxBody::new(body))
+                })
+            };
+
+            let req = Request::from_parts(http::Request::from_parts(parts, body), properties);
+
+            (req, Some(shared_bytes_sent))
+        } else {
+            (req, None)
+        };
 
         let region = self.region.clone();
         let fut = self.inner.call(req);
@@ -358,7 +364,7 @@ impl Body for MeasuredBody {
 
     fn poll_trailers(
         self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
+        _cx: &mut Context<'_>,
     ) -> Poll<Result<Option<HeaderMap>, Self::Error>> {
         Poll::Ready(Ok(None))
     }

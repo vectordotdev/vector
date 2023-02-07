@@ -32,6 +32,7 @@ impl<T: Send + Sync + 'static> RetryLogic for CloudwatchRetryLogic<T> {
     type Error = CloudwatchError;
     type Response = T;
 
+    // TODO this match may not be necessary given the logic in `is_retriable_error()`
     #[allow(clippy::cognitive_complexity)] // long, but just a hair over our limit
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
         match error {
@@ -69,7 +70,7 @@ impl<T: Send + Sync + 'static> RetryLogic for CloudwatchRetryLogic<T> {
 
 #[cfg(test)]
 mod test {
-    use aws_sdk_cloudwatchlogs::error::{PutLogEventsError, PutLogEventsErrorKind};
+    use aws_sdk_cloudwatchlogs::error::PutLogEventsError;
     use aws_sdk_cloudwatchlogs::types::SdkError;
     use aws_smithy_http::body::SdkBody;
     use aws_smithy_http::operation::Response;
@@ -93,10 +94,7 @@ mod test {
         let raw = Response::new(http_response);
 
         let err = CloudwatchError::Put(SdkError::service_error(
-            PutLogEventsError::new(
-                PutLogEventsErrorKind::Unhandled(Box::new(meta_err.clone())),
-                meta_err,
-            ),
+            PutLogEventsError::unhandled(meta_err),
             raw,
         ));
         assert!(retry_logic.is_retriable_error(&err));
