@@ -1,6 +1,7 @@
 pub mod auth;
 pub mod region;
 
+use std::error::Error;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -17,12 +18,13 @@ use aws_smithy_async::rt::sleep::{AsyncSleep, Sleep};
 use aws_smithy_client::bounds::SmithyMiddleware;
 use aws_smithy_client::erase::{DynConnector, DynMiddleware};
 use aws_smithy_client::{Builder, SdkError};
-use aws_smithy_http::body::SdkBody;
+use aws_smithy_http::body::{BoxBody, SdkBody};
 use aws_smithy_http::operation::{Request, Response};
 use aws_smithy_types::retry::RetryConfig;
 use aws_types::region::Region;
 use aws_types::SdkConfig;
 use bytes::Bytes;
+use http::HeaderMap;
 use http_body::Body;
 use once_cell::sync::OnceCell;
 use pin_project::pin_project;
@@ -268,11 +270,15 @@ where
         let maybe_bytes_sent = self.enabled.then(|| {
             let shared_bytes_sent = Arc::new(AtomicUsize::new(0));
 
-            // let (request, bag) = req.into_parts();
-            // let (parts, sdkbody) = request.into_parts();
-            req.http_mut()
-                .body_mut()
-                .map(|body| MeasuredBody::new(body, shared_bytes_sent.clone()).inner);
+            let (request, properties) = req.into_parts();
+            let (parts, body) = request.into_parts();
+            let body = body.map(move |body| {
+                let body = MeasuredBody::new(body, shared_bytes_sent.clone());
+                SdkBody::from_dyn(BoxBody::new(body))
+            });
+
+            let _measured_req =
+                Request::from_parts(http::Request::from_parts(parts, body), properties);
 
             shared_bytes_sent
         });
@@ -336,5 +342,24 @@ impl MeasuredBody {
             Poll::Ready(Some(Err(e))) => Poll::Ready(Some(Err(e))),
             Poll::Pending => Poll::Pending,
         }
+    }
+}
+
+impl Body for MeasuredBody {
+    type Data = Bytes;
+    type Error = Box<dyn Error + Send + Sync>;
+
+    fn poll_data(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+    ) -> Poll<Option<Result<Self::Data, Self::Error>>> {
+        self.poll_inner(cx)
+    }
+
+    fn poll_trailers(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+    ) -> Poll<Result<Option<HeaderMap>, Self::Error>> {
+        Poll::Ready(Ok(None))
     }
 }
