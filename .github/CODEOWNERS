@@ -1,7 +1,16 @@
+lib/file-source/ @spencergilbert
+lib/k8s-e2e-tests/ @spencergilbert
+lib/k8s-test-framework/ @spencergilbert
+lib/opentelemetry-proto/ @spencergilbert
+lib/vector-common/ @vectordotdev/core-team
+lib/vector-config/ @vectordotdev/core-team
+lib/vector-config-common/ @vectordotdev/core-team
+lib/vector-config-macros/ @vectordotdev/core-team
 lib/vector-core/ @vectordotdev/core-team
-
-src/vrl/ @vectordotdev/processing-team
-
+lib/vector-vrl-functions/ @vectordotdev/processing-team
+lib/vrl/ @vectordotdev/processing-team
+src/config/ @vectordotdev/core-team
+src/internal_telemetry/ @vectordotdev/core-team
 src/sinks/ @vectordotdev/integrations-team
 src/sinks/amqp/ @StephenWakely
 src/sinks/apex/ @neuronull
@@ -43,7 +52,7 @@ src/sinks/splunk_hec/ @StephenWakely # sink_splunk_hec_logs,sink_splunk_hec_metr
 src/sinks/statsd.rs @neuronull
 src/sinks/vector/ @neuronull
 src/sinks/websocket/ @neuronull
-
+src/source_sender/ @vectordotdev/core-team
 src/sources/ @vectordotdev/integrations-team
 src/sources/amqp.rs @StephenWakely
 src/sources/apache_metrics/ @davidhuie-dd
@@ -83,5 +92,6 @@ src/sources/splunk_hec/ @StephenWakely
 src/sources/statsd/ @neuronull
 src/sources/syslog.rs @StephenWakely
 src/sources/vector/ @neuronull
-
+src/test_util/ @vectordotdev/core-team
+src/topology/ @vectordotdev/core-team
 src/transforms/ @vectordotdev/processing-team
