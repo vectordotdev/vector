@@ -460,7 +460,7 @@ impl ReaderModel {
     }
 
     fn track_read(&mut self, event_count: usize, bytes_read: u64) {
-        // We tneed to track how many acknowledgements we expect to come in based on the number of
+        // We need to track how many acknowledgements we expect to come in based on the number of
         // records read vs the number of their events that have been acknowledged, as we only adjust
         // the buffer size when a record has been fully acknowledged, since one record may contain
         // multiple events.
