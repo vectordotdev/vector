@@ -126,7 +126,6 @@ pub fn build_healthcheck(
 
 pub fn healthcheck_response(
     response: http::Response<BodyBox>,
-    auth: GcpAuthenticator,
     not_found_error: crate::Error,
 ) -> crate::Result<()> {
     match response.status() {
