@@ -28,12 +28,12 @@ base: components: sinks: mqtt: configuration: {
 		}
 	}
 	clean_session: {
-		description: "Clean MQTT session on login or not"
+		description: "If set to true, the MQTT session is cleaned on login."
 		required:    false
 		type: bool: default: false
 	}
 	client_id: {
-		description: "MQTT client ID"
+		description: "MQTT client ID."
 		required:    false
 		type: string: default: "vector"
 	}
@@ -154,22 +154,22 @@ base: components: sinks: mqtt: configuration: {
 		}
 	}
 	host: {
-		description: "MQTT server address"
+		description: "MQTT server address (The broker’s domain name or IP address)."
 		required:    true
-		type: string: examples: ["mqtt.example.com"]
+		type: string: examples: ["mqtt.example.com", "127.0.0.1"]
 	}
 	keep_alive: {
-		description: "Connection keep-alive interval"
+		description: "Connection keep-alive interval."
 		required:    false
 		type: uint: default: 60
 	}
 	password: {
-		description: "MQTT password"
+		description: "MQTT password."
 		required:    false
 		type: string: {}
 	}
 	port: {
-		description: "TCP port"
+		description: "TCP port of the MQTT server to connect to."
 		required:    false
 		type: uint: default: 1883
 	}
@@ -278,12 +278,12 @@ base: components: sinks: mqtt: configuration: {
 		}
 	}
 	topic: {
-		description: "MQTT publish topic"
+		description: "MQTT publish topic (templates allowed)"
 		required:    true
 		type: string: syntax: "template"
 	}
 	user: {
-		description: "MQTT username"
+		description: "MQTT username."
 		required:    false
 		type: string: {}
 	}
