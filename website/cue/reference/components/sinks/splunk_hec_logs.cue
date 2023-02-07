@@ -72,7 +72,7 @@ components: sinks: splunk_hec_logs: {
 		notices: []
 	}
 
-	configuration: sinks._splunk_hec.configuration & {
+	configuration: {
 		endpoint: {
 			description: "The base URL of the Splunk instance."
 			required:    true
