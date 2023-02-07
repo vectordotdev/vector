@@ -227,8 +227,9 @@ base: components: sinks: pulsar: configuration: {
 	}
 	endpoint: {
 		description: """
-			The endpoint to which the Pulsar client should connect to. The endpoint should specify the
-			pulsar protocol and port.
+			The endpoint to which the Pulsar client should connect to.
+
+			The endpoint should specify the pulsar protocol and port.
 			"""
 		required: true
 		type: string: examples: ["pulsar://127.0.0.1:6650"]
