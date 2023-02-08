@@ -210,7 +210,7 @@ base: components: sinks: file: configuration: {
 	}
 	path: {
 		description: """
-			File name to write events to.
+			File path to write events to.
 
 			Compression format extension must be explicit.
 			"""
