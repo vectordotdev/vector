@@ -479,7 +479,6 @@ jobs:
     needs:
       - generate-publish-metadata
       - build-x86_64-unknown-linux-gnu-packages
-      - build-x86_64-unknown-linux-gnu-debug-tarball
       - build-x86_64-unknown-linux-musl-packages
       - build-aarch64-unknown-linux-musl-packages
       - build-aarch64-unknown-linux-gnu-packages
@@ -760,7 +759,6 @@ jobs:
     needs:
       - generate-publish-metadata
       - build-x86_64-unknown-linux-gnu-packages
-      - build-x86_64-unknown-linux-gnu-debug-tarball
       - build-x86_64-unknown-linux-musl-packages
       - build-aarch64-unknown-linux-musl-packages
       - build-aarch64-unknown-linux-gnu-packages
