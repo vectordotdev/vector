@@ -13,7 +13,7 @@ components: sinks: gcp_cloud_storage: {
 	}
 
 	features: {
-		auto_generated: true
+		auto_generated:   true
 		acknowledgements: true
 		healthcheck: enabled: true
 		send: {
@@ -75,7 +75,7 @@ components: sinks: gcp_cloud_storage: {
 	}
 
 	configuration: base.components.sinks.gcp_cloud_storage.configuration
-	
+
 	input: {
 		logs:    true
 		metrics: null
