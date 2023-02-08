@@ -165,6 +165,7 @@ pub async fn create_client<T: ClientBuilder>(
 
     // Build the configuration first.
     let mut config_builder = SdkConfig::builder()
+        .credentials_cache(auth.credentials_cache().await?)
         .credentials_provider(auth.credentials_provider(region.clone()).await?)
         .region(region.clone())
         .retry_config(retry_config.clone());
