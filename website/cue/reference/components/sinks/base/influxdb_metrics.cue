@@ -66,7 +66,7 @@ base: components: sinks: influxdb_metrics: configuration: {
 			Only relevant when using InfluxDB v2.x and above.
 			"""
 		required: true
-		type: string: {}
+		type: string: examples: ["vector-bucket", "4d2225e4d3d49f75"]
 	}
 	consistency: {
 		description: """
@@ -75,7 +75,7 @@ base: components: sinks: influxdb_metrics: configuration: {
 			Only relevant when using InfluxDB v0.x/v1.x.
 			"""
 		required: false
-		type: string: {}
+		type: string: examples: ["any", "one", "quorum", "all"]
 	}
 	database: {
 		description: """
@@ -84,7 +84,7 @@ base: components: sinks: influxdb_metrics: configuration: {
 			Only relevant when using InfluxDB v0.x/v1.x.
 			"""
 		required: true
-		type: string: {}
+		type: string: examples: ["vector-database", "iot-store"]
 	}
 	default_namespace: {
 		description: """
@@ -108,7 +108,7 @@ base: components: sinks: influxdb_metrics: configuration: {
 			Only relevant when using InfluxDB v2.x and above.
 			"""
 		required: true
-		type: string: {}
+		type: string: examples: ["my-org", "33f2cff0a28e5b63"]
 	}
 	password: {
 		description: """
@@ -117,7 +117,7 @@ base: components: sinks: influxdb_metrics: configuration: {
 			Only relevant when using InfluxDB v0.x/v1.x.
 			"""
 		required: false
-		type: string: {}
+		type: string: examples: ["${INFLUXDB_PASSWORD}", "influxdb4ever"]
 	}
 	quantiles: {
 		description: "The list of quantiles to calculate when sending distribution metrics."
@@ -277,7 +277,7 @@ base: components: sinks: influxdb_metrics: configuration: {
 			Only relevant when using InfluxDB v0.x/v1.x.
 			"""
 		required: false
-		type: string: {}
+		type: string: examples: ["autogen", "one_day_only"]
 	}
 	tags: {
 		description: "A map of additional tags, in the form of key/value pairs, to add to each measurement."
@@ -382,7 +382,7 @@ base: components: sinks: influxdb_metrics: configuration: {
 			[token_docs]: https://v2.docs.influxdata.com/v2.0/security/tokens/
 			"""
 		required: true
-		type: string: {}
+		type: string: examples: ["${INFLUXDB_TOKEN}", "ef8d5de700e7989468166c40fc8a0ccd"]
 	}
 	username: {
 		description: """
@@ -391,6 +391,6 @@ base: components: sinks: influxdb_metrics: configuration: {
 			Only relevant when using InfluxDB v0.x/v1.x.
 			"""
 		required: false
-		type: string: {}
+		type: string: examples: ["todd", "vector-source"]
 	}
 }
