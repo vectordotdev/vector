@@ -26,7 +26,7 @@ base: components: sinks: configuration: {
 					"""
 				relevant_when: "type = \"disk\""
 				required:      true
-				type: uint: {}
+				type: uint: unit: "bytes"
 			}
 			type: {
 				description: "The type of buffer to use."
@@ -35,7 +35,7 @@ base: components: sinks: configuration: {
 					default: "memory"
 					enum: {
 						disk: """
-														Events are buffered on disk. (version 2)
+														Events are buffered on disk.
 
 														This is less performant, but more durable. Data that has been synchronized to disk will not
 														be lost if Vector is restarted forcefully or crashes.

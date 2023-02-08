@@ -2,7 +2,7 @@ version: '3'
 
 services:
   datadog-agent:
-    image: docker.io/datadog/agent:${DATADOG_AGENT_VERSION}
+    image: docker.io/datadog/agent:${CONFIG_VERSION}
     environment:
     - DD_API_KEY=${TEST_DATADOG_API_KEY:?TEST_DATADOG_API_KEY required}
     - DD_APM_ENABLED=false

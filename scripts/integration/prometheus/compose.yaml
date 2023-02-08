@@ -2,11 +2,11 @@ version: '3'
 
 services:
   influxdb-v1:
-    image: docker.io/influxdb:1.8
+    image: docker.io/influxdb:${CONFIG_INFLUXDB}
     environment:
     - INFLUXDB_REPORTING_DISABLED=true
   influxdb-v1-tls:
-    image: docker.io/influxdb:1.8
+    image: docker.io/influxdb:${CONFIG_INFLUXDB}
     environment:
     - INFLUXDB_REPORTING_DISABLED=true
     - INFLUXDB_HTTP_HTTPS_ENABLED=true
@@ -17,7 +17,7 @@ services:
     volumes:
     - ../../../tests/data/ca:/etc/ssl:ro
   prometheus:
-    image: docker.io/prom/prometheus:${PROMETHEUS_VERSION:-v2.33.4}
+    image: docker.io/prom/prometheus:${CONFIG_PROMETHEUS}
     command: --config.file=/etc/vector/prometheus.yaml
     volumes:
     - ../../../tests/data:/etc/vector:ro
