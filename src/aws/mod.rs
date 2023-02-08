@@ -55,7 +55,7 @@ pub fn is_retriable_error<T>(error: &SdkError<T>) -> bool {
         }
         _ => {
             // TODO make sure this message is useful for users
-            warn!("Unhandled SdkError please report this, retrying request");
+            warn!("Unhandled SdkError please report this, retrying request.");
             true
         }
     }
