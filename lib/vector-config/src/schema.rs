@@ -24,52 +24,64 @@ pub fn apply_metadata<T>(schema: &mut SchemaObject, metadata: Metadata<T>)
 where
     T: Configurable + Serialize,
 {
-    // Set the title/description of this schema.
+    let base_metadata = T::metadata();
+
+    // Calculate the title/description of this schema.
     //
-    // By default, we want to populate `description` because most things don't need a title: their property name or type
-    // name is the title... which is why we enforce description being present at the very least.
+    // If the given `metadata` has either a title or description present, we use both those values,
+    // even if one of them is `None`. If both are `None`, we try falling back to the base metadata
+    // for `T`.
     //
-    // Additionally, we panic if a description is missing _unless_ one of these two conditions is
+    // This ensures that per-field titles/descriptions can override the base title/description of
+    // `T`, without mixing and matching, as sometimes the base type's title/description is far too
+    // generic and muddles the output. Essentially, if the callsite decides to provide an overridden
+    // title/description, it controls the entire title/description.
+    let (schema_title, schema_description) =
+        if metadata.title().is_some() || metadata.description().is_some() {
+            (metadata.title(), metadata.description())
+        } else {
+            (base_metadata.title(), base_metadata.description())
+        };
+
+    // A description _must_ be present, one way or another, _unless_ one of these two conditions is
     // met:
     // - the field is marked transparent
     // - `T` is referenceable and _does_ have a description
-    let base_metadata = T::metadata();
-    let referenceable_name = T::referenceable_name();
-
-    let has_referenceable_description = referenceable_name.is_some() && base_metadata.description().is_some();
+    //
+    // We panic otherwise.
+    let has_referenceable_description =
+        T::referenceable_name().is_some() && base_metadata.description().is_some();
     let is_transparent = base_metadata.transparent() || metadata.transparent();
-
-    let schema_title = metadata.title().or(base_metadata.title()).map(|s| s.to_string());
-    let schema_description = metadata.description().or(base_metadata.description()).map(|s| s.to_string());
     if schema_description.is_none() && !is_transparent && !has_referenceable_description {
         let type_name = std::any::type_name::<T>();
-        panic!("no description provided for `{}`; all `Configurable` types must define a description or be provided one when used within another `Configurable` type", type_name);
+        panic!("No description provided for `{}`! All `Configurable` types must define a description, or have one specified at the field-level where the type is being used.", type_name);
     }
 
-    // Set the default value for this schema, if any.
+    // If a default value was given, serialize it.
     let schema_default = metadata
         .default_value()
         .map(|v| serde_json::to_value(v).expect("default value should never fail to serialize"));
 
+    // Take the existing schema metadata, if any, or create a default version of it, and then apply
+    // all of our newly-calculated values to it.
+    //
+    // Similar to the above title/description logic, we update both title/description if either of
+    // them have been set, to avoid mixing/matching between base and override metadata.
     let mut schema_metadata = schema.metadata.take().unwrap_or_default();
-    schema_metadata.title = schema_title.or(schema_metadata.title);
-    schema_metadata.description = schema_description.or(schema_metadata.description);
+    if schema_title.is_some() || schema_description.is_some() {
+        schema_metadata.title = schema_title.map(|s| s.to_string());
+        schema_metadata.description = schema_description.map(|s| s.to_string());
+    }
     schema_metadata.default = schema_default.or(schema_metadata.default);
     schema_metadata.deprecated = metadata.deprecated();
-    /*let schema_metadata = schemars::schema::Metadata {
-        title: schema_title,
-        description: schema_description,
-        default: schema_default,
-        deprecated: metadata.deprecated(),
-        ..Default::default()
-    };*/
 
     // Set any custom attributes as extensions on the schema. If an attribute is declared multiple
     // times, we turn the value into an array and merge them together. We _do_ not that, however, if
     // the original value is a flag, or the value being added to an existing key is a flag, as
     // having a flag declared multiple times, or mixing a flag with a KV pair, doesn't make sense.
     let map_entries_len = {
-        let custom_map = schema.extensions
+        let custom_map = schema
+            .extensions
             .entry("_metadata".to_string())
             .or_insert_with(|| Value::Object(Map::new()))
             .as_object_mut()
@@ -288,8 +300,6 @@ pub fn generate_optional_schema<T>(gen: &mut SchemaGenerator) -> Result<SchemaOb
 where
     T: Configurable + Serialize,
 {
-    //println!("optional schema for {}", std::any::type_name::<T>());
-
     // Optional schemas are generally very simple in practice, but because of how we memoize schema
     // generation and use references to schema definitions, we have to handle quite a few cases
     // here.
@@ -318,9 +328,7 @@ where
     // came from (if we don't have to wrap the original schema) or will apply them to the new
     // wrapped schema.
     let original_metadata = schema.metadata.take();
-    let original_extensions = std::mem::replace(&mut schema.extensions, IndexMap::default());
-
-    //println!("original extensions: {:?}", original_extensions);
+    let original_extensions = std::mem::take(&mut schema.extensions);
 
     // Figure out if the schema is a referenceable schema or a scalar schema.
     match schema.instance_type.as_mut() {
@@ -340,7 +348,7 @@ where
                     subschemas: Some(Box::new(SubschemaValidation {
                         one_of: Some(vec![
                             Schema::Object(generate_null_schema()),
-                            Schema::Object(std::mem::replace(&mut schema, SchemaObject::default())),
+                            Schema::Object(std::mem::take(&mut schema)),
                         ]),
                         ..Default::default()
                     })),
@@ -395,8 +403,6 @@ where
     // Stick the metadata and extensions back on `schema`.
     schema.metadata = original_metadata;
     schema.extensions = original_extensions;
-
-    //println!("schema after re-adding original extensions: {:?}", schema.extensions);
 
     Ok(schema)
 }
@@ -501,16 +507,12 @@ pub fn get_or_generate_schema<T>(
 where
     T: Configurable + Serialize,
 {
-    //let schema_type = std::any::type_name::<T>();
-    //println!("generating schema for {}", schema_type);
-
     let (mut schema, metadata) = match T::referenceable_name() {
         // When `T` has a referenceable name, try looking it up in the schema generator's definition
         // list, and if it exists, create a schema reference to it. Otherwise, generate it and
         // backfill it in the schema generator.
         Some(name) => {
             if !gen.definitions().contains_key(name) {
-                //println!("schema is referenceable but not yet defined in schema gen");
                 // In order to avoid infinite recursion, we copy the approach that `schemars` takes and
                 // insert a dummy boolean schema before actually generating the real schema, and then
                 // replace it afterwards. If any recursion occurs, a schema reference will be handed
@@ -551,41 +553,27 @@ where
     // metadata. We do that because applying schema metadata enforces logic like "can't be without a
     // description". The implicit metadata for `T` may lack that.
     if let Some(overrides) = overrides.as_ref() {
-        T::validate_metadata(&overrides)?;
+        T::validate_metadata(overrides)?;
     }
 
     let maybe_metadata = match metadata {
         // If we generated the schema for a referenceable type, we won't need to merge its implicit
         // metadata into the schema we're returning _here_, so just use the override metadata if
         // it was given.
-        None => {
-            //println!("  using override metadata as no base metadata present");
-            overrides
-        }
+        None => overrides,
 
         // If we didn't generate the schema for a referenceable type, we'll be holding its implicit
         // metadata here, which we need to merge the override metadata into if it was given. If
         // there was no override metadata, then we just use the base by itself.
         Some(base) => match overrides {
-            None => {
-                //println!("  using base metadata as no override metadata present");
-                Some(base)
-            }
-            Some(overrides) => {
-                //println!("  using merge base/override metadata");
-                //println!("  base: {:?}", base);
-                //println!("  override: {:?}", overrides);
-                Some(base.merge(overrides))
-            }
+            None => Some(base),
+            Some(overrides) => Some(base.merge(overrides)),
         },
     };
 
     if let Some(metadata) = maybe_metadata {
-        //println!("  maybe metadata: {:?}", metadata);
         apply_metadata(&mut schema, metadata);
     }
-
-    //println!("generated schema for {}: {:?}", schema_type, schema);
 
     Ok(schema)
 }

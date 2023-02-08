@@ -19,7 +19,7 @@ where
     }
 
     fn metadata() -> Metadata<Self> {
-        V::metadata().convert()
+        Metadata::with_transparent(true)
     }
 
     fn validate_metadata(metadata: &Metadata<Self>) -> Result<(), GenerateError> {
@@ -40,7 +40,7 @@ where
     V: Configurable + Serialize + std::hash::Hash + Eq,
 {
     fn metadata() -> Metadata<Self> {
-        V::metadata().convert()
+        Metadata::with_transparent(true)
     }
 
     fn validate_metadata(metadata: &Metadata<Self>) -> Result<(), GenerateError> {
