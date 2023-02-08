@@ -20,6 +20,7 @@ use crate::{
 #[configurable_component(sink("honeycomb"))]
 #[derive(Clone, Debug)]
 pub struct HoneycombConfig {
+    // This endpoint is not user-configurable and only exists for testing purposes
     #[serde(skip, default = "default_endpoint")]
     endpoint: String,
 
