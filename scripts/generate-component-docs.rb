@@ -982,10 +982,10 @@ def resolve_enum_schema(root_schema, schema)
     .reject { |subschema| get_schema_metadata(subschema, 'docs::hidden') }
   subschema_count = subschemas.count
 
-  # If we only have one subschema after filtering, check to see if it's an `allOf` or `oneOf`
-  # schema and `is_optional` is true.
+  # If we only have one subschema after filtering, check to see if it's an `allOf` or `oneOf` schema
+  # and `is_optional` is true.
   #
-  # If it's an `allOf` subschema, then that means we originall had an `allOf` schema that we had to
+  # If it's an `allOf` subschema, then that means we originally had an `allOf` schema that we had to
   # make optional, thus converting it to a `oneOf` with subschemas in the shape of `[null, allOf]`.
   # In this case, we'll just remove the `oneOf` and move the `allOf` subschema up, as if it this
   # schema was a `allOf` one all along.
