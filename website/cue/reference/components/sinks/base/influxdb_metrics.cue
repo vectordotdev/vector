@@ -94,12 +94,12 @@ base: components: sinks: influxdb_metrics: configuration: {
 			present, it is used as a prefix to the metric name, and separated with a period (`.`).
 			"""
 		required: false
-		type: string: {}
+		type: string: examples: ["service"]
 	}
 	endpoint: {
 		description: "The endpoint to send data to."
 		required:    true
-		type: string: {}
+		type: string: examples: ["http://localhost:8086/"]
 	}
 	org: {
 		description: """
@@ -282,10 +282,15 @@ base: components: sinks: influxdb_metrics: configuration: {
 	tags: {
 		description: "A map of additional tags, in the form of key/value pairs, to add to each measurement."
 		required:    false
-		type: object: options: "*": {
-			description: "A tag key/value pair."
-			required:    true
-			type: string: {}
+		type: object: {
+			examples: [{
+				region: "us-west-1"
+			}]
+			options: "*": {
+				description: "A tag key/value pair."
+				required:    true
+				type: string: {}
+			}
 		}
 	}
 	tls: {
