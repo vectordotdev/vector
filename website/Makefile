@@ -30,6 +30,7 @@ config-examples:
 	yarn config-examples
 	
 rust-docs:
+	brew install cyrus-sasl
 	../scripts/environment/install-protoc.sh
 	PATH=${PATH}:~/protoc/ cargo doc
 	mv ../target/doc/ static/rustdocs/
