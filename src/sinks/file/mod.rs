@@ -44,7 +44,7 @@ use bytes_path::BytesPath;
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct FileSinkConfig {
-    /// File name to write events to.
+    /// File path to write events to.
     ///
     /// Compression format extension must be explicit.
     #[configurable(metadata(docs::examples = "/tmp/vector-%Y-%m-%d.log"))]
