@@ -64,12 +64,12 @@ base: components: sinks: datadog_metrics: configuration: {
 			The default Datadog [API key][api_key] to send metrics with.
 
 			If a metric has a Datadog [API key][api_key] set explicitly in its metadata, it will take
-			precedence over the default.
+			precedence over this setting.
 
 			[api_key]: https://docs.datadoghq.com/api/?lang=bash#authentication
 			"""
 		required: true
-		type: string: {}
+		type: string: examples: ["${DATADOG_API_KEY_ENV_VAR}", "ef8d5de700e7989468166c40fc8a0ccd"]
 	}
 	default_namespace: {
 		description: """
@@ -79,21 +79,25 @@ base: components: sinks: datadog_metrics: configuration: {
 			present, it is used as a prefix to the metric name, and separated with a period (`.`).
 			"""
 		required: false
-		type: string: {}
+		type: string: examples: ["myservice"]
 	}
 	endpoint: {
-		description: "The endpoint to send metrics to."
-		required:    false
-		type: string: {}
-	}
-	region: {
-		deprecated: true
 		description: """
-			The Datadog region to send metrics to.
+			The endpoint to send metrics to.
 
-			This option is deprecated, and the `site` field should be used instead.
+			The endpoint must contain an HTTP scheme, and may specify a
+			hostname or IP address and port.
+
+			If set, overrides the `site` option.
 			"""
 		required: false
+		type: string: examples: ["http://127.0.0.1:8080", "http://example.com:12345"]
+	}
+	region: {
+		deprecated:         true
+		deprecated_message: "This option has been deprecated, use the `site` option instead."
+		description:        "The Datadog region to send metrics to."
+		required:           false
 		type: string: enum: {
 			eu: "EU region."
 			us: "US region."
@@ -249,7 +253,10 @@ base: components: sinks: datadog_metrics: configuration: {
 			[dd_site]: https://docs.datadoghq.com/getting_started/site
 			"""
 		required: false
-		type: string: default: "datadoghq.com"
+		type: string: {
+			default: "datadoghq.com"
+			examples: ["us3.datadoghq.com", "datadoghq.eu"]
+		}
 	}
 	tls: {
 		description: "Configures the TLS options for incoming/outgoing connections."

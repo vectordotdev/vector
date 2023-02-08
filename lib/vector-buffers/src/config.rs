@@ -203,12 +203,16 @@ pub enum BufferType {
     /// be lost if Vector is restarted forcefully or crashes.
     ///
     /// Data is synchronized to disk every 500ms.
-    #[configurable(title = "Events are buffered on disk. (version 2)")]
+    #[configurable(title = "Events are buffered on disk.")]
     #[serde(rename = "disk")]
     DiskV2 {
         /// The maximum size of the buffer on disk.
         ///
         /// Must be at least ~256 megabytes (268435488 bytes).
+        #[configurable(
+            validation(range(min = 268435488)),
+            metadata(docs::type_unit = "bytes")
+        )]
         max_size: NonZeroU64,
 
         #[configurable(derived)]

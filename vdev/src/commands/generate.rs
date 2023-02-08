@@ -1,5 +1,5 @@
 crate::cli_subcommands! {
-    "Generate or Regenerate derived files"
+    "Generate or Regenerate derived files..."
     component_docs,
     manifests,
     release_cue,

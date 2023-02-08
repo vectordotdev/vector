@@ -16,6 +16,7 @@ use crate::{
         elasticsearch::{BulkConfig, ElasticsearchAuth, ElasticsearchCommon, ElasticsearchConfig},
         util::{BatchConfig, Compression, TowerRequestConfig},
     },
+    template::Template,
     test_util::{
         components::{run_and_assert_sink_compliance, AWS_SINK_TAGS},
         random_events_with_stream, random_string, wait_for_duration,
@@ -34,7 +35,7 @@ fn elasticsearch_address() -> String {
 async fn firehose_put_records() {
     let stream = gen_stream();
 
-    let elasticsearch_arn = ensure_elasticsearch_domain(stream.clone()).await;
+    let elasticsearch_arn = ensure_elasticsearch_domain(stream.clone().to_string()).await;
 
     ensure_elasticsearch_delivery_stream(stream.clone(), elasticsearch_arn.clone()).await;
 
@@ -77,8 +78,8 @@ async fn firehose_put_records() {
         })),
         endpoints: vec![elasticsearch_address()],
         bulk: Some(BulkConfig {
-            index: Some(stream.clone()),
-            action: None,
+            index: Template::try_from(stream.clone()).expect("unable to parse Template"),
+            ..Default::default()
         }),
         aws: Some(region),
         ..Default::default()

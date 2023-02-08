@@ -253,7 +253,7 @@ impl Configurable for Compression {
         );
         let zlib_string_subschema = generate_string_schema(
             "Zlib",
-            Some("[Zlib]][zlib] compression."),
+            Some("[Zlib][zlib] compression."),
             "[zlib]: https://zlib.net/",
         );
 

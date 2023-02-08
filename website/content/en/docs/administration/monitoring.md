@@ -42,7 +42,7 @@ encoding.codec = "text"
 Once Vector logs enter your topology through the `internal_logs` source, you can treat them like logs from any other
 system, i.e. you can [transform] them and send them off to any number of [sinks]. The configuration below, for example,
 transforms Vector's logs using the [`remap` transform][remap] and [Vector Remap Language][VRL] and then stores those
-logs in [Clickhouse]:
+logs in [ClickHouse]:
 
 ```toml
 [sources.vector_logs]

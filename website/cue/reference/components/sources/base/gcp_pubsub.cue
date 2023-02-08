@@ -47,7 +47,7 @@ base: components: sources: gcp_pubsub: configuration: {
 	}
 	api_key: {
 		description: """
-			An API key. ([documentation](https://cloud.google.com/docs/authentication/api-keys))
+			An [API key][gcp_api_key].
 
 			Either an API key, or a path to a service account credentials JSON file can be specified.
 
@@ -55,13 +55,15 @@ base: components: sources: gcp_pubsub: configuration: {
 			filename is named, an attempt is made to fetch an instance service account for the compute instance the program is
 			running on. If this is not on a GCE instance, then you must define it with an API key or service account
 			credentials JSON file.
+
+			[gcp_api_key]: https://cloud.google.com/docs/authentication/api-keys
 			"""
 		required: false
 		type: string: {}
 	}
 	credentials_path: {
 		description: """
-			Path to a service account credentials JSON file. ([documentation](https://cloud.google.com/docs/authentication/production#manually))
+			Path to a [service account] credentials JSON file.
 
 			Either an API key, or a path to a service account credentials JSON file can be specified.
 
@@ -69,6 +71,8 @@ base: components: sources: gcp_pubsub: configuration: {
 			filename is named, an attempt is made to fetch an instance service account for the compute instance the program is
 			running on. If this is not on a GCE instance, then you must define it with an API key or service account
 			credentials JSON file.
+
+			[gcp_service_account_credentials]: https://cloud.google.com/docs/authentication/production#manually
 			"""
 		required: false
 		type: string: {}
@@ -155,6 +159,14 @@ base: components: sources: gcp_pubsub: configuration: {
 																The maximum length of the byte buffer.
 
 																This length does *not* include the trailing delimiter.
+
+																By default, there is no maximum length enforced. If events are malformed, this can lead to
+																additional resource usage as events continue to be buffered in memory, and can potentially
+																lead to memory exhaustion in extreme cases.
+
+																If there is a risk of processing malformed data, such as logs with user-controlled input,
+																consider setting the maximum length to a reasonably large value as a safety net. This will
+																ensure that processing is not truly unbounded.
 																"""
 						required: false
 						type: uint: {}
@@ -188,6 +200,14 @@ base: components: sources: gcp_pubsub: configuration: {
 						The maximum length of the byte buffer.
 
 						This length does *not* include the trailing delimiter.
+
+						By default, there is no maximum length enforced. If events are malformed, this can lead to
+						additional resource usage as events continue to be buffered in memory, and can potentially
+						lead to memory exhaustion in extreme cases.
+
+						If there is a risk of processing malformed data, such as logs with user-controlled input,
+						consider setting the maximum length to a reasonably large value as a safety net. This will
+						ensure that processing is not truly unbounded.
 						"""
 					required: false
 					type: uint: {}
