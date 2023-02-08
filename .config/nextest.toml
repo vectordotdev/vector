@@ -13,8 +13,6 @@ failure-output = "immediate-final"
 # don't cancel the test run on the first failure
 fail-fast = false
 
-slow-timeout = { period = "30s" }
-
 [profile.default.junit]
 # output test results at target/nextest/default/junit.xml
 path = "junit.xml"
