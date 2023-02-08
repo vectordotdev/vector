@@ -4,4 +4,4 @@ CheckExternal: false
 IgnoreAltMissing: true
 IgnoreEmptyHref: true
 IgnoreDirs:
-- "rustdocs"
+- ".*rustdocs.*"
