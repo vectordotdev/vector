@@ -2,9 +2,9 @@ version: '3'
 
 services:
   emqx:
-    image: docker.io/emqx:${MQTT_VERSION}
+    image: docker.io/emqx:${CONFIG_VERSION}
     ports:
-    - 18083:18083
+    - 1883:1883
 
 networks:
   default:
