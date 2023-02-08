@@ -125,13 +125,12 @@ base: components: sinks: influxdb_logs: configuration: {
 		type: string: examples: ["vector-logs"]
 	}
 	namespace: {
-		deprecated: true
+		deprecated:         true
+		deprecated_message: "This field is deprecated, and `measurement` should be used instead."
 		description: """
 			The namespace of the measurement name to use.
 
 			When specified, the measurement name will be `<namespace>.vector`.
-
-			This field is deprecated, and `measurement` should be used instead.
 			"""
 		required: false
 		type: string: examples: ["service"]
