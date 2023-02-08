@@ -207,14 +207,26 @@ base: components: sinks: gcp_pubsub: configuration: {
 		}
 	}
 	endpoint: {
-		description: "The endpoint to which to publish events."
-		required:    false
-		type: string: {}
+		description: """
+			The endpoint to which to publish events.
+
+			The scheme (`http` or `https`) must be specified. No path should be included since the paths defined
+			by the [`GCP Pub/Sub`][pubsub_api] api are used.
+
+			The trailing slash `/` must not be included.
+
+			[pubsub_api]: https://cloud.google.com/pubsub/docs/reference/rest
+			"""
+		required: false
+		type: string: {
+			default: "https://pubsub.googleapis.com"
+			examples: ["https://us-central1-pubsub.googleapis.com"]
+		}
 	}
 	project: {
 		description: "The project name to which to publish events."
 		required:    true
-		type: string: {}
+		type: string: examples: ["vector-123456"]
 	}
 	request: {
 		description: """
@@ -447,6 +459,6 @@ base: components: sinks: gcp_pubsub: configuration: {
 	topic: {
 		description: "The topic within the project to which to publish events."
 		required:    true
-		type: string: {}
+		type: string: examples: ["this-is-a-topic"]
 	}
 }
