@@ -60,7 +60,7 @@ enum BuildError {
 #[configurable_component]
 #[derive(Clone, Debug, Default)]
 struct Metrics {
-    /// Expose topic lag metrics.
+    /// Expose topic lag metrics (`kafka_consumer_lag`).
     pub topic_lag_metric: bool,
 }
 

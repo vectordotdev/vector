@@ -250,7 +250,7 @@ base: components: sources: kafka: configuration: {
 		description: "Metrics configuration."
 		required:    false
 		type: object: options: topic_lag_metric: {
-			description: "Expose topic lag metrics."
+			description: "Expose topic lag metrics (`kafka_consumer_lag`)."
 			required:    false
 			type: bool: default: false
 		}
