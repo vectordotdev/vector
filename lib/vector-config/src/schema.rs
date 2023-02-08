@@ -144,7 +144,6 @@ where
         validation.apply(schema);
     }
 
-    //schema.metadata = Some(Box::new(schema_metadata));
     schema.metadata = Some(schema_metadata);
 }
 
