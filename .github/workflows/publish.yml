@@ -429,7 +429,7 @@ jobs:
           platforms: all
       - name: Set up Docker Buildx
         id: buildx
-        uses: docker/setup-buildx-action@v2.4.0
+        uses: docker/setup-buildx-action@v2.4.1
         with:
           version: latest
           install: true
@@ -475,7 +475,6 @@ jobs:
     needs:
       - generate-publish-metadata
       - build-x86_64-unknown-linux-gnu-packages
-      - build-x86_64-unknown-linux-gnu-debug-tarball
       - build-x86_64-unknown-linux-musl-packages
       - build-aarch64-unknown-linux-musl-packages
       - build-aarch64-unknown-linux-gnu-packages
@@ -508,11 +507,6 @@ jobs:
         uses: actions/download-artifact@v3
         with:
           name: vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-gnu
-          path: target/artifacts
-      - name: Download staged package artifacts (x86_64-unknown-linux-gnu-debug)
-        uses: actions/download-artifact@v3
-        with:
-          name: vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-gnu-debug
           path: target/artifacts
       - name: Download staged package artifacts (x86_64-unknown-linux-musl)
         uses: actions/download-artifact@v3
@@ -756,7 +750,6 @@ jobs:
     needs:
       - generate-publish-metadata
       - build-x86_64-unknown-linux-gnu-packages
-      - build-x86_64-unknown-linux-gnu-debug-tarball
       - build-x86_64-unknown-linux-musl-packages
       - build-aarch64-unknown-linux-musl-packages
       - build-aarch64-unknown-linux-gnu-packages
