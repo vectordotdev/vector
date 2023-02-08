@@ -127,7 +127,7 @@ base: components: sinks: loki: configuration: {
 					This implies sending push requests as Protocol Buffers.
 					"""
 				zlib: """
-					[Zlib]][zlib] compression.
+					[Zlib][zlib] compression.
 
 					[zlib]: https://zlib.net/
 					"""

@@ -53,7 +53,7 @@ impl Cli {
                         println!("    {target} => {mount}");
                     }
                 }
-                println!("  Needs docker socket: {}", config.runner.needs_docker_sock);
+                println!("  Needs docker socket: {}", config.runner.needs_docker_socket);
 
                 println!("Environments:");
                 for environment in config.environments().keys() {

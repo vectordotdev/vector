@@ -123,7 +123,7 @@ base: components: sinks: clickhouse: configuration: {
 					"""
 				none: "No compression."
 				zlib: """
-					[Zlib]][zlib] compression.
+					[Zlib][zlib] compression.
 
 					[zlib]: https://zlib.net/
 					"""
@@ -165,7 +165,7 @@ base: components: sinks: clickhouse: configuration: {
 		}
 	}
 	endpoint: {
-		description: "The endpoint of the Clickhouse server."
+		description: "The endpoint of the ClickHouse server."
 		required:    true
 		type: string: examples: ["http://localhost:8123"]
 	}
@@ -313,7 +313,7 @@ base: components: sinks: clickhouse: configuration: {
 		}
 	}
 	skip_unknown_fields: {
-		description: "Sets `input_format_skip_unknown_fields`, allowing Clickhouse to discard fields not present in the table schema."
+		description: "Sets `input_format_skip_unknown_fields`, allowing ClickHouse to discard fields not present in the table schema."
 		required:    false
 		type: bool: default: false
 	}

@@ -5,7 +5,7 @@ args:
 - "::docker_logs::"
 
 runner:
-  needs_docker_sock: true
+  needs_docker_socket: true
 
 matrix:
   default: ["default"]

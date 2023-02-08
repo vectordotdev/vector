@@ -13,6 +13,7 @@ components: sinks: nats: {
 	}
 
 	features: {
+		auto_generated:   true
 		acknowledgements: true
 		healthcheck: enabled: true
 		send: {
@@ -52,25 +53,7 @@ components: sinks: nats: {
 		notices: []
 	}
 
-	configuration: components._nats.configuration & {
-		connection_name: {
-			common:      false
-			description: "A name assigned to the NATS connection."
-			required:    false
-			type: string: {
-				default: "vector"
-				examples: ["foo", "API Name Option Example"]
-			}
-		}
-		subject: {
-			description: "The NATS subject to publish messages to."
-			required:    true
-			type: string: {
-				examples: ["{{ host }}", "foo", "time.us.east", "time.*.east", "time.>", ">"]
-				syntax: "template"
-			}
-		}
-	}
+	configuration: base.components.sinks.nats.configuration
 
 	input: {
 		logs:    true
