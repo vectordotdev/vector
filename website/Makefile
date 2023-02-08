@@ -30,9 +30,8 @@ config-examples:
 	yarn config-examples
 	
 rust-docs:
-	brew install cyrus-sasl
 	../scripts/environment/install-protoc.sh
-	PATH=${PATH}:~/protoc/ cargo doc
+	PATH=${PATH}:~/protoc/ cargo doc --no-deps
 	mv ../target/doc/ static/rustdocs/
 
 structured-data: cue-build config-examples rust-docs
