@@ -95,7 +95,7 @@ impl GenerateConfig for FileSinkConfig {
     }
 }
 
-fn default_idle_timeout() -> Duration {
+const fn default_idle_timeout() -> Duration {
     Duration::from_secs(30)
 }
 
