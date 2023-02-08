@@ -54,7 +54,7 @@ base: components: sinks: axiom: configuration: {
 	dataset: {
 		description: "The Axiom dataset to write to."
 		required:    true
-		type: string: {}
+		type: string: examples: ["vector.dev"]
 	}
 	org_id: {
 		description: """
@@ -63,7 +63,7 @@ base: components: sinks: axiom: configuration: {
 			Only required when using personal tokens.
 			"""
 		required: false
-		type: string: {}
+		type: string: examples: ["${AXIOM_ORG_ID}", "123abc"]
 	}
 	request: {
 		description: "Outbound HTTP request settings."
@@ -307,7 +307,7 @@ base: components: sinks: axiom: configuration: {
 	token: {
 		description: "The Axiom API token."
 		required:    true
-		type: string: {}
+		type: string: examples: ["${AXIOM_TOKEN}", "123abc"]
 	}
 	url: {
 		description: """
@@ -316,6 +316,6 @@ base: components: sinks: axiom: configuration: {
 			Only required if not using Axiom Cloud.
 			"""
 		required: false
-		type: string: {}
+		type: string: examples: ["https://axiom.my-domain.com", "${AXIOM_URL}"]
 	}
 }

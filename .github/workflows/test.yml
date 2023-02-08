@@ -62,8 +62,10 @@ jobs:
               - "Cargo.toml"
               - "Makefile"
               - "rust-toolchain.toml"
+              - "vdev/**"
             deny:
               - 'deny.toml'
+              - "vdev/**"
             dependencies:
               - ".cargo/**"
               - 'Cargo.toml'
@@ -72,16 +74,22 @@ jobs:
               - '.github/workflows/pr.yml'
               - 'Makefile'
               - 'scripts/cross/**'
+              - "vdev/**"
             cue:
               - 'website/cue/**'
+              - "vdev"
             component_docs:
               - 'scripts/generate-component-docs.rb'
+              - "vdev/**"
             markdown:
               - '**/**.md'
+              - "vdev/**"
             internal_events:
               - 'src/internal_events/**'
+              - "vdev/**"
             docker:
               - 'distribution/docker/**'
+              - "vdev/**"
 
   # Remove this once https://github.com/vectordotdev/vector/issues/3771 is closed.
   # Then, modify the `cross-linux` job to run `test` instead of `build`.
