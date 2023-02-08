@@ -30,7 +30,7 @@ config-examples:
 	yarn config-examples
 	
 rust-docs:
-	../script/environment/install-protoc.sh
+	../scripts/environment/install-protoc.sh
 	cargo doc
 	mv ../target/doc/ static/rustdocs/
 
