@@ -65,6 +65,8 @@ pub struct InfluxDbConfig {
     pub default_namespace: Option<String>,
 
     /// The endpoint to send data to.
+    ///
+    /// This should be a full HTTP URI, including the scheme, host, and port.
     #[configurable(metadata(docs::examples = "http://localhost:8086/"))]
     pub endpoint: String,
 

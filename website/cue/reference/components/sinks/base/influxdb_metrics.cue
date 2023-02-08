@@ -97,8 +97,12 @@ base: components: sinks: influxdb_metrics: configuration: {
 		type: string: examples: ["service"]
 	}
 	endpoint: {
-		description: "The endpoint to send data to."
-		required:    true
+		description: """
+			The endpoint to send data to.
+
+			This should be a full HTTP URI, including the scheme, host, and port.
+			"""
+		required: true
 		type: string: examples: ["http://localhost:8086/"]
 	}
 	org: {
