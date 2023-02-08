@@ -123,7 +123,7 @@ pub struct HecLogsSinkConfig {
     pub timestamp_nanos_key: Option<String>,
 
     /// Overrides the name of the log field used to grab the timestamp to send to Splunk HEC.
-    /// When set to “”, vector omits setting a timestamp in the events sent to Splunk HEC.
+    /// When set to `“”`, vector omits setting a timestamp in the events sent to Splunk HEC.
     ///
     /// By default, the [global `log_schema.timestamp_key` option][global_timestamp_key] is used.
     ///
