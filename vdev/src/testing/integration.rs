@@ -2,7 +2,9 @@ use std::{path::Path, path::PathBuf, process::Command};
 
 use anyhow::{bail, Context, Result};
 
-use super::config::{ComposeConfig, Environment, IntegrationTestConfig};
+#[cfg(unix)]
+use super::config::ComposeConfig;
+use super::config::{Environment, IntegrationTestConfig};
 use super::runner::{
     ContainerTestRunner as _, IntegrationTestRunner, TestRunner as _, CONTAINER_TOOL, DOCKER_SOCKET,
 };
@@ -111,6 +113,7 @@ struct Compose {
     path: PathBuf,
     test_dir: PathBuf,
     env: Environment,
+    #[cfg(unix)]
     config: ComposeConfig,
     network: Option<String>,
 }
@@ -122,11 +125,13 @@ impl Compose {
             Err(error) => Err(error).with_context(|| format!("Could not lookup {path:?}")),
             Ok(false) => Ok(None),
             Ok(true) => {
+                #[cfg(unix)]
                 let config = ComposeConfig::parse(&path)?;
                 Ok(Some(Self {
                     path,
                     test_dir,
                     env,
+                    #[cfg(unix)]
                     config,
                     network,
                 }))
