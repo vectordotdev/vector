@@ -12,6 +12,7 @@ use std::{
     time::Duration,
 };
 
+use indexmap::IndexMap;
 use serde::{de, Deserialize, Deserializer};
 use serde_with::serde_as;
 use vector_config::{
@@ -310,6 +311,9 @@ pub struct AdvancedSinkConfig {
 
     /// The tags to apply to each event.
     tags: HashMap<String, TagConfig>,
+
+    /// The headers to apply to each event.
+    headers: HashMap<String, Vec<String>>,
 }
 
 /// Specification of the value of a created tag.
@@ -336,6 +340,7 @@ impl GenerateConfig for AdvancedSinkConfig {
             tls: None,
             partition_key: default_partition_key(),
             tags: HashMap::new(),
+            headers: HashMap::new(),
         })
         .unwrap()
     }
@@ -469,6 +474,9 @@ pub enum SinkConfig {
 pub struct GlobalOptions {
     /// The data directory where Vector will store state.
     data_dir: Option<String>,
+
+    /// A map of additional tags for metrics.
+    tags: Option<IndexMap<String, String>>,
 }
 
 /// The overall configuration for Vector.

@@ -122,7 +122,7 @@ fn build_virtual_newtype_schema_fn(virtual_ty: Type) -> proc_macro2::TokenStream
             // type must have a default value for itself if having a default value is required.
             let metadata = <Self as ::vector_config::Configurable>::metadata().convert();
 
-            ::vector_config::schema::get_or_generate_schema::<#virtual_ty>(schema_gen, metadata)
+            ::vector_config::schema::get_or_generate_schema::<#virtual_ty>(schema_gen, Some(metadata))
         }
     }
 }
@@ -142,7 +142,7 @@ fn build_enum_generate_schema_fn(variants: &[Variant<'_>]) -> proc_macro2::Token
             #(#mapped_variants)*
 
             let mut schema = ::vector_config::schema::generate_one_of_schema(&subschemas);
-            ::vector_config::schema::apply_metadata(&mut schema, enum_metadata);
+            //::vector_config::schema::apply_metadata(&mut schema, enum_metadata);
 
             Ok(schema)
         }
@@ -167,7 +167,7 @@ fn generate_struct_field(field: &Field<'_>) -> proc_macro2::TokenStream {
     let field_metadata = generate_field_metadata(&field_metadata_ref, field);
 
     let spanned_generate_schema = quote_spanned! {field.span()=>
-        ::vector_config::schema::get_or_generate_schema(schema_gen, #field_metadata_ref)?
+        ::vector_config::schema::get_or_generate_schema(schema_gen, Some(#field_metadata_ref))?
     };
 
     quote! {
@@ -221,6 +221,7 @@ fn generate_named_struct_field(
             };
 
         quote! {
+            //println!("property '{}': subschema: {:?}", #field_key, subschema);
             if let Some(_) = properties.insert(#field_key.to_string(), subschema) {
                 panic!(#field_already_contained);
             }
@@ -231,8 +232,10 @@ fn generate_named_struct_field(
 
     quote! {
         {
+            //println!("property '{}': generating schema", #field_key);
             #field_schema
             #integrate_field
+            //println!("property '{}': generated schema", #field_key);
         }
     }
 }
@@ -291,7 +294,7 @@ fn build_named_struct_generate_schema_fn(
                 ::vector_config::schema::convert_to_flattened_schema(&mut schema, flattened_subschemas);
             }
 
-            ::vector_config::schema::apply_metadata(&mut schema, metadata);
+            //::vector_config::schema::apply_metadata(&mut schema, metadata);
 
             Ok(schema)
         }
@@ -313,7 +316,7 @@ fn build_tuple_struct_generate_schema_fn(fields: &[Field<'_>]) -> proc_macro2::T
             #(#mapped_fields)*
 
             let mut schema = ::vector_config::schema::generate_tuple_schema(&subschemas);
-            ::vector_config::schema::apply_metadata(&mut schema, metadata);
+            //::vector_config::schema::apply_metadata(&mut schema, metadata);
 
             Ok(schema)
         }
@@ -340,7 +343,7 @@ fn build_newtype_struct_generate_schema_fn(fields: &[Field<'_>]) -> proc_macro2:
             let metadata = <Self as ::vector_config::Configurable>::metadata();
 
             #field_schema
-            ::vector_config::schema::apply_metadata(&mut subschema, metadata);
+            //::vector_config::schema::apply_metadata(&mut subschema, metadata);
 
             Ok(subschema)
         }
@@ -417,13 +420,14 @@ fn generate_field_metadata(meta_ident: &Ident, field: &Field<'_>) -> proc_macro2
     // definition attached to that identifier will carry the field type's metadata. Any metadata
     // specified on the field itself should live solely on the field's schema (which can exist
     // alongside the schema reference) and vice versa.
-    let spanned_metadata = quote_spanned! {field.span()=>
+    /*let spanned_metadata = quote_spanned! {field.span()=>
         if <#field_schema_ty as ::vector_config::Configurable>::referenceable_name().is_none() {
             <#field_schema_ty as ::vector_config::Configurable>::metadata()
         } else {
             ::vector_config::Metadata::default()
         }
-    };
+    };*/
+    let spanned_metadata = quote! { ::vector_config::Metadata::<#field_schema_ty>::default() };
 
     let maybe_title = get_metadata_title(meta_ident, field.title());
     let maybe_description = get_metadata_description(meta_ident, field.description());
