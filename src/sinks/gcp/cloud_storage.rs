@@ -66,14 +66,14 @@ pub struct GcsSinkConfig {
 
     /// The storage class for created objects.
     ///
-    /// For more information, see [Storage classes][storage_classes].
+    /// For more information, see the [storage classes][storage_classes] documentation.
     ///
     /// [storage_classes]: https://cloud.google.com/storage/docs/storage-classes
     storage_class: Option<GcsStorageClass>,
 
     /// The set of metadata `key:value` pairs for the created objects.
     ///
-    /// For more information, see [Custom metadata][custom_metadata].
+    /// For more information, see the [custom metadata][custom_metadata] documentation.
     ///
     /// [custom_metadata]: https://cloud.google.com/storage/docs/metadata#custom-metadata
     #[configurable(metadata(docs::additional_props_description = "A key/value pair."))]

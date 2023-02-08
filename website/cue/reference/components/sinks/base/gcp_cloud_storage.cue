@@ -84,7 +84,7 @@ base: components: sinks: gcp_cloud_storage: configuration: {
 	}
 	api_key: {
 		description: """
-			An API key. ([documentation](https://cloud.google.com/docs/authentication/api-keys))
+			An [API key][gcp_api_key].
 
 			Either an API key, or a path to a service account credentials JSON file can be specified.
 
@@ -92,6 +92,8 @@ base: components: sinks: gcp_cloud_storage: configuration: {
 			filename is named, an attempt is made to fetch an instance service account for the compute instance the program is
 			running on. If this is not on a GCE instance, then you must define it with an API key or service account
 			credentials JSON file.
+
+			[gcp_api_key]: https://cloud.google.com/docs/authentication/api-keys
 			"""
 		required: false
 		type: string: {}
@@ -159,7 +161,7 @@ base: components: sinks: gcp_cloud_storage: configuration: {
 	}
 	credentials_path: {
 		description: """
-			Path to a service account credentials JSON file. ([documentation](https://cloud.google.com/docs/authentication/production#manually))
+			Path to a [service account] credentials JSON file.
 
 			Either an API key, or a path to a service account credentials JSON file can be specified.
 
@@ -167,6 +169,8 @@ base: components: sinks: gcp_cloud_storage: configuration: {
 			filename is named, an attempt is made to fetch an instance service account for the compute instance the program is
 			running on. If this is not on a GCE instance, then you must define it with an API key or service account
 			credentials JSON file.
+
+			[gcp_service_account_credentials]: https://cloud.google.com/docs/authentication/production#manually
 			"""
 		required: false
 		type: string: {}
@@ -380,7 +384,7 @@ base: components: sinks: gcp_cloud_storage: configuration: {
 		description: """
 			The set of metadata `key:value` pairs for the created objects.
 
-			For more information, see [Custom metadata][custom_metadata].
+			For more information, see the [custom metadata][custom_metadata] documentation.
 
 			[custom_metadata]: https://cloud.google.com/storage/docs/metadata#custom-metadata
 			"""
@@ -538,7 +542,7 @@ base: components: sinks: gcp_cloud_storage: configuration: {
 		description: """
 			The storage class for created objects.
 
-			For more information, see [Storage classes][storage_classes].
+			For more information, see the [storage classes][storage_classes] documentation.
 
 			[storage_classes]: https://cloud.google.com/storage/docs/storage-classes
 			"""
