@@ -31,7 +31,7 @@ config-examples:
 	
 rust-docs:
 	../scripts/environment/install-protoc.sh
-	PATH=${PATH}:~/protoc/ cargo doc --no-default-features --features="docs"
+	PATH=${PATH}:~/protoc/ cargo doc --no-default-features --features="docs" --no-deps
 	mv ../target/doc/ static/rustdocs/
 
 structured-data: cue-build config-examples rust-docs
