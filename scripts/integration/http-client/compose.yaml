@@ -2,13 +2,13 @@ version: '3'
 
 services:
   dufs:
-    image: docker.io/sigoden/dufs:${HTTP_CLIENT_VERSION}
+    image: docker.io/sigoden/dufs:${CONFIG_VERSION}
     command:
     - /data
     volumes:
     - ../../../tests/data/http-client/serve:/data
   dufs-auth:
-    image: docker.io/sigoden/dufs:${HTTP_CLIENT_VERSION}
+    image: docker.io/sigoden/dufs:${CONFIG_VERSION}
     command:
     - -a
     - /@user:pass
@@ -18,7 +18,7 @@ services:
     volumes:
     - ../../../tests/data/http-client/serve:/data
   dufs-https:
-    image: docker.io/sigoden/dufs:${HTTP_CLIENT_VERSION}
+    image: docker.io/sigoden/dufs:${CONFIG_VERSION}
     command:
     - --tls-cert
     - /certs/ca.cert.pem

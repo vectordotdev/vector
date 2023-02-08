@@ -2,7 +2,7 @@ version: '3'
 
 services:
   datadog-trace-agent:
-    image: docker.io/datadog/agent:${DATADOG_TRACES_VERSION}
+    image: docker.io/datadog/agent:${CONFIG_VERSION}
     environment:
     - DD_API_KEY=${TEST_DATADOG_API_KEY:?TEST_DATADOG_API_KEY required}
     - DD_APM_ENABLED=true
@@ -16,7 +16,7 @@ services:
     - DD_APM_MAX_CPU_PERCENT=0
     - DD_HOSTNAME=datadog-trace-agent
   datadog-trace-agent-to-vector:
-    image: docker.io/datadog/agent:${DATADOG_TRACES_VERSION}
+    image: docker.io/datadog/agent:${CONFIG_VERSION}
     environment:
     - DD_API_KEY=${TEST_DATADOG_API_KEY:?TEST_DATADOG_API_KEY required}
     - DD_APM_ENABLED=true
