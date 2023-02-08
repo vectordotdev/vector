@@ -108,6 +108,13 @@ impl<T> Metadata<T> {
         self.deprecated_message = Some(message);
     }
 
+    pub fn with_transparent(transparent: bool) -> Self {
+        Self {
+            transparent,
+            ..Default::default()
+        }
+    }
+
     pub fn transparent(&self) -> bool {
         self.transparent
     }
