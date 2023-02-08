@@ -2,7 +2,7 @@ args:
 - --features
 - aws-integration-tests
 - --lib
-- "::aws_s3::integration_tests::handles_errored_status"
+- ::aws_
 
 env:
   AWS_ACCESS_KEY_ID: dummy
@@ -15,7 +15,6 @@ env:
   S3_ADDRESS: http://mock-localstack:4566
   SQS_ADDRESS: http://mock-localstack:4566
   WATCHLOGS_ADDRESS: http://mock-watchlogs:6000
-  TEST_LOG: debug
 
 matrix:
   version: [latest]
