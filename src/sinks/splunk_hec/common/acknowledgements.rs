@@ -25,6 +25,7 @@ use crate::{
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(default)]
+#[configurable(metadata(docs::advanced))]
 pub struct HecClientAcknowledgementsConfig {
     /// Controls if the sink will integrate with [Splunk HEC indexer acknowledgements][splunk_indexer_ack_docs] for end-to-end acknowledgements.
     ///

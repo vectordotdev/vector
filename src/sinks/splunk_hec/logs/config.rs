@@ -40,6 +40,7 @@ pub struct HecLogsSinkConfig {
     pub default_token: SensitiveString,
 
     /// The base URL of the Splunk instance.
+    #[configurable(validation(format = "uri"))]
     pub endpoint: String,
 
     /// Overrides the name of the log field used to grab the hostname to send to Splunk HEC.
@@ -47,12 +48,14 @@ pub struct HecLogsSinkConfig {
     /// By default, the [global `log_schema.host_key` option][global_host_key] is used.
     ///
     /// [global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
+    #[configurable(metadata(docs::advanced))]
     #[serde(default = "host_key")]
     pub host_key: String,
 
     /// Fields to be [added to Splunk index][splunk_field_index_docs].
     ///
     /// [splunk_field_index_docs]: https://docs.splunk.com/Documentation/Splunk/8.0.0/Data/IFXandHEC
+    #[configurable(metadata(docs::advanced))]
     #[serde(default)]
     pub indexed_fields: Vec<String>,
 
@@ -64,6 +67,7 @@ pub struct HecLogsSinkConfig {
     /// The sourcetype of events sent to this sink.
     ///
     /// If unset, Splunk will default to `httpevent`.
+    #[configurable(metadata(docs::advanced))]
     pub sourcetype: Option<Template>,
 
     /// The source of events sent to this sink.
@@ -71,6 +75,7 @@ pub struct HecLogsSinkConfig {
     /// This is typically the filename the logs originated from.
     ///
     /// If unset, the Splunk collector will set it.
+    #[configurable(metadata(docs::advanced))]
     pub source: Option<Template>,
 
     #[configurable(derived)]
@@ -105,18 +110,23 @@ pub struct HecLogsSinkConfig {
     /// By default, the [global `log_schema.timestamp_key` option][global_timestamp_key] is used.
     ///
     /// [global_timestamp_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.timestamp_key
+    #[configurable(metadata(docs::advanced))]
     #[serde(default = "crate::sinks::splunk_hec::common::timestamp_key")]
     pub timestamp_key: String,
 
-    /// Passes the auto_extract_timestamp option to Splunk.
-    /// Note this option is only used by Version 8 and above of Splunk.
-    /// This will cause Splunk to extract the timestamp from the message text rather than use
-    /// the timestamp embedded in the event. The timestamp must be in the format yyyy-mm-dd hh:mm:ss.
-    /// This option only applies for the `Event` endpoint target.
+    /// Passes the `auto_extract_timestamp` option to Splunk.
+    ///
+    /// This option is only relevant to Splunk v8.x and above, and is only applied when
+    /// `endpoint_target` is set to `event`.
+    ///
+    /// Setting this to `true` will cause Splunk to extract the timestamp from the message text
+    /// rather than use the timestamp embedded in the event. The timestamp must be in the format
+    /// `yyyy-mm-dd hh:mm:ss`.
     #[serde(default)]
     pub auto_extract_timestamp: Option<bool>,
 
     #[configurable(derived)]
+    #[configurable(metadata(docs::advanced))]
     #[serde(default = "default_endpoint_target")]
     pub endpoint_target: EndpointTarget,
 }

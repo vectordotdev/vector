@@ -44,6 +44,7 @@ pub struct HecMetricsSinkConfig {
     pub default_token: SensitiveString,
 
     /// The base URL of the Splunk instance.
+    #[configurable(validation(format = "uri"))]
     pub endpoint: String,
 
     /// Overrides the name of the log field used to grab the hostname to send to Splunk HEC.
@@ -51,6 +52,7 @@ pub struct HecMetricsSinkConfig {
     /// By default, the [global `log_schema.host_key` option][global_host_key] is used.
     ///
     /// [global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
+    #[configurable(metadata(docs::advanced))]
     #[serde(default = "host_key")]
     pub host_key: String,
 
@@ -62,6 +64,7 @@ pub struct HecMetricsSinkConfig {
     /// The sourcetype of events sent to this sink.
     ///
     /// If unset, Splunk will default to `httpevent`.
+    #[configurable(metadata(docs::advanced))]
     pub sourcetype: Option<Template>,
 
     /// The source of events sent to this sink.
@@ -69,6 +72,7 @@ pub struct HecMetricsSinkConfig {
     /// This is typically the filename the logs originated from.
     ///
     /// If unset, the Splunk collector will set it.
+    #[configurable(metadata(docs::advanced))]
     pub source: Option<Template>,
 
     #[configurable(derived)]
