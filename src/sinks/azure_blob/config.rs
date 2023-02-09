@@ -77,7 +77,6 @@ pub struct AzureBlobSinkConfig {
     /// Prefixes are useful for partitioning objects, such as by creating an blob key that
     /// stores blobs under a particular "directory". If using a prefix for this purpose, it must end
     /// in `/` to act as a directory path. A trailing `/` is **not** automatically added.
-    #[configurable(metadata(docs::examples = "date/%F/"))]
     #[configurable(metadata(docs::examples = "date/%F/hour/%H/"))]
     #[configurable(metadata(docs::examples = "year=%Y/month=%m/day=%d/"))]
     #[configurable(metadata(
