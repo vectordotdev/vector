@@ -84,7 +84,7 @@ base: components: sinks: gcp_cloud_storage: configuration: {
 	}
 	api_key: {
 		description: """
-			An API key. ([documentation](https://cloud.google.com/docs/authentication/api-keys))
+			An [API key][gcp_api_key].
 
 			Either an API key, or a path to a service account credentials JSON file can be specified.
 
@@ -92,6 +92,8 @@ base: components: sinks: gcp_cloud_storage: configuration: {
 			filename is named, an attempt is made to fetch an instance service account for the compute instance the program is
 			running on. If this is not on a GCE instance, then you must define it with an API key or service account
 			credentials JSON file.
+
+			[gcp_api_key]: https://cloud.google.com/docs/authentication/api-keys
 			"""
 		required: false
 		type: string: {}
@@ -131,7 +133,7 @@ base: components: sinks: gcp_cloud_storage: configuration: {
 	bucket: {
 		description: "The GCS bucket name."
 		required:    true
-		type: string: {}
+		type: string: examples: ["my-bucket"]
 	}
 	compression: {
 		description: """
@@ -159,7 +161,7 @@ base: components: sinks: gcp_cloud_storage: configuration: {
 	}
 	credentials_path: {
 		description: """
-			Path to a service account credentials JSON file. ([documentation](https://cloud.google.com/docs/authentication/production#manually))
+			Path to a [service account] credentials JSON file.
 
 			Either an API key, or a path to a service account credentials JSON file can be specified.
 
@@ -167,6 +169,8 @@ base: components: sinks: gcp_cloud_storage: configuration: {
 			filename is named, an attempt is made to fetch an instance service account for the compute instance the program is
 			running on. If this is not on a GCE instance, then you must define it with an API key or service account
 			credentials JSON file.
+
+			[gcp_service_account_credentials]: https://cloud.google.com/docs/authentication/production#manually
 			"""
 		required: false
 		type: string: {}
@@ -299,11 +303,15 @@ base: components: sinks: gcp_cloud_storage: configuration: {
 			object keys must be unique.
 			"""
 		required: false
-		type: bool: {}
+		type: bool: default: true
 	}
 	filename_extension: {
-		description: "The filename extension to use in the object key."
-		required:    false
+		description: """
+			The filename extension to use in the object key.
+
+			If not specified, the extension will be determined by the compression scheme used.
+			"""
+		required: false
 		type: string: {}
 	}
 	filename_time_format: {
@@ -326,7 +334,7 @@ base: components: sinks: gcp_cloud_storage: configuration: {
 			[chrono_strftime_specifiers]: https://docs.rs/chrono/latest/chrono/format/strftime/index.html#specifiers
 			"""
 		required: false
-		type: string: {}
+		type: string: default: "%s"
 	}
 	framing: {
 		description: "Framing configuration."
@@ -367,13 +375,16 @@ base: components: sinks: gcp_cloud_storage: configuration: {
 			in `/` in order to act as a directory path: Vector will **not** add a trailing `/` automatically.
 			"""
 		required: false
-		type: string: syntax: "template"
+		type: string: {
+			examples: ["date=%F/", "date=%F/hour=%H/", "year=%Y/month=%m/day=%d/", "application_id={{ application_id }}/date=%F/"]
+			syntax: "template"
+		}
 	}
 	metadata: {
 		description: """
 			The set of metadata `key:value` pairs for the created objects.
 
-			For more information, see [Custom metadata][custom_metadata].
+			For more information, see the [custom metadata][custom_metadata] documentation.
 
 			[custom_metadata]: https://cloud.google.com/storage/docs/metadata#custom-metadata
 			"""
@@ -531,7 +542,7 @@ base: components: sinks: gcp_cloud_storage: configuration: {
 		description: """
 			The storage class for created objects.
 
-			For more information, see [Storage classes][storage_classes].
+			For more information, see the [storage classes][storage_classes] documentation.
 
 			[storage_classes]: https://cloud.google.com/storage/docs/storage-classes
 			"""

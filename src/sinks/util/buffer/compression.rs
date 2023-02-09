@@ -277,10 +277,7 @@ impl Configurable for Compression {
         // generation, where we need to be able to generate the right enum key/value pair for the
         // `none` algorithm as part of the overall set of enum values declared for the `algorithm`
         // field in the "full" schema version.
-        let mut compression_level_metadata = Metadata::default();
-        compression_level_metadata.set_transparent();
-        let compression_level_schema =
-            get_or_generate_schema::<CompressionLevel>(gen, compression_level_metadata)?;
+        let compression_level_schema = get_or_generate_schema::<CompressionLevel>(gen, None)?;
 
         let mut required = BTreeSet::new();
         required.insert(ALGORITHM_NAME.to_string());

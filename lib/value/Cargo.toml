@@ -21,7 +21,7 @@ async-graphql = { version = "5.0.5", default-features = false, optional = true }
 mlua = { version = "0.8.7", default-features = false, features = ["lua54", "send", "vendored"], optional = true}
 serde = { version = "1.0.152", default-features = false, features = ["derive", "rc"], optional = true }
 serde_json = { version = "1.0.92", optional = true }
-toml = { version = "0.7.1", default-features = false, optional = true }
+toml = { version = "0.7.2", default-features = false, optional = true }
 quickcheck = { version = "1.0.3", optional = true }
 
 [features]
@@ -38,5 +38,5 @@ quickcheck = "1.0.3"
 lookup = { path = "../lookup", default-features = false, features = ["arbitrary"] }
 serde = { version = "1.0.152", default-features = false, features = ["derive", "rc"]}
 serde_json = { version = "1.0.92"}
-toml = { version = "0.7.1", default-features = false }
+toml = { version = "0.7.2", default-features = false }
 mlua = { version = "0.8.7", default-features = false, features = ["lua54", "send", "vendored"]}

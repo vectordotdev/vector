@@ -217,7 +217,7 @@ base: components: sinks: prometheus_remote_write: configuration: {
 		required: false
 		type: array: {
 			default: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0]
-			items: type: number: {}
+			items: type: float: {}
 		}
 	}
 	default_namespace: {
@@ -232,12 +232,16 @@ base: components: sinks: prometheus_remote_write: configuration: {
 			[prom_naming_docs]: https://prometheus.io/docs/practices/naming/#metric-names
 			"""
 		required: false
-		type: string: {}
+		type: string: examples: ["service"]
 	}
 	endpoint: {
-		description: "The endpoint to send data to."
-		required:    true
-		type: string: {}
+		description: """
+			The endpoint to send data to.
+
+			The endpoint should include the scheme and the path to write to.
+			"""
+		required: true
+		type: string: examples: ["https://localhost:8087/api/v1/write"]
 	}
 	quantiles: {
 		description: """
@@ -248,7 +252,7 @@ base: components: sinks: prometheus_remote_write: configuration: {
 		required: false
 		type: array: {
 			default: [0.5, 0.75, 0.9, 0.95, 0.99]
-			items: type: number: {}
+			items: type: float: {}
 		}
 	}
 	request: {
@@ -403,7 +407,10 @@ base: components: sinks: prometheus_remote_write: configuration: {
 			This may be used by Cortex or other remote services to identify the tenant making the request.
 			"""
 		required: false
-		type: string: syntax: "template"
+		type: string: {
+			examples: ["my-domain"]
+			syntax: "template"
+		}
 	}
 	tls: {
 		description: "TLS configuration."
