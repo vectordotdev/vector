@@ -44,7 +44,9 @@ pub struct InfluxDbLogsConfig {
     ///
     /// When specified, the measurement name will be `<namespace>.vector`.
     ///
-    #[configurable(deprecated = "This field is deprecated, and `measurement` should be used instead.")]
+    #[configurable(
+        deprecated = "This field is deprecated, and `measurement` should be used instead."
+    )]
     #[configurable(metadata(docs::examples = "service"))]
     pub namespace: Option<String>,
 
