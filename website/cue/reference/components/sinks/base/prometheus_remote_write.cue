@@ -241,7 +241,7 @@ base: components: sinks: prometheus_remote_write: configuration: {
 			The endpoint should include the scheme and the path to write to.
 			"""
 		required: true
-		type: string: examples: ["https://localhost:8087/"]
+		type: string: examples: ["https://localhost:8087/api/v1/write"]
 	}
 	quantiles: {
 		description: """
