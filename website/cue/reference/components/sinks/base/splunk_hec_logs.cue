@@ -249,7 +249,7 @@ base: components: sinks: splunk_hec_logs: configuration: {
 			The base URL of the Splunk instance.
 
 			The scheme (`http` or `https`) must be specified. No path should be included since the paths defined
-			by the [`Splunk`][splunk] api are used.
+			by the [`Splunk`][splunk] API are used.
 
 			[splunk]: https://docs.splunk.com/Documentation/Splunk/8.0.0/Data/HECRESTendpoints
 			"""
@@ -296,9 +296,9 @@ base: components: sinks: splunk_hec_logs: configuration: {
 	}
 	index: {
 		description: """
-			The name of the index where to send the events to.
+			The name of the index where to send events to.
 
-			If not specified, the default index is used.
+			If not specified, the default index defined within Splunk is used.
 			"""
 		required: false
 		type: string: {
@@ -483,7 +483,7 @@ base: components: sinks: splunk_hec_logs: configuration: {
 			"""
 		required: false
 		type: string: {
-			examples: ["{{ sourcetype }}", "_json", "httpevent"]
+			examples: ["{{ sourcetype }}", "_json"]
 			syntax: "template"
 		}
 	}
