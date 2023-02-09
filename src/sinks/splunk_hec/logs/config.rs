@@ -67,7 +67,7 @@ pub struct HecLogsSinkConfig {
     #[configurable(metadata(docs::examples = "field1", docs::examples = "field2"))]
     pub indexed_fields: Vec<String>,
 
-    /// The name of the index where to send events to.
+    /// The name of the index to send events to.
     ///
     /// If not specified, the default index defined within Splunk is used.
     #[configurable(metadata(docs::examples = "{{ host }}", docs::examples = "custom_index"))]
