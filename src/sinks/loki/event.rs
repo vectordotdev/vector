@@ -31,22 +31,30 @@ impl Encoder<Vec<LokiRecord>> for LokiBatchEncoder {
         let batch = LokiBatch::from(input);
         let body = match self.0 {
             LokiBatchEncoding::Json => {
-                let body = serde_json::json!({ "streams": [batch] });
+                let streams: Vec<LokiStream> = batch.stream_by_labels.into_values().collect();
+                let body = serde_json::json!({ "streams": streams });
                 serde_json::to_vec(&body)?
             }
             LokiBatchEncoding::Protobuf => {
-                let labels = batch.stream;
-                let entries = batch
-                    .values
-                    .iter()
-                    .map(|event| {
-                        loki_logproto::util::Entry(
-                            event.timestamp,
-                            String::from_utf8_lossy(&event.event).into_owned(),
-                        )
-                    })
-                    .collect();
-                let batch = loki_logproto::util::Batch(labels, entries);
+                let streams = batch.stream_by_labels.into_values();
+                let batch = loki_logproto::util::Batch(
+                    streams
+                        .map(|stream| {
+                            let labels = stream.stream;
+                            let entries = stream
+                                .values
+                                .iter()
+                                .map(|event| {
+                                    loki_logproto::util::Entry(
+                                        event.timestamp,
+                                        String::from_utf8_lossy(&event.event).into_owned(),
+                                    )
+                                })
+                                .collect();
+                            loki_logproto::util::Stream(labels, entries)
+                        })
+                        .collect(),
+                );
                 batch.encode()
             }
         };
@@ -56,10 +64,15 @@ impl Encoder<Vec<LokiRecord>> for LokiBatchEncoder {
 
 #[derive(Debug, Default, Serialize)]
 pub struct LokiBatch {
-    stream: HashMap<String, String>,
-    values: Vec<LokiEvent>,
+    stream_by_labels: HashMap<String, LokiStream>,
     #[serde(skip)]
     finalizers: EventFinalizers,
+}
+
+#[derive(Debug, Default, Serialize)]
+pub struct LokiStream {
+    stream: HashMap<String, String>,
+    values: Vec<LokiEvent>,
 }
 
 impl From<Vec<LokiRecord>> for LokiBatch {
@@ -68,11 +81,47 @@ impl From<Vec<LokiRecord>> for LokiBatch {
             .into_iter()
             .fold(Self::default(), |mut res, mut item| {
                 res.finalizers.merge(item.take_finalizers());
-                res.stream.extend(item.labels.into_iter());
-                res.values.push(item.event);
+                item.labels.sort();
+                // Convert a HashMap of keys and values into a string in the
+                // format "k1,v1,k2,v2,". If any of the keys or values contain
+                // a comma, it escapes the comma by adding a backslash before
+                // it (e.g. "val,ue" becomes "val\,ue").
+                let labels: String = item
+                    .labels
+                    .iter()
+                    .flat_map(|(a, b)| [a, b])
+                    .map(|s| {
+                        let mut escaped: String = s
+                            .chars()
+                            .map(|c| match c {
+                                '\\' => "\\\\".to_string(),
+                                ',' => "\\,".to_string(),
+                                c => c.to_string(),
+                            })
+                            .collect();
+                        escaped.push(',');
+                        escaped
+                    })
+                    .collect();
+                if !res.stream_by_labels.contains_key(&labels) {
+                    res.stream_by_labels.insert(
+                        labels.clone(),
+                        LokiStream {
+                            stream: item.labels.into_iter().collect(),
+                            values: Vec::new(),
+                        },
+                    );
+                }
+                let stream = res
+                    .stream_by_labels
+                    .get_mut(&labels)
+                    .expect("stream must exist");
+                stream.values.push(item.event);
                 res
             });
-        result.values.sort_by_key(|e| e.timestamp);
+        for (_k, stream) in result.stream_by_labels.iter_mut() {
+            stream.values.sort_by_key(|e| e.timestamp);
+        }
         result
     }
 }
@@ -157,7 +206,6 @@ impl Finalizable for LokiRecord {
 #[derive(Hash, Eq, PartialEq, Clone, Debug)]
 pub struct PartitionKey {
     pub tenant_id: Option<String>,
-    labels: String,
 }
 
 impl ByteSizeOf for PartitionKey {
@@ -166,21 +214,5 @@ impl ByteSizeOf for PartitionKey {
             .as_ref()
             .map(|value| value.allocated_bytes())
             .unwrap_or(0)
-            + self.labels.allocated_bytes()
-    }
-}
-
-impl PartitionKey {
-    pub fn new(tenant_id: Option<String>, labels: &mut Labels) -> Self {
-        // Let's join all of the labels to single string so that
-        // cloning requires only single allocation.
-        // That requires sorting to ensure uniqueness, but
-        // also choosing a separator that isn't likely to be
-        // used in either name or value.
-        labels.sort();
-        PartitionKey {
-            tenant_id,
-            labels: labels.iter().flat_map(|(a, b)| [a, "→", b, "∇"]).collect(),
-        }
     }
 }

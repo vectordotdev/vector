@@ -6,14 +6,13 @@ use syn::{
     DeriveInput, ExprPath, GenericArgument, Generics, Ident, PathArguments, PathSegment, Type,
     TypeParam,
 };
-use vector_config_common::attributes::CustomAttribute;
 
 use super::{
     util::{
         err_serde_failed, get_serde_default_value, try_extract_doc_title_description,
         DarlingResultIterator,
     },
-    Data, Field, Metadata, Style, Tagging, Variant,
+    Data, Field, LazyCustomAttribute, Metadata, Style, Tagging, Variant,
 };
 
 const ERR_NO_ENUM_TUPLES: &str = "enum variants cannot be tuples (multiple unnamed fields)";
@@ -128,7 +127,7 @@ impl<'a> Container<'a> {
         Attributes::from_attributes(&input.attrs)
             .and_then(|attrs| attrs.finalize(&input.attrs))
             // We successfully parsed the derive input through both `serde` itself and our own attribute parsing, so
-            // build our data container based on whether or not we have a struct, enum, and do any neccessary
+            // build our data container based on whether or not we have a struct, enum, and do any necessary
             // validation, etc.
             .and_then(|attrs| {
                 let tagging: Tagging = serde.attrs.tag().into();
@@ -200,9 +199,17 @@ impl<'a> Container<'a> {
                         serde_ast::Style::Struct
                         | serde_ast::Style::Tuple
                         | serde_ast::Style::Newtype => {
+                            let is_newtype_wrapper_field =
+                                matches!(style, serde_ast::Style::Newtype);
                             let fields = fields
                                 .iter()
-                                .map(|field| Field::from_ast(field, virtual_newtype.is_some()))
+                                .map(|field| {
+                                    Field::from_ast(
+                                        field,
+                                        virtual_newtype.is_some(),
+                                        is_newtype_wrapper_field,
+                                    )
+                                })
                                 .collect_darling_results(&mut accumulator);
 
                             (Data::Struct(style.into(), fields), false)
@@ -369,7 +376,7 @@ impl<'a> Container<'a> {
     /// Attributes can take the shape of flags (`#[configurable(metadata(im_a_teapot))]`) or
     /// key/value pairs (`#[configurable(metadata(status = "beta"))]`) to allow rich, semantic
     /// metadata to be attached directly to containers.
-    pub fn metadata(&self) -> impl Iterator<Item = CustomAttribute> {
+    pub fn metadata(&self) -> impl Iterator<Item = LazyCustomAttribute> {
         self.attrs
             .metadata
             .clone()

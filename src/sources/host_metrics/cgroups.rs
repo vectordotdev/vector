@@ -6,38 +6,12 @@ use tokio::{
     fs::{self, File},
     io::AsyncReadExt,
 };
-use vector_config::configurable_component;
 use vector_core::metric_tags;
 
-use super::{filter_result_sync, FilterList, HostMetrics, MetricsBuffer};
+use super::{filter_result_sync, CGroupsConfig, HostMetrics, MetricsBuffer};
 use crate::event::MetricTags;
 
 const MICROSECONDS: f64 = 1.0 / 1_000_000.0;
-
-/// Options for the “cgroups” (controller groups) metrics collector.
-///
-/// This collector is only available on Linux systems, and only supports either version 2 or hybrid cgroups.
-#[configurable_component]
-#[derive(Clone, Debug, Derivative)]
-#[derivative(Default)]
-#[serde(default)]
-pub(crate) struct CGroupsConfig {
-    /// The number of levels of the cgroups hierarchy for which to report metrics.
-    ///
-    /// A value of `1` means just the root or named cgroup.
-    #[derivative(Default(value = "100"))]
-    levels: usize,
-
-    /// The base cgroup name to provide metrics for.
-    pub(super) base: Option<PathBuf>,
-
-    /// Lists of group name patterns to include or exclude.
-    groups: FilterList,
-
-    /// Base cgroup directory, for testing use only
-    #[serde(skip_serializing)]
-    base_dir: Option<PathBuf>,
-}
 
 #[derive(Debug, Snafu)]
 enum CGroupsError {
@@ -89,17 +63,19 @@ struct CGroupRecurser<'a> {
     buffer: String,
     load_cpu: bool,
     load_memory: bool,
-    config: &'a CGroupsConfig,
+    config: CGroupsConfig,
 }
 
 impl<'a> CGroupRecurser<'a> {
     fn new(host: &'a HostMetrics, output: &'a mut MetricsBuffer) -> Self {
+        let cgroups = host.config.cgroups.clone().unwrap_or_default();
+
         Self {
             output,
             buffer: String::new(),
             load_cpu: true,
             load_memory: true,
-            config: &host.config.cgroups,
+            config: cgroups,
         }
     }
 
@@ -145,7 +121,7 @@ impl<'a> CGroupRecurser<'a> {
             }
 
             if level < self.config.levels {
-                let groups = &self.config.groups;
+                let groups = self.config.groups.clone();
                 if let Some(children) =
                     filter_result_sync(cgroup.children().await, "Failed to load cgroups children.")
                 {
@@ -253,19 +229,19 @@ impl CGroupRoot {
             let hybrid_test_file = join_path(&hybrid_root, CGROUP_CONTROLLERS);
             let modern_test_file = join_path(&base_dir, CGROUP_CONTROLLERS);
             let cpu_dir = join_path(&base_dir, "cpu");
-            if is_file(&hybrid_test_file) {
+            if is_file(hybrid_test_file) {
                 debug!(
                     message = "Detected hybrid cgroup base directory.",
                     ?base_dir
                 );
                 Mode::Hybrid(base_dir, hybrid_root)
-            } else if is_file(&modern_test_file) {
+            } else if is_file(modern_test_file) {
                 debug!(
                     message = "Detected modern cgroup base directory.",
                     ?base_dir
                 );
                 Mode::Modern(base_dir)
-            } else if is_dir(&cpu_dir) {
+            } else if is_dir(cpu_dir) {
                 debug!(
                     message = "Detected legacy cgroup base directory.",
                     ?base_dir
@@ -311,7 +287,7 @@ impl CGroup {
     }
 
     /// Open the file and read its contents. Returns `Ok(Some(filename))` if the file was read
-    /// successfully, `Ok(None)` if it didn't exist, and `Err(…)` if an error happend during the
+    /// successfully, `Ok(None)` if it didn't exist, and `Err(…)` if an error happened during the
     /// process.
     async fn open_read(
         &self,

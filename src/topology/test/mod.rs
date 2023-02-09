@@ -783,8 +783,8 @@ async fn topology_disk_buffer_flushes_on_idle() {
         vec![String::from("in1"), String::from("t1")],
         sink1,
     );
-    sink1_outer.buffer = BufferConfig::Single(BufferType::DiskV1 {
-        max_size: std::num::NonZeroU64::new(1024).unwrap(),
+    sink1_outer.buffer = BufferConfig::Single(BufferType::DiskV2 {
+        max_size: std::num::NonZeroU64::new(268435488).unwrap(),
         when_full: WhenFull::DropNewest,
     });
     config.add_sink_outer("out1", sink1_outer);

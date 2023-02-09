@@ -13,7 +13,7 @@ pub type ReaderResult<T> = Result<T, ReaderError<Record>>;
 pub type WriterResult<T> = Result<T, WriterError<Record>>;
 
 // This is specifically set at 60KB because we allow a maximum record size of up to 64KB, and so
-// we'd likely to occassionally encounter a record that, when encoded, is larger than the write
+// we'd likely to occasionally encounter a record that, when encoded, is larger than the write
 // buffer overall, which exercises the "write this record directly to the wrapped writer" logic that
 // exists in `tokio::io::BufWriter` itself.
 pub const TEST_WRITE_BUFFER_SIZE: usize = 60 * 1024;

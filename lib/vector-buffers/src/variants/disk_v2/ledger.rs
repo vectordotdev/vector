@@ -74,7 +74,7 @@ pub enum LedgerLoadCreateError {
 
 /// Ledger state.
 ///
-/// Stores the relevant information related to both the reader and writer.  Gets serailized and
+/// Stores the relevant information related to both the reader and writer.  Gets serialized and
 /// stored on disk, and is managed via a memory-mapped file.
 ///
 /// # Warning
@@ -352,7 +352,7 @@ where
     pub fn get_data_file_path(&self, file_id: u16) -> PathBuf {
         self.config
             .data_dir
-            .join(format!("buffer-data-{}.dat", file_id))
+            .join(format!("buffer-data-{file_id}.dat"))
     }
 
     /// Waits for a signal from the reader that progress has been made.

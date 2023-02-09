@@ -144,5 +144,12 @@ components: sinks: splunk_hec_metrics: {
 
 	telemetry: components.sinks.splunk_hec_logs.telemetry
 
-	how_it_works: sinks._splunk_hec.how_it_works
+	how_it_works: sinks._splunk_hec.how_it_works & {
+		multi_value_tags: {
+			title: "Multivalue Tags"
+			body: """
+				If Splunk receives a tag with multiple values it will only take the last value specified,
+				so Vector only sends this last value.
+				"""
+		}}
 }

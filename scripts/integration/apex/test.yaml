@@ -1,0 +1,11 @@
+args:
+- --features
+- apex-integration-tests
+- --lib
+- '::apex::'
+
+env:
+  MOCK_APEX_ADDRESS: http://mock-apex:4567
+
+matrix:
+  version: [latest]

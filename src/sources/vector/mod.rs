@@ -120,7 +120,7 @@ pub struct VectorConfig {
     /// Version of the configuration.
     version: Option<VectorConfigVersion>,
 
-    /// The address to listen for connections on.
+    /// The socket address to listen for connections on.
     ///
     /// It _must_ include a port.
     pub address: SocketAddr,
@@ -137,6 +137,16 @@ pub struct VectorConfig {
     #[serde(default)]
     #[configurable(metadata(docs::hidden))]
     log_namespace: Option<bool>,
+}
+
+impl VectorConfig {
+    /// Creates a `VectorConfig` with the given address.
+    pub fn from_address(addr: SocketAddr) -> Self {
+        Self {
+            address: addr,
+            ..Default::default()
+        }
+    }
 }
 
 impl Default for VectorConfig {

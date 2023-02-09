@@ -3,7 +3,7 @@ use hyper::body::Body;
 use snafu::Snafu;
 
 use crate::{
-    common::datadog::{get_api_base_endpoint, Region},
+    common::datadog::{get_api_base_endpoint, DD_US_SITE},
     http::{HttpClient, HttpError},
     sinks::HealthcheckError,
 };
@@ -17,16 +17,15 @@ pub mod metrics;
 #[cfg(feature = "sinks-datadog_traces")]
 pub mod traces;
 
+pub fn default_site() -> String {
+    DD_US_SITE.to_owned()
+}
+
 /// Gets the API endpoint for validating credentials.
 ///
-/// If `site` is not specified, we fallback to `region`, and if that is not specified, we fallback
-/// to the Datadog US domain.
-fn get_api_validate_endpoint(
-    endpoint: Option<&String>,
-    site: Option<&String>,
-    region: Option<Region>,
-) -> crate::Result<Uri> {
-    let base = get_api_base_endpoint(endpoint, site, region);
+/// If `endpoint` is not specified, we fallback to `site`.
+fn get_api_validate_endpoint(endpoint: Option<&String>, site: &str) -> crate::Result<Uri> {
+    let base = get_api_base_endpoint(endpoint, site);
     let validate = format!("{}{}", base, "/api/v1/validate");
     validate.parse::<Uri>().map_err(Into::into)
 }

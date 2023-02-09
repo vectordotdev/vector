@@ -49,15 +49,13 @@ impl Kind {
 
                     self.as_object_mut()
                         .map_or(CompactOptions::Never, |object| {
-                            match object.known_mut().get_mut(&Field::from(field.clone())) {
-                                None => {
-                                    // The modified value is discarded here (It's not needed)
-                                    &mut at_path_kind
-                                }
-                                Some(child) => child,
-                            }
-                            .remove_inner(&segments[1..], compact)
-                            .compact(object, field.clone(), compact)
+                            // The modified value is discarded here (It's not needed)
+                            object
+                                .known_mut()
+                                .get_mut(&Field::from(field.clone()))
+                                .unwrap_or(&mut at_path_kind)
+                                .remove_inner(&segments[1..], compact)
+                                .compact(object, field.clone(), compact)
                         })
                 }
 
@@ -104,15 +102,13 @@ impl Kind {
                             }
                         }
 
-                        match array.known_mut().get_mut(&(index as usize).into()) {
-                            None => {
-                                // The modified value is discarded here (It's not needed)
-                                &mut at_path_kind
-                            }
-                            Some(child) => child,
-                        }
-                        .remove_inner(&segments[1..], compact)
-                        .compact(array, index as usize, compact)
+                        // The modified value is discarded here (It's not needed)
+                        array
+                            .known_mut()
+                            .get_mut(&(index as usize).into())
+                            .unwrap_or(&mut at_path_kind)
+                            .remove_inner(&segments[1..], compact)
+                            .compact(array, index as usize, compact)
                     } else {
                         // guaranteed to not delete anything
                         CompactOptions::Never
@@ -174,7 +170,7 @@ impl Kind {
 enum CompactOptions {
     /// Compaction will always happen.
     Always,
-    /// Compaction may or may not happen. Both possibilites should be merged together.
+    /// Compaction may or may not happen. Both possibilities should be merged together.
     Maybe,
     /// Compaction will never happen.
     Never,

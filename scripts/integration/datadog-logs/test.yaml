@@ -1,0 +1,12 @@
+args:
+- --features
+- datadog-logs-integration-tests
+- --lib
+- '::datadog::logs::'
+
+runner:
+  env:
+    TEST_DATADOG_API_KEY:
+
+matrix:
+  version: [latest]

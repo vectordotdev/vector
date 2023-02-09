@@ -1,0 +1,8 @@
+args:
+- --features
+- amqp-integration-tests
+- --lib
+- '::amqp::'
+
+matrix:
+  version: ['3.8']

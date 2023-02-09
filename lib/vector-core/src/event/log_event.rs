@@ -500,7 +500,7 @@ where
 
     fn index(&self, key: T) -> &Value {
         self.get(key.as_ref())
-            .expect(&*format!("Key is not found: {:?}", key.as_ref()))
+            .unwrap_or_else(|| panic!("Key is not found: {:?}", key.as_ref()))
     }
 }
 
@@ -572,7 +572,7 @@ impl tracing::field::Visit for LogEvent {
     }
 
     fn record_debug(&mut self, field: &tracing::field::Field, value: &dyn Debug) {
-        self.insert(field.name(), format!("{:?}", value));
+        self.insert(field.name(), format!("{value:?}"));
     }
 
     fn record_i64(&mut self, field: &tracing::field::Field, value: i64) {

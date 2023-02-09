@@ -14,6 +14,7 @@ components: sinks: honeycomb: {
 
 	features: {
 		acknowledgements: true
+		auto_generated:   true
 		healthcheck: enabled: true
 		send: {
 			batch: {
@@ -57,22 +58,7 @@ components: sinks: honeycomb: {
 		notices: []
 	}
 
-	configuration: {
-		api_key: {
-			description: "The team key that will be used to authenticate against Honeycomb."
-			required:    true
-			type: string: {
-				examples: ["${HONEYCOMB_API_KEY}", "some-api-key"]
-			}
-		}
-		dataset: {
-			description: "The dataset that Vector will send logs to."
-			required:    true
-			type: string: {
-				examples: ["my-honeycomb-dataset"]
-			}
-		}
-	}
+	configuration: base.components.sinks.honeycomb.configuration
 
 	input: {
 		logs:    true

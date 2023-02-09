@@ -1,4 +1,5 @@
 use std::net::SocketAddr;
+use std::time::Duration;
 use std::{
     collections::{BTreeMap, VecDeque},
     convert::TryFrom,
@@ -13,6 +14,7 @@ use lookup::{event_path, metadata_path, owned_value_path, path, OwnedValuePath, 
 use smallvec::{smallvec, SmallVec};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::Decoder;
+use value::kind::Collection;
 use value::Kind;
 use vector_config::{configurable_component, NamedComponent};
 use vector_core::{
@@ -37,7 +39,7 @@ use crate::{
 #[configurable_component(source("logstash"))]
 #[derive(Clone, Debug)]
 pub struct LogstashConfig {
-    /// The address to listen for connections on.
+    #[configurable(derived)]
     address: SocketListenAddr,
 
     #[configurable(derived)]
@@ -46,12 +48,15 @@ pub struct LogstashConfig {
     #[configurable(derived)]
     tls: Option<TlsSourceConfig>,
 
-    /// The size, in bytes, of the receive buffer used for each connection.
+    /// The size of the receive buffer used for each connection.
     ///
-    /// This should not typically needed to be changed.
+    /// This generally should not need to be changed.
+    #[configurable(metadata(docs::type_unit = "bytes"))]
+    #[configurable(metadata(docs::examples = 65536))]
     receive_buffer_bytes: Option<usize>,
 
     /// The maximum number of TCP connections that will be allowed at any given time.
+    #[configurable(metadata(docs::type_unit = "connections"))]
     connection_limit: Option<u32>,
 
     #[configurable(derived)]
@@ -72,6 +77,13 @@ impl LogstashConfig {
             .ok()
             .map(LegacyKey::InsertIfEmpty);
 
+        let tls_client_metadata_path = self
+            .tls
+            .as_ref()
+            .and_then(|tls| tls.client_metadata_key.as_ref())
+            .and_then(|k| k.path.clone())
+            .map(LegacyKey::Overwrite);
+
         BytesDeserializerConfig
             .schema_definition(log_namespace)
             .with_standard_vector_source_metadata()
@@ -88,6 +100,13 @@ impl LogstashConfig {
                 &owned_value_path!("host"),
                 Kind::bytes(),
                 Some("host"),
+            )
+            .with_source_metadata(
+                Self::NAME,
+                tls_client_metadata_path,
+                &owned_value_path!("tls_client_metadata"),
+                Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
+                None,
             )
     }
 }
@@ -115,17 +134,20 @@ impl GenerateConfig for LogstashConfig {
 #[async_trait::async_trait]
 impl SourceConfig for LogstashConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
+        let log_namespace = cx.log_namespace(self.log_namespace);
         let source = LogstashSource {
             timestamp_converter: types::Conversion::Timestamp(cx.globals.timezone()),
-            log_namespace: cx.log_namespace(self.log_namespace),
             legacy_host_key_path: parse_value_path(log_schema().host_key()).ok(),
+            log_namespace,
         };
-        let shutdown_secs = 30;
+        let shutdown_secs = Duration::from_secs(30);
         let tls_config = self.tls.as_ref().map(|tls| tls.tls_config.clone());
         let tls_client_metadata_key = self
             .tls
             .as_ref()
-            .and_then(|tls| tls.client_metadata_key.clone());
+            .and_then(|tls| tls.client_metadata_key.clone())
+            .and_then(|k| k.path);
+
         let tls = MaybeTlsSettings::from_config(&tls_config, true)?;
         source.run(
             self.address,
@@ -137,6 +159,8 @@ impl SourceConfig for LogstashConfig {
             cx,
             self.acknowledgements,
             self.connection_limit,
+            LogstashConfig::NAME,
+            log_namespace,
         )
     }
 
@@ -590,7 +614,7 @@ impl Decoder for LogstashDecoder {
                     let payload_size = rest.get_u32() as usize;
 
                     if rest.remaining() < payload_size {
-                        src.reserve(payload_size as usize);
+                        src.reserve(payload_size);
                         return Ok(None);
                     }
 
@@ -781,6 +805,10 @@ mod test {
                 .with_metadata_field(
                     &owned_value_path!(LogstashConfig::NAME, "host"),
                     Kind::bytes(),
+                )
+                .with_metadata_field(
+                    &owned_value_path!(LogstashConfig::NAME, "tls_client_metadata"),
+                    Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
                 );
 
         assert_eq!(definition, expected_definition)

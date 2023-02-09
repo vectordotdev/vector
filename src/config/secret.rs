@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use enum_dispatch::enum_dispatch;
 use vector_config::NamedComponent;
@@ -10,7 +10,7 @@ use crate::signal;
 pub trait SecretBackend: NamedComponent + core::fmt::Debug + Send + Sync {
     fn retrieve(
         &mut self,
-        secret_keys: Vec<String>,
+        secret_keys: HashSet<String>,
         signal_rx: &mut signal::SignalRx,
     ) -> crate::Result<HashMap<String, String>>;
 }

@@ -5,6 +5,7 @@ use opentelemetry_proto::proto::collector::logs::v1::{
 use tonic::{Request, Response, Status};
 use vector_common::internal_event::{CountByteSize, InternalEventHandle as _, Registered};
 use vector_core::{
+    config::LogNamespace,
     event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event},
     EstimatedJsonEncodedSizeOf,
 };
@@ -20,6 +21,7 @@ pub(super) struct Service {
     pub pipeline: SourceSender,
     pub acknowledgements: bool,
     pub events_received: Registered<EventsReceived>,
+    pub log_namespace: LogNamespace,
 }
 
 #[tonic::async_trait]
@@ -32,7 +34,7 @@ impl LogsService for Service {
             .into_inner()
             .resource_logs
             .into_iter()
-            .flat_map(|v| v.into_iter())
+            .flat_map(|v| v.into_event_iter(self.log_namespace))
             .collect();
 
         let count = events.len();

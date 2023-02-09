@@ -15,6 +15,7 @@ use bytes::BytesMut;
 use codecs::{encoding::SerializerConfig, TextSerializerConfig};
 use futures::{future::BoxFuture, stream::FuturesUnordered, FutureExt, Sink, Stream};
 use pulsar::authentication::oauth2::{OAuth2Authentication, OAuth2Params};
+use pulsar::compression;
 use pulsar::error::AuthenticationError;
 use pulsar::{
     message::proto, producer::SendFuture, proto::CommandSendReceipt, Authentication,
@@ -58,6 +59,14 @@ pub struct PulsarSinkConfig {
     pub encoding: EncodingConfig,
 
     #[configurable(derived)]
+    #[serde(default)]
+    batch: BatchConfig,
+
+    #[configurable(derived)]
+    #[serde(default)]
+    compression: PulsarCompression,
+
+    #[configurable(derived)]
     auth: Option<AuthConfig>,
 
     #[configurable(derived)]
@@ -70,6 +79,14 @@ pub struct PulsarSinkConfig {
 
     /// Log field to use as Pulsar message key.
     partition_key_field: Option<String>,
+}
+
+/// Event batching behavior.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct BatchConfig {
+    /// The maximum size of a batch, in events, before it is flushed.
+    pub batch_size: Option<u32>,
 }
 
 /// Authentication configuration.
@@ -109,6 +126,29 @@ pub struct OAuth2Config {
 
     /// The OAuth2 scope.
     scope: Option<String>,
+}
+
+/// Supported compression types for Pulsar.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Derivative)]
+#[derivative(Default)]
+#[serde(rename_all = "lowercase")]
+pub enum PulsarCompression {
+    /// No compression.
+    #[derivative(Default)]
+    None,
+
+    /// LZ4.
+    Lz4,
+
+    /// Zlib.
+    Zlib,
+
+    /// Zstandard.
+    Zstd,
+
+    /// Snappy.
+    Snappy,
 }
 
 type PulsarProducer = Producer<TokioExecutor>;
@@ -155,10 +195,12 @@ impl GenerateConfig for PulsarSinkConfig {
             endpoint: "pulsar://127.0.0.1:6650".to_string(),
             topic: "topic-1234".to_string(),
             partition_key_field: Some("message".to_string()),
-            encoding: TextSerializerConfig::new().into(),
+            compression: Default::default(),
+            encoding: TextSerializerConfig::default().into(),
             auth: None,
             acknowledgements: Default::default(),
             producer_name: None,
+            batch: Default::default(),
         })
         .unwrap()
     }
@@ -246,18 +288,38 @@ impl PulsarSinkConfig {
             });
         }
 
+        let mut producer_options = pulsar::ProducerOptions {
+            compression: Some(match self.compression {
+                PulsarCompression::None => compression::Compression::None,
+                PulsarCompression::Lz4 => {
+                    compression::Compression::Lz4(compression::CompressionLz4::default())
+                }
+                PulsarCompression::Zlib => {
+                    compression::Compression::Zlib(compression::CompressionZlib::default())
+                }
+                PulsarCompression::Zstd => {
+                    compression::Compression::Zstd(compression::CompressionZstd::default())
+                }
+                PulsarCompression::Snappy => {
+                    compression::Compression::Snappy(compression::CompressionSnappy::default())
+                }
+            }),
+            ..Default::default()
+        };
+
+        if !is_healthcheck {
+            producer_options.batch_size = self.batch.batch_size;
+        }
+
         if let SerializerConfig::Avro { avro } = self.encoding.config() {
-            pulsar_builder = pulsar_builder.with_options(pulsar::producer::ProducerOptions {
-                schema: Some(proto::Schema {
-                    schema_data: avro.schema.as_bytes().into(),
-                    r#type: proto::schema::Type::Avro as i32,
-                    ..Default::default()
-                }),
+            producer_options.schema = Some(proto::Schema {
+                schema_data: avro.schema.as_bytes().into(),
+                r#type: proto::schema::Type::Avro as i32,
                 ..Default::default()
             });
         }
 
-        pulsar_builder.build().await
+        pulsar_builder.with_options(producer_options).build().await
     }
 }
 
@@ -450,10 +512,12 @@ mod integration_tests {
             endpoint: pulsar_address(),
             topic: topic.clone(),
             producer_name: None,
-            encoding: TextSerializerConfig::new().into(),
+            compression: PulsarCompression::None,
+            encoding: TextSerializerConfig::default().into(),
             auth: None,
             acknowledgements: Default::default(),
             partition_key_field: Some("message".to_string()),
+            batch: Default::default(),
         };
 
         let pulsar = Pulsar::<TokioExecutor>::builder(&cnf.endpoint, TokioExecutor)

@@ -1,0 +1,16 @@
+args:
+- --features
+- datadog-traces-integration-tests
+- --lib
+- '::datadog::traces::'
+
+env:
+  AGENT_PORT: '8082'
+  TEST_LOG: ${TEST_LOG}
+  TRACE_AGENT_TO_VECTOR_URL: http://datadog-trace-agent-to-vector:8126/v0.3/traces
+  TRACE_AGENT_URL: http://datadog-trace-agent:8126/v0.3/traces
+  VECTOR_PORT: '8081'
+  TEST_DATADOG_API_KEY:
+
+matrix:
+  version: [latest]

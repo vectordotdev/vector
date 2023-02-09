@@ -29,7 +29,7 @@ fn to_syslog_facility(value: Value) -> Resolved {
         21 => "local5",
         22 => "local6",
         23 => "local7",
-        _ => return Err(format!("facility code {} not valid", value).into()),
+        _ => return Err(format!("facility code {value} not valid").into()),
     };
     Ok(code.into())
 }

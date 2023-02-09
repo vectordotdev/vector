@@ -80,7 +80,7 @@ pub fn tests(ignore_cue: bool) -> Vec<Test> {
 
     let output = Command::new("bash")
         .current_dir(dir)
-        .args(&["cue.sh", "export", "-e", "remap"])
+        .args(["cue.sh", "export", "-e", "remap"])
         .output()
         .expect("failed to execute process");
 

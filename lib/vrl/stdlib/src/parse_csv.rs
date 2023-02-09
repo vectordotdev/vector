@@ -17,7 +17,7 @@ fn parse_csv(csv_string: Value, delimiter: Value) -> Resolved {
         .into_byte_records()
         .next()
         .transpose()
-        .map_err(|err| format!("invalid csv record: {}", err).into()) // shouldn't really happen
+        .map_err(|err| format!("invalid csv record: {err}").into()) // shouldn't really happen
         .map(|record| {
             record
                 .map(|record| {

@@ -138,7 +138,7 @@ impl fmt::Display for MetricSeries {
         if let Some(tags) = &self.tags {
             write_list(fmt, ",", tags.iter_all(), |fmt, (tag, value)| {
                 write_word(fmt, tag).and_then(|()| match value {
-                    Some(value) => write!(fmt, "={:?}", value),
+                    Some(value) => write!(fmt, "={value:?}"),
                     None => Ok(()),
                 })
             })?;

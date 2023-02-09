@@ -187,6 +187,13 @@ impl CheckpointsView {
                     self.update(fng, pos);
                 }
             }
+            if let Ok(Some(fingerprint)) =
+                fingerprinter.get_legacy_first_lines_checksum(path, fingerprint_buffer)
+            {
+                if let Some((_, pos)) = self.checkpoints.remove(&fingerprint) {
+                    self.update(fng, pos);
+                }
+            }
         }
     }
 }
@@ -572,6 +579,47 @@ mod test {
 
         let old_fingerprint = FileFingerprint::FirstLinesChecksum(18057733963141331840);
         let new_fingerprint = FileFingerprint::FirstLinesChecksum(17791311590754645022);
+        let position: FilePosition = 6;
+
+        let fingerprinter = Fingerprinter {
+            strategy: FingerprintStrategy::FirstLinesChecksum {
+                ignored_header_bytes: 0,
+                lines: 1,
+            },
+            max_line_length: 102400,
+            ignore_not_found: false,
+        };
+
+        let mut buf = Vec::new();
+
+        let data_dir = tempdir().unwrap();
+        {
+            let mut chkptr = Checkpointer::new(data_dir.path());
+            chkptr.update_checkpoint(old_fingerprint, position);
+            assert_eq!(chkptr.get_checkpoint(old_fingerprint), Some(position));
+            chkptr.write_checkpoints().ok();
+        }
+        {
+            let mut chkptr = Checkpointer::new(data_dir.path());
+            chkptr.read_checkpoints(None);
+            assert_eq!(chkptr.get_checkpoint(new_fingerprint), None);
+
+            chkptr.maybe_upgrade(&path, new_fingerprint, &fingerprinter, &mut buf);
+
+            assert_eq!(chkptr.get_checkpoint(new_fingerprint), Some(position));
+            assert_eq!(chkptr.get_checkpoint(old_fingerprint), None);
+        }
+    }
+
+    #[test]
+    fn test_checkpointer_fingerprint_upgrades_legacy_first_lines_checksum() {
+        let log_dir = tempdir().unwrap();
+        let path = log_dir.path().join("test.log");
+        let data = "hello\n";
+        std::fs::write(&path, data).unwrap();
+
+        let old_fingerprint = FileFingerprint::FirstLinesChecksum(17791311590754645022);
+        let new_fingerprint = FileFingerprint::FirstLinesChecksum(11081174131906673079);
         let position: FilePosition = 6;
 
         let fingerprinter = Fingerprinter {

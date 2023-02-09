@@ -297,7 +297,7 @@ where
     array_match(field, move |values| values.iter().any(&func))
 }
 
-/// Retrns a `Matcher` that returns true if the log event resolves to an array of strings,
+/// Returns a `Matcher` that returns true if the log event resolves to an array of strings,
 /// where at least one string matches the provided `func`.
 fn any_string_match<S, F>(field: S, func: F) -> Box<dyn Matcher<LogEvent>>
 where

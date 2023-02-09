@@ -59,7 +59,7 @@ pub const SOURCETYPE: &str = "splunk_sourcetype";
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields, default)]
 pub struct SplunkConfig {
-    /// The address to listen for connections on.
+    /// The socket address to listen for connections on.
     ///
     /// The address _must_ include a port.
     #[serde(default = "default_socket_address")]
@@ -71,7 +71,7 @@ pub struct SplunkConfig {
     /// it was communicating with the Splunk HEC endpoint directly.
     ///
     /// If _not_ supplied, the `Authorization` header will be ignored and requests will not be authenticated.
-    #[configurable(deprecated)]
+    #[configurable(deprecated = "This option has been deprecated, use `valid_tokens` instead.")]
     token: Option<SensitiveString>,
 
     /// Optional list of valid authorization tokens.
@@ -80,6 +80,7 @@ pub struct SplunkConfig {
     /// would if it was communicating with the Splunk HEC endpoint directly.
     ///
     /// If _not_ supplied, the `Authorization` header will be ignored and requests will not be authenticated.
+    #[configurable(metadata(docs::examples = "A94A8FE5CCB19BA61C4C08"))]
     valid_tokens: Option<Vec<SensitiveString>>,
 
     /// Whether or not to forward the Splunk HEC authentication token with events.
@@ -712,10 +713,14 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
 
                     self.time = Time::Provided(time);
                 } else if let Some(t) = t.as_f64() {
-                    self.time = Time::Provided(Utc.timestamp(
-                        t.floor() as i64,
-                        (t.fract() * 1000.0 * 1000.0 * 1000.0) as u32,
-                    ));
+                    self.time = Time::Provided(
+                        Utc.timestamp_opt(
+                            t.floor() as i64,
+                            (t.fract() * 1000.0 * 1000.0 * 1000.0) as u32,
+                        )
+                        .single()
+                        .expect("invalid timestamp"),
+                    );
                 } else {
                     return Err(ApiError::InvalidDataFormat { event: self.events }.into());
                 }
@@ -870,9 +875,11 @@ fn parse_timestamp(t: i64) -> Option<DateTime<Utc>> {
     }
 
     let ts = if t < SEC_CUTOFF {
-        Utc.timestamp(t, 0)
+        Utc.timestamp_opt(t, 0).single().expect("invalid timestamp")
     } else if t < MILLISEC_CUTOFF {
-        Utc.timestamp_millis(t)
+        Utc.timestamp_millis_opt(t)
+            .single()
+            .expect("invalid timestamp")
     } else {
         Utc.timestamp_nanos(t)
     };
@@ -1115,7 +1122,7 @@ fn finish_ok(maybe_ack_id: Option<u64>) -> Response {
     } else {
         splunk_response::SUCCESS
     };
-    response_json(StatusCode::OK, &body)
+    response_json(StatusCode::OK, body)
 }
 
 async fn finish_err(rejection: Rejection) -> Result<(Response,), Rejection> {
@@ -1350,7 +1357,7 @@ mod tests {
         opts: &SendWithOpts<'_>,
     ) -> RequestBuilder {
         let mut b = reqwest::Client::new()
-            .post(&format!("http://{}/{}", address, api))
+            .post(format!("http://{}/{}", address, api))
             .header("Authorization", format!("Splunk {}", token));
 
         b = match opts.channel {
@@ -1394,8 +1401,12 @@ mod tests {
     #[tokio::test]
     async fn no_compression_text_event() {
         let message = "gzip_text_event";
-        let (sink, source) =
-            start(TextSerializerConfig::new().into(), Compression::None, None).await;
+        let (sink, source) = start(
+            TextSerializerConfig::default().into(),
+            Compression::None,
+            None,
+        )
+        .await;
 
         let event = channel_n(vec![message], sink, source).await.remove(0);
 
@@ -1412,7 +1423,7 @@ mod tests {
     async fn one_simple_text_event() {
         let message = "one_simple_text_event";
         let (sink, source) = start(
-            TextSerializerConfig::new().into(),
+            TextSerializerConfig::default().into(),
             Compression::gzip_default(),
             None,
         )
@@ -1432,8 +1443,12 @@ mod tests {
     #[tokio::test]
     async fn multiple_simple_text_event() {
         let n = 200;
-        let (sink, source) =
-            start(TextSerializerConfig::new().into(), Compression::None, None).await;
+        let (sink, source) = start(
+            TextSerializerConfig::default().into(),
+            Compression::None,
+            None,
+        )
+        .await;
 
         let messages = (0..n)
             .map(|i| format!("multiple_simple_text_event_{}", i))
@@ -1455,7 +1470,7 @@ mod tests {
     async fn one_simple_json_event() {
         let message = "one_simple_json_event";
         let (sink, source) = start(
-            JsonSerializerConfig::new().into(),
+            JsonSerializerConfig::default().into(),
             Compression::gzip_default(),
             None,
         )
@@ -1476,7 +1491,7 @@ mod tests {
     async fn multiple_simple_json_event() {
         let n = 200;
         let (sink, source) = start(
-            JsonSerializerConfig::new().into(),
+            JsonSerializerConfig::default().into(),
             Compression::gzip_default(),
             None,
         )
@@ -1501,7 +1516,7 @@ mod tests {
     #[tokio::test]
     async fn json_event() {
         let (sink, source) = start(
-            JsonSerializerConfig::new().into(),
+            JsonSerializerConfig::default().into(),
             Compression::gzip_default(),
             None,
         )
@@ -1523,7 +1538,7 @@ mod tests {
     #[tokio::test]
     async fn line_to_message() {
         let (sink, source) = start(
-            JsonSerializerConfig::new().into(),
+            JsonSerializerConfig::default().into(),
             Compression::gzip_default(),
             None,
         )
@@ -1775,7 +1790,7 @@ mod tests {
             let (source, address) = source_with(None, Some(VALID_TOKENS), None, true).await;
             let (sink, health) = sink(
                 address,
-                TextSerializerConfig::new().into(),
+                TextSerializerConfig::default().into(),
                 Compression::gzip_default(),
             )
             .await;
@@ -1823,7 +1838,7 @@ mod tests {
             let (source, address) = source_with(None, None, None, false).await;
             let (sink, health) = sink(
                 address,
-                TextSerializerConfig::new().into(),
+                TextSerializerConfig::default().into(),
                 Compression::gzip_default(),
             )
             .await;
@@ -1844,7 +1859,7 @@ mod tests {
             let (source, address) = source_with(None, None, None, true).await;
             let (sink, health) = sink(
                 address,
-                TextSerializerConfig::new().into(),
+                TextSerializerConfig::default().into(),
                 Compression::gzip_default(),
             )
             .await;
@@ -1936,7 +1951,7 @@ mod tests {
         let (source, address) = source(None).await;
 
         let b = reqwest::Client::new()
-            .post(&format!(
+            .post(format!(
                 "http://{}/{}",
                 address, "services/collector/event"
             ))
@@ -1994,9 +2009,15 @@ mod tests {
     fn parse_timestamps() {
         let cases = vec![
             Utc::now(),
-            Utc.ymd(1971, 11, 7).and_hms(1, 1, 1),
-            Utc.ymd(2011, 8, 5).and_hms(1, 1, 1),
-            Utc.ymd(2189, 11, 4).and_hms(2, 2, 2),
+            Utc.ymd(1971, 11, 7)
+                .and_hms_opt(1, 1, 1)
+                .expect("invalid timestamp"),
+            Utc.ymd(2011, 8, 5)
+                .and_hms_opt(1, 1, 1)
+                .expect("invalid timestamp"),
+            Utc.ymd(2189, 11, 4)
+                .and_hms_opt(2, 2, 2)
+                .expect("invalid timestamp"),
         ];
 
         for case in cases {
@@ -2004,16 +2025,13 @@ mod tests {
             let millis = case.timestamp_millis();
             let nano = case.timestamp_nanos();
 
+            assert_eq!(parse_timestamp(sec).unwrap().timestamp(), case.timestamp());
             assert_eq!(
-                parse_timestamp(sec as i64).unwrap().timestamp(),
-                case.timestamp()
-            );
-            assert_eq!(
-                parse_timestamp(millis as i64).unwrap().timestamp_millis(),
+                parse_timestamp(millis).unwrap().timestamp_millis(),
                 case.timestamp_millis()
             );
             assert_eq!(
-                parse_timestamp(nano as i64).unwrap().timestamp_nanos(),
+                parse_timestamp(nano).unwrap().timestamp_nanos(),
                 case.timestamp_nanos()
             );
         }
@@ -2032,7 +2050,7 @@ mod tests {
         assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
             let message = "for the host";
             let (sink, source) = start(
-                TextSerializerConfig::new().into(),
+                TextSerializerConfig::default().into(),
                 Compression::gzip_default(),
                 None,
             )

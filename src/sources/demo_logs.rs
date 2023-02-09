@@ -6,6 +6,7 @@ use codecs::{
 use fakedata::logs::*;
 use futures::StreamExt;
 use rand::seq::SliceRandom;
+use serde_with::serde_as;
 use snafu::Snafu;
 use std::task::Poll;
 use tokio::time::{self, Duration};
@@ -26,10 +27,10 @@ use crate::{
 };
 
 /// Configuration for the `demo_logs` source.
+#[serde_as]
 #[configurable_component(source("demo_logs"))]
 #[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
-#[serde(default)]
 pub struct DemoLogsConfig {
     /// The amount of time, in seconds, to pause between each batch of output lines.
     ///
@@ -37,23 +38,32 @@ pub struct DemoLogsConfig {
     /// `interval` to `0.0`.
     #[serde(alias = "batch_interval")]
     #[derivative(Default(value = "default_interval()"))]
-    pub interval: f64,
+    #[serde(default = "default_interval")]
+    #[configurable(metadata(docs::examples = 1.0, docs::examples = 0.1, docs::examples = 0.01,))]
+    #[serde_as(as = "serde_with::DurationSeconds<f64>")]
+    pub interval: Duration,
 
     /// The total number of lines to output.
     ///
     /// By default, the source continuously prints logs (infinitely).
     #[derivative(Default(value = "default_count()"))]
+    #[serde(default = "default_count")]
     pub count: usize,
 
     #[serde(flatten)]
+    #[configurable(metadata(
+        docs::enum_tag_description = "The format of the randomly generated output."
+    ))]
     pub format: OutputFormat,
 
     #[configurable(derived)]
     #[derivative(Default(value = "default_framing_message_based()"))]
+    #[serde(default = "default_framing_message_based")]
     pub framing: FramingConfig,
 
     #[configurable(derived)]
     #[derivative(Default(value = "default_decoding()"))]
+    #[serde(default = "default_decoding")]
     pub decoding: DeserializerConfig,
 
     /// The namespace to use for logs. This overrides the global setting.
@@ -62,8 +72,8 @@ pub struct DemoLogsConfig {
     pub log_namespace: Option<bool>,
 }
 
-const fn default_interval() -> f64 {
-    1.0
+const fn default_interval() -> Duration {
+    Duration::from_secs(1)
 }
 
 const fn default_count() -> usize {
@@ -81,6 +91,9 @@ pub enum DemoLogsConfigError {
 #[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
 #[serde(tag = "format", rename_all = "snake_case")]
+#[configurable(metadata(
+    docs::enum_tag_description = "The format of the randomly generated output."
+))]
 pub enum OutputFormat {
     /// Lines are chosen at random from the list specified using `lines`.
     Shuffle {
@@ -88,26 +101,41 @@ pub enum OutputFormat {
         #[serde(default)]
         sequence: bool,
         /// The list of lines to output.
+        #[configurable(metadata(docs::examples = "lines_example()"))]
         lines: Vec<String>,
     },
 
-    /// Randomly generated logs in [Apache common](\(urls.apache_common)) format.
+    /// Randomly generated logs in [Apache common][apache_common] format.
+    ///
+    /// [apache_common]: https://httpd.apache.org/docs/current/logs.html#common
     ApacheCommon,
 
-    /// Randomly generated logs in [Apache error](\(urls.apache_error)) format.
+    /// Randomly generated logs in [Apache error][apache_error] format.
+    ///
+    /// [apache_error]: https://httpd.apache.org/docs/current/logs.html#errorlog
     ApacheError,
 
-    /// Randomly generated logs in Syslog format ([RFC 5424](\(urls.syslog_5424))).
+    /// Randomly generated logs in Syslog format ([RFC 5424][syslog_5424]).
+    ///
+    /// [syslog_5424]: https://tools.ietf.org/html/rfc5424
     #[serde(alias = "rfc5424")]
     Syslog,
 
-    /// Randomly generated logs in Syslog format ([RFC 3164](\(urls.syslog_3164))).
+    /// Randomly generated logs in Syslog format ([RFC 3164][syslog_3164]).
+    ///
+    /// [syslog_3164]: https://tools.ietf.org/html/rfc3164
     #[serde(alias = "rfc3164")]
     BsdSyslog,
 
-    /// Randomly generated HTTP server logs in [JSON](\(urls.json)) format.
+    /// Randomly generated HTTP server logs in [JSON][json] format.
+    ///
+    /// [json]: https://en.wikipedia.org/wiki/JSON
     #[derivative(Default)]
     Json,
+}
+
+const fn lines_example() -> [&'static str; 2] {
+    ["line1", "line2"]
 }
 
 impl OutputFormat {
@@ -158,7 +186,7 @@ impl DemoLogsConfig {
     pub fn repeat(
         lines: Vec<String>,
         count: usize,
-        interval: f64,
+        interval: Duration,
         log_namespace: Option<bool>,
     ) -> Self {
         Self {
@@ -176,7 +204,7 @@ impl DemoLogsConfig {
 }
 
 async fn demo_logs_source(
-    interval: f64,
+    interval: Duration,
     count: usize,
     format: OutputFormat,
     decoder: Decoder,
@@ -184,9 +212,8 @@ async fn demo_logs_source(
     mut out: SourceSender,
     log_namespace: LogNamespace,
 ) -> Result<(), ()> {
-    let maybe_interval: Option<f64> = (interval != 0.0).then_some(interval);
-
-    let mut interval = maybe_interval.map(|i| time::interval(Duration::from_secs_f64(i)));
+    let interval: Option<Duration> = (interval != Duration::ZERO).then_some(interval);
+    let mut interval = interval.map(time::interval);
 
     let bytes_received = register!(BytesReceived::from(Protocol::NONE));
     let events_received = register!(EventsReceived);

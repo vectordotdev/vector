@@ -30,6 +30,16 @@ impl DecodingConfig {
         }
     }
 
+    /// Get the decoding configuration.
+    pub const fn config(&self) -> &DeserializerConfig {
+        &self.decoding
+    }
+
+    /// Get the framing configuration.
+    pub const fn framing(&self) -> &FramingConfig {
+        &self.framing
+    }
+
     /// Builds a `Decoder` from the provided configuration.
     pub fn build(&self) -> Decoder {
         // Build the framer.
