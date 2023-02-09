@@ -17,7 +17,7 @@ readonly INSTALL_PATH=${1:-"/usr/bin"}
 
 if [[ -n $1 ]]
 then
-  mkdir -p ${INSTALL_PATH}
+  mkdir -p "${INSTALL_PATH}"
 fi
 
 get_platform() {
