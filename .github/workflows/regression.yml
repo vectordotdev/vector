@@ -21,6 +21,8 @@ on:
       - "docs/**"
       - "rfcs/**"
       - "website/**"
+  merge_group:
+    types: [checks_requested]
 
 jobs:
   cancel-previous:

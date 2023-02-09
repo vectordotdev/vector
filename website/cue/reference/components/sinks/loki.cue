@@ -105,7 +105,7 @@ components: sinks: loki: {
 		label_expansion: {
 			title: "Label Expansion"
 			body: """
-				The `labels` option can be passed keys suffixed with "*" to
+				The `labels` option can be passed keys suffixed with `*` to
 				allow for setting multiple keys based on the contents of an
 				object. For example, with an object:
 
