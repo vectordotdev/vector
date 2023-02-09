@@ -117,7 +117,7 @@ base: components: sinks: influxdb_logs: configuration: {
 			This should be a full HTTP URI, including the scheme, host, and port.
 			"""
 		required: true
-		type: string: examples: ["http://localhost:8086/"]
+		type: string: examples: ["http://localhost:8086"]
 	}
 	measurement: {
 		description: "The name of the InfluxDB measurement that will be written to."
