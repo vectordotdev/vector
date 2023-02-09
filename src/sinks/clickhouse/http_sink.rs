@@ -182,7 +182,7 @@ impl RetryLogic for ClickhouseRetryLogic {
             StatusCode::INTERNAL_SERVER_ERROR => {
                 let body = response.body();
 
-                // Currently, clickhouse returns 500's incorrect data and type mismatch errors.
+                // Currently, ClickHouse returns 500's incorrect data and type mismatch errors.
                 // This attempts to check if the body starts with `Code: {code_num}` and to not
                 // retry those errors.
                 //

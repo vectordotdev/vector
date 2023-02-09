@@ -124,7 +124,7 @@ base: components: sinks: influxdb_metrics: configuration: {
 		required:    false
 		type: array: {
 			default: [0.5, 0.75, 0.9, 0.95, 0.99]
-			items: type: number: {}
+			items: type: float: {}
 		}
 	}
 	request: {

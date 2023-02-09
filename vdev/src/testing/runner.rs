@@ -83,7 +83,7 @@ pub trait ContainerTestRunner: TestRunner {
 
     fn image_name(&self) -> String;
 
-    fn network_name(&self) -> Option<String>;
+    fn network_name(&self) -> Option<&str>;
 
     fn needs_docker_socket(&self) -> bool;
 
@@ -213,8 +213,7 @@ pub trait ContainerTestRunner: TestRunner {
     }
 
     fn create(&self) -> Result<()> {
-        let network_name = self.network_name();
-        let network_name = network_name.as_deref().unwrap_or("host");
+        let network_name = self.network_name().unwrap_or("host");
 
         let docker_socket = format!("{}:/var/run/docker.sock", DOCKER_SOCKET.display());
         let docker_args = self
@@ -296,23 +295,23 @@ where
     }
 }
 
-pub struct IntegrationTestRunner {
+pub(super) struct IntegrationTestRunner {
     integration: String,
     needs_docker_socket: bool,
-    needs_network: bool,
+    network: Option<String>,
     volumes: Vec<String>,
 }
 
 impl IntegrationTestRunner {
-    pub fn new(
+    pub(super) fn new(
         integration: String,
         config: &IntegrationRunnerConfig,
-        needs_network: bool,
+        network: Option<String>,
     ) -> Result<Self> {
         Ok(Self {
             integration,
             needs_docker_socket: config.needs_docker_socket,
-            needs_network,
+            network,
             volumes: config
                 .volumes
                 .iter()
@@ -322,7 +321,7 @@ impl IntegrationTestRunner {
     }
 
     pub(super) fn ensure_network(&self) -> Result<()> {
-        if let Some(network_name) = self.network_name() {
+        if let Some(network_name) = &self.network {
             let mut command = dockercmd(["network", "ls", "--format", "{{.Name}}"]);
 
             if command
@@ -333,7 +332,7 @@ impl IntegrationTestRunner {
                 return Ok(());
             }
 
-            dockercmd(["network", "create", &network_name]).wait("Creating network")
+            dockercmd(["network", "create", network_name]).wait("Creating network")
         } else {
             Ok(())
         }
@@ -341,9 +340,8 @@ impl IntegrationTestRunner {
 }
 
 impl ContainerTestRunner for IntegrationTestRunner {
-    fn network_name(&self) -> Option<String> {
-        self.needs_network
-            .then(|| format!("vector-integration-tests-{}", self.integration))
+    fn network_name(&self) -> Option<&str> {
+        self.network.as_deref()
     }
 
     fn container_name(&self) -> String {
@@ -370,7 +368,7 @@ impl ContainerTestRunner for IntegrationTestRunner {
 pub struct DockerTestRunner;
 
 impl ContainerTestRunner for DockerTestRunner {
-    fn network_name(&self) -> Option<String> {
+    fn network_name(&self) -> Option<&str> {
         None
     }
 

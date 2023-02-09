@@ -4,7 +4,7 @@ use crate::{
     schema::{assert_string_schema_for_map, generate_map_schema, generate_set_schema},
     schemars::{gen::SchemaGenerator, schema::SchemaObject},
     str::ConfigurableString,
-    Configurable, GenerateError,
+    Configurable, GenerateError, Metadata,
 };
 
 impl<K, V> Configurable for indexmap::IndexMap<K, V>
@@ -16,6 +16,15 @@ where
         // A hashmap with required fields would be... an object.  So if you want that, make a struct
         // instead, not a hashmap.
         true
+    }
+
+    fn metadata() -> Metadata<Self> {
+        Metadata::with_transparent(true)
+    }
+
+    fn validate_metadata(metadata: &Metadata<Self>) -> Result<(), GenerateError> {
+        let converted = metadata.convert::<V>();
+        V::validate_metadata(&converted)
     }
 
     fn generate_schema(gen: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
@@ -30,6 +39,15 @@ impl<V> Configurable for indexmap::IndexSet<V>
 where
     V: Configurable + Serialize + std::hash::Hash + Eq,
 {
+    fn metadata() -> Metadata<Self> {
+        Metadata::with_transparent(true)
+    }
+
+    fn validate_metadata(metadata: &Metadata<Self>) -> Result<(), GenerateError> {
+        let converted = metadata.convert::<V>();
+        V::validate_metadata(&converted)
+    }
+
     fn generate_schema(gen: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
         generate_set_schema::<V>(gen)
     }

@@ -30,7 +30,7 @@ base: components: sinks: honeycomb: configuration: {
 	api_key: {
 		description: "The team key that will be used to authenticate against Honeycomb."
 		required:    true
-		type: string: {}
+		type: string: examples: ["${HONEYCOMB_API_KEY}", "some-api-key"]
 	}
 	batch: {
 		description: "Event batching behavior."
@@ -67,7 +67,7 @@ base: components: sinks: honeycomb: configuration: {
 	dataset: {
 		description: "The dataset to which logs are sent."
 		required:    true
-		type: string: {}
+		type: string: examples: ["my-honeycomb-dataset"]
 	}
 	encoding: {
 		description: "Transformations to prepare an event for serialization."

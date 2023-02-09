@@ -124,7 +124,7 @@ pub struct RemapConfig {
     #[serde(default = "crate::serde::default_false")]
     pub reroute_dropped: bool,
 
-    #[configurable(derived)]
+    #[configurable(derived, metadata(docs::hidden))]
     #[serde(default)]
     pub runtime: VrlRuntime,
 }
