@@ -43,19 +43,10 @@ pub fn is_retriable_error<T>(error: &SdkError<T>) -> bool {
     match error {
         SdkError::TimeoutError(_) | SdkError::DispatchFailure(_) => true,
         SdkError::ConstructionFailure(_) => false,
-        SdkError::ResponseError(err) => {
-            let raw = err.raw();
-
-            check_response(raw)
-        }
-        SdkError::ServiceError(err) => {
-            let raw = err.raw();
-
-            check_response(raw)
-        }
+        SdkError::ResponseError(err) => check_response(err.raw()),
+        SdkError::ServiceError(err) => check_response(err.raw()),
         _ => {
-            // TODO make sure this message is useful for users
-            warn!("Unhandled SdkError please report this, retrying request.");
+            warn!("AWS returned an unhandled error, retrying request.");
             true
         }
     }
@@ -267,9 +258,9 @@ where
         // Attach a body callback that will capture the bytes sent by interrogating the body chunks that get read as it
         // sends the request out over the wire. We'll read the shared atomic counter, which will contain the number of
         // bytes "read", aka the bytes it actually sent, if and only if we get back a successful response.
-        let shared_bytes_sent = Arc::new(AtomicUsize::new(0));
 
         let (req, maybe_bytes_sent) = if self.enabled {
+            let shared_bytes_sent = Arc::new(AtomicUsize::new(0));
             let (request, properties) = req.into_parts();
             let (parts, body) = request.into_parts();
 
