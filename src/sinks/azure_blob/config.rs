@@ -140,7 +140,7 @@ pub struct AzureBlobSinkConfig {
     pub(super) acknowledgements: AcknowledgementsConfig,
 }
 
-fn default_blob_prefix() -> Template {
+pub fn default_blob_prefix() -> Template {
     Template::try_from(DEFAULT_KEY_PREFIX).unwrap()
 }
 
