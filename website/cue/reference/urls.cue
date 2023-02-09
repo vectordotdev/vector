@@ -291,6 +291,7 @@ urls: {
 	kubernetes_authorization:                   "\(kubernetes)/docs/reference/access-authn-authz/authorization/"
 	kubernetes_daemonset:                       "\(kubernetes)/docs/concepts/workloads/controllers/daemonset/"
 	kubernetes_example_daemonset:               "\(vector_repo)/blob/master/config/kubernetes/vector-daemonset.yaml"
+	kubernetes_host_path:                       "\(kubernetes)/docs/concepts/storage/volumes/#hostpath"
 	kubernetes_limit_resources:                 "\(kubernetes)/docs/tasks/configure-pod-container/assign-cpu-resource/"
 	kubernetes_logging_architecture:            "\(kubernetes)/docs/concepts/cluster-administration/logging/"
 	kubernetes_rbac:                            "\(kubernetes)/docs/reference/access-authn-authz/rbac/"

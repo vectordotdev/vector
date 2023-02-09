@@ -126,7 +126,7 @@ impl Configurable for TimeZone {
 [tzdb]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones"#,
         );
         tz_metadata.add_custom_attribute(CustomAttribute::kv("logical_name", "Named"));
-        let tz_schema = get_or_generate_schema::<Tz>(gen, tz_metadata)?;
+        let tz_schema = get_or_generate_schema::<Tz>(gen, Some(tz_metadata))?;
 
         Ok(generate_one_of_schema(&[local_schema, tz_schema]))
     }

@@ -42,6 +42,10 @@ components: sources: kubernetes_logs: {
 			"""
 				[Kubernetes](\(urls.kubernetes)) version `\(services.kubernetes.versions)` is required.
 				""",
+			"""
+				This source requires read access to the `/var/log/pods` directory. When run in a
+				Kubernetes cluster this can be provided with a [hostPath](\(urls.kubernetes_host_path)) volume.
+				""",
 		]
 		warnings: []
 		notices: []
