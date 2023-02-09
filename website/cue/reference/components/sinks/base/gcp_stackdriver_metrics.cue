@@ -29,7 +29,7 @@ base: components: sinks: gcp_stackdriver_metrics: configuration: {
 	}
 	api_key: {
 		description: """
-			An API key. ([documentation](https://cloud.google.com/docs/authentication/api-keys))
+			An [API key][gcp_api_key].
 
 			Either an API key, or a path to a service account credentials JSON file can be specified.
 
@@ -37,6 +37,8 @@ base: components: sinks: gcp_stackdriver_metrics: configuration: {
 			filename is named, an attempt is made to fetch an instance service account for the compute instance the program is
 			running on. If this is not on a GCE instance, then you must define it with an API key or service account
 			credentials JSON file.
+
+			[gcp_api_key]: https://cloud.google.com/docs/authentication/api-keys
 			"""
 		required: false
 		type: string: {}
@@ -75,7 +77,7 @@ base: components: sinks: gcp_stackdriver_metrics: configuration: {
 	}
 	credentials_path: {
 		description: """
-			Path to a service account credentials JSON file. ([documentation](https://cloud.google.com/docs/authentication/production#manually))
+			Path to a [service account] credentials JSON file.
 
 			Either an API key, or a path to a service account credentials JSON file can be specified.
 
@@ -83,6 +85,8 @@ base: components: sinks: gcp_stackdriver_metrics: configuration: {
 			filename is named, an attempt is made to fetch an instance service account for the compute instance the program is
 			running on. If this is not on a GCE instance, then you must define it with an API key or service account
 			credentials JSON file.
+
+			[gcp_service_account_credentials]: https://cloud.google.com/docs/authentication/production#manually
 			"""
 		required: false
 		type: string: {}
@@ -254,27 +258,34 @@ base: components: sinks: gcp_stackdriver_metrics: configuration: {
 	resource: {
 		description: "The monitored resource to associate the metrics with."
 		required:    true
-		type: object: options: {
-			"*": {
-				description: "A type-specific label."
-				required:    true
-				type: string: {}
-			}
-			type: {
-				description: """
-					The monitored resource type.
+		type: object: {
+			examples: [{
+				instanceId: "Twilight"
+				projectId:  "vector-123456"
+				type:       "global"
+				zone:       "us-central1-a"
+			}]
+			options: {
+				"*": {
+					description: """
+						Values for all of the labels listed in the associated monitored resource descriptor.
 
-					For example, the type of a Compute Engine VM instance is `gce_instance`.
-					"""
-				required: true
-				type: string: {}
+						For example, Compute Engine VM instances use the labels `projectId`, `instanceId`, and `zone`.
+						"""
+					required: true
+					type: string: {}
+				}
+				type: {
+					description: """
+						The monitored resource type.
+
+						For example, the type of a Compute Engine VM instance is `gce_instance`.
+						"""
+					required: true
+					type: string: examples: ["global", "gce_instance"]
+				}
 			}
 		}
-	}
-	skip_authentication: {
-		description: "Skip all authentication handling. For use with integration tests only."
-		required:    false
-		type: bool: default: false
 	}
 	tls: {
 		description: "TLS configuration."

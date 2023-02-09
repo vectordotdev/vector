@@ -49,14 +49,24 @@ impl SinkBatchSettings for PubsubDefaultBatchSettings {
 #[derive(Clone, Debug)]
 pub struct PubsubConfig {
     /// The project name to which to publish events.
+    #[configurable(metadata(docs::examples = "vector-123456"))]
     pub project: String,
 
     /// The topic within the project to which to publish events.
+    #[configurable(metadata(docs::examples = "this-is-a-topic"))]
     pub topic: String,
 
     /// The endpoint to which to publish events.
-    #[serde(default)]
-    pub endpoint: Option<String>,
+    ///
+    /// The scheme (`http` or `https`) must be specified. No path should be included since the paths defined
+    /// by the [`GCP Pub/Sub`][pubsub_api] api are used.
+    ///
+    /// The trailing slash `/` must not be included.
+    ///
+    /// [pubsub_api]: https://cloud.google.com/pubsub/docs/reference/rest
+    #[serde(default = "default_endpoint")]
+    #[configurable(metadata(docs::examples = "https://us-central1-pubsub.googleapis.com"))]
+    pub endpoint: String,
 
     #[serde(default, flatten)]
     pub auth: GcpAuthConfig,
@@ -83,6 +93,10 @@ pub struct PubsubConfig {
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     acknowledgements: AcknowledgementsConfig,
+}
+
+fn default_endpoint() -> String {
+    PUBSUB_URL.to_string()
 }
 
 impl GenerateConfig for PubsubConfig {
@@ -145,13 +159,9 @@ impl PubsubSink {
         // We only need to load the credentials if we are not targeting an emulator.
         let auth = config.auth.build(Scope::PubSub).await?;
 
-        let uri_base = match config.endpoint.as_ref() {
-            Some(host) => host.to_string(),
-            None => PUBSUB_URL.into(),
-        };
         let uri_base = format!(
             "{}/v1/projects/{}/topics/{}",
-            uri_base, config.project, config.topic,
+            config.endpoint, config.project, config.topic,
         );
 
         let transformer = config.encoding.transformer();
@@ -273,7 +283,7 @@ mod integration_tests {
         PubsubConfig {
             project: PROJECT.into(),
             topic: topic.into(),
-            endpoint: Some(gcp::PUBSUB_ADDRESS.clone()),
+            endpoint: gcp::PUBSUB_ADDRESS.clone(),
             auth: GcpAuthConfig {
                 skip_authentication: true,
                 ..Default::default()

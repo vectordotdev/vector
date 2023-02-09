@@ -1,0 +1,13 @@
+args:
+- --features
+- fluent-integration-tests
+- --lib
+- "::fluent::"
+
+runner:
+  needs_docker_socket: true
+  volumes:
+    /tmp: /tmp
+
+matrix:
+  default: ["default"]

@@ -39,6 +39,7 @@ pub const TEST_PEM_CLIENT_KEY_PATH: &str =
 
 /// Configures the TLS options for incoming/outgoing connections.
 #[configurable_component]
+#[configurable(metadata(docs::advanced))]
 #[derive(Clone, Debug, Default)]
 pub struct TlsEnableableConfig {
     /// Whether or not to require TLS for incoming/outgoing connections.
@@ -80,6 +81,7 @@ pub struct TlsSourceConfig {
 
 /// TLS configuration.
 #[configurable_component]
+#[configurable(metadata(docs::advanced))]
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct TlsConfig {

@@ -60,6 +60,10 @@ pub struct PulsarSinkConfig {
 
     #[configurable(derived)]
     #[serde(default)]
+    batch: BatchConfig,
+
+    #[configurable(derived)]
+    #[serde(default)]
     compression: PulsarCompression,
 
     #[configurable(derived)]
@@ -75,6 +79,14 @@ pub struct PulsarSinkConfig {
 
     /// Log field to use as Pulsar message key.
     partition_key_field: Option<String>,
+}
+
+/// Event batching behavior.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct BatchConfig {
+    /// The maximum size of a batch, in events, before it is flushed.
+    pub batch_size: Option<u32>,
 }
 
 /// Authentication configuration.
@@ -188,6 +200,7 @@ impl GenerateConfig for PulsarSinkConfig {
             auth: None,
             acknowledgements: Default::default(),
             producer_name: None,
+            batch: Default::default(),
         })
         .unwrap()
     }
@@ -293,6 +306,10 @@ impl PulsarSinkConfig {
             }),
             ..Default::default()
         };
+
+        if !is_healthcheck {
+            producer_options.batch_size = self.batch.batch_size;
+        }
 
         if let SerializerConfig::Avro { avro } = self.encoding.config() {
             producer_options.schema = Some(proto::Schema {
@@ -500,6 +517,7 @@ mod integration_tests {
             auth: None,
             acknowledgements: Default::default(),
             partition_key_field: Some("message".to_string()),
+            batch: Default::default(),
         };
 
         let pulsar = Pulsar::<TokioExecutor>::builder(&cnf.endpoint, TokioExecutor)

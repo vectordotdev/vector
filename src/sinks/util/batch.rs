@@ -91,6 +91,7 @@ pub struct Unmerged;
 // defaults, since that is satisfied here.
 #[serde_as]
 #[configurable_component]
+#[configurable(metadata(docs::advanced))]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct BatchConfig<D: SinkBatchSettings + Clone, S = Unmerged>
 where

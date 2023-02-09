@@ -1,0 +1,97 @@
+lib/file-source/ @spencergilbert
+lib/k8s-e2e-tests/ @spencergilbert
+lib/k8s-test-framework/ @spencergilbert
+lib/opentelemetry-proto/ @spencergilbert
+lib/vector-common/ @vectordotdev/core-team
+lib/vector-config/ @vectordotdev/core-team
+lib/vector-config-common/ @vectordotdev/core-team
+lib/vector-config-macros/ @vectordotdev/core-team
+lib/vector-core/ @vectordotdev/core-team
+lib/vector-vrl-functions/ @vectordotdev/processing-team
+lib/vrl/ @vectordotdev/processing-team
+src/config/ @vectordotdev/core-team
+src/internal_telemetry/ @vectordotdev/core-team
+src/sinks/ @vectordotdev/integrations-team
+src/sinks/amqp/ @StephenWakely
+src/sinks/apex/ @neuronull
+src/sinks/aws_cloudwatch_logs/ @spencergilbert
+src/sinks/aws_cloudwatch_metrics/ @spencergilbert
+src/sinks/aws_kinesis/ @spencergilbert # sink_aws_kinesis_firehose,sink_aws_kinesis_stream
+src/sinks/aws_s3/ @spencergilbert
+src/sinks/aws_sqs/ @spencergilbert
+src/sinks/axiom.rs @spencergilbert
+src/sinks/azure_blob/ @davidhuie-dd
+src/sinks/azure_monitor_logs.rs @davidhuie-dd
+src/sinks/blackhole/ @davidhuie-dd
+src/sinks/clickhouse/ @davidhuie-dd
+src/sinks/console/ @davidhuie-dd
+src/sinks/datadog_archives.rs @neuronull
+src/sinks/datadog_events/ @neuronull
+src/sinks/datadog_logs/ @neuronull
+src/sinks/datadog_metrics/ @neuronull
+src/sinks/datadog_traces/ @neuronull
+src/sinks/elasticsearch/ @spencergilbert
+src/sinks/file/ @spencergilbert
+src/sinks/gcp/ @StephenWakely # sink_gcp_chronicle_unstructured,sink_gcp_cloud_storage,sink_gcp_pubsub,sink_gcp_stackdriver_logs,sink_gcp_stackdriver_metrics
+src/sinks/honeycomb.rs @spencergilbert
+src/sinks/http.rs @neuronull
+src/sinks/humio/ @StephenWakely # sink_humio_logs,sink_humio_metrics
+src/sinks/influxdb/ @davidhuie-dd # sink_influxdb_logs,sink_influxdb_metrics
+src/sinks/kafka/ @davidhuie-dd
+src/sinks/logdna.rs @neuronull
+src/sinks/loki/ @spencergilbert
+src/sinks/nats.rs @StephenWakely
+src/sinks/new_relic/ @davidhuie-dd # sink_newrelix,sink_newrelic_logs
+src/sinks/papertrail.rs @StephenWakely
+src/sinks/prometheus/ @StephenWakely # sink_prometheus_exporter,sink_prometheus_remote_write
+src/sinks/pulsar.rs @davidhuie-dd
+src/sinks/redis.rs @StephenWakely
+src/sinks/sematext/ @spencergilbert # sink_sematext_logs,sink_sematext_metrics
+src/sinks/socket.rs @neuronull
+src/sinks/splunk_hec/ @StephenWakely # sink_splunk_hec_logs,sink_splunk_hec_metrics
+src/sinks/statsd.rs @neuronull
+src/sinks/vector/ @neuronull
+src/sinks/websocket/ @neuronull
+src/source_sender/ @vectordotdev/core-team
+src/sources/ @vectordotdev/integrations-team
+src/sources/amqp.rs @StephenWakely
+src/sources/apache_metrics/ @davidhuie-dd
+src/sources/aws_ecs_metrics/ @spencergilbert
+src/sources/aws_kinesis_firehose/ @spencergilbert
+src/sources/aws_s3/ @spencergilbert
+src/sources/aws_sqs/ @spencergilbert
+src/sources/datadog_agent/ @neuronull
+src/sources/demo_logs.rs @StephenWakely
+src/sources/dnstap/ @StephenWakely
+src/sources/docker_logs/ @spencergilbert
+src/sources/eventstoredb_metrics/ @davidhuie-dd
+src/sources/exec/ @davidhuie-dd
+src/sources/file.rs @spencergilbert
+src/sources/file_descriptors/ @davidhuie-dd # source_file_descriptor,source_stdin
+src/sources/fluent/ @neuronull
+src/sources/gcp_pubsub.rs @StephenWakely
+src/sources/heroku_logs.rs @spencergilbert
+src/sources/host_metrics/ @davidhuie-dd
+src/sources/http_client/ @neuronull
+src/sources/http_server.rs @neuronull
+src/sources/internal_logs.rs @neuronull
+src/sources/internal_metrics.rs @neuronull
+src/sources/journald.rs @spencergilbert
+src/sources/kafka.rs @davidhuie-dd
+src/sources/kubernetes_logs/ @spencergilbert
+src/sources/logstash.rs @neuronull
+src/sources/mongodb_metrics/ @davidhuie-dd
+src/sources/nats.rs @StephenWakely
+src/sources/nginx_metrics/ @davidhuie-dd
+src/sources/opentelemetry/ @spencergilbert
+src/sources/postgresql_metrics.rs @davidhuie-dd
+src/sources/prometheus/ @StephenWakely # source_prometheus_remote_write,source_prometheus_scrape
+src/sources/redis/ @StephenWakely
+src/sources/socket/ @neuronull
+src/sources/splunk_hec/ @StephenWakely
+src/sources/statsd/ @neuronull
+src/sources/syslog.rs @StephenWakely
+src/sources/vector/ @neuronull
+src/test_util/ @vectordotdev/core-team
+src/topology/ @vectordotdev/core-team
+src/transforms/ @vectordotdev/processing-team

@@ -33,7 +33,7 @@ vector-core = { path = "../vector-core", default-features = false }
 
 [dev-dependencies]
 futures = { version = "0.3", default-features = false }
-indoc = { version = "1", default-features = false }
+indoc = { version = "2", default-features = false }
 tokio = { version = "1", features = ["test-util"] }
 similar-asserts = "1.4.2"
 

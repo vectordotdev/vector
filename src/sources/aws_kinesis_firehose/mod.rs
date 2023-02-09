@@ -96,6 +96,7 @@ const fn access_keys_example() -> [&'static str; 2] {
 
 /// Compression scheme for records in a Firehose message.
 #[configurable_component]
+#[configurable(metadata(docs::advanced))]
 #[derive(Clone, Copy, Debug, Derivative, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 #[derivative(Default)]

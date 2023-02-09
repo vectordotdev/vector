@@ -15,12 +15,11 @@ use super::{
     service::TraceApiRetry,
 };
 use crate::{
-    common::datadog::get_base_domain,
     config::{GenerateConfig, Input, SinkConfig, SinkContext},
     http::HttpClient,
     sinks::{
         datadog::{
-            get_api_validate_endpoint, healthcheck,
+            default_site, get_api_validate_endpoint, healthcheck,
             traces::{
                 request_builder::DatadogTracesRequestBuilder, service::TraceApiService,
                 sink::TracesSink,
@@ -62,22 +61,36 @@ impl SinkBatchSettings for DatadogTracesDefaultBatchSettings {
 #[serde(deny_unknown_fields)]
 pub struct DatadogTracesConfig {
     /// The endpoint to send traces to.
+    ///
+    /// The endpoint must contain an HTTP scheme, and may specify a
+    /// hostname or IP address and port.
+    ///
+    /// If set, overrides the `site` option.
+    #[configurable(metadata(docs::examples = "http://127.0.0.1:8080"))]
+    #[configurable(metadata(docs::examples = "http://example.com:12345"))]
+    #[serde(default)]
     pub(crate) endpoint: Option<String>,
 
     /// The Datadog [site][dd_site] to send traces to.
     ///
     /// [dd_site]: https://docs.datadoghq.com/getting_started/site
-    pub site: Option<String>,
+    #[configurable(metadata(docs::examples = "us3.datadoghq.com"))]
+    #[configurable(metadata(docs::examples = "datadoghq.eu"))]
+    #[serde(default = "default_site")]
+    pub site: String,
 
     /// The default Datadog [API key][api_key] to send traces with.
     ///
     /// If a trace has a Datadog [API key][api_key] set explicitly in its metadata, it will take
-    /// precedence over the default.
+    /// precedence over this setting.
     ///
     /// [api_key]: https://docs.datadoghq.com/api/?lang=bash#authentication
+    #[configurable(metadata(docs::examples = "${DATADOG_API_KEY_ENV_VAR}"))]
+    #[configurable(metadata(docs::examples = "ef8d5de700e7989468166c40fc8a0ccd"))]
     pub default_api_key: SensitiveString,
 
     #[configurable(derived)]
+    #[serde(default)]
     pub tls: Option<TlsEnableableConfig>,
 
     #[configurable(derived)]
@@ -136,12 +149,9 @@ impl DatadogTracesEndpointConfiguration {
 
 impl DatadogTracesConfig {
     fn get_base_uri(&self) -> String {
-        self.endpoint.clone().unwrap_or_else(|| {
-            format!(
-                "https://trace.agent.{}",
-                get_base_domain(self.site.as_ref(), None)
-            )
-        })
+        self.endpoint
+            .clone()
+            .unwrap_or_else(|| format!("https://trace.agent.{}", self.site))
     }
 
     fn generate_traces_endpoint_configuration(
@@ -219,7 +229,7 @@ impl DatadogTracesConfig {
 
     pub fn build_healthcheck(&self, client: HttpClient) -> crate::Result<Healthcheck> {
         let validate_endpoint =
-            get_api_validate_endpoint(self.endpoint.as_ref(), self.site.as_ref(), None)?;
+            get_api_validate_endpoint(self.endpoint.as_ref(), self.site.as_ref())?;
         Ok(healthcheck(
             client,
             validate_endpoint,

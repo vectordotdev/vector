@@ -79,9 +79,6 @@ if [[ "$CHANNEL" == "nightly" ]]; then
   verify_artifact \
     "https://packages.timber.io/vector/nightly/latest/vector-nightly-x86_64-unknown-linux-gnu.tar.gz" \
     "$td_nightly/vector-nightly-x86_64-unknown-linux-gnu.tar.gz"
-  verify_artifact \
-    "https://packages.timber.io/vector/nightly/latest/vector-nightly-x86_64-unknown-linux-gnu-debug.tar.gz" \
-    "$td_nightly/vector-nightly-x86_64-unknown-linux-gnu-debug.tar.gz"
 elif [[ "$CHANNEL" == "latest" ]]; then
   VERSION_EXACT="$VERSION"
   # shellcheck disable=SC2001

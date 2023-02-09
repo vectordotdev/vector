@@ -537,8 +537,21 @@ pub struct RequestConfig {
 
     /// Additional HTTP headers to add to every HTTP request.
     #[serde(default)]
-    #[configurable(metadata(docs::additional_props_description = "An HTTP request header."))]
+    #[configurable(metadata(
+        docs::additional_props_description = "An HTTP request header and it's value."
+    ))]
+    #[configurable(metadata(docs::examples = "headers_examples()"))]
     pub headers: IndexMap<String, String>,
+}
+
+fn headers_examples() -> IndexMap<String, String> {
+    IndexMap::<_, _>::from_iter(
+        [
+            ("Accept".to_owned(), "text/plain".to_owned()),
+            ("X-My-Custom-Header".to_owned(), "A-Value".to_owned()),
+        ]
+        .into_iter(),
+    )
 }
 
 impl RequestConfig {

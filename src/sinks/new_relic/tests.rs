@@ -2,6 +2,7 @@ use std::{collections::HashMap, convert::TryFrom, time::SystemTime};
 
 use chrono::{DateTime, Utc};
 use futures::{future::ready, stream};
+use serde::Deserialize;
 
 use super::*;
 use crate::{
@@ -23,7 +24,8 @@ async fn component_spec_compliance() {
     let mock_endpoint = spawn_blackhole_http_server(always_200_response).await;
 
     let config = NewRelicConfig::generate_config().to_string();
-    let mut config = toml::from_str::<NewRelicConfig>(&config).expect("config should be valid");
+    let mut config = NewRelicConfig::deserialize(toml::de::ValueDeserializer::new(&config))
+        .expect("config should be valid");
     config.override_uri = Some(mock_endpoint);
 
     let context = SinkContext::new_test();

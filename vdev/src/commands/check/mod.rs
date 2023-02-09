@@ -1,5 +1,5 @@
 crate::cli_subcommands! {
-    "Check parts of the Vector code base"
+    "Check parts of the Vector code base..."
     component_docs,
     mod component_features,
     mod deny,
@@ -15,7 +15,7 @@ crate::cli_subcommands! {
 // These should eventually be migrated to Rust code
 
 crate::script_wrapper! {
-    component_docs = "Check component documentation is up-to-date"
+    component_docs = "Check that component documentation is up-to-date"
         => "check-component-docs.sh"
 }
 
@@ -25,7 +25,7 @@ crate::script_wrapper! {
 }
 
 crate::script_wrapper! {
-    events = "Check that events satisfy patterns set in https://github.com/vectordotdev/vector/blob/master/rfcs/2020-03-17-2064-event-driven-observability.md"
+    events = "Check that events satisfy patterns set in https://github.com/vectordotdev/vector/blob/master/docs/specs/instrumentation.md"
         => "check-events"
 }
 

@@ -216,6 +216,7 @@ impl Configurable for Compression {
         metadata.set_title("Compression configuration.");
         metadata.set_description("All compression algorithms use the default compression level unless otherwise specified.");
         metadata.add_custom_attribute(CustomAttribute::kv("docs::enum_tagging", "external"));
+        metadata.add_custom_attribute(CustomAttribute::flag("docs::advanced"));
         metadata
     }
 
@@ -252,7 +253,7 @@ impl Configurable for Compression {
         );
         let zlib_string_subschema = generate_string_schema(
             "Zlib",
-            Some("[Zlib]][zlib] compression."),
+            Some("[Zlib][zlib] compression."),
             "[zlib]: https://zlib.net/",
         );
 
@@ -276,10 +277,7 @@ impl Configurable for Compression {
         // generation, where we need to be able to generate the right enum key/value pair for the
         // `none` algorithm as part of the overall set of enum values declared for the `algorithm`
         // field in the "full" schema version.
-        let mut compression_level_metadata = Metadata::default();
-        compression_level_metadata.set_transparent();
-        let compression_level_schema =
-            get_or_generate_schema::<CompressionLevel>(gen, compression_level_metadata)?;
+        let compression_level_schema = get_or_generate_schema::<CompressionLevel>(gen, None)?;
 
         let mut required = BTreeSet::new();
         required.insert(ALGORITHM_NAME.to_string());
