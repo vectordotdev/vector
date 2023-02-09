@@ -36,7 +36,7 @@ base: components: sinks: prometheus_exporter: configuration: {
 		required: false
 		type: string: {
 			default: "0.0.0.0:9598"
-			examples: ["0.0.0.0:9598"]
+			examples: ["192.160.0.10:9598"]
 		}
 	}
 	auth: {

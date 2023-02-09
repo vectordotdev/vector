@@ -16,7 +16,7 @@ components: sinks: prometheus_exporter: {
 	}
 
 	features: {
-		auto_generated: true
+		auto_generated:   true
 		acknowledgements: true
 		healthcheck: enabled: false
 		exposes: {
