@@ -57,6 +57,9 @@ enum Errors {
 #[serde(deny_unknown_fields)]
 pub struct RemoteWriteConfig {
     /// The endpoint to send data to.
+    ///
+    /// The endpoint should include the scheme and the path to write to.
+    #[configurable(metadata(docs::examples = "https://localhost:8087/api/v1/write"))]
     pub endpoint: String,
 
     /// The default namespace for any metrics sent.
@@ -67,6 +70,7 @@ pub struct RemoteWriteConfig {
     /// It should follow the Prometheus [naming conventions][prom_naming_docs].
     ///
     /// [prom_naming_docs]: https://prometheus.io/docs/practices/naming/#metric-names
+    #[configurable(metadata(docs::examples = "service"))]
     pub default_namespace: Option<String>,
 
     /// Default buckets to use for aggregating [distribution][dist_metric_docs] metrics into histograms.
@@ -95,6 +99,7 @@ pub struct RemoteWriteConfig {
     ///
     /// This may be used by Cortex or other remote services to identify the tenant making the request.
     #[serde(default)]
+    #[configurable(metadata(docs::examples = "my-domain"))]
     pub tenant_id: Option<Template>,
 
     #[configurable(derived)]
