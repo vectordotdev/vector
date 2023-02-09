@@ -34,7 +34,10 @@ base: components: sinks: prometheus_exporter: configuration: {
 			The metrics are exposed at the typical Prometheus exporter path, `/metrics`.
 			"""
 		required: false
-		type: string: default: "0.0.0.0:9598"
+		type: string: {
+			default: "0.0.0.0:9598"
+			examples: ["192.160.0.10:9598"]
+		}
 	}
 	auth: {
 		description: """

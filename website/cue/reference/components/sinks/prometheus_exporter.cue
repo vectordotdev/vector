@@ -16,6 +16,7 @@ components: sinks: prometheus_exporter: {
 	}
 
 	features: {
+		auto_generated:   true
 		acknowledgements: true
 		healthcheck: enabled: false
 		exposes: {
@@ -57,84 +58,7 @@ components: sinks: prometheus_exporter: {
 		notices: []
 	}
 
-	configuration: {
-		address: {
-			description: "The address to expose for scraping. The metrics are exposed at the typical Prometheus exporter path, `/metrics`"
-			required:    true
-			warnings: []
-			type: string: {
-				examples: ["0.0.0.0:\(_port)"]
-			}
-		}
-		auth: configuration._http_auth & {_args: {
-			password_example: "${PROMETHEUS_PASSWORD}"
-			username_example: "${PROMETHEUS_USERNAME}"
-		}}
-		buckets: {
-			common:      false
-			description: """
-				Default buckets to use for aggregating [distribution](\(urls.vector_data_model)/metric#distribution)
-				metrics into histograms.
-				"""
-			required:    false
-			type: array: {
-				default: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0]
-				items: type: float: examples: [0.005, 0.01]
-			}
-		}
-		flush_period_secs: {
-			common:      false
-			description: "Time interval on which metrics are flushed. On the flush interval, if a metric has not been seen since the last flush interval, it is considered expired and is removed. Be sure to configure this value higher than your client's scrape interval."
-			required:    false
-			type: uint: {
-				default: 60
-				unit:    "seconds"
-			}
-		}
-		default_namespace: {
-			common:      true
-			description: """
-				Used as a namespace for metrics that don't have it. Typically
-				namespaces are set during ingestion (sources), but it is
-				optional and when missing, we'll use this value. It should
-				follow Prometheus [naming conventions](\(urls.prometheus_metric_naming)).
-				"""
-			required:    false
-			type: string: {
-				default: null
-				examples: ["service"]
-			}
-		}
-		quantiles: {
-			common:      false
-			description: """
-				Quantiles to use for aggregating [distribution](\(urls.vector_data_model)/metric#distribution) metrics
-				into a summary.
-				"""
-			required:    false
-			type: array: {
-				default: [0.5, 0.75, 0.9, 0.95, 0.99]
-				items: type: float: examples: [0.5, 0.75, 0.9, 0.95, 0.99]
-			}
-		}
-		distributions_as_summaries: {
-			common:      false
-			description: """
-				Whether or not to render [distributions](\(urls.vector_data_model)/metric#distribution) as a
-				[histogram](\(urls.vector_data_model)/metric#histogram) or
-				[summary](\(urls.vector_data_model)/metric#summary), which map one-to-one with the Prometheus
-				metric types of the same name.
-				"""
-			required:    false
-			type: bool: default: false
-		}
-		suppress_timestamp: {
-			common:      false
-			description: "Whether or not to strip metric timestamp in the response."
-			required:    false
-			type: bool: default: false
-		}
-	}
+	configuration: base.components.sinks.prometheus_exporter.configuration
 
 	input: {
 		logs: false
