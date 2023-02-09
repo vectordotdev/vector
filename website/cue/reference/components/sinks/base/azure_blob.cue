@@ -85,7 +85,7 @@ base: components: sinks: azure_blob: configuration: {
 		required: false
 		type: string: {
 			default: "blob/%F/"
-			examples: ["date/%F/", "date/%F/hour/%H/", "year=%Y/month=%m/day=%d/", "kubernetes/{{ metadata.cluster }}/{{ metadata.application_name }}/"]
+			examples: ["date/%F/hour/%H/", "year=%Y/month=%m/day=%d/", "kubernetes/{{ metadata.cluster }}/{{ metadata.application_name }}/"]
 			syntax: "template"
 		}
 	}

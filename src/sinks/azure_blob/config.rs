@@ -1,4 +1,4 @@
-use std::{convert::TryInto, sync::Arc};
+use std::sync::Arc;
 
 use azure_storage_blobs::prelude::*;
 use codecs::{encoding::Framer, JsonSerializerConfig, NewlineDelimitedEncoderConfig};
@@ -150,7 +150,7 @@ impl GenerateConfig for AzureBlobSinkConfig {
             storage_account: Some(String::from("some-account-name")),
             container_name: String::from("logs"),
             endpoint: None,
-            blob_prefix: "blob".try_into().unwrap(),
+            blob_prefix: default_blob_prefix(),
             blob_time_format: Some(String::from("%s")),
             blob_append_uuid: Some(true),
             encoding: (Some(NewlineDelimitedEncoderConfig::new()), JsonSerializerConfig::default()).into(),
