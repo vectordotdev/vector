@@ -11,6 +11,15 @@ set -o errexit -o verbose
 readonly TMP_DIR="$(mktemp -d -t "protoc_XXXX")"
 trap 'rm -rf "${TMP_DIR?}"' EXIT
 
+# A parameter can be optionally passed to this script to specify an alternative
+# location to install protoc. Default is /usr/bin.
+readonly INSTALL_PATH=${1:-"/usr/bin"}
+
+if [[ -n $1 ]]
+then
+  mkdir -p ${INSTALL_PATH}
+fi
+
 get_platform() {
   local os
   os=$(uname)
@@ -54,5 +63,4 @@ install_protoc() {
   mv --force --verbose "${TMP_DIR}/bin/protoc" "${install_path}"
 }
 
-mkdir -p "${HOME}/protoc/"
-install_protoc "3.19.5" "${HOME}/protoc/protoc"
+install_protoc "3.19.5" "${INSTALL_PATH}/protoc"

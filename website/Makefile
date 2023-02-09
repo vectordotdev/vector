@@ -30,8 +30,8 @@ config-examples:
 	yarn config-examples
 	
 rust-docs:
-	../scripts/environment/install-protoc.sh
-	PATH=${PATH}:~/protoc/ cargo doc --no-default-features --features="docs"
+	../scripts/environment/install-protoc.sh ${HOME}/protoc
+	PATH=${PATH}:${HOME}/protoc/ cargo doc --no-default-features --features="docs"
 	mv ../target/doc/ static/rustdocs/
 
 structured-data: cue-build config-examples rust-docs
