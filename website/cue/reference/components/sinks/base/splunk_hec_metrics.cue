@@ -40,7 +40,7 @@ base: components: sinks: splunk_hec_metrics: configuration: {
 				type: uint: default: 1000000
 			}
 			query_interval: {
-				description: "The amount of time, in seconds, to wait in between queries to the Splunk HEC indexer acknowledgement endpoint."
+				description: "The amount of time to wait in between queries to the Splunk HEC indexer acknowledgement endpoint."
 				required:    false
 				type: uint: {
 					default: 10
@@ -134,7 +134,7 @@ base: components: sinks: splunk_hec_metrics: configuration: {
 			The base URL of the Splunk instance.
 
 			The scheme (`http` or `https`) must be specified. No path should be included since the paths defined
-			by the [`Splunk`][splunk] api are used.
+			by the [`Splunk`][splunk] API are used.
 
 			[splunk]: https://docs.splunk.com/Documentation/Splunk/8.0.0/Data/HECRESTendpoints
 			"""
@@ -156,7 +156,7 @@ base: components: sinks: splunk_hec_metrics: configuration: {
 		description: """
 			The name of the index where to send the events to.
 
-			If not specified, the default index is used.
+			If not specified, the default index defined within Splunk is used.
 			"""
 		required: false
 		type: string: {
@@ -329,7 +329,7 @@ base: components: sinks: splunk_hec_metrics: configuration: {
 			"""
 		required: false
 		type: string: {
-			examples: ["{{ sourcetype }}", "_json", "httpevent"]
+			examples: ["{{ sourcetype }}", "_json"]
 			syntax: "template"
 		}
 	}

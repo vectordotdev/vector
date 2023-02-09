@@ -51,7 +51,7 @@ pub struct HecMetricsSinkConfig {
     /// The base URL of the Splunk instance.
     ///
     /// The scheme (`http` or `https`) must be specified. No path should be included since the paths defined
-    /// by the [`Splunk`][splunk] api are used.
+    /// by the [`Splunk`][splunk] API are used.
     ///
     /// [splunk]: https://docs.splunk.com/Documentation/Splunk/8.0.0/Data/HECRESTendpoints
     #[configurable(metadata(
@@ -71,18 +71,14 @@ pub struct HecMetricsSinkConfig {
 
     /// The name of the index where to send the events to.
     ///
-    /// If not specified, the default index is used.
+    /// If not specified, the default index defined within Splunk is used.
     #[configurable(metadata(docs::examples = "{{ host }}", docs::examples = "custom_index"))]
     pub index: Option<Template>,
 
     /// The sourcetype of events sent to this sink.
     ///
     /// If unset, Splunk will default to `httpevent`.
-    #[configurable(metadata(
-        docs::examples = "{{ sourcetype }}",
-        docs::examples = "_json",
-        docs::examples = "httpevent"
-    ))]
+    #[configurable(metadata(docs::examples = "{{ sourcetype }}", docs::examples = "_json",))]
     pub sourcetype: Option<Template>,
 
     /// The source of events sent to this sink.
