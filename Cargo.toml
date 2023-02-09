@@ -168,16 +168,16 @@ metrics = "0.20.1"
 metrics-tracing-context = { version = "0.12.0", default-features = false }
 
 # AWS - Official SDK
-aws-sdk-s3 = { version = "0.21.0", default-features = false, features = ["rustls"], optional = true }
-aws-sdk-sqs = { version = "0.21.0", default-features = false, features = ["rustls"], optional = true }
-aws-sdk-cloudwatch = { version = "0.21.0", default-features = false, features = ["rustls"], optional = true }
-aws-sdk-cloudwatchlogs = { version = "0.21.0", default-features = false, features = ["rustls"], optional = true }
-aws-sdk-elasticsearch = {version = "0.21.0", default-features = false, features = ["rustls"], optional = true }
-aws-sdk-firehose = { version = "0.21.0", default-features = false, features = ["rustls"], optional = true }
-aws-sdk-kinesis = { version = "0.21.0", default-features = false, features = ["rustls"], optional = true }
+aws-sdk-s3 = { version = "0.21.0", default-features = false, features = ["native-tls"], optional = true }
+aws-sdk-sqs = { version = "0.21.0", default-features = false, features = ["native-tls"], optional = true }
+aws-sdk-cloudwatch = { version = "0.21.0", default-features = false, features = ["native-tls"], optional = true }
+aws-sdk-cloudwatchlogs = { version = "0.21.0", default-features = false, features = ["native-tls"], optional = true }
+aws-sdk-elasticsearch = {version = "0.21.0", default-features = false, features = ["native-tls"], optional = true }
+aws-sdk-firehose = { version = "0.21.0", default-features = false, features = ["native-tls"], optional = true }
+aws-sdk-kinesis = { version = "0.21.0", default-features = false, features = ["native-tls"], optional = true }
 aws-types = { version = "0.51.0", default-features = false, features = ["hardcoded-credentials"], optional = true }
 aws-sigv4 = { version = "0.53.0", default-features = false, features = ["sign-http"], optional = true }
-aws-config = { version = "0.51.0", default-features = false, features = ["rustls"], optional = true }
+aws-config = { version = "0.51.0", default-features = false, features = ["native-tls"], optional = true }
 aws-smithy-async = { version = "0.51.0", default-features = false, optional = true }
 aws-smithy-client = { version = "0.51.0", default-features = false, features = ["client-hyper"], optional = true}
 aws-smithy-http = { version = "0.51.0", default-features = false, features = ["event-stream"], optional = true }
@@ -197,7 +197,7 @@ tower-http = { version = "0.3.5", default-features = false, features = ["decompr
 serde = { version = "1.0.152", default-features = false, features = ["derive"] }
 serde-toml-merge = { version = "0.3.0", default-features = false }
 serde_bytes = { version = "0.11.9", default-features = false, features = ["std"], optional = true }
-serde_json = { version = "1.0.92", default-features = false, features = ["raw_value"] }
+serde_json = { version = "1.0.93", default-features = false, features = ["raw_value"] }
 serde_with = { version = "2.2.0", default-features = false, features = ["macros", "std"] }
 serde_yaml = { version = "0.9.17", default-features = false }
 
@@ -316,7 +316,7 @@ syslog = { version = "6.0.1", default-features = false, optional = true }
 tikv-jemallocator = { version = "0.5.0", default-features = false, optional = true }
 tokio-postgres = { version = "0.7.7", default-features = false, features = ["runtime", "with-chrono-0_4"], optional = true }
 tokio-tungstenite = {version = "0.18.0", default-features = false, features = ["connect"], optional = true}
-toml = { version = "0.7.1", default-features = false, features = ["parse", "display"] }
+toml = { version = "0.7.2", default-features = false, features = ["parse", "display"] }
 tonic = { version = "0.8", optional = true, default-features = false, features = ["transport", "codegen", "prost", "tls", "tls-roots", "gzip"] }
 trust-dns-proto = { version = "0.22.0", default-features = false, features = ["dnssec"], optional = true }
 typetag = { version = "0.2.5", default-features = false }

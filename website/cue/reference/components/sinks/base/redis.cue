@@ -196,10 +196,23 @@ base: components: sinks: redis: configuration: {
 			}
 		}
 	}
+	endpoint: {
+		description: """
+			The URL of the Redis endpoint to connect to.
+
+			The URL _must_ take the form of `protocol://server:port/db` where the protocol can either be
+			`redis` or `rediss` for connections secured via TLS.
+			"""
+		required: true
+		type: string: examples: ["redis://127.0.0.1:6379/0"]
+	}
 	key: {
 		description: "The Redis key to publish messages to."
 		required:    true
-		type: string: syntax: "template"
+		type: string: {
+			examples: ["syslog:{{ app }}", "vector"]
+			syntax: "template"
+		}
 	}
 	list_option: {
 		description: "List-specific options."
@@ -365,15 +378,5 @@ base: components: sinks: redis: configuration: {
 				}
 			}
 		}
-	}
-	url: {
-		description: """
-			The Redis URL to connect to.
-
-			The URL _must_ take the form of `protocol://server:port/db` where the protocol can either be
-			`redis` or `rediss` for connections secured via TLS.
-			"""
-		required: true
-		type: string: {}
 	}
 }

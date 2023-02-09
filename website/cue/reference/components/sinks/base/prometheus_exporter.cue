@@ -34,7 +34,10 @@ base: components: sinks: prometheus_exporter: configuration: {
 			The metrics are exposed at the typical Prometheus exporter path, `/metrics`.
 			"""
 		required: false
-		type: string: default: "0.0.0.0:9598"
+		type: string: {
+			default: "0.0.0.0:9598"
+			examples: ["192.160.0.10:9598"]
+		}
 	}
 	auth: {
 		description: """
@@ -92,7 +95,7 @@ base: components: sinks: prometheus_exporter: configuration: {
 		required: false
 		type: array: {
 			default: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0]
-			items: type: number: {}
+			items: type: float: {}
 		}
 	}
 	default_namespace: {
@@ -148,7 +151,7 @@ base: components: sinks: prometheus_exporter: configuration: {
 		required: false
 		type: array: {
 			default: [0.5, 0.75, 0.9, 0.95, 0.99]
-			items: type: number: {}
+			items: type: float: {}
 		}
 	}
 	suppress_timestamp: {
