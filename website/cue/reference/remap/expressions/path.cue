@@ -166,6 +166,6 @@ remap: expressions: path: {
 				."parent.key.with.special characters".child
 				"""#
 			return: "Hello, World!"
-		}
+		},
 	]
 }
