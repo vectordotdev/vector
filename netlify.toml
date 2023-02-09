@@ -1,6 +1,7 @@
 [build]
 base = "website"
 publish = "public"
+environment = { RUSTDOCFLAGS= "--cfg docsrs" }
 
 # Reinstate this when we figure out how to target this better
 #ignore = "./scripts/build-ignore.sh"
