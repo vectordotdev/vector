@@ -369,7 +369,7 @@ jobs:
         run: make check-markdown
       - name: Check Component Docs
         if: needs.changes.outputs.source == 'true' || needs.changes.outputs.component_docs == 'true'
-        run: make check-component-docs
+        run: LOG_LEVEL=debug make check-component-docs
   master-failure:
     name: master-failure
     if: failure() && github.ref == 'refs/heads/master'
