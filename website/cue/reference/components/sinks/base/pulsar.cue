@@ -39,7 +39,7 @@ base: components: sinks: pulsar: configuration: {
 					When used for JWT, the value should be `token`.
 					"""
 				required: false
-				type: string: {}
+				type: string: examples: ["${PULSAR_NAME}", "name123"]
 			}
 			oauth2: {
 				description: "OAuth2-specific authentication configuration."
@@ -48,7 +48,7 @@ base: components: sinks: pulsar: configuration: {
 					audience: {
 						description: "The OAuth2 audience."
 						required:    false
-						type: string: {}
+						type: string: examples: ["${OAUTH2_AUDIENCE}", "pulsar"]
 					}
 					credentials_url: {
 						description: """
@@ -57,17 +57,17 @@ base: components: sinks: pulsar: configuration: {
 																A data URL is also supported.
 																"""
 						required: true
-						type: string: {}
+						type: string: examples: ["{OAUTH2_CREDENTIALS_URL}", "file:///oauth2_credentials", "data:application/json;base64,cHVsc2FyCg=="]
 					}
 					issuer_url: {
 						description: "The issuer URL."
 						required:    true
-						type: string: {}
+						type: string: examples: ["${OAUTH2_ISSUER_URL}", "https://oauth2.issuer"]
 					}
 					scope: {
 						description: "The OAuth2 scope."
 						required:    false
-						type: string: {}
+						type: string: examples: ["${OAUTH2_SCOPE}", "admin"]
 					}
 				}
 			}
@@ -79,7 +79,7 @@ base: components: sinks: pulsar: configuration: {
 					When used for JWT, the value should be the signed JWT, in the compact representation.
 					"""
 				required: false
-				type: string: {}
+				type: string: examples: ["${PULSAR_TOKEN}", "123456789"]
 			}
 		}
 	}
@@ -89,7 +89,10 @@ base: components: sinks: pulsar: configuration: {
 		type: object: options: batch_size: {
 			description: "The maximum size of a batch, in events, before it is flushed."
 			required:    false
-			type: uint: {}
+			type: uint: {
+				examples: [1000]
+				unit: "events"
+			}
 		}
 	}
 	compression: {
@@ -223,14 +226,18 @@ base: components: sinks: pulsar: configuration: {
 		}
 	}
 	endpoint: {
-		description: "The endpoint to which the Pulsar client should connect to."
-		required:    true
-		type: string: {}
+		description: """
+			The endpoint to which the Pulsar client should connect to.
+
+			The endpoint should specify the pulsar protocol and port.
+			"""
+		required: true
+		type: string: examples: ["pulsar://127.0.0.1:6650"]
 	}
 	partition_key_field: {
 		description: "Log field to use as Pulsar message key."
 		required:    false
-		type: string: {}
+		type: string: examples: ["message", "my_field"]
 	}
 	producer_name: {
 		description: "The name of the producer. If not specified, the default name assigned by Pulsar will be used."
@@ -240,6 +247,6 @@ base: components: sinks: pulsar: configuration: {
 	topic: {
 		description: "The Pulsar topic name to write events to."
 		required:    true
-		type: string: {}
+		type: string: examples: ["topic-1234"]
 	}
 }
