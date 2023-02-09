@@ -321,11 +321,16 @@ impl MeasuredBody {
             shared_bytes_sent,
         }
     }
+}
 
-    fn poll_inner(
+impl Body for MeasuredBody {
+    type Data = Bytes;
+    type Error = Box<dyn Error + Send + Sync>;
+
+    fn poll_data(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
-    ) -> Poll<Option<Result<Bytes, aws_smithy_http::body::Error>>> {
+    ) -> Poll<Option<Result<Self::Data, Self::Error>>> {
         let this = self.project();
 
         match this.inner.poll_data(cx) {
@@ -339,18 +344,6 @@ impl MeasuredBody {
             Poll::Ready(Some(Err(e))) => Poll::Ready(Some(Err(e))),
             Poll::Pending => Poll::Pending,
         }
-    }
-}
-
-impl Body for MeasuredBody {
-    type Data = Bytes;
-    type Error = Box<dyn Error + Send + Sync>;
-
-    fn poll_data(
-        self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-    ) -> Poll<Option<Result<Self::Data, Self::Error>>> {
-        self.poll_inner(cx)
     }
 
     fn poll_trailers(
