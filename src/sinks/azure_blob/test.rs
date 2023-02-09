@@ -41,7 +41,7 @@ fn azure_blob_build_request_without_compression() {
     let compression = Compression::None;
     let container_name = String::from("logs");
     let sink_config = AzureBlobSinkConfig {
-        blob_prefix: Some("blob".into()),
+        blob_prefix: "blob".try_into().unwrap(),
         container_name: container_name.clone(),
         ..default_config((None::<FramingConfig>, TextSerializerConfig::default()).into())
     };
@@ -86,7 +86,7 @@ fn azure_blob_build_request_with_compression() {
     let compression = Compression::gzip_default();
     let container_name = String::from("logs");
     let sink_config = AzureBlobSinkConfig {
-        blob_prefix: Some("blob".into()),
+        blob_prefix: "blob".try_into().unwrap(),
         container_name: container_name.clone(),
         ..default_config((None::<FramingConfig>, TextSerializerConfig::default()).into())
     };
@@ -130,7 +130,7 @@ fn azure_blob_build_request_with_time_format() {
     let compression = Compression::None;
     let container_name = String::from("logs");
     let sink_config = AzureBlobSinkConfig {
-        blob_prefix: Some("blob".into()),
+        blob_prefix: "blob".try_into().unwrap(),
         container_name: container_name.clone(),
         ..default_config((None::<FramingConfig>, TextSerializerConfig::default()).into())
     };
@@ -178,7 +178,7 @@ fn azure_blob_build_request_with_uuid() {
     let compression = Compression::None;
     let container_name = String::from("logs");
     let sink_config = AzureBlobSinkConfig {
-        blob_prefix: Some("blob".into()),
+        blob_prefix: "blob".try_into().unwrap(),
         container_name: container_name.clone(),
         ..default_config((None::<FramingConfig>, TextSerializerConfig::default()).into())
     };
