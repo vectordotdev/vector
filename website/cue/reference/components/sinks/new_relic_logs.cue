@@ -60,7 +60,7 @@ components: sinks: new_relic_logs: {
 		requirements: []
 		warnings: [
 			"""
-				This transform has been deprecated. Please use the [`new_relic` sink](\(urls.vector_new_relic_sink)) instead.
+				This sink no longer exists as of 0.25.0. Please use the [`new_relic` sink](\(urls.vector_new_relic_sink)) instead.
 				""",
 		]
 		notices: []
