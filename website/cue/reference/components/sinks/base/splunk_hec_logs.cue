@@ -296,7 +296,7 @@ base: components: sinks: splunk_hec_logs: configuration: {
 	}
 	index: {
 		description: """
-			The name of the index where to send events to.
+			The name of the index to send events to.
 
 			If not specified, the default index defined within Splunk is used.
 			"""
