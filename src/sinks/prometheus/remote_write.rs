@@ -59,7 +59,7 @@ pub struct RemoteWriteConfig {
     /// The endpoint to send data to.
     ///
     /// The endpoint should include the scheme and the path to write to.
-    #[configurable(metadata(docs::examples = "https://localhost:8087/"))]
+    #[configurable(metadata(docs::examples = "https://localhost:8087/api/v1/write"))]
     pub endpoint: String,
 
     /// The default namespace for any metrics sent.
