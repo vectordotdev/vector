@@ -147,7 +147,7 @@ impl Expression for Op {
         // This merges the type definitions for state. If it is known at compile-time
         // if the RHS will be resolved, this should not be used
         let maybe_rhs = |state: &mut TypeState| {
-            let rhs_info = self.rhs.type_info(&state);
+            let rhs_info = self.rhs.type_info(state);
             *state = state.clone().merge(rhs_info.state);
             rhs_info.result
         };
