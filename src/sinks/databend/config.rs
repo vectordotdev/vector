@@ -1,19 +1,22 @@
 use std::collections::BTreeMap;
 
-use codecs::encoding::{Framer, Serializer};
+use codecs::{
+    encoding::{Framer, FramingConfig, SerializerConfig},
+    JsonSerializerConfig,
+};
 use futures::future::FutureExt;
 use tower::ServiceBuilder;
 use vector_config::{component::GenerateConfig, configurable_component};
 use vector_core::tls::TlsSettings;
 
 use crate::{
-    codecs::{Encoder, EncodingConfigWithFraming, SinkType},
+    codecs::{Encoder, EncodingConfigWithFraming, SinkType, Transformer},
     config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext},
     http::{Auth, HttpClient, MaybeAuth},
     sinks::{
         util::{
-            BatchConfig, Compression, RealtimeSizeBasedDefaultBatchSettings, ServiceBuilderExt,
-            TowerRequestConfig, UriSerde,
+            buffer::compression::CompressionLevel, BatchConfig, Compression,
+            RealtimeSizeBasedDefaultBatchSettings, ServiceBuilderExt, TowerRequestConfig, UriSerde,
         },
         Healthcheck, VectorSink,
     },
@@ -43,10 +46,6 @@ pub struct DatabendConfig {
     #[configurable(metadata(docs::examples = "mydatabase"))]
     #[serde(default = "DatabendConfig::default_database")]
     pub database: String,
-
-    #[configurable(derived)]
-    #[serde(default = "Compression::gzip_default")]
-    pub compression: Compression,
 
     #[configurable(derived)]
     #[serde(
@@ -82,7 +81,6 @@ impl GenerateConfig for DatabendConfig {
     fn generate_config() -> toml::Value {
         toml::from_str(
             r#"endpoint = "http://localhost:8000"
-            encoding.codec = "json"
             table = "default"
             database = "default"
         "#,
@@ -125,27 +123,13 @@ impl SinkConfig for DatabendConfig {
 
         let encoding_config = EncodingConfigWithFraming::new(
             Some(FramingConfig::NewlineDelimited),
-            SerializerConfig::Json(JsonSerializerConfig),
-            self.encoding,
+            SerializerConfig::Json(JsonSerializerConfig::default()),
+            self.encoding.clone(),
         );
         let (framer, serializer) = encoding_config.build(SinkType::StreamBased)?;
         let mut file_format_options = BTreeMap::new();
-        match serializer {
-            Serializer::Json(_) => {
-                file_format_options.insert("type".to_string(), "NDJSON".to_string());
-            }
-            _ => return Err(format!("Unsupported encoding: {:?}", &serializer).into()),
-        }
-        match config.compression {
-            Compression::Gzip(_) => {
-                file_format_options.insert("compression".to_string(), "gzip".to_string());
-            }
-            _ => {
-                return Err(
-                    format!("Unsupported compression format: {:?}", &config.compression).into(),
-                )
-            }
-        }
+        file_format_options.insert("type".to_string(), "NDJSON".to_string());
+        file_format_options.insert("compression".to_string(), "gzip".to_string());
 
         let mut copy_options = BTreeMap::new();
         copy_options.insert("purge".to_string(), "true".to_string());
@@ -156,10 +140,12 @@ impl SinkConfig for DatabendConfig {
             .settings(request_settings, DatabendRetryLogic)
             .service(service);
 
-        let transformer = self.encoding.transformer();
+        let transformer = self.encoding.clone();
         let encoder = Encoder::<Framer>::new(framer, serializer);
-        let request_builder =
-            DatabendRequestBuilder::new(config.compression, (transformer, encoder));
+        let request_builder = DatabendRequestBuilder::new(
+            Compression::Gzip(CompressionLevel::default()),
+            (transformer, encoder),
+        );
 
         let sink = DatabendSink::new(batch_settings, request_builder, service);
 
@@ -197,22 +183,11 @@ mod tests {
             endpoint = "http://localhost:8000"
             table = "mytable"
             database = "mydatabase"
-            encoding.codec = "json"
         "#,
         )
         .unwrap();
         assert_eq!(cfg.endpoint.uri, "http://localhost:8000");
         assert_eq!(cfg.table, "mytable");
         assert_eq!(cfg.database, "mydatabase");
-
-        let (framer, serializer) = cfg.encoding.build(SinkType::StreamBased).unwrap();
-        match framer {
-            Framer::NewlineDelimited(_) => (),
-            _ => panic!("Unexpected framer"),
-        }
-        match serializer {
-            Serializer::Json(_) => (),
-            _ => panic!("Unexpected serializer"),
-        }
     }
 }

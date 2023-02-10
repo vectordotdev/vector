@@ -61,7 +61,6 @@ async fn insert_events() {
         r#"
             endpoint = "{}"
             table = "{}"
-            encoding.codec = "json"
             auth.strategy = "basic"
             auth.user = "{}"
             auth.password = "{}"
