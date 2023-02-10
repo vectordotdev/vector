@@ -123,7 +123,12 @@ impl SinkConfig for DatabendConfig {
         let table = config.table;
         let client = DatabendAPIClient::new(self.build_client(&cx)?, endpoint, auth);
 
-        let (framer, serializer) = self.encoding.build(SinkType::StreamBased)?;
+        let encoding_config = EncodingConfigWithFraming::new(
+            Some(FramingConfig::NewlineDelimited),
+            SerializerConfig::Json(JsonSerializerConfig),
+            self.encoding,
+        );
+        let (framer, serializer) = encoding_config.build(SinkType::StreamBased)?;
         let mut file_format_options = BTreeMap::new();
         match serializer {
             Serializer::Json(_) => {
