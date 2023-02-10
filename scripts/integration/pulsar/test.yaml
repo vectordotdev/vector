@@ -1,0 +1,11 @@
+args:
+- --features
+- pulsar-integration-tests
+- --lib
+- '::pulsar::'
+
+env:
+  PULSAR_ADDRESS: pulsar://pulsar:6650
+
+matrix:
+  version: [latest]

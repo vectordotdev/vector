@@ -50,6 +50,17 @@ pub struct AzureBlobSinkConfig {
     /// [az_cli_docs]: https://docs.microsoft.com/en-us/cli/azure/account?view=azure-cli-latest#az-account-get-access-token
     pub storage_account: Option<String>,
 
+    /// The Azure Blob Storage Endpoint URL.
+    ///
+    /// This is used to override the default blob storage endpoint URL in cases where you are using
+    /// credentials read from the environment/managed identities or access tokens without using an
+    /// explicit connection_string (which already explicitly supports overriding the blob endpoint
+    /// URL).
+    ///
+    /// This may only be used with `storage_account` and will be ignored when used with
+    /// `connection_string`.
+    pub endpoint: Option<String>,
+
     /// The Azure Blob Storage Account container name.
     pub(super) container_name: String,
 
@@ -57,7 +68,7 @@ pub struct AzureBlobSinkConfig {
     ///
     /// Prefixes are useful for partitioning objects, such as by creating an blob key that
     /// stores blobs under a particular "directory". If using a prefix for this purpose, it must end
-    /// in `/` in order to act as a directory path: Vector will **not** add a trailing `/` automatically.
+    /// in `/` to act as a directory path. A trailing `/` is **not** automatically added.
     pub blob_prefix: Option<String>,
 
     /// The timestamp format for the time component of the blob key.
@@ -119,10 +130,11 @@ impl GenerateConfig for AzureBlobSinkConfig {
             connection_string: Some(String::from("DefaultEndpointsProtocol=https;AccountName=some-account-name;AccountKey=some-account-key;").into()),
             storage_account: Some(String::from("some-account-name")),
             container_name: String::from("logs"),
+            endpoint: None,
             blob_prefix: Some(String::from("blob")),
             blob_time_format: Some(String::from("%s")),
             blob_append_uuid: Some(true),
-            encoding: (Some(NewlineDelimitedEncoderConfig::new()), JsonSerializerConfig::new()).into(),
+            encoding: (Some(NewlineDelimitedEncoderConfig::new()), JsonSerializerConfig::default()).into(),
             compression: Compression::gzip_default(),
             batch: BatchConfig::default(),
             request: TowerRequestConfig::default(),
@@ -141,6 +153,7 @@ impl SinkConfig for AzureBlobSinkConfig {
                 .map(|v| v.inner().to_string()),
             self.storage_account.as_ref().map(|v| v.to_string()),
             self.container_name.clone(),
+            self.endpoint.clone(),
         )?;
 
         let healthcheck = azure_common::config::build_healthcheck(
@@ -160,16 +173,15 @@ impl SinkConfig for AzureBlobSinkConfig {
     }
 }
 
-const DEFAULT_REQUEST_LIMITS: TowerRequestConfig =
-    TowerRequestConfig::const_default().rate_limit_num(250);
-
 const DEFAULT_KEY_PREFIX: &str = "blob/%F/";
 const DEFAULT_FILENAME_TIME_FORMAT: &str = "%s";
 const DEFAULT_FILENAME_APPEND_UUID: bool = true;
 
 impl AzureBlobSinkConfig {
     pub fn build_processor(&self, client: Arc<ContainerClient>) -> crate::Result<VectorSink> {
-        let request_limits = self.request.unwrap_with(&DEFAULT_REQUEST_LIMITS);
+        let request_limits = self
+            .request
+            .unwrap_with(&TowerRequestConfig::default().rate_limit_num(250));
         let service = ServiceBuilder::new()
             .settings(request_limits, AzureBlobRetryLogic)
             .service(AzureBlobService::new(client));

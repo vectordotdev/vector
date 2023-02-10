@@ -21,7 +21,7 @@ use crate::{
     tls::TlsConfig,
 };
 
-const HOST: &str = "https://cloud.humio.com";
+pub(super) const HOST: &str = "https://cloud.humio.com";
 
 /// Configuration for the `humio_logs` sink.
 #[configurable_component(sink("humio_logs"))]
@@ -29,11 +29,25 @@ const HOST: &str = "https://cloud.humio.com";
 #[serde(deny_unknown_fields)]
 pub struct HumioLogsConfig {
     /// The Humio ingestion token.
+    #[configurable(metadata(
+        docs::examples = "${HUMIO_TOKEN}",
+        docs::examples = "A94A8FE5CCB19BA61C4C08"
+    ))]
     pub(super) token: SensitiveString,
 
     /// The base URL of the Humio instance.
+    ///
+    /// The scheme (`http` or `https`) must be specified. No path should be included since the paths defined
+    /// by the [`Splunk`][splunk] api are used.
+    ///
+    /// [splunk]: https://docs.splunk.com/Documentation/Splunk/8.0.0/Data/HECRESTendpoints
     #[serde(alias = "host")]
-    pub(super) endpoint: Option<String>,
+    #[serde(default = "default_endpoint")]
+    #[configurable(metadata(
+        docs::examples = "http://127.0.0.1",
+        docs::examples = "https://example.com",
+    ))]
+    pub(super) endpoint: String,
 
     /// The source of events sent to this sink.
     ///
@@ -46,6 +60,11 @@ pub struct HumioLogsConfig {
     /// The type of events sent to this sink. Humio uses this as the name of the parser to use to ingest the data.
     ///
     /// If unset, Humio will default it to none.
+    #[configurable(metadata(
+        docs::examples = "json",
+        docs::examples = "none",
+        docs::examples = "{{ event_type }}"
+    ))]
     pub(super) event_type: Option<Template>,
 
     /// Overrides the name of the log field used to grab the hostname to send to Humio.
@@ -76,6 +95,7 @@ pub struct HumioLogsConfig {
     ///
     /// [humio_data_format]: https://docs.humio.com/integrations/data-shippers/hec/#format-of-data
     #[serde(default)]
+    #[configurable(metadata(docs::examples = "{{ host }}", docs::examples = "custom_index"))]
     pub(super) index: Option<Template>,
 
     #[configurable(derived)]
@@ -94,8 +114,6 @@ pub struct HumioLogsConfig {
     pub(super) tls: Option<TlsConfig>,
 
     /// Overrides the name of the log field used to grab the nanosecond-enabled timestamp to send to Humio.
-    ///
-    /// By default, `@timestamp.nanos` is used.
     #[serde(default = "timestamp_nanos_key")]
     pub(super) timestamp_nanos_key: Option<String>,
 
@@ -116,6 +134,10 @@ pub struct HumioLogsConfig {
     pub(super) timestamp_key: String,
 }
 
+fn default_endpoint() -> String {
+    HOST.to_string()
+}
+
 pub fn timestamp_nanos_key() -> Option<String> {
     Some("@timestamp.nanos".to_string())
 }
@@ -124,9 +146,9 @@ impl GenerateConfig for HumioLogsConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
             token: "${HUMIO_TOKEN}".to_owned().into(),
-            endpoint: None,
+            endpoint: default_endpoint(),
             source: None,
-            encoding: JsonSerializerConfig::new().into(),
+            encoding: JsonSerializerConfig::default().into(),
             event_type: None,
             indexed_fields: vec![],
             index: None,
@@ -160,11 +182,9 @@ impl SinkConfig for HumioLogsConfig {
 
 impl HumioLogsConfig {
     fn build_hec_config(&self) -> HecLogsSinkConfig {
-        let endpoint = self.endpoint.clone().unwrap_or_else(|| HOST.to_string());
-
         HecLogsSinkConfig {
             default_token: self.token.clone(),
-            endpoint,
+            endpoint: self.endpoint.clone(),
             host_key: self.host_key.clone(),
             indexed_fields: self.indexed_fields.clone(),
             index: self.index.clone(),
@@ -354,9 +374,9 @@ mod integration_tests {
 
         HumioLogsConfig {
             token: token.to_string().into(),
-            endpoint: Some(humio_address()),
+            endpoint: humio_address(),
             source: None,
-            encoding: JsonSerializerConfig::new().into(),
+            encoding: JsonSerializerConfig::default().into(),
             event_type: None,
             host_key: log_schema().host_key().to_string(),
             indexed_fields: vec![],

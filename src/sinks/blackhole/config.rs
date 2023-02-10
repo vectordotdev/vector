@@ -1,4 +1,7 @@
+use std::time::Duration;
+
 use futures::{future, FutureExt};
+use serde_with::serde_as;
 use vector_config::configurable_component;
 
 use crate::{
@@ -6,26 +9,30 @@ use crate::{
     sinks::{blackhole::sink::BlackholeSink, Healthcheck, VectorSink},
 };
 
-const fn default_print_interval_secs() -> u64 {
-    1
+const fn default_print_interval_secs() -> Duration {
+    Duration::from_secs(1)
 }
 
 /// Configuration for the `blackhole` sink.
+#[serde_as]
 #[configurable_component(sink("blackhole"))]
 #[derive(Clone, Debug, Derivative)]
 #[serde(deny_unknown_fields, default)]
 #[derivative(Default)]
 pub struct BlackholeConfig {
-    /// The number of seconds between reporting a summary of activity.
+    /// The interval between reporting a summary of activity.
     ///
     /// Set to `0` to disable reporting.
-    #[derivative(Default(value = "1"))]
+    #[derivative(Default(value = "default_print_interval_secs()"))]
     #[serde(default = "default_print_interval_secs")]
-    pub print_interval_secs: u64,
+    #[serde_as(as = "serde_with::DurationSeconds<u64>")]
+    #[configurable(metadata(docs::examples = 10))]
+    pub print_interval_secs: Duration,
 
     /// The number of events, per second, that the sink is allowed to consume.
     ///
     /// By default, there is no limit.
+    #[configurable(metadata(docs::examples = 1000))]
     pub rate: Option<usize>,
 
     #[configurable(derived)]
@@ -57,7 +64,7 @@ impl SinkConfig for BlackholeConfig {
 
 impl GenerateConfig for BlackholeConfig {
     fn generate_config() -> toml::Value {
-        toml::Value::try_from(&Self::default()).unwrap()
+        toml::Value::try_from(Self::default()).unwrap()
     }
 }
 

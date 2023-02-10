@@ -1,0 +1,11 @@
+args:
+- --features
+- docker-logs-integration-tests
+- --lib
+- "::docker_logs::"
+
+runner:
+  needs_docker_socket: true
+
+matrix:
+  default: ["default"]

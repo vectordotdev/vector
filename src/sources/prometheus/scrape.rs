@@ -1,9 +1,10 @@
 use std::collections::HashMap;
+use std::time::Duration;
 
 use bytes::Bytes;
 use futures_util::FutureExt;
 use http::{response::Parts, Uri};
-
+use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
 use vector_config::configurable_component;
 use vector_core::{config::LogNamespace, event::Event};
@@ -17,8 +18,8 @@ use crate::{
     sources::{
         self,
         util::http_client::{
-            build_url, call, default_scrape_interval_secs, GenericHttpClientInputs,
-            HttpClientBuilder, HttpClientContext,
+            build_url, call, default_interval, GenericHttpClientInputs, HttpClientBuilder,
+            HttpClientContext,
         },
     },
     tls::{TlsConfig, TlsSettings},
@@ -40,35 +41,35 @@ enum ConfigError {
 }
 
 /// Configuration for the `prometheus_scrape` source.
+#[serde_as]
 #[configurable_component(source("prometheus_scrape"))]
 #[derive(Clone, Debug)]
 pub struct PrometheusScrapeConfig {
     /// Endpoints to scrape metrics from.
+    #[configurable(metadata(docs::examples = "http://localhost:9090/metrics"))]
     #[serde(alias = "hosts")]
     endpoints: Vec<String>,
 
     /// The interval between scrapes, in seconds.
-    #[serde(default = "default_scrape_interval_secs")]
-    scrape_interval_secs: u64,
+    #[serde(default = "default_interval")]
+    #[serde_as(as = "serde_with::DurationSeconds<u64>")]
+    #[serde(rename = "scrape_interval_secs")]
+    interval: Duration,
 
-    /// Overrides the name of the tag used to add the instance to each metric.
+    /// The tag name added to each event representing the scraped instance's host:port.
     ///
     /// The tag value will be the host/port of the scraped instance.
-    ///
-    /// By default, `"instance"` is used.
     instance_tag: Option<String>,
 
-    /// Overrides the name of the tag used to add the endpoint to each metric.
+    /// The tag name added to each event representing the scraped instance's endpoint.
     ///
     /// The tag value will be the endpoint of the scraped instance.
-    ///
-    /// By default, `"endpoint"` is used.
     endpoint_tag: Option<String>,
 
-    /// Controls how tag conflicts are handled if the scraped source has tags that Vector would add.
+    /// Controls how tag conflicts are handled if the scraped source has tags to be added.
     ///
-    /// If `true`, Vector will not add the new tag if the scraped metric has the tag already. If `false`, Vector will
-    /// rename the conflicting tag by prepending `exported_` to the name.
+    /// If `true`, the new tag is not added if the scraped metric has the tag already. If `false`, the conflicting tag
+    /// is renamed by prepending `exported_` to the original name.
     ///
     /// This matches Prometheus’ `honor_labels` configuration.
     #[serde(default = "crate::serde::default_false")]
@@ -80,6 +81,8 @@ pub struct PrometheusScrapeConfig {
     /// appended to any parameters manually provided in the `endpoints` option. This option is especially useful when
     /// scraping the `/federate` endpoint.
     #[serde(default)]
+    #[configurable(metadata(docs::additional_props_description = "A query string parameter."))]
+    #[configurable(metadata(docs::examples = "query_example()"))]
     query: HashMap<String, Vec<String>>,
 
     #[configurable(derived)]
@@ -89,11 +92,20 @@ pub struct PrometheusScrapeConfig {
     auth: Option<Auth>,
 }
 
+fn query_example() -> serde_json::Value {
+    serde_json::json! ({
+        "match[]": [
+            "{job=\"somejob\"}",
+            "{__name__=~\"job:.*\"}"
+        ]
+    })
+}
+
 impl GenerateConfig for PrometheusScrapeConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
             endpoints: vec!["http://localhost:9090/metrics".to_string()],
-            scrape_interval_secs: default_scrape_interval_secs(),
+            interval: default_interval(),
             instance_tag: Some("instance".to_string()),
             endpoint_tag: Some("endpoint".to_string()),
             honor_labels: false,
@@ -124,7 +136,7 @@ impl SourceConfig for PrometheusScrapeConfig {
 
         let inputs = GenericHttpClientInputs {
             urls,
-            interval_secs: self.scrape_interval_secs,
+            interval: self.interval,
             headers: HashMap::new(),
             content_type: "text/plain".to_string(),
             auth: self.auth.clone(),
@@ -328,7 +340,7 @@ mod test {
 
         let config = PrometheusScrapeConfig {
             endpoints: vec![format!("http://{}/metrics", in_addr)],
-            scrape_interval_secs: 1,
+            interval: Duration::from_secs(1),
             instance_tag: Some("instance".to_string()),
             endpoint_tag: Some("endpoint".to_string()),
             honor_labels: true,
@@ -361,7 +373,7 @@ mod test {
 
         let config = PrometheusScrapeConfig {
             endpoints: vec![format!("http://{}/metrics", in_addr)],
-            scrape_interval_secs: 1,
+            interval: Duration::from_secs(1),
             instance_tag: Some("instance".to_string()),
             endpoint_tag: Some("endpoint".to_string()),
             honor_labels: true,
@@ -412,7 +424,7 @@ mod test {
 
         let config = PrometheusScrapeConfig {
             endpoints: vec![format!("http://{}/metrics", in_addr)],
-            scrape_interval_secs: 1,
+            interval: Duration::from_secs(1),
             instance_tag: Some("instance".to_string()),
             endpoint_tag: Some("endpoint".to_string()),
             honor_labels: false,
@@ -458,6 +470,62 @@ mod test {
         }
     }
 
+    /// According to the [spec](https://github.com/OpenObservability/OpenMetrics/blob/main/specification/OpenMetrics.md?plain=1#L115)
+    /// > Label names MUST be unique within a LabelSet.
+    /// Prometheus itself will reject the metric with an error. Largely to remain backward compatible with older versions of Vector,
+    /// we accept the metric, but take the last label in the list.
+    #[tokio::test]
+    async fn test_prometheus_duplicate_tags() {
+        let in_addr = next_addr();
+
+        let dummy_endpoint = warp::path!("metrics").map(|| {
+            r#"
+                    metric_label{code="200",code="success"} 100 1612411516789
+            "#
+        });
+
+        tokio::spawn(warp::serve(dummy_endpoint).run(in_addr));
+        wait_for_tcp(in_addr).await;
+
+        let config = PrometheusScrapeConfig {
+            endpoints: vec![format!("http://{}/metrics", in_addr)],
+            interval: Duration::from_secs(1),
+            instance_tag: Some("instance".to_string()),
+            endpoint_tag: Some("endpoint".to_string()),
+            honor_labels: true,
+            query: HashMap::new(),
+            auth: None,
+            tls: None,
+        };
+
+        let events = run_and_assert_source_compliance(
+            config,
+            Duration::from_secs(3),
+            &HTTP_PULL_SOURCE_TAGS,
+        )
+        .await;
+        assert!(!events.is_empty());
+
+        let metrics: Vec<vector_core::event::Metric> = events
+            .into_iter()
+            .map(|event| event.into_metric())
+            .collect();
+        let metric = &metrics[0];
+
+        assert_eq!(metric.name(), "metric_label");
+
+        let code_tag = metric
+            .tags()
+            .unwrap()
+            .iter_all()
+            .filter(|(name, _value)| *name == "code")
+            .map(|(_name, value)| value)
+            .collect::<Vec<_>>();
+
+        assert_eq!(1, code_tag.len());
+        assert_eq!("success", code_tag[0].unwrap());
+    }
+
     #[tokio::test]
     async fn test_prometheus_request_query() {
         let in_addr = next_addr();
@@ -476,7 +544,7 @@ mod test {
 
         let config = PrometheusScrapeConfig {
             endpoints: vec![format!("http://{}/metrics?key1=val1", in_addr)],
-            scrape_interval_secs: 1,
+            interval: Duration::from_secs(1),
             instance_tag: Some("instance".to_string()),
             endpoint_tag: Some("endpoint".to_string()),
             honor_labels: false,
@@ -589,7 +657,7 @@ mod test {
                 endpoint_tag: None,
                 honor_labels: false,
                 query: HashMap::new(),
-                scrape_interval_secs: 1,
+                interval: Duration::from_secs(1),
                 tls: None,
                 auth: None,
             },
@@ -673,8 +741,8 @@ mod integration_tests {
     #[tokio::test]
     async fn scrapes_metrics() {
         let config = PrometheusScrapeConfig {
-            endpoints: vec!["http://localhost:9090/metrics".into()],
-            scrape_interval_secs: 1,
+            endpoints: vec!["http://prometheus:9090/metrics".into()],
+            interval: Duration::from_secs(1),
             instance_tag: Some("instance".to_string()),
             endpoint_tag: Some("endpoint".to_string()),
             honor_labels: false,
@@ -711,11 +779,11 @@ mod integration_tests {
         assert!(build.tags().unwrap().contains_key("version"));
         assert_eq!(
             build.tag_value("instance"),
-            Some("localhost:9090".to_string())
+            Some("prometheus:9090".to_string())
         );
         assert_eq!(
             build.tag_value("endpoint"),
-            Some("http://localhost:9090/metrics".to_string())
+            Some("http://prometheus:9090/metrics".to_string())
         );
 
         let queries = find_metric("prometheus_engine_queries");
@@ -723,11 +791,11 @@ mod integration_tests {
         assert!(matches!(queries.value(), &MetricValue::Gauge { .. }));
         assert_eq!(
             queries.tag_value("instance"),
-            Some("localhost:9090".to_string())
+            Some("prometheus:9090".to_string())
         );
         assert_eq!(
             queries.tag_value("endpoint"),
-            Some("http://localhost:9090/metrics".to_string())
+            Some("http://prometheus:9090/metrics".to_string())
         );
 
         let go_info = find_metric("go_info");
@@ -736,11 +804,11 @@ mod integration_tests {
         assert!(go_info.tags().unwrap().contains_key("version"));
         assert_eq!(
             go_info.tag_value("instance"),
-            Some("localhost:9090".to_string())
+            Some("prometheus:9090".to_string())
         );
         assert_eq!(
             go_info.tag_value("endpoint"),
-            Some("http://localhost:9090/metrics".to_string())
+            Some("http://prometheus:9090/metrics".to_string())
         );
     }
 }

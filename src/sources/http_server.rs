@@ -7,8 +7,9 @@ use codecs::{
     BytesDecoderConfig, BytesDeserializerConfig, JsonDeserializerConfig,
     NewlineDelimitedDecoderConfig,
 };
-use http::StatusCode;
-use lookup::{lookup_v2::parse_value_path, owned_value_path, path};
+
+use http::{StatusCode, Uri};
+use lookup::{lookup_v2::OptionalValuePath, owned_value_path, path};
 use tokio_util::codec::Decoder as _;
 use value::{kind::Collection, Kind};
 use vector_config::{configurable_component, NamedComponent};
@@ -20,10 +21,12 @@ use warp::http::{HeaderMap, HeaderValue};
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
+    components::validation::*,
     config::{
         GenerateConfig, Output, Resource, SourceAcknowledgementsConfig, SourceConfig, SourceContext,
     },
     event::{Event, Value},
+    register_validatable_component,
     serde::{bool_or_struct, default_decoding},
     sources::util::{
         http::{add_query_parameters, HttpMethod},
@@ -36,7 +39,7 @@ use crate::{
 #[configurable_component(source("http"))]
 #[configurable(metadata(deprecated))]
 #[derive(Clone, Debug)]
-pub struct HttpConfig(#[configurable(derived)] SimpleHttpConfig);
+pub struct HttpConfig(SimpleHttpConfig);
 
 impl GenerateConfig for HttpConfig {
     fn generate_config() -> toml::Value {
@@ -67,7 +70,11 @@ impl SourceConfig for HttpConfig {
 #[configurable_component(source("http_server"))]
 #[derive(Clone, Debug)]
 pub struct SimpleHttpConfig {
-    /// The address to listen for connections on.
+    /// The socket address to listen for connections on.
+    ///
+    /// It _must_ include a port.
+    #[configurable(metadata(docs::examples = "0.0.0.0:80"))]
+    #[configurable(metadata(docs::examples = "localhost:80"))]
     address: SocketAddr,
 
     /// The expected encoding of received data.
@@ -80,12 +87,16 @@ pub struct SimpleHttpConfig {
     ///
     /// These will override any values included in the JSON payload with conflicting names.
     #[serde(default)]
+    #[configurable(metadata(docs::examples = "User-Agent"))]
+    #[configurable(metadata(docs::examples = "X-My-Custom-Header"))]
     headers: Vec<String>,
 
     /// A list of URL query parameters to include in the log event.
     ///
     /// These will override any values included in the body with conflicting names.
     #[serde(default)]
+    #[configurable(metadata(docs::examples = "application"))]
+    #[configurable(metadata(docs::examples = "source"))]
     query_parameters: Vec<String>,
 
     #[configurable(derived)]
@@ -103,11 +114,14 @@ pub struct SimpleHttpConfig {
 
     /// The URL path on which log event POST requests shall be sent.
     #[serde(default = "default_path")]
+    #[configurable(metadata(docs::examples = "/event/path"))]
+    #[configurable(metadata(docs::examples = "/logs"))]
     path: String,
 
     /// The event key in which the requested URL path used to send the request will be stored.
     #[serde(default = "default_path_key")]
-    path_key: String,
+    #[configurable(metadata(docs::examples = "vector_http_path"))]
+    path_key: OptionalValuePath,
 
     /// Specifies the action of the HTTP request.
     #[serde(default = "default_http_method")]
@@ -142,9 +156,7 @@ impl SimpleHttpConfig {
             .schema_definition(log_namespace)
             .with_source_metadata(
                 SimpleHttpConfig::NAME,
-                parse_value_path(&self.path_key)
-                    .ok()
-                    .map(LegacyKey::InsertIfEmpty),
+                self.path_key.path.clone().map(LegacyKey::InsertIfEmpty),
                 &owned_value_path!("path"),
                 Kind::bytes(),
                 None,
@@ -174,71 +186,8 @@ impl SimpleHttpConfig {
 
         schema_definition
     }
-}
 
-impl Default for SimpleHttpConfig {
-    fn default() -> Self {
-        Self {
-            address: "0.0.0.0:8080".parse().unwrap(),
-            encoding: None,
-            headers: Vec::new(),
-            query_parameters: Vec::new(),
-            tls: None,
-            auth: None,
-            path: default_path(),
-            path_key: default_path_key(),
-            method: default_http_method(),
-            strict_path: true,
-            framing: None,
-            decoding: Some(default_decoding()),
-            acknowledgements: SourceAcknowledgementsConfig::default(),
-            log_namespace: None,
-        }
-    }
-}
-
-impl GenerateConfig for SimpleHttpConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(SimpleHttpConfig::default()).unwrap()
-    }
-}
-
-const fn default_http_method() -> HttpMethod {
-    HttpMethod::Post
-}
-
-fn default_path() -> String {
-    "/".to_string()
-}
-
-fn default_path_key() -> String {
-    "path".to_string()
-}
-
-/// Removes duplicates from the list, and logs a `warn!()` for each duplicate removed.
-fn remove_duplicates(mut list: Vec<String>, list_name: &str) -> Vec<String> {
-    list.sort();
-
-    let mut dedup = false;
-    for (idx, name) in list.iter().enumerate() {
-        if idx < list.len() - 1 && list[idx] == list[idx + 1] {
-            warn!(
-                "`{}` configuration contains duplicate entry for `{}`. Removing duplicate.",
-                list_name, name
-            );
-            dedup = true;
-        }
-    }
-
-    if dedup {
-        list.dedup();
-    }
-    list
-}
-
-#[async_trait::async_trait]
-impl SourceConfig for SimpleHttpConfig {
-    async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
+    fn get_decoding_config(&self) -> crate::Result<DecodingConfig> {
         if self.encoding.is_some() && (self.framing.is_some() || self.decoding.is_some()) {
             return Err("Using `encoding` is deprecated and does not have any effect when `decoding` or `framing` is provided. Configure `framing` and `decoding` instead.".into());
         }
@@ -271,7 +220,98 @@ impl SourceConfig for SimpleHttpConfig {
             (framing, decoding)
         };
 
-        let decoder = DecodingConfig::new(framing, decoding, LogNamespace::Legacy).build();
+        Ok(DecodingConfig::new(
+            framing,
+            decoding,
+            self.log_namespace.unwrap_or(false).into(),
+        ))
+    }
+}
+
+impl Default for SimpleHttpConfig {
+    fn default() -> Self {
+        Self {
+            address: "0.0.0.0:8080".parse().unwrap(),
+            encoding: None,
+            headers: Vec::new(),
+            query_parameters: Vec::new(),
+            tls: None,
+            auth: None,
+            path: default_path(),
+            path_key: default_path_key(),
+            method: default_http_method(),
+            strict_path: true,
+            framing: None,
+            decoding: Some(default_decoding()),
+            acknowledgements: SourceAcknowledgementsConfig::default(),
+            log_namespace: None,
+        }
+    }
+}
+
+impl_generate_config_from_default!(SimpleHttpConfig);
+
+impl ValidatableComponent for SimpleHttpConfig {
+    fn validation_configuration() -> ValidationConfiguration {
+        let config = Self {
+            decoding: Some(DeserializerConfig::Json),
+            ..Default::default()
+        };
+
+        let listen_addr_http = format!("http://{}/", config.address);
+        let uri = Uri::try_from(&listen_addr_http).expect("should not fail to parse URI");
+
+        let external_resource = ExternalResource::new(
+            ResourceDirection::Push,
+            HttpResourceConfig::from_parts(uri, Some(config.method.into())),
+            config
+                .get_decoding_config()
+                .expect("should not fail to get decoding config"),
+        );
+
+        ValidationConfiguration::from_source(Self::NAME, config, Some(external_resource))
+    }
+}
+
+register_validatable_component!(SimpleHttpConfig);
+
+const fn default_http_method() -> HttpMethod {
+    HttpMethod::Post
+}
+
+fn default_path() -> String {
+    "/".to_string()
+}
+
+fn default_path_key() -> OptionalValuePath {
+    OptionalValuePath::from(owned_value_path!("path"))
+}
+
+/// Removes duplicates from the list, and logs a `warn!()` for each duplicate removed.
+fn remove_duplicates(mut list: Vec<String>, list_name: &str) -> Vec<String> {
+    list.sort();
+
+    let mut dedup = false;
+    for (idx, name) in list.iter().enumerate() {
+        if idx < list.len() - 1 && list[idx] == list[idx + 1] {
+            warn!(
+                "`{}` configuration contains duplicate entry for `{}`. Removing duplicate.",
+                list_name, name
+            );
+            dedup = true;
+        }
+    }
+
+    if dedup {
+        list.dedup();
+    }
+    list
+}
+
+#[async_trait::async_trait]
+impl SourceConfig for SimpleHttpConfig {
+    async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
+        let decoder = self.get_decoding_config()?.build();
         let log_namespace = cx.log_namespace(self.log_namespace);
 
         let source = SimpleHttpSource {
@@ -322,7 +362,7 @@ impl SourceConfig for SimpleHttpConfig {
 struct SimpleHttpSource {
     headers: Vec<String>,
     query_parameters: Vec<String>,
-    path_key: String,
+    path_key: OptionalValuePath,
     decoder: Decoder,
     log_namespace: LogNamespace,
 }
@@ -343,7 +383,7 @@ impl SimpleHttpSource {
             self.log_namespace.insert_source_metadata(
                 SimpleHttpConfig::NAME,
                 log,
-                Some(LegacyKey::InsertIfEmpty(path!(self.path_key.as_str()))),
+                self.path_key.path.as_ref().map(LegacyKey::InsertIfEmpty),
                 path!("path"),
                 request_path.to_owned(),
             );
@@ -441,6 +481,7 @@ mod tests {
     };
     use futures::Stream;
     use http::{HeaderMap, Method};
+    use lookup::lookup_v2::OptionalValuePath;
     use similar_asserts::assert_eq;
 
     use super::{remove_duplicates, SimpleHttpConfig};
@@ -476,7 +517,7 @@ mod tests {
         let (sender, recv) = SourceSender::new_test_finalize(status);
         let address = next_addr();
         let path = path.to_owned();
-        let path_key = path_key.to_owned();
+        let path_key = OptionalValuePath::from(owned_value_path!(path_key));
         let context = SourceContext::new_test(sender, None);
         let method = match Method::from_str(method).unwrap() {
             Method::GET => HttpMethod::Get,

@@ -65,12 +65,16 @@ pub struct KafkaSaslConfig {
     pub(crate) enabled: Option<bool>,
 
     /// The SASL username.
+    #[configurable(metadata(docs::examples = "username"))]
     pub(crate) username: Option<String>,
 
     /// The SASL password.
+    #[configurable(metadata(docs::examples = "password"))]
     pub(crate) password: Option<SensitiveString>,
 
     /// The SASL mechanism to use.
+    #[configurable(metadata(docs::examples = "SCRAM-SHA-256"))]
+    #[configurable(metadata(docs::examples = "SCRAM-SHA-512"))]
     pub(crate) mechanism: Option<String>,
 }
 

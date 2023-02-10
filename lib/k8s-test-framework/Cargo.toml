@@ -11,5 +11,5 @@ license = "MPL-2.0"
 k8s-openapi = { version = "0.16.0", default-features = false, features = ["v1_19"] }
 serde_json = "1"
 tempfile = "3"
-tokio = { version = "1.23.0", features = ["full"] }
+tokio = { version = "1.25.0", features = ["full"] }
 log = "0.4"

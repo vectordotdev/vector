@@ -8,6 +8,7 @@ use std::{
 };
 
 use async_trait::async_trait;
+use base64::prelude::{Engine as _, BASE64_STANDARD};
 use futures::{future, stream::BoxStream, FutureExt, StreamExt};
 use hyper::{
     header::HeaderValue,
@@ -79,6 +80,7 @@ pub struct PrometheusExporterConfig {
     ///
     /// The metrics are exposed at the typical Prometheus exporter path, `/metrics`.
     #[serde(default = "default_address")]
+    #[configurable(metadata(docs::examples = "192.160.0.10:9598"))]
     pub address: SocketAddr,
 
     #[configurable(derived)]
@@ -101,8 +103,8 @@ pub struct PrometheusExporterConfig {
 
     /// Whether or not to render [distributions][dist_metric_docs] as an [aggregated histogram][prom_agg_hist_docs] or  [aggregated summary][prom_agg_summ_docs].
     ///
-    /// While Vector supports distributions as a lossless way to represent a set of samples for a
-    /// metric, Prometheus clients (the application being scraped, which is this sink) must
+    /// While distributions as a lossless way to represent a set of samples for a
+    /// metric is supported, Prometheus clients (the application being scraped, which is this sink) must
     /// aggregate locally into either an aggregated histogram or aggregated summary.
     ///
     /// [dist_metric_docs]: https://vector.dev/docs/about/under-the-hood/architecture/data-model/metric/#distribution
@@ -175,7 +177,7 @@ const fn default_suppress_timestamp() -> bool {
 
 impl GenerateConfig for PrometheusExporterConfig {
     fn generate_config() -> toml::Value {
-        toml::Value::try_from(&Self::default()).unwrap()
+        toml::Value::try_from(Self::default()).unwrap()
     }
 }
 
@@ -349,7 +351,7 @@ fn authorized(req: &Request<Body>, auth: &Option<Auth>) -> bool {
                 Auth::Basic { user, password } => HeaderValue::from_str(
                     format!(
                         "Basic {}",
-                        base64::encode(format!("{}:{}", user, password.inner()))
+                        BASE64_STANDARD.encode(format!("{}:{}", user, password.inner()))
                     )
                     .as_str(),
                 ),
@@ -452,9 +454,9 @@ impl PrometheusExporter {
         }
     }
 
-    async fn start_server_if_needed(&mut self) {
+    async fn start_server_if_needed(&mut self) -> crate::Result<()> {
         if self.server_shutdown_trigger.is_some() {
-            return;
+            return Ok(());
         }
 
         let handler = Handler {
@@ -494,14 +496,10 @@ impl PrometheusExporter {
         let tls = self.config.tls.clone();
         let address = self.config.address;
 
-        tokio::spawn(async move {
-            let tls = MaybeTlsSettings::from_config(&tls, true)
-                .map_err(|error| error!("Server TLS error: {}.", error))?;
-            let listener = tls
-                .bind(&address)
-                .await
-                .map_err(|error| error!("Server bind error: {}.", error))?;
+        let tls = MaybeTlsSettings::from_config(&tls, true)?;
+        let listener = tls.bind(&address).await?;
 
+        tokio::spawn(async move {
             info!(message = "Building HTTP server.", address = %address);
 
             Server::builder(hyper::server::accept::from_stream(listener.accept_stream()))
@@ -515,13 +513,16 @@ impl PrometheusExporter {
         });
 
         self.server_shutdown_trigger = Some(trigger);
+        Ok(())
     }
 }
 
 #[async_trait]
 impl StreamSink<Event> for PrometheusExporter {
     async fn run(mut self: Box<Self>, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
-        self.start_server_if_needed().await;
+        self.start_server_if_needed()
+            .await
+            .map_err(|error| error!("Failed to start Prometheus exporter: {}.", error))?;
 
         let mut last_flush = Instant::now();
         let flush_period = self.config.flush_period_secs;
@@ -602,7 +603,10 @@ mod tests {
         finalization::{BatchNotifier, BatchStatus},
         sensitive_string::SensitiveString,
     };
-    use vector_core::{event::StatisticKind, metric_tags, samples};
+    use vector_core::{
+        event::{MetricTags, StatisticKind},
+        metric_tags, samples,
+    };
 
     use super::*;
     use crate::{
@@ -828,6 +832,35 @@ mod tests {
         );
     }
 
+    /// According to the [spec](https://github.com/OpenObservability/OpenMetrics/blob/main/specification/OpenMetrics.md?plain=1#L115)
+    /// > Label names MUST be unique within a LabelSet.
+    /// Prometheus itself will reject the metric with an error. Largely to remain backward compatible with older versions of Vector,
+    /// we only publish the last tag in the list.
+    #[tokio::test]
+    async fn prometheus_duplicate_labels() {
+        let (name, event) = create_metric_with_tags(
+            None,
+            MetricValue::Gauge { value: 123.4 },
+            Some(metric_tags!("code" => "200", "code" => "success")),
+        );
+        let events = vec![event];
+
+        let response_result = export_and_fetch_with_auth(None, None, events, false).await;
+
+        assert!(response_result.is_ok());
+
+        let body = response_result.expect("Cannot extract body from the response");
+
+        assert!(body.contains(&format!(
+            indoc! {r#"
+               # HELP {name} {name}
+               # TYPE {name} gauge
+               {name}{{code="success"}} 123.4
+            "# },
+            name = name
+        )));
+    }
+
     async fn export_and_fetch(
         tls_config: Option<TlsEnableableConfig>,
         mut events: Vec<Event>,
@@ -1000,9 +1033,17 @@ mod tests {
     }
 
     pub(self) fn create_metric(name: Option<String>, value: MetricValue) -> (String, Event) {
+        create_metric_with_tags(name, value, Some(metric_tags!("some_tag" => "some_value")))
+    }
+
+    pub(self) fn create_metric_with_tags(
+        name: Option<String>,
+        value: MetricValue,
+        tags: Option<MetricTags>,
+    ) -> (String, Event) {
         let name = name.unwrap_or_else(|| format!("vector_set_{}", random_string(16)));
         let event = Metric::new(name.clone(), MetricKind::Incremental, value)
-            .with_tags(Some(metric_tags!("some_tag" => "some_value")))
+            .with_tags(tags)
             .into();
         (name, event)
     }
@@ -1179,7 +1220,7 @@ mod tests {
         // that we check the internal metric data, which, when in this mode, will actually be a
         // sketch (so that we can merge without loss of accuracy).
         //
-        // The render code is actually what will end up rrendering those sketches as aggregated
+        // The render code is actually what will end up rendering those sketches as aggregated
         // summaries in the scrape output.
         let config = PrometheusExporterConfig {
             address: next_addr(), // Not actually bound, just needed to fill config

@@ -125,7 +125,8 @@ mod tests {
     use std::collections::BTreeMap;
 
     use codecs::{
-        CharacterDelimitedEncoder, JsonSerializer, NewlineDelimitedEncoder, TextSerializer,
+        CharacterDelimitedEncoder, JsonSerializerConfig, NewlineDelimitedEncoder,
+        TextSerializerConfig,
     };
     use value::Value;
     use vector_core::event::LogEvent;
@@ -138,7 +139,7 @@ mod tests {
             Transformer::default(),
             crate::codecs::Encoder::<Framer>::new(
                 CharacterDelimitedEncoder::new(b',').into(),
-                JsonSerializer::new().into(),
+                JsonSerializerConfig::default().build().into(),
             ),
         );
 
@@ -155,7 +156,7 @@ mod tests {
             Transformer::default(),
             crate::codecs::Encoder::<Framer>::new(
                 CharacterDelimitedEncoder::new(b',').into(),
-                JsonSerializer::new().into(),
+                JsonSerializerConfig::default().build().into(),
             ),
         );
 
@@ -180,7 +181,7 @@ mod tests {
             Transformer::default(),
             crate::codecs::Encoder::<Framer>::new(
                 CharacterDelimitedEncoder::new(b',').into(),
-                JsonSerializer::new().into(),
+                JsonSerializerConfig::default().build().into(),
             ),
         );
 
@@ -218,7 +219,7 @@ mod tests {
             Transformer::default(),
             crate::codecs::Encoder::<Framer>::new(
                 NewlineDelimitedEncoder::new().into(),
-                JsonSerializer::new().into(),
+                JsonSerializerConfig::default().build().into(),
             ),
         );
 
@@ -235,7 +236,7 @@ mod tests {
             Transformer::default(),
             crate::codecs::Encoder::<Framer>::new(
                 NewlineDelimitedEncoder::new().into(),
-                JsonSerializer::new().into(),
+                JsonSerializerConfig::default().build().into(),
             ),
         );
 
@@ -260,7 +261,7 @@ mod tests {
             Transformer::default(),
             crate::codecs::Encoder::<Framer>::new(
                 NewlineDelimitedEncoder::new().into(),
-                JsonSerializer::new().into(),
+                JsonSerializerConfig::default().build().into(),
             ),
         );
 
@@ -296,7 +297,7 @@ mod tests {
     fn test_encode_event_json() {
         let encoding = (
             Transformer::default(),
-            crate::codecs::Encoder::<()>::new(JsonSerializer::new().into()),
+            crate::codecs::Encoder::<()>::new(JsonSerializerConfig::default().build().into()),
         );
 
         let mut writer = Vec::new();
@@ -318,7 +319,7 @@ mod tests {
     fn test_encode_event_text() {
         let encoding = (
             Transformer::default(),
-            crate::codecs::Encoder::<()>::new(TextSerializer::new().into()),
+            crate::codecs::Encoder::<()>::new(TextSerializerConfig::default().build().into()),
         );
 
         let mut writer = Vec::new();

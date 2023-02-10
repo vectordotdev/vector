@@ -1,7 +1,7 @@
 package metadata
 
 services: statsd_receiver: {
-	name:     "Statsd receiver"
+	name:     "StatsD receiver"
 	thing:    "a \(name)"
 	url:      urls.statsd
 	versions: null

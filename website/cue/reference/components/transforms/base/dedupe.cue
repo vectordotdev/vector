@@ -25,18 +25,12 @@ base: components: transforms: dedupe: configuration: {
 			ignore: {
 				description: "Matches events using all fields except for the ignored ones."
 				required:    true
-				type: array: items: type: string: {
-					examples: ["field1", "parent.child_field", "host", "hostname"]
-					syntax: "literal"
-				}
+				type: array: items: type: string: examples: ["field1", "parent.child_field", "host", "hostname"]
 			}
 			match: {
 				description: "Matches events using only the specified fields."
 				required:    true
-				type: array: items: type: string: {
-					examples: ["field1", "parent.child_field"]
-					syntax: "literal"
-				}
+				type: array: items: type: string: examples: ["field1", "parent.child_field"]
 			}
 		}
 	}

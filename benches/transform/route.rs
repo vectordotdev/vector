@@ -78,7 +78,7 @@ fn route(c: &mut Criterion) {
             output_buffer: output_buffer.clone(),
         },
         // A small filter where a sole field is mapped into a named route, does
-        // not matche.
+        // not match.
         Param {
             slug: "vrl_field_not_match",
             input: event.clone(),

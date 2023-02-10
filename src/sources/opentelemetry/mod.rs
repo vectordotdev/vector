@@ -11,12 +11,25 @@ mod status;
 use std::net::SocketAddr;
 
 use futures::{future::join, FutureExt, TryFutureExt};
+use lookup::{owned_value_path, LookupBuf};
+use opentelemetry_proto::convert::{
+    ATTRIBUTES_KEY, DROPPED_ATTRIBUTES_COUNT_KEY, FLAGS_KEY, OBSERVED_TIMESTAMP_KEY, RESOURCE_KEY,
+    SEVERITY_NUMBER_KEY, SEVERITY_TEXT_KEY, SPAN_ID_KEY, TRACE_ID_KEY,
+};
 
 use opentelemetry_proto::proto::collector::logs::v1::logs_service_server::LogsServiceServer;
-use vector_common::internal_event::{BytesReceived, Protocol};
-use vector_config::configurable_component;
-use vector_core::config::LogNamespace;
+use value::{kind::Collection, Kind};
+use vector_common::internal_event::{BytesReceived, EventsReceived, Protocol};
+use vector_config::{configurable_component, NamedComponent};
+use vector_core::{
+    config::{log_schema, LegacyKey, LogNamespace},
+    schema::Definition,
+};
 
+use self::{
+    grpc::Service,
+    http::{build_warp_filter, run_http_server},
+};
 use crate::{
     config::{
         DataType, GenerateConfig, Output, Resource, SourceAcknowledgementsConfig, SourceConfig,
@@ -25,11 +38,6 @@ use crate::{
     serde::bool_or_struct,
     sources::{util::grpc::run_grpc_server, Source},
     tls::{MaybeTlsSettings, TlsEnableableConfig},
-};
-
-use self::{
-    grpc::Service,
-    http::{build_warp_filter, run_http_server},
 };
 
 pub const LOGS: &str = "logs";
@@ -48,50 +56,68 @@ pub struct OpentelemetryConfig {
     #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: SourceAcknowledgementsConfig,
+
+    /// The namespace to use for logs. This overrides the global setting.
+    #[configurable(metadata(docs::hidden))]
+    #[serde(default)]
+    log_namespace: Option<bool>,
 }
 
 /// Configuration for the `opentelemetry` gRPC server.
 #[configurable_component]
+#[configurable(metadata(docs::examples = "example_grpc_config()"))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 struct GrpcConfig {
-    /// The address to listen for connections on.
+    /// The socket address to listen for connections on.
     ///
     /// It _must_ include a port.
+    #[configurable(metadata(docs::examples = "0.0.0.0:4317", docs::examples = "localhost:4317"))]
     address: SocketAddr,
 
     #[configurable(derived)]
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     tls: Option<TlsEnableableConfig>,
+}
+
+fn example_grpc_config() -> GrpcConfig {
+    GrpcConfig {
+        address: "0.0.0.0:4317".parse().unwrap(),
+        tls: None,
+    }
 }
 
 /// Configuration for the `opentelemetry` HTTP server.
 #[configurable_component]
+#[configurable(metadata(docs::examples = "example_http_config()"))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 struct HttpConfig {
-    /// The address to listen for connections on.
+    /// The socket address to listen for connections on.
     ///
     /// It _must_ include a port.
+    #[configurable(metadata(docs::examples = "0.0.0.0:4318", docs::examples = "localhost:4318"))]
     address: SocketAddr,
 
     #[configurable(derived)]
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     tls: Option<TlsEnableableConfig>,
+}
+
+fn example_http_config() -> HttpConfig {
+    HttpConfig {
+        address: "0.0.0.0:4318".parse().unwrap(),
+        tls: None,
+    }
 }
 
 impl GenerateConfig for OpentelemetryConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
-            grpc: GrpcConfig {
-                address: "0.0.0.0:4317".parse().unwrap(),
-                tls: Default::default(),
-            },
-            http: HttpConfig {
-                address: "0.0.0.0:4318".parse().unwrap(),
-                tls: Default::default(),
-            },
+            grpc: example_grpc_config(),
+            http: example_http_config(),
             acknowledgements: Default::default(),
+            log_namespace: None,
         })
         .unwrap()
     }
@@ -101,11 +127,15 @@ impl GenerateConfig for OpentelemetryConfig {
 impl SourceConfig for OpentelemetryConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<Source> {
         let acknowledgements = cx.do_acknowledgements(self.acknowledgements);
+        let events_received = register!(EventsReceived);
+        let log_namespace = cx.log_namespace(self.log_namespace);
 
         let grpc_tls_settings = MaybeTlsSettings::from_config(&self.grpc.tls, true)?;
         let grpc_service = LogsServiceServer::new(Service {
             pipeline: cx.out.clone(),
             acknowledgements,
+            log_namespace,
+            events_received: events_received.clone(),
         })
         .accept_compressed(tonic::codec::CompressionEncoding::Gzip);
         let grpc_source = run_grpc_server(
@@ -121,15 +151,110 @@ impl SourceConfig for OpentelemetryConfig {
         let http_tls_settings = MaybeTlsSettings::from_config(&self.http.tls, true)?;
         let protocol = http_tls_settings.http_protocol_name();
         let bytes_received = register!(BytesReceived::from(Protocol::from(protocol)));
-        let filters = build_warp_filter(acknowledgements, cx.out, bytes_received);
+        let filters = build_warp_filter(
+            acknowledgements,
+            log_namespace,
+            cx.out,
+            bytes_received,
+            events_received,
+        );
         let http_source =
             run_http_server(self.http.address, http_tls_settings, filters, cx.shutdown);
 
         Ok(join(grpc_source, http_source).map(|_| Ok(())).boxed())
     }
 
-    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
-        vec![Output::default(DataType::Log).with_port(LOGS)]
+    // TODO: appropriately handle "severity" meaning across both "severity_text" and "severity_number",
+    // as both are optional and can be converted to/from.
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+        let log_namespace = global_log_namespace.merge(self.log_namespace);
+        let schema_definition = Definition::new_with_default_metadata(Kind::any(), [log_namespace])
+            .with_source_metadata(
+                Self::NAME,
+                Some(LegacyKey::Overwrite(owned_value_path!(RESOURCE_KEY))),
+                &owned_value_path!(RESOURCE_KEY),
+                Kind::object(Collection::from_unknown(Kind::any())).or_undefined(),
+                None,
+            )
+            .with_source_metadata(
+                Self::NAME,
+                Some(LegacyKey::Overwrite(owned_value_path!(ATTRIBUTES_KEY))),
+                &owned_value_path!(ATTRIBUTES_KEY),
+                Kind::object(Collection::from_unknown(Kind::any())).or_undefined(),
+                None,
+            )
+            .with_source_metadata(
+                Self::NAME,
+                Some(LegacyKey::Overwrite(owned_value_path!(TRACE_ID_KEY))),
+                &owned_value_path!(TRACE_ID_KEY),
+                Kind::bytes().or_undefined(),
+                None,
+            )
+            .with_source_metadata(
+                Self::NAME,
+                Some(LegacyKey::Overwrite(owned_value_path!(SPAN_ID_KEY))),
+                &owned_value_path!(SPAN_ID_KEY),
+                Kind::bytes().or_undefined(),
+                None,
+            )
+            .with_source_metadata(
+                Self::NAME,
+                Some(LegacyKey::Overwrite(owned_value_path!(SEVERITY_TEXT_KEY))),
+                &owned_value_path!(SEVERITY_TEXT_KEY),
+                Kind::bytes().or_undefined(),
+                Some("severity"),
+            )
+            .with_source_metadata(
+                Self::NAME,
+                Some(LegacyKey::Overwrite(owned_value_path!(SEVERITY_NUMBER_KEY))),
+                &owned_value_path!(SEVERITY_NUMBER_KEY),
+                Kind::integer().or_undefined(),
+                None,
+            )
+            .with_source_metadata(
+                Self::NAME,
+                Some(LegacyKey::Overwrite(owned_value_path!(FLAGS_KEY))),
+                &owned_value_path!(FLAGS_KEY),
+                Kind::integer().or_undefined(),
+                None,
+            )
+            .with_source_metadata(
+                Self::NAME,
+                Some(LegacyKey::Overwrite(owned_value_path!(
+                    DROPPED_ATTRIBUTES_COUNT_KEY
+                ))),
+                &owned_value_path!(DROPPED_ATTRIBUTES_COUNT_KEY),
+                Kind::integer(),
+                None,
+            )
+            .with_source_metadata(
+                Self::NAME,
+                Some(LegacyKey::Overwrite(owned_value_path!(
+                    OBSERVED_TIMESTAMP_KEY
+                ))),
+                &owned_value_path!(OBSERVED_TIMESTAMP_KEY),
+                Kind::timestamp(),
+                None,
+            )
+            .with_source_metadata(
+                Self::NAME,
+                None,
+                &owned_value_path!("timestamp"),
+                Kind::timestamp(),
+                Some("timestamp"),
+            )
+            .with_standard_vector_source_metadata();
+
+        let schema_definition = match log_namespace {
+            LogNamespace::Vector => schema_definition.with_meaning(LookupBuf::root(), "message"),
+            LogNamespace::Legacy => {
+                schema_definition.with_meaning(log_schema().message_key(), "message")
+            }
+        };
+
+        vec![Output::default(DataType::Log)
+            .with_port(LOGS)
+            .with_schema_definition(schema_definition)]
     }
 
     fn resources(&self) -> Vec<Resource> {

@@ -1,3 +1,4 @@
+use http::Method;
 use vector_config::configurable_component;
 
 /// HTTP method.
@@ -22,4 +23,17 @@ pub enum HttpMethod {
 
     /// HTTP DELETE method.
     Delete,
+}
+
+impl From<HttpMethod> for Method {
+    fn from(http_method: HttpMethod) -> Self {
+        match http_method {
+            HttpMethod::Head => Self::HEAD,
+            HttpMethod::Get => Self::GET,
+            HttpMethod::Post => Self::POST,
+            HttpMethod::Put => Self::PUT,
+            HttpMethod::Patch => Self::PATCH,
+            HttpMethod::Delete => Self::DELETE,
+        }
+    }
 }

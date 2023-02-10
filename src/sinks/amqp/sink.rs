@@ -23,7 +23,7 @@ use super::{
 /// This is passed into the `RequestBuilder` which then splits it out into the event
 /// and metadata containing the exchange and routing_key.
 /// This event needs to be created prior to building the request so we can filter out
-/// any events that error whilst redndering the templates.
+/// any events that error whilst rendering the templates.
 #[derive(Serialize)]
 pub(super) struct AmqpEvent {
     pub(super) event: Event,
@@ -133,7 +133,7 @@ impl AmqpSink {
             channel: Arc::clone(&self.channel),
         });
 
-        let sink = input
+        input
             .filter_map(|event| std::future::ready(self.make_amqp_event(event)))
             .request_builder(None, request_builder)
             .filter_map(|request| async move {
@@ -145,9 +145,10 @@ impl AmqpSink {
                     Ok(req) => Some(req),
                 }
             })
-            .into_driver(service);
-
-        sink.run().await
+            .into_driver(service)
+            .protocol("amqp_0_9_1")
+            .run()
+            .await
     }
 }
 

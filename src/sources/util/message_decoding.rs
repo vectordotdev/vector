@@ -5,9 +5,10 @@ use chrono::{DateTime, Utc};
 use codecs::StreamDecodingError;
 use lookup::{metadata_path, path};
 use tokio_util::codec::Decoder as _;
-use vector_core::{
-    config::LogNamespace, internal_event::EventsReceived, EstimatedJsonEncodedSizeOf,
+use vector_common::internal_event::{
+    CountByteSize, EventsReceived, InternalEventHandle as _, Registered,
 };
+use vector_core::{config::LogNamespace, EstimatedJsonEncodedSizeOf};
 
 use crate::{codecs::Decoder, config::log_schema, event::BatchNotifier, event::Event};
 
@@ -18,6 +19,7 @@ pub fn decode_message<'a>(
     timestamp: Option<DateTime<Utc>>,
     batch: &'a Option<BatchNotifier>,
     log_namespace: LogNamespace,
+    events_received: &'a Registered<EventsReceived>,
 ) -> impl Iterator<Item = Event> + 'a {
     let schema = log_schema();
 
@@ -27,49 +29,32 @@ pub fn decode_message<'a>(
 
     iter::from_fn(move || loop {
         break match decoder.decode_eof(&mut buffer) {
-            Ok(Some((events, _))) => {
-                let count = events.len();
-                Some(
-                    events
-                        .into_iter()
-                        .map(move |mut event| {
-                            if let Event::Log(ref mut log) = event {
-                                log_namespace.insert_vector_metadata(
-                                    log,
-                                    path!(schema.source_type_key()),
-                                    path!("source_type"),
-                                    Bytes::from(source_type),
-                                );
-                                match log_namespace {
-                                    LogNamespace::Vector => {
-                                        if let Some(timestamp) = timestamp {
-                                            log.try_insert(
-                                                metadata_path!(source_type, "timestamp"),
-                                                timestamp,
-                                            );
-                                        }
-
-                                        log.insert(
-                                            metadata_path!("vector", "ingest_timestamp"),
-                                            now,
-                                        );
-                                    }
-                                    LogNamespace::Legacy => {
-                                        if let Some(timestamp) = timestamp {
-                                            log.try_insert(schema.timestamp_key(), timestamp);
-                                        }
-                                    }
-                                }
+            Ok(Some((events, _))) => Some(events.into_iter().map(move |mut event| {
+                if let Event::Log(ref mut log) = event {
+                    log_namespace.insert_vector_metadata(
+                        log,
+                        path!(schema.source_type_key()),
+                        path!("source_type"),
+                        Bytes::from(source_type),
+                    );
+                    match log_namespace {
+                        LogNamespace::Vector => {
+                            if let Some(timestamp) = timestamp {
+                                log.try_insert(metadata_path!(source_type, "timestamp"), timestamp);
                             }
-                            event
-                        })
-                        .fold_finally(
-                            0,
-                            |size, event: &Event| size + event.estimated_json_encoded_size_of(),
-                            move |byte_size| emit!(EventsReceived { byte_size, count }),
-                        ),
-                )
-            }
+
+                            log.insert(metadata_path!("vector", "ingest_timestamp"), now);
+                        }
+                        LogNamespace::Legacy => {
+                            if let Some(timestamp) = timestamp {
+                                log.try_insert(schema.timestamp_key(), timestamp);
+                            }
+                        }
+                    }
+                }
+                events_received.emit(CountByteSize(1, event.estimated_json_encoded_size_of()));
+                event
+            })),
             Err(error) => {
                 // Error is logged by `crate::codecs::Decoder`, no further handling
                 // is needed here.

@@ -1,5 +1,6 @@
 use std::io::Read;
 
+use base64::prelude::{Engine as _, BASE64_STANDARD};
 use bytes::Bytes;
 use chrono::Utc;
 use codecs::StreamDecodingError;
@@ -10,7 +11,9 @@ use snafu::{ResultExt, Snafu};
 use tokio_util::codec::FramedRead;
 use vector_common::{
     finalization::AddBatchNotifier,
-    internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Registered},
+    internal_event::{
+        ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Registered,
+    },
 };
 use vector_config::NamedComponent;
 use vector_core::{
@@ -18,6 +21,7 @@ use vector_core::{
     event::BatchNotifier,
     EstimatedJsonEncodedSizeOf,
 };
+use vrl::SecretTarget;
 use warp::reject;
 
 use super::{
@@ -39,6 +43,7 @@ use crate::{
 #[derive(Clone)]
 pub(super) struct Context {
     pub(super) compression: Compression,
+    pub(super) store_access_key: bool,
     pub(super) decoder: Decoder,
     pub(super) acknowledgements: bool,
     pub(super) bytes_received: Registered<BytesReceived>,
@@ -54,6 +59,7 @@ pub(super) async fn firehose(
     mut context: Context,
 ) -> Result<impl warp::Reply, reject::Rejection> {
     let log_namespace = context.log_namespace;
+    let events_received = register!(EventsReceived);
 
     for record in request.records {
         let bytes = decode_record(&record, context.compression)
@@ -67,10 +73,10 @@ pub(super) async fn firehose(
         loop {
             match stream.next().await {
                 Some(Ok((mut events, _byte_size))) => {
-                    emit!(EventsReceived {
-                        count: events.len(),
-                        byte_size: events.estimated_json_encoded_size_of(),
-                    });
+                    events_received.emit(CountByteSize(
+                        events.len(),
+                        events.estimated_json_encoded_size_of(),
+                    ));
 
                     let (batch, receiver) = context
                         .acknowledgements
@@ -124,6 +130,15 @@ pub(super) async fn firehose(
                                 path!("source_arn"),
                                 source_arn.to_owned(),
                             );
+
+                            if context.store_access_key {
+                                if let Some(access_key) = &request.access_key {
+                                    log.metadata_mut().secrets_mut().insert_secret(
+                                        "aws_kinesis_firehose_access_key",
+                                        access_key,
+                                    );
+                                }
+                            }
                         }
                     }
 
@@ -192,7 +207,9 @@ fn decode_record(
     record: &EncodedFirehoseRecord,
     compression: Compression,
 ) -> Result<Bytes, RecordDecodeError> {
-    let buf = base64::decode(record.data.as_bytes()).context(Base64Snafu {})?;
+    let buf = BASE64_STANDARD
+        .decode(record.data.as_bytes())
+        .context(Base64Snafu {})?;
 
     if buf.is_empty() {
         return Ok(Bytes::default());

@@ -18,8 +18,8 @@ use crate::{
     num::ConfigurableNumber,
     schema::{
         assert_string_schema_for_map, generate_array_schema, generate_bool_schema,
-        generate_map_schema, generate_number_schema, generate_set_schema, generate_string_schema,
-        get_or_generate_schema,
+        generate_map_schema, generate_number_schema, generate_optional_schema, generate_set_schema,
+        generate_string_schema,
     },
     str::ConfigurableString,
     Configurable, GenerateError, Metadata,
@@ -38,30 +38,37 @@ impl<T> Configurable for Option<T>
 where
     T: Configurable + Serialize,
 {
+    fn referenceable_name() -> Option<&'static str> {
+        match T::referenceable_name() {
+            None => None,
+            Some(_) => Some(std::any::type_name::<Self>()),
+        }
+    }
+
     fn is_optional() -> bool {
         true
     }
 
     fn metadata() -> Metadata<Self> {
-        // We clone the default metadata of the wrapped type because otherwise this "level" of the schema would
-        // effective sever the link between things like the description of `T` itself and what we show for a field of
-        // type `Option<T>`.
-        //
-        // Said another way, this allows callers to use `#[configurable(derived)]` on a field of `Option<T>` so long as
-        // `T` has a description, and both the optional field and the schema for `T` will get the description... but the
-        // description for the optional field can still be overridden independently, etc.
-        T::metadata().convert().as_subschema()
+        Metadata::with_transparent(true)
+    }
+
+    fn validate_metadata(metadata: &Metadata<Self>) -> Result<(), GenerateError> {
+        // We have to convert from `Metadata<Self>` to `Metadata<T>` which erases the default value.
+        let converted = metadata.convert::<T>();
+        T::validate_metadata(&converted)
     }
 
     fn generate_schema(gen: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
-        let mut inner_metadata = T::metadata();
-        inner_metadata.set_transparent();
-
-        get_or_generate_schema(gen, inner_metadata)
+        generate_optional_schema::<T>(gen)
     }
 }
 
 impl Configurable for bool {
+    fn metadata() -> Metadata<Self> {
+        Metadata::with_transparent(true)
+    }
+
     fn generate_schema(_: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
         Ok(generate_bool_schema())
     }
@@ -69,6 +76,10 @@ impl Configurable for bool {
 
 // Strings.
 impl Configurable for String {
+    fn metadata() -> Metadata<Self> {
+        Metadata::with_transparent(true)
+    }
+
     fn generate_schema(_: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
         Ok(generate_string_schema())
     }
@@ -76,7 +87,7 @@ impl Configurable for String {
 
 impl Configurable for char {
     fn metadata() -> Metadata<Self> {
-        let mut metadata = Metadata::default();
+        let mut metadata = Metadata::with_transparent(true);
         metadata.add_validation(Validation::Length {
             minimum: Some(1),
             maximum: Some(1),
@@ -90,12 +101,12 @@ impl Configurable for char {
 }
 
 // Numbers.
-macro_rules! impl_configuable_numeric {
+macro_rules! impl_configurable_numeric {
 	($($ty:ty),+) => {
 		$(
 			impl Configurable for $ty {
                 fn metadata() -> Metadata<Self> {
-                    let mut metadata = Metadata::default();
+                    let mut metadata = Metadata::with_transparent(true);
                     let numeric_type = <Self as ConfigurableNumber>::class();
                     metadata.add_custom_attribute(CustomAttribute::kv("docs::numeric_type", numeric_type));
 
@@ -114,7 +125,7 @@ macro_rules! impl_configuable_numeric {
 	};
 }
 
-impl_configuable_numeric!(
+impl_configurable_numeric!(
     u8,
     u16,
     u32,
@@ -143,6 +154,15 @@ impl<T> Configurable for Vec<T>
 where
     T: Configurable + Serialize,
 {
+    fn metadata() -> Metadata<Self> {
+        T::metadata().convert()
+    }
+
+    fn validate_metadata(metadata: &Metadata<Self>) -> Result<(), GenerateError> {
+        let converted = metadata.convert::<T>();
+        T::validate_metadata(&converted)
+    }
+
     fn generate_schema(gen: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
         generate_array_schema::<T>(gen)
     }
@@ -159,6 +179,15 @@ where
         true
     }
 
+    fn metadata() -> Metadata<Self> {
+        Metadata::with_transparent(true)
+    }
+
+    fn validate_metadata(metadata: &Metadata<Self>) -> Result<(), GenerateError> {
+        let converted = metadata.convert::<V>();
+        V::validate_metadata(&converted)
+    }
+
     fn generate_schema(gen: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
         // Make sure our key type is _truly_ a string schema.
         assert_string_schema_for_map::<K, Self>(gen)?;
@@ -171,6 +200,15 @@ impl<V> Configurable for BTreeSet<V>
 where
     V: Configurable + Serialize + Eq + std::hash::Hash,
 {
+    fn metadata() -> Metadata<Self> {
+        Metadata::with_transparent(true)
+    }
+
+    fn validate_metadata(metadata: &Metadata<Self>) -> Result<(), GenerateError> {
+        let converted = metadata.convert::<V>();
+        V::validate_metadata(&converted)
+    }
+
     fn generate_schema(gen: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
         generate_set_schema::<V>(gen)
     }
@@ -187,6 +225,15 @@ where
         true
     }
 
+    fn metadata() -> Metadata<Self> {
+        Metadata::with_transparent(true)
+    }
+
+    fn validate_metadata(metadata: &Metadata<Self>) -> Result<(), GenerateError> {
+        let converted = metadata.convert::<V>();
+        V::validate_metadata(&converted)
+    }
+
     fn generate_schema(gen: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
         // Make sure our key type is _truly_ a string schema.
         assert_string_schema_for_map::<K, Self>(gen)?;
@@ -199,6 +246,15 @@ impl<V> Configurable for HashSet<V>
 where
     V: Configurable + Serialize + Eq + std::hash::Hash,
 {
+    fn metadata() -> Metadata<Self> {
+        Metadata::with_transparent(true)
+    }
+
+    fn validate_metadata(metadata: &Metadata<Self>) -> Result<(), GenerateError> {
+        let converted = metadata.convert::<V>();
+        V::validate_metadata(&converted)
+    }
+
     fn generate_schema(gen: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
         generate_set_schema::<V>(gen)
     }

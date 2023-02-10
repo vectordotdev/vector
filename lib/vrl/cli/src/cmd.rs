@@ -58,7 +58,7 @@ impl Opts {
     fn timezone(&self) -> Result<TimeZone, Error> {
         if let Some(ref tz) = self.timezone {
             TimeZone::parse(tz)
-                .ok_or_else(|| Error::Parse(format!("unable to parse timezone: {}", tz)))
+                .ok_or_else(|| Error::Parse(format!("unable to parse timezone: {tz}")))
         } else {
             Ok(TimeZone::default())
         }
@@ -69,7 +69,7 @@ impl Opts {
             Some(source) => Ok(source.clone()),
             None => match self.program_file.as_ref() {
                 Some(path) => read(File::open(path)?),
-                None => Ok("".to_owned()),
+                None => Ok(String::new()),
             },
         }
     }
@@ -101,7 +101,7 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
         Err(err) => {
             #[allow(clippy::print_stderr)]
             {
-                eprintln!("{}", err);
+                eprintln!("{err}");
             }
             exitcode::SOFTWARE
         }
@@ -168,8 +168,8 @@ fn run(opts: &Opts) -> Result<(), Error> {
             #[allow(clippy::print_stdout)]
             #[allow(clippy::print_stderr)]
             match result {
-                Ok(ok) => println!("{}", ok),
-                Err(err) => eprintln!("{}", err),
+                Ok(ok) => println!("{ok}"),
+                Err(err) => eprintln!("{err}"),
             }
         }
 

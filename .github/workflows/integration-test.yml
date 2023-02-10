@@ -88,9 +88,6 @@ jobs:
           - test: 'redis'
           - test: 'shutdown'
           - test: 'splunk'
-            env:
-              SPLUNK_VERSION: 7.3.9
-          - test: 'splunk'
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v3

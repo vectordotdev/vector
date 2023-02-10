@@ -4,6 +4,7 @@ use chrono::Utc;
 use codecs::NativeDeserializerConfig;
 use futures::TryFutureExt;
 use tonic::{Request, Response, Status};
+use vector_common::internal_event::{CountByteSize, InternalEventHandle as _};
 use vector_config::{configurable_component, NamedComponent};
 use vector_core::{
     config::LogNamespace,
@@ -66,8 +67,8 @@ impl proto::Service for Service {
 
         let count = events.len();
         let byte_size = events.estimated_json_encoded_size_of();
-
-        emit!(EventsReceived { count, byte_size });
+        let events_received = register!(EventsReceived);
+        events_received.emit(CountByteSize(count, byte_size));
 
         let receiver = BatchNotifier::maybe_apply_to(self.acknowledgements, &mut events);
 
@@ -119,7 +120,7 @@ pub struct VectorConfig {
     /// Version of the configuration.
     version: Option<VectorConfigVersion>,
 
-    /// The address to listen for connections on.
+    /// The socket address to listen for connections on.
     ///
     /// It _must_ include a port.
     pub address: SocketAddr,
@@ -136,6 +137,16 @@ pub struct VectorConfig {
     #[serde(default)]
     #[configurable(metadata(docs::hidden))]
     log_namespace: Option<bool>,
+}
+
+impl VectorConfig {
+    /// Creates a `VectorConfig` with the given address.
+    pub fn from_address(addr: SocketAddr) -> Self {
+        Self {
+            address: addr,
+            ..Default::default()
+        }
+    }
 }
 
 impl Default for VectorConfig {

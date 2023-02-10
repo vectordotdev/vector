@@ -31,25 +31,30 @@ use crate::{
     template::{Template, TemplateParseError},
 };
 
-/// Authentication strategies.
+/// Elasticsearch Authentication strategies.
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields, rename_all = "snake_case", tag = "strategy")]
+#[configurable(metadata(docs::enum_tag_description = "The authentication strategy to use."))]
 pub enum ElasticsearchAuth {
     /// HTTP Basic Authentication.
     Basic {
         /// Basic authentication username.
+        #[configurable(metadata(docs::examples = "${ELASTICSEARCH_USERNAME}"))]
+        #[configurable(metadata(docs::examples = "username"))]
         user: String,
 
         /// Basic authentication password.
+        #[configurable(metadata(docs::examples = "${ELASTICSEARCH_PASSWORD}"))]
+        #[configurable(metadata(docs::examples = "password"))]
         password: SensitiveString,
     },
 
     /// Amazon OpenSearch Service-specific authentication.
-    Aws(#[configurable(derived)] AwsAuthentication),
+    Aws(AwsAuthentication),
 }
 
-/// Indexing mode.
+/// Elasticsearch Indexing mode.
 #[configurable_component]
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
@@ -171,12 +176,20 @@ impl ElasticsearchCommonMode {
     }
 }
 
-/// Configuration for api version.
+/// Configuration for Elasticsearch API version.
 #[configurable_component]
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
 pub enum ElasticsearchApiVersion {
-    /// Auto-detect the api version. Will fail if endpoint isn't reachable.
+    /// Auto-detect the API version.
+    ///
+    /// If the [cluster state version endpoint][es_version] isn't reachable, a warning is logged to
+    /// stdout, and the version is assumed to be V6 if the `suppress_type_name` option is set to
+    /// true. Otherwise, the version is assumed to be V8. In the future, the sink will instead
+    /// return an Error during configuration parsing, since a wronly assumed version could lead to
+    /// incorrect API calls.
+    ///
+    /// [es_version]: https://www.elastic.co/guide/en/elasticsearch/reference/current/cluster-state.html#cluster-state-api-path-params
     Auto,
     /// Use the Elasticsearch 6.x API.
     V6,

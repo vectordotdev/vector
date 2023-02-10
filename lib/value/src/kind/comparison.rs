@@ -532,7 +532,7 @@ mod tests {
                 },
             ),
         ]) {
-            assert_eq!(this.is_superset(&other).is_ok(), want, "{}", title);
+            assert_eq!(this.is_superset(&other).is_ok(), want, "{title}");
         }
     }
 
@@ -622,7 +622,7 @@ mod tests {
                 },
             ),
         ]) {
-            assert_eq!(kind.is_exact(), want, "{}", title);
+            assert_eq!(kind.is_exact(), want, "{title}");
         }
     }
 }
