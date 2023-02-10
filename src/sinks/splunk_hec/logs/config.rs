@@ -40,6 +40,16 @@ pub struct HecLogsSinkConfig {
     pub default_token: SensitiveString,
 
     /// The base URL of the Splunk instance.
+    ///
+    /// The scheme (`http` or `https`) must be specified. No path should be included since the paths defined
+    /// by the [`Splunk`][splunk] API are used.
+    ///
+    /// [splunk]: https://docs.splunk.com/Documentation/Splunk/8.0.0/Data/HECRESTendpoints
+    #[configurable(metadata(
+        docs::examples = "https://http-inputs-hec.splunkcloud.com",
+        docs::examples = "https://hec.splunk.com:8088",
+        docs::examples = "http://example.com"
+    ))]
     pub endpoint: String,
 
     /// Overrides the name of the log field used to grab the hostname to send to Splunk HEC.
@@ -54,16 +64,19 @@ pub struct HecLogsSinkConfig {
     ///
     /// [splunk_field_index_docs]: https://docs.splunk.com/Documentation/Splunk/8.0.0/Data/IFXandHEC
     #[serde(default)]
+    #[configurable(metadata(docs::examples = "field1", docs::examples = "field2"))]
     pub indexed_fields: Vec<String>,
 
-    /// The name of the index where to send the events to.
+    /// The name of the index to send events to.
     ///
-    /// If not specified, the default index is used.
+    /// If not specified, the default index defined within Splunk is used.
+    #[configurable(metadata(docs::examples = "{{ host }}", docs::examples = "custom_index"))]
     pub index: Option<Template>,
 
     /// The sourcetype of events sent to this sink.
     ///
     /// If unset, Splunk will default to `httpevent`.
+    #[configurable(metadata(docs::examples = "{{ sourcetype }}", docs::examples = "_json",))]
     pub sourcetype: Option<Template>,
 
     /// The source of events sent to this sink.
@@ -71,6 +84,11 @@ pub struct HecLogsSinkConfig {
     /// This is typically the filename the logs originated from.
     ///
     /// If unset, the Splunk collector will set it.
+    #[configurable(metadata(
+        docs::examples = "{{ file }}",
+        docs::examples = "/var/log/syslog",
+        docs::examples = "UDP:514"
+    ))]
     pub source: Option<Template>,
 
     #[configurable(derived)]
@@ -101,14 +119,17 @@ pub struct HecLogsSinkConfig {
     pub timestamp_nanos_key: Option<String>,
 
     /// Overrides the name of the log field used to grab the timestamp to send to Splunk HEC.
+    /// When set to `“”`, vector omits setting a timestamp in the events sent to Splunk HEC.
     ///
     /// By default, the [global `log_schema.timestamp_key` option][global_timestamp_key] is used.
     ///
     /// [global_timestamp_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.timestamp_key
     #[serde(default = "crate::sinks::splunk_hec::common::timestamp_key")]
+    #[configurable(metadata(docs::examples = "timestamp", docs::examples = ""))]
     pub timestamp_key: String,
 
     /// Passes the auto_extract_timestamp option to Splunk.
+    ///
     /// Note this option is only used by Version 8 and above of Splunk.
     /// This will cause Splunk to extract the timestamp from the message text rather than use
     /// the timestamp embedded in the event. The timestamp must be in the format yyyy-mm-dd hh:mm:ss.
