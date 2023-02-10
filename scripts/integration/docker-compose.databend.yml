@@ -3,7 +3,9 @@ version: "3"
 services:
   minio:
     image: docker.io/minio/minio
-    command: server /data
+    command: server /var/lib/minio/data
+    volumes:
+      - minio_data:/var/lib/minio/data
   createbuckets:
     image: docker.io/minio/mc
     depends_on:
@@ -56,6 +58,7 @@ services:
       - cargoregistry:/usr/local/cargo/registry
 
 volumes:
+  minio_data: {}
   target: {}
   cargogit: {}
   cargoregistry: {}
