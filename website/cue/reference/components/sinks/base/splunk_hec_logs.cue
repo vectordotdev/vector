@@ -40,9 +40,12 @@ base: components: sinks: splunk_hec_logs: configuration: {
 				type: uint: default: 1000000
 			}
 			query_interval: {
-				description: "The amount of time, in seconds, to wait in between queries to the Splunk HEC indexer acknowledgement endpoint."
+				description: "The amount of time to wait between queries to the Splunk HEC indexer acknowledgement endpoint."
 				required:    false
-				type: uint: default: 10
+				type: uint: {
+					default: 10
+					unit:    "seconds"
+				}
 			}
 			retry_limit: {
 				description: "The maximum number of times an acknowledgement ID will be queried for its status."

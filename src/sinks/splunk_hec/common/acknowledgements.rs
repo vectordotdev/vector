@@ -31,7 +31,8 @@ pub struct HecClientAcknowledgementsConfig {
     /// [splunk_indexer_ack_docs]: https://docs.splunk.com/Documentation/Splunk/8.2.3/Data/AboutHECIDXAck
     pub indexer_acknowledgements_enabled: bool,
 
-    /// The amount of time, in seconds, to wait in between queries to the Splunk HEC indexer acknowledgement endpoint.
+    /// The amount of time to wait between queries to the Splunk HEC indexer acknowledgement endpoint.
+    #[configurable(metadata(docs::type_unit = "seconds"))]
     pub query_interval: NonZeroU8,
 
     /// The maximum number of times an acknowledgement ID will be queried for its status.
