@@ -48,8 +48,12 @@ pub struct DatabendConfig {
     #[serde(default = "Compression::gzip_default")]
     pub compression: Compression,
 
-    #[serde(flatten)]
-    pub encoding: EncodingConfigWithFraming,
+    #[configurable(derived)]
+    #[serde(
+        default,
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    pub encoding: Transformer,
 
     #[configurable(derived)]
     #[serde(default)]
