@@ -1,0 +1,4 @@
+[build]
+publish = "../target/doc/"
+command = "make docs"
+environment = { RUSTDOCFLAGS= "--cfg docsrs" }
