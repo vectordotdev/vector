@@ -215,11 +215,11 @@ impl HttpSink for HttpEventSink {
 
         let series = gcp::GcpSeries {
             time_series: &[gcp::GcpSerie {
-                metric: gcp::GcpTypedResource {
+                metric: gcp::GcpMetric {
                     r#type: metric_type,
                     labels: metric_labels,
                 },
-                resource: gcp::GcpTypedResource {
+                resource: gcp::GcpResource {
                     r#type: self.config.resource.r#type.clone(),
                     labels: self.config.resource.labels.clone(),
                 },

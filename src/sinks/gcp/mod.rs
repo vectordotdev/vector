@@ -89,9 +89,23 @@ pub struct GcpPointValue {
 
 #[derive(Serialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
+pub struct GcpMetric {
+    pub r#type: String,
+    pub labels: HashMap<String, String>,
+}
+
+#[derive(Serialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct GcpResource {
+    pub r#type: String,
+    pub labels: HashMap<String, String>,
+}
+
+#[derive(Serialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct GcpSerie<'a> {
-    pub metric: GcpTypedResource,
-    pub resource: GcpTypedResource,
+    pub metric: GcpMetric,
+    pub resource: GcpResource,
     pub metric_kind: GcpMetricKind,
     pub value_type: GcpValueType,
     pub points: &'a [GcpPoint],
