@@ -47,9 +47,9 @@ pub struct Compiler<'a> {
     /// It is possible for this state to switch from `None`, to `Some(T)` and
     /// back to `None`, if the parent expression of a fallible expression
     /// nullifies the fallibility of that expression.
-    // TODO: This should probably be kept on the call stack as the "compile_*" functions are called
-    //    otherwise some expressions may remove it when they shouldn't (such as the RHS of an operation removing
-    //    the error from the LHS)
+    // This should probably be kept on the call stack as the "compile_*" functions are called
+    // otherwise some expressions may remove it when they shouldn't (such as the RHS of an operation removing
+    // the error from the LHS)
     fallible_expression_error: Option<Box<dyn DiagnosticMessage>>,
 
     config: CompileConfig,
