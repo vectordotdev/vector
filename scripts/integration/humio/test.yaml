@@ -1,0 +1,12 @@
+args:
+- --features
+- humio-integration-tests
+- --lib
+- '::humio::'
+
+runner:
+  env:
+    HUMIO_ADDRESS: http://humio:8080
+
+matrix:
+  version: [1.13.1]

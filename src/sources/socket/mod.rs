@@ -4,10 +4,10 @@ pub mod udp;
 mod unix;
 
 use codecs::{decoding::DeserializerConfig, NewlineDelimitedDecoderConfig};
-use lookup::{lookup_v2::parse_value_path, owned_value_path};
+use lookup::{lookup_v2::OptionalValuePath, owned_value_path};
 use value::{kind::Collection, Kind};
 use vector_config::{configurable_component, NamedComponent};
-use vector_core::config::{LegacyKey, LogNamespace};
+use vector_core::config::{log_schema, LegacyKey, LogNamespace};
 
 #[cfg(unix)]
 use crate::serde::default_framing_message_based;
@@ -30,22 +30,23 @@ pub struct SocketConfig {
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(tag = "mode", rename_all = "snake_case")]
+#[configurable(metadata(docs::enum_tag_description = "The type of socket to use."))]
 #[allow(clippy::large_enum_variant)] // just used for configuration
 pub enum Mode {
     /// Listen on TCP.
-    Tcp(#[configurable(derived)] tcp::TcpConfig),
+    Tcp(tcp::TcpConfig),
 
     /// Listen on UDP.
-    Udp(#[configurable(derived)] udp::UdpConfig),
+    Udp(udp::UdpConfig),
 
-    /// Listen on UDS, in datagram mode. (Unix domain socket)
+    /// Listen on a Unix domain socket (UDS), in datagram mode.
     #[cfg(unix)]
-    UnixDatagram(#[configurable(derived)] unix::UnixConfig),
+    UnixDatagram(unix::UnixConfig),
 
-    /// Listen on UDS, in stream mode. (Unix domain socket)
+    /// Listen on a Unix domain socket (UDS), in stream mode.
     #[cfg(unix)]
     #[serde(alias = "unix")]
-    UnixStream(#[configurable(derived)] unix::UnixConfig),
+    UnixStream(unix::UnixConfig),
 }
 
 impl SocketConfig {
@@ -141,7 +142,8 @@ impl SourceConfig for SocketConfig {
                 let tls_client_metadata_key = config
                     .tls()
                     .as_ref()
-                    .and_then(|tls| tls.client_metadata_key.clone());
+                    .and_then(|tls| tls.client_metadata_key.clone())
+                    .and_then(|k| k.path);
                 let tls = MaybeTlsSettings::from_config(&tls_config, true)?;
                 tcp.run(
                     config.address(),
@@ -229,42 +231,28 @@ impl SourceConfig for SocketConfig {
 
         let schema_definition = match &self.mode {
             Mode::Tcp(config) => {
-                let host_key_path = config
-                    .host_key()
-                    .as_ref()
-                    .and_then(|x| parse_value_path(x).ok())
-                    .map_or_else(
-                        || LegacyKey::InsertIfEmpty(owned_value_path!("host")),
-                        LegacyKey::InsertIfEmpty,
-                    );
+                let legacy_host_key = config.host_key().clone().path.map(LegacyKey::InsertIfEmpty);
 
-                let port_key_path = config
-                    .port_key()
-                    .as_ref()
-                    .and_then(|x| parse_value_path(x).ok())
-                    .map_or_else(
-                        || LegacyKey::InsertIfEmpty(owned_value_path!("port")),
-                        LegacyKey::InsertIfEmpty,
-                    );
+                let legacy_port_key = config.port_key().clone().path.map(LegacyKey::InsertIfEmpty);
 
                 let tls_client_metadata_path = config
                     .tls()
                     .as_ref()
                     .and_then(|tls| tls.client_metadata_key.as_ref())
-                    .and_then(|x| parse_value_path(x).ok())
+                    .and_then(|k| k.path.clone())
                     .map(LegacyKey::Overwrite);
 
                 schema_definition
                     .with_source_metadata(
                         Self::NAME,
-                        Some(host_key_path),
+                        legacy_host_key,
                         &owned_value_path!("host"),
                         Kind::bytes(),
-                        None,
+                        Some("host"),
                     )
                     .with_source_metadata(
                         Self::NAME,
-                        Some(port_key_path),
+                        legacy_port_key,
                         &owned_value_path!("port"),
                         Kind::bytes(),
                         None,
@@ -279,35 +267,21 @@ impl SourceConfig for SocketConfig {
                     )
             }
             Mode::Udp(config) => {
-                let host_key_path = config
-                    .host_key()
-                    .as_ref()
-                    .and_then(|x| parse_value_path(x).ok())
-                    .map_or_else(
-                        || LegacyKey::InsertIfEmpty(owned_value_path!("host")),
-                        LegacyKey::InsertIfEmpty,
-                    );
+                let legacy_host_key = config.host_key().clone().path.map(LegacyKey::InsertIfEmpty);
 
-                let port_key_path = config
-                    .port_key()
-                    .as_ref()
-                    .and_then(|x| parse_value_path(x).ok())
-                    .map_or_else(
-                        || LegacyKey::InsertIfEmpty(owned_value_path!("port")),
-                        LegacyKey::InsertIfEmpty,
-                    );
+                let legacy_port_key = config.port_key().clone().path.map(LegacyKey::InsertIfEmpty);
 
                 schema_definition
                     .with_source_metadata(
                         Self::NAME,
-                        Some(host_key_path),
+                        legacy_host_key,
                         &owned_value_path!("host"),
                         Kind::bytes(),
                         None,
                     )
                     .with_source_metadata(
                         Self::NAME,
-                        Some(port_key_path),
+                        legacy_port_key,
                         &owned_value_path!("port"),
                         Kind::bytes(),
                         None,
@@ -315,18 +289,11 @@ impl SourceConfig for SocketConfig {
             }
             #[cfg(unix)]
             Mode::UnixDatagram(config) => {
-                let host_key_path = config
-                    .host_key()
-                    .as_ref()
-                    .and_then(|x| parse_value_path(x).ok())
-                    .map_or_else(
-                        || LegacyKey::InsertIfEmpty(owned_value_path!("host")),
-                        LegacyKey::InsertIfEmpty,
-                    );
+                let legacy_host_key = config.host_key().clone().path.map(LegacyKey::InsertIfEmpty);
 
                 schema_definition.with_source_metadata(
                     Self::NAME,
-                    Some(host_key_path),
+                    legacy_host_key,
                     &owned_value_path!("host"),
                     Kind::bytes(),
                     None,
@@ -334,18 +301,11 @@ impl SourceConfig for SocketConfig {
             }
             #[cfg(unix)]
             Mode::UnixStream(config) => {
-                let host_key_path = config
-                    .host_key()
-                    .as_ref()
-                    .and_then(|x| parse_value_path(x).ok())
-                    .map_or_else(
-                        || LegacyKey::InsertIfEmpty(owned_value_path!("host")),
-                        LegacyKey::InsertIfEmpty,
-                    );
+                let legacy_host_key = config.host_key().clone().path.map(LegacyKey::InsertIfEmpty);
 
                 schema_definition.with_source_metadata(
                     Self::NAME,
-                    Some(host_key_path),
+                    legacy_host_key,
                     &owned_value_path!("host"),
                     Kind::bytes(),
                     None,
@@ -373,6 +333,14 @@ impl SourceConfig for SocketConfig {
     }
 }
 
+pub(crate) fn default_host_key() -> OptionalValuePath {
+    OptionalValuePath::from(owned_value_path!(log_schema().host_key()))
+}
+
+fn default_max_length() -> Option<usize> {
+    Some(crate::serde::default_max_length())
+}
+
 #[cfg(test)]
 mod test {
     use std::{
@@ -390,7 +358,7 @@ mod test {
     #[cfg(unix)]
     use codecs::{decoding::CharacterDelimitedDecoderOptions, CharacterDelimitedDecoderConfig};
     use futures::{stream, StreamExt};
-    use lookup::path;
+    use lookup::{lookup_v2::OptionalValuePath, owned_value_path, path};
     use tokio::{
         task::JoinHandle,
         time::{timeout, Duration, Instant},
@@ -611,7 +579,7 @@ mod test {
                         ..Default::default()
                     },
                 },
-                client_metadata_key: Some("tls_peer".into()),
+                client_metadata_key: Some(OptionalValuePath::from(owned_value_path!("tls_peer"))),
             }));
 
             let server = SocketConfig::from(config)
@@ -1019,7 +987,7 @@ mod test {
             let (tx, rx) = SourceSender::new_test();
             let address = next_addr();
             let mut config = UdpConfig::from_address(address.into());
-            config.max_length = 11;
+            config.max_length = Some(11);
             let address = init_udp_with_config(tx, config).await;
 
             send_lines_udp(
@@ -1055,7 +1023,7 @@ mod test {
             let (tx, rx) = SourceSender::new_test();
             let address = next_addr();
             let mut config = UdpConfig::from_address(address.into());
-            config.max_length = 10;
+            config.max_length = Some(10);
             config.framing = CharacterDelimitedDecoderConfig {
                 character_delimited: CharacterDelimitedDecoderOptions::new(b',', None),
             }

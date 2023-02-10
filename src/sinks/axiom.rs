@@ -26,17 +26,24 @@ pub struct AxiomConfig {
     ///
     /// Only required if not using Axiom Cloud.
     #[configurable(validation(format = "uri"))]
+    #[configurable(metadata(docs::examples = "https://axiom.my-domain.com"))]
+    #[configurable(metadata(docs::examples = "${AXIOM_URL}"))]
     url: Option<String>,
 
     /// The Axiom organization ID.
     ///
     /// Only required when using personal tokens.
+    #[configurable(metadata(docs::examples = "${AXIOM_ORG_ID}"))]
+    #[configurable(metadata(docs::examples = "123abc"))]
     org_id: Option<String>,
 
     /// The Axiom API token.
+    #[configurable(metadata(docs::examples = "${AXIOM_TOKEN}"))]
+    #[configurable(metadata(docs::examples = "123abc"))]
     token: SensitiveString,
 
     /// The Axiom dataset to write to.
+    #[configurable(metadata(docs::examples = "vector.dev"))]
     dataset: String,
 
     #[configurable(derived)]

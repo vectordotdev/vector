@@ -84,7 +84,7 @@ mod tests {
             tdef: TypeDef::integer(),
         }
 
-        interger_positive {
+        integer_positive {
             args: func_args![value: value!(42)],
             want: Ok(value!(42)),
             tdef: TypeDef::integer(),

@@ -15,16 +15,16 @@ impl fmt::Display for Value {
                     .replace('"', r#"\""#)
                     .replace('\n', r#"\n"#)
             ),
-            Self::Integer(val) => write!(f, "{}", val),
-            Self::Float(val) => write!(f, "{}", val),
-            Self::Boolean(val) => write!(f, "{}", val),
+            Self::Integer(val) => write!(f, "{val}"),
+            Self::Float(val) => write!(f, "{val}"),
+            Self::Boolean(val) => write!(f, "{val}"),
             Self::Object(map) => {
                 let joined = map
                     .iter()
-                    .map(|(key, val)| format!(r#""{}": {}"#, key, val))
+                    .map(|(key, val)| format!(r#""{key}": {val}"#))
                     .collect::<Vec<_>>()
                     .join(", ");
-                write!(f, "{{ {} }}", joined)
+                write!(f, "{{ {joined} }}")
             }
             Self::Array(array) => {
                 let joined = array
@@ -32,7 +32,7 @@ impl fmt::Display for Value {
                     .map(ToString::to_string)
                     .collect::<Vec<_>>()
                     .join(", ");
-                write!(f, "[{}]", joined)
+                write!(f, "[{joined}]")
             }
             Self::Timestamp(val) => {
                 write!(f, "t'{}'", val.to_rfc3339_opts(SecondsFormat::AutoSi, true))

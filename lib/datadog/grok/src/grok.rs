@@ -64,7 +64,7 @@ impl<'a> Iterator for MatchesIter<'a> {
         // that index, if anything.
         self.names.next().map(|(k, v)| {
             let key = k.as_str();
-            let value = self.captures.at(*v as usize).unwrap_or("");
+            let value = self.captures.at(*v).unwrap_or("");
             (key, value)
         })
     }

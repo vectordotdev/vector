@@ -71,7 +71,7 @@ pub async fn assert_vector_started(url: &str) -> Result<(), Box<dyn std::error::
 
 /// This helper function performs HTTP requests to the specified URL and
 /// waits for the presence of `vector_started`-ish metric until the deadline
-/// with even dealys between attempts.
+/// with even delays between attempts.
 pub async fn wait_for_vector_started(
     url: &str,
     next_attempt_delay: std::time::Duration,

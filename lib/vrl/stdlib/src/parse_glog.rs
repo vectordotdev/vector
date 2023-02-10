@@ -19,7 +19,7 @@ fn parse_glog(bytes: Value) -> Resolved {
             "W" => Ok("warning"),
             "E" => Ok("error"),
             "F" => Ok("fatal"),
-            _ => Err(format!(r#"unrecognized log level "{}""#, level)),
+            _ => Err(format!(r#"unrecognized log level "{level}""#)),
         }?;
 
         log.insert("level".into(), Value::Bytes(level.to_owned().into()));
@@ -29,9 +29,7 @@ fn parse_glog(bytes: Value) -> Resolved {
             "timestamp".into(),
             Value::Timestamp(
                 Utc.datetime_from_str(timestamp, "%Y%m%d %H:%M:%S%.f")
-                    .map_err(|error| {
-                        format!(r#"failed parsing timestamp {}: {}"#, timestamp, error)
-                    })?,
+                    .map_err(|error| format!(r#"failed parsing timestamp {timestamp}: {error}"#))?,
             ),
         );
     }

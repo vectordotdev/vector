@@ -1,56 +1,6 @@
 package metadata
 
 components: sinks: _splunk_hec: {
-	configuration: {
-		acknowledgements: {
-			type: object: {
-				options: {
-					indexer_acknowledgements_enabled: {
-						common:      false
-						description: "Controls if the sink will integrate with [Splunk HEC indexer acknowledgements](\(urls.splunk_hec_indexer_acknowledgements)) for end-to-end acknowledgements."
-						required:    false
-						type: bool: {
-							default: true
-						}
-					}
-					query_interval: {
-						common:      false
-						description: "The amount of time to wait in between queries to the Splunk HEC indexer acknowledgement endpoint. Minimum of `1`."
-						required:    false
-						type: uint: {
-							default: 10
-							unit:    "seconds"
-						}
-					}
-					retry_limit: {
-						common:      false
-						description: "The maximum number of times an ack id will be queried for its status. Minimum of `1`."
-						required:    false
-						type: uint: {
-							default: 30
-							unit:    null
-						}
-					}
-					max_pending_acks: {
-						common:      false
-						description: "The maximum number of ack ids pending query. Once reached, the sink will begin applying backpressure."
-						required:    false
-						type: uint: {
-							default: 1_000_000
-							unit:    null
-						}
-					}
-				}
-			}
-		}
-		default_token: {
-			description: "Default Splunk HEC token. If an event has a token set in its metadata, it will prevail over the one set here."
-			required:    true
-			type: string: {
-				examples: ["${SPLUNK_HEC_TOKEN}", "A94A8FE5CCB19BA61C4C08"]
-			}
-		}
-	}
 	how_it_works: {
 		indexer_acknowledgements: {
 			title: "Indexer Acknowledgements"

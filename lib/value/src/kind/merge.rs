@@ -268,7 +268,7 @@ mod tests {
             ),
         ]) {
             this.merge(other, strategy);
-            assert_eq!(this, merged, "{}", title);
+            assert_eq!(this, merged, "{title}");
         }
     }
 }

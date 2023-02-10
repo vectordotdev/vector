@@ -11,6 +11,7 @@ use futures::{stream, stream::FuturesUnordered, FutureExt, Stream, StreamExt, Tr
 use http::uri::{InvalidUri, Scheme, Uri};
 use lookup::owned_value_path;
 use once_cell::sync::Lazy;
+use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
 use tokio::sync::{mpsc, watch};
 use tokio_stream::wrappers::ReceiverStream;
@@ -43,8 +44,8 @@ use crate::{
     SourceSender,
 };
 
-const MIN_ACK_DEADLINE_SECS: i32 = 10;
-const MAX_ACK_DEADLINE_SECS: i32 = 600;
+const MIN_ACK_DEADLINE_SECS: u64 = 10;
+const MAX_ACK_DEADLINE_SECS: u64 = 600;
 
 // We use a bounded channel for the acknowledgement ID communication
 // between the request stream and receiver. During benchmark runs,
@@ -117,6 +118,7 @@ pub(crate) enum PubsubError {
 static CLIENT_ID: Lazy<String> = Lazy::new(|| uuid::Uuid::new_v4().to_string());
 
 /// Configuration for the `gcp_pubsub` source.
+#[serde_as]
 #[configurable_component(source("gcp_pubsub"))]
 #[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
@@ -129,7 +131,9 @@ pub struct PubsubConfig {
     pub subscription: String,
 
     /// The endpoint from which to pull data.
-    pub endpoint: Option<String>,
+    #[configurable(metadata(docs::examples = "https://us-central1-pubsub.googleapis.com"))]
+    #[serde(default = "default_endpoint")]
+    pub endpoint: String,
 
     #[serde(flatten)]
     pub auth: GcpAuthConfig,
@@ -144,33 +148,50 @@ pub struct PubsubConfig {
     /// The number of messages in a response to mark a stream as
     /// "busy". This is used to determine if more streams should be
     /// started.
+    ///
+    /// The GCP Pub/Sub servers send responses with 100 or more messages when
+    /// the subscription is busy.
     #[serde(default = "default_full_response")]
     pub full_response_size: usize,
 
     /// How often to poll the currently active streams to see if they
     /// are all busy and so open a new stream.
     #[serde(default = "default_poll_time")]
-    pub poll_time_seconds: f64,
+    #[serde_as(as = "serde_with::DurationSeconds<f64>")]
+    pub poll_time_seconds: Duration,
 
     /// The acknowledgement deadline, in seconds, to use for this stream.
     ///
     /// Messages that are not acknowledged when this deadline expires may be retransmitted.
-    pub ack_deadline_secs: Option<i32>,
+    #[serde(default = "default_ack_deadline")]
+    #[serde_as(as = "serde_with::DurationSeconds<u64>")]
+    pub ack_deadline_secs: Duration,
 
-    /// Deprecated, old name of `ack_deadline_secs`.
-    pub ack_deadline_seconds: Option<i32>,
+    /// The acknowledgement deadline, in seconds, to use for this stream.
+    ///
+    /// Messages that are not acknowledged when this deadline expires may be retransmitted.
+    #[configurable(
+        deprecated = "This option has been deprecated, use `ack_deadline_secs` instead."
+    )]
+    pub ack_deadline_seconds: Option<u16>,
 
     /// The amount of time, in seconds, to wait between retry attempts after an error.
-    pub retry_delay_secs: Option<f64>,
+    #[serde(default = "default_retry_delay")]
+    #[serde_as(as = "serde_with::DurationSeconds<f64>")]
+    pub retry_delay_secs: Duration,
 
-    /// Deprecated, old name of `retry_delay_secs`.
+    /// The amount of time, in seconds, to wait between retry attempts after an error.
+    #[configurable(
+        deprecated = "This option has been deprecated, use `retry_delay_secs` instead."
+    )]
     pub retry_delay_seconds: Option<f64>,
 
     /// The amount of time, in seconds, with no received activity
     /// before sending a keepalive request. If this is set larger than
     /// `60`, you may see periodic errors sent from the server.
     #[serde(default = "default_keepalive")]
-    pub keepalive_secs: f64,
+    #[serde_as(as = "serde_with::DurationSeconds<f64>")]
+    pub keepalive_secs: Duration,
 
     /// The namespace to use for logs. This overrides the global setting.
     #[configurable(metadata(docs::hidden))]
@@ -192,16 +213,20 @@ pub struct PubsubConfig {
     pub acknowledgements: SourceAcknowledgementsConfig,
 }
 
-const fn default_ack_deadline() -> i32 {
-    600
+fn default_endpoint() -> String {
+    PUBSUB_URL.to_string()
 }
 
-const fn default_retry_delay() -> f64 {
-    1.0
+const fn default_ack_deadline() -> Duration {
+    Duration::from_secs(600)
 }
 
-const fn default_keepalive() -> f64 {
-    60.0
+const fn default_retry_delay() -> Duration {
+    Duration::from_secs(1)
+}
+
+const fn default_keepalive() -> Duration {
+    Duration::from_secs(60)
 }
 
 const fn default_max_concurrency() -> usize {
@@ -212,45 +237,36 @@ const fn default_full_response() -> usize {
     100
 }
 
-const fn default_poll_time() -> f64 {
-    2.0
+const fn default_poll_time() -> Duration {
+    Duration::from_secs(2)
 }
 
 #[async_trait::async_trait]
 impl SourceConfig for PubsubConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<crate::sources::Source> {
         let log_namespace = cx.log_namespace(self.log_namespace);
-        let ack_deadline_secs = match (self.ack_deadline_secs, self.ack_deadline_seconds) {
-            (Some(ads), None) => ads,
-            (None, Some(ads)) => {
+        let ack_deadline_secs = match self.ack_deadline_seconds {
+            None => self.ack_deadline_secs,
+            Some(ads) => {
                 warn!("The `ack_deadline_seconds` setting is deprecated, use `ack_deadline_secs` instead.");
-                ads
+                Duration::from_secs(ads as u64)
             }
-            (Some(_), Some(_)) => return Err(PubsubError::BothAckDeadlineSecsAndSeconds.into()),
-            (None, None) => default_ack_deadline(),
         };
-        if !(MIN_ACK_DEADLINE_SECS..=MAX_ACK_DEADLINE_SECS).contains(&ack_deadline_secs) {
+        if !(MIN_ACK_DEADLINE_SECS..=MAX_ACK_DEADLINE_SECS).contains(&ack_deadline_secs.as_secs()) {
             return Err(PubsubError::InvalidAckDeadline.into());
         }
 
-        let retry_delay_secs = match (self.retry_delay_secs, self.retry_delay_seconds) {
-            (Some(rds), None) => rds,
-            (None, Some(rds)) => {
+        let retry_delay_secs = match self.retry_delay_seconds {
+            None => self.retry_delay_secs,
+            Some(rds) => {
                 warn!("The `retry_delay_seconds` setting is deprecated, use `retry_delay_secs` instead.");
-                rds
+                Duration::from_secs_f64(rds)
             }
-            (Some(_), Some(_)) => return Err(PubsubError::BothRetryDelaySecsAndSeconds.into()),
-            (None, None) => default_retry_delay(),
         };
 
         let auth = self.auth.build(Scope::PubSub).await?;
 
-        let mut uri: Uri = self
-            .endpoint
-            .as_deref()
-            .unwrap_or(PUBSUB_URL)
-            .parse()
-            .context(UriSnafu)?;
+        let mut uri: Uri = self.endpoint.parse().context(UriSnafu)?;
         auth.apply_uri(&mut uri);
 
         let tls = TlsSettings::from_options(&self.tls)?;
@@ -293,18 +309,15 @@ impl SourceConfig for PubsubConfig {
             shutdown: cx.shutdown,
             out: cx.out,
             ack_deadline_secs,
-            retry_delay: Duration::from_secs_f64(retry_delay_secs),
-            keepalive: Duration::from_secs_f64(self.keepalive_secs),
+            retry_delay: retry_delay_secs,
+            keepalive: self.keepalive_secs,
             concurrency: Default::default(),
             full_response_size: self.full_response_size,
             log_namespace,
             bytes_received: register!(BytesReceived::from(protocol)),
             events_received: register!(EventsReceived),
         }
-        .run_all(
-            self.max_concurrency,
-            Duration::from_secs_f64(self.poll_time_seconds),
-        )
+        .run_all(self.max_concurrency, self.poll_time_seconds)
         .map_err(|error| error!(message = "Source failed.", %error));
         Ok(Box::pin(source))
     }
@@ -355,7 +368,7 @@ struct PubsubSource {
     subscription: String,
     decoder: Decoder,
     acknowledgements: bool,
-    ack_deadline_secs: i32,
+    ack_deadline_secs: Duration,
     shutdown: ShutdownSignal,
     out: SourceSender,
     retry_delay: Duration,
@@ -551,7 +564,7 @@ impl PubsubSource {
     ) -> impl Stream<Item = proto::StreamingPullRequest> + 'static {
         let subscription = self.subscription.clone();
         let client_id = CLIENT_ID.clone();
-        let stream_ack_deadline_seconds = self.ack_deadline_secs;
+        let stream_ack_deadline_seconds = self.ack_deadline_secs.as_secs() as i32;
         let ack_ids = ReceiverStream::new(ack_ids).ready_chunks(ACK_QUEUE_SIZE);
 
         stream::once(async move {
@@ -650,7 +663,8 @@ impl PubsubSource {
             &message.data,
             message.publish_time.map(|dt| {
                 DateTime::from_utc(
-                    NaiveDateTime::from_timestamp(dt.seconds, dt.nanos as u32),
+                    NaiveDateTime::from_timestamp_opt(dt.seconds, dt.nanos as u32)
+                        .expect("invalid timestamp"),
                     Utc,
                 )
             }),
@@ -806,6 +820,7 @@ mod tests {
 mod integration_tests {
     use std::collections::{BTreeMap, HashSet};
 
+    use base64::prelude::{Engine as _, BASE64_STANDARD};
     use futures::{Stream, StreamExt};
     use http::method::Method;
     use hyper::{Request, StatusCode};
@@ -823,7 +838,7 @@ mod integration_tests {
     const PROJECT: &str = "sourceproject";
     static PROJECT_URI: Lazy<String> =
         Lazy::new(|| format!("{}/v1/projects/{}", *gcp::PUBSUB_ADDRESS, PROJECT));
-    const ACK_DEADLINE: u64 = 10; // Minimum custom deadline allowed by Pub/Sub
+    static ACK_DEADLINE: Lazy<Duration> = Lazy::new(|| Duration::from_secs(10)); // Minimum custom deadline allowed by Pub/Sub
 
     #[tokio::test]
     async fn oneshot() {
@@ -914,7 +929,7 @@ mod integration_tests {
             assert_eq!(tester.pull_count(10).await, 0);
 
             // Wait for the acknowledgement deadline to expire
-            tokio::time::sleep(Duration::from_secs(ACK_DEADLINE + 1)).await;
+            tokio::time::sleep(*ACK_DEADLINE + Duration::from_secs(1)).await;
 
             // All messages are still acknowledged
             assert_eq!(tester.pull_count(10).await, 0);
@@ -940,7 +955,7 @@ mod integration_tests {
             assert_eq!(tester.pull_count(10).await, 0);
 
             // Wait for the acknowledgement deadline to expire
-            tokio::time::sleep(std::time::Duration::from_secs(ACK_DEADLINE + 1)).await;
+            tokio::time::sleep(*ACK_DEADLINE + Duration::from_secs(1)).await;
 
             // All messages are still in the queue
             assert_eq!(tester.pull_count(10).await, 1);
@@ -969,7 +984,10 @@ mod integration_tests {
     fn now_trunc() -> DateTime<Utc> {
         let start = Utc::now().timestamp();
         // Truncate the milliseconds portion, the hard way.
-        DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(start, 0), Utc)
+        DateTime::<Utc>::from_utc(
+            NaiveDateTime::from_timestamp_opt(start, 0).expect("invalid timestamp"),
+            Utc,
+        )
     }
 
     struct Tester {
@@ -998,7 +1016,7 @@ mod integration_tests {
 
             let body = json!({
                 "topic": format!("projects/{}/topics/{}", PROJECT, this.topic),
-                "ackDeadlineSeconds": ACK_DEADLINE,
+                "ackDeadlineSeconds": *ACK_DEADLINE,
             });
             this.request(Method::PUT, "subscriptions/{sub}", body).await;
 
@@ -1016,12 +1034,12 @@ mod integration_tests {
             let config = PubsubConfig {
                 project: PROJECT.into(),
                 subscription: self.subscription.clone(),
-                endpoint: Some(gcp::PUBSUB_ADDRESS.clone()),
+                endpoint: gcp::PUBSUB_ADDRESS.clone(),
                 auth: GcpAuthConfig {
                     skip_authentication: true,
                     ..Default::default()
                 },
-                ack_deadline_secs: Some(ACK_DEADLINE as i32),
+                ack_deadline_secs: *ACK_DEADLINE,
                 ..Default::default()
             };
             let (mut ctx, shutdown) = SourceContext::new_shutdown(&self.component, tx);
@@ -1041,7 +1059,7 @@ mod integration_tests {
             let lines: Vec<_> = test_util::random_lines(44).take(count).collect();
             let messages: Vec<_> = lines
                 .iter()
-                .map(|message| base64::encode(&message))
+                .map(|input| BASE64_STANDARD.encode(input))
                 .map(|data| json!({ "data": data, "attributes": attributes.clone() }))
                 .collect();
             let body = json!({ "messages": messages });

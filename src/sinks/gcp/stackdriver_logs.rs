@@ -65,6 +65,7 @@ pub struct StackdriverConfig {
     ///
     /// [sev_names]: https://cloud.google.com/logging/docs/reference/v2/rest/v2/LogEntry#logseverity
     /// [logsev_docs]: https://cloud.google.com/logging/docs/reference/v2/rest/v2/LogEntry#logseverity
+    #[configurable(metadata(docs::examples = "severity"))]
     pub severity_key: Option<String>,
 
     #[serde(flatten)]
@@ -118,31 +119,43 @@ const MAX_BATCH_PAYLOAD_SIZE: usize = 10_000_000;
 #[derivative(Default)]
 pub enum StackdriverLogName {
     /// The billing account ID to which to publish logs.
+    ///
+    ///	Exactly one of `billing_account_id`, `folder_id`, `organization_id`, or `project_id` must be set.
     #[serde(rename = "billing_account_id")]
-    BillingAccount(#[configurable(transparent)] String),
+    #[configurable(metadata(docs::examples = "012345-6789AB-CDEF01"))]
+    BillingAccount(String),
 
     /// The folder ID to which to publish logs.
     ///
     /// See the [Google Cloud Platform folder documentation][folder_docs] for more details.
     ///
+    ///	Exactly one of `billing_account_id`, `folder_id`, `organization_id`, or `project_id` must be set.
+    ///
     /// [folder_docs]: https://cloud.google.com/resource-manager/docs/creating-managing-folders
     #[serde(rename = "folder_id")]
-    Folder(#[configurable(transparent)] String),
+    #[configurable(metadata(docs::examples = "My Folder"))]
+    Folder(String),
 
     /// The organization ID to which to publish logs.
     ///
     /// This would be the identifier assigned to your organization on Google Cloud Platform.
+    ///
+    ///	Exactly one of `billing_account_id`, `folder_id`, `organization_id`, or `project_id` must be set.
     #[serde(rename = "organization_id")]
-    Organization(#[configurable(transparent)] String),
+    #[configurable(metadata(docs::examples = "622418129737"))]
+    Organization(String),
 
     /// The project ID to which to publish logs.
     ///
     /// See the [Google Cloud Platform project management documentation][project_docs] for more details.
     ///
+    ///	Exactly one of `billing_account_id`, `folder_id`, `organization_id`, or `project_id` must be set.
+    ///
     /// [project_docs]: https://cloud.google.com/resource-manager/docs/creating-managing-projects
     #[derivative(Default)]
     #[serde(rename = "project_id")]
-    Project(#[configurable(transparent)] String),
+    #[configurable(metadata(docs::examples = "vector-123456"))]
+    Project(String),
 }
 
 /// A monitored resource.
@@ -163,12 +176,25 @@ pub struct StackdriverResource {
     /// The monitored resource type.
     ///
     /// For example, the type of a Compute Engine VM instance is `gce_instance`.
+    /// See the [Google Cloud Platform monitored resource documentation][gcp_resources] for
+    /// more details.
+    ///
+    /// [gcp_resources]: https://cloud.google.com/monitoring/api/resources
     #[serde(rename = "type")]
     pub type_: String,
 
     /// Type-specific labels.
     #[serde(flatten)]
+    #[configurable(metadata(docs::additional_props_description = "A type-specific label."))]
+    #[configurable(metadata(docs::examples = "label_examples()"))]
     pub labels: HashMap<String, Template>,
+}
+
+fn label_examples() -> HashMap<String, String> {
+    let mut example = HashMap::new();
+    example.insert("instanceId".to_string(), "Twilight".to_string());
+    example.insert("zone".to_string(), "{{ zone }}".to_string());
+    example
 }
 
 impl_generate_config_from_default!(StackdriverConfig);
@@ -183,23 +209,23 @@ impl SinkConfig for StackdriverConfig {
             .validate()?
             .limit_max_bytes(MAX_BATCH_PAYLOAD_SIZE)?
             .into_batch_settings()?;
-        let request = self.request.unwrap_with(&TowerRequestConfig {
-            rate_limit_num: Some(1000),
-            rate_limit_duration_secs: Some(1),
-            ..Default::default()
-        });
+        let request = self.request.unwrap_with(
+            &TowerRequestConfig::default()
+                .rate_limit_duration_secs(1)
+                .rate_limit_num(1000),
+        );
         let tls_settings = TlsSettings::from_options(&self.tls)?;
         let client = HttpClient::new(tls_settings, cx.proxy())?;
 
         let sink = StackdriverSink {
             config: self.clone(),
-            auth,
+            auth: auth.clone(),
             severity_key: self.severity_key.clone(),
             uri: self.endpoint.parse().unwrap(),
         };
 
         let healthcheck = healthcheck(client.clone(), sink.clone()).boxed();
-
+        auth.spawn_regenerate_token();
         let sink = BatchedHttpSink::new(
             sink,
             JsonArrayBuffer::new(batch.size),
@@ -360,11 +386,7 @@ async fn healthcheck(client: HttpClient, sink: StackdriverSink) -> crate::Result
     let request = sink.build_request(vec![]).await?.map(Body::from);
 
     let response = client.send(request).await?;
-    healthcheck_response(
-        response,
-        sink.auth.clone(),
-        HealthcheckError::NotFound.into(),
-    )
+    healthcheck_response(response, HealthcheckError::NotFound.into())
 }
 
 impl StackdriverConfig {
@@ -387,6 +409,7 @@ mod tests {
     use chrono::{TimeZone, Utc};
     use futures::{future::ready, stream};
     use indoc::indoc;
+    use serde::Deserialize;
     use serde_json::value::RawValue;
 
     use super::*;
@@ -409,8 +432,8 @@ mod tests {
         let mock_endpoint = spawn_blackhole_http_server(always_200_response).await;
 
         let config = StackdriverConfig::generate_config().to_string();
-        let mut config =
-            toml::from_str::<StackdriverConfig>(&config).expect("config should be valid");
+        let mut config = StackdriverConfig::deserialize(toml::de::ValueDeserializer::new(&config))
+            .expect("config should be valid");
 
         // If we don't override the credentials path/API key, it tries to directly call out to the Google Instance
         // Metadata API, which we clearly don't have in unit tests. :)
@@ -492,7 +515,11 @@ mod tests {
         log.insert("anumber", Value::Bytes("100".into()));
         log.insert(
             "timestamp",
-            Value::Timestamp(Utc.ymd(2020, 1, 1).and_hms(12, 30, 0)),
+            Value::Timestamp(
+                Utc.ymd(2020, 1, 1)
+                    .and_hms_opt(12, 30, 0)
+                    .expect("invalid timestamp"),
+            ),
         );
 
         let json = encoder.encode_event(Event::from(log)).unwrap();

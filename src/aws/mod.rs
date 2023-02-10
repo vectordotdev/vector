@@ -8,7 +8,7 @@ use std::sync::Arc;
 use std::task::{Context, Poll};
 use std::time::{Duration, SystemTime};
 
-pub use auth::AwsAuthentication;
+pub use auth::{AwsAuthentication, ImdsAuthentication};
 use aws_config::meta::region::ProvideRegion;
 use aws_sigv4::http_request::{SignableRequest, SigningSettings};
 use aws_sigv4::SigningParams;
@@ -61,7 +61,7 @@ pub fn is_retriable_error<T>(error: &SdkError<T>) -> bool {
             //
             // Now just look for those when it's a client_error
             let re = RETRIABLE_CODES.get_or_init(|| {
-                RegexSet::new(&["RequestTimeout", "RequestExpired", "ThrottlingException"])
+                RegexSet::new(["RequestTimeout", "RequestExpired", "ThrottlingException"])
                     .expect("invalid regex")
             });
 

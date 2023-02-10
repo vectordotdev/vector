@@ -124,7 +124,7 @@ pub struct Ec2Metadata {
     )]
     proxy: ProxyConfig,
 
-    /// Requires the transform to be able to successfully query the EC2 metadata before Vector can start.
+    /// Requires the transform to be able to successfully query the EC2 metadata before starting to process the data.
     #[serde(default = "default_required")]
     #[derivative(Default(value = "default_required()"))]
     required: bool,

@@ -1,10 +1,14 @@
-use std::{convert::TryFrom, time::Instant};
+use std::{
+    convert::TryFrom,
+    time::{Duration, Instant},
+};
 
 use bytes::Bytes;
 use chrono::Utc;
 use futures::{future::join_all, StreamExt, TryFutureExt};
 use http::{Request, StatusCode};
 use hyper::{body::to_bytes as body_to_bytes, Body, Uri};
+use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
@@ -55,6 +59,7 @@ enum NginxError {
 }
 
 /// Configuration for the `nginx_metrics` source.
+#[serde_as]
 #[configurable_component(source("nginx_metrics"))]
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
@@ -63,11 +68,13 @@ pub struct NginxMetricsConfig {
     ///
     /// Each endpoint must be a valid HTTP/HTTPS URI pointing to an NGINX instance that has the
     /// `ngx_http_stub_status_module` module enabled.
+    #[configurable(metadata(docs::examples = "http://localhost:8000/basic_status"))]
     endpoints: Vec<String>,
 
-    /// The interval between scrapes, in seconds.
+    /// The interval between scrapes.
     #[serde(default = "default_scrape_interval_secs")]
-    scrape_interval_secs: u64,
+    #[serde_as(as = "serde_with::DurationSeconds<u64>")]
+    scrape_interval_secs: Duration,
 
     /// Overrides the default namespace for the metrics emitted by the source.
     ///
@@ -84,8 +91,8 @@ pub struct NginxMetricsConfig {
     auth: Option<Auth>,
 }
 
-pub(super) const fn default_scrape_interval_secs() -> u64 {
-    15
+pub(super) const fn default_scrape_interval_secs() -> Duration {
+    Duration::from_secs(15)
 }
 
 pub fn default_namespace() -> String {
@@ -111,7 +118,7 @@ impl SourceConfig for NginxMetricsConfig {
             )?);
         }
 
-        let duration = time::Duration::from_secs(self.scrape_interval_secs);
+        let duration = self.scrape_interval_secs;
         let shutdown = cx.shutdown;
         Ok(Box::pin(async move {
             let mut interval = IntervalStream::new(time::interval(duration)).take_until(shutdown);
@@ -290,7 +297,7 @@ mod integration_tests {
     async fn test_nginx(endpoint: String, auth: Option<Auth>, proxy: ProxyConfig) {
         let config = NginxMetricsConfig {
             endpoints: vec![endpoint],
-            scrape_interval_secs: 15,
+            scrape_interval_secs: Duration::from_secs(15),
             namespace: "vector_nginx".to_owned(),
             tls: None,
             auth,

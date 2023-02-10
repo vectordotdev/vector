@@ -4,6 +4,7 @@ components: sources: nats: {
 	title: "NATS"
 
 	features: {
+		auto_generated:   true
 		acknowledgements: false
 		collect: {
 			checkpoint: enabled: false
@@ -38,20 +39,10 @@ components: sources: nats: {
 		platform_name: null
 	}
 
-	configuration: components._nats.configuration & {
-		queue: {
-			common:      false
-			description: "NATS Queue Group to join"
-			required:    false
-			type: string: {
-				default: "vector"
-				examples: ["foo", "API Name Option Example"]
-			}
-		}
-	}
+	configuration: base.components.sources.nats.configuration
 
 	output: logs: record: {
-		description: "An individual NATS record"
+		description: "An individual NATS record."
 		fields: {
 			message: {
 				description: "The raw line from the NATS message."
@@ -65,6 +56,13 @@ components: sources: nats: {
 				required:    true
 				type: string: {
 					examples: ["nats"]
+				}
+			}
+			subject: {
+				description: "The subject from the NATS message."
+				required:    true
+				type: string: {
+					examples: ["nats.subject"]
 				}
 			}
 		}

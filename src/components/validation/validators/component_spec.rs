@@ -23,11 +23,53 @@ impl Validator for ComponentSpecValidator {
     fn check_validation(
         &self,
         _component_type: ComponentType,
-        _expectation: TestCaseExpectation,
+        expectation: TestCaseExpectation,
         inputs: &[TestEvent],
         outputs: &[Event],
         telemetry_events: &[Event],
     ) -> Result<Vec<String>, Vec<String>> {
+        for input in inputs {
+            debug!("Validator observed input event: {:?}", input);
+        }
+
+        for output in outputs {
+            debug!("Validator observed output event: {:?}", output);
+        }
+
+        // Validate that the number of inputs/outputs matched the test case expectation.
+        //
+        // NOTE: This logic currently assumes that one input event leads to, at most, one output
+        // event. It also assumes that tests that are marked as expecting to be partially successful
+        // should never emit the same number of output events as there are input events.
+        match expectation {
+            TestCaseExpectation::Success => {
+                if inputs.len() != outputs.len() {
+                    return Err(vec![format!(
+                        "Sent {} inputs but only received {} outputs.",
+                        inputs.len(),
+                        outputs.len()
+                    )]);
+                }
+            }
+            TestCaseExpectation::Failure => {
+                if !outputs.is_empty() {
+                    return Err(vec![format!(
+                        "Received {} outputs but none were expected.",
+                        outputs.len()
+                    )]);
+                }
+            }
+            TestCaseExpectation::PartialSuccess => {
+                if inputs.len() == outputs.len() {
+                    return Err(vec![
+                        "Received an output event for every input, when only some outputs were expected.".to_string()
+                    ]);
+                }
+            }
+        }
+
+        // TODO: Check for the relevant telemetry events for the given component type.
+
         Ok(vec![
             format!(
                 "sent {} inputs and received {} outputs",

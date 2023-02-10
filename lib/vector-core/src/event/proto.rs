@@ -203,9 +203,12 @@ impl From<Metric> for event::Metric {
 
         let namespace = (!metric.namespace.is_empty()).then_some(metric.namespace);
 
-        let timestamp = metric
-            .timestamp
-            .map(|ts| chrono::Utc.timestamp(ts.seconds, ts.nanos as u32));
+        let timestamp = metric.timestamp.map(|ts| {
+            chrono::Utc
+                .timestamp_opt(ts.seconds, ts.nanos as u32)
+                .single()
+                .expect("invalid timestamp")
+        });
 
         let mut tags = MetricTags(
             metric
@@ -521,7 +524,7 @@ impl From<sketch::AgentDdSketch> for MetricSketch {
             .collect::<Vec<_>>();
         MetricSketch::AgentDDSketch(
             AgentDDSketch::from_raw(
-                sketch.count as u32,
+                sketch.count,
                 sketch.min,
                 sketch.max,
                 sketch.sum,
@@ -538,7 +541,10 @@ fn decode_value(input: Value) -> Option<event::Value> {
     match input.kind {
         Some(value::Kind::RawBytes(data)) => Some(event::Value::Bytes(data)),
         Some(value::Kind::Timestamp(ts)) => Some(event::Value::Timestamp(
-            chrono::Utc.timestamp(ts.seconds, ts.nanos as u32),
+            chrono::Utc
+                .timestamp_opt(ts.seconds, ts.nanos as u32)
+                .single()
+                .expect("invalid timestamp"),
         )),
         Some(value::Kind::Integer(value)) => Some(event::Value::Integer(value)),
         Some(value::Kind::Float(value)) => Some(event::Value::Float(NotNan::new(value).unwrap())),

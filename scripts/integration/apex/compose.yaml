@@ -1,0 +1,13 @@
+version: '3'
+
+services:
+  mock-apex:
+    image: mcasper/mock-apex:${CONFIG_VERSION}
+    environment:
+    - MOCK_API_TOKEN=token
+    ports:
+    - '4567'
+
+networks:
+  default:
+    name: ${VECTOR_NETWORK}

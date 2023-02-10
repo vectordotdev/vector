@@ -401,8 +401,8 @@ impl TransformOutputsBuf {
         self.primary_buffer.as_ref().map_or(0, OutputBuffer::len)
             + self
                 .named_buffers
-                .iter()
-                .map(|(_, buf)| buf.len())
+                .values()
+                .map(OutputBuffer::len)
                 .sum::<usize>()
     }
 
@@ -416,8 +416,8 @@ impl ByteSizeOf for TransformOutputsBuf {
         self.primary_buffer.size_of()
             + self
                 .named_buffers
-                .iter()
-                .map(|(_, buf)| buf.size_of())
+                .values()
+                .map(ByteSizeOf::size_of)
                 .sum::<usize>()
     }
 }
@@ -552,7 +552,7 @@ impl<T: TaskTransform<Event> + Send + 'static> TaskTransform<EventArray> for Wra
         self: Box<Self>,
         stream: Pin<Box<dyn Stream<Item = EventArray> + Send>>,
     ) -> Pin<Box<dyn Stream<Item = EventArray> + Send>> {
-        // This is an aweful lot of boxes
+        // This is an awful lot of boxes
         let stream = stream.flat_map(into_event_stream).boxed();
         Box::new(self.0).transform(stream).map(Into::into).boxed()
     }

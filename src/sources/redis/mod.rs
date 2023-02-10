@@ -5,7 +5,7 @@ use codecs::{
     StreamDecodingError,
 };
 use futures::StreamExt;
-use lookup::{lookup_v2::BorrowedSegment, owned_value_path, path};
+use lookup::{lookup_v2::OptionalValuePath, owned_value_path, path, OwnedValuePath};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::FramedRead;
 use value::Kind;
@@ -13,8 +13,10 @@ use vector_common::internal_event::{
     ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol, Registered,
 };
 use vector_config::{configurable_component, NamedComponent};
-use vector_core::config::{LegacyKey, LogNamespace};
-use vector_core::EstimatedJsonEncodedSizeOf;
+use vector_core::{
+    config::{LegacyKey, LogNamespace},
+    EstimatedJsonEncodedSizeOf,
+};
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
@@ -106,9 +108,11 @@ pub struct RedisSourceConfig {
     /// The Redis URL to connect to.
     ///
     /// The URL must take the form of `protocol://server:port/db` where the `protocol` can either be `redis` or `rediss` for connections secured via TLS.
+    #[configurable(metadata(docs::examples = "redis://127.0.0.1:6379/0"))]
     url: String,
 
     /// The Redis key to read messages from.
+    #[configurable(metadata(docs::examples = "vector"))]
     key: String,
 
     /// Sets the name of the log field to use to add the key to each event.
@@ -116,7 +120,8 @@ pub struct RedisSourceConfig {
     /// The value will be the Redis key that the event was read from.
     ///
     /// By default, this is not set and the field will not be automatically added.
-    redis_key: Option<String>,
+    #[configurable(metadata(docs::examples = "redis_key"))]
+    redis_key: Option<OptionalValuePath>,
 
     #[configurable(derived)]
     #[serde(default = "default_framing_message_based")]
@@ -158,6 +163,7 @@ impl SourceConfig for RedisSourceConfig {
         if self.key.is_empty() {
             return Err("`key` cannot be empty.".into());
         }
+        let redis_key = self.redis_key.clone().and_then(|k| k.path);
 
         let client = redis::Client::open(self.url.as_str()).context(ClientSnafu {})?;
         let connection_info = ConnectionInfo::from(client.get_connection_info());
@@ -173,7 +179,7 @@ impl SourceConfig for RedisSourceConfig {
             bytes_received: bytes_received.clone(),
             events_received: events_received.clone(),
             key: self.key.clone(),
-            redis_key: self.redis_key.clone(),
+            redis_key,
             decoder,
             cx,
             log_namespace,
@@ -193,8 +199,8 @@ impl SourceConfig for RedisSourceConfig {
 
         let redis_key_path = self
             .redis_key
-            .as_ref()
-            .map(|x| owned_value_path!(x))
+            .clone()
+            .and_then(|k| k.path)
             .map(LegacyKey::InsertIfEmpty);
 
         let schema_definition = self
@@ -222,7 +228,7 @@ pub(self) struct InputHandler {
     pub bytes_received: Registered<BytesReceived>,
     pub events_received: Registered<EventsReceived>,
     pub key: String,
-    pub redis_key: Option<String>,
+    pub redis_key: Option<OwnedValuePath>,
     pub decoder: Decoder,
     pub log_namespace: LogNamespace,
     pub cx: SourceContext,
@@ -257,15 +263,10 @@ impl InputHandler {
                                 now,
                             );
 
-                            let redis_key_path = self
-                                .redis_key
-                                .as_deref()
-                                .map(|x| [BorrowedSegment::from(x)]);
-
                             self.log_namespace.insert_source_metadata(
                                 RedisSourceConfig::NAME,
                                 log,
-                                redis_key_path.as_ref().map(LegacyKey::InsertIfEmpty),
+                                self.redis_key.as_ref().map(LegacyKey::InsertIfEmpty),
                                 path!("key"),
                                 self.key.as_str(),
                             );
@@ -307,10 +308,13 @@ mod integration_test {
     use redis::AsyncCommands;
 
     use super::*;
-    use crate::config::log_schema;
-    use crate::test_util::components::{run_and_assert_source_compliance_n, SOURCE_TAGS};
     use crate::{
-        test_util::{collect_n, random_string},
+        config::log_schema,
+        test_util::{
+            collect_n,
+            components::{run_and_assert_source_compliance_n, SOURCE_TAGS},
+            random_string,
+        },
         SourceSender,
     };
 
@@ -369,7 +373,7 @@ mod integration_test {
             }),
             url: REDIS_SERVER.to_owned(),
             key: key.clone(),
-            redis_key: Some("remapped_key".into()),
+            redis_key: Some(OptionalValuePath::from(owned_value_path!("remapped_key"))),
             framing: default_framing_message_based(),
             decoding: default_decoding(),
             log_namespace: Some(true),
@@ -452,7 +456,7 @@ mod integration_test {
         // Briefly wait to ensure the source is subscribed.
         //
         // TODO: This is a prime example of where being able to check if the shutdown signal had been polled at least
-        // once would serve as the most precise indicator of "is the source ready and waiting to receieve?".
+        // once would serve as the most precise indicator of "is the source ready and waiting to receive?".
         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
 
         // Now create a normal Redis client and use it to publish a bunch of message, which we'll ensure the source consumes.

@@ -1,0 +1,34 @@
+# Add new pull requests to Gardener project board for triage
+
+on:
+  pull_request_target:
+    types:
+      - opened
+      - reopened
+
+jobs:
+  add-contributor-to-project:
+    name: Add contributor PR to Gardener project board
+    runs-on: ubuntu-latest
+    if: ${{ github.actor != 'dependabot[bot]' }}
+    steps:
+      - uses: tspascoal/get-user-teams-membership@v2
+        id: checkVectorMember
+        with:
+          username: ${{ github.actor }}
+          team: vector
+          GITHUB_TOKEN: ${{ secrets.GH_PROJECT_PAT }}
+      - uses: actions/add-to-project@v0.4.0
+        if: ${{ steps.checkVectorMember.outputs.isTeamMember == 'false' }}
+        with:
+          project-url: https://github.com/orgs/vectordotdev/projects/49
+          github-token: ${{ secrets.GH_PROJECT_PAT }}
+  add-dependabot-to-project:
+    name: Add dependabot PR to Gardener project board
+    runs-on: ubuntu-latest
+    if: ${{ github.actor == 'dependabot[bot]' }}
+    steps:
+      - uses: actions/add-to-project@v0.4.0
+        with:
+          project-url: https://github.com/orgs/vectordotdev/projects/49
+          github-token: ${{ secrets.GH_PROJECT_PAT }}
