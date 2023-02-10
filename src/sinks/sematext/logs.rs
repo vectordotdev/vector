@@ -29,9 +29,13 @@ pub struct SematextLogsConfig {
 
     /// The endpoint to send data to.
     #[serde(alias = "host")]
+    #[configurable(metadata(docs::examples = "http://127.0.0.1"))]
+    #[configurable(metadata(docs::examples = "https://example.com"))]
     endpoint: Option<String>,
 
     /// The token that will be used to write to Sematext.
+    #[configurable(metadata(docs::examples = "${SEMATEXT_TOKEN}"))]
+    #[configurable(metadata(docs::examples = "some-sematext-token"))]
     token: SensitiveString,
 
     #[configurable(derived)]

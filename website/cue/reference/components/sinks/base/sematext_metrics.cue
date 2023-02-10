@@ -75,11 +75,11 @@ base: components: sinks: sematext_metrics: configuration: {
 		type: string: {}
 	}
 	region: {
-		description: "Sematext region."
+		description: "The Sematext region to send data to."
 		required:    false
 		type: string: enum: {
-			eu: "EU region."
-			us: "US region."
+			eu: "Europe"
+			us: "United States"
 		}
 	}
 	request: {

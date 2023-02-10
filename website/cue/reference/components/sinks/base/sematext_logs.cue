@@ -86,14 +86,14 @@ base: components: sinks: sematext_logs: configuration: {
 	endpoint: {
 		description: "The endpoint to send data to."
 		required:    false
-		type: string: {}
+		type: string: examples: ["http://127.0.0.1", "https://example.com"]
 	}
 	region: {
-		description: "Sematext region."
+		description: "The Sematext region to send data to."
 		required:    false
 		type: string: enum: {
-			eu: "EU region."
-			us: "US region."
+			eu: "Europe"
+			us: "United States"
 		}
 	}
 	request: {
@@ -242,6 +242,6 @@ base: components: sinks: sematext_logs: configuration: {
 	token: {
 		description: "The token that will be used to write to Sematext."
 		required:    true
-		type: string: {}
+		type: string: examples: ["${SEMATEXT_TOKEN}", "some-sematext-token"]
 	}
 }
