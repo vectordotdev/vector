@@ -135,14 +135,6 @@ impl Expression for Op {
         // see: https://github.com/vectordotdev/vector/issues/13789
         // and: https://github.com/vectordotdev/vector/issues/13791
 
-        // let rhs_def = match self.opcode {
-        //     Err | Or | Merge | And | Eq | Ne | Gt | Ge | Lt | Le => TypeDef::null(),
-        //     _ => {
-        //         // TODO: delete me. Backwards compact while the implementation is modified
-        //         self.rhs.apply_type_info(&mut state)
-        //     }
-        // };
-
         // calculates state for an RHS that may or may not be resolved at runtime
         // This merges the type definitions for state. If it is known at compile-time
         // if the RHS will be resolved, this should not be used
