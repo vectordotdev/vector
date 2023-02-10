@@ -155,7 +155,7 @@ impl Expression for Op {
         let result = match self.opcode {
             Err => {
                 let rhs_def = maybe_rhs(&mut state);
-                // let rhs_info = self.rhs.type_info(&state);
+
                 // entire expression is only fallible if both lhs and rhs were fallible
                 let fallible = lhs_def.is_fallible() && rhs_def.is_fallible();
 

@@ -13,3 +13,8 @@ assert!(type_def(x) == { "boolean": true })
 # The typedef of RHS is conditionally applied (can't know if it will be resolved or not)
 .unknown || {x = "string"}
 assert!(type_def(x) == { "boolean": true, "bytes": true })
+
+
+# The typedef of RHS is always applied
+true && {x = "string"; true}
+assert!(type_def(x) == {"bytes": true })
