@@ -2,14 +2,14 @@ version: '3'
 
 services:
   mongodb-primary:
-    image: docker.io/bitnami/mongodb:${MONGODB_VERSION}
+    image: docker.io/bitnami/mongodb:${CONFIG_VERSION}
     environment:
     - MONGODB_ADVERTISED_HOSTNAME=mongodb-primary
     - MONGODB_REPLICA_SET_MODE=primary
     - MONGODB_ROOT_PASSWORD=toor
     - MONGODB_REPLICA_SET_KEY=vector
   mongodb-secondary:
-    image: docker.io/bitnami/mongodb:${MONGODB_VERSION}
+    image: docker.io/bitnami/mongodb:${CONFIG_VERSION}
     depends_on:
     - mongodb-primary
     environment:
@@ -20,7 +20,7 @@ services:
     - MONGODB_INITIAL_PRIMARY_ROOT_PASSWORD=toor
     - MONGODB_REPLICA_SET_KEY=vector
   mongodb-arbiter:
-    image: docker.io/bitnami/mongodb:${MONGODB_VERSION}
+    image: docker.io/bitnami/mongodb:${CONFIG_VERSION}
     depends_on:
     - mongodb-primary
     environment:

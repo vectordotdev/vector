@@ -1,5 +1,5 @@
 crate::cli_subcommands! {
-    "Package Vector in various formats"
+    "Package Vector in various formats..."
         archive, deb, msi, rpm,
 }
 

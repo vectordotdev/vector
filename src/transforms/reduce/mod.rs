@@ -695,9 +695,9 @@ max_events = 0
 
         match reduce_config {
             Ok(_conf) => unreachable!("max_events=0 should be rejected."),
-            Err(err) => assert!(err.to_string().contains(
-                "invalid value: integer `0`, expected a nonzero usize for key `max_events`"
-            )),
+            Err(err) => assert!(err
+                .to_string()
+                .contains("invalid value: integer `0`, expected a nonzero usize")),
         }
     }
 

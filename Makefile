@@ -338,35 +338,6 @@ test-integration: test-integration-nginx test-integration-opentelemetry test-int
 test-integration: test-integration-redis test-integration-splunk test-integration-dnstap test-integration-datadog-agent test-integration-datadog-logs
 test-integration: test-integration-datadog-traces test-integration-shutdown
 
-.PHONY: test-integration-aws-s3
-test-integration-aws-s3: ## Runs AWS S3 integration tests
-	FILTER=::aws_s3 make test-integration-aws
-
-.PHONY: test-integration-aws-sqs
-test-integration-aws-sqs: ## Runs AWS SQS integration tests
-	FILTER=::aws_sqs make test-integration-aws
-
-.PHONY: test-integration-aws-cloudwatch-logs
-test-integration-aws-cloudwatch-logs: ## Runs AWS Cloudwatch Logs integration tests
-	FILTER=::aws_cloudwatch_logs make test-integration-aws
-
-.PHONY: test-integration-aws-cloudwatch-metrics
-test-integration-aws-cloudwatch-metrics: ## Runs AWS Cloudwatch Metrics integration tests
-	FILTER=::aws_cloudwatch_metrics make test-integration-aws
-
-.PHONY: test-integration-aws-kinesis
-test-integration-aws-kinesis: ## Runs AWS Kinesis integration tests
-	FILTER=::aws_kinesis make test-integration-aws
-
-.PHONY: test-integration-datadog-agent
-test-integration-datadog-agent: ## Runs Datadog Agent integration tests
-	@test $${TEST_DATADOG_API_KEY?TEST_DATADOG_API_KEY must be set}
-	RUST_VERSION=${RUST_VERSION} ${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.datadog-agent.yml build
-	RUST_VERSION=${RUST_VERSION} ${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.datadog-agent.yml run --rm runner
-ifeq ($(AUTODESPAWN), true)
-	make test-integration-datadog-agent-cleanup
-endif
-
 test-integration-%-cleanup:
 	cargo vdev --verbose integration stop $*
 

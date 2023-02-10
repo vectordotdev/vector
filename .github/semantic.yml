@@ -77,6 +77,7 @@ scopes:
   - traces # Anything related to Vectors' trace events
   - transforms # Anything related to Vector's transform components
   - unit tests # Anything related to Vector's unit testing feature
+  - vdev # Anything related to the vdev tooling
   - vrl # Anything related to the Vector Remap Language
 
   # platforms

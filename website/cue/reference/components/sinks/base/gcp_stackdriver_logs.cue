@@ -29,7 +29,7 @@ base: components: sinks: gcp_stackdriver_logs: configuration: {
 	}
 	api_key: {
 		description: """
-			An API key. ([documentation](https://cloud.google.com/docs/authentication/api-keys))
+			An [API key][gcp_api_key].
 
 			Either an API key, or a path to a service account credentials JSON file can be specified.
 
@@ -37,6 +37,8 @@ base: components: sinks: gcp_stackdriver_logs: configuration: {
 			filename is named, an attempt is made to fetch an instance service account for the compute instance the program is
 			running on. If this is not on a GCE instance, then you must define it with an API key or service account
 			credentials JSON file.
+
+			[gcp_api_key]: https://cloud.google.com/docs/authentication/api-keys
 			"""
 		required: false
 		type: string: {}
@@ -74,13 +76,17 @@ base: components: sinks: gcp_stackdriver_logs: configuration: {
 		}
 	}
 	billing_account_id: {
-		description: "The billing account ID to which to publish logs."
-		required:    true
+		description: """
+			The billing account ID to which to publish logs.
+
+			Exactly one of `billing_account_id`, `folder_id`, `organization_id`, or `project_id` must be set.
+			"""
+		required: true
 		type: string: {}
 	}
 	credentials_path: {
 		description: """
-			Path to a service account credentials JSON file. ([documentation](https://cloud.google.com/docs/authentication/production#manually))
+			Path to a [service account] credentials JSON file.
 
 			Either an API key, or a path to a service account credentials JSON file can be specified.
 
@@ -88,6 +94,8 @@ base: components: sinks: gcp_stackdriver_logs: configuration: {
 			filename is named, an attempt is made to fetch an instance service account for the compute instance the program is
 			running on. If this is not on a GCE instance, then you must define it with an API key or service account
 			credentials JSON file.
+
+			[gcp_service_account_credentials]: https://cloud.google.com/docs/authentication/production#manually
 			"""
 		required: false
 		type: string: {}
@@ -122,6 +130,8 @@ base: components: sinks: gcp_stackdriver_logs: configuration: {
 
 			See the [Google Cloud Platform folder documentation][folder_docs] for more details.
 
+			Exactly one of `billing_account_id`, `folder_id`, `organization_id`, or `project_id` must be set.
+
 			[folder_docs]: https://cloud.google.com/resource-manager/docs/creating-managing-folders
 			"""
 		required: true
@@ -141,6 +151,8 @@ base: components: sinks: gcp_stackdriver_logs: configuration: {
 			The organization ID to which to publish logs.
 
 			This would be the identifier assigned to your organization on Google Cloud Platform.
+
+			Exactly one of `billing_account_id`, `folder_id`, `organization_id`, or `project_id` must be set.
 			"""
 		required: true
 		type: string: {}
@@ -150,6 +162,8 @@ base: components: sinks: gcp_stackdriver_logs: configuration: {
 			The project ID to which to publish logs.
 
 			See the [Google Cloud Platform project management documentation][project_docs] for more details.
+
+			Exactly one of `billing_account_id`, `folder_id`, `organization_id`, or `project_id` must be set.
 
 			[project_docs]: https://cloud.google.com/resource-manager/docs/creating-managing-projects
 			"""
@@ -302,20 +316,30 @@ base: components: sinks: gcp_stackdriver_logs: configuration: {
 	resource: {
 		description: "The monitored resource to associate the logs with."
 		required:    true
-		type: object: options: {
-			"*": {
-				description: "A type-specific label."
-				required:    true
-				type: string: syntax: "template"
-			}
-			type: {
-				description: """
-					The monitored resource type.
+		type: object: {
+			examples: [{
+				instanceId: "Twilight"
+				zone:       "{{ zone }}"
+			}]
+			options: {
+				"*": {
+					description: "A type-specific label."
+					required:    true
+					type: string: syntax: "template"
+				}
+				type: {
+					description: """
+						The monitored resource type.
 
-					For example, the type of a Compute Engine VM instance is `gce_instance`.
-					"""
-				required: true
-				type: string: {}
+						For example, the type of a Compute Engine VM instance is `gce_instance`.
+						See the [Google Cloud Platform monitored resource documentation][gcp_resources] for
+						more details.
+
+						[gcp_resources]: https://cloud.google.com/monitoring/api/resources
+						"""
+					required: true
+					type: string: {}
+				}
 			}
 		}
 	}
@@ -336,7 +360,7 @@ base: components: sinks: gcp_stackdriver_logs: configuration: {
 			[logsev_docs]: https://cloud.google.com/logging/docs/reference/v2/rest/v2/LogEntry#logseverity
 			"""
 		required: false
-		type: string: {}
+		type: string: examples: ["severity"]
 	}
 	tls: {
 		description: "TLS configuration."
