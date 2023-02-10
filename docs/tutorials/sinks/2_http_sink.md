@@ -231,7 +231,10 @@ we described earlier.
 
 The following functions for the `RequestBuilder` trait need implementing:
 
-### compression
+*compression* -  The payload for the built request can be compressed. Here we return
+`Compression::None` to indicate that we will not be compressing.
+`Compression::Gzip` and `Compression::Zlib` are available choices that we can
+use according to what the external service can cater for.
 
 ```rust
     fn compression(&self) -> Compression {
@@ -239,12 +242,7 @@ The following functions for the `RequestBuilder` trait need implementing:
     }
 ```
 
-The payload for the built request can be compressed. Here we return
-`Compression::None` to indicate that we will not be compressing.
-`Compression::Gzip` and `Compression::Zlib` are available choices that we can
-use according to what the external service can cater for.
-
-### encoder
+*encoder* -  We return the encoder to use. This is the `BasicEncoder` defined earlier.
 
 ```rust
     fn encoder(&self) -> &Self::Encoder {
@@ -252,10 +250,15 @@ use according to what the external service can cater for.
     }
 ```
 
-We return the encoder to use. This is the `BasicEncoder` defined earlier.
+*split_input* - `split_input` takes the input and extracts the metadata from
+the events. In this case we are returning the `input` parameter unprocessed.
 
-
-### split_input
+This may not always be the case. For example, the `amqp` sink will initially
+process the event to extract fields to be used to calculate the `amqp`
+exchange to send the message to. The exchange is bundled with the event to
+`split_input`. `split_input` splits that out into the event for encoding and
+the metadata containing the exchange which will be used to route the message
+when sending the event to an `amqp` server.
 
 ```rust
     fn split_input(
@@ -267,18 +270,9 @@ We return the encoder to use. This is the `BasicEncoder` defined earlier.
         (finalizers, metadata_builder, input)
     }
 ```
-
-`split_input` takes the input and extracts the metadata from the events. In this
-case we are returning the `input` parameter unprocessed.
-
-This may not always be the case. For example, the `amqp` sink will initially
-process the event to extract fields to be used to calculate the `amqp`
-exchange to send the message to. The exchange is bundled with the event to
-`split_input`. `split_input` splits that out into the event for encoding and
-the metadata containing the exchange which will be used to route the message
-when sending the event to an `amqp` server.
-
-### build_request
+*build_request* -  `build_request` is used to build the final request that
+will contain the encoded payload and the metadata. The `BasicRequest` object we
+return here is passed to our `Tower` service where the data is actually sent.
 
 ```rust
     fn build_request(
@@ -294,10 +288,6 @@ when sending the event to an `amqp` server.
         }
     }
 ```
-
-`build_request` is used to build the final request that will contain the encoded
-payload and the metadata. The `BasicRequest` object we return here is passed to
-our `Tower` service where the data is actually sent.
 
 # Service
 
@@ -436,22 +426,18 @@ Finally, we need to update the `run_inner` method of our `BasicSink` trait.
 After creating our service, we run a number of custom extension methods on `BoxStream` that
 process the stream of events.
 
-## request_builder
+*request_builder* - `request_builder` indicates which request builder to use
+to build our request. We pass in the `BasicRequestBuilder` described earlier.
+The first parameter is the limit to the number of concurrent request builders
+that should be in operation at any time. We pass `None` which means no limit
+is applied.
 
-`request_builder` indicates which request builder to use to build our request. We pass in
-the `BasicRequestBuilder` described earlier. The first parameter is the limit to the number
-of concurrent request builders that should be in operation at any time. We pass `None` which
-means no limit is applied.
+*filter_map* - If building the request errors, we want to emit an error and
+then filter the event from being processed further.
 
-## filter_map
-
-If building the request errors, we want to emit an error and then filter the event from being
-processed further.
-
-## into_driver
-
-The `Driver` is the final stage of the process that drives the interaction between the stream
-of incoming events and the `BasicService` we created above.
+*into_driver* - The `Driver` is the final stage of the process that drives the
+interaction between the stream of incoming events and the `BasicService` we
+created above.
 
 # Running our sink
 
