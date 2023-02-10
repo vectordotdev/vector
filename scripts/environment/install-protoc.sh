@@ -1,6 +1,15 @@
 #! /usr/bin/env bash
 set -o errexit -o verbose
 
+# A parameter can be optionally passed to this script to specify an alternative
+# location to install protoc. Default is /usr/bin.
+readonly INSTALL_PATH=${1:-"/usr/bin"}
+
+if [[ -n $1 ]]
+then
+  mkdir -p "${INSTALL_PATH}"
+fi
+
 # Protoc. No guard because we want to override Ubuntu's old version in
 # case it is already installed by a dependency.
 #
@@ -54,4 +63,4 @@ install_protoc() {
   mv --force --verbose "${TMP_DIR}/bin/protoc" "${install_path}"
 }
 
-install_protoc "3.19.5" "/usr/bin/protoc"
+install_protoc "3.19.5" "${INSTALL_PATH}/protoc"
