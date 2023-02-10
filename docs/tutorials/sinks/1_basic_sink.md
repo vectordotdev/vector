@@ -2,8 +2,7 @@ Let's write a basic sink for Vector. Currently, there are two styles of sink in
 Vector - 'event' and 'event streams'. The 'event' style sinks are deprecated,
 but currently a significant portion of Vectors sinks are still developed in
 this style. A tracking issue that covers which sinks have been converted to
-'event streams' can be found [here](https://github.com/vectordotdev/vector/
-issues/9261).
+'event streams' can be found [here][event_streams_tracking].
 
 This tutorial covers writing an 'event stream' Sink.
 
@@ -172,17 +171,51 @@ representation of the object.
 
 # Importing to Vector
 
+## Feature flag
+
+Each sink is kept behind a feature flag which allows copies of Vector to be
+build with just the components required. We need to add this feature to the 
+`Cargo.toml`.
+
+```diff
+  sinks-azure_blob = ["dep:azure_core", "dep:azure_identity", "dep:azure_storage", "dep:azure_storage_blobs"]
+  sinks-azure_monitor_logs = []
++ sinks-basic = []
+  sinks-blackhole = []
+  sinks-chronicle = []
+```
+
+Add it to our list of log sinks:
+
+```diff
+sinks-logs = [
+  "sinks-amqp",
+  "sinks-apex",
+  "sinks-aws_cloudwatch_logs",
+  "sinks-aws_kinesis_firehose",
+  "sinks-aws_kinesis_streams",
+  "sinks-aws_s3",
+  "sinks-aws_sqs",
+  "sinks-axiom",
+  "sinks-azure_blob",
+  "sinks-azure_monitor_logs",
++ "sinks-basic",
+  "sinks-blackhole",
+  "sinks-chronicle",
+```
+
+## Module
+
 Import this module into Vector. In `src/sinks/mod.rs` add the line:
 
 
 ```diff
- #[cfg(feature = "sinks-azure_monitor_logs")]
- pub mod azure_monitor_logs;
-
-+pub mod basic;
-
- #[cfg(feature = "sinks-blackhole")]
- pub mod blackhole;
+  #[cfg(feature = "sinks-azure_monitor_logs")]
+  pub mod azure_monitor_logs;
++ #[cfg(feature = "sinks-basic")]
++ pub mod basic;
+  #[cfg(feature = "sinks-blackhole")]
+  pub mod blackhole;
 ```
 
 All sinks are feature gated, this allows us to build custom versions of Vector
@@ -202,6 +235,7 @@ pub enum Sinks {
     ...
 
 +    /// Basic
++    #[cfg(feature = "sinks-basic")]
 +    Basic(#[configurable(derived)] basic::BasicConfig),
 
     ...
@@ -216,6 +250,7 @@ Then we need to add this to the `get_component_name` function defined below.
         match self {
             ...
 
++           #[cfg(feature = "sinks-basic")]
 +           Self::Basic(config) => config.get_component_name(),
 
             ...
@@ -328,13 +363,32 @@ sinks:
       - stdin
 ```
 
-This simply connects a `stdin` source to our `basic` sink. Run it with:
+This simply connects a `stdin` source to our `basic` sink. 
+
+## vdev
+
+Vector provides a build tool `vdev` that simplifies the task of building Vector. Install
+`vdev` using the instructions [here][vdev_install]. 
+
+With `vdev` installed we can run Vector using:
 
 ```sh
-cargo run -- -c ./basic.yml
+vdev run ./basic.yml
+```
+
+This uses the config file to detect and set the relevant features to build Vector with.
+
+Without `vdev`, we can run using:
+
+```sh
+cargo run --no-default-features --features "sources-stdin, sinks-basic" -- -c ./basic.yml
 ```
 
 Type some text into the terminal and Vector should output the Debug information
 for the log event.
 
 Our sink works!
+
+
+[event_streams_tracking]: https://github.com/vectordotdev/vector/issues/9261
+[vdev_install]: https://github.com/vectordotdev/vector/tree/master/vdev#installation

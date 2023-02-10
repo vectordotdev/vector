@@ -477,7 +477,7 @@ sinks:
 Then run Vector:
 
 ```sh
-cargo run -- -c ./basic.yml
+vdev run ./basic.yml
 ```
 
 If we type something into the console, this should now be sent to our HTTP server:
