@@ -52,6 +52,8 @@ pub mod file;
 pub mod gcp;
 #[cfg(any(feature = "sinks-gcp"))]
 pub mod gcs_common;
+#[cfg(feature = "sinks-hdfs")]
+pub mod hdfs;
 #[cfg(feature = "sinks-honeycomb")]
 pub mod honeycomb;
 #[cfg(feature = "sinks-http")]
@@ -70,6 +72,8 @@ pub mod loki;
 pub mod nats;
 #[cfg(feature = "sinks-new_relic")]
 pub mod new_relic;
+#[cfg(feature = "sinks-hdfs")]
+pub mod opendal_common;
 #[cfg(feature = "sinks-papertrail")]
 pub mod papertrail;
 #[cfg(feature = "sinks-prometheus")]
@@ -236,6 +240,10 @@ pub enum Sinks {
     /// GCP Pub/Sub.
     #[cfg(feature = "sinks-gcp")]
     GcpPubsub(gcp::pubsub::PubsubConfig),
+
+    /// Hdfs.
+    #[cfg(feature = "sinks-hdfs")]
+    Hdfs(hdfs::HdfsConfig),
 
     /// Honeycomb.
     #[cfg(feature = "sinks-honeycomb")]
@@ -421,6 +429,8 @@ impl NamedComponent for Sinks {
             Self::GcpCloudStorage(config) => config.get_component_name(),
             #[cfg(feature = "sinks-gcp")]
             Self::GcpPubsub(config) => config.get_component_name(),
+            #[cfg(feature = "sinks-hdfs")]
+            Self::Hdfs(config) => config.get_component_name(),
             #[cfg(feature = "sinks-honeycomb")]
             Self::Honeycomb(config) => config.get_component_name(),
             #[cfg(feature = "sinks-http")]
