@@ -192,7 +192,7 @@ impl MetricNormalize for AwsCloudwatchMetricNormalize {
 #[derive(Debug, Clone)]
 struct CloudWatchMetricsRetryLogic;
 
-impl RetryLogic for CloudWatchMetricsRetryLogic {j
+impl RetryLogic for CloudWatchMetricsRetryLogic {
     type Error = SdkError<PutMetricDataError>;
     type Response = ();
 
