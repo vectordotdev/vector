@@ -96,12 +96,15 @@ impl Condition {
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ConditionConfig {
     /// Matches an event if it is a log.
+    #[configurable(metadata(docs::hidden))]
     IsLog,
 
     /// Matches an event if it is a metric.
+    #[configurable(metadata(docs::hidden))]
     IsMetric,
 
     /// Matches an event if it is a trace.
+    #[configurable(metadata(docs::hidden))]
     IsTrace,
 
     /// Matches an event with a [Vector Remap Language](https://vector.dev/docs/reference/vrl) (VRL) [boolean expression](https://vector.dev/docs/reference/vrl#boolean-expressions).

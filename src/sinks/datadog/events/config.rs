@@ -35,6 +35,7 @@ pub struct DatadogEventsConfig {
     /// hostname or IP address and port.
     ///
     /// If set, overrides the `site` option.
+    #[configurable(metadata(docs::advanced))]
     #[configurable(metadata(docs::examples = "http://127.0.0.1:8080"))]
     #[configurable(metadata(docs::examples = "http://example.com:12345"))]
     #[serde(default)]
