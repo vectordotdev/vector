@@ -83,7 +83,11 @@ base: components: sinks: azure_blob: configuration: {
 			in `/` to act as a directory path. A trailing `/` is **not** automatically added.
 			"""
 		required: false
-		type: string: {}
+		type: string: {
+			default: "blob/%F/"
+			examples: ["date/%F/hour/%H/", "year=%Y/month=%m/day=%d/", "kubernetes/{{ metadata.cluster }}/{{ metadata.application_name }}/"]
+			syntax: "template"
+		}
 	}
 	blob_time_format: {
 		description: """
@@ -105,7 +109,7 @@ base: components: sinks: azure_blob: configuration: {
 			[chrono_strftime_specifiers]: https://docs.rs/chrono/latest/chrono/format/strftime/index.html#specifiers
 			"""
 		required: false
-		type: string: {}
+		type: string: syntax: "strftime"
 	}
 	compression: {
 		description: """
@@ -140,12 +144,12 @@ base: components: sinks: azure_blob: configuration: {
 			Either `storage_account`, or this field, must be specified.
 			"""
 		required: false
-		type: string: {}
+		type: string: examples: ["DefaultEndpointsProtocol=https;AccountName=mylogstorage;AccountKey=storageaccountkeybase64encoded;EndpointSuffix=core.windows.net"]
 	}
 	container_name: {
 		description: "The Azure Blob Storage Account container name."
 		required:    true
-		type: string: {}
+		type: string: examples: ["my-logs"]
 	}
 	encoding: {
 		description: "Configures how events are encoded into raw bytes."
@@ -276,7 +280,7 @@ base: components: sinks: azure_blob: configuration: {
 			`connection_string`.
 			"""
 		required: false
-		type: string: {}
+		type: string: examples: ["https://test.blob.core.usgovcloudapi.net/", "https://test.blob.core.windows.net/"]
 	}
 	framing: {
 		description: "Framing configuration."
@@ -468,6 +472,6 @@ base: components: sinks: azure_blob: configuration: {
 			[az_cli_docs]: https://docs.microsoft.com/en-us/cli/azure/account?view=azure-cli-latest#az-account-get-access-token
 			"""
 		required: false
-		type: string: {}
+		type: string: examples: ["mylogstorage"]
 	}
 }
