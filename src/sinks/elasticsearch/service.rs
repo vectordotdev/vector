@@ -4,7 +4,7 @@ use std::{
     task::{Context, Poll},
 };
 
-use aws_types::credentials::SharedCredentialsProvider;
+use aws_credential_types::provider::SharedCredentialsProvider;
 use aws_types::region::Region;
 use bytes::Bytes;
 use futures::future::BoxFuture;

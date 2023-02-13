@@ -3,7 +3,9 @@ use std::time::Duration;
 use aws_config::{
     default_provider::credentials::DefaultCredentialsChain, imds, sts::AssumeRoleProviderBuilder,
 };
-use aws_types::{credentials::SharedCredentialsProvider, region::Region, Credentials};
+use aws_credential_types::provider::SharedCredentialsProvider;
+use aws_credential_types::Credentials;
+use aws_types::region::Region;
 use serde_with::serde_as;
 use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;

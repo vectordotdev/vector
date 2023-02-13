@@ -80,6 +80,7 @@ pub struct PrometheusExporterConfig {
     ///
     /// The metrics are exposed at the typical Prometheus exporter path, `/metrics`.
     #[serde(default = "default_address")]
+    #[configurable(metadata(docs::examples = "192.160.0.10:9598"))]
     pub address: SocketAddr,
 
     #[configurable(derived)]

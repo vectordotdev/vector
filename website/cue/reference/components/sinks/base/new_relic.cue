@@ -4,7 +4,7 @@ base: components: sinks: new_relic: configuration: {
 	account_id: {
 		description: "The New Relic account ID."
 		required:    true
-		type: string: {}
+		type: string: examples: ["xxxx", "${NEW_RELIC_ACCOUNT_KEY}"]
 	}
 	acknowledgements: {
 		description: """
@@ -127,7 +127,7 @@ base: components: sinks: new_relic: configuration: {
 	license_key: {
 		description: "A valid New Relic license key."
 		required:    true
-		type: string: {}
+		type: string: examples: ["xxxx", "${NEW_RELIC_LICENSE_KEY}"]
 	}
 	region: {
 		description: "New Relic region."
