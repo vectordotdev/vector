@@ -30,7 +30,7 @@ pub struct SematextLogsConfig {
 
     /// The endpoint to send data to.
     ///
-    /// Setting this option overrides the `region`.
+    /// Setting this option overrides the `region` option.
     #[serde(alias = "host")]
     #[configurable(metadata(docs::examples = "http://127.0.0.1"))]
     #[configurable(metadata(docs::examples = "https://example.com"))]

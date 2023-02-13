@@ -87,7 +87,7 @@ base: components: sinks: sematext_logs: configuration: {
 		description: """
 			The endpoint to send data to.
 
-			Setting this option overrides the `region`.
+			Setting this option overrides the `region` option.
 			"""
 		required: false
 		type: string: examples: ["http://127.0.0.1", "https://example.com"]

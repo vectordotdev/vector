@@ -63,7 +63,7 @@ pub struct SematextMetricsConfig {
 
     /// The endpoint to send data to.
     ///
-    /// Setting this option overrides the `region`.
+    /// Setting this option overrides the `region` option.
     #[configurable(metadata(docs::examples = "http://127.0.0.1"))]
     #[configurable(metadata(docs::examples = "https://example.com"))]
     pub endpoint: Option<String>,
