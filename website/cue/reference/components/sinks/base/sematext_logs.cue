@@ -84,16 +84,23 @@ base: components: sinks: sematext_logs: configuration: {
 		}
 	}
 	endpoint: {
-		description: "The endpoint to send data to."
-		required:    false
+		description: """
+			The endpoint to send data to.
+
+			Setting this option overrides the `region`.
+			"""
+		required: false
 		type: string: examples: ["http://127.0.0.1", "https://example.com"]
 	}
 	region: {
 		description: "The Sematext region to send data to."
 		required:    false
-		type: string: enum: {
-			eu: "Europe"
-			us: "United States"
+		type: string: {
+			default: "us"
+			enum: {
+				eu: "Europe"
+				us: "United States"
+			}
 		}
 	}
 	request: {
