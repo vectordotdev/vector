@@ -5,6 +5,10 @@ components: sources: splunk_hec: {
 
 	title: "Splunk HTTP Event Collector (HEC)"
 
+	description: """
+		This source exposes three HTTP endpoints at a configurable address that jointly implement the [Splunk HEC API](https://docs.splunk.com/Documentation/Splunk/9.0.3/Data/UsetheHTTPEventCollector): `/services/collector/event`, `/services/collector/raw`, and `/services/collector/health`.
+		"""
+
 	classes: {
 		commonly_used: false
 		delivery:      "at_least_once"
