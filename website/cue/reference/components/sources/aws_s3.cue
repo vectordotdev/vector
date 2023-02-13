@@ -151,7 +151,7 @@ components: sources: aws_s3: components._aws & {
 
 			policies: [
 				{
-					_action:       "ReceiveMessage"
+					_action: "ReceiveMessage"
 				},
 				{
 					_action:       "DeleteMessage"
