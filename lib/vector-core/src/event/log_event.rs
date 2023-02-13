@@ -464,7 +464,7 @@ impl LogEvent {
         }
     }
 
-    /// Fetches the `timestamp` of the event. This is either from the "host" semantic meaning (Vector namespace)
+    /// Fetches the `host` of the event. This is either from the "host" semantic meaning (Vector namespace)
     /// or from the host key set on the "Global Log Schema" (Legacy namespace).
     pub fn get_host(&self) -> Option<&Value> {
         match self.namespace() {
