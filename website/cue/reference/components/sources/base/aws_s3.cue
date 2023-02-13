@@ -217,12 +217,8 @@ base: components: sources: aws_s3: configuration: {
 		type: string: examples: ["us-east-1"]
 	}
 	sqs: {
-		description: """
-			Configuration options for SQS.
-
-			Only relevant when `strategy = "sqs"`.
-			"""
-		required: false
+		description: "Configuration options for SQS."
+		required:    false
 		type: object: options: {
 			client_concurrency: {
 				description: """
@@ -369,18 +365,6 @@ base: components: sources: aws_s3: configuration: {
 					unit:    "seconds"
 				}
 			}
-		}
-	}
-	strategy: {
-		description: "The strategy to use to consume objects from S3."
-		required:    false
-		type: string: {
-			default: "sqs"
-			enum: sqs: """
-				Consumes objects by processing bucket notification events sent to an [AWS SQS queue][aws_sqs].
-
-				[aws_sqs]: https://aws.amazon.com/sqs/
-				"""
 		}
 	}
 	tls_options: {
