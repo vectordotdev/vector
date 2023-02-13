@@ -497,11 +497,9 @@ base: components: sinks: aws_cloudwatch_logs: configuration: {
 		description: """
 			The [stream name][stream_name] of the target CloudWatch Logs stream.
 
-			There can only be one writer to a log stream at a time. If you have multiple
-			instances writing to the same log group, you must include an identifier in the
-			stream name that is guaranteed to be unique per instance.
-
-			For example, you might choose `host`.
+			There can only be one writer to a log stream at a time. If multiple instances are writing to
+			the same log group, the stream name must include an identifier that is guaranteed to be
+			unique per instance.
 
 			[stream_name]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html
 			"""
