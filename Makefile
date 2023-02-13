@@ -411,7 +411,7 @@ bench-all: bench-remap-functions
 
 .PHONY: check
 check: ## Run prerequisite code checks
-	${MAYBE_ENVIRONMENT_EXEC} cargo check --workspace --all-targets --features all-integration-tests
+	${MAYBE_ENVIRONMENT_EXEC} cargo vdev check rust
 
 .PHONY: check-all
 check-all: ## Check everything
@@ -425,7 +425,7 @@ check-component-features: ## Check that all component features are setup properl
 
 .PHONY: check-clippy
 check-clippy: ## Check code with Clippy
-	${MAYBE_ENVIRONMENT_EXEC} cargo clippy --workspace --all-targets --features all-integration-tests -- -D warnings
+	${MAYBE_ENVIRONMENT_EXEC} cargo vdev check rust --clippy
 
 .PHONY: check-docs
 check-docs: ## Check that all /docs file are valid
