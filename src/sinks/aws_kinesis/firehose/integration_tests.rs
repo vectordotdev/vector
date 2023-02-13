@@ -148,6 +148,7 @@ async fn firehose_client() -> aws_sdk_firehose::Client {
 
 /// creates ES domain with the given name and returns the ARN
 async fn ensure_elasticsearch_domain(domain_name: String) -> String {
+    let endpoint = test_region_endpoint().endpoint().unwrap().unwrap();
     let client = EsClient::from_conf(
         aws_sdk_elasticsearch::config::Builder::new()
             .credentials_provider(
@@ -156,7 +157,7 @@ async fn ensure_elasticsearch_domain(domain_name: String) -> String {
                     .await
                     .unwrap(),
             )
-            .endpoint_resolver(test_region_endpoint().endpoint().unwrap().unwrap())
+            .endpoint_url(endpoint)
             .region(test_region_endpoint().region())
             .build(),
     );
