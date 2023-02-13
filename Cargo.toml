@@ -168,21 +168,22 @@ metrics = "0.20.1"
 metrics-tracing-context = { version = "0.12.0", default-features = false }
 
 # AWS - Official SDK
-aws-sdk-s3 = { version = "0.21.0", default-features = false, features = ["native-tls"], optional = true }
-aws-sdk-sqs = { version = "0.21.0", default-features = false, features = ["native-tls"], optional = true }
-aws-sdk-cloudwatch = { version = "0.21.0", default-features = false, features = ["native-tls"], optional = true }
-aws-sdk-cloudwatchlogs = { version = "0.21.0", default-features = false, features = ["native-tls"], optional = true }
-aws-sdk-elasticsearch = {version = "0.21.0", default-features = false, features = ["native-tls"], optional = true }
-aws-sdk-firehose = { version = "0.21.0", default-features = false, features = ["native-tls"], optional = true }
-aws-sdk-kinesis = { version = "0.21.0", default-features = false, features = ["native-tls"], optional = true }
-aws-types = { version = "0.51.0", default-features = false, features = ["hardcoded-credentials"], optional = true }
+aws-sdk-s3 = { version = "0.23.0", default-features = false, features = ["native-tls"], optional = true }
+aws-sdk-sqs = { version = "0.23.0", default-features = false, features = ["native-tls"], optional = true }
+aws-sdk-cloudwatch = { version = "0.23.0", default-features = false, features = ["native-tls"], optional = true }
+aws-sdk-cloudwatchlogs = { version = "0.23.0", default-features = false, features = ["native-tls"], optional = true }
+aws-sdk-elasticsearch = {version = "0.23.0", default-features = false, features = ["native-tls"], optional = true }
+aws-sdk-firehose = { version = "0.23.0", default-features = false, features = ["native-tls"], optional = true }
+aws-sdk-kinesis = { version = "0.23.0", default-features = false, features = ["native-tls"], optional = true }
+aws-types = { version = "0.53.0", default-features = false, optional = true }
 aws-sigv4 = { version = "0.53.0", default-features = false, features = ["sign-http"], optional = true }
-aws-config = { version = "0.51.0", default-features = false, features = ["native-tls"], optional = true }
-aws-smithy-async = { version = "0.51.0", default-features = false, optional = true }
-aws-smithy-client = { version = "0.51.0", default-features = false, features = ["client-hyper"], optional = true}
-aws-smithy-http = { version = "0.51.0", default-features = false, features = ["event-stream"], optional = true }
-aws-smithy-http-tower = { version = "0.54.1", default-features = false, optional = true }
-aws-smithy-types = { version = "0.51.0", default-features = false, optional = true }
+aws-config = { version = "0.53.0", default-features = false, features = ["native-tls"], optional = true }
+aws-credential-types = { version = "0.53.0", default-features = false, features = ["hardcoded-credentials"], optional = true }
+aws-smithy-async = { version = "0.53.1", default-features = false, optional = true }
+aws-smithy-client = { version = "0.53.1", default-features = false, features = ["client-hyper"], optional = true}
+aws-smithy-http = { version = "0.53.1", default-features = false, features = ["event-stream"], optional = true }
+aws-smithy-http-tower = { version = "0.53.1", default-features = false, optional = true }
+aws-smithy-types = { version = "0.53.1", default-features = false, optional = true }
 
 # Azure
 azure_core = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "b4544d4920fa3064eb921340054cd9cc130b7664", default-features = false, features = ["enable_reqwest"], optional = true }
@@ -439,6 +440,7 @@ api-client = [
 
 aws-core = [
   "aws-config",
+  "dep:aws-credential-types",
   "dep:aws-sigv4",
   "dep:aws-types",
   "dep:aws-smithy-async",
