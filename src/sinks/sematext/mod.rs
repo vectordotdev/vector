@@ -17,6 +17,6 @@ pub enum Region {
     Eu,
 }
 
-fn default_region() -> Region {
+const fn default_region() -> Region {
     Region::Us
 }
