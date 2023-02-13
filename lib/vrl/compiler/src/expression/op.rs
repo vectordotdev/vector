@@ -635,7 +635,7 @@ mod tests {
 
         and_other {
             expr: |_| op(And, (), "bar"),
-            want: TypeDef::boolean().fallible(),
+            want: TypeDef::boolean().infallible(),
         }
 
         equal {
