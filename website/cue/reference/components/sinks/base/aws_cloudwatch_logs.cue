@@ -186,7 +186,7 @@ base: components: sinks: aws_cloudwatch_logs: configuration: {
 			[log_group]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html
 			"""
 		required: false
-		type: bool: {}
+		type: bool: default: true
 	}
 	create_missing_stream: {
 		description: """
@@ -195,7 +195,7 @@ base: components: sinks: aws_cloudwatch_logs: configuration: {
 			[log_stream]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html
 			"""
 		required: false
-		type: bool: {}
+		type: bool: default: true
 	}
 	encoding: {
 		description: "Configures how events are encoded into raw bytes."
@@ -325,7 +325,10 @@ base: components: sinks: aws_cloudwatch_logs: configuration: {
 			[group_name]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html
 			"""
 		required: true
-		type: string: syntax: "template"
+		type: string: {
+			examples: ["group-name", "{{ file }}"]
+			syntax: "template"
+		}
 	}
 	region: {
 		description: """
@@ -503,7 +506,10 @@ base: components: sinks: aws_cloudwatch_logs: configuration: {
 			[stream_name]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html
 			"""
 		required: true
-		type: string: syntax: "template"
+		type: string: {
+			examples: ["{{ host }}", "%Y-%m-%d", "stream-name"]
+			syntax: "template"
+		}
 	}
 	tls: {
 		description: "TLS configuration."
