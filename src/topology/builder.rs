@@ -270,7 +270,11 @@ pub async fn build_pieces(
             schema_definitions,
             schema: config.schema,
         };
-        let server = match source.inner.build(context).await {
+        let source = {
+            let _span = span.enter();
+            source.inner.build(context).await
+        };
+        let server = match source {
             Err(error) => {
                 errors.push(format!("Source \"{}\": {}", key, error));
                 continue;
