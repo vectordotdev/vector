@@ -22,7 +22,7 @@ use vector_core::{
 
 use crate::{
     codecs::{self, EncodingConfig},
-    config::{log_schema, GenerateConfig, SinkConfig, SinkContext},
+    config::{GenerateConfig, SinkConfig, SinkContext},
     gcp::{GcpAuthConfig, GcpAuthenticator},
     http::HttpClient,
     sinks::{
@@ -302,7 +302,7 @@ impl Encoder<(String, Vec<Event>)> for ChronicleEncoder {
             .filter_map(|mut event| {
                 let timestamp = event
                     .as_log()
-                    .get(log_schema().timestamp_key())
+                    .get_timestamp()
                     .and_then(|ts| ts.as_timestamp())
                     .cloned();
                 let mut bytes = BytesMut::new();

@@ -10,7 +10,7 @@ use vector_config::configurable_component;
 
 use crate::{
     codecs::Transformer,
-    config::{log_schema, AcknowledgementsConfig, Input, SinkConfig, SinkContext},
+    config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext},
     event::{Event, Value},
     gcp::{GcpAuthConfig, GcpAuthenticator, Scope},
     http::HttpClient,
@@ -306,7 +306,7 @@ impl HttpEventEncoder<serde_json::Value> for StackdriverEventEncoder {
         );
 
         // If the event contains a timestamp, send it in the main message so gcp can pick it up.
-        if let Some(timestamp) = log.get(log_schema().timestamp_key()) {
+        if let Some(timestamp) = log.get_timestamp() {
             entry.insert("timestamp".into(), json!(timestamp));
         }
 
