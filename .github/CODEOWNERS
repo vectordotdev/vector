@@ -95,3 +95,4 @@ src/sources/vector/ @neuronull @vectordotdev/integrations-team
 src/test_util/ @vectordotdev/core-team
 src/topology/ @vectordotdev/core-team
 src/transforms/ @vectordotdev/processing-team
+website/cue @vectordotdev/ux-team
