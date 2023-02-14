@@ -5,8 +5,6 @@ use once_cell::sync::Lazy;
 use serde::Deserialize;
 use serde_json::Value;
 
-pub const DEFAULT_ALL: &str = "all-integration-tests";
-
 type ComponentMap = HashMap<String, Component>;
 
 // Use a BTree to keep the results in sorted order

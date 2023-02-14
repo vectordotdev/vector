@@ -1,6 +1,6 @@
 use anyhow::Result;
 
-use crate::{app, features, util::ChainArgs as _};
+use crate::{app, util::ChainArgs as _};
 
 /// Check the Rust code for errors
 #[derive(clap::Args, Debug)]
@@ -17,7 +17,7 @@ impl Cli {
     pub fn exec(self) -> Result<()> {
         let features = self.features.join(",");
         let features = if self.features.is_empty() {
-            features::DEFAULT_ALL
+            "default,all-integration-tests"
         } else {
             &features
         };

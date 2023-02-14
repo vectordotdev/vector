@@ -2,7 +2,7 @@ use std::env;
 
 use anyhow::Result;
 
-use crate::{app, features, util::CargoToml};
+use crate::{app, util::CargoToml};
 
 const CARGO: &str = "cargo";
 const BASE_ARGS: [&str; 5] = [
@@ -45,7 +45,7 @@ impl Cli {
             CARGO,
             BASE_ARGS
                 .into_iter()
-                .chain(["--features", features::DEFAULT_ALL]),
+                .chain(["--features", "all-integration-tests"]),
             true,
         )?;
 
@@ -67,7 +67,9 @@ fn extract_features() -> Result<Vec<String>> {
         .features
         .into_keys()
         .filter(|feature| {
-            !feature.contains("-utils") && feature != "default" && feature != features::DEFAULT_ALL
+            !feature.contains("-utils")
+                && feature != "default"
+                && feature != "all-integration-tests"
         })
         .collect())
 }
