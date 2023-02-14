@@ -8,7 +8,7 @@
 //! - Error handling
 //! - Limitation
 
-use std::{num::NonZeroUsize, task::Poll};
+use std::{fmt, num::NonZeroUsize, task::Poll};
 
 use bytes::Bytes;
 use codecs::encoding::Framer;
@@ -41,22 +41,22 @@ use crate::{
     },
 };
 
-pub struct OpenDalSink {
-    op: Operator,
+pub struct OpenDalSink<Svc> {
+    service: Svc,
     request_builder: OpenDalRequestBuilder,
     partitioner: KeyPartitioner,
     batcher_settings: BatcherSettings,
 }
 
-impl OpenDalSink {
+impl<Svc> OpenDalSink<Svc> {
     pub fn new(
-        op: Operator,
+        service: Svc,
         request_builder: OpenDalRequestBuilder,
         partitioner: KeyPartitioner,
         batcher_settings: BatcherSettings,
     ) -> Self {
         Self {
-            op,
+            service,
             request_builder,
             partitioner,
             batcher_settings,
@@ -65,7 +65,13 @@ impl OpenDalSink {
 }
 
 #[async_trait::async_trait]
-impl StreamSink<Event> for OpenDalSink {
+impl<Svc> StreamSink<Event> for OpenDalSink<Svc>
+where
+    Svc: Service<OpenDalRequest> + Send + 'static,
+    Svc::Future: Send + 'static,
+    Svc::Response: DriverResponse + Send + 'static,
+    Svc::Error: fmt::Debug + Into<crate::Error> + Send,
+{
     async fn run(
         self: Box<Self>,
         input: futures_util::stream::BoxStream<'_, Event>,
@@ -74,7 +80,13 @@ impl StreamSink<Event> for OpenDalSink {
     }
 }
 
-impl OpenDalSink {
+impl<Svc> OpenDalSink<Svc>
+where
+    Svc: Service<OpenDalRequest> + Send + 'static,
+    Svc::Future: Send + 'static,
+    Svc::Response: DriverResponse + Send + 'static,
+    Svc::Error: fmt::Debug + Into<crate::Error> + Send,
+{
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         let partitioner = self.partitioner;
         let settings = self.batcher_settings;
@@ -100,7 +112,7 @@ impl OpenDalSink {
                     Ok(req) => Some(req),
                 }
             })
-            .into_driver(OpenDalService::new(self.op.clone()))
+            .into_driver(self.service)
             // TODO: set protocol with services scheme instead hardcoded file
             .protocol("file")
             .run()

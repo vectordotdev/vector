@@ -1,5 +1,6 @@
 use codecs::{encoding::Framer, JsonSerializerConfig, NewlineDelimitedEncoderConfig};
 use opendal::{layers::LoggingLayer, services::Hdfs, Operator};
+use tower::ServiceBuilder;
 use vector_config::configurable_component;
 use vector_core::{
     config::{AcknowledgementsConfig, DataType, Input},
@@ -171,8 +172,11 @@ impl HdfsConfig {
             compression: self.compression,
         };
 
+        // TODO: we can add tower middleware here.
+        let svc = ServiceBuilder::new().service(OpenDalService::new(op));
+
         let sink = OpenDalSink::new(
-            op,
+            svc,
             request_builder,
             self.key_partitioner()?,
             batcher_settings,
