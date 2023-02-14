@@ -465,7 +465,7 @@ base: components: sinks: aws_kinesis_streams: configuration: {
 			[stream_name]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html
 			"""
 		required: true
-		type: string: {}
+		type: string: examples: ["my-stream"]
 	}
 	tls: {
 		description: "TLS configuration."
