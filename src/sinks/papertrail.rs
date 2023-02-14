@@ -5,10 +5,7 @@ use vector_config::configurable_component;
 
 use crate::{
     codecs::{Encoder, EncodingConfig, Transformer},
-    config::{
-        log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig,
-        SinkContext,
-    },
+    config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext},
     event::Event,
     internal_events::TemplateRenderingError,
     schema,
