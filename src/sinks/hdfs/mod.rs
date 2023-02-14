@@ -8,3 +8,6 @@
 
 mod config;
 pub use self::config::HdfsConfig;
+
+#[cfg(test)]
+mod test;

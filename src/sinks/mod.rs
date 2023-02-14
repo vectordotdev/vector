@@ -241,7 +241,7 @@ pub enum Sinks {
     #[cfg(feature = "sinks-gcp")]
     GcpPubsub(gcp::pubsub::PubsubConfig),
 
-    /// Hdfs.
+    /// HDFS.
     #[cfg(feature = "sinks-hdfs")]
     Hdfs(hdfs::HdfsConfig),
 

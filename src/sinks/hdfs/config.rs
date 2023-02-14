@@ -70,7 +70,7 @@ pub struct HdfsConfig {
 impl GenerateConfig for HdfsConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
-            prefix: "/tmp".to_string(),
+            prefix: "tmp/".to_string(),
             name_node: "default".to_string(),
 
             encoding: (
