@@ -77,6 +77,7 @@ pub struct GcsSinkConfig {
     ///
     /// [custom_metadata]: https://cloud.google.com/storage/docs/metadata#custom-metadata
     #[configurable(metadata(docs::additional_props_description = "A key/value pair."))]
+    #[configurable(metadata(docs::advanced))]
     metadata: Option<HashMap<String, String>>,
 
     /// A prefix to apply to all object keys.
@@ -91,6 +92,7 @@ pub struct GcsSinkConfig {
         docs::examples = "year=%Y/month=%m/day=%d/",
         docs::examples = "application_id={{ application_id }}/date=%F/"
     ))]
+    #[configurable(metadata(docs::advanced))]
     key_prefix: Option<String>,
 
     /// The timestamp format for the time component of the object key.
@@ -110,6 +112,7 @@ pub struct GcsSinkConfig {
     ///
     /// [chrono_strftime_specifiers]: https://docs.rs/chrono/latest/chrono/format/strftime/index.html#specifiers
     #[serde(default = "default_time_format")]
+    #[configurable(metadata(docs::advanced))]
     filename_time_format: String,
 
     /// Whether or not to append a UUID v4 token to the end of the object key.
@@ -121,11 +124,13 @@ pub struct GcsSinkConfig {
     /// This ensures there are no name collisions, and can be useful in high-volume workloads where
     /// object keys must be unique.
     #[serde(default = "crate::serde::default_true")]
+    #[configurable(metadata(docs::advanced))]
     filename_append_uuid: bool,
 
     /// The filename extension to use in the object key.
     ///
     /// If not specified, the extension will be determined by the compression scheme used.
+    #[configurable(metadata(docs::advanced))]
     filename_extension: Option<String>,
 
     #[serde(flatten)]

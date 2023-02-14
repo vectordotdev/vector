@@ -14,6 +14,7 @@ pub struct RegionOrEndpoint {
 
     /// Custom endpoint for use with AWS-compatible services.
     #[configurable(metadata(docs::examples = "http://127.0.0.0:5000/path/to/service"))]
+    #[configurable(metadata(docs::advanced))]
     pub endpoint: Option<String>,
 }
 

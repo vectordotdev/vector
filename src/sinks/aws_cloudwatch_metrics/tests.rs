@@ -1,5 +1,3 @@
-#![cfg(test)]
-
 use aws_sdk_cloudwatch::types::DateTime;
 use chrono::{offset::TimeZone, Utc};
 use similar_asserts::assert_eq;
