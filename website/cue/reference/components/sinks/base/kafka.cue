@@ -205,7 +205,7 @@ base: components: sinks: kafka: configuration: {
 			If omitted, no headers will be written.
 			"""
 		required: false
-		type: string: {}
+		type: string: examples: ["headers"]
 	}
 	key_field: {
 		description: """
@@ -394,6 +394,9 @@ base: components: sinks: kafka: configuration: {
 	topic: {
 		description: "The Kafka topic name to write events to."
 		required:    true
-		type: string: syntax: "template"
+		type: string: {
+			examples: ["topic-1234", "logs-{{unit}}-%Y-%m-%d"]
+			syntax: "template"
+		}
 	}
 }
