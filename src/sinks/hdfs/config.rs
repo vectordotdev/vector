@@ -148,7 +148,7 @@ impl SinkConfig for HdfsConfig {
 
 impl HdfsConfig {
     pub fn build_operator(&self) -> crate::Result<Operator> {
-        // Build OpenDAL Operator
+        // Build OpenDal Operator
         let mut builder = Hdfs::default();
         // Prefix logic will be handled by key_partitioner.
         builder.root(&self.root);
@@ -168,12 +168,12 @@ impl HdfsConfig {
         let (framer, serializer) = self.encoding.build(SinkType::MessageBased)?;
         let encoder = Encoder::<Framer>::new(framer, serializer);
 
-        let request_builder = OpenDALRequestBuilder {
+        let request_builder = OpenDalRequestBuilder {
             encoder: (transformer, encoder),
             compression: self.compression,
         };
 
-        let sink = OpenDALSink::new(
+        let sink = OpenDalSink::new(
             op,
             request_builder,
             self.key_partitioner()?,

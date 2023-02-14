@@ -41,17 +41,17 @@ use crate::{
     },
 };
 
-pub struct OpenDALSink {
+pub struct OpenDalSink {
     op: Operator,
-    request_builder: OpenDALRequestBuilder,
+    request_builder: OpenDalRequestBuilder,
     partitioner: KeyPartitioner,
     batcher_settings: BatcherSettings,
 }
 
-impl OpenDALSink {
+impl OpenDalSink {
     pub fn new(
         op: Operator,
-        request_builder: OpenDALRequestBuilder,
+        request_builder: OpenDalRequestBuilder,
         partitioner: KeyPartitioner,
         batcher_settings: BatcherSettings,
     ) -> Self {
@@ -65,7 +65,7 @@ impl OpenDALSink {
 }
 
 #[async_trait::async_trait]
-impl StreamSink<Event> for OpenDALSink {
+impl StreamSink<Event> for OpenDalSink {
     async fn run(
         self: Box<Self>,
         input: futures_util::stream::BoxStream<'_, Event>,
@@ -74,7 +74,7 @@ impl StreamSink<Event> for OpenDALSink {
     }
 }
 
-impl OpenDALSink {
+impl OpenDalSink {
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         let partitioner = self.partitioner;
         let settings = self.batcher_settings;
@@ -100,7 +100,7 @@ impl OpenDALSink {
                     Ok(req) => Some(req),
                 }
             })
-            .into_driver(OpenDALService::new(self.op.clone()))
+            .into_driver(OpenDalService::new(self.op.clone()))
             // TODO: set protocl with services scheme instead hardcoded file
             .protocol("file")
             .run()
@@ -109,54 +109,54 @@ impl OpenDALSink {
 }
 
 #[derive(Debug, Clone)]
-pub struct OpenDALService {
+pub struct OpenDalService {
     op: Operator,
 }
 
-impl OpenDALService {
-    pub const fn new(op: Operator) -> OpenDALService {
-        OpenDALService { op }
+impl OpenDalService {
+    pub const fn new(op: Operator) -> OpenDalService {
+        OpenDalService { op }
     }
 }
 
 #[derive(Clone)]
-pub struct OpenDALRequest {
+pub struct OpenDalRequest {
     pub payload: Bytes,
-    pub metadata: OpenDALMetadata,
+    pub metadata: OpenDalMetadata,
     pub request_metadata: RequestMetadata,
 }
 
-impl MetaDescriptive for OpenDALRequest {
+impl MetaDescriptive for OpenDalRequest {
     fn get_metadata(&self) -> RequestMetadata {
         self.request_metadata
     }
 }
 
-impl Finalizable for OpenDALRequest {
+impl Finalizable for OpenDalRequest {
     fn take_finalizers(&mut self) -> EventFinalizers {
         std::mem::take(&mut self.metadata.finalizers)
     }
 }
 
 #[derive(Clone)]
-pub struct OpenDALMetadata {
+pub struct OpenDalMetadata {
     pub partition_key: String,
     pub count: usize,
     pub byte_size: usize,
     pub finalizers: EventFinalizers,
 }
 
-pub struct OpenDALRequestBuilder {
+pub struct OpenDalRequestBuilder {
     pub encoder: (Transformer, Encoder<Framer>),
     pub compression: Compression,
 }
 
-impl RequestBuilder<(String, Vec<Event>)> for OpenDALRequestBuilder {
-    type Metadata = OpenDALMetadata;
+impl RequestBuilder<(String, Vec<Event>)> for OpenDalRequestBuilder {
+    type Metadata = OpenDalMetadata;
     type Events = Vec<Event>;
     type Encoder = (Transformer, Encoder<Framer>);
     type Payload = Bytes;
-    type Request = OpenDALRequest;
+    type Request = OpenDalRequest;
     type Error = std::io::Error;
 
     fn compression(&self) -> Compression {
@@ -173,7 +173,7 @@ impl RequestBuilder<(String, Vec<Event>)> for OpenDALRequestBuilder {
     ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
         let (partition_key, mut events) = input;
         let finalizers = events.take_finalizers();
-        let opendal_metadata = OpenDALMetadata {
+        let opendal_metadata = OpenDalMetadata {
             partition_key,
             count: events.len(),
             byte_size: events.size_of(),
@@ -197,7 +197,7 @@ impl RequestBuilder<(String, Vec<Event>)> for OpenDALRequestBuilder {
 
         metadata.partition_key = format!("{}{}.{}", metadata.partition_key, name, extension);
 
-        OpenDALRequest {
+        OpenDalRequest {
             metadata,
             payload: payload.into_payload(),
             request_metadata: request_metadata,
@@ -206,13 +206,13 @@ impl RequestBuilder<(String, Vec<Event>)> for OpenDALRequestBuilder {
 }
 
 #[derive(Debug)]
-pub struct OpenDALResponse {
+pub struct OpenDalResponse {
     pub count: usize,
     pub events_byte_size: usize,
     pub byte_size: usize,
 }
 
-impl DriverResponse for OpenDALResponse {
+impl DriverResponse for OpenDalResponse {
     fn event_status(&self) -> EventStatus {
         EventStatus::Delivered
     }
@@ -226,8 +226,8 @@ impl DriverResponse for OpenDALResponse {
     }
 }
 
-impl Service<OpenDALRequest> for OpenDALService {
-    type Response = OpenDALResponse;
+impl Service<OpenDalRequest> for OpenDalService {
+    type Response = OpenDalResponse;
     type Error = opendal::Error;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
@@ -237,7 +237,7 @@ impl Service<OpenDALRequest> for OpenDALService {
     }
 
     // Emission of internal events for errors and dropped events is handled upstream by the caller.
-    fn call(&mut self, request: OpenDALRequest) -> Self::Future {
+    fn call(&mut self, request: OpenDalRequest) -> Self::Future {
         let byte_size = request.payload.len();
         let op = self.op.clone();
 
@@ -247,7 +247,7 @@ impl Service<OpenDALRequest> for OpenDALService {
                 .write(request.payload)
                 .in_current_span()
                 .await;
-            result.map(|_| OpenDALResponse {
+            result.map(|_| OpenDalResponse {
                 count: request.metadata.count,
                 events_byte_size: request.metadata.byte_size,
                 byte_size,
@@ -257,13 +257,13 @@ impl Service<OpenDALRequest> for OpenDALService {
 }
 
 #[derive(Debug, Snafu)]
-pub enum OpenDALError {
-    #[snafu(display("Failed to call OpenDAL: {}", source))]
-    OpenDAL { source: opendal::Error },
+pub enum OpenDalError {
+    #[snafu(display("Failed to call OpenDal: {}", source))]
+    OpenDal { source: opendal::Error },
 }
 
-impl From<opendal::Error> for OpenDALError {
+impl From<opendal::Error> for OpenDalError {
     fn from(source: opendal::Error) -> Self {
-        Self::OpenDAL { source }
+        Self::OpenDal { source }
     }
 }

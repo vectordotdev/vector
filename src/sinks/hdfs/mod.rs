@@ -2,9 +2,9 @@
 //!
 //! This sink will send it's output to HDFS.
 //!
-//! `hdfs` is an OpenDAL based services. This mod itself only provide
-//! config to build an [`OpenDALSink`]. All real implement are powered by
-//! [`OpenDALSink`].
+//! `hdfs` is an OpenDal based services. This mod itself only provide
+//! config to build an [`OpenDalSink`]. All real implement are powered by
+//! [`OpenDalSink`].
 
 mod config;
 pub use self::config::HdfsConfig;
