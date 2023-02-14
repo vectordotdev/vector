@@ -1,5 +1,6 @@
 use bytes::{BufMut, BytesMut};
 use syslog::{Facility, Formatter3164, LogFormat, Severity};
+use value::Kind;
 use vector_config::configurable_component;
 
 use crate::{
@@ -10,6 +11,7 @@ use crate::{
     },
     event::Event,
     internal_events::TemplateRenderingError,
+    schema,
     sinks::util::{tcp::TcpSinkConfig, UriSerde},
     tcp::TcpKeepaliveConfig,
     template::Template,
@@ -111,7 +113,10 @@ impl SinkConfig for PapertrailConfig {
     }
 
     fn input(&self) -> Input {
+        let requirement = schema::Requirement::empty().optional_meaning("host", Kind::bytes());
+
         Input::new(self.encoding.config().input_type() & DataType::Log)
+            .with_schema_requirement(requirement)
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
