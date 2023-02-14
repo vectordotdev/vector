@@ -304,7 +304,7 @@ base: components: sinks: aws_kinesis_streams: configuration: {
 			If not specified, a unique partition key will be generated for each Kinesis record.
 			"""
 		required: false
-		type: string: {}
+		type: string: examples: ["user_id"]
 	}
 	region: {
 		description: """
