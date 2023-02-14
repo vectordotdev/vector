@@ -101,9 +101,9 @@ impl Future for CloudwatchFuture {
                     let response = match ready!(fut.poll_unpin(cx)) {
                         Ok(response) => response,
                         Err(err) => {
-                            if let SdkError::ServiceError { err, raw: _ } = &err {
+                            if let SdkError::ServiceError(inner) = &err {
                                 if let DescribeLogStreamsErrorKind::ResourceNotFoundException(_) =
-                                    err.kind
+                                    inner.err().kind
                                 {
                                     if self.create_missing_group {
                                         info!("Log group provided does not exist; creating a new one.");
@@ -148,8 +148,8 @@ impl Future for CloudwatchFuture {
                         Ok(_) => {}
                         Err(err) => {
                             let resource_already_exists = match &err {
-                                SdkError::ServiceError { err, raw: _ } => matches!(
-                                    err.kind,
+                                SdkError::ServiceError(inner) => matches!(
+                                    inner.err().kind,
                                     CreateLogGroupErrorKind::ResourceAlreadyExistsException(_)
                                 ),
                                 _ => false,
@@ -173,8 +173,8 @@ impl Future for CloudwatchFuture {
                         Ok(_) => {}
                         Err(err) => {
                             let resource_already_exists = match &err {
-                                SdkError::ServiceError { err, raw: _ } => matches!(
-                                    err.kind,
+                                SdkError::ServiceError(inner) => matches!(
+                                    inner.err().kind,
                                     CreateLogStreamErrorKind::ResourceAlreadyExistsException(_)
                                 ),
                                 _ => false,
@@ -237,10 +237,10 @@ impl Client {
                 .log_group_name(group_name)
                 .log_stream_name(stream_name)
                 .build()
-                .map_err(|err| SdkError::ConstructionFailure(err.into()))?
+                .map_err(SdkError::construction_failure)?
                 .make_operation(cw_client.conf())
                 .await
-                .map_err(|err| SdkError::ConstructionFailure(err.into()))?;
+                .map_err(SdkError::construction_failure)?;
 
             let (req, parts) = op.into_request_response();
             let (mut body, props) = req.into_parts();
@@ -249,9 +249,9 @@ impl Client {
                 let owned_value = value.clone();
                 body.headers_mut().insert(
                     http::header::HeaderName::from_bytes(owned_header.as_bytes())
-                        .map_err(|err| SdkError::ConstructionFailure(err.into()))?,
+                        .map_err(SdkError::construction_failure)?,
                     http::HeaderValue::from_str(owned_value.as_str())
-                        .map_err(|err| SdkError::ConstructionFailure(err.into()))?,
+                        .map_err(SdkError::construction_failure)?,
                 );
             }
             client
