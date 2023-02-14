@@ -101,7 +101,7 @@ impl OpenDALSink {
                 }
             })
             .into_driver(OpenDALService::new(self.op.clone()))
-            // TODO: set protocl with services scheme instead hardcoded file
+            // TODO: set protocol with services scheme instead hardcoded file
             .protocol("file")
             .run()
             .await
