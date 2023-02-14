@@ -1,16 +1,19 @@
-use super::config::HdfsConfig;
-use crate::codecs::SinkType;
-use crate::event::LogEvent;
-use crate::sinks::util::{request_builder::RequestBuilder, Compression};
-use crate::{codecs::Encoder, sinks::util::request_builder::EncodeResult};
-use crate::{
-    codecs::EncodingConfigWithFraming, sinks::opendal_common::OpendalRequest,
-    sinks::opendal_common::OpendalRequestBuilder,
-};
 use bytes::Bytes;
-use codecs::encoding::Framer;
-use codecs::{JsonSerializerConfig, NewlineDelimitedEncoderConfig};
+use codecs::{encoding::Framer, JsonSerializerConfig, NewlineDelimitedEncoderConfig};
 use vector_core::partition::Partitioner;
+
+use super::config::HdfsConfig;
+use crate::{
+    codecs::{Encoder, EncodingConfigWithFraming, SinkType},
+    event::LogEvent,
+    sinks::{
+        opendal_common::{OpendalRequest, OpendalRequestBuilder},
+        util::{
+            request_builder::{EncodeResult, RequestBuilder},
+            Compression,
+        },
+    },
+};
 
 fn default_config(encoding: EncodingConfigWithFraming) -> HdfsConfig {
     HdfsConfig {

@@ -1,24 +1,22 @@
-use crate::codecs::Encoder;
-use crate::codecs::EncodingConfigWithFraming;
-use crate::codecs::SinkType;
-use crate::config::{GenerateConfig, SinkConfig, SinkContext};
-use crate::sinks::opendal_common::*;
-use crate::sinks::util::partitioner::KeyPartitioner;
-use crate::sinks::util::BatchConfig;
-use crate::sinks::util::BulkSizeBasedDefaultBatchSettings;
-use crate::sinks::util::Compression;
-use crate::sinks::Healthcheck;
-use codecs::encoding::Framer;
-use codecs::JsonSerializerConfig;
-use codecs::NewlineDelimitedEncoderConfig;
-use opendal::layers::LoggingLayer;
-use opendal::services::Hdfs;
-use opendal::Operator;
+use codecs::{encoding::Framer, JsonSerializerConfig, NewlineDelimitedEncoderConfig};
+use opendal::{layers::LoggingLayer, services::Hdfs, Operator};
 use vector_config::configurable_component;
-use vector_core::config::DataType;
 use vector_core::{
-    config::{AcknowledgementsConfig, Input},
+    config::{AcknowledgementsConfig, DataType, Input},
     sink::VectorSink,
+};
+
+use crate::{
+    codecs::{Encoder, EncodingConfigWithFraming, SinkType},
+    config::{GenerateConfig, SinkConfig, SinkContext},
+    sinks::{
+        opendal_common::*,
+        util::{
+            partitioner::KeyPartitioner, BatchConfig, BulkSizeBasedDefaultBatchSettings,
+            Compression,
+        },
+        Healthcheck,
+    },
 };
 
 /// Configuration for the `hdfs` sink.

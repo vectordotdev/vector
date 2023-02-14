@@ -8,35 +8,38 @@
 //! - Error handling
 //! - Limitation
 
-use crate::codecs::Encoder;
-use crate::codecs::Transformer;
-use crate::event::EventFinalizers;
-use crate::sinks::util::metadata::RequestMetadataBuilder;
-use crate::sinks::util::partitioner::KeyPartitioner;
-use crate::sinks::util::{request_builder::EncodeResult, Compression};
-use crate::sinks::BoxFuture;
-use crate::{
-    event::Event,
-    internal_events::SinkRequestBuildError,
-    sinks::util::{RequestBuilder, SinkBuilderExt},
-};
+use std::{num::NonZeroUsize, task::Poll};
+
 use bytes::Bytes;
 use codecs::encoding::Framer;
 use futures::{stream::BoxStream, StreamExt};
 use opendal::Operator;
 use snafu::Snafu;
-use std::num::NonZeroUsize;
-use std::task::Poll;
 use tower::Service;
 use tracing::Instrument;
-use vector_common::finalization::{EventStatus, Finalizable};
-use vector_common::request_metadata::MetaDescriptive;
-use vector_common::request_metadata::RequestMetadata;
-use vector_core::internal_event::CountByteSize;
-use vector_core::sink::StreamSink;
-use vector_core::stream::BatcherSettings;
-use vector_core::stream::DriverResponse;
-use vector_core::ByteSizeOf;
+use vector_common::{
+    finalization::{EventStatus, Finalizable},
+    request_metadata::{MetaDescriptive, RequestMetadata},
+};
+use vector_core::{
+    internal_event::CountByteSize,
+    sink::StreamSink,
+    stream::{BatcherSettings, DriverResponse},
+    ByteSizeOf,
+};
+
+use crate::{
+    codecs::{Encoder, Transformer},
+    event::{Event, EventFinalizers},
+    internal_events::SinkRequestBuildError,
+    sinks::{
+        util::{
+            metadata::RequestMetadataBuilder, partitioner::KeyPartitioner,
+            request_builder::EncodeResult, Compression, RequestBuilder, SinkBuilderExt,
+        },
+        BoxFuture,
+    },
+};
 
 pub struct OpendalSink {
     op: Operator,
