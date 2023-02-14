@@ -2,7 +2,7 @@ version: '3'
 
 services:
   rabbitmq:
-    image: docker.io/rabbitmq:${AMQP_VERSION}
+    image: docker.io/rabbitmq:${CONFIG_VERSION}
     ports:
     - 5672:5672
 

@@ -12,7 +12,7 @@ use std::{
     time::Duration,
 };
 
-use serde::{de, Deserialize, Deserializer};
+use indexmap::IndexMap;
 use serde_with::serde_as;
 use vector_config::{
     component::GenerateConfig, configurable_component, schema::generate_root_schema,
@@ -152,31 +152,72 @@ pub struct TlsConfig {
 }
 
 /// A listening address that can optionally support being passed in by systemd.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[configurable_component]
-#[serde(untagged)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[serde(try_from = "String", into = "String")]
+#[configurable(metadata(docs::examples = "0.0.0.0:9000"))]
+#[configurable(metadata(docs::examples = "systemd"))]
+#[configurable(metadata(docs::examples = "systemd#3"))]
 pub enum SocketListenAddr {
-    /// A literal socket address.
+    /// An IPv4/IPv6 address and port.
     SocketAddr(SocketAddr),
 
-    /// A file descriptor identifier passed by systemd.
-    #[serde(deserialize_with = "parse_systemd_fd")]
+    /// A file descriptor identifier that is given from, and managed by, the socket activation feature of `systemd`.
     SystemdFd(usize),
 }
 
-fn parse_systemd_fd<'de, D>(des: D) -> Result<usize, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let s: &'de str = Deserialize::deserialize(des)?;
-    match s {
-        "systemd" => Ok(0),
-        s if s.starts_with("systemd#") => s[8..]
-            .parse::<usize>()
-            .map_err(de::Error::custom)?
-            .checked_sub(1)
-            .ok_or_else(|| de::Error::custom("systemd indices start from 1, found 0")),
-        _ => Err(de::Error::custom("must start with \"systemd\"")),
+impl From<SocketAddr> for SocketListenAddr {
+    fn from(addr: SocketAddr) -> Self {
+        Self::SocketAddr(addr)
+    }
+}
+
+impl From<usize> for SocketListenAddr {
+    fn from(fd: usize) -> Self {
+        Self::SystemdFd(fd)
+    }
+}
+
+impl TryFrom<String> for SocketListenAddr {
+    type Error = String;
+
+    fn try_from(input: String) -> Result<Self, Self::Error> {
+        // first attempt to parse the string into a SocketAddr directly
+        match input.parse::<SocketAddr>() {
+            Ok(socket_addr) => Ok(socket_addr.into()),
+
+            // then attempt to parse a systemd file descriptor
+            Err(_) => {
+                let fd: usize = match input.as_str() {
+                    "systemd" => Ok(0),
+                    s if s.starts_with("systemd#") => s[8..]
+                        .parse::<usize>()
+                        .map_err(|_| "failed to parse usize".to_string())?
+                        .checked_sub(1)
+                        .ok_or_else(|| "systemd indices start at 1".to_string()),
+
+                    // otherwise fail
+                    _ => Err("unable to parse".to_string()),
+                }?;
+
+                Ok(fd.into())
+            }
+        }
+    }
+}
+
+impl From<SocketListenAddr> for String {
+    fn from(addr: SocketListenAddr) -> String {
+        match addr {
+            SocketListenAddr::SocketAddr(addr) => addr.to_string(),
+            SocketListenAddr::SystemdFd(fd) => {
+                if fd == 0 {
+                    "systemd".to_owned()
+                } else {
+                    format!("systemd#{}", fd)
+                }
+            }
+        }
     }
 }
 
@@ -310,6 +351,9 @@ pub struct AdvancedSinkConfig {
 
     /// The tags to apply to each event.
     tags: HashMap<String, TagConfig>,
+
+    /// The headers to apply to each event.
+    headers: HashMap<String, Vec<String>>,
 }
 
 /// Specification of the value of a created tag.
@@ -336,6 +380,7 @@ impl GenerateConfig for AdvancedSinkConfig {
             tls: None,
             partition_key: default_partition_key(),
             tags: HashMap::new(),
+            headers: HashMap::new(),
         })
         .unwrap()
     }
@@ -469,6 +514,9 @@ pub enum SinkConfig {
 pub struct GlobalOptions {
     /// The data directory where Vector will store state.
     data_dir: Option<String>,
+
+    /// A map of additional tags for metrics.
+    tags: Option<IndexMap<String, String>>,
 }
 
 /// The overall configuration for Vector.

@@ -9,4 +9,4 @@ runner:
     AXIOM_URL: http://axiom-core
 
 matrix:
-  version: [13-alpine]
+  postgres: [13-alpine]

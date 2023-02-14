@@ -73,10 +73,12 @@ pub struct AwsKinesisFirehoseConfig {
     tls: Option<TlsEnableableConfig>,
 
     #[configurable(derived)]
+    #[configurable(metadata(docs::advanced))]
     #[serde(default = "default_framing_message_based")]
     framing: FramingConfig,
 
     #[configurable(derived)]
+    #[configurable(metadata(docs::advanced))]
     #[serde(default = "default_decoding")]
     decoding: DeserializerConfig,
 
@@ -113,8 +115,10 @@ pub enum Compression {
     /// [magic_bytes]: https://en.wikipedia.org/wiki/List_of_file_signatures
     #[derivative(Default)]
     Auto,
+
     /// Uncompressed.
     None,
+
     /// GZIP.
     Gzip,
 }
