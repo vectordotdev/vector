@@ -5,17 +5,15 @@
 //! opendal service now only support very basic sink features. To make it
 //! useful, we need to add the following features:
 //!
-//! - Batch events
 //! - Error handling
 //! - Limitation
-//! - Compression
-//! - KeyPartition
 
 use crate::codecs::Encoder;
 use crate::codecs::Transformer;
 use crate::event::EventFinalizers;
 use crate::sinks::util::metadata::RequestMetadataBuilder;
 use crate::sinks::util::partitioner::KeyPartitioner;
+use crate::sinks::util::retries::RetryLogic;
 use crate::sinks::util::{request_builder::EncodeResult, Compression};
 use crate::sinks::BoxFuture;
 use crate::{
@@ -48,8 +46,18 @@ pub struct OpendalSink {
 }
 
 impl OpendalSink {
-    pub fn new(op: Operator) -> Self {
-        todo!()
+    pub fn new(
+        op: Operator,
+        request_builder: OpendalRequestBuilder,
+        partitioner: KeyPartitioner,
+        batcher_settings: BatcherSettings,
+    ) -> Self {
+        Self {
+            op,
+            request_builder,
+            partitioner,
+            batcher_settings,
+        }
     }
 }
 
@@ -106,6 +114,7 @@ impl OpendalService {
     }
 }
 
+#[derive(Clone)]
 pub struct OpendalRequest {
     pub payload: Bytes,
     pub metadata: OpendalMetadata,
@@ -124,6 +133,7 @@ impl Finalizable for OpendalRequest {
     }
 }
 
+#[derive(Clone)]
 pub struct OpendalMetadata {
     pub partition_key: String,
     pub count: usize,
@@ -131,7 +141,7 @@ pub struct OpendalMetadata {
     pub finalizers: EventFinalizers,
 }
 
-struct OpendalRequestBuilder {
+pub struct OpendalRequestBuilder {
     pub encoder: (Transformer, Encoder<Framer>),
     pub compression: Compression,
 }
@@ -226,6 +236,18 @@ impl Service<OpendalRequest> for OpendalService {
                 .await;
             result.map(|_| OpendalResponse { byte_size })
         })
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct OpendalRetryLogic;
+
+impl RetryLogic for OpendalRetryLogic {
+    type Error = opendal::Error;
+    type Response = OpendalResponse;
+
+    fn is_retriable_error(&self, error: &Self::Error) -> bool {
+        error.is_temporary()
     }
 }
 
