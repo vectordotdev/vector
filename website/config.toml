@@ -137,14 +137,19 @@ url = "/download"
 weight = 4
 
 [[languages.en.menus.navbar]]
+name = "Releases"
+url = "/releases"
+weight = 5
+
+[[languages.en.menus.navbar]]
 name = "Blog"
 url = "/blog"
-weight = 5
+weight = 6
 
 [[languages.en.menus.navbar]]
 name = "Support"
 url = "https://www.datadoghq.com/product/observability-pipelines"
-weight = 6
+weight = 7
 
 # Footer menu
 [[languages.en.menus.footer]]
