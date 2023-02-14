@@ -288,6 +288,7 @@ jobs:
           - ubuntu:18.04
           - ubuntu:20.04
           - ubuntu:22.04
+          - ubuntu:23.04
           - debian:10
           - debian:11
     container:
@@ -339,6 +340,8 @@ jobs:
           - "fedora:34"
           - "fedora:35"
           - "fedora:36"
+          - "fedora:37"
+          - "fedora:38"
     container:
       image: ${{ matrix.container }}
     steps:
@@ -377,7 +380,7 @@ jobs:
 
   macos-verify:
     name: Verify macOS Package
-    runs-on: macos-11
+    runs-on: macos-12
     needs:
       - generate-publish-metadata
       - build-x86_64-apple-darwin-packages
