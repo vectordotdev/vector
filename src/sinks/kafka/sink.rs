@@ -1,5 +1,3 @@
-use std::convert::TryFrom;
-
 use async_trait::async_trait;
 use futures::{future, stream::BoxStream, StreamExt};
 use rdkafka::{
@@ -29,6 +27,7 @@ use crate::{
 };
 
 #[derive(Debug, Snafu)]
+#[snafu(visibility(pub(crate)))]
 pub(super) enum BuildError {
     #[snafu(display("creating kafka producer failed: {}", source))]
     KafkaCreateFailed { source: KafkaError },
@@ -67,7 +66,7 @@ impl KafkaSink {
             transformer,
             encoder,
             service: KafkaService::new(producer),
-            topic: Template::try_from(config.topic).context(TopicTemplateSnafu)?,
+            topic: config.topic,
             key_field: config.key_field,
         })
     }
@@ -98,10 +97,7 @@ impl KafkaSink {
 pub(crate) async fn healthcheck(config: KafkaSinkConfig) -> crate::Result<()> {
     trace!("Healthcheck started.");
     let client = config.to_rdkafka(KafkaRole::Consumer).unwrap();
-    let topic = match Template::try_from(config.topic)
-        .context(TopicTemplateSnafu)?
-        .render_string(&LogEvent::from_str_legacy(""))
-    {
+    let topic = match config.topic.render_string(&LogEvent::from_str_legacy("")) {
         Ok(topic) => Some(topic),
         Err(error) => {
             warn!(
