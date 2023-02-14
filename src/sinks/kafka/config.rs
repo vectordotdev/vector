@@ -38,6 +38,7 @@ pub struct KafkaSinkConfig {
     /// If the field does not exist in the log or in tags, a blank value will be used. If unspecified, the key is not sent.
     ///
     /// Kafka uses a hash of the key to choose the partition or uses round-robin if the record has no key.
+    #[configurable(metadata(docs::advanced))]
     pub key_field: Option<String>,
 
     #[configurable(derived)]
@@ -45,10 +46,12 @@ pub struct KafkaSinkConfig {
 
     // These batching options will **not** override librdkafka_options values.
     #[configurable(derived)]
+    #[configurable(metadata(docs::advanced))]
     #[serde(default)]
     pub batch: BatchConfig<NoDefaultsBatchSettings>,
 
     #[configurable(derived)]
+    #[configurable(metadata(docs::advanced))]
     #[serde(default)]
     pub compression: KafkaCompression,
 
@@ -58,10 +61,12 @@ pub struct KafkaSinkConfig {
 
     /// Default timeout, in milliseconds, for network requests.
     #[serde(default = "default_socket_timeout_ms")]
+    #[configurable(metadata(docs::advanced))]
     pub socket_timeout_ms: u64,
 
     /// Local message timeout, in milliseconds.
     #[serde(default = "default_message_timeout_ms")]
+    #[configurable(metadata(docs::advanced))]
     pub message_timeout_ms: u64,
 
     /// A map of advanced options to pass directly to the underlying `librdkafka` client.
@@ -70,6 +75,7 @@ pub struct KafkaSinkConfig {
     ///
     /// [config_props_docs]: https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md
     #[serde(default)]
+    #[configurable(metadata(docs::advanced))]
     #[configurable(metadata(
         docs::additional_props_description = "A librdkafka configuration option."
     ))]
@@ -78,6 +84,7 @@ pub struct KafkaSinkConfig {
     /// The log field name to use for the Kafka headers.
     ///
     /// If omitted, no headers will be written.
+    #[configurable(metadata(docs::advanced))]
     #[serde(alias = "headers_field")] // accidentally released as `headers_field` in 0.18
     pub headers_key: Option<String>,
 

@@ -46,6 +46,7 @@ pub struct KafkaAuthConfig {
     pub(crate) sasl: Option<KafkaSaslConfig>,
 
     #[configurable(derived)]
+    #[configurable(metadata(docs::advanced))]
     pub(crate) tls: Option<TlsEnableableConfig>,
 }
 
