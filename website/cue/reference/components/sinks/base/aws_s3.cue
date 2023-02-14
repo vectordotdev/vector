@@ -73,6 +73,10 @@ base: components: sinks: aws_s3: configuration: {
 
 				Only relevant when specified for a bucket: this canned ACL is otherwise ignored when
 				specified for an object.
+
+				For more information about logs, see [Amazon S3 Server Access Logging][serverlogs].
+
+				[serverlogs]: https://docs.aws.amazon.com/AmazonS3/latest/dev/ServerLogs.html
 				"""
 			private: """
 				Bucket/object are private.
@@ -83,13 +87,13 @@ base: components: sinks: aws_s3: configuration: {
 				This is the default.
 				"""
 			"public-read": """
-				Bucket/object can be read publically.
+				Bucket/object can be read publicly.
 
 				The bucket/object owner is granted the `FULL_CONTROL` permission, and anyone in the
 				`AllUsers` grantee group is granted the `READ` permission.
 				"""
 			"public-read-write": """
-				Bucket/object can be read and written publically.
+				Bucket/object can be read and written publicly.
 
 				The bucket/object owner is granted the `FULL_CONTROL` permission, and anyone in the
 				`AllUsers` grantee group is granted the `READ` and `WRITE` permissions.
@@ -227,13 +231,16 @@ base: components: sinks: aws_s3: configuration: {
 			This must not include a leading `s3://` or a trailing `/`.
 			"""
 		required: true
-		type: string: {}
+		type: string: examples: ["my-bucket"]
 	}
 	compression: {
 		description: """
 			Compression configuration.
 
 			All compression algorithms use the default compression level unless otherwise specified.
+
+			Some cloud storage API clients and browsers will handle decompression transparently, so
+			files may not always appear to be compressed depending how they are accessed.
 			"""
 		required: false
 		type: string: {
@@ -262,7 +269,9 @@ base: components: sinks: aws_s3: configuration: {
 			By default, the compression scheme used dictates this value.
 			"""
 		required: false
-		type: string: {}
+		type: string: examples: [
+			"gzip",
+		]
 	}
 	content_type: {
 		description: """
@@ -273,7 +282,7 @@ base: components: sinks: aws_s3: configuration: {
 			By default, `text/x-log` is used.
 			"""
 		required: false
-		type: string: {}
+		type: string: examples: ["application/gzip"]
 	}
 	encoding: {
 		description: "Configures how events are encoded into raw bytes."
@@ -408,12 +417,18 @@ base: components: sinks: aws_s3: configuration: {
 			object keys must be unique.
 			"""
 		required: false
-		type: bool: {}
+		type: bool: default: true
 	}
 	filename_extension: {
-		description: "The filename extension to use in the object key."
-		required:    false
-		type: string: {}
+		description: """
+			The filename extension to use in the object key.
+
+			This overrides setting the extension based on the configured `compression`.
+			"""
+		required: false
+		type: string: examples: [
+			"json",
+		]
 	}
 	filename_time_format: {
 		description: """
@@ -435,7 +450,7 @@ base: components: sinks: aws_s3: configuration: {
 			[chrono_strftime_specifiers]: https://docs.rs/chrono/latest/chrono/format/strftime/index.html#specifiers
 			"""
 		required: false
-		type: string: {}
+		type: string: default: "%s"
 	}
 	framing: {
 		description: "Framing configuration."
@@ -477,7 +492,7 @@ base: components: sinks: aws_s3: configuration: {
 			[grantee]: https://docs.aws.amazon.com/AmazonS3/latest/dev/acl-overview.html#specifying-grantee
 			"""
 		required: false
-		type: string: {}
+		type: string: examples: ["79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be", "person@email.com", "http://acs.amazonaws.com/groups/global/AllUsers"]
 	}
 	grant_read: {
 		description: """
@@ -488,7 +503,7 @@ base: components: sinks: aws_s3: configuration: {
 			[grantee]: https://docs.aws.amazon.com/AmazonS3/latest/dev/acl-overview.html#specifying-grantee
 			"""
 		required: false
-		type: string: {}
+		type: string: examples: ["79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be", "person@email.com", "http://acs.amazonaws.com/groups/global/AllUsers"]
 	}
 	grant_read_acp: {
 		description: """
@@ -499,7 +514,7 @@ base: components: sinks: aws_s3: configuration: {
 			[grantee]: https://docs.aws.amazon.com/AmazonS3/latest/dev/acl-overview.html#specifying-grantee
 			"""
 		required: false
-		type: string: {}
+		type: string: examples: ["79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be", "person@email.com", "http://acs.amazonaws.com/groups/global/AllUsers"]
 	}
 	grant_write_acp: {
 		description: """
@@ -510,7 +525,7 @@ base: components: sinks: aws_s3: configuration: {
 			[grantee]: https://docs.aws.amazon.com/AmazonS3/latest/dev/acl-overview.html#specifying-grantee
 			"""
 		required: false
-		type: string: {}
+		type: string: examples: ["79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be", "person@email.com", "http://acs.amazonaws.com/groups/global/AllUsers"]
 	}
 	key_prefix: {
 		description: """
@@ -521,7 +536,11 @@ base: components: sinks: aws_s3: configuration: {
 			in `/` to act as a directory path. A trailing `/` is **not** automatically added.
 			"""
 		required: false
-		type: string: syntax: "template"
+		type: string: {
+			default: "date=%F"
+			examples: ["date=%F/hour=%H", "year=%Y/month=%m/day=%d", "application_id={{ application_id }}/date=%F"]
+			syntax: "template"
+		}
 	}
 	region: {
 		description: """
@@ -703,7 +722,10 @@ base: components: sinks: aws_s3: configuration: {
 			If not specified, Amazon S3 uses the AWS managed CMK in AWS to protect the data.
 			"""
 		required: false
-		type: string: syntax: "template"
+		type: string: {
+			examples: ["abcd1234"]
+			syntax: "template"
+		}
 	}
 	storage_class: {
 		description: """
@@ -714,18 +736,17 @@ base: components: sinks: aws_s3: configuration: {
 			[s3_storage_classes]: https://docs.aws.amazon.com/AmazonS3/latest/dev/storage-class-intro.html
 			"""
 		required: false
-		type: string: enum: {
-			DEEP_ARCHIVE:        "Glacier Deep Archive."
-			GLACIER:             "Glacier Flexible Retrieval."
-			INTELLIGENT_TIERING: "Intelligent Tiering."
-			ONEZONE_IA:          "Infrequently Accessed (single Availability zone)."
-			REDUCED_REDUNDANCY:  "Reduced Redundancy."
-			STANDARD: """
-				Standard Redundancy.
-
-				This is the default.
-				"""
-			STANDARD_IA: "Infrequently Accessed."
+		type: string: {
+			default: "STANDARD"
+			enum: {
+				DEEP_ARCHIVE:        "Glacier Deep Archive."
+				GLACIER:             "Glacier Flexible Retrieval."
+				INTELLIGENT_TIERING: "Intelligent Tiering."
+				ONEZONE_IA:          "Infrequently Accessed (single Availability zone)."
+				REDUCED_REDUNDANCY:  "Reduced Redundancy."
+				STANDARD:            "Standard Redundancy."
+				STANDARD_IA:         "Infrequently Accessed."
+			}
 		}
 	}
 	tags: {

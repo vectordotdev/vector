@@ -27,17 +27,20 @@ use vector_core::{
 };
 
 use super::S3SinkConfig;
-use crate::test_util::components::{run_and_assert_sink_error, COMPONENT_ERROR_TAGS};
 use crate::{
     aws::{create_client, AwsAuthentication, RegionOrEndpoint},
     common::s3::S3ClientBuilder,
     config::SinkContext,
     sinks::{
+        aws_s3::config::default_filename_time_format,
         s3_common::config::{S3Options, S3ServerSideEncryption},
         util::{BatchConfig, Compression, TowerRequestConfig},
     },
     test_util::{
-        components::{run_and_assert_sink_compliance, AWS_SINK_TAGS},
+        components::{
+            run_and_assert_sink_compliance, run_and_assert_sink_error, AWS_SINK_TAGS,
+            COMPONENT_ERROR_TAGS,
+        },
         random_lines_with_stream, random_string,
     },
 };
@@ -55,7 +58,7 @@ async fn s3_insert_message_into_with_flat_key_prefix() {
     create_bucket(&bucket, false).await;
 
     let mut config = config(&bucket, 1000000);
-    config.key_prefix = Some("test-prefix".to_string());
+    config.key_prefix = "test-prefix".to_string();
     let prefix = config.key_prefix.clone();
     let service = config.create_service(&cx.globals.proxy).await.unwrap();
     let sink = config.build_processor(service).unwrap();
@@ -64,7 +67,7 @@ async fn s3_insert_message_into_with_flat_key_prefix() {
     run_and_assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
     assert_eq!(receiver.await, BatchStatus::Delivered);
 
-    let keys = get_keys(&bucket, prefix.unwrap()).await;
+    let keys = get_keys(&bucket, prefix).await;
     assert_eq!(keys.len(), 1);
 
     let key = keys[0].clone();
@@ -89,7 +92,7 @@ async fn s3_insert_message_into_with_folder_key_prefix() {
     create_bucket(&bucket, false).await;
 
     let mut config = config(&bucket, 1000000);
-    config.key_prefix = Some("test-prefix/".to_string());
+    config.key_prefix = "test-prefix/".to_string();
     let prefix = config.key_prefix.clone();
     let service = config.create_service(&cx.globals.proxy).await.unwrap();
     let sink = config.build_processor(service).unwrap();
@@ -98,7 +101,7 @@ async fn s3_insert_message_into_with_folder_key_prefix() {
     run_and_assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
     assert_eq!(receiver.await, BatchStatus::Delivered);
 
-    let keys = get_keys(&bucket, prefix.unwrap()).await;
+    let keys = get_keys(&bucket, prefix).await;
     assert_eq!(keys.len(), 1);
 
     let key = keys[0].clone();
@@ -123,7 +126,7 @@ async fn s3_insert_message_into_with_ssekms_key_id() {
     create_bucket(&bucket, false).await;
 
     let mut config = config(&bucket, 1000000);
-    config.key_prefix = Some("test-prefix".to_string());
+    config.key_prefix = "test-prefix".to_string();
     let prefix = config.key_prefix.clone();
     config.options.server_side_encryption = Some(S3ServerSideEncryption::AwsKms);
     config.options.ssekms_key_id = Some("alias/aws/s3".to_string());
@@ -135,7 +138,7 @@ async fn s3_insert_message_into_with_ssekms_key_id() {
     run_and_assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
     assert_eq!(receiver.await, BatchStatus::Delivered);
 
-    let keys = get_keys(&bucket, prefix.unwrap()).await;
+    let keys = get_keys(&bucket, prefix).await;
     assert_eq!(keys.len(), 1);
 
     let key = keys[0].clone();
@@ -160,9 +163,9 @@ async fn s3_rotate_files_after_the_buffer_size_is_reached() {
     create_bucket(&bucket, false).await;
 
     let config = S3SinkConfig {
-        key_prefix: Some(format!("{}/{}", random_string(10), "{{i}}")),
-        filename_time_format: Some("waitsforfullbatch".into()),
-        filename_append_uuid: Some(false),
+        key_prefix: format!("{}/{}", random_string(10), "{{i}}"),
+        filename_time_format: "waitsforfullbatch".into(),
+        filename_append_uuid: false,
         ..config(&bucket, 10)
     };
     let prefix = config.key_prefix.clone();
@@ -189,7 +192,7 @@ async fn s3_rotate_files_after_the_buffer_size_is_reached() {
     // Hard-coded sleeps are bad, but we're waiting on localstack's state to converge.
     tokio::time::sleep(Duration::from_secs(1)).await;
 
-    let keys = get_keys(&bucket, prefix.unwrap()).await;
+    let keys = get_keys(&bucket, prefix).await;
     assert_eq!(keys.len(), 3);
 
     let mut response_lines: Vec<Vec<String>> = Vec::new();
@@ -220,7 +223,7 @@ async fn s3_gzip() {
     let batch_multiplier = 3;
     let config = S3SinkConfig {
         compression: Compression::gzip_default(),
-        filename_time_format: Some("%s%f".into()),
+        filename_time_format: "%s%f".into(),
         ..config(&bucket, batch_size)
     };
 
@@ -232,7 +235,7 @@ async fn s3_gzip() {
     run_and_assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
     assert_eq!(receiver.await, BatchStatus::Delivered);
 
-    let keys = get_keys(&bucket, prefix.unwrap()).await;
+    let keys = get_keys(&bucket, prefix).await;
     assert_eq!(keys.len(), batch_multiplier);
 
     let mut response_lines: Vec<String> = Vec::new();
@@ -294,7 +297,7 @@ async fn s3_insert_message_into_object_lock() {
     run_and_assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
     assert_eq!(receiver.await, BatchStatus::Delivered);
 
-    let keys = get_keys(&bucket, prefix.unwrap()).await;
+    let keys = get_keys(&bucket, prefix).await;
     assert_eq!(keys.len(), 1);
 
     let key = keys[0].clone();
@@ -326,7 +329,7 @@ async fn acknowledges_failures() {
     run_and_assert_sink_error(sink, events, &COMPONENT_ERROR_TAGS).await;
     assert_eq!(receiver.await, BatchStatus::Rejected);
 
-    let objects = list_objects(&bucket, prefix.unwrap()).await;
+    let objects = list_objects(&bucket, prefix).await;
     assert_eq!(objects, None);
 }
 
@@ -382,9 +385,9 @@ fn config(bucket: &str, batch_size: usize) -> S3SinkConfig {
 
     S3SinkConfig {
         bucket: bucket.to_string(),
-        key_prefix: Some(random_string(10) + "/date=%F"),
-        filename_time_format: None,
-        filename_append_uuid: None,
+        key_prefix: random_string(10) + "/date=%F",
+        filename_time_format: default_filename_time_format(),
+        filename_append_uuid: true,
         filename_extension: None,
         options: S3Options::default(),
         region: RegionOrEndpoint::with_both("minio", s3_address()),
