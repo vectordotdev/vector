@@ -26,7 +26,7 @@ const SEC_IN_NANOS: i64 = 1_000_000_000;
 const ADDRESS_KEY: &str = "address";
 const ADDRESS_NAME_SPECIFIER_KEY: &str = "address_name_specifier";
 const AUTHORITY_KEY: &str = "authority";
-const BUILD_VERSION_KEY: &str = "version";
+const BUILD_VERSION_KEY: &str = "user_agent_build_version";
 const CLIENT_FEATURES_KEY: &str = "client_features";
 const CLUSTER_KEY: &str = "cluster";
 const COMMON_PROPERTIES_KEY: &str = "common_properties";
@@ -558,12 +558,7 @@ impl From<TlsProperties> for Value {
 
 impl From<tls_properties::TlsVersion> for Value {
     fn from(tls_version: tls_properties::TlsVersion) -> Self {
-        let mut tls_version_map = BTreeMap::new();
-        tls_version_map.insert(
-            String::from(TLS_VERSION_KEY),
-            Value::Bytes(tls_version.as_str_name().into()),
-        );
-        Value::Object(tls_version_map)
+        Value::Bytes(tls_version.as_str_name().into()
     }
 }
 
