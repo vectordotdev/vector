@@ -12,6 +12,7 @@ use snafu::Snafu;
 use std::io;
 use tokio_util::codec::Encoder as _;
 use tower::{Service, ServiceBuilder};
+use value::Kind;
 use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
 use vector_config::configurable_component;
 use vector_core::{
@@ -25,6 +26,7 @@ use crate::{
     config::{GenerateConfig, SinkConfig, SinkContext},
     gcp::{GcpAuthConfig, GcpAuthenticator},
     http::HttpClient,
+    schema,
     sinks::{
         gcs_common::{
             config::{healthcheck_response, GcsRetryLogic},
@@ -208,7 +210,10 @@ impl SinkConfig for ChronicleUnstructuredConfig {
     }
 
     fn input(&self) -> Input {
-        Input::log()
+        let requirement =
+            schema::Requirement::empty().required_meaning("timestamp", Kind::timestamp());
+
+        Input::log().with_schema_requirement(requirement)
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {

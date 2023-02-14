@@ -6,6 +6,7 @@ use http::{Request, Uri};
 use hyper::Body;
 use serde_json::{json, map};
 use snafu::Snafu;
+use value::Kind;
 use vector_config::configurable_component;
 
 use crate::{
@@ -14,6 +15,7 @@ use crate::{
     event::{Event, Value},
     gcp::{GcpAuthConfig, GcpAuthenticator, Scope},
     http::HttpClient,
+    schema,
     sinks::{
         gcs_common::config::healthcheck_response,
         util::{
@@ -239,7 +241,10 @@ impl SinkConfig for StackdriverConfig {
     }
 
     fn input(&self) -> Input {
-        Input::log()
+        let requirement =
+            schema::Requirement::empty().required_meaning("timestamp", Kind::timestamp());
+
+        Input::log().with_schema_requirement(requirement)
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
