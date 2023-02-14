@@ -1,8 +1,8 @@
 //! `hdfs` sink.
 //!
-//! This sink will send it's output to hdfs.
+//! This sink will send it's output to HDFS.
 //!
-//! `hdfs` is an opendal based services. This mod itself only provide
+//! `hdfs` is an OpenDAL based services. This mod itself only provide
 //! config to build an [`OpendalSink`]. All real implement are powered by
 //! [`OpendalSink`].
 
@@ -17,17 +17,29 @@ use vector_core::{
     sink::VectorSink,
 };
 
-/// A sink that dumps its output to hdfs.
+/// Configuration for the `hdfs` sink.
 #[configurable_component(sink("hdfs"))]
 #[derive(Clone, Debug)]
+#[serde(deny_unknown_fields)]
+
 pub struct HdfsConfig {
     /// A prefix/root to apply to all pathes.
     #[serde(default)]
     #[configurable(metadata(docs::templateable))]
     pub root: String,
+
+    /// An HDFS cluster consists of a single NameNode, a master server that manages the file system namespace and regulates access to files by clients.
+    ///
+    /// For example:
+    ///
+    /// - `default`: visiting local fs.
+    /// - `http://172.16.80.2:8090` visiting name node at `172.16.80.2`
+    ///
+    /// For more information: [HDFS Architecture](https://hadoop.apache.org/docs/r3.3.4/hadoop-project-dist/hadoop-hdfs/HdfsDesign.html#NameNode_and_DataNodes)
     #[configurable(derived)]
     #[serde(default)]
     pub name_node: String,
+
     #[configurable(derived)]
     #[serde(
         default,
