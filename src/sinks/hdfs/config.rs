@@ -79,7 +79,9 @@ pub struct HdfsConfig {
     /// - `default`: visiting local fs.
     /// - `http://172.16.80.2:8090` visiting name node at `172.16.80.2`
     ///
-    /// For more information: [HDFS Architecture](https://hadoop.apache.org/docs/r3.3.4/hadoop-project-dist/hadoop-hdfs/HdfsDesign.html#NameNode_and_DataNodes)
+    /// For more information, see the [HDFS Architecture][hdfs_arch] documentation.
+    ///
+    /// [hdfs_arch]: https://hadoop.apache.org/docs/r3.3.4/hadoop-project-dist/hadoop-hdfs/HdfsDesign.html#NameNode_and_DataNodes
     #[configurable(derived)]
     #[serde(default)]
     pub name_node: String,
