@@ -16,8 +16,7 @@
 #![deny(clippy::clone_on_ref_ptr)]
 #![deny(clippy::trivially_copy_pass_by_ref)]
 #![deny(clippy::disallowed_methods)] // [nursery] mark some functions as verboten
-#![deny(clippy::missing_const_for_fn)] // [nursery] valuable to the optimizer,
-// but may produce false positives
+#![deny(clippy::missing_const_for_fn)] // [nursery] valuable to the optimizer, but may produce false positives
 
 //! This is the main entry point for Vector.
 
