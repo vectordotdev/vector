@@ -147,7 +147,7 @@ fn map_timestamp(mut events: EventArray) -> EventArray {
                 }
 
                 if let Some(path) = log.get_host() {
-                    log.rename_key(host_path, "os.host");
+                    log.rename_key(host_path.as_str(), "os.host");
                 }
             }
         }
