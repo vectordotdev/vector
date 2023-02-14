@@ -142,12 +142,12 @@ fn map_timestamp(mut events: EventArray) -> EventArray {
     match &mut events {
         EventArray::Logs(logs) => {
             for log in logs {
-                if let Some(ts) = log.remove(crate::config::log_schema().timestamp_key()) {
-                    log.insert("@timestamp", ts);
+                if let Some(path) = log.timestamp_path() {
+                    log.rename_key(path.as_str(), "@timestamp");
                 }
 
-                if let Some(host) = log.remove(crate::config::log_schema().host_key()) {
-                    log.insert("os.host", host);
+                if let Some(path) = log.get_host() {
+                    log.rename_key(host_path, "os.host");
                 }
             }
         }
