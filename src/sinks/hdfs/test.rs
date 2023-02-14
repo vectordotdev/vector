@@ -17,12 +17,13 @@ use crate::{
 
 fn default_config(encoding: EncodingConfigWithFraming) -> HdfsConfig {
     HdfsConfig {
+        root: "/tmp/".to_string(),
+        prefix: "%F/".to_string(),
         name_node: "default".to_string(),
         encoding,
         compression: Compression::gzip_default(),
         batch: Default::default(),
         acknowledgements: Default::default(),
-        prefix: "tmp/".to_string(),
     }
 }
 
@@ -74,18 +75,14 @@ fn build_request(compression: Compression) -> OpendalRequest {
 #[test]
 fn hdfs_build_request() {
     let req = build_request(Compression::None);
-    assert!(req.metadata.partition_key.starts_with("tmp/"));
     assert!(req.metadata.partition_key.ends_with(".log"));
 
     let req = build_request(Compression::None);
-    assert!(req.metadata.partition_key.starts_with("tmp/"));
     assert!(req.metadata.partition_key.ends_with(".log"));
 
     let req = build_request(Compression::gzip_default());
-    assert!(req.metadata.partition_key.starts_with("tmp/"));
     assert!(req.metadata.partition_key.ends_with(".log.gz"));
 
     let req = build_request(Compression::zlib_default());
-    assert!(req.metadata.partition_key.starts_with("tmp/"));
     assert!(req.metadata.partition_key.ends_with(".log.zz"));
 }

@@ -25,11 +25,20 @@ use crate::{
 #[serde(deny_unknown_fields)]
 
 pub struct HdfsConfig {
+    /// The root path of hdfs services.
+    ///
+    /// Root must be a valid dir.
+    ///
+    /// The final file path with be like `{root}/{prefix}{suffix}`.
+    #[serde(default)]
+    pub root: String,
     /// A prefix to apply to all keys.
     ///
     /// Prefixes are useful for partitioning objects, such as by creating an blob key that
     /// stores blobs under a particular "directory". If using a prefix for this purpose, it must end
     /// in `/` to act as a directory path. A trailing `/` is **not** automatically added.
+    ///
+    /// The final file path with be like `{root}/{prefix}{suffix}`.
     #[serde(default)]
     #[configurable(metadata(docs::templateable))]
     pub prefix: String,
@@ -69,7 +78,8 @@ pub struct HdfsConfig {
 impl GenerateConfig for HdfsConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
-            prefix: "tmp/".to_string(),
+            root: "/".to_string(),
+            prefix: "%F/".to_string(),
             name_node: "default".to_string(),
 
             encoding: (
@@ -112,7 +122,7 @@ impl HdfsConfig {
         // Build OpenDAL Operator
         let mut builder = Hdfs::default();
         // Prefix logic will be handled by key_partitioner.
-        builder.root("/");
+        builder.root(&self.root);
         builder.name_node(&self.name_node);
 
         let op = Operator::create(builder)?

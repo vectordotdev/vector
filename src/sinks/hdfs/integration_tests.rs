@@ -5,6 +5,7 @@ use std::{
 
 use codecs::{encoding::FramingConfig, TextSerializerConfig};
 use futures::{stream, Stream, StreamExt, TryStreamExt};
+use opendal::ObjectMode;
 use similar_asserts::assert_eq;
 use vector_core::event::{BatchNotifier, BatchStatusReceiver, Event, EventArray, LogEvent};
 
@@ -46,7 +47,6 @@ async fn hdfs_healthchecks_valid_node_node() {
 #[tokio::test]
 async fn hdfs_rotate_files_after_the_buffer_size_is_reached() {
     let config = config(&hdfs_name_node(), 10);
-    let prefix = config.prefix.clone();
     let op = config.build_operator().unwrap();
     let sink = config.build_processor(op.clone()).unwrap();
 
@@ -70,14 +70,23 @@ async fn hdfs_rotate_files_after_the_buffer_size_is_reached() {
     // Hard-coded sleeps are bad, but we're waiting on localstack's state to converge.
     tokio::time::sleep(Duration::from_secs(1)).await;
 
-    let objects: Vec<_> = op
-        .object(&prefix)
+    let mut objects: Vec<_> = op
+        .object("/")
         .scan()
         .await
         .unwrap()
-        .try_collect()
+        .try_collect::<Vec<_>>()
         .await
-        .unwrap();
+        .unwrap()
+        .into_iter()
+        .filter(|o| o.blocking_mode().unwrap() == ObjectMode::FILE)
+        .collect();
+    objects.sort_by(|l, r| {
+        let l = l.blocking_metadata().unwrap().last_modified().unwrap();
+        let r = r.blocking_metadata().unwrap().last_modified().unwrap();
+
+        l.cmp(&r)
+    });
     assert_eq!(objects.len(), 3);
 
     let mut response_lines: Vec<Vec<String>> = Vec::new();
@@ -104,7 +113,9 @@ fn config(name_node: &str, batch_size: usize) -> HdfsConfig {
     batch.timeout_secs = Some(5.0);
 
     HdfsConfig {
-        prefix: format!("tmp/{}/date=%F", random_string(10)),
+        // Write test file in local with random_string.
+        root: format!("/tmp/{}/", random_string(10)),
+        prefix: "%F-".to_string(),
         name_node: name_node.to_string(),
 
         encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
