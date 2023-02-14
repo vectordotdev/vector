@@ -8,6 +8,7 @@ crate::cli_subcommands! {
     mod examples,
     mod fmt,
     mod markdown,
+    mod rust,
     mod scripts,
     version,
 }
