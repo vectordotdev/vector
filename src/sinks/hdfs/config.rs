@@ -15,6 +15,7 @@ use opendal::layers::LoggingLayer;
 use opendal::services::Hdfs;
 use opendal::Operator;
 use vector_config::configurable_component;
+use vector_core::config::DataType;
 use vector_core::{
     config::{AcknowledgementsConfig, Input},
     sink::VectorSink,
@@ -90,15 +91,7 @@ impl GenerateConfig for HdfsConfig {
 #[async_trait::async_trait]
 impl SinkConfig for HdfsConfig {
     async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        // Build OpenDAL Operator
-        let mut builder = Hdfs::default();
-        // Prefix logic will be handled by key_partitioner.
-        builder.root("/");
-        builder.name_node(&self.name_node);
-
-        let op = Operator::create(builder)?
-            .layer(LoggingLayer::default())
-            .finish();
+        let op = self.build_operator()?;
 
         let check_op = op.clone();
         let healthcheck = Box::pin(async move { Ok(check_op.check().await?) });
@@ -108,7 +101,7 @@ impl SinkConfig for HdfsConfig {
     }
 
     fn input(&self) -> Input {
-        Input::log()
+        Input::new(self.encoding.config().1.input_type() & DataType::Log)
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
@@ -117,6 +110,19 @@ impl SinkConfig for HdfsConfig {
 }
 
 impl HdfsConfig {
+    pub fn build_operator(&self) -> crate::Result<Operator> {
+        // Build OpenDAL Operator
+        let mut builder = Hdfs::default();
+        // Prefix logic will be handled by key_partitioner.
+        builder.root("/");
+        builder.name_node(&self.name_node);
+
+        let op = Operator::create(builder)?
+            .layer(LoggingLayer::default())
+            .finish();
+        Ok(op)
+    }
+
     pub fn build_processor(&self, op: Operator) -> crate::Result<VectorSink> {
         // Configure our partitioning/batching.
         let batcher_settings = self.batch.into_batcher_settings()?;

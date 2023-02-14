@@ -1,19 +1,30 @@
 use super::HdfsConfig;
+use crate::event::Event;
+use crate::event::LogEvent;
+use crate::sinks::util::BatchConfig;
 use crate::sinks::util::Compression;
+use crate::test_util::components::{run_and_assert_sink_compliance, SINK_TAGS};
 use crate::{
     config::{SinkConfig, SinkContext},
     test_util::{random_lines_with_stream, random_string},
 };
-use codecs::{JsonSerializerConfig, NewlineDelimitedEncoderConfig};
+use codecs::encoding::FramingConfig;
+use codecs::TextSerializerConfig;
+use futures::stream;
 use futures::Stream;
-use tokio_stream::StreamExt;
+use futures::StreamExt;
+use futures::TryStreamExt;
+use std::io::BufRead;
+use std::io::BufReader;
+use std::io::Cursor;
+use std::time::Duration;
 use vector_common::finalization::{BatchNotifier, BatchStatusReceiver};
 use vector_core::event::EventArray;
 
 #[tokio::test]
 async fn hdfs_healthchecks_invalid_node_node() {
     // Point to an invalid endpoint
-    let config = config("http://127.0.0.1:1");
+    let config = config("http://127.0.0.1:1", 10);
     let (_, health_check) = config
         .build(SinkContext::new_test())
         .await
@@ -25,7 +36,7 @@ async fn hdfs_healthchecks_invalid_node_node() {
 
 #[tokio::test]
 async fn hdfs_healthchecks_valid_node_node() {
-    let config = config(&hdfs_name_node());
+    let config = config(&hdfs_name_node(), 10);
     let (_, health_check) = config
         .build(SinkContext::new_test())
         .await
@@ -35,22 +46,73 @@ async fn hdfs_healthchecks_valid_node_node() {
     assert!(result.is_ok())
 }
 
+#[tokio::test]
+async fn hdfs_rotate_files_after_the_buffer_size_is_reached() {
+    let config = config(&hdfs_name_node(), 10);
+    let prefix = config.prefix.clone();
+    let op = config.build_operator().unwrap();
+    let sink = config.build_processor(op.clone()).unwrap();
+
+    let (lines, _events) = random_lines_with_stream(100, 30, None);
+
+    let events = lines.clone().into_iter().enumerate().map(|(i, line)| {
+        let mut e = LogEvent::from(line);
+        let i = if i < 10 {
+            1
+        } else if i < 20 {
+            2
+        } else {
+            3
+        };
+        e.insert("i", i.to_string());
+        Event::from(e)
+    });
+
+    run_and_assert_sink_compliance(sink, stream::iter(events), &SINK_TAGS).await;
+
+    // Hard-coded sleeps are bad, but we're waiting on localstack's state to converge.
+    tokio::time::sleep(Duration::from_secs(1)).await;
+
+    let objects: Vec<_> = op
+        .object(&prefix)
+        .scan()
+        .await
+        .unwrap()
+        .try_collect()
+        .await
+        .unwrap();
+    assert_eq!(objects.len(), 3);
+
+    let mut response_lines: Vec<Vec<String>> = Vec::new();
+    for o in objects {
+        let bs = o.read().await.unwrap();
+        let buf_read = BufReader::new(Cursor::new(bs));
+
+        response_lines.push(buf_read.lines().map(|l| l.unwrap()).collect());
+    }
+
+    assert_eq!(&lines[00..10], response_lines[0].as_slice());
+    assert_eq!(&lines[10..20], response_lines[1].as_slice());
+    assert_eq!(&lines[20..30], response_lines[2].as_slice());
+}
+
 #[allow(dead_code)]
 fn hdfs_name_node() -> String {
     std::env::var("HDFS_NAME_NODE").unwrap_or_else(|_| "default".into())
 }
 
-fn config(name_node: &str) -> HdfsConfig {
+fn config(name_node: &str, batch_size: usize) -> HdfsConfig {
+    let mut batch = BatchConfig::default();
+    batch.max_events = Some(batch_size);
+    batch.timeout_secs = Some(5.0);
+
     HdfsConfig {
-        prefix: random_string(10) + "/date=%F",
-        encoding: (
-            Some(NewlineDelimitedEncoderConfig::new()),
-            JsonSerializerConfig::default(),
-        )
-            .into(),
+        prefix: format!("tmp/{}/date=%F", random_string(10)),
         name_node: name_node.to_string(),
-        compression: Compression::gzip_default(),
-        batch: Default::default(),
+
+        encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
+        compression: Compression::None,
+        batch,
         acknowledgements: Default::default(),
     }
 }

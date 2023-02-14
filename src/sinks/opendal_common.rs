@@ -28,6 +28,7 @@ use snafu::Snafu;
 use std::num::NonZeroUsize;
 use std::task::Poll;
 use tower::Service;
+use tracing::Instrument;
 use vector_common::finalization::{EventStatus, Finalizable};
 use vector_common::request_metadata::MetaDescriptive;
 use vector_common::request_metadata::RequestMetadata;
@@ -239,6 +240,7 @@ impl Service<OpendalRequest> for OpendalService {
             let result = op
                 .object(&request.metadata.partition_key.as_str())
                 .write(request.payload)
+                .in_current_span()
                 .await;
             result.map(|_| OpendalResponse {
                 count: request.metadata.count,
