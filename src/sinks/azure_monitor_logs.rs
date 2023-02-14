@@ -42,11 +42,17 @@ pub struct AzureMonitorLogsConfig {
     /// The [unique identifier][uniq_id] for the Log Analytics workspace.
     ///
     /// [uniq_id]: https://docs.microsoft.com/en-us/azure/azure-monitor/platform/data-collector-api#request-uri-parameters
+    #[configurable(metadata(docs::examples = "5ce893d9-2c32-4b6c-91a9-b0887c2de2d6"))]
+    #[configurable(metadata(docs::examples = "97ce69d9-b4be-4241-8dbd-d265edcf06c4"))]
     pub customer_id: String,
 
     /// The [primary or the secondary key][shared_key] for the Log Analytics workspace.
     ///
     /// [shared_key]: https://docs.microsoft.com/en-us/azure/azure-monitor/platform/data-collector-api#authorization
+    #[configurable(metadata(
+        docs::examples = "SERsIYhgMVlJB6uPsq49gCxNiruf6v0vhMYE+lfzbSGcXjdViZdV/e5pEMTYtw9f8SkVLf4LFlLCc2KxtRZfCA=="
+    ))]
+    #[configurable(metadata(docs::examples = "${AZURE_MONITOR_SHARED_KEY_ENV_VAR}"))]
     pub shared_key: SensitiveString,
 
     /// The [record type][record_type] of the data that is being submitted.
@@ -55,16 +61,26 @@ pub struct AzureMonitorLogsConfig {
     ///
     /// [record_type]: https://docs.microsoft.com/en-us/azure/azure-monitor/platform/data-collector-api#request-headers
     #[configurable(validation(pattern = "[a-zA-Z0-9_]{1,100}"))]
+    #[configurable(metadata(docs::examples = "MyTableName"))]
+    #[configurable(metadata(docs::examples = "MyRecordType"))]
     pub log_type: String,
 
     /// The [Resource ID][resource_id] of the Azure resource the data should be associated with.
     ///
     /// [resource_id]: https://docs.microsoft.com/en-us/azure/azure-monitor/platform/data-collector-api#request-headers
+    #[configurable(metadata(
+        docs::examples = "/subscriptions/11111111-1111-1111-1111-111111111111/resourceGroups/otherResourceGroup/providers/Microsoft.Storage/storageAccounts/examplestorage"
+    ))]
+    #[configurable(metadata(
+        docs::examples = "/subscriptions/11111111-1111-1111-1111-111111111111/resourceGroups/examplegroup/providers/Microsoft.SQL/servers/serverName/databases/databaseName"
+    ))]
     pub azure_resource_id: Option<String>,
 
     /// [Alternative host][alt_host] for dedicated Azure regions.
     ///
     /// [alt_host]: https://docs.azure.cn/en-us/articles/guidance/developerdifferences#check-endpoints-in-azure
+    #[configurable(metadata(docs::examples = "ods.opinsights.azure.us"))]
+    #[configurable(metadata(docs::examples = "ods.opinsights.azure.cn"))]
     #[serde(default = "default_host")]
     pub(super) host: String,
 
