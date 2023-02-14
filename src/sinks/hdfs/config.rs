@@ -53,9 +53,9 @@ use crate::{
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct HdfsConfig {
-    /// The root path of hdfs services.
+    /// The root path for HDFS.
     ///
-    /// Root must be a valid dir.
+    /// Must be a valid directory.
     ///
     /// The final file path with be like `{root}/{prefix}{suffix}`.
     #[serde(default)]
