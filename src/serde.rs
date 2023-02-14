@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 use codecs::{
     decoding::{DeserializerConfig, FramingConfig},
     BytesDecoderConfig, BytesDeserializerConfig,

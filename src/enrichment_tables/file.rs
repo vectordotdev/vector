@@ -1,3 +1,4 @@
+//! Handles enrichment tables for `type = file`.
 use std::{
     collections::{BTreeMap, HashMap},
     fs,
@@ -247,6 +248,7 @@ impl EnrichmentTableConfig for FileConfig {
 
 impl_generate_config_from_default!(FileConfig);
 
+/// A struct that implements [enrichment::Table] to handle loading enricment data from a CSV file.
 #[derive(Clone)]
 pub struct File {
     config: FileConfig,
@@ -261,6 +263,7 @@ pub struct File {
 }
 
 impl File {
+    /// Creates a new [File] based on the provided config.
     pub fn new(
         config: FileConfig,
         last_modified: SystemTime,

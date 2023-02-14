@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 pub mod auth;
 pub mod region;
 

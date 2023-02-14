@@ -1,3 +1,4 @@
+//! Functionality for managing template fields used by Vector's sinks.
 use std::{borrow::Cow, convert::TryFrom, fmt, hash::Hash, path::PathBuf};
 
 use bytes::Bytes;
@@ -18,6 +19,8 @@ use crate::{
 
 static RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"\{\{(?P<key>[^\}]+)\}\}").unwrap());
 
+/// Errors raised whilst parsing a Template field.
+#[allow(missing_docs)]
 #[derive(Clone, Debug, Eq, PartialEq, Snafu)]
 pub enum TemplateParseError {
     #[snafu(display("Invalid strftime item"))]
@@ -26,6 +29,8 @@ pub enum TemplateParseError {
     InvalidPathSyntax { path: String },
 }
 
+/// Errors raised whilst rendering a Template.
+#[allow(missing_docs)]
 #[derive(Clone, Debug, Eq, PartialEq, Snafu)]
 pub enum TemplateRenderingError {
     #[snafu(display("Missing fields on event: {:?}", missing_keys))]
@@ -132,6 +137,7 @@ impl fmt::Display for Template {
 impl ConfigurableString for Template {}
 
 impl Template {
+    /// Renders the given template with data from the event.
     pub fn render<'a>(
         &self,
         event: impl Into<EventRef<'a>>,
@@ -139,6 +145,7 @@ impl Template {
         self.render_string(event.into()).map(Into::into)
     }
 
+    /// Renders the given template with data from the event.
     pub fn render_string<'a>(
         &self,
         event: impl Into<EventRef<'a>>,
@@ -181,6 +188,7 @@ impl Template {
         }
     }
 
+    /// Returns the names of the fields that are rendered in this template.
     pub fn get_fields(&self) -> Option<Vec<String>> {
         let parts: Vec<_> = self
             .parts
@@ -196,6 +204,7 @@ impl Template {
         (!parts.is_empty()).then_some(parts)
     }
 
+    /// Returns a reference to the template string.
     pub fn get_ref(&self) -> &str {
         &self.src
     }
@@ -205,6 +214,7 @@ impl Template {
         self.src.is_empty()
     }
 
+    /// A dynamic template string contains sections that depend on the input event or time.
     pub const fn is_dynamic(&self) -> bool {
         !self.is_static
     }

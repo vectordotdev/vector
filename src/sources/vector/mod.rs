@@ -1,3 +1,4 @@
+//! The `vector` source. See [VectorConfig].
 use std::net::SocketAddr;
 
 use chrono::Utc;
@@ -35,7 +36,7 @@ enum VectorConfigVersion {
 }
 
 #[derive(Debug, Clone)]
-pub struct Service {
+struct Service {
     pipeline: SourceSender,
     acknowledgements: bool,
     log_namespace: LogNamespace,
