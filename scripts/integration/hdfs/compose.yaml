@@ -2,7 +2,7 @@ version: '3'
 
 services:
   namenode:
-    image: docker.io/bde2020/hadoop-namenode:${HDFS_VERSION}
+    image: docker.io/bde2020/hadoop-namenode:${CONFIG_HADOOP}
     ports:
       - "9870:9870"
       - "9000:9000"
@@ -11,7 +11,7 @@ services:
     env_file:
       - ../../../tests/data/hdfs/hadoop.env
   datanode:
-    image: docker.io/bde2020/hadoop-datanode:${HDFS_VERSION}
+    image: docker.io/bde2020/hadoop-datanode:${CONFIG_HADOOP}
     environment:
       - SERVICE_PRECONDITION=namenode:9870
     env_file:
