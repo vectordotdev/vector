@@ -137,7 +137,7 @@ impl tokio_util::codec::Encoder<Event> for PapertrailEncoder {
     ) -> Result<(), Self::Error> {
         let host = event
             .as_mut_log()
-            .remove(log_schema().host_key())
+            .get_host()
             .map(|host| host.to_string_lossy().into_owned());
 
         let process = self
