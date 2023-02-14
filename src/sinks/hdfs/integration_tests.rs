@@ -1,6 +1,4 @@
 use super::HdfsConfig;
-use crate::event::Event;
-use crate::event::LogEvent;
 use crate::sinks::util::BatchConfig;
 use crate::sinks::util::Compression;
 use crate::test_util::components::{run_and_assert_sink_compliance, SINK_TAGS};
@@ -14,12 +12,16 @@ use futures::stream;
 use futures::Stream;
 use futures::StreamExt;
 use futures::TryStreamExt;
+use similar_asserts::assert_eq;
 use std::io::BufRead;
 use std::io::BufReader;
 use std::io::Cursor;
 use std::time::Duration;
-use vector_common::finalization::{BatchNotifier, BatchStatusReceiver};
+use vector_core::event::BatchNotifier;
+use vector_core::event::BatchStatusReceiver;
+use vector_core::event::Event;
 use vector_core::event::EventArray;
+use vector_core::event::LogEvent;
 
 #[tokio::test]
 async fn hdfs_healthchecks_invalid_node_node() {
