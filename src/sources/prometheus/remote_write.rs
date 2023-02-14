@@ -36,6 +36,7 @@ pub struct PrometheusRemoteWriteConfig {
     tls: Option<TlsEnableableConfig>,
 
     #[configurable(derived)]
+    #[configurable(metadata(docs::advanced))]
     auth: Option<HttpSourceAuthConfig>,
 
     #[configurable(derived)]

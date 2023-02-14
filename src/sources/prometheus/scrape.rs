@@ -59,11 +59,13 @@ pub struct PrometheusScrapeConfig {
     /// The tag name added to each event representing the scraped instance's host:port.
     ///
     /// The tag value will be the host/port of the scraped instance.
+    #[configurable(metadata(docs::advanced))]
     instance_tag: Option<String>,
 
     /// The tag name added to each event representing the scraped instance's endpoint.
     ///
     /// The tag value will be the endpoint of the scraped instance.
+    #[configurable(metadata(docs::advanced))]
     endpoint_tag: Option<String>,
 
     /// Controls how tag conflicts are handled if the scraped source has tags to be added.
@@ -73,6 +75,7 @@ pub struct PrometheusScrapeConfig {
     ///
     /// This matches Prometheus’ `honor_labels` configuration.
     #[serde(default = "crate::serde::default_false")]
+    #[configurable(metadata(docs::advanced))]
     honor_labels: bool,
 
     /// Custom parameters for the scrape request query string.
@@ -89,6 +92,7 @@ pub struct PrometheusScrapeConfig {
     tls: Option<TlsConfig>,
 
     #[configurable(derived)]
+    #[configurable(metadata(docs::advanced))]
     auth: Option<Auth>,
 }
 
