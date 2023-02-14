@@ -11,10 +11,11 @@
 //! - Compression
 //! - KeyPartition
 
+use crate::codecs::Encoder;
+use crate::codecs::Transformer;
 use crate::event::EventFinalizers;
-use crate::sinks::util::encoding::write_all;
-use crate::sinks::util::encoding::Encoder;
 use crate::sinks::util::metadata::RequestMetadataBuilder;
+use crate::sinks::util::partitioner::KeyPartitioner;
 use crate::sinks::util::{request_builder::EncodeResult, Compression};
 use crate::sinks::BoxFuture;
 use crate::{
@@ -23,9 +24,11 @@ use crate::{
     sinks::util::{RequestBuilder, SinkBuilderExt},
 };
 use bytes::Bytes;
+use codecs::encoding::Framer;
 use futures::{stream::BoxStream, StreamExt};
 use opendal::Operator;
 use snafu::Snafu;
+use std::num::NonZeroUsize;
 use std::task::Poll;
 use tower::Service;
 use vector_common::finalization::{EventStatus, Finalizable};
@@ -33,15 +36,20 @@ use vector_common::request_metadata::MetaDescriptive;
 use vector_common::request_metadata::RequestMetadata;
 use vector_core::internal_event::CountByteSize;
 use vector_core::sink::StreamSink;
+use vector_core::stream::BatcherSettings;
 use vector_core::stream::DriverResponse;
+use vector_core::ByteSizeOf;
 
 pub struct OpendalSink {
     op: Operator,
+    request_builder: OpendalRequestBuilder,
+    partitioner: KeyPartitioner,
+    batcher_settings: BatcherSettings,
 }
 
 impl OpendalSink {
     pub fn new(op: Operator) -> Self {
-        Self { op }
+        todo!()
     }
 }
 
@@ -57,13 +65,21 @@ impl StreamSink<Event> for OpendalSink {
 
 impl OpendalSink {
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
+        let partitioner = self.partitioner;
+        let settings = self.batcher_settings;
+
+        let builder_limit = NonZeroUsize::new(64);
+        let request_builder = self.request_builder;
+
         input
-            .request_builder(
-                None,
-                OpendalRequestBuilder {
-                    encoder: OpendalEncoder,
-                },
-            )
+            .batched_partitioned(partitioner, settings)
+            .filter_map(|(key, batch)| async move {
+                // We don't need to emit an error here if the event is dropped since this will occur if the template
+                // couldn't be rendered during the partitioning. A `TemplateRenderingError` is already emitted when
+                // that occurs.
+                key.map(move |k| (k, batch))
+            })
+            .request_builder(builder_limit, request_builder)
             .filter_map(|request| async move {
                 match request {
                     Err(error) => {
@@ -79,21 +95,6 @@ impl OpendalSink {
     }
 }
 
-/// TODO: we should implment batch encoder.
-#[derive(Clone)]
-struct OpendalEncoder;
-
-impl Encoder<Event> for OpendalEncoder {
-    fn encode_input(
-        &self,
-        input: Event,
-        writer: &mut dyn std::io::Write,
-    ) -> std::io::Result<usize> {
-        let event = serde_json::to_string(&input).unwrap();
-        write_all(writer, 1, event.as_bytes()).map(|()| event.len())
-    }
-}
-
 #[derive(Debug, Clone)]
 pub struct OpendalService {
     op: Operator,
@@ -106,38 +107,45 @@ impl OpendalService {
 }
 
 pub struct OpendalRequest {
-    pub path: String,
     pub payload: Bytes,
-    pub finalizers: EventFinalizers,
-    pub metadata: RequestMetadata,
+    pub metadata: OpendalMetadata,
+    pub request_metadata: RequestMetadata,
 }
 
 impl MetaDescriptive for OpendalRequest {
     fn get_metadata(&self) -> RequestMetadata {
-        self.metadata
+        self.request_metadata
     }
 }
 
 impl Finalizable for OpendalRequest {
     fn take_finalizers(&mut self) -> EventFinalizers {
-        std::mem::take(&mut self.finalizers)
+        std::mem::take(&mut self.metadata.finalizers)
     }
 }
 
-struct OpendalRequestBuilder {
-    encoder: OpendalEncoder,
+pub struct OpendalMetadata {
+    pub partition_key: String,
+    pub count: usize,
+    pub byte_size: usize,
+    pub finalizers: EventFinalizers,
 }
 
-impl RequestBuilder<Event> for OpendalRequestBuilder {
-    type Metadata = EventFinalizers;
-    type Events = Event;
-    type Encoder = OpendalEncoder;
+struct OpendalRequestBuilder {
+    pub encoder: (Transformer, Encoder<Framer>),
+    pub compression: Compression,
+}
+
+impl RequestBuilder<(String, Vec<Event>)> for OpendalRequestBuilder {
+    type Metadata = OpendalMetadata;
+    type Events = Vec<Event>;
+    type Encoder = (Transformer, Encoder<Framer>);
     type Payload = Bytes;
     type Request = OpendalRequest;
     type Error = std::io::Error;
 
     fn compression(&self) -> Compression {
-        Compression::None
+        self.compression
     }
 
     fn encoder(&self) -> &Self::Encoder {
@@ -146,25 +154,38 @@ impl RequestBuilder<Event> for OpendalRequestBuilder {
 
     fn split_input(
         &self,
-        mut input: Event,
+        input: (String, Vec<Event>),
     ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
-        let finalizers = input.take_finalizers();
-        let metadata_builder = RequestMetadataBuilder::from_events(&input);
-        (finalizers, metadata_builder, input)
+        let (partition_key, mut events) = input;
+        let finalizers = events.take_finalizers();
+        let opendal_metadata = OpendalMetadata {
+            partition_key,
+            count: events.len(),
+            byte_size: events.size_of(),
+            finalizers,
+        };
+
+        let builder = RequestMetadataBuilder::from_events(&events);
+
+        (opendal_metadata, builder, events)
     }
 
     fn build_request(
         &self,
-        metadata: Self::Metadata,
+        mut metadata: Self::Metadata,
         request_metadata: RequestMetadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
+        // TODO: we can support time format later.
+        let name = uuid::Uuid::new_v4().to_string();
+        let extension = self.compression.extension();
+
+        metadata.partition_key = format!("{}{}.{}", metadata.partition_key, name, extension);
+
         OpendalRequest {
-            // TODO: path should be construct by key partition like s3 and gcp.
-            path: uuid::Uuid::new_v4().to_string(),
-            finalizers: metadata,
+            metadata,
             payload: payload.into_payload(),
-            metadata: request_metadata,
+            request_metadata: request_metadata,
         }
     }
 }
@@ -199,7 +220,10 @@ impl Service<OpendalRequest> for OpendalService {
         let op = self.op.clone();
 
         Box::pin(async move {
-            let result = op.object(&request.path).write(request.payload).await;
+            let result = op
+                .object(&request.metadata.partition_key.as_str())
+                .write(request.payload)
+                .await;
             result.map(|_| OpendalResponse { byte_size })
         })
     }
