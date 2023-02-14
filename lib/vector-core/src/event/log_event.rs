@@ -25,7 +25,7 @@ use super::{
 use crate::config::log_schema;
 use crate::config::LogNamespace;
 use crate::{event::MaybeAsLogMut, ByteSizeOf};
-use lookup::path;
+use lookup::{metadata_path, path};
 
 #[derive(Debug, Deserialize)]
 struct Inner {
@@ -396,6 +396,90 @@ impl LogEvent {
             }
         }
         self.metadata.merge(incoming.metadata);
+    }
+}
+
+/// Log Namespace utility methods. These can only be used when an event has a
+/// valid schema definition set (which should be on every event in transforms and sinks).
+impl LogEvent {
+    /// Fetches the "message" path of the event. This is either from the "message" semantic meaning (Vector namespace)
+    /// or from the message key set on the "Global Log Schema" (Legacy namespace).
+    // TODO: This can eventually return a `&TargetOwnedPath` once Semantic meaning and the
+    //   "Global Log Schema" are updated to the new path lookup code
+    pub fn message_path(&self) -> Option<String> {
+        match self.namespace() {
+            LogNamespace::Vector => self.find_key_by_meaning("message"),
+            LogNamespace::Legacy => Some(log_schema().message_key().to_owned()),
+        }
+    }
+
+    /// Fetches the "timestamp" path of the event. This is either from the "timestamp" semantic meaning (Vector namespace)
+    /// or from the timestamp key set on the "Global Log Schema" (Legacy namespace).
+    // TODO: This can eventually return a `&TargetOwnedPath` once Semantic meaning and the
+    //   "Global Log Schema" are updated to the new path lookup code
+    pub fn timestamp_path(&self) -> Option<String> {
+        match self.namespace() {
+            LogNamespace::Vector => self.find_key_by_meaning("timestamp"),
+            LogNamespace::Legacy => Some(log_schema().timestamp_key().to_owned()),
+        }
+    }
+
+    /// Fetches the `host` path of the event. This is either from the "host" semantic meaning (Vector namespace)
+    /// or from the host key set on the "Global Log Schema" (Legacy namespace).
+    // TODO: This can eventually return a `&TargetOwnedPath` once Semantic meaning and the
+    //   "Global Log Schema" are updated to the new path lookup code
+    pub fn host_path(&self) -> Option<String> {
+        match self.namespace() {
+            LogNamespace::Vector => self.find_key_by_meaning("host"),
+            LogNamespace::Legacy => Some(log_schema().host_key().to_owned()),
+        }
+    }
+
+    /// Fetches the `source_type` path of the event. This is either from the `source_type` Vector metadata field (Vector namespace)
+    /// or from the `source_type` key set on the "Global Log Schema" (Legacy namespace).
+    // TODO: This can eventually return a `&TargetOwnedPath` once Semantic meaning and the
+    //   "Global Log Schema" are updated to the new path lookup code
+    pub fn source_type_path(&self) -> Option<String> {
+        match self.namespace() {
+            LogNamespace::Vector => self.find_key_by_meaning("source_type"),
+            LogNamespace::Legacy => Some(log_schema().source_type_key().to_owned()),
+        }
+    }
+
+    /// Fetches the `message` of the event. This is either from the "message" semantic meaning (Vector namespace)
+    /// or from the message key set on the "Global Log Schema" (Legacy namespace).
+    pub fn get_message(&self) -> Option<&Value> {
+        match self.namespace() {
+            LogNamespace::Vector => self.get_by_meaning("message"),
+            LogNamespace::Legacy => self.get((PathPrefix::Event, log_schema().message_key())),
+        }
+    }
+
+    /// Fetches the `timestamp` of the event. This is either from the "timestamp" semantic meaning (Vector namespace)
+    /// or from the timestamp key set on the "Global Log Schema" (Legacy namespace).
+    pub fn get_timestamp(&self) -> Option<&Value> {
+        match self.namespace() {
+            LogNamespace::Vector => self.get_by_meaning("timestamp"),
+            LogNamespace::Legacy => self.get((PathPrefix::Event, log_schema().timestamp_key())),
+        }
+    }
+
+    /// Fetches the `host` of the event. This is either from the "host" semantic meaning (Vector namespace)
+    /// or from the host key set on the "Global Log Schema" (Legacy namespace).
+    pub fn get_host(&self) -> Option<&Value> {
+        match self.namespace() {
+            LogNamespace::Vector => self.get_by_meaning("host"),
+            LogNamespace::Legacy => self.get((PathPrefix::Event, log_schema().host_key())),
+        }
+    }
+
+    /// Fetches the `source_type` of the event. This is either from the `source_type` Vector metadata field (Vector namespace)
+    /// or from the `source_type` key set on the "Global Log Schema" (Legacy namespace).
+    pub fn get_source_type(&self) -> Option<&Value> {
+        match self.namespace() {
+            LogNamespace::Vector => self.get(metadata_path!("vector", "source_type")),
+            LogNamespace::Legacy => self.get((PathPrefix::Event, log_schema().source_type_key())),
+        }
     }
 }
 
