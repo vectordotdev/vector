@@ -13,12 +13,14 @@ use std::{num::NonZeroUsize, task::Poll};
 use bytes::Bytes;
 use codecs::encoding::Framer;
 use futures::{stream::BoxStream, StreamExt};
+use metrics::counter;
 use opendal::Operator;
 use snafu::Snafu;
 use tower::Service;
 use tracing::Instrument;
 use vector_common::{
     finalization::{EventStatus, Finalizable},
+    internal_event::InternalEvent,
     request_metadata::{MetaDescriptive, RequestMetadata},
 };
 use vector_core::{
@@ -245,12 +247,35 @@ impl Service<OpendalRequest> for OpendalService {
                 .write(request.payload)
                 .in_current_span()
                 .await;
-            result.map(|_| OpendalResponse {
-                count: request.metadata.count,
-                events_byte_size: request.metadata.byte_size,
-                byte_size,
+            result.map(|_| {
+                emit!(OpendalBytesSent { byte_size });
+
+                OpendalResponse {
+                    count: request.metadata.count,
+                    events_byte_size: request.metadata.byte_size,
+                    byte_size,
+                }
             })
         })
+    }
+}
+
+pub struct OpendalBytesSent {
+    pub byte_size: usize,
+}
+
+impl InternalEvent for OpendalBytesSent {
+    /// TODO: we should return different protocl for opendal services.
+    fn emit(self) {
+        trace!(
+            message = "Bytes sent.",
+            protocol = "file",
+            byte_size = %self.byte_size,
+        );
+        counter!(
+            "component_sent_bytes_total", self.byte_size as u64,
+            "protocol" => "file",
+        );
     }
 }
 
