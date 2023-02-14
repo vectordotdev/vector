@@ -11,3 +11,6 @@ pub use self::config::HdfsConfig;
 
 #[cfg(test)]
 mod test;
+
+#[cfg(all(test, feature = "hdfs-integration-tests"))]
+mod integration_tests;

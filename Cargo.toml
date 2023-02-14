@@ -752,6 +752,7 @@ all-integration-tests = [
   "redis-integration-tests",
   "splunk-integration-tests",
   "dnstap-integration-tests",
+  "hdfs-integration-tests",
 ]
 
 amqp-integration-tests = ["sources-amqp", "sinks-amqp"]
@@ -811,6 +812,7 @@ pulsar-integration-tests = ["sinks-pulsar"]
 redis-integration-tests = ["sinks-redis", "sources-redis"]
 splunk-integration-tests = ["sinks-splunk_hec"]
 dnstap-integration-tests = ["sources-dnstap"]
+hdfs-integration-tests = ["sinks-hdfs"]
 disable-resolv-conf = []
 shutdown-tests = ["api", "sinks-blackhole", "sinks-console", "sinks-prometheus", "sources", "transforms-lua", "transforms-remap", "unix"]
 cli-tests = ["sinks-blackhole", "sinks-socket", "sources-demo_logs", "sources-file"]
