@@ -4,10 +4,10 @@ use std::{
 };
 
 use codecs::{encoding::FramingConfig, TextSerializerConfig};
-use futures::{stream, Stream, StreamExt, TryStreamExt};
+use futures::{stream, TryStreamExt};
 use opendal::ObjectMode;
 use similar_asserts::assert_eq;
-use vector_core::event::{BatchNotifier, BatchStatusReceiver, Event, EventArray, LogEvent};
+use vector_core::event::{Event, LogEvent};
 
 use super::HdfsConfig;
 use crate::{
@@ -123,19 +123,4 @@ fn config(name_node: &str, batch_size: usize) -> HdfsConfig {
         batch,
         acknowledgements: Default::default(),
     }
-}
-
-#[allow(dead_code)]
-fn make_events_batch(
-    len: usize,
-    count: usize,
-) -> (
-    Vec<String>,
-    impl Stream<Item = EventArray>,
-    BatchStatusReceiver,
-) {
-    let (batch, receiver) = BatchNotifier::new_with_receiver();
-    let (lines, events) = random_lines_with_stream(len, count, Some(batch));
-
-    (lines, events.map(Into::into), receiver)
 }
