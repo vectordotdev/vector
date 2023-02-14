@@ -43,6 +43,7 @@ pub struct VectorConfig {
     /// Both IP address and hostname are accepted formats.
     ///
     /// The address _must_ include a port.
+    #[configurable(validation(format = "uri"))]
     #[configurable(metadata(docs::examples = "92.12.333.224:6000"))]
     #[configurable(metadata(docs::examples = "https://somehost:6000"))]
     address: String,
@@ -52,6 +53,7 @@ pub struct VectorConfig {
     /// If set to `true`, requests will be compressed with [`gzip`][gzip_docs].
     ///
     /// [gzip_docs]: https://www.gzip.org/
+    #[configurable(metadata(docs::advanced))]
     #[serde(default)]
     compression: bool,
 

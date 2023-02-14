@@ -47,6 +47,7 @@ pub struct AdaptiveConcurrencySettings {
     /// the current RTT. Smaller values cause this reference to adjust more slowly, which may be useful if a service has
     /// unusually high response variability.
     #[configurable(validation(range(min = 0.0, max = 1.0)))]
+    #[serde(default = "default_ewma_alpha")]
     pub(super) ewma_alpha: f64,
 
     /// Scale of RTT deviations which are not considered anomalous.
@@ -58,6 +59,7 @@ pub struct AdaptiveConcurrencySettings {
     /// can ignore increases in RTT that are within an expected range. This factor is used to scale up the deviation to
     /// an appropriate range.  Larger values cause the algorithm to ignore larger increases in the RTT.
     #[configurable(validation(range(min = 0.0)))]
+    #[serde(default = "default_rtt_deviation_scale")]
     pub(super) rtt_deviation_scale: f64,
 }
 

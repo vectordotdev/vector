@@ -57,50 +57,50 @@ enum BuildError {
 #[serde(tag = "type", rename_all = "snake_case")]
 #[enum_dispatch(TransformConfig)]
 pub enum Transforms {
-    /// Aggregate.
+    /// Aggregate metrics passing through a topology.
     #[cfg(feature = "transforms-aggregate")]
     Aggregate(aggregate::AggregateConfig),
 
-    /// AWS EC2 metadata.
+    /// Parse metadata emitted by AWS EC2 instances.
     #[cfg(feature = "transforms-aws_ec2_metadata")]
     AwsEc2Metadata(aws_ec2_metadata::Ec2Metadata),
 
-    /// Dedupe.
+    /// Deduplicate logs passing through a topology.
     #[cfg(feature = "transforms-dedupe")]
     Dedupe(dedupe::DedupeConfig),
 
-    /// Filter.
+    /// Filter events based on a set of conditions.
     #[cfg(feature = "transforms-filter")]
     Filter(filter::FilterConfig),
 
-    /// Log to metric.
+    /// Convert log events to metric events.
     LogToMetric(log_to_metric::LogToMetricConfig),
 
-    /// Lua.
+    /// Modify event data using the Lua programming language.
     #[cfg(feature = "transforms-lua")]
     Lua(lua::LuaConfig),
 
-    /// Metric to log.
+    /// Convert metric events to log events.
     #[cfg(feature = "transforms-metric_to_log")]
     MetricToLog(metric_to_log::MetricToLogConfig),
 
-    /// Reduce.
+    /// Collapse multiple log events into a single event based on a set of conditions and merge strategies.
     #[cfg(feature = "transforms-reduce")]
     Reduce(reduce::ReduceConfig),
 
-    /// Remap.
+    /// Modify your observability data as it passes through your topology using Vector Remap Language (VRL).
     #[cfg(feature = "transforms-remap")]
     Remap(remap::RemapConfig),
 
-    /// Route.
+    /// Split a stream of events into multiple sub-streams based on user-supplied conditions.
     #[cfg(feature = "transforms-route")]
     Route(route::RouteConfig),
 
-    /// Sample.
+    /// Sample events from an event stream based on supplied criteria and at a configurable rate.
     #[cfg(feature = "transforms-sample")]
     Sample(sample::SampleConfig),
 
-    /// Tag cardinality limit.
+    /// Limit the cardinality of tags on metrics events as a safeguard against cardinality explosion.
     #[cfg(feature = "transforms-tag_cardinality_limit")]
     TagCardinalityLimit(tag_cardinality_limit::TagCardinalityLimitConfig),
 
@@ -112,7 +112,7 @@ pub enum Transforms {
     #[cfg(test)]
     TestNoop(crate::test_util::mock::transforms::NoopTransformConfig),
 
-    /// Throttle.
+    /// Rate limit logs passing through a topology.
     #[cfg(feature = "transforms-throttle")]
     Throttle(throttle::ThrottleConfig),
 }

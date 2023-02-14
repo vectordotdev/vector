@@ -44,18 +44,26 @@ pub struct InfluxDbLogsConfig {
     ///
     /// When specified, the measurement name will be `<namespace>.vector`.
     ///
-    /// This field is deprecated, and `measurement` should be used instead.
-    #[configurable(deprecated)]
+    #[configurable(
+        deprecated = "This field is deprecated, and `measurement` should be used instead."
+    )]
+    #[configurable(metadata(docs::examples = "service"))]
     pub namespace: Option<String>,
 
     /// The name of the InfluxDB measurement that will be written to.
+    #[configurable(metadata(docs::examples = "vector-logs"))]
     pub measurement: Option<String>,
 
     /// The endpoint to send data to.
+    ///
+    /// This should be a full HTTP URI, including the scheme, host, and port.
+    #[configurable(metadata(docs::examples = "http://localhost:8086"))]
     pub endpoint: String,
 
     /// The list of names of log fields that should be added as tags to each measurement.
     #[serde(default)]
+    #[configurable(metadata(docs::examples = "field1"))]
+    #[configurable(metadata(docs::examples = "parent.child_field"))]
     pub tags: Vec<String>,
 
     #[serde(flatten)]

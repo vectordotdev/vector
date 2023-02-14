@@ -260,9 +260,7 @@ impl From<S3CannedAcl> for ObjectCannedAcl {
             S3CannedAcl::AuthenticatedRead => ObjectCannedAcl::AuthenticatedRead,
             S3CannedAcl::BucketOwnerRead => ObjectCannedAcl::BucketOwnerRead,
             S3CannedAcl::BucketOwnerFullControl => ObjectCannedAcl::BucketOwnerFullControl,
-            S3CannedAcl::LogDeliveryWrite => {
-                ObjectCannedAcl::Unknown("log-delivery-write".to_string())
-            }
+            S3CannedAcl::LogDeliveryWrite => ObjectCannedAcl::from("log-delivery-write"),
         }
     }
 }
@@ -301,7 +299,7 @@ pub fn build_healthcheck(bucket: String, client: S3Client) -> crate::Result<Heal
         match req {
             Ok(_) => Ok(()),
             Err(error) => Err(match error {
-                SdkError::ServiceError { err: _, raw } => match raw.http().status() {
+                SdkError::ServiceError(inner) => match inner.raw().http().status() {
                     StatusCode::FORBIDDEN => HealthcheckError::InvalidCredentials.into(),
                     StatusCode::NOT_FOUND => HealthcheckError::UnknownBucket { bucket }.into(),
                     status => HealthcheckError::UnknownStatus { status }.into(),
