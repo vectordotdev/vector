@@ -20,6 +20,35 @@ use crate::{
 };
 
 /// Configuration for the `hdfs` sink.
+///
+/// The Hadoop Distributed File System (HDFS) is a distributed file system
+/// designed to run on commodity hardware. HDFS consists of a namenode and a
+/// datanode. We will send rpc to namenode to know which datanode to send
+/// and receive data to. Also, HDFS will rebalance data across the cluster
+/// to make sure each file has enough redundancy.
+///
+/// ```txt
+///                     ┌───────────────┐
+///                     │  Data Node 2  │
+///                     └───────────────┘
+///                             ▲
+/// ┌───────────────┐           │            ┌───────────────┐
+/// │  Data Node 1  │◄──────────┼───────────►│  Data Node 3  │
+/// └───────────────┘           │            └───────────────┘
+///                     ┌───────┴───────┐
+///                     │   Name Node   │
+///                     └───────────────┘
+///                             ▲
+///                             │
+///                      ┌──────┴─────┐
+///                      │   Vector   │
+///                      └────────────┘
+/// ```
+///
+/// For more information, please refer to:
+///
+/// - [HDFS Users Guide](https://hadoop.apache.org/docs/stable/hadoop-project-dist/hadoop-hdfs/HdfsUserGuide.html)
+/// - [opendal::services::hdfs](https://docs.rs/opendal/latest/opendal/services/struct.Hdfs.html)
 #[configurable_component(sink("hdfs"))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
