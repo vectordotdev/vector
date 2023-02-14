@@ -52,7 +52,6 @@ use crate::{
 #[configurable_component(sink("hdfs"))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
-
 pub struct HdfsConfig {
     /// The root path of hdfs services.
     ///
@@ -61,6 +60,7 @@ pub struct HdfsConfig {
     /// The final file path with be like `{root}/{prefix}{suffix}`.
     #[serde(default)]
     pub root: String,
+    
     /// A prefix to apply to all keys.
     ///
     /// Prefixes are useful for partitioning objects, such as by creating an blob key that
@@ -79,9 +79,12 @@ pub struct HdfsConfig {
     /// - `default`: visiting local fs.
     /// - `http://172.16.80.2:8090` visiting name node at `172.16.80.2`
     ///
-    /// For more information: [HDFS Architecture](https://hadoop.apache.org/docs/r3.3.4/hadoop-project-dist/hadoop-hdfs/HdfsDesign.html#NameNode_and_DataNodes)
-    #[configurable(derived)]
+    /// For more information, see the [HDFS Architecture][hdfs_arch] documentation.
+    ///
+    /// [hdfs_arch]: https://hadoop.apache.org/docs/r3.3.4/hadoop-project-dist/hadoop-hdfs/HdfsDesign.html#NameNode_and_DataNodes
     #[serde(default)]
+    #[configurable(metadata(docs::examples = "default")]
+    #[configurable(metadata(docs::examples = "http://172.16.80.2:8090")]
     pub name_node: String,
 
     #[serde(flatten)]

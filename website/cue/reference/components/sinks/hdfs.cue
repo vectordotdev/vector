@@ -15,6 +15,7 @@ components: sinks: hdfs: {
 
 	features: {
 		acknowledgements: true
+		auto_generated:   true
 		healthcheck: enabled: true
 		send: {
 			compression: {
@@ -42,36 +43,7 @@ components: sinks: hdfs: {
 		notices: []
 	}
 
-	configuration: {
-		root: {
-			description: "Root path of hdfs services."
-			required:    true
-			type: string: {}
-		}
-		prefix: {
-			description: """
-				A prefix to apply to all keys.
-
-				Prefixes are useful for partitioning objects, such as by creating an blob key that stores blobs under a particular "directory". If using a prefix for this purpose, it must end in `/` to act as a directory path. A trailing `/` is **not**
-			"""
-			required:    true
-			type: string: syntax: "template"
-		}
-		name_node: {
-			description: """
-				An HDFS cluster consists of a single NameNode, a master server that manages the file system namespace and regulates access to files by clients.
-
-				For example:
-
-				- `default`: visiting local fs.
-				- `http://172.16.80.2:8090` visiting name node at `172.16.80.2`
-
-				For more information: [HDFS Architecture](https://hadoop.apache.org/docs/r3.3.4/hadoop-project-dist/hadoop-hdfs/HdfsDesign.html#NameNode_and_DataNodes)
-			"""
-			required:    true
-			type: string: {}
-		}
-	}
+	configuration: base.components.sinks.hdfs.configuration
 
 	input: {
 		logs:    true
