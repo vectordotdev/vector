@@ -1,9 +1,7 @@
-#![cfg(feature = "aws-cloudwatch-logs-integration-tests")]
-#![cfg(test)]
-
 use std::convert::TryFrom;
 
 use aws_sdk_cloudwatchlogs::Client as CloudwatchLogsClient;
+
 use aws_sdk_cloudwatchlogs::Region;
 use chrono::Duration;
 use codecs::TextSerializerConfig;
@@ -43,8 +41,8 @@ async fn cloudwatch_insert_log_event() {
         group_name: Template::try_from(GROUP_NAME).unwrap(),
         region: RegionOrEndpoint::with_both("localstack", watchlogs_address().as_str()),
         encoding: TextSerializerConfig::default().into(),
-        create_missing_group: None,
-        create_missing_stream: None,
+        create_missing_group: true,
+        create_missing_stream: true,
         compression: Default::default(),
         batch: Default::default(),
         request: Default::default(),
@@ -93,8 +91,8 @@ async fn cloudwatch_insert_log_events_sorted() {
         group_name: Template::try_from(GROUP_NAME).unwrap(),
         region: RegionOrEndpoint::with_both("localstack", watchlogs_address().as_str()),
         encoding: TextSerializerConfig::default().into(),
-        create_missing_group: None,
-        create_missing_stream: None,
+        create_missing_group: true,
+        create_missing_stream: true,
         compression: Default::default(),
         batch: Default::default(),
         request: Default::default(),
@@ -162,8 +160,8 @@ async fn cloudwatch_insert_out_of_range_timestamp() {
         group_name: Template::try_from(GROUP_NAME).unwrap(),
         region: RegionOrEndpoint::with_both("localstack", watchlogs_address().as_str()),
         encoding: TextSerializerConfig::default().into(),
-        create_missing_group: None,
-        create_missing_stream: None,
+        create_missing_group: true,
+        create_missing_stream: true,
         compression: Default::default(),
         batch: Default::default(),
         request: Default::default(),
@@ -235,8 +233,8 @@ async fn cloudwatch_dynamic_group_and_stream_creation() {
         group_name: Template::try_from(group_name.as_str()).unwrap(),
         region: RegionOrEndpoint::with_both("localstack", watchlogs_address().as_str()),
         encoding: TextSerializerConfig::default().into(),
-        create_missing_group: None,
-        create_missing_stream: None,
+        create_missing_group: true,
+        create_missing_stream: true,
         compression: Default::default(),
         batch: Default::default(),
         request: Default::default(),
@@ -290,8 +288,8 @@ async fn cloudwatch_insert_log_event_batched() {
         group_name: Template::try_from(group_name.as_str()).unwrap(),
         region: RegionOrEndpoint::with_both("localstack", watchlogs_address().as_str()),
         encoding: TextSerializerConfig::default().into(),
-        create_missing_group: None,
-        create_missing_stream: None,
+        create_missing_group: true,
+        create_missing_stream: true,
         compression: Default::default(),
         batch,
         request: Default::default(),
@@ -340,8 +338,8 @@ async fn cloudwatch_insert_log_event_partitioned() {
         stream_name: Template::try_from(format!("{}-{{{{key}}}}", stream_name)).unwrap(),
         region: RegionOrEndpoint::with_both("localstack", watchlogs_address().as_str()),
         encoding: TextSerializerConfig::default().into(),
-        create_missing_group: None,
-        create_missing_stream: None,
+        create_missing_group: true,
+        create_missing_stream: true,
         compression: Default::default(),
         batch: Default::default(),
         request: Default::default(),
@@ -432,8 +430,8 @@ async fn cloudwatch_healthcheck() {
         group_name: Template::try_from(GROUP_NAME).unwrap(),
         region: RegionOrEndpoint::with_both("localstack", watchlogs_address().as_str()),
         encoding: TextSerializerConfig::default().into(),
-        create_missing_group: None,
-        create_missing_stream: None,
+        create_missing_group: true,
+        create_missing_stream: true,
         compression: Default::default(),
         batch: Default::default(),
         request: Default::default(),
@@ -449,7 +447,7 @@ async fn cloudwatch_healthcheck() {
 
 async fn create_client_test() -> CloudwatchLogsClient {
     let auth = AwsAuthentication::test_auth();
-    let region = Some(Region::new("localstack"));
+    let region = Some(aws_types::region::Region::new("localstack"));
     let watchlogs_address = watchlogs_address();
     let endpoint = Some(watchlogs_address);
     let proxy = ProxyConfig::default();

@@ -38,10 +38,13 @@ pub enum Compression {
     /// It is set to `none` if the compression scheme cannot be determined.
     #[derivative(Default)]
     Auto,
+
     /// Uncompressed.
     None,
+
     /// GZIP.
     Gzip,
+
     /// ZSTD.
     Zstd,
 }
@@ -76,11 +79,10 @@ pub struct AwsS3Config {
     compression: Compression,
 
     /// The strategy to use to consume objects from S3.
+    #[configurable(metadata(docs::hidden))]
     strategy: Strategy,
 
     /// Configuration options for SQS.
-    ///
-    /// Only relevant when `strategy = "sqs"`.
     sqs: Option<sqs::Config>,
 
     /// The ARN of an [IAM role][iam_role] to assume at startup.

@@ -54,17 +54,20 @@ pub struct CloudwatchLogsSinkConfig {
     /// The [group name][group_name] of the target CloudWatch Logs stream.
     ///
     /// [group_name]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html
+    #[configurable(metadata(docs::examples = "group-name"))]
+    #[configurable(metadata(docs::examples = "{{ file }}"))]
     pub group_name: Template,
 
     /// The [stream name][stream_name] of the target CloudWatch Logs stream.
     ///
-    /// There can only be one writer to a log stream at a time. If you have multiple
-    /// instances writing to the same log group, you must include an identifier in the
-    /// stream name that is guaranteed to be unique per instance.
-    ///
-    /// For example, you might choose `host`.
+    /// There can only be one writer to a log stream at a time. If multiple instances are writing to
+    /// the same log group, the stream name must include an identifier that is guaranteed to be
+    /// unique per instance.
     ///
     /// [stream_name]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html
+    #[configurable(metadata(docs::examples = "{{ host }}"))]
+    #[configurable(metadata(docs::examples = "%Y-%m-%d"))]
+    #[configurable(metadata(docs::examples = "stream-name"))]
     pub stream_name: Template,
 
     /// The [AWS region][aws_region] of the target service.
@@ -79,12 +82,14 @@ pub struct CloudwatchLogsSinkConfig {
     /// the first stream.
     ///
     /// [log_group]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html
-    pub create_missing_group: Option<bool>,
+    #[serde(default = "crate::serde::default_true")]
+    pub create_missing_group: bool,
 
     /// Dynamically create a [log stream][log_stream] if it does not already exist.
     ///
     /// [log_stream]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html
-    pub create_missing_stream: Option<bool>,
+    #[serde(default = "crate::serde::default_true")]
+    pub create_missing_stream: bool,
 
     #[configurable(derived)]
     pub encoding: EncodingConfig,
@@ -211,8 +216,8 @@ fn default_config(encoding: EncodingConfig) -> CloudwatchLogsSinkConfig {
         group_name: Default::default(),
         stream_name: Default::default(),
         region: Default::default(),
-        create_missing_group: Default::default(),
-        create_missing_stream: Default::default(),
+        create_missing_group: true,
+        create_missing_stream: true,
         compression: Default::default(),
         batch: Default::default(),
         request: Default::default(),

@@ -43,6 +43,7 @@ pub struct LogstashConfig {
     address: SocketListenAddr,
 
     #[configurable(derived)]
+    #[configurable(metadata(docs::advanced))]
     keepalive: Option<TcpKeepaliveConfig>,
 
     #[configurable(derived)]
@@ -53,10 +54,12 @@ pub struct LogstashConfig {
     /// This generally should not need to be changed.
     #[configurable(metadata(docs::type_unit = "bytes"))]
     #[configurable(metadata(docs::examples = 65536))]
+    #[configurable(metadata(docs::advanced))]
     receive_buffer_bytes: Option<usize>,
 
     /// The maximum number of TCP connections that will be allowed at any given time.
     #[configurable(metadata(docs::type_unit = "connections"))]
+    #[configurable(metadata(docs::advanced))]
     connection_limit: Option<u32>,
 
     #[configurable(derived)]

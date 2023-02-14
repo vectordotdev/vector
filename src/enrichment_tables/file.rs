@@ -15,12 +15,14 @@ use vector_config::configurable_component;
 
 use crate::config::EnrichmentTableConfig;
 
-/// File encoding options.
+/// File encoding configuration.
 #[configurable_component]
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[serde(tag = "type", rename_all = "snake_case")]
 enum Encoding {
-    /// Comma-separated values.
+    /// Decodes the file as a [CSV][csv] (comma-seperated values) file.
+    ///
+    /// [csv]: https://wikipedia.org/wiki/Comma-separated_values
     Csv {
         /// Whether or not the file contains column headers.
         ///

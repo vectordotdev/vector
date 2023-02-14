@@ -116,13 +116,7 @@ fn build_metadata_fn(container: &Container<'_>) -> proc_macro2::TokenStream {
 fn build_virtual_newtype_schema_fn(virtual_ty: Type) -> proc_macro2::TokenStream {
     quote! {
         fn generate_schema(schema_gen: &mut ::vector_config::schemars::gen::SchemaGenerator) -> std::result::Result<::vector_config::schemars::schema::SchemaObject, ::vector_config::GenerateError> {
-            // Virtual newtypes always shuttle their schema's metadata/overridden metadata when generating the schema
-            // for the wrapped type, otherwise we wouldn't be able to effectively document them. This does mean we end
-            // up dropping any default value for _this_ schema's metadata, including overridden metadata, so the wrapped
-            // type must have a default value for itself if having a default value is required.
-            let metadata = <Self as ::vector_config::Configurable>::metadata().convert();
-
-            ::vector_config::schema::get_or_generate_schema::<#virtual_ty>(schema_gen, metadata)
+            ::vector_config::schema::get_or_generate_schema::<#virtual_ty>(schema_gen, None)
         }
     }
 }
@@ -138,13 +132,9 @@ fn build_enum_generate_schema_fn(variants: &[Variant<'_>]) -> proc_macro2::Token
         fn generate_schema(schema_gen: &mut ::vector_config::schemars::gen::SchemaGenerator) -> std::result::Result<::vector_config::schemars::schema::SchemaObject, ::vector_config::GenerateError> {
             let mut subschemas = ::std::vec::Vec::new();
 
-            let enum_metadata = <Self as ::vector_config::Configurable>::metadata();
             #(#mapped_variants)*
 
-            let mut schema = ::vector_config::schema::generate_one_of_schema(&subschemas);
-            ::vector_config::schema::apply_metadata(&mut schema, enum_metadata);
-
-            Ok(schema)
+            Ok(::vector_config::schema::generate_one_of_schema(&subschemas))
         }
     }
 }
@@ -167,7 +157,7 @@ fn generate_struct_field(field: &Field<'_>) -> proc_macro2::TokenStream {
     let field_metadata = generate_field_metadata(&field_metadata_ref, field);
 
     let spanned_generate_schema = quote_spanned! {field.span()=>
-        ::vector_config::schema::get_or_generate_schema(schema_gen, #field_metadata_ref)?
+        ::vector_config::schema::get_or_generate_schema(schema_gen, Some(#field_metadata_ref))?
     };
 
     quote! {
@@ -291,8 +281,6 @@ fn build_named_struct_generate_schema_fn(
                 ::vector_config::schema::convert_to_flattened_schema(&mut schema, flattened_subschemas);
             }
 
-            ::vector_config::schema::apply_metadata(&mut schema, metadata);
-
             Ok(schema)
         }
     }
@@ -309,13 +297,9 @@ fn build_tuple_struct_generate_schema_fn(fields: &[Field<'_>]) -> proc_macro2::T
         fn generate_schema(schema_gen: &mut ::vector_config::schemars::gen::SchemaGenerator) -> std::result::Result<::vector_config::schemars::schema::SchemaObject, ::vector_config::GenerateError> {
             let mut subschemas = ::std::collections::Vec::new();
 
-            let metadata = <Self as ::vector_config::Configurable>::metadata();
             #(#mapped_fields)*
 
-            let mut schema = ::vector_config::schema::generate_tuple_schema(&subschemas);
-            ::vector_config::schema::apply_metadata(&mut schema, metadata);
-
-            Ok(schema)
+            Ok(::vector_config::schema::generate_tuple_schema(&subschemas))
         }
     }
 }
@@ -337,10 +321,7 @@ fn build_newtype_struct_generate_schema_fn(fields: &[Field<'_>]) -> proc_macro2:
 
     quote! {
         fn generate_schema(schema_gen: &mut ::vector_config::schemars::gen::SchemaGenerator) -> std::result::Result<::vector_config::schemars::schema::SchemaObject, ::vector_config::GenerateError> {
-            let metadata = <Self as ::vector_config::Configurable>::metadata();
-
             #field_schema
-            ::vector_config::schema::apply_metadata(&mut subschema, metadata);
 
             Ok(subschema)
         }
@@ -387,44 +368,6 @@ fn generate_field_metadata(meta_ident: &Ident, field: &Field<'_>) -> proc_macro2
     let field_ty = field.ty();
     let field_schema_ty = get_field_schema_ty(field);
 
-    // Our rules around how we generate this metadata are slightly complex, but here it goes:
-    //
-    // - All `Configurable` types define their own metadata, which at a minimum is their
-    //   description. It can optionally include things like validation rules, and custom attributes,
-    //   of which we use to better document types for downstream consumption. An example would be
-    //   specifying the integer type (signed vs unsigned vs floating point) as JSON Schema does not
-    //   differentiate between the three.
-    // - Building on that, there are types like `bool` or `u64` (scalars, essentially) where having
-    //   a description for the `Configurable` implementation on `bool` or `u64` makes no sense,
-    //   because the type name is self-describing. These types set the "transparent" flag in their
-    //   metadata to indicate that they intentionally have no description and that it's fine to not
-    //   emit a description in the schema for this type.
-    // - Scalars are also not "referenceable" which means their schema is used inline, not pointed
-    //   to by a schema reference.
-    // - All other types, whether they have a derive-based or hand-written implementation of
-    //   `Configurable` should have a referenceable name.
-    // - When using a referenceable type for a named field (struct or enum variant), it can be
-    //   annotated with a derive helper attribute called `derived`, which informs the codegen that
-    //   the title/description for that field should come from the field type's schema itself.
-    //
-    // Now that we've laid out the rules and invariants, let's talk about this code below.
-    //
-    // For non-referenceable types, their schema -- and thus their metadata -- will be used inline
-    // as the schema for the field, so we want to simply _merge_ our field's metadata into the field
-    // type's metadata.
-    //
-    // For referenceable types, their schema will be referred to by an identifier, and the
-    // definition attached to that identifier will carry the field type's metadata. Any metadata
-    // specified on the field itself should live solely on the field's schema (which can exist
-    // alongside the schema reference) and vice versa.
-    let spanned_metadata = quote_spanned! {field.span()=>
-        if <#field_schema_ty as ::vector_config::Configurable>::referenceable_name().is_none() {
-            <#field_schema_ty as ::vector_config::Configurable>::metadata()
-        } else {
-            ::vector_config::Metadata::default()
-        }
-    };
-
     let maybe_title = get_metadata_title(meta_ident, field.title());
     let maybe_description = get_metadata_description(meta_ident, field.description());
     let maybe_clear_title_description = field
@@ -454,7 +397,7 @@ fn generate_field_metadata(meta_ident: &Ident, field: &Field<'_>) -> proc_macro2
     let maybe_custom_attributes = get_metadata_custom_attributes(meta_ident, field.metadata());
 
     quote! {
-        let mut #meta_ident = #spanned_metadata;
+        let mut #meta_ident = ::vector_config::Metadata::<#field_schema_ty>::default();
         #maybe_clear_title_description
         #maybe_title
         #maybe_description

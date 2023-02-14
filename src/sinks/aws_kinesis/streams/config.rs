@@ -144,7 +144,7 @@ impl SinkConfig for KinesisStreamsSinkConfig {
             KinesisRetryLogic,
         >(
             &self.base,
-            None,
+            self.partition_key_field.clone(),
             batch_settings,
             KinesisStreamClient { client },
         )

@@ -1,0 +1,9 @@
+[build]
+publish = "../target/doc/"
+command = "make docs"
+
+[[redirects]]
+from = "/"
+to = "/vector"
+status = 301
+force = false
