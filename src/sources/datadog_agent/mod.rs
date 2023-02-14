@@ -31,6 +31,7 @@ use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use tracing::Span;
 use value::Kind;
+use vector_common::internal_event::{EventsReceived, Registered};
 use vector_config::{configurable_component, NamedComponent};
 use vector_core::config::{LegacyKey, LogNamespace};
 use vector_core::event::{BatchNotifier, BatchStatus};
@@ -59,32 +60,41 @@ pub const TRACES: &str = "traces";
 #[configurable_component(source("datadog_agent"))]
 #[derive(Clone, Debug)]
 pub struct DatadogAgentConfig {
-    /// The address to accept connections on.
+    /// The socket address to accept connections on.
     ///
-    /// The address _must_ include a port.
+    /// It _must_ include a port.
+    #[configurable(metadata(docs::examples = "0.0.0.0:80"))]
+    #[configurable(metadata(docs::examples = "localhost:80"))]
     address: SocketAddr,
 
-    /// When incoming events contain a Datadog API key, if this setting is set to `true` the key will kept in the event
-    /// metadata and will be used if the event is sent to a Datadog sink.
+    /// If this is set to `true`, when incoming events contain a Datadog API key, it will be
+    /// stored in the event metadata and will be used if the event is sent to a Datadog sink.
+    #[configurable(metadata(docs::advanced))]
     #[serde(default = "crate::serde::default_true")]
     store_api_key: bool,
 
-    /// If this settings is set to `true`, logs won't be accepted by the component.
+    /// If this is set to `true`, logs won't be accepted by the component.
+    #[configurable(metadata(docs::advanced))]
     #[serde(default = "crate::serde::default_false")]
     disable_logs: bool,
 
-    /// If this settings is set to `true`, metrics won't be accepted by the component.
+    /// If this is set to `true`, metrics won't be accepted by the component.
+    #[configurable(metadata(docs::advanced))]
     #[serde(default = "crate::serde::default_false")]
     disable_metrics: bool,
 
-    /// If this settings is set to `true`, traces won't be accepted by the component.
+    /// If this is set to `true`, traces won't be accepted by the component.
+    #[configurable(metadata(docs::advanced))]
     #[serde(default = "crate::serde::default_false")]
     disable_traces: bool,
 
-    /// If this setting is set to `true` logs, metrics and traces will be sent to different outputs.
+    /// If this is set to `true` logs, metrics and traces will be sent to different outputs.
     ///
-    /// For a source component named `agent` the received logs, metrics, and traces can then be accessed by specifying
-    /// `agent.logs`, `agent.metrics`, and `agent.traces`, respectively, as the input to another component.
+    ///
+    /// For a source component named `agent`, the received logs, metrics, and traces can then be
+    /// configured as input to other components by specifying `agent.logs`, `agent.metrics`, and
+    /// `agent.traces`, respectively.
+    #[configurable(metadata(docs::advanced))]
     #[serde(default = "crate::serde::default_false")]
     multiple_outputs: bool,
 
@@ -286,6 +296,7 @@ pub(crate) struct DatadogAgentSource {
     protocol: &'static str,
     logs_schema_definition: Arc<schema::Definition>,
     metrics_schema_definition: Arc<schema::Definition>,
+    events_received: Registered<EventsReceived>,
 }
 
 #[derive(Clone)]
@@ -337,6 +348,7 @@ impl DatadogAgentSource {
             logs_schema_definition: Arc::new(logs_schema_definition),
             metrics_schema_definition: Arc::new(metrics_schema_definition),
             log_namespace,
+            events_received: register!(EventsReceived),
         }
     }
 

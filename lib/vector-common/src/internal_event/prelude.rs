@@ -1,11 +1,11 @@
-// Set of `stage` tags to use when emiting error events.
+// Set of `stage` tags to use when emitting error events.
 pub mod error_stage {
     pub const RECEIVING: &str = "receiving";
     pub const PROCESSING: &str = "processing";
     pub const SENDING: &str = "sending";
 }
 
-// Set of `error_type` tags to use when emiting error events.
+// Set of `error_type` tags to use when emitting error events.
 pub mod error_type {
     // When the event acknowledgment failed.
     pub const ACKNOWLEDGMENT_FAILED: &str = "acknowledgment_failed";

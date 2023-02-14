@@ -72,6 +72,8 @@ impl Future for ShutdownSignal {
                     Poll::Pending
                 }
             }
+            // TODO: This should almost certainly be a panic to avoid deadlocking in the case of a
+            // poll-after-ready situation.
             None => Poll::Pending,
         }
     }
@@ -288,7 +290,7 @@ impl SourceShutdownCoordinator {
         )
     }
 
-    /// Returned future will finish once all sources have finished.
+    /// Returned future will finish once all *current* sources have finished.
     #[must_use]
     pub fn shutdown_tripwire(&self) -> future::BoxFuture<'static, ()> {
         let futures = self
@@ -297,9 +299,7 @@ impl SourceShutdownCoordinator {
             .cloned()
             .map(|tripwire| tripwire.then(tripwire_handler).boxed());
 
-        future::join_all(futures)
-            .map(|_| info!("All sources have finished."))
-            .boxed()
+        future::join_all(futures).map(|_| ()).boxed()
     }
 
     fn shutdown_source_complete(

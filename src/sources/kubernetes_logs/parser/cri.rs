@@ -1,8 +1,6 @@
-use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use derivative::Derivative;
 use lookup::path;
-use regex::bytes::{CaptureLocations, Regex};
 use vector_common::conversion;
 use vector_config::NamedComponent;
 use vector_core::config::{log_schema, LegacyKey, LogNamespace};
@@ -16,9 +14,6 @@ use crate::{
     transforms::{FunctionTransform, OutputBuffer},
 };
 
-const CRI_REGEX_PATTERN: &str = r"(?-u)^(?P<timestamp>.*) (?P<stream>(stdout|stderr)) (?P<multiline_tag>(P|F)) (?P<message>.*)\n?$";
-const MESSAGE_KEY: &str = "message";
-const MULTILINE_KEY: &str = "multiline_tag";
 const STREAM_KEY: &str = "stream";
 const TIMESTAMP_KEY: &str = "timestamp";
 
@@ -35,31 +30,12 @@ const TIMESTAMP_KEY: &str = "timestamp";
 #[derive(Clone, Derivative)]
 #[derivative(Debug)]
 pub(super) struct Cri {
-    #[derivative(Debug = "ignore")]
-    pattern: Regex,
-    capture_locations: CaptureLocations,
-    capture_names: Vec<(usize, String)>,
     log_namespace: LogNamespace,
 }
 
 impl Cri {
-    pub fn new(log_namespace: LogNamespace) -> Self {
-        let pattern =
-            Regex::new(CRI_REGEX_PATTERN).expect("CRI log regex pattern should never fail");
-
-        let capture_names = pattern
-            .capture_names()
-            .enumerate()
-            .filter_map(|(i, s)| s.map(|s| (i, s.to_string())))
-            .collect::<Vec<_>>();
-        let capture_locations = pattern.capture_locations();
-
-        Self {
-            pattern,
-            capture_locations,
-            capture_names,
-            log_namespace,
-        }
+    pub const fn new(log_namespace: LogNamespace) -> Self {
+        Self { log_namespace }
     }
 }
 
@@ -82,95 +58,130 @@ impl FunctionTransform for Cri {
                 });
                 return;
             }
-            Some(s) => match self.pattern.captures_read(&mut self.capture_locations, &s) {
+            Some(s) => match parse_log_line(&s) {
                 None => {
                     emit!(ParserMatchError { value: &s[..] });
                     return;
                 }
-                Some(_) => {
-                    let locations = &self.capture_locations;
-                    let captures = self.capture_names.iter().filter_map(|(idx, name)| {
-                        locations.get(*idx).and_then(|(start, end)| {
-                            let raw = &s[start..end];
+                Some(parsed_log) => {
+                    // For all fields except `timestamp`, simply treat them as `Value::Bytes`. For
+                    // `timestamp`, however, we actually make sure we can convert it correctly and feed it
+                    // in as `Value::Timestamp`.
 
-                            // For all fields except `timestamp`, simply treat them as `Value::Bytes`. For
-                            // `timestamp`, however, we actually make sure we can convert it correctly and feed it
-                            // in as `Value::Timestamp`.
-                            let value = if name == TIMESTAMP_KEY {
-                                let ds = String::from_utf8_lossy(raw);
-                                match DateTime::parse_from_str(&ds, "%+") {
-                                    Ok(dt) => Some(Value::Timestamp(dt.with_timezone(&Utc))),
-                                    Err(e) => {
-                                        emit!(ParserConversionError {
-                                            name,
-                                            error: conversion::Error::TimestampParse {
-                                                s: ds.to_string(),
-                                                source: e,
-                                            },
-                                        });
-                                        None
-                                    }
-                                }
-                            } else {
-                                Some(Value::Bytes(Bytes::copy_from_slice(raw)))
-                            };
+                    // MESSAGE
+                    // Insert either directly into `.` or `log_schema().message_key()`,
+                    // overwriting the original "full" CRI log that included additional fields.
+                    drop(log.insert(message_field, Value::Bytes(s.slice_ref(parsed_log.message))));
 
-                            value.map(|v| (name, v))
-                        })
-                    });
+                    // MULTILINE_TAG
+                    // If the MULTILINE_TAG is 'P' (partial), insert our generic `_partial` key.
+                    // This is safe to `unwrap()` as we've just ensured this value is a Value::Bytes
+                    // during the above capturing and mapping.
+                    if parsed_log.multiline_tag[0] == b'P' {
+                        self.log_namespace.insert_source_metadata(
+                            Config::NAME,
+                            log,
+                            Some(LegacyKey::Overwrite(path!(event::PARTIAL))),
+                            path!(event::PARTIAL),
+                            true,
+                        );
+                    }
 
-                    for (name, value) in captures {
-                        match name.as_str() {
-                            MESSAGE_KEY => {
-                                // Insert either directly into `.` or `log_schema().message_key()`,
-                                // overwriting the original "full" CRI log that included additional fields.
-                                drop(log.insert(message_field, value));
-                            }
-                            MULTILINE_KEY => {
-                                // If the MULTILINE_TAG is 'P' (partial), insert our generic `_partial` key.
-                                // This is safe to `unwrap()` as we've just ensured this value is a Value::Bytes
-                                // during the above capturing and mapping.
-                                if value.as_bytes().unwrap()[0] == b'P' {
-                                    self.log_namespace.insert_source_metadata(
-                                        Config::NAME,
-                                        log,
-                                        Some(LegacyKey::Overwrite(path!(event::PARTIAL))),
-                                        path!(event::PARTIAL),
-                                        true,
-                                    );
-                                }
-                            }
-                            TIMESTAMP_KEY => {
-                                // Insert the TIMESTAMP_TAG parsed out of the CRI log, this is the timestamp of
-                                // when the runtime processed this message.
-                                self.log_namespace.insert_source_metadata(
-                                    Config::NAME,
-                                    log,
-                                    Some(LegacyKey::Overwrite(path!(log_schema().timestamp_key()))),
-                                    path!(TIMESTAMP_KEY),
-                                    value,
-                                );
-                            }
-                            STREAM_KEY => {
-                                self.log_namespace.insert_source_metadata(
-                                    Config::NAME,
-                                    log,
-                                    Some(LegacyKey::Overwrite(path!(STREAM_KEY))),
-                                    path!(STREAM_KEY),
-                                    value,
-                                );
-                            }
-                            _ => {
-                                unreachable!("all CRI captures groups should be matched");
-                            }
+                    // TIMESTAMP_TAG
+                    let ds = String::from_utf8_lossy(parsed_log.timestamp);
+                    match DateTime::parse_from_str(&ds, "%+") {
+                        Ok(dt) =>
+                        // Insert the TIMESTAMP_TAG parsed out of the CRI log, this is the timestamp of
+                        // when the runtime processed this message.
+                        {
+                            self.log_namespace.insert_source_metadata(
+                                Config::NAME,
+                                log,
+                                Some(LegacyKey::Overwrite(path!(log_schema().timestamp_key()))),
+                                path!(TIMESTAMP_KEY),
+                                Value::Timestamp(dt.with_timezone(&Utc)),
+                            )
+                        }
+                        Err(e) => {
+                            emit!(ParserConversionError {
+                                name: TIMESTAMP_KEY,
+                                error: conversion::Error::TimestampParse {
+                                    s: ds.to_string(),
+                                    source: e,
+                                },
+                            });
                         }
                     }
+
+                    // STREAM_TAG
+                    self.log_namespace.insert_source_metadata(
+                        Config::NAME,
+                        log,
+                        Some(LegacyKey::Overwrite(path!(STREAM_KEY))),
+                        path!(STREAM_KEY),
+                        Value::Bytes(s.slice_ref(parsed_log.stream)),
+                    );
                 }
             },
         }
 
         output.push(event);
     }
+}
+
+struct ParsedLog<'a> {
+    timestamp: &'a [u8],
+    stream: &'a [u8],
+    multiline_tag: &'a [u8],
+    message: &'a [u8],
+}
+
+#[allow(clippy::trivially_copy_pass_by_ref)]
+#[inline]
+const fn is_delimiter(c: &u8) -> bool {
+    *c == b' '
+}
+
+/// Parses a CRI log line.
+///
+/// Equivalent to regex: `(?-u)^(?P<timestamp>.*) (?P<stream>(stdout|stderr)) (?P<multiline_tag>(P|F)) (?P<message>.*)(?P<new_line_tag>\n?)$`
+#[inline]
+fn parse_log_line(line: &[u8]) -> Option<ParsedLog> {
+    let rest = line;
+
+    let after_timestamp_pos = rest.iter().position(is_delimiter)?;
+    let (timestamp, rest) = rest.split_at(after_timestamp_pos + 1);
+    let timestamp = timestamp.split_last()?.1; // Trim the delimiter
+
+    let after_stream_pos = rest.iter().position(is_delimiter)?;
+    let (stream, rest) = rest.split_at(after_stream_pos + 1);
+    let stream = stream.split_last()?.1;
+    if stream != b"stdout".as_ref() && stream != b"stderr".as_ref() {
+        return None;
+    }
+
+    let after_multiline_tag_pos = rest.iter().position(is_delimiter)?;
+    let (multiline_tag, rest) = rest.split_at(after_multiline_tag_pos + 1);
+    let multiline_tag = multiline_tag.split_last()?.1;
+    if multiline_tag != b"F".as_ref() && multiline_tag != b"P".as_ref() {
+        return None;
+    }
+
+    let has_new_line_tag = !rest.is_empty() && *rest.last()? == b'\n';
+    let message = if has_new_line_tag {
+        // Remove the newline tag field, if it exists.
+        // For additional details, see https://github.com/vectordotdev/vector/issues/8606.
+        rest.split_last()?.1
+    } else {
+        rest
+    };
+
+    Some(ParsedLog {
+        timestamp,
+        stream,
+        multiline_tag,
+        message,
+    })
 }
 
 #[cfg(test)]

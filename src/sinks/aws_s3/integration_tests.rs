@@ -388,7 +388,7 @@ fn config(bucket: &str, batch_size: usize) -> S3SinkConfig {
         filename_extension: None,
         options: S3Options::default(),
         region: RegionOrEndpoint::with_both("minio", s3_address()),
-        encoding: (None::<FramingConfig>, TextSerializerConfig::new()).into(),
+        encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
         compression: Compression::None,
         batch,
         request: TowerRequestConfig::default(),
@@ -423,7 +423,7 @@ async fn create_bucket(bucket: &str, object_lock_enabled: bool) {
     {
         Ok(_) => {}
         Err(err) => match err {
-            SdkError::ServiceError { err, raw: _ } => match err.kind {
+            SdkError::ServiceError(inner) => match &inner.err().kind {
                 CreateBucketErrorKind::BucketAlreadyOwnedByYou(_) => {}
                 err => panic!("Failed to create bucket: {:?}", err),
             },

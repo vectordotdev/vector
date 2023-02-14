@@ -112,7 +112,7 @@ pub enum Error {
 ///
 /// Rules can reference aliases as %{alias_name}, aliases can reference each other themselves, cross-references or circular dependencies are not allowed and result in an error.
 /// Only one can match any given log. The first one that matches, from top to bottom, is the one that does the parsing.
-/// For further documentation and the full list of available matcher and filters check out https://docs.datadoghq.com/logs/processing/parsing
+/// For further documentation and the full list of available matcher and filters check out <https://docs.datadoghq.com/logs/processing/parsing>
 pub fn parse_grok_rules(
     patterns: &[String],
     aliases: BTreeMap<String, String>,
@@ -368,9 +368,9 @@ fn resolves_match_function(
                         let format = String::from_utf8_lossy(b);
                         let result = date::time_format_to_regex(&format, true)
                             .map_err(|_e| Error::InvalidFunctionArguments(match_fn.name.clone()))?;
-                        let mut regext_opt = None;
+                        let mut regex_opt = None;
                         if result.tz_captured {
-                            regext_opt = Some(regex::Regex::new(&result.regex).map_err(|error| {
+                            regex_opt = Some(regex::Regex::new(&result.regex).map_err(|error| {
                                 error!(message = "Error compiling regex", regex = %result.regex, %error);
                                 Error::InvalidFunctionArguments(match_fn.name.clone())
                             })?);
@@ -393,7 +393,7 @@ fn resolves_match_function(
                         let filter = GrokFilter::Date(DateFilter {
                             original_format: format.to_string(),
                             strp_format,
-                            regex_with_tz: regext_opt,
+                            regex_with_tz: regex_opt,
                             target_tz,
                             tz_aware: result.with_tz,
                         });

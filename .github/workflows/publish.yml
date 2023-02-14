@@ -90,37 +90,6 @@ jobs:
           name: vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-gnu
           path: target/artifacts/vector*
 
-  build-x86_64-unknown-linux-gnu-debug-tarball:
-    name: Build Vector (debug) for x86_64-unknown-linux-gnu (.tar.gz)
-    runs-on: [linux, release-builder]
-    needs: generate-publish-metadata
-    env:
-      VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
-      VECTOR_BUILD_DESC: ${{ needs.generate-publish-metadata.outputs.vector_build_desc }}
-      CHANNEL: ${{ needs.generate-publish-metadata.outputs.vector_release_channel }}
-    steps:
-      - name: Checkout Vector
-        uses: actions/checkout@v3
-        with:
-          ref: ${{ inputs.git_ref }}
-      - name: Bootstrap runner environment (Ubuntu-specific)
-        run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - name: Bootstrap runner environment (generic)
-        run: bash scripts/environment/prepare.sh
-      - name: Build Vector
-        env:
-          CARGO_PROFILE_RELEASE_DEBUG: 2 # https://doc.rust-lang.org/cargo/reference/profiles.html#debug
-        run: make package-x86_64-unknown-linux-gnu
-      - name: Rename tarball with the correct debug suffix
-        run: |
-          mv "target/artifacts/vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-gnu.tar.gz" \
-             "target/artifacts/vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-gnu-debug.tar.gz"
-      - name: Stage package artifacts for publish
-        uses: actions/upload-artifact@v3
-        with:
-          name: vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-gnu-debug
-          path: "target/artifacts/vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-gnu-debug.tar.gz"
-
   build-aarch64-unknown-linux-musl-packages:
     name: Build Vector for aarch64-unknown-linux-musl (.tar.gz)
     runs-on: [linux, release-builder]
@@ -313,7 +282,14 @@ jobs:
       VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
     strategy:
       matrix:
-        container: ["ubuntu:16.04","ubuntu:18.04","ubuntu:20.04","ubuntu:22.04","debian:9","debian:10","debian:11"]
+        container:
+          - ubuntu:14.04
+          - ubuntu:16.04
+          - ubuntu:18.04
+          - ubuntu:20.04
+          - ubuntu:22.04
+          - debian:10
+          - debian:11
     container:
       image: ${{ matrix.container }}
     steps:
@@ -358,6 +334,7 @@ jobs:
         container:
           - "quay.io/centos/centos:stream8"
           - "quay.io/centos/centos:stream9"
+          - "amazonlinux:1"
           - "amazonlinux:2"
           - "fedora:34"
           - "fedora:35"
@@ -452,7 +429,7 @@ jobs:
           platforms: all
       - name: Set up Docker Buildx
         id: buildx
-        uses: docker/setup-buildx-action@v2.2.1
+        uses: docker/setup-buildx-action@v2.4.1
         with:
           version: latest
           install: true
@@ -498,7 +475,6 @@ jobs:
     needs:
       - generate-publish-metadata
       - build-x86_64-unknown-linux-gnu-packages
-      - build-x86_64-unknown-linux-gnu-debug-tarball
       - build-x86_64-unknown-linux-musl-packages
       - build-aarch64-unknown-linux-musl-packages
       - build-aarch64-unknown-linux-gnu-packages
@@ -532,11 +508,6 @@ jobs:
         with:
           name: vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-gnu
           path: target/artifacts
-      - name: Download staged package artifacts (x86_64-unknown-linux-gnu-debug)
-        uses: actions/download-artifact@v3
-        with:
-          name: vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-gnu-debug
-          path: target/artifacts
       - name: Download staged package artifacts (x86_64-unknown-linux-musl)
         uses: actions/download-artifact@v3
         with:
@@ -569,8 +540,8 @@ jobs:
         run: make release-s3
 
   publish-github:
-    name: Publish to Github
-    # We only publish to Github for versioned releases, not nightlies.
+    name: Publish to GitHub
+    # We only publish to GitHub for versioned releases, not nightlies.
     if: ${{ inputs.mode == 'Release' }}
     runs-on: ubuntu-20.04
     needs:
@@ -633,7 +604,7 @@ jobs:
         with:
           name: vector-${{ env.VECTOR_VERSION }}-armv7-unknown-linux-musleabihf
           path: target/artifacts
-      - name: Publish release to Github
+      - name: Publish release to GitHub
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: make release-github
@@ -695,7 +666,7 @@ jobs:
           path: target/artifacts
       - name: Push amd64 deb
         id: push-deb-amd64
-        uses: cloudsmith-io/action@v0.5.2
+        uses: cloudsmith-io/action@v0.5.3
         with:
           api-key: ${{ secrets.CLOUDSMITH_API_KEY }}
           command: "push"
@@ -708,7 +679,7 @@ jobs:
           file: "target/artifacts/vector_${{ env.VECTOR_VERSION }}-1_amd64.deb"
       - name: Push arm64 deb
         id: push-deb-arm64
-        uses: cloudsmith-io/action@v0.5.2
+        uses: cloudsmith-io/action@v0.5.3
         with:
           api-key: ${{ secrets.CLOUDSMITH_API_KEY }}
           command: "push"
@@ -721,7 +692,7 @@ jobs:
           file: "target/artifacts/vector_${{ env.VECTOR_VERSION }}-1_arm64.deb"
       - name: Push armhf deb
         id: push-deb-armhf
-        uses: cloudsmith-io/action@v0.5.2
+        uses: cloudsmith-io/action@v0.5.3
         with:
           api-key: ${{ secrets.CLOUDSMITH_API_KEY }}
           command: "push"
@@ -734,7 +705,7 @@ jobs:
           file: "target/artifacts/vector_${{ env.VECTOR_VERSION }}-1_armhf.deb"
       - name: Push x86_64 RPM
         id: push-rpm-x86_64
-        uses: cloudsmith-io/action@v0.5.2
+        uses: cloudsmith-io/action@v0.5.3
         with:
           api-key: ${{ secrets.CLOUDSMITH_API_KEY }}
           command: "push"
@@ -747,7 +718,7 @@ jobs:
           file: "target/artifacts/vector-${{ env.VECTOR_VERSION }}-1.x86_64.rpm"
       - name: Push aarch64 RPM
         id: push-rpm-aarch64
-        uses: cloudsmith-io/action@v0.5.2
+        uses: cloudsmith-io/action@v0.5.3
         with:
           api-key: ${{ secrets.CLOUDSMITH_API_KEY }}
           command: "push"
@@ -760,7 +731,7 @@ jobs:
           file: "target/artifacts/vector-${{ env.VECTOR_VERSION }}-1.aarch64.rpm"
       - name: Push armv7-gnu RPM
         id: push-rpm-armv7-gnu
-        uses: cloudsmith-io/action@v0.5.2
+        uses: cloudsmith-io/action@v0.5.3
         with:
           api-key: ${{ secrets.CLOUDSMITH_API_KEY }}
           command: "push"
@@ -779,7 +750,6 @@ jobs:
     needs:
       - generate-publish-metadata
       - build-x86_64-unknown-linux-gnu-packages
-      - build-x86_64-unknown-linux-gnu-debug-tarball
       - build-x86_64-unknown-linux-musl-packages
       - build-aarch64-unknown-linux-musl-packages
       - build-aarch64-unknown-linux-gnu-packages

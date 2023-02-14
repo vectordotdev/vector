@@ -6,7 +6,7 @@ ruby '~> 2.7.0'
 # !!!
 
 source 'https://rubygems.org'
-gem 'git', '~> 1.11.0' # for scripts/check-version.rb
+gem 'git', '~> 1.13.0' # for scripts/check-version.rb
 gem 'paint', '~> 2.1' # for scripts/release-prepare.rb
 gem 'semantic', '~> 1.6.1' # for scripts/check-version.rb
 gem 'toml-rb', '~> 2.0' # for scripts/check-meta.rb

@@ -131,7 +131,7 @@ impl DiagnosticMessage for Error {
                     self.expr_span,
                 ),
                 Label::context(
-                    format!("this expression resolves to {}", kind),
+                    format!("this expression resolves to {kind}"),
                     self.expr_span,
                 ),
             ],

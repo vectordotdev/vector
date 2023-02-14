@@ -10,12 +10,13 @@ use tokio::time::{sleep, Duration};
 
 use super::{config::KinesisFirehoseClientBuilder, *};
 use crate::{
-    aws::{create_client, AwsAuthentication, RegionOrEndpoint},
+    aws::{create_client, AwsAuthentication, ImdsAuthentication, RegionOrEndpoint},
     config::{ProxyConfig, SinkConfig, SinkContext},
     sinks::{
         elasticsearch::{BulkConfig, ElasticsearchAuth, ElasticsearchCommon, ElasticsearchConfig},
         util::{BatchConfig, Compression, TowerRequestConfig},
     },
+    template::Template,
     test_util::{
         components::{run_and_assert_sink_compliance, AWS_SINK_TAGS},
         random_events_with_stream, random_string, wait_for_duration,
@@ -34,9 +35,9 @@ fn elasticsearch_address() -> String {
 async fn firehose_put_records() {
     let stream = gen_stream();
 
-    let elasticseacrh_arn = ensure_elasticsearch_domain(stream.clone()).await;
+    let elasticsearch_arn = ensure_elasticsearch_domain(stream.clone().to_string()).await;
 
-    ensure_elasticesarch_delivery_stream(stream.clone(), elasticseacrh_arn.clone()).await;
+    ensure_elasticsearch_delivery_stream(stream.clone(), elasticsearch_arn.clone()).await;
 
     let mut batch = BatchConfig::default();
     batch.max_events = Some(2);
@@ -46,7 +47,7 @@ async fn firehose_put_records() {
     let base = KinesisSinkBaseConfig {
         stream_name: stream.clone(),
         region: region.clone(),
-        encoding: JsonSerializerConfig::new().into(), // required for ES destination w/ localstack
+        encoding: JsonSerializerConfig::default().into(), // required for ES destination w/ localstack
         compression: Compression::None,
         request: TowerRequestConfig {
             timeout_secs: Some(10),
@@ -73,11 +74,12 @@ async fn firehose_put_records() {
     let config = ElasticsearchConfig {
         auth: Some(ElasticsearchAuth::Aws(AwsAuthentication::Default {
             load_timeout_secs: Some(5),
+            imds: ImdsAuthentication::default(),
         })),
         endpoints: vec![elasticsearch_address()],
         bulk: Some(BulkConfig {
-            index: Some(stream.clone()),
-            action: None,
+            index: Template::try_from(stream.clone()).expect("unable to parse Template"),
+            ..Default::default()
         }),
         aws: Some(region),
         ..Default::default()
@@ -146,6 +148,7 @@ async fn firehose_client() -> aws_sdk_firehose::Client {
 
 /// creates ES domain with the given name and returns the ARN
 async fn ensure_elasticsearch_domain(domain_name: String) -> String {
+    let endpoint = test_region_endpoint().endpoint().unwrap().unwrap();
     let client = EsClient::from_conf(
         aws_sdk_elasticsearch::config::Builder::new()
             .credentials_provider(
@@ -154,7 +157,7 @@ async fn ensure_elasticsearch_domain(domain_name: String) -> String {
                     .await
                     .unwrap(),
             )
-            .endpoint_resolver(test_region_endpoint().endpoint().unwrap().unwrap())
+            .endpoint_url(endpoint)
             .region(test_region_endpoint().region())
             .build(),
     );
@@ -196,9 +199,9 @@ async fn ensure_elasticsearch_domain(domain_name: String) -> String {
 }
 
 /// creates Firehose delivery stream to ship to Elasticsearch
-async fn ensure_elasticesarch_delivery_stream(
+async fn ensure_elasticsearch_delivery_stream(
     delivery_stream_name: String,
-    elasticseacrh_arn: String,
+    elasticsearch_arn: String,
 ) {
     let client = firehose_client().await;
 
@@ -208,7 +211,7 @@ async fn ensure_elasticesarch_delivery_stream(
         .elasticsearch_destination_configuration(
             ElasticsearchDestinationConfiguration::builder()
                 .index_name(delivery_stream_name)
-                .domain_arn(elasticseacrh_arn)
+                .domain_arn(elasticsearch_arn)
                 .role_arn("doesn't matter")
                 .type_name("doesn't matter")
                 .build(),

@@ -464,7 +464,7 @@ impl LogEvent {
         }
     }
 
-    /// Fetches the `timestamp` of the event. This is either from the "host" semantic meaning (Vector namespace)
+    /// Fetches the `host` of the event. This is either from the "host" semantic meaning (Vector namespace)
     /// or from the host key set on the "Global Log Schema" (Legacy namespace).
     pub fn get_host(&self) -> Option<&Value> {
         match self.namespace() {
@@ -584,7 +584,7 @@ where
 
     fn index(&self, key: T) -> &Value {
         self.get(key.as_ref())
-            .expect(&*format!("Key is not found: {:?}", key.as_ref()))
+            .unwrap_or_else(|| panic!("Key is not found: {:?}", key.as_ref()))
     }
 }
 
@@ -656,7 +656,7 @@ impl tracing::field::Visit for LogEvent {
     }
 
     fn record_debug(&mut self, field: &tracing::field::Field, value: &dyn Debug) {
-        self.insert(field.name(), format!("{:?}", value));
+        self.insert(field.name(), format!("{value:?}"));
     }
 
     fn record_i64(&mut self, field: &tracing::field::Field, value: i64) {

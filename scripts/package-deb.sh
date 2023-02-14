@@ -19,7 +19,7 @@ TARGET="${TARGET:?"You must specify a target triple, ex: x86_64-apple-darwin"}"
 #
 
 PROJECT_ROOT="$(pwd)"
-PACKAGE_VERSION="${VECTOR_VERSION:-"$("$PROJECT_ROOT"/scripts/version.sh)"}"
+PACKAGE_VERSION="${VECTOR_VERSION:-"$(cargo vdev version)"}"
 ARCHIVE_NAME="vector-${PACKAGE_VERSION}-$TARGET.tar.gz"
 ARCHIVE_PATH="target/artifacts/$ARCHIVE_NAME"
 ABSOLUTE_ARCHIVE_PATH="$PROJECT_ROOT/$ARCHIVE_PATH"

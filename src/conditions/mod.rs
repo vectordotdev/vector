@@ -96,19 +96,22 @@ impl Condition {
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ConditionConfig {
     /// Matches an event if it is a log.
+    #[configurable(metadata(docs::hidden))]
     IsLog,
 
     /// Matches an event if it is a metric.
+    #[configurable(metadata(docs::hidden))]
     IsMetric,
 
     /// Matches an event if it is a trace.
+    #[configurable(metadata(docs::hidden))]
     IsTrace,
 
     /// Matches an event with a [Vector Remap Language](https://vector.dev/docs/reference/vrl) (VRL) [boolean expression](https://vector.dev/docs/reference/vrl#boolean-expressions).
-    Vrl(#[configurable(derived)] VrlConfig),
+    Vrl(VrlConfig),
 
     /// Matches an event with a [Datadog Search](https://docs.datadoghq.com/logs/explorer/search_syntax/) query.
-    DatadogSearch(#[configurable(derived)] DatadogSearchConfig),
+    DatadogSearch(DatadogSearchConfig),
 }
 
 impl ConditionConfig {
@@ -173,10 +176,10 @@ dyn_clone::clone_trait_object!(ConditionalConfig);
 #[serde(untagged)]
 pub enum AnyCondition {
     /// A [Vector Remap Language](https://vector.dev/docs/reference/vrl) (VRL) [boolean expression](https://vector.dev/docs/reference/vrl#boolean-expressions).
-    String(#[configurable(transparent)] String),
+    String(String),
 
     /// A fully-specified condition.
-    Map(#[configurable(derived)] ConditionConfig),
+    Map(ConditionConfig),
 }
 
 impl AnyCondition {

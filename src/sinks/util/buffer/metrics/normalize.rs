@@ -9,7 +9,7 @@ use vector_core::event::{
 ///
 /// Depending on the system in which they are being sent to, metrics may have to be modified in order to fit the data
 /// model or constraints placed on that system.  Typically, this boils down to whether or not the system can accept
-/// absolute metrics or incremental metrics: the latest value of a metric, or the delta between the the last time the
+/// absolute metrics or incremental metrics: the latest value of a metric, or the delta between the last time the
 /// metric was observed and now, respective. Other rules may need to be applied, such as dropping metrics of a specific
 /// type that the system does not support.
 ///
@@ -61,8 +61,8 @@ impl<N: MetricNormalize> MetricNormalizer<N> {
     }
 }
 
-impl<N: Default> MetricNormalizer<N> {
-    pub fn default() -> Self {
+impl<N: Default> Default for MetricNormalizer<N> {
+    fn default() -> Self {
         Self {
             state: MetricSet::default(),
             normalizer: N::default(),

@@ -11,7 +11,7 @@ base: components: transforms: lua: configuration: {
 		type: object: options: {
 			init: {
 				description: """
-					A function which is called when the first event comes, before calling `hooks.process`.
+					The function called when the first event comes in, before `hooks.process` is called.
 
 					It can produce new events using the `emit` function.
 
@@ -19,18 +19,15 @@ base: components: transforms: lua: configuration: {
 					cases, the closure/function takes a single parameter, `emit`, which is a reference to a function for emitting events.
 					"""
 				required: false
-				type: string: {
-					examples: ["""
-						function (emit)
-						\t-- Custom Lua code here
-						end
-						""", "init"]
-					syntax: "literal"
-				}
+				type: string: examples: ["""
+					function (emit)
+					\t-- Custom Lua code here
+					end
+					""", "init"]
 			}
 			process: {
 				description: """
-					A function which is called for each incoming event.
+					The function called for each incoming event.
 
 					It can produce new events using the `emit` function.
 
@@ -39,22 +36,19 @@ base: components: transforms: lua: configuration: {
 					while the second parameter, `emit`, is a reference to a function for emitting events.
 					"""
 				required: true
-				type: string: {
-					examples: ["""
-						function (event, emit)
-						\tevent.log.field = "value" -- set value of a field
-						\tevent.log.another_field = nil -- remove field
-						\tevent.log.first, event.log.second = nil, event.log.first -- rename field
-						\t-- Very important! Emit the processed event.
-						\temit(event)
-						end
-						""", "process"]
-					syntax: "literal"
-				}
+				type: string: examples: ["""
+					function (event, emit)
+					\tevent.log.field = "value" -- set value of a field
+					\tevent.log.another_field = nil -- remove field
+					\tevent.log.first, event.log.second = nil, event.log.first -- rename field
+					\t-- Very important! Emit the processed event.
+					\temit(event)
+					end
+					""", "process"]
 			}
 			shutdown: {
 				description: """
-					A function which is called when Vector is stopped.
+					The function called when the transform is stopped.
 
 					It can produce new events using the `emit` function.
 
@@ -62,14 +56,33 @@ base: components: transforms: lua: configuration: {
 					cases, the closure/function takes a single parameter, `emit`, which is a reference to a function for emitting events.
 					"""
 				required: false
-				type: string: {
-					examples: ["""
-						function (emit)
-						\t-- Custom Lua code here
-						end
-						""", "shutdown"]
-					syntax: "literal"
-				}
+				type: string: examples: ["""
+					function (emit)
+					\t-- Custom Lua code here
+					end
+					""", "shutdown"]
+			}
+		}
+	}
+	metric_tag_values: {
+		description: """
+			When set to `single`, metric tag values will be exposed as single strings, the
+			same as they were before this config option. Tags with multiple values will show the last assigned value, and null values
+			will be ignored.
+
+			When set to `full`, all metric tags will be exposed as arrays of either string or null
+			values.
+			"""
+		required: false
+		type: string: {
+			default: "single"
+			enum: {
+				full: "All tags will be exposed as arrays of either string or null values."
+				single: """
+					Tag values will be exposed as single strings, the same as they were before this config
+					option. Tags with multiple values will show the last assigned value, and null values will be
+					ignored.
+					"""
 			}
 		}
 	}
@@ -77,15 +90,12 @@ base: components: transforms: lua: configuration: {
 		description: """
 			A list of directories to search when loading a Lua file via the `require` function.
 
-			If not specified, the modules are looked up in the directories of Vector’s configs.
+			If not specified, the modules are looked up in the configuration directories.
 			"""
 		required: false
 		type: array: {
 			default: []
-			items: type: string: {
-				examples: ["/etc/vector/lua"]
-				syntax: "literal"
-			}
+			items: type: string: examples: ["/etc/vector/lua"]
 		}
 	}
 	source: {
@@ -97,41 +107,38 @@ base: components: transforms: lua: configuration: {
 			hooks can be configured directly with inline Lua source for each respective hook.
 			"""
 		required: false
-		type: string: {
-			examples: ["""
-				function init()
-				\tcount = 0
-				end
+		type: string: examples: ["""
+			function init()
+			\tcount = 0
+			end
 
-				function process()
-				\tcount = count + 1
-				end
+			function process()
+			\tcount = count + 1
+			end
 
-				function timer_handler(emit)
-				\temit(make_counter(counter))
-				\tcounter = 0
-				end
+			function timer_handler(emit)
+			\temit(make_counter(counter))
+			\tcounter = 0
+			end
 
-				function shutdown(emit)
-				\temit(make_counter(counter))
-				end
+			function shutdown(emit)
+			\temit(make_counter(counter))
+			end
 
-				function make_counter(value)
-				\treturn metric = {
-				\t\tname = "event_counter",
-				\t\tkind = "incremental",
-				\t\ttimestamp = os.date("!*t"),
-				\t\tcounter = {
-				\t\t\tvalue = value
-				\t\t}
-				 \t}
-				end
-				""", """
-				-- external file with hooks and timers defined
-				require('custom_module')
-				"""]
-			syntax: "literal"
-		}
+			function make_counter(value)
+			\treturn metric = {
+			\t\tname = "event_counter",
+			\t\tkind = "incremental",
+			\t\ttimestamp = os.date("!*t"),
+			\t\tcounter = {
+			\t\t\tvalue = value
+			\t\t}
+			 \t}
+			end
+			""", """
+			-- external file with hooks and timers defined
+			require('custom_module')
+			"""]
 	}
 	timers: {
 		description: "A list of timers which should be configured and executed periodically."
@@ -150,10 +157,7 @@ base: components: transforms: lua: configuration: {
 						reference to a function for emitting events.
 						"""
 					required: true
-					type: string: {
-						examples: ["timer_handler"]
-						syntax: "literal"
-					}
+					type: string: examples: ["timer_handler"]
 				}
 				interval_seconds: {
 					description: "The interval to execute the handler, in seconds."
@@ -167,7 +171,7 @@ base: components: transforms: lua: configuration: {
 		description: """
 			Transform API version.
 
-			Specifying this version ensures that Vector does not break backward compatibility.
+			Specifying this version ensures that backward compatibility is not broken.
 			"""
 		required: true
 		type: string: enum: {

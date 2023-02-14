@@ -18,12 +18,14 @@ criterion_group!(
               chunks,
               compact,
               contains,
+              decode_base16,
               decode_base64,
               decode_percent,
               decrypt,
               // TODO: Cannot pass a Path to bench_function
               //del,
               downcase,
+              encode_base16,
               encode_base64,
               encode_key_value,
               encode_json,
@@ -112,6 +114,7 @@ criterion_group!(
               replace,
               reverse_dns,
               round,
+              seahash,
               set,
               sha1,
               sha2,
@@ -261,6 +264,15 @@ bench_function! {
 }
 
 bench_function! {
+    decode_base16 => vrl_stdlib::DecodeBase16;
+
+    literal {
+        args: func_args![value: "736f6d652b3d737472696e672f76616c7565"],
+        want: Ok("some+=string/value"),
+    }
+}
+
+bench_function! {
     decode_base64 => vrl_stdlib::DecodeBase64;
 
     literal {
@@ -298,6 +310,15 @@ bench_function! {
     literal {
         args: func_args![value: "FOO"],
         want: Ok("foo")
+    }
+}
+
+bench_function! {
+    encode_base16 => vrl_stdlib::EncodeBase16;
+
+    literal {
+        args: func_args![value: "some+=string/value"],
+        want: Ok("736f6d652b3d737472696e672f76616c7565"),
     }
 }
 
@@ -524,7 +545,7 @@ bench_function! {
     format_timestamp => vrl_stdlib::FormatTimestamp;
 
     iso_6801 {
-        args: func_args![value: Utc.timestamp(10, 0), format: "%+"],
+        args: func_args![value: Utc.timestamp_opt(10, 0).single().expect("invalid timestamp"), format: "%+"],
         want: Ok("1970-01-01T00:00:10+00:00"),
     }
 }
@@ -554,6 +575,15 @@ bench_function! {
     mixed_included_string {
         args: func_args![value: value!(["foo", 1, true, [1,2,3]]), item: value!("foo")],
         want: Ok(value!(true)),
+    }
+}
+
+bench_function! {
+    seahash => vrl_stdlib::Seahash;
+
+    literal {
+        args: func_args![value: "foo"],
+        want: Ok(4_413_582_353_838_009_230_i64),
     }
 }
 
@@ -1315,11 +1345,11 @@ bench_function! {
             "subscription_filters":  ["Destination"],
             "log_events": [{
                 "id":  "35683658089614582423604394983260738922885519999578275840",
-                "timestamp":  (Utc.timestamp(1600110569, 39000000)),
+                "timestamp":  (Utc.timestamp_opt(1600110569, 39000000).single().expect("invalid timestamp")),
                 "message":  r#"{"bytes":26780,"datetime":"14/Sep/2020:11:45:41 -0400","host":"157.130.216.193","method":"PUT","protocol":"HTTP/1.0","referer":"https://www.principalcross-platform.io/markets/ubiquitous","request":"/expedite/convergence","source_type":"stdin","status":301,"user-identifier":"-"}"#,
             }, {
                 "id":  "35683658089659183914001456229543810359430816722590236673",
-                "timestamp":  (Utc.timestamp(1600110569, 41000000)),
+                "timestamp":  (Utc.timestamp_opt(1600110569, 41000000).single().expect("invalid timestamp")),
                 "message":  r#"{"bytes":17707,"datetime":"14/Sep/2020:11:45:41 -0400","host":"109.81.244.252","method":"GET","protocol":"HTTP/2.0","referer":"http://www.investormission-critical.io/24/7/vortals","request":"/scale/functionalities/optimize","source_type":"stdin","status":502,"user-identifier":"feeney1708"}"#,
             }]
         }))

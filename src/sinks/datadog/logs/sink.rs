@@ -2,7 +2,7 @@ use std::{fmt::Debug, io, num::NonZeroUsize, sync::Arc};
 
 use async_trait::async_trait;
 use bytes::Bytes;
-use codecs::{encoding::Framer, CharacterDelimitedEncoder, JsonSerializer};
+use codecs::{encoding::Framer, CharacterDelimitedEncoder, JsonSerializerConfig};
 use futures::{stream::BoxStream, StreamExt};
 use lookup::event_path;
 use snafu::Snafu;
@@ -46,6 +46,7 @@ pub struct LogSinkBuilder<S> {
     batch_settings: BatcherSettings,
     compression: Option<Compression>,
     default_api_key: Arc<str>,
+    protocol: String,
 }
 
 impl<S> LogSinkBuilder<S> {
@@ -54,6 +55,7 @@ impl<S> LogSinkBuilder<S> {
         service: S,
         default_api_key: Arc<str>,
         batch_settings: BatcherSettings,
+        protocol: String,
     ) -> Self {
         Self {
             encoding: JsonEncoding::new(transformer),
@@ -61,6 +63,7 @@ impl<S> LogSinkBuilder<S> {
             default_api_key,
             batch_settings,
             compression: None,
+            protocol,
         }
     }
 
@@ -77,6 +80,7 @@ impl<S> LogSinkBuilder<S> {
             service: self.service,
             batch_settings: self.batch_settings,
             compression: self.compression.unwrap_or_default(),
+            protocol: self.protocol,
         }
     }
 }
@@ -99,6 +103,8 @@ pub struct LogSink<S> {
     compression: Compression,
     /// Batch settings: timeout, max events, max bytes, etc.
     batch_settings: BatcherSettings,
+    /// The protocol name
+    protocol: String,
 }
 
 /// Customized encoding specific to the Datadog Logs sink, as the logs API only accepts JSON encoded
@@ -117,7 +123,7 @@ impl JsonEncoding {
                 transformer,
                 Encoder::<Framer>::new(
                     CharacterDelimitedEncoder::new(b',').into(),
-                    JsonSerializer::new().into(),
+                    JsonSerializerConfig::default().build().into(),
                 ),
             ),
         }
@@ -134,12 +140,15 @@ impl crate::sinks::util::encoding::Encoder<Vec<Event>> for JsonEncoding {
     fn encode_input(&self, mut input: Vec<Event>, writer: &mut dyn io::Write) -> io::Result<usize> {
         for event in input.iter_mut() {
             let log = event.as_mut_log();
-            if let Some(message_path) = log.message_path() {
-                log.rename_key(message_path.as_str(), event_path!("message"));
-            }
-            if let Some(host_path) = log.host_path() {
-                log.rename_key(host_path.as_str(), event_path!("host"));
-            }
+            let message_path = log
+                .message_path()
+                .expect("message is required (make sure the \"message\" semantic meaning is set)");
+            log.rename_key(message_path.as_str(), event_path!("message"));
+
+            let host_path = log
+                .host_path()
+                .expect("message is required (make sure the \"host\" semantic meaning is set)");
+            log.rename_key(host_path.as_str(), event_path!("host"));
 
             if let Some(Value::Timestamp(ts)) = log
                 .timestamp_path()
@@ -392,56 +401,42 @@ where
         let partitioner = EventPartitioner::default();
 
         let builder_limit = NonZeroUsize::new(64);
+        let input = input.batched_partitioned(partitioner, self.batch_settings);
         if self.schema_enabled {
-            let sink = input
-                .batched_partitioned(partitioner, self.batch_settings)
-                .request_builder(
-                    builder_limit,
-                    SemanticLogRequestBuilder {
-                        default_api_key,
-                        encoding: SemanticJsonEncoding {
-                            log_schema: self.encoding.log_schema,
-                            encoder: self.encoding.encoder,
-                        },
-                        compression: self.compression,
+            input.request_builder(
+                builder_limit,
+                SemanticLogRequestBuilder {
+                    default_api_key,
+                    encoding: SemanticJsonEncoding {
+                        log_schema: self.encoding.log_schema,
+                        encoder: self.encoding.encoder,
                     },
-                )
-                .filter_map(|request| async move {
-                    match request {
-                        Err(error) => {
-                            emit!(SinkRequestBuildError { error });
-                            None
-                        }
-                        Ok(req) => Some(req),
-                    }
-                })
-                .into_driver(self.service);
-
-            sink.run().await
+                    compression: self.compression,
+                },
+            )
         } else {
-            let sink = input
-                .batched_partitioned(partitioner, self.batch_settings)
-                .request_builder(
-                    builder_limit,
-                    LogRequestBuilder {
-                        default_api_key,
-                        encoding: self.encoding,
-                        compression: self.compression,
-                    },
-                )
-                .filter_map(|request| async move {
-                    match request {
-                        Err(error) => {
-                            emit!(SinkRequestBuildError { error });
-                            None
-                        }
-                        Ok(req) => Some(req),
-                    }
-                })
-                .into_driver(self.service);
-
-            sink.run().await
+            input.request_builder(
+                builder_limit,
+                LogRequestBuilder {
+                    default_api_key,
+                    encoding: self.encoding,
+                    compression: self.compression,
+                },
+            )
         }
+        .filter_map(|request| async move {
+            match request {
+                Err(error) => {
+                    emit!(SinkRequestBuildError { error });
+                    None
+                }
+                Ok(req) => Some(req),
+            }
+        })
+        .into_driver(self.service)
+        .protocol(self.protocol)
+        .run()
+        .await
     }
 }
 

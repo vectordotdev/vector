@@ -35,7 +35,7 @@ where
     let listener = tls_settings.bind(&address).await?;
     let stream = listener.accept_stream();
 
-    info!(message = "Building gRPC server.", address = %address);
+    info!(%address, "Building gRPC server.");
 
     Server::builder()
         .trace_fn(move |_| span.clone())

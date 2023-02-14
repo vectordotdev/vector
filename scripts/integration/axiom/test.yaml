@@ -1,0 +1,12 @@
+args:
+- --features
+- axiom-integration-tests
+- --lib
+- '::axiom::'
+
+runner:
+  env:
+    AXIOM_URL: http://axiom-core
+
+matrix:
+  postgres: [13-alpine]

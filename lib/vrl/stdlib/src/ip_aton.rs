@@ -7,7 +7,7 @@ fn ip_aton(value: Value) -> Resolved {
     let ip: Ipv4Addr = value
         .try_bytes_utf8_lossy()?
         .parse()
-        .map_err(|err| format!("unable to parse IPv4 address: {}", err))?;
+        .map_err(|err| format!("unable to parse IPv4 address: {err}"))?;
     Ok(u32::from(ip).into())
 }
 

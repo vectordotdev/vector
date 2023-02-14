@@ -10,7 +10,7 @@ use indexmap::IndexMap;
 use rand::Rng;
 use serde::Serialize;
 use tokio::{
-    sync::mpsc::{self},
+    sync::mpsc,
     time::{sleep, Duration},
 };
 use url::{ParseError, Url};
@@ -21,12 +21,12 @@ use super::{
     SourceOuter, TransformOuter,
 };
 use crate::{
-    common::datadog::{get_api_base_endpoint, Region},
+    common::datadog::{get_api_base_endpoint, get_base_domain_region, Region},
     conditions::AnyCondition,
     http::{HttpClient, HttpError},
     sinks::{
-        datadog::{logs::DatadogLogsConfig, metrics::DatadogMetricsConfig},
-        util::retries::ExponentialBackoff,
+        datadog::{default_site, logs::DatadogLogsConfig, metrics::DatadogMetricsConfig},
+        util::{http::RequestConfig, retries::ExponentialBackoff},
     },
     sources::{
         host_metrics::{Collector, HostMetricsConfig},
@@ -73,8 +73,8 @@ pub struct Options {
     /// The Datadog [site][dd_site] to send data to.
     ///
     /// [dd_site]: https://docs.datadoghq.com/getting_started/site
-    #[serde(default)]
-    site: Option<String>,
+    #[serde(default = "default_site")]
+    site: String,
 
     /// The Datadog region to send data to.
     ///
@@ -130,7 +130,7 @@ impl Default for Options {
         Self {
             enabled: default_enabled(),
             enable_logs_reporting: default_enable_logs_reporting(),
-            site: None,
+            site: default_site(),
             region: None,
             endpoint: None,
             api_key: None,
@@ -482,7 +482,13 @@ fn setup_logs_reporting(
         endpoint: datadog.endpoint.clone(),
         site: datadog.site.clone(),
         region: datadog.region,
-        enterprise: true,
+        request: RequestConfig {
+            headers: IndexMap::from([(
+                "DD-EVP-ORIGIN".to_string(),
+                "vector-enterprise".to_string(),
+            )]),
+            ..Default::default()
+        },
         ..Default::default()
     };
 
@@ -524,7 +530,7 @@ fn setup_metrics_reporting(
     // systems' performance. To avoid this, we explicitly set `collectors`.
     let host_metrics = HostMetricsConfig {
         namespace: Some("vector.host".to_owned()),
-        scrape_interval_secs: datadog.reporting_interval_secs,
+        scrape_interval_secs: Duration::from_secs_f64(datadog.reporting_interval_secs),
         collectors: Some(vec![
             Collector::Cpu,
             Collector::Disk,
@@ -540,8 +546,8 @@ fn setup_metrics_reporting(
         // While the default namespace for internal metrics is already "vector",
         // setting the namespace here is meant for clarity and resistance
         // against any future or accidental changes.
-        namespace: Some("vector".to_owned()),
-        scrape_interval_secs: datadog.reporting_interval_secs,
+        namespace: "vector".to_owned(),
+        scrape_interval_secs: Duration::from_secs_f64(datadog.reporting_interval_secs),
         ..Default::default()
     };
 
@@ -668,7 +674,7 @@ pub(crate) fn report_configuration(
         // Endpoint to report a config to Datadog OP.
         let endpoint = get_reporting_endpoint(
             opts.endpoint.as_ref(),
-            opts.site.as_ref(),
+            opts.site.as_str(),
             opts.region,
             &opts.configuration_key,
         );
@@ -705,13 +711,15 @@ pub(crate) fn report_configuration(
 /// Returns the full URL endpoint of where to POST a Datadog Vector configuration.
 fn get_reporting_endpoint(
     endpoint: Option<&String>,
-    site: Option<&String>,
+    site: &str,
     region: Option<Region>,
     configuration_key: &str,
 ) -> String {
+    let base = get_base_domain_region(site, region);
+
     format!(
         "{}{}/{}/versions",
-        get_api_base_endpoint(endpoint, site, region),
+        get_api_base_endpoint(endpoint, base),
         DATADOG_REPORTING_PATH_STUB,
         configuration_key
     )

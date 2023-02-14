@@ -121,7 +121,7 @@ async fn reader_throws_error_when_finished_file_has_truncated_record_data() {
             let (mut writer, _, ledger) =
                 create_buffer_v2_with_max_data_file_size(data_dir.clone(), 172).await;
 
-            // Write two smaller records, such that the first one fits entirelyh, and the second one
+            // Write two smaller records, such that the first one fits entirely, and the second one
             // starts within the 128-byte zone but finishes over the limit, thus triggering data
             // file rollover.
             let first_record_size = 32;
@@ -391,7 +391,7 @@ async fn writer_detects_when_last_record_has_scrambled_archive_data() {
                 .expect("metadata should not fail");
             assert_eq!(expected_data_file_len, metadata.len());
 
-            let target_pos = expected_data_file_len as u64 - 8;
+            let target_pos = expected_data_file_len - 8;
             let pos = data_file
                 .seek(SeekFrom::Start(target_pos))
                 .await

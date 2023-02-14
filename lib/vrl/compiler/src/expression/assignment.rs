@@ -61,7 +61,7 @@ impl Assignment {
                 let expr = expr.into_inner();
                 let target = Target::try_from(target.into_inner())?;
                 verify_mutable(&target, config, expr_span, assignment_span)?;
-                verify_overwriteable(
+                verify_overwritable(
                     &target,
                     state,
                     target_span,
@@ -116,7 +116,7 @@ impl Assignment {
                 // "err" target.
                 let ok = Target::try_from(ok.into_inner())?;
                 verify_mutable(&ok, config, expr_span, ok_span)?;
-                verify_overwriteable(
+                verify_overwritable(
                     &ok,
                     state,
                     ok_span,
@@ -132,7 +132,7 @@ impl Assignment {
                 // error message.
                 let err = Target::try_from(err.into_inner())?;
                 verify_mutable(&err, config, expr_span, err_span)?;
-                verify_overwriteable(
+                verify_overwritable(
                     &err,
                     state,
                     err_span,
@@ -198,7 +198,7 @@ fn verify_mutable(
 ///
 /// This returns an error if an assignment is done to an object field or array
 /// index, while the parent of the field/index isn't an actual object/array.
-fn verify_overwriteable(
+fn verify_overwritable(
     target: &Target,
     state: &TypeState,
     target_span: Span,
@@ -233,7 +233,7 @@ fn verify_overwriteable(
                 let segment_span = Span::new(segment_start, parent_span.end());
 
                 parent_span = Span::new(parent_span.start(), segment_start.saturating_sub(1));
-                remainder_str.insert_str(0, &format!(".{}", segment_str));
+                remainder_str.insert_str(0, &format!(".{segment_str}"));
 
                 ("object", segment_span, parent_kind.contains_object())
             }
@@ -253,13 +253,13 @@ fn verify_overwriteable(
         }
 
         let parent_str = match target {
-            Target::Internal(ident, _) => format!("{ident}{}", path),
+            Target::Internal(ident, _) => format!("{ident}{path}"),
             Target::External(_) => {
                 if path.is_root() && remainder_str.starts_with('.') {
                     remainder_str = remainder_str[1..].to_owned();
                 }
 
-                format!(".{}", path)
+                format!(".{path}")
             }
             Target::Noop => unreachable!(),
         };
@@ -297,8 +297,8 @@ impl fmt::Display for Assignment {
         use Variant::{Infallible, Single};
 
         match &self.variant {
-            Single { target, expr } => write!(f, "{} = {}", target, expr),
-            Infallible { ok, err, expr, .. } => write!(f, "{}, {} = {}", ok, err, expr),
+            Single { target, expr } => write!(f, "{target} = {expr}"),
+            Infallible { ok, err, expr, .. } => write!(f, "{ok}, {err} = {expr}"),
         }
     }
 }
@@ -308,9 +308,9 @@ impl fmt::Debug for Assignment {
         use Variant::{Infallible, Single};
 
         match &self.variant {
-            Single { target, expr } => write!(f, "{:?} = {:?}", target, expr),
+            Single { target, expr } => write!(f, "{target:?} = {expr:?}"),
             Infallible { ok, err, expr, .. } => {
-                write!(f, "Ok({:?}), Err({:?}) = {:?}", ok, err, expr)
+                write!(f, "Ok({ok:?}), Err({err:?}) = {expr:?}")
             }
         }
     }
@@ -411,8 +411,8 @@ impl fmt::Display for Target {
         match self {
             Noop => f.write_str("_"),
             Internal(ident, path) if path.is_root() => ident.fmt(f),
-            Internal(ident, path) => write!(f, "{}{}", ident, path),
-            External(path) => write!(f, "{}", path),
+            Internal(ident, path) => write!(f, "{ident}{path}"),
+            External(path) => write!(f, "{path}"),
         }
     }
 }
@@ -425,12 +425,12 @@ impl fmt::Debug for Target {
             Noop => f.write_str("Noop"),
             Internal(ident, path) => {
                 if path.is_root() {
-                    write!(f, "Internal({})", ident)
+                    write!(f, "Internal({ident})")
                 } else {
-                    write!(f, "Internal({}{})", ident, path)
+                    write!(f, "Internal({ident}{path})")
                 }
             }
-            External(path) => write!(f, "External({})", path),
+            External(path) => write!(f, "External({path})"),
         }
     }
 }
@@ -576,8 +576,8 @@ where
         use Variant::{Infallible, Single};
 
         match self {
-            Single { target, expr } => write!(f, "{} = {}", target, expr),
-            Infallible { ok, err, expr, .. } => write!(f, "{}, {} = {}", ok, err, expr),
+            Single { target, expr } => write!(f, "{target} = {expr}"),
+            Infallible { ok, err, expr, .. } => write!(f, "{ok}, {err} = {expr}"),
         }
     }
 }
@@ -667,12 +667,12 @@ impl DiagnosticMessage for Error {
                     "or change this to an infallible assignment:",
                     self.assignment_span,
                 ),
-                Label::context(format!("{}, err = {}", target, expr), self.assignment_span),
+                Label::context(format!("{target}, err = {expr}"), self.assignment_span),
             ],
             InfallibleAssignment(target, expr, ok_span, err_span) => vec![
                 Label::primary("this error assignment is unnecessary", err_span),
                 Label::context("because this expression can't fail", self.expr_span),
-                Label::context(format!("use: {} = {}", target, expr), ok_span),
+                Label::context(format!("use: {target} = {expr}"), ok_span),
             ],
             InvalidTarget(span) => vec![
                 Label::primary("invalid assignment target", span),
@@ -698,7 +698,7 @@ impl DiagnosticMessage for Error {
                     segment_span,
                 ),
                 Label::context(
-                    format!("this path resolves to a value of type {}", parent_kind),
+                    format!("this path resolves to a value of type {parent_kind}"),
                     parent_span,
                 ),
             ],

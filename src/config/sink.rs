@@ -26,12 +26,10 @@ where
     ///
     /// This must be a valid URI, which requires at least the scheme and host. All other
     /// components -- port, path, etc -- are allowed as well.
-    #[configurable(deprecated)]
-    #[configurable(metadata(docs::hidden))]
-    #[configurable(validation(format = "uri"))]
+    #[configurable(deprecated, metadata(docs::hidden), validation(format = "uri"))]
     healthcheck_uri: Option<UriSerde>,
 
-    #[configurable(derived)]
+    #[configurable(derived, metadata(docs::advanced))]
     #[serde(default, deserialize_with = "crate::serde::bool_or_struct")]
     healthcheck: SinkHealthcheckOptions,
 
@@ -78,9 +76,7 @@ where
         for stage in self.buffer.stages() {
             match stage {
                 BufferType::Memory { .. } => {}
-                BufferType::DiskV1 { .. } | BufferType::DiskV2 { .. } => {
-                    resources.push(Resource::DiskBuffer(id.to_string()))
-                }
+                BufferType::DiskV2 { .. } => resources.push(Resource::DiskBuffer(id.to_string())),
             }
         }
         resources

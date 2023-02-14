@@ -21,6 +21,10 @@ pub(crate) use self::allocator::{
 };
 
 const NUM_GROUPS: usize = 128;
+// Allocations are not tracked during startup.
+// We use the Relaxed ordering for both stores and loads of this atomic as no other threads exist when
+// this code is running, and all future threads will have a happens-after relationship with
+// this thread -- the main thread -- ensuring that they see the latest value of TRACK_ALLOCATIONS.
 pub static TRACK_ALLOCATIONS: AtomicBool = AtomicBool::new(false);
 
 /// Track allocations and deallocations separately.
@@ -117,60 +121,60 @@ pub fn init_allocation_tracing() {
     }
     let alloc_processor = thread::Builder::new().name("vector-alloc-processor".to_string());
     alloc_processor
-        .spawn(|| loop {
-            if TRACK_ALLOCATIONS.load(Ordering::Relaxed) {
-                without_allocation_tracing(|| {
-                    for (group_idx, group) in GROUP_INFO.iter().enumerate() {
-                        let mut allocations_diff = 0;
-                        let mut deallocations_diff = 0;
-                        let mutex = THREAD_LOCAL_REFS.lock().unwrap();
-                        for idx in 0..mutex.len() {
-                            allocations_diff += mutex[idx].allocations[group_idx].swap(0,Ordering::Relaxed);
-                            deallocations_diff += mutex[idx].deallocations[group_idx].swap(0,Ordering::Relaxed);
-                        }
-                        if allocations_diff == 0 && deallocations_diff == 0 {
-                            continue;
-                        }
-                        let mem_used_diff = allocations_diff as i64 - deallocations_diff as i64;
-                        let group_info = group.lock().unwrap();
-                        if allocations_diff > 0 {
-                            counter!(
-                                "component_allocated_bytes_total",
-                                allocations_diff,
-                                "component_kind" => group_info.component_kind.clone(),
-                                "component_type" => group_info.component_type.clone(),
-                                "component_id" => group_info.component_id.clone());
-                        }
-                        if deallocations_diff > 0 {
-                            counter!(
-                                "component_deallocated_bytes_total",
-                                deallocations_diff,
-                                "component_kind" => group_info.component_kind.clone(),
-                                "component_type" => group_info.component_type.clone(),
-                                "component_id" => group_info.component_id.clone());
-                        }
-                        if mem_used_diff > 0 {
-                            increment_gauge!(
-                                "component_allocated_bytes",
-                                mem_used_diff.to_f64().expect("failed to convert mem_used from int to float"),
-                                "component_kind" => group_info.component_kind.clone(),
-                                "component_type" => group_info.component_type.clone(),
-                                "component_id" => group_info.component_id.clone());
-                            }
-                        if mem_used_diff < 0 {
-                            decrement_gauge!(
-                                "component_allocated_bytes",
-                                -mem_used_diff.to_f64().expect("failed to convert mem_used from int to float"),
-                                "component_kind" => group_info.component_kind.clone(),
-                                "component_type" => group_info.component_type.clone(),
-                                "component_id" => group_info.component_id.clone());
-                        }
+        .spawn(|| {
+            without_allocation_tracing(|| loop {
+                for (group_idx, group) in GROUP_INFO.iter().enumerate() {
+                    let mut allocations_diff = 0;
+                    let mut deallocations_diff = 0;
+                    let mutex = THREAD_LOCAL_REFS.lock().unwrap();
+                    for idx in 0..mutex.len() {
+                        allocations_diff +=
+                            mutex[idx].allocations[group_idx].swap(0, Ordering::Relaxed);
+                        deallocations_diff +=
+                            mutex[idx].deallocations[group_idx].swap(0, Ordering::Relaxed);
                     }
-                });
-            }
-            thread::sleep(Duration::from_millis(
-                REPORTING_INTERVAL_MS.load(Ordering::Relaxed),
-            ));
+                    if allocations_diff == 0 && deallocations_diff == 0 {
+                        continue;
+                    }
+                    let mem_used_diff = allocations_diff as i64 - deallocations_diff as i64;
+                    let group_info = group.lock().unwrap();
+                    if allocations_diff > 0 {
+                        counter!(
+                            "component_allocated_bytes_total",
+                            allocations_diff,
+                            "component_kind" => group_info.component_kind.clone(),
+                            "component_type" => group_info.component_type.clone(),
+                            "component_id" => group_info.component_id.clone());
+                    }
+                    if deallocations_diff > 0 {
+                        counter!(
+                            "component_deallocated_bytes_total",
+                            deallocations_diff,
+                            "component_kind" => group_info.component_kind.clone(),
+                            "component_type" => group_info.component_type.clone(),
+                            "component_id" => group_info.component_id.clone());
+                    }
+                    if mem_used_diff > 0 {
+                        increment_gauge!(
+                            "component_allocated_bytes",
+                            mem_used_diff.to_f64().expect("failed to convert mem_used from int to float"),
+                            "component_kind" => group_info.component_kind.clone(),
+                            "component_type" => group_info.component_type.clone(),
+                            "component_id" => group_info.component_id.clone());
+                    }
+                    if mem_used_diff < 0 {
+                        decrement_gauge!(
+                            "component_allocated_bytes",
+                            -mem_used_diff.to_f64().expect("failed to convert mem_used from int to float"),
+                            "component_kind" => group_info.component_kind.clone(),
+                            "component_type" => group_info.component_type.clone(),
+                            "component_id" => group_info.component_id.clone());
+                    }
+                }
+                thread::sleep(Duration::from_millis(
+                    REPORTING_INTERVAL_MS.load(Ordering::Relaxed),
+                ));
+            })
         })
         .unwrap();
 }
@@ -187,22 +191,22 @@ pub fn acquire_allocation_group_id(
     component_type: String,
     component_kind: String,
 ) -> AllocationGroupId {
-    let group_id =
-        AllocationGroupId::register().expect("failed to register allocation group token");
-    let idx = group_id.as_raw();
-    match GROUP_INFO.get(idx as usize) {
-        Some(mutex) => {
-            let mut writer = mutex.lock().unwrap();
+    if let Some(group_id) = AllocationGroupId::register() {
+        if let Some(group_lock) = GROUP_INFO.get(group_id.as_raw() as usize) {
+            let mut writer = group_lock.lock().unwrap();
             *writer = GroupInfo {
                 component_id,
                 component_kind,
                 component_type,
             };
-            group_id
-        }
-        None => {
-            info!("Maximum number of registrable allocation group IDs reached ({}). Allocations for component '{}' will be attributed to the root allocation group.", NUM_GROUPS, component_id);
-            AllocationGroupId::ROOT
+
+            return group_id;
         }
     }
+
+    // TODO: Technically, `NUM_GROUPS` is lower (128) than the upper bound for the
+    // `AllocationGroupId::register` call itself (253), so we can hardcode `NUM_GROUPS` here knowing
+    // it's the lower of the two values and will trigger first.. but this may not always be true.
+    info!("Maximum number of registrable allocation group IDs reached ({}). Allocations for component '{}' will be attributed to the root allocation group.", NUM_GROUPS, component_id);
+    AllocationGroupId::ROOT
 }

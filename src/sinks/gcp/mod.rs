@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use serde::{Deserialize, Serialize};
 use vector_config::configurable_component;
 
@@ -22,11 +24,26 @@ pub struct GcpTypedResource {
     /// The monitored resource type.
     ///
     /// For example, the type of a Compute Engine VM instance is `gce_instance`.
+    #[configurable(metadata(docs::examples = "global", docs::examples = "gce_instance"))]
     pub r#type: String,
 
     /// Type-specific labels.
     #[serde(flatten)]
-    pub labels: std::collections::HashMap<String, String>,
+    #[configurable(metadata(
+        docs::additional_props_description = "Values for all of the labels listed in the associated monitored resource descriptor.\n\nFor example, Compute Engine VM instances use the labels `projectId`, `instanceId`, and `zone`."
+    ))]
+    #[configurable(metadata(docs::examples = "label_examples()"))]
+    pub labels: HashMap<String, String>,
+}
+
+fn label_examples() -> HashMap<String, String> {
+    let mut example = HashMap::new();
+    example.insert("type".to_string(), "global".to_string());
+    example.insert("projectId".to_string(), "vector-123456".to_string());
+    example.insert("instanceId".to_string(), "Twilight".to_string());
+    example.insert("zone".to_string(), "us-central1-a".to_string());
+
+    example
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, Copy)]

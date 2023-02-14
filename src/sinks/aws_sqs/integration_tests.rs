@@ -1,11 +1,9 @@
 #![cfg(all(test, feature = "aws-sqs-integration-tests"))]
 
 use std::collections::HashMap;
-use std::str::FromStr;
 
-use aws_sdk_sqs::{model::QueueAttributeName, Client as SqsClient, Endpoint, Region};
+use aws_sdk_sqs::{model::QueueAttributeName, Client as SqsClient};
 use codecs::TextSerializerConfig;
-use http::Uri;
 use tokio::time::{sleep, Duration};
 
 use super::{config::SqsSinkConfig, sink::SqsSink};
@@ -31,8 +29,8 @@ async fn create_test_client() -> SqsClient {
     let proxy = ProxyConfig::default();
     create_client::<SqsClientBuilder>(
         &auth,
-        Some(Region::new("localstack")),
-        Some(Endpoint::immutable(Uri::from_str(&endpoint).unwrap())),
+        Some(aws_types::region::Region::new("localstack")),
+        Some(endpoint),
         &proxy,
         &None,
         true,
@@ -52,7 +50,7 @@ async fn sqs_send_message_batch() {
     let config = SqsSinkConfig {
         queue_url: queue_url.clone(),
         region: RegionOrEndpoint::with_both("local", sqs_address().as_str()),
-        encoding: TextSerializerConfig::new().into(),
+        encoding: TextSerializerConfig::default().into(),
         message_group_id: None,
         message_deduplication_id: None,
         request: Default::default(),

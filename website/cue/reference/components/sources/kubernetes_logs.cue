@@ -6,8 +6,8 @@ components: sources: kubernetes_logs: {
 	title: "Kubernetes Logs"
 
 	description: """
-		Collects all log data for Kubernetes Nodes, automatically enriching data
-		with Kubernetes metadata via the Kubernetes API.
+		Collects Pod logs from Kubernetes Nodes, automatically enriching data
+		with metadata via the Kubernetes API.
 		"""
 
 	classes: {
@@ -20,6 +20,7 @@ components: sources: kubernetes_logs: {
 	}
 
 	features: {
+		auto_generated:   true
 		acknowledgements: false
 		collect: {
 			checkpoint: enabled: true
@@ -41,6 +42,10 @@ components: sources: kubernetes_logs: {
 			"""
 				[Kubernetes](\(urls.kubernetes)) version `\(services.kubernetes.versions)` is required.
 				""",
+			"""
+				This source requires read access to the `/var/log/pods` directory. When run in a
+				Kubernetes cluster this can be provided with a [hostPath](\(urls.kubernetes_host_path)) volume.
+				""",
 		]
 		warnings: []
 		notices: []
@@ -50,284 +55,7 @@ components: sources: kubernetes_logs: {
 		platform_name: "kubernetes"
 	}
 
-	configuration: {
-		pod_annotation_fields: {
-			common:      false
-			description: "Configuration for how the events are annotated with Pod metadata."
-			required:    false
-			type: object: {
-				examples: []
-				options: {
-					container_id: {
-						common:      false
-						description: "Event field for Container id."
-						required:    false
-						type: string: {
-							default: "kubernetes.container_id"
-						}
-					}
-					container_image: {
-						common:      false
-						description: "Event field for Container image."
-						required:    false
-						type: string: {
-							default: "kubernetes.container_image"
-						}
-					}
-					container_name: {
-						common:      false
-						description: "Event field for Container name."
-						required:    false
-						type: string: {
-							default: "kubernetes.container_name"
-						}
-					}
-					pod_ip: {
-						common:      false
-						description: "Event field for Pod IPv4 Address."
-						required:    false
-						type: string: {
-							default: "kubernetes.pod_ip"
-						}
-					}
-					pod_ips: {
-						common:      false
-						description: "Event field for Pod IPv4 and IPv6 Addresses."
-						required:    false
-						type: string: {
-							default: "kubernetes.pod_ips"
-						}
-					}
-					pod_labels: {
-						common:      false
-						description: "Event field for Pod labels."
-						required:    false
-						type: string: {
-							default: "kubernetes.pod_labels"
-						}
-					}
-					pod_annotations: {
-						common:      false
-						description: "Event field for Pod annotations."
-						required:    false
-						type: string: {
-							default: "kubernetes.pod_annotations"
-						}
-					}
-					pod_name: {
-						common:      false
-						description: "Event field for Pod name."
-						required:    false
-						type: string: {
-							default: "kubernetes.pod_name"
-						}
-					}
-					pod_namespace: {
-						common:      false
-						description: "Event field for Pod namespace."
-						required:    false
-						type: string: {
-							default: "kubernetes.pod_namespace"
-						}
-					}
-					pod_node_name: {
-						common:      false
-						description: "Event field for Pod node_name."
-						required:    false
-						type: string: {
-							default: "kubernetes.pod_node_name"
-						}
-					}
-					pod_owner: {
-						common:      false
-						description: "Event field for Pod owner reference."
-						required:    false
-						type: string: {
-							default: "kubernetes.pod_owner"
-						}
-					}
-					pod_uid: {
-						common:      false
-						description: "Event field for Pod uid."
-						required:    false
-						type: string: {
-							default: "kubernetes.pod_uid"
-						}
-					}
-				}
-			}
-		}
-		namespace_annotation_fields: {
-			common:      false
-			description: "Configuration for how the events are annotated with Namespace metadata."
-			required:    false
-			type: object: {
-				examples: []
-				options: {
-					namespace_labels: {
-						common:      false
-						description: "Event field for Namespace labels."
-						required:    false
-						type: string: {
-							default: "kubernetes.namespace_labels"
-						}
-					}
-				}
-			}
-		}
-		node_annotation_fields: {
-			common:      false
-			description: "Configuration for how the events are annotated with Node metadata."
-			required:    false
-			type: object: {
-				examples: []
-				options: {
-					node_labels: {
-						common:      false
-						description: "Event field for Node labels."
-						required:    false
-						type: string: {
-							default: "kubernetes.node_labels"
-						}
-					}
-				}
-			}
-		}
-		auto_partial_merge: {
-			common:      false
-			description: "Automatically merge partial messages into a single event. Partial here is in respect to messages that were split by the Kubernetes Container Runtime log driver."
-			required:    false
-			type: bool: default: true
-		}
-		ingestion_timestamp_field: {
-			common:      false
-			description: "The exact time the event was ingested into Vector."
-			required:    false
-			type: string: default: null
-		}
-		kube_config_file: {
-			common:      false
-			description: "Optional path to a kubeconfig file readable by Vector. If not set, Vector will try to connect to Kubernetes using in-cluster configuration."
-			required:    false
-			type: string: default: null
-		}
-		self_node_name: {
-			common:      false
-			description: "The name of the Kubernetes `Node` this Vector instance runs at. Configured to use an env var by default, to be evaluated to a value provided by Kubernetes at Pod deploy time."
-			required:    false
-			type: string: {
-				default: "${VECTOR_SELF_NODE_NAME}"
-			}
-		}
-		exclude_paths_glob_patterns: {
-			common: false
-			description: """
-				A list of glob patterns to exclude from reading the files.
-				"""
-			required: false
-			type: array: {
-				default: ["**/*.gz", "**/*.tmp"]
-				items: type: string: {
-					examples: ["**/exclude/**"]
-				}
-			}
-		}
-		extra_field_selector: {
-			common: false
-			description: """
-				Specifies the field selector to filter `Pod`s with, to be used in addition to the built-in `Node` filter.
-				The name of the Kubernetes `Node` this Vector instance runs at. Configured to use an env var by default, to be evaluated to a value provided by Kubernetes at Pod deploy time.
-				"""
-			required: false
-			type: string: {
-				default: ""
-				examples: ["metadata.name!=pod-name-to-exclude", "metadata.name!=pod-name-to-exclude,metadata.name=mypod"]
-			}
-		}
-		extra_label_selector: {
-			common: false
-			description: """
-				Specifies the label selector to filter `Pod`s with, to be used in
-				addition to the built-in `vector.dev/exclude` filter.
-				"""
-			required: false
-			type: string: {
-				default: ""
-				examples: ["my_custom_label!=my_value", "my_custom_label!=my_value,my_other_custom_label=my_value"]
-			}
-		}
-		extra_namespace_label_selector: {
-			common: false
-			description: """
-				Specifies the label selector to filter `Namespace`s with, to be used in
-				addition to the built-in `vector.dev/exclude` filter.
-				"""
-			required: false
-			type: string: {
-				default: ""
-				examples: ["my_custom_label!=my_value", "my_custom_label!=my_value,my_other_custom_label=my_value"]
-			}
-		}
-		max_read_bytes: {
-			category:    "Reading"
-			common:      false
-			description: "An approximate limit on the amount of data read from a single pod log file at a given time."
-			required:    false
-			type: uint: {
-				default: 2048
-				examples: [2048]
-				unit: "bytes"
-			}
-		}
-		max_line_bytes: {
-			common:      false
-			description: "The maximum number of bytes a line can contain before being discarded. This protects against malformed lines or tailing incorrect files."
-			required:    false
-			type: uint: {
-				default: 32_768
-				unit:    "bytes"
-			}
-		}
-		fingerprint_lines: {
-			common: false
-			description: """
-				The number of lines to read when generating a unique fingerprint of a log file.
-				This is helpful when some containers share common first log lines.
-				WARNING: If the file has less than this amount of lines then it won't be read at all.
-				This is important since container logs are broken up into several files, so the greater
-				`lines` value is, the greater the chance of it not reading the last file/logs of
-				the container.
-				"""
-			required: false
-			type: uint: {
-				default: 1
-				unit:    "lines"
-			}
-		}
-		glob_minimum_cooldown_ms: {
-			common:      false
-			description: "Delay between file discovery calls. This controls the interval at which Vector searches for files within a single pod."
-			required:    false
-			type: uint: {
-				default: 60_000
-				unit:    "milliseconds"
-			}
-		}
-		delay_deletion_ms: {
-			common: false
-			description: """
-				Delay between receiving a `DELETE` event and removing any related metadata Vector has stored. This controls how quickly Vector will remove
-				metadata for resources that have been removed from Kubernetes, a longer delay will allow Vector to continue processing and enriching logs after the source Pod has been deleted.
-				If Vector tries to process logs from a Pod which has already had its metadata removed from the local cache, it will fail to enrich the event with metadata and log a warning.
-				"""
-			required: false
-			type: uint: {
-				default: 60_000
-				unit:    "milliseconds"
-			}
-		}
-		timezone: configuration._timezone
-	}
+	configuration: base.components.sources.kubernetes_logs.configuration
 
 	output: logs: line: {
 		description: "An individual line from a `Pod` log file."
@@ -538,14 +266,14 @@ components: sources: kubernetes_logs: {
 			body: """
 				Vector provides rich filtering options for Kubernetes log collection:
 
-				* Built-in [`Pod`](#pod-exclusion) and [`container`](#container-exclusion)
+				* Built-in [Pod](#pod-exclusion) and [Container](#container-exclusion)
 				  exclusion rules.
 				* The `exclude_paths_glob_patterns` option allows you to exclude
 				  Kubernetes log files by the file name and path.
 				* The `extra_field_selector` option specifies the field selector to
-				  filter Pods with, to be used in addition to the built-in `Node` filter.
+				  filter Pods with, to be used in addition to the built-in Node filter.
 				* The `extra_label_selector` option specifies the label selector to
-				  filter `Pod`s with, to be used in addition to the [built-in
+				  filter Pods with, to be used in addition to the [built-in
 				  `vector.dev/exclude` filter](#pod-exclusion).
 				"""
 		}
@@ -557,18 +285,28 @@ components: sources: kubernetes_logs: {
 				ignores compressed and temporary files. This behavior can be configured with the
 				[`exclude_paths_glob_patterns`](\(urls.vector_kubernetes_logs_source)#configuration) option.
 
-				[Globbing](\(urls.globbing)) is used to continually discover `Pod`s log files
+				[Globbing](\(urls.globbing)) is used to continually discover Pods' log files
 				at a rate defined by the `glob_minimum_cooldown` option. In environments when files are
 				rotated rapidly, we recommend lowering the `glob_minimum_cooldown` to catch files
 				before they are compressed.
 				"""
 		}
 
+		namespace_exclusion: {
+			title: "Namespace exclusion"
+			body:  """
+					By default, the [`kubernetes_logs` source](\(urls.vector_kubernetes_logs_source))
+					will skip logs from the Namespaces that have a `vector.dev/exclude: "true"` **label**.
+					You can configure additional exclusion rules via label selectors,
+					see [the available options](\(urls.vector_kubernetes_logs_source)#configuration).
+					"""
+		}
+
 		pod_exclusion: {
 			title: "Pod exclusion"
 			body:  """
 					By default, the [`kubernetes_logs` source](\(urls.vector_kubernetes_logs_source))
-					will skip logs from the `Pod`s that have a `vector.dev/exclude: "true"` *label*.
+					will skip logs from the Pods that have a `vector.dev/exclude: "true"` **label**.
 					You can configure additional exclusion rules via label or field selectors,
 					see [the available options](\(urls.vector_kubernetes_logs_source)#configuration).
 					"""
@@ -578,9 +316,9 @@ components: sources: kubernetes_logs: {
 			title: "Container exclusion"
 			body:  """
 					The [`kubernetes_logs` source](\(urls.vector_kubernetes_logs_source))
-					can skip the logs from the individual `container`s of a particular
-					`Pod`. Add an *annotation* `vector.dev/exclude-containers` to the
-					`Pod`, and enumerate the `name`s of all the `container`s to exclude in
+					can skip the logs from the individual Containers of a particular
+					Pod. Add an **annotation** `vector.dev/exclude-containers` to the
+					Pod, and enumerate the names of all the Containers to exclude in
 					the value of the annotation like so:
 
 					```yaml
@@ -588,9 +326,8 @@ components: sources: kubernetes_logs: {
 					```
 
 					This annotation will make Vector skip logs originating from the
-					`container1` and `container2` of the `Pod` marked with the annotation,
-					while logs from other `container`s in the `Pod` will still be
-					collected.
+					_container1_ and _container2_ of the Pod marked with the annotation,
+					while logs from other Containers in the Pod will still be collected.
 					"""
 		}
 
@@ -625,7 +362,7 @@ components: sources: kubernetes_logs: {
 			title: "Pod removal"
 			body: """
 				To ensure all data is collected, Vector will continue to collect logs from the
-				`Pod` for some time after its removal. This ensures that Vector obtains some of
+				Pod for some time after its removal. This ensures that Vector obtains some of
 				the most important data, such as crash details.
 				"""
 		}
@@ -691,15 +428,15 @@ components: sources: kubernetes_logs: {
 				Vector requires access to the Kubernetes API.
 				Specifically, the [`kubernetes_logs` source](\(urls.vector_kubernetes_logs_source))
 				uses the `/api/v1/pods`, `/api/v1/namespaces`, and `/api/v1/nodes` endpoints
-				to "list" and "watch" resources we use to enrich events with additional metadata.
+				to `list` and `watch` resources we use to enrich events with additional metadata.
 
 				Modern Kubernetes clusters run with RBAC (role-based access control)
 				scheme. RBAC-enabled clusters require some configuration to grant Vector
 				the authorization to access the Kubernetes API endpoints.	As RBAC is
 				currently the standard way of controlling access to the Kubernetes API,
-				we ship the necessary configuration out of the box: see `ClusterRole`,
-				`ClusterRoleBinding` and a `ServiceAccount` in our `kubectl` YAML
-				config, and the `rbac` configuration at the Helm chart.
+				we ship the necessary configuration out of the box: see the [ClusterRole, ClusterRoleBinding][rbac],
+				and [ServiceAccount][serviceaccount] in our Kubectl YAML
+				config, and the [`rbac.yaml`][rbac_helm] template configuration of the Helm chart.
 
 				If your cluster doesn't use any access control scheme	and doesn't
 				restrict access to the Kubernetes API, you don't need to do any extra
@@ -708,8 +445,12 @@ components: sources: kubernetes_logs: {
 				Clusters using legacy ABAC scheme are not officially supported
 				(although Vector might work if you configure access properly) -
 				we encourage switching to RBAC. If you use a custom access control
-				scheme - make sure Vector `Pod`/`ServiceAccount` is granted "list" and "watch" access
+				scheme - make sure Vector's Pod/ServiceAccount is granted `list` and `watch` access
 				to the `/api/v1/pods`, `/api/v1/namespaces`, and `/api/v1/nodes` resources.
+
+				[serviceaccount]: https://github.com/vectordotdev/vector/blob/master/distribution/kubernetes/vector-agent/serviceaccount.yaml
+				[rbac]: https://github.com/vectordotdev/vector/blob/master/distribution/kubernetes/vector-agent/rbac.yaml
+				[rbac_helm]: https://github.com/vectordotdev/helm-charts/blob/develop/charts/vector/templates/rbac.yaml
 				"""
 		}
 	}

@@ -20,7 +20,7 @@ use vector_config::NamedComponent;
 use vector_core::config::log_schema;
 
 use super::{
-    tests::{run_compliance, INTERVAL_SECS},
+    tests::{run_compliance, INTERVAL},
     HttpClientConfig,
 };
 
@@ -53,7 +53,7 @@ pub(crate) async fn run_error(config: HttpClientConfig) {
 async fn invalid_endpoint() {
     run_error(HttpClientConfig {
         endpoint: "http://nope".to_string(),
-        scrape_interval_secs: INTERVAL_SECS,
+        interval: INTERVAL,
         query: HashMap::new(),
         decoding: default_decoding(),
         framing: default_framing_message_based(),
@@ -71,7 +71,7 @@ async fn invalid_endpoint() {
 async fn collected_logs_bytes() {
     let events = run_compliance(HttpClientConfig {
         endpoint: format!("{}/logs/bytes", dufs_address()),
-        scrape_interval_secs: INTERVAL_SECS,
+        interval: INTERVAL,
         query: HashMap::new(),
         decoding: DeserializerConfig::Bytes,
         framing: default_framing_message_based(),
@@ -95,7 +95,7 @@ async fn collected_logs_bytes() {
 async fn collected_logs_json() {
     let events = run_compliance(HttpClientConfig {
         endpoint: format!("{}/logs/json.json", dufs_address()),
-        scrape_interval_secs: INTERVAL_SECS,
+        interval: INTERVAL,
         query: HashMap::new(),
         decoding: DeserializerConfig::Json,
         framing: default_framing_message_based(),
@@ -119,7 +119,7 @@ async fn collected_logs_json() {
 async fn collected_metrics_native_json() {
     let events = run_compliance(HttpClientConfig {
         endpoint: format!("{}/metrics/native.json", dufs_address()),
-        scrape_interval_secs: INTERVAL_SECS,
+        interval: INTERVAL,
         query: HashMap::new(),
         decoding: DeserializerConfig::NativeJson,
         framing: default_framing_message_based(),
@@ -148,7 +148,7 @@ async fn collected_metrics_native_json() {
 async fn collected_trace_native_json() {
     let events = run_compliance(HttpClientConfig {
         endpoint: format!("{}/traces/native.json", dufs_address()),
-        scrape_interval_secs: INTERVAL_SECS,
+        interval: INTERVAL,
         query: HashMap::new(),
         decoding: DeserializerConfig::NativeJson,
         framing: default_framing_message_based(),
@@ -172,7 +172,7 @@ async fn collected_trace_native_json() {
 async fn unauthorized_no_auth() {
     run_error(HttpClientConfig {
         endpoint: format!("{}/logs/json.json", dufs_auth_address()),
-        scrape_interval_secs: INTERVAL_SECS,
+        interval: INTERVAL,
         query: HashMap::new(),
         decoding: DeserializerConfig::Json,
         framing: default_framing_message_based(),
@@ -190,7 +190,7 @@ async fn unauthorized_no_auth() {
 async fn unauthorized_wrong_auth() {
     run_error(HttpClientConfig {
         endpoint: format!("{}/logs/json.json", dufs_auth_address()),
-        scrape_interval_secs: INTERVAL_SECS,
+        interval: INTERVAL,
         query: HashMap::new(),
         decoding: DeserializerConfig::Json,
         framing: default_framing_message_based(),
@@ -211,7 +211,7 @@ async fn unauthorized_wrong_auth() {
 async fn authorized() {
     run_compliance(HttpClientConfig {
         endpoint: format!("{}/logs/json.json", dufs_auth_address()),
-        scrape_interval_secs: INTERVAL_SECS,
+        interval: INTERVAL,
         query: HashMap::new(),
         decoding: DeserializerConfig::Json,
         framing: default_framing_message_based(),
@@ -232,7 +232,7 @@ async fn authorized() {
 async fn tls_invalid_ca() {
     run_error(HttpClientConfig {
         endpoint: format!("{}/logs/json.json", dufs_https_address()),
-        scrape_interval_secs: INTERVAL_SECS,
+        interval: INTERVAL,
         query: HashMap::new(),
         decoding: DeserializerConfig::Json,
         framing: default_framing_message_based(),
@@ -253,7 +253,7 @@ async fn tls_invalid_ca() {
 async fn tls_valid() {
     run_compliance(HttpClientConfig {
         endpoint: format!("{}/logs/json.json", dufs_https_address()),
-        scrape_interval_secs: INTERVAL_SECS,
+        interval: INTERVAL,
         query: HashMap::new(),
         decoding: DeserializerConfig::Json,
         framing: default_framing_message_based(),
@@ -275,7 +275,7 @@ async fn shutdown() {
     let source_id = ComponentKey::from("http_client_shutdown");
     let source = HttpClientConfig {
         endpoint: format!("{}/logs/json.json", dufs_address()),
-        scrape_interval_secs: INTERVAL_SECS,
+        interval: INTERVAL,
         query: HashMap::new(),
         decoding: DeserializerConfig::Json,
         framing: default_framing_message_based(),

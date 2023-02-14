@@ -46,10 +46,7 @@ base: components: transforms: remap: configuration: {
 			[vrl]: https://vector.dev/docs/reference/vrl
 			"""
 		required: false
-		type: string: {
-			examples: ["./my/program.vrl"]
-			syntax: "literal"
-		}
+		type: string: examples: ["./my/program.vrl"]
 	}
 	metric_tag_values: {
 		description: """
@@ -66,9 +63,9 @@ base: components: transforms: remap: configuration: {
 			enum: {
 				full: "All tags will be exposed as arrays of either string or null values."
 				single: """
-					Tag values will be exposed as single strings, the
-					same as they were before this config option. Tags with multiple values will show the last assigned value, and null values
-					will be ignored.
+					Tag values will be exposed as single strings, the same as they were before this config
+					option. Tags with multiple values will show the last assigned value, and null values will be
+					ignored.
 					"""
 			}
 		}
@@ -87,18 +84,6 @@ base: components: transforms: remap: configuration: {
 			"""
 		required: false
 		type: bool: default: false
-	}
-	runtime: {
-		description: "Available VRL runtimes."
-		required:    false
-		type: string: {
-			default: "ast"
-			enum: ast: """
-				Tree-walking runtime.
-
-				This is the only, and default, runtime.
-				"""
-		}
 	}
 	source: {
 		description: """
@@ -132,9 +117,6 @@ base: components: transforms: remap: configuration: {
 			[tz_database]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
 			"""
 		required: false
-		type: string: {
-			default: "local"
-			examples: ["local", "America/New_York", "EST5EDT"]
-		}
+		type: string: examples: ["local", "America/New_York", "EST5EDT"]
 	}
 }

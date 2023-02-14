@@ -1,8 +1,4 @@
-use std::str::FromStr;
-
-use aws_smithy_http::endpoint::Endpoint;
 use aws_types::region::Region;
-use http::Uri;
 use vector_config::configurable_component;
 
 /// Configuration of the region/endpoint to use when interacting with an AWS service.
@@ -10,10 +6,15 @@ use vector_config::configurable_component;
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 #[serde(default)]
 pub struct RegionOrEndpoint {
-    /// The AWS region to use.
+    /// The [AWS region][aws_region] of the target service.
+    ///
+    /// [aws_region]: https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints
+    #[configurable(metadata(docs::examples = "us-east-1"))]
     pub region: Option<String>,
 
-    /// The API endpoint of the service.
+    /// Custom endpoint for use with AWS-compatible services.
+    #[configurable(metadata(docs::examples = "http://127.0.0.0:5000/path/to/service"))]
+    #[configurable(metadata(docs::advanced))]
     pub endpoint: Option<String>,
 }
 
@@ -32,12 +33,9 @@ impl RegionOrEndpoint {
         }
     }
 
-    pub fn endpoint(&self) -> crate::Result<Option<Endpoint>> {
-        if let Some(endpoint) = &self.endpoint {
-            Ok(Some(Endpoint::immutable(Uri::from_str(endpoint)?)))
-        } else {
-            Ok(None)
-        }
+    pub fn endpoint(&self) -> crate::Result<Option<String>> {
+        let endpoint = self.endpoint.clone();
+        Ok(endpoint)
     }
 
     pub fn region(&self) -> Option<Region> {

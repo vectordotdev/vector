@@ -192,7 +192,7 @@ impl<T: Ord + Clone> Collection<T> {
     /// For *known fields*:
     ///
     /// - If a field exists in both collections, their `Kind`s are merged, or the `other` fields
-    ///   are used (depending on the configured [`Strategy`](merge::Strategy)).
+    ///   are used (depending on the configured [`Strategy`](crate::kind::merge::Strategy)).
     ///
     /// - If a field exists in one but not the other, the field is merged with the "unknown"
     ///   of the other if it exists, or just the field is used otherwise.
@@ -514,7 +514,7 @@ mod tests {
                 },
             ),
         ]) {
-            assert_eq!(this.is_superset(&other).is_ok(), want, "{}", title);
+            assert_eq!(this.is_superset(&other).is_ok(), want, "{title}");
         }
     }
 
@@ -693,7 +693,7 @@ mod tests {
             ),
         ] {
             this.merge(other, strategy);
-            assert_eq!(this, want, "{}", title);
+            assert_eq!(this, want, "{title}");
         }
     }
 
@@ -778,7 +778,7 @@ mod tests {
         ]) {
             this.anonymize();
 
-            assert_eq!(this, want, "{}", title);
+            assert_eq!(this, want, "{title}");
         }
     }
 
@@ -837,7 +837,7 @@ mod tests {
                 },
             ),
         ]) {
-            assert_eq!(this.to_string(), want.to_string(), "{}", title);
+            assert_eq!(this.to_string(), want.to_string(), "{title}");
         }
     }
 
@@ -893,7 +893,7 @@ mod tests {
                 },
             ),
         ]) {
-            assert_eq!(this.to_string(), want.to_string(), "{}", title);
+            assert_eq!(this.to_string(), want.to_string(), "{title}");
         }
     }
 
@@ -948,7 +948,7 @@ mod tests {
                 },
             ),
         ]) {
-            assert_eq!(this.reduced_kind(), want, "{}", title);
+            assert_eq!(this.reduced_kind(), want, "{title}");
         }
     }
 }

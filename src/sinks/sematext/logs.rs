@@ -17,20 +17,28 @@ use crate::{
         },
         Healthcheck, VectorSink,
     },
+    template::Template,
 };
 
 /// Configuration for the `sematext_logs` sink.
 #[configurable_component(sink("sematext_logs"))]
 #[derive(Clone, Debug)]
 pub struct SematextLogsConfig {
+    #[serde(default = "super::default_region")]
     #[configurable(derived)]
-    region: Option<Region>,
+    region: Region,
 
     /// The endpoint to send data to.
+    ///
+    /// Setting this option overrides the `region` option.
     #[serde(alias = "host")]
+    #[configurable(metadata(docs::examples = "http://127.0.0.1"))]
+    #[configurable(metadata(docs::examples = "https://example.com"))]
     endpoint: Option<String>,
 
     /// The token that will be used to write to Sematext.
+    #[configurable(metadata(docs::examples = "${SEMATEXT_TOKEN}"))]
+    #[configurable(metadata(docs::examples = "some-sematext-token"))]
     token: SensitiveString,
 
     #[configurable(derived)]
@@ -60,37 +68,35 @@ pub struct SematextLogsConfig {
 impl GenerateConfig for SematextLogsConfig {
     fn generate_config() -> toml::Value {
         toml::from_str(indoc! {r#"
-            region = "us"
             token = "${SEMATEXT_TOKEN}"
         "#})
         .unwrap()
     }
 }
 
+// https://sematext.com/docs/logs/index-events-via-elasticsearch-api/
+const US_ENDPOINT: &str = "https://logsene-receiver.sematext.com";
+const EU_ENDPOINT: &str = "https://logsene-receiver.eu.sematext.com";
+
 #[async_trait::async_trait]
 impl SinkConfig for SematextLogsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let endpoint = match (&self.endpoint, &self.region) {
-            (Some(host), None) => host.clone(),
-            (None, Some(Region::Us)) => "https://logsene-receiver.sematext.com".to_owned(),
-            (None, Some(Region::Eu)) => "https://logsene-receiver.eu.sematext.com".to_owned(),
-            (None, None) => "https://logsene-receiver.sematext.com".to_owned(),
-            (Some(_), Some(_)) => {
-                return Err("Only one of `region` and `host` can be set.".into());
-            }
+            (Some(endpoint), _) => endpoint.clone(),
+            (None, Region::Us) => US_ENDPOINT.to_owned(),
+            (None, Region::Eu) => EU_ENDPOINT.to_owned(),
         };
 
         let (sink, healthcheck) = ElasticsearchConfig {
             endpoints: vec![endpoint],
             compression: Compression::None,
-            doc_type: Some(
-                "\
-            logs"
-                    .to_string(),
-            ),
+            doc_type: "\
+                logs"
+                .to_string(),
             bulk: Some(BulkConfig {
-                action: None,
-                index: Some(self.token.inner().to_owned()),
+                index: Template::try_from(self.token.inner())
+                    .expect("unable to parse token as Template"),
+                ..Default::default()
             }),
             batch: self.batch,
             request: RequestConfig {
@@ -174,7 +180,6 @@ mod tests {
     #[tokio::test]
     async fn smoke() {
         let (mut config, cx) = load_sink::<SematextLogsConfig>(indoc! {r#"
-            region = "us"
             token = "mylogtoken"
         "#})
         .unwrap();
@@ -186,7 +191,6 @@ mod tests {
         // Swap out the host so we can force send it
         // to our local server
         config.endpoint = Some(format!("http://{}", addr));
-        config.region = None;
 
         let (sink, _) = config.build(cx).await.unwrap();
 
