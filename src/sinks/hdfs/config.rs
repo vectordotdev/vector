@@ -81,8 +81,9 @@ pub struct HdfsConfig {
     /// For more information, see the [HDFS Architecture][hdfs_arch] documentation.
     ///
     /// [hdfs_arch]: https://hadoop.apache.org/docs/r3.3.4/hadoop-project-dist/hadoop-hdfs/HdfsDesign.html#NameNode_and_DataNodes
-    #[configurable(derived)]
     #[serde(default)]
+    #[configurable(metadata(docs::examples = "default")]
+    #[configurable(metadata(docs::examples = "http://172.16.80.2:8090")]
     pub name_node: String,
 
     #[serde(flatten)]
