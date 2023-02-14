@@ -2,7 +2,6 @@ use std::convert::TryFrom;
 
 use aws_sdk_cloudwatchlogs::Client as CloudwatchLogsClient;
 
-use aws_sdk_cloudwatchlogs::Region;
 use chrono::Duration;
 use codecs::TextSerializerConfig;
 use futures::{stream, StreamExt};

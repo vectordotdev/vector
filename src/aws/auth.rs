@@ -1,7 +1,11 @@
+use std::time::Duration;
 
-
-use aws_credential_types::cache::CredentialsCache;
-use aws_credential_types::{provider::SharedCredentialsProvider, Credentials};
+use aws_config::{
+    default_provider::credentials::DefaultCredentialsChain, imds, sts::AssumeRoleProviderBuilder,
+};
+use aws_credential_types::{
+    cache::CredentialsCache, provider::SharedCredentialsProvider, Credentials,
+};
 use aws_types::region::Region;
 
 use serde_with::serde_as;
