@@ -104,7 +104,7 @@ components: sources: envoy_als: {
 			fields: {
 				"identifier.log_name": {
 					description: "The name of the log configured in the grpc access log config."
-					required:    false
+					required:    true
 					common:      true
 					type: string: {
 						default: ""
