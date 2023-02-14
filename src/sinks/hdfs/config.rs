@@ -139,12 +139,12 @@ impl HdfsConfig {
         let (framer, serializer) = self.encoding.build(SinkType::MessageBased)?;
         let encoder = Encoder::<Framer>::new(framer, serializer);
 
-        let request_builder = OpendalRequestBuilder {
+        let request_builder = OpenDALRequestBuilder {
             encoder: (transformer, encoder),
             compression: self.compression,
         };
 
-        let sink = OpendalSink::new(
+        let sink = OpenDALSink::new(
             op,
             request_builder,
             self.key_partitioner()?,

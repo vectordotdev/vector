@@ -7,7 +7,7 @@ use crate::{
     codecs::{Encoder, EncodingConfigWithFraming, SinkType},
     event::LogEvent,
     sinks::{
-        opendal_common::{OpendalRequest, OpendalRequestBuilder},
+        opendal_common::{OpenDALRequest, OpenDALRequestBuilder},
         util::{
             request_builder::{EncodeResult, RequestBuilder},
             Compression,
@@ -32,7 +32,7 @@ fn hdfs_generate_config() {
     crate::test_util::test_generate_config::<HdfsConfig>();
 }
 
-fn request_builder(sink_config: &HdfsConfig) -> OpendalRequestBuilder {
+fn request_builder(sink_config: &HdfsConfig) -> OpenDALRequestBuilder {
     let transformer = sink_config.encoding.transformer();
     let (framer, serializer) = sink_config
         .encoding
@@ -40,13 +40,13 @@ fn request_builder(sink_config: &HdfsConfig) -> OpendalRequestBuilder {
         .expect("encoding must build with success");
     let encoder = Encoder::<Framer>::new(framer, serializer);
 
-    OpendalRequestBuilder {
+    OpenDALRequestBuilder {
         encoder: (transformer, encoder),
         compression: sink_config.compression,
     }
 }
 
-fn build_request(compression: Compression) -> OpendalRequest {
+fn build_request(compression: Compression) -> OpenDALRequest {
     let sink_config = HdfsConfig {
         compression,
         ..default_config(
