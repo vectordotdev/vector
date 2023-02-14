@@ -13,7 +13,6 @@ use crate::codecs::Transformer;
 use crate::event::EventFinalizers;
 use crate::sinks::util::metadata::RequestMetadataBuilder;
 use crate::sinks::util::partitioner::KeyPartitioner;
-use crate::sinks::util::retries::RetryLogic;
 use crate::sinks::util::{request_builder::EncodeResult, Compression};
 use crate::sinks::BoxFuture;
 use crate::{
@@ -202,7 +201,9 @@ impl RequestBuilder<(String, Vec<Event>)> for OpendalRequestBuilder {
 
 #[derive(Debug)]
 pub struct OpendalResponse {
-    byte_size: usize,
+    pub count: usize,
+    pub events_byte_size: usize,
+    pub byte_size: usize,
 }
 
 impl DriverResponse for OpendalResponse {
@@ -211,8 +212,11 @@ impl DriverResponse for OpendalResponse {
     }
 
     fn events_sent(&self) -> CountByteSize {
-        // (events count, byte size)
-        CountByteSize(1, self.byte_size)
+        CountByteSize(self.count, self.events_byte_size)
+    }
+
+    fn bytes_sent(&self) -> Option<usize> {
+        Some(self.byte_size)
     }
 }
 
@@ -221,10 +225,12 @@ impl Service<OpendalRequest> for OpendalService {
     type Error = opendal::Error;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
+    // Emission of an internal event in case of errors is handled upstream by the caller.
     fn poll_ready(&mut self, _: &mut std::task::Context<'_>) -> Poll<Result<(), Self::Error>> {
         Poll::Ready(Ok(()))
     }
 
+    // Emission of internal events for errors and dropped events is handled upstream by the caller.
     fn call(&mut self, request: OpendalRequest) -> Self::Future {
         let byte_size = request.payload.len();
         let op = self.op.clone();
@@ -234,20 +240,12 @@ impl Service<OpendalRequest> for OpendalService {
                 .object(&request.metadata.partition_key.as_str())
                 .write(request.payload)
                 .await;
-            result.map(|_| OpendalResponse { byte_size })
+            result.map(|_| OpendalResponse {
+                count: request.metadata.count,
+                events_byte_size: request.metadata.byte_size,
+                byte_size,
+            })
         })
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct OpendalRetryLogic;
-
-impl RetryLogic for OpendalRetryLogic {
-    type Error = opendal::Error;
-    type Response = OpendalResponse;
-
-    fn is_retriable_error(&self, error: &Self::Error) -> bool {
-        error.is_temporary()
     }
 }
 
