@@ -60,6 +60,7 @@ pub struct HdfsConfig {
     /// The final file path with be like `{root}/{prefix}{suffix}`.
     #[serde(default)]
     pub root: String,
+    
     /// A prefix to apply to all keys.
     ///
     /// Prefixes are useful for partitioning objects, such as by creating an blob key that
