@@ -1,6 +1,3 @@
-#![cfg(feature = "aws-cloudwatch-metrics-integration-tests")]
-#![cfg(test)]
-
 use chrono::{offset::TimeZone, Utc};
 use rand::seq::SliceRandom;
 use vector_core::metric_tags;
