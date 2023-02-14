@@ -1,0 +1,22 @@
+version: '3'
+
+services:
+  namenode:
+    image: docker.io/bde2020/hadoop-namenode:${HDFS_VERSION}
+    ports:
+      - "9870:9870"
+      - "9000:9000"
+    environment:
+      - CLUSTER_NAME=test
+    env_file:
+      - ../../../tests/data/hdfs/hadoop.env
+  datanode:
+    image: docker.io/bde2020/hadoop-datanode:${HDFS_VERSION}
+    environment:
+      - SERVICE_PRECONDITION=namenode:9870
+    env_file:
+      - ../../../tests/data/hdfs/hadoop.env
+
+networks:
+  default:
+    name: ${VECTOR_NETWORK}

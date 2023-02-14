@@ -1,0 +1,13 @@
+args:
+- --features
+- hdfs-integration-tests
+- --lib
+- '::hdfs::'
+
+env:
+  HDFS_NAME_NODE: hdfs://namenode:9000
+  JAVA_HOME: /usr/lib/jvm/java-11-openjdk-arm64/
+  LD_LIBRARY_PATH: $LD_LIBRARY_PATH:/usr/lib/jvm/java-11-openjdk-arm64/lib/server/
+
+matrix:
+  version: ['2.0.0-hadoop3.2.1-java8']
