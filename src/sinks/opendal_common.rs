@@ -13,14 +13,12 @@ use std::{num::NonZeroUsize, task::Poll};
 use bytes::Bytes;
 use codecs::encoding::Framer;
 use futures::{stream::BoxStream, StreamExt};
-use metrics::counter;
 use opendal::Operator;
 use snafu::Snafu;
 use tower::Service;
 use tracing::Instrument;
 use vector_common::{
     finalization::{EventStatus, Finalizable},
-    internal_event::InternalEvent,
     request_metadata::{MetaDescriptive, RequestMetadata},
 };
 use vector_core::{
@@ -103,6 +101,8 @@ impl OpenDALSink {
                 }
             })
             .into_driver(OpenDALService::new(self.op.clone()))
+            // TODO: set protocl with services scheme instead hardcoded file
+            .protocol("file")
             .run()
             .await
     }
@@ -247,35 +247,12 @@ impl Service<OpenDALRequest> for OpenDALService {
                 .write(request.payload)
                 .in_current_span()
                 .await;
-            result.map(|_| {
-                emit!(OpenDALBytesSent { byte_size });
-
-                OpenDALResponse {
-                    count: request.metadata.count,
-                    events_byte_size: request.metadata.byte_size,
-                    byte_size,
-                }
+            result.map(|_| OpenDALResponse {
+                count: request.metadata.count,
+                events_byte_size: request.metadata.byte_size,
+                byte_size,
             })
         })
-    }
-}
-
-pub struct OpenDALBytesSent {
-    pub byte_size: usize,
-}
-
-impl InternalEvent for OpenDALBytesSent {
-    /// TODO: we should return different protocl for opendal services.
-    fn emit(self) {
-        trace!(
-            message = "Bytes sent.",
-            protocol = "file",
-            byte_size = %self.byte_size,
-        );
-        counter!(
-            "component_sent_bytes_total", self.byte_size as u64,
-            "protocol" => "file",
-        );
     }
 }
 
