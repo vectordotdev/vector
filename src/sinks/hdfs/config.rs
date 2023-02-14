@@ -52,7 +52,6 @@ use crate::{
 #[configurable_component(sink("hdfs"))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
-
 pub struct HdfsConfig {
     /// The root path of hdfs services.
     ///
