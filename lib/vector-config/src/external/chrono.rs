@@ -1,12 +1,15 @@
+use chrono::{DateTime, TimeZone};
+use serde_json::Value;
+
 use crate::{
     schema::generate_string_schema,
     schemars::{gen::SchemaGenerator, schema::SchemaObject},
-    Configurable, GenerateError, Metadata,
+    Configurable, GenerateError, Metadata, ToValue,
 };
 
-impl<TZ> Configurable for chrono::DateTime<TZ>
+impl<TZ> Configurable for DateTime<TZ>
 where
-    TZ: chrono::TimeZone,
+    TZ: TimeZone,
 {
     fn metadata() -> Metadata<Self> {
         let mut metadata = Metadata::default();
@@ -16,5 +19,15 @@ where
 
     fn generate_schema(_: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
         Ok(generate_string_schema())
+    }
+}
+
+impl<TZ> ToValue for DateTime<TZ>
+where
+    Self: ToString,
+    TZ: TimeZone,
+{
+    fn to_value(&self) -> Value {
+        Value::String(self.to_string())
     }
 }
