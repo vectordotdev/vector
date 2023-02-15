@@ -344,6 +344,7 @@ pub fn configurable_component_impl(args: TokenStream, item: TokenStream) -> Toke
 
     // Generate and apply all of the necessary derives.
     let mut derives = Punctuated::<Path, Comma>::new();
+
     derives.push(parse_quote_spanned! {input.ident.span()=>
         ::vector_config_macros::Configurable
     });
