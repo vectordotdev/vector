@@ -2087,12 +2087,12 @@ fn test_output_schema_definition_json_vector_namespace() {
             .with_metadata_field(
                 &owned_value_path!("datadog_agent", "ddsource"),
                 Kind::bytes(),
-                None
+                Some("source")
             )
             .with_metadata_field(
                 &owned_value_path!("datadog_agent", "ddtags"),
                 Kind::bytes(),
-                None
+                Some("tags")
             )
             .with_metadata_field(
                 &owned_value_path!("datadog_agent", "hostname"),
@@ -2102,12 +2102,12 @@ fn test_output_schema_definition_json_vector_namespace() {
             .with_metadata_field(
                 &owned_value_path!("datadog_agent", "service"),
                 Kind::bytes(),
-                None
+                Some("service")
             )
             .with_metadata_field(
                 &owned_value_path!("datadog_agent", "status"),
                 Kind::bytes(),
-                None
+                Some("severity")
             )
             .with_metadata_field(
                 &owned_value_path!("datadog_agent", "timestamp"),
