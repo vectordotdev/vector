@@ -46,7 +46,11 @@ async fn hdfs_healthchecks_valid_node_node() {
 
 #[tokio::test]
 async fn hdfs_rotate_files_after_the_buffer_size_is_reached() {
-    let config = config(&hdfs_name_node(), 10);
+    let mut config = config(&hdfs_name_node(), 10);
+    // Include event batch id in prefix to make sure the generated files are
+    // in order.
+    config.prefix = "%F-{{ .i }}-".to_string();
+
     let op = config.build_operator().unwrap();
     let sink = config.build_processor(op.clone()).unwrap();
 
@@ -81,12 +85,8 @@ async fn hdfs_rotate_files_after_the_buffer_size_is_reached() {
         .into_iter()
         .filter(|o| o.blocking_mode().unwrap() == ObjectMode::FILE)
         .collect();
-    objects.sort_by(|l, r| {
-        let l = l.blocking_metadata().unwrap().last_modified().unwrap();
-        let r = r.blocking_metadata().unwrap().last_modified().unwrap();
-
-        l.cmp(&r)
-    });
+    // Sort file path in order, becuase we have the event id in path.
+    objects.sort_by(|l, r| l.path().cmp(r.path()));
     assert_eq!(objects.len(), 3);
 
     let mut response_lines: Vec<Vec<String>> = Vec::new();
@@ -102,7 +102,6 @@ async fn hdfs_rotate_files_after_the_buffer_size_is_reached() {
     assert_eq!(&lines[20..30], response_lines[2].as_slice());
 }
 
-#[allow(dead_code)]
 fn hdfs_name_node() -> String {
     std::env::var("HDFS_NAME_NODE").unwrap_or_else(|_| "default".into())
 }
