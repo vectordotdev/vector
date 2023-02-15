@@ -286,11 +286,11 @@ impl TransformConfig for RemapConfig {
             dropped_definition = dropped_definition.merge(
                 input_definition
                     .clone()
-                    .with_metadata_field(&owned_value_path!("reason"), Kind::bytes())
-                    .with_metadata_field(&owned_value_path!("message"), Kind::bytes())
-                    .with_metadata_field(&owned_value_path!("component_id"), Kind::bytes())
-                    .with_metadata_field(&owned_value_path!("component_type"), Kind::bytes())
-                    .with_metadata_field(&owned_value_path!("component_kind"), Kind::bytes()),
+                    .with_metadata_field(&owned_value_path!("reason"), Kind::bytes(), None)
+                    .with_metadata_field(&owned_value_path!("message"), Kind::bytes(), None)
+                    .with_metadata_field(&owned_value_path!("component_id"), Kind::bytes(), None)
+                    .with_metadata_field(&owned_value_path!("component_type"), Kind::bytes(), None)
+                    .with_metadata_field(&owned_value_path!("component_kind"), Kind::bytes(), None),
             );
         }
 

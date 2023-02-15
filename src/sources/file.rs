@@ -950,17 +950,23 @@ mod tests {
             definition,
             Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
                 .with_meaning(OwnedTargetPath::event_root(), "message")
-                .with_metadata_field(&owned_value_path!("vector", "source_type"), Kind::bytes())
+                .with_metadata_field(
+                    &owned_value_path!("vector", "source_type"),
+                    Kind::bytes(),
+                    None
+                )
                 .with_metadata_field(
                     &owned_value_path!("vector", "ingest_timestamp"),
-                    Kind::timestamp()
+                    Kind::timestamp(),
+                    None
                 )
                 .with_metadata_field(
                     &owned_value_path!("file", "host"),
-                    Kind::bytes().or_undefined()
+                    Kind::bytes().or_undefined(),
+                    Some("host")
                 )
-                .with_metadata_field(&owned_value_path!("file", "offset"), Kind::integer())
-                .with_metadata_field(&owned_value_path!("file", "path"), Kind::bytes())
+                .with_metadata_field(&owned_value_path!("file", "offset"), Kind::integer(), None)
+                .with_metadata_field(&owned_value_path!("file", "path"), Kind::bytes(), None)
         )
     }
 

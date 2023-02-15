@@ -964,21 +964,36 @@ mod tests {
         let expected_definition =
             Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
                 .with_meaning(OwnedTargetPath::event_root(), "message")
-                .with_metadata_field(&owned_value_path!("vector", "source_type"), Kind::bytes())
-                .with_metadata_field(&owned_value_path!("fluent", "tag"), Kind::bytes())
-                .with_metadata_field(&owned_value_path!("fluent", "timestamp"), Kind::timestamp())
+                .with_metadata_field(
+                    &owned_value_path!("vector", "source_type"),
+                    Kind::bytes(),
+                    None,
+                )
+                .with_metadata_field(&owned_value_path!("fluent", "tag"), Kind::bytes(), None)
+                .with_metadata_field(
+                    &owned_value_path!("fluent", "timestamp"),
+                    Kind::timestamp(),
+                    Some("timestamp"),
+                )
                 .with_metadata_field(
                     &owned_value_path!("fluent", "record"),
                     Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
+                    None,
                 )
                 .with_metadata_field(
                     &owned_value_path!("vector", "ingest_timestamp"),
                     Kind::timestamp(),
+                    None,
                 )
-                .with_metadata_field(&owned_value_path!("fluent", "host"), Kind::bytes())
+                .with_metadata_field(
+                    &owned_value_path!("fluent", "host"),
+                    Kind::bytes(),
+                    Some("host"),
+                )
                 .with_metadata_field(
                     &owned_value_path!("fluent", "tls_client_metadata"),
                     Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
+                    None,
                 );
 
         assert_eq!(definition, expected_definition)

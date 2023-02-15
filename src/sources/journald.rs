@@ -1469,22 +1469,30 @@ mod tests {
 
         let expected_definition =
             Definition::new_with_default_metadata(Kind::bytes().or_null(), [LogNamespace::Vector])
-                .with_metadata_field(&owned_value_path!("vector", "source_type"), Kind::bytes())
+                .with_metadata_field(
+                    &owned_value_path!("vector", "source_type"),
+                    Kind::bytes(),
+                    None,
+                )
                 .with_metadata_field(
                     &owned_value_path!("vector", "ingest_timestamp"),
                     Kind::timestamp(),
+                    None,
                 )
                 .with_metadata_field(
                     &owned_value_path!(JournaldConfig::NAME, "metadata"),
                     Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
+                    None,
                 )
                 .with_metadata_field(
                     &owned_value_path!(JournaldConfig::NAME, "timestamp"),
                     Kind::timestamp().or_undefined(),
+                    Some("timestamp"),
                 )
                 .with_metadata_field(
                     &owned_value_path!(JournaldConfig::NAME, "host"),
                     Kind::bytes().or_undefined(),
+                    Some("host"),
                 );
 
         assert_eq!(definition, expected_definition)

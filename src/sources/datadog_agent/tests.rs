@@ -2086,27 +2086,44 @@ fn test_output_schema_definition_json_vector_namespace() {
         Definition::new_with_default_metadata(Kind::json(), [LogNamespace::Vector])
             .with_metadata_field(
                 &owned_value_path!("datadog_agent", "ddsource"),
-                Kind::bytes()
+                Kind::bytes(),
+                None
             )
-            .with_metadata_field(&owned_value_path!("datadog_agent", "ddtags"), Kind::bytes())
+            .with_metadata_field(
+                &owned_value_path!("datadog_agent", "ddtags"),
+                Kind::bytes(),
+                None
+            )
             .with_metadata_field(
                 &owned_value_path!("datadog_agent", "hostname"),
-                Kind::bytes()
+                Kind::bytes(),
+                Some("host")
             )
             .with_metadata_field(
                 &owned_value_path!("datadog_agent", "service"),
-                Kind::bytes()
+                Kind::bytes(),
+                None
             )
-            .with_metadata_field(&owned_value_path!("datadog_agent", "status"), Kind::bytes())
+            .with_metadata_field(
+                &owned_value_path!("datadog_agent", "status"),
+                Kind::bytes(),
+                None
+            )
             .with_metadata_field(
                 &owned_value_path!("datadog_agent", "timestamp"),
-                Kind::timestamp()
+                Kind::timestamp(),
+                Some("timestamp")
             )
             .with_metadata_field(
                 &owned_value_path!("vector", "ingest_timestamp"),
-                Kind::timestamp()
+                Kind::timestamp(),
+                None
             )
-            .with_metadata_field(&owned_value_path!("vector", "source_type"), Kind::bytes())
+            .with_metadata_field(
+                &owned_value_path!("vector", "source_type"),
+                Kind::bytes(),
+                None
+            )
     )
 }
 
@@ -2127,27 +2144,44 @@ fn test_output_schema_definition_bytes_vector_namespace() {
         Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
             .with_metadata_field(
                 &owned_value_path!("datadog_agent", "ddsource"),
-                Kind::bytes()
+                Kind::bytes(),
+                None
             )
-            .with_metadata_field(&owned_value_path!("datadog_agent", "ddtags"), Kind::bytes())
+            .with_metadata_field(
+                &owned_value_path!("datadog_agent", "ddtags"),
+                Kind::bytes(),
+                None
+            )
             .with_metadata_field(
                 &owned_value_path!("datadog_agent", "hostname"),
-                Kind::bytes()
+                Kind::bytes(),
+                Some("host")
             )
             .with_metadata_field(
                 &owned_value_path!("datadog_agent", "service"),
-                Kind::bytes()
+                Kind::bytes(),
+                None
             )
-            .with_metadata_field(&owned_value_path!("datadog_agent", "status"), Kind::bytes())
+            .with_metadata_field(
+                &owned_value_path!("datadog_agent", "status"),
+                Kind::bytes(),
+                None
+            )
             .with_metadata_field(
                 &owned_value_path!("datadog_agent", "timestamp"),
-                Kind::timestamp()
+                Kind::timestamp(),
+                Some("timestamp")
             )
             .with_metadata_field(
                 &owned_value_path!("vector", "ingest_timestamp"),
-                Kind::timestamp()
+                Kind::timestamp(),
+                None
             )
-            .with_metadata_field(&owned_value_path!("vector", "source_type"), Kind::bytes())
+            .with_metadata_field(
+                &owned_value_path!("vector", "source_type"),
+                Kind::bytes(),
+                None
+            )
             .with_meaning(OwnedTargetPath::event_root(), "message")
     )
 }

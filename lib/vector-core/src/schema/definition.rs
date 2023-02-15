@@ -226,10 +226,11 @@ impl Definition {
         });
 
         let vector_definition = if self.log_namespaces.contains(&LogNamespace::Vector) {
-            Some(
-                self.clone()
-                    .with_metadata_field(&vector_path.with_field_prefix(prefix), kind),
-            )
+            Some(self.clone().with_metadata_field(
+                &vector_path.with_field_prefix(prefix),
+                kind,
+                meaning,
+            ))
         } else {
             None
         };
@@ -256,7 +257,7 @@ impl Definition {
     ) -> Self {
         match target_path.prefix {
             PathPrefix::Event => self.with_event_field(&target_path.path, kind, meaning),
-            PathPrefix::Metadata => self.with_metadata_field(&target_path.path, kind),
+            PathPrefix::Metadata => self.with_metadata_field(&target_path.path, kind, meaning),
         }
     }
 
@@ -274,8 +275,6 @@ impl Definition {
         kind: Kind,
         meaning: Option<&str>,
     ) -> Self {
-        let meaning = meaning.map(ToOwned::to_owned);
-
         if !path.is_root() {
             assert!(
                 self.event_kind.as_object().is_some(),
@@ -287,7 +286,7 @@ impl Definition {
 
         if let Some(meaning) = meaning {
             self.meaning.insert(
-                meaning,
+                meaning.to_owned(),
                 MeaningPointer::Valid(OwnedTargetPath::event(path.clone())),
             );
         }
@@ -332,7 +331,12 @@ impl Definition {
     /// - If the path is not root, and the definition does not allow the type to be an object
     /// - Provided path has one or more coalesced segments (e.g. `.(foo | bar)`).
     #[must_use]
-    pub fn with_metadata_field(mut self, path: &OwnedValuePath, kind: Kind) -> Self {
+    pub fn with_metadata_field(
+        mut self,
+        path: &OwnedValuePath,
+        kind: Kind,
+        meaning: Option<&str>,
+    ) -> Self {
         if !path.is_root() {
             assert!(
                 self.metadata_kind.as_object().is_some(),
@@ -341,6 +345,14 @@ impl Definition {
         }
 
         self.metadata_kind.set_at_path(path, kind);
+
+        if let Some(meaning) = meaning {
+            self.meaning.insert(
+                meaning.to_owned(),
+                MeaningPointer::Valid(OwnedTargetPath::metadata(path.clone())),
+            );
+        }
+
         self
     }
 
@@ -793,6 +805,34 @@ mod tests {
         got = got.unknown_fields(Kind::bytes().or_integer());
 
         assert_eq!(got, want);
+    }
+
+    #[test]
+    fn test_meaning_path() {
+        let def = Definition::new(
+            Kind::object(Collection::empty()),
+            Kind::object(Collection::empty()),
+            [LogNamespace::Legacy],
+        )
+        .with_event_field(
+            &owned_value_path!("foo"),
+            Kind::boolean(),
+            Some("foo_meaning"),
+        )
+        .with_metadata_field(
+            &owned_value_path!("bar"),
+            Kind::boolean(),
+            Some("bar_meaning"),
+        );
+
+        assert_eq!(
+            def.meaning_path("foo_meaning").unwrap(),
+            &OwnedTargetPath::event(owned_value_path!("foo"))
+        );
+        assert_eq!(
+            def.meaning_path("bar_meaning").unwrap(),
+            &OwnedTargetPath::metadata(owned_value_path!("bar"))
+        );
     }
 
     #[test]

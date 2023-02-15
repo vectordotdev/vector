@@ -1295,22 +1295,30 @@ mod tests {
         let expected_definition =
             Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
                 .with_meaning(OwnedTargetPath::event_root(), "message")
-                .with_metadata_field(&owned_value_path!("vector", "source_type"), Kind::bytes())
+                .with_metadata_field(
+                    &owned_value_path!("vector", "source_type"),
+                    Kind::bytes(),
+                    None,
+                )
                 .with_metadata_field(
                     &owned_value_path!(SimpleHttpConfig::NAME, "path"),
                     Kind::bytes(),
+                    None,
                 )
                 .with_metadata_field(
                     &owned_value_path!(SimpleHttpConfig::NAME, "headers"),
                     Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
+                    None,
                 )
                 .with_metadata_field(
                     &owned_value_path!(SimpleHttpConfig::NAME, "query_parameters"),
                     Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
+                    None,
                 )
                 .with_metadata_field(
                     &owned_value_path!("vector", "ingest_timestamp"),
                     Kind::timestamp(),
+                    None,
                 );
 
         assert_eq!(definition, expected_definition)

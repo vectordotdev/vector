@@ -524,15 +524,24 @@ pub mod test {
         let expected_definition =
             Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
                 .with_meaning(OwnedTargetPath::event_root(), "message")
-                .with_metadata_field(&owned_value_path!("vector", "source_type"), Kind::bytes())
+                .with_metadata_field(
+                    &owned_value_path!("vector", "source_type"),
+                    Kind::bytes(),
+                    None,
+                )
                 .with_metadata_field(
                     &owned_value_path!("vector", "ingest_timestamp"),
                     Kind::timestamp(),
+                    None,
                 )
-                .with_metadata_field(&owned_value_path!("amqp", "timestamp"), Kind::timestamp())
-                .with_metadata_field(&owned_value_path!("amqp", "routing"), Kind::bytes())
-                .with_metadata_field(&owned_value_path!("amqp", "exchange"), Kind::bytes())
-                .with_metadata_field(&owned_value_path!("amqp", "offset"), Kind::integer());
+                .with_metadata_field(
+                    &owned_value_path!("amqp", "timestamp"),
+                    Kind::timestamp(),
+                    Some("timestamp"),
+                )
+                .with_metadata_field(&owned_value_path!("amqp", "routing"), Kind::bytes(), None)
+                .with_metadata_field(&owned_value_path!("amqp", "exchange"), Kind::bytes(), None)
+                .with_metadata_field(&owned_value_path!("amqp", "offset"), Kind::integer(), None);
 
         assert_eq!(definition, expected_definition);
     }
