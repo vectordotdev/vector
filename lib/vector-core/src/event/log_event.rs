@@ -464,6 +464,17 @@ impl LogEvent {
         }
     }
 
+    /// Removes the `timestamp` from the event. This is either from the "timestamp" semantic meaning (Vector namespace)
+    /// or from the timestamp key set on the "Global Log Schema" (Legacy namespace).
+    pub fn remove_timestamp(&mut self) -> Option<Value> {
+        match self.namespace() {
+            LogNamespace::Vector => self
+                .find_key_by_meaning("timestamp")
+                .and_then(|key| self.remove(key.as_str())),
+            LogNamespace::Legacy => self.remove((PathPrefix::Event, log_schema().timestamp_key())),
+        }
+    }
+
     /// Fetches the `host` of the event. This is either from the "host" semantic meaning (Vector namespace)
     /// or from the host key set on the "Global Log Schema" (Legacy namespace).
     pub fn get_host(&self) -> Option<&Value> {

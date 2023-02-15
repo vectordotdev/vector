@@ -2,14 +2,16 @@ use bytes::Bytes;
 use futures::{FutureExt, SinkExt};
 use http::{Request, StatusCode, Uri};
 use serde_json::json;
+use value::Kind;
 use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
 
 use crate::{
     codecs::Transformer,
-    config::{log_schema, AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
+    config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     event::{Event, Value},
     http::HttpClient,
+    schema,
     sinks::util::{
         http::{BatchedHttpSink, HttpEventEncoder, HttpSink},
         BatchConfig, BoxedRawValue, JsonArrayBuffer, SinkBatchSettings, TowerRequestConfig,
@@ -110,7 +112,10 @@ impl SinkConfig for HoneycombConfig {
     }
 
     fn input(&self) -> Input {
-        Input::log()
+        let requirement =
+            schema::Requirement::empty().optional_meaning("timestamp", Kind::timestamp());
+
+        Input::log().with_schema_requirement(requirement)
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
@@ -127,8 +132,7 @@ impl HttpEventEncoder<serde_json::Value> for HoneycombEventEncoder {
         self.transformer.transform(&mut event);
         let mut log = event.into_log();
 
-        let timestamp = if let Some(Value::Timestamp(ts)) = log.remove(log_schema().timestamp_key())
-        {
+        let timestamp = if let Some(Value::Timestamp(ts)) = log.remove_timestamp() {
             ts
         } else {
             chrono::Utc::now()
