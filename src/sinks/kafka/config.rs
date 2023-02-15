@@ -1,8 +1,9 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, time::Duration};
 
 use codecs::JsonSerializerConfig;
 use futures::FutureExt;
 use rdkafka::ClientConfig;
+use serde_with::serde_as;
 use vector_config::configurable_component;
 
 use crate::{
@@ -15,30 +16,43 @@ use crate::{
         util::{BatchConfig, NoDefaultsBatchSettings},
         Healthcheck, VectorSink,
     },
+    template::Template,
 };
 
 pub(crate) const QUEUED_MIN_MESSAGES: u64 = 100000;
 
 /// Configuration for the `kafka` sink.
+#[serde_as]
 #[configurable_component(sink("kafka"))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct KafkaSinkConfig {
-    /// A comma-separated list of the initial Kafka brokers to connect to.
+    /// A comma-separated list of Kafka bootstrap servers.
     ///
-    /// Each value must be in the form of `<host>` or `<host>:<port>`, and separated by a comma.
+    /// These are the servers in a Kafka cluster that a client should use to "bootstrap" its
+    /// connection to the cluster, allowing discovering all other hosts in the cluster.
+    ///
+    /// Must be in the form of `host:port`, and comma-separated.
+    #[configurable(metadata(docs::examples = "10.14.22.123:9092,10.14.23.332:9092"))]
     pub bootstrap_servers: String,
 
     /// The Kafka topic name to write events to.
     #[configurable(metadata(docs::templateable))]
-    pub topic: String,
+    #[configurable(metadata(
+        docs::examples = "topic-1234",
+        docs::examples = "logs-{{unit}}-%Y-%m-%d"
+    ))]
+    pub topic: Template,
 
     /// The log field name or tags key to use for the topic key.
     ///
-    /// If the field does not exist in the log or in tags, a blank value will be used. If unspecified, the key is not sent.
+    /// If the field does not exist in the log or in tags, a blank value will be used. If
+    /// unspecified, the key is not sent.
     ///
-    /// Kafka uses a hash of the key to choose the partition or uses round-robin if the record has no key.
+    /// Kafka uses a hash of the key to choose the partition or uses round-robin if the record has
+    /// no key.
     #[configurable(metadata(docs::advanced))]
+    #[configurable(metadata(docs::examples = "user_id"))]
     pub key_field: Option<String>,
 
     #[configurable(derived)]
@@ -60,14 +74,18 @@ pub struct KafkaSinkConfig {
     pub auth: KafkaAuthConfig,
 
     /// Default timeout, in milliseconds, for network requests.
+    #[serde_as(as = "serde_with::DurationMilliSeconds<u64>")]
     #[serde(default = "default_socket_timeout_ms")]
+    #[configurable(metadata(docs::examples = 30000, docs::examples = 60000))]
     #[configurable(metadata(docs::advanced))]
-    pub socket_timeout_ms: u64,
+    pub socket_timeout_ms: Duration,
 
     /// Local message timeout, in milliseconds.
+    #[serde_as(as = "serde_with::DurationMilliSeconds<u64>")]
+    #[configurable(metadata(docs::examples = 150000, docs::examples = 450000))]
     #[serde(default = "default_message_timeout_ms")]
     #[configurable(metadata(docs::advanced))]
-    pub message_timeout_ms: u64,
+    pub message_timeout_ms: Duration,
 
     /// A map of advanced options to pass directly to the underlying `librdkafka` client.
     ///
@@ -75,6 +93,7 @@ pub struct KafkaSinkConfig {
     ///
     /// [config_props_docs]: https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md
     #[serde(default)]
+    #[configurable(metadata(docs::examples = "example_librdkafka_options()"))]
     #[configurable(metadata(docs::advanced))]
     #[configurable(metadata(
         docs::additional_props_description = "A librdkafka configuration option."
@@ -86,6 +105,7 @@ pub struct KafkaSinkConfig {
     /// If omitted, no headers will be written.
     #[configurable(metadata(docs::advanced))]
     #[serde(alias = "headers_field")] // accidentally released as `headers_field` in 0.18
+    #[configurable(metadata(docs::examples = "headers"))]
     pub headers_key: Option<String>,
 
     #[configurable(derived)]
@@ -97,12 +117,23 @@ pub struct KafkaSinkConfig {
     pub acknowledgements: AcknowledgementsConfig,
 }
 
-const fn default_socket_timeout_ms() -> u64 {
-    60000 // default in librdkafka
+const fn default_socket_timeout_ms() -> Duration {
+    Duration::from_millis(60000) // default in librdkafka
 }
 
-const fn default_message_timeout_ms() -> u64 {
-    300000 // default in librdkafka
+const fn default_message_timeout_ms() -> Duration {
+    Duration::from_millis(300000) // default in librdkafka
+}
+
+fn example_librdkafka_options() -> HashMap<String, String> {
+    HashMap::<_, _>::from_iter(
+        [
+            ("client.id".to_string(), "${ENV_VAR}".to_string()),
+            ("fetch.error.backoff.ms".to_string(), "1000".to_string()),
+            ("socket.send.buffer.bytes".to_string(), "100".to_string()),
+        ]
+        .into_iter(),
+    )
 }
 
 /// Used to determine the options to set in configs, since both Kafka consumers and producers have
@@ -118,7 +149,10 @@ impl KafkaSinkConfig {
         let mut client_config = ClientConfig::new();
         client_config
             .set("bootstrap.servers", &self.bootstrap_servers)
-            .set("socket.timeout.ms", &self.socket_timeout_ms.to_string())
+            .set(
+                "socket.timeout.ms",
+                &self.socket_timeout_ms.as_millis().to_string(),
+            )
             .set("statistics.interval.ms", "1000");
 
         self.auth.apply(&mut client_config)?;
@@ -128,7 +162,10 @@ impl KafkaSinkConfig {
             KafkaRole::Producer => {
                 client_config
                     .set("compression.codec", &to_string(self.compression))
-                    .set("message.timeout.ms", &self.message_timeout_ms.to_string());
+                    .set(
+                        "message.timeout.ms",
+                        &self.message_timeout_ms.as_millis().to_string(),
+                    );
 
                 if let Some(value) = self.batch.timeout_secs {
                     // Delay in milliseconds to wait for messages in the producer queue to accumulate before
@@ -209,7 +246,7 @@ impl GenerateConfig for KafkaSinkConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
             bootstrap_servers: "10.14.22.123:9092,10.14.23.332:9092".to_owned(),
-            topic: "topic-1234".to_owned(),
+            topic: Template::try_from("topic-1234".to_owned()).unwrap(),
             key_field: Some("user_id".to_owned()),
             encoding: JsonSerializerConfig::default().into(),
             batch: Default::default(),
