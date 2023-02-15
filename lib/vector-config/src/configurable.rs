@@ -1,3 +1,8 @@
+#![deny(missing_docs)]
+
+use schemars::{gen::SchemaGenerator, schema::SchemaObject};
+use serde_json::Value;
+
 use crate::{GenerateError, Metadata};
 
 /// A type that can be represented in a Vector configuration.
@@ -55,7 +60,12 @@ where
     ///
     /// If an error occurs while generating the schema, an error variant will be returned describing
     /// the issue.
-    fn generate_schema(
-        gen: &mut schemars::gen::SchemaGenerator,
-    ) -> Result<schemars::schema::SchemaObject, GenerateError>;
+    fn generate_schema(gen: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError>;
+}
+
+/// A type that can be converted directly to a `serde_json::Value`. This is used when translating
+/// the default value in a `Metadata` into a schema object.
+pub trait ToValue {
+    /// Convert this value into a `serde_json::Value`. Must not fail.
+    fn to_value(&self) -> Value;
 }

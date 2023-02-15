@@ -1,4 +1,5 @@
 use serde::Serializer;
+use serde_json::Value;
 use std::fmt;
 use vector_config::{
     schema::{
@@ -6,7 +7,7 @@ use vector_config::{
         generate_one_of_schema,
     },
     schemars::{gen::SchemaGenerator, schema::SchemaObject},
-    Configurable, GenerateError, Metadata,
+    Configurable, GenerateError, Metadata, ToValue,
 };
 use vector_config_common::attributes::CustomAttribute;
 
@@ -165,6 +166,12 @@ impl Configurable for Concurrency {
             adaptive_schema,
             fixed_schema,
         ]))
+    }
+}
+
+impl ToValue for Concurrency {
+    fn to_value(&self) -> Value {
+        serde_json::to_value(self).expect("Could not convert concurrency to JSON")
     }
 }
 

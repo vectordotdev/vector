@@ -35,8 +35,7 @@ pub fn derive_configurable_impl(input: TokenStream) -> TokenStream {
         let where_clause = generics.make_where_clause();
         for typ in generic_field_types {
             let ty = &typ.ident;
-            let predicate =
-                parse_quote! { #ty: ::vector_config::Configurable + ::serde::Serialize };
+            let predicate = parse_quote! { #ty: ::vector_config::Configurable + ::serde::Serialize + ::vector_config::ToValue };
 
             where_clause.predicates.push(predicate);
         }
@@ -56,6 +55,8 @@ pub fn derive_configurable_impl(input: TokenStream) -> TokenStream {
             Data::Enum(variants) => build_enum_generate_schema_fn(variants),
         },
     };
+
+    let to_value_fn = build_to_value_fn(&container);
 
     let name = container.ident();
     let ref_name = container.name();
@@ -95,6 +96,10 @@ pub fn derive_configurable_impl(input: TokenStream) -> TokenStream {
 
                 #generate_schema_fn
             }
+
+            impl #impl_generics ::vector_config::ToValue for #name #ty_generics #where_clause {
+                #to_value_fn
+            }
         };
     };
 
@@ -109,6 +114,15 @@ fn build_metadata_fn(container: &Container<'_>) -> proc_macro2::TokenStream {
         fn metadata() -> ::vector_config::Metadata<Self> {
             #container_metadata
             #meta_ident
+        }
+    }
+}
+
+fn build_to_value_fn(_container: &Container<'_>) -> proc_macro2::TokenStream {
+    quote! {
+        fn to_value(&self) -> ::vector_config::serde_json::Value {
+            ::vector_config::serde_json::to_value(self)
+                .expect("Could not convert value to JSON")
         }
     }
 }

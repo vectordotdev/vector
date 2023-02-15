@@ -8,12 +8,11 @@ use schemars::{
         SchemaObject, SingleOrVec, SubschemaValidation,
     },
 };
-use serde::Serialize;
 use serde_json::{Map, Value};
 
 use crate::{
     num::ConfigurableNumber, Configurable, ConfigurableString, CustomAttribute, GenerateError,
-    Metadata,
+    Metadata, ToValue,
 };
 
 /// Applies metadata to the given schema.
@@ -22,7 +21,7 @@ use crate::{
 /// patterns, etc), as well as actual arbitrary key/value data.
 pub fn apply_metadata<T>(schema: &mut SchemaObject, metadata: Metadata<T>)
 where
-    T: Configurable + Serialize,
+    T: Configurable + ToValue,
 {
     let base_metadata = T::metadata();
 
@@ -58,9 +57,7 @@ where
     }
 
     // If a default value was given, serialize it.
-    let schema_default = metadata
-        .default_value()
-        .map(|v| serde_json::to_value(v).expect("default value should never fail to serialize"));
+    let schema_default = metadata.default_value().map(ToValue::to_value);
 
     // Take the existing schema metadata, if any, or create a default version of it, and then apply
     // all of our newly-calculated values to it.
@@ -224,7 +221,7 @@ where
 
 pub fn generate_array_schema<T>(gen: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError>
 where
-    T: Configurable + Serialize,
+    T: Configurable + ToValue,
 {
     // Generate the actual schema for the element type `T`.
     let element_schema = get_or_generate_schema::<T>(gen, None)?;
@@ -241,7 +238,7 @@ where
 
 pub fn generate_set_schema<T>(gen: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError>
 where
-    T: Configurable + Serialize,
+    T: Configurable + ToValue,
 {
     // Generate the actual schema for the element type `T`.
     let element_schema = get_or_generate_schema::<T>(gen, None)?;
@@ -259,7 +256,7 @@ where
 
 pub fn generate_map_schema<V>(gen: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError>
 where
-    V: Configurable + Serialize,
+    V: Configurable + ToValue,
 {
     // Generate the actual schema for the element type `V`.
     let element_schema = get_or_generate_schema::<V>(gen, None)?;
@@ -296,7 +293,7 @@ pub fn generate_struct_schema(
 
 pub fn generate_optional_schema<T>(gen: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError>
 where
-    T: Configurable + Serialize,
+    T: Configurable + ToValue,
 {
     // Optional schemas are generally very simple in practice, but because of how we memoize schema
     // generation and use references to schema definitions, we have to handle quite a few cases
@@ -483,7 +480,7 @@ pub fn generate_internal_tagged_variant_schema(
 
 pub fn generate_root_schema<T>() -> Result<RootSchema, GenerateError>
 where
-    T: Configurable + Serialize,
+    T: Configurable + ToValue,
 {
     // Set env variable to enable generating all schemas, including platform-specific ones.
     std::env::set_var("VECTOR_GENERATE_SCHEMA", "true");
@@ -503,7 +500,7 @@ pub fn get_or_generate_schema<T>(
     overrides: Option<Metadata<T>>,
 ) -> Result<SchemaObject, GenerateError>
 where
-    T: Configurable + Serialize,
+    T: Configurable + ToValue,
 {
     let (mut schema, metadata) = match T::referenceable_name() {
         // When `T` has a referenceable name, try looking it up in the schema generator's definition
@@ -581,7 +578,7 @@ pub fn generate_baseline_schema<T>(
     metadata: Metadata<T>,
 ) -> Result<SchemaObject, GenerateError>
 where
-    T: Configurable + Serialize,
+    T: Configurable + ToValue,
 {
     // Generate the schema and apply its metadata.
     let mut schema = T::generate_schema(gen)?;
@@ -608,7 +605,7 @@ fn get_schema_ref<S: AsRef<str>>(gen: &mut SchemaGenerator, name: S) -> SchemaOb
 /// the issue.
 pub fn assert_string_schema_for_map<K, M>(gen: &mut SchemaGenerator) -> Result<(), GenerateError>
 where
-    K: ConfigurableString + Serialize,
+    K: ConfigurableString + ToValue,
 {
     // We need to force the schema to be treated as transparent so that when the schema generation
     // finalizes the schema, we don't throw an error due to a lack of title/description.

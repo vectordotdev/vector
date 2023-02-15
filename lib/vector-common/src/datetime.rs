@@ -3,13 +3,14 @@ use std::fmt::Debug;
 use chrono::{DateTime, Local, ParseError, TimeZone as _, Utc};
 use chrono_tz::Tz;
 use derivative::Derivative;
+use serde_json::Value;
 use vector_config::{
     schema::{
         apply_metadata, generate_const_string_schema, generate_one_of_schema,
         get_or_generate_schema,
     },
     schemars::{gen::SchemaGenerator, schema::SchemaObject},
-    Configurable, GenerateError, Metadata,
+    Configurable, GenerateError, Metadata, ToValue,
 };
 use vector_config_common::attributes::CustomAttribute;
 
@@ -129,5 +130,11 @@ impl Configurable for TimeZone {
         let tz_schema = get_or_generate_schema::<Tz>(gen, Some(tz_metadata))?;
 
         Ok(generate_one_of_schema(&[local_schema, tz_schema]))
+    }
+}
+
+impl ToValue for TimeZone {
+    fn to_value(&self) -> Value {
+        serde_json::to_value(self).expect("Could not convert time zone to JSON")
     }
 }

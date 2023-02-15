@@ -37,6 +37,12 @@ pub struct Template {
 
 impl ConfigurableString for Template {}
 
+impl ToString for Template {
+    fn to_string(&self) -> String {
+        self.src.clone()
+    }
+}
+
 impl TryFrom<String> for Template {
     type Error = String;
 

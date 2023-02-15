@@ -2,13 +2,14 @@ use std::{collections::BTreeSet, fmt};
 
 use indexmap::IndexMap;
 use serde::{de, ser};
+use serde_json::Value;
 use vector_config::{
     schema::{
         apply_metadata, generate_const_string_schema, generate_enum_schema, generate_one_of_schema,
         generate_struct_schema, get_or_generate_schema,
     },
     schemars::{gen::SchemaGenerator, schema::SchemaObject},
-    Configurable, GenerateError, Metadata,
+    Configurable, GenerateError, Metadata, ToValue,
 };
 use vector_config_common::attributes::CustomAttribute;
 
@@ -302,6 +303,12 @@ impl Configurable for Compression {
     }
 }
 
+impl ToValue for Compression {
+    fn to_value(&self) -> Value {
+        serde_json::to_value(self).expect("Could not convert compression settings to JSON")
+    }
+}
+
 /// Compression level.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct CompressionLevel(flate2::Compression);
@@ -433,6 +440,13 @@ impl Configurable for CompressionLevel {
 
         let valid_values = string_consts.chain(level_consts).collect();
         Ok(generate_enum_schema(valid_values))
+    }
+}
+
+impl ToValue for CompressionLevel {
+    fn to_value(&self) -> Value {
+        // FIXME
+        serde_json::to_value(self).expect("Could not convert compression level to JSON")
     }
 }
 
