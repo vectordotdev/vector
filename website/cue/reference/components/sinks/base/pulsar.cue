@@ -242,7 +242,7 @@ base: components: sinks: pulsar: configuration: {
 	producer_name: {
 		description: "The name of the producer. If not specified, the default name assigned by Pulsar will be used."
 		required:    false
-		type: string: {}
+		type: string: examples: ["producer-name"]
 	}
 	topic: {
 		description: "The Pulsar topic name to write events to."

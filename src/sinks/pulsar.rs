@@ -57,6 +57,7 @@ pub struct PulsarSinkConfig {
     topic: String,
 
     /// The name of the producer. If not specified, the default name assigned by Pulsar will be used.
+    #[configurable(metadata(docs::examples = "producer-name"))]
     producer_name: Option<String>,
 
     #[configurable(derived)]
