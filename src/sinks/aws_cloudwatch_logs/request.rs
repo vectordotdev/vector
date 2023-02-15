@@ -236,19 +236,19 @@ impl Client {
                 .log_group_name(group_name)
                 .log_stream_name(stream_name)
                 .build()
-                .map_err(|err| SdkError::construction_failure(err))?
+                .map_err(SdkError::construction_failure)?
                 .make_operation(cw_client.conf())
                 .await
-                .map_err(|err| SdkError::construction_failure(err))?;
+                .map_err(SdkError::construction_failure)?;
 
             for (header, value) in headers.iter() {
                 let owned_header = header.clone();
                 let owned_value = value.clone();
                 op.request_mut().headers_mut().insert(
                     HeaderName::from_bytes(owned_header.as_bytes())
-                        .map_err(|err| SdkError::construction_failure(err))?,
+                        .map_err(SdkError::construction_failure)?,
                     HeaderValue::from_str(owned_value.as_str())
-                        .map_err(|err| SdkError::construction_failure(err))?,
+                        .map_err(SdkError::construction_failure)?,
                 );
             }
 
