@@ -13,6 +13,7 @@ pub struct Metadata<T> {
     deprecated_message: Option<&'static str>,
     transparent: bool,
     validations: Vec<validation::Validation>,
+    _dummy: std::marker::PhantomData<T>,
 }
 
 impl<T> Metadata<T> {
@@ -122,6 +123,7 @@ impl<T> Metadata<T> {
             deprecated_message: other.deprecated_message.or(self.deprecated_message),
             transparent: other.transparent,
             validations: self.validations,
+            _dummy: Default::default(),
         }
     }
 
@@ -138,6 +140,7 @@ impl<T> Metadata<T> {
             deprecated_message: self.deprecated_message,
             transparent: self.transparent,
             validations: self.validations.clone(),
+            _dummy: Default::default(),
         }
     }
 }
@@ -153,6 +156,7 @@ impl<T> Default for Metadata<T> {
             deprecated_message: None,
             transparent: false,
             validations: Vec::new(),
+            _dummy: Default::default(),
         }
     }
 }
