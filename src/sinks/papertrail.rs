@@ -1,15 +1,14 @@
 use bytes::{BufMut, BytesMut};
 use syslog::{Facility, Formatter3164, LogFormat, Severity};
+use value::Kind;
 use vector_config::configurable_component;
 
 use crate::{
     codecs::{Encoder, EncodingConfig, Transformer},
-    config::{
-        log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig,
-        SinkContext,
-    },
+    config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext},
     event::Event,
     internal_events::TemplateRenderingError,
+    schema,
     sinks::util::{tcp::TcpSinkConfig, UriSerde},
     tcp::TcpKeepaliveConfig,
     template::Template,
@@ -111,7 +110,10 @@ impl SinkConfig for PapertrailConfig {
     }
 
     fn input(&self) -> Input {
+        let requirement = schema::Requirement::empty().optional_meaning("host", Kind::bytes());
+
         Input::new(self.encoding.config().input_type() & DataType::Log)
+            .with_schema_requirement(requirement)
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
@@ -137,7 +139,7 @@ impl tokio_util::codec::Encoder<Event> for PapertrailEncoder {
     ) -> Result<(), Self::Error> {
         let host = event
             .as_mut_log()
-            .remove(log_schema().host_key())
+            .get_host()
             .map(|host| host.to_string_lossy().into_owned());
 
         let process = self
