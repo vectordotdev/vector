@@ -299,7 +299,7 @@ pub fn build_healthcheck(bucket: String, client: S3Client) -> crate::Result<Heal
         match req {
             Ok(_) => Ok(()),
             Err(error) => Err(match error {
-                SdkError::ServiceError(err) => match err.into_raw().http().status() {
+                SdkError::ServiceError(inner) => match inner.into_raw().http().status() {
                     StatusCode::FORBIDDEN => HealthcheckError::InvalidCredentials.into(),
                     StatusCode::NOT_FOUND => HealthcheckError::UnknownBucket { bucket }.into(),
                     status => HealthcheckError::UnknownStatus { status }.into(),

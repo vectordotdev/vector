@@ -102,9 +102,9 @@ impl Future for CloudwatchFuture {
                     let response = match ready!(fut.poll_unpin(cx)) {
                         Ok(response) => response,
                         Err(err) => {
-                            if let SdkError::ServiceError(err) = &err {
+                            if let SdkError::ServiceError(inner) = &err {
                                 if let DescribeLogStreamsErrorKind::ResourceNotFoundException(_) =
-                                    err.err().kind
+                                    inner.err().kind
                                 {
                                     if self.create_missing_group {
                                         info!("Log group provided does not exist; creating a new one.");
@@ -149,8 +149,8 @@ impl Future for CloudwatchFuture {
                         Ok(_) => {}
                         Err(err) => {
                             let resource_already_exists = match &err {
-                                SdkError::ServiceError(err) => matches!(
-                                    err.err().kind,
+                                SdkError::ServiceError(inner) => matches!(
+                                    inner.err().kind,
                                     CreateLogGroupErrorKind::ResourceAlreadyExistsException(_)
                                 ),
                                 _ => false,
@@ -174,8 +174,8 @@ impl Future for CloudwatchFuture {
                         Ok(_) => {}
                         Err(err) => {
                             let resource_already_exists = match &err {
-                                SdkError::ServiceError(err) => matches!(
-                                    err.err().kind,
+                                SdkError::ServiceError(inner) => matches!(
+                                    inner.err().kind,
                                     CreateLogStreamErrorKind::ResourceAlreadyExistsException(_)
                                 ),
                                 _ => false,

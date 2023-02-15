@@ -994,6 +994,7 @@ dependencies = [
  "http-body",
  "hyper",
  "hyper-rustls",
+ "hyper-tls",
  "lazy_static",
  "pin-project-lite",
  "serde",
