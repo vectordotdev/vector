@@ -3,7 +3,6 @@ use std::fmt;
 use vector_config_common::{attributes::CustomAttribute, validation};
 
 /// The metadata associated with a given type or field.
-#[derive(Clone)]
 pub struct Metadata<T> {
     title: Option<&'static str>,
     description: Option<&'static str>,

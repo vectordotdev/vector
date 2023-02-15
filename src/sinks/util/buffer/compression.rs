@@ -263,7 +263,7 @@ impl Configurable for Compression {
             gzip_string_subschema,
             zlib_string_subschema,
         ]);
-        apply_metadata(&mut all_string_oneof_subschema, string_metadata.clone());
+        apply_metadata(&mut all_string_oneof_subschema, string_metadata);
 
         // Next we'll create a full schema for the given algorithms.
         //
