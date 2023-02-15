@@ -259,11 +259,9 @@ fn build_named_struct_generate_schema_fn(
 
             let had_unflatted_properties = !properties.is_empty();
 
-            let additional_properties = None;
             let mut schema = ::vector_config::schema::generate_struct_schema(
                 properties,
                 required,
-                additional_properties,
             );
 
             // If we have any flattened subschemas, deal with them now.
@@ -656,8 +654,7 @@ fn generate_enum_struct_named_variant_schema(
 
             ::vector_config::schema::generate_struct_schema(
                 properties,
-                required,
-                None
+                required
             )
         }
     }
@@ -845,8 +842,7 @@ fn generate_enum_variant_schema(variant: &Variant<'_>) -> proc_macro2::TokenStre
 
                 ::vector_config::schema::generate_struct_schema(
                     wrapper_properties,
-                    wrapper_required,
-                    None
+                    wrapper_required
                 )
             }
         }
@@ -900,8 +896,7 @@ fn generate_single_field_struct_schema(
 
             ::vector_config::schema::generate_struct_schema(
                 wrapper_properties,
-                wrapper_required,
-                None
+                wrapper_required
             )
         }
     }

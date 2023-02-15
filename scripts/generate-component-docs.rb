@@ -887,7 +887,7 @@ def resolve_bare_schema(root_schema, schema)
       # If the object schema has `additionalProperties` set, we add an additional field
       # (`*`) which uses the specified schema for that field.
       additional_properties = schema['additionalProperties']
-      if !additional_properties.nil?
+      if !additional_properties.nil? && additional_properties != false
         @logger.debug "Handling additional properties."
 
         # Normally, we only get here if there's a hashmap field on a struct that can act as the

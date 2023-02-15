@@ -277,7 +277,6 @@ where
 pub fn generate_struct_schema(
     properties: IndexMap<String, SchemaObject>,
     required: BTreeSet<String>,
-    additional_properties: Option<Box<Schema>>,
 ) -> SchemaObject {
     let properties = properties
         .into_iter()
@@ -288,7 +287,7 @@ pub fn generate_struct_schema(
         object: Some(Box::new(ObjectValidation {
             properties,
             required,
-            additional_properties,
+            additional_properties: Some(Box::new(Schema::Bool(false))),
             ..Default::default()
         })),
         ..Default::default()
@@ -479,7 +478,7 @@ pub fn generate_internal_tagged_variant_schema(
     let mut required = BTreeSet::new();
     required.insert(tag);
 
-    generate_struct_schema(properties, required, None)
+    generate_struct_schema(properties, required)
 }
 
 pub fn generate_root_schema<T>() -> Result<RootSchema, GenerateError>
