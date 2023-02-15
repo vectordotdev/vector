@@ -47,6 +47,9 @@ pub struct Compiler<'a> {
     /// It is possible for this state to switch from `None`, to `Some(T)` and
     /// back to `None`, if the parent expression of a fallible expression
     /// nullifies the fallibility of that expression.
+    // This should probably be kept on the call stack as the "compile_*" functions are called
+    // otherwise some expressions may remove it when they shouldn't (such as the RHS of an operation removing
+    // the error from the LHS)
     fallible_expression_error: Option<Box<dyn DiagnosticMessage>>,
 
     config: CompileConfig,
@@ -383,6 +386,9 @@ impl<'a> Compiler<'a> {
             self.fallible_expression_error = None;
         }
 
+        // save the error so the RHS can't delete an error from the LHS
+        let fallible_expression_error = self.fallible_expression_error.take();
+
         let rhs_span = rhs.span();
         let rhs = Node::new(rhs_span, self.compile_expr(*rhs, state)?);
 
@@ -390,9 +396,21 @@ impl<'a> Compiler<'a> {
             .map_err(|err| self.diagnostics.push(Box::new(err)))
             .ok()?;
 
+        let type_info = op.type_info(&original_state);
+
+        // re-apply the RHS error saved from above
+        if self.fallible_expression_error.is_none() {
+            self.fallible_expression_error = fallible_expression_error;
+        }
+
+        if type_info.result.is_infallible() {
+            // There was a short-circuit operation that is preventing a fallibility error
+            self.fallible_expression_error = None;
+        }
+
         // Both "lhs" and "rhs" are compiled above, but "rhs" isn't always executed.
         // The expression can provide a more accurate type state.
-        *state = op.type_info(&original_state).state;
+        *state = type_info.state;
         Some(op)
     }
 
