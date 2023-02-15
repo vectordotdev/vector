@@ -237,7 +237,7 @@ mod test {
                 .with_metadata_field(
                     &owned_value_path!("vector", "source_type"),
                     Kind::bytes(),
-                    Some("source_type"),
+                    None,
                 )
                 .with_metadata_field(
                     &owned_value_path!("vector", "ingest_timestamp"),

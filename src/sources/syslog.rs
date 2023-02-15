@@ -523,7 +523,7 @@ mod test {
                 .with_metadata_field(
                     &owned_value_path!("syslog", "severity"),
                     Kind::bytes().or_undefined(),
-                    None,
+                    Some("severity"),
                 )
                 .with_metadata_field(
                     &owned_value_path!("syslog", "facility"),
