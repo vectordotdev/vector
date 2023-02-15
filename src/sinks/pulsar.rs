@@ -34,7 +34,6 @@ use vector_common::{
     sensitive_string::SensitiveString,
 };
 use vector_config::configurable_component;
-use vector_core::config::log_schema;
 
 #[derive(Debug, Snafu)]
 enum BuildError {
