@@ -676,7 +676,7 @@ impl From<LogstashEventFrame> for SmallVec<[Event; 1]> {
 #[cfg(test)]
 mod test {
     use bytes::BufMut;
-    use lookup::LookupBuf;
+    use lookup::OwnedTargetPath;
     use rand::{thread_rng, Rng};
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
     use value::kind::Collection;
@@ -795,7 +795,7 @@ mod test {
 
         let expected_definition =
             Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
-                .with_meaning(LookupBuf::root(), "message")
+                .with_meaning(OwnedTargetPath::event_root(), "message")
                 .with_metadata_field(&owned_value_path!("vector", "source_type"), Kind::bytes())
                 .with_metadata_field(
                     &owned_value_path!("vector", "ingest_timestamp"),

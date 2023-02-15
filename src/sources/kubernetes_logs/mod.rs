@@ -1014,7 +1014,7 @@ fn prepare_label_selector(selector: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use lookup::{owned_value_path, LookupBuf};
+    use lookup::{owned_value_path, OwnedTargetPath};
     use similar_asserts::assert_eq;
     use value::{kind::Collection, Kind};
     use vector_core::{config::LogNamespace, schema::Definition};
@@ -1239,7 +1239,7 @@ mod tests {
                     &owned_value_path!("vector", "ingest_timestamp"),
                     Kind::timestamp()
                 )
-                .with_meaning(LookupBuf::root(), "message")
+                .with_meaning(OwnedTargetPath::event_root(), "message")
         )
     }
 

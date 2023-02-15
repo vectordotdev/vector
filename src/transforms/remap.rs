@@ -8,7 +8,7 @@ use std::{
 
 use codecs::MetricTagValues;
 use lookup::lookup_v2::{parse_value_path, ValuePath};
-use lookup::{metadata_path, owned_value_path, path, PathPrefix};
+use lookup::{metadata_path, owned_value_path, path, OwnedTargetPath, PathPrefix};
 use snafu::{ResultExt, Snafu};
 use value::Kind;
 use vector_common::TimeZone;
@@ -227,6 +227,7 @@ impl TransformConfig for RemapConfig {
                 input_definition.clone(),
             )
             .map(|(program, _, _, external_context)| {
+                // Apply any semantic meanings set in the VRL program
                 let meaning = external_context
                     .get_custom::<MeaningList>()
                     .cloned()
@@ -240,7 +241,8 @@ impl TransformConfig for RemapConfig {
                     input_definition.log_namespaces().clone(),
                 );
                 for (id, path) in meaning {
-                    new_type_def = new_type_def.with_meaning(path, &id);
+                    // currently only event paths are supported
+                    new_type_def = new_type_def.with_meaning(OwnedTargetPath::event(path), &id);
                 }
                 new_type_def
             })

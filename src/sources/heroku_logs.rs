@@ -395,7 +395,7 @@ mod tests {
 
     use chrono::{DateTime, Utc};
     use futures::Stream;
-    use lookup::{owned_value_path, LookupBuf};
+    use lookup::{owned_value_path, OwnedTargetPath};
     use similar_asserts::assert_eq;
     use value::{kind::Collection, Kind};
     use vector_config::NamedComponent;
@@ -656,7 +656,7 @@ mod tests {
 
         let expected_definition =
             Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
-                .with_meaning(LookupBuf::root(), "message")
+                .with_meaning(OwnedTargetPath::event_root(), "message")
                 .with_metadata_field(&owned_value_path!("vector", "source_type"), Kind::bytes())
                 .with_metadata_field(
                     &owned_value_path!("vector", "ingest_timestamp"),

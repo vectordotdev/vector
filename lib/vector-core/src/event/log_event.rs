@@ -268,7 +268,7 @@ impl LogEvent {
         self.metadata()
             .schema_definition()
             .meaning_path(meaning.as_ref())
-            .and_then(|path| self.inner.fields.get_by_path(path))
+            .and_then(|path| self.get(path))
     }
 
     // TODO(Jean): Once the event API uses `Lookup`, the allocation here can be removed.

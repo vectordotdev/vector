@@ -801,7 +801,6 @@ mod tests {
     };
 
     use encoding_rs::UTF_16LE;
-    use lookup::LookupBuf;
     use similar_asserts::assert_eq;
     use tempfile::tempdir;
     use tokio::time::{sleep, timeout, Duration};
@@ -950,7 +949,7 @@ mod tests {
         assert_eq!(
             definition,
             Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
-                .with_meaning(LookupBuf::root(), "message")
+                .with_meaning(OwnedTargetPath::event_root(), "message")
                 .with_metadata_field(&owned_value_path!("vector", "source_type"), Kind::bytes())
                 .with_metadata_field(
                     &owned_value_path!("vector", "ingest_timestamp"),
@@ -2184,6 +2183,7 @@ mod tests {
         Unfinalized, // Acknowledgement handling but no finalization
         Acks,        // Full acknowledgements and proper finalization
     }
+    use lookup::OwnedTargetPath;
     use AckingMode::*;
 
     async fn run_file_source(

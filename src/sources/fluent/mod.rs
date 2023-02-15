@@ -622,7 +622,7 @@ impl From<FluentEvent<'_>> for LogEvent {
 mod tests {
     use bytes::BytesMut;
     use chrono::{DateTime, Utc};
-    use lookup::LookupBuf;
+    use lookup::OwnedTargetPath;
     use rmp_serde::Serializer;
     use serde::Serialize;
     use std::collections::BTreeMap;
@@ -963,7 +963,7 @@ mod tests {
 
         let expected_definition =
             Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
-                .with_meaning(LookupBuf::root(), "message")
+                .with_meaning(OwnedTargetPath::event_root(), "message")
                 .with_metadata_field(&owned_value_path!("vector", "source_type"), Kind::bytes())
                 .with_metadata_field(&owned_value_path!("fluent", "tag"), Kind::bytes())
                 .with_metadata_field(&owned_value_path!("fluent", "timestamp"), Kind::timestamp())

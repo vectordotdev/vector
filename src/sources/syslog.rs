@@ -433,7 +433,7 @@ fn enrich_syslog_event(
 
 #[cfg(test)]
 mod test {
-    use lookup::{event_path, owned_value_path, LookupBuf};
+    use lookup::{event_path, owned_value_path, OwnedTargetPath};
     use std::{
         collections::{BTreeMap, HashMap},
         fmt,
@@ -499,7 +499,7 @@ mod test {
 
         let expected_definition =
             Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
-                .with_meaning(LookupBuf::root(), "message")
+                .with_meaning(OwnedTargetPath::event_root(), "message")
                 .with_metadata_field(&owned_value_path!("vector", "source_type"), Kind::bytes())
                 .with_metadata_field(
                     &owned_value_path!("vector", "ingest_timestamp"),

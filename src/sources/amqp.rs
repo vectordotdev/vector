@@ -485,7 +485,7 @@ async fn handle_ack(status: BatchStatus, entry: FinalizerEntry) {
 
 #[cfg(test)]
 pub mod test {
-    use lookup::LookupBuf;
+    use lookup::OwnedTargetPath;
     use value::kind::Collection;
     use vector_core::schema::Definition;
 
@@ -523,7 +523,7 @@ pub mod test {
 
         let expected_definition =
             Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
-                .with_meaning(LookupBuf::root(), "message")
+                .with_meaning(OwnedTargetPath::event_root(), "message")
                 .with_metadata_field(&owned_value_path!("vector", "source_type"), Kind::bytes())
                 .with_metadata_field(
                     &owned_value_path!("vector", "ingest_timestamp"),

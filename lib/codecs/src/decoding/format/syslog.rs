@@ -1,7 +1,7 @@
 use bytes::Bytes;
 use chrono::{DateTime, Datelike, Utc};
 use lookup::lookup_v2::parse_value_path;
-use lookup::{event_path, owned_value_path, LookupBuf, OwnedValuePath};
+use lookup::{event_path, owned_value_path, OwnedTargetPath, OwnedValuePath};
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 use std::collections::BTreeMap;
@@ -112,7 +112,7 @@ impl SyslogDeserializerConfig {
             }
             (LogNamespace::Vector, Some(source)) => {
                 schema::Definition::new_with_default_metadata(Kind::bytes(), [log_namespace])
-                    .with_meaning(LookupBuf::root(), "message")
+                    .with_meaning(OwnedTargetPath::event_root(), "message")
                     .with_source_metadata(
                         source,
                         None,

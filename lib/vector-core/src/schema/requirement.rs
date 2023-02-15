@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use lookup::LookupBuf;
+use lookup::OwnedTargetPath;
 use value::Kind;
 
 use super::Definition;
@@ -96,9 +96,9 @@ impl Requirement {
             });
 
             match maybe_meaning_path {
-                Some(path) => {
+                Some(target_path) => {
                     // Get the kind at the path for the given semantic meaning.
-                    let definition_kind = definition.event_kind().at_path(path);
+                    let definition_kind = definition.kind_at(target_path);
 
                     if req_meaning.kind.is_superset(&definition_kind).is_err() {
                         // The semantic meaning kind does not match the expected
@@ -174,7 +174,7 @@ pub enum ValidationError {
     /// A semantic meaning is pointing to multiple paths.
     MeaningDuplicate {
         identifier: &'static str,
-        paths: BTreeSet<LookupBuf>,
+        paths: BTreeSet<OwnedTargetPath>,
     },
 }
 
@@ -225,6 +225,7 @@ impl std::error::Error for ValidationError {}
 
 #[cfg(test)]
 mod tests {
+    use lookup::lookup_v2::parse_target_path;
     use lookup::owned_value_path;
     use std::collections::HashMap;
 
@@ -339,7 +340,10 @@ mod tests {
                         )),
                     errors: vec![ValidationError::MeaningDuplicate {
                         identifier: "foo",
-                        paths: BTreeSet::from(["foo".into(), "bar".into()]),
+                        paths: BTreeSet::from([
+                            parse_target_path("foo").unwrap(),
+                            parse_target_path("bar").unwrap(),
+                        ]),
                     }],
                 },
             ),

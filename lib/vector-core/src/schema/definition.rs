@@ -1,8 +1,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::config::{log_schema, LegacyKey, LogNamespace};
-use lookup::lookup_v2::parse_value_path;
-use lookup::{owned_value_path, LookupBuf, OwnedTargetPath, OwnedValuePath, PathPrefix};
+use lookup::lookup_v2::{parse_value_path, TargetPath};
+use lookup::{owned_value_path, OwnedTargetPath, OwnedValuePath, PathPrefix};
 use value::{kind::Collection, Kind};
 
 /// The definition of a schema.
@@ -40,8 +40,8 @@ pub struct Definition {
 /// sink builder, will return an error if the definition stores an "invalid" meaning pointer.
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
 enum MeaningPointer {
-    Valid(LookupBuf),
-    Invalid(BTreeSet<LookupBuf>),
+    Valid(OwnedTargetPath),
+    Invalid(BTreeSet<OwnedTargetPath>),
 }
 
 impl MeaningPointer {
@@ -64,20 +64,6 @@ impl MeaningPointer {
         };
 
         Self::Invalid(set)
-    }
-}
-
-#[cfg(test)]
-impl From<&str> for MeaningPointer {
-    fn from(v: &str) -> Self {
-        MeaningPointer::Valid(v.into())
-    }
-}
-
-#[cfg(test)]
-impl From<LookupBuf> for MeaningPointer {
-    fn from(v: LookupBuf) -> Self {
-        MeaningPointer::Valid(v)
     }
 }
 
@@ -300,8 +286,10 @@ impl Definition {
         self.event_kind.set_at_path(path, kind);
 
         if let Some(meaning) = meaning {
-            self.meaning
-                .insert(meaning, MeaningPointer::Valid(path.clone().into()));
+            self.meaning.insert(
+                meaning,
+                MeaningPointer::Valid(OwnedTargetPath::event(path.clone())),
+            );
         }
 
         self
@@ -372,17 +360,25 @@ impl Definition {
     ///
     /// This method panics if the provided path points to an unknown location in the collection.
     #[must_use]
-    pub fn with_meaning(mut self, path: impl Into<LookupBuf>, meaning: &str) -> Self {
-        let path = path.into();
-
+    pub fn with_meaning(mut self, target_path: OwnedTargetPath, meaning: &str) -> Self {
         // Ensure the path exists in the collection.
-        assert!(
-            self.event_kind.at_path(&path).contains_any_defined(),
-            "meaning must point to a valid path"
-        );
+        match target_path.prefix {
+            PathPrefix::Event => assert!(
+                self.event_kind
+                    .at_path(&target_path.path)
+                    .contains_any_defined(),
+                "meaning must point to a valid path"
+            ),
+            PathPrefix::Metadata => assert!(
+                self.metadata_kind
+                    .at_path(&target_path.path)
+                    .contains_any_defined(),
+                "meaning must point to a valid path"
+            ),
+        };
 
         self.meaning
-            .insert(meaning.to_owned(), MeaningPointer::Valid(path));
+            .insert(meaning.to_owned(), MeaningPointer::Valid(target_path));
         self
     }
 
@@ -419,22 +415,22 @@ impl Definition {
         self
     }
 
-    /// Returns a `Lookup` into an event, based on the provided `meaning`, if the meaning exists.
-    pub fn meaning_path(&self, meaning: &str) -> Option<&LookupBuf> {
+    /// Returns an `OwnedTargetPath` into an event, based on the provided `meaning`, if the meaning exists.
+    pub fn meaning_path(&self, meaning: &str) -> Option<&OwnedTargetPath> {
         match self.meaning.get(meaning) {
             Some(MeaningPointer::Valid(path)) => Some(path),
             None | Some(MeaningPointer::Invalid(_)) => None,
         }
     }
 
-    pub fn invalid_meaning(&self, meaning: &str) -> Option<&BTreeSet<LookupBuf>> {
+    pub fn invalid_meaning(&self, meaning: &str) -> Option<&BTreeSet<OwnedTargetPath>> {
         match &self.meaning.get(meaning) {
             Some(MeaningPointer::Invalid(paths)) => Some(paths),
             None | Some(MeaningPointer::Valid(_)) => None,
         }
     }
 
-    pub fn meanings(&self) -> impl Iterator<Item = (&String, &LookupBuf)> {
+    pub fn meanings(&self) -> impl Iterator<Item = (&String, &OwnedTargetPath)> {
         self.meaning
             .iter()
             .filter_map(|(id, pointer)| match pointer {
@@ -453,6 +449,14 @@ impl Definition {
 
     pub fn metadata_kind(&self) -> &Kind {
         &self.metadata_kind
+    }
+
+    #[allow(clippy::needless_pass_by_value)]
+    pub fn kind_at<'a>(&self, target_path: impl TargetPath<'a>) -> Kind {
+        match target_path.prefix() {
+            PathPrefix::Event => self.event_kind.at_path(target_path.value_path()),
+            PathPrefix::Metadata => self.metadata_kind.at_path(target_path.value_path()),
+        }
     }
 }
 
@@ -519,6 +523,7 @@ mod test_utils {
 #[cfg(test)]
 mod tests {
     use crate::event::{Event, EventMetadata, LogEvent};
+    use lookup::lookup_v2::parse_target_path;
     use lookup::owned_value_path;
     use std::collections::{BTreeMap, HashMap};
     use value::Value;
@@ -636,7 +641,11 @@ mod tests {
                     want: Definition {
                         event_kind: Kind::object(BTreeMap::from([("foo".into(), Kind::boolean())])),
                         metadata_kind: Kind::object(Collection::empty()),
-                        meaning: [("foo_meaning".to_owned(), "foo".into())].into(),
+                        meaning: [(
+                            "foo_meaning".to_owned(),
+                            MeaningPointer::Valid(parse_target_path("foo").unwrap()),
+                        )]
+                        .into(),
                         log_namespaces: BTreeSet::new(),
                     },
                 },
@@ -655,7 +664,7 @@ mod tests {
                         metadata_kind: Kind::object(Collection::empty()),
                         meaning: [(
                             "foobar".to_owned(),
-                            LookupBuf::from_str(".foo.bar").unwrap().into(),
+                            MeaningPointer::Valid(parse_target_path(".foo.bar").unwrap()),
                         )]
                         .into(),
                         log_namespaces: BTreeSet::new(),
@@ -712,7 +721,11 @@ mod tests {
                             Kind::boolean().or_undefined(),
                         )])),
                         metadata_kind: Kind::object(Collection::empty()),
-                        meaning: [("foo_meaning".to_owned(), "foo".into())].into(),
+                        meaning: [(
+                            "foo_meaning".to_owned(),
+                            MeaningPointer::Valid(parse_target_path("foo").unwrap()),
+                        )]
+                        .into(),
                         log_namespaces: BTreeSet::new(),
                     },
                 },
@@ -734,7 +747,7 @@ mod tests {
                         metadata_kind: Kind::object(Collection::empty()),
                         meaning: [(
                             "foobar".to_owned(),
-                            LookupBuf::from_str(".foo.bar").unwrap().into(),
+                            MeaningPointer::Valid(parse_target_path(".foo.bar").unwrap()),
                         )]
                         .into(),
                         log_namespaces: BTreeSet::new(),
@@ -801,7 +814,10 @@ mod tests {
                             Kind::boolean().or_null(),
                         )]))),
                         metadata_kind: Kind::object(Collection::empty()),
-                        meaning: BTreeMap::from([("foo_meaning".to_owned(), "foo".into())]),
+                        meaning: BTreeMap::from([(
+                            "foo_meaning".to_owned(),
+                            MeaningPointer::Valid(parse_target_path("foo").unwrap()),
+                        )]),
                         log_namespaces: BTreeSet::new(),
                     },
                     other: Definition {
@@ -810,7 +826,10 @@ mod tests {
                             Kind::boolean().or_null(),
                         )]))),
                         metadata_kind: Kind::object(Collection::empty()),
-                        meaning: BTreeMap::from([("foo_meaning".to_owned(), "foo".into())]),
+                        meaning: BTreeMap::from([(
+                            "foo_meaning".to_owned(),
+                            MeaningPointer::Valid(parse_target_path("foo").unwrap()),
+                        )]),
                         log_namespaces: BTreeSet::new(),
                     },
                     want: Definition {
@@ -819,7 +838,10 @@ mod tests {
                             Kind::boolean().or_null(),
                         )]))),
                         metadata_kind: Kind::object(Collection::empty()),
-                        meaning: BTreeMap::from([("foo_meaning".to_owned(), "foo".into())]),
+                        meaning: BTreeMap::from([(
+                            "foo_meaning".to_owned(),
+                            MeaningPointer::Valid(parse_target_path("foo").unwrap()),
+                        )]),
                         log_namespaces: BTreeSet::new(),
                     },
                 },
@@ -931,7 +953,7 @@ mod tests {
                         metadata_kind: Kind::object(Collection::empty()),
                         meaning: BTreeMap::from([(
                             "foo".into(),
-                            MeaningPointer::Valid("foo".into()),
+                            MeaningPointer::Valid(parse_target_path("foo").unwrap()),
                         )]),
                         log_namespaces: BTreeSet::new(),
                     },
@@ -943,7 +965,7 @@ mod tests {
                         metadata_kind: Kind::object(Collection::empty()),
                         meaning: BTreeMap::from([(
                             "foo".into(),
-                            MeaningPointer::Valid("bar".into()),
+                            MeaningPointer::Valid(parse_target_path("bar").unwrap()),
                         )]),
                         log_namespaces: BTreeSet::new(),
                     },
@@ -955,7 +977,10 @@ mod tests {
                         metadata_kind: Kind::object(Collection::empty()),
                         meaning: BTreeMap::from([(
                             "foo".into(),
-                            MeaningPointer::Invalid(BTreeSet::from(["foo".into(), "bar".into()])),
+                            MeaningPointer::Invalid(BTreeSet::from([
+                                parse_target_path("foo").unwrap(),
+                                parse_target_path("bar").unwrap(),
+                            ])),
                         )]),
                         log_namespaces: BTreeSet::new(),
                     },
@@ -972,7 +997,7 @@ mod tests {
                         metadata_kind: Kind::object(Collection::empty()),
                         meaning: BTreeMap::from([(
                             "foo".into(),
-                            MeaningPointer::Valid("foo".into()),
+                            MeaningPointer::Valid(parse_target_path("foo").unwrap()),
                         )]),
                         log_namespaces: BTreeSet::new(),
                     },
@@ -984,7 +1009,7 @@ mod tests {
                         metadata_kind: Kind::object(Collection::empty()),
                         meaning: BTreeMap::from([(
                             "foo".into(),
-                            MeaningPointer::Valid("foo".into()),
+                            MeaningPointer::Valid(parse_target_path("foo").unwrap()),
                         )]),
                         log_namespaces: BTreeSet::new(),
                     },
@@ -996,7 +1021,7 @@ mod tests {
                         metadata_kind: Kind::object(Collection::empty()),
                         meaning: BTreeMap::from([(
                             "foo".into(),
-                            MeaningPointer::Valid("foo".into()),
+                            MeaningPointer::Valid(parse_target_path("foo").unwrap()),
                         )]),
                         log_namespaces: BTreeSet::new(),
                     },

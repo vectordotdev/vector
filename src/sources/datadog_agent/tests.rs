@@ -14,8 +14,7 @@ use codecs::{
 use futures::{Stream, StreamExt};
 use http::HeaderMap;
 use indoc::indoc;
-use lookup::owned_value_path;
-use lookup::LookupBuf;
+use lookup::{owned_value_path, OwnedTargetPath};
 use ordered_float::NotNan;
 use prost::Message;
 use quickcheck::{Arbitrary, Gen, QuickCheck, TestResult};
@@ -2149,7 +2148,7 @@ fn test_output_schema_definition_bytes_vector_namespace() {
                 Kind::timestamp()
             )
             .with_metadata_field(&owned_value_path!("vector", "source_type"), Kind::bytes())
-            .with_meaning(LookupBuf::root(), "message")
+            .with_meaning(OwnedTargetPath::event_root(), "message")
     )
 }
 
