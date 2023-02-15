@@ -342,7 +342,7 @@ pub fn configurable_component_impl(args: TokenStream, item: TokenStream) -> Toke
         .typed_component()
         .map(|tc| tc.get_component_desc_registration(&input));
 
-    // Generate and apply all of the necessary derives
+    // Generate and apply all of the necessary derives.
     let mut derives = Punctuated::<Path, Comma>::new();
 
     derives.push(parse_quote_spanned! {input.ident.span()=>
