@@ -16,6 +16,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     unzip \
   && rm -rf /var/lib/apt/lists/*
 
+# Link installed java runtime to default to avoid arch like amd64 or arm64
+RUN ln -s $(readlink -f /usr/bin/java | sed "s:bin/java::") /usr/lib/jvm/default
+ENV JAVA_HOME=/usr/lib/jvm/default
+
 ENV HADOOP_VERSION 3.2.4
 ENV HADOOP_URL https://www.apache.org/dist/hadoop/common/hadoop-$HADOOP_VERSION/hadoop-$HADOOP_VERSION.tar.gz
 
