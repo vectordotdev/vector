@@ -106,24 +106,29 @@ pub enum OutputFormat {
     },
 
     /// Randomly generated logs in [Apache common][apache_common] format.
+    ///
     /// [apache_common]: https://httpd.apache.org/docs/current/logs.html#common
     ApacheCommon,
 
     /// Randomly generated logs in [Apache error][apache_error] format.
+    ///
     /// [apache_error]: https://httpd.apache.org/docs/current/logs.html#errorlog
     ApacheError,
 
     /// Randomly generated logs in Syslog format ([RFC 5424][syslog_5424]).
+    ///
     /// [syslog_5424]: https://tools.ietf.org/html/rfc5424
     #[serde(alias = "rfc5424")]
     Syslog,
 
     /// Randomly generated logs in Syslog format ([RFC 3164][syslog_3164]).
+    ///
     /// [syslog_3164]: https://tools.ietf.org/html/rfc3164
     #[serde(alias = "rfc3164")]
     BsdSyslog,
 
     /// Randomly generated HTTP server logs in [JSON][json] format.
+    ///
     /// [json]: https://en.wikipedia.org/wiki/JSON
     #[derivative(Default)]
     Json,

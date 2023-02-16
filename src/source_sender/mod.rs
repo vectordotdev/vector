@@ -47,19 +47,16 @@ impl Builder {
     }
 
     pub fn add_output(&mut self, output: Output) -> LimitedReceiver<EventArray> {
+        let lag_time = self.lag_time.clone();
         match output.port {
             None => {
-                let (inner, rx) = Inner::new_with_buffer(
-                    self.buf_size,
-                    DEFAULT_OUTPUT.to_owned(),
-                    self.lag_time.clone(),
-                );
+                let (inner, rx) =
+                    Inner::new_with_buffer(self.buf_size, DEFAULT_OUTPUT.to_owned(), lag_time);
                 self.inner = Some(inner);
                 rx
             }
             Some(name) => {
-                let (inner, rx) =
-                    Inner::new_with_buffer(self.buf_size, name.clone(), self.lag_time.clone());
+                let (inner, rx) = Inner::new_with_buffer(self.buf_size, name.clone(), lag_time);
                 self.named_inners.insert(name, inner);
                 rx
             }

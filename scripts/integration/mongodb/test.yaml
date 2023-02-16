@@ -9,4 +9,4 @@ env:
   SECONDARY_MONGODB_ADDRESS: mongodb://root:toor@mongodb-secondary
 
 matrix:
-- version: [4.2.10]
+  version: [4.2.10]

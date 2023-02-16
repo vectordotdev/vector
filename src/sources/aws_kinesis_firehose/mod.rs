@@ -37,9 +37,7 @@ pub struct AwsKinesisFirehoseConfig {
     ///
     /// AWS Kinesis Firehose can be configured to pass along a user-configurable access key with each request. If
     /// configured, `access_key` should be set to the same value. Otherwise, all requests will be allowed.
-    ///
-    /// This option has been deprecated, the `access_keys` option should be used instead.
-    #[configurable(deprecated)]
+    #[configurable(deprecated = "This option has been deprecated, use `access_keys` instead.")]
     #[configurable(metadata(docs::examples = "A94A8FE5CCB19BA61C4C08"))]
     access_key: Option<SensitiveString>,
 
@@ -75,10 +73,12 @@ pub struct AwsKinesisFirehoseConfig {
     tls: Option<TlsEnableableConfig>,
 
     #[configurable(derived)]
+    #[configurable(metadata(docs::advanced))]
     #[serde(default = "default_framing_message_based")]
     framing: FramingConfig,
 
     #[configurable(derived)]
+    #[configurable(metadata(docs::advanced))]
     #[serde(default = "default_decoding")]
     decoding: DeserializerConfig,
 
@@ -98,6 +98,7 @@ const fn access_keys_example() -> [&'static str; 2] {
 
 /// Compression scheme for records in a Firehose message.
 #[configurable_component]
+#[configurable(metadata(docs::advanced))]
 #[derive(Clone, Copy, Debug, Derivative, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 #[derivative(Default)]
@@ -114,8 +115,10 @@ pub enum Compression {
     /// [magic_bytes]: https://en.wikipedia.org/wiki/List_of_file_signatures
     #[derivative(Default)]
     Auto,
+
     /// Uncompressed.
     None,
+
     /// GZIP.
     Gzip,
 }

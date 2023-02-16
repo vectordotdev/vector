@@ -29,7 +29,7 @@ base: components: sinks: gcp_stackdriver_metrics: configuration: {
 	}
 	api_key: {
 		description: """
-			An API key. ([documentation](https://cloud.google.com/docs/authentication/api-keys))
+			An [API key][gcp_api_key].
 
 			Either an API key, or a path to a service account credentials JSON file can be specified.
 
@@ -37,6 +37,8 @@ base: components: sinks: gcp_stackdriver_metrics: configuration: {
 			filename is named, an attempt is made to fetch an instance service account for the compute instance the program is
 			running on. If this is not on a GCE instance, then you must define it with an API key or service account
 			credentials JSON file.
+
+			[gcp_api_key]: https://cloud.google.com/docs/authentication/api-keys
 			"""
 		required: false
 		type: string: {}
@@ -75,7 +77,7 @@ base: components: sinks: gcp_stackdriver_metrics: configuration: {
 	}
 	credentials_path: {
 		description: """
-			Path to a service account credentials JSON file. ([documentation](https://cloud.google.com/docs/authentication/production#manually))
+			Path to a [service account] credentials JSON file.
 
 			Either an API key, or a path to a service account credentials JSON file can be specified.
 
@@ -83,6 +85,8 @@ base: components: sinks: gcp_stackdriver_metrics: configuration: {
 			filename is named, an attempt is made to fetch an instance service account for the compute instance the program is
 			running on. If this is not on a GCE instance, then you must define it with an API key or service account
 			credentials JSON file.
+
+			[gcp_service_account_credentials]: https://cloud.google.com/docs/authentication/production#manually
 			"""
 		required: false
 		type: string: {}
@@ -189,14 +193,20 @@ base: components: sinks: gcp_stackdriver_metrics: configuration: {
 				}
 			}
 			rate_limit_duration_secs: {
-				description: "The time window, in seconds, used for the `rate_limit_num` option."
+				description: "The time window used for the `rate_limit_num` option."
 				required:    false
-				type: uint: default: 1
+				type: uint: {
+					default: 1
+					unit:    "seconds"
+				}
 			}
 			rate_limit_num: {
 				description: "The maximum number of requests allowed within the `rate_limit_duration_secs` time window."
 				required:    false
-				type: uint: default: 9223372036854775807
+				type: uint: {
+					default: 9223372036854775807
+					unit:    "requests"
+				}
 			}
 			retry_attempts: {
 				description: """
@@ -205,7 +215,10 @@ base: components: sinks: gcp_stackdriver_metrics: configuration: {
 					The default, for all intents and purposes, represents an infinite number of retries.
 					"""
 				required: false
-				type: uint: default: 9223372036854775807
+				type: uint: {
+					default: 9223372036854775807
+					unit:    "retries"
+				}
 			}
 			retry_initial_backoff_secs: {
 				description: """
@@ -214,49 +227,65 @@ base: components: sinks: gcp_stackdriver_metrics: configuration: {
 					After the first retry has failed, the fibonacci sequence will be used to select future backoffs.
 					"""
 				required: false
-				type: uint: default: 1
+				type: uint: {
+					default: 1
+					unit:    "seconds"
+				}
 			}
 			retry_max_duration_secs: {
-				description: "The maximum amount of time, in seconds, to wait between retries."
+				description: "The maximum amount of time to wait between retries."
 				required:    false
-				type: uint: default: 3600
+				type: uint: {
+					default: 3600
+					unit:    "seconds"
+				}
 			}
 			timeout_secs: {
 				description: """
-					The maximum time a request can take before being aborted.
+					The time a request can take before being aborted.
 
 					It is highly recommended that you do not lower this value below the service’s internal timeout, as this could
 					create orphaned requests, pile on retries, and result in duplicate data downstream.
 					"""
 				required: false
-				type: uint: default: 60
+				type: uint: {
+					default: 60
+					unit:    "seconds"
+				}
 			}
 		}
 	}
 	resource: {
 		description: "The monitored resource to associate the metrics with."
 		required:    true
-		type: object: options: {
-			"*": {
-				description: "A type-specific label."
-				required:    true
-				type: string: {}
-			}
-			type: {
-				description: """
-					The monitored resource type.
+		type: object: {
+			examples: [{
+				instanceId: "Twilight"
+				projectId:  "vector-123456"
+				type:       "global"
+				zone:       "us-central1-a"
+			}]
+			options: {
+				"*": {
+					description: """
+						Values for all of the labels listed in the associated monitored resource descriptor.
 
-					For example, the type of a Compute Engine VM instance is `gce_instance`.
-					"""
-				required: true
-				type: string: {}
+						For example, Compute Engine VM instances use the labels `projectId`, `instanceId`, and `zone`.
+						"""
+					required: true
+					type: string: {}
+				}
+				type: {
+					description: """
+						The monitored resource type.
+
+						For example, the type of a Compute Engine VM instance is `gce_instance`.
+						"""
+					required: true
+					type: string: examples: ["global", "gce_instance"]
+				}
 			}
 		}
-	}
-	skip_authentication: {
-		description: "Skip all authentication handling. For use with integration tests only."
-		required:    false
-		type: bool: default: false
 	}
 	tls: {
 		description: "TLS configuration."

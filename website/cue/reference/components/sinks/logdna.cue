@@ -14,6 +14,7 @@ components: sinks: logdna: {
 
 	features: {
 		acknowledgements: true
+		auto_generated:   true
 		healthcheck: enabled: true
 		send: {
 			batch: {
@@ -53,78 +54,7 @@ components: sinks: logdna: {
 		notices: []
 	}
 
-	configuration: {
-		api_key: {
-			description: "The Ingestion API key."
-			required:    true
-			type: string: {
-				examples: ["${LOGDNA_API_KEY}", "ef8d5de700e7989468166c40fc8a0ccd"]
-			}
-		}
-		default_app: {
-			common:      false
-			description: "The default app that will be set for events that do not contain a `file` or `app` field."
-			required:    false
-			type: string: {
-				default: "vector"
-				examples: ["vector", "myapp"]
-			}
-		}
-		default_env: {
-			common:      false
-			description: "The default environment that will be set for events that do not contain an `env` field."
-			required:    false
-			type: string: {
-				default: "production"
-				examples: ["staging", "production"]
-			}
-		}
-		endpoint: {
-			common:      false
-			description: "The endpoint to send logs to."
-			required:    false
-			type: string: {
-				default: "https://logs.logdna.com/logs/ingest"
-				examples: ["http://127.0.0.1", "http://example.com"]
-			}
-		}
-		hostname: {
-			description: "The hostname that will be attached to each batch of events."
-			required:    true
-			type: string: {
-				examples: ["${HOSTNAME}", "my-local-machine"]
-			}
-		}
-		ip: {
-			common:      false
-			description: "The IP address that will be attached to each batch of events."
-			required:    false
-			type: string: {
-				default: null
-				examples: ["0.0.0.0"]
-			}
-		}
-		mac: {
-			common:      false
-			description: "The mac address that will be attached to each batch of events."
-			required:    false
-			type: string: {
-				default: null
-				examples: ["my-mac-address"]
-			}
-		}
-		tags: {
-			common:      false
-			description: "The tags that will be attached to each batch of events."
-			required:    false
-			type: array: {
-				default: null
-				items: type: string: {
-					examples: ["tag1", "tag2"]
-				}
-			}
-		}
-	}
+	configuration: base.components.sinks.logdna.configuration
 
 	input: {
 		logs:    true

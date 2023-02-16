@@ -35,15 +35,31 @@ pub struct HecMetricsSinkConfig {
     ///
     /// This namespace is only used if a metric has no existing namespace. When a namespace is
     /// present, it is used as a prefix to the metric name, and separated with a period (`.`).
+    #[configurable(metadata(docs::examples = "service"))]
     pub default_namespace: Option<String>,
 
     /// Default Splunk HEC token.
     ///
     /// If an event has a token set in its metadata, it will prevail over the one set here.
     #[serde(alias = "token")]
+    #[configurable(metadata(
+        docs::examples = "${SPLUNK_HEC_TOKEN}",
+        docs::examples = "A94A8FE5CCB19BA61C4C08"
+    ))]
     pub default_token: SensitiveString,
 
     /// The base URL of the Splunk instance.
+    ///
+    /// The scheme (`http` or `https`) must be specified. No path should be included since the paths defined
+    /// by the [`Splunk`][splunk] API are used.
+    ///
+    /// [splunk]: https://docs.splunk.com/Documentation/Splunk/8.0.0/Data/HECRESTendpoints
+    #[configurable(metadata(
+        docs::examples = "https://http-inputs-hec.splunkcloud.com",
+        docs::examples = "https://hec.splunk.com:8088",
+        docs::examples = "http://example.com"
+    ))]
+    #[configurable(validation(format = "uri"))]
     pub endpoint: String,
 
     /// Overrides the name of the log field used to grab the hostname to send to Splunk HEC.
@@ -51,17 +67,21 @@ pub struct HecMetricsSinkConfig {
     /// By default, the [global `log_schema.host_key` option][global_host_key] is used.
     ///
     /// [global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
+    #[configurable(metadata(docs::advanced))]
     #[serde(default = "host_key")]
     pub host_key: String,
 
     /// The name of the index where to send the events to.
     ///
-    /// If not specified, the default index is used.
+    /// If not specified, the default index defined within Splunk is used.
+    #[configurable(metadata(docs::examples = "{{ host }}", docs::examples = "custom_index"))]
     pub index: Option<Template>,
 
     /// The sourcetype of events sent to this sink.
     ///
     /// If unset, Splunk will default to `httpevent`.
+    #[configurable(metadata(docs::advanced))]
+    #[configurable(metadata(docs::examples = "{{ sourcetype }}", docs::examples = "_json",))]
     pub sourcetype: Option<Template>,
 
     /// The source of events sent to this sink.
@@ -69,6 +89,12 @@ pub struct HecMetricsSinkConfig {
     /// This is typically the filename the logs originated from.
     ///
     /// If unset, the Splunk collector will set it.
+    #[configurable(metadata(docs::advanced))]
+    #[configurable(metadata(
+        docs::examples = "{{ file }}",
+        docs::examples = "/var/log/syslog",
+        docs::examples = "UDP:514"
+    ))]
     pub source: Option<Template>,
 
     #[configurable(derived)]

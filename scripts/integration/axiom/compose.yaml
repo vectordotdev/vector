@@ -2,12 +2,10 @@ version: '3'
 
 services:
   postgres:
-    image: postgres:${AXIOM_VERSION}
+    image: postgres:${CONFIG_POSTGRES}
     environment:
       POSTGRES_USER: axiom
       POSTGRES_PASSWORD: axiom
-    volumes:
-    - postgres_data:/var/lib/postgresql/data
   axiom-db:
     image: axiomhq/axiom-db:latest
     restart: unless-stopped

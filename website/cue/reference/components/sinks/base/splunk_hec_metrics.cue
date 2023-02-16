@@ -40,9 +40,12 @@ base: components: sinks: splunk_hec_metrics: configuration: {
 				type: uint: default: 1000000
 			}
 			query_interval: {
-				description: "The amount of time, in seconds, to wait in between queries to the Splunk HEC indexer acknowledgement endpoint."
+				description: "The amount of time to wait between queries to the Splunk HEC indexer acknowledgement endpoint."
 				required:    false
-				type: uint: default: 10
+				type: uint: {
+					default: 10
+					unit:    "seconds"
+				}
 			}
 			retry_limit: {
 				description: "The maximum number of times an acknowledgement ID will be queried for its status."
@@ -100,7 +103,7 @@ base: components: sinks: splunk_hec_metrics: configuration: {
 					"""
 				none: "No compression."
 				zlib: """
-					[Zlib]][zlib] compression.
+					[Zlib][zlib] compression.
 
 					[zlib]: https://zlib.net/
 					"""
@@ -115,7 +118,7 @@ base: components: sinks: splunk_hec_metrics: configuration: {
 			present, it is used as a prefix to the metric name, and separated with a period (`.`).
 			"""
 		required: false
-		type: string: {}
+		type: string: examples: ["service"]
 	}
 	default_token: {
 		description: """
@@ -124,12 +127,19 @@ base: components: sinks: splunk_hec_metrics: configuration: {
 			If an event has a token set in its metadata, it will prevail over the one set here.
 			"""
 		required: true
-		type: string: {}
+		type: string: examples: ["${SPLUNK_HEC_TOKEN}", "A94A8FE5CCB19BA61C4C08"]
 	}
 	endpoint: {
-		description: "The base URL of the Splunk instance."
-		required:    true
-		type: string: {}
+		description: """
+			The base URL of the Splunk instance.
+
+			The scheme (`http` or `https`) must be specified. No path should be included since the paths defined
+			by the [`Splunk`][splunk] API are used.
+
+			[splunk]: https://docs.splunk.com/Documentation/Splunk/8.0.0/Data/HECRESTendpoints
+			"""
+		required: true
+		type: string: examples: ["https://http-inputs-hec.splunkcloud.com", "https://hec.splunk.com:8088", "http://example.com"]
 	}
 	host_key: {
 		description: """
@@ -146,10 +156,13 @@ base: components: sinks: splunk_hec_metrics: configuration: {
 		description: """
 			The name of the index where to send the events to.
 
-			If not specified, the default index is used.
+			If not specified, the default index defined within Splunk is used.
 			"""
 		required: false
-		type: string: syntax: "template"
+		type: string: {
+			examples: ["{{ host }}", "custom_index"]
+			syntax: "template"
+		}
 	}
 	request: {
 		description: """
@@ -232,14 +245,20 @@ base: components: sinks: splunk_hec_metrics: configuration: {
 				}
 			}
 			rate_limit_duration_secs: {
-				description: "The time window, in seconds, used for the `rate_limit_num` option."
+				description: "The time window used for the `rate_limit_num` option."
 				required:    false
-				type: uint: default: 1
+				type: uint: {
+					default: 1
+					unit:    "seconds"
+				}
 			}
 			rate_limit_num: {
 				description: "The maximum number of requests allowed within the `rate_limit_duration_secs` time window."
 				required:    false
-				type: uint: default: 9223372036854775807
+				type: uint: {
+					default: 9223372036854775807
+					unit:    "requests"
+				}
 			}
 			retry_attempts: {
 				description: """
@@ -248,7 +267,10 @@ base: components: sinks: splunk_hec_metrics: configuration: {
 					The default, for all intents and purposes, represents an infinite number of retries.
 					"""
 				required: false
-				type: uint: default: 9223372036854775807
+				type: uint: {
+					default: 9223372036854775807
+					unit:    "retries"
+				}
 			}
 			retry_initial_backoff_secs: {
 				description: """
@@ -257,22 +279,31 @@ base: components: sinks: splunk_hec_metrics: configuration: {
 					After the first retry has failed, the fibonacci sequence will be used to select future backoffs.
 					"""
 				required: false
-				type: uint: default: 1
+				type: uint: {
+					default: 1
+					unit:    "seconds"
+				}
 			}
 			retry_max_duration_secs: {
-				description: "The maximum amount of time, in seconds, to wait between retries."
+				description: "The maximum amount of time to wait between retries."
 				required:    false
-				type: uint: default: 3600
+				type: uint: {
+					default: 3600
+					unit:    "seconds"
+				}
 			}
 			timeout_secs: {
 				description: """
-					The maximum time a request can take before being aborted.
+					The time a request can take before being aborted.
 
 					It is highly recommended that you do not lower this value below the service’s internal timeout, as this could
 					create orphaned requests, pile on retries, and result in duplicate data downstream.
 					"""
 				required: false
-				type: uint: default: 60
+				type: uint: {
+					default: 60
+					unit:    "seconds"
+				}
 			}
 		}
 	}
@@ -285,7 +316,10 @@ base: components: sinks: splunk_hec_metrics: configuration: {
 			If unset, the Splunk collector will set it.
 			"""
 		required: false
-		type: string: syntax: "template"
+		type: string: {
+			examples: ["{{ file }}", "/var/log/syslog", "UDP:514"]
+			syntax: "template"
+		}
 	}
 	sourcetype: {
 		description: """
@@ -294,7 +328,10 @@ base: components: sinks: splunk_hec_metrics: configuration: {
 			If unset, Splunk will default to `httpevent`.
 			"""
 		required: false
-		type: string: syntax: "template"
+		type: string: {
+			examples: ["{{ sourcetype }}", "_json"]
+			syntax: "template"
+		}
 	}
 	tls: {
 		description: "TLS configuration."

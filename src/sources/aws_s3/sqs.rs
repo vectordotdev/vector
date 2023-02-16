@@ -60,6 +60,7 @@ pub(super) struct Config {
     #[configurable(metadata(
         docs::examples = "https://sqs.us-east-2.amazonaws.com/123456789012/MyQueue"
     ))]
+    #[configurable(validation(format = "uri"))]
     pub(super) queue_url: String,
 
     /// How long to wait while polling the queue for new messages, in seconds.

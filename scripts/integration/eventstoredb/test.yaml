@@ -1,9 +1,8 @@
 args:
-- --no-default-features
 - --features
 - eventstoredb_metrics-integration-tests
 - --lib
 - '::eventstoredb_metrics::'
 
 matrix:
-- version: [latest]
+  version: [latest]

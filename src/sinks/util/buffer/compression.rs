@@ -2,13 +2,14 @@ use std::{collections::BTreeSet, fmt};
 
 use indexmap::IndexMap;
 use serde::{de, ser};
+use serde_json::Value;
 use vector_config::{
     schema::{
         apply_metadata, generate_const_string_schema, generate_enum_schema, generate_one_of_schema,
         generate_struct_schema, get_or_generate_schema,
     },
     schemars::{gen::SchemaGenerator, schema::SchemaObject},
-    Configurable, GenerateError, Metadata,
+    Configurable, GenerateError, Metadata, ToValue,
 };
 use vector_config_common::attributes::CustomAttribute;
 
@@ -216,6 +217,7 @@ impl Configurable for Compression {
         metadata.set_title("Compression configuration.");
         metadata.set_description("All compression algorithms use the default compression level unless otherwise specified.");
         metadata.add_custom_attribute(CustomAttribute::kv("docs::enum_tagging", "external"));
+        metadata.add_custom_attribute(CustomAttribute::flag("docs::advanced"));
         metadata
     }
 
@@ -252,7 +254,7 @@ impl Configurable for Compression {
         );
         let zlib_string_subschema = generate_string_schema(
             "Zlib",
-            Some("[Zlib]][zlib] compression."),
+            Some("[Zlib][zlib] compression."),
             "[zlib]: https://zlib.net/",
         );
 
@@ -276,10 +278,7 @@ impl Configurable for Compression {
         // generation, where we need to be able to generate the right enum key/value pair for the
         // `none` algorithm as part of the overall set of enum values declared for the `algorithm`
         // field in the "full" schema version.
-        let mut compression_level_metadata = Metadata::default();
-        compression_level_metadata.set_transparent();
-        let compression_level_schema =
-            get_or_generate_schema::<CompressionLevel>(gen, compression_level_metadata)?;
+        let compression_level_schema = get_or_generate_schema::<CompressionLevel>(gen, None)?;
 
         let mut required = BTreeSet::new();
         required.insert(ALGORITHM_NAME.to_string());
@@ -291,7 +290,7 @@ impl Configurable for Compression {
         );
         properties.insert(LEVEL_NAME.to_string(), compression_level_schema);
 
-        let mut full_subschema = generate_struct_schema(properties, required, None);
+        let mut full_subschema = generate_struct_schema(properties, required);
         let mut full_metadata = Metadata::<()>::with_description("");
         full_metadata.add_custom_attribute(CustomAttribute::flag("docs::hidden"));
         apply_metadata(&mut full_subschema, full_metadata);
@@ -301,6 +300,12 @@ impl Configurable for Compression {
             all_string_oneof_subschema,
             full_subschema,
         ]))
+    }
+}
+
+impl ToValue for Compression {
+    fn to_value(&self) -> Value {
+        serde_json::to_value(self).expect("Could not convert compression settings to JSON")
     }
 }
 
@@ -435,6 +440,13 @@ impl Configurable for CompressionLevel {
 
         let valid_values = string_consts.chain(level_consts).collect();
         Ok(generate_enum_schema(valid_values))
+    }
+}
+
+impl ToValue for CompressionLevel {
+    fn to_value(&self) -> Value {
+        // FIXME
+        serde_json::to_value(self).expect("Could not convert compression level to JSON")
     }
 }
 

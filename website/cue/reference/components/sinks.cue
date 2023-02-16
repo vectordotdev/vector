@@ -24,6 +24,12 @@ components: sinks: [Name=string]: {
 			}
 		}
 
+		if features.send != _|_ && features.send.proxy != _|_ {
+			if features.send.proxy.enabled {
+				proxy: base.components.sinks.configuration.proxy
+			}
+		}
+
 		if !features.auto_generated {
 			if features.acknowledgements {
 				acknowledgements: {

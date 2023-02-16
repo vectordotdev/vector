@@ -76,7 +76,7 @@ base: components: sinks: humio_metrics: configuration: {
 					"""
 				none: "No compression."
 				zlib: """
-					[Zlib]][zlib] compression.
+					[Zlib][zlib] compression.
 
 					[zlib]: https://zlib.net/
 					"""
@@ -84,9 +84,19 @@ base: components: sinks: humio_metrics: configuration: {
 		}
 	}
 	endpoint: {
-		description: "The base URL of the Humio instance."
-		required:    false
-		type: string: {}
+		description: """
+			The base URL of the Humio instance.
+
+			The scheme (`http` or `https`) must be specified. No path should be included since the paths defined
+			by the [`Splunk`][splunk] api are used.
+
+			[splunk]: https://docs.splunk.com/Documentation/Splunk/8.0.0/Data/HECRESTendpoints
+			"""
+		required: false
+		type: string: {
+			default: "https://cloud.humio.com"
+			examples: ["http://127.0.0.1", "https://example.com"]
+		}
 	}
 	event_type: {
 		description: """
@@ -95,7 +105,10 @@ base: components: sinks: humio_metrics: configuration: {
 			If unset, Humio will default it to none.
 			"""
 		required: false
-		type: string: syntax: "template"
+		type: string: {
+			examples: ["json", "none", "{{ event_type }}"]
+			syntax: "template"
+		}
 	}
 	host_key: {
 		description: """
@@ -133,7 +146,10 @@ base: components: sinks: humio_metrics: configuration: {
 			[humio_data_format]: https://docs.humio.com/integrations/data-shippers/hec/#format-of-data
 			"""
 		required: false
-		type: string: syntax: "template"
+		type: string: {
+			examples: ["{{ host }}", "custom_index"]
+			syntax: "template"
+		}
 	}
 	indexed_fields: {
 		description: """
@@ -158,6 +174,8 @@ base: components: sinks: humio_metrics: configuration: {
 			When set to `single`, only the last non-bare value of tags will be displayed with the
 			metric.  When set to `full`, all metric tags will be exposed as separate assignments as
 			described by [the `native_json` codec][vector_native_json].
+
+			[vector_native_json]: https://github.com/vectordotdev/vector/blob/master/lib/codecs/tests/data/native_encoding/schema.cue
 			"""
 		required: false
 		type: string: {
@@ -253,14 +271,20 @@ base: components: sinks: humio_metrics: configuration: {
 				}
 			}
 			rate_limit_duration_secs: {
-				description: "The time window, in seconds, used for the `rate_limit_num` option."
+				description: "The time window used for the `rate_limit_num` option."
 				required:    false
-				type: uint: default: 1
+				type: uint: {
+					default: 1
+					unit:    "seconds"
+				}
 			}
 			rate_limit_num: {
 				description: "The maximum number of requests allowed within the `rate_limit_duration_secs` time window."
 				required:    false
-				type: uint: default: 9223372036854775807
+				type: uint: {
+					default: 9223372036854775807
+					unit:    "requests"
+				}
 			}
 			retry_attempts: {
 				description: """
@@ -269,7 +293,10 @@ base: components: sinks: humio_metrics: configuration: {
 					The default, for all intents and purposes, represents an infinite number of retries.
 					"""
 				required: false
-				type: uint: default: 9223372036854775807
+				type: uint: {
+					default: 9223372036854775807
+					unit:    "retries"
+				}
 			}
 			retry_initial_backoff_secs: {
 				description: """
@@ -278,22 +305,31 @@ base: components: sinks: humio_metrics: configuration: {
 					After the first retry has failed, the fibonacci sequence will be used to select future backoffs.
 					"""
 				required: false
-				type: uint: default: 1
+				type: uint: {
+					default: 1
+					unit:    "seconds"
+				}
 			}
 			retry_max_duration_secs: {
-				description: "The maximum amount of time, in seconds, to wait between retries."
+				description: "The maximum amount of time to wait between retries."
 				required:    false
-				type: uint: default: 3600
+				type: uint: {
+					default: 3600
+					unit:    "seconds"
+				}
 			}
 			timeout_secs: {
 				description: """
-					The maximum time a request can take before being aborted.
+					The time a request can take before being aborted.
 
 					It is highly recommended that you do not lower this value below the service’s internal timeout, as this could
 					create orphaned requests, pile on retries, and result in duplicate data downstream.
 					"""
 				required: false
-				type: uint: default: 60
+				type: uint: {
+					default: 60
+					unit:    "seconds"
+				}
 			}
 		}
 	}
@@ -408,6 +444,6 @@ base: components: sinks: humio_metrics: configuration: {
 	token: {
 		description: "The Humio ingestion token."
 		required:    true
-		type: string: {}
+		type: string: examples: ["${HUMIO_TOKEN}", "A94A8FE5CCB19BA61C4C08"]
 	}
 }

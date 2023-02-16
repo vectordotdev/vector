@@ -12,4 +12,4 @@ env:
   ELASTICSEARCH_HTTP_ADDRESS: http://elasticsearch:9200
 
 matrix:
-- version: [7.13.1]
+  version: [7.13.1]

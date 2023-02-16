@@ -59,11 +59,13 @@ pub struct PrometheusScrapeConfig {
     /// The tag name added to each event representing the scraped instance's host:port.
     ///
     /// The tag value will be the host/port of the scraped instance.
+    #[configurable(metadata(docs::advanced))]
     instance_tag: Option<String>,
 
     /// The tag name added to each event representing the scraped instance's endpoint.
     ///
     /// The tag value will be the endpoint of the scraped instance.
+    #[configurable(metadata(docs::advanced))]
     endpoint_tag: Option<String>,
 
     /// Controls how tag conflicts are handled if the scraped source has tags to be added.
@@ -73,6 +75,7 @@ pub struct PrometheusScrapeConfig {
     ///
     /// This matches Prometheus’ `honor_labels` configuration.
     #[serde(default = "crate::serde::default_false")]
+    #[configurable(metadata(docs::advanced))]
     honor_labels: bool,
 
     /// Custom parameters for the scrape request query string.
@@ -89,6 +92,7 @@ pub struct PrometheusScrapeConfig {
     tls: Option<TlsConfig>,
 
     #[configurable(derived)]
+    #[configurable(metadata(docs::advanced))]
     auth: Option<Auth>,
 }
 
@@ -741,7 +745,7 @@ mod integration_tests {
     #[tokio::test]
     async fn scrapes_metrics() {
         let config = PrometheusScrapeConfig {
-            endpoints: vec!["http://localhost:9090/metrics".into()],
+            endpoints: vec!["http://prometheus:9090/metrics".into()],
             interval: Duration::from_secs(1),
             instance_tag: Some("instance".to_string()),
             endpoint_tag: Some("endpoint".to_string()),
@@ -779,11 +783,11 @@ mod integration_tests {
         assert!(build.tags().unwrap().contains_key("version"));
         assert_eq!(
             build.tag_value("instance"),
-            Some("localhost:9090".to_string())
+            Some("prometheus:9090".to_string())
         );
         assert_eq!(
             build.tag_value("endpoint"),
-            Some("http://localhost:9090/metrics".to_string())
+            Some("http://prometheus:9090/metrics".to_string())
         );
 
         let queries = find_metric("prometheus_engine_queries");
@@ -791,11 +795,11 @@ mod integration_tests {
         assert!(matches!(queries.value(), &MetricValue::Gauge { .. }));
         assert_eq!(
             queries.tag_value("instance"),
-            Some("localhost:9090".to_string())
+            Some("prometheus:9090".to_string())
         );
         assert_eq!(
             queries.tag_value("endpoint"),
-            Some("http://localhost:9090/metrics".to_string())
+            Some("http://prometheus:9090/metrics".to_string())
         );
 
         let go_info = find_metric("go_info");
@@ -804,11 +808,11 @@ mod integration_tests {
         assert!(go_info.tags().unwrap().contains_key("version"));
         assert_eq!(
             go_info.tag_value("instance"),
-            Some("localhost:9090".to_string())
+            Some("prometheus:9090".to_string())
         );
         assert_eq!(
             go_info.tag_value("endpoint"),
-            Some("http://localhost:9090/metrics".to_string())
+            Some("http://prometheus:9090/metrics".to_string())
         );
     }
 }

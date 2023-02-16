@@ -2,14 +2,13 @@ package metadata
 
 base: components: sources: aws_kinesis_firehose: configuration: {
 	access_key: {
-		deprecated: true
+		deprecated:         true
+		deprecated_message: "This option has been deprecated, use `access_keys` instead."
 		description: """
 			An optional access key to authenticate requests against.
 
 			AWS Kinesis Firehose can be configured to pass along a user-configurable access key with each request. If
 			configured, `access_key` should be set to the same value. Otherwise, all requests will be allowed.
-
-			This option has been deprecated, the `access_keys` option should be used instead.
 			"""
 		required: false
 		type: string: examples: ["A94A8FE5CCB19BA61C4C08"]
@@ -124,6 +123,14 @@ base: components: sources: aws_kinesis_firehose: configuration: {
 																The maximum length of the byte buffer.
 
 																This length does *not* include the trailing delimiter.
+
+																By default, there is no maximum length enforced. If events are malformed, this can lead to
+																additional resource usage as events continue to be buffered in memory, and can potentially
+																lead to memory exhaustion in extreme cases.
+
+																If there is a risk of processing malformed data, such as logs with user-controlled input,
+																consider setting the maximum length to a reasonably large value as a safety net. This will
+																ensure that processing is not truly unbounded.
 																"""
 						required: false
 						type: uint: {}
@@ -157,6 +164,14 @@ base: components: sources: aws_kinesis_firehose: configuration: {
 						The maximum length of the byte buffer.
 
 						This length does *not* include the trailing delimiter.
+
+						By default, there is no maximum length enforced. If events are malformed, this can lead to
+						additional resource usage as events continue to be buffered in memory, and can potentially
+						lead to memory exhaustion in extreme cases.
+
+						If there is a risk of processing malformed data, such as logs with user-controlled input,
+						consider setting the maximum length to a reasonably large value as a safety net. This will
+						ensure that processing is not truly unbounded.
 						"""
 					required: false
 					type: uint: {}

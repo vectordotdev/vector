@@ -11,24 +11,20 @@ use super::{
     service::{DatadogMetricsRetryLogic, DatadogMetricsService},
     sink::DatadogMetricsSink,
 };
-use crate::tls::{MaybeTlsSettings, TlsEnableableConfig};
 use crate::{
-    common::datadog::get_base_domain,
+    common::datadog::get_base_domain_region,
     config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext},
     http::HttpClient,
     sinks::{
-        datadog::{get_api_validate_endpoint, healthcheck, Region},
-        util::{
-            batch::BatchConfig, Concurrency, ServiceBuilderExt, SinkBatchSettings,
-            TowerRequestConfig,
-        },
+        datadog::{default_site, get_api_validate_endpoint, healthcheck},
+        util::{batch::BatchConfig, ServiceBuilderExt, SinkBatchSettings, TowerRequestConfig},
         Healthcheck, UriParseSnafu, VectorSink,
     },
 };
-
-// TODO: revisit our concurrency and batching defaults
-const DEFAULT_REQUEST_LIMITS: TowerRequestConfig =
-    TowerRequestConfig::new(Concurrency::None).retry_attempts(5);
+use crate::{
+    common::datadog::Region,
+    tls::{MaybeTlsSettings, TlsEnableableConfig},
+};
 
 // This default is centered around "series" data, which should be the lion's share of what we
 // process.  Given that a single series, when encoded, is in the 150-300 byte range, we can fit a
@@ -38,6 +34,9 @@ const DEFAULT_REQUEST_LIMITS: TowerRequestConfig =
 // "we've exceeded our maximum payload size, split this batch" scenarios anyways.
 pub const MAXIMUM_PAYLOAD_COMPRESSED_SIZE: usize = 3_200_000;
 pub const MAXIMUM_PAYLOAD_SIZE: usize = 62_914_560;
+
+// TODO: revisit our concurrency and batching defaults
+const DEFAULT_REQUEST_RETRY_ATTEMPTS: usize = 5;
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct DatadogMetricsDefaultBatchSettings;
@@ -93,36 +92,51 @@ impl DatadogMetricsEndpointConfiguration {
 
 /// Configuration for the `datadog_metrics` sink.
 #[configurable_component(sink("datadog_metrics"))]
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct DatadogMetricsConfig {
     /// Sets the default namespace for any metrics sent.
     ///
     /// This namespace is only used if a metric has no existing namespace. When a namespace is
     /// present, it is used as a prefix to the metric name, and separated with a period (`.`).
+    #[configurable(metadata(docs::examples = "myservice"))]
+    #[serde(default)]
     pub default_namespace: Option<String>,
 
     /// The endpoint to send metrics to.
+    ///
+    /// The endpoint must contain an HTTP scheme, and may specify a
+    /// hostname or IP address and port.
+    ///
+    /// If set, overrides the `site` option.
+    #[configurable(metadata(docs::advanced))]
+    #[configurable(metadata(docs::examples = "http://127.0.0.1:8080"))]
+    #[configurable(metadata(docs::examples = "http://example.com:12345"))]
+    #[serde(default)]
     pub(crate) endpoint: Option<String>,
 
     /// The Datadog region to send metrics to.
-    ///
-    /// This option is deprecated, and the `site` field should be used instead.
-    #[configurable(deprecated)]
+    #[configurable(deprecated = "This option has been deprecated, use the `site` option instead.")]
+    #[serde(default)]
     pub region: Option<Region>,
 
     /// The Datadog [site][dd_site] to send metrics to.
     ///
     /// [dd_site]: https://docs.datadoghq.com/getting_started/site
-    pub site: Option<String>,
+    #[serde(default = "default_site")]
+    #[configurable(metadata(docs::examples = "us3.datadoghq.com"))]
+    #[configurable(metadata(docs::examples = "datadoghq.eu"))]
+    pub site: String,
 
     /// The default Datadog [API key][api_key] to send metrics with.
     ///
     /// If a metric has a Datadog [API key][api_key] set explicitly in its metadata, it will take
-    /// precedence over the default.
+    /// precedence over this setting.
     ///
     /// [api_key]: https://docs.datadoghq.com/api/?lang=bash#authentication
     #[serde(alias = "api_key")]
+    #[configurable(metadata(docs::examples = "${DATADOG_API_KEY_ENV_VAR}"))]
+    #[configurable(metadata(docs::examples = "ef8d5de700e7989468166c40fc8a0ccd"))]
     pub default_api_key: SensitiveString,
 
     #[configurable(derived)]
@@ -146,6 +160,22 @@ pub struct DatadogMetricsConfig {
 }
 
 impl_generate_config_from_default!(DatadogMetricsConfig);
+
+impl Default for DatadogMetricsConfig {
+    fn default() -> Self {
+        Self {
+            default_namespace: None,
+            endpoint: None,
+            region: None,
+            site: default_site(),
+            default_api_key: Default::default(),
+            batch: BatchConfig::default(),
+            request: TowerRequestConfig::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
+            tls: None,
+        }
+    }
+}
 
 #[async_trait::async_trait]
 impl SinkConfig for DatadogMetricsConfig {
@@ -181,7 +211,7 @@ impl DatadogMetricsConfig {
             format!(
                 "https://{}-vector.agent.{}",
                 version,
-                get_base_domain(self.site.as_ref(), self.region)
+                get_base_domain_region(self.site.as_str(), self.region)
             )
         })
     }
@@ -214,8 +244,10 @@ impl DatadogMetricsConfig {
     }
 
     fn build_healthcheck(&self, client: HttpClient) -> crate::Result<Healthcheck> {
-        let validate_endpoint =
-            get_api_validate_endpoint(self.endpoint.as_ref(), self.site.as_ref(), self.region)?;
+        let validate_endpoint = get_api_validate_endpoint(
+            self.endpoint.as_ref(),
+            get_base_domain_region(self.site.as_str(), self.region),
+        )?;
         Ok(healthcheck(
             client,
             validate_endpoint,
@@ -227,7 +259,11 @@ impl DatadogMetricsConfig {
     fn build_sink(&self, client: HttpClient) -> crate::Result<VectorSink> {
         let batcher_settings = self.batch.into_batcher_settings()?;
 
-        let request_limits = self.request.unwrap_with(&DEFAULT_REQUEST_LIMITS);
+        // TODO: revisit our concurrency and batching defaults
+        let request_limits = self.request.unwrap_with(
+            &TowerRequestConfig::default().retry_attempts(DEFAULT_REQUEST_RETRY_ATTEMPTS),
+        );
+
         let endpoint_configuration = self.generate_metrics_endpoint_configuration()?;
         let service = ServiceBuilder::new()
             .settings(request_limits, DatadogMetricsRetryLogic)

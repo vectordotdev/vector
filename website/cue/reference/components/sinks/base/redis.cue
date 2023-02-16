@@ -196,10 +196,23 @@ base: components: sinks: redis: configuration: {
 			}
 		}
 	}
+	endpoint: {
+		description: """
+			The URL of the Redis endpoint to connect to.
+
+			The URL _must_ take the form of `protocol://server:port/db` where the protocol can either be
+			`redis` or `rediss` for connections secured via TLS.
+			"""
+		required: true
+		type: string: examples: ["redis://127.0.0.1:6379/0"]
+	}
 	key: {
 		description: "The Redis key to publish messages to."
 		required:    true
-		type: string: syntax: "template"
+		type: string: {
+			examples: ["syslog:{{ app }}", "vector"]
+			syntax: "template"
+		}
 	}
 	list_option: {
 		description: "List-specific options."
@@ -304,14 +317,20 @@ base: components: sinks: redis: configuration: {
 				}
 			}
 			rate_limit_duration_secs: {
-				description: "The time window, in seconds, used for the `rate_limit_num` option."
+				description: "The time window used for the `rate_limit_num` option."
 				required:    false
-				type: uint: default: 1
+				type: uint: {
+					default: 1
+					unit:    "seconds"
+				}
 			}
 			rate_limit_num: {
 				description: "The maximum number of requests allowed within the `rate_limit_duration_secs` time window."
 				required:    false
-				type: uint: default: 9223372036854775807
+				type: uint: {
+					default: 9223372036854775807
+					unit:    "requests"
+				}
 			}
 			retry_attempts: {
 				description: """
@@ -320,7 +339,10 @@ base: components: sinks: redis: configuration: {
 					The default, for all intents and purposes, represents an infinite number of retries.
 					"""
 				required: false
-				type: uint: default: 9223372036854775807
+				type: uint: {
+					default: 9223372036854775807
+					unit:    "retries"
+				}
 			}
 			retry_initial_backoff_secs: {
 				description: """
@@ -329,33 +351,32 @@ base: components: sinks: redis: configuration: {
 					After the first retry has failed, the fibonacci sequence will be used to select future backoffs.
 					"""
 				required: false
-				type: uint: default: 1
+				type: uint: {
+					default: 1
+					unit:    "seconds"
+				}
 			}
 			retry_max_duration_secs: {
-				description: "The maximum amount of time, in seconds, to wait between retries."
+				description: "The maximum amount of time to wait between retries."
 				required:    false
-				type: uint: default: 3600
+				type: uint: {
+					default: 3600
+					unit:    "seconds"
+				}
 			}
 			timeout_secs: {
 				description: """
-					The maximum time a request can take before being aborted.
+					The time a request can take before being aborted.
 
 					It is highly recommended that you do not lower this value below the service’s internal timeout, as this could
 					create orphaned requests, pile on retries, and result in duplicate data downstream.
 					"""
 				required: false
-				type: uint: default: 60
+				type: uint: {
+					default: 60
+					unit:    "seconds"
+				}
 			}
 		}
-	}
-	url: {
-		description: """
-			The Redis URL to connect to.
-
-			The URL _must_ take the form of `protocol://server:port/db` where the protocol can either be
-			`redis` or `rediss` for connections secured via TLS.
-			"""
-		required: true
-		type: string: {}
 	}
 }

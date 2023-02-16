@@ -124,14 +124,17 @@ pub struct RedisSinkConfig {
     #[serde(alias = "list")]
     list_option: Option<ListOption>,
 
-    /// The Redis URL to connect to.
+    /// The URL of the Redis endpoint to connect to.
     ///
     /// The URL _must_ take the form of `protocol://server:port/db` where the protocol can either be
     /// `redis` or `rediss` for connections secured via TLS.
-    url: String,
+    #[configurable(metadata(docs::examples = "redis://127.0.0.1:6379/0"))]
+    #[serde(alias = "url")]
+    endpoint: String,
 
     /// The Redis key to publish messages to.
     #[configurable(validation(length(min = 1)))]
+    #[configurable(metadata(docs::examples = "syslog:{{ app }}", docs::examples = "vector"))]
     key: Template,
 
     #[configurable(derived)]
@@ -237,7 +240,7 @@ impl RedisSinkConfig {
 
     async fn build_client(&self) -> RedisResult<ConnectionManager> {
         trace!("Open Redis client.");
-        let client = redis::Client::open(self.url.as_str())?;
+        let client = redis::Client::open(self.endpoint.as_str())?;
         trace!("Open Redis client success.");
         trace!("Get Redis connection.");
         let conn = client.get_tokio_connection_manager().await;
@@ -493,7 +496,7 @@ mod integration_tests {
         debug!("Test events num: {}.", num_events);
 
         let cnf = RedisSinkConfig {
-            url: redis_server(),
+            endpoint: redis_server(),
             key: key.clone(),
             encoding: JsonSerializerConfig::default().into(),
             data_type: DataTypeConfig::List,
@@ -502,7 +505,7 @@ mod integration_tests {
             }),
             batch: BatchConfig::default(),
             request: TowerRequestConfig {
-                rate_limit_num: Option::from(u64::MAX),
+                rate_limit_num: Some(u64::MAX),
                 ..Default::default()
             },
             acknowledgements: Default::default(),
@@ -556,7 +559,7 @@ mod integration_tests {
         debug!("Test events num: {}.", num_events);
 
         let cnf = RedisSinkConfig {
-            url: redis_server(),
+            endpoint: redis_server(),
             key: key.clone(),
             encoding: JsonSerializerConfig::default().into(),
             data_type: DataTypeConfig::List,
@@ -565,7 +568,7 @@ mod integration_tests {
             }),
             batch: BatchConfig::default(),
             request: TowerRequestConfig {
-                rate_limit_num: Option::from(u64::MAX),
+                rate_limit_num: Some(u64::MAX),
                 ..Default::default()
             },
             acknowledgements: Default::default(),
@@ -635,14 +638,14 @@ mod integration_tests {
         let mut pubsub_stream = pubsub_conn.on_message();
 
         let cnf = RedisSinkConfig {
-            url: redis_server(),
+            endpoint: redis_server(),
             key: key.clone(),
             encoding: JsonSerializerConfig::default().into(),
             data_type: DataTypeConfig::Channel,
             list_option: None,
             batch: BatchConfig::default(),
             request: TowerRequestConfig {
-                rate_limit_num: Option::from(u64::MAX),
+                rate_limit_num: Some(u64::MAX),
                 ..Default::default()
             },
             acknowledgements: Default::default(),

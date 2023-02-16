@@ -1,10 +1,11 @@
+use serde_json::Value;
 use std::marker::PhantomData;
 
 use serde::{Serialize, Serializer};
 
 use crate::{
     schemars::{gen::SchemaGenerator, schema::SchemaObject},
-    Configurable, GenerateError, Metadata,
+    Configurable, GenerateError, Metadata, ToValue,
 };
 
 /// Delegated serialization.
@@ -93,5 +94,15 @@ where
     fn generate_schema(gen: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
         // Forward to the underlying `H`.
         H::generate_schema(gen)
+    }
+}
+
+impl<I, H> ToValue for Delegated<I, H>
+where
+    H: Configurable,
+    Delegated<I, H>: Serialize,
+{
+    fn to_value(&self) -> Value {
+        serde_json::to_value(self).unwrap()
     }
 }

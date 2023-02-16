@@ -9,4 +9,4 @@ env:
   SPLUNK_HEC_ADDRESS: http://splunk-hec:8088
 
 matrix:
-- version: ["8.2.4", "7.3"]
+  version: ["8.2.4", "7.3"]

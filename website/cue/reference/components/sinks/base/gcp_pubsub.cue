@@ -29,7 +29,7 @@ base: components: sinks: gcp_pubsub: configuration: {
 	}
 	api_key: {
 		description: """
-			An API key. ([documentation](https://cloud.google.com/docs/authentication/api-keys))
+			An [API key][gcp_api_key].
 
 			Either an API key, or a path to a service account credentials JSON file can be specified.
 
@@ -37,6 +37,8 @@ base: components: sinks: gcp_pubsub: configuration: {
 			filename is named, an attempt is made to fetch an instance service account for the compute instance the program is
 			running on. If this is not on a GCE instance, then you must define it with an API key or service account
 			credentials JSON file.
+
+			[gcp_api_key]: https://cloud.google.com/docs/authentication/api-keys
 			"""
 		required: false
 		type: string: {}
@@ -78,7 +80,7 @@ base: components: sinks: gcp_pubsub: configuration: {
 	}
 	credentials_path: {
 		description: """
-			Path to a service account credentials JSON file. ([documentation](https://cloud.google.com/docs/authentication/production#manually))
+			Path to a [service account] credentials JSON file.
 
 			Either an API key, or a path to a service account credentials JSON file can be specified.
 
@@ -86,6 +88,8 @@ base: components: sinks: gcp_pubsub: configuration: {
 			filename is named, an attempt is made to fetch an instance service account for the compute instance the program is
 			running on. If this is not on a GCE instance, then you must define it with an API key or service account
 			credentials JSON file.
+
+			[gcp_service_account_credentials]: https://cloud.google.com/docs/authentication/production#manually
 			"""
 		required: false
 		type: string: {}
@@ -207,14 +211,26 @@ base: components: sinks: gcp_pubsub: configuration: {
 		}
 	}
 	endpoint: {
-		description: "The endpoint to which to publish events."
-		required:    false
-		type: string: {}
+		description: """
+			The endpoint to which to publish events.
+
+			The scheme (`http` or `https`) must be specified. No path should be included since the paths defined
+			by the [`GCP Pub/Sub`][pubsub_api] api are used.
+
+			The trailing slash `/` must not be included.
+
+			[pubsub_api]: https://cloud.google.com/pubsub/docs/reference/rest
+			"""
+		required: false
+		type: string: {
+			default: "https://pubsub.googleapis.com"
+			examples: ["https://us-central1-pubsub.googleapis.com"]
+		}
 	}
 	project: {
 		description: "The project name to which to publish events."
 		required:    true
-		type: string: {}
+		type: string: examples: ["vector-123456"]
 	}
 	request: {
 		description: """
@@ -297,14 +313,20 @@ base: components: sinks: gcp_pubsub: configuration: {
 				}
 			}
 			rate_limit_duration_secs: {
-				description: "The time window, in seconds, used for the `rate_limit_num` option."
+				description: "The time window used for the `rate_limit_num` option."
 				required:    false
-				type: uint: default: 1
+				type: uint: {
+					default: 1
+					unit:    "seconds"
+				}
 			}
 			rate_limit_num: {
 				description: "The maximum number of requests allowed within the `rate_limit_duration_secs` time window."
 				required:    false
-				type: uint: default: 9223372036854775807
+				type: uint: {
+					default: 9223372036854775807
+					unit:    "requests"
+				}
 			}
 			retry_attempts: {
 				description: """
@@ -313,7 +335,10 @@ base: components: sinks: gcp_pubsub: configuration: {
 					The default, for all intents and purposes, represents an infinite number of retries.
 					"""
 				required: false
-				type: uint: default: 9223372036854775807
+				type: uint: {
+					default: 9223372036854775807
+					unit:    "retries"
+				}
 			}
 			retry_initial_backoff_secs: {
 				description: """
@@ -322,29 +347,33 @@ base: components: sinks: gcp_pubsub: configuration: {
 					After the first retry has failed, the fibonacci sequence will be used to select future backoffs.
 					"""
 				required: false
-				type: uint: default: 1
+				type: uint: {
+					default: 1
+					unit:    "seconds"
+				}
 			}
 			retry_max_duration_secs: {
-				description: "The maximum amount of time, in seconds, to wait between retries."
+				description: "The maximum amount of time to wait between retries."
 				required:    false
-				type: uint: default: 3600
+				type: uint: {
+					default: 3600
+					unit:    "seconds"
+				}
 			}
 			timeout_secs: {
 				description: """
-					The maximum time a request can take before being aborted.
+					The time a request can take before being aborted.
 
 					It is highly recommended that you do not lower this value below the service’s internal timeout, as this could
 					create orphaned requests, pile on retries, and result in duplicate data downstream.
 					"""
 				required: false
-				type: uint: default: 60
+				type: uint: {
+					default: 60
+					unit:    "seconds"
+				}
 			}
 		}
-	}
-	skip_authentication: {
-		description: "Skip all authentication handling. For use with integration tests only."
-		required:    false
-		type: bool: default: false
 	}
 	tls: {
 		description: "TLS configuration."
@@ -434,6 +463,6 @@ base: components: sinks: gcp_pubsub: configuration: {
 	topic: {
 		description: "The topic within the project to which to publish events."
 		required:    true
-		type: string: {}
+		type: string: examples: ["this-is-a-topic"]
 	}
 }

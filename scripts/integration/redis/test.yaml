@@ -8,4 +8,4 @@ env:
   REDIS_URL: redis://redis:6379/0
 
 matrix:
-- version: [6-alpine]
+  version: [6-alpine]

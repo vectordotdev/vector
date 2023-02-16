@@ -1,18 +1,18 @@
 use std::collections::BTreeMap;
-use std::fs;
 use std::path::{Path, PathBuf};
+use std::{env, fs};
 
 use anyhow::{bail, Context, Result};
 use hashlink::LinkedHashMap;
 use itertools::{self, Itertools};
 use serde::Deserialize;
+use serde_yaml::Value;
 
 use crate::{app, util};
 
 const FILE_NAME: &str = "test.yaml";
 
-pub type Environment = BTreeMap<String, String>;
-pub type EnvConfig = Option<Environment>;
+pub type Environment = BTreeMap<String, Option<String>>;
 
 #[derive(Deserialize, Debug)]
 pub struct RustToolchainRootConfig {
@@ -40,6 +40,8 @@ impl RustToolchainConfig {
 #[derive(Debug, Deserialize)]
 pub struct ComposeConfig {
     pub services: BTreeMap<String, ComposeService>,
+    #[serde(default)]
+    pub volumes: BTreeMap<String, Value>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -56,18 +58,37 @@ impl ComposeConfig {
     }
 }
 
-#[derive(Deserialize, Clone, Debug)]
+#[derive(Clone, Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct IntegrationTestConfig {
-    /// The list of arguments to add to the docker command line for the runner
+    /// The list of arguments to add to the command line for the test runner
     pub args: Vec<String>,
-    /// The set of environment variables to set in both the services and the runner.
-    pub(super) env: EnvConfig,
+    /// The set of environment variables to set in both the services and the runner. Variables with
+    /// no value are treated as "passthrough" -- they must be set by the caller of `vdev` and are
+    /// passed into the containers.
+    #[serde(default)]
+    pub env: Environment,
+    /// The matrix of environment configurations values.
+    matrix: LinkedHashMap<String, Vec<String>>,
+    /// Configuration specific to the compose services.
+    #[serde(default)]
+    pub runner: IntegrationRunnerConfig,
+}
+
+#[derive(Clone, Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct IntegrationRunnerConfig {
     /// The set of environment variables to set in just the runner. This is used for settings that
     /// might otherwise affect the operation of either docker or docker-compose but are needed in
     /// the runner.
-    pub(super) runner_env: EnvConfig,
-    /// The matrix of environment configurations values.
-    matrix: Vec<LinkedHashMap<String, Vec<String>>>,
+    #[serde(default)]
+    pub env: Environment,
+    /// The set of volumes that need to be mounted into the runner.
+    #[serde(default)]
+    pub volumes: BTreeMap<String, String>,
+    /// Does the test runner need access to the host's docker socket?
+    #[serde(default)]
+    pub needs_docker_socket: bool,
 }
 
 impl IntegrationTestConfig {
@@ -85,20 +106,20 @@ impl IntegrationTestConfig {
     }
 
     pub fn environments(&self) -> LinkedHashMap<String, Environment> {
-        let mut environments = LinkedHashMap::new();
-
-        for matrix in &self.matrix {
-            for product in matrix.values().multi_cartesian_product() {
-                let config: Environment = matrix
+        self.matrix
+            .values()
+            .multi_cartesian_product()
+            .map(|product| {
+                let key = product.iter().join("-");
+                let config: Environment = self
+                    .matrix
                     .keys()
-                    .zip(product.iter())
-                    .map(|(variable, &value)| (variable.clone(), value.clone()))
+                    .zip(product.into_iter())
+                    .map(|(variable, value)| (variable.clone(), Some(value.clone())))
                     .collect();
-                environments.insert(product.iter().join("-"), config);
-            }
-        }
-
-        environments
+                (key, config)
+            })
+            .collect()
     }
 
     pub fn load(integration: &str) -> Result<(PathBuf, Self)> {
@@ -129,5 +150,22 @@ impl IntegrationTestConfig {
         }
 
         Ok(configs)
+    }
+
+    /// Ensure that all passthrough environment variables are set.
+    pub fn check_required(&self) -> Result<()> {
+        let missing: Vec<_> = self
+            .env
+            .iter()
+            .chain(self.runner.env.iter())
+            .filter_map(|(key, value)| value.is_none().then_some(key))
+            .filter(|var| env::var(var).is_err())
+            .collect();
+        if missing.is_empty() {
+            Ok(())
+        } else {
+            let missing = missing.into_iter().join(", ");
+            bail!("Required environment variables are not set: {missing}");
+        }
     }
 }

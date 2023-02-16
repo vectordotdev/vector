@@ -1,9 +1,10 @@
+use serde_json::Value;
 use vector_config_common::validation::{Format, Validation};
 
 use crate::{
     schema::generate_string_schema,
     schemars::{gen::SchemaGenerator, schema::SchemaObject},
-    Configurable, GenerateError, Metadata,
+    Configurable, GenerateError, Metadata, ToValue,
 };
 
 impl Configurable for url::Url {
@@ -16,5 +17,11 @@ impl Configurable for url::Url {
 
     fn generate_schema(_: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
         Ok(generate_string_schema())
+    }
+}
+
+impl ToValue for url::Url {
+    fn to_value(&self) -> Value {
+        Value::String(self.to_string())
     }
 }

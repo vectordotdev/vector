@@ -326,8 +326,9 @@ impl Reduce {
 
     fn flush_into(&mut self, output: &mut Vec<Event>) {
         let mut flush_discriminants = Vec::new();
+        let now = Instant::now();
         for (k, t) in &self.reduce_merge_states {
-            if t.stale_since.elapsed() >= self.expire_after {
+            if (now - t.stale_since) >= self.expire_after {
                 flush_discriminants.push(k.clone());
             }
         }
@@ -404,8 +405,6 @@ impl Reduce {
         } else {
             self.push_or_new_reduce_state(event, discriminant)
         }
-
-        self.flush_into(output);
     }
 }
 
@@ -696,9 +695,9 @@ max_events = 0
 
         match reduce_config {
             Ok(_conf) => unreachable!("max_events=0 should be rejected."),
-            Err(err) => assert!(err.to_string().contains(
-                "invalid value: integer `0`, expected a nonzero usize for key `max_events`"
-            )),
+            Err(err) => assert!(err
+                .to_string()
+                .contains("invalid value: integer `0`, expected a nonzero usize")),
         }
     }
 

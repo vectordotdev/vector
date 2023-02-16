@@ -5,6 +5,7 @@
 #![deny(unused_assignments)]
 #![deny(unused_comparisons)]
 #![deny(warnings)]
+#![cfg_attr(docsrs, feature(doc_cfg), deny(rustdoc::broken_intra_doc_links))]
 #![allow(clippy::approx_constant)]
 #![allow(clippy::float_cmp)]
 #![allow(clippy::match_wild_err_arm)]

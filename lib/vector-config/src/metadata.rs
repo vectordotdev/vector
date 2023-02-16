@@ -2,8 +2,6 @@ use std::fmt;
 
 use vector_config_common::{attributes::CustomAttribute, validation};
 
-use crate::Configurable;
-
 /// The metadata associated with a given type or field.
 #[derive(Clone)]
 pub struct Metadata<T> {
@@ -75,23 +73,6 @@ impl<T> Metadata<T> {
         self.default_value.take()
     }
 
-    pub fn map_default_value<F, U>(self, f: F) -> Metadata<U>
-    where
-        F: FnOnce(T) -> U,
-        U: Configurable,
-    {
-        Metadata {
-            title: self.title,
-            description: self.description,
-            default_value: self.default_value.map(f),
-            custom_attributes: self.custom_attributes,
-            deprecated: self.deprecated,
-            deprecated_message: self.deprecated_message,
-            transparent: self.transparent,
-            validations: self.validations,
-        }
-    }
-
     pub fn deprecated(&self) -> bool {
         self.deprecated
     }
@@ -106,6 +87,13 @@ impl<T> Metadata<T> {
 
     pub fn set_deprecated_message(&mut self, message: &'static str) {
         self.deprecated_message = Some(message);
+    }
+
+    pub fn with_transparent(transparent: bool) -> Self {
+        Self {
+            transparent,
+            ..Default::default()
+        }
     }
 
     pub fn transparent(&self) -> bool {

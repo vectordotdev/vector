@@ -12,12 +12,17 @@ use vector_core::config::{LegacyKey, LogNamespace};
 
 use super::Config;
 
-/// Configuration for how the events are annotated with Node metadata.
+/// Configuration for how the events are enriched with Node metadata.
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields, default)]
 pub struct FieldsSpec {
-    /// Event field for Node labels.
+    /// Event field for the Node's labels.
+    ///
+    /// Set to `""` to suppress this key.
+    #[configurable(metadata(docs::examples = ".k8s.node_labels"))]
+    #[configurable(metadata(docs::examples = "k8s.node_labels"))]
+    #[configurable(metadata(docs::examples = ""))]
     pub node_labels: OptionalTargetPath,
 }
 

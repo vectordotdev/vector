@@ -27,16 +27,6 @@ base: components: sinks: aws_cloudwatch_metrics: configuration: {
 			type: bool: {}
 		}
 	}
-	assume_role: {
-		deprecated: true
-		description: """
-			The ARN of an [IAM role][iam_role] to assume at startup.
-
-			[iam_role]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles.html
-			"""
-		required: false
-		type: string: {}
-	}
 	auth: {
 		description: "Configuration of the authentication strategy for interacting with AWS services."
 		required:    false
@@ -176,7 +166,7 @@ base: components: sinks: aws_cloudwatch_metrics: configuration: {
 					"""
 				none: "No compression."
 				zlib: """
-					[Zlib]][zlib] compression.
+					[Zlib][zlib] compression.
 
 					[zlib]: https://zlib.net/
 					"""
@@ -185,13 +175,15 @@ base: components: sinks: aws_cloudwatch_metrics: configuration: {
 	}
 	default_namespace: {
 		description: """
-			The default namespace to use for metrics that do not have one.
+			The default [namespace][namespace] to use for metrics that do not have one.
 
 			Metrics with the same name can only be differentiated by their namespace, and not all
 			metrics have their own namespace.
+
+			[namespace]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/cloudwatch_concepts.html#Namespace
 			"""
 		required: true
-		type: string: {}
+		type: string: examples: ["service"]
 	}
 	endpoint: {
 		description: "Custom endpoint for use with AWS-compatible services."
@@ -288,14 +280,20 @@ base: components: sinks: aws_cloudwatch_metrics: configuration: {
 				}
 			}
 			rate_limit_duration_secs: {
-				description: "The time window, in seconds, used for the `rate_limit_num` option."
+				description: "The time window used for the `rate_limit_num` option."
 				required:    false
-				type: uint: default: 1
+				type: uint: {
+					default: 1
+					unit:    "seconds"
+				}
 			}
 			rate_limit_num: {
 				description: "The maximum number of requests allowed within the `rate_limit_duration_secs` time window."
 				required:    false
-				type: uint: default: 9223372036854775807
+				type: uint: {
+					default: 9223372036854775807
+					unit:    "requests"
+				}
 			}
 			retry_attempts: {
 				description: """
@@ -304,7 +302,10 @@ base: components: sinks: aws_cloudwatch_metrics: configuration: {
 					The default, for all intents and purposes, represents an infinite number of retries.
 					"""
 				required: false
-				type: uint: default: 9223372036854775807
+				type: uint: {
+					default: 9223372036854775807
+					unit:    "retries"
+				}
 			}
 			retry_initial_backoff_secs: {
 				description: """
@@ -313,22 +314,31 @@ base: components: sinks: aws_cloudwatch_metrics: configuration: {
 					After the first retry has failed, the fibonacci sequence will be used to select future backoffs.
 					"""
 				required: false
-				type: uint: default: 1
+				type: uint: {
+					default: 1
+					unit:    "seconds"
+				}
 			}
 			retry_max_duration_secs: {
-				description: "The maximum amount of time, in seconds, to wait between retries."
+				description: "The maximum amount of time to wait between retries."
 				required:    false
-				type: uint: default: 3600
+				type: uint: {
+					default: 3600
+					unit:    "seconds"
+				}
 			}
 			timeout_secs: {
 				description: """
-					The maximum time a request can take before being aborted.
+					The time a request can take before being aborted.
 
 					It is highly recommended that you do not lower this value below the service’s internal timeout, as this could
 					create orphaned requests, pile on retries, and result in duplicate data downstream.
 					"""
 				required: false
-				type: uint: default: 60
+				type: uint: {
+					default: 60
+					unit:    "seconds"
+				}
 			}
 		}
 	}
