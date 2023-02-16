@@ -193,7 +193,7 @@ pub enum Sinks {
     #[configurable(metadata(docs::label = "Blackhole"))]
     Blackhole(blackhole::BlackholeConfig),
 
-    /// Deliver log data to the ClickHouse database.
+    /// Deliver log data to a ClickHouse database.
     #[cfg(feature = "sinks-clickhouse")]
     #[configurable(metadata(docs::label = "ClickHouse"))]
     Clickhouse(clickhouse::ClickhouseConfig),
