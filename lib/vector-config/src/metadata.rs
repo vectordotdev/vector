@@ -58,19 +58,8 @@ impl<T> Metadata<T> {
         self.default_value.as_ref()
     }
 
-    pub fn with_default_value(default: T) -> Self {
-        Self {
-            default_value: Some(default),
-            ..Default::default()
-        }
-    }
-
     pub fn set_default_value(&mut self, default_value: T) {
         self.default_value = Some(default_value);
-    }
-
-    pub fn consume_default_value(&mut self) -> Option<T> {
-        self.default_value.take()
     }
 
     pub fn deprecated(&self) -> bool {
