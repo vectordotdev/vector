@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 
 use aws_sdk_s3::{
     error::PutObjectError,
@@ -37,6 +37,11 @@ pub struct S3Options {
     /// modify the ACL on the created objects.
     ///
     /// [grantee]: https://docs.aws.amazon.com/AmazonS3/latest/dev/acl-overview.html#specifying-grantee
+    #[configurable(metadata(
+        docs::examples = "79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be"
+    ))]
+    #[configurable(metadata(docs::examples = "person@email.com"))]
+    #[configurable(metadata(docs::examples = "http://acs.amazonaws.com/groups/global/AllUsers"))]
     pub grant_full_control: Option<String>,
 
     /// Grants `READ` permissions on the created objects to the named [grantee].
@@ -44,6 +49,11 @@ pub struct S3Options {
     /// This allows the grantee to read the created objects and their metadata.
     ///
     /// [grantee]: https://docs.aws.amazon.com/AmazonS3/latest/dev/acl-overview.html#specifying-grantee
+    #[configurable(metadata(
+        docs::examples = "79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be"
+    ))]
+    #[configurable(metadata(docs::examples = "person@email.com"))]
+    #[configurable(metadata(docs::examples = "http://acs.amazonaws.com/groups/global/AllUsers"))]
     pub grant_read: Option<String>,
 
     /// Grants `READ_ACP` permissions on the created objects to the named [grantee].
@@ -51,6 +61,11 @@ pub struct S3Options {
     /// This allows the grantee to read the ACL on the created objects.
     ///
     /// [grantee]: https://docs.aws.amazon.com/AmazonS3/latest/dev/acl-overview.html#specifying-grantee
+    #[configurable(metadata(
+        docs::examples = "79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be"
+    ))]
+    #[configurable(metadata(docs::examples = "person@email.com"))]
+    #[configurable(metadata(docs::examples = "http://acs.amazonaws.com/groups/global/AllUsers"))]
     pub grant_read_acp: Option<String>,
 
     /// Grants `WRITE_ACP` permissions on the created objects to the named [grantee].
@@ -58,6 +73,11 @@ pub struct S3Options {
     /// This allows the grantee to modify the ACL on the created objects.
     ///
     /// [grantee]: https://docs.aws.amazon.com/AmazonS3/latest/dev/acl-overview.html#specifying-grantee
+    #[configurable(metadata(
+        docs::examples = "79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be"
+    ))]
+    #[configurable(metadata(docs::examples = "person@email.com"))]
+    #[configurable(metadata(docs::examples = "http://acs.amazonaws.com/groups/global/AllUsers"))]
     pub grant_write_acp: Option<String>,
 
     /// The Server-side Encryption algorithm used when storing these objects.
@@ -69,6 +89,7 @@ pub struct S3Options {
     /// Only applies when `server_side_encryption` is configured to use KMS.
     ///
     /// If not specified, Amazon S3 uses the AWS managed CMK in AWS to protect the data.
+    #[configurable(metadata(docs::examples = "abcd1234"))]
     #[configurable(metadata(docs::templateable))]
     pub ssekms_key_id: Option<String>,
 
@@ -77,25 +98,41 @@ pub struct S3Options {
     /// See the [S3 Storage Classes][s3_storage_classes] for more details.
     ///
     /// [s3_storage_classes]: https://docs.aws.amazon.com/AmazonS3/latest/dev/storage-class-intro.html
-    pub storage_class: Option<S3StorageClass>,
+    #[serde(default)]
+    pub storage_class: S3StorageClass,
 
     /// The tag-set for the object.
     #[configurable(metadata(docs::additional_props_description = "A single tag."))]
+    #[configurable(metadata(docs::examples = "example_tags()"))]
     pub tags: Option<BTreeMap<String, String>>,
 
-    /// Specifies what content encoding has been applied to the object.
+    /// Overrides what content encoding has been applied to the object.
     ///
     /// Directly comparable to the `Content-Encoding` HTTP header.
     ///
-    /// By default, the compression scheme used dictates this value.
+    /// If not specified, the compression scheme used dictates this value.
+    #[configurable(metadata(docs::examples = "gzip"))]
     pub content_encoding: Option<String>,
 
-    /// Specifies the MIME type of the object.
+    /// Overrides the MIME type of the object.
     ///
     /// Directly comparable to the `Content-Type` HTTP header.
     ///
-    /// By default, `text/x-log` is used.
+    /// If not specified, the compression scheme used dictates this value.
+    /// When `compression` is set to `none`, the value `text/x-log` is used.
+    #[configurable(metadata(docs::examples = "application/gzip"))]
     pub content_type: Option<String>,
+}
+
+fn example_tags() -> HashMap<String, String> {
+    HashMap::<_, _>::from_iter(
+        [
+            ("Project".to_string(), "Blue".to_string()),
+            ("Classification".to_string(), "confidential".to_string()),
+            ("PHI".to_string(), "True".to_string()),
+        ]
+        .into_iter(),
+    )
 }
 
 /// S3 storage classes.
@@ -109,8 +146,6 @@ pub struct S3Options {
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum S3StorageClass {
     /// Standard Redundancy.
-    ///
-    /// This is the default.
     #[derivative(Default)]
     Standard,
 
@@ -198,13 +233,13 @@ pub enum S3CannedAcl {
     #[derivative(Default)]
     Private,
 
-    /// Bucket/object can be read publically.
+    /// Bucket/object can be read publicly.
     ///
     /// The bucket/object owner is granted the `FULL_CONTROL` permission, and anyone in the
     /// `AllUsers` grantee group is granted the `READ` permission.
     PublicRead,
 
-    /// Bucket/object can be read and written publically.
+    /// Bucket/object can be read and written publicly.
     ///
     /// The bucket/object owner is granted the `FULL_CONTROL` permission, and anyone in the
     /// `AllUsers` grantee group is granted the `READ` and `WRITE` permissions.
@@ -247,6 +282,10 @@ pub enum S3CannedAcl {
     ///
     /// Only relevant when specified for a bucket: this canned ACL is otherwise ignored when
     /// specified for an object.
+    ///
+    /// For more information about logs, see [Amazon S3 Server Access Logging][serverlogs].
+    ///
+    /// [serverlogs]: https://docs.aws.amazon.com/AmazonS3/latest/dev/ServerLogs.html
     LogDeliveryWrite,
 }
 
