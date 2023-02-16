@@ -111,6 +111,15 @@ components: sinks: azure_blob: {
 
 				You can control the resulting name via the [`blob_prefix`](#blob_prefix),
 				[`blob_time_format`](#blob_time_format), and [`blob_append_uuid`](#blob_append_uuid) options.
+
+				For example, to store objects at the root Azure storage folder, without a timestamp or UUID use
+				these configuration options:
+
+				```text
+				blob_prefix = "{{ my_file_name }}"
+				blob_time_format = ""
+				blob_append_uuid = false
+				```
 				"""
 		}
 	}
