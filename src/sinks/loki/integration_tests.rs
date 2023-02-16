@@ -170,7 +170,7 @@ async fn namespaced_timestamp() {
     let (timestamps, outputs) = fetch_stream(stream.to_string(), "default").await;
     assert_eq!(lines.len(), outputs.len());
     for (i, output) in outputs.iter().enumerate() {
-        let output = serde_json::from_str::<serde_json::Value>(&output).unwrap();
+        let output = serde_json::from_str::<serde_json::Value>(output).unwrap();
         let output = output.as_object().unwrap();
 
         // The sink should have removed the `norknork` field because we have configured
