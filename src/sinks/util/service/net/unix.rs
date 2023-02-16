@@ -7,7 +7,7 @@ use std::{
 };
 
 use futures::{future::BoxFuture, FutureExt};
-use snafu::{ResultExt, Snafu};
+use snafu::ResultExt;
 use tokio::{
     io::AsyncWriteExt,
     net::{UnixDatagram, UnixStream},
@@ -26,20 +26,7 @@ use crate::{
     sinks::{util::retries::ExponentialBackoff, Healthcheck},
 };
 
-#[derive(Debug, Snafu)]
-pub enum UnixError {
-    #[snafu(display("Failed to bind Unix socket: {}.", source))]
-    FailedToBind { source: std::io::Error },
-
-    #[snafu(display("Failed to send Unix datagram: {}", source))]
-    FailedToSend { source: std::io::Error },
-
-    #[snafu(display("Failed to connect to Unix endpoint: {}", source))]
-    FailedToConnect { source: std::io::Error },
-
-    #[snafu(display("Failed to get Unix socket back after send as channel closed unexpectedly."))]
-    ServiceSocketChannelClosed,
-}
+use super::{NetError, net_error::*};
 
 /// Unix socket modes.
 #[configurable_component]
@@ -69,7 +56,7 @@ pub struct UnixConnectorConfig {
     /// The Unix socket mode to use.
     unix_mode: UnixMode,
 
-    /// The size of the socket's send buffer, in bytes.
+    /// The size of the socket's send buffer.
     ///
     /// If set, the value of the setting is passed via the `SO_SNDBUF` option.
     #[configurable(metadata(docs::type_unit = "bytes"))]
@@ -131,19 +118,19 @@ pub struct UnixConnector {
 }
 
 impl UnixConnector {
-    async fn connect(&self) -> Result<(PathBuf, UnixEither), UnixError> {
+    async fn connect(&self) -> Result<(PathBuf, UnixEither), NetError> {
         let either_socket = match self.mode {
             UnixMode::Datagram => UnixDatagram::unbound()
-                .context(FailedToBindSnafu)
+                .context(FailedToBind)
                 .and_then(|datagram| {
                     datagram
                         .connect(&self.path)
-                        .context(FailedToConnectSnafu)
+                        .context(FailedToConnect)
                         .map(|_| UnixEither::Datagram(datagram))
                 })?,
             UnixMode::Stream => UnixStream::connect(&self.path)
                 .await
-                .context(FailedToConnectSnafu)
+                .context(FailedToConnect)
                 .map(UnixEither::Stream)?,
         };
 
@@ -222,7 +209,7 @@ impl UnixService {
 
 impl Service<Vec<u8>> for UnixService {
     type Response = usize;
-    type Error = UnixError;
+    type Error = NetError;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -247,7 +234,7 @@ impl Service<Vec<u8>> for UnixService {
                             Some(socket) => UnixServiceState::Connected(socket),
                             None => UnixServiceState::Disconnected,
                         },
-                        Err(_) => return Poll::Ready(Err(UnixError::ServiceSocketChannelClosed)),
+                        Err(_) => return Poll::Ready(Err(NetError::ServiceSocketChannelClosed)),
                     }
                 }
             };
@@ -264,7 +251,7 @@ impl Service<Vec<u8>> for UnixService {
         };
 
         Box::pin(async move {
-            match socket.send(&buf).await.context(FailedToSendSnafu) {
+            match socket.send(&buf).await.context(FailedToSend) {
                 Ok(sent) => {
                     // Emit an error if we weren't able to send the entire buffer.
                     if sent != buf.len() {

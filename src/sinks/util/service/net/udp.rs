@@ -5,7 +5,7 @@ use std::{
 };
 
 use futures::{future::BoxFuture, FutureExt};
-use snafu::{ResultExt, Snafu};
+use snafu::ResultExt;
 use tokio::{net::UdpSocket, sync::oneshot, time::sleep};
 use tower::Service;
 
@@ -18,31 +18,7 @@ use crate::{
     sinks::{util::retries::ExponentialBackoff, Healthcheck},
 };
 
-use super::HostAndPort;
-
-#[derive(Debug, Snafu)]
-pub enum UdpError {
-    #[snafu(display("Address was invalid: {}", reason))]
-    InvalidAddress { reason: String },
-
-    #[snafu(display("Failed to bind UDP socket: {}.", source))]
-    FailedToBind { source: std::io::Error },
-
-    #[snafu(display("Failed to send UDP datagram: {}", source))]
-    FailedToSend { source: std::io::Error },
-
-    #[snafu(display("Failed to connect to UDP endpoint: {}", source))]
-    FailedToConnect { source: std::io::Error },
-
-    #[snafu(display("No addresses returned."))]
-    NoAddresses,
-
-    #[snafu(display("Failed to resolve address: {}", source))]
-    FailedToResolve { source: crate::dns::DnsError },
-
-    #[snafu(display("Failed to get UDP socket back after send as channel closed unexpectedly."))]
-    ServiceSocketChannelClosed,
-}
+use super::{HostAndPort, NetError, net_error::*};
 
 /// `UdpConnector` configuration.
 #[configurable_component]
@@ -86,20 +62,20 @@ pub struct UdpConnector {
 }
 
 impl UdpConnector {
-    async fn connect(&self) -> Result<UdpSocket, UdpError> {
+    async fn connect(&self) -> Result<UdpSocket, NetError> {
         let ip = dns::Resolver
             .lookup_ip(self.address.host.clone())
             .await
-            .context(FailedToResolveSnafu)?
+            .context(FailedToResolve)?
             .next()
-            .ok_or(UdpError::NoAddresses)?;
+            .ok_or(NetError::NoAddresses)?;
 
         let addr = SocketAddr::new(ip, self.address.port);
         let bind_address = find_bind_address(&addr);
 
         let socket = UdpSocket::bind(bind_address)
             .await
-            .context(FailedToBindSnafu)?;
+            .context(FailedToBind)?;
 
         if let Some(send_buffer_size) = self.send_buffer_size {
             if let Err(error) = net::set_send_buffer_size(&socket, send_buffer_size) {
@@ -107,7 +83,7 @@ impl UdpConnector {
             }
         }
 
-        socket.connect(addr).await.context(FailedToConnectSnafu)?;
+        socket.connect(addr).await.context(FailedToConnect)?;
 
         Ok(socket)
     }
@@ -175,7 +151,7 @@ impl UdpService {
 
 impl Service<Vec<u8>> for UdpService {
     type Response = usize;
-    type Error = UdpError;
+    type Error = NetError;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -200,7 +176,7 @@ impl Service<Vec<u8>> for UdpService {
                             Some(socket) => UdpServiceState::Connected(socket),
                             None => UdpServiceState::Disconnected,
                         },
-                        Err(_) => return Poll::Ready(Err(UdpError::ServiceSocketChannelClosed)),
+                        Err(_) => return Poll::Ready(Err(NetError::ServiceSocketChannelClosed)),
                     }
                 }
             };
@@ -217,7 +193,7 @@ impl Service<Vec<u8>> for UdpService {
         };
 
         Box::pin(async move {
-            match socket.send(&buf).await.context(FailedToSendSnafu) {
+            match socket.send(&buf).await.context(FailedToSend) {
                 Ok(sent) => {
                     // Emit an error if we weren't able to send the entire buffer.
                     if sent != buf.len() {

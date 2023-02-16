@@ -5,7 +5,7 @@ use std::{
 };
 
 use futures::{future::BoxFuture, FutureExt};
-use snafu::{ResultExt, Snafu};
+use snafu::ResultExt;
 use tokio::{
     io::AsyncWriteExt,
     net::{TcpSocket, TcpStream},
@@ -24,31 +24,7 @@ use crate::{
     sinks::{util::retries::ExponentialBackoff, Healthcheck},
 };
 
-use super::HostAndPort;
-
-#[derive(Debug, Snafu)]
-pub enum TcpError {
-    #[snafu(display("Address was invalid: {}", reason))]
-    InvalidAddress { reason: String },
-
-    #[snafu(display("Failed to configure TCP socket: {}.", source))]
-    FailedToConfigure { source: std::io::Error },
-
-    #[snafu(display("Failed to send TCP message: {}", source))]
-    FailedToSend { source: std::io::Error },
-
-    #[snafu(display("Failed to connect to TCP endpoint: {}", source))]
-    FailedToConnect { source: std::io::Error },
-
-    #[snafu(display("No addresses returned."))]
-    NoAddresses,
-
-    #[snafu(display("Failed to resolve address: {}", source))]
-    FailedToResolve { source: crate::dns::DnsError },
-
-    #[snafu(display("Failed to get TCP stream back after send as channel closed unexpectedly."))]
-    ServiceStreamChannelClosed,
-}
+use super::{HostAndPort, NetError, net_error::*};
 
 /// `TcpConnector` configuration.
 #[configurable_component]
@@ -64,7 +40,7 @@ pub struct TcpConnectorConfig {
     #[configurable(derived)]
     keepalive: Option<TcpKeepaliveConfig>,
 
-    /// The size of the socket's send buffer, in bytes.
+    /// The size of the socket's send buffer.
     ///
     /// If set, the value of the setting is passed via the `SO_SNDBUF` option.
     #[configurable(metadata(docs::type_unit = "bytes"))]
@@ -103,20 +79,20 @@ pub struct TcpConnector {
 }
 
 impl TcpConnector {
-    async fn connect(&self) -> Result<(SocketAddr, TcpStream), TcpError> {
+    async fn connect(&self) -> Result<(SocketAddr, TcpStream), NetError> {
         let ip = dns::Resolver
             .lookup_ip(self.address.host.clone())
             .await
-            .context(FailedToResolveSnafu)?
+            .context(FailedToResolve)?
             .next()
-            .ok_or(TcpError::NoAddresses)?;
+            .ok_or(NetError::NoAddresses)?;
 
         let addr = SocketAddr::new(ip, self.address.port);
 
         let socket = if addr.is_ipv4() {
-            TcpSocket::new_v4().context(FailedToConfigureSnafu)?
+            TcpSocket::new_v4().context(FailedToConfigure)?
         } else {
-            TcpSocket::new_v6().context(FailedToConfigureSnafu)?
+            TcpSocket::new_v6().context(FailedToConfigure)?
         };
 
         if let Some(send_buffer_size) = self.send_buffer_size {
@@ -125,7 +101,7 @@ impl TcpConnector {
             }
         }
 
-        let stream = socket.connect(addr).await.context(FailedToConnectSnafu)?;
+        let stream = socket.connect(addr).await.context(FailedToConnect)?;
 
         let maybe_keepalive_secs = self
             .keepalive
@@ -208,7 +184,7 @@ impl TcpService {
 
 impl Service<Vec<u8>> for TcpService {
     type Response = usize;
-    type Error = TcpError;
+    type Error = NetError;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -233,7 +209,7 @@ impl Service<Vec<u8>> for TcpService {
                             Some(stream) => TcpServiceState::Connected(stream),
                             None => TcpServiceState::Disconnected,
                         },
-                        Err(_) => return Poll::Ready(Err(TcpError::ServiceStreamChannelClosed)),
+                        Err(_) => return Poll::Ready(Err(NetError::ServiceSocketChannelClosed)),
                     }
                 }
             };
@@ -252,7 +228,7 @@ impl Service<Vec<u8>> for TcpService {
         Box::pin(async move {
             let buf_len = buf.len();
 
-            match stream.write_all(&buf).await.context(FailedToSendSnafu) {
+            match stream.write_all(&buf).await.context(FailedToSend) {
                 Ok(_) => {
                     // Send the stream back to the service.
                     let _ = tx.send(Some(stream));

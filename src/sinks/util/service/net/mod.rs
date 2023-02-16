@@ -6,6 +6,7 @@ pub use self::tcp::{TcpConnector, TcpConnectorConfig};
 pub use self::udp::{UdpConnector, UdpConnectorConfig};
 pub use self::unix::{UnixConnector, UnixConnectorConfig, UnixMode};
 
+use snafu::Snafu;
 use vector_config::configurable_component;
 
 /// Hostname and port tuple.
@@ -13,7 +14,7 @@ use vector_config::configurable_component;
 #[derive(Clone, Debug)]
 #[serde(try_from = "String", into = "String")]
 #[configurable(metadata(docs::examples = "92.12.333.224:5000"))]
-#[configurable(metadata(docs::examples = "https://somehost:5000"))]
+#[configurable(metadata(docs::examples = "somehost:5000"))]
 struct HostAndPort {
     /// Hostname.
     host: String,
@@ -41,4 +42,32 @@ impl From<HostAndPort> for String {
     fn from(value: HostAndPort) -> Self {
         format!("{}:{}", value.host, value.port)
     }
+}
+
+#[derive(Debug, Snafu)]
+#[snafu(module, context(suffix(false)), visibility(pub))]
+pub enum NetError {
+    #[snafu(display("Address is invalid: {}", reason))]
+    InvalidAddress { reason: String },
+
+    #[snafu(display("Failed to resolve address: {}", source))]
+    FailedToResolve { source: crate::dns::DnsError },
+
+    #[snafu(display("No addresses returned."))]
+    NoAddresses,
+
+    #[snafu(display("Failed to configure socket: {}.", source))]
+    FailedToConfigure { source: std::io::Error },
+
+    #[snafu(display("Failed to bind socket: {}.", source))]
+    FailedToBind { source: std::io::Error },
+
+    #[snafu(display("Failed to send message: {}", source))]
+    FailedToSend { source: std::io::Error },
+
+    #[snafu(display("Failed to connect to endpoint: {}", source))]
+    FailedToConnect { source: std::io::Error },
+
+    #[snafu(display("Failed to get socket back after send as channel closed unexpectedly."))]
+    ServiceSocketChannelClosed,
 }
