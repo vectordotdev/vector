@@ -168,7 +168,7 @@ pub enum Sinks {
     #[configurable(metadata(docs::label = "AWS S3"))]
     AwsS3(aws_s3::S3SinkConfig),
 
-    /// Publish observability events to Simple Queue Service topics.
+    /// Publish observability events to AWS Simple Queue Service topics.
     #[cfg(feature = "sinks-aws_sqs")]
     #[configurable(metadata(docs::label = "AWS SQS"))]
     AwsSqs(aws_sqs::SqsSinkConfig),
