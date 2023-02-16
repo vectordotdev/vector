@@ -212,7 +212,7 @@ pub enum Sources {
     #[configurable(metadata(docs::label = "HTTP Server"))]
     HttpServer(http_server::SimpleHttpConfig),
 
-    /// Expose all log and trace messages emitted by the running Vector instance.
+    /// Expose all log messages emitted by the running Vector instance.
     #[cfg(feature = "sources-internal_logs")]
     #[configurable(metadata(docs::label = "Internal Logs"))]
     InternalLogs(internal_logs::InternalLogsConfig),
