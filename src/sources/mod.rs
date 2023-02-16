@@ -272,7 +272,7 @@ pub enum Sources {
     #[configurable(metadata(docs::label = "Prometheus Scrape"))]
     PrometheusScrape(prometheus::PrometheusScrapeConfig),
 
-    /// Collect metrics from Prometheus.
+    /// Receive metric via the Prometheus Remote Write protocol.
     #[cfg(feature = "sources-prometheus")]
     #[configurable(metadata(docs::label = "Prometheus Remote Write"))]
     PrometheusRemoteWrite(prometheus::PrometheusRemoteWriteConfig),
