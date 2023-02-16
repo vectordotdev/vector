@@ -196,7 +196,7 @@ pub enum Sources {
     #[configurable(metadata(docs::label = "Host metrics"))]
     HostMetrics(host_metrics::HostMetricsConfig),
 
-    /// Receive logs emitted by an HTTP server.
+    /// Host a HTTP endpoint to receive logs.
     #[cfg(feature = "sources-http_server")]
     #[configurable(deprecated)]
     #[configurable(metadata(docs::label = "HTTP"))]
@@ -207,7 +207,7 @@ pub enum Sources {
     #[configurable(metadata(docs::label = "HTTP Client"))]
     HttpClient(http_client::HttpClientConfig),
 
-    /// Receive logs emitted by an HTTP server.
+    /// Host a HTTP endpoint to receive logs.
     #[cfg(feature = "sources-http_server")]
     #[configurable(metadata(docs::label = "HTTP Server"))]
     HttpServer(http_server::SimpleHttpConfig),
