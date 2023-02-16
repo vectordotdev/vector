@@ -232,7 +232,7 @@ pub enum Sources {
     #[configurable(metadata(docs::label = "Kafka"))]
     Kafka(kafka::KafkaSourceConfig),
 
-    /// Collect logs from Kubernetes Nodes.
+    /// Collect Pod logs from Kubernetes Nodes.
     #[cfg(feature = "sources-kubernetes_logs")]
     #[configurable(metadata(docs::label = "Kubernetes Logs"))]
     KubernetesLogs(kubernetes_logs::Config),
