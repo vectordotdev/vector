@@ -151,7 +151,7 @@ pub enum Sources {
     #[configurable(metadata(docs::label = "dnstap"))]
     Dnstap(dnstap::DnstapConfig),
 
-    /// Collect logs from Docker.
+    /// Collect container logs from a Docker Daemon.
     #[cfg(feature = "sources-docker_logs")]
     #[configurable(metadata(docs::label = "Docker Logs"))]
     DockerLogs(docker_logs::DockerLogsConfig),
