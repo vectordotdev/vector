@@ -267,7 +267,7 @@ pub enum Sources {
     #[configurable(metadata(docs::label = "PostgreSQL Metrics"))]
     PostgresqlMetrics(postgresql_metrics::PostgresqlMetricsConfig),
 
-    /// Collect metrics via the Prometheus client.
+    /// Collect metrics from Prometheus exporters.
     #[cfg(feature = "sources-prometheus")]
     #[configurable(metadata(docs::label = "Prometheus Scrape"))]
     PrometheusScrape(prometheus::PrometheusScrapeConfig),
