@@ -27,16 +27,6 @@ base: components: sinks: aws_sqs: configuration: {
 			type: bool: {}
 		}
 	}
-	assume_role: {
-		deprecated: true
-		description: """
-			The ARN of an [IAM role][iam_role] to assume at startup.
-
-			[iam_role]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles.html
-			"""
-		required: false
-		type: string: {}
-	}
 	auth: {
 		description: "Configuration of the authentication strategy for interacting with AWS services."
 		required:    false
@@ -258,7 +248,7 @@ base: components: sinks: aws_sqs: configuration: {
 			[deduplication_id_docs]: https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/using-messagededuplicationid-property.html
 			"""
 		required: false
-		type: string: {}
+		type: string: examples: ["{{ transaction_id }}"]
 	}
 	message_group_id: {
 		description: """
@@ -267,12 +257,12 @@ base: components: sinks: aws_sqs: configuration: {
 			Can be applied only to FIFO queues.
 			"""
 		required: false
-		type: string: {}
+		type: string: examples: ["vector", "vector-%Y-%m-%d"]
 	}
 	queue_url: {
 		description: "The URL of the Amazon SQS queue to which messages are sent."
 		required:    true
-		type: string: {}
+		type: string: examples: ["https://sqs.us-east-2.amazonaws.com/123456789012/MyQueue"]
 	}
 	region: {
 		description: """
