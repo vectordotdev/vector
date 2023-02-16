@@ -11,7 +11,7 @@ mod status;
 use std::net::SocketAddr;
 
 use futures::{future::join, FutureExt, TryFutureExt};
-use lookup::{owned_value_path, LookupBuf};
+use lookup::{owned_value_path, OwnedTargetPath};
 use opentelemetry_proto::convert::{
     ATTRIBUTES_KEY, DROPPED_ATTRIBUTES_COUNT_KEY, FLAGS_KEY, OBSERVED_TIMESTAMP_KEY, RESOURCE_KEY,
     SEVERITY_NUMBER_KEY, SEVERITY_TEXT_KEY, SPAN_ID_KEY, TRACE_ID_KEY,
@@ -246,9 +246,11 @@ impl SourceConfig for OpentelemetryConfig {
             .with_standard_vector_source_metadata();
 
         let schema_definition = match log_namespace {
-            LogNamespace::Vector => schema_definition.with_meaning(LookupBuf::root(), "message"),
+            LogNamespace::Vector => {
+                schema_definition.with_meaning(OwnedTargetPath::event_root(), "message")
+            }
             LogNamespace::Legacy => {
-                schema_definition.with_meaning(log_schema().message_key(), "message")
+                schema_definition.with_meaning(log_schema().owned_message_path(), "message")
             }
         };
 

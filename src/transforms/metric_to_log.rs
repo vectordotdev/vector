@@ -205,6 +205,7 @@ impl TransformConfig for MetricToLogConfig {
                 schema_definition = schema_definition.with_metadata_field(
                     &owned_value_path!("vector"),
                     Kind::object(Collection::empty()),
+                    None,
                 );
             }
             LogNamespace::Legacy => {

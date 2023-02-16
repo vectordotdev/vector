@@ -1,3 +1,5 @@
+use lookup::lookup_v2::parse_target_path;
+use lookup::OwnedTargetPath;
 use once_cell::sync::{Lazy, OnceCell};
 use vector_config::configurable_component;
 
@@ -109,6 +111,15 @@ impl LogSchema {
 
     pub fn message_key(&self) -> &str {
         &self.message_key
+    }
+
+    /// Returns an `OwnedTargetPath` of the message key.
+    /// This parses the path and will panic if it is invalid.
+    ///
+    /// This should only be used where the result will either be cached,
+    /// or performance isn't critical, since this requires parsing / memory allocation.
+    pub fn owned_message_path(&self) -> OwnedTargetPath {
+        parse_target_path(self.message_key()).expect("valid message key")
     }
 
     pub fn timestamp_key(&self) -> &str {
