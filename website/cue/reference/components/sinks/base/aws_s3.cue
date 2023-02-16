@@ -262,11 +262,11 @@ base: components: sinks: aws_s3: configuration: {
 	}
 	content_encoding: {
 		description: """
-			Specifies what content encoding has been applied to the object.
+			Overrides what content encoding has been applied to the object.
 
 			Directly comparable to the `Content-Encoding` HTTP header.
 
-			By default, the compression scheme used dictates this value.
+			If not specified, the compression scheme used dictates this value.
 			"""
 		required: false
 		type: string: examples: [
@@ -275,11 +275,12 @@ base: components: sinks: aws_s3: configuration: {
 	}
 	content_type: {
 		description: """
-			Specifies the MIME type of the object.
+			Overrides the MIME type of the object.
 
 			Directly comparable to the `Content-Type` HTTP header.
 
-			By default, `text/x-log` is used.
+			If not specified, the compression scheme used dictates this value.
+			When `compression` is set to `none`, the value `text/x-log` is used.
 			"""
 		required: false
 		type: string: examples: ["application/gzip"]
@@ -752,10 +753,17 @@ base: components: sinks: aws_s3: configuration: {
 	tags: {
 		description: "The tag-set for the object."
 		required:    false
-		type: object: options: "*": {
-			description: "A single tag."
-			required:    true
-			type: string: {}
+		type: object: {
+			examples: [{
+				Classification: "confidential"
+				PHI:            "True"
+				Project:        "Blue"
+			}]
+			options: "*": {
+				description: "A single tag."
+				required:    true
+				type: string: {}
+			}
 		}
 	}
 	tls: {

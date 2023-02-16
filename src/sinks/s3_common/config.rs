@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 
 use aws_sdk_s3::{
     error::PutObjectError,
@@ -103,23 +103,36 @@ pub struct S3Options {
 
     /// The tag-set for the object.
     #[configurable(metadata(docs::additional_props_description = "A single tag."))]
+    #[configurable(metadata(docs::examples = "example_tags()"))]
     pub tags: Option<BTreeMap<String, String>>,
 
-    /// Specifies what content encoding has been applied to the object.
+    /// Overrides what content encoding has been applied to the object.
     ///
     /// Directly comparable to the `Content-Encoding` HTTP header.
     ///
-    /// By default, the compression scheme used dictates this value.
+    /// If not specified, the compression scheme used dictates this value.
     #[configurable(metadata(docs::examples = "gzip"))]
     pub content_encoding: Option<String>,
 
-    /// Specifies the MIME type of the object.
+    /// Overrides the MIME type of the object.
     ///
     /// Directly comparable to the `Content-Type` HTTP header.
     ///
-    /// By default, `text/x-log` is used.
+    /// If not specified, the compression scheme used dictates this value.
+    /// When `compression` is set to `none`, the value `text/x-log` is used.
     #[configurable(metadata(docs::examples = "application/gzip"))]
     pub content_type: Option<String>,
+}
+
+fn example_tags() -> HashMap<String, String> {
+    HashMap::<_, _>::from_iter(
+        [
+            ("Project".to_string(), "Blue".to_string()),
+            ("Classification".to_string(), "confidential".to_string()),
+            ("PHI".to_string(), "True".to_string()),
+        ]
+        .into_iter(),
+    )
 }
 
 /// S3 storage classes.
