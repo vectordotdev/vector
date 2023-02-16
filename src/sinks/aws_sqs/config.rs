@@ -38,6 +38,9 @@ pub(super) enum BuildError {
 pub struct SqsSinkConfig {
     /// The URL of the Amazon SQS queue to which messages are sent.
     #[configurable(validation(format = "uri"))]
+    #[configurable(metadata(
+        docs::examples = "https://sqs.us-east-2.amazonaws.com/123456789012/MyQueue"
+    ))]
     pub queue_url: String,
 
     #[serde(flatten)]
@@ -49,6 +52,8 @@ pub struct SqsSinkConfig {
     /// The tag that specifies that a message belongs to a specific message group.
     ///
     /// Can be applied only to FIFO queues.
+    #[configurable(metadata(docs::examples = "vector"))]
+    #[configurable(metadata(docs::examples = "vector-%Y-%m-%d"))]
     pub message_group_id: Option<String>,
 
     /// The message deduplication ID value to allow AWS to identify duplicate messages.
@@ -57,6 +62,7 @@ pub struct SqsSinkConfig {
     /// documentation][deduplication_id_docs] for more about how AWS does message deduplication.
     ///
     /// [deduplication_id_docs]: https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/using-messagededuplicationid-property.html
+    #[configurable(metadata(docs::examples = "{{ transaction_id }}"))]
     pub message_deduplication_id: Option<String>,
 
     #[configurable(derived)]
@@ -70,6 +76,7 @@ pub struct SqsSinkConfig {
     ///
     /// [iam_role]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles.html
     #[configurable(deprecated)]
+    #[configurable(metadata(docs::hidden))]
     pub assume_role: Option<String>,
 
     #[configurable(derived)]
