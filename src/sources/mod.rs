@@ -106,144 +106,180 @@ enum BuildError {
 #[serde(tag = "type", rename_all = "snake_case")]
 #[enum_dispatch(SourceConfig)]
 pub enum Sources {
-    /// AMQP.
+    /// Collect events from AMQP 0.9.1 compatible brokers like RabbitMQ.
     #[cfg(feature = "sources-amqp")]
+    #[configurable(metadata(docs::label = "AMQP"))]
     Amqp(amqp::AmqpSourceConfig),
 
-    /// Apache HTTP Server (HTTPD) Metrics.
+    /// Collect metrics from Apache's HTTPD server.
     #[cfg(feature = "sources-apache_metrics")]
+    #[configurable(metadata(docs::label = "Apache Metrics"))]
     ApacheMetrics(apache_metrics::ApacheMetricsConfig),
 
-    /// AWS ECS Metrics.
+    /// Collect Docker container stats for tasks running in AWS ECS and AWS Fargate.
     #[cfg(feature = "sources-aws_ecs_metrics")]
+    #[configurable(metadata(docs::label = "AWS ECS Metrics"))]
     AwsEcsMetrics(aws_ecs_metrics::AwsEcsMetricsSourceConfig),
 
-    /// AWS Kinesis Firehose.
+    /// Collect logs from AWS Kinesis Firehose.
     #[cfg(feature = "sources-aws_kinesis_firehose")]
+    #[configurable(metadata(docs::label = "AWS Kinesis Firehose"))]
     AwsKinesisFirehose(aws_kinesis_firehose::AwsKinesisFirehoseConfig),
 
-    /// AWS S3.
+    /// Collect logs from AWS S3.
     #[cfg(feature = "sources-aws_s3")]
+    #[configurable(metadata(docs::label = "AWS S3"))]
     AwsS3(aws_s3::AwsS3Config),
 
-    /// AWS SQS.
+    /// Collect logs from AWS SQS.
     #[cfg(feature = "sources-aws_sqs")]
+    #[configurable(metadata(docs::label = "AWS SQS"))]
     AwsSqs(aws_sqs::AwsSqsConfig),
 
-    /// Datadog Agent.
+    /// Receive logs, metrics, and traces collected by a Datadog Agent.
     #[cfg(feature = "sources-datadog_agent")]
+    #[configurable(metadata(docs::label = "Datadog Agent"))]
     DatadogAgent(datadog_agent::DatadogAgentConfig),
 
-    /// Demo logs.
+    /// Generate fake log events, which can be useful for testing and demos.
     #[cfg(feature = "sources-demo_logs")]
+    #[configurable(metadata(docs::label = "Demo Logs"))]
     DemoLogs(demo_logs::DemoLogsConfig),
 
-    /// DNSTAP.
+    /// Collect DNS logs from a dnstap-compatible server.
     #[cfg(all(unix, feature = "sources-dnstap"))]
+    #[configurable(metadata(docs::label = "dnstap"))]
     Dnstap(dnstap::DnstapConfig),
 
-    /// Docker Logs.
+    /// Collect container logs from a Docker Daemon.
     #[cfg(feature = "sources-docker_logs")]
+    #[configurable(metadata(docs::label = "Docker Logs"))]
     DockerLogs(docker_logs::DockerLogsConfig),
 
-    /// EventStoreDB Metrics.
+    /// Receive metrics from collected by a EventStoreDB.
     #[cfg(feature = "sources-eventstoredb_metrics")]
+    #[configurable(metadata(docs::label = "EventStoreDB Metrics"))]
     EventstoredbMetrics(eventstoredb_metrics::EventStoreDbConfig),
 
-    /// Exec.
+    /// Collect output from a process running on the host.
     #[cfg(feature = "sources-exec")]
+    #[configurable(metadata(docs::label = "Exec"))]
     Exec(exec::ExecConfig),
 
-    /// File.
+    /// Collect logs from files.
     #[cfg(feature = "sources-file")]
+    #[configurable(metadata(docs::label = "File"))]
     File(file::FileConfig),
 
-    /// File descriptor.
+    /// Collect logs from a file descriptor.
     #[cfg(all(unix, feature = "sources-file-descriptor"))]
+    #[configurable(metadata(docs::label = "File Descriptor"))]
     FileDescriptor(file_descriptors::file_descriptor::FileDescriptorSourceConfig),
 
-    /// Fluent.
+    /// Collect logs from a Fluentd or Fluent Bit agent.
     #[cfg(feature = "sources-fluent")]
+    #[configurable(metadata(docs::label = "Fluent"))]
     Fluent(fluent::FluentConfig),
 
-    /// GCP Pub/Sub.
+    /// Fetch observability events from GCP's Pub/Sub messaging system.
     #[cfg(feature = "sources-gcp_pubsub")]
+    #[configurable(metadata(docs::label = "GCP Pub/Sub"))]
     GcpPubsub(gcp_pubsub::PubsubConfig),
 
-    /// Heroku Logs.
+    /// Collect logs from Heroku's Logplex, the router responsible for receiving logs from your Heroku apps.
     #[cfg(feature = "sources-heroku_logs")]
+    #[configurable(metadata(docs::label = "Heroku Logplex"))]
     HerokuLogs(heroku_logs::LogplexConfig),
 
-    /// Host Metrics.
+    /// Collect metric data from the local system.
     #[cfg(feature = "sources-host_metrics")]
+    #[configurable(metadata(docs::label = "Host metrics"))]
     HostMetrics(host_metrics::HostMetricsConfig),
 
-    /// HTTP.
+    /// Host an HTTP endpoint to receive logs.
     #[cfg(feature = "sources-http_server")]
+    #[configurable(deprecated)]
+    #[configurable(metadata(docs::label = "HTTP"))]
     Http(http_server::HttpConfig),
 
-    /// HTTP Client.
+    /// Pull observability data from an HTTP server at a configured interval.
     #[cfg(feature = "sources-http_client")]
+    #[configurable(metadata(docs::label = "HTTP Client"))]
     HttpClient(http_client::HttpClientConfig),
 
-    /// HTTP Server.
+    /// Host an HTTP endpoint to receive logs.
     #[cfg(feature = "sources-http_server")]
+    #[configurable(metadata(docs::label = "HTTP Server"))]
     HttpServer(http_server::SimpleHttpConfig),
 
-    /// Internal Logs.
+    /// Expose internal log messages emitted by the running Vector instance.
     #[cfg(feature = "sources-internal_logs")]
+    #[configurable(metadata(docs::label = "Internal Logs"))]
     InternalLogs(internal_logs::InternalLogsConfig),
 
-    /// Internal Metrics.
+    /// Expose internal metrics emitted by the running Vector instance.
     #[cfg(feature = "sources-internal_metrics")]
+    #[configurable(metadata(docs::label = "Internal Metrics"))]
     InternalMetrics(internal_metrics::InternalMetricsConfig),
 
-    /// Journald.
+    /// Collect logs from JournalD.
     #[cfg(all(unix, feature = "sources-journald"))]
+    #[configurable(metadata(docs::label = "JournalD"))]
     Journald(journald::JournaldConfig),
 
-    /// Kafka.
+    /// Collect logs from Apache Kafka.
     #[cfg(feature = "sources-kafka")]
+    #[configurable(metadata(docs::label = "Kafka"))]
     Kafka(kafka::KafkaSourceConfig),
 
-    /// Kubernetes Logs.
+    /// Collect Pod logs from Kubernetes Nodes.
     #[cfg(feature = "sources-kubernetes_logs")]
+    #[configurable(metadata(docs::label = "Kubernetes Logs"))]
     KubernetesLogs(kubernetes_logs::Config),
 
-    /// Logstash.
+    /// Collect logs from a Logstash agent.
     #[cfg(all(feature = "sources-logstash"))]
+    #[configurable(metadata(docs::label = "Logstash"))]
     Logstash(logstash::LogstashConfig),
 
-    /// MongoDB Metrics.
+    /// Collect metrics from the MongoDB database.
     #[cfg(feature = "sources-mongodb_metrics")]
+    #[configurable(metadata(docs::label = "MongoDB Metrics"))]
     MongodbMetrics(mongodb_metrics::MongoDbMetricsConfig),
 
-    /// NATS.
+    /// Read observability data from subjects on the NATS messaging system.
     #[cfg(all(feature = "sources-nats"))]
+    #[configurable(metadata(docs::label = "NATS"))]
     Nats(nats::NatsSourceConfig),
 
-    /// NGINX Metrics.
+    /// Collect metrics from NGINX.
     #[cfg(feature = "sources-nginx_metrics")]
+    #[configurable(metadata(docs::label = "NGINX"))]
     NginxMetrics(nginx_metrics::NginxMetricsConfig),
 
-    /// OpenTelemetry.
+    /// Receive OTLP data through gRPC or HTTP.
     #[cfg(feature = "sources-opentelemetry")]
+    #[configurable(metadata(docs::label = "OpenTelemetry"))]
     Opentelemetry(opentelemetry::OpentelemetryConfig),
 
-    /// PostgreSQL Metrics.
+    /// Collect metrics from the PostgreSQL database.
     #[cfg(feature = "sources-postgresql_metrics")]
+    #[configurable(metadata(docs::label = "PostgreSQL Metrics"))]
     PostgresqlMetrics(postgresql_metrics::PostgresqlMetricsConfig),
 
-    /// Prometheus Scrape.
+    /// Collect metrics from Prometheus exporters.
     #[cfg(feature = "sources-prometheus")]
+    #[configurable(metadata(docs::label = "Prometheus Scrape"))]
     PrometheusScrape(prometheus::PrometheusScrapeConfig),
 
-    /// Prometheus Remote Write.
+    /// Receive metric via the Prometheus Remote Write protocol.
     #[cfg(feature = "sources-prometheus")]
+    #[configurable(metadata(docs::label = "Prometheus Remote Write"))]
     PrometheusRemoteWrite(prometheus::PrometheusRemoteWriteConfig),
 
-    /// Redis.
+    /// Collect observability data from Redis.
     #[cfg(feature = "sources-redis")]
+    #[configurable(metadata(docs::label = "Redis"))]
     Redis(redis::RedisSourceConfig),
 
     /// Test (backpressure).
@@ -266,24 +302,29 @@ pub enum Sources {
     #[cfg(test)]
     TestTripwire(crate::test_util::mock::sources::TripwireSourceConfig),
 
-    /// Socket.
+    /// Collect logs over a socket.
     #[cfg(feature = "sources-socket")]
+    #[configurable(metadata(docs::label = "Socket"))]
     Socket(socket::SocketConfig),
 
-    /// Splunk HEC.
+    /// Receive logs from Splunk.
     #[cfg(feature = "sources-splunk_hec")]
+    #[configurable(metadata(docs::label = "Splunk HEC"))]
     SplunkHec(splunk_hec::SplunkConfig),
 
-    /// StatsD.
+    /// Collect metrics emitted by the StatsD aggregator.
     #[cfg(feature = "sources-statsd")]
+    #[configurable(metadata(docs::label = "StatsD"))]
     Statsd(statsd::StatsdConfig),
 
-    /// Stdin.
+    /// Collect logs sent via stdin.
     #[cfg(feature = "sources-stdin")]
+    #[configurable(metadata(docs::label = "stdin"))]
     Stdin(file_descriptors::stdin::StdinConfig),
 
-    /// Syslog.
+    /// Collect logs sent via Syslog.
     #[cfg(feature = "sources-syslog")]
+    #[configurable(metadata(docs::label = "Syslog"))]
     Syslog(syslog::SyslogConfig),
 
     /// Unit test.
@@ -292,8 +333,9 @@ pub enum Sources {
     /// Unit test stream.
     UnitTestStream(UnitTestStreamSourceConfig),
 
-    /// Vector.
+    /// Collect observability data from a Vector instance.
     #[cfg(feature = "sources-vector")]
+    #[configurable(metadata(docs::label = "Vector"))]
     Vector(vector::VectorConfig),
 }
 

@@ -133,200 +133,249 @@ pub enum HealthcheckError {
 #[serde(tag = "type", rename_all = "snake_case")]
 #[enum_dispatch(SinkConfig)]
 pub enum Sinks {
-    /// AMQP.
+    /// Send events to AMQP 0.9.1 compatible brokers like RabbitMQ.
     #[cfg(feature = "sinks-amqp")]
+    #[configurable(metadata(docs::label = "AMQP"))]
     Amqp(amqp::AmqpSinkConfig),
 
-    /// Apex Logs.
+    /// Deliver log events to Apex.
     #[cfg(feature = "sinks-apex")]
+    #[configurable(metadata(docs::label = "Apex"))]
     Apex(apex::ApexSinkConfig),
 
-    /// AWS CloudWatch Logs.
+    /// Publish log events to AWS CloudWatch Logs.
     #[cfg(feature = "sinks-aws_cloudwatch_logs")]
+    #[configurable(metadata(docs::label = "AWS CloudWatch Logs"))]
     AwsCloudwatchLogs(aws_cloudwatch_logs::CloudwatchLogsSinkConfig),
 
-    /// AWS CloudWatch Metrics.
+    /// Publish metric events to AWS CloudWatch Metrics.
     #[cfg(feature = "sinks-aws_cloudwatch_metrics")]
+    #[configurable(metadata(docs::label = "AWS CloudWatch Metrics"))]
     AwsCloudwatchMetrics(aws_cloudwatch_metrics::CloudWatchMetricsSinkConfig),
 
-    /// AWS Kinesis Firehose.
+    /// Publish logs to AWS Kinesis Data Firehose topics.
     #[cfg(feature = "sinks-aws_kinesis_firehose")]
+    #[configurable(metadata(docs::label = "AWS Kinesis Data Firehose Logs"))]
     AwsKinesisFirehose(aws_kinesis::firehose::KinesisFirehoseSinkConfig),
 
-    /// AWS Kinesis Streams.
+    /// Publish logs to AWS Kinesis Streams topics.
     #[cfg(feature = "sinks-aws_kinesis_streams")]
+    #[configurable(metadata(docs::label = "AWS Kinesis Streams Logs"))]
     AwsKinesisStreams(aws_kinesis::streams::KinesisStreamsSinkConfig),
 
-    /// AWS S3.
+    /// Store observability events in the AWS S3 object storage system.
     #[cfg(feature = "sinks-aws_s3")]
+    #[configurable(metadata(docs::label = "AWS S3"))]
     AwsS3(aws_s3::S3SinkConfig),
 
-    /// AWS SQS.
+    /// Publish observability events to AWS Simple Queue Service topics.
     #[cfg(feature = "sinks-aws_sqs")]
+    #[configurable(metadata(docs::label = "AWS SQS"))]
     AwsSqs(aws_sqs::SqsSinkConfig),
 
-    /// Axiom.
+    /// Deliver log events to Axiom.
     #[cfg(feature = "sinks-axiom")]
+    #[configurable(metadata(docs::label = "Axiom"))]
     Axiom(axiom::AxiomConfig),
 
-    /// Azure Blob Storage.
+    /// Store your observability data in Azure Blob Storage.
     #[cfg(feature = "sinks-azure_blob")]
+    #[configurable(metadata(docs::label = "Azure Blob Storage"))]
     AzureBlob(azure_blob::AzureBlobSinkConfig),
 
-    /// Azure Monitor Logs.
+    /// Publish log events to the Azure Monitor Logs service.
     #[cfg(feature = "sinks-azure_monitor_logs")]
+    #[configurable(metadata(docs::label = "Azure Monitor Logs"))]
     AzureMonitorLogs(azure_monitor_logs::AzureMonitorLogsConfig),
 
-    /// Blackhole.
+    /// Send observability events nowhere, which can be useful for debugging purposes.
     #[cfg(feature = "sinks-blackhole")]
+    #[configurable(metadata(docs::label = "Blackhole"))]
     Blackhole(blackhole::BlackholeConfig),
 
-    /// ClickHouse.
+    /// Deliver log data to a ClickHouse database.
     #[cfg(feature = "sinks-clickhouse")]
+    #[configurable(metadata(docs::label = "ClickHouse"))]
     Clickhouse(clickhouse::ClickhouseConfig),
 
-    /// Console.
+    /// Display observability events in the console, which can be useful for debugging purposes.
     #[cfg(feature = "sinks-console")]
+    #[configurable(metadata(docs::label = "Console"))]
     Console(console::ConsoleSinkConfig),
 
-    /// Datadog Archives.
+    /// Send events to Datadog Archives.
     #[cfg(feature = "sinks-datadog_archives")]
+    #[configurable(metadata(docs::label = "Datadog Archives"))]
     DatadogArchives(datadog_archives::DatadogArchivesSinkConfig),
 
-    /// Datadog Events.
+    /// Publish observability events to the Datadog Events API.
     #[cfg(feature = "sinks-datadog_events")]
+    #[configurable(metadata(docs::label = "Datadog Events"))]
     DatadogEvents(datadog::events::DatadogEventsConfig),
 
-    /// Datadog Logs.
+    /// Publish log events to Datadog.
     #[cfg(feature = "sinks-datadog_logs")]
+    #[configurable(metadata(docs::label = "Datadog Logs"))]
     DatadogLogs(datadog::logs::DatadogLogsConfig),
 
-    /// Datadog Metrics.
+    /// Publish metric events to Datadog.
     #[cfg(feature = "sinks-datadog_metrics")]
+    #[configurable(metadata(docs::label = "Datadog Metrics"))]
     DatadogMetrics(datadog::metrics::DatadogMetricsConfig),
 
-    /// Datadog Traces.
+    /// Publish traces to Datadog.
     #[cfg(feature = "sinks-datadog_traces")]
+    #[configurable(metadata(docs::label = "Datadog Traces"))]
     DatadogTraces(datadog::traces::DatadogTracesConfig),
 
-    /// Elasticsearch.
+    /// Index observability events in Elasticsearch.
     #[cfg(feature = "sinks-elasticsearch")]
+    #[configurable(metadata(docs::label = "Elasticsearch"))]
     Elasticsearch(elasticsearch::ElasticsearchConfig),
 
-    /// File.
+    /// Output observability events into files.
     #[cfg(feature = "sinks-file")]
+    #[configurable(metadata(docs::label = "File"))]
     File(file::FileSinkConfig),
 
-    /// Google Chronicle (unstructured).
+    /// Store unstructured log events in Google Chronicle.
     #[cfg(feature = "sinks-gcp")]
+    #[configurable(metadata(docs::label = "GCP Chronicle Unstructured"))]
     GcpChronicleUnstructured(gcp::chronicle_unstructured::ChronicleUnstructuredConfig),
 
-    /// GCP Stackdriver Logs.
+    /// Deliver logs to GCP's Cloud Operations suite.
     #[cfg(feature = "sinks-gcp")]
+    #[configurable(metadata(docs::label = "GCP Operations (Stackdriver)"))]
     GcpStackdriverLogs(gcp::stackdriver_logs::StackdriverConfig),
 
-    /// GCP Stackdriver Metrics.
+    /// Deliver metrics to GCP's Cloud Monitoring system.
     #[cfg(feature = "sinks-gcp")]
+    #[configurable(metadata(docs::label = "GCP Cloud Monitoring (Stackdriver)"))]
     GcpStackdriverMetrics(gcp::stackdriver_metrics::StackdriverConfig),
 
-    /// GCP Cloud Storage.
+    /// Store observability events in GCP Cloud Storage.
     #[cfg(feature = "sinks-gcp")]
+    #[configurable(metadata(docs::label = "GCP Cloud Storage"))]
     GcpCloudStorage(gcp::cloud_storage::GcsSinkConfig),
 
-    /// GCP Pub/Sub.
+    /// Publish observability events to GCP's Pub/Sub messaging system.
     #[cfg(feature = "sinks-gcp")]
+    #[configurable(metadata(docs::label = "GCP Pub/Sub"))]
     GcpPubsub(gcp::pubsub::PubsubConfig),
 
-    /// Honeycomb.
+    /// Deliver log events to Honeycomb.
     #[cfg(feature = "sinks-honeycomb")]
+    #[configurable(metadata(docs::label = "Honeycomb"))]
     Honeycomb(honeycomb::HoneycombConfig),
 
-    /// HTTP.
+    /// Deliver observability event data to an HTTP server.
     #[cfg(feature = "sinks-http")]
+    #[configurable(metadata(docs::label = "HTTP"))]
     Http(http::HttpSinkConfig),
 
-    /// Humio Logs.
+    /// Deliver log event data to Humio.
     #[cfg(feature = "sinks-humio")]
+    #[configurable(metadata(docs::label = "Humio Logs"))]
     HumioLogs(humio::logs::HumioLogsConfig),
 
-    /// Humio Metrics.
+    /// Deliver metric event data to Humio.
     #[cfg(feature = "sinks-humio")]
+    #[configurable(metadata(docs::label = "Humio Metrics"))]
     HumioMetrics(humio::metrics::HumioMetricsConfig),
 
-    /// InfluxDB Logs.
+    /// Deliver log event data to InfluxDB.
     #[cfg(any(feature = "sinks-influxdb", feature = "prometheus-integration-tests"))]
+    #[configurable(metadata(docs::label = "InfluxDB Logs"))]
     InfluxdbLogs(influxdb::logs::InfluxDbLogsConfig),
 
-    /// InfluxDB Metrics.
+    /// Deliver metric event data to InfluxDB.
     #[cfg(any(feature = "sinks-influxdb", feature = "prometheus-integration-tests"))]
+    #[configurable(metadata(docs::label = "InfluxDB Metrics"))]
     InfluxdbMetrics(influxdb::metrics::InfluxDbConfig),
 
-    /// Kafka.
+    /// Publish observability event data to Apache Kafka topics.
     #[cfg(feature = "sinks-kafka")]
+    #[configurable(metadata(docs::label = "Kafka"))]
     Kafka(kafka::KafkaSinkConfig),
 
-    /// LogDNA.
+    /// Deliver log event data to LogDNA.
     #[cfg(feature = "sinks-logdna")]
+    #[configurable(metadata(docs::label = "LogDNA"))]
     Logdna(logdna::LogdnaConfig),
 
-    /// Loki.
+    /// Deliver log event data to the Loki aggregation system.
     #[cfg(feature = "sinks-loki")]
+    #[configurable(metadata(docs::label = "Loki"))]
     Loki(loki::LokiConfig),
 
-    /// NATS.
+    /// Publish observability data to subjects on the NATS messaging system.
     #[cfg(feature = "sinks-nats")]
+    #[configurable(metadata(docs::label = "NATS"))]
     Nats(self::nats::NatsSinkConfig),
 
-    /// New Relic.
+    /// Deliver events to New Relic.
     #[cfg(feature = "sinks-new_relic")]
+    #[configurable(metadata(docs::label = "New Relic"))]
     NewRelic(new_relic::NewRelicConfig),
 
-    /// Papertrail.
+    /// Deliver log events to Papertrail from SolarWinds.
     #[cfg(feature = "sinks-papertrail")]
+    #[configurable(metadata(docs::label = "Papertrail"))]
     Papertrail(papertrail::PapertrailConfig),
 
-    /// Prometheus Exporter.
+    /// Expose metric events on a Prometheus compatible endpoint.
     #[cfg(feature = "sinks-prometheus")]
+    #[configurable(metadata(docs::label = "Prometheus Exporter"))]
     PrometheusExporter(prometheus::exporter::PrometheusExporterConfig),
 
-    /// Prometheus Remote Write.
+    /// Deliver metric data to a Prometheus remote write endpoint.
     #[cfg(feature = "sinks-prometheus")]
+    #[configurable(metadata(docs::label = "Prometheus Remote Write"))]
     PrometheusRemoteWrite(prometheus::remote_write::RemoteWriteConfig),
 
-    /// Apache Pulsar.
+    /// Publish observability events to Apache Pulsar topics.
     #[cfg(feature = "sinks-pulsar")]
+    #[configurable(metadata(docs::label = "Pulsar"))]
     Pulsar(pulsar::PulsarSinkConfig),
 
-    /// Redis.
+    /// Publish observability data to Redis.
     #[cfg(feature = "sinks-redis")]
+    #[configurable(metadata(docs::label = "Redis"))]
     Redis(redis::RedisSinkConfig),
 
-    /// Sematext Logs.
+    /// Publish log events to Sematext.
     #[cfg(feature = "sinks-sematext")]
+    #[configurable(metadata(docs::label = "Sematext Logs"))]
     SematextLogs(sematext::logs::SematextLogsConfig),
 
-    /// Sematext Metrics.
+    /// Publish metric events to Sematext.
     #[cfg(feature = "sinks-sematext")]
+    #[configurable(metadata(docs::label = "Sematext Metrics"))]
     SematextMetrics(sematext::metrics::SematextMetricsConfig),
 
-    /// Socket.
+    /// Deliver logs to a remote socket endpoint.
     #[cfg(feature = "sinks-socket")]
+    #[configurable(metadata(docs::label = "Socket"))]
     Socket(socket::SocketSinkConfig),
 
-    /// Splunk HEC Logs.
+    /// Deliver log data to Splunk's HTTP Event Collector.
     #[cfg(feature = "sinks-splunk_hec")]
+    #[configurable(metadata(docs::label = "Splunk HEC Logs"))]
     SplunkHecLogs(splunk_hec::logs::config::HecLogsSinkConfig),
 
-    /// Splunk HEC Metrics.
+    /// Deliver metric data to Splunk's HTTP Event Collector.
     #[cfg(feature = "sinks-splunk_hec")]
+    #[configurable(metadata(docs::label = "Splunk HEC Metrics"))]
     SplunkHecMetrics(splunk_hec::metrics::config::HecMetricsSinkConfig),
 
-    /// StatsD.
+    /// Deliver metric data to a StatsD aggregator.
     #[cfg(feature = "sinks-statsd")]
+    #[configurable(metadata(docs::label = "Statsd"))]
     Statsd(statsd::StatsdSinkConfig),
 
     /// Test (adaptive concurrency).
     #[cfg(all(test, feature = "sources-demo_logs"))]
+    #[configurable(metadata(docs::label = ""))]
     TestArc(self::util::adaptive_concurrency::tests::TestConfig),
 
     /// Test (backpressure).
@@ -355,12 +404,14 @@ pub enum Sinks {
     /// Unit test stream.
     UnitTestStream(UnitTestStreamSinkConfig),
 
-    /// Vector.
+    /// Relay observability data to a Vector instance.
     #[cfg(feature = "sinks-vector")]
+    #[configurable(metadata(docs::label = "Vector"))]
     Vector(vector::VectorConfig),
 
-    /// Websocket.
+    /// Deliver observability event data to a websocket listener.
     #[cfg(feature = "sinks-websocket")]
+    #[configurable(metadata(docs::label = "Websocket"))]
     Websocket(websocket::WebSocketSinkConfig),
 }
 
