@@ -323,7 +323,7 @@ pub enum Sinks {
     #[configurable(metadata(docs::label = "Papertrail"))]
     Papertrail(papertrail::PapertrailConfig),
 
-    /// Output metric events to a Prometheus exporter running on the host.
+    /// Expose metric events on a Prometheus compatible endpoint.
     #[cfg(feature = "sinks-prometheus")]
     #[configurable(metadata(docs::label = "Prometheus Exporter"))]
     PrometheusExporter(prometheus::exporter::PrometheusExporterConfig),
