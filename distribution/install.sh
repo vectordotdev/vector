@@ -173,7 +173,7 @@ install_from_archive() {
     ensure mkdir -p "$_dir"
 
     printf "%s Downloading Vector via %s" "$_prompt" "$_url"
-    ensure downloader "$_url" "$_file"
+    ensure downloader "$_url" "$_file" "$_arch"
     printf " ✓\n"
 
     ensure mkdir -p "$prefix"
