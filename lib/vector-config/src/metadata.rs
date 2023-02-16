@@ -5,7 +5,8 @@ use vector_config_common::{attributes::CustomAttribute, validation};
 use crate::ToValue;
 
 /// The metadata associated with a given type or field.
-pub struct Metadata<T> {
+#[derive(Default)]
+pub struct Metadata {
     title: Option<&'static str>,
     description: Option<&'static str>,
     default_value: Option<Box<dyn ToValue>>,
@@ -14,10 +15,9 @@ pub struct Metadata<T> {
     deprecated_message: Option<&'static str>,
     transparent: bool,
     validations: Vec<validation::Validation>,
-    _dummy: std::marker::PhantomData<T>,
 }
 
-impl<T> Metadata<T> {
+impl Metadata {
     pub fn with_title(title: &'static str) -> Self {
         Self {
             title: Some(title),
@@ -111,7 +111,7 @@ impl<T> Metadata<T> {
         self.validations.push(validation);
     }
 
-    pub fn merge(mut self, other: Metadata<T>) -> Self {
+    pub fn merge(mut self, other: Metadata) -> Self {
         self.custom_attributes.extend(other.custom_attributes);
         self.validations.extend(other.validations);
 
@@ -124,14 +124,13 @@ impl<T> Metadata<T> {
             deprecated_message: other.deprecated_message.or(self.deprecated_message),
             transparent: other.transparent,
             validations: self.validations,
-            _dummy: Default::default(),
         }
     }
 
     /// Converts this metadata from holding a default value of `T` to `U`.
     ///
     /// If a default value was present before, it is dropped.
-    pub fn convert<U>(&self) -> Metadata<U> {
+    pub(crate) fn convert(&self) -> Metadata {
         Metadata {
             title: self.title,
             description: self.description,
@@ -141,28 +140,11 @@ impl<T> Metadata<T> {
             deprecated_message: self.deprecated_message,
             transparent: self.transparent,
             validations: self.validations.clone(),
-            _dummy: Default::default(),
         }
     }
 }
 
-impl<T> Default for Metadata<T> {
-    fn default() -> Self {
-        Self {
-            title: None,
-            description: None,
-            default_value: None,
-            custom_attributes: Vec::new(),
-            deprecated: false,
-            deprecated_message: None,
-            transparent: false,
-            validations: Vec::new(),
-            _dummy: Default::default(),
-        }
-    }
-}
-
-impl<T> fmt::Debug for Metadata<T> {
+impl fmt::Debug for Metadata {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Metadata")
             .field("title", &self.title)

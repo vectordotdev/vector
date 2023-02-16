@@ -7,7 +7,7 @@ use crate::{
 };
 
 impl Configurable for no_proxy::NoProxy {
-    fn metadata() -> Metadata<Self> {
+    fn metadata() -> Metadata {
         // Any schema that maps to a scalar type needs to be marked as transparent... and since we
         // generate a schema equivalent to a string, we need to mark ourselves as transparent, too.
         Metadata::with_transparent(true)

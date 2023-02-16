@@ -11,7 +11,7 @@ impl<TZ> Configurable for DateTime<TZ>
 where
     TZ: TimeZone,
 {
-    fn metadata() -> Metadata<Self> {
+    fn metadata() -> Metadata {
         let mut metadata = Metadata::default();
         metadata.set_description("ISO 8601 combined date and time with timezone.");
         metadata

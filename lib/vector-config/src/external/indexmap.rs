@@ -19,12 +19,12 @@ where
         true
     }
 
-    fn metadata() -> Metadata<Self> {
+    fn metadata() -> Metadata {
         Metadata::with_transparent(true)
     }
 
-    fn validate_metadata(metadata: &Metadata<Self>) -> Result<(), GenerateError> {
-        let converted = metadata.convert::<V>();
+    fn validate_metadata(metadata: &Metadata) -> Result<(), GenerateError> {
+        let converted = metadata.convert();
         V::validate_metadata(&converted)
     }
 
@@ -54,12 +54,12 @@ impl<V> Configurable for IndexSet<V>
 where
     V: Configurable + ToValue + std::hash::Hash + Eq,
 {
-    fn metadata() -> Metadata<Self> {
+    fn metadata() -> Metadata {
         Metadata::with_transparent(true)
     }
 
-    fn validate_metadata(metadata: &Metadata<Self>) -> Result<(), GenerateError> {
-        let converted = metadata.convert::<V>();
+    fn validate_metadata(metadata: &Metadata) -> Result<(), GenerateError> {
+        let converted = metadata.convert();
         V::validate_metadata(&converted)
     }
 

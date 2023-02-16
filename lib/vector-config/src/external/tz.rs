@@ -7,7 +7,7 @@ use crate::{
 };
 
 impl Configurable for chrono_tz::Tz {
-    fn metadata() -> Metadata<Self> {
+    fn metadata() -> Metadata {
         let mut metadata = Metadata::default();
         metadata.set_description("An IANA timezone.");
         metadata

@@ -101,7 +101,7 @@ impl Configurable for TimeZone {
         Some(std::any::type_name::<Self>())
     }
 
-    fn metadata() -> vector_config::Metadata<Self> {
+    fn metadata() -> vector_config::Metadata {
         let mut metadata = vector_config::Metadata::default();
         metadata.set_title("Timezone reference.");
         metadata.set_description(r#"This can refer to any valid timezone as defined in the [TZ database][tzdb], or "local" which refers to the system local timezone.
@@ -116,9 +116,9 @@ impl Configurable for TimeZone {
 
     fn generate_schema(gen: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
         let mut local_schema = generate_const_string_schema("local".to_string());
-        let mut local_metadata = Metadata::<()>::with_description("System local timezone.");
+        let mut local_metadata = Metadata::with_description("System local timezone.");
         local_metadata.add_custom_attribute(CustomAttribute::kv("logical_name", "Local"));
-        apply_metadata(&mut local_schema, local_metadata);
+        apply_metadata::<()>(&mut local_schema, local_metadata);
 
         let mut tz_metadata = Metadata::with_title("A named timezone.");
         tz_metadata.set_description(

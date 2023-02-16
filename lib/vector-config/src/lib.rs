@@ -168,7 +168,7 @@ pub mod validation {
 }
 
 #[doc(hidden)]
-pub fn __ensure_numeric_validation_bounds<N>(metadata: &Metadata<N>) -> Result<(), GenerateError>
+pub fn __ensure_numeric_validation_bounds<N>(metadata: &Metadata) -> Result<(), GenerateError>
 where
     N: Configurable + ConfigurableNumber,
 {
