@@ -1,6 +1,6 @@
 //! Handles enrichment tables for `type = geoip`.
-//! Enrichment data is loading from a MaxMind GeoIP database either
-//! [MaxMind GeoIP2][maxmind] or [GeoLite2 binary city database][geolite]
+//! Enrichment data is loaded from one of the MaxMind GeoIP databases,
+//! [MaxMind GeoIP2][maxmind] or [GeoLite2 binary city database][geolite].
 //!
 //! [maxmind]: https://dev.maxmind.com/geoip/geoip2/downloadable
 //! [geolite]: https://dev.maxmind.com/geoip/geoip2/geolite2/#Download_Access
@@ -99,7 +99,7 @@ impl EnrichmentTableConfig for GeoipConfig {
 }
 
 #[derive(Clone)]
-/// A struct that implements [enrichment::Table] to handle loading enricment data from a Geoip database.
+/// A struct that implements [enrichment::Table] to handle loading enrichment data from a GeoIP database.
 pub struct Geoip {
     config: GeoipConfig,
     dbreader: Arc<maxminddb::Reader<Vec<u8>>>,
@@ -108,7 +108,7 @@ pub struct Geoip {
 }
 
 impl Geoip {
-    /// Creates a new Geoup struct from the provided config.
+    /// Creates a new GeoIP struct from the provided config.
     pub fn new(config: GeoipConfig) -> crate::Result<Self> {
         let dbreader = Arc::new(Reader::open_readfile(config.path.clone())?);
         let dbkind = DatabaseKind::from(dbreader.metadata.database_type.as_str());
