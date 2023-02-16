@@ -3,7 +3,9 @@ use aws_smithy_types::retry::RetryConfig;
 use codecs::JsonSerializerConfig;
 use futures::FutureExt;
 use tower::ServiceBuilder;
+use value::Kind;
 use vector_config::configurable_component;
+use vector_core::schema;
 
 use crate::{
     aws::{
@@ -12,8 +14,8 @@ use crate::{
     },
     codecs::{Encoder, EncodingConfig},
     config::{
-        log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Input, ProxyConfig,
-        SinkConfig, SinkContext,
+        AcknowledgementsConfig, DataType, GenerateConfig, Input, ProxyConfig, SinkConfig,
+        SinkContext,
     },
     sinks::{
         aws_cloudwatch_logs::{
@@ -184,7 +186,6 @@ impl SinkConfig for CloudwatchLogsSinkConfig {
             request_builder: CloudwatchRequestBuilder {
                 group_template: self.group_name.clone(),
                 stream_template: self.stream_name.clone(),
-                log_schema: log_schema().clone(),
                 transformer,
                 encoder,
             },
@@ -196,7 +197,11 @@ impl SinkConfig for CloudwatchLogsSinkConfig {
     }
 
     fn input(&self) -> Input {
+        let requirement =
+            schema::Requirement::empty().optional_meaning("timestamp", Kind::timestamp());
+
         Input::new(self.encoding.config().input_type() & DataType::Log)
+            .with_schema_requirement(requirement)
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
