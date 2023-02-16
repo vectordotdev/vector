@@ -290,7 +290,7 @@ impl Configurable for Compression {
         );
         properties.insert(LEVEL_NAME.to_string(), compression_level_schema);
 
-        let mut full_subschema = generate_struct_schema(properties, required);
+        let mut full_subschema = generate_struct_schema(properties, required, None);
         let mut full_metadata = Metadata::<()>::with_description("");
         full_metadata.add_custom_attribute(CustomAttribute::flag("docs::hidden"));
         apply_metadata(&mut full_subschema, full_metadata);
