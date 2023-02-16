@@ -243,12 +243,12 @@ pub enum Sinks {
     #[configurable(metadata(docs::label = "GCP Chronicle Unstructured"))]
     GcpChronicleUnstructured(gcp::chronicle_unstructured::ChronicleUnstructuredConfig),
 
-    /// Deliver logs to GCP’s Cloud Operations suite.
+    /// Deliver logs to GCP's Cloud Operations suite.
     #[cfg(feature = "sinks-gcp")]
     #[configurable(metadata(docs::label = "GCP Operations (Stackdriver)"))]
     GcpStackdriverLogs(gcp::stackdriver_logs::StackdriverConfig),
 
-    /// Deliver metrics to GCP’s Cloud Monitoring system.
+    /// Deliver metrics to GCP's Cloud Monitoring system.
     #[cfg(feature = "sinks-gcp")]
     #[configurable(metadata(docs::label = "GCP Cloud Monitoring (Stackdriver)"))]
     GcpStackdriverMetrics(gcp::stackdriver_metrics::StackdriverConfig),
@@ -258,7 +258,7 @@ pub enum Sinks {
     #[configurable(metadata(docs::label = "GCP Cloud Storage"))]
     GcpCloudStorage(gcp::cloud_storage::GcsSinkConfig),
 
-    /// Publish observability events to GCP’s Pub/Sub messaging system.
+    /// Publish observability events to GCP's Pub/Sub messaging system.
     #[cfg(feature = "sinks-gcp")]
     #[configurable(metadata(docs::label = "GCP Pub/Sub"))]
     GcpPubsub(gcp::pubsub::PubsubConfig),
@@ -358,12 +358,12 @@ pub enum Sinks {
     #[configurable(metadata(docs::label = "Socket"))]
     Socket(socket::SocketSinkConfig),
 
-    /// Deliver log data to Splunk’s HTTP Event Collector.
+    /// Deliver log data to Splunk's HTTP Event Collector.
     #[cfg(feature = "sinks-splunk_hec")]
     #[configurable(metadata(docs::label = "Splunk HEC Logs"))]
     SplunkHecLogs(splunk_hec::logs::config::HecLogsSinkConfig),
 
-    /// Deliver metric data to Splunk’s HTTP Event Collector.
+    /// Deliver metric data to Splunk's HTTP Event Collector.
     #[cfg(feature = "sinks-splunk_hec")]
     #[configurable(metadata(docs::label = "Splunk HEC Metrics"))]
     SplunkHecMetrics(splunk_hec::metrics::config::HecMetricsSinkConfig),
