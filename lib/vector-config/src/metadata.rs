@@ -2,11 +2,13 @@ use std::fmt;
 
 use vector_config_common::{attributes::CustomAttribute, validation};
 
+use crate::ToValue;
+
 /// The metadata associated with a given type or field.
 pub struct Metadata<T> {
     title: Option<&'static str>,
     description: Option<&'static str>,
-    default_value: Option<T>,
+    default_value: Option<Box<dyn ToValue>>,
     custom_attributes: Vec<CustomAttribute>,
     deprecated: bool,
     deprecated_message: Option<&'static str>,
@@ -54,12 +56,12 @@ impl<T> Metadata<T> {
         self.description = None;
     }
 
-    pub fn default_value(&self) -> Option<&T> {
-        self.default_value.as_ref()
+    pub fn default_value(&self) -> Option<&dyn ToValue> {
+        self.default_value.as_deref()
     }
 
-    pub fn set_default_value(&mut self, default_value: T) {
-        self.default_value = Some(default_value);
+    pub fn set_default_value(&mut self, default_value: impl ToValue + 'static) {
+        self.default_value = Some(Box::new(default_value));
     }
 
     pub fn deprecated(&self) -> bool {
