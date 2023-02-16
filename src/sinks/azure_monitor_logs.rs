@@ -211,7 +211,7 @@ impl HttpEventEncoder<serde_json::Value> for AzureMonitorLogsEventEncoder {
         let mut entry = serde_json::json!(&log);
         let object_entry = entry.as_object_mut().unwrap();
         object_entry.insert(
-            log_schema().timestamp_key.to_string(),
+            log_schema().timestamp_key().to_string(),
             JsonValue::String(timestamp.to_rfc3339_opts(chrono::SecondsFormat::Millis, true)),
         );
 
