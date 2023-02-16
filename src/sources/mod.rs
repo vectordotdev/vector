@@ -302,7 +302,7 @@ pub enum Sources {
     #[cfg(test)]
     TestTripwire(crate::test_util::mock::sources::TripwireSourceConfig),
 
-    /// Collect logs using the socket client.
+    /// Collect logs over a socket.
     #[cfg(feature = "sources-socket")]
     #[configurable(metadata(docs::label = "Socket"))]
     Socket(socket::SocketConfig),
