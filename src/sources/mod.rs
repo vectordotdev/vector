@@ -227,7 +227,7 @@ pub enum Sources {
     #[configurable(metadata(docs::label = "JournalD"))]
     Journald(journald::JournaldConfig),
 
-    /// Collect logs from Kafka.
+    /// Collect logs from Apache Kafka.
     #[cfg(feature = "sources-kafka")]
     #[configurable(metadata(docs::label = "Kafka"))]
     Kafka(kafka::KafkaSourceConfig),
