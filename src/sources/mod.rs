@@ -186,8 +186,7 @@ pub enum Sources {
     #[configurable(metadata(docs::label = "GCP Pub/Sub"))]
     GcpPubsub(gcp_pubsub::PubsubConfig),
 
-    /// Collect logs from Heroku’s Logplex, the router responsible for receiving logs
-    /// from your Heroku apps.
+    /// Collect logs from Heroku’s Logplex, the router responsible for receiving logs from your Heroku apps.
     #[cfg(feature = "sources-heroku_logs")]
     #[configurable(metadata(docs::label = "Heroku Logplex"))]
     HerokuLogs(heroku_logs::LogplexConfig),
