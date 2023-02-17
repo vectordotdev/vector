@@ -97,7 +97,11 @@ type = "console"
 
 vs (right way):
 
-```toml [sinks.sink0] inputs = ["source0"] target = "stdout" type = "console"
+```toml
+[sinks.sink0]
+inputs = ["source0"]
+target = "stdout"
+type = "console"
 ```
 
 #### Single word or phrase
