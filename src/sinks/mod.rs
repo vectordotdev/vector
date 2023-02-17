@@ -62,10 +62,10 @@ pub mod humio;
 pub mod influxdb;
 #[cfg(feature = "sinks-kafka")]
 pub mod kafka;
-#[cfg(feature = "sinks-logdna")]
-pub mod logdna;
 #[cfg(feature = "sinks-loki")]
 pub mod loki;
+#[cfg(feature = "sinks-mezmo")]
+pub mod mezmo;
 #[cfg(feature = "sinks-nats")]
 pub mod nats;
 #[cfg(feature = "sinks-new_relic")]
@@ -265,9 +265,9 @@ pub enum Sinks {
     #[cfg(feature = "sinks-kafka")]
     Kafka(kafka::KafkaSinkConfig),
 
-    /// LogDNA.
-    #[cfg(feature = "sinks-logdna")]
-    Logdna(logdna::LogdnaConfig),
+    /// Mezmo (formerly LogDNA).
+    #[cfg(feature = "sinks-mezmo")]
+    Mezmo(mezmo::MezmoConfig),
 
     /// Loki.
     #[cfg(feature = "sinks-loki")]
@@ -435,8 +435,8 @@ impl NamedComponent for Sinks {
             Self::InfluxdbMetrics(config) => config.get_component_name(),
             #[cfg(feature = "sinks-kafka")]
             Self::Kafka(config) => config.get_component_name(),
-            #[cfg(feature = "sinks-logdna")]
-            Self::Logdna(config) => config.get_component_name(),
+            #[cfg(feature = "sinks-mezmo")]
+            Self::Mezmo(config) => config.get_component_name(),
             #[cfg(feature = "sinks-loki")]
             Self::Loki(config) => config.get_component_name(),
             #[cfg(feature = "sinks-nats")]

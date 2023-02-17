@@ -24,10 +24,10 @@ use crate::{
 
 const PATH: &str = "/logs/ingest";
 
-/// Configuration for the `logdna` sink.
-#[configurable_component(sink("logdna"))]
+/// Configuration for the `mezmo` (formerly `logdna`) sink.
+#[configurable_component(sink("mezmo"))]
 #[derive(Clone, Debug)]
-pub struct LogdnaConfig {
+pub struct MezmoConfig {
     /// The Ingestion API key.
     #[configurable(metadata(docs::examples = "${LOGDNA_API_KEY}"))]
     #[configurable(metadata(docs::examples = "ef8d5de700e7989468166c40fc8a0ccd"))]
@@ -96,7 +96,7 @@ pub struct LogdnaConfig {
 
 fn default_endpoint() -> UriSerde {
     UriSerde {
-        uri: Uri::from_static("https://logs.logdna.com"),
+        uri: Uri::from_static("https://logs.mezmo.com"),
         auth: None,
     }
 }
@@ -109,7 +109,7 @@ fn default_env() -> String {
     "production".to_owned()
 }
 
-impl GenerateConfig for LogdnaConfig {
+impl GenerateConfig for MezmoConfig {
     fn generate_config() -> toml::Value {
         toml::from_str(
             r#"hostname = "hostname"
@@ -120,7 +120,7 @@ impl GenerateConfig for LogdnaConfig {
 }
 
 #[async_trait::async_trait]
-impl SinkConfig for LogdnaConfig {
+impl SinkConfig for MezmoConfig {
     async fn build(
         &self,
         cx: SinkContext,
@@ -136,7 +136,7 @@ impl SinkConfig for LogdnaConfig {
             batch_settings.timeout,
             client.clone(),
         )
-        .sink_map_err(|error| error!(message = "Fatal logdna sink error.", %error));
+        .sink_map_err(|error| error!(message = "Fatal mezmo sink error.", %error));
 
         let healthcheck = healthcheck(self.clone(), client).boxed();
 
@@ -162,7 +162,7 @@ pub struct PartitionKey {
     tags: Option<Vec<String>>,
 }
 
-pub struct LogdnaEventEncoder {
+pub struct MezmoEventEncoder {
     hostname: Template,
     tags: Option<Vec<Template>>,
     transformer: Transformer,
@@ -170,7 +170,7 @@ pub struct LogdnaEventEncoder {
     default_env: String,
 }
 
-impl LogdnaEventEncoder {
+impl MezmoEventEncoder {
     fn render_key(
         &self,
         event: &Event,
@@ -194,9 +194,7 @@ impl LogdnaEventEncoder {
     }
 }
 
-impl HttpEventEncoder<PartitionInnerBuffer<serde_json::Value, PartitionKey>>
-    for LogdnaEventEncoder
-{
+impl HttpEventEncoder<PartitionInnerBuffer<serde_json::Value, PartitionKey>> for MezmoEventEncoder {
     fn encode_event(
         &mut self,
         mut event: Event,
@@ -259,13 +257,13 @@ impl HttpEventEncoder<PartitionInnerBuffer<serde_json::Value, PartitionKey>>
 }
 
 #[async_trait::async_trait]
-impl HttpSink for LogdnaConfig {
+impl HttpSink for MezmoConfig {
     type Input = PartitionInnerBuffer<serde_json::Value, PartitionKey>;
     type Output = PartitionInnerBuffer<Vec<BoxedRawValue>, PartitionKey>;
-    type Encoder = LogdnaEventEncoder;
+    type Encoder = MezmoEventEncoder;
 
     fn build_encoder(&self) -> Self::Encoder {
-        LogdnaEventEncoder {
+        MezmoEventEncoder {
             hostname: self.hostname.clone(),
             tags: self.tags.clone(),
             transformer: self.encoding.clone(),
@@ -327,7 +325,7 @@ impl HttpSink for LogdnaConfig {
     }
 }
 
-impl LogdnaConfig {
+impl MezmoConfig {
     fn build_uri(&self, query: &str) -> Uri {
         let host = &self.endpoint.uri;
 
@@ -338,7 +336,7 @@ impl LogdnaConfig {
     }
 }
 
-async fn healthcheck(config: LogdnaConfig, client: HttpClient) -> crate::Result<()> {
+async fn healthcheck(config: MezmoConfig, client: HttpClient) -> crate::Result<()> {
     let uri = config.build_uri("");
 
     let req = Request::post(uri).body(hyper::Body::empty()).unwrap();
@@ -376,12 +374,12 @@ mod tests {
 
     #[test]
     fn generate_config() {
-        crate::test_util::test_generate_config::<LogdnaConfig>();
+        crate::test_util::test_generate_config::<MezmoConfig>();
     }
 
     #[test]
     fn encode_event() {
-        let (config, _cx) = load_sink::<LogdnaConfig>(
+        let (config, _cx) = load_sink::<MezmoConfig>(
             r#"
             api_key = "mylogtoken"
             hostname = "vector"
@@ -428,7 +426,7 @@ mod tests {
         Vec<Vec<String>>,
         mpsc::Receiver<(Parts, bytes::Bytes)>,
     ) {
-        let (mut config, cx) = load_sink::<LogdnaConfig>(
+        let (mut config, cx) = load_sink::<MezmoConfig>(
             r#"
             api_key = "mylogtoken"
             ip = "127.0.0.1"
