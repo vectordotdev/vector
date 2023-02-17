@@ -336,7 +336,7 @@ impl Display for Resource {
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
-pub struct TestDefinition<T = OutputId> {
+pub struct TestDefinition<T: 'static = OutputId> {
     /// The name of the unit test.
     pub name: String,
 

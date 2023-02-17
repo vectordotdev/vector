@@ -2,17 +2,19 @@ use std::fmt;
 
 use vector_config_common::{attributes::CustomAttribute, validation};
 
+use crate::ToValue;
+
 /// The metadata associated with a given type or field.
-#[derive(Clone)]
 pub struct Metadata<T> {
     title: Option<&'static str>,
     description: Option<&'static str>,
-    default_value: Option<T>,
+    default_value: Option<Box<dyn ToValue>>,
     custom_attributes: Vec<CustomAttribute>,
     deprecated: bool,
     deprecated_message: Option<&'static str>,
     transparent: bool,
     validations: Vec<validation::Validation>,
+    _dummy: std::marker::PhantomData<T>,
 }
 
 impl<T> Metadata<T> {
@@ -54,23 +56,12 @@ impl<T> Metadata<T> {
         self.description = None;
     }
 
-    pub fn default_value(&self) -> Option<&T> {
-        self.default_value.as_ref()
+    pub fn default_value(&self) -> Option<&dyn ToValue> {
+        self.default_value.as_deref()
     }
 
-    pub fn with_default_value(default: T) -> Self {
-        Self {
-            default_value: Some(default),
-            ..Default::default()
-        }
-    }
-
-    pub fn set_default_value(&mut self, default_value: T) {
-        self.default_value = Some(default_value);
-    }
-
-    pub fn consume_default_value(&mut self) -> Option<T> {
-        self.default_value.take()
+    pub fn set_default_value(&mut self, default_value: impl ToValue + 'static) {
+        self.default_value = Some(Box::new(default_value));
     }
 
     pub fn deprecated(&self) -> bool {
@@ -133,6 +124,7 @@ impl<T> Metadata<T> {
             deprecated_message: other.deprecated_message.or(self.deprecated_message),
             transparent: other.transparent,
             validations: self.validations,
+            _dummy: Default::default(),
         }
     }
 
@@ -149,6 +141,7 @@ impl<T> Metadata<T> {
             deprecated_message: self.deprecated_message,
             transparent: self.transparent,
             validations: self.validations.clone(),
+            _dummy: Default::default(),
         }
     }
 }
@@ -164,6 +157,7 @@ impl<T> Default for Metadata<T> {
             deprecated_message: None,
             transparent: false,
             validations: Vec::new(),
+            _dummy: Default::default(),
         }
     }
 }
