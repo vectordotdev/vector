@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 use std::{
     sync::{Arc, RwLock},
     time::Duration,

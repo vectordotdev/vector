@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 use std::{ffi::OsString, time::Duration};
 
 use windows_service::{

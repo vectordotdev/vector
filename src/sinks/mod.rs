@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 use enum_dispatch::enum_dispatch;
 use futures::future::BoxFuture;
 use snafu::Snafu;
