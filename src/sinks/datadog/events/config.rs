@@ -171,8 +171,7 @@ impl SinkConfig for DatadogEventsConfig {
         let requirement = schema::Requirement::empty()
             .required_meaning("message", Kind::bytes())
             .optional_meaning("host", Kind::bytes())
-            .optional_meaning("timestamp", Kind::timestamp())
-            .optional_meaning("source_type", Kind::bytes());
+            .optional_meaning("timestamp", Kind::timestamp());
 
         Input::log().with_schema_requirement(requirement)
     }
