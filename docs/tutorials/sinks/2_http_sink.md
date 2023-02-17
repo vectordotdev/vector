@@ -274,6 +274,7 @@ when sending the event to an `amqp` server.
         (finalizers, metadata_builder, input)
     }
 ```
+
 [*build_request*][request_builder_build_request] - used to build the
 final request that will contain the encoded payload and the metadata. The
 `BasicRequest` object we return here is passed to our `Tower`[tower] service
