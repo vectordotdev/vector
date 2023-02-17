@@ -152,7 +152,7 @@ impl SourceConfig for SocketConfig {
                     tls,
                     tls_client_metadata_key,
                     config.receive_buffer_bytes(),
-                    config.connection_close_secs(),
+                    config.max_connection_duration_secs(),
                     cx,
                     false.into(),
                     config.connection_limit,
