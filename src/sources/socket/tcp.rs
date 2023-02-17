@@ -79,10 +79,10 @@ pub struct TcpConfig {
     #[configurable(metadata(docs::type_unit = "bytes"))]
     receive_buffer_bytes: Option<usize>,
 
-    /// Optional timeout after which each connection is closed.
+    /// Optional maximum duration after which each connection is closed.
     /// This is helpful for load balancing long-lived connections.
     #[configurable(metadata(docs::type_unit = "seconds"))]
-    connection_close_secs: Option<u64>,
+    max_connection_duration_secs: Option<u64>,
 
     /// The maximum number of TCP connections that will be allowed at any given time.
     #[configurable(metadata(docs::type_unit = "connections"))]
@@ -168,8 +168,8 @@ impl TcpConfig {
         self.receive_buffer_bytes
     }
 
-    pub const fn connection_close_secs(&self) -> Option<u64> {
-        self.connection_close_secs
+    pub const fn max_connection_duration_secs(&self) -> Option<u64> {
+        self.max_connection_duration_secs
     }
 
     pub fn set_max_length(&mut self, val: Option<usize>) -> &mut Self {
