@@ -6,7 +6,8 @@ use std::{
     time::Duration,
 };
 
-use futures::{future::BoxFuture, FutureExt};
+use futures::future::BoxFuture;
+use futures_util::FutureExt;
 use snafu::ResultExt;
 use tokio::{
     io::AsyncWriteExt,
@@ -26,7 +27,7 @@ use crate::{
     sinks::{util::retries::ExponentialBackoff, Healthcheck},
 };
 
-use super::{NetError, net_error::*};
+use super::{net_error::*, NetError, ServiceState};
 
 /// Unix socket modes.
 #[configurable_component]
@@ -120,14 +121,16 @@ pub struct UnixConnector {
 impl UnixConnector {
     async fn connect(&self) -> Result<(PathBuf, UnixEither), NetError> {
         let either_socket = match self.mode {
-            UnixMode::Datagram => UnixDatagram::unbound()
-                .context(FailedToBind)
-                .and_then(|datagram| {
-                    datagram
-                        .connect(&self.path)
-                        .context(FailedToConnect)
-                        .map(|_| UnixEither::Datagram(datagram))
-                })?,
+            UnixMode::Datagram => {
+                UnixDatagram::unbound()
+                    .context(FailedToBind)
+                    .and_then(|datagram| {
+                        datagram
+                            .connect(&self.path)
+                            .context(FailedToConnect)
+                            .map(|_| UnixEither::Datagram(datagram))
+                    })?
+            }
             UnixMode::Stream => UnixStream::connect(&self.path)
                 .await
                 .context(FailedToConnect)
@@ -175,34 +178,16 @@ impl UnixConnector {
     }
 }
 
-enum UnixServiceState {
-    /// The service is currently disconnected.
-    Disconnected,
-
-    /// The service is currently attempting to connect to the endpoint.
-    Connecting(BoxFuture<'static, UnixEither>),
-
-    /// The service is connected and idle.
-    Connected(UnixEither),
-
-    /// The service has an in-flight send to the socket.
-    ///
-    /// If the socket experiences an unrecoverable error during the send, `None` will be returned
-    /// over the channel to signal the need to establish a new connection rather than reusing the
-    /// existing connection.
-    Sending(oneshot::Receiver<Option<UnixEither>>),
-}
-
 pub struct UnixService {
     connector: UnixConnector,
-    state: UnixServiceState,
+    state: ServiceState<UnixEither>,
 }
 
 impl UnixService {
     const fn new(connector: UnixConnector) -> Self {
         Self {
             connector,
-            state: UnixServiceState::Disconnected,
+            state: ServiceState::Disconnected,
         }
     }
 }
@@ -215,24 +200,24 @@ impl Service<Vec<u8>> for UnixService {
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         loop {
             self.state = match &mut self.state {
-                UnixServiceState::Disconnected => {
+                ServiceState::Disconnected => {
                     let connector = self.connector.clone();
-                    UnixServiceState::Connecting(Box::pin(async move {
-                        connector.connect_backoff().await
-                    }))
+                    ServiceState::Connecting(Box::pin(
+                        async move { connector.connect_backoff().await },
+                    ))
                 }
-                UnixServiceState::Connecting(fut) => {
+                ServiceState::Connecting(fut) => {
                     let socket = ready!(fut.poll_unpin(cx));
-                    UnixServiceState::Connected(socket)
+                    ServiceState::Connected(socket)
                 }
-                UnixServiceState::Connected(_) => break,
-                UnixServiceState::Sending(fut) => {
+                ServiceState::Connected(_) => break,
+                ServiceState::Sending(fut) => {
                     match ready!(fut.poll_unpin(cx)) {
                         // When a send concludes, and there's an error, the request future sends
                         // back `None`. Otherwise, it'll send back `Some(...)` with the socket.
                         Ok(maybe_socket) => match maybe_socket {
-                            Some(socket) => UnixServiceState::Connected(socket),
-                            None => UnixServiceState::Disconnected,
+                            Some(socket) => ServiceState::Connected(socket),
+                            None => ServiceState::Disconnected,
                         },
                         Err(_) => return Poll::Ready(Err(NetError::ServiceSocketChannelClosed)),
                     }
@@ -245,8 +230,8 @@ impl Service<Vec<u8>> for UnixService {
     fn call(&mut self, buf: Vec<u8>) -> Self::Future {
         let (tx, rx) = oneshot::channel();
 
-        let mut socket = match std::mem::replace(&mut self.state, UnixServiceState::Sending(rx)) {
-            UnixServiceState::Connected(socket) => socket,
+        let mut socket = match std::mem::replace(&mut self.state, ServiceState::Sending(rx)) {
+            ServiceState::Connected(socket) => socket,
             _ => panic!("poll_ready must be called first"),
         };
 

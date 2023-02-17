@@ -6,7 +6,9 @@ pub use self::tcp::{TcpConnector, TcpConnectorConfig};
 pub use self::udp::{UdpConnector, UdpConnectorConfig};
 pub use self::unix::{UnixConnector, UnixConnectorConfig, UnixMode};
 
+use futures_util::future::BoxFuture;
 use snafu::Snafu;
+use tokio::sync::oneshot;
 use vector_config::configurable_component;
 
 /// Hostname and port tuple.
@@ -70,4 +72,22 @@ pub enum NetError {
 
     #[snafu(display("Failed to get socket back after send as channel closed unexpectedly."))]
     ServiceSocketChannelClosed,
+}
+
+pub enum ServiceState<C> {
+    /// The service is currently disconnected.
+    Disconnected,
+
+    /// The service is currently attempting to connect to the endpoint.
+    Connecting(BoxFuture<'static, C>),
+
+    /// The service is connected and idle.
+    Connected(C),
+
+    /// The service has an in-flight send to the socket.
+    ///
+    /// If the socket experiences an unrecoverable error during the send, `None` will be returned
+    /// over the channel to signal the need to establish a new connection rather than reusing the
+    /// existing connection.
+    Sending(oneshot::Receiver<Option<C>>),
 }

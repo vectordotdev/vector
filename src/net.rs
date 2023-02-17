@@ -1,3 +1,5 @@
+//! Networking-related helper functions.
+
 use std::{io, os::fd::AsRawFd, time::Duration};
 
 use socket2::{SockRef, TcpKeepalive};

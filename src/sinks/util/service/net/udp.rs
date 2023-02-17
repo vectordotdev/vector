@@ -4,7 +4,8 @@ use std::{
     time::Duration,
 };
 
-use futures::{future::BoxFuture, FutureExt};
+use futures::future::BoxFuture;
+use futures_util::FutureExt;
 use snafu::ResultExt;
 use tokio::{net::UdpSocket, sync::oneshot, time::sleep};
 use tower::Service;
@@ -18,7 +19,7 @@ use crate::{
     sinks::{util::retries::ExponentialBackoff, Healthcheck},
 };
 
-use super::{HostAndPort, NetError, net_error::*};
+use super::{net_error::*, HostAndPort, NetError, ServiceState};
 
 /// `UdpConnector` configuration.
 #[configurable_component]
@@ -73,9 +74,7 @@ impl UdpConnector {
         let addr = SocketAddr::new(ip, self.address.port);
         let bind_address = find_bind_address(&addr);
 
-        let socket = UdpSocket::bind(bind_address)
-            .await
-            .context(FailedToBind)?;
+        let socket = UdpSocket::bind(bind_address).await.context(FailedToBind)?;
 
         if let Some(send_buffer_size) = self.send_buffer_size {
             if let Err(error) = net::set_send_buffer_size(&socket, send_buffer_size) {
@@ -117,34 +116,16 @@ impl UdpConnector {
     }
 }
 
-enum UdpServiceState {
-    /// The service is currently disconnected.
-    Disconnected,
-
-    /// The service is currently attempting to connect to the endpoint.
-    Connecting(BoxFuture<'static, UdpSocket>),
-
-    /// The service is connected and idle.
-    Connected(UdpSocket),
-
-    /// The service has an in-flight send to the socket.
-    ///
-    /// If the socket experiences an unrecoverable error during the send, `None` will be returned
-    /// over the channel to signal the need to establish a new connection rather than reusing the
-    /// existing connection.
-    Sending(oneshot::Receiver<Option<UdpSocket>>),
-}
-
 pub struct UdpService {
     connector: UdpConnector,
-    state: UdpServiceState,
+    state: ServiceState<UdpSocket>,
 }
 
 impl UdpService {
     const fn new(connector: UdpConnector) -> Self {
         Self {
             connector,
-            state: UdpServiceState::Disconnected,
+            state: ServiceState::Disconnected,
         }
     }
 }
@@ -157,24 +138,24 @@ impl Service<Vec<u8>> for UdpService {
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         loop {
             self.state = match &mut self.state {
-                UdpServiceState::Disconnected => {
+                ServiceState::Disconnected => {
                     let connector = self.connector.clone();
-                    UdpServiceState::Connecting(Box::pin(async move {
-                        connector.connect_backoff().await
-                    }))
+                    ServiceState::Connecting(Box::pin(
+                        async move { connector.connect_backoff().await },
+                    ))
                 }
-                UdpServiceState::Connecting(fut) => {
+                ServiceState::Connecting(fut) => {
                     let socket = ready!(fut.poll_unpin(cx));
-                    UdpServiceState::Connected(socket)
+                    ServiceState::Connected(socket)
                 }
-                UdpServiceState::Connected(_) => break,
-                UdpServiceState::Sending(fut) => {
+                ServiceState::Connected(_) => break,
+                ServiceState::Sending(fut) => {
                     match ready!(fut.poll_unpin(cx)) {
                         // When a send concludes, and there's an error, the request future sends
                         // back `None`. Otherwise, it'll send back `Some(...)` with the socket.
                         Ok(maybe_socket) => match maybe_socket {
-                            Some(socket) => UdpServiceState::Connected(socket),
-                            None => UdpServiceState::Disconnected,
+                            Some(socket) => ServiceState::Connected(socket),
+                            None => ServiceState::Disconnected,
                         },
                         Err(_) => return Poll::Ready(Err(NetError::ServiceSocketChannelClosed)),
                     }
@@ -187,8 +168,8 @@ impl Service<Vec<u8>> for UdpService {
     fn call(&mut self, buf: Vec<u8>) -> Self::Future {
         let (tx, rx) = oneshot::channel();
 
-        let socket = match std::mem::replace(&mut self.state, UdpServiceState::Sending(rx)) {
-            UdpServiceState::Connected(socket) => socket,
+        let socket = match std::mem::replace(&mut self.state, ServiceState::Sending(rx)) {
+            ServiceState::Connected(socket) => socket,
             _ => panic!("poll_ready must be called first"),
         };
 

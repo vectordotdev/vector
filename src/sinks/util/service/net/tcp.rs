@@ -4,7 +4,8 @@ use std::{
     time::Duration,
 };
 
-use futures::{future::BoxFuture, FutureExt};
+use futures::future::BoxFuture;
+use futures_util::FutureExt;
 use snafu::ResultExt;
 use tokio::{
     io::AsyncWriteExt,
@@ -24,7 +25,7 @@ use crate::{
     sinks::{util::retries::ExponentialBackoff, Healthcheck},
 };
 
-use super::{HostAndPort, NetError, net_error::*};
+use super::{net_error::*, HostAndPort, NetError};
 
 /// `TcpConnector` configuration.
 #[configurable_component]

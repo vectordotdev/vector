@@ -5,9 +5,7 @@ use tokio::{net::UdpSocket, sync::mpsc};
 use tokio_stream::wrappers::ReceiverStream;
 use tokio_util::{codec::BytesCodec, udp::UdpFramed};
 use vector_core::{
-    event::{
-        metric::TagValue, Event, Metric, MetricKind, MetricTags, MetricValue, StatisticKind,
-    },
+    event::{metric::TagValue, Event, Metric, MetricKind, MetricTags, MetricValue, StatisticKind},
     metric_tags,
 };
 
