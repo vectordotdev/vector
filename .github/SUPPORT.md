@@ -48,7 +48,7 @@ Situation specific (not exhaustive):
   working configuration?
 - Is this the first time you are using
   [VRL](https://vector.dev/docs/reference/vrl/#learn)? If so, also try out the
-  [VRL playground](https://playground.vrl.dev/) to debug
+  [VRL playground](https://playground.vrl.dev/) to debug.
 
 These are just some examples of questions that may or may not apply to your
 situation.
