@@ -32,6 +32,71 @@ remap: expressions: path: {
 					and only contain alpha-numeric characters, `_`, and '@' (`a-zA-Z0-9_@`). If a segment contains
 					any other character, the entire segment must be enclosed in double quotes.
 					"""
+				characteristics: {
+					array_elements: {
+						title: "Array element paths"
+						description: """
+							Array elements can be accessed by their index:
+
+							```coffee
+							.array[0]
+							```
+							"""
+					}
+					coalescing: {
+						title:       "Path segment coalescing"
+						description: """
+							Path segments can be coalesced, allowing for the first non-null value to be used. This is
+							particularly useful when working with
+							[externally tagged](\(urls.externally_tagged_representation)) data:
+
+							```coffee
+							.grand_parent.(parent1 | parent2).child
+							```
+							"""
+					}
+					dynamic: {
+						title: "Dynamic paths"
+						description: """
+							Dynamic paths are currently not supported.
+							"""
+					}
+					nested_objects: {
+						title: "Nested object paths"
+						description: """
+							Nested object values are accessed by delimiting each ancestor path with `.`:
+
+							```coffee
+							.parent.child
+							```
+							"""
+					}
+					nonexistent: {
+						title: "Non-existent paths"
+						description: """
+							Non-existent paths resolve to `null`.
+							"""
+					}
+					quoting: {
+						title: "Path quoting"
+						description: #"""
+							Path segments can be quoted to include special characters, such as spaces, periods, and
+							others:
+
+							```coffee
+							."parent.key.with.special \"characters\"".child
+							```
+							"""#
+					}
+					valid_characters: {
+						title: "Valid path characters"
+						description: """
+							Path segments only allow for underscores and ASCII alpha-numeric characters
+							(`[a-zA-Z0-9_]`) where integers like `0` are not supported. Quoting
+							can be used to escape these constraints.
+							"""
+					}
+				}
 			}
 		}
 	}
@@ -94,69 +159,4 @@ remap: expressions: path: {
 			return: "Hello, World!"
 		},
 	]
-	characteristics: {
-		array_elements: {
-			title: "Array element paths"
-			description: """
-				Array elements can be accessed by their index:
-
-				```coffee
-				.array[0]
-				```
-				"""
-		}
-		coalescing: {
-			title:       "Path segment coalescing"
-			description: """
-				Path segments can be coalesced, allowing for the first non-null value to be used. This is
-				particularly useful when working with
-				[externally tagged](\(urls.externally_tagged_representation)) data:
-
-				```coffee
-				.grand_parent.(parent1 | parent2).child
-				```
-				"""
-		}
-		dynamic: {
-			title: "Dynamic paths"
-			description: """
-				Dynamic paths are currently not supported.
-				"""
-		}
-		nested_objects: {
-			title: "Nested object paths"
-			description: """
-				Nested object values are accessed by delimiting each ancestor path with `.`:
-
-				```coffee
-				.parent.child
-				```
-				"""
-		}
-		nonexistent: {
-			title: "Non-existent paths"
-			description: """
-				Non-existent paths resolve to `null`.
-				"""
-		}
-		quoting: {
-			title: "Path quoting"
-			description: #"""
-				Path segments can be quoted to include special characters, such as spaces, periods, and
-				others:
-
-				```coffee
-				."parent.key.with.special \"characters\"".child
-				```
-				"""#
-		}
-		valid_characters: {
-			title: "Valid path characters"
-			description: """
-				Path segments only allow for underscores and ASCII alpha-numeric characters
-				(`[a-zA-Z0-9_]`) where integers like `0` are not supported. Quoting
-				can be used to escape these constraints.
-				"""
-		}
-	}
 }
