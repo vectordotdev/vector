@@ -3,10 +3,8 @@ package metadata
 remap: expressions: path: {
 	title: "Path"
 	description: """
-		A _path_ expression is a sequence of period-delimited segments that represent the location of a value
-		within an object.
-		A leading "." means the path points to the event.
-		A leading "%" means the path points to the event _metadata_.
+		A _path_ expression is prefix followed by a sequence of period-delimited segments that represent the location of a value
+		within an object. The path must start with a valid prefix (options shown below).
 		"""
 	return: """
 		Returns the value of the path location.
@@ -14,26 +12,28 @@ remap: expressions: path: {
 
 	grammar: {
 		source: """
+			"%" ~ path_segments
 			"." ~ path_segments
 			"""
 		definitions: {
 			"\".\"": {
 				description: """
-					The `.` character represents the root of the event. All paths must begin with `.` or `%`
+					The `"."` prefix represents the root of the event.
 					"""
 			}
 			"\"%\"": {
 				description: """
-					The `%` character represents the root of the event metadata.
+					The `"%"` prefix represents event metadata.
 					"""
 			}
 			path_segments: {
 				description: """
 					`path_segments` denote a segment of a nested path. Each segment must be delimited by a `.` character
-					and only contain alpha-numeric characters and `_` (`a-zA-Z0-9_`). Segments that contain
-					characters outside of this range must be quoted.
+					and only contain alpha-numeric characters, `_`, and '@' (`a-zA-Z0-9_@`). If a segment contains
+					any other character, the entire segment must be enclosed in double quotes.
 					"""
-				characteristics: {
+			}
+			characteristics: {
 					array_elements: {
 						title: "Array element paths"
 						description: """
@@ -98,26 +98,17 @@ remap: expressions: path: {
 							"""
 					}
 				}
-			}
 		}
 	}
 
 	examples: [
 		{
-			title: "Root event path"
+			title: "Root path"
 			input: log: message: "Hello, World!"
 			source: #"""
 				.
 				"""#
 			return: input.log
-		},
-		{
-			title: "Root metadata path"
-			input: log: message: "Hello, World!"
-			source: #"""
-				%
-				"""#
-			return: {}
 		},
 		{
 			title: "Top-level path"
