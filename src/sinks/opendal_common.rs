@@ -49,7 +49,7 @@ pub struct OpenDalSink<Svc> {
 }
 
 impl<Svc> OpenDalSink<Svc> {
-    pub fn new(
+    pub const fn new(
         service: Svc,
         request_builder: OpenDalRequestBuilder,
         partitioner: KeyPartitioner,
@@ -212,7 +212,7 @@ impl RequestBuilder<(String, Vec<Event>)> for OpenDalRequestBuilder {
         OpenDalRequest {
             metadata,
             payload: payload.into_payload(),
-            request_metadata: request_metadata,
+            request_metadata,
         }
     }
 }
@@ -255,7 +255,7 @@ impl Service<OpenDalRequest> for OpenDalService {
 
         Box::pin(async move {
             let result = op
-                .object(&request.metadata.partition_key.as_str())
+                .object(&request.metadata.partition_key)
                 .write(request.payload)
                 .in_current_span()
                 .await;
