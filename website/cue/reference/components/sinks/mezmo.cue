@@ -1,7 +1,7 @@
 package metadata
 
 components: sinks: mezmo: {
-	title: "Mezmo (formerl LogDNA)"
+	title: "Mezmo (formerly LogDNA)"
 
 	classes: {
 		commonly_used: false
