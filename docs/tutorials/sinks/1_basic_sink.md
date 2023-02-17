@@ -56,9 +56,10 @@ pub struct BasicConfig {
 }
 ```
 
-Note the `configurable_component` attribute. This is used by Vector to generate
-documentation from the struct. To do this, doc comments must be included above
-the struct - Vector won't compile if they aren't.
+Note the [`configurable_component`][configurable_component] attribute. This
+is used by Vector to generate documentation from the struct. To do this, doc
+comments must be included above the struct - Vector won't compile if they
+aren't.
 
 We also include a single member in our struct - `acknowledgements`.  This
 struct configures end-to-end acknowledments for the sink, which is the ability
@@ -66,7 +67,8 @@ for the sink to inform the upstream sources if the event has been successfully
 delivered. See Vector's [documentation][acknowledgements] for more details. We
 will make this a configurable option.
 
-Next we want to implement the `GenerateConfig` trait for our struct:
+Next we want to implement the [`GenerateConfig`][generate_config] trait for
+our struct:
 
 ```rust
 impl GenerateConfig for BasicConfig {
@@ -81,8 +83,8 @@ configuration for the sink.
 
 # SinkConfig
 
-We need to implement the `SinkConfig` trait. This is used by Vector to generate
-the main Sink from the configuration.
+We need to implement the [`SinkConfig`][sink_config] trait. This is used by
+Vector to generate the main Sink from the configuration.
 
 ```rust
 #[async_trait::async_trait]
@@ -106,8 +108,8 @@ impl SinkConfig for BasicConfig {
 
 ## The `build` function
 
-Of particular importance is the `build` function. This is an async function that
-builds two components of the sink.
+Of particular importance is the [`build`][sink_config_build] function. This is
+an async function that builds two components of the sink.
 
 First, the healthcheck is an async block that can be used to check the health
 of the service we are connecting to. In this very simple case we are just
@@ -115,8 +117,8 @@ outputting to the console which we assume will work, so the healthcheck returns
 `Ok(())` indicating our target is healthy.
 
 The actual work for this sink is done in `BasicSink` (to be implemented
-shortly). The `build` function converts this into a `VectorSink` via
-`VectorSink::from_event_streamsink` and returns it.
+shortly). The `build` function converts this into a [`VectorSink`][vector_sink]
+via [`VectorSink::from_event_streamsink`][from_eventstreamsink] and returns it.
 
 
 ## BasicSink
@@ -129,7 +131,8 @@ struct BasicSink;
 
 Our sink is so basic it has no properties to determine it's behaviour.
 
-For it to work with Vector it must implement the `StreamSink` trait:
+For it to work with Vector it must implement the [`StreamSink`][stream_sink]
+trait:
 
 ```rust
 #[async_trait::async_trait]
@@ -222,8 +225,8 @@ All sinks are feature gated, this allows us to build custom versions of Vector
 with only the components required. We will ignore the feature flag for now with
 our new basic sink.
 
-Next, each sink needs to be added to the `Sinks` enum. Find the enum in
-`mod.rs` and add our new sink to it.
+Next, each sink needs to be added to the [`Sinks`][sinks_enum] enum. Find the
+enum in `mod.rs` and add our new sink to it.
 
 ```diff
 #[configurable_component]
@@ -282,15 +285,15 @@ First we need to make `event` mutable so that we can update the events status wh
 it is delivered.
 
 Next we access the events finalizers with the `take_finalizers` function. We
-then update the status with `EventStatus::Delivered` to indicate the event has
-been delivered successfully.
+then update the status with [`EventStatus::Delivered`][event_status_delivered]
+to indicate the event has been delivered successfully.
 
 If there had been an error whilst delivering the event, but the error was not a
-permanent error, we would update the status with `EventStatus::Errored`. Vector
+permanent error, we would update the status with [`EventStatus::Errored`][event_status_errored]. Vector
 will attempt to redeliver this event again.
 
 If the error was a permanent one that would never work no matter how many times
-we retry delivery, we update the status with `EventStatus::Rejected`.
+we retry delivery, we update the status with [`EventStatus::Rejected`][event_status_rejected].
 
 # Emitting internal events
 
@@ -303,7 +306,7 @@ There are two events that need to be emitted by the component.
 
 ## BytesSent
 
-`BytesSent` instruments how many bytes the sink is sending downstream.
+[`BytesSent`][bytes_sent] instruments how many bytes the sink is sending downstream.
 
 First we need to get the number of bytes that we are sending. Then we need to
 emit the event. Change the body of `run_inner` to look like the following:
@@ -330,8 +333,8 @@ emit the event. Change the body of `run_inner` to look like the following:
 
 ## EventSent
 
-`EventSent` is emmitted by each component in Vector to instrument how many
-bytes have been sent to the next downstream component.
+[`EventSent`][events_sent] is emmitted by each component in Vector to
+instrument how many bytes have been sent to the next downstream component.
 
 Add the following after emmitting `BytesSent`:
 
@@ -393,3 +396,16 @@ Our sink works!
 [event_streams_tracking]: https://github.com/vectordotdev/vector/issues/9261
 [vdev_install]: https://github.com/vectordotdev/vector/tree/master/vdev#installation
 [acknowledgements]: https://vector.dev/docs/about/under-the-hood/architecture/end-to-end-acknowledgements/
+[configurable_component]: https://rust-doc.vector.dev/vector_config/attr.configurable_component.html
+[generate_config]: https://rust-doc.vector.dev/vector/config/trait.generateconfig
+[sink_config]: https://rust-doc.vector.dev/vector/config/trait.sinkconfig
+[sink_config_build]: https://rust-doc.vector.dev/vector/config/trait.sinkconfig#tymethod.build
+[from_eventstreamsink]: https://rust-doc.vector.dev/vector/sinks/enum.vectorsink#method.from_event_streamsink
+[vector_sink]: https://rust-doc.vector.dev/vector/sinks/enum.vectorsink 
+[stream_sink]: https://rust-doc.vector.dev/vector/sinks/util/trait.streamsink
+[sinks_enum]: https://rust-doc.vector.dev/vector/sinks/enum.sinks
+[event_status_delivered]: https://rust-doc.vector.dev/vector/event/enum.eventstatus#variant.Delivered
+[event_status_errored]: https://rust-doc.vector.dev/vector/event/enum.eventstatus#variant.Errored
+[event_status_rejected]: https://rust-doc.vector.dev/vector/event/enum.eventstatus#variant.Rejected
+[bytes_sent]: https://rust-doc.vector.dev/vector_common/internal_event/struct.bytessent
+[events_sent]: https://rust-doc.vector.dev/vector_common/internal_event/struct.eventssent
