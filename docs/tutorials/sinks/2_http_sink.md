@@ -47,6 +47,8 @@ this field to the `BasicConfig` struct:
 
 ```rust
     /// The endpoint to send HTTP traffic to.
+    ///
+    /// This should include the protocol and host, but can also include the port, path, and any other valid part of a URI.
     #[configurable(metadata(
         docs::examples = "http://localhost:3000/",
         docs::examples = "http://example.com/endpoint/",
@@ -463,7 +465,7 @@ sinks:
 Then run Vector:
 
 ```sh
-vdev run ./basic.yml
+cargo vdev run ./basic.yml
 ```
 
 If we type something into the console, this should now be sent to our HTTP server:

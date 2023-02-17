@@ -1,6 +1,6 @@
 Let's write a basic sink for Vector. Currently, there are two styles of sink in
 Vector - 'event' and 'event streams'. The 'event' style sinks are deprecated,
-but currently a significant portion of Vectors sinks are still developed in
+but currently a significant portion of Vector's sinks are still developed in
 this style. A tracking issue that covers which sinks have been converted to
 'event streams' can be found [here][event_streams_tracking].
 
@@ -10,8 +10,7 @@ Create a new rust module in `src/sinks/` called `basic.rs`.
 
 # Doc comments
 
-It's always good to start with some module level comments to explain what the
-sink does.
+Provide some module level comments to explain what the sink does.
 
 ```rust
 //! `Basic` sink.
@@ -39,8 +38,8 @@ use vector_core::{
 
 The first step when developing a Sink is to create a struct that represents the
 configuration for that sink. The configuration file passed to Vector on startup
-is deserialized to the fields in this struct so the user can customise the sinks
-behaviour.
+is deserialized to the fields in this struct so the user can customise the
+sink's behaviour.
 
 ```rust
 #[configurable_component(sink("basic"))]
@@ -61,10 +60,11 @@ Note the `configurable_component` attribute. This is used by Vector to generate
 documentation from the struct. To do this, doc comments must be included above
 the struct - Vector won't compile if they aren't.
 
-We also include a single member in our struct - `acknowledgemets`. Every sink
-needs to be able to control how it handles acknowledgements - do connected
-sources need to wait for this sink to send the message before acknowledging
-that they have received the events. We will make this a configurable option.
+We also include a single member in our struct - `acknowledgements`.  This
+struct configures end-to-end acknowledments for the sink, which is the ability
+for the sink to inform the upstream sources if the event has been successfully
+delivered. See Vector's [documentation][acknowledgements] for more details. We
+will make this a configurable option.
 
 Next we want to implement the `GenerateConfig` trait for our struct:
 
@@ -206,7 +206,7 @@ sinks-logs = [
 
 ## Module
 
-Import this module into Vector. In `src/sinks/mod.rs` add the line:
+Import this module into Vector. In `src/sinks/mod.rs` add the lines:
 
 
 ```diff
@@ -373,7 +373,7 @@ Vector provides a build tool `vdev` that simplifies the task of building Vector.
 With `vdev` installed we can run Vector using:
 
 ```sh
-vdev run ./basic.yml
+cargo vdev run ./basic.yml
 ```
 
 This uses the config file to detect and set the relevant features to build Vector with.
@@ -392,3 +392,4 @@ Our sink works!
 
 [event_streams_tracking]: https://github.com/vectordotdev/vector/issues/9261
 [vdev_install]: https://github.com/vectordotdev/vector/tree/master/vdev#installation
+[acknowledgements]: https://vector.dev/docs/about/under-the-hood/architecture/end-to-end-acknowledgements/
