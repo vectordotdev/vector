@@ -177,7 +177,7 @@ representation of the object.
 ## Feature flag
 
 Each sink is kept behind a feature flag which allows copies of Vector to be
-build with just the components required. We need to add this feature to the 
+build with just the components required. We need to add this feature to the
 `Cargo.toml`.
 
 ```diff
@@ -366,12 +366,12 @@ sinks:
       - stdin
 ```
 
-This simply connects a `stdin` source to our `basic` sink. 
+This simply connects a `stdin` source to our `basic` sink.
 
 ## vdev
 
 Vector provides a build tool `vdev` that simplifies the task of building Vector. Install
-`vdev` using the instructions [here][vdev_install]. 
+`vdev` using the instructions [here][vdev_install].
 
 With `vdev` installed we can run Vector using:
 
@@ -401,7 +401,7 @@ Our sink works!
 [sink_config]: https://rust-doc.vector.dev/vector/config/trait.sinkconfig
 [sink_config_build]: https://rust-doc.vector.dev/vector/config/trait.sinkconfig#tymethod.build
 [from_eventstreamsink]: https://rust-doc.vector.dev/vector/sinks/enum.vectorsink#method.from_event_streamsink
-[vector_sink]: https://rust-doc.vector.dev/vector/sinks/enum.vectorsink 
+[vector_sink]: https://rust-doc.vector.dev/vector/sinks/enum.vectorsink
 [stream_sink]: https://rust-doc.vector.dev/vector/sinks/util/trait.streamsink
 [sinks_enum]: https://rust-doc.vector.dev/vector/sinks/enum.sinks
 [event_status_delivered]: https://rust-doc.vector.dev/vector/event/enum.eventstatus#variant.Delivered
