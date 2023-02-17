@@ -137,7 +137,7 @@ async fn firehose_client() -> aws_sdk_firehose::Client {
     create_client::<KinesisFirehoseClientBuilder>(
         &auth,
         region_endpoint.region(),
-        region_endpoint.endpoint().unwrap(),
+        region_endpoint.endpoint(),
         &proxy,
         &None,
         true,
@@ -148,7 +148,6 @@ async fn firehose_client() -> aws_sdk_firehose::Client {
 
 /// creates ES domain with the given name and returns the ARN
 async fn ensure_elasticsearch_domain(domain_name: String) -> String {
-    let endpoint = test_region_endpoint().endpoint().unwrap().unwrap();
     let client = EsClient::from_conf(
         aws_sdk_elasticsearch::config::Builder::new()
             .credentials_provider(
@@ -157,7 +156,7 @@ async fn ensure_elasticsearch_domain(domain_name: String) -> String {
                     .await
                     .unwrap(),
             )
-            .endpoint_url(endpoint)
+            .endpoint_url(test_region_endpoint().endpoint().unwrap())
             .region(test_region_endpoint().region())
             .build(),
     );

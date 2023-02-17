@@ -424,7 +424,9 @@ impl Configurable for Duration {
         required.insert("secs".into());
         required.insert("nsecs".into());
 
-        Ok(crate::schema::generate_struct_schema(properties, required))
+        Ok(crate::schema::generate_struct_schema(
+            properties, required, None,
+        ))
     }
 }
 

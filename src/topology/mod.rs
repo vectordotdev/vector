@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 //! Topology contains all topology based types.
 //!
 //! Topology is broken up into two main sections. The first
