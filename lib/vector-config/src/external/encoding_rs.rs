@@ -16,7 +16,7 @@ impl Configurable for &'static Encoding {
         Some("encoding_rs::Encoding")
     }
 
-    fn metadata() -> Metadata<Self> {
+    fn metadata() -> Metadata {
         let mut metadata = Metadata::default();
         metadata.set_description(
             "An encoding as defined in the [Encoding Standard](https://encoding.spec.whatwg.org/).",

@@ -130,7 +130,7 @@ impl Configurable for Concurrency {
         Some(std::any::type_name::<Self>())
     }
 
-    fn metadata() -> Metadata<Self> {
+    fn metadata() -> Metadata {
         let mut metadata = Metadata::default();
         metadata.set_description("Configuration for outbound request concurrency.");
         metadata.add_custom_attribute(CustomAttribute::kv("docs::enum_tagging", "external"));
@@ -139,27 +139,27 @@ impl Configurable for Concurrency {
 
     fn generate_schema(_: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
         let mut none_schema = generate_const_string_schema("none".to_string());
-        let mut none_metadata = Metadata::<()>::with_title("A fixed concurrency of 1.");
+        let mut none_metadata = Metadata::with_title("A fixed concurrency of 1.");
         none_metadata.set_description("Only one request can be outstanding at any given time.");
         none_metadata.add_custom_attribute(CustomAttribute::kv("logical_name", "None"));
-        apply_metadata(&mut none_schema, none_metadata);
+        apply_metadata::<()>(&mut none_schema, none_metadata);
 
         let mut adaptive_schema = generate_const_string_schema("adaptive".to_string());
-        let mut adaptive_metadata = Metadata::<()>::with_title(
+        let mut adaptive_metadata = Metadata::with_title(
             "Concurrency will be managed by Vector's [Adaptive Request Concurrency][arc] feature.",
         );
         adaptive_metadata
             .set_description("[arc]: https://vector.dev/docs/about/under-the-hood/networking/arc/");
         adaptive_metadata.add_custom_attribute(CustomAttribute::kv("logical_name", "Adaptive"));
-        apply_metadata(&mut adaptive_schema, adaptive_metadata);
+        apply_metadata::<()>(&mut adaptive_schema, adaptive_metadata);
 
         let mut fixed_schema = generate_number_schema::<usize>();
         let mut fixed_metadata =
-            Metadata::<()>::with_description("A fixed amount of concurrency will be allowed.");
+            Metadata::with_description("A fixed amount of concurrency will be allowed.");
         fixed_metadata.set_transparent();
         fixed_metadata.add_custom_attribute(CustomAttribute::kv("docs::numeric_type", "uint"));
         fixed_metadata.add_custom_attribute(CustomAttribute::kv("logical_name", "Fixed"));
-        apply_metadata(&mut fixed_schema, fixed_metadata);
+        apply_metadata::<()>(&mut fixed_schema, fixed_metadata);
 
         Ok(generate_one_of_schema(&[
             none_schema,

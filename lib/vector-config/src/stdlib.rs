@@ -56,13 +56,13 @@ where
         true
     }
 
-    fn metadata() -> Metadata<Self> {
+    fn metadata() -> Metadata {
         Metadata::with_transparent(true)
     }
 
-    fn validate_metadata(metadata: &Metadata<Self>) -> Result<(), GenerateError> {
-        // We have to convert from `Metadata<Self>` to `Metadata<T>` which erases the default value.
-        let converted = metadata.convert::<T>();
+    fn validate_metadata(metadata: &Metadata) -> Result<(), GenerateError> {
+        // We have to convert from `Metadata` to `Metadata` which erases the default value.
+        let converted = metadata.convert();
         T::validate_metadata(&converted)
     }
 
@@ -81,7 +81,7 @@ impl<T: ToValue> ToValue for Option<T> {
 }
 
 impl Configurable for bool {
-    fn metadata() -> Metadata<Self> {
+    fn metadata() -> Metadata {
         Metadata::with_transparent(true)
     }
 
@@ -98,7 +98,7 @@ impl ToValue for bool {
 
 // Strings.
 impl Configurable for String {
-    fn metadata() -> Metadata<Self> {
+    fn metadata() -> Metadata {
         Metadata::with_transparent(true)
     }
 
@@ -114,7 +114,7 @@ impl ToValue for String {
 }
 
 impl Configurable for char {
-    fn metadata() -> Metadata<Self> {
+    fn metadata() -> Metadata {
         let mut metadata = Metadata::with_transparent(true);
         metadata.add_validation(Validation::Length {
             minimum: Some(1),
@@ -138,7 +138,7 @@ impl ToValue for char {
 macro_rules! impl_configurable_numeric {
     ($ty:ty => $into:expr) => {
         impl Configurable for $ty {
-            fn metadata() -> Metadata<Self> {
+            fn metadata() -> Metadata {
                 let mut metadata = Metadata::with_transparent(true);
                 let numeric_type = <Self as ConfigurableNumber>::class();
                 metadata
@@ -147,7 +147,7 @@ macro_rules! impl_configurable_numeric {
                 metadata
             }
 
-            fn validate_metadata(metadata: &Metadata<Self>) -> Result<(), GenerateError> {
+            fn validate_metadata(metadata: &Metadata) -> Result<(), GenerateError> {
                 $crate::__ensure_numeric_validation_bounds::<Self>(metadata)
             }
 
@@ -192,12 +192,12 @@ impl<T> Configurable for Vec<T>
 where
     T: Configurable + ToValue,
 {
-    fn metadata() -> Metadata<Self> {
+    fn metadata() -> Metadata {
         T::metadata().convert()
     }
 
-    fn validate_metadata(metadata: &Metadata<Self>) -> Result<(), GenerateError> {
-        let converted = metadata.convert::<T>();
+    fn validate_metadata(metadata: &Metadata) -> Result<(), GenerateError> {
+        let converted = metadata.convert();
         T::validate_metadata(&converted)
     }
 
@@ -223,12 +223,12 @@ where
         true
     }
 
-    fn metadata() -> Metadata<Self> {
+    fn metadata() -> Metadata {
         Metadata::with_transparent(true)
     }
 
-    fn validate_metadata(metadata: &Metadata<Self>) -> Result<(), GenerateError> {
-        let converted = metadata.convert::<V>();
+    fn validate_metadata(metadata: &Metadata) -> Result<(), GenerateError> {
+        let converted = metadata.convert();
         V::validate_metadata(&converted)
     }
 
@@ -258,12 +258,12 @@ impl<V> Configurable for BTreeSet<V>
 where
     V: Configurable + ToValue + Eq + Hash,
 {
-    fn metadata() -> Metadata<Self> {
+    fn metadata() -> Metadata {
         Metadata::with_transparent(true)
     }
 
-    fn validate_metadata(metadata: &Metadata<Self>) -> Result<(), GenerateError> {
-        let converted = metadata.convert::<V>();
+    fn validate_metadata(metadata: &Metadata) -> Result<(), GenerateError> {
+        let converted = metadata.convert();
         V::validate_metadata(&converted)
     }
 
@@ -289,12 +289,12 @@ where
         true
     }
 
-    fn metadata() -> Metadata<Self> {
+    fn metadata() -> Metadata {
         Metadata::with_transparent(true)
     }
 
-    fn validate_metadata(metadata: &Metadata<Self>) -> Result<(), GenerateError> {
-        let converted = metadata.convert::<V>();
+    fn validate_metadata(metadata: &Metadata) -> Result<(), GenerateError> {
+        let converted = metadata.convert();
         V::validate_metadata(&converted)
     }
 
@@ -324,12 +324,12 @@ impl<V> Configurable for HashSet<V>
 where
     V: Configurable + ToValue + Eq + Hash,
 {
-    fn metadata() -> Metadata<Self> {
+    fn metadata() -> Metadata {
         Metadata::with_transparent(true)
     }
 
-    fn validate_metadata(metadata: &Metadata<Self>) -> Result<(), GenerateError> {
-        let converted = metadata.convert::<V>();
+    fn validate_metadata(metadata: &Metadata) -> Result<(), GenerateError> {
+        let converted = metadata.convert();
         V::validate_metadata(&converted)
     }
 
@@ -353,7 +353,7 @@ impl Configurable for SocketAddr {
         Some("stdlib::SocketAddr")
     }
 
-    fn metadata() -> Metadata<Self> {
+    fn metadata() -> Metadata {
         let mut metadata = Metadata::default();
         metadata.set_description("An internet socket address, either IPv4 or IPv6.");
         metadata
@@ -378,7 +378,7 @@ impl Configurable for PathBuf {
         Some("stdlib::PathBuf")
     }
 
-    fn metadata() -> Metadata<Self> {
+    fn metadata() -> Metadata {
         let mut metadata = Metadata::default();
         metadata.set_description("A file path.");
 
@@ -409,7 +409,7 @@ impl Configurable for Duration {
         Some("stdlib::Duration")
     }
 
-    fn metadata() -> Metadata<Self> {
+    fn metadata() -> Metadata {
         let mut metadata = Metadata::default();
         metadata.set_description("An duration of time.");
         metadata

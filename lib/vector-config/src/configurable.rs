@@ -39,7 +39,7 @@ where
     }
 
     /// Gets the metadata for this value.
-    fn metadata() -> Metadata<Self> {
+    fn metadata() -> Metadata {
         Metadata::default()
     }
 
@@ -50,7 +50,7 @@ where
     /// numeric types, there is a limited amount of validation that can occur within the
     /// `Configurable` derive macro, and additional validation must happen at runtime when the
     /// `Configurable` trait is being used, which this method allows for.
-    fn validate_metadata(_metadata: &Metadata<Self>) -> Result<(), GenerateError> {
+    fn validate_metadata(_metadata: &Metadata) -> Result<(), GenerateError> {
         Ok(())
     }
 

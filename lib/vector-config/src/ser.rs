@@ -72,22 +72,22 @@ where
         H::referenceable_name()
     }
 
-    fn metadata() -> Metadata<Self> {
+    fn metadata() -> Metadata {
         // Forward to the underlying `H`.
         //
-        // We have to convert from `Metadata<H>` to `Metadata<Self>` which erases the default value,
+        // We have to convert from `Metadata` to `Metadata` which erases the default value,
         // notably, but delegated helpers should never actually have default values, so this is
         // essentially a no-op.
-        H::metadata().convert::<Self>()
+        H::metadata().convert()
     }
 
-    fn validate_metadata(metadata: &Metadata<Self>) -> Result<(), GenerateError> {
+    fn validate_metadata(metadata: &Metadata) -> Result<(), GenerateError> {
         // Forward to the underlying `H`.
         //
-        // We have to convert from `Metadata<Self>` to `Metadata<H>` which erases the default value,
+        // We have to convert from `Metadata` to `Metadata` which erases the default value,
         // notably, but `serde_with` helpers should never actually have default values, so this is
         // essentially a no-op.
-        let converted = metadata.convert::<H>();
+        let converted = metadata.convert();
         H::validate_metadata(&converted)
     }
 

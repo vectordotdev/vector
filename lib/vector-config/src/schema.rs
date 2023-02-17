@@ -19,7 +19,7 @@ use crate::{
 ///
 /// Metadata can include semantic information (title, description, etc), validation (min/max, allowable
 /// patterns, etc), as well as actual arbitrary key/value data.
-pub fn apply_metadata<T>(schema: &mut SchemaObject, metadata: Metadata<T>)
+pub fn apply_metadata<T>(schema: &mut SchemaObject, metadata: Metadata)
 where
     T: Configurable + ToValue,
 {
@@ -498,7 +498,7 @@ where
 
 pub fn get_or_generate_schema<T>(
     gen: &mut SchemaGenerator,
-    overrides: Option<Metadata<T>>,
+    overrides: Option<Metadata>,
 ) -> Result<SchemaObject, GenerateError>
 where
     T: Configurable + ToValue,
@@ -568,7 +568,7 @@ where
     };
 
     if let Some(metadata) = maybe_metadata {
-        apply_metadata(&mut schema, metadata);
+        apply_metadata::<T>(&mut schema, metadata);
     }
 
     Ok(schema)
@@ -576,14 +576,14 @@ where
 
 pub fn generate_baseline_schema<T>(
     gen: &mut SchemaGenerator,
-    metadata: Metadata<T>,
+    metadata: Metadata,
 ) -> Result<SchemaObject, GenerateError>
 where
     T: Configurable + ToValue,
 {
     // Generate the schema and apply its metadata.
     let mut schema = T::generate_schema(gen)?;
-    apply_metadata(&mut schema, metadata);
+    apply_metadata::<T>(&mut schema, metadata);
 
     Ok(schema)
 }
@@ -610,7 +610,7 @@ where
 {
     // We need to force the schema to be treated as transparent so that when the schema generation
     // finalizes the schema, we don't throw an error due to a lack of title/description.
-    let mut key_metadata = Metadata::<K>::default();
+    let mut key_metadata = Metadata::default();
     key_metadata.set_transparent();
 
     let key_schema = get_or_generate_schema::<K>(gen, None)?;
