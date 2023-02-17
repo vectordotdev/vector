@@ -191,6 +191,7 @@ impl SourceConfig for SyslogConfig {
                     tls,
                     tls_client_metadata_key,
                     receive_buffer_bytes,
+                    None,
                     cx,
                     false.into(),
                     connection_limit,
