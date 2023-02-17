@@ -1,3 +1,4 @@
+//! Functionality to handle enrichment tables.
 pub use enrichment::{Condition, IndexHandle, Table};
 use enum_dispatch::enum_dispatch;
 use vector_config::{configurable_component, NamedComponent};

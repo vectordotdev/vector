@@ -729,7 +729,7 @@ impl ConsumerContext for CustomContext {
 
 #[cfg(test)]
 mod test {
-    use lookup::LookupBuf;
+    use lookup::OwnedTargetPath;
     use vector_core::schema::Definition;
 
     use super::*;
@@ -782,21 +782,39 @@ mod test {
         assert_eq!(
             definition,
             Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
-                .with_meaning(LookupBuf::root(), "message")
-                .with_metadata_field(&owned_value_path!("kafka", "timestamp"), Kind::timestamp())
-                .with_metadata_field(&owned_value_path!("kafka", "message_key"), Kind::bytes())
-                .with_metadata_field(&owned_value_path!("kafka", "topic"), Kind::bytes())
-                .with_metadata_field(&owned_value_path!("kafka", "partition"), Kind::bytes())
-                .with_metadata_field(&owned_value_path!("kafka", "offset"), Kind::bytes())
+                .with_meaning(OwnedTargetPath::event_root(), "message")
+                .with_metadata_field(
+                    &owned_value_path!("kafka", "timestamp"),
+                    Kind::timestamp(),
+                    Some("timestamp")
+                )
+                .with_metadata_field(
+                    &owned_value_path!("kafka", "message_key"),
+                    Kind::bytes(),
+                    None
+                )
+                .with_metadata_field(&owned_value_path!("kafka", "topic"), Kind::bytes(), None)
+                .with_metadata_field(
+                    &owned_value_path!("kafka", "partition"),
+                    Kind::bytes(),
+                    None
+                )
+                .with_metadata_field(&owned_value_path!("kafka", "offset"), Kind::bytes(), None)
                 .with_metadata_field(
                     &owned_value_path!("kafka", "headers"),
-                    Kind::object(Collection::empty().with_unknown(Kind::bytes()))
+                    Kind::object(Collection::empty().with_unknown(Kind::bytes())),
+                    None
                 )
                 .with_metadata_field(
                     &owned_value_path!("vector", "ingest_timestamp"),
-                    Kind::timestamp()
+                    Kind::timestamp(),
+                    None
                 )
-                .with_metadata_field(&owned_value_path!("vector", "source_type"), Kind::bytes())
+                .with_metadata_field(
+                    &owned_value_path!("vector", "source_type"),
+                    Kind::bytes(),
+                    None
+                )
         )
     }
 

@@ -1,12 +1,11 @@
 use bytes::{BufMut, BytesMut};
 use tokio_util::codec::Encoder;
-use vector_config::configurable_component;
 use vector_core::{config::DataType, event::Event, schema};
 
 use crate::MetricTagValues;
 
 /// Config used to build a `JsonSerializer`.
-#[configurable_component]
+#[crate::configurable_component]
 #[derive(Debug, Clone, Default)]
 pub struct JsonSerializerConfig {
     /// Controls how metric tag values are encoded.

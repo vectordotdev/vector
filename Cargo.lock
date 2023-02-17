@@ -1867,9 +1867,9 @@ dependencies = [
 
 [[package]]
 name = "clap"
-version = "4.1.4"
+version = "4.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f13b9c79b5d1dd500d20ef541215a6423c75829ef43117e1b4d17fd8af0b5d76"
+checksum = "ec0b0588d44d4d63a87dbd75c136c166bbfd9a86a31cb89e09906521c7d3f5e3"
 dependencies = [
  "bitflags",
  "clap_derive",
@@ -1887,17 +1887,17 @@ version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "23e2b6c3dcdb73299f48ae05b294da14e2f560b3ed2c09e742269eb1b22af231"
 dependencies = [
- "clap 4.1.4",
+ "clap 4.1.6",
  "log",
 ]
 
 [[package]]
 name = "clap_complete"
-version = "4.1.1"
+version = "4.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3d6540eedc41f8a5a76cf3d8d458057dcdf817be4158a55b5f861f7a5483de75"
+checksum = "bd125be87bf4c255ebc50de0b7f4d2a6201e8ac3dc86e39c0ad081dc5e7236fe"
 dependencies = [
- "clap 4.1.4",
+ "clap 4.1.6",
 ]
 
 [[package]]
@@ -4096,9 +4096,9 @@ checksum = "a898e4b7951673fce96614ce5751d13c40fc5674bc2d759288e46c3ab62598b3"
 
 [[package]]
 name = "inherent"
-version = "1.0.3"
+version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a036328c11e86e024522cb1e9b78ba9df3e316995e004e98854a18e4a326d2e1"
+checksum = "cb659d59c4af6c9dc568b13db431174ab5fa961aa53f5aad7f42fb710c06bc46"
 dependencies = [
  "proc-macro2 1.0.51",
  "quote 1.0.23",
@@ -9071,7 +9071,7 @@ dependencies = [
  "anyhow",
  "atty",
  "cached",
- "clap 4.1.4",
+ "clap 4.1.6",
  "clap-verbosity-flag",
  "clap_complete",
  "confy",
@@ -9140,7 +9140,7 @@ dependencies = [
  "bytesize",
  "chrono",
  "cidr-utils",
- "clap 4.1.4",
+ "clap 4.1.6",
  "codecs",
  "colored",
  "console-subscriber",
@@ -9302,7 +9302,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "chrono",
- "clap 4.1.4",
+ "clap 4.1.6",
  "futures 0.3.26",
  "graphql_client",
  "indoc",
@@ -9325,7 +9325,7 @@ dependencies = [
  "async-trait",
  "bytecheck",
  "bytes 1.4.0",
- "clap 4.1.4",
+ "clap 4.1.6",
  "crc32fast",
  "criterion",
  "crossbeam-queue",
@@ -9569,7 +9569,7 @@ dependencies = [
 name = "vrl-cli"
 version = "0.1.0"
 dependencies = [
- "clap 4.1.4",
+ "clap 4.1.6",
  "exitcode",
  "indoc",
  "lookup",
@@ -9715,7 +9715,7 @@ dependencies = [
  "ansi_term",
  "chrono",
  "chrono-tz",
- "clap 4.1.4",
+ "clap 4.1.6",
  "enrichment",
  "glob",
  "lookup",

@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 use std::{
     fmt,
     task::{Context, Poll},

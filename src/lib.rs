@@ -5,6 +5,7 @@
 #![deny(unused_assignments)]
 #![deny(unused_comparisons)]
 #![deny(warnings)]
+#![deny(missing_docs)]
 #![cfg_attr(docsrs, feature(doc_cfg), deny(rustdoc::broken_intra_doc_links))]
 #![allow(clippy::approx_constant)]
 #![allow(clippy::float_cmp)]
@@ -15,8 +16,9 @@
 #![deny(clippy::clone_on_ref_ptr)]
 #![deny(clippy::trivially_copy_pass_by_ref)]
 #![deny(clippy::disallowed_methods)] // [nursery] mark some functions as verboten
-#![deny(clippy::missing_const_for_fn)] // [nursery] valuable to the optimizer,
-                                       // but may produce false positives
+#![deny(clippy::missing_const_for_fn)] // [nursery] valuable to the optimizer, but may produce false positives
+
+//! The main library to support building Vector.
 
 #[macro_use]
 extern crate tracing;
@@ -123,6 +125,8 @@ pub use source_sender::SourceSender;
 pub use vector_common::{shutdown, Error, Result};
 pub use vector_core::{event, metrics, schema, tcp, tls};
 
+/// The current version of Vector in simplified format.
+/// <version-number>-nightly.
 pub fn vector_version() -> impl std::fmt::Display {
     #[cfg(feature = "nightly")]
     let pkg_version = format!("{}-nightly", built_info::PKG_VERSION);
@@ -133,6 +137,7 @@ pub fn vector_version() -> impl std::fmt::Display {
     pkg_version
 }
 
+/// Returns a string containing full version information of the current build.
 pub fn get_version() -> String {
     let pkg_version = vector_version();
     let build_desc = built_info::VECTOR_BUILD_DESC;
@@ -153,15 +158,21 @@ pub fn get_version() -> String {
     format!("{} ({})", pkg_version, build_string)
 }
 
+/// Includes information about the current build.
 #[allow(warnings)]
 pub mod built_info {
     include!(concat!(env!("OUT_DIR"), "/built.rs"));
 }
 
+/// Returns the host name of the current system.
 pub fn get_hostname() -> std::io::Result<String> {
     Ok(hostname::get()?.to_string_lossy().into())
 }
 
+/// Spawn a task with the given name. The name is only used if
+/// built with [`tokio_unstable`][tokio_unstable].
+///
+/// [tokio_unstable]: https://docs.rs/tokio/latest/tokio/#unstable-features
 #[track_caller]
 pub(crate) fn spawn_named<T>(
     task: impl std::future::Future<Output = T> + Send + 'static,
@@ -177,6 +188,7 @@ where
     tokio::spawn(task)
 }
 
+/// Returns an estimate of the number of recommended threads that Vector should spawn.
 pub fn num_threads() -> usize {
     let count = match std::thread::available_parallelism() {
         Ok(count) => count,

@@ -173,7 +173,7 @@ install_from_archive() {
     ensure mkdir -p "$_dir"
 
     printf "%s Downloading Vector via %s" "$_prompt" "$_url"
-    ensure downloader "$_url" "$_file"
+    ensure downloader "$_url" "$_file" "$_arch"
     printf " ✓\n"
 
     ensure mkdir -p "$prefix"
@@ -266,6 +266,14 @@ get_gnu_musl_glibc() {
   else
     err "Unknown architecture from ldd: ${_ldd_version}"
   fi
+}
+
+check_proc() {
+    # Check for /proc by looking for the /proc/self/exe link
+    # This is only run on Linux
+    if ! test -L /proc/self/exe ; then
+        err "fatal: Unable to find /proc/self/exe.  Is /proc mounted?  Installation cannot proceed without /proc."
+    fi
 }
 
 get_bitness() {
