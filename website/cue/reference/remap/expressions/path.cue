@@ -32,8 +32,7 @@ remap: expressions: path: {
 					and only contain alpha-numeric characters, `_`, and '@' (`a-zA-Z0-9_@`). If a segment contains
 					any other character, the entire segment must be enclosed in double quotes.
 					"""
-			}
-			characteristics: {
+				characteristics: {
 					array_elements: {
 						title: "Array element paths"
 						description: """
@@ -98,6 +97,7 @@ remap: expressions: path: {
 							"""
 					}
 				}
+			}
 		}
 	}
 
