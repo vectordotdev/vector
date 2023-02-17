@@ -120,7 +120,7 @@ impl TcpConfig {
             port_key: default_port_key(),
             tls: None,
             receive_buffer_bytes: None,
-            connection_close_secs: None,
+            max_connection_duration_secs: None,
             framing: None,
             decoding: default_decoding(),
             connection_limit: None,
