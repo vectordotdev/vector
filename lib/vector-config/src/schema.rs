@@ -213,7 +213,7 @@ where
     schema
 }
 
-pub fn generate_array_schema<T>(
+pub(crate) fn generate_array_schema<T>(
     gen: &RefCell<SchemaGenerator>,
 ) -> Result<SchemaObject, GenerateError>
 where
@@ -232,7 +232,9 @@ where
     })
 }
 
-pub fn generate_set_schema<T>(gen: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError>
+pub(crate) fn generate_set_schema<T>(
+    gen: &RefCell<SchemaGenerator>,
+) -> Result<SchemaObject, GenerateError>
 where
     T: Configurable,
 {
@@ -250,7 +252,9 @@ where
     })
 }
 
-pub fn generate_map_schema<V>(gen: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError>
+pub(crate) fn generate_map_schema<V>(
+    gen: &RefCell<SchemaGenerator>,
+) -> Result<SchemaObject, GenerateError>
 where
     V: Configurable,
 {
@@ -288,7 +292,7 @@ pub fn generate_struct_schema(
     }
 }
 
-pub fn generate_optional_schema<T>(
+pub(crate) fn generate_optional_schema<T>(
     gen: &RefCell<SchemaGenerator>,
 ) -> Result<SchemaObject, GenerateError>
 where
@@ -410,21 +414,6 @@ pub fn generate_one_of_schema(subschemas: &[SchemaObject]) -> SchemaObject {
     SchemaObject {
         subschemas: Some(Box::new(SubschemaValidation {
             one_of: Some(subschemas),
-            ..Default::default()
-        })),
-        ..Default::default()
-    }
-}
-
-pub fn generate_all_of_schema(subschemas: &[SchemaObject]) -> SchemaObject {
-    let subschemas = subschemas
-        .iter()
-        .map(|s| Schema::Object(s.clone()))
-        .collect::<Vec<_>>();
-
-    SchemaObject {
-        subschemas: Some(Box::new(SubschemaValidation {
-            all_of: Some(subschemas),
             ..Default::default()
         })),
         ..Default::default()
@@ -570,7 +559,7 @@ where
     Ok(schema)
 }
 
-pub fn generate_baseline_schema<T>(
+fn generate_baseline_schema<T>(
     gen: &RefCell<SchemaGenerator>,
     metadata: Metadata,
 ) -> Result<SchemaObject, GenerateError>
@@ -604,7 +593,7 @@ fn get_schema_ref<S: AsRef<str>>(gen: &RefCell<SchemaGenerator>, name: S) -> Sch
 ///
 /// If the schema is not a valid, string-like schema, an error variant will be returned describing
 /// the issue.
-pub fn assert_string_schema_for_map<K, M>(
+pub(crate) fn assert_string_schema_for_map<K, M>(
     gen: &RefCell<SchemaGenerator>,
 ) -> Result<(), GenerateError>
 where
