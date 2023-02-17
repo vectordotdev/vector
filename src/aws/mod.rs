@@ -47,7 +47,7 @@ pub fn is_retriable_error<T>(error: &SdkError<T>) -> bool {
         SdkError::ResponseError(err) => check_response(err.raw()),
         SdkError::ServiceError(err) => check_response(err.raw()),
         _ => {
-            warn!("AWS returned an unhandled error, retrying request.");
+            warn!("AWS returned unknown error, retrying request.");
             true
         }
     }
@@ -157,6 +157,7 @@ pub async fn create_client<T: ClientBuilder>(
 
     // Build the configuration first.
     let mut config_builder = SdkConfig::builder()
+        .credentials_cache(auth.credentials_cache().await?)
         .credentials_provider(auth.credentials_provider(region.clone()).await?)
         .region(region.clone())
         .retry_config(retry_config.clone());
@@ -338,7 +339,6 @@ impl Body for MeasuredBody {
             Poll::Ready(Some(Ok(data))) => {
                 this.shared_bytes_sent
                     .fetch_add(data.len(), Ordering::Release);
-
                 Poll::Ready(Some(Ok(data)))
             }
             Poll::Ready(None) => Poll::Ready(None),

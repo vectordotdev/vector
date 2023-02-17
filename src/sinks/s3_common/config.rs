@@ -338,7 +338,7 @@ pub fn build_healthcheck(bucket: String, client: S3Client) -> crate::Result<Heal
         match req {
             Ok(_) => Ok(()),
             Err(error) => Err(match error {
-                SdkError::ServiceError(inner) => match inner.raw().http().status() {
+                SdkError::ServiceError(inner) => match inner.into_raw().http().status() {
                     StatusCode::FORBIDDEN => HealthcheckError::InvalidCredentials.into(),
                     StatusCode::NOT_FOUND => HealthcheckError::UnknownBucket { bucket }.into(),
                     status => HealthcheckError::UnknownStatus { status }.into(),
@@ -357,7 +357,7 @@ pub async fn create_service(
     proxy: &ProxyConfig,
     tls_options: &Option<TlsConfig>,
 ) -> crate::Result<S3Service> {
-    let endpoint = region.endpoint()?;
+    let endpoint = region.endpoint();
     let region = region.region();
     let client =
         create_client::<S3ClientBuilder>(auth, region.clone(), endpoint, proxy, tls_options, true)

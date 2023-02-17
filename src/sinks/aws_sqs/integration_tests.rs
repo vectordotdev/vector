@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use aws_sdk_sqs::{model::QueueAttributeName, Client as SqsClient};
+use aws_sdk_sqs::{model::QueueAttributeName, Client as SqsClient, Region};
 use codecs::TextSerializerConfig;
 use tokio::time::{sleep, Duration};
 
@@ -29,7 +29,7 @@ async fn create_test_client() -> SqsClient {
     let proxy = ProxyConfig::default();
     create_client::<SqsClientBuilder>(
         &auth,
-        Some(aws_types::region::Region::new("localstack")),
+        Some(Region::new("localstack")),
         Some(endpoint),
         &proxy,
         &None,

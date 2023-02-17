@@ -33,9 +33,8 @@ impl RegionOrEndpoint {
         }
     }
 
-    pub fn endpoint(&self) -> crate::Result<Option<String>> {
-        let endpoint = self.endpoint.clone();
-        Ok(endpoint)
+    pub fn endpoint(&self) -> Option<String> {
+        self.endpoint.clone()
     }
 
     pub fn region(&self) -> Option<Region> {

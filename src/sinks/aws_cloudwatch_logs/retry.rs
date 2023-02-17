@@ -32,6 +32,7 @@ impl<T: Send + Sync + 'static> RetryLogic for CloudwatchRetryLogic<T> {
     type Error = CloudwatchError;
     type Response = T;
 
+    // TODO this match may not be necessary given the logic in `is_retriable_error()`
     #[allow(clippy::cognitive_complexity)] // long, but just a hair over our limit
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
         match error {

@@ -115,7 +115,7 @@ impl KinesisStreamsSinkConfig {
         create_client::<KinesisClientBuilder>(
             &self.base.auth,
             self.base.region.region(),
-            self.base.region.endpoint()?,
+            self.base.region.endpoint(),
             proxy,
             &self.base.tls,
             true,

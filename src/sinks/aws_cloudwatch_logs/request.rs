@@ -14,8 +14,9 @@ use aws_sdk_cloudwatchlogs::model::InputLogEvent;
 use aws_sdk_cloudwatchlogs::output::{DescribeLogStreamsOutput, PutLogEventsOutput};
 use aws_sdk_cloudwatchlogs::types::SdkError;
 use aws_sdk_cloudwatchlogs::Client as CloudwatchLogsClient;
-use aws_smithy_http::operation::{Operation, Request};
 use futures::{future::BoxFuture, FutureExt};
+use http::header::HeaderName;
+use http::HeaderValue;
 use indexmap::IndexMap;
 use tokio::sync::oneshot;
 
@@ -227,11 +228,9 @@ impl Client {
         let group_name = self.group_name.clone();
         let stream_name = self.stream_name.clone();
         let headers = self.headers.clone();
+
         Box::pin(async move {
-            // #12760 this is a relatively convoluted way of changing the headers of a request
-            // about to be sent. https://github.com/awslabs/aws-sdk-rust/issues/537 should
-            // eventually make this better.
-            let op = PutLogEvents::builder()
+            let mut op = PutLogEvents::builder()
                 .set_log_events(Some(log_events))
                 .set_sequence_token(sequence_token)
                 .log_group_name(group_name)
@@ -242,24 +241,18 @@ impl Client {
                 .await
                 .map_err(SdkError::construction_failure)?;
 
-            let (req, parts) = op.into_request_response();
-            let (mut body, props) = req.into_parts();
             for (header, value) in headers.iter() {
                 let owned_header = header.clone();
                 let owned_value = value.clone();
-                body.headers_mut().insert(
-                    http::header::HeaderName::from_bytes(owned_header.as_bytes())
+                op.request_mut().headers_mut().insert(
+                    HeaderName::from_bytes(owned_header.as_bytes())
                         .map_err(SdkError::construction_failure)?,
-                    http::HeaderValue::from_str(owned_value.as_str())
+                    HeaderValue::from_str(owned_value.as_str())
                         .map_err(SdkError::construction_failure)?,
                 );
             }
-            client
-                .call(Operation::from_parts(
-                    Request::from_parts(body, props),
-                    parts,
-                ))
-                .await
+
+            client.call(op).await
         })
     }
 
