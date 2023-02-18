@@ -289,10 +289,11 @@ async fn handle_stream<T>(
     let reader = FramedRead::new(socket, source.decoder());
     let mut reader = ReadyFrames::new(reader);
 
-    let connection_close_timeout = OptionFuture::from(match max_connection_duration_secs {
-        Some(timeout_secs) => Some(tokio::time::sleep(Duration::from_secs(timeout_secs))),
-        None => None,
-    });
+    let connection_close_timeout = OptionFuture::from(
+        max_connection_duration_secs
+            .map(|timeout_secs| tokio::time::sleep(Duration::from_secs(timeout_secs))),
+    );
+
     tokio::pin!(connection_close_timeout);
 
     loop {
