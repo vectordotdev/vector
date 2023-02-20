@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::{convert::TryInto, future, path::PathBuf, time::Duration};
 
 use bytes::Bytes;
@@ -18,6 +19,7 @@ use tokio::{sync::oneshot, task::spawn_blocking};
 use tracing::{Instrument, Span};
 use value::Kind;
 use vector_common::finalizer::OrderedFinalizer;
+use vector_common::internal_event::{ByteSize, CountByteSize, InternalEventHandle, Registered};
 use vector_config::{configurable_component, NamedComponent};
 use vector_core::config::{LegacyKey, LogNamespace};
 
@@ -579,16 +581,26 @@ pub fn file_source(
 
         let mut encoding_decoder = encoding_charset.map(Decoder::new);
 
+        let mut file_id_to_metrics_mapping: HashMap<
+            FileFingerprint,
+            Registered<FileBytesReceived>,
+        > = HashMap::new();
+
         // sizing here is just a guess
         let (tx, rx) = futures::channel::mpsc::channel::<Vec<Line>>(2);
         let rx = rx
             .map(futures::stream::iter)
             .flatten()
             .map(move |mut line| {
-                emit!(FileBytesReceived {
-                    byte_size: line.text.len(),
-                    file: &line.filename,
-                });
+                file_id_to_metrics_mapping
+                    .entry(line.file_id)
+                    .or_insert_with(|| {
+                        register!(FileBytesReceived {
+                            file: line.filename.clone()
+                        })
+                    })
+                    .emit(ByteSize(line.text.len()));
+
                 // transcode each line from the file's encoding charset to utf8
                 line.text = match encoding_decoder.as_mut() {
                     Some(d) => d.decode_to_utf8(line.text),
@@ -617,8 +629,21 @@ pub fn file_source(
 
         // Once file server ends this will run until it has finished processing remaining
         // logs in the queue.
+        let mut file_id_to_event_metrics_mapping: HashMap<
+            FileFingerprint,
+            Registered<FileEventsReceived>,
+        > = HashMap::new();
         let span = Span::current();
         let mut messages = messages.map(move |line| {
+            file_id_to_event_metrics_mapping
+                .entry(line.file_id)
+                .or_insert_with(|| {
+                    register!(FileEventsReceived {
+                        file: line.filename.clone()
+                    })
+                })
+                .emit(CountByteSize(1, line.text.len()));
+
             let mut event = create_event(
                 line.text,
                 line.start_offset,
@@ -736,12 +761,6 @@ fn create_event(
     meta: &EventMetadata,
     log_namespace: LogNamespace,
 ) -> LogEvent {
-    emit!(FileEventsReceived {
-        count: 1,
-        file,
-        byte_size: line.len(),
-    });
-
     let deserializer = BytesDeserializer::new();
     let mut event = deserializer.parse_single(line, log_namespace);
 

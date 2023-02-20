@@ -82,63 +82,51 @@ mod source {
     use std::{io::Error, path::Path, time::Duration};
 
     use file_source::FileSourceInternalEvents;
-    use metrics::counter;
+    use metrics::{counter, register_counter, Counter};
 
     use super::{FileOpen, InternalEvent};
     use crate::emit;
-    use vector_common::internal_event::{error_stage, error_type};
+    use vector_common::internal_event::{error_stage, error_type, ByteSize, CountByteSize};
+    use vector_common::registered_event;
 
-    #[derive(Debug)]
-    pub struct FileBytesReceived<'a> {
-        pub byte_size: usize,
-        pub file: &'a str,
-    }
-
-    impl<'a> InternalEvent for FileBytesReceived<'a> {
-        fn emit(self) {
-            trace!(
-                message = "Bytes received.",
-                byte_size = %self.byte_size,
-                protocol = "file",
-                file = %self.file,
-            );
-            counter!(
-                "component_received_bytes_total", self.byte_size as u64,
-                "protocol" => "file",
-                "file" => self.file.to_owned()
-            );
+    registered_event!(
+        FileBytesReceived {
+            file: String,
+        } => {
+            received_bytes: Counter = register_counter!("component_received_bytes_total", "protocol" => "file", "file" => self.file.clone()),
+            file: String = self.file,
         }
-    }
 
-    #[derive(Debug)]
-    pub struct FileEventsReceived<'a> {
-        pub count: usize,
-        pub file: &'a str,
-        pub byte_size: usize,
-    }
+        fn emit(&self, data: ByteSize) {
+            self.received_bytes.increment(data.0 as u64);
+            trace!(message = "Bytes received.", byte_size = %data.0, protocol = "file", file = %self.file);
+        }
+    );
 
-    impl InternalEvent for FileEventsReceived<'_> {
-        fn emit(self) {
+    registered_event!(
+        FileEventsReceived {
+            file: String,
+        } => {
+            component_received_event_bytes_total: Counter = register_counter!("component_received_event_bytes_total", "file" => self.file.clone()),
+            component_received_events_total: Counter = register_counter!("component_received_events_total", "file" => self.file.clone()),
+            events_in_total: Counter = register_counter!("events_in_total", "file" => self.file.clone()),
+            file: String = self.file,
+        }
+
+        fn emit(&self, data: CountByteSize) {
+            self.component_received_event_bytes_total
+                .increment(data.1 as u64);
+            self.component_received_events_total
+                .increment(data.0 as u64);
+            self.events_in_total.increment(data.0 as u64);
             trace!(
                 message = "Events received.",
-                count = %self.count,
-                byte_size = %self.byte_size,
+                count = %data.0,
+                byte_size = %data.1,
                 file = %self.file
             );
-            counter!(
-                "events_in_total", self.count as u64,
-                "file" => self.file.to_owned(),
-            );
-            counter!(
-                "component_received_events_total", self.count as u64,
-                "file" => self.file.to_owned(),
-            );
-            counter!(
-                "component_received_event_bytes_total", self.byte_size as u64,
-                "file" => self.file.to_owned(),
-            );
         }
-    }
+    );
 
     #[derive(Debug)]
     pub struct FileChecksumFailed<'a> {
