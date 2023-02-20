@@ -155,16 +155,27 @@ mod tests {
     /// Ensures that serialized `GcpSeries` matches the format that GCP expects (https://cloud.google.com/monitoring/api/ref_v3/rest/v3/TimeSeries).
     #[test]
     fn serialize_gcp_series() {
-        let end_time = chrono::DateTime::from_utc(chrono::NaiveDate::from_ymd(2023, 2, 14).and_hms(10, 00, 00), chrono::Utc);
+        let end_time = chrono::DateTime::from_utc(
+            chrono::NaiveDate::from_ymd(2023, 2, 14).and_hms(10, 00, 00),
+            chrono::Utc,
+        );
         let gcp_series = GcpSeries {
             time_series: &[GcpSerie {
                 metric: GcpMetric {
                     r#type: "custom.googleapis.com/my_namespace/metrics/my_metric".to_string(),
-                    labels: [("my_metric_label".to_string(), "my_metric_label_value".to_string())].into(),
+                    labels: [(
+                        "my_metric_label".to_string(),
+                        "my_metric_label_value".to_string(),
+                    )]
+                    .into(),
                 },
                 resource: GcpResource {
                     r#type: "my_resource".to_string(),
-                    labels: [("my_resource_label".to_string(), "my_resource_label_value".to_string())].into(),
+                    labels: [(
+                        "my_resource_label".to_string(),
+                        "my_resource_label_value".to_string(),
+                    )]
+                    .into(),
                 },
                 metric_kind: GcpMetricKind::Gauge,
                 value_type: GcpValueType::Int64,
@@ -177,7 +188,7 @@ mod tests {
                         int64_value: Some(10),
                     },
                 }],
-            }]
+            }],
         };
 
         let serialized = serde_json::to_string(&gcp_series).unwrap();
