@@ -329,7 +329,7 @@ releases: "0.24.0": {
 			type: "feat"
 			scopes: ["apex sink"]
 			description: """
-				A new `apex` sink] was added to send logs to Apex.
+				A new `apex` sink was added to send logs to Apex.
 				This sink was removed in v0.28 as the Apex service moved to EOL.
 				"""
 			contributors: ["mcasper"]
