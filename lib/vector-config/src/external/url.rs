@@ -3,7 +3,7 @@ use vector_config_common::validation::{Format, Validation};
 
 use crate::{
     schema::generate_string_schema,
-    schemars::{gen::SchemaGenerator, schema::SchemaObject},
+    schema_gen::{SchemaGenerator, SchemaObject},
     Configurable, GenerateError, Metadata, ToValue,
 };
 

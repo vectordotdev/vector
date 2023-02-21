@@ -1,6 +1,6 @@
 #![deny(missing_docs)]
 
-use schemars::{gen::SchemaGenerator, schema::SchemaObject};
+use crate::schema_gen::{SchemaGenerator, SchemaObject};
 use serde_json::Value;
 
 use crate::{GenerateError, Metadata};

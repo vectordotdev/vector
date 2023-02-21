@@ -1,18 +1,12 @@
 use std::{collections::BTreeSet, mem};
 
+use crate::schema_gen::*;
 use indexmap::IndexMap;
-use schemars::{
-    gen::{SchemaGenerator, SchemaSettings},
-    schema::{
-        ArrayValidation, InstanceType, NumberValidation, ObjectValidation, RootSchema, Schema,
-        SchemaObject, SingleOrVec, SubschemaValidation,
-    },
-};
 use serde_json::{Map, Value};
+use vector_config_common::attributes::CustomAttribute;
 
 use crate::{
-    num::ConfigurableNumber, Configurable, ConfigurableString, CustomAttribute, GenerateError,
-    Metadata, ToValue,
+    num::ConfigurableNumber, Configurable, ConfigurableString, GenerateError, Metadata, ToValue,
 };
 
 /// Applies metadata to the given schema.
@@ -486,14 +480,10 @@ where
     // Set env variable to enable generating all schemas, including platform-specific ones.
     std::env::set_var("VECTOR_GENERATE_SCHEMA", "true");
 
-    let mut schema_gen = SchemaSettings::draft2019_09().into_generator();
+    let mut schema_gen = SchemaSettings::new().into_generator();
 
     let schema = get_or_generate_schema::<T>(&mut schema_gen, Some(T::metadata()))?;
-    Ok(RootSchema {
-        meta_schema: None,
-        schema,
-        definitions: schema_gen.take_definitions(),
-    })
+    Ok(schema_gen.into_root_schema(schema))
 }
 
 pub fn get_or_generate_schema<T>(
@@ -589,7 +579,7 @@ where
 }
 
 fn get_schema_ref<S: AsRef<str>>(gen: &mut SchemaGenerator, name: S) -> SchemaObject {
-    let ref_path = format!("{}{}", gen.settings().definitions_path, name.as_ref());
+    let ref_path = format!("{}{}", gen.settings().definitions_path(), name.as_ref());
     SchemaObject::new_ref(ref_path)
 }
 
