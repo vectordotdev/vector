@@ -482,11 +482,11 @@ fn setup_logs_reporting(
     // Create a Datadog logs sink to consume and emit internal logs.
     let datadog_logs = DatadogLogsConfig {
         dd_common: DatadogCommonConfig {
-            default_api_key: api_key.into(),
             endpoint: datadog.endpoint.clone(),
             site: datadog.site.clone(),
             ..Default::default()
         },
+        default_api_key: api_key.into(),
         region: datadog.region,
         request: RequestConfig {
             headers: IndexMap::from([(
@@ -590,11 +590,11 @@ fn setup_metrics_reporting(
     // Create a Datadog metrics sink to consume and emit internal + host metrics.
     let datadog_metrics = DatadogMetricsConfig {
         dd_common: DatadogCommonConfig {
-            default_api_key: api_key.into(),
             endpoint: datadog.endpoint.clone(),
             site: datadog.site.clone(),
             ..Default::default()
         },
+        default_api_key: api_key.into(),
         region: datadog.region,
         ..Default::default()
     };
