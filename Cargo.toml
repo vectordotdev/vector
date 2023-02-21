@@ -601,7 +601,6 @@ transforms-throttle = ["dep:governor"]
 sinks = ["sinks-logs", "sinks-metrics"]
 sinks-logs = [
   "sinks-amqp",
-  "sinks-apex",
   "sinks-aws_cloudwatch_logs",
   "sinks-aws_kinesis_firehose",
   "sinks-aws_kinesis_streams",
@@ -656,7 +655,6 @@ sinks-metrics = [
 ]
 
 sinks-amqp = ["lapin"]
-sinks-apex = []
 sinks-aws_cloudwatch_logs = ["aws-core", "dep:aws-sdk-cloudwatchlogs"]
 sinks-aws_cloudwatch_metrics = ["aws-core", "dep:aws-sdk-cloudwatch"]
 sinks-aws_kinesis_firehose = ["aws-core", "dep:aws-sdk-firehose"]
@@ -719,7 +717,6 @@ nightly = []
 # Testing-related features
 all-integration-tests = [
   "amqp-integration-tests",
-  "apex-integration-tests",
   "aws-integration-tests",
   "axiom-integration-tests",
   "azure-integration-tests",
@@ -771,7 +768,6 @@ azure-integration-tests = [
   "azure-blob-integration-tests"
 ]
 
-apex-integration-tests = ["sinks-apex"]
 aws-cloudwatch-logs-integration-tests = ["sinks-aws_cloudwatch_logs"]
 aws-cloudwatch-metrics-integration-tests = ["sinks-aws_cloudwatch_metrics"]
 aws-ec2-metadata-integration-tests = ["transforms-aws_ec2_metadata"]
