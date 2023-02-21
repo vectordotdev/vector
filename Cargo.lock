@@ -9725,7 +9725,7 @@ dependencies = [
  "vrl",
  "vrl-core",
  "woothee",
- "zstd 0.12.2+zstd.1.5.2",
+ "zstd 0.12.3+zstd.1.5.2",
 ]
 
 [[package]]
