@@ -129,7 +129,7 @@ fn build_to_value_fn(_container: &Container<'_>) -> proc_macro2::TokenStream {
 
 fn build_virtual_newtype_schema_fn(virtual_ty: Type) -> proc_macro2::TokenStream {
     quote! {
-        fn generate_schema(schema_gen: &mut ::vector_config::schemars::gen::SchemaGenerator) -> std::result::Result<::vector_config::schemars::schema::SchemaObject, ::vector_config::GenerateError> {
+        fn generate_schema(schema_gen: &::std::cell::RefCell<::vector_config::schemars::gen::SchemaGenerator>) -> std::result::Result<::vector_config::schemars::schema::SchemaObject, ::vector_config::GenerateError> {
             ::vector_config::schema::get_or_generate_schema::<#virtual_ty>(schema_gen, None)
         }
     }
@@ -143,7 +143,7 @@ fn build_enum_generate_schema_fn(variants: &[Variant<'_>]) -> proc_macro2::Token
         .map(generate_enum_variant_schema);
 
     quote! {
-        fn generate_schema(schema_gen: &mut ::vector_config::schemars::gen::SchemaGenerator) -> std::result::Result<::vector_config::schemars::schema::SchemaObject, ::vector_config::GenerateError> {
+        fn generate_schema(schema_gen: &::std::cell::RefCell<::vector_config::schemars::gen::SchemaGenerator>) -> std::result::Result<::vector_config::schemars::schema::SchemaObject, ::vector_config::GenerateError> {
             let mut subschemas = ::std::vec::Vec::new();
 
             #(#mapped_variants)*
@@ -264,7 +264,7 @@ fn build_named_struct_generate_schema_fn(
         .map(|field| generate_named_struct_field(container, field));
 
     quote! {
-        fn generate_schema(schema_gen: &mut ::vector_config::schemars::gen::SchemaGenerator) -> std::result::Result<::vector_config::schemars::schema::SchemaObject, ::vector_config::GenerateError> {
+        fn generate_schema(schema_gen: &::std::cell::RefCell<::vector_config::schemars::gen::SchemaGenerator>) -> std::result::Result<::vector_config::schemars::schema::SchemaObject, ::vector_config::GenerateError> {
             let mut properties = ::vector_config::indexmap::IndexMap::new();
             let mut required = ::std::collections::BTreeSet::new();
             let mut flattened_subschemas = ::std::vec::Vec::new();
@@ -309,7 +309,7 @@ fn build_tuple_struct_generate_schema_fn(fields: &[Field<'_>]) -> proc_macro2::T
         .map(generate_tuple_struct_field);
 
     quote! {
-        fn generate_schema(schema_gen: &mut ::vector_config::schemars::gen::SchemaGenerator) -> std::result::Result<::vector_config::schemars::schema::SchemaObject, ::vector_config::GenerateError> {
+        fn generate_schema(schema_gen: &::std::cell::RefCell<::vector_config::schemars::gen::SchemaGenerator>) -> std::result::Result<::vector_config::schemars::schema::SchemaObject, ::vector_config::GenerateError> {
             let mut subschemas = ::std::collections::Vec::new();
 
             #(#mapped_fields)*
@@ -335,7 +335,7 @@ fn build_newtype_struct_generate_schema_fn(fields: &[Field<'_>]) -> proc_macro2:
     let field_schema = mapped_fields.remove(0);
 
     quote! {
-        fn generate_schema(schema_gen: &mut ::vector_config::schemars::gen::SchemaGenerator) -> std::result::Result<::vector_config::schemars::schema::SchemaObject, ::vector_config::GenerateError> {
+        fn generate_schema(schema_gen: &::std::cell::RefCell<::vector_config::schemars::gen::SchemaGenerator>) -> std::result::Result<::vector_config::schemars::schema::SchemaObject, ::vector_config::GenerateError> {
             #field_schema
 
             Ok(subschema)
