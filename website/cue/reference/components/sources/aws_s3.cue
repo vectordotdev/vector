@@ -151,12 +151,11 @@ components: sources: aws_s3: components._aws & {
 
 			policies: [
 				{
-					_action:       "ReceiveMessage"
-					required_when: "[`strategy`](#strategy) is set to `sqs`"
+					_action: "ReceiveMessage"
 				},
 				{
 					_action:       "DeleteMessage"
-					required_when: "[`strategy`](#strategy) is set to `sqs` and [`delete_message`](#sqs.delete_message) is set to `true`"
+					required_when: "[`delete_message`](#sqs.delete_message) is set to `true`"
 				},
 			]
 		},

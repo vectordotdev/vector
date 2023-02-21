@@ -433,7 +433,7 @@ fn enrich_syslog_event(
 
 #[cfg(test)]
 mod test {
-    use lookup::{event_path, owned_value_path, LookupBuf};
+    use lookup::{event_path, owned_value_path, OwnedTargetPath};
     use std::{
         collections::{BTreeMap, HashMap},
         fmt,
@@ -499,50 +499,68 @@ mod test {
 
         let expected_definition =
             Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
-                .with_meaning(LookupBuf::root(), "message")
-                .with_metadata_field(&owned_value_path!("vector", "source_type"), Kind::bytes())
+                .with_meaning(OwnedTargetPath::event_root(), "message")
+                .with_metadata_field(
+                    &owned_value_path!("vector", "source_type"),
+                    Kind::bytes(),
+                    None,
+                )
                 .with_metadata_field(
                     &owned_value_path!("vector", "ingest_timestamp"),
                     Kind::timestamp(),
+                    None,
                 )
-                .with_metadata_field(&owned_value_path!("syslog", "timestamp"), Kind::timestamp())
+                .with_metadata_field(
+                    &owned_value_path!("syslog", "timestamp"),
+                    Kind::timestamp(),
+                    Some("timestamp"),
+                )
                 .with_metadata_field(
                     &owned_value_path!("syslog", "hostname"),
                     Kind::bytes().or_undefined(),
+                    Some("host"),
                 )
                 .with_metadata_field(
                     &owned_value_path!("syslog", "severity"),
                     Kind::bytes().or_undefined(),
+                    Some("severity"),
                 )
                 .with_metadata_field(
                     &owned_value_path!("syslog", "facility"),
                     Kind::bytes().or_undefined(),
+                    None,
                 )
                 .with_metadata_field(
                     &owned_value_path!("syslog", "version"),
                     Kind::integer().or_undefined(),
+                    None,
                 )
                 .with_metadata_field(
                     &owned_value_path!("syslog", "appname"),
                     Kind::bytes().or_undefined(),
+                    None,
                 )
                 .with_metadata_field(
                     &owned_value_path!("syslog", "msgid"),
                     Kind::bytes().or_undefined(),
+                    None,
                 )
                 .with_metadata_field(
                     &owned_value_path!("syslog", "procid"),
                     Kind::integer().or_bytes().or_undefined(),
+                    None,
                 )
                 .with_metadata_field(
                     &owned_value_path!("syslog", "structured_data"),
                     Kind::object(Collection::from_unknown(Kind::object(
                         Collection::from_unknown(Kind::bytes()),
                     ))),
+                    None,
                 )
                 .with_metadata_field(
                     &owned_value_path!("syslog", "tls_client_metadata"),
                     Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
+                    None,
                 );
 
         assert_eq!(definition, expected_definition);

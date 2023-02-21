@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 use std::path::{Path, PathBuf};
 
 use rdkafka::{consumer::ConsumerContext, ClientConfig, ClientContext, Statistics};
@@ -46,6 +47,7 @@ pub struct KafkaAuthConfig {
     pub(crate) sasl: Option<KafkaSaslConfig>,
 
     #[configurable(derived)]
+    #[configurable(metadata(docs::advanced))]
     pub(crate) tls: Option<TlsEnableableConfig>,
 }
 

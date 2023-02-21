@@ -8,7 +8,7 @@ use std::{
 
 use codecs::MetricTagValues;
 use lookup::lookup_v2::{parse_value_path, ValuePath};
-use lookup::{metadata_path, owned_value_path, path, PathPrefix};
+use lookup::{metadata_path, owned_value_path, path, OwnedTargetPath, PathPrefix};
 use snafu::{ResultExt, Snafu};
 use value::Kind;
 use vector_common::TimeZone;
@@ -61,7 +61,7 @@ pub struct RemapConfig {
     /// Required if `source` is missing.
     ///
     /// [vrl]: https://vector.dev/docs/reference/vrl
-    #[configurable(metadata(docs::examples = "./my/program.vrl",))]
+    #[configurable(metadata(docs::examples = "./my/program.vrl"))]
     pub file: Option<PathBuf>,
 
     /// When set to `single`, metric tag values will be exposed as single strings, the
@@ -82,6 +82,7 @@ pub struct RemapConfig {
     /// [global_timezone]: https://vector.dev/docs/reference/configuration//global-options#timezone
     /// [tz_database]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
     #[serde(default)]
+    #[configurable(metadata(docs::advanced))]
     pub timezone: Option<TimeZone>,
 
     /// Drops any event that encounters an error during processing.
@@ -226,6 +227,7 @@ impl TransformConfig for RemapConfig {
                 input_definition.clone(),
             )
             .map(|(program, _, _, external_context)| {
+                // Apply any semantic meanings set in the VRL program
                 let meaning = external_context
                     .get_custom::<MeaningList>()
                     .cloned()
@@ -239,7 +241,8 @@ impl TransformConfig for RemapConfig {
                     input_definition.log_namespaces().clone(),
                 );
                 for (id, path) in meaning {
-                    new_type_def = new_type_def.with_meaning(path, &id);
+                    // currently only event paths are supported
+                    new_type_def = new_type_def.with_meaning(OwnedTargetPath::event(path), &id);
                 }
                 new_type_def
             })
@@ -283,11 +286,11 @@ impl TransformConfig for RemapConfig {
             dropped_definition = dropped_definition.merge(
                 input_definition
                     .clone()
-                    .with_metadata_field(&owned_value_path!("reason"), Kind::bytes())
-                    .with_metadata_field(&owned_value_path!("message"), Kind::bytes())
-                    .with_metadata_field(&owned_value_path!("component_id"), Kind::bytes())
-                    .with_metadata_field(&owned_value_path!("component_type"), Kind::bytes())
-                    .with_metadata_field(&owned_value_path!("component_kind"), Kind::bytes()),
+                    .with_metadata_field(&owned_value_path!("reason"), Kind::bytes(), None)
+                    .with_metadata_field(&owned_value_path!("message"), Kind::bytes(), None)
+                    .with_metadata_field(&owned_value_path!("component_id"), Kind::bytes(), None)
+                    .with_metadata_field(&owned_value_path!("component_type"), Kind::bytes(), None)
+                    .with_metadata_field(&owned_value_path!("component_kind"), Kind::bytes(), None),
             );
         }
 

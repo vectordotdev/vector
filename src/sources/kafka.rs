@@ -75,9 +75,11 @@ pub struct KafkaSourceConfig {
     /// The Kafka topics names to read events from.
     ///
     /// Regular expression syntax is supported if the topic begins with `^`.
-    #[configurable(metadata(docs::examples = "^(prefix1|prefix2)-.+"))]
-    #[configurable(metadata(docs::examples = "topic-1"))]
-    #[configurable(metadata(docs::examples = "topic-2"))]
+    #[configurable(metadata(
+        docs::examples = "^(prefix1|prefix2)-.+",
+        docs::examples = "topic-1",
+        docs::examples = "topic-2"
+    ))]
     topics: Vec<String>,
 
     /// The consumer group name to be used to consume events from Kafka.
@@ -97,30 +99,29 @@ pub struct KafkaSourceConfig {
 
     /// The Kafka session timeout.
     #[serde_as(as = "serde_with::DurationMilliSeconds<u64>")]
-    #[configurable(metadata(docs::examples = 5000))]
-    #[configurable(metadata(docs::examples = 10000))]
+    #[configurable(metadata(docs::examples = 5000, docs::examples = 10000))]
+    #[configurable(metadata(docs::advanced))]
     #[serde(default = "default_session_timeout_ms")]
     session_timeout_ms: Duration,
 
     /// Timeout for network requests.
     #[serde_as(as = "serde_with::DurationMilliSeconds<u64>")]
-    #[configurable(metadata(docs::examples = 30000))]
-    #[configurable(metadata(docs::examples = 60000))]
+    #[configurable(metadata(docs::examples = 30000, docs::examples = 60000))]
+    #[configurable(metadata(docs::advanced))]
     #[serde(default = "default_socket_timeout_ms")]
     socket_timeout_ms: Duration,
 
     /// Maximum time the broker may wait to fill the response.
     #[serde_as(as = "serde_with::DurationMilliSeconds<u64>")]
-    #[configurable(metadata(docs::examples = 50))]
-    #[configurable(metadata(docs::examples = 100))]
+    #[configurable(metadata(docs::examples = 50, docs::examples = 100))]
+    #[configurable(metadata(docs::advanced))]
     #[serde(default = "default_fetch_wait_max_ms")]
     fetch_wait_max_ms: Duration,
 
     /// The frequency that the consumer offsets are committed (written) to offset storage.
     #[serde_as(as = "serde_with::DurationMilliSeconds<u64>")]
     #[serde(default = "default_commit_interval_ms")]
-    #[configurable(metadata(docs::examples = 5000))]
-    #[configurable(metadata(docs::examples = 10000))]
+    #[configurable(metadata(docs::examples = 5000, docs::examples = 10000))]
     commit_interval_ms: Duration,
 
     /// Overrides the name of the log field used to add the message key to each event.
@@ -172,6 +173,7 @@ pub struct KafkaSourceConfig {
     ///
     /// See the [librdkafka documentation](https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md) for details.
     #[configurable(metadata(docs::examples = "example_librdkafka_options()"))]
+    #[configurable(metadata(docs::advanced))]
     #[configurable(metadata(
         docs::additional_props_description = "A librdkafka configuration option."
     ))]
@@ -181,6 +183,7 @@ pub struct KafkaSourceConfig {
     auth: kafka::KafkaAuthConfig,
 
     #[configurable(derived)]
+    #[configurable(metadata(docs::advanced))]
     #[serde(default = "default_framing_message_based")]
     #[derivative(Default(value = "default_framing_message_based()"))]
     framing: FramingConfig,
@@ -726,7 +729,7 @@ impl ConsumerContext for CustomContext {
 
 #[cfg(test)]
 mod test {
-    use lookup::LookupBuf;
+    use lookup::OwnedTargetPath;
     use vector_core::schema::Definition;
 
     use super::*;
@@ -779,21 +782,39 @@ mod test {
         assert_eq!(
             definition,
             Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
-                .with_meaning(LookupBuf::root(), "message")
-                .with_metadata_field(&owned_value_path!("kafka", "timestamp"), Kind::timestamp())
-                .with_metadata_field(&owned_value_path!("kafka", "message_key"), Kind::bytes())
-                .with_metadata_field(&owned_value_path!("kafka", "topic"), Kind::bytes())
-                .with_metadata_field(&owned_value_path!("kafka", "partition"), Kind::bytes())
-                .with_metadata_field(&owned_value_path!("kafka", "offset"), Kind::bytes())
+                .with_meaning(OwnedTargetPath::event_root(), "message")
+                .with_metadata_field(
+                    &owned_value_path!("kafka", "timestamp"),
+                    Kind::timestamp(),
+                    Some("timestamp")
+                )
+                .with_metadata_field(
+                    &owned_value_path!("kafka", "message_key"),
+                    Kind::bytes(),
+                    None
+                )
+                .with_metadata_field(&owned_value_path!("kafka", "topic"), Kind::bytes(), None)
+                .with_metadata_field(
+                    &owned_value_path!("kafka", "partition"),
+                    Kind::bytes(),
+                    None
+                )
+                .with_metadata_field(&owned_value_path!("kafka", "offset"), Kind::bytes(), None)
                 .with_metadata_field(
                     &owned_value_path!("kafka", "headers"),
-                    Kind::object(Collection::empty().with_unknown(Kind::bytes()))
+                    Kind::object(Collection::empty().with_unknown(Kind::bytes())),
+                    None
                 )
                 .with_metadata_field(
                     &owned_value_path!("vector", "ingest_timestamp"),
-                    Kind::timestamp()
+                    Kind::timestamp(),
+                    None
                 )
-                .with_metadata_field(&owned_value_path!("vector", "source_type"), Kind::bytes())
+                .with_metadata_field(
+                    &owned_value_path!("vector", "source_type"),
+                    Kind::bytes(),
+                    None
+                )
         )
     }
 

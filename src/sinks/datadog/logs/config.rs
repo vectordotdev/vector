@@ -53,6 +53,18 @@ pub struct DatadogLogsConfig {
     #[serde(flatten)]
     pub dd_common: DatadogCommonConfig,
 
+    /// The endpoint to send logs to.
+    ///
+    /// The endpoint must contain an HTTP scheme, and may specify a
+    /// hostname or IP address and port.
+    ///
+    /// If set, overrides the `site` option.
+    #[configurable(metadata(docs::advanced))]
+    #[configurable(metadata(docs::examples = "http://127.0.0.1:8080"))]
+    #[configurable(metadata(docs::examples = "http://example.com:12345"))]
+    #[serde(default)]
+    pub(crate) endpoint: Option<String>,
+
     /// The Datadog region to send logs to.
     #[configurable(deprecated = "This option has been deprecated, use the `site` option instead.")]
     #[serde(default)]

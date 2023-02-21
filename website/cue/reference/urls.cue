@@ -647,5 +647,5 @@ urls: {
 	ytt:                                        "https://carvel.dev/ytt/"
 	yum:                                        "\(wikipedia)/wiki/Yum_(software)"
 	zlib:                                       "https://www.zlib.net"
-	zstd:                                       "https://zstd.net"
+	zstd:                                       "https://facebook.github.io/zstd"
 }

@@ -139,7 +139,7 @@ impl Service<S3Request> for S3Service {
                 .set_grant_write_acp(options.grant_write_acp)
                 .set_server_side_encryption(options.server_side_encryption.map(Into::into))
                 .set_ssekms_key_id(options.ssekms_key_id)
-                .set_storage_class(options.storage_class.map(Into::into))
+                .set_storage_class(Some(options.storage_class.into()))
                 .set_tagging(tagging)
                 .content_md5(content_md5);
 

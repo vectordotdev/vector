@@ -6,14 +6,16 @@ use http::{Request, Uri};
 use hyper::Body;
 use serde_json::{json, map};
 use snafu::Snafu;
+use value::Kind;
 use vector_config::configurable_component;
 
 use crate::{
     codecs::Transformer,
-    config::{log_schema, AcknowledgementsConfig, Input, SinkConfig, SinkContext},
+    config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext},
     event::{Event, Value},
     gcp::{GcpAuthConfig, GcpAuthenticator, Scope},
     http::HttpClient,
+    schema,
     sinks::{
         gcs_common::config::healthcheck_response,
         util::{
@@ -65,6 +67,7 @@ pub struct StackdriverConfig {
     ///
     /// [sev_names]: https://cloud.google.com/logging/docs/reference/v2/rest/v2/LogEntry#logseverity
     /// [logsev_docs]: https://cloud.google.com/logging/docs/reference/v2/rest/v2/LogEntry#logseverity
+    #[configurable(metadata(docs::examples = "severity"))]
     pub severity_key: Option<String>,
 
     #[serde(flatten)]
@@ -118,30 +121,42 @@ const MAX_BATCH_PAYLOAD_SIZE: usize = 10_000_000;
 #[derivative(Default)]
 pub enum StackdriverLogName {
     /// The billing account ID to which to publish logs.
+    ///
+    ///	Exactly one of `billing_account_id`, `folder_id`, `organization_id`, or `project_id` must be set.
     #[serde(rename = "billing_account_id")]
+    #[configurable(metadata(docs::examples = "012345-6789AB-CDEF01"))]
     BillingAccount(String),
 
     /// The folder ID to which to publish logs.
     ///
     /// See the [Google Cloud Platform folder documentation][folder_docs] for more details.
     ///
+    ///	Exactly one of `billing_account_id`, `folder_id`, `organization_id`, or `project_id` must be set.
+    ///
     /// [folder_docs]: https://cloud.google.com/resource-manager/docs/creating-managing-folders
     #[serde(rename = "folder_id")]
+    #[configurable(metadata(docs::examples = "My Folder"))]
     Folder(String),
 
     /// The organization ID to which to publish logs.
     ///
     /// This would be the identifier assigned to your organization on Google Cloud Platform.
+    ///
+    ///	Exactly one of `billing_account_id`, `folder_id`, `organization_id`, or `project_id` must be set.
     #[serde(rename = "organization_id")]
+    #[configurable(metadata(docs::examples = "622418129737"))]
     Organization(String),
 
     /// The project ID to which to publish logs.
     ///
     /// See the [Google Cloud Platform project management documentation][project_docs] for more details.
     ///
+    ///	Exactly one of `billing_account_id`, `folder_id`, `organization_id`, or `project_id` must be set.
+    ///
     /// [project_docs]: https://cloud.google.com/resource-manager/docs/creating-managing-projects
     #[derivative(Default)]
     #[serde(rename = "project_id")]
+    #[configurable(metadata(docs::examples = "vector-123456"))]
     Project(String),
 }
 
@@ -163,13 +178,25 @@ pub struct StackdriverResource {
     /// The monitored resource type.
     ///
     /// For example, the type of a Compute Engine VM instance is `gce_instance`.
+    /// See the [Google Cloud Platform monitored resource documentation][gcp_resources] for
+    /// more details.
+    ///
+    /// [gcp_resources]: https://cloud.google.com/monitoring/api/resources
     #[serde(rename = "type")]
     pub type_: String,
 
     /// Type-specific labels.
     #[serde(flatten)]
     #[configurable(metadata(docs::additional_props_description = "A type-specific label."))]
+    #[configurable(metadata(docs::examples = "label_examples()"))]
     pub labels: HashMap<String, Template>,
+}
+
+fn label_examples() -> HashMap<String, String> {
+    let mut example = HashMap::new();
+    example.insert("instanceId".to_string(), "Twilight".to_string());
+    example.insert("zone".to_string(), "{{ zone }}".to_string());
+    example
 }
 
 impl_generate_config_from_default!(StackdriverConfig);
@@ -214,7 +241,10 @@ impl SinkConfig for StackdriverConfig {
     }
 
     fn input(&self) -> Input {
-        Input::log()
+        let requirement =
+            schema::Requirement::empty().required_meaning("timestamp", Kind::timestamp());
+
+        Input::log().with_schema_requirement(requirement)
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
@@ -281,7 +311,7 @@ impl HttpEventEncoder<serde_json::Value> for StackdriverEventEncoder {
         );
 
         // If the event contains a timestamp, send it in the main message so gcp can pick it up.
-        if let Some(timestamp) = log.get(log_schema().timestamp_key()) {
+        if let Some(timestamp) = log.get_timestamp() {
             entry.insert("timestamp".into(), json!(timestamp));
         }
 

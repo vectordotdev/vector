@@ -27,16 +27,6 @@ base: components: sinks: aws_cloudwatch_metrics: configuration: {
 			type: bool: {}
 		}
 	}
-	assume_role: {
-		deprecated: true
-		description: """
-			The ARN of an [IAM role][iam_role] to assume at startup.
-
-			[iam_role]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles.html
-			"""
-		required: false
-		type: string: {}
-	}
 	auth: {
 		description: "Configuration of the authentication strategy for interacting with AWS services."
 		required:    false
@@ -185,13 +175,15 @@ base: components: sinks: aws_cloudwatch_metrics: configuration: {
 	}
 	default_namespace: {
 		description: """
-			The default namespace to use for metrics that do not have one.
+			The default [namespace][namespace] to use for metrics that do not have one.
 
 			Metrics with the same name can only be differentiated by their namespace, and not all
 			metrics have their own namespace.
+
+			[namespace]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/cloudwatch_concepts.html#Namespace
 			"""
 		required: true
-		type: string: {}
+		type: string: examples: ["service"]
 	}
 	endpoint: {
 		description: "Custom endpoint for use with AWS-compatible services."

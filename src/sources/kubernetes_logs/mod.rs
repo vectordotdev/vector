@@ -1014,7 +1014,7 @@ fn prepare_label_selector(selector: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use lookup::{owned_value_path, LookupBuf};
+    use lookup::{owned_value_path, OwnedTargetPath};
     use similar_asserts::assert_eq;
     use value::{kind::Collection, Kind};
     use vector_core::{config::LogNamespace, schema::Definition};
@@ -1169,77 +1169,102 @@ mod tests {
         assert_eq!(
             definition,
             Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
-                .with_metadata_field(&owned_value_path!("kubernetes_logs", "file"), Kind::bytes())
+                .with_metadata_field(
+                    &owned_value_path!("kubernetes_logs", "file"),
+                    Kind::bytes(),
+                    None
+                )
                 .with_metadata_field(
                     &owned_value_path!("kubernetes_logs", "container_id"),
                     Kind::bytes().or_undefined(),
+                    None
                 )
                 .with_metadata_field(
                     &owned_value_path!("kubernetes_logs", "container_image"),
                     Kind::bytes().or_undefined(),
+                    None
                 )
                 .with_metadata_field(
                     &owned_value_path!("kubernetes_logs", "container_name"),
                     Kind::bytes().or_undefined(),
+                    None
                 )
                 .with_metadata_field(
                     &owned_value_path!("kubernetes_logs", "namespace_labels"),
                     Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
+                    None
                 )
                 .with_metadata_field(
                     &owned_value_path!("kubernetes_logs", "node_labels"),
                     Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
+                    None
                 )
                 .with_metadata_field(
                     &owned_value_path!("kubernetes_logs", "pod_annotations"),
                     Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
+                    None
                 )
                 .with_metadata_field(
                     &owned_value_path!("kubernetes_logs", "pod_ip"),
                     Kind::bytes().or_undefined(),
+                    None
                 )
                 .with_metadata_field(
                     &owned_value_path!("kubernetes_logs", "pod_ips"),
                     Kind::array(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
+                    None
                 )
                 .with_metadata_field(
                     &owned_value_path!("kubernetes_logs", "pod_labels"),
                     Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
+                    None
                 )
                 .with_metadata_field(
                     &owned_value_path!("kubernetes_logs", "pod_name"),
                     Kind::bytes().or_undefined(),
+                    None
                 )
                 .with_metadata_field(
                     &owned_value_path!("kubernetes_logs", "pod_namespace"),
                     Kind::bytes().or_undefined(),
+                    None
                 )
                 .with_metadata_field(
                     &owned_value_path!("kubernetes_logs", "pod_node_name"),
                     Kind::bytes().or_undefined(),
+                    None
                 )
                 .with_metadata_field(
                     &owned_value_path!("kubernetes_logs", "pod_owner"),
                     Kind::bytes().or_undefined(),
+                    None
                 )
                 .with_metadata_field(
                     &owned_value_path!("kubernetes_logs", "pod_uid"),
                     Kind::bytes().or_undefined(),
+                    None
                 )
                 .with_metadata_field(
                     &owned_value_path!("kubernetes_logs", "stream"),
-                    Kind::bytes()
+                    Kind::bytes(),
+                    None
                 )
                 .with_metadata_field(
                     &owned_value_path!("kubernetes_logs", "timestamp"),
-                    Kind::timestamp()
+                    Kind::timestamp(),
+                    Some("timestamp")
                 )
-                .with_metadata_field(&owned_value_path!("vector", "source_type"), Kind::bytes())
+                .with_metadata_field(
+                    &owned_value_path!("vector", "source_type"),
+                    Kind::bytes(),
+                    None
+                )
                 .with_metadata_field(
                     &owned_value_path!("vector", "ingest_timestamp"),
-                    Kind::timestamp()
+                    Kind::timestamp(),
+                    None
                 )
-                .with_meaning(LookupBuf::root(), "message")
+                .with_meaning(OwnedTargetPath::event_root(), "message")
         )
     }
 

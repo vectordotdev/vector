@@ -133,10 +133,11 @@ pub mod indexmap {
 pub mod schemars {
     pub use schemars::*;
 }
+pub use serde_json;
 
 pub mod component;
 mod configurable;
-pub use self::configurable::Configurable;
+pub use self::configurable::{Configurable, ToValue};
 mod errors;
 pub use self::errors::{BoundDirection, GenerateError};
 mod external;
@@ -167,7 +168,7 @@ pub mod validation {
 }
 
 #[doc(hidden)]
-pub fn __ensure_numeric_validation_bounds<N>(metadata: &Metadata<N>) -> Result<(), GenerateError>
+pub fn __ensure_numeric_validation_bounds<N>(metadata: &Metadata) -> Result<(), GenerateError>
 where
     N: Configurable + ConfigurableNumber,
 {

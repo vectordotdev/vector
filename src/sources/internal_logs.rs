@@ -198,7 +198,7 @@ async fn run(
 #[cfg(test)]
 mod tests {
     use futures::Stream;
-    use lookup::LookupBuf;
+    use lookup::OwnedTargetPath;
     use tokio::time::{sleep, Duration};
     use value::kind::Collection;
     use vector_core::event::Value;
@@ -342,19 +342,26 @@ mod tests {
 
         let expected_definition =
             Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
-                .with_meaning(LookupBuf::root(), "message")
-                .with_metadata_field(&owned_value_path!("vector", "source_type"), Kind::bytes())
+                .with_meaning(OwnedTargetPath::event_root(), "message")
+                .with_metadata_field(
+                    &owned_value_path!("vector", "source_type"),
+                    Kind::bytes(),
+                    None,
+                )
                 .with_metadata_field(
                     &owned_value_path!(InternalLogsConfig::NAME, "pid"),
                     Kind::integer(),
+                    None,
                 )
                 .with_metadata_field(
                     &owned_value_path!("vector", "ingest_timestamp"),
                     Kind::timestamp(),
+                    None,
                 )
                 .with_metadata_field(
                     &owned_value_path!(InternalLogsConfig::NAME, "host"),
                     Kind::bytes().or_undefined(),
+                    Some("host"),
                 );
 
         assert_eq!(definition, expected_definition)

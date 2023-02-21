@@ -69,6 +69,7 @@ pub struct ElasticsearchConfig {
     ///
     /// [doc_type]: https://www.elastic.co/guide/en/elasticsearch/reference/6.8/actions-index.html
     #[serde(default = "default_doc_type")]
+    #[configurable(metadata(docs::advanced))]
     pub doc_type: String,
 
     /// The API version of Elasticsearch.
@@ -91,6 +92,7 @@ pub struct ElasticsearchConfig {
     ///
     /// To avoid duplicates in Elasticsearch, please use option `id_key`.
     #[serde(default)]
+    #[configurable(metadata(docs::advanced))]
     pub request_retry_partial: bool,
 
     /// The name of the event key that should map to Elasticsearch’s [`_id` field][es_id].
@@ -101,12 +103,14 @@ pub struct ElasticsearchConfig {
     /// [es_id]: https://www.elastic.co/guide/en/elasticsearch/reference/current/mapping-id-field.html
     /// [perf_doc]: https://www.elastic.co/guide/en/elasticsearch/reference/master/tune-for-indexing-speed.html#_use_auto_generated_ids
     #[serde(default)]
+    #[configurable(metadata(docs::advanced))]
     #[configurable(metadata(docs::examples = "id"))]
     #[configurable(metadata(docs::examples = "_id"))]
     pub id_key: Option<String>,
 
     /// The name of the pipeline to apply.
     #[serde(default)]
+    #[configurable(metadata(docs::advanced))]
     #[configurable(metadata(docs::examples = "pipeline-name"))]
     pub pipeline: Option<String>,
 
@@ -123,6 +127,7 @@ pub struct ElasticsearchConfig {
         default
     )]
     #[configurable(derived)]
+    #[configurable(metadata(docs::advanced))]
     pub encoding: Transformer,
 
     #[serde(default)]
@@ -138,6 +143,7 @@ pub struct ElasticsearchConfig {
 
     /// Custom parameters to add to the query string for each HTTP request sent to Elasticsearch.
     #[serde(default)]
+    #[configurable(metadata(docs::advanced))]
     #[configurable(metadata(docs::additional_props_description = "A query string parameter."))]
     #[configurable(metadata(docs::examples = "query_examples()"))]
     pub query: Option<HashMap<String, String>>,

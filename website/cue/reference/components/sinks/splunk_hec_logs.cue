@@ -14,6 +14,7 @@ components: sinks: splunk_hec_logs: {
 	}
 
 	features: {
+		auto_generated:   true
 		acknowledgements: true
 		healthcheck: enabled: true
 		send: {
@@ -72,113 +73,8 @@ components: sinks: splunk_hec_logs: {
 		notices: []
 	}
 
-	configuration: sinks._splunk_hec.configuration & {
-		endpoint: {
-			description: "The base URL of the Splunk instance."
-			required:    true
-			type: string: {
-				examples: ["https://http-inputs-hec.splunkcloud.com", "https://hec.splunk.com:8088", "http://example.com"]
-			}
-		}
-		endpoint_target: {
-			common:      false
-			description: """
-                                     The Splunk endpoint to send to. Either the [event endpoint](\(urls.splunk_hec_event_endpoint)) or the
-                                     [raw endpoint](\(urls.splunk_hec_raw_endpoint)). [metadata](\(urls.splunk_hec_metadata)) for the event
-                                     endpoint is sent with each event. For the `raw` endpoint, configured [event metadata](\(urls.splunk_hec_metadata))
-                                     is sent as query parameters - except the `timestamp` field.
-                                     """
-			required:    false
-			warnings: []
-			type: string: {
-				default: "event"
-				enum: {
-					event: "[Event endpoint](\(urls.splunk_hec_event_endpoint))"
-					raw:   "[Raw endpoint](\(urls.splunk_hec_raw_endpoint))"
-				}
-				syntax: "literal"
-			}
-		}
-		host_key: {
-			common:      true
-			description: """
-				The name of the log field to be used as the hostname sent to Splunk HEC. This overrides the
-				[global `host_key` option](\(urls.vector_configuration)/global-options#log_schema.host_key).
-				"""
-			required:    false
-			type: string: {
-				default: null
-				examples: ["hostname"]
-			}
-		}
-		index: {
-			common:      false
-			description: "The name of the index where to send the events to. If not specified, the default index is used."
-			required:    false
-			type: string: {
-				default: null
-				examples: ["{{ host }}", "custom_index"]
-				syntax: "template"
-			}
-		}
-		indexed_fields: {
-			common:      true
-			description: "Fields to be [added to Splunk index](\(urls.splunk_hec_indexed_fields))."
-			required:    false
-			type: array: {
-				default: null
-				items: type: string: {
-					examples: ["field1", "field2"]
-					syntax: "field_path"
-				}
-			}
-		}
-		source: {
-			common:      false
-			description: "The source of events sent to this sink. Typically the filename the logs originated from. If unset, the Splunk collector will set it."
-			required:    false
-			type: string: {
-				default: null
-				examples: ["{{ file }}", "/var/log/syslog", "UDP:514"]
-				syntax: "template"
-			}
-		}
-		sourcetype: {
-			common:      false
-			description: "The sourcetype of events sent to this sink. If unset, Splunk will default to httpevent."
-			required:    false
-			type: string: {
-				default: null
-				examples: ["{{ sourcetype }}", "_json", "httpevent"]
-				syntax: "template"
-			}
-		}
-		timestamp_key: {
-			common:      false
-			description: """
-				The name of the log field to be used as the timestamp sent to Splunk HEC. This overrides the
-				[global `timestamp_key` option](\(urls.vector_configuration)/global-options#log_schema.timestamp_key).
-				When set to "", vector omits setting a timestamp in the events sent to Splunk HEC.
-				"""
-			required:    false
-			type: string: {
-				default: null
-				examples: ["timestamp", ""]
-			}
-		}
-		auto_extract_timestamp: {
-			common: false
-			description: """
-				    Passes the auto_extract_timestamp option to Splunk.
-				    Note this option is only used by Version 8 and above of Splunk.
-				    This will cause Splunk to extract the timestamp from the message text rather than use
-				    the timestamp embedded in the event. The timestamp must be in the format yyyy-mm-dd hh:mm:ss.
-				    This option only applies for the `Event` endpoint target.
-				"""
-			required: false
-			type: bool: default: false
-		}
-	}
+	configuration: base.components.sinks.splunk_hec_logs.configuration
+
 	input: {
 		logs:    true
 		metrics: null

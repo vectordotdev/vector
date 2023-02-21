@@ -1,4 +1,4 @@
-# result: [true, false, false, false, "nope", "nope"]
+# result: [true, false, false, false, "nope"]
 
 [
     true && true,
@@ -7,6 +7,5 @@
     false && false,
 
     # fallible
-    true && "foo" ?? "nope",
     downcase(.thing) && .thing ?? "nope"
 ]

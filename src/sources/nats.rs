@@ -267,7 +267,7 @@ async fn create_subscription(
 mod tests {
     #![allow(clippy::print_stdout)] //tests
 
-    use lookup::{owned_value_path, LookupBuf};
+    use lookup::{owned_value_path, OwnedTargetPath};
     use value::{kind::Collection, Kind};
     use vector_core::schema::Definition;
 
@@ -293,13 +293,18 @@ mod tests {
 
         let expected_definition =
             Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
-                .with_meaning(LookupBuf::root(), "message")
-                .with_metadata_field(&owned_value_path!("vector", "source_type"), Kind::bytes())
+                .with_meaning(OwnedTargetPath::event_root(), "message")
+                .with_metadata_field(
+                    &owned_value_path!("vector", "source_type"),
+                    Kind::bytes(),
+                    None,
+                )
                 .with_metadata_field(
                     &owned_value_path!("vector", "ingest_timestamp"),
                     Kind::timestamp(),
+                    None,
                 )
-                .with_metadata_field(&owned_value_path!("nats", "subject"), Kind::bytes());
+                .with_metadata_field(&owned_value_path!("nats", "subject"), Kind::bytes(), None);
 
         assert_eq!(definition, expected_definition);
     }

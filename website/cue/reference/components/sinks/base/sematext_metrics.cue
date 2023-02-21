@@ -67,19 +67,26 @@ base: components: sinks: sematext_metrics: configuration: {
 			present, it is used as a prefix to the metric name, and separated with a period (`.`).
 			"""
 		required: true
-		type: string: {}
+		type: string: examples: ["service"]
 	}
 	endpoint: {
-		description: "The endpoint to send data to."
-		required:    false
-		type: string: {}
+		description: """
+			The endpoint to send data to.
+
+			Setting this option overrides the `region` option.
+			"""
+		required: false
+		type: string: examples: ["http://127.0.0.1", "https://example.com"]
 	}
 	region: {
-		description: "Sematext region."
+		description: "The Sematext region to send data to."
 		required:    false
-		type: string: enum: {
-			eu: "EU region."
-			us: "US region."
+		type: string: {
+			default: "us"
+			enum: {
+				eu: "Europe"
+				us: "United States"
+			}
 		}
 	}
 	request: {
@@ -228,6 +235,6 @@ base: components: sinks: sematext_metrics: configuration: {
 	token: {
 		description: "The token that will be used to write to Sematext."
 		required:    true
-		type: string: {}
+		type: string: examples: ["${SEMATEXT_TOKEN}", "some-sematext-token"]
 	}
 }

@@ -1,0 +1,8 @@
+# result: [{ "bytes": true, "null": true }, {"boolean": true, "bytes": true}]
+
+.x = null
+# The compiler can't know if the assignment will be resolved, so it is conditionally applied to the
+# typedef
+result = assert(.bool) ?? {.x = "string"}
+
+[type_def(.x), type_def(result)]

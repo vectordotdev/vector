@@ -1,3 +1,4 @@
+//! The `vector` source. See [VectorConfig].
 use std::net::SocketAddr;
 
 use chrono::Utc;
@@ -35,7 +36,7 @@ enum VectorConfigVersion {
 }
 
 #[derive(Debug, Clone)]
-pub struct Service {
+struct Service {
     pipeline: SourceSender,
     acknowledgements: bool,
     log_namespace: LogNamespace,
@@ -234,10 +235,15 @@ mod test {
 
         let expected_definition =
             Definition::new_with_default_metadata(Kind::any(), [LogNamespace::Vector])
-                .with_metadata_field(&owned_value_path!("vector", "source_type"), Kind::bytes())
+                .with_metadata_field(
+                    &owned_value_path!("vector", "source_type"),
+                    Kind::bytes(),
+                    None,
+                )
                 .with_metadata_field(
                     &owned_value_path!("vector", "ingest_timestamp"),
                     Kind::timestamp(),
+                    None,
                 );
 
         assert_eq!(definition, expected_definition)
