@@ -7102,31 +7102,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "schemars"
-version = "0.8.11"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2a5fb6c61f29e723026dc8e923d94c694313212abbecbbe5f55a7748eec5b307"
-dependencies = [
- "dyn-clone",
- "indexmap",
- "schemars_derive",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "schemars_derive"
-version = "0.8.11"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f188d036977451159430f3b8dc82ec76364a42b7e289c2b18a9a18f4470058e9"
-dependencies = [
- "proc-macro2 1.0.51",
- "quote 1.0.23",
- "serde_derive_internals",
- "syn 1.0.107",
-]
-
-[[package]]
 name = "scoped-tls"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9423,7 +9398,6 @@ dependencies = [
  "inventory",
  "no-proxy",
  "num-traits",
- "schemars",
  "serde",
  "serde_json",
  "serde_with 2.2.0",
@@ -9439,9 +9413,9 @@ name = "vector-config-common"
 version = "0.1.0"
 dependencies = [
  "darling 0.13.4",
+ "indexmap",
  "proc-macro2 1.0.51",
  "quote 1.0.23",
- "schemars",
  "serde",
  "serde_json",
  "syn 1.0.107",

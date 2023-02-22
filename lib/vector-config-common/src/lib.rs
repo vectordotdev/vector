@@ -13,4 +13,5 @@
 #![deny(warnings)]
 pub mod attributes;
 pub mod num;
+pub mod schema_gen;
 pub mod validation;

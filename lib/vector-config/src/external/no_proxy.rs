@@ -4,7 +4,7 @@ use serde_json::Value;
 
 use crate::{
     schema::generate_array_schema,
-    schemars::{gen::SchemaGenerator, schema::SchemaObject},
+    schema_gen::{SchemaGenerator, SchemaObject},
     Configurable, GenerateError, Metadata, ToValue,
 };
 
