@@ -4,11 +4,13 @@ use bytes::{Bytes, BytesMut};
 use futures::SinkExt;
 use http::{Request, Uri};
 use indoc::indoc;
+use value::Kind;
 use vector_config::configurable_component;
+use vector_core::schema;
 
 use crate::{
     codecs::Transformer,
-    config::{log_schema, AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
+    config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     event::{Event, MetricTags, Value},
     http::HttpClient,
     internal_events::InfluxdbEncodingError,
@@ -128,8 +130,6 @@ impl SinkConfig for InfluxDbLogsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let measurement = self.get_measurement()?;
         let mut tags: HashSet<String> = self.tags.clone().into_iter().collect();
-        tags.replace(log_schema().host_key().to_string());
-        tags.replace(log_schema().source_type_key().to_string());
         tags.replace("metric_type".to_string());
 
         let tls_settings = TlsSettings::from_options(&self.tls)?;
@@ -176,7 +176,11 @@ impl SinkConfig for InfluxDbLogsConfig {
     }
 
     fn input(&self) -> Input {
-        Input::log()
+        let requirements = schema::Requirement::empty()
+            .optional_meaning("host", Kind::bytes())
+            .optional_meaning("timestamp", Kind::timestamp());
+
+        Input::log().with_schema_requirement(requirements)
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
@@ -202,10 +206,16 @@ impl HttpEventEncoder<BytesMut> for InfluxDbLogsEncoder {
         };
 
         // Timestamp
-        let timestamp = encode_timestamp(match log.remove(log_schema().timestamp_key()) {
+        let timestamp = encode_timestamp(match log.remove_timestamp() {
             Some(Value::Timestamp(ts)) => Some(ts),
             _ => None,
         });
+
+        // Add the `host` and `source_type` to the HashSet of tags to include
+        if let Some(host_path) = log.host_path() {
+            self.tags.replace(host_path);
+        }
+        self.tags.replace(log.source_type_path().to_string());
 
         // Tags + Fields
         let mut tags = MetricTags::default();
