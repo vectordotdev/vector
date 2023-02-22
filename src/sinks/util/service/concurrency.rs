@@ -1,6 +1,7 @@
+use std::{cell::RefCell, fmt};
+
 use serde::Serializer;
 use serde_json::Value;
-use std::fmt;
 use vector_config::{
     schema::{
         apply_metadata, generate_const_string_schema, generate_number_schema,
@@ -137,7 +138,7 @@ impl Configurable for Concurrency {
         metadata
     }
 
-    fn generate_schema(_: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
+    fn generate_schema(_: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
         let mut none_schema = generate_const_string_schema("none".to_string());
         let mut none_metadata = Metadata::with_title("A fixed concurrency of 1.");
         none_metadata.set_description("Only one request can be outstanding at any given time.");

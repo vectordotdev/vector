@@ -1,5 +1,5 @@
 use serde_json::Value;
-use std::marker::PhantomData;
+use std::{cell::RefCell, marker::PhantomData};
 
 use serde::{Serialize, Serializer};
 
@@ -91,7 +91,7 @@ where
         H::validate_metadata(&converted)
     }
 
-    fn generate_schema(gen: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
+    fn generate_schema(gen: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
         // Forward to the underlying `H`.
         H::generate_schema(gen)
     }

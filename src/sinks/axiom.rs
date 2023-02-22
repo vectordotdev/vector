@@ -4,10 +4,7 @@ use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
 
 use crate::{
-    config::{
-        log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig,
-        SinkContext,
-    },
+    config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext},
     sinks::{
         elasticsearch::{ElasticsearchApiVersion, ElasticsearchAuth, ElasticsearchConfig},
         util::{http::RequestConfig, Compression},
@@ -86,11 +83,7 @@ impl SinkConfig for AxiomConfig {
             "X-Axiom-Org-Id".to_string(),
             self.org_id.clone().unwrap_or_default(),
         );
-        let mut query = HashMap::with_capacity(1);
-        query.insert(
-            "timestamp-field".to_string(),
-            log_schema().timestamp_key().to_string(),
-        );
+        let query = HashMap::from([("timestamp-field".to_string(), "@timestamp".to_string())]);
 
         // Axiom has a custom high-performance database that can be ingested
         // into using our HTTP endpoints, including one compatible with the
