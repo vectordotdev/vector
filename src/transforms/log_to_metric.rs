@@ -20,7 +20,7 @@ use crate::{
 };
 
 /// Configuration for the `log_to_metric` transform.
-#[configurable_component(transform("log_to_metric"))]
+#[configurable_component(transform("log_to_metric", "Convert log events to metric events."))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct LogToMetricConfig {
@@ -144,6 +144,7 @@ impl GenerateConfig for LogToMetricConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "log_to_metric")]
 impl TransformConfig for LogToMetricConfig {
     async fn build(&self, _context: &TransformContext) -> crate::Result<Transform> {
         Ok(Transform::function(LogToMetric::new(self.clone())))

@@ -9403,6 +9403,7 @@ dependencies = [
  "serde_with 2.2.0",
  "snafu",
  "toml 0.7.2",
+ "typetag",
  "url",
  "vector-config-common",
  "vector-config-macros",
@@ -9426,6 +9427,7 @@ name = "vector-config-macros"
 version = "0.1.0"
 dependencies = [
  "darling 0.13.4",
+ "itertools",
  "proc-macro2 1.0.51",
  "quote 1.0.23",
  "serde",
