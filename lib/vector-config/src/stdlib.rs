@@ -1,4 +1,5 @@
 use std::{
+    cell::RefCell,
     collections::{BTreeMap, BTreeSet, HashMap, HashSet},
     hash::Hash,
     net::SocketAddr,
@@ -28,7 +29,7 @@ use crate::{
 
 // Unit type.
 impl Configurable for () {
-    fn generate_schema(_: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
+    fn generate_schema(_: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
         // Using a unit type in a configuration-related type is never actually valid.
         Err(GenerateError::InvalidType)
     }
@@ -56,17 +57,17 @@ where
         true
     }
 
-    fn metadata() -> Metadata<Self> {
+    fn metadata() -> Metadata {
         Metadata::with_transparent(true)
     }
 
-    fn validate_metadata(metadata: &Metadata<Self>) -> Result<(), GenerateError> {
-        // We have to convert from `Metadata<Self>` to `Metadata<T>` which erases the default value.
-        let converted = metadata.convert::<T>();
+    fn validate_metadata(metadata: &Metadata) -> Result<(), GenerateError> {
+        // We have to convert from `Metadata` to `Metadata` which erases the default value.
+        let converted = metadata.convert();
         T::validate_metadata(&converted)
     }
 
-    fn generate_schema(gen: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
+    fn generate_schema(gen: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
         generate_optional_schema::<T>(gen)
     }
 }
@@ -81,11 +82,11 @@ impl<T: ToValue> ToValue for Option<T> {
 }
 
 impl Configurable for bool {
-    fn metadata() -> Metadata<Self> {
+    fn metadata() -> Metadata {
         Metadata::with_transparent(true)
     }
 
-    fn generate_schema(_: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
+    fn generate_schema(_: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
         Ok(generate_bool_schema())
     }
 }
@@ -98,11 +99,11 @@ impl ToValue for bool {
 
 // Strings.
 impl Configurable for String {
-    fn metadata() -> Metadata<Self> {
+    fn metadata() -> Metadata {
         Metadata::with_transparent(true)
     }
 
-    fn generate_schema(_: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
+    fn generate_schema(_: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
         Ok(generate_string_schema())
     }
 }
@@ -114,7 +115,7 @@ impl ToValue for String {
 }
 
 impl Configurable for char {
-    fn metadata() -> Metadata<Self> {
+    fn metadata() -> Metadata {
         let mut metadata = Metadata::with_transparent(true);
         metadata.add_validation(Validation::Length {
             minimum: Some(1),
@@ -123,7 +124,7 @@ impl Configurable for char {
         metadata
     }
 
-    fn generate_schema(_: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
+    fn generate_schema(_: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
         Ok(generate_string_schema())
     }
 }
@@ -138,7 +139,7 @@ impl ToValue for char {
 macro_rules! impl_configurable_numeric {
     ($ty:ty => $into:expr) => {
         impl Configurable for $ty {
-            fn metadata() -> Metadata<Self> {
+            fn metadata() -> Metadata {
                 let mut metadata = Metadata::with_transparent(true);
                 let numeric_type = <Self as ConfigurableNumber>::class();
                 metadata
@@ -147,11 +148,13 @@ macro_rules! impl_configurable_numeric {
                 metadata
             }
 
-            fn validate_metadata(metadata: &Metadata<Self>) -> Result<(), GenerateError> {
+            fn validate_metadata(metadata: &Metadata) -> Result<(), GenerateError> {
                 $crate::__ensure_numeric_validation_bounds::<Self>(metadata)
             }
 
-            fn generate_schema(_: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
+            fn generate_schema(
+                _: &RefCell<SchemaGenerator>,
+            ) -> Result<SchemaObject, GenerateError> {
                 Ok(generate_number_schema::<Self>())
             }
         }
@@ -192,16 +195,16 @@ impl<T> Configurable for Vec<T>
 where
     T: Configurable + ToValue,
 {
-    fn metadata() -> Metadata<Self> {
+    fn metadata() -> Metadata {
         T::metadata().convert()
     }
 
-    fn validate_metadata(metadata: &Metadata<Self>) -> Result<(), GenerateError> {
-        let converted = metadata.convert::<T>();
+    fn validate_metadata(metadata: &Metadata) -> Result<(), GenerateError> {
+        let converted = metadata.convert();
         T::validate_metadata(&converted)
     }
 
-    fn generate_schema(gen: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
+    fn generate_schema(gen: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
         generate_array_schema::<T>(gen)
     }
 }
@@ -223,16 +226,16 @@ where
         true
     }
 
-    fn metadata() -> Metadata<Self> {
+    fn metadata() -> Metadata {
         Metadata::with_transparent(true)
     }
 
-    fn validate_metadata(metadata: &Metadata<Self>) -> Result<(), GenerateError> {
-        let converted = metadata.convert::<V>();
+    fn validate_metadata(metadata: &Metadata) -> Result<(), GenerateError> {
+        let converted = metadata.convert();
         V::validate_metadata(&converted)
     }
 
-    fn generate_schema(gen: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
+    fn generate_schema(gen: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
         // Make sure our key type is _truly_ a string schema.
         assert_string_schema_for_map::<K, Self>(gen)?;
 
@@ -258,16 +261,16 @@ impl<V> Configurable for BTreeSet<V>
 where
     V: Configurable + ToValue + Eq + Hash,
 {
-    fn metadata() -> Metadata<Self> {
+    fn metadata() -> Metadata {
         Metadata::with_transparent(true)
     }
 
-    fn validate_metadata(metadata: &Metadata<Self>) -> Result<(), GenerateError> {
-        let converted = metadata.convert::<V>();
+    fn validate_metadata(metadata: &Metadata) -> Result<(), GenerateError> {
+        let converted = metadata.convert();
         V::validate_metadata(&converted)
     }
 
-    fn generate_schema(gen: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
+    fn generate_schema(gen: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
         generate_set_schema::<V>(gen)
     }
 }
@@ -289,16 +292,16 @@ where
         true
     }
 
-    fn metadata() -> Metadata<Self> {
+    fn metadata() -> Metadata {
         Metadata::with_transparent(true)
     }
 
-    fn validate_metadata(metadata: &Metadata<Self>) -> Result<(), GenerateError> {
-        let converted = metadata.convert::<V>();
+    fn validate_metadata(metadata: &Metadata) -> Result<(), GenerateError> {
+        let converted = metadata.convert();
         V::validate_metadata(&converted)
     }
 
-    fn generate_schema(gen: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
+    fn generate_schema(gen: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
         // Make sure our key type is _truly_ a string schema.
         assert_string_schema_for_map::<K, Self>(gen)?;
 
@@ -324,16 +327,16 @@ impl<V> Configurable for HashSet<V>
 where
     V: Configurable + ToValue + Eq + Hash,
 {
-    fn metadata() -> Metadata<Self> {
+    fn metadata() -> Metadata {
         Metadata::with_transparent(true)
     }
 
-    fn validate_metadata(metadata: &Metadata<Self>) -> Result<(), GenerateError> {
-        let converted = metadata.convert::<V>();
+    fn validate_metadata(metadata: &Metadata) -> Result<(), GenerateError> {
+        let converted = metadata.convert();
         V::validate_metadata(&converted)
     }
 
-    fn generate_schema(gen: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
+    fn generate_schema(gen: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
         generate_set_schema::<V>(gen)
     }
 }
@@ -353,13 +356,13 @@ impl Configurable for SocketAddr {
         Some("stdlib::SocketAddr")
     }
 
-    fn metadata() -> Metadata<Self> {
+    fn metadata() -> Metadata {
         let mut metadata = Metadata::default();
         metadata.set_description("An internet socket address, either IPv4 or IPv6.");
         metadata
     }
 
-    fn generate_schema(_: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
+    fn generate_schema(_: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
         // TODO: We don't need anything other than a string schema to (de)serialize a `SocketAddr`,
         // but we eventually should have validation since the format for the possible permutations
         // is well-known and can be easily codified.
@@ -378,7 +381,7 @@ impl Configurable for PathBuf {
         Some("stdlib::PathBuf")
     }
 
-    fn metadata() -> Metadata<Self> {
+    fn metadata() -> Metadata {
         let mut metadata = Metadata::default();
         metadata.set_description("A file path.");
 
@@ -392,7 +395,7 @@ impl Configurable for PathBuf {
         metadata
     }
 
-    fn generate_schema(_: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
+    fn generate_schema(_: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
         Ok(generate_string_schema())
     }
 }
@@ -409,13 +412,13 @@ impl Configurable for Duration {
         Some("stdlib::Duration")
     }
 
-    fn metadata() -> Metadata<Self> {
+    fn metadata() -> Metadata {
         let mut metadata = Metadata::default();
         metadata.set_description("An duration of time.");
         metadata
     }
 
-    fn generate_schema(_: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
+    fn generate_schema(_: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
         let mut properties = IndexMap::default();
         properties.insert("secs".into(), generate_number_schema::<u64>());
         properties.insert("nsecs".into(), generate_number_schema::<u32>());

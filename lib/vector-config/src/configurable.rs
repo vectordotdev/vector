@@ -1,5 +1,7 @@
 #![deny(missing_docs)]
 
+use std::cell::RefCell;
+
 use schemars::{gen::SchemaGenerator, schema::SchemaObject};
 use serde_json::Value;
 
@@ -39,7 +41,7 @@ where
     }
 
     /// Gets the metadata for this value.
-    fn metadata() -> Metadata<Self> {
+    fn metadata() -> Metadata {
         Metadata::default()
     }
 
@@ -50,7 +52,7 @@ where
     /// numeric types, there is a limited amount of validation that can occur within the
     /// `Configurable` derive macro, and additional validation must happen at runtime when the
     /// `Configurable` trait is being used, which this method allows for.
-    fn validate_metadata(_metadata: &Metadata<Self>) -> Result<(), GenerateError> {
+    fn validate_metadata(_metadata: &Metadata) -> Result<(), GenerateError> {
         Ok(())
     }
 
@@ -60,7 +62,7 @@ where
     ///
     /// If an error occurs while generating the schema, an error variant will be returned describing
     /// the issue.
-    fn generate_schema(gen: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError>;
+    fn generate_schema(gen: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError>;
 }
 
 /// A type that can be converted directly to a `serde_json::Value`. This is used when translating

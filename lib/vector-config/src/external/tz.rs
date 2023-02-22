@@ -1,3 +1,5 @@
+use std::cell::RefCell;
+
 use serde_json::Value;
 
 use crate::{
@@ -7,13 +9,13 @@ use crate::{
 };
 
 impl Configurable for chrono_tz::Tz {
-    fn metadata() -> Metadata<Self> {
+    fn metadata() -> Metadata {
         let mut metadata = Metadata::default();
         metadata.set_description("An IANA timezone.");
         metadata
     }
 
-    fn generate_schema(_: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
+    fn generate_schema(_: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
         Ok(generate_string_schema())
     }
 }

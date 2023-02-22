@@ -1,3 +1,5 @@
+use std::cell::RefCell;
+
 use serde_json::Value;
 use vector_config_common::validation::{Format, Validation};
 
@@ -8,14 +10,14 @@ use crate::{
 };
 
 impl Configurable for url::Url {
-    fn metadata() -> Metadata<Self> {
+    fn metadata() -> Metadata {
         let mut metadata = Metadata::default();
         metadata.set_description("A uniform resource location (URL).");
         metadata.add_validation(Validation::KnownFormat(Format::Uri));
         metadata
     }
 
-    fn generate_schema(_: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
+    fn generate_schema(_: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
         Ok(generate_string_schema())
     }
 }

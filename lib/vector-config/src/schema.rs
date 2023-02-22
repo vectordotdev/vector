@@ -1,4 +1,4 @@
-use std::{collections::BTreeSet, mem};
+use std::{cell::RefCell, collections::BTreeSet, mem};
 
 use indexmap::IndexMap;
 use schemars::{
@@ -19,7 +19,7 @@ use crate::{
 ///
 /// Metadata can include semantic information (title, description, etc), validation (min/max, allowable
 /// patterns, etc), as well as actual arbitrary key/value data.
-pub fn apply_metadata<T>(schema: &mut SchemaObject, metadata: Metadata<T>)
+pub fn apply_metadata<T>(schema: &mut SchemaObject, metadata: Metadata)
 where
     T: Configurable + ToValue,
 {
@@ -219,7 +219,9 @@ where
     schema
 }
 
-pub fn generate_array_schema<T>(gen: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError>
+pub fn generate_array_schema<T>(
+    gen: &RefCell<SchemaGenerator>,
+) -> Result<SchemaObject, GenerateError>
 where
     T: Configurable + ToValue,
 {
@@ -236,7 +238,7 @@ where
     })
 }
 
-pub fn generate_set_schema<T>(gen: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError>
+pub fn generate_set_schema<T>(gen: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError>
 where
     T: Configurable + ToValue,
 {
@@ -254,7 +256,7 @@ where
     })
 }
 
-pub fn generate_map_schema<V>(gen: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError>
+pub fn generate_map_schema<V>(gen: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError>
 where
     V: Configurable + ToValue,
 {
@@ -292,7 +294,9 @@ pub fn generate_struct_schema(
     }
 }
 
-pub fn generate_optional_schema<T>(gen: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError>
+pub fn generate_optional_schema<T>(
+    gen: &RefCell<SchemaGenerator>,
+) -> Result<SchemaObject, GenerateError>
 where
     T: Configurable + ToValue,
 {
@@ -486,9 +490,10 @@ where
     // Set env variable to enable generating all schemas, including platform-specific ones.
     std::env::set_var("VECTOR_GENERATE_SCHEMA", "true");
 
-    let mut schema_gen = SchemaSettings::draft2019_09().into_generator();
+    let schema_gen = RefCell::new(SchemaSettings::draft2019_09().into_generator());
 
-    let schema = get_or_generate_schema::<T>(&mut schema_gen, Some(T::metadata()))?;
+    let schema = get_or_generate_schema::<T>(&schema_gen, Some(T::metadata()))?;
+    let mut schema_gen = schema_gen.into_inner();
     Ok(RootSchema {
         meta_schema: None,
         schema,
@@ -497,8 +502,8 @@ where
 }
 
 pub fn get_or_generate_schema<T>(
-    gen: &mut SchemaGenerator,
-    overrides: Option<Metadata<T>>,
+    gen: &RefCell<SchemaGenerator>,
+    overrides: Option<Metadata>,
 ) -> Result<SchemaObject, GenerateError>
 where
     T: Configurable + ToValue,
@@ -508,13 +513,14 @@ where
         // list, and if it exists, create a schema reference to it. Otherwise, generate it and
         // backfill it in the schema generator.
         Some(name) => {
-            if !gen.definitions().contains_key(name) {
+            if !gen.borrow().definitions().contains_key(name) {
                 // In order to avoid infinite recursion, we copy the approach that `schemars` takes and
                 // insert a dummy boolean schema before actually generating the real schema, and then
                 // replace it afterwards. If any recursion occurs, a schema reference will be handed
                 // back, which means we don't have to worry about the dummy schema needing to be updated
                 // after the fact.
-                gen.definitions_mut()
+                gen.borrow_mut()
+                    .definitions_mut()
                     .insert(name.to_string(), Schema::Bool(false));
 
                 // We generate the schema for `T` with its own default metadata, and not the
@@ -528,7 +534,8 @@ where
                 // for all usages of `T` that didn't override the default themselves.
                 let schema = generate_baseline_schema::<T>(gen, T::metadata())?;
 
-                gen.definitions_mut()
+                gen.borrow_mut()
+                    .definitions_mut()
                     .insert(name.to_string(), Schema::Object(schema));
             }
 
@@ -568,28 +575,32 @@ where
     };
 
     if let Some(metadata) = maybe_metadata {
-        apply_metadata(&mut schema, metadata);
+        apply_metadata::<T>(&mut schema, metadata);
     }
 
     Ok(schema)
 }
 
 pub fn generate_baseline_schema<T>(
-    gen: &mut SchemaGenerator,
-    metadata: Metadata<T>,
+    gen: &RefCell<SchemaGenerator>,
+    metadata: Metadata,
 ) -> Result<SchemaObject, GenerateError>
 where
     T: Configurable + ToValue,
 {
     // Generate the schema and apply its metadata.
     let mut schema = T::generate_schema(gen)?;
-    apply_metadata(&mut schema, metadata);
+    apply_metadata::<T>(&mut schema, metadata);
 
     Ok(schema)
 }
 
-fn get_schema_ref<S: AsRef<str>>(gen: &mut SchemaGenerator, name: S) -> SchemaObject {
-    let ref_path = format!("{}{}", gen.settings().definitions_path, name.as_ref());
+fn get_schema_ref<S: AsRef<str>>(gen: &RefCell<SchemaGenerator>, name: S) -> SchemaObject {
+    let ref_path = format!(
+        "{}{}",
+        gen.borrow().settings().definitions_path,
+        name.as_ref()
+    );
     SchemaObject::new_ref(ref_path)
 }
 
@@ -604,13 +615,15 @@ fn get_schema_ref<S: AsRef<str>>(gen: &mut SchemaGenerator, name: S) -> SchemaOb
 ///
 /// If the schema is not a valid, string-like schema, an error variant will be returned describing
 /// the issue.
-pub fn assert_string_schema_for_map<K, M>(gen: &mut SchemaGenerator) -> Result<(), GenerateError>
+pub fn assert_string_schema_for_map<K, M>(
+    gen: &RefCell<SchemaGenerator>,
+) -> Result<(), GenerateError>
 where
     K: ConfigurableString + ToValue,
 {
     // We need to force the schema to be treated as transparent so that when the schema generation
     // finalizes the schema, we don't throw an error due to a lack of title/description.
-    let mut key_metadata = Metadata::<K>::default();
+    let mut key_metadata = Metadata::default();
     key_metadata.set_transparent();
 
     let key_schema = get_or_generate_schema::<K>(gen, None)?;
@@ -618,6 +631,7 @@ where
 
     // Get a reference to the underlying schema if we're dealing with a reference, or just use what
     // we have if it's the actual definition.
+    let gen = gen.borrow();
     let underlying_schema = if wrapped_schema.is_ref() {
         gen.dereference(&wrapped_schema)
     } else {

@@ -9,7 +9,7 @@ use vector_config::configurable_component;
 use crate::{
     aws::RegionOrEndpoint,
     codecs::Transformer,
-    config::{log_schema, AcknowledgementsConfig, DataType, Input, SinkConfig, SinkContext},
+    config::{AcknowledgementsConfig, DataType, Input, SinkConfig, SinkContext},
     event::{EventRef, LogEvent, Value},
     http::HttpClient,
     internal_events::TemplateRenderingError,
@@ -33,6 +33,8 @@ use crate::{
     transforms::metric_to_log::MetricToLogConfig,
 };
 use lookup::event_path;
+use value::Kind;
+use vector_core::schema::Requirement;
 
 /// The field name for the timestamp required by data stream mode
 pub const DATA_STREAM_TIMESTAMP_KEY: &str = "@timestamp";
@@ -359,15 +361,17 @@ impl DataStreamConfig {
         true
     }
 
+    /// If there is a `timestamp` field, rename it to the expected `@timestamp` for Elastic Common Schema.
     pub fn remap_timestamp(&self, log: &mut LogEvent) {
-        // we keep it if the timestamp field is @timestamp
-        let timestamp_key = log_schema().timestamp_key();
-        if timestamp_key == DATA_STREAM_TIMESTAMP_KEY {
-            return;
-        }
+        if let Some(timestamp_key) = log.timestamp_path() {
+            if timestamp_key == DATA_STREAM_TIMESTAMP_KEY {
+                return;
+            }
 
-        if let Some(value) = log.remove(timestamp_key) {
-            log.insert(event_path!(DATA_STREAM_TIMESTAMP_KEY), value);
+            log.rename_key(
+                timestamp_key.as_str(),
+                event_path!(DATA_STREAM_TIMESTAMP_KEY),
+            )
         }
     }
 
@@ -521,7 +525,9 @@ impl SinkConfig for ElasticsearchConfig {
     }
 
     fn input(&self) -> Input {
-        Input::new(DataType::Metric | DataType::Log)
+        let requirements = Requirement::empty().optional_meaning("timestamp", Kind::timestamp());
+
+        Input::new(DataType::Metric | DataType::Log).with_schema_requirement(requirements)
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {

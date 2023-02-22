@@ -1,3 +1,5 @@
+use std::cell::RefCell;
+
 use chrono::{DateTime, TimeZone};
 use serde_json::Value;
 
@@ -11,13 +13,13 @@ impl<TZ> Configurable for DateTime<TZ>
 where
     TZ: TimeZone,
 {
-    fn metadata() -> Metadata<Self> {
+    fn metadata() -> Metadata {
         let mut metadata = Metadata::default();
         metadata.set_description("ISO 8601 combined date and time with timezone.");
         metadata
     }
 
-    fn generate_schema(_: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
+    fn generate_schema(_: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
         Ok(generate_string_schema())
     }
 }
