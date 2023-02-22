@@ -26,7 +26,7 @@ use tokio_util::codec::FramedRead;
 
 use value::{kind::Collection, Kind};
 use vector_common::finalizer::OrderedFinalizer;
-use vector_config::{configurable_component, NamedComponent};
+use vector_config::configurable_component;
 use vector_core::{
     config::{LegacyKey, LogNamespace},
     EstimatedJsonEncodedSizeOf,

@@ -20,7 +20,7 @@ use opentelemetry_proto::convert::{
 use opentelemetry_proto::proto::collector::logs::v1::logs_service_server::LogsServiceServer;
 use value::{kind::Collection, Kind};
 use vector_common::internal_event::{BytesReceived, EventsReceived, Protocol};
-use vector_config::{configurable_component, NamedComponent};
+use vector_config::configurable_component;
 use vector_core::{
     config::{log_schema, LegacyKey, LogNamespace},
     schema::Definition,

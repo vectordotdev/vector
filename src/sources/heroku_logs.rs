@@ -17,7 +17,7 @@ use tokio_util::codec::Decoder as _;
 use value::{kind::Collection, Kind};
 use warp::http::{HeaderMap, StatusCode};
 
-use vector_config::{configurable_component, NamedComponent};
+use vector_config::configurable_component;
 use vector_core::{
     config::{LegacyKey, LogNamespace},
     schema::Definition,
@@ -398,7 +398,6 @@ mod tests {
     use lookup::{owned_value_path, OwnedTargetPath};
     use similar_asserts::assert_eq;
     use value::{kind::Collection, Kind};
-    use vector_config::NamedComponent;
     use vector_core::{
         config::LogNamespace,
         event::{Event, EventStatus, Value},

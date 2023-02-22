@@ -16,7 +16,7 @@ use lookup::{
 };
 use smallvec::SmallVec;
 use tokio_util::udp::UdpFramed;
-use vector_config::{configurable_component, NamedComponent};
+use vector_config::configurable_component;
 use vector_core::config::{LegacyKey, LogNamespace};
 
 #[cfg(unix)]
