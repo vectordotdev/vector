@@ -1,3 +1,5 @@
+use std::cell::RefCell;
+
 use serde_json::Value;
 use vector_config_common::validation::{Format, Validation};
 
@@ -15,7 +17,7 @@ impl Configurable for url::Url {
         metadata
     }
 
-    fn generate_schema(_: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
+    fn generate_schema(_: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
         Ok(generate_string_schema())
     }
 }
