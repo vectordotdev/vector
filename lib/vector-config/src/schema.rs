@@ -15,7 +15,7 @@ use crate::{
 /// patterns, etc), as well as actual arbitrary key/value data.
 pub fn apply_metadata<T>(schema: &mut SchemaObject, metadata: Metadata)
 where
-    T: Configurable + ToValue,
+    T: Configurable,
 {
     let base_metadata = T::metadata();
 
@@ -217,7 +217,7 @@ pub fn generate_array_schema<T>(
     gen: &RefCell<SchemaGenerator>,
 ) -> Result<SchemaObject, GenerateError>
 where
-    T: Configurable + ToValue,
+    T: Configurable,
 {
     // Generate the actual schema for the element type `T`.
     let element_schema = get_or_generate_schema::<T>(gen, None)?;
@@ -234,7 +234,7 @@ where
 
 pub fn generate_set_schema<T>(gen: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError>
 where
-    T: Configurable + ToValue,
+    T: Configurable,
 {
     // Generate the actual schema for the element type `T`.
     let element_schema = get_or_generate_schema::<T>(gen, None)?;
@@ -252,7 +252,7 @@ where
 
 pub fn generate_map_schema<V>(gen: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError>
 where
-    V: Configurable + ToValue,
+    V: Configurable,
 {
     // Generate the actual schema for the element type `V`.
     let element_schema = get_or_generate_schema::<V>(gen, None)?;
@@ -292,7 +292,7 @@ pub fn generate_optional_schema<T>(
     gen: &RefCell<SchemaGenerator>,
 ) -> Result<SchemaObject, GenerateError>
 where
-    T: Configurable + ToValue,
+    T: Configurable,
 {
     // Optional schemas are generally very simple in practice, but because of how we memoize schema
     // generation and use references to schema definitions, we have to handle quite a few cases
@@ -479,7 +479,7 @@ pub fn generate_internal_tagged_variant_schema(
 
 pub fn generate_root_schema<T>() -> Result<RootSchema, GenerateError>
 where
-    T: Configurable + ToValue,
+    T: Configurable,
 {
     // Set env variable to enable generating all schemas, including platform-specific ones.
     std::env::set_var("VECTOR_GENERATE_SCHEMA", "true");
@@ -495,7 +495,7 @@ pub fn get_or_generate_schema<T>(
     overrides: Option<Metadata>,
 ) -> Result<SchemaObject, GenerateError>
 where
-    T: Configurable + ToValue,
+    T: Configurable,
 {
     let (mut schema, metadata) = match T::referenceable_name() {
         // When `T` has a referenceable name, try looking it up in the schema generator's definition
@@ -575,7 +575,7 @@ pub fn generate_baseline_schema<T>(
     metadata: Metadata,
 ) -> Result<SchemaObject, GenerateError>
 where
-    T: Configurable + ToValue,
+    T: Configurable,
 {
     // Generate the schema and apply its metadata.
     let mut schema = T::generate_schema(gen)?;
@@ -608,7 +608,7 @@ pub fn assert_string_schema_for_map<K, M>(
     gen: &RefCell<SchemaGenerator>,
 ) -> Result<(), GenerateError>
 where
-    K: ConfigurableString + ToValue,
+    K: ConfigurableString,
 {
     // We need to force the schema to be treated as transparent so that when the schema generation
     // finalizes the schema, we don't throw an error due to a lack of title/description.
