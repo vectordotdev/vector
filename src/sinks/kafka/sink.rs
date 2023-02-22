@@ -9,7 +9,6 @@ use rdkafka::{
 use snafu::{ResultExt, Snafu};
 use tokio::time::Duration;
 use tower::limit::ConcurrencyLimit;
-use vector_core::config::log_schema;
 
 use super::config::{KafkaRole, KafkaSinkConfig};
 use crate::{
@@ -80,7 +79,6 @@ impl KafkaSink {
             topic_template: self.topic,
             transformer: self.transformer,
             encoder: self.encoder,
-            log_schema: log_schema(),
         };
 
         input
