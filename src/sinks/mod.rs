@@ -7,6 +7,8 @@ pub mod util;
 
 #[cfg(feature = "sinks-amqp")]
 pub mod amqp;
+#[cfg(feature = "sinks-appsignal")]
+pub mod appsignal;
 #[cfg(feature = "sinks-aws_cloudwatch_logs")]
 pub mod aws_cloudwatch_logs;
 #[cfg(feature = "sinks-aws_cloudwatch_metrics")]
@@ -142,6 +144,11 @@ pub enum Sinks {
     #[cfg(feature = "sinks-amqp")]
     #[configurable(metadata(docs::label = "AMQP"))]
     Amqp(amqp::AmqpSinkConfig),
+
+    /// Send events to AppSignal.
+    #[cfg(feature = "sinks-appsignal")]
+    #[configurable(metadata(docs::label = "AppSignal"))]
+    Appsignal(appsignal::AppsignalSinkConfig),
 
     /// Publish log events to AWS CloudWatch Logs.
     #[cfg(feature = "sinks-aws_cloudwatch_logs")]
@@ -434,6 +441,8 @@ impl NamedComponent for Sinks {
         match self {
             #[cfg(feature = "sinks-amqp")]
             Self::Amqp(config) => config.get_component_name(),
+            #[cfg(feature = "sinks-appsignal")]
+            Self::Appsignal(config) => config.get_component_name(),
             #[cfg(feature = "sinks-aws_cloudwatch_logs")]
             Self::AwsCloudwatchLogs(config) => config.get_component_name(),
             #[cfg(feature = "sinks-aws_cloudwatch_metrics")]

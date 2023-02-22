@@ -28,6 +28,9 @@ Apanda
 apikey
 apimachinery
 apiserver
+appsignal
+Appsignal
+APPSIGNAL
 archlinux
 Archos
 Arival

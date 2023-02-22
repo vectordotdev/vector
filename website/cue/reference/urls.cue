@@ -1,6 +1,7 @@
 package metadata
 
 urls: {
+	appsignal:                                  "https://www.appsignal.com/"
 	azure_blob_storage:                         "https://azure.microsoft.com/en-us/services/storage/blobs/"
 	azure_event_hubs:                           "https://learn.microsoft.com/en-us/azure/event-hubs/"
 	azure_event_hubs_kafka:                     "https://learn.microsoft.com/en-us/azure/event-hubs/event-hubs-for-kafka-ecosystem-overview"
