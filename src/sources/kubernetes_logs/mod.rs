@@ -35,7 +35,7 @@ use vector_common::{
     internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol},
     TimeZone,
 };
-use vector_config::{configurable_component, NamedComponent};
+use vector_config::configurable_component;
 use vector_core::{
     config::LegacyKey, config::LogNamespace, transform::TaskTransform, EstimatedJsonEncodedSizeOf,
 };

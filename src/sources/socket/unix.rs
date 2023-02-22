@@ -5,7 +5,7 @@ use chrono::Utc;
 use codecs::decoding::{DeserializerConfig, FramingConfig};
 use lookup::{lookup_v2::OptionalValuePath, path};
 use vector_common::shutdown::ShutdownSignal;
-use vector_config::{configurable_component, NamedComponent};
+use vector_config::configurable_component;
 use vector_core::config::{LegacyKey, LogNamespace};
 
 use crate::{

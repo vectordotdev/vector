@@ -11,7 +11,7 @@ use lookup::{
     lookup_v2::{OptionalTargetPath, ValuePath},
     owned_value_path, path, OwnedTargetPath,
 };
-use vector_config::{configurable_component, NamedComponent};
+use vector_config::configurable_component;
 use vector_core::config::{LegacyKey, LogNamespace};
 
 use super::{

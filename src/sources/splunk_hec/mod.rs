@@ -18,7 +18,7 @@ use tracing::Span;
 use value::{kind::Collection, Kind};
 use vector_common::internal_event::{CountByteSize, InternalEventHandle as _, Registered};
 use vector_common::sensitive_string::SensitiveString;
-use vector_config::{configurable_component, NamedComponent};
+use vector_config::configurable_component;
 use vector_core::{
     config::{LegacyKey, LogNamespace},
     event::BatchNotifier,

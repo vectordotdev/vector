@@ -131,10 +131,8 @@ pub enum Transforms {
     Throttle(throttle::ThrottleConfig),
 }
 
-// We can't use `enum_dispatch` here because it doesn't support associated constants.
+// TODO: Use `enum_dispatch` here.
 impl NamedComponent for Transforms {
-    const NAME: &'static str = "_invalid_usage";
-
     fn get_component_name(&self) -> &'static str {
         match self {
             #[cfg(feature = "transforms-aggregate")]

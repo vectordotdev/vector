@@ -2,7 +2,6 @@ use chrono::{DateTime, Utc};
 use derivative::Derivative;
 use lookup::path;
 use vector_common::conversion;
-use vector_config::NamedComponent;
 use vector_core::config::{log_schema, LegacyKey, LogNamespace};
 
 use crate::{

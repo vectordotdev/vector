@@ -6,7 +6,7 @@ use codecs::NativeDeserializerConfig;
 use futures::TryFutureExt;
 use tonic::{Request, Response, Status};
 use vector_common::internal_event::{CountByteSize, InternalEventHandle as _};
-use vector_config::{configurable_component, NamedComponent};
+use vector_config::configurable_component;
 use vector_core::{
     config::LogNamespace,
     event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event},
