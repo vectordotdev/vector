@@ -82,34 +82,30 @@ pub(super) struct DatabendPresignedResponse {
 #[derive(Clone)]
 pub(super) struct DatabendAPIClient {
     client: HttpClient,
-    endpoint: UriSerde,
+    host: UriSerde,
     auth: Option<Auth>,
 }
 
 impl DatabendAPIClient {
-    pub(super) const fn new(client: HttpClient, endpoint: UriSerde, auth: Option<Auth>) -> Self {
-        Self {
-            client,
-            endpoint,
-            auth,
-        }
+    pub(super) const fn new(client: HttpClient, host: UriSerde, auth: Option<Auth>) -> Self {
+        Self { client, host, auth }
     }
 
     pub(super) fn get_protocol(&self) -> &str {
-        self.endpoint.uri.scheme_str().unwrap_or("http")
+        self.host.uri.scheme_str().unwrap_or("http")
     }
 
-    pub(super) fn get_endpoint(&self) -> &str {
-        self.endpoint.uri.host().unwrap_or("unknown")
+    pub(super) fn get_host(&self) -> &str {
+        self.host.uri.host().unwrap_or("unknown")
     }
 
-    fn get_page_url(&self, next_uri: &str) -> Result<String, DatabendError> {
-        let api_uri = self.endpoint.append_path(next_uri)?;
+    fn get_page_endpoint(&self, next_uri: &str) -> Result<String, DatabendError> {
+        let api_uri = self.host.append_path(next_uri)?;
         Ok(api_uri.to_string())
     }
 
-    fn get_query_url(&self) -> Result<String, DatabendError> {
-        let api_uri = self.endpoint.append_path("/v1/query")?;
+    fn get_query_endpoint(&self) -> Result<String, DatabendError> {
+        let api_uri = self.host.append_path("/v1/query")?;
         Ok(api_uri.to_string())
     }
 
@@ -132,20 +128,25 @@ impl DatabendAPIClient {
             a.apply(&mut request);
         }
         let response = self.client.send(request).await?;
-        if response.status() != StatusCode::OK {
+        let status_code = response.status();
+        let body_bytes = hyper::body::to_bytes(response.into_body()).await?;
+        if status_code != StatusCode::OK {
             return Err(DatabendError::Server {
-                code: response.status().as_u16(),
-                message: "Http Status not OK".to_string(),
+                code: status_code.as_u16(),
+                message: format!(
+                    "Unexpected status code {} with response: {}",
+                    status_code,
+                    String::from_utf8_lossy(&body_bytes),
+                ),
             });
         }
-        let body_bytes = hyper::body::to_bytes(response.into_body()).await?;
         let resp: DatabendHttpResponse =
             serde_json::from_slice(&body_bytes).map_err(|e| DatabendError::Server {
                 code: 0,
                 message: format!(
                     "Failed to parse response: {}: {}",
                     e,
-                    String::from_utf8_lossy(&body_bytes)
+                    String::from_utf8_lossy(&body_bytes),
                 ),
             })?;
         match resp.error {
@@ -161,16 +162,16 @@ impl DatabendAPIClient {
         &self,
         next_uri: String,
     ) -> Result<DatabendHttpResponse, DatabendError> {
-        let url = self.get_page_url(&next_uri)?;
-        self.do_request(url, None).await
+        let endpoint = self.get_page_endpoint(&next_uri)?;
+        self.do_request(endpoint, None).await
     }
 
     pub(super) async fn query(
         &self,
         req: DatabendHttpRequest,
     ) -> Result<DatabendHttpResponse, DatabendError> {
-        let url = self.get_query_url()?;
-        let resp = self.do_request(url, Some(req)).await?;
+        let endpoint = self.get_query_endpoint()?;
+        let resp = self.do_request(endpoint, Some(req)).await?;
         match resp.next_uri {
             None => Ok(resp),
             Some(_) => {
@@ -192,12 +193,13 @@ impl DatabendAPIClient {
         data: Bytes,
     ) -> Result<(), DatabendError> {
         let req_body = Body::from(data);
-        let mut req_builder = match presigned.method.as_str() {
+        let upload_method = presigned.method.as_str();
+        let mut req_builder = match upload_method {
             "PUT" => Ok(Request::put(presigned.url)),
             "POST" => Ok(Request::post(presigned.url)),
             _ => Err(DatabendError::Server {
-                code: 0,
-                message: "Unsupported Presigned Method".to_string(),
+                code: 405,
+                message: format!("Unsupported presigned upload method: {}", upload_method),
             }),
         }?;
         for (k, v) in presigned.headers {

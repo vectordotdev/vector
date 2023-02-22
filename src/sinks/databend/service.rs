@@ -208,7 +208,7 @@ impl Service<DatabendRequest> for DatabendService {
             let metadata = request.get_metadata();
             let stage_location = service.new_stage_location();
             let protocol = service.client.get_protocol();
-            let endpoint = service.client.get_endpoint();
+            let endpoint = service.client.get_host();
             let byte_size = request.data.len();
             let presigned_resp = service.get_presigned_url(&stage_location).await?;
             service

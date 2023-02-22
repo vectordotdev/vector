@@ -110,8 +110,8 @@ async fn insert_events() {
         let log_event = input_event.into_log();
         let expected = serde_json::to_string(&log_event).unwrap();
         let resp_data = response_to_map(&resp);
-        let actural = serde_json::to_string(&resp_data[0]).unwrap();
-        assert_eq!(expected, actural);
+        let actrual = serde_json::to_string(&resp_data[0]).unwrap();
+        assert_eq!(expected, actrual);
     }
 
     assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
