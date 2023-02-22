@@ -1,4 +1,5 @@
 use std::{
+    cell::RefCell,
     collections::{BTreeMap, BTreeSet, HashMap, HashSet},
     hash::Hash,
     net::SocketAddr,
@@ -28,7 +29,7 @@ use crate::{
 
 // Unit type.
 impl Configurable for () {
-    fn generate_schema(_: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
+    fn generate_schema(_: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
         // Using a unit type in a configuration-related type is never actually valid.
         Err(GenerateError::InvalidType)
     }
@@ -66,7 +67,7 @@ where
         T::validate_metadata(&converted)
     }
 
-    fn generate_schema(gen: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
+    fn generate_schema(gen: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
         generate_optional_schema::<T>(gen)
     }
 }
@@ -85,7 +86,7 @@ impl Configurable for bool {
         Metadata::with_transparent(true)
     }
 
-    fn generate_schema(_: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
+    fn generate_schema(_: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
         Ok(generate_bool_schema())
     }
 }
@@ -102,7 +103,7 @@ impl Configurable for String {
         Metadata::with_transparent(true)
     }
 
-    fn generate_schema(_: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
+    fn generate_schema(_: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
         Ok(generate_string_schema())
     }
 }
@@ -123,7 +124,7 @@ impl Configurable for char {
         metadata
     }
 
-    fn generate_schema(_: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
+    fn generate_schema(_: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
         Ok(generate_string_schema())
     }
 }
@@ -151,7 +152,9 @@ macro_rules! impl_configurable_numeric {
                 $crate::__ensure_numeric_validation_bounds::<Self>(metadata)
             }
 
-            fn generate_schema(_: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
+            fn generate_schema(
+                _: &RefCell<SchemaGenerator>,
+            ) -> Result<SchemaObject, GenerateError> {
                 Ok(generate_number_schema::<Self>())
             }
         }
@@ -201,7 +204,7 @@ where
         T::validate_metadata(&converted)
     }
 
-    fn generate_schema(gen: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
+    fn generate_schema(gen: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
         generate_array_schema::<T>(gen)
     }
 }
@@ -232,7 +235,7 @@ where
         V::validate_metadata(&converted)
     }
 
-    fn generate_schema(gen: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
+    fn generate_schema(gen: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
         // Make sure our key type is _truly_ a string schema.
         assert_string_schema_for_map::<K, Self>(gen)?;
 
@@ -267,7 +270,7 @@ where
         V::validate_metadata(&converted)
     }
 
-    fn generate_schema(gen: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
+    fn generate_schema(gen: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
         generate_set_schema::<V>(gen)
     }
 }
@@ -298,7 +301,7 @@ where
         V::validate_metadata(&converted)
     }
 
-    fn generate_schema(gen: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
+    fn generate_schema(gen: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
         // Make sure our key type is _truly_ a string schema.
         assert_string_schema_for_map::<K, Self>(gen)?;
 
@@ -333,7 +336,7 @@ where
         V::validate_metadata(&converted)
     }
 
-    fn generate_schema(gen: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
+    fn generate_schema(gen: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
         generate_set_schema::<V>(gen)
     }
 }
@@ -359,7 +362,7 @@ impl Configurable for SocketAddr {
         metadata
     }
 
-    fn generate_schema(_: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
+    fn generate_schema(_: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
         // TODO: We don't need anything other than a string schema to (de)serialize a `SocketAddr`,
         // but we eventually should have validation since the format for the possible permutations
         // is well-known and can be easily codified.
@@ -392,7 +395,7 @@ impl Configurable for PathBuf {
         metadata
     }
 
-    fn generate_schema(_: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
+    fn generate_schema(_: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
         Ok(generate_string_schema())
     }
 }
@@ -415,7 +418,7 @@ impl Configurable for Duration {
         metadata
     }
 
-    fn generate_schema(_: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
+    fn generate_schema(_: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
         let mut properties = IndexMap::default();
         properties.insert("secs".into(), generate_number_schema::<u64>());
         properties.insert("nsecs".into(), generate_number_schema::<u32>());

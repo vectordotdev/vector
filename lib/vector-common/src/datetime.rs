@@ -1,4 +1,4 @@
-use std::fmt::Debug;
+use std::{cell::RefCell, fmt::Debug};
 
 use chrono::{DateTime, Local, ParseError, TimeZone as _, Utc};
 use chrono_tz::Tz;
@@ -114,7 +114,7 @@ impl Configurable for TimeZone {
         metadata
     }
 
-    fn generate_schema(gen: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
+    fn generate_schema(gen: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
         let mut local_schema = generate_const_string_schema("local".to_string());
         let mut local_metadata = Metadata::with_description("System local timezone.");
         local_metadata.add_custom_attribute(CustomAttribute::kv("logical_name", "Local"));
