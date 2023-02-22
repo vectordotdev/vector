@@ -54,7 +54,7 @@ base: components: sinks: axiom: configuration: {
 	dataset: {
 		description: "The Axiom dataset to write to."
 		required:    true
-		type: string: examples: ["vector.dev"]
+		type: string: examples: ["${AXIOM_DATASET}", "vector.dev"]
 	}
 	org_id: {
 		description: """
