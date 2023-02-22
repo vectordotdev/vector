@@ -150,9 +150,7 @@ mod integration_tests {
     use crate::{
         config::SinkContext,
         sinks::axiom::AxiomConfig,
-        test_util::{
-            components::{run_and_assert_sink_compliance, HTTP_SINK_TAGS},
-        },
+        test_util::components::{run_and_assert_sink_compliance, HTTP_SINK_TAGS},
     };
 
     #[tokio::test]
@@ -181,12 +179,12 @@ mod integration_tests {
         let mut event1 = LogEvent::from("message_1").with_batch_notifier(&batch);
         event1.insert("host", "aws.cloud.eur");
         event1.insert("source_type", "file");
-        event1.insert("test_id", test_id);
+        event1.insert("test_id", test_id.clone());
 
         let mut event2 = LogEvent::from("message_2").with_batch_notifier(&batch);
         event2.insert("host", "aws.cloud.eur");
         event2.insert("source_type", "file");
-        event2.insert("test_id", test_id);
+        event2.insert("test_id", test_id.clone());
 
         drop(batch);
 
@@ -219,7 +217,10 @@ mod integration_tests {
         }
 
         let query_req = QueryRequest {
-            apl: format!("['{}'] | where test_id == '{}' | order by _time desc | limit 2", dataset, test_id),
+            apl: format!(
+                "['{}'] | where test_id == '{}' | order by _time desc | limit 2",
+                dataset, test_id
+            ),
             start_time: Utc::now() - Duration::minutes(10),
             end_time: Utc::now() + Duration::minutes(10),
         };
