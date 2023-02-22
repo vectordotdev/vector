@@ -131,11 +131,21 @@ Source vector fields (`%vector`)
 }
 ```
 
-### Global Log Schema
+### Semantic Meaning
 
-The global log schema will no longer be used when Log Namespacing is enabled.
+Before Log Namespacing, Vector used the [global log schema] to keep certain types of information
+at known locations. This is changing, and when log namespacing is enabled, the [global log schema]
+will no longer be used. To replace it, a new feature called "semantic meaning" will be used instead.
+This allows assigning meaning to different fields of an event, which allows sinks to access
+information needed, such as timestamps, hostname, the message, etc.
+
+Semantic meaning will automatically be assigned by all sources. Sinks will check on startup to make
+sure a meaning exists for all required fields. If a source does not provide a required field, or
+a meaning needs to be manually adjusted for any reason, the VRL function [set_semantic_meaning] can
+be used.
 
 
 
 
 [global log schema]: /docs/reference/configuration/global-options/#log_schema
+[set_semantic_meaning]: /docs/reference/vrl/functions/#set_semantic_meaning
