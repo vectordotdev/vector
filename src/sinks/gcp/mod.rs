@@ -89,9 +89,23 @@ pub struct GcpPointValue {
 
 #[derive(Serialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
+pub struct GcpMetric {
+    pub r#type: String,
+    pub labels: HashMap<String, String>,
+}
+
+#[derive(Serialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct GcpResource {
+    pub r#type: String,
+    pub labels: HashMap<String, String>,
+}
+
+#[derive(Serialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct GcpSerie<'a> {
-    pub metric: GcpTypedResource,
-    pub resource: GcpTypedResource,
+    pub metric: GcpMetric,
+    pub resource: GcpResource,
     pub metric_kind: GcpMetricKind,
     pub value_type: GcpValueType,
     pub points: &'a [GcpPoint],
@@ -132,4 +146,57 @@ where
     S: serde::Serializer,
 {
     serialize_datetime(value.as_ref().expect("always defined"), serializer)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Ensures that serialized `GcpSeries` matches the format that GCP expects (https://cloud.google.com/monitoring/api/ref_v3/rest/v3/TimeSeries).
+    #[test]
+    fn serialize_gcp_series() {
+        let end_time = chrono::DateTime::from_utc(
+            chrono::NaiveDate::from_ymd(2023, 2, 14).and_hms(10, 00, 00),
+            chrono::Utc,
+        );
+        let gcp_series = GcpSeries {
+            time_series: &[GcpSerie {
+                metric: GcpMetric {
+                    r#type: "custom.googleapis.com/my_namespace/metrics/my_metric".to_string(),
+                    labels: [(
+                        "my_metric_label".to_string(),
+                        "my_metric_label_value".to_string(),
+                    )]
+                    .into(),
+                },
+                resource: GcpResource {
+                    r#type: "my_resource".to_string(),
+                    labels: [(
+                        "my_resource_label".to_string(),
+                        "my_resource_label_value".to_string(),
+                    )]
+                    .into(),
+                },
+                metric_kind: GcpMetricKind::Gauge,
+                value_type: GcpValueType::Int64,
+                points: &[GcpPoint {
+                    interval: GcpInterval {
+                        start_time: None,
+                        end_time,
+                    },
+                    value: GcpPointValue {
+                        int64_value: Some(10),
+                    },
+                }],
+            }],
+        };
+
+        let serialized = serde_json::to_string(&gcp_series).unwrap();
+
+        // Convert to `serde_json::Value` so that field order does not matter.
+        let value: serde_json::Value = serde_json::from_str(&serialized).unwrap();
+        let expected: serde_json::Value = serde_json::from_str(r#"{"timeSeries":[{"metric":{"type":"custom.googleapis.com/my_namespace/metrics/my_metric","labels":{"my_metric_label":"my_metric_label_value"}},"resource":{"type":"my_resource","labels":{"my_resource_label":"my_resource_label_value"}},"metricKind":"GAUGE","valueType": "INT64","points":[{"interval":{"endTime":"2023-02-14T10:00:00.000000000Z"},"value":{"int64Value":"10"}}]}]}"#).unwrap();
+
+        assert_eq!(value, expected);
+    }
 }
