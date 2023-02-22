@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 use std::{collections::HashMap, num::NonZeroUsize, path::PathBuf, sync::Arc};
 
 use futures::StreamExt;

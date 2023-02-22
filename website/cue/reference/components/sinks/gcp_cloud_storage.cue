@@ -129,6 +129,15 @@ components: sinks: gcp_cloud_storage: {
 				You can control the resulting name via the [`key_prefix`](#key_prefix),
 				[`filename_time_format`](#filename_time_format),
 				and [`filename_append_uuid`](#filename_append_uuid) options.
+
+				For example, to store objects at the root GCS folder, without a timestamp or UUID use
+				these configuration options:
+
+				```text
+				key_prefix = "{{ my_file_name }}"
+				filename_time_format = ""
+				filename_append_uuid = false
+				```
 				"""
 		}
 

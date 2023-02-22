@@ -56,7 +56,6 @@ jobs:
       matrix:
         include:
           - test: 'amqp'
-          - test: 'apex'
           - test: 'aws'
           # Database container currently fails to start due to failing to validate the license
           #- test: 'axiom'

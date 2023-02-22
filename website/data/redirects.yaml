@@ -3,7 +3,6 @@ platforms:
 - kubernetes
 
 sinks:
-- apex
 - aws_sqs
 - aws_cloudwatch_logs
 - aws_cloudwatch_metrics

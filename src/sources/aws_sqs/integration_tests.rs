@@ -1,12 +1,11 @@
 #![cfg(feature = "aws-sqs-integration-tests")]
 #![cfg(test)]
 
-use std::{collections::HashSet, str::FromStr, time::Duration};
+use std::{collections::HashSet, time::Duration};
 
-use aws_sdk_sqs::{output::CreateQueueOutput, Endpoint};
+use aws_sdk_sqs::output::CreateQueueOutput;
 use aws_types::region::Region;
 use futures::StreamExt;
-use http::Uri;
 use tokio::time::timeout;
 
 use crate::{
@@ -58,9 +57,7 @@ async fn get_sqs_client() -> aws_sdk_sqs::Client {
                 .await
                 .unwrap(),
         )
-        .endpoint_resolver(Endpoint::immutable(
-            Uri::from_str(sqs_address().as_str()).unwrap(),
-        ))
+        .endpoint_url(sqs_address())
         .region(Some(Region::new("us-east-1")))
         .build();
 

@@ -329,8 +329,8 @@ releases: "0.24.0": {
 			type: "feat"
 			scopes: ["apex sink"]
 			description: """
-				A new [`apex` sink](/docs/reference/configuration/sinks/apex/) was added to send
-				logs to [Apex](https://apex.sh/logs/).
+				A new `apex` sink was added to send logs to Apex.
+				This sink was removed in v0.28 as the Apex service moved to EOL.
 				"""
 			contributors: ["mcasper"]
 			pr_numbers: [13436]

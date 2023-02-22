@@ -1,0 +1,9 @@
+# result: [{"boolean": true}, {"boolean": true}, {"boolean": true}, {"null": true}, {"null": true}]
+
+[
+    type_def(true || true),
+    type_def(null || true),
+    type_def(true || null),
+    type_def(false || null),
+    type_def(null || null),
+]

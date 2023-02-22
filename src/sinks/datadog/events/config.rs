@@ -1,9 +1,11 @@
 use futures::FutureExt;
 use indoc::indoc;
 use tower::ServiceBuilder;
+use value::Kind;
 use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
 use vector_core::config::proxy::ProxyConfig;
+use vector_core::schema;
 
 use crate::{
     common::datadog::{get_base_domain_region, Region},
@@ -35,6 +37,7 @@ pub struct DatadogEventsConfig {
     /// hostname or IP address and port.
     ///
     /// If set, overrides the `site` option.
+    #[configurable(metadata(docs::advanced))]
     #[configurable(metadata(docs::examples = "http://127.0.0.1:8080"))]
     #[configurable(metadata(docs::examples = "http://example.com:12345"))]
     #[serde(default)]
@@ -165,7 +168,12 @@ impl SinkConfig for DatadogEventsConfig {
     }
 
     fn input(&self) -> Input {
-        Input::log()
+        let requirement = schema::Requirement::empty()
+            .required_meaning("message", Kind::bytes())
+            .optional_meaning("host", Kind::bytes())
+            .optional_meaning("timestamp", Kind::timestamp());
+
+        Input::log().with_schema_requirement(requirement)
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {

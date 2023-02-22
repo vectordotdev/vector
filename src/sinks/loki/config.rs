@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use futures::future::FutureExt;
+use value::Kind;
 use vector_config::configurable_component;
 
 use super::{healthcheck::healthcheck, sink::LokiSink};
@@ -8,6 +9,7 @@ use crate::{
     codecs::EncodingConfig,
     config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext},
     http::{Auth, HttpClient, MaybeAuth},
+    schema,
     sinks::{
         util::{BatchConfig, Compression, SinkBatchSettings, TowerRequestConfig, UriSerde},
         VectorSink,
@@ -247,7 +249,11 @@ impl SinkConfig for LokiConfig {
     }
 
     fn input(&self) -> Input {
+        let requirement =
+            schema::Requirement::empty().optional_meaning("timestamp", Kind::timestamp());
+
         Input::new(self.encoding.config().input_type() & DataType::Log)
+            .with_schema_requirement(requirement)
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {

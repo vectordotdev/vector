@@ -14,6 +14,7 @@ components: sinks: sematext_logs: {
 
 	features: {
 		acknowledgements: true
+		auto_generated:   true
 		healthcheck: enabled: true
 		send: {
 			batch: {
@@ -43,7 +44,7 @@ components: sinks: sematext_logs: {
 		notices: []
 	}
 
-	configuration: sinks._sematext.configuration
+	configuration: base.components.sinks.sematext_logs.configuration
 
 	input: {
 		logs:    true

@@ -43,6 +43,7 @@ pub struct LogstashConfig {
     address: SocketListenAddr,
 
     #[configurable(derived)]
+    #[configurable(metadata(docs::advanced))]
     keepalive: Option<TcpKeepaliveConfig>,
 
     #[configurable(derived)]
@@ -53,10 +54,12 @@ pub struct LogstashConfig {
     /// This generally should not need to be changed.
     #[configurable(metadata(docs::type_unit = "bytes"))]
     #[configurable(metadata(docs::examples = 65536))]
+    #[configurable(metadata(docs::advanced))]
     receive_buffer_bytes: Option<usize>,
 
     /// The maximum number of TCP connections that will be allowed at any given time.
     #[configurable(metadata(docs::type_unit = "connections"))]
+    #[configurable(metadata(docs::advanced))]
     connection_limit: Option<u32>,
 
     #[configurable(derived)]
@@ -673,7 +676,7 @@ impl From<LogstashEventFrame> for SmallVec<[Event; 1]> {
 #[cfg(test)]
 mod test {
     use bytes::BufMut;
-    use lookup::LookupBuf;
+    use lookup::OwnedTargetPath;
     use rand::{thread_rng, Rng};
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
     use value::kind::Collection;
@@ -792,23 +795,31 @@ mod test {
 
         let expected_definition =
             Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
-                .with_meaning(LookupBuf::root(), "message")
-                .with_metadata_field(&owned_value_path!("vector", "source_type"), Kind::bytes())
+                .with_meaning(OwnedTargetPath::event_root(), "message")
+                .with_metadata_field(
+                    &owned_value_path!("vector", "source_type"),
+                    Kind::bytes(),
+                    None,
+                )
                 .with_metadata_field(
                     &owned_value_path!("vector", "ingest_timestamp"),
                     Kind::timestamp(),
+                    None,
                 )
                 .with_metadata_field(
                     &owned_value_path!(LogstashConfig::NAME, "timestamp"),
                     Kind::timestamp().or_undefined(),
+                    Some("timestamp"),
                 )
                 .with_metadata_field(
                     &owned_value_path!(LogstashConfig::NAME, "host"),
                     Kind::bytes(),
+                    Some("host"),
                 )
                 .with_metadata_field(
                     &owned_value_path!(LogstashConfig::NAME, "tls_client_metadata"),
                     Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
+                    None,
                 );
 
         assert_eq!(definition, expected_definition)

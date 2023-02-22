@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 use std::{collections::HashMap, fmt, fs::remove_dir_all, path::PathBuf};
 
 use clap::Parser;

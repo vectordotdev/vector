@@ -330,7 +330,7 @@ test-behavior: test-behavior-transforms test-behavior-formats test-behavior-conf
 
 .PHONY: test-integration
 test-integration: ## Runs all integration tests
-test-integration: test-integration-amqp test-integration-apex test-integration-aws test-integration-axiom test-integration-azure test-integration-chronicle test-integration-clickhouse
+test-integration: test-integration-amqp test-integration-aws test-integration-axiom test-integration-azure test-integration-chronicle test-integration-clickhouse
 test-integration: test-integration-databend test-integration-docker-logs test-integration-elasticsearch
 test-integration: test-integration-eventstoredb test-integration-fluent test-integration-gcp test-integration-humio test-integration-http-client test-integration-influxdb
 test-integration: test-integration-kafka test-integration-logstash test-integration-loki test-integration-mongodb test-integration-nats
@@ -411,7 +411,7 @@ bench-all: bench-remap-functions
 
 .PHONY: check
 check: ## Run prerequisite code checks
-	${MAYBE_ENVIRONMENT_EXEC} cargo check --workspace --all-targets --features all-integration-tests
+	${MAYBE_ENVIRONMENT_EXEC} cargo vdev check rust
 
 .PHONY: check-all
 check-all: ## Check everything
@@ -425,7 +425,7 @@ check-component-features: ## Check that all component features are setup properl
 
 .PHONY: check-clippy
 check-clippy: ## Check code with Clippy
-	${MAYBE_ENVIRONMENT_EXEC} cargo clippy --workspace --all-targets --features all-integration-tests -- -D warnings
+	${MAYBE_ENVIRONMENT_EXEC} cargo vdev check rust --clippy
 
 .PHONY: check-docs
 check-docs: ## Check that all /docs file are valid

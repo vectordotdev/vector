@@ -220,8 +220,8 @@ impl CloudwatchLogsSvc {
         let group_name = key.group.clone();
         let stream_name = key.stream.clone();
 
-        let create_missing_group = config.create_missing_group.unwrap_or(true);
-        let create_missing_stream = config.create_missing_stream.unwrap_or(true);
+        let create_missing_group = config.create_missing_group;
+        let create_missing_stream = config.create_missing_stream;
 
         CloudwatchLogsSvc {
             headers: config.request.headers,
