@@ -11,8 +11,8 @@ use std::{
     time::Duration,
 };
 
+use crate::schema_gen::{SchemaGenerator, SchemaObject};
 use indexmap::IndexMap;
-use schemars::{gen::SchemaGenerator, schema::SchemaObject};
 use serde_json::{Number, Value};
 use vector_config_common::{attributes::CustomAttribute, validation::Validation};
 

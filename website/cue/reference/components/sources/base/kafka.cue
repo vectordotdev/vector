@@ -262,6 +262,15 @@ base: components: sources: kafka: configuration: {
 			}
 		}
 	}
+	metrics: {
+		description: "Metrics configuration."
+		required:    false
+		type: object: options: topic_lag_metric: {
+			description: "Expose topic lag metrics for all topics and partitions. Metric names are `kafka_consumer_lag`."
+			required:    false
+			type: bool: default: false
+		}
+	}
 	offset_key: {
 		description: """
 			Overrides the name of the log field used to add the offset to each event.

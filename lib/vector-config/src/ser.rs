@@ -4,7 +4,7 @@ use std::{cell::RefCell, marker::PhantomData};
 use serde::{Serialize, Serializer};
 
 use crate::{
-    schemars::{gen::SchemaGenerator, schema::SchemaObject},
+    schema_gen::{SchemaGenerator, SchemaObject},
     Configurable, GenerateError, Metadata, ToValue,
 };
 

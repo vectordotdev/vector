@@ -2,10 +2,12 @@
 
 use std::cell::RefCell;
 
-use schemars::{gen::SchemaGenerator, schema::SchemaObject};
 use serde_json::Value;
 
-use crate::{GenerateError, Metadata};
+use crate::{
+    schema_gen::{SchemaGenerator, SchemaObject},
+    GenerateError, Metadata,
+};
 
 /// A type that can be represented in a Vector configuration.
 ///

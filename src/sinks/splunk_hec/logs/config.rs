@@ -35,7 +35,7 @@ use crate::{
 pub struct HecLogsSinkConfig {
     /// Default Splunk HEC token.
     ///
-    /// If an event has a token set in its metadata, it will prevail over the one set here.
+    /// If an event has a token set in its secrets (`splunk_hec_token`), it will prevail over the one set here.
     #[serde(alias = "token")]
     pub default_token: SensitiveString,
 

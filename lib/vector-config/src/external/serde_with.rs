@@ -5,7 +5,7 @@ use vector_config_common::attributes::CustomAttribute;
 use crate::{
     num::NumberClass,
     schema::generate_number_schema,
-    schemars::{gen::SchemaGenerator, schema::SchemaObject},
+    schema_gen::{SchemaGenerator, SchemaObject},
     Configurable, GenerateError, Metadata,
 };
 

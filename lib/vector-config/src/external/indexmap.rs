@@ -5,7 +5,7 @@ use serde_json::Value;
 
 use crate::{
     schema::{assert_string_schema_for_map, generate_map_schema, generate_set_schema},
-    schemars::{gen::SchemaGenerator, schema::SchemaObject},
+    schema_gen::{SchemaGenerator, SchemaObject},
     str::ConfigurableString,
     Configurable, GenerateError, Metadata, ToValue,
 };
