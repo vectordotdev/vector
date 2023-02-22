@@ -25,7 +25,7 @@ use crate::{
     sinks::{util::retries::ExponentialBackoff, Healthcheck},
 };
 
-use super::{net_error::*, HostAndPort, NetError};
+use super::{net_error::*, HostAndPort, NetError, ServiceState};
 
 /// `TcpConnector` configuration.
 #[configurable_component]
@@ -151,34 +151,16 @@ impl TcpConnector {
     }
 }
 
-enum TcpServiceState {
-    /// The service is currently disconnected.
-    Disconnected,
-
-    /// The service is currently attempting to connect to the endpoint.
-    Connecting(BoxFuture<'static, TcpStream>),
-
-    /// The service is connected and idle.
-    Connected(TcpStream),
-
-    /// The service has an in-flight send to the stream.
-    ///
-    /// If the stream experiences an unrecoverable error during the send, `None` will be returned
-    /// over the channel to signal the need to establish a new connection rather than reusing the
-    /// existing connection.
-    Sending(oneshot::Receiver<Option<TcpStream>>),
-}
-
 pub struct TcpService {
     connector: TcpConnector,
-    state: TcpServiceState,
+    state: ServiceState<TcpStream>,
 }
 
 impl TcpService {
     const fn new(connector: TcpConnector) -> Self {
         Self {
             connector,
-            state: TcpServiceState::Disconnected,
+            state: ServiceState::Disconnected,
         }
     }
 }
@@ -191,24 +173,24 @@ impl Service<Vec<u8>> for TcpService {
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         loop {
             self.state = match &mut self.state {
-                TcpServiceState::Disconnected => {
+                ServiceState::Disconnected => {
                     let connector = self.connector.clone();
-                    TcpServiceState::Connecting(Box::pin(async move {
-                        connector.connect_backoff().await
-                    }))
+                    ServiceState::Connecting(Box::pin(
+                        async move { connector.connect_backoff().await },
+                    ))
                 }
-                TcpServiceState::Connecting(fut) => {
+                ServiceState::Connecting(fut) => {
                     let stream = ready!(fut.poll_unpin(cx));
-                    TcpServiceState::Connected(stream)
+                    ServiceState::Connected(stream)
                 }
-                TcpServiceState::Connected(_) => break,
-                TcpServiceState::Sending(fut) => {
+                ServiceState::Connected(_) => break,
+                ServiceState::Sending(fut) => {
                     match ready!(fut.poll_unpin(cx)) {
                         // When a send concludes, and there's an error, the request future sends
                         // back `None`. Otherwise, it'll send back `Some(...)` with the stream.
                         Ok(maybe_stream) => match maybe_stream {
-                            Some(stream) => TcpServiceState::Connected(stream),
-                            None => TcpServiceState::Disconnected,
+                            Some(stream) => ServiceState::Connected(stream),
+                            None => ServiceState::Disconnected,
                         },
                         Err(_) => return Poll::Ready(Err(NetError::ServiceSocketChannelClosed)),
                     }
@@ -221,8 +203,8 @@ impl Service<Vec<u8>> for TcpService {
     fn call(&mut self, buf: Vec<u8>) -> Self::Future {
         let (tx, rx) = oneshot::channel();
 
-        let mut stream = match std::mem::replace(&mut self.state, TcpServiceState::Sending(rx)) {
-            TcpServiceState::Connected(stream) => stream,
+        let mut stream = match std::mem::replace(&mut self.state, ServiceState::Sending(rx)) {
+            ServiceState::Connected(stream) => stream,
             _ => panic!("poll_ready must be called first"),
         };
 

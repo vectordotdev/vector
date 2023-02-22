@@ -88,7 +88,7 @@ impl UnixConnectorConfig {
     }
 }
 
-enum UnixEither {
+pub(super) enum UnixEither {
     Datagram(UnixDatagram),
     Stream(UnixStream),
 }
