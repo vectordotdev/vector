@@ -43,15 +43,6 @@ impl Schema {
     /// Converts the given schema (if it is a boolean schema) into an equivalent schema object.
     ///
     /// If the given schema is already a schema object, this has no effect.
-    ///
-    /// # Example
-    /// ```
-    /// use schemars::schema::{Schema, SchemaObject};
-    ///
-    /// let bool_schema = Schema::Bool(true);
-    ///
-    /// assert_eq!(bool_schema.into_object(), SchemaObject::default());
-    /// ```
     pub fn into_object(self) -> SchemaObject {
         match self {
             Schema::Object(o) => o,
