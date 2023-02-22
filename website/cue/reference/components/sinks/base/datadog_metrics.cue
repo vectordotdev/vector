@@ -61,9 +61,9 @@ base: components: sinks: datadog_metrics: configuration: {
 	}
 	default_api_key: {
 		description: """
-			The default Datadog [API key][api_key] to send metrics with.
+			The default Datadog [API key][api_key] to use in authentication of HTTP requests.
 
-			If a metric has a Datadog [API key][api_key] set explicitly in its metadata, it will take
+			If an event has a Datadog [API key][api_key] set explicitly in its metadata, it will take
 			precedence over this setting.
 
 			[api_key]: https://docs.datadoghq.com/api/?lang=bash#authentication
@@ -83,7 +83,7 @@ base: components: sinks: datadog_metrics: configuration: {
 	}
 	endpoint: {
 		description: """
-			The endpoint to send metrics to.
+			The endpoint to send observability data to.
 
 			The endpoint must contain an HTTP scheme, and may specify a
 			hostname or IP address and port.
@@ -248,7 +248,7 @@ base: components: sinks: datadog_metrics: configuration: {
 	}
 	site: {
 		description: """
-			The Datadog [site][dd_site] to send metrics to.
+			The Datadog [site][dd_site] to send observability data to.
 
 			[dd_site]: https://docs.datadoghq.com/getting_started/site
 			"""
