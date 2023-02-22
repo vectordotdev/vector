@@ -22,6 +22,7 @@ const TEST_COMMAND: &[&str] = &[
     "run",
     "--no-fail-fast",
     "--no-default-features",
+    "--no-capture",
 ];
 // The upstream container we publish artifacts to on a successful master build.
 const UPSTREAM_IMAGE: &str =

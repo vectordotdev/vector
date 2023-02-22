@@ -63,6 +63,8 @@ pub struct InfluxDbLogsConfig {
     pub endpoint: String,
 
     /// The list of names of log fields that should be added as tags to each measurement.
+    ///
+    /// By default Vector adds `host`, `metric_type`, and `source_type`.
     #[serde(default)]
     #[configurable(metadata(docs::examples = "field1"))]
     #[configurable(metadata(docs::examples = "parent.child_field"))]
@@ -129,8 +131,7 @@ impl GenerateConfig for InfluxDbLogsConfig {
 impl SinkConfig for InfluxDbLogsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let measurement = self.get_measurement()?;
-        let mut tags: HashSet<String> = self.tags.clone().into_iter().collect();
-        tags.replace("metric_type".to_string());
+        let tags: HashSet<String> = self.tags.clone().into_iter().collect();
 
         let tls_settings = TlsSettings::from_options(&self.tls)?;
         let client = HttpClient::new(tls_settings, cx.proxy())?;
@@ -177,6 +178,7 @@ impl SinkConfig for InfluxDbLogsConfig {
 
     fn input(&self) -> Input {
         let requirements = schema::Requirement::empty()
+            .optional_meaning("message", Kind::bytes())
             .optional_meaning("host", Kind::bytes())
             .optional_meaning("timestamp", Kind::timestamp());
 
@@ -196,11 +198,8 @@ struct InfluxDbLogsEncoder {
 }
 
 impl HttpEventEncoder<BytesMut> for InfluxDbLogsEncoder {
-    fn encode_event(&mut self, event: Event) -> Option<BytesMut> {
-        let mut log = event.into_log();
-        log.insert("metric_type", "logs".to_string());
+    fn encode_event(&mut self, mut event: Event) -> Option<BytesMut> {
         let mut log = {
-            let mut event = Event::from(log);
             self.transformer.transform(&mut event);
             event.into_log()
         };
@@ -216,9 +215,10 @@ impl HttpEventEncoder<BytesMut> for InfluxDbLogsEncoder {
             self.tags.replace(host_path);
         }
         self.tags.replace(log.source_type_path().to_string());
+        dbg!(log.clone());
 
         // Tags + Fields
-        let mut tags = MetricTags::default();
+        let mut tags = MetricTags::from([("metric_type".to_string(), "logs".to_string())]);
         let mut fields: HashMap<String, Field> = HashMap::new();
         log.convert_to_fields().for_each(|(key, value)| {
             if self.tags.contains(&key) {
@@ -781,7 +781,11 @@ mod tests {
 #[cfg(test)]
 mod integration_tests {
     use chrono::Utc;
+    use codecs::BytesDeserializerConfig;
     use futures::stream;
+    use lookup::{owned_value_path, path};
+    use std::sync::Arc;
+    use vector_core::config::{LegacyKey, LogNamespace};
     use vector_core::event::{BatchNotifier, BatchStatus, Event, LogEvent};
 
     use super::*;
@@ -800,7 +804,8 @@ mod integration_tests {
         let endpoint = address_v2();
         onboarding_v2(&endpoint).await;
 
-        let measure = format!("vector-{}", Utc::now().timestamp_nanos());
+        let now = Utc::now();
+        let measure = format!("vector-{}", now.timestamp_nanos());
 
         let cx = SinkContext::new_test();
 
@@ -834,9 +839,38 @@ mod integration_tests {
         event2.insert("host", "aws.cloud.eur");
         event2.insert("source_type", "file");
 
+        let mut namespaced_log =
+            LogEvent::from(vrl::value!("namespaced message")).with_batch_notifier(&batch);
+        LogNamespace::Vector.insert_source_metadata(
+            "file",
+            &mut namespaced_log,
+            Some(LegacyKey::Overwrite(path!("host"))),
+            path!("host"),
+            "aws.cloud.eur",
+        );
+        LogNamespace::Vector.insert_standard_vector_source_metadata(
+            &mut namespaced_log,
+            "file",
+            now,
+        );
+        let schema = BytesDeserializerConfig
+            .schema_definition(LogNamespace::Vector)
+            .with_metadata_field(
+                &owned_value_path!("file", "host"),
+                Kind::bytes(),
+                Some("host"),
+            );
+        namespaced_log
+            .metadata_mut()
+            .set_schema_definition(&Arc::new(schema));
+
         drop(batch);
 
-        let events = vec![Event::Log(event1), Event::Log(event2)];
+        let events = vec![
+            Event::Log(namespaced_log),
+            Event::Log(event1),
+            Event::Log(event2),
+        ];
 
         run_and_assert_sink_compliance(sink, stream::iter(events), &HTTP_SINK_TAGS).await;
 
