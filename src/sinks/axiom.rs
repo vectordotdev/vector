@@ -157,7 +157,7 @@ mod integration_tests {
     async fn axiom_logs_put_data() {
         let client = reqwest::Client::new();
         let url = env::var("AXIOM_URL").unwrap();
-        let token = env::var("AXIOM_TOKEN").unwrap();
+        let token = env::var("AXIOM_TOKEN").expect("AXIOM_TOKEN environment variable to be set");
         let dataset = env::var("AXIOM_DATASET").unwrap();
 
         let cx = SinkContext::new_test();
