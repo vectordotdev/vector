@@ -12,7 +12,6 @@ use rustyline::{
     error::ReadlineError,
     highlight::{Highlighter, MatchingBracketHighlighter},
     hint::{Hinter, HistoryHinter},
-    history::MemHistory,
     validate::{self, ValidationResult, Validator},
     Context, Editor, Helper,
 };
@@ -62,7 +61,7 @@ pub(crate) fn run(
     let mut state = TypeState::default();
 
     let mut rt = Runtime::new(state::Runtime::default());
-    let mut rl = Editor::<Repl, MemHistory>::new()?;
+    let mut rl = Editor::<Repl>::new()?;
     rl.set_helper(Some(Repl::new()));
 
     #[allow(clippy::print_stdout)]
@@ -84,7 +83,7 @@ pub(crate) fn run(
             // Capture "help docs <func_name>"
             Ok(line) if func_docs_regex.is_match(line) => show_func_docs(line, &func_docs_regex),
             Ok(line) => {
-                rl.add_history_entry(line)?;
+                rl.add_history_entry(line);
 
                 let command = match line {
                     "next" => {

@@ -1,3 +1,5 @@
+use std::cell::RefCell;
+
 use chrono::{DateTime, TimeZone};
 use serde_json::Value;
 
@@ -17,7 +19,7 @@ where
         metadata
     }
 
-    fn generate_schema(_: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
+    fn generate_schema(_: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
         Ok(generate_string_schema())
     }
 }

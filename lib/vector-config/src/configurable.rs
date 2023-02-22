@@ -1,5 +1,7 @@
 #![deny(missing_docs)]
 
+use std::cell::RefCell;
+
 use schemars::{gen::SchemaGenerator, schema::SchemaObject};
 use serde_json::Value;
 
@@ -60,7 +62,7 @@ where
     ///
     /// If an error occurs while generating the schema, an error variant will be returned describing
     /// the issue.
-    fn generate_schema(gen: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError>;
+    fn generate_schema(gen: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError>;
 }
 
 /// A type that can be converted directly to a `serde_json::Value`. This is used when translating

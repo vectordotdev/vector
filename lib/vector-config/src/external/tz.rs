@@ -1,3 +1,5 @@
+use std::cell::RefCell;
+
 use serde_json::Value;
 
 use crate::{
@@ -13,7 +15,7 @@ impl Configurable for chrono_tz::Tz {
         metadata
     }
 
-    fn generate_schema(_: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
+    fn generate_schema(_: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
         Ok(generate_string_schema())
     }
 }
