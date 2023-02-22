@@ -34,6 +34,7 @@ concurrency:
 env:
   AWS_ACCESS_KEY_ID: "dummy"
   AWS_SECRET_ACCESS_KEY: "dummy"
+  AXIOM_TOKEN: ${{ secrets.AXIOM_TOKEN }}
   CONTAINER_TOOL: "docker"
   DD_ENV: "ci"
   DD_API_KEY: ${{ secrets.DD_API_KEY }}
