@@ -338,7 +338,7 @@ windows-service = "0.5.0"
 
 [target.'cfg(unix)'.dependencies]
 atty = { version = "0.2.14", default-features = false }
-nix = { git = "https://github.com/StephenWakely/nix.git", branch = "memfd_create/gnu/musl", default-features = false, features = ["socket", "signal"] }
+nix = { version = "0.26.2", default-features = false, features = ["socket", "signal"] }
 
 [build-dependencies]
 prost-build = { version = "0.11.6", default-features = false, optional = true }
@@ -376,6 +376,7 @@ zstd = { version = "0.12.3", default-features = false }
 chrono = { git = "https://github.com/vectordotdev/chrono.git", branch = "no-default-time-v0.4.22-1" }
 # The upgrade for `tokio-util` >= 0.6.9 is blocked on https://github.com/vectordotdev/vector/issues/11257.
 tokio-util = { git = "https://github.com/vectordotdev/tokio", branch = "tokio-util-0.7.4-framed-read-continue-on-error" }
+nix = { git = "https://github.com/StephenWakely/nix.git", branch = "memfd/gnu/musl" }
 
 [features]
 # Default features for *-unknown-linux-gnu and *-apple-darwin
