@@ -28,7 +28,7 @@ possible data collisions that made calculating the types difficult.
 
 ## How to enable
 
-The global Vector configuration `schema.log_namespace` can be set to `true` to enable the new
+The [global config] `schema.log_namespace` can be set to `true` to enable the new
 Log Namespacing feature for all components. The default is `false`.
 
 Every source also has a `log_namespace` config option. This will override the global setting,
@@ -154,3 +154,4 @@ be used.
 [global log schema]: /docs/reference/configuration/global-options/#log_schema
 [set_semantic_meaning]: /docs/reference/vrl/functions/#set_semantic_meaning
 [remap]: /docs/reference/configuration/transforms/remap/
+[global config]: /docs/reference/configuration/global-options/#log_namespacing
