@@ -279,7 +279,7 @@ impl Configurable for Compression {
         // `none` algorithm as part of the overall set of enum values declared for the `algorithm`
         // field in the "full" schema version.
         let compression_level_schema =
-            get_or_generate_schema(&CompressionLevel::make_ref(), gen, None)?;
+            get_or_generate_schema(&CompressionLevel::as_configurable_ref(), gen, None)?;
 
         let mut required = BTreeSet::new();
         required.insert(ALGORITHM_NAME.to_string());

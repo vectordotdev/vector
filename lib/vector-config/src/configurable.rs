@@ -67,7 +67,7 @@ where
     fn generate_schema(gen: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError>;
 
     /// Create a new configurable reference table.
-    fn make_ref() -> ConfigurableRef
+    fn as_configurable_ref() -> ConfigurableRef
     where
         Self: 'static,
     {

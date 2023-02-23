@@ -68,7 +68,7 @@ where
     }
 
     fn generate_schema(gen: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
-        generate_optional_schema(&T::make_ref(), gen)
+        generate_optional_schema(&T::as_configurable_ref(), gen)
     }
 }
 
@@ -205,7 +205,7 @@ where
     }
 
     fn generate_schema(gen: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
-        generate_array_schema(&T::make_ref(), gen)
+        generate_array_schema(&T::as_configurable_ref(), gen)
     }
 }
 
@@ -237,9 +237,13 @@ where
 
     fn generate_schema(gen: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
         // Make sure our key type is _truly_ a string schema.
-        assert_string_schema_for_map(&K::make_ref(), gen, std::any::type_name::<Self>())?;
+        assert_string_schema_for_map(
+            &K::as_configurable_ref(),
+            gen,
+            std::any::type_name::<Self>(),
+        )?;
 
-        generate_map_schema(&V::make_ref(), gen)
+        generate_map_schema(&V::as_configurable_ref(), gen)
     }
 }
 
@@ -271,7 +275,7 @@ where
     }
 
     fn generate_schema(gen: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
-        generate_set_schema(&V::make_ref(), gen)
+        generate_set_schema(&V::as_configurable_ref(), gen)
     }
 }
 
@@ -303,9 +307,13 @@ where
 
     fn generate_schema(gen: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
         // Make sure our key type is _truly_ a string schema.
-        assert_string_schema_for_map(&K::make_ref(), gen, std::any::type_name::<Self>())?;
+        assert_string_schema_for_map(
+            &K::as_configurable_ref(),
+            gen,
+            std::any::type_name::<Self>(),
+        )?;
 
-        generate_map_schema(&V::make_ref(), gen)
+        generate_map_schema(&V::as_configurable_ref(), gen)
     }
 }
 
@@ -337,7 +345,7 @@ where
     }
 
     fn generate_schema(gen: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
-        generate_set_schema(&V::make_ref(), gen)
+        generate_set_schema(&V::as_configurable_ref(), gen)
     }
 }
 

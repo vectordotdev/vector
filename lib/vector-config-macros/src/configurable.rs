@@ -131,7 +131,7 @@ fn build_virtual_newtype_schema_fn(virtual_ty: Type) -> proc_macro2::TokenStream
     quote! {
         fn generate_schema(schema_gen: &::std::cell::RefCell<::vector_config::schema_gen::SchemaGenerator>) -> std::result::Result<::vector_config::schema_gen::SchemaObject, ::vector_config::GenerateError> {
             ::vector_config::schema::get_or_generate_schema(
-                &<#virtual_ty as ::vector_config::Configurable>::make_ref(),
+                &<#virtual_ty as ::vector_config::Configurable>::as_configurable_ref(),
                 schema_gen,
                 None,
             )
@@ -177,7 +177,7 @@ fn generate_struct_field(field: &Field<'_>) -> proc_macro2::TokenStream {
 
     let spanned_generate_schema = quote_spanned! {field.span()=>
         ::vector_config::schema::get_or_generate_schema(
-            &<#field_schema_ty as ::vector_config::Configurable>::make_ref(),
+            &<#field_schema_ty as ::vector_config::Configurable>::as_configurable_ref(),
             schema_gen,
             Some(#field_metadata_ref),
         )?

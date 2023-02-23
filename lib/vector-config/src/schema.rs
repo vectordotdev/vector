@@ -14,7 +14,7 @@ use crate::{
 /// Metadata can include semantic information (title, description, etc), validation (min/max, allowable
 /// patterns, etc), as well as actual arbitrary key/value data.
 pub fn apply_base_metadata(schema: &mut SchemaObject, metadata: Metadata) {
-    apply_metadata(&<()>::make_ref(), schema, metadata)
+    apply_metadata(&<()>::as_configurable_ref(), schema, metadata)
 }
 
 fn apply_metadata(config: &ConfigurableRef, schema: &mut SchemaObject, metadata: Metadata) {
@@ -468,7 +468,8 @@ where
 
     let schema_gen = RefCell::new(SchemaSettings::new().into_generator());
 
-    let schema = get_or_generate_schema(&T::make_ref(), &schema_gen, Some(T::metadata()))?;
+    let schema =
+        get_or_generate_schema(&T::as_configurable_ref(), &schema_gen, Some(T::metadata()))?;
 
     Ok(schema_gen.into_inner().into_root_schema(schema))
 }
