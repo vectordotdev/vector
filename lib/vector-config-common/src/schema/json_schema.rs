@@ -430,6 +430,12 @@ pub struct ArrayValidation {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub additional_items: Option<Box<Schema>>,
 
+    /// The `unevaluatedItems` keyword.
+    ///
+    /// See [JSON Schema 9.3.1.3. "unevaluatedItems"](https://tools.ietf.org/html/draft-handrews-json-schema-02#section-9.3.1.3).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub unevaluated_items: Option<Box<Schema>>,
+
     /// The `maxItems` keyword.
     ///
     /// See [JSON Schema Validation 6.4.1. "maxItems"](https://tools.ietf.org/html/draft-handrews-json-schema-validation-02#section-6.4.1).
@@ -494,6 +500,12 @@ pub struct ObjectValidation {
     /// See [JSON Schema 9.3.2.3. "additionalProperties"](https://tools.ietf.org/html/draft-handrews-json-schema-02#section-9.3.2.3).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub additional_properties: Option<Box<Schema>>,
+
+    /// The `unevaluatedProperties` keyword.
+    ///
+    /// See [JSON Schema 9.3.2.4. "unevaluatedProperties"](https://tools.ietf.org/html/draft-handrews-json-schema-02#section-9.3.2.4).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub unevaluated_properties: Option<Box<Schema>>,
 
     /// The `propertyNames` keyword.
     ///
