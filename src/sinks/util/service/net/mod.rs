@@ -11,7 +11,7 @@ pub use self::unix::{UnixConnector, UnixConnectorConfig, UnixMode};
 
 use futures_util::{future::BoxFuture, FutureExt};
 use snafu::{Snafu, ResultExt};
-use tokio::{sync::oneshot, net::{TcpStream, UdpSocket}};
+use tokio::{sync::oneshot, net::{TcpStream, UdpSocket}, io::AsyncWriteExt};
 use tower::Service;
 use vector_config::configurable_component;
 
@@ -127,6 +127,36 @@ impl NetworkConnection {
                 .map(|()| buf.len()),
             Self::Udp(socket) => socket.send(buf).await,
             Self::Unix(socket) => socket.send(buf).await,
+        }
+    }
+}
+
+pub enum NetworkConnector {
+    Tcp(TcpConnector),
+    Udp(UdpConnector),
+    Unix(UnixConnector),
+}
+
+impl NetworkConnector {
+    async fn connect_backoff(&self) -> NetworkConnection {
+        // TODO: Make this configurable.
+        let mut backoff = ExponentialBackoff::from_millis(2)
+            .factor(250)
+            .max_delay(Duration::from_secs(60));
+
+        loop {
+            match self.connect().await {
+                Ok((addr, stream)) => {
+                    emit!(TcpSocketConnectionEstablished {
+                        peer_addr: Some(addr)
+                    });
+                    return stream;
+                }
+                Err(error) => {
+                    emit!(TcpSocketOutgoingConnectionError { error });
+                    sleep(backoff.next().unwrap()).await;
+                }
+            }
         }
     }
 }
