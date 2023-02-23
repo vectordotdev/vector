@@ -9,14 +9,14 @@ use crate::{
     num::ConfigurableNumber, Configurable, ConfigurableRef, GenerateError, Metadata, ToValue,
 };
 
-pub fn apply_base_metadata(schema: &mut SchemaObject, metadata: Metadata) {
-    apply_metadata(&<()>::make_ref(), schema, metadata)
-}
-
 /// Applies metadata to the given schema.
 ///
 /// Metadata can include semantic information (title, description, etc), validation (min/max, allowable
 /// patterns, etc), as well as actual arbitrary key/value data.
+pub fn apply_base_metadata(schema: &mut SchemaObject, metadata: Metadata) {
+    apply_metadata(&<()>::make_ref(), schema, metadata)
+}
+
 fn apply_metadata(config: &ConfigurableRef, schema: &mut SchemaObject, metadata: Metadata) {
     let type_name = config.type_name();
     let base_metadata = config.make_metadata();
@@ -25,12 +25,12 @@ fn apply_metadata(config: &ConfigurableRef, schema: &mut SchemaObject, metadata:
     //
     // If the given `metadata` has either a title or description present, we use both those values,
     // even if one of them is `None`. If both are `None`, we try falling back to the base metadata
-    // for `T`.
+    // for the configurable type.
     //
     // This ensures that per-field titles/descriptions can override the base title/description of
-    // `T`, without mixing and matching, as sometimes the base type's title/description is far too
-    // generic and muddles the output. Essentially, if the callsite decides to provide an overridden
-    // title/description, it controls the entire title/description.
+    // the type, without mixing and matching, as sometimes the base type's title/description is far
+    // too generic and muddles the output. Essentially, if the callsite decides to provide an
+    // overridden title/description, it controls the entire title/description.
     let (schema_title, schema_description) =
         if metadata.title().is_some() || metadata.description().is_some() {
             (metadata.title(), metadata.description())
@@ -41,7 +41,7 @@ fn apply_metadata(config: &ConfigurableRef, schema: &mut SchemaObject, metadata:
     // A description _must_ be present, one way or another, _unless_ one of these two conditions is
     // met:
     // - the field is marked transparent
-    // - `T` is referenceable and _does_ have a description
+    // - the type is referenceable and _does_ have a description
     //
     // We panic otherwise.
     let has_referenceable_description =
@@ -304,11 +304,11 @@ pub(crate) fn generate_optional_schema(
     //     type already uses that mechanism
     //   - create our own `oneOf` schema to map between either the "null" schema or the real schema
 
-    // Generate the inner schema for `T` We'll add some override metadata, too, so that we can mark
-    // this resulting schema as "optional". This is only consequential to documentation generation
-    // so that some of the more complex code for parsing enum schemas can correctly differentiate a
-    // `oneOf` schema that represents a Rust enum versus one that simply represents our "null or X"
-    // wrapped schema.
+    // Generate the inner schema for the inner type. We'll add some override metadata, too, so that
+    // we can mark this resulting schema as "optional". This is only consequential to documentation
+    // generation so that some of the more complex code for parsing enum schemas can correctly
+    // differentiate a `oneOf` schema that represents a Rust enum versus one that simply represents
+    // our "null or X" wrapped schema.
     let mut overrides = Metadata::default();
     overrides.add_custom_attribute(CustomAttribute::flag("docs::optional"));
     let mut schema = get_or_generate_schema(config, gen, Some(overrides))?;
@@ -480,9 +480,9 @@ pub fn get_or_generate_schema(
 ) -> Result<SchemaObject, GenerateError> {
     let metadata = config.make_metadata();
     let (mut schema, metadata) = match &config.referenceable_name() {
-        // When `T` has a referenceable name, try looking it up in the schema generator's definition
-        // list, and if it exists, create a schema reference to it. Otherwise, generate it and
-        // backfill it in the schema generator.
+        // When the configurable type has a referenceable name, try looking it up in the schema
+        // generator's definition list, and if it exists, create a schema reference to
+        // it. Otherwise, generate it and backfill it in the schema generator.
         Some(name) => {
             // Creating a string just to borrow it is ugly, but that's required by the types in the
             // schema generator definitions.
@@ -496,15 +496,16 @@ pub fn get_or_generate_schema(
                     .definitions_mut()
                     .insert(name.to_string(), Schema::Bool(false));
 
-                // We generate the schema for `T` with its own default metadata, and not the
+                // We generate the schema for the type with its own default metadata, and not the
                 // override metadata passed into this method, because the override metadata might
-                // only be relevant to the place that `T` is being used.
+                // only be relevant to the place that the type is being used.
                 //
-                // For example, if `T` was something for setting the logging level, one component
-                // that allows the logging level to be changed for that component specifically might
-                // want to specify a default value, whereas `T` should not have a default at all..
-                // so if we applied that override metadata, we'd be unwittingly applying a default
-                // for all usages of `T` that didn't override the default themselves.
+                // For example, if the type was something for setting the logging level, one
+                // component that allows the logging level to be changed for that component
+                // specifically might want to specify a default value, whereas the configurable
+                // should not have a default at all.  So, if we applied that override metadata, we'd
+                // be unwittingly applying a default for all usages of the type that didn't override
+                // the default themselves.
                 let mut schema = config.generate_schema(gen)?;
                 apply_metadata(config, &mut schema, metadata);
 
@@ -515,20 +516,20 @@ pub fn get_or_generate_schema(
 
             (get_schema_ref(gen, name), None)
         }
-        // Always generate the schema directly if `T` is not referenceable.
+        // Always generate the schema directly if the type is not referenceable.
         None => (config.generate_schema(gen)?, Some(metadata)),
     };
 
     // Figure out what metadata we should apply to the resulting schema.
     //
-    // If `T` was referenceable, we use its implicit metadata when generating the
+    // If the type was referenceable, we use its implicit metadata when generating the
     // "baseline" schema, because a referenceable type should always be self-contained. We then
     // apply the override metadata, if it exists, to the schema we got back. This allows us to
     // override titles, descriptions, and add additional attributes, and so on.
     //
-    // If `T` was not referenceable, we only generate its schema without trying to apply any
+    // If the type was not referenceable, we only generate its schema without trying to apply any
     // metadata. We do that because applying schema metadata enforces logic like "can't be without a
-    // description". The implicit metadata for `T` may lack that.
+    // description". The implicit metadata for the type may lack that.
     if let Some(overrides) = overrides.as_ref() {
         config.validate_metadata(overrides)?;
     }
