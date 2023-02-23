@@ -12,25 +12,33 @@ remap: functions: set_semantic_meaning: {
 
 	arguments: [
 		{
-			name: "key"
+			name: "target"
 			description: """
-				The name of the secret.
+				The path of the value that will be assigned a meaning.
 				"""
 			required: true
-			type: ["string"]
+			type: ["path"]
+		},
+		{
+			name: "meaning"
+			description: """
+				The name of the meaning to assign.
+				"""
+			required: true
+			type: ["path"]
 		},
 	]
 	internal_failure_reasons: [
 	]
-	return: types: ["string"]
+	return: types: ["null"]
 
 	examples: [
 		{
-			title: "Get the Datadog API key from the event metadata."
+			title: "Sets custom field semantic meaning"
 			source: #"""
-				get_secret("datadog_api_key")
+				set_semantic_meaning(.foo, "bar")
 				"""#
-			return: "secret value"
+			return: "null"
 		},
 	]
 }

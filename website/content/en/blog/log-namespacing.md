@@ -1,12 +1,12 @@
 ---
 title: Log Namespacing. Changing Vector's data model.
 short: Log Namespacing
-description: Improving reliability and performance across your entire observability infrastructure
+description: Introducing log namespacing.
 authors: ["fuchsnj"]
 date: "2023-??-??"
 badges:
   type: announcement
-  domains: ["data model"]
+  domains: ["log namespacing"]
 tags: []
 ---
 
@@ -60,7 +60,7 @@ encoding.codec = "json"
 
 ```
 
-## Features
+## How It Works
 
 
 ### Data Layout
@@ -99,6 +99,12 @@ When enabled, the layout of this data is well-defined and consistent.
 Event Data (and _only_ Event Data) is placed at the root of the event (eg: `.`).
 Source metadata is placed in event metadata, prefixed by the source name. (eg: `%datadog_agent`)
 Vector metadata is placed in event metadata, prefixed by `vector`. (eg: `%vector`)
+
+Generally sinks will only send the event data. If you want to include any metadata fields,
+it's recommended to use a [remap] transform to add data to the event as needed.
+
+It's important to note that previously the type of an event (`.`) would always be an object
+with fields. Now it is possible for event to be any type, such as a string.
 
 Example event from the `datadog agent logs` source. (same data as the example above)
 
@@ -145,7 +151,6 @@ a meaning needs to be manually adjusted for any reason, the VRL function [set_se
 be used.
 
 
-
-
 [global log schema]: /docs/reference/configuration/global-options/#log_schema
 [set_semantic_meaning]: /docs/reference/vrl/functions/#set_semantic_meaning
+[remap]: /docs/reference/configuration/transforms/remap/
