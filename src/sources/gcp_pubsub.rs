@@ -25,7 +25,7 @@ use vector_common::internal_event::{
     ByteSize, BytesReceived, EventsReceived, InternalEventHandle as _, Protocol, Registered,
 };
 use vector_common::{byte_size_of::ByteSizeOf, finalizer::UnorderedFinalizer};
-use vector_config::{configurable_component, NamedComponent};
+use vector_config::configurable_component;
 use vector_core::config::{LegacyKey, LogNamespace};
 
 use crate::{
@@ -735,7 +735,7 @@ impl Future for Task {
 
 #[cfg(test)]
 mod tests {
-    use lookup::LookupBuf;
+    use lookup::OwnedTargetPath;
     use vector_core::schema::Definition;
 
     use super::*;
@@ -759,23 +759,31 @@ mod tests {
 
         let expected_definition =
             Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
-                .with_meaning(LookupBuf::root(), "message")
-                .with_metadata_field(&owned_value_path!("vector", "source_type"), Kind::bytes())
+                .with_meaning(OwnedTargetPath::event_root(), "message")
+                .with_metadata_field(
+                    &owned_value_path!("vector", "source_type"),
+                    Kind::bytes(),
+                    None,
+                )
                 .with_metadata_field(
                     &owned_value_path!("vector", "ingest_timestamp"),
                     Kind::timestamp(),
+                    None,
                 )
                 .with_metadata_field(
                     &owned_value_path!("gcp_pubsub", "timestamp"),
                     Kind::timestamp().or_undefined(),
+                    Some("timestamp"),
                 )
                 .with_metadata_field(
                     &owned_value_path!("gcp_pubsub", "attributes"),
                     Kind::object(Collection::empty().with_unknown(Kind::bytes())),
+                    None,
                 )
                 .with_metadata_field(
                     &owned_value_path!("gcp_pubsub", "message_id"),
                     Kind::bytes(),
+                    None,
                 );
 
         assert_eq!(definition, expected_definition);

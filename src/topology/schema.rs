@@ -338,6 +338,7 @@ mod tests {
     use std::collections::HashMap;
 
     use indexmap::IndexMap;
+    use lookup::lookup_v2::parse_target_path;
     use lookup::owned_value_path;
     use similar_asserts::assert_eq;
     use value::Kind;
@@ -450,7 +451,7 @@ mod tests {
                             Kind::integer().or_bytes().or_timestamp(),
                             Some("foo bar"),
                         )
-                        .with_meaning("foo", "baz qux"),
+                        .with_meaning(parse_target_path("foo").unwrap(), "baz qux"),
                 },
             ),
         ]) {

@@ -100,6 +100,7 @@ components: sources: kafka: {
 		kafka_produced_messages_bytes_total:  components.sources.internal_metrics.output.metrics.kafka_produced_messages_bytes_total
 		kafka_consumed_messages_total:        components.sources.internal_metrics.output.metrics.kafka_consumed_messages_total
 		kafka_consumed_messages_bytes_total:  components.sources.internal_metrics.output.metrics.kafka_consumed_messages_bytes_total
+		kafka_consumer_lag:                   components.sources.internal_metrics.output.metrics.kafka_consumer_lag
 		processed_bytes_total:                components.sources.internal_metrics.output.metrics.processed_bytes_total
 		processed_events_total:               components.sources.internal_metrics.output.metrics.processed_events_total
 		component_discarded_events_total:     components.sources.internal_metrics.output.metrics.component_discarded_events_total

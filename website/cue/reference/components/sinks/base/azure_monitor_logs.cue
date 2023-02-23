@@ -34,7 +34,7 @@ base: components: sinks: azure_monitor_logs: configuration: {
 			[resource_id]: https://docs.microsoft.com/en-us/azure/azure-monitor/platform/data-collector-api#request-headers
 			"""
 		required: false
-		type: string: {}
+		type: string: examples: ["/subscriptions/11111111-1111-1111-1111-111111111111/resourceGroups/otherResourceGroup/providers/Microsoft.Storage/storageAccounts/examplestorage", "/subscriptions/11111111-1111-1111-1111-111111111111/resourceGroups/examplegroup/providers/Microsoft.SQL/servers/serverName/databases/databaseName"]
 	}
 	batch: {
 		description: "Event batching behavior."
@@ -75,7 +75,7 @@ base: components: sinks: azure_monitor_logs: configuration: {
 			[uniq_id]: https://docs.microsoft.com/en-us/azure/azure-monitor/platform/data-collector-api#request-uri-parameters
 			"""
 		required: true
-		type: string: {}
+		type: string: examples: ["5ce893d9-2c32-4b6c-91a9-b0887c2de2d6", "97ce69d9-b4be-4241-8dbd-d265edcf06c4"]
 	}
 	encoding: {
 		description: "Transformations to prepare an event for serialization."
@@ -108,7 +108,10 @@ base: components: sinks: azure_monitor_logs: configuration: {
 			[alt_host]: https://docs.azure.cn/en-us/articles/guidance/developerdifferences#check-endpoints-in-azure
 			"""
 		required: false
-		type: string: default: "ods.opinsights.azure.com"
+		type: string: {
+			default: "ods.opinsights.azure.com"
+			examples: ["ods.opinsights.azure.us", "ods.opinsights.azure.cn"]
+		}
 	}
 	log_type: {
 		description: """
@@ -119,7 +122,7 @@ base: components: sinks: azure_monitor_logs: configuration: {
 			[record_type]: https://docs.microsoft.com/en-us/azure/azure-monitor/platform/data-collector-api#request-headers
 			"""
 		required: true
-		type: string: {}
+		type: string: examples: ["MyTableName", "MyRecordType"]
 	}
 	request: {
 		description: """
@@ -271,7 +274,7 @@ base: components: sinks: azure_monitor_logs: configuration: {
 			[shared_key]: https://docs.microsoft.com/en-us/azure/azure-monitor/platform/data-collector-api#authorization
 			"""
 		required: true
-		type: string: {}
+		type: string: examples: ["SERsIYhgMVlJB6uPsq49gCxNiruf6v0vhMYE+lfzbSGcXjdViZdV/e5pEMTYtw9f8SkVLf4LFlLCc2KxtRZfCA==", "${AZURE_MONITOR_SHARED_KEY_ENV_VAR}"]
 	}
 	tls: {
 		description: "TLS configuration."

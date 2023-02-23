@@ -3,7 +3,6 @@ use std::num::NonZeroUsize;
 use bytes::{Bytes, BytesMut};
 use rdkafka::message::{Header, OwnedHeaders};
 use tokio_util::codec::Encoder as _;
-use vector_core::config::LogSchema;
 
 use crate::{
     codecs::{Encoder, Transformer},
@@ -22,7 +21,6 @@ pub struct KafkaRequestBuilder {
     pub topic_template: Template,
     pub transformer: Transformer,
     pub encoder: Encoder<()>,
-    pub log_schema: &'static LogSchema,
 }
 
 impl KafkaRequestBuilder {
@@ -44,7 +42,7 @@ impl KafkaRequestBuilder {
         let metadata = KafkaRequestMetadata {
             finalizers: event.take_finalizers(),
             key: get_key(&event, &self.key_field),
-            timestamp_millis: get_timestamp_millis(&event, self.log_schema),
+            timestamp_millis: get_timestamp_millis(&event),
             headers: get_headers(&event, &self.headers_key),
             topic,
         };
@@ -77,12 +75,9 @@ fn get_key(event: &Event, key_field: &Option<String>) -> Option<Bytes> {
     })
 }
 
-fn get_timestamp_millis(event: &Event, log_schema: &'static LogSchema) -> Option<i64> {
+fn get_timestamp_millis(event: &Event) -> Option<i64> {
     match &event {
-        Event::Log(log) => log
-            .get(log_schema.timestamp_key())
-            .and_then(|v| v.as_timestamp())
-            .copied(),
+        Event::Log(log) => log.get_timestamp().and_then(|v| v.as_timestamp()).copied(),
         Event::Metric(metric) => metric.timestamp(),
         _ => None,
     }

@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 #[allow(unused_imports)]
 use std::collections::HashSet;
 
@@ -59,49 +60,61 @@ enum BuildError {
 pub enum Transforms {
     /// Aggregate metrics passing through a topology.
     #[cfg(feature = "transforms-aggregate")]
+    #[configurable(metadata(docs::label = "Aggregate"))]
     Aggregate(aggregate::AggregateConfig),
 
     /// Parse metadata emitted by AWS EC2 instances.
     #[cfg(feature = "transforms-aws_ec2_metadata")]
+    #[configurable(metadata(docs::label = "AWS EC2 Metadata"))]
     AwsEc2Metadata(aws_ec2_metadata::Ec2Metadata),
 
     /// Deduplicate logs passing through a topology.
     #[cfg(feature = "transforms-dedupe")]
+    #[configurable(metadata(docs::label = "Dedupe"))]
     Dedupe(dedupe::DedupeConfig),
 
     /// Filter events based on a set of conditions.
     #[cfg(feature = "transforms-filter")]
+    #[configurable(metadata(docs::label = "Filter"))]
     Filter(filter::FilterConfig),
 
     /// Convert log events to metric events.
+    #[configurable(metadata(docs::label = "Log To Metric"))]
     LogToMetric(log_to_metric::LogToMetricConfig),
 
     /// Modify event data using the Lua programming language.
     #[cfg(feature = "transforms-lua")]
+    #[configurable(metadata(docs::label = "Lua"))]
     Lua(lua::LuaConfig),
 
     /// Convert metric events to log events.
     #[cfg(feature = "transforms-metric_to_log")]
+    #[configurable(metadata(docs::label = "Metric To Log"))]
     MetricToLog(metric_to_log::MetricToLogConfig),
 
     /// Collapse multiple log events into a single event based on a set of conditions and merge strategies.
     #[cfg(feature = "transforms-reduce")]
+    #[configurable(metadata(docs::label = "Reduce"))]
     Reduce(reduce::ReduceConfig),
 
     /// Modify your observability data as it passes through your topology using Vector Remap Language (VRL).
     #[cfg(feature = "transforms-remap")]
+    #[configurable(metadata(docs::label = "Remap"))]
     Remap(remap::RemapConfig),
 
     /// Split a stream of events into multiple sub-streams based on user-supplied conditions.
     #[cfg(feature = "transforms-route")]
+    #[configurable(metadata(docs::label = "Route"))]
     Route(route::RouteConfig),
 
     /// Sample events from an event stream based on supplied criteria and at a configurable rate.
     #[cfg(feature = "transforms-sample")]
+    #[configurable(metadata(docs::label = "Sample"))]
     Sample(sample::SampleConfig),
 
     /// Limit the cardinality of tags on metrics events as a safeguard against cardinality explosion.
     #[cfg(feature = "transforms-tag_cardinality_limit")]
+    #[configurable(metadata(docs::label = "Tag Cardinality Limit"))]
     TagCardinalityLimit(tag_cardinality_limit::TagCardinalityLimitConfig),
 
     /// Test (basic).
@@ -114,13 +127,12 @@ pub enum Transforms {
 
     /// Rate limit logs passing through a topology.
     #[cfg(feature = "transforms-throttle")]
+    #[configurable(metadata(docs::label = "Throttle"))]
     Throttle(throttle::ThrottleConfig),
 }
 
-// We can't use `enum_dispatch` here because it doesn't support associated constants.
+// TODO: Use `enum_dispatch` here.
 impl NamedComponent for Transforms {
-    const NAME: &'static str = "_invalid_usage";
-
     fn get_component_name(&self) -> &'static str {
         match self {
             #[cfg(feature = "transforms-aggregate")]

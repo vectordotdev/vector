@@ -16,7 +16,6 @@ use crate::{
     SourceSender,
 };
 use codecs::decoding::DeserializerConfig;
-use vector_config::NamedComponent;
 use vector_core::config::log_schema;
 
 use super::{

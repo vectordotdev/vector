@@ -75,6 +75,7 @@ pub struct KinesisStreamsSinkConfig {
     /// The log field used as the Kinesis record’s partition key value.
     ///
     /// If not specified, a unique partition key will be generated for each Kinesis record.
+    #[configurable(metadata(docs::examples = "user_id"))]
     pub partition_key_field: Option<String>,
 
     #[configurable(derived)]
@@ -114,7 +115,7 @@ impl KinesisStreamsSinkConfig {
         create_client::<KinesisClientBuilder>(
             &self.base.auth,
             self.base.region.region(),
-            self.base.region.endpoint()?,
+            self.base.region.endpoint(),
             proxy,
             &self.base.tls,
             true,
