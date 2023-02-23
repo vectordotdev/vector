@@ -65,6 +65,14 @@ where
     /// If an error occurs while generating the schema, an error variant will be returned describing
     /// the issue.
     fn generate_schema(gen: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError>;
+
+    /// Create a new configurable reference table.
+    fn as_configurable_ref() -> ConfigurableRef
+    where
+        Self: 'static,
+    {
+        ConfigurableRef::new::<Self>()
+    }
 }
 
 /// A type that can be converted directly to a `serde_json::Value`. This is used when translating
@@ -72,4 +80,50 @@ where
 pub trait ToValue {
     /// Convert this value into a `serde_json::Value`. Must not fail.
     fn to_value(&self) -> Value;
+}
+
+/// A pseudo-reference to a type that can be represented in a Vector configuration. This is
+/// composed of references to all the class trait functions.
+pub struct ConfigurableRef {
+    // TODO: Turn this into a plain value once this is resolved:
+    // https://github.com/rust-lang/rust/issues/63084
+    type_name: fn() -> &'static str,
+    // TODO: Turn this into a plain value once const trait functions are implemented
+    // Ref: https://github.com/rust-lang/rfcs/pull/911
+    referenceable_name: fn() -> Option<&'static str>,
+    make_metadata: fn() -> Metadata,
+    validate_metadata: fn(&Metadata) -> Result<(), GenerateError>,
+    generate_schema: fn(&RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError>,
+}
+
+impl ConfigurableRef {
+    /// Create a new configurable reference table.
+    pub const fn new<T: Configurable + ?Sized + 'static>() -> Self {
+        Self {
+            type_name: std::any::type_name::<T>,
+            referenceable_name: T::referenceable_name,
+            make_metadata: T::metadata,
+            validate_metadata: T::validate_metadata,
+            generate_schema: T::generate_schema,
+        }
+    }
+
+    pub(crate) fn type_name(&self) -> &'static str {
+        (self.type_name)()
+    }
+    pub(crate) fn referenceable_name(&self) -> Option<&'static str> {
+        (self.referenceable_name)()
+    }
+    pub(crate) fn make_metadata(&self) -> Metadata {
+        (self.make_metadata)()
+    }
+    pub(crate) fn validate_metadata(&self, metadata: &Metadata) -> Result<(), GenerateError> {
+        (self.validate_metadata)(metadata)
+    }
+    pub(crate) fn generate_schema(
+        &self,
+        gen: &RefCell<SchemaGenerator>,
+    ) -> Result<SchemaObject, GenerateError> {
+        (self.generate_schema)(gen)
+    }
 }

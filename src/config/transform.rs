@@ -22,7 +22,7 @@ use super::{id::Inputs, ComponentKey};
 #[derive(Clone, Debug)]
 pub struct TransformOuter<T>
 where
-    T: Configurable + Serialize,
+    T: Configurable + Serialize + 'static,
 {
     #[configurable(derived)]
     pub inputs: Inputs<T>,

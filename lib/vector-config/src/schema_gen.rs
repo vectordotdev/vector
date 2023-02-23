@@ -5,29 +5,31 @@ use serde_json::{Map, Value};
 use vector_config_common::{attributes::CustomAttribute, schema::*};
 
 use crate::{
-    num::ConfigurableNumber, Configurable, ConfigurableString, GenerateError, Metadata, ToValue,
+    num::ConfigurableNumber, Configurable, ConfigurableRef, GenerateError, Metadata, ToValue,
 };
 
 /// Applies metadata to the given schema.
 ///
 /// Metadata can include semantic information (title, description, etc), validation (min/max, allowable
 /// patterns, etc), as well as actual arbitrary key/value data.
-pub fn apply_metadata<T>(schema: &mut SchemaObject, metadata: Metadata)
-where
-    T: Configurable,
-{
-    let base_metadata = T::metadata();
+pub fn apply_base_metadata(schema: &mut SchemaObject, metadata: Metadata) {
+    apply_metadata(&<()>::as_configurable_ref(), schema, metadata)
+}
+
+fn apply_metadata(config: &ConfigurableRef, schema: &mut SchemaObject, metadata: Metadata) {
+    let type_name = config.type_name();
+    let base_metadata = config.make_metadata();
 
     // Calculate the title/description of this schema.
     //
     // If the given `metadata` has either a title or description present, we use both those values,
-    // even if one of them is `None`. If both are `None`, we try falling back to the bcargo fmtase metadata
-    // for `T`.
+    // even if one of them is `None`. If both are `None`, we try falling back to the base metadata
+    // for the configurable type.
     //
     // This ensures that per-field titles/descriptions can override the base title/description of
-    // `T`, without mixing and matching, as sometimes the base type's title/description is far too
-    // generic and muddles the output. Essentially, if the callsite decides to provide an overridden
-    // title/description, it controls the entire title/description.
+    // the type, without mixing and matching, as sometimes the base type's title/description is far
+    // too generic and muddles the output. Essentially, if the callsite decides to provide an
+    // overridden title/description, it controls the entire title/description.
     let (schema_title, schema_description) =
         if metadata.title().is_some() || metadata.description().is_some() {
             (metadata.title(), metadata.description())
@@ -38,15 +40,14 @@ where
     // A description _must_ be present, one way or another, _unless_ one of these two conditions is
     // met:
     // - the field is marked transparent
-    // - `T` is referenceable and _does_ have a description
+    // - the type is referenceable and _does_ have a description
     //
     // We panic otherwise.
     let has_referenceable_description =
-        T::referenceable_name().is_some() && base_metadata.description().is_some();
+        config.referenceable_name().is_some() && base_metadata.description().is_some();
     let is_transparent = base_metadata.transparent() || metadata.transparent();
     if schema_description.is_none() && !is_transparent && !has_referenceable_description {
-        let type_name = std::any::type_name::<T>();
-        panic!("No description provided for `{}`! All `Configurable` types must define a description, or have one specified at the field-level where the type is being used.", type_name);
+        panic!("No description provided for `{type_name}`! All `Configurable` types must define a description, or have one specified at the field-level where the type is being used.");
     }
 
     // If a default value was given, serialize it.
@@ -94,7 +95,7 @@ where
                         Some(Value::Bool(_)) | None => {},
                         // Any other value being present means we're clashing with a different metadata
                         // attribute, which is not good, so we have to bail out.
-                        _ => panic!("Tried to set metadata flag '{}' but already existed in schema metadata for `{}`.", key, std::any::type_name::<T>()),
+                        _ => panic!("Tried to set metadata flag '{key}' but already existed in schema metadata for `{type_name}`."),
                     }
                 }
                 CustomAttribute::KeyValue { key, value } => {
@@ -103,7 +104,7 @@ where
                             // We already have a flag entry for this key, which we cannot turn into an
                             // array, so we panic in this particular case to signify the weirdness.
                             Value::Bool(_) => {
-                                panic!("Tried to overwrite metadata flag '{}' but already existed in schema metadata for `{}` as a flag.", key, std::any::type_name::<T>());
+                                panic!("Tried to overwrite metadata flag '{key}' but already existed in schema metadata for `{type_name}` as a flag.");
                             },
                             // The entry is already a multi-value KV pair, so just append the value.
                             Value::Array(items) => {
@@ -176,7 +177,7 @@ pub fn generate_string_schema() -> SchemaObject {
 
 pub fn generate_number_schema<N>() -> SchemaObject
 where
-    N: Configurable + ConfigurableNumber,
+    N: ConfigurableNumber,
 {
     // TODO: Once `schemars` has proper integer support, we should allow specifying min/max bounds
     // in a way that's relevant to the number class. As is, we're always forcing bounds to fit into
@@ -212,14 +213,12 @@ where
     schema
 }
 
-pub fn generate_array_schema<T>(
+pub(crate) fn generate_array_schema(
+    config: &ConfigurableRef,
     gen: &RefCell<SchemaGenerator>,
-) -> Result<SchemaObject, GenerateError>
-where
-    T: Configurable,
-{
-    // Generate the actual schema for the element type `T`.
-    let element_schema = get_or_generate_schema::<T>(gen, None)?;
+) -> Result<SchemaObject, GenerateError> {
+    // Generate the actual schema for the element type.
+    let element_schema = get_or_generate_schema(config, gen, None)?;
 
     Ok(SchemaObject {
         instance_type: Some(InstanceType::Array.into()),
@@ -231,12 +230,12 @@ where
     })
 }
 
-pub fn generate_set_schema<T>(gen: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError>
-where
-    T: Configurable,
-{
-    // Generate the actual schema for the element type `T`.
-    let element_schema = get_or_generate_schema::<T>(gen, None)?;
+pub(crate) fn generate_set_schema(
+    config: &ConfigurableRef,
+    gen: &RefCell<SchemaGenerator>,
+) -> Result<SchemaObject, GenerateError> {
+    // Generate the actual schema for the element type.
+    let element_schema = get_or_generate_schema(config, gen, None)?;
 
     Ok(SchemaObject {
         instance_type: Some(InstanceType::Array.into()),
@@ -249,12 +248,12 @@ where
     })
 }
 
-pub fn generate_map_schema<V>(gen: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError>
-where
-    V: Configurable,
-{
-    // Generate the actual schema for the element type `V`.
-    let element_schema = get_or_generate_schema::<V>(gen, None)?;
+pub(crate) fn generate_map_schema(
+    config: &ConfigurableRef,
+    gen: &RefCell<SchemaGenerator>,
+) -> Result<SchemaObject, GenerateError> {
+    // Generate the actual schema for the element type.
+    let element_schema = get_or_generate_schema(config, gen, None)?;
 
     Ok(SchemaObject {
         instance_type: Some(InstanceType::Object.into()),
@@ -287,12 +286,10 @@ pub fn generate_struct_schema(
     }
 }
 
-pub fn generate_optional_schema<T>(
+pub(crate) fn generate_optional_schema(
+    config: &ConfigurableRef,
     gen: &RefCell<SchemaGenerator>,
-) -> Result<SchemaObject, GenerateError>
-where
-    T: Configurable,
-{
+) -> Result<SchemaObject, GenerateError> {
     // Optional schemas are generally very simple in practice, but because of how we memoize schema
     // generation and use references to schema definitions, we have to handle quite a few cases
     // here.
@@ -306,14 +303,14 @@ where
     //     type already uses that mechanism
     //   - create our own `oneOf` schema to map between either the "null" schema or the real schema
 
-    // Generate the inner schema for `T` We'll add some override metadata, too, so that we can mark
-    // this resulting schema as "optional". This is only consequential to documentation generation
-    // so that some of the more complex code for parsing enum schemas can correctly differentiate a
-    // `oneOf` schema that represents a Rust enum versus one that simply represents our "null or X"
-    // wrapped schema.
+    // Generate the inner schema for the inner type. We'll add some override metadata, too, so that
+    // we can mark this resulting schema as "optional". This is only consequential to documentation
+    // generation so that some of the more complex code for parsing enum schemas can correctly
+    // differentiate a `oneOf` schema that represents a Rust enum versus one that simply represents
+    // our "null or X" wrapped schema.
     let mut overrides = Metadata::default();
     overrides.add_custom_attribute(CustomAttribute::flag("docs::optional"));
-    let mut schema = get_or_generate_schema::<T>(gen, Some(overrides))?;
+    let mut schema = get_or_generate_schema(config, gen, Some(overrides))?;
 
     // Take the metadata and extensions of the original schema.
     //
@@ -415,21 +412,6 @@ pub fn generate_one_of_schema(subschemas: &[SchemaObject]) -> SchemaObject {
     }
 }
 
-pub fn generate_all_of_schema(subschemas: &[SchemaObject]) -> SchemaObject {
-    let subschemas = subschemas
-        .iter()
-        .map(|s| Schema::Object(s.clone()))
-        .collect::<Vec<_>>();
-
-    SchemaObject {
-        subschemas: Some(Box::new(SubschemaValidation {
-            all_of: Some(subschemas),
-            ..Default::default()
-        })),
-        ..Default::default()
-    }
-}
-
 pub fn generate_tuple_schema(subschemas: &[SchemaObject]) -> SchemaObject {
     let subschemas = subschemas
         .iter()
@@ -478,28 +460,29 @@ pub fn generate_internal_tagged_variant_schema(
 
 pub fn generate_root_schema<T>() -> Result<RootSchema, GenerateError>
 where
-    T: Configurable,
+    T: Configurable + 'static,
 {
     // Set env variable to enable generating all schemas, including platform-specific ones.
     std::env::set_var("VECTOR_GENERATE_SCHEMA", "true");
 
     let schema_gen = RefCell::new(SchemaSettings::new().into_generator());
 
-    let schema = get_or_generate_schema::<T>(&schema_gen, Some(T::metadata()))?;
+    let schema =
+        get_or_generate_schema(&T::as_configurable_ref(), &schema_gen, Some(T::metadata()))?;
+
     Ok(schema_gen.into_inner().into_root_schema(schema))
 }
 
-pub fn get_or_generate_schema<T>(
+pub fn get_or_generate_schema(
+    config: &ConfigurableRef,
     gen: &RefCell<SchemaGenerator>,
     overrides: Option<Metadata>,
-) -> Result<SchemaObject, GenerateError>
-where
-    T: Configurable,
-{
-    let (mut schema, metadata) = match T::referenceable_name() {
-        // When `T` has a referenceable name, try looking it up in the schema generator's definition
-        // list, and if it exists, create a schema reference to it. Otherwise, generate it and
-        // backfill it in the schema generator.
+) -> Result<SchemaObject, GenerateError> {
+    let metadata = config.make_metadata();
+    let (mut schema, metadata) = match config.referenceable_name() {
+        // When the configurable type has a referenceable name, try looking it up in the schema
+        // generator's definition list, and if it exists, create a schema reference to
+        // it. Otherwise, generate it and backfill it in the schema generator.
         Some(name) => {
             if !gen.borrow().definitions().contains_key(name) {
                 // In order to avoid infinite recursion, we copy the approach that `schemars` takes and
@@ -511,16 +494,18 @@ where
                     .definitions_mut()
                     .insert(name.to_string(), Schema::Bool(false));
 
-                // We generate the schema for `T` with its own default metadata, and not the
+                // We generate the schema for the type with its own default metadata, and not the
                 // override metadata passed into this method, because the override metadata might
-                // only be relevant to the place that `T` is being used.
+                // only be relevant to the place that the type is being used.
                 //
-                // For example, if `T` was something for setting the logging level, one component
-                // that allows the logging level to be changed for that component specifically might
-                // want to specify a default value, whereas `T` should not have a default at all..
-                // so if we applied that override metadata, we'd be unwittingly applying a default
-                // for all usages of `T` that didn't override the default themselves.
-                let schema = generate_baseline_schema::<T>(gen, T::metadata())?;
+                // For example, if the type was something for setting the logging level, one
+                // component that allows the logging level to be changed for that component
+                // specifically might want to specify a default value, whereas the configurable
+                // should not have a default at all.  So, if we applied that override metadata, we'd
+                // be unwittingly applying a default for all usages of the type that didn't override
+                // the default themselves.
+                let mut schema = config.generate_schema(gen)?;
+                apply_metadata(config, &mut schema, metadata);
 
                 gen.borrow_mut()
                     .definitions_mut()
@@ -529,56 +514,42 @@ where
 
             (get_schema_ref(gen, name), None)
         }
-        // Always generate the schema directly if `T` is not referenceable.
-        None => (T::generate_schema(gen)?, Some(T::metadata())),
+        // Always generate the schema directly if the type is not referenceable.
+        None => (config.generate_schema(gen)?, Some(metadata)),
     };
 
     // Figure out what metadata we should apply to the resulting schema.
     //
-    // If `T` was referenceable, we use its implicit metadata when generating the
+    // If the type was referenceable, we use its implicit metadata when generating the
     // "baseline" schema, because a referenceable type should always be self-contained. We then
     // apply the override metadata, if it exists, to the schema we got back. This allows us to
     // override titles, descriptions, and add additional attributes, and so on.
     //
-    // If `T` was not referenceable, we only generate its schema without trying to apply any
+    // If the type was not referenceable, we only generate its schema without trying to apply any
     // metadata. We do that because applying schema metadata enforces logic like "can't be without a
-    // description". The implicit metadata for `T` may lack that.
+    // description". The implicit metadata for the type may lack that.
     if let Some(overrides) = overrides.as_ref() {
-        T::validate_metadata(overrides)?;
+        config.validate_metadata(overrides)?;
     }
 
-    let maybe_metadata = match metadata {
+    match metadata {
         // If we generated the schema for a referenceable type, we won't need to merge its implicit
         // metadata into the schema we're returning _here_, so just use the override metadata if
         // it was given.
-        None => overrides,
+        None => {
+            if let Some(metadata) = overrides {
+                apply_metadata(config, &mut schema, metadata);
+            }
+        }
 
         // If we didn't generate the schema for a referenceable type, we'll be holding its implicit
         // metadata here, which we need to merge the override metadata into if it was given. If
         // there was no override metadata, then we just use the base by itself.
         Some(base) => match overrides {
-            None => Some(base),
-            Some(overrides) => Some(base.merge(overrides)),
+            None => apply_metadata(config, &mut schema, base),
+            Some(overrides) => apply_metadata(config, &mut schema, base.merge(overrides)),
         },
     };
-
-    if let Some(metadata) = maybe_metadata {
-        apply_metadata::<T>(&mut schema, metadata);
-    }
-
-    Ok(schema)
-}
-
-pub fn generate_baseline_schema<T>(
-    gen: &RefCell<SchemaGenerator>,
-    metadata: Metadata,
-) -> Result<SchemaObject, GenerateError>
-where
-    T: Configurable,
-{
-    // Generate the schema and apply its metadata.
-    let mut schema = T::generate_schema(gen)?;
-    apply_metadata::<T>(&mut schema, metadata);
 
     Ok(schema)
 }
@@ -603,18 +574,19 @@ fn get_schema_ref<S: AsRef<str>>(gen: &RefCell<SchemaGenerator>, name: S) -> Sch
 ///
 /// If the schema is not a valid, string-like schema, an error variant will be returned describing
 /// the issue.
-pub fn assert_string_schema_for_map<K, M>(
+pub(crate) fn assert_string_schema_for_map(
+    config: &ConfigurableRef,
     gen: &RefCell<SchemaGenerator>,
-) -> Result<(), GenerateError>
-where
-    K: ConfigurableString,
-{
+    map_type: &'static str,
+) -> Result<(), GenerateError> {
+    let key_schema = get_or_generate_schema(config, gen, None)?;
+    let key_type = config.type_name();
+
     // We need to force the schema to be treated as transparent so that when the schema generation
     // finalizes the schema, we don't throw an error due to a lack of title/description.
     let mut key_metadata = Metadata::default();
     key_metadata.set_transparent();
 
-    let key_schema = get_or_generate_schema::<K>(gen, None)?;
     let wrapped_schema = Schema::Object(key_schema);
 
     // Get a reference to the underlying schema if we're dealing with a reference, or just use what
@@ -650,10 +622,7 @@ where
     };
 
     if !is_string_like {
-        Err(GenerateError::MapKeyNotStringLike {
-            key_type: std::any::type_name::<K>(),
-            map_type: std::any::type_name::<M>(),
-        })
+        Err(GenerateError::MapKeyNotStringLike { key_type, map_type })
     } else {
         Ok(())
     }

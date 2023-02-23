@@ -5,8 +5,9 @@ use serde::{de, ser};
 use serde_json::Value;
 use vector_config::{
     schema::{
-        apply_metadata, generate_const_string_schema, generate_enum_schema, generate_one_of_schema,
-        generate_struct_schema, get_or_generate_schema, SchemaGenerator, SchemaObject,
+        apply_base_metadata, generate_const_string_schema, generate_enum_schema,
+        generate_one_of_schema, generate_struct_schema, get_or_generate_schema, SchemaGenerator,
+        SchemaObject,
     },
     Configurable, GenerateError, Metadata, ToValue,
 };
@@ -236,7 +237,7 @@ impl Configurable for Compression {
                 const_metadata.set_title(title);
             }
             const_metadata.add_custom_attribute(CustomAttribute::kv(LOGICAL_NAME, logical_name));
-            apply_metadata::<()>(&mut const_schema, const_metadata);
+            apply_base_metadata(&mut const_schema, const_metadata);
             const_schema
         };
 
@@ -262,7 +263,7 @@ impl Configurable for Compression {
             gzip_string_subschema,
             zlib_string_subschema,
         ]);
-        apply_metadata::<()>(&mut all_string_oneof_subschema, string_metadata);
+        apply_base_metadata(&mut all_string_oneof_subschema, string_metadata);
 
         // Next we'll create a full schema for the given algorithms.
         //
@@ -277,7 +278,8 @@ impl Configurable for Compression {
         // generation, where we need to be able to generate the right enum key/value pair for the
         // `none` algorithm as part of the overall set of enum values declared for the `algorithm`
         // field in the "full" schema version.
-        let compression_level_schema = get_or_generate_schema::<CompressionLevel>(gen, None)?;
+        let compression_level_schema =
+            get_or_generate_schema(&CompressionLevel::as_configurable_ref(), gen, None)?;
 
         let mut required = BTreeSet::new();
         required.insert(ALGORITHM_NAME.to_string());
@@ -292,7 +294,7 @@ impl Configurable for Compression {
         let mut full_subschema = generate_struct_schema(properties, required, None);
         let mut full_metadata = Metadata::with_description("");
         full_metadata.add_custom_attribute(CustomAttribute::flag("docs::hidden"));
-        apply_metadata::<()>(&mut full_subschema, full_metadata);
+        apply_base_metadata(&mut full_subschema, full_metadata);
 
         // Finally, we zip both schemas together.
         Ok(generate_one_of_schema(&[

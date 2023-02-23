@@ -6,7 +6,7 @@ use derivative::Derivative;
 use serde_json::Value;
 use vector_config::{
     schema::{
-        apply_metadata, generate_const_string_schema, generate_one_of_schema,
+        apply_base_metadata, generate_const_string_schema, generate_one_of_schema,
         get_or_generate_schema, SchemaGenerator, SchemaObject,
     },
     Configurable, GenerateError, Metadata, ToValue,
@@ -117,7 +117,7 @@ impl Configurable for TimeZone {
         let mut local_schema = generate_const_string_schema("local".to_string());
         let mut local_metadata = Metadata::with_description("System local timezone.");
         local_metadata.add_custom_attribute(CustomAttribute::kv("logical_name", "Local"));
-        apply_metadata::<()>(&mut local_schema, local_metadata);
+        apply_base_metadata(&mut local_schema, local_metadata);
 
         let mut tz_metadata = Metadata::with_title("A named timezone.");
         tz_metadata.set_description(
@@ -126,7 +126,7 @@ impl Configurable for TimeZone {
 [tzdb]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones"#,
         );
         tz_metadata.add_custom_attribute(CustomAttribute::kv("logical_name", "Named"));
-        let tz_schema = get_or_generate_schema::<Tz>(gen, Some(tz_metadata))?;
+        let tz_schema = get_or_generate_schema(&Tz::as_configurable_ref(), gen, Some(tz_metadata))?;
 
         Ok(generate_one_of_schema(&[local_schema, tz_schema]))
     }

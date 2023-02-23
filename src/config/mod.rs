@@ -533,7 +533,7 @@ fn default_test_input_type() -> String {
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
-pub struct TestOutput<T = OutputId> {
+pub struct TestOutput<T: 'static = OutputId> {
     /// The transform outputs to extract events from.
     pub extract_from: OneOrMany<T>,
 
