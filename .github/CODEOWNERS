@@ -24,6 +24,7 @@ src/sinks/azure_monitor_logs.rs @davidhuie-dd @vectordotdev/integrations-team
 src/sinks/blackhole/ @davidhuie-dd @vectordotdev/integrations-team
 src/sinks/clickhouse/ @davidhuie-dd @vectordotdev/integrations-team
 src/sinks/console/ @davidhuie-dd @vectordotdev/integrations-team
+src/sinks/databend/ @spencergilbert @vectordotdev/integrations-team
 src/sinks/datadog_archives.rs @neuronull @vectordotdev/integrations-team
 src/sinks/datadog_events/ @neuronull @vectordotdev/integrations-team
 src/sinks/datadog_logs/ @neuronull @vectordotdev/integrations-team
