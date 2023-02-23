@@ -192,24 +192,24 @@ base: components: sinks: webhdfs: configuration: {
 	}
 	prefix: {
 		description: """
-			A prefix to apply to all keys.
+				A prefix to apply to all keys.
 
-			Prefixes are useful for partitioning objects, such as by creating an blob key that stores blobs under a particular "directory". If using a prefix for this purpose, it must end in `/` to act as a directory path. A trailing `/` is **not**
-		"""
-		required:    true
+				Prefixes are useful for partitioning objects, such as by creating an blob key that stores blobs under a particular "directory". If using a prefix for this purpose, it must end in `/` to act as a directory path. A trailing `/` is **not**
+			"""
+		required: true
 		type: string: syntax: "template"
 	}
 	endpoint: {
 		description: """
-			An hdfs cluster consists of a single NameNode, a master server that manages the file system namespace and regulates access to files by clients.
+				An hdfs cluster consists of a single NameNode, a master server that manages the file system namespace and regulates access to files by clients.
 
-			For example:
+				For example:
 
-			- `http://172.16.80.2:8090` visiting name node's webhdfs port at `172.16.80.2:8090`
+				- `http://172.16.80.2:8090` visiting name node's webhdfs port at `172.16.80.2:8090`
 
-			For more information: [HDFS Architecture](https://hadoop.apache.org/docs/r3.3.4/hadoop-project-dist/hadoop-hdfs/HdfsDesign.html)
-		"""
-		required:    true
+				For more information: [HDFS Architecture](https://hadoop.apache.org/docs/r3.3.4/hadoop-project-dist/hadoop-hdfs/HdfsDesign.html)
+			"""
+		required: true
 		type: string: {}
 	}
 }
