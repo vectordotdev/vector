@@ -480,14 +480,12 @@ pub fn get_or_generate_schema(
     overrides: Option<Metadata>,
 ) -> Result<SchemaObject, GenerateError> {
     let metadata = config.make_metadata();
-    let (mut schema, metadata) = match &config.referenceable_name() {
+    let (mut schema, metadata) = match config.referenceable_name() {
         // When the configurable type has a referenceable name, try looking it up in the schema
         // generator's definition list, and if it exists, create a schema reference to
         // it. Otherwise, generate it and backfill it in the schema generator.
         Some(name) => {
-            // Creating a string just to borrow it is ugly, but that's required by the types in the
-            // schema generator definitions.
-            if !gen.borrow().definitions().contains_key(&name.to_string()) {
+            if !gen.borrow().definitions().contains_key(name) {
                 // In order to avoid infinite recursion, we copy the approach that `schemars` takes and
                 // insert a dummy boolean schema before actually generating the real schema, and then
                 // replace it afterwards. If any recursion occurs, a schema reference will be handed
