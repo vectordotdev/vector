@@ -304,7 +304,7 @@ async fn handle_stream<T>(
                     break;
                 }
                 None
-            }
+            },
             _ = &mut shutdown_signal => {
                 if close_socket(reader.get_ref().get_ref().get_ref()) {
                     break;

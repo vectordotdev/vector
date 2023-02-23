@@ -173,6 +173,11 @@ impl TcpConfig {
         self.max_connection_duration_secs
     }
 
+    pub fn set_max_connection_duration_secs(&mut self, val: Option<u64>) -> &mut Self {
+        self.max_connection_duration_secs = val;
+        self
+    }
+
     pub fn set_max_length(&mut self, val: Option<usize>) -> &mut Self {
         self.max_length = val;
         self
