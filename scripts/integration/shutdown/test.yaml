@@ -5,8 +5,7 @@ args:
 features: 
 - shutdown-tests
 
-test:
-- integration
+test: "integration"
 
 env:
   KAFKA_HOST: kafka

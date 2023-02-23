@@ -65,6 +65,19 @@ impl IntegrationTest {
             env_vars.insert(key, Some(value));
         }
         let mut args = self.config.args.clone();
+
+        args.push("--features".to_string());
+        args.extend(self.config.features.clone());
+
+        // if the test field is present in the struct append the test name
+        // if not then use the --lib flag
+        match self.config.test {
+            Some(ref test_arg) => {
+                args.push("--test".to_string());
+                args.push(test_arg.to_string());
+            },
+            None => args.push("--lib".to_string())
+        }
         args.extend(extra_args);
         self.runner
             .test(&env_vars, &self.config.runner.env, &args)?;
