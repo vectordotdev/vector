@@ -73,6 +73,12 @@ pub struct IntegrationTestConfig {
     /// Configuration specific to the compose services.
     #[serde(default)]
     pub runner: IntegrationRunnerConfig,
+
+    pub features: Vec<String>,
+
+    pub test: Option<String>,
+
+    pub test_filter: Option<String>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize)]
