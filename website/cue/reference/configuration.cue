@@ -260,9 +260,7 @@ configuration: {
 				option in the source configuration.
 				"""
 			required: false
-			description: "Controls if log namespacing will be enabled globally."
 			warnings: []
-			required: false
 			type: bool: default: false
 		}
 
