@@ -199,16 +199,15 @@ base: components: sinks: webhdfs: configuration: {
 		required:    true
 		type: string: syntax: "template"
 	}
-	name_node: {
+	endpoint: {
 		description: """
-			An WEBwebhdfs cluster consists of a single NameNode, a master server that manages the file system namespace and regulates access to files by clients.
+			An hdfs cluster consists of a single NameNode, a master server that manages the file system namespace and regulates access to files by clients.
 
 			For example:
 
-			- `default`: visiting local fs.
-			- `http://172.16.80.2:8090` visiting name node at `172.16.80.2`
+			- `http://172.16.80.2:8090` visiting name node's webhdfs port at `172.16.80.2:8090`
 
-			For more information: [WEBwebhdfs Architecture](https://hadoop.apache.org/docs/r3.3.4/hadoop-project-dist/hadoop-webhdfs/WebwebhdfsDesign.html#NameNode_and_DataNodes)
+			For more information: [HDFS Architecture](https://hadoop.apache.org/docs/r3.3.4/hadoop-project-dist/hadoop-hdfs/HdfsDesign.html)
 		"""
 		required:    true
 		type: string: {}
