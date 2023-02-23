@@ -5,7 +5,7 @@ use std::cell::RefCell;
 use serde_json::Value;
 
 use crate::{
-    schema_gen::{SchemaGenerator, SchemaObject},
+    schema::{SchemaGenerator, SchemaObject},
     GenerateError, Metadata,
 };
 

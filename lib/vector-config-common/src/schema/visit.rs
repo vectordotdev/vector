@@ -1,7 +1,4 @@
-use super::{
-    schema::{RootSchema, Schema, SchemaObject, SingleOrVec},
-    Map,
-};
+use super::{Map, RootSchema, Schema, SchemaObject, SingleOrVec};
 
 /// Trait used to recursively modify a constructed schema and its subschemas.
 pub trait Visitor: std::fmt::Debug {

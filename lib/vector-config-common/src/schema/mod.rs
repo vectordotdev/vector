@@ -3,11 +3,11 @@
 // pursuant to the listed conditions in the license.
 
 mod gen;
-mod schema;
+mod json_schema;
 pub mod visit;
 
 pub type Map<K, V> = indexmap::IndexMap<K, V>;
 pub type Set<V> = std::collections::BTreeSet<V>;
 
 pub use self::gen::{SchemaGenerator, SchemaSettings};
-pub use self::schema::*;
+pub use self::json_schema::*;

@@ -1,9 +1,8 @@
 use std::{cell::RefCell, collections::BTreeSet, mem};
 
-use crate::schema_gen::*;
 use indexmap::IndexMap;
 use serde_json::{Map, Value};
-use vector_config_common::attributes::CustomAttribute;
+use vector_config_common::{attributes::CustomAttribute, schema::*};
 
 use crate::{
     num::ConfigurableNumber, Configurable, ConfigurableRef, GenerateError, Metadata, ToValue,
