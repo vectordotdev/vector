@@ -1,9 +1,11 @@
+use std::cell::RefCell;
+
 use indexmap::{IndexMap, IndexSet};
 use serde_json::Value;
 
 use crate::{
     schema::{assert_string_schema_for_map, generate_map_schema, generate_set_schema},
-    schemars::{gen::SchemaGenerator, schema::SchemaObject},
+    schema_gen::{SchemaGenerator, SchemaObject},
     str::ConfigurableString,
     Configurable, GenerateError, Metadata, ToValue,
 };
@@ -28,7 +30,7 @@ where
         V::validate_metadata(&converted)
     }
 
-    fn generate_schema(gen: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
+    fn generate_schema(gen: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
         // Make sure our key type is _truly_ a string schema.
         assert_string_schema_for_map::<K, Self>(gen)?;
 
@@ -63,7 +65,7 @@ where
         V::validate_metadata(&converted)
     }
 
-    fn generate_schema(gen: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
+    fn generate_schema(gen: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
         generate_set_schema::<V>(gen)
     }
 }

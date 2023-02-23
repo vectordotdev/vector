@@ -608,10 +608,6 @@ compile-vrl-wasm: ## Compile VRL crates to WASM target
 
 ##@ Utility
 
-.PHONY: build-ci-docker-images
-build-ci-docker-images: ## Rebuilds all Docker images used in CI
-	@scripts/build-ci-docker-images.sh
-
 .PHONY: clean
 clean: environment-clean ## Clean everything
 	cargo clean

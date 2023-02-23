@@ -1,9 +1,11 @@
+use std::cell::RefCell;
+
 use encoding_rs::Encoding;
 use serde_json::Value;
 
 use crate::{
     schema::generate_string_schema,
-    schemars::{gen::SchemaGenerator, schema::SchemaObject},
+    schema_gen::{SchemaGenerator, SchemaObject},
     Configurable, GenerateError, Metadata, ToValue,
 };
 
@@ -24,7 +26,7 @@ impl Configurable for &'static Encoding {
         metadata
     }
 
-    fn generate_schema(_: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
+    fn generate_schema(_: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
         Ok(generate_string_schema())
     }
 }

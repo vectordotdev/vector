@@ -151,12 +151,15 @@ fn pathbuf_to_string(path: &Path) -> crate::Result<&str> {
 }
 
 #[derive(Default)]
-pub(crate) struct KafkaStatisticsContext;
+pub(crate) struct KafkaStatisticsContext {
+    pub(crate) expose_lag_metrics: bool,
+}
 
 impl ClientContext for KafkaStatisticsContext {
     fn stats(&self, statistics: Statistics) {
         emit!(KafkaStatisticsReceived {
-            statistics: &statistics
+            statistics: &statistics,
+            expose_lag_metrics: self.expose_lag_metrics,
         });
     }
 }

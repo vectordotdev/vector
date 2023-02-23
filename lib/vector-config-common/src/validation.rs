@@ -1,11 +1,11 @@
 use darling::FromMeta;
 use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
-use schemars::schema::{InstanceType, SchemaObject};
 use syn::{Lit, Meta};
 
-use crate::num::{
-    ERR_NUMERIC_OUT_OF_RANGE, NUMERIC_ENFORCED_LOWER_BOUND, NUMERIC_ENFORCED_UPPER_BOUND,
+use crate::{
+    num::{ERR_NUMERIC_OUT_OF_RANGE, NUMERIC_ENFORCED_LOWER_BOUND, NUMERIC_ENFORCED_UPPER_BOUND},
+    schema_gen::{InstanceType, SchemaObject},
 };
 
 /// Well-known validator formats as described in the [JSON Schema Validation specification][jsvs].

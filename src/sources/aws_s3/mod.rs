@@ -8,7 +8,7 @@ use lookup::owned_value_path;
 use snafu::Snafu;
 use tokio_util::io::StreamReader;
 use value::{kind::Collection, Kind};
-use vector_config::{configurable_component, NamedComponent};
+use vector_config::configurable_component;
 use vector_core::config::{DataType, LegacyKey, LogNamespace};
 
 use super::util::MultilineConfig;
@@ -419,7 +419,6 @@ mod integration_tests {
     use lookup::path;
     use similar_asserts::assert_eq;
     use value::Value;
-    use vector_config::NamedComponent;
 
     use super::{sqs, AwsS3Config, Compression, Strategy};
     use crate::{

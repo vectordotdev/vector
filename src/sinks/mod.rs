@@ -410,8 +410,6 @@ pub enum Sinks {
 }
 
 impl NamedComponent for Sinks {
-    const NAME: &'static str = "_invalid_usage";
-
     fn get_component_name(&self) -> &'static str {
         match self {
             #[cfg(feature = "sinks-amqp")]

@@ -856,7 +856,9 @@ impl RequestBuilder<(String, Vec<Event>)> for DatadogAzureRequestBuilder {
 //
 // TODO: When the sink is fully supported and we expose it for use/within the docs, remove this.
 impl NamedComponent for DatadogArchivesSinkConfig {
-    const NAME: &'static str = "datadog_archives";
+    fn get_component_name(&self) -> &'static str {
+        "datadog_archives"
+    }
 }
 
 #[async_trait::async_trait]

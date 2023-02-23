@@ -1,4 +1,4 @@
-use std::{collections::BTreeSet, fmt};
+use std::{cell::RefCell, collections::BTreeSet, fmt};
 
 use indexmap::IndexMap;
 use serde::{de, ser};
@@ -8,7 +8,7 @@ use vector_config::{
         apply_metadata, generate_const_string_schema, generate_enum_schema, generate_one_of_schema,
         generate_struct_schema, get_or_generate_schema,
     },
-    schemars::{gen::SchemaGenerator, schema::SchemaObject},
+    schema_gen::{SchemaGenerator, SchemaObject},
     Configurable, GenerateError, Metadata, ToValue,
 };
 use vector_config_common::attributes::CustomAttribute;
@@ -221,7 +221,7 @@ impl Configurable for Compression {
         metadata
     }
 
-    fn generate_schema(gen: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
+    fn generate_schema(gen: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
         const ALGORITHM_NAME: &str = "algorithm";
         const LEVEL_NAME: &str = "level";
         const LOGICAL_NAME: &str = "logical_name";
@@ -431,7 +431,7 @@ impl Configurable for CompressionLevel {
         metadata
     }
 
-    fn generate_schema(_: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
+    fn generate_schema(_: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
         let string_consts = ["none", "fast", "best", "default"]
             .iter()
             .map(|s| serde_json::Value::from(*s));

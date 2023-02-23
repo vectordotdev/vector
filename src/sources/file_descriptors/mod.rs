@@ -85,7 +85,7 @@ pub trait FileDescriptorConfig: NamedComponent {
             out,
             shutdown,
             host_key,
-            Self::NAME,
+            self.get_component_name(),
             hostname,
             log_namespace,
         )))

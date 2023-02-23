@@ -12,7 +12,7 @@ use http::{StatusCode, Uri};
 use lookup::{lookup_v2::OptionalValuePath, owned_value_path, path};
 use tokio_util::codec::Decoder as _;
 use value::{kind::Collection, Kind};
-use vector_config::{configurable_component, NamedComponent};
+use vector_config::configurable_component;
 use vector_core::{
     config::{DataType, LegacyKey, LogNamespace},
     schema::Definition,
@@ -466,7 +466,6 @@ mod tests {
     use std::{collections::BTreeMap, io::Write, net::SocketAddr};
     use value::kind::Collection;
     use value::Kind;
-    use vector_config::NamedComponent;
     use vector_core::config::LogNamespace;
     use vector_core::event::LogEvent;
     use vector_core::schema::Definition;
