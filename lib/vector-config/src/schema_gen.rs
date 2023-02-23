@@ -1,9 +1,8 @@
 use std::{cell::RefCell, collections::BTreeSet, mem};
 
-use crate::schema_gen::*;
 use indexmap::IndexMap;
 use serde_json::{Map, Value};
-use vector_config_common::attributes::CustomAttribute;
+use vector_config_common::{attributes::CustomAttribute, schema::*};
 
 use crate::{
     num::ConfigurableNumber, Configurable, ConfigurableString, GenerateError, Metadata, ToValue,
@@ -22,7 +21,7 @@ where
     // Calculate the title/description of this schema.
     //
     // If the given `metadata` has either a title or description present, we use both those values,
-    // even if one of them is `None`. If both are `None`, we try falling back to the base metadata
+    // even if one of them is `None`. If both are `None`, we try falling back to the bcargo fmtase metadata
     // for `T`.
     //
     // This ensures that per-field titles/descriptions can override the base title/description of

@@ -6,9 +6,8 @@ use serde_json::Value;
 use vector_config::{
     schema::{
         apply_metadata, generate_const_string_schema, generate_enum_schema, generate_one_of_schema,
-        generate_struct_schema, get_or_generate_schema,
+        generate_struct_schema, get_or_generate_schema, SchemaGenerator, SchemaObject,
     },
-    schema_gen::{SchemaGenerator, SchemaObject},
     Configurable, GenerateError, Metadata, ToValue,
 };
 use vector_config_common::attributes::CustomAttribute;
