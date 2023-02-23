@@ -6,7 +6,7 @@ mod unix;
 use codecs::{decoding::DeserializerConfig, NewlineDelimitedDecoderConfig};
 use lookup::{lookup_v2::OptionalValuePath, owned_value_path};
 use value::{kind::Collection, Kind};
-use vector_config::{configurable_component, NamedComponent};
+use vector_config::configurable_component;
 use vector_core::config::{log_schema, LegacyKey, LogNamespace};
 
 #[cfg(unix)]
@@ -364,7 +364,6 @@ mod test {
         time::{timeout, Duration, Instant},
     };
     use vector_common::btreemap;
-    use vector_config::NamedComponent;
     use vector_core::event::EventContainer;
     #[cfg(unix)]
     use {

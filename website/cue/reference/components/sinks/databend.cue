@@ -1,32 +1,37 @@
 package metadata
 
-components: sinks: apex: {
-	title: "Apex"
+components: sinks: databend: {
+	title: "Databend"
 
 	classes: {
 		commonly_used: true
 		delivery:      "at_least_once"
 		development:   "beta"
 		egress_method: "batch"
-		service_providers: ["apex.sh"]
+		service_providers: ["Databend"]
 		stateful: false
 	}
 
 	features: {
+		auto_generated:   true
 		acknowledgements: true
 		healthcheck: enabled: true
 		send: {
 			batch: {
 				enabled:      true
-				common:       true
+				common:       false
 				max_bytes:    10_000_000
 				timeout_secs: 1.0
 			}
 			compression: {
-				enabled: false
+				enabled: true
+				default: "gzip"
+				algorithms: ["none", "gzip"]
+				levels: ["none", "fast", "default", "best", 0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
 			}
 			encoding: {
-				enabled: false
+				enabled: true
+				codec: enabled: false
 			}
 			proxy: enabled: true
 			request: {
@@ -41,10 +46,14 @@ components: sinks: apex: {
 				enabled_by_scheme:      true
 			}
 			to: {
-				service: services.apex
+				service: services.databend
 
 				interface: {
 					socket: {
+						api: {
+							title: "Databend HTTP REST API"
+							url:   urls.databend_rest
+						}
 						direction: "outgoing"
 						protocols: ["http"]
 						ssl: "optional"
@@ -55,34 +64,16 @@ components: sinks: apex: {
 	}
 
 	support: {
-		requirements: []
+		requirements: [
+			"""
+				[Databend](\(urls.databend)) version `>= 0.9.0` is required.
+				""",
+		]
 		warnings: []
 		notices: []
 	}
 
-	configuration: {
-		uri: {
-			description: "The base URI of the Apex instance. Vector will append `/add_events` to this."
-			required:    true
-			type: string: {
-				examples: ["http://localhost:3100"]
-			}
-		}
-		project_id: {
-			description: "The ID of the project to associate reported logs with."
-			required:    true
-			type: string: {
-				examples: ["my-project"]
-			}
-		}
-		api_token: {
-			description: "The API token to use to authenticate with Apex."
-			required:    true
-			type: string: {
-				examples: ["${API_TOKEN}"]
-			}
-		}
-	}
+	configuration: base.components.sinks.databend.configuration
 
 	input: {
 		logs:    true
@@ -90,14 +81,28 @@ components: sinks: apex: {
 		traces:  false
 	}
 
+	how_it_works: {
+		staged_sink: {
+			title: "Staged Sink"
+			body: """
+				The `Databend` sink will do a 3-step batch sink by default:
+				1. Get a presigned url for object storage before a batch by the query:
+				    ```sql
+				    PRESIGN UPLOAD @stage_name/stage_path;
+				    ```
+				    The `stage_name` default to user stage: `~`.
+				    The `stage_path` generated from: `vector/{database}/{table}/{timestamp}-{random_suffix}`
+				2. Format data into ndjson, and upload directly into object storage with the presigned url.
+				3. Insert with the uploaded file with stage attachment in previous step.
+				    ref: https://databend.rs/doc/sql-commands/dml/dml-insert#insert-with-stage-attachment
+				"""
+		}
+	}
+
 	telemetry: metrics: {
 		component_sent_bytes_total:       components.sources.internal_metrics.output.metrics.component_sent_bytes_total
 		component_sent_events_total:      components.sources.internal_metrics.output.metrics.component_sent_events_total
 		component_sent_event_bytes_total: components.sources.internal_metrics.output.metrics.component_sent_event_bytes_total
-		events_discarded_total:           components.sources.internal_metrics.output.metrics.events_discarded_total
 		events_out_total:                 components.sources.internal_metrics.output.metrics.events_out_total
-		processed_bytes_total:            components.sources.internal_metrics.output.metrics.processed_bytes_total
-		processing_errors_total:          components.sources.internal_metrics.output.metrics.processing_errors_total
-		streams_total:                    components.sources.internal_metrics.output.metrics.streams_total
 	}
 }

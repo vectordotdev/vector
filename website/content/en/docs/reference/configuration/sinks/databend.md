@@ -1,9 +1,9 @@
 ---
-title: Apex
-description: Deliver log events to [Apex](https://apex.sh/logs/)
+title: Databend
+description: Deliver log data to the [Databend](https://databend.rs) database
 kind: sink
 layout: component
-tags: ["apex", "component", "sink", "logs"]
+tags: ["datafuselabs", "databend", "component", "sink", "storage", "logs"]
 ---
 
 {{/*

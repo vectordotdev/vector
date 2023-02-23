@@ -1,7 +1,6 @@
 use bytes::{BufMut, BytesMut};
 use tokio_util::codec::Encoder;
 use value::Kind;
-use vector_config::configurable_component;
 use vector_core::{
     config::{log_schema, DataType},
     event::Event,
@@ -11,7 +10,7 @@ use vector_core::{
 use crate::MetricTagValues;
 
 /// Config used to build a `TextSerializer`.
-#[configurable_component]
+#[crate::configurable_component]
 #[derive(Debug, Clone, Default)]
 pub struct TextSerializerConfig {
     /// Controls how metric tag values are encoded.

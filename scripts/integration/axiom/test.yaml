@@ -6,7 +6,10 @@ args:
 
 runner:
   env:
-    AXIOM_URL: http://axiom-core
+    AXIOM_URL: https://api.axiom.co
+    AXIOM_ORG_ID: vector-integration-test-8gny
+    AXIOM_DATASET: events
+    AXIOM_TOKEN:
 
 matrix:
   postgres: [13-alpine]

@@ -11,7 +11,7 @@ use http::{
 use hyper::Body;
 use indexmap::IndexMap;
 use tokio_util::codec::Encoder as _;
-use vector_config::{configurable_component, NamedComponent};
+use vector_config::configurable_component;
 
 use crate::{
     codecs::{Encoder, EncodingConfigWithFraming, SinkType, Transformer},

@@ -330,8 +330,8 @@ test-behavior: test-behavior-transforms test-behavior-formats test-behavior-conf
 
 .PHONY: test-integration
 test-integration: ## Runs all integration tests
-test-integration: test-integration-amqp test-integration-apex test-integration-aws test-integration-axiom test-integration-azure test-integration-chronicle test-integration-clickhouse
-test-integration: test-integration-docker-logs test-integration-elasticsearch
+test-integration: test-integration-amqp test-integration-aws test-integration-axiom test-integration-azure test-integration-chronicle test-integration-clickhouse
+test-integration: test-integration-databend test-integration-docker-logs test-integration-elasticsearch
 test-integration: test-integration-eventstoredb test-integration-fluent test-integration-gcp test-integration-humio test-integration-http-client test-integration-influxdb
 test-integration: test-integration-kafka test-integration-logstash test-integration-loki test-integration-mongodb test-integration-nats
 test-integration: test-integration-nginx test-integration-opentelemetry test-integration-postgres test-integration-prometheus test-integration-pulsar
@@ -607,10 +607,6 @@ compile-vrl-wasm: ## Compile VRL crates to WASM target
 	@scripts/compile-vrl-wasm.sh
 
 ##@ Utility
-
-.PHONY: build-ci-docker-images
-build-ci-docker-images: ## Rebuilds all Docker images used in CI
-	@scripts/build-ci-docker-images.sh
 
 .PHONY: clean
 clean: environment-clean ## Clean everything

@@ -1,4 +1,5 @@
 use darling::error::Accumulator;
+use quote::{quote, ToTokens};
 use serde_derive_internals::{attr as serde_attr, Ctxt};
 use syn::{spanned::Spanned, Attribute, ExprPath, Lit, Meta, MetaNameValue, NestedMeta};
 
@@ -137,11 +138,6 @@ fn none_if_empty(s: String) -> Option<String> {
     }
 }
 
-pub fn get_default_exprpath() -> ExprPath {
-    syn::parse_str("::std::default::Default::default")
-        .expect("expression path for default should never be invalid")
-}
-
 pub fn err_field_missing_description<T: Spanned>(field: &T) -> darling::Error {
     darling::Error::custom(ERR_FIELD_MISSING_DESCRIPTION).with_span(field)
 }
@@ -150,10 +146,19 @@ pub fn err_field_implicit_transparent<T: Spanned>(field: &T) -> darling::Error {
     darling::Error::custom(ERR_FIELD_IMPLICIT_TRANSPARENT).with_span(field)
 }
 
-pub fn get_serde_default_value(default: &serde_attr::Default) -> Option<ExprPath> {
+pub fn get_serde_default_value<S: ToTokens>(
+    source: &S,
+    default: &serde_attr::Default,
+) -> Option<ExprPath> {
     match default {
         serde_attr::Default::None => None,
-        serde_attr::Default::Default => Some(get_default_exprpath()),
+        serde_attr::Default::Default => {
+            let qualified_path = syn::parse2(quote! {
+                <#source as ::std::default::Default>::default
+            })
+            .expect("should not fail to parse qualified default path");
+            Some(qualified_path)
+        }
         serde_attr::Default::Path(path) => Some(path.clone()),
     }
 }

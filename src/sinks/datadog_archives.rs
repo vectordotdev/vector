@@ -215,7 +215,7 @@ pub struct S3Options {
     /// For more information, see [Using Amazon S3 storage classes][storage_classes].
     ///
     /// [storage_classes]: https://docs.aws.amazon.com/AmazonS3/latest/dev/storage-class-intro.html
-    pub storage_class: Option<S3StorageClass>,
+    pub storage_class: S3StorageClass,
 
     /// The tag-set for the object.
     #[configurable(metadata(docs::additional_props_description = "A single tag."))]
@@ -362,7 +362,7 @@ impl DatadogArchivesSinkConfig {
             .service(service);
 
         match s3_options.storage_class {
-            Some(class @ S3StorageClass::DeepArchive) | Some(class @ S3StorageClass::Glacier) => {
+            class @ S3StorageClass::DeepArchive | class @ S3StorageClass::Glacier => {
                 return Err(ConfigError::UnsupportedStorageClass {
                     storage_class: format!("{:?}", class),
                 });
@@ -856,7 +856,9 @@ impl RequestBuilder<(String, Vec<Event>)> for DatadogAzureRequestBuilder {
 //
 // TODO: When the sink is fully supported and we expose it for use/within the docs, remove this.
 impl NamedComponent for DatadogArchivesSinkConfig {
-    const NAME: &'static str = "datadog_archives";
+    fn get_component_name(&self) -> &'static str {
+        "datadog_archives"
+    }
 }
 
 #[async_trait::async_trait]
@@ -1141,7 +1143,7 @@ mod tests {
                 request: TowerRequestConfig::default(),
                 aws_s3: Some(S3Config {
                     options: S3Options {
-                        storage_class: Some(class),
+                        storage_class: class,
                         ..Default::default()
                     },
                     region: RegionOrEndpoint::with_region("us-east-1".to_owned()),

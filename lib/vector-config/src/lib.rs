@@ -130,9 +130,10 @@
 pub mod indexmap {
     pub use indexmap::*;
 }
-pub mod schemars {
-    pub use schemars::*;
+pub mod schema_gen {
+    pub use vector_config_common::schema_gen::*;
 }
+
 pub use serde_json;
 
 pub mod component;
@@ -153,8 +154,6 @@ mod stdlib;
 mod str;
 pub use self::str::ConfigurableString;
 
-use vector_config_common::attributes::CustomAttribute;
-
 // Re-export of the `#[configurable_component]` and `#[derive(Configurable)]` proc macros.
 pub use vector_config_macros::*;
 
@@ -168,7 +167,7 @@ pub mod validation {
 }
 
 #[doc(hidden)]
-pub fn __ensure_numeric_validation_bounds<N>(metadata: &Metadata<N>) -> Result<(), GenerateError>
+pub fn __ensure_numeric_validation_bounds<N>(metadata: &Metadata) -> Result<(), GenerateError>
 where
     N: Configurable + ConfigurableNumber,
 {
