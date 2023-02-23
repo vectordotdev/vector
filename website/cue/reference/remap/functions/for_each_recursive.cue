@@ -1,6 +1,6 @@
 package metadata
 
-remap: functions: for_keys: {
+remap: functions: for_each_recursive: {
 	category: "Enumerate"
 	description: """
 		Iterate recursively through an object.
@@ -43,7 +43,7 @@ remap: functions: for_keys: {
 			}
 			source: #"""
 
-				for_keys(.) -> |keys, value| {
+				for_each_recursive(.) -> |keys, value| {
                     # Check the path to the key.
                     # An enrichment table could be used here
                     # for checking log fields against.

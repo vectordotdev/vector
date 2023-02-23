@@ -2,7 +2,7 @@ use ::value::Value;
 use std::collections::btree_map;
 use vrl::prelude::*;
 
-fn for_keys<T>(value: Value, ctx: &mut Context, runner: closure::Runner<T>) -> Resolved
+fn for_each_recursive<T>(value: Value, ctx: &mut Context, runner: closure::Runner<T>) -> Resolved
 where
     T: Fn(&mut Context) -> Resolved,
 {
@@ -86,11 +86,11 @@ impl<'a> std::iter::Iterator for MapParent<'a> {
 }
 
 #[derive(Clone, Copy, Debug)]
-pub struct ForKeys;
+pub struct ForEachRecursive;
 
-impl Function for ForKeys {
+impl Function for ForEachRecursive {
     fn identifier(&self) -> &'static str {
-        "for_keys"
+        "for_each_recursive"
     }
 
     fn parameters(&self) -> &'static [Parameter] {
@@ -104,7 +104,7 @@ impl Function for ForKeys {
     fn examples(&self) -> &'static [Example] {
         &[Example {
             title: "iterate object key values",
-            source: r#".example = {}; .example.child = "123"; for_keys(.) -> |keys, value| { if join!(keys, ".") == "example.child" { . = remove!(., keys) }}; ."#,
+            source: r#".example = {}; .example.child = "123"; for_each_recursive(.) -> |keys, value| { if join!(keys, ".") == "example.child" { . = remove!(., keys) }}; ."#,
             result: Ok(r#"{"example":{}}"#),
         }]
     }
@@ -118,7 +118,7 @@ impl Function for ForKeys {
         let value = arguments.required("value");
         let closure = arguments.required_closure()?;
 
-        Ok(ForKeysFn { value, closure }.as_expr())
+        Ok(ForEachRecursiveFn { value, closure }.as_expr())
     }
 
     fn closure(&self) -> Option<closure::Definition> {
@@ -139,7 +139,7 @@ impl Function for ForKeys {
                 output: Output::Kind(Kind::any()),
                 example: Example {
                     title: "iterate object keys/values",
-                    source: r#".example = {}; .example.child = "123"; for_keys(.) -> |keys, value| { if join!(keys, ".") == "example.child" { . = remove!(., keys) }}; ."#,
+                    source: r#".example = {}; .example.child = "123"; for_each_recursive(.) -> |keys, value| { if join!(keys, ".") == "example.child" { . = remove!(., keys) }}; ."#,
                     result: Ok(r#"{"example":{}}"#),
                 },
             }],
@@ -149,12 +149,12 @@ impl Function for ForKeys {
 }
 
 #[derive(Debug, Clone)]
-struct ForKeysFn {
+struct ForEachRecursiveFn {
     value: Box<dyn Expression>,
     closure: FunctionClosure,
 }
 
-impl FunctionExpression for ForKeysFn {
+impl FunctionExpression for ForEachRecursiveFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         let FunctionClosure {
@@ -164,7 +164,7 @@ impl FunctionExpression for ForKeysFn {
         } = &self.closure;
         let runner = closure::Runner::new(variables, |ctx| block.resolve(ctx));
 
-        for_keys(value, ctx, runner)
+        for_each_recursive(value, ctx, runner)
     }
 
     fn type_def(&self, ctx: &state::TypeState) -> TypeDef {
