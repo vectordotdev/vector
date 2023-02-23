@@ -1,7 +1,7 @@
 ---
-title: Log Namespacing. Changing Vector's data model.
+title: Log Namespacing: Changing Vector's data model.
 short: Log Namespacing
-description: Introducing log namespacing.
+description: Introducing log namespacing
 authors: ["fuchsnj"]
 date: "2023-??-??"
 badges:
