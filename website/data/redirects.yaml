@@ -12,6 +12,7 @@ sinks:
 - axiom
 - azure_monitor_logs
 - clickhouse
+- databend
 - datadog_logs
 - datadog_metrics
 - elasticsearch

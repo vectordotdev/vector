@@ -613,6 +613,7 @@ sinks-logs = [
   "sinks-chronicle",
   "sinks-clickhouse",
   "sinks-console",
+  "sinks-databend",
   "sinks-datadog_archives",
   "sinks-datadog_events",
   "sinks-datadog_logs",
@@ -668,6 +669,7 @@ sinks-blackhole = []
 sinks-chronicle = []
 sinks-clickhouse = []
 sinks-console = []
+sinks-databend = []
 sinks-datadog_archives = ["sinks-aws_s3", "sinks-azure_blob", "sinks-gcp"]
 sinks-datadog_events = []
 sinks-datadog_logs = []
@@ -722,6 +724,7 @@ all-integration-tests = [
   "azure-integration-tests",
   "chronicle-integration-tests",
   "clickhouse-integration-tests",
+  "databend-integration-tests",
   "datadog-agent-integration-tests",
   "datadog-logs-integration-tests",
   "datadog-metrics-integration-tests",
@@ -780,6 +783,7 @@ axiom-integration-tests = ["sinks-axiom"]
 azure-blob-integration-tests = ["sinks-azure_blob"]
 chronicle-integration-tests = ["sinks-gcp"]
 clickhouse-integration-tests = ["sinks-clickhouse"]
+databend-integration-tests = ["sinks-databend"]
 datadog-agent-integration-tests = ["sources-datadog_agent"]
 datadog-logs-integration-tests = ["sinks-datadog_logs"]
 datadog-metrics-integration-tests = ["sinks-datadog_metrics"]

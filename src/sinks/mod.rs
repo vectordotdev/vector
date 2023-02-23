@@ -34,6 +34,8 @@ pub mod blackhole;
 pub mod clickhouse;
 #[cfg(feature = "sinks-console")]
 pub mod console;
+#[cfg(feature = "sinks-databend")]
+pub mod databend;
 #[cfg(any(
     feature = "sinks-datadog_events",
     feature = "sinks-datadog_logs",
@@ -196,6 +198,10 @@ pub enum Sinks {
     #[cfg(feature = "sinks-console")]
     #[configurable(metadata(docs::label = "Console"))]
     Console(console::ConsoleSinkConfig),
+
+    /// Deliver log data to a Databend database.
+    #[cfg(feature = "sinks-databend")]
+    Databend(databend::DatabendConfig),
 
     /// Send events to Datadog Archives.
     #[cfg(feature = "sinks-datadog_archives")]
@@ -438,6 +444,8 @@ impl NamedComponent for Sinks {
             Self::Clickhouse(config) => config.get_component_name(),
             #[cfg(feature = "sinks-console")]
             Self::Console(config) => config.get_component_name(),
+            #[cfg(feature = "sinks-databend")]
+            Self::Databend(config) => config.get_component_name(),
             #[cfg(feature = "sinks-datadog_archives")]
             Self::DatadogArchives(config) => config.get_component_name(),
             #[cfg(feature = "sinks-datadog_events")]

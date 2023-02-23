@@ -1,0 +1,14 @@
+args:
+- --features
+- databend-integration-tests
+- --lib
+- '::databend::'
+
+runner:
+  env:
+    DATABEND_ENDPOINT: http://databend:8000
+    DATABEND_USER: vector
+    DATABEND_PASSWORD: vector
+
+matrix:
+  version: ['latest']

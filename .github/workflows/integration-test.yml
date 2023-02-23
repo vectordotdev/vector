@@ -61,6 +61,7 @@ jobs:
           - test: 'axiom'
           - test: 'azure'
           - test: 'clickhouse'
+          - test: 'databend'
           - test: 'datadog-agent'
           - test: 'datadog-logs'
           - test: 'datadog-metrics'
