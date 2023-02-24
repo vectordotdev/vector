@@ -276,6 +276,18 @@ base: components: sinks: azure_monitor_logs: configuration: {
 		required: true
 		type: string: examples: ["SERsIYhgMVlJB6uPsq49gCxNiruf6v0vhMYE+lfzbSGcXjdViZdV/e5pEMTYtw9f8SkVLf4LFlLCc2KxtRZfCA==", "${AZURE_MONITOR_SHARED_KEY_ENV_VAR}"]
 	}
+	time_generated_key: {
+		description: """
+			Event field to store the value used to populate the [`TimeGenerated`][1] column.
+
+			If unset, the global `log_schema.timestamp_key` is used. This should only be changed if an
+			existing `timestamp` field is present, but shouldn't be used for the `TimeGenerated` column.
+
+			[1]: https://learn.microsoft.com/en-us/azure/azure-monitor/logs/log-standard-columns#timegenerated
+			"""
+		required: false
+		type: string: examples: ["time_generated"]
+	}
 	tls: {
 		description: "TLS configuration."
 		required:    false
