@@ -1,12 +1,11 @@
 use std::sync::Arc;
 
+use futures::{stream, Sink, Stream};
 use futures_util::{future, stream::BoxStream, FutureExt, StreamExt};
-use serde::{Deserialize, Serialize};
 use tokio::sync::{oneshot, Mutex};
 use vector_config::configurable_component;
-use vector_core::config::LogNamespace;
 use vector_core::{
-    config::{DataType, Input, Output},
+    config::{DataType, Input, LogNamespace, Output},
     event::Event,
     sink::{StreamSink, VectorSink},
 };
@@ -52,6 +51,59 @@ impl SourceConfig for UnitTestSourceConfig {
     }
 }
 
+/// Configuration for the `unit_test_stream` source.
+#[configurable_component(source("unit_test_stream"))]
+#[derive(Clone)]
+pub struct UnitTestStreamSourceConfig {
+    #[serde(skip)]
+    stream: Arc<Mutex<Option<stream::BoxStream<'static, Event>>>>,
+}
+
+impl_generate_config_from_default!(UnitTestStreamSourceConfig);
+
+impl UnitTestStreamSourceConfig {
+    pub fn new(stream: impl Stream<Item = Event> + Send + 'static) -> Self {
+        Self {
+            stream: Arc::new(Mutex::new(Some(stream.boxed()))),
+        }
+    }
+}
+
+impl Default for UnitTestStreamSourceConfig {
+    fn default() -> Self {
+        Self::new(stream::empty().boxed())
+    }
+}
+
+impl std::fmt::Debug for UnitTestStreamSourceConfig {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("UnitTestStreamSourceConfig")
+            .finish()
+    }
+}
+
+#[async_trait::async_trait]
+impl SourceConfig for UnitTestStreamSourceConfig {
+    async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
+        let stream = self.stream.lock().await.take().unwrap();
+        Ok(Box::pin(async move {
+            let mut out = cx.out;
+            let _shutdown = cx.shutdown;
+            out.send_event_stream(stream).await.map_err(|_| ())?;
+            Ok(())
+        }))
+    }
+
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
+        vec![Output::default(DataType::all())]
+    }
+
+    fn can_acknowledge(&self) -> bool {
+        false
+    }
+}
+
 #[derive(Clone)]
 pub enum UnitTestSinkCheck {
     /// Check all events that are received against the list of conditions.
@@ -77,7 +129,8 @@ pub struct UnitTestSinkResult {
 }
 
 /// Configuration for the `unit_test` sink.
-#[derive(Clone, Default, Derivative, Deserialize, Serialize)]
+#[configurable_component(sink("unit_test"))]
+#[derive(Clone, Default, Derivative)]
 #[derivative(Debug)]
 pub struct UnitTestSinkConfig {
     /// Name of the test that this sink is being used for.
@@ -96,8 +149,9 @@ pub struct UnitTestSinkConfig {
     pub check: UnitTestSinkCheck,
 }
 
+impl_generate_config_from_default!(UnitTestSinkConfig);
+
 #[async_trait::async_trait]
-#[typetag::serde(name = "unit_test")]
 impl SinkConfig for UnitTestSinkConfig {
     async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let tx = self.result_tx.lock().await.take();
@@ -110,10 +164,6 @@ impl SinkConfig for UnitTestSinkConfig {
         let healthcheck = future::ok(()).boxed();
 
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
-    }
-
-    fn sink_type(&self) -> &'static str {
-        "unit_test"
     }
 
     fn input(&self) -> Input {
@@ -212,6 +262,49 @@ impl StreamSink<Event> for UnitTestSink {
             }
         }
         Ok(())
+    }
+}
+
+/// Configuration for the `unit_test_stream` sink.
+#[configurable_component(sink("unit_test_stream"))]
+#[derive(Clone, Default)]
+pub struct UnitTestStreamSinkConfig {
+    /// Sink that receives the processed events.
+    #[serde(skip)]
+    sink: Arc<Mutex<Option<Box<dyn Sink<Event, Error = ()> + Send + Unpin>>>>,
+}
+
+impl_generate_config_from_default!(UnitTestStreamSinkConfig);
+
+impl UnitTestStreamSinkConfig {
+    pub fn new(sink: impl Sink<Event, Error = ()> + Send + Unpin + 'static) -> Self {
+        Self {
+            sink: Arc::new(Mutex::new(Some(Box::new(sink)))),
+        }
+    }
+}
+
+impl std::fmt::Debug for UnitTestStreamSinkConfig {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.debug_struct("UnitTestStreamSinkConfig").finish()
+    }
+}
+
+#[async_trait::async_trait]
+impl SinkConfig for UnitTestStreamSinkConfig {
+    async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+        let sink = self.sink.lock().await.take().unwrap();
+        let healthcheck = future::ok(()).boxed();
+
+        Ok((VectorSink::from_event_sink(sink), healthcheck))
+    }
+
+    fn input(&self) -> Input {
+        Input::all()
+    }
+
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &AcknowledgementsConfig::DEFAULT
     }
 }
 

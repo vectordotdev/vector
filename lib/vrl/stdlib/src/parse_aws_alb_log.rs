@@ -38,7 +38,7 @@ impl Function for ParseAwsAlbLog {
         &self,
         _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
 
@@ -243,7 +243,7 @@ fn parse_log(mut input: &str) -> Result<Value> {
 
     match input.is_empty() {
         true => Ok(log.into()),
-        false => Err(format!(r#"Log should be fully consumed: "{}""#, input).into()),
+        false => Err(format!(r#"Log should be fully consumed: "{input}""#).into()),
     }
 }
 

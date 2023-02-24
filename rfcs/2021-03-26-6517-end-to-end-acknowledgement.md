@@ -247,7 +247,7 @@ When the last event in the batch is dropped, the sender will be closed
 and the receiver will be signalled that all events are completed.
 
 Since this is making the parameter list for `trait SourceConfig::build`
-increasingly unweidly, a new context structure will be introduced to
+increasingly unwieldy, a new context structure will be introduced to
 carry the data.
 
 ```rust

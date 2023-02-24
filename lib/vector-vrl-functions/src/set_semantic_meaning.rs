@@ -1,15 +1,15 @@
 use std::ops::{Deref, DerefMut};
 
 use ::value::Value;
-use lookup::LookupBuf;
+use lookup::OwnedValuePath;
 use vrl::state::TypeState;
 use vrl::{diagnostic::Label, prelude::*};
 
 #[derive(Debug, Default, Clone)]
-pub struct MeaningList(pub BTreeMap<String, LookupBuf>);
+pub struct MeaningList(pub BTreeMap<String, OwnedValuePath>);
 
 impl Deref for MeaningList {
-    type Target = BTreeMap<String, LookupBuf>;
+    type Target = BTreeMap<String, OwnedValuePath>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -57,7 +57,7 @@ impl Function for SetSemanticMeaning {
         &self,
         state: &TypeState,
         ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let span = ctx.span();
         let query = arguments.required_query("target")?;

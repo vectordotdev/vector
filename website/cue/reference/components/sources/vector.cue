@@ -19,6 +19,7 @@ components: sources: vector: {
 	}
 
 	features: {
+		auto_generated:   true
 		acknowledgements: true
 		multiline: enabled: false
 		receive: {
@@ -52,46 +53,12 @@ components: sources: vector: {
 		platform_name: null
 	}
 
-	configuration: {
-		acknowledgements: configuration._source_acknowledgements
-		address: {
-			description: """
-				The HTTP address to listen for connections on. It _must_ include a port.
-				"""
-			required: true
-			type: string: {
-				examples: ["0.0.0.0:\(_port)"]
-			}
-		}
-		shutdown_timeout_secs: {
-			common:      false
-			description: "The timeout before a connection is forcefully closed during shutdown."
-			required:    false
-			type: uint: {
-				default: 30
-				unit:    "seconds"
-			}
-		}
-		version: {
-			description: "Source API version. Specifying this version ensures that Vector does not break backward compatibility."
-			common:      true
-			required:    false
-			warnings: ["Ensure you use the same version for both the source and sink."]
-			type: string: {
-				enum: {
-					"1": "Vector source API version 1"
-					"2": "Vector source API version 2"
-				}
-				default: "2"
-			}
-		}
-	}
+	configuration: base.components.sources.vector.configuration
 
 	output: {
 		logs: event: {
 			description: "A Vector event"
 			fields: {
-				client_metadata: fields._client_metadata
 				source_type: {
 					description: "The name of the source type."
 					required:    true

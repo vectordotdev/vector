@@ -259,7 +259,7 @@ where
     fn ident(&self, index: usize) -> Option<&Ident> {
         self.variables
             .get(index)
-            .and_then(|v| (!v.is_empty()).then(|| v))
+            .and_then(|v| (!v.is_empty()).then_some(v))
     }
 }
 

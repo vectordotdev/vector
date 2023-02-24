@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{HashMap, HashSet};
 
 use bytes::{Bytes, BytesMut};
 use futures::SinkExt;
@@ -8,12 +8,10 @@ use vector_config::configurable_component;
 
 use crate::{
     codecs::Transformer,
-    config::{
-        log_schema, AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext,
-        SinkDescription,
-    },
-    event::{Event, Value},
+    config::{log_schema, AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
+    event::{Event, MetricTags, Value},
     http::HttpClient,
+    internal_events::InfluxdbEncodingError,
     sinks::{
         influxdb::{
             encode_timestamp, healthcheck, influx_line_protocol, influxdb_settings, Field,
@@ -38,7 +36,7 @@ impl SinkBatchSettings for InfluxDbLogsDefaultBatchSettings {
 }
 
 /// Configuration for the `influxdb_logs` sink.
-#[configurable_component(sink)]
+#[configurable_component(sink("influxdb_logs"))]
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct InfluxDbLogsConfig {
@@ -46,18 +44,26 @@ pub struct InfluxDbLogsConfig {
     ///
     /// When specified, the measurement name will be `<namespace>.vector`.
     ///
-    /// This field is deprecated, and `measurement` should be used instead.
-    #[configurable(deprecated)]
+    #[configurable(
+        deprecated = "This field is deprecated, and `measurement` should be used instead."
+    )]
+    #[configurable(metadata(docs::examples = "service"))]
     pub namespace: Option<String>,
 
     /// The name of the InfluxDB measurement that will be written to.
+    #[configurable(metadata(docs::examples = "vector-logs"))]
     pub measurement: Option<String>,
 
     /// The endpoint to send data to.
+    ///
+    /// This should be a full HTTP URI, including the scheme, host, and port.
+    #[configurable(metadata(docs::examples = "http://localhost:8086"))]
     pub endpoint: String,
 
     /// The list of names of log fields that should be added as tags to each measurement.
     #[serde(default)]
+    #[configurable(metadata(docs::examples = "field1"))]
+    #[configurable(metadata(docs::examples = "parent.child_field"))]
     pub tags: Vec<String>,
 
     #[serde(flatten)]
@@ -103,10 +109,6 @@ struct InfluxDbLogsSink {
     transformer: Transformer,
 }
 
-inventory::submit! {
-    SinkDescription::new::<InfluxDbLogsConfig>("influxdb_logs")
-}
-
 impl GenerateConfig for InfluxDbLogsConfig {
     fn generate_config() -> toml::Value {
         toml::from_str(indoc! {r#"
@@ -122,14 +124,13 @@ impl GenerateConfig for InfluxDbLogsConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "influxdb_logs")]
 impl SinkConfig for InfluxDbLogsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let measurement = self.get_measurement()?;
         let mut tags: HashSet<String> = self.tags.clone().into_iter().collect();
-        tags.insert(log_schema().host_key().to_string());
-        tags.insert(log_schema().source_type_key().to_string());
-        tags.insert("metric_type".to_string());
+        tags.replace(log_schema().host_key().to_string());
+        tags.replace(log_schema().source_type_key().to_string());
+        tags.replace("metric_type".to_string());
 
         let tls_settings = TlsSettings::from_options(&self.tls)?;
         let client = HttpClient::new(tls_settings, cx.proxy())?;
@@ -155,7 +156,7 @@ impl SinkConfig for InfluxDbLogsConfig {
 
         let sink = InfluxDbLogsSink {
             uri,
-            token,
+            token: token.inner().to_owned(),
             protocol_version,
             measurement,
             tags,
@@ -176,10 +177,6 @@ impl SinkConfig for InfluxDbLogsConfig {
 
     fn input(&self) -> Input {
         Input::log()
-    }
-
-    fn sink_type(&self) -> &'static str {
-        "influxdb_logs"
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
@@ -211,18 +208,18 @@ impl HttpEventEncoder<BytesMut> for InfluxDbLogsEncoder {
         });
 
         // Tags + Fields
-        let mut tags: BTreeMap<String, String> = BTreeMap::new();
+        let mut tags = MetricTags::default();
         let mut fields: HashMap<String, Field> = HashMap::new();
         log.convert_to_fields().for_each(|(key, value)| {
             if self.tags.contains(&key) {
-                tags.insert(key, value.to_string_lossy());
+                tags.replace(key, value.to_string_lossy().into_owned());
             } else {
                 fields.insert(key, to_field(value));
             }
         });
 
         let mut output = BytesMut::new();
-        if let Err(error) = influx_line_protocol(
+        if let Err(error_message) = influx_line_protocol(
             self.protocol_version,
             &self.measurement,
             Some(tags),
@@ -230,7 +227,10 @@ impl HttpEventEncoder<BytesMut> for InfluxDbLogsEncoder {
             timestamp,
             &mut output,
         ) {
-            warn!(message = "Failed to encode event; dropping event.", %error, internal_log_rate_secs = 30);
+            emit!(InfluxdbEncodingError {
+                error_message,
+                count: 1
+            });
             return None;
         };
 
@@ -301,14 +301,14 @@ fn to_field(value: &Value) -> Field {
         Value::Integer(num) => Field::Int(*num),
         Value::Float(num) => Field::Float(num.into_inner()),
         Value::Boolean(b) => Field::Bool(*b),
-        _ => Field::String(value.to_string_lossy()),
+        _ => Field::String(value.to_string_lossy().into_owned()),
     }
 }
 
 #[cfg(test)]
 mod tests {
     use chrono::{offset::TimeZone, Utc};
-    use futures::{channel::mpsc, StreamExt};
+    use futures::{channel::mpsc, stream, StreamExt};
     use http::{request::Parts, StatusCode};
     use indoc::indoc;
     use vector_core::event::{BatchNotifier, BatchStatus, Event, LogEvent};
@@ -319,7 +319,13 @@ mod tests {
             influxdb::test_util::{assert_fields, split_line_protocol, ts},
             util::test::{build_test_server_status, load_sink},
         },
-        test_util::{components, components::HTTP_SINK_TAGS, next_addr},
+        test_util::{
+            components::{
+                run_and_assert_sink_compliance, run_and_assert_sink_error, COMPONENT_ERROR_TAGS,
+                HTTP_SINK_TAGS,
+            },
+            next_addr,
+        },
     };
 
     type Receiver = mpsc::Receiver<(Parts, bytes::Bytes)>;
@@ -685,7 +691,10 @@ mod tests {
             let mut event = LogEvent::from(line.to_string()).with_batch_notifier(&batch);
             event.insert(format!("key{}", i).as_str(), format!("value{}", i));
 
-            let timestamp = Utc.ymd(1970, 1, 1).and_hms_nano(0, 0, (i as u32) + 1, 0);
+            let timestamp = Utc
+                .ymd(1970, 1, 1)
+                .and_hms_nano_opt(0, 0, (i as u32) + 1, 0)
+                .expect("invalid timestamp");
             event.insert("timestamp", timestamp);
             event.insert("source_type", "file");
 
@@ -693,10 +702,10 @@ mod tests {
         }
         drop(batch);
 
-        components::init_test();
-        sink.run_events(events).await.unwrap();
         if batch_status == BatchStatus::Delivered {
-            components::SINK_TESTS.assert(&HTTP_SINK_TAGS);
+            run_and_assert_sink_compliance(sink, stream::iter(events), &HTTP_SINK_TAGS).await;
+        } else {
+            run_and_assert_sink_error(sink, stream::iter(events), &COMPONENT_ERROR_TAGS).await;
         }
 
         assert_eq!(receiver.try_recv(), Ok(batch_status));
@@ -794,7 +803,7 @@ mod integration_tests {
             influxdb2_settings: Some(InfluxDb2Settings {
                 org: ORG.to_string(),
                 bucket: BUCKET.to_string(),
-                token: TOKEN.to_string(),
+                token: TOKEN.to_string().into(),
             }),
             encoding: Default::default(),
             batch: Default::default(),

@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, time::Instant};
+use std::time::{Duration, Instant};
 
 use chrono::Utc;
 use futures::{
@@ -11,15 +11,16 @@ use mongodb::{
     options::ClientOptions,
     Client,
 };
+use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
 use vector_config::configurable_component;
-use vector_core::ByteSizeOf;
+use vector_core::{metric_tags, ByteSizeOf, EstimatedJsonEncodedSizeOf};
 
 use crate::{
     config::{self, Output, SourceConfig, SourceContext},
-    event::metric::{Metric, MetricKind, MetricValue},
+    event::metric::{Metric, MetricKind, MetricTags, MetricValue},
     internal_events::{
         CollectionCompleted, EndpointBytesReceived, MongoDbMetricsBsonParseError,
         MongoDbMetricsEventsReceived, MongoDbMetricsRequestError, StreamClosedError,
@@ -36,7 +37,7 @@ macro_rules! tags {
         {
             let mut tags = $tags.clone();
             $(
-                tags.insert($key.into(), $value.into());
+                tags.replace($key.into(), $value.to_string());
             )*
             tags
         }
@@ -74,6 +75,7 @@ enum CollectError {
 }
 
 /// Configuration for the `mongodb_metrics` source.
+#[serde_as]
 #[configurable_component(source("mongodb_metrics"))]
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
@@ -81,11 +83,13 @@ pub struct MongoDbMetricsConfig {
     /// A list of MongoDB instances to scrape.
     ///
     /// Each endpoint must be in the [Connection String URI Format](https://www.mongodb.com/docs/manual/reference/connection-string/).
+    #[configurable(metadata(docs::examples = "mongodb://localhost:27017"))]
     endpoints: Vec<String>,
 
     /// The interval between scrapes, in seconds.
     #[serde(default = "default_scrape_interval_secs")]
-    scrape_interval_secs: u64,
+    #[serde_as(as = "serde_with::DurationSeconds<u64>")]
+    scrape_interval_secs: Duration,
 
     /// Overrides the default namespace for the metrics emitted by the source.
     ///
@@ -101,11 +105,11 @@ struct MongoDbMetrics {
     client: Client,
     endpoint: String,
     namespace: Option<String>,
-    tags: BTreeMap<String, String>,
+    tags: MetricTags,
 }
 
-pub const fn default_scrape_interval_secs() -> u64 {
-    15
+pub const fn default_scrape_interval_secs() -> Duration {
+    Duration::from_secs(15)
 }
 
 pub fn default_namespace() -> String {
@@ -126,7 +130,7 @@ impl SourceConfig for MongoDbMetricsConfig {
         )
         .await?;
 
-        let duration = time::Duration::from_secs(self.scrape_interval_secs);
+        let duration = self.scrape_interval_secs;
         let shutdown = cx.shutdown;
         Ok(Box::pin(async move {
             let mut interval = IntervalStream::new(time::interval(duration)).take_until(shutdown);
@@ -164,16 +168,16 @@ impl MongoDbMetrics {
     /// Works only with Standalone connection-string. Collect metrics only from specified instance.
     /// https://docs.mongodb.com/manual/reference/connection-string/#standard-connection-string-format
     async fn new(endpoint: &str, namespace: Option<String>) -> Result<MongoDbMetrics, BuildError> {
-        let mut tags: BTreeMap<String, String> = BTreeMap::new();
-
         let mut client_options = ClientOptions::parse(endpoint)
             .await
             .context(InvalidEndpointSnafu)?;
         client_options.direct_connection = Some(true);
 
         let endpoint = sanitize_endpoint(endpoint, &client_options);
-        tags.insert("endpoint".into(), endpoint.clone());
-        tags.insert("host".into(), client_options.hosts[0].to_string());
+        let tags = metric_tags!(
+            "endpoint" => endpoint.clone(),
+            "host" => client_options.hosts[0].to_string(),
+        );
 
         Ok(Self {
             client: Client::with_options(client_options).context(InvalidClientOptionsSnafu)?,
@@ -227,12 +231,7 @@ impl MongoDbMetrics {
         Ok(())
     }
 
-    fn create_metric(
-        &self,
-        name: &str,
-        value: MetricValue,
-        tags: BTreeMap<String, String>,
-    ) -> Metric {
+    fn create_metric(&self, name: &str, value: MetricValue, tags: MetricTags) -> Metric {
         Metric::new(name, MetricKind::Absolute, value)
             .with_namespace(self.namespace.clone())
             .with_tags(Some(tags))
@@ -262,7 +261,7 @@ impl MongoDbMetrics {
         metrics.push(self.create_metric("up", gauge!(up_value), tags!(self.tags)));
 
         emit!(MongoDbMetricsEventsReceived {
-            byte_size: metrics.size_of(),
+            byte_size: metrics.estimated_json_encoded_size_of(),
             count: metrics.len(),
             endpoint: &self.endpoint,
         });
@@ -542,11 +541,13 @@ impl MongoDbMetrics {
         }
 
         // mongod_metrics_record_moves_total
-        metrics.push(self.create_metric(
-            "mongod_metrics_record_moves_total",
-            counter!(status.metrics.record.moves),
-            tags!(self.tags),
-        ));
+        if let Some(record) = status.metrics.record {
+            metrics.push(self.create_metric(
+                "mongod_metrics_record_moves_total",
+                counter!(record.moves),
+                tags!(self.tags),
+            ));
+        }
 
         // mongod_metrics_repl_apply_
         metrics.push(self.create_metric(
@@ -988,7 +989,7 @@ fn bson_size(value: &Bson) -> usize {
         Bson::Symbol(value) => value.size_of(),
         Bson::Decimal128(value) => value.bytes().size_of(),
         Bson::DbPointer(_) => {
-            // DbPointer parts are not public and cannot be evaludated
+            // DbPointer parts are not public and cannot be evaluated
             0
         }
         Bson::Null | Bson::Undefined | Bson::MaxKey | Bson::MinKey => 0,
@@ -1005,7 +1006,7 @@ fn document_size(doc: &Document) -> usize {
 /// URI components: https://docs.mongodb.com/manual/reference/connection-string/#components
 /// It's not possible to use [url::Url](https://docs.rs/url/2.1.1/url/struct.Url.html) because connection string can have multiple hosts.
 /// Would be nice to serialize [ClientOptions][https://docs.rs/mongodb/1.1.1/mongodb/options/struct.ClientOptions.html] to String, but it's not supported.
-/// `endpoint` argument would not be required, but field `original_uri` in `ClieotnOptions` is private.
+/// `endpoint` argument would not be required, but field `original_uri` in `ClientOptions` is private.
 /// `.unwrap()` in function is safe because endpoint was already verified by `ClientOptions`.
 /// Based on ClientOptions::parse_uri -- https://github.com/mongodb/mongo-rust-driver/blob/09e1193f93dcd850ebebb7fb82f6ab786fd85de1/src/client/options/mod.rs#L708
 fn sanitize_endpoint(endpoint: &str, options: &ClientOptions) -> String {
@@ -1121,7 +1122,7 @@ mod integration_tests {
             tokio::spawn(async move {
                 MongoDbMetricsConfig {
                     endpoints,
-                    scrape_interval_secs: 15,
+                    scrape_interval_secs: Duration::from_secs(15),
                     namespace: namespace.to_owned(),
                 }
                 .build(SourceContext::new_test(sender, None))
@@ -1160,8 +1161,8 @@ mod integration_tests {
                 assert!((timestamp - Utc::now()).num_seconds() < 1);
                 // validate basic tags
                 let tags = metric.tags().expect("existed tags");
-                assert_eq!(tags.get("endpoint"), Some(&clean_endpoint));
-                assert_eq!(tags.get("host"), Some(&host));
+                assert_eq!(tags.get("endpoint"), Some(&clean_endpoint[..]));
+                assert_eq!(tags.get("host"), Some(&host[..]));
             }
         })
         .await;

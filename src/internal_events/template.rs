@@ -1,8 +1,8 @@
-use crate::{emit, internal_events::ComponentEventsDropped};
+use crate::emit;
 use metrics::counter;
-use vector_core::internal_event::InternalEvent;
+use vector_core::internal_event::{ComponentEventsDropped, InternalEvent, UNINTENTIONAL};
 
-use super::prelude::{error_stage, error_type};
+use vector_common::internal_event::{error_stage, error_type};
 
 pub struct TemplateRenderingError<'a> {
     pub field: Option<&'a str>,
@@ -24,6 +24,7 @@ impl<'a> InternalEvent for TemplateRenderingError<'a> {
             error = %self.error,
             error_type = error_type::TEMPLATE_FAILED,
             stage = error_stage::PROCESSING,
+            internal_log_rate_limit = true,
         );
 
         counter!(
@@ -37,9 +38,8 @@ impl<'a> InternalEvent for TemplateRenderingError<'a> {
             "error_type" => "render_error");
 
         if self.drop_event {
-            emit!(ComponentEventsDropped {
+            emit!(ComponentEventsDropped::<UNINTENTIONAL> {
                 count: 1,
-                intentional: false,
                 reason: "Failed to render template.",
             });
 

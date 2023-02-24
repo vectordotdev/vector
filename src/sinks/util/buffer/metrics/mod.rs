@@ -20,7 +20,7 @@ pub use self::split::*;
 /// Batching mostly means that we will aggregate away timestamp information, and apply metric-specific compression to
 /// improve the performance of the pipeline. In particular, only the latest in a series of metrics are output, and
 /// incremental metrics are summed into the output buffer. Any conversion of metrics is handled by the normalization
-/// type `N: MetricNormalize`. Further, distribution metrics have their their samples compressed with
+/// type `N: MetricNormalize`. Further, distribution metrics have their samples compressed with
 /// `compress_distribution` below.
 ///
 /// Note: This has been deprecated, please do not use when creating new Sinks.
@@ -126,14 +126,12 @@ pub fn compress_distribution(samples: &mut Vec<Sample>) -> Vec<Sample> {
 
 #[cfg(test)]
 pub(self) mod tests {
-    use std::collections::BTreeMap;
-
-    use pretty_assertions::assert_eq;
-    use vector_core::event::MetricKind;
+    use similar_asserts::assert_eq;
+    use vector_core::event::metric::{MetricKind, MetricKind::*, MetricValue, StatisticKind};
+    use vector_core::metric_tags;
 
     use super::*;
     use crate::{
-        event::metric::{MetricKind::*, MetricValue, StatisticKind},
         sinks::util::BatchSettings,
         test_util::metrics::{AbsoluteMetricNormalizer, IncrementalMetricNormalizer},
     };
@@ -146,7 +144,7 @@ pub(self) mod tests {
             kind,
             MetricValue::Counter { value },
         )
-        .with_tags(Some(tag(tagstr)))
+        .with_tags(Some(metric_tags!(tagstr => "true")))
     }
 
     pub fn sample_gauge(num: usize, kind: MetricKind, value: f64) -> Metric {
@@ -210,12 +208,6 @@ pub(self) mod tests {
                 sum: factor * 7.0,
             },
         )
-    }
-
-    fn tag(name: &str) -> BTreeMap<String, String> {
-        vec![(name.to_owned(), "true".to_owned())]
-            .into_iter()
-            .collect()
     }
 
     fn rebuffer<State: MetricNormalize + Default>(metrics: Vec<Metric>) -> Buffer {

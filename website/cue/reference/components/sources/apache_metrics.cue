@@ -50,34 +50,7 @@ components: sources: apache_metrics: {
 		platform_name: null
 	}
 
-	configuration: {
-		endpoints: {
-			description: "`mod_status` endpoints to scrape metrics from."
-			required:    true
-			type: array: {
-				items: type: string: {
-					examples: ["http://localhost:8080/server-status/?auto"]
-				}
-			}
-		}
-		scrape_interval_secs: {
-			description: "The interval between scrapes."
-			common:      true
-			required:    false
-			type: uint: {
-				default: 15
-				unit:    "seconds"
-			}
-		}
-		namespace: {
-			description: "The namespace of the metric. Disabled if empty."
-			required:    false
-			common:      false
-			type: string: {
-				default: "apache"
-			}
-		}
-	}
+	configuration: base.components.sources.apache_metrics.configuration
 
 	output: metrics: {
 		// Default Apache metrics tags

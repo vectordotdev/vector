@@ -1,13 +1,13 @@
 use std::{
     future::Future,
     pin::Pin,
-    task::{Context, Poll},
+    task::{ready, Context, Poll},
 };
 
 use futures::{
     channel::oneshot,
     future::{select, BoxFuture, Either},
-    pin_mut, ready,
+    pin_mut,
     stream::FuturesOrdered,
     FutureExt, StreamExt,
 };

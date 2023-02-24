@@ -63,7 +63,7 @@ impl Function for Chunks {
         &self,
         _state: &TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
         let chunk_size = arguments.required("chunk_size");

@@ -1,0 +1,15 @@
+args:
+- --features
+- es-integration-tests
+- --lib
+- '::elasticsearch::integration_tests::'
+
+env:
+  AWS_ACCESS_KEY_ID: dummy
+  AWS_SECRET_ACCESS_KEY: dummy
+  ELASTICSEARCH_AWS_ADDRESS: http://localstack:4571
+  ELASTICSEARCH_HTTPS_ADDRESS: https://elasticsearch-secure:9200
+  ELASTICSEARCH_HTTP_ADDRESS: http://elasticsearch:9200
+
+matrix:
+  version: [7.13.1]

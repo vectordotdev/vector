@@ -26,7 +26,7 @@ impl Function for TallyValue {
         &self,
         _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let array = arguments.required("array");
         let value = arguments.required("value");

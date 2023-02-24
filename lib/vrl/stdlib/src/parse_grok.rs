@@ -47,7 +47,7 @@ impl DiagnosticMessage for Error {
         match self {
             Error::InvalidGrokPattern(err) => {
                 vec![Label::primary(
-                    format!("grok pattern error: {}", err),
+                    format!("grok pattern error: {err}"),
                     Span::default(),
                 )]
             }
@@ -101,7 +101,7 @@ impl Function for ParseGrok {
         &self,
         _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
 

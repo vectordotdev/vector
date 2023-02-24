@@ -2,6 +2,7 @@ use std::convert::TryInto;
 
 use bytes::Bytes;
 use chrono::Utc;
+use lookup::lookup_v2::parse_value_path;
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 use value::Kind;
@@ -34,7 +35,7 @@ impl JsonDeserializerConfig {
             LogNamespace::Legacy => schema::Definition::empty_legacy_namespace()
                 .unknown_fields(Kind::json())
                 .try_with_field(
-                    log_schema().timestamp_key(),
+                    &parse_value_path(log_schema().timestamp_key()).expect("valid timestamp key"),
                     // The JSON decoder will try to insert a new `timestamp`-type value into the
                     // "timestamp_key" field, but only if that field doesn't already exist.
                     Kind::json().or_timestamp(),
@@ -70,7 +71,7 @@ impl Deserializer for JsonDeserializer {
         &self,
         bytes: Bytes,
         log_namespace: LogNamespace,
-    ) -> vector_core::Result<SmallVec<[Event; 1]>> {
+    ) -> vector_common::Result<SmallVec<[Event; 1]>> {
         // It's common to receive empty frames when parsing NDJSON, since it
         // allows multiple empty newlines. We proceed without a warning here.
         if bytes.is_empty() {

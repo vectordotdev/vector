@@ -7,7 +7,10 @@ use metrics::counter;
 use prometheus_parser::ParserError;
 use vector_core::internal_event::InternalEvent;
 
-use super::prelude::{error_stage, error_type};
+use crate::emit;
+use vector_common::internal_event::{
+    error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL,
+};
 
 #[cfg(feature = "sources-prometheus")]
 #[derive(Debug)]
@@ -26,12 +29,12 @@ impl<'a> InternalEvent for PrometheusParseError<'a> {
             error = ?self.error,
             error_type = error_type::PARSER_FAILED,
             stage = error_stage::PROCESSING,
-            internal_log_rate_secs = 10,
+            internal_log_rate_limit = true,
         );
         debug!(
             message = %format!("Failed to parse response:\n\n{}\n\n", self.body),
             url = %self.url,
-            internal_log_rate_secs = 10
+            internal_log_rate_limit = true
         );
         counter!(
             "component_errors_total", 1,
@@ -56,7 +59,7 @@ impl InternalEvent for PrometheusRemoteWriteParseError {
             error = ?self.error,
             error_type = error_type::PARSER_FAILED,
             stage = error_stage::PROCESSING,
-            internal_log_rate_secs = 10,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,
@@ -82,5 +85,29 @@ impl InternalEvent for PrometheusServerRequestComplete {
             warn!(message, status_code = %self.status_code);
         }
         counter!("requests_received_total", 1);
+    }
+}
+
+#[derive(Debug)]
+pub struct PrometheusNormalizationError;
+
+impl InternalEvent for PrometheusNormalizationError {
+    fn emit(self) {
+        let normalization_reason = "Prometheus metric normalization failed.";
+        error!(
+            message = normalization_reason,
+            error_type = error_type::CONVERSION_FAILED,
+            stage = error_stage::PROCESSING,
+            internal_log_rate_limit = true,
+        );
+        counter!(
+            "component_errors_total", 1,
+            "error_type" => error_type::CONVERSION_FAILED,
+            "stage" => error_stage::PROCESSING,
+        );
+        emit!(ComponentEventsDropped::<UNINTENTIONAL> {
+            count: 1,
+            reason: normalization_reason
+        });
     }
 }

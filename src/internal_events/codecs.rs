@@ -1,15 +1,17 @@
-use crate::{emit, internal_events::ComponentEventsDropped};
+use crate::emit;
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
-use super::prelude::{error_stage, error_type};
+use vector_common::internal_event::{
+    error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL,
+};
 
 #[derive(Debug)]
-pub struct DecoderFramingError<'a> {
-    pub error: &'a codecs::decoding::BoxedFramingError,
+pub struct DecoderFramingError<E> {
+    pub error: E,
 }
 
-impl<'a> InternalEvent for DecoderFramingError<'a> {
+impl<E: std::fmt::Display> InternalEvent for DecoderFramingError<E> {
     fn emit(self) {
         counter!("decoder_framing_errors_total", 1);
         error!(
@@ -17,6 +19,7 @@ impl<'a> InternalEvent for DecoderFramingError<'a> {
             error = %self.error,
             error_type = error_type::PARSER_FAILED,
             stage = error_stage::PROCESSING,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,
@@ -39,6 +42,7 @@ impl<'a> InternalEvent for DecoderDeserializeError<'a> {
             error = %self.error,
             error_type = error_type::PARSER_FAILED,
             stage = error_stage::PROCESSING,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,
@@ -55,12 +59,13 @@ pub struct EncoderFramingError<'a> {
 
 impl<'a> InternalEvent for EncoderFramingError<'a> {
     fn emit(self) {
+        let reason = "Failed framing bytes.";
         error!(
-            message = "Failed framing bytes.",
+            message = reason,
             error = %self.error,
             error_type = error_type::ENCODER_FAILED,
             stage = error_stage::SENDING,
-            internal_log_rate_secs = 10,
+            internal_log_rate_limit = true,
         );
         counter!("encoder_framing_errors_total", 1);
         counter!(
@@ -68,11 +73,7 @@ impl<'a> InternalEvent for EncoderFramingError<'a> {
             "error_type" => error_type::ENCODER_FAILED,
             "stage" => error_stage::SENDING,
         );
-        emit!(ComponentEventsDropped {
-            count: 1,
-            intentional: false,
-            reason: "Failed framing bytes.",
-        });
+        emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
     }
 }
 
@@ -83,12 +84,13 @@ pub struct EncoderSerializeError<'a> {
 
 impl<'a> InternalEvent for EncoderSerializeError<'a> {
     fn emit(self) {
+        let reason = "Failed serializing frame.";
         error!(
-            message = "Failed serializing frame.",
+            message = reason,
             error = %self.error,
             error_type = error_type::ENCODER_FAILED,
             stage = error_stage::SENDING,
-            internal_log_rate_secs = 10,
+            internal_log_rate_limit = true,
         );
         counter!("encoder_serialize_errors_total", 1);
         counter!(
@@ -96,10 +98,36 @@ impl<'a> InternalEvent for EncoderSerializeError<'a> {
             "error_type" => error_type::ENCODER_FAILED,
             "stage" => error_stage::SENDING,
         );
-        emit!(ComponentEventsDropped {
-            count: 1,
-            intentional: false,
-            reason: "Failed serializing frame.",
-        });
+        emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
+    }
+}
+
+#[derive(Debug)]
+pub struct EncoderWriteError<'a, E> {
+    pub error: &'a E,
+    pub count: usize,
+}
+
+impl<E: std::fmt::Display> InternalEvent for EncoderWriteError<'_, E> {
+    fn emit(self) {
+        let reason = "Failed writing bytes.";
+        error!(
+            message = reason,
+            error = %self.error,
+            error_type = error_type::IO_FAILED,
+            stage = error_stage::SENDING,
+            internal_log_rate_limit = true,
+        );
+        counter!(
+            "component_errors_total", 1,
+            "error_type" => error_type::ENCODER_FAILED,
+            "stage" => error_stage::SENDING,
+        );
+        if self.count > 0 {
+            emit!(ComponentEventsDropped::<UNINTENTIONAL> {
+                count: self.count,
+                reason,
+            });
+        }
     }
 }

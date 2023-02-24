@@ -41,6 +41,8 @@
           {{ with $v.syntax }}
           {{ if eq . "remap_program" }}
           {{ partial "badge.html" (dict "word" . "color" "gray" "href" "/docs/reference/vrl#program") }}
+          {{ else if eq . "template" }}
+          {{ partial "badge.html" (dict "word" . "color" "gray" "href" "/docs/reference/configuration/template-syntax/") }}
           {{ else }}
           {{ partial "badge.html" (dict "word" . "color" "gray") }}
           {{ end }}
@@ -52,6 +54,32 @@
           {{ end }}
         </span>
       </span>
+
+      {{ if $v.deprecated }}
+      <div class="mt-3 border-2 rounded-md border-yellow-400 flex flex-col space-y-1.5 py-2 px-3">
+        <span>
+          {{ partial "heading.html" (dict "text" "Deprecated" "level" 4 "toc_hide" true) }}
+        </span>
+        <div class="flex space-x-5 items-center">
+          <div class="flex-shrink-0">
+            {{/* Heroicon: outline/exclamation-circle */}}
+            <svg xmlns="http://www.w3.org/2000/svg" class="text-yellow-500 h-5 w-5" fill="none" viewBox="0 0 24 24"
+              stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+
+          <div class="prose dark:prose-dark max-w-none leading-snug">
+            {{ if $v.deprecated_message }}
+            {{ $v.deprecated_message | markdownify }}
+            {{ else }}
+            This field is deprecated.
+            {{ end }}
+          </div>
+        </div>
+      </div>
+      {{ end }}
 
       <div class="mt-6 prose dark:prose-dark max-w-none leading-snug text-gray-600 dark:text-gray-300">
         {{ $v.description | markdownify }}
@@ -1747,9 +1775,7 @@
           </span>
 
           <span>
-            {{ if $v.required }}
-            {{ partial "badge.html" (dict "word" "required" "color" "red") }}
-            {{ else }}
+            {{ if not $v.required }}
             {{ partial "badge.html" (dict "word" "optional" "color" "blue") }}
             {{ end }}
           </span>
@@ -1963,6 +1989,8 @@
         {{ with $v.syntax }}
         {{ if eq . "remap_program" }}
         {{ partial "badge.html" (dict "word" . "color" "gray" "href" "/docs/reference/vrl#program") }}
+        {{ else if eq . "template" }}
+        {{ partial "badge.html" (dict "word" . "color" "gray" "href" "/docs/reference/configuration/template-syntax/") }}
         {{ else }}
         {{ partial "badge.html" (dict "word" . "color" "gray") }}
         {{ end }}
@@ -1978,6 +2006,14 @@
     <div class="mt-4 prose dark:prose-dark max-w-none leading-snug">
       {{ $v.description | markdownify }}
     </div>
+
+    {{ if eq $v.type.string.syntax "template" }}
+    <div class="mt-4 text-sm">
+      <strong>Note</strong>: This parameter supports Vector's
+      <a href="/docs/reference/configuration/template-syntax">template syntax</a>, which enables you to use
+      dynamic per-event values.
+    </div>
+    {{ end }}
 
     {{ with $v.relevant_when }}
     <div class="mt-2">

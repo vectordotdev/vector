@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 /// Exponentially Weighted Moving Average
 #[derive(Clone, Copy, Debug)]
 pub struct Ewma {

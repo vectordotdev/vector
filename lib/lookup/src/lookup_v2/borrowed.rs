@@ -1,4 +1,4 @@
-use crate::lookup_v2::Path;
+use crate::lookup_v2::ValuePath;
 use std::borrow::Cow;
 use std::iter::Cloned;
 use std::slice::Iter;
@@ -48,7 +48,7 @@ impl From<isize> for BorrowedSegment<'_> {
     }
 }
 
-impl<'a, 'b> Path<'a> for &'b Vec<BorrowedSegment<'a>> {
+impl<'a, 'b> ValuePath<'a> for &'b Vec<BorrowedSegment<'a>> {
     type Iter = Cloned<Iter<'b, BorrowedSegment<'a>>>;
 
     fn segment_iter(&self) -> Self::Iter {
@@ -56,7 +56,7 @@ impl<'a, 'b> Path<'a> for &'b Vec<BorrowedSegment<'a>> {
     }
 }
 
-impl<'a, 'b> Path<'a> for &'b [BorrowedSegment<'a>] {
+impl<'a, 'b> ValuePath<'a> for &'b [BorrowedSegment<'a>] {
     type Iter = Cloned<Iter<'b, BorrowedSegment<'a>>>;
 
     fn segment_iter(&self) -> Self::Iter {
@@ -64,7 +64,7 @@ impl<'a, 'b> Path<'a> for &'b [BorrowedSegment<'a>] {
     }
 }
 
-impl<'a, 'b, const A: usize> Path<'a> for &'b [BorrowedSegment<'a>; A] {
+impl<'a, 'b, const A: usize> ValuePath<'a> for &'b [BorrowedSegment<'a>; A] {
     type Iter = Cloned<Iter<'b, BorrowedSegment<'a>>>;
 
     fn segment_iter(&self) -> Self::Iter {

@@ -8,7 +8,7 @@ metadata:
     app.kubernetes.io/name: vector
     app.kubernetes.io/instance: vector
     app.kubernetes.io/component: Agent
-    app.kubernetes.io/version: "0.24.0-distroless-libc"
+    app.kubernetes.io/version: "0.27.0-distroless-libc"
 spec:
   selector:
     matchLabels:
@@ -28,7 +28,7 @@ spec:
       dnsPolicy: ClusterFirst
       containers:
         - name: vector
-          image: "timberio/vector:0.24.0-distroless-libc"
+          image: "timberio/vector:0.27.0-distroless-libc"
           imagePullPolicy: IfNotPresent
           args:
             - --config-dir

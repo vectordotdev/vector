@@ -90,7 +90,7 @@ impl Function for GetEnrichmentTableRecord {
         &self,
         _state: &TypeState,
         ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let registry = ctx
             .get_external_context_mut::<TableRegistry>()

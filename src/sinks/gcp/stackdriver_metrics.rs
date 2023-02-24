@@ -10,7 +10,7 @@ use http::Uri;
 use vector_config::configurable_component;
 
 use crate::{
-    config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext, SinkDescription},
+    config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext},
     event::{Event, Metric, MetricValue},
     gcp::{GcpAuthConfig, GcpAuthenticator},
     http::HttpClient,
@@ -36,9 +36,12 @@ impl SinkBatchSettings for StackdriverMetricsDefaultBatchSettings {
 }
 
 /// Configuration for the `gcp_stackdriver_metrics` sink.
-#[configurable_component(sink)]
+#[configurable_component(sink("gcp_stackdriver_metrics"))]
 #[derive(Clone, Debug, Default)]
 pub struct StackdriverConfig {
+    #[serde(skip, default = "default_endpoint")]
+    endpoint: String,
+
     /// The project ID to which to publish metrics.
     ///
     /// See the [Google Cloud Platform project management documentation][project_docs] for more details.
@@ -83,25 +86,24 @@ fn default_metric_namespace_value() -> String {
     "namespace".to_string()
 }
 
-impl_generate_config_from_default!(StackdriverConfig);
-
-inventory::submit! {
-    SinkDescription::new::<StackdriverConfig>("gcp_stackdriver_metrics")
+fn default_endpoint() -> String {
+    "https://monitoring.googleapis.com".to_string()
 }
 
+impl_generate_config_from_default!(StackdriverConfig);
+
 #[async_trait::async_trait]
-#[typetag::serde(name = "gcp_stackdriver_metrics")]
 impl SinkConfig for StackdriverConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let auth = self.auth.build(Scope::MonitoringWrite).await?;
 
         let healthcheck = healthcheck().boxed();
         let started = chrono::Utc::now();
-        let request = self.request.unwrap_with(&TowerRequestConfig {
-            rate_limit_num: Some(1000),
-            rate_limit_duration_secs: Some(1),
-            ..Default::default()
-        });
+        let request = self.request.unwrap_with(
+            &TowerRequestConfig::default()
+                .rate_limit_duration_secs(1)
+                .rate_limit_num(1000),
+        );
         let tls_settings = TlsSettings::from_options(&self.tls)?;
         let client = HttpClient::new(tls_settings, cx.proxy())?;
         let batch_settings = self.batch.into_batch_settings()?;
@@ -128,10 +130,6 @@ impl SinkConfig for StackdriverConfig {
 
     fn input(&self) -> Input {
         Input::metric()
-    }
-
-    fn sink_type(&self) -> &'static str {
-        "gcp_stackdriver_metrics"
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
@@ -212,16 +210,16 @@ impl HttpSink for HttpEventSink {
         let metric_labels = series
             .tags
             .unwrap_or_default()
-            .into_iter()
+            .into_iter_single()
             .collect::<std::collections::HashMap<_, _>>();
 
         let series = gcp::GcpSeries {
             time_series: &[gcp::GcpSerie {
-                metric: gcp::GcpTypedResource {
+                metric: gcp::GcpMetric {
                     r#type: metric_type,
                     labels: metric_labels,
                 },
-                resource: gcp::GcpTypedResource {
+                resource: gcp::GcpResource {
                     r#type: self.config.resource.r#type.clone(),
                     labels: self.config.resource.labels.clone(),
                 },
@@ -239,8 +237,8 @@ impl HttpSink for HttpEventSink {
         let body = crate::serde::json::to_bytes(&series).unwrap().freeze();
 
         let uri: Uri = format!(
-            "https://monitoring.googleapis.com/v3/projects/{}/timeSeries",
-            self.config.project_id
+            "{}/v3/projects/{}/timeSeries",
+            self.config.endpoint, self.config.project_id
         )
         .parse()?;
 
@@ -255,4 +253,50 @@ impl HttpSink for HttpEventSink {
 
 async fn healthcheck() -> crate::Result<()> {
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use futures::{future::ready, stream};
+    use serde::Deserialize;
+    use vector_core::event::{MetricKind, MetricValue};
+
+    use super::*;
+    use crate::{
+        config::{GenerateConfig, SinkConfig, SinkContext},
+        test_util::{
+            components::{run_and_assert_sink_compliance, SINK_TAGS},
+            http::{always_200_response, spawn_blackhole_http_server},
+        },
+    };
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<StackdriverConfig>();
+    }
+
+    #[tokio::test]
+    async fn component_spec_compliance() {
+        let mock_endpoint = spawn_blackhole_http_server(always_200_response).await;
+
+        let config = StackdriverConfig::generate_config().to_string();
+        let mut config = StackdriverConfig::deserialize(toml::de::ValueDeserializer::new(&config))
+            .expect("config should be valid");
+
+        // If we don't override the credentials path/API key, it tries to directly call out to the Google Instance
+        // Metadata API, which we clearly don't have in unit tests. :)
+        config.auth.credentials_path = None;
+        config.auth.api_key = Some("fake".to_string().into());
+        config.endpoint = mock_endpoint.to_string();
+
+        let context = SinkContext::new_test();
+        let (sink, _healthcheck) = config.build(context).await.unwrap();
+
+        let event = Event::Metric(Metric::new(
+            "gauge-test",
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 1_f64 },
+        ));
+        run_and_assert_sink_compliance(sink, stream::once(ready(event)), &SINK_TAGS).await;
+    }
 }

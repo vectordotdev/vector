@@ -9,8 +9,8 @@ use quickcheck::{empty_shrinker, Arbitrary, Gen};
 use crate::{
     event::{
         metric::{
-            Bucket, MetricData, MetricName, MetricSeries, MetricSketch, MetricTime, Quantile,
-            Sample,
+            Bucket, MetricData, MetricName, MetricSeries, MetricSketch, MetricTags, MetricTime,
+            Quantile, Sample,
         },
         Event, EventMetadata, LogEvent, Metric, MetricKind, MetricValue, StatisticKind, TraceEvent,
         Value,
@@ -55,7 +55,10 @@ fn datetime(g: &mut Gen) -> DateTime<Utc> {
     // are. We just sort of arbitrarily restrict things.
     let secs = i64::arbitrary(g) % 32_000;
     let nanosecs = u32::arbitrary(g) % 32_000;
-    DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(secs, nanosecs), Utc)
+    DateTime::<Utc>::from_utc(
+        NaiveDateTime::from_timestamp_opt(secs, nanosecs).expect("invalid timestamp"),
+        Utc,
+    )
 }
 
 impl Arbitrary for Event {
@@ -203,24 +206,23 @@ impl Arbitrary for MetricValue {
                 sum: f64::arbitrary(g) % MAX_F64_SIZE,
             },
             6 => {
-                let bin_keys = Vec::<i16>::arbitrary(g);
-                let bin_counts = bin_keys
-                    .iter()
-                    .map(|_| u16::arbitrary(g))
-                    .collect::<Vec<_>>();
+                // We're working around quickcheck's limitations here, and
+                // should really migrate the tests in question to use proptest
+                let num_samples = u8::arbitrary(g);
+                let samples = std::iter::repeat_with(|| loop {
+                    let f = f64::arbitrary(g);
+                    if f.is_normal() {
+                        return f;
+                    }
+                })
+                .take(num_samples as usize)
+                .collect::<Vec<_>>();
+
+                let mut sketch = AgentDDSketch::with_agent_defaults();
+                sketch.insert_many(&samples);
+
                 MetricValue::Sketch {
-                    sketch: MetricSketch::AgentDDSketch(
-                        AgentDDSketch::from_raw(
-                            u32::arbitrary(g),                // count
-                            f64::arbitrary(g) % MAX_F64_SIZE, // min
-                            f64::arbitrary(g) % MAX_F64_SIZE, // max
-                            f64::arbitrary(g) % MAX_F64_SIZE, // sum
-                            f64::arbitrary(g) % MAX_F64_SIZE, // avg
-                            bin_keys.as_slice(),
-                            bin_counts.as_slice(),
-                        )
-                        .unwrap(),
-                    ),
+                    sketch: MetricSketch::AgentDDSketch(sketch),
                 }
             }
 
@@ -355,7 +357,7 @@ impl Arbitrary for MetricValue {
             //
             // We can't extract the values used to build it, which is by design, so all we could do
             // is mess with the internal buckets, which isn't even exposed (and absolutely shouldn't
-            // be) and doing that is gauranteed to mess with the sketch in non-obvious ways that
+            // be) and doing that is guaranteed to mess with the sketch in non-obvious ways that
             // would not occur if we were actually seeding it with real samples.
             MetricValue::Sketch { sketch } => Box::new(iter::once(MetricValue::Sketch {
                 sketch: sketch.clone(),
@@ -474,11 +476,11 @@ impl Arbitrary for StatisticKind {
 impl Arbitrary for MetricSeries {
     fn arbitrary(g: &mut Gen) -> Self {
         let tags = if bool::arbitrary(g) {
-            let mut map: BTreeMap<String, String> = BTreeMap::new();
+            let mut map = MetricTags::default();
             for _ in 0..(usize::arbitrary(g) % MAX_MAP_SIZE) {
                 let key = String::from(Name::arbitrary(g));
                 let value = String::from(Name::arbitrary(g));
-                map.insert(key, value);
+                map.replace(key, value);
             }
             if map.is_empty() {
                 None
@@ -601,7 +603,9 @@ impl Arbitrary for MetricData {
 }
 
 impl Arbitrary for EventMetadata {
-    fn arbitrary(_g: &mut Gen) -> Self {
-        EventMetadata::default()
+    fn arbitrary(g: &mut Gen) -> Self {
+        let mut metadata = EventMetadata::default();
+        *metadata.value_mut() = Value::arbitrary(g);
+        metadata
     }
 }

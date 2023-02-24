@@ -96,6 +96,8 @@ where
 {
     type Future = RetryPolicyFuture<L>;
 
+    // NOTE: in the error cases- `Error` and `EventsDropped` internal events are emitted by the
+    // driver, so only need to log here.
     fn retry(&self, _: &Req, result: Result<&Res, &Error>) -> Option<Self::Future> {
         match result {
             Ok(response) => match self.logic.should_retry_response(response) {
@@ -103,17 +105,18 @@ where
                     if self.remaining_attempts == 0 {
                         error!(
                             message = "OK/retry response but retries exhausted; dropping the request.",
-                            reason = ?reason
+                            reason = ?reason,
+                            internal_log_rate_limit = true,
                         );
                         return None;
                     }
 
-                    warn!(message = "Retrying after response.", reason = %reason);
+                    warn!(message = "Retrying after response.", reason = %reason, internal_log_rate_limit = true);
                     Some(self.build_retry())
                 }
 
                 RetryAction::DontRetry(reason) => {
-                    error!(message = "Not retriable; dropping the request.", reason = ?reason);
+                    error!(message = "Not retriable; dropping the request.", reason = ?reason, internal_log_rate_limit = true);
                     None
                 }
 
@@ -121,28 +124,33 @@ where
             },
             Err(error) => {
                 if self.remaining_attempts == 0 {
-                    error!(message = "Retries exhausted; dropping the request.", %error);
+                    error!(message = "Retries exhausted; dropping the request.", %error, internal_log_rate_limit = true);
                     return None;
                 }
 
                 if let Some(expected) = error.downcast_ref::<L::Error>() {
                     if self.logic.is_retriable_error(expected) {
-                        warn!(message = "Retrying after error.", error = %expected);
+                        warn!(message = "Retrying after error.", error = %expected, internal_log_rate_limit = true);
                         Some(self.build_retry())
                     } else {
                         error!(
                             message = "Non-retriable error; dropping the request.",
-                            %error
+                            %error,
+                            internal_log_rate_limit = true,
                         );
                         None
                     }
                 } else if error.downcast_ref::<Elapsed>().is_some() {
-                    warn!("Request timed out. If this happens often while the events are actually reaching their destination, try decreasing `batch.max_bytes` and/or using `compression` if applicable. Alternatively `request.timeout_secs` can be increased.");
+                    warn!(
+                        message = "Request timed out. If this happens often while the events are actually reaching their destination, try decreasing `batch.max_bytes` and/or using `compression` if applicable. Alternatively `request.timeout_secs` can be increased.",
+                        internal_log_rate_limit = true
+                    );
                     Some(self.build_retry())
                 } else {
                     error!(
                         message = "Unexpected error type; dropping the request.",
-                        %error
+                        %error,
+                        internal_log_rate_limit = true
                     );
                     None
                 }
@@ -163,7 +171,7 @@ impl<L: RetryLogic> Future for RetryPolicyFuture<L> {
     type Output = FixedRetryPolicy<L>;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        futures::ready!(self.delay.poll_unpin(cx));
+        std::task::ready!(self.delay.poll_unpin(cx));
         Poll::Ready(self.policy.clone())
     }
 }

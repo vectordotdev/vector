@@ -1,1 +1,1 @@
-{"metric":{"name":"x","namespace":"b","tags":{"g":"k","x":"v"},"timestamp":"1970-01-01T03:50:44.000009910Z","kind":"absolute","gauge":{"value":-738752.0}}}
+{"metric":{"name":"n","timestamp":"1970-01-01T04:21:27.000023295Z","kind":"absolute","counter":{"value":-266560.0}}}

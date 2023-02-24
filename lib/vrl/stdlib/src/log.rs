@@ -77,7 +77,7 @@ impl Function for Log {
         &self,
         _state: &state::TypeState,
         ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let levels = vec![
             "trace".into(),

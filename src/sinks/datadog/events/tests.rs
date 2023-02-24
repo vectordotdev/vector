@@ -8,7 +8,7 @@ use futures::{
 };
 use hyper::StatusCode;
 use indoc::indoc;
-use pretty_assertions::assert_eq;
+use similar_asserts::assert_eq;
 use vector_core::event::{BatchNotifier, BatchStatus};
 
 use super::*;
@@ -17,7 +17,7 @@ use crate::{
     event::EventArray,
     sinks::util::test::{build_test_server_status, load_sink},
     test_util::{
-        components::{self, HTTP_SINK_TAGS},
+        components::{self, COMPONENT_ERROR_TAGS, HTTP_SINK_TAGS},
         next_addr, random_lines_with_stream,
     },
 };
@@ -53,7 +53,7 @@ async fn start_test(
     // Swap out the endpoint so we can force send it
     // to our local server
     let endpoint = format!("http://{}", addr);
-    config.endpoint = Some(endpoint.clone());
+    config.dd_common.endpoint = Some(endpoint.clone());
 
     let (sink, _) = config.build(cx).await.unwrap();
 
@@ -63,10 +63,10 @@ async fn start_test(
     let (batch, mut receiver) = BatchNotifier::new_with_receiver();
     let (expected, events) = random_events_with_stream(100, 10, Some(batch));
 
-    components::init_test();
-    sink.run(events).await.unwrap();
     if batch_status == BatchStatus::Delivered {
-        components::SINK_TESTS.assert(&HTTP_SINK_TAGS);
+        components::run_and_assert_sink_compliance(sink, events, &HTTP_SINK_TAGS).await;
+    } else {
+        components::run_and_assert_sink_error(sink, events, &COMPONENT_ERROR_TAGS).await;
     }
 
     assert_eq!(receiver.try_recv(), Ok(batch_status));
@@ -118,7 +118,7 @@ async fn api_key_in_metadata() {
     // Swap out the endpoint so we can force send it
     // to our local server
     let endpoint = format!("http://{}", addr);
-    config.endpoint = Some(endpoint.clone());
+    config.dd_common.endpoint = Some(endpoint.clone());
 
     let (sink, _) = config.build(cx).await.unwrap();
 

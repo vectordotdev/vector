@@ -187,10 +187,7 @@ fn main() {
 
         // Set some read-only paths that can be tested
         for (path, recursive) in &test.read_only_paths {
-            config.set_read_only_event_path(path.clone(), *recursive);
-        }
-        for (path, recursive) in &test.read_only_metadata_paths {
-            config.set_read_only_metadata_path(path.clone(), *recursive);
+            config.set_read_only_path(path.clone(), *recursive);
         }
 
         let compile_start = Instant::now();
@@ -434,7 +431,7 @@ fn compare_partial_diagnostic(got: &str, want: &str) -> bool {
 }
 
 fn print_result(failed_count: usize) {
-    let code = if failed_count > 0 { 1 } else { 0 };
+    let code = i32::from(failed_count > 0);
 
     println!("\n");
 

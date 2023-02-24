@@ -7,6 +7,7 @@ use ::value::Value;
 use once_cell::sync::Lazy;
 use regex::{Regex, RegexBuilder};
 use roxmltree::{Document, Node, NodeType};
+use rust_decimal::prelude::Zero;
 use vrl::prelude::*;
 
 /// Used to keep Clippy's `too_many_argument` check happy.
@@ -67,7 +68,7 @@ fn parse_xml(value: Value, options: ParseOptions) -> Resolved {
     };
     // Trim whitespace around XML elements, if applicable.
     let parse = if trim { trim_xml(&string) } else { string };
-    let doc = Document::parse(&parse).map_err(|e| format!("unable to parse xml: {}", e))?;
+    let doc = Document::parse(&parse).map_err(|e| format!("unable to parse xml: {e}"))?;
     let value = process_node(doc.root(), &config);
     Ok(value)
 }
@@ -115,7 +116,7 @@ impl Function for ParseXml {
         &self,
         _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
 
@@ -295,7 +296,11 @@ fn process_node<'a>(node: Node, config: &ParseXmlConfig<'a>) -> Value {
             }
         }
 
-        for n in node.children().into_iter().filter(|n| !n.is_comment()) {
+        for n in node
+            .children()
+            .into_iter()
+            .filter(|n| n.is_element() || n.is_text())
+        {
             let name = match n.node_type() {
                 NodeType::Element => n.tag_name().name().to_string(),
                 NodeType::Text => config.text_key.to_string(),
@@ -334,7 +339,10 @@ fn process_node<'a>(node: Node, config: &ParseXmlConfig<'a>) -> Value {
         NodeType::Root => Value::Object(recurse(node)),
 
         NodeType::Element => {
-            match (config.always_use_text_key, node.attributes().is_empty()) {
+            match (
+                config.always_use_text_key,
+                node.attributes().len().is_zero(),
+            ) {
                 // If the node has attributes, *always* recurse to expand default keys.
                 (_, false) if config.include_attr => Value::Object(recurse(node)),
                 // If a text key should be used, always recurse.
@@ -493,6 +501,18 @@ mod tests {
                         "from": "Jani",
                         "heading": "Reminder",
                         "body": "Don't forget me this weekend!"
+                    }
+                }
+            )),
+            tdef: type_def(),
+        }
+
+        header_inside_element {
+            args: func_args![ value: r#"<p><?xml?>text123</p>"# ],
+            want: Ok(value!(
+                {
+                    "p": {
+                        "text": "text123"
                     }
                 }
             )),

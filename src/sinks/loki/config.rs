@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use futures::future::FutureExt;
+use value::Kind;
 use vector_config::configurable_component;
 
 use super::{healthcheck::healthcheck, sink::LokiSink};
@@ -8,6 +9,7 @@ use crate::{
     codecs::EncodingConfig,
     config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext},
     http::{Auth, HttpClient, MaybeAuth},
+    schema,
     sinks::{
         util::{BatchConfig, Compression, SinkBatchSettings, TowerRequestConfig, UriSerde},
         VectorSink,
@@ -16,37 +18,91 @@ use crate::{
     tls::{TlsConfig, TlsSettings},
 };
 
+/// Loki-specific compression.
+#[configurable_component]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub enum ExtendedCompression {
+    /// Snappy compression.
+    ///
+    /// This implies sending push requests as Protocol Buffers.
+    #[serde(rename = "snappy")]
+    Snappy,
+}
+
+/// Compression configuration.
+#[configurable_component]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[serde(untagged)]
+pub enum CompressionConfigAdapter {
+    /// Basic compression.
+    Original(Compression),
+
+    /// Loki-specific compression.
+    Extended(ExtendedCompression),
+}
+
+impl CompressionConfigAdapter {
+    pub const fn content_encoding(self) -> Option<&'static str> {
+        match self {
+            CompressionConfigAdapter::Original(compression) => compression.content_encoding(),
+            CompressionConfigAdapter::Extended(_) => Some("snappy"),
+        }
+    }
+}
+
+impl Default for CompressionConfigAdapter {
+    fn default() -> Self {
+        CompressionConfigAdapter::Extended(ExtendedCompression::Snappy)
+    }
+}
+
+fn default_loki_path() -> String {
+    "/loki/api/v1/push".to_string()
+}
+
 /// Configuration for the `loki` sink.
-#[configurable_component(sink)]
+#[configurable_component(sink("loki"))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct LokiConfig {
     /// The base URL of the Loki instance.
     ///
-    /// Vector will append `/loki/api/v1/push` to this.
+    /// The `path` value is appended to this.
+    #[configurable(metadata(docs::examples = "http://localhost:3100"))]
     pub endpoint: UriSerde,
+
+    /// The path to use in the URL of the Loki instance.
+    #[serde(default = "default_loki_path")]
+    pub path: String,
 
     #[configurable(derived)]
     pub encoding: EncodingConfig,
 
-    /// The tenant ID to send.
-    ///
-    /// By default, this is not required since a proxy should set this header.
+    /// The [tenant ID][tenant_id] to specify in requests to Loki.
     ///
     /// When running Loki locally, a tenant ID is not required.
+    ///
+    /// [tenant_id]: https://grafana.com/docs/loki/latest/operations/multi-tenancy/
+    #[configurable(metadata(
+        docs::examples = "some_tenant_id",
+        docs::examples = "{{ event_field }}",
+    ))]
     pub tenant_id: Option<Template>,
 
     /// A set of labels that are attached to each batch of events.
     ///
-    /// Both keys and values are templatable, which enables you to attach dynamic labels to events
+    /// Both keys and values are templateable, which enables you to attach dynamic labels to events.
     ///
-    /// Labels can be suffixed with a “*” to allow the expansion of objects into multiple labels,
-    /// see “How it works” for more information.
+    /// Labels can be suffixed with a `*` to allow the expansion of objects into multiple labels,
+    /// see [Label expansion][label_expansion] for more information.
     ///
     /// Note: If the set of labels has high cardinality, this can cause drastic performance issues
     /// with Loki. To prevent this from happening, reduce the number of unique label keys and
     /// values.
-    #[configurable(metadata(templateable))]
+    ///
+    /// [label_expansion]: https://vector.dev/docs/reference/configuration/sinks/loki/#label-expansion
+    #[configurable(metadata(docs::examples = "loki_labels_examples()"))]
+    #[configurable(metadata(docs::additional_props_description = "A Loki label."))]
     pub labels: HashMap<Template, Template>,
 
     /// Whether or not to delete fields from the event when they are used as labels.
@@ -61,7 +117,7 @@ pub struct LokiConfig {
 
     #[configurable(derived)]
     #[serde(default)]
-    pub compression: Compression,
+    pub compression: CompressionConfigAdapter,
 
     #[configurable(derived)]
     #[serde(default)]
@@ -88,6 +144,20 @@ pub struct LokiConfig {
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     acknowledgements: AcknowledgementsConfig,
+}
+
+fn loki_labels_examples() -> HashMap<String, String> {
+    let mut examples = HashMap::new();
+    examples.insert("source".to_string(), "vector".to_string());
+    examples.insert(
+        "pod_labels_*".to_string(),
+        "{{ kubernetes.pod_labels }}".to_string(),
+    );
+    examples.insert(
+        "{{ event_field }}".to_string(),
+        "{{ some_other_event_field }}".to_string(),
+    );
+    examples
 }
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -149,7 +219,6 @@ impl LokiConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "loki")]
 impl SinkConfig for LokiConfig {
     async fn build(
         &self,
@@ -180,11 +249,11 @@ impl SinkConfig for LokiConfig {
     }
 
     fn input(&self) -> Input {
-        Input::new(self.encoding.config().input_type() & DataType::Log)
-    }
+        let requirement =
+            schema::Requirement::empty().optional_meaning("timestamp", Kind::timestamp());
 
-    fn sink_type(&self) -> &'static str {
-        "loki"
+        Input::new(self.encoding.config().input_type() & DataType::Log)
+            .with_schema_requirement(requirement)
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {

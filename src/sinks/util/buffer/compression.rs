@@ -1,36 +1,19 @@
-use std::fmt;
+use std::{cell::RefCell, collections::BTreeSet, fmt};
 
+use indexmap::IndexMap;
 use serde::{de, ser};
+use serde_json::Value;
 use vector_config::{
-    configurable_component,
     schema::{
-        finalize_schema, generate_composite_schema, generate_number_schema, generate_string_schema,
+        apply_base_metadata, generate_const_string_schema, generate_enum_schema,
+        generate_one_of_schema, generate_struct_schema, get_or_generate_schema, SchemaGenerator,
+        SchemaObject,
     },
-    schemars::{gen::SchemaGenerator, schema::SchemaObject},
-    validation::Validation,
-    Configurable, Metadata,
+    Configurable, GenerateError, Metadata, ToValue,
 };
-
-// NOTE: The resulting schema for `Compression` is not going to look right, because of how we do the customized "string
-// or map" stuff. We've done a bunch of work here to get us half-way towards generating a valid schema for it, including
-// add in the `CompressionLevel` type and doing a custom `Configurable` implementation for it... but the real meat of
-// the change would be doing so for `Compression` because of it being an enum and all the boilerplate involved there.
-//
-// It'd be nice to find a succinct way to allow the expression of these constraints, possibly through a declarative
-// macro that helps build the manual `Configurable` implementation such that, while still leaving the developer
-// responsible for generating a correct schema, it would be far closer to a human-readable description of the schema
-// i.e. "this schema can be X or Y, and if X, it can only be these values, or if Y, the value must fall within this
-// specific range" and so on, with methods for describing enum variants, etc.
-//
-// Another complication is that we can _almost_ sort of get there with the existing primitives but `serde` itself has no
-// way to express an enum that functions like what we're doing here i.e. the variant name is parsed from the value,
-// without needing to be a tag field, with the ability to fallback to a newtype variant, etc.
-//
-// Long story short, these custom (de)serialization strategies are hard to encode in a procedural way because they are
-// in fact not themselves declared procedurally.
+use vector_config_common::attributes::CustomAttribute;
 
 /// Compression configuration.
-#[configurable_component(no_ser, no_deser)]
 #[derive(Copy, Clone, Debug, Derivative, Eq, PartialEq)]
 #[derivative(Default)]
 pub enum Compression {
@@ -40,13 +23,13 @@ pub enum Compression {
 
     /// [Gzip][gzip] compression.
     ///
-    /// [gzip]: https://en.wikipedia.org/wiki/Gzip
-    Gzip(#[configurable(derived)] CompressionLevel),
+    /// [gzip]: https://www.gzip.org/
+    Gzip(CompressionLevel),
 
     /// [Zlib][zlib] compression.
     ///
-    /// [zlib]: https://en.wikipedia.org/wiki/Zlib
-    Zlib(#[configurable(derived)] CompressionLevel),
+    /// [zlib]: https://zlib.net/
+    Zlib(CompressionLevel),
 }
 
 impl Compression {
@@ -75,6 +58,14 @@ impl Compression {
             Self::None => None,
             Self::Gzip(_) => Some("gzip"),
             Self::Zlib(_) => Some("deflate"),
+        }
+    }
+
+    pub const fn accept_encoding(self) -> Option<&'static str> {
+        match self {
+            Self::Gzip(_) => Some("gzip"),
+            Self::Zlib(_) => Some("deflate"),
+            _ => None,
         }
     }
 
@@ -187,31 +178,135 @@ impl ser::Serialize for Compression {
     {
         use ser::SerializeMap;
 
-        let mut map = serializer.serialize_map(None)?;
-        let mut level = None;
+        let default_level = CompressionLevel::const_default();
+
         match self {
-            Compression::None => map.serialize_entry("algorithm", "none")?,
+            Compression::None => serializer.serialize_str("none"),
             Compression::Gzip(gzip_level) => {
-                map.serialize_entry("algorithm", "gzip")?;
-                level = Some(*gzip_level);
+                if *gzip_level != default_level {
+                    let mut map = serializer.serialize_map(None)?;
+                    map.serialize_entry("algorithm", "gzip")?;
+                    map.serialize_entry("level", &gzip_level)?;
+                    map.end()
+                } else {
+                    serializer.serialize_str("gzip")
+                }
             }
             Compression::Zlib(zlib_level) => {
-                map.serialize_entry("algorithm", "zlib")?;
-                level = Some(*zlib_level);
+                if *zlib_level != default_level {
+                    let mut map = serializer.serialize_map(None)?;
+                    map.serialize_entry("algorithm", "zlib")?;
+                    map.serialize_entry("level", &zlib_level)?;
+                    map.end()
+                } else {
+                    serializer.serialize_str("zlib")
+                }
             }
         }
+    }
+}
 
-        // If there's a level present, and it's _not_ the default compression level, then serialize it. We already
-        // handle deserializing as the default level when the level isn't explicitly specified (but `algorithm` is) so
-        // serializing the default would just clutter the serialized output.
-        if let Some(level) = level {
-            let default = CompressionLevel::const_default();
-            if level != default {
-                map.serialize_entry("level", &level)?
+// TODO: Consider an approach for generating schema of "string or object" structure used by this type.
+impl Configurable for Compression {
+    fn referenceable_name() -> Option<&'static str> {
+        Some(std::any::type_name::<Self>())
+    }
+
+    fn metadata() -> Metadata {
+        let mut metadata = Metadata::default();
+        metadata.set_title("Compression configuration.");
+        metadata.set_description("All compression algorithms use the default compression level unless otherwise specified.");
+        metadata.add_custom_attribute(CustomAttribute::kv("docs::enum_tagging", "external"));
+        metadata.add_custom_attribute(CustomAttribute::flag("docs::advanced"));
+        metadata
+    }
+
+    fn generate_schema(gen: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
+        const ALGORITHM_NAME: &str = "algorithm";
+        const LEVEL_NAME: &str = "level";
+        const LOGICAL_NAME: &str = "logical_name";
+        const ENUM_TAGGING_MODE: &str = "docs::enum_tagging";
+
+        let generate_string_schema = |logical_name: &str,
+                                      title: Option<&'static str>,
+                                      description: &'static str|
+         -> SchemaObject {
+            let mut const_schema = generate_const_string_schema(logical_name.to_lowercase());
+            let mut const_metadata = Metadata::with_description(description);
+            if let Some(title) = title {
+                const_metadata.set_title(title);
             }
-        }
+            const_metadata.add_custom_attribute(CustomAttribute::kv(LOGICAL_NAME, logical_name));
+            apply_base_metadata(&mut const_schema, const_metadata);
+            const_schema
+        };
 
-        map.end()
+        // First, we'll create the string-only subschemas for each algorithm, and wrap those up
+        // within a one-of schema.
+        let mut string_metadata = Metadata::with_description("Compression algorithm.");
+        string_metadata.add_custom_attribute(CustomAttribute::kv(ENUM_TAGGING_MODE, "external"));
+
+        let none_string_subschema = generate_string_schema("None", None, "No compression.");
+        let gzip_string_subschema = generate_string_schema(
+            "Gzip",
+            Some("[Gzip][gzip] compression."),
+            "[gzip]: https://www.gzip.org/",
+        );
+        let zlib_string_subschema = generate_string_schema(
+            "Zlib",
+            Some("[Zlib][zlib] compression."),
+            "[zlib]: https://zlib.net/",
+        );
+
+        let mut all_string_oneof_subschema = generate_one_of_schema(&[
+            none_string_subschema,
+            gzip_string_subschema,
+            zlib_string_subschema,
+        ]);
+        apply_base_metadata(&mut all_string_oneof_subschema, string_metadata);
+
+        // Next we'll create a full schema for the given algorithms.
+        //
+        // TODO: We're currently using all three algorithms in the enum subschema for `algorithm`,
+        // but in reality, `level` is never used when the algorithm is `none`. This is _currently_
+        // fine because the field is optional, and we don't use `deny_unknown_fields`, so if users
+        // specify it when the algorithm is `none`: no harm, no foul.
+        //
+        // However, it does lead to a suboptimal schema being generated, one that sort of implies it
+        // may have value when set, even if the algorithm is `none`. We do this because, otherwise,
+        // it's very hard to reconcile the resolved schemas during component documentation
+        // generation, where we need to be able to generate the right enum key/value pair for the
+        // `none` algorithm as part of the overall set of enum values declared for the `algorithm`
+        // field in the "full" schema version.
+        let compression_level_schema =
+            get_or_generate_schema(&CompressionLevel::as_configurable_ref(), gen, None)?;
+
+        let mut required = BTreeSet::new();
+        required.insert(ALGORITHM_NAME.to_string());
+
+        let mut properties = IndexMap::new();
+        properties.insert(
+            ALGORITHM_NAME.to_string(),
+            all_string_oneof_subschema.clone(),
+        );
+        properties.insert(LEVEL_NAME.to_string(), compression_level_schema);
+
+        let mut full_subschema = generate_struct_schema(properties, required, None);
+        let mut full_metadata = Metadata::with_description("");
+        full_metadata.add_custom_attribute(CustomAttribute::flag("docs::hidden"));
+        apply_base_metadata(&mut full_subschema, full_metadata);
+
+        // Finally, we zip both schemas together.
+        Ok(generate_one_of_schema(&[
+            all_string_oneof_subschema,
+            full_subschema,
+        ]))
+    }
+}
+
+impl ToValue for Compression {
+    fn to_value(&self) -> Value {
+        serde_json::to_value(self).expect("Could not convert compression settings to JSON")
     }
 }
 
@@ -325,39 +420,34 @@ impl ser::Serialize for CompressionLevel {
     }
 }
 
+// TODO: Consider an approach for generating schema of "string or number" structure used by this type.
 impl Configurable for CompressionLevel {
-    fn generate_schema(gen: &mut SchemaGenerator, overrides: Metadata<Self>) -> SchemaObject {
-        let as_number = generate_number_schema::<u32>();
-        let as_string = generate_string_schema();
-
-        let mut schema = generate_composite_schema(&[as_number, as_string]);
-        finalize_schema(gen, &mut schema, overrides);
-        schema
+    fn referenceable_name() -> Option<&'static str> {
+        Some(std::any::type_name::<Self>())
     }
 
-    fn description() -> Option<&'static str> {
-        Some("Compression level.")
-    }
-
-    fn metadata() -> vector_config::Metadata<Self> {
-        let mut metadata = vector_config::Metadata::default();
-        if let Some(description) = Self::description() {
-            metadata.set_description(description);
-        }
-
-        // Allows the user to specify any number from 0 to 9, or the constants "none", "fast", or "best".
-        //
-        // TODO: Technically, we can define `integer` or `number` for a schema's instance type, which would make the
-        // validation do the right thing, since as-is, while our implicit casting, everything in the schema ends up
-        // looking like it can be a floating-point number. We should add support for generating `integer` schemas, and
-        // then add validator support to do ranges specifically for integers vs numbers (floating-point).
-        metadata.add_validation(Validation::Range {
-            minimum: Some(0.0),
-            maximum: Some(9.0),
-        });
-        metadata.add_validation(Validation::Pattern(String::from("none|fast|best|default")));
-
+    fn metadata() -> Metadata {
+        let mut metadata = Metadata::default();
+        metadata.set_description("Compression level.");
         metadata
+    }
+
+    fn generate_schema(_: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
+        let string_consts = ["none", "fast", "best", "default"]
+            .iter()
+            .map(|s| serde_json::Value::from(*s));
+
+        let level_consts = (0u32..=9).map(serde_json::Value::from);
+
+        let valid_values = string_consts.chain(level_consts).collect();
+        Ok(generate_enum_schema(valid_values))
+    }
+}
+
+impl ToValue for CompressionLevel {
+    fn to_value(&self) -> Value {
+        // FIXME
+        serde_json::to_value(self).expect("Could not convert compression level to JSON")
     }
 }
 

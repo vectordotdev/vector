@@ -1,5 +1,4 @@
-use std::collections::BTreeMap;
-use std::fmt;
+use std::{borrow::Cow, collections::BTreeMap, fmt};
 
 use bytes::Bytes;
 use ordered_float::NotNan;
@@ -29,19 +28,22 @@ impl Value {
         }
     }
 
-    // TODO: return Cow 🐄
     /// Converts self into a `String` representation, using JSON for `Map`/`Array`.
-    pub fn to_string_lossy(&self) -> String {
+    pub fn to_string_lossy(&self) -> Cow<'_, str> {
         match self {
-            Self::Bytes(bytes) => String::from_utf8_lossy(bytes).into_owned(),
-            Self::Regex(regex) => regex.as_str().to_string(),
-            Self::Timestamp(timestamp) => timestamp_to_string(timestamp),
-            Self::Integer(num) => num.to_string(),
-            Self::Float(num) => num.to_string(),
-            Self::Boolean(b) => b.to_string(),
-            Self::Object(map) => serde_json::to_string(map).expect("Cannot serialize map"),
-            Self::Array(arr) => serde_json::to_string(arr).expect("Cannot serialize array"),
-            Self::Null => "<null>".to_string(),
+            Self::Bytes(bytes) => String::from_utf8_lossy(bytes),
+            Self::Regex(regex) => regex.as_str().into(),
+            Self::Timestamp(timestamp) => timestamp_to_string(timestamp).into(),
+            Self::Integer(num) => num.to_string().into(),
+            Self::Float(num) => num.to_string().into(),
+            Self::Boolean(b) => b.to_string().into(),
+            Self::Object(map) => serde_json::to_string(map)
+                .expect("Cannot serialize map")
+                .into(),
+            Self::Array(arr) => serde_json::to_string(arr)
+                .expect("Cannot serialize array")
+                .into(),
+            Self::Null => "<null>".into(),
         }
     }
 }
@@ -55,9 +57,8 @@ impl Serialize for Value {
             Self::Integer(i) => serializer.serialize_i64(*i),
             Self::Float(f) => serializer.serialize_f64(f.into_inner()),
             Self::Boolean(b) => serializer.serialize_bool(*b),
-            Self::Bytes(_) | Self::Timestamp(_) => {
-                serializer.serialize_str(&self.to_string_lossy())
-            }
+            Self::Bytes(b) => serializer.serialize_str(String::from_utf8_lossy(b).as_ref()),
+            Self::Timestamp(ts) => serializer.serialize_str(&timestamp_to_string(ts)),
             Self::Regex(regex) => serializer.serialize_str(regex.as_str()),
             Self::Object(m) => serializer.collect_map(m),
             Self::Array(a) => serializer.collect_seq(a),
@@ -243,20 +244,20 @@ mod test {
     fn json_value_to_vector_value_to_json_value() {
         const FIXTURE_ROOT: &str = "tests/data/fixtures/value";
 
-        std::fs::read_dir(FIXTURE_ROOT)
-            .unwrap()
-            .for_each(|type_dir| match type_dir {
-                Ok(type_name) => {
+        for type_dir in std::fs::read_dir(FIXTURE_ROOT).unwrap() {
+            type_dir.map_or_else(
+                |_| panic!("This test should never read Err'ing type folders."),
+                |type_name| {
                     let path = type_name.path();
-                    std::fs::read_dir(path)
-                        .unwrap()
-                        .for_each(|fixture_file| match fixture_file {
-                            Ok(fixture_file) => {
+                    for fixture_file in std::fs::read_dir(path).unwrap() {
+                        fixture_file.map_or_else(
+                            |_| panic!("This test should never read Err'ing test fixtures."),
+                            |fixture_file| {
                                 let path = fixture_file.path();
-                                let buf = parse_artifact(&path).unwrap();
+                                let buf = parse_artifact(path).unwrap();
 
                                 let serde_value: serde_json::Value =
-                                    serde_json::from_slice(&*buf).unwrap();
+                                    serde_json::from_slice(&buf).unwrap();
                                 let vector_value = Value::from(serde_value);
 
                                 // Validate type
@@ -273,7 +274,9 @@ mod test {
                                     Value::Array { .. } => expected_type.eq("array"),
                                     Value::Object(_) => expected_type.eq("map"),
                                     Value::Null => expected_type.eq("null"),
-                                    _ => unreachable!("You need to add a new type handler here."),
+                                    _ => {
+                                        unreachable!("You need to add a new type handler here.")
+                                    }
                                 };
                                 assert!(
                                     is_match,
@@ -281,11 +284,11 @@ mod test {
                                     expected_type, vector_value
                                 );
                                 let _value: serde_json::Value = vector_value.try_into().unwrap();
-                            }
-                            _ => panic!("This test should never read Err'ing test fixtures."),
-                        });
-                }
-                _ => panic!("This test should never read Err'ing type folders."),
-            });
+                            },
+                        );
+                    }
+                },
+            );
+        }
     }
 }

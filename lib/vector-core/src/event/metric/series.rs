@@ -1,15 +1,19 @@
 use core::fmt;
-use std::collections::btree_map;
 
-use serde::{Deserialize, Serialize};
+use crate::event::metric::TagValue;
 use vector_common::byte_size_of::ByteSizeOf;
+use vector_config::configurable_component;
 
 use super::{write_list, write_word, MetricTags};
 
-#[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, PartialOrd, Ord, Serialize)]
+/// Metrics series.
+#[configurable_component]
+#[derive(Clone, Debug, Eq, Hash, PartialEq, PartialOrd, Ord)]
 pub struct MetricSeries {
     #[serde(flatten)]
     pub name: MetricName,
+
+    #[configurable(derived)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tags: Option<MetricTags>,
 }
@@ -38,8 +42,17 @@ impl MetricSeries {
     /// Sets or updates the string value of a tag.
     ///
     /// *Note:* This will create the tags map if it is not present.
-    pub fn insert_tag(&mut self, key: String, value: String) -> Option<String> {
-        (self.tags.get_or_insert_with(Default::default)).insert(key, value)
+    pub fn replace_tag(&mut self, key: String, value: impl Into<TagValue>) -> Option<String> {
+        (self.tags.get_or_insert_with(Default::default)).replace(key, value)
+    }
+
+    pub fn set_multi_value_tag(&mut self, key: String, values: impl IntoIterator<Item = TagValue>) {
+        (self.tags.get_or_insert_with(Default::default)).set_multi_value(key, values);
+    }
+
+    /// Removes all the tags.
+    pub fn remove_tags(&mut self) {
+        self.tags = None;
     }
 
     /// Removes the tag entry for the named key, if it exists, and returns the old value.
@@ -57,13 +70,6 @@ impl MetricSeries {
             }
         }
     }
-
-    /// Get the tag entry for the named key. *Note:* This will create
-    /// the tags map if it is not present, even if nothing is later
-    /// inserted.
-    pub fn tag_entry(&mut self, key: String) -> btree_map::Entry<String, String> {
-        self.tags.get_or_insert_with(Default::default).entry(key)
-    }
 }
 
 impl ByteSizeOf for MetricSeries {
@@ -72,9 +78,24 @@ impl ByteSizeOf for MetricSeries {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, PartialOrd, Ord, Serialize)]
+/// Metric name.
+#[configurable_component]
+#[derive(Clone, Debug, Eq, Hash, PartialEq, PartialOrd, Ord)]
 pub struct MetricName {
+    /// The name of the metric.
+    ///
+    /// This would typically be a name for the metric itself, unrelated to where the metric
+    /// originates from. For example, if the metric represented the amount of used system memory, it
+    /// may be called `memory.used`.
     pub name: String,
+
+    /// The namespace of the metric.
+    ///
+    /// Namespace represents a grouping for a metric where the name itself may otherwise be too
+    /// generic. For example, while the name of a metric may be `memory.used` for the amount of used
+    /// system memory, the namespace could differentiate that by being `system` for the total amount
+    /// of used memory across the system, or `vector` for the amount of used system memory specific
+    /// to Vector, and so on.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub namespace: Option<String>,
 }
@@ -115,8 +136,11 @@ impl fmt::Display for MetricSeries {
         write_word(fmt, &self.name.name)?;
         write!(fmt, "{{")?;
         if let Some(tags) = &self.tags {
-            write_list(fmt, ",", tags.iter(), |fmt, (tag, value)| {
-                write_word(fmt, tag).and_then(|()| write!(fmt, "={:?}", value))
+            write_list(fmt, ",", tags.iter_all(), |fmt, (tag, value)| {
+                write_word(fmt, tag).and_then(|()| match value {
+                    Some(value) => write!(fmt, "={value:?}"),
+                    None => Ok(()),
+                })
             })?;
         }
         write!(fmt, "}}")

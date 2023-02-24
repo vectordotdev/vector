@@ -34,6 +34,7 @@ concurrency:
 env:
   AWS_ACCESS_KEY_ID: "dummy"
   AWS_SECRET_ACCESS_KEY: "dummy"
+  AXIOM_TOKEN: ${{ secrets.AXIOM_TOKEN }}
   CONTAINER_TOOL: "docker"
   DD_ENV: "ci"
   DD_API_KEY: ${{ secrets.DD_API_KEY }}
@@ -55,11 +56,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - test: 'apex'
+          - test: 'amqp'
           - test: 'aws'
           - test: 'axiom'
           - test: 'azure'
           - test: 'clickhouse'
+          - test: 'databend'
           - test: 'datadog-agent'
           - test: 'datadog-logs'
           - test: 'datadog-metrics'
@@ -71,7 +73,7 @@ jobs:
           - test: 'fluent'
           - test: 'gcp'
           - test: 'humio'
-          - test: 'http-scrape'
+          - test: 'http-client'
           - test: 'influxdb'
           - test: 'kafka'
           - test: 'logstash'
@@ -86,9 +88,7 @@ jobs:
           - test: 'redis'
           - test: 'shutdown'
           - test: 'splunk'
-            env:
-              SPLUNK_VERSION: 7.3.9
-          - test: 'splunk'
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v3
       - run: make ci-sweep
@@ -102,6 +102,9 @@ jobs:
         if: always()
       - run: make test-integration-${{ matrix.test }}-cleanup
         if: ${{ always() }}
+        env:
+          TEST_DATADOG_API_KEY: ${{ secrets.CI_TEST_DATADOG_API_KEY }}
+          SPLUNK_VERSION: ${{ matrix.env.SPLUNK_VERSION }}
 
   test-integration-check:
     name: test-integration-check

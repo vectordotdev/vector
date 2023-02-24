@@ -4,6 +4,8 @@ weight: 2
 tags: ["concurrency", "pipeline", "state"]
 ---
 
+{{< svg "img/concurrency-model.svg" >}}
+
 Vector implements a concurrency model that scales naturally with incoming data volume as shown above. Each Vector
 [source][sources] is responsible for defining the unit of concurrency and implementing it accordingly. This allows for
 a natural concurrency model that adapts to however Vector is being used, avoiding the need for tedious concurrency

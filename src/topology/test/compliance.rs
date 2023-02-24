@@ -1,79 +1,18 @@
-use std::sync::Mutex;
-
-use async_trait::async_trait;
-use futures_util::{stream::BoxStream, StreamExt};
-use serde::{Deserialize, Serialize};
-use tokio::sync::oneshot::{channel, Receiver, Sender};
-use vector_core::{
-    config::{AcknowledgementsConfig, Input},
-    event::{Event, EventArray, EventContainer, LogEvent},
-    sink::{StreamSink, VectorSink},
-};
+use tokio::sync::oneshot::{channel, Receiver};
+use vector_core::event::{Event, EventArray, EventContainer, LogEvent};
 
 use crate::{
-    config::{unit_test::UnitTestSourceConfig, ConfigBuilder, SinkConfig, SinkContext},
-    sinks::Healthcheck,
-    sources::Sources,
+    config::{unit_test::UnitTestSourceConfig, ConfigBuilder},
     test_util::{
         components::assert_transform_compliance,
-        mock::transforms::{NoopTransformConfig, TransformType},
+        mock::{
+            oneshot_sink,
+            transforms::{NoopTransformConfig, TransformType},
+        },
         start_topology,
     },
     topology::RunningTopology,
-    transforms::Transforms,
 };
-
-#[derive(Debug, Serialize, Deserialize)]
-struct OneshotSinkConfig {
-    #[serde(skip)]
-    tx: Mutex<Option<Sender<EventArray>>>,
-}
-
-#[async_trait]
-#[typetag::serde(name = "oneshot")]
-impl SinkConfig for OneshotSinkConfig {
-    fn input(&self) -> Input {
-        Input::all()
-    }
-
-    fn sink_type(&self) -> &'static str {
-        "oneshot"
-    }
-
-    fn acknowledgements(&self) -> &AcknowledgementsConfig {
-        &AcknowledgementsConfig::DEFAULT
-    }
-
-    async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let tx = {
-            let mut guard = self.tx.lock().expect("who cares if the lock is poisoned");
-            guard.take()
-        };
-        let sink = Box::new(OneshotSink { tx });
-
-        let healthcheck = Box::pin(async { Ok(()) });
-
-        Ok((VectorSink::Stream(sink), healthcheck))
-    }
-}
-
-struct OneshotSink {
-    tx: Option<Sender<EventArray>>,
-}
-
-#[async_trait]
-impl StreamSink<EventArray> for OneshotSink {
-    async fn run(mut self: Box<Self>, mut input: BoxStream<'_, EventArray>) -> Result<(), ()> {
-        let tx = self.tx.take().expect("cannot take rx more than once");
-        let events = input
-            .next()
-            .await
-            .expect("must always get an item in oneshot sink");
-        let _ = tx.send(events);
-
-        Ok(())
-    }
-}
 
 async fn create_topology(
     event: Event,
@@ -85,22 +24,16 @@ async fn create_topology(
 
     builder.add_source(
         "in",
-        Sources::UnitTest(UnitTestSourceConfig {
+        UnitTestSourceConfig {
             events: vec![event],
-        }),
+        },
     );
     builder.add_transform(
         "transform",
         &["in"],
-        Transforms::TestNoop(NoopTransformConfig::from(transform_type)),
+        NoopTransformConfig::from(transform_type),
     );
-    builder.add_sink(
-        "out",
-        &["transform"],
-        OneshotSinkConfig {
-            tx: Mutex::new(Some(tx)),
-        },
-    );
+    builder.add_sink("out", &["transform"], oneshot_sink(tx));
 
     let config = builder.build().expect("building config should not fail");
     let (topology, _) = start_topology(config, false).await;

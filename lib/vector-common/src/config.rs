@@ -3,10 +3,15 @@ use std::{
     fmt,
 };
 
-use vector_config::configurable_component;
+use vector_config::{configurable_component, ConfigurableString};
 
 /// Component identifier.
 #[configurable_component(no_deser, no_ser)]
+#[cfg_attr(
+    feature = "serde",
+    derive(::serde::Deserialize, ::serde::Serialize),
+    serde(from = "String", into = "String")
+)]
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct ComponentKey {
     /// Component ID.
@@ -28,7 +33,7 @@ impl ComponentKey {
     }
 
     pub fn port<D: fmt::Display>(&self, name: D) -> String {
-        format!("{}.{}", self.id, name)
+        format!("{}.{name}", self.id)
     }
 
     #[must_use]
@@ -46,6 +51,12 @@ impl From<String> for ComponentKey {
 impl From<&str> for ComponentKey {
     fn from(value: &str) -> Self {
         Self::from(value.to_owned())
+    }
+}
+
+impl From<ComponentKey> for String {
+    fn from(key: ComponentKey) -> Self {
+        key.into_id()
     }
 }
 
@@ -67,52 +78,7 @@ impl PartialOrd for ComponentKey {
     }
 }
 
-#[cfg(feature = "serde")]
-mod serde {
-    use std::fmt;
-
-    use serde::{
-        de::{self, Visitor},
-        Deserialize, Deserializer, Serialize, Serializer,
-    };
-
-    use super::ComponentKey;
-
-    impl Serialize for ComponentKey {
-        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where
-            S: Serializer,
-        {
-            serializer.serialize_str(&self.to_string())
-        }
-    }
-
-    struct ComponentKeyVisitor;
-
-    impl<'de> Visitor<'de> for ComponentKeyVisitor {
-        type Value = ComponentKey;
-
-        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-            formatter.write_str("a string")
-        }
-
-        fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
-        where
-            E: de::Error,
-        {
-            Ok(ComponentKey::from(value))
-        }
-    }
-
-    impl<'de> Deserialize<'de> for ComponentKey {
-        fn deserialize<D>(deserializer: D) -> Result<ComponentKey, D::Error>
-        where
-            D: Deserializer<'de>,
-        {
-            deserializer.deserialize_string(ComponentKeyVisitor)
-        }
-    }
-}
+impl ConfigurableString for ComponentKey {}
 
 #[cfg(test)]
 mod tests {

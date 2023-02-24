@@ -1,7 +1,7 @@
 use std::{
     collections::HashMap,
     fmt,
-    task::{Context, Poll},
+    task::{ready, Context, Poll},
 };
 
 use aws_sdk_cloudwatchlogs::error::{
@@ -11,7 +11,7 @@ use aws_sdk_cloudwatchlogs::model::InputLogEvent;
 use aws_sdk_cloudwatchlogs::types::SdkError;
 use aws_sdk_cloudwatchlogs::Client as CloudwatchLogsClient;
 use chrono::Duration;
-use futures::{future::BoxFuture, ready, FutureExt};
+use futures::{future::BoxFuture, FutureExt};
 use futures_util::TryFutureExt;
 use indexmap::IndexMap;
 use tokio::sync::oneshot;
@@ -22,7 +22,8 @@ use tower::{
     timeout::Timeout,
     Service, ServiceBuilder, ServiceExt,
 };
-use vector_core::{internal_event::EventsSent, stream::DriverResponse};
+use vector_common::request_metadata::MetaDescriptive;
+use vector_core::{internal_event::CountByteSize, stream::DriverResponse};
 use vrl::prelude::fmt::Debug;
 
 use crate::{
@@ -117,12 +118,8 @@ impl DriverResponse for CloudwatchResponse {
         EventStatus::Delivered
     }
 
-    fn events_sent(&self) -> EventsSent {
-        EventsSent {
-            count: self.events_count,
-            byte_size: self.events_byte_size,
-            output: None,
-        }
+    fn events_sent(&self) -> CountByteSize {
+        CountByteSize(self.events_count, self.events_byte_size)
     }
 }
 
@@ -161,8 +158,9 @@ impl Service<BatchCloudwatchRequest> for CloudwatchLogsPartitionSvc {
     }
 
     fn call(&mut self, req: BatchCloudwatchRequest) -> Self::Future {
-        let events_count = req.events.len();
-        let events_byte_size = req.events.iter().map(|x| x.event_byte_size).sum();
+        let events_count = req.get_metadata().event_count();
+        let events_byte_size = req.get_metadata().events_byte_size();
+
         let key = req.key;
         let events = req
             .events
@@ -222,8 +220,8 @@ impl CloudwatchLogsSvc {
         let group_name = key.group.clone();
         let stream_name = key.stream.clone();
 
-        let create_missing_group = config.create_missing_group.unwrap_or(true);
-        let create_missing_stream = config.create_missing_stream.unwrap_or(true);
+        let create_missing_group = config.create_missing_group;
+        let create_missing_stream = config.create_missing_stream;
 
         CloudwatchLogsSvc {
             headers: config.request.headers,

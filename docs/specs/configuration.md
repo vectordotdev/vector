@@ -25,7 +25,7 @@ interpreted as described in [RFC 2119].
 Vector's runtime behavior is expressed through user-defined configuration files
 intended to be written directly by users. Therefore, the quality of Vector's
 configuration largely affects Vector's user experience. This document aims to
-make Vector's configuration as high quality as possible in order to achieve a
+make Vector's configuration as high quality as possible in order to achieve the
 [best in class user experience][user_experience].
 
 ## Scope

@@ -1,1 +1,1 @@
-{"metric":{"name":"t","namespace":"a","kind":"absolute","gauge":{"value":-27136.0}}}
+{"metric":{"name":"r","namespace":"y","tags":{"b":"y","y":"l"},"timestamp":"1970-01-01T04:50:22.000001520Z","interval_ms":504692610,"kind":"absolute","gauge":{"value":17280.0}}}

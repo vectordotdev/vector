@@ -18,14 +18,14 @@ fn benchmark_lookup(c: &mut Criterion) {
 
     group.bench_function("lookup_v2_parse", |b| {
         b.iter(|| {
-            lookup_v2::Path::segment_iter(&lookup_str).count()
+            lookup_v2::ValuePath::segment_iter(&lookup_str).count()
             // let lookup = Lookup::from_str(lookup_str);
         })
     });
 
     group.bench_function("lookup_v2_parse_escaped", |b| {
         b.iter(|| {
-            lookup_v2::Path::segment_iter(&lookup_str_escaped).count()
+            lookup_v2::ValuePath::segment_iter(&lookup_str_escaped).count()
             // let lookup = Lookup::from_str(lookup_str);
         })
     });

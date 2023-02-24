@@ -11,7 +11,7 @@ fn tally(value: Value) -> Resolved {
         if let Value::Bytes(value) = value {
             *map.entry(value).or_insert(0) += 1;
         } else {
-            return Err(format!("all values must be strings, found: {:?}", value).into());
+            return Err(format!("all values must be strings, found: {value:?}").into());
         }
     }
     let map: BTreeMap<_, _> = map
@@ -41,7 +41,7 @@ impl Function for Tally {
         &self,
         _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
 

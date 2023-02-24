@@ -124,13 +124,14 @@ fn hec_encoder(encoding: EncodingConfig) -> HecLogsEncoder {
     HecLogsEncoder {
         transformer,
         encoder,
+        auto_extract_timestamp: false,
     }
 }
 
 #[test]
 fn splunk_encode_log_event_json() {
     let processed_event = get_processed_event();
-    let encoder = hec_encoder(JsonSerializerConfig::new().into());
+    let encoder = hec_encoder(JsonSerializerConfig::default().into());
     let mut bytes = Vec::new();
     encoder
         .encode_input(vec![processed_event], &mut bytes)
@@ -165,7 +166,7 @@ fn splunk_encode_log_event_json() {
 #[test]
 fn splunk_encode_log_event_text() {
     let processed_event = get_processed_event();
-    let encoder = hec_encoder(TextSerializerConfig::new().into());
+    let encoder = hec_encoder(TextSerializerConfig::default().into());
     let mut bytes = Vec::new();
     encoder
         .encode_input(vec![processed_event], &mut bytes)
@@ -188,14 +189,14 @@ fn splunk_encode_log_event_text() {
 async fn splunk_passthrough_token() {
     let addr = next_addr();
     let config = HecLogsSinkConfig {
-        default_token: "token".into(),
+        default_token: "token".to_string().into(),
         endpoint: format!("http://{}", addr),
         host_key: "host".into(),
         indexed_fields: Vec::new(),
         index: None,
         sourcetype: None,
         source: None,
-        encoding: JsonSerializerConfig::new().into(),
+        encoding: JsonSerializerConfig::default().into(),
         compression: Compression::None,
         batch: Default::default(),
         request: Default::default(),
@@ -203,6 +204,7 @@ async fn splunk_passthrough_token() {
         acknowledgements: Default::default(),
         timestamp_nanos_key: None,
         timestamp_key: log_schema().timestamp_key().into(),
+        auto_extract_timestamp: None,
         endpoint_target: EndpointTarget::Event,
     };
     let cx = SinkContext::new_test();
@@ -246,7 +248,7 @@ fn splunk_encode_log_event_json_timestamps() {
         timestamp_key: &str,
     ) -> HecEventJson {
         let processed_event = get_processed_event_timestamp(timestamp, timestamp_key);
-        let encoder = hec_encoder(JsonSerializerConfig::new().into());
+        let encoder = hec_encoder(JsonSerializerConfig::default().into());
         let mut bytes = Vec::new();
         encoder
             .encode_input(vec![processed_event], &mut bytes)

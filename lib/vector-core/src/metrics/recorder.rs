@@ -3,17 +3,15 @@ use std::time::Duration;
 
 use chrono::Utc;
 use metrics::{Counter, Gauge, Histogram, Key, KeyName, Recorder, SharedString, Unit};
-use metrics_util::{
-    registry::{GenerationalStorage, Recency, Registry as MetricsRegistry},
-    MetricKindMask,
-};
+use metrics_util::{registry::Registry as MetricsRegistry, MetricKindMask};
 use once_cell::unsync::OnceCell;
 use quanta::Clock;
 
+use super::recency::{GenerationalStorage, Recency};
 use super::storage::VectorStorage;
-use crate::event::{Metric, MetricKind, MetricValue};
+use crate::event::{Metric, MetricValue};
 
-thread_local!(static LOCAL_REGISTRY: OnceCell<Registry> = OnceCell::new());
+thread_local!(static LOCAL_REGISTRY: OnceCell<Registry> = const { OnceCell::new() });
 
 #[allow(dead_code)]
 pub(super) struct Registry {
@@ -50,43 +48,30 @@ impl Registry {
 
         for (key, counter) in self.registry.get_counter_handles() {
             if recency.map_or(true, |recency| {
-                recency.should_store_counter(&key, counter.get_generation(), &self.registry)
+                recency.should_store_counter(&key, &counter, &self.registry)
             }) {
                 // NOTE this will truncate if the value is greater than 2**52.
                 #[allow(clippy::cast_precision_loss)]
-                let value = counter.get_inner().swap(0, Ordering::Relaxed) as f64;
-                metrics.push(Metric::from_metric_kv(
-                    &key,
-                    MetricKind::Incremental,
-                    MetricValue::Counter { value },
-                    timestamp,
-                ));
+                let value = counter.get_inner().load(Ordering::Relaxed) as f64;
+                let value = MetricValue::Counter { value };
+                metrics.push(Metric::from_metric_kv(&key, value, timestamp));
             }
         }
         for (key, gauge) in self.registry.get_gauge_handles() {
             if recency.map_or(true, |recency| {
-                recency.should_store_gauge(&key, gauge.get_generation(), &self.registry)
+                recency.should_store_gauge(&key, &gauge, &self.registry)
             }) {
                 let value = gauge.get_inner().load(Ordering::Relaxed);
-                metrics.push(Metric::from_metric_kv(
-                    &key,
-                    MetricKind::Absolute,
-                    MetricValue::Gauge { value },
-                    timestamp,
-                ));
+                let value = MetricValue::Gauge { value };
+                metrics.push(Metric::from_metric_kv(&key, value, timestamp));
             }
         }
         for (key, histogram) in self.registry.get_histogram_handles() {
             if recency.map_or(true, |recency| {
-                recency.should_store_histogram(&key, histogram.get_generation(), &self.registry)
+                recency.should_store_histogram(&key, &histogram, &self.registry)
             }) {
                 let value = histogram.get_inner().make_metric();
-                metrics.push(Metric::from_metric_kv(
-                    &key,
-                    MetricKind::Absolute,
-                    value,
-                    timestamp,
-                ));
+                metrics.push(Metric::from_metric_kv(&key, value, timestamp));
             }
         }
         metrics

@@ -60,7 +60,7 @@ impl Function for ParseNginxLog {
         &self,
         _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
         let format = arguments
@@ -100,8 +100,8 @@ impl Function for ParseNginxLog {
 
 fn regex_for_format(format: &[u8]) -> &Regex {
     match format {
-        b"combined" => &*log_util::REGEX_NGINX_COMBINED_LOG,
-        b"error" => &*log_util::REGEX_NGINX_ERROR_LOG,
+        b"combined" => &log_util::REGEX_NGINX_COMBINED_LOG,
+        b"error" => &log_util::REGEX_NGINX_ERROR_LOG,
         _ => unreachable!(),
     }
 }

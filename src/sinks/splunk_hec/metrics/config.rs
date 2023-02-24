@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use futures_util::FutureExt;
 use tower::ServiceBuilder;
+use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
 use vector_core::sink::VectorSink;
 
@@ -26,7 +27,7 @@ use crate::{
 };
 
 /// Configuration of the `splunk_hec_metrics` sink.
-#[configurable_component(sink)]
+#[configurable_component(sink("splunk_hec_metrics"))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct HecMetricsSinkConfig {
@@ -34,15 +35,31 @@ pub struct HecMetricsSinkConfig {
     ///
     /// This namespace is only used if a metric has no existing namespace. When a namespace is
     /// present, it is used as a prefix to the metric name, and separated with a period (`.`).
+    #[configurable(metadata(docs::examples = "service"))]
     pub default_namespace: Option<String>,
 
     /// Default Splunk HEC token.
     ///
     /// If an event has a token set in its metadata, it will prevail over the one set here.
     #[serde(alias = "token")]
-    pub default_token: String,
+    #[configurable(metadata(
+        docs::examples = "${SPLUNK_HEC_TOKEN}",
+        docs::examples = "A94A8FE5CCB19BA61C4C08"
+    ))]
+    pub default_token: SensitiveString,
 
     /// The base URL of the Splunk instance.
+    ///
+    /// The scheme (`http` or `https`) must be specified. No path should be included since the paths defined
+    /// by the [`Splunk`][splunk] API are used.
+    ///
+    /// [splunk]: https://docs.splunk.com/Documentation/Splunk/8.0.0/Data/HECRESTendpoints
+    #[configurable(metadata(
+        docs::examples = "https://http-inputs-hec.splunkcloud.com",
+        docs::examples = "https://hec.splunk.com:8088",
+        docs::examples = "http://example.com"
+    ))]
+    #[configurable(validation(format = "uri"))]
     pub endpoint: String,
 
     /// Overrides the name of the log field used to grab the hostname to send to Splunk HEC.
@@ -50,19 +67,21 @@ pub struct HecMetricsSinkConfig {
     /// By default, the [global `log_schema.host_key` option][global_host_key] is used.
     ///
     /// [global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
+    #[configurable(metadata(docs::advanced))]
     #[serde(default = "host_key")]
     pub host_key: String,
 
     /// The name of the index where to send the events to.
     ///
-    /// If not specified, the default index is used.
-    #[configurable(metadata(templateable))]
+    /// If not specified, the default index defined within Splunk is used.
+    #[configurable(metadata(docs::examples = "{{ host }}", docs::examples = "custom_index"))]
     pub index: Option<Template>,
 
     /// The sourcetype of events sent to this sink.
     ///
     /// If unset, Splunk will default to `httpevent`.
-    #[configurable(metadata(templateable))]
+    #[configurable(metadata(docs::advanced))]
+    #[configurable(metadata(docs::examples = "{{ sourcetype }}", docs::examples = "_json",))]
     pub sourcetype: Option<Template>,
 
     /// The source of events sent to this sink.
@@ -70,7 +89,12 @@ pub struct HecMetricsSinkConfig {
     /// This is typically the filename the logs originated from.
     ///
     /// If unset, the Splunk collector will set it.
-    #[configurable(metadata(templateable))]
+    #[configurable(metadata(docs::advanced))]
+    #[configurable(metadata(
+        docs::examples = "{{ file }}",
+        docs::examples = "/var/log/syslog",
+        docs::examples = "UDP:514"
+    ))]
     pub source: Option<Template>,
 
     #[configurable(derived)]
@@ -97,7 +121,7 @@ impl GenerateConfig for HecMetricsSinkConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
             default_namespace: None,
-            default_token: "${VECTOR_SPLUNK_HEC_TOKEN}".to_owned(),
+            default_token: "${VECTOR_SPLUNK_HEC_TOKEN}".to_owned().into(),
             endpoint: "http://localhost:8088".to_owned(),
             host_key: host_key(),
             index: None,
@@ -114,13 +138,12 @@ impl GenerateConfig for HecMetricsSinkConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "splunk_hec_metrics")]
 impl SinkConfig for HecMetricsSinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let client = create_client(&self.tls, cx.proxy())?;
         let healthcheck = build_healthcheck(
             self.endpoint.clone(),
-            self.default_token.clone(),
+            self.default_token.inner().to_owned(),
             client.clone(),
         )
         .boxed();
@@ -130,10 +153,6 @@ impl SinkConfig for HecMetricsSinkConfig {
 
     fn input(&self) -> Input {
         Input::metric()
-    }
-
-    fn sink_type(&self) -> &'static str {
-        "splunk_hec_metrics"
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
@@ -161,7 +180,7 @@ impl HecMetricsSinkConfig {
         let http_request_builder = Arc::new(HttpRequestBuilder::new(
             self.endpoint.clone(),
             EndpointTarget::default(),
-            self.default_token.clone(),
+            self.default_token.inner().to_owned(),
             self.compression,
         ));
         let http_service = ServiceBuilder::new()
@@ -170,6 +189,7 @@ impl HecMetricsSinkConfig {
                 client,
                 Arc::clone(&http_request_builder),
                 EndpointTarget::Event,
+                false,
             ));
 
         let service = HecService::new(

@@ -3,7 +3,8 @@
 #![allow(clippy::print_stderr)] // test framework
 #![allow(clippy::print_stdout)] // test framework
 use diagnostic::Span;
-use lookup::{FieldBuf, LookupBuf, SegmentBuf};
+use lookup::lookup_v2::OwnedSegment;
+use lookup::{FieldBuf, LookupBuf, OwnedValuePath, SegmentBuf};
 use ordered_float::NotNan;
 use parser::ast::{
     Assignment, AssignmentOp, AssignmentTarget, Block, Container, Expr, FunctionArgument,
@@ -72,7 +73,7 @@ prop_compose! {
 }
 
 prop_compose! {
-    fn variable()(ident in ident(), lookup in path()) -> (Ident, LookupBuf) {
+    fn variable()(ident in ident(), lookup in path()) -> (Ident, OwnedValuePath) {
         (ident, lookup)
     }
 }
@@ -92,7 +93,7 @@ prop_compose! {
 prop_compose! {
     fn timestamp_literal() (secs in 0..i64::MAX) -> Literal {
         use chrono::{Utc, TimeZone};
-        Literal::Timestamp(Utc.timestamp(secs, 0).to_string())
+        Literal::Timestamp(Utc.timestamp_opt(secs, 0).single().expect("invalid timestamp").to_string())
     }
 }
 
@@ -115,11 +116,11 @@ prop_compose! {
 }
 
 prop_compose! {
-    fn path() (path in prop::collection::vec(ident(), 1..2)) -> LookupBuf {
-        LookupBuf {
+    fn path() (path in prop::collection::vec(ident(), 1..2)) -> OwnedValuePath {
+        OwnedValuePath {
             segments:
             path.into_iter()
-                .map(|field| SegmentBuf::Field(FieldBuf::from(field.as_ref())))
+                .map(|field| OwnedSegment::Field(field.as_ref().to_owned()))
                 .collect(),
         }
     }

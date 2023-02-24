@@ -5,14 +5,11 @@ use std::{
     mem,
     num::NonZeroUsize,
     pin::Pin,
-    task::{Context, Poll},
+    task::{ready, Context, Poll},
     time::Duration,
 };
 
-use futures::{
-    ready,
-    stream::{Fuse, Stream, StreamExt},
-};
+use futures::stream::{Fuse, Stream, StreamExt};
 use pin_project::pin_project;
 use tokio_util::time::{delay_queue::Key, DelayQueue};
 use twox_hash::XxHash64;
@@ -239,7 +236,7 @@ impl BatcherSettings {
     }
 
     /// A batcher config using the `ByteSizeOf` trait to determine batch sizes.
-    /// The output is a Vec<T>
+    /// The output is a  `Vec<T>`.
     pub fn into_byte_size_config<T: ByteSizeOf>(
         self,
     ) -> BatchConfigParts<SizeLimit<ByteSizeOfItemSize>, Vec<T>> {
@@ -247,7 +244,7 @@ impl BatcherSettings {
     }
 
     /// A batcher config using the `ItemBatchSize` trait to determine batch sizes.
-    /// The output is a Vec<T>
+    /// The output is a `Vec<T>`.
     pub fn into_item_size_config<T, I>(self, item_size: I) -> BatchConfigParts<SizeLimit<I>, Vec<T>>
     where
         I: ItemBatchSize<T>,

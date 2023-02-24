@@ -1,7 +1,7 @@
 pub mod logs;
 pub mod metrics;
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::HashMap;
 
 use bytes::{BufMut, BytesMut};
 use chrono::{DateTime, Utc};
@@ -9,7 +9,9 @@ use futures::FutureExt;
 use http::{StatusCode, Uri};
 use snafu::{ResultExt, Snafu};
 use tower::Service;
+use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
+use vector_core::event::MetricTags;
 
 use crate::http::HttpClient;
 
@@ -56,27 +58,39 @@ pub struct InfluxDb1Settings {
     /// The name of the database to write into.
     ///
     /// Only relevant when using InfluxDB v0.x/v1.x.
+    #[configurable(metadata(docs::examples = "vector-database"))]
+    #[configurable(metadata(docs::examples = "iot-store"))]
     database: String,
 
     /// The consistency level to use for writes.
     ///
     /// Only relevant when using InfluxDB v0.x/v1.x.
+    #[configurable(metadata(docs::examples = "any"))]
+    #[configurable(metadata(docs::examples = "one"))]
+    #[configurable(metadata(docs::examples = "quorum"))]
+    #[configurable(metadata(docs::examples = "all"))]
     consistency: Option<String>,
 
     /// The target retention policy for writes.
     ///
     /// Only relevant when using InfluxDB v0.x/v1.x.
+    #[configurable(metadata(docs::examples = "autogen"))]
+    #[configurable(metadata(docs::examples = "one_day_only"))]
     retention_policy_name: Option<String>,
 
     /// The username to authenticate with.
     ///
     /// Only relevant when using InfluxDB v0.x/v1.x.
+    #[configurable(metadata(docs::examples = "todd"))]
+    #[configurable(metadata(docs::examples = "vector-source"))]
     username: Option<String>,
 
     /// The password to authenticate with.
     ///
     /// Only relevant when using InfluxDB v0.x/v1.x.
-    password: Option<String>,
+    #[configurable(metadata(docs::examples = "${INFLUXDB_PASSWORD}"))]
+    #[configurable(metadata(docs::examples = "influxdb4ever"))]
+    password: Option<SensitiveString>,
 }
 
 /// Configuration settings for InfluxDB v2.x.
@@ -86,11 +100,15 @@ pub struct InfluxDb2Settings {
     /// The name of the organization to write into.
     ///
     /// Only relevant when using InfluxDB v2.x and above.
+    #[configurable(metadata(docs::examples = "my-org"))]
+    #[configurable(metadata(docs::examples = "33f2cff0a28e5b63"))]
     org: String,
 
     /// The name of the bucket to write into.
     ///
     /// Only relevant when using InfluxDB v2.x and above.
+    #[configurable(metadata(docs::examples = "vector-bucket"))]
+    #[configurable(metadata(docs::examples = "4d2225e4d3d49f75"))]
     bucket: String,
 
     /// The [token][token_docs] to authenticate with.
@@ -98,13 +116,15 @@ pub struct InfluxDb2Settings {
     /// Only relevant when using InfluxDB v2.x and above.
     ///
     /// [token_docs]: https://v2.docs.influxdata.com/v2.0/security/tokens/
-    token: String,
+    #[configurable(metadata(docs::examples = "${INFLUXDB_TOKEN}"))]
+    #[configurable(metadata(docs::examples = "ef8d5de700e7989468166c40fc8a0ccd"))]
+    token: SensitiveString,
 }
 
 trait InfluxDbSettings: std::fmt::Debug {
     fn write_uri(&self, endpoint: String) -> crate::Result<Uri>;
     fn healthcheck_uri(&self, endpoint: String) -> crate::Result<Uri>;
-    fn token(&self) -> String;
+    fn token(&self) -> SensitiveString;
     fn protocol_version(&self) -> ProtocolVersion;
 }
 
@@ -117,7 +137,7 @@ impl InfluxDbSettings for InfluxDb1Settings {
                 ("consistency", self.consistency.clone()),
                 ("db", Some(self.database.clone())),
                 ("rp", self.retention_policy_name.clone()),
-                ("p", self.password.clone()),
+                ("p", self.password.as_ref().map(|v| v.inner().to_owned())),
                 ("u", self.username.clone()),
                 ("precision", Some("ns".to_owned())),
             ],
@@ -128,8 +148,8 @@ impl InfluxDbSettings for InfluxDb1Settings {
         encode_uri(&endpoint, "ping", &[])
     }
 
-    fn token(&self) -> String {
-        "".to_string()
+    fn token(&self) -> SensitiveString {
+        SensitiveString::default()
     }
 
     fn protocol_version(&self) -> ProtocolVersion {
@@ -154,7 +174,7 @@ impl InfluxDbSettings for InfluxDb2Settings {
         encode_uri(&endpoint, "ping", &[])
     }
 
-    fn token(&self) -> String {
+    fn token(&self) -> SensitiveString {
         self.token.clone()
     }
 
@@ -211,7 +231,7 @@ fn healthcheck(
 pub(in crate::sinks) fn influx_line_protocol(
     protocol_version: ProtocolVersion,
     measurement: &str,
-    tags: Option<BTreeMap<String, String>>,
+    tags: Option<MetricTags>,
     fields: Option<HashMap<String, Field>>,
     timestamp: i64,
     line_protocol: &mut BytesMut,
@@ -241,16 +261,16 @@ pub(in crate::sinks) fn influx_line_protocol(
     Ok(())
 }
 
-fn encode_tags(tags: BTreeMap<String, String>, output: &mut BytesMut) {
+fn encode_tags(tags: MetricTags, output: &mut BytesMut) {
     let original_len = output.len();
     // `tags` is already sorted
-    for (key, value) in tags {
+    for (key, value) in tags.iter_single() {
         if key.is_empty() || value.is_empty() {
             continue;
         }
-        encode_string(&key, output);
+        encode_string(key, output);
         output.put_u8(b'=');
-        encode_string(&value, output);
+        encode_string(value, output);
         output.put_u8(b',');
     }
 
@@ -358,6 +378,7 @@ pub mod test_util {
     use std::{fs::File, io::Read};
 
     use chrono::{offset::TimeZone, DateTime, SecondsFormat, Utc};
+    use vector_core::metric_tags;
 
     use super::*;
     use crate::tls;
@@ -374,14 +395,12 @@ pub mod test_util {
         Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 11)
     }
 
-    pub(crate) fn tags() -> BTreeMap<String, String> {
-        vec![
-            ("normal_tag".to_owned(), "value".to_owned()),
-            ("true_tag".to_owned(), "true".to_owned()),
-            ("empty_tag".to_owned(), "".to_owned()),
-        ]
-        .into_iter()
-        .collect()
+    pub(crate) fn tags() -> MetricTags {
+        metric_tags!(
+            "normal_tag" => "value",
+            "true_tag" => "true",
+            "empty_tag" => "",
+        )
     }
 
     pub(crate) fn assert_fields(value: String, fields: Vec<&str>) {
@@ -567,7 +586,7 @@ mod tests {
         let settings = influxdb_settings(config.influxdb1_settings, config.influxdb2_settings);
         assert_eq!(
             settings.expect_err("expected error").to_string(),
-            "Unclear settings. Both version configured v1: InfluxDb1Settings { database: \"my-database\", consistency: None, retention_policy_name: None, username: None, password: None }, v2: InfluxDb2Settings { org: \"my-org\", bucket: \"my-bucket\", token: \"my-token\" }.".to_owned()
+            "Unclear settings. Both version configured v1: InfluxDb1Settings { database: \"my-database\", consistency: None, retention_policy_name: None, username: None, password: None }, v2: InfluxDb2Settings { org: \"my-org\", bucket: \"my-bucket\", token: \"**REDACTED**\" }.".to_owned()
         );
     }
 
@@ -610,7 +629,7 @@ mod tests {
             database: "vector_db".to_owned(),
             retention_policy_name: Some("autogen".to_owned()),
             username: Some("writer".to_owned()),
-            password: Some("secret".to_owned()),
+            password: Some("secret".to_owned().into()),
         };
 
         let uri = settings
@@ -624,7 +643,7 @@ mod tests {
         let settings = InfluxDb2Settings {
             org: "my-org".to_owned(),
             bucket: "my-bucket".to_owned(),
-            token: "my-token".to_owned(),
+            token: "my-token".to_owned().into(),
         };
 
         let uri = settings
@@ -643,7 +662,7 @@ mod tests {
             database: "vector_db".to_owned(),
             retention_policy_name: Some("autogen".to_owned()),
             username: Some("writer".to_owned()),
-            password: Some("secret".to_owned()),
+            password: Some("secret".to_owned().into()),
         };
 
         let uri = settings
@@ -657,7 +676,7 @@ mod tests {
         let settings = InfluxDb2Settings {
             org: "my-org".to_owned(),
             bucket: "my-bucket".to_owned(),
-            token: "my-token".to_owned(),
+            token: "my-token".to_owned().into(),
         };
 
         let uri = settings
@@ -850,7 +869,7 @@ mod tests {
             "http://localhost:9999",
             "api/v2/write",
             &[
-                ("org", Some("Orgazniation name".to_owned())),
+                ("org", Some("Organization name".to_owned())),
                 ("bucket", Some("Bucket=name".to_owned())),
                 ("none", None),
             ],
@@ -858,7 +877,7 @@ mod tests {
         .unwrap();
         assert_eq!(
             uri,
-            "http://localhost:9999/api/v2/write?org=Orgazniation+name&bucket=Bucket%3Dname"
+            "http://localhost:9999/api/v2/write?org=Organization+name&bucket=Bucket%3Dname"
         );
     }
 
@@ -899,7 +918,7 @@ mod integration_tests {
         let influxdb2_settings = Some(InfluxDb2Settings {
             org: ORG.to_string(),
             bucket: BUCKET.to_string(),
-            token: TOKEN.to_string(),
+            token: TOKEN.to_string().into(),
         });
         let proxy = ProxyConfig::default();
         let client = HttpClient::new(None, &proxy).unwrap();
@@ -920,7 +939,7 @@ mod integration_tests {
         let influxdb2_settings = Some(InfluxDb2Settings {
             org: ORG.to_string(),
             bucket: BUCKET.to_string(),
-            token: TOKEN.to_string(),
+            token: TOKEN.to_string().into(),
         });
         let proxy = ProxyConfig::default();
         let client = HttpClient::new(None, &proxy).unwrap();

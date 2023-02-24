@@ -1,10 +1,14 @@
+#![allow(missing_docs)]
 use std::path::{Path, PathBuf};
 
 use rdkafka::{consumer::ConsumerContext, ClientConfig, ClientContext, Statistics};
 use snafu::Snafu;
+use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
 
-use crate::{internal_events::KafkaStatisticsReceived, tls::TlsEnableableConfig};
+use crate::{
+    internal_events::KafkaStatisticsReceived, tls::TlsEnableableConfig, tls::PEM_START_MARKER,
+};
 
 #[derive(Debug, Snafu)]
 enum KafkaError {
@@ -43,6 +47,7 @@ pub struct KafkaAuthConfig {
     pub(crate) sasl: Option<KafkaSaslConfig>,
 
     #[configurable(derived)]
+    #[configurable(metadata(docs::advanced))]
     pub(crate) tls: Option<TlsEnableableConfig>,
 }
 
@@ -62,12 +67,16 @@ pub struct KafkaSaslConfig {
     pub(crate) enabled: Option<bool>,
 
     /// The SASL username.
+    #[configurable(metadata(docs::examples = "username"))]
     pub(crate) username: Option<String>,
 
     /// The SASL password.
-    pub(crate) password: Option<String>,
+    #[configurable(metadata(docs::examples = "password"))]
+    pub(crate) password: Option<SensitiveString>,
 
     /// The SASL mechanism to use.
+    #[configurable(metadata(docs::examples = "SCRAM-SHA-256"))]
+    #[configurable(metadata(docs::examples = "SCRAM-SHA-512"))]
     pub(crate) mechanism: Option<String>,
 }
 
@@ -87,10 +96,10 @@ impl KafkaAuthConfig {
         if sasl_enabled {
             let sasl = self.sasl.as_ref().unwrap();
             if let Some(username) = &sasl.username {
-                client.set("sasl.username", username);
+                client.set("sasl.username", username.as_str());
             }
             if let Some(password) = &sasl.password {
-                client.set("sasl.password", password);
+                client.set("sasl.password", password.inner());
             }
             if let Some(mechanism) = &sasl.mechanism {
                 client.set("sasl.mechanism", mechanism);
@@ -99,15 +108,34 @@ impl KafkaAuthConfig {
 
         if tls_enabled {
             let tls = self.tls.as_ref().unwrap();
+
             if let Some(path) = &tls.options.ca_file {
-                client.set("ssl.ca.location", pathbuf_to_string(path)?);
+                let text = pathbuf_to_string(path)?;
+                if text.contains(PEM_START_MARKER) {
+                    client.set("ssl.ca.pem", text);
+                } else {
+                    client.set("ssl.ca.location", text);
+                }
             }
+
             if let Some(path) = &tls.options.crt_file {
-                client.set("ssl.certificate.location", pathbuf_to_string(path)?);
+                let text = pathbuf_to_string(path)?;
+                if text.contains(PEM_START_MARKER) {
+                    client.set("ssl.certificate.pem", text);
+                } else {
+                    client.set("ssl.certificate.location", text);
+                }
             }
+
             if let Some(path) = &tls.options.key_file {
-                client.set("ssl.key.location", pathbuf_to_string(path)?);
+                let text = pathbuf_to_string(path)?;
+                if text.contains(PEM_START_MARKER) {
+                    client.set("ssl.key.pem", text);
+                } else {
+                    client.set("ssl.key.location", text);
+                }
             }
+
             if let Some(pass) = &tls.options.key_pass {
                 client.set("ssl.key.password", pass);
             }
@@ -122,12 +150,16 @@ fn pathbuf_to_string(path: &Path) -> crate::Result<&str> {
         .ok_or_else(|| KafkaError::InvalidPath { path: path.into() }.into())
 }
 
-pub(crate) struct KafkaStatisticsContext;
+#[derive(Default)]
+pub(crate) struct KafkaStatisticsContext {
+    pub(crate) expose_lag_metrics: bool,
+}
 
 impl ClientContext for KafkaStatisticsContext {
     fn stats(&self, statistics: Statistics) {
         emit!(KafkaStatisticsReceived {
-            statistics: &statistics
+            statistics: &statistics,
+            expose_lag_metrics: self.expose_lag_metrics,
         });
     }
 }

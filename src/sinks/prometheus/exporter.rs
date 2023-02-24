@@ -8,35 +8,36 @@ use std::{
 };
 
 use async_trait::async_trait;
+use base64::prelude::{Engine as _, BASE64_STANDARD};
 use futures::{future, stream::BoxStream, FutureExt, StreamExt};
 use hyper::{
     header::HeaderValue,
     service::{make_service_fn, service_fn},
     Body, Method, Request, Response, Server, StatusCode,
 };
-use indexmap::IndexMap;
-use serde::{Deserialize, Serialize};
+use indexmap::{map::Entry, IndexMap};
 use serde_with::serde_as;
 use snafu::Snafu;
 use stream_cancel::{Trigger, Tripwire};
 use tracing::{Instrument, Span};
 use vector_config::configurable_component;
 use vector_core::{
-    internal_event::{BytesSent, EventsSent},
-    ByteSizeOf,
+    internal_event::{
+        ByteSize, BytesSent, CountByteSize, EventsSent, InternalEventHandle as _, Output, Protocol,
+        Registered,
+    },
+    ByteSizeOf, EstimatedJsonEncodedSizeOf,
 };
 
 use super::collector::{MetricCollector, StringCollector};
 use crate::{
-    config::{
-        AcknowledgementsConfig, GenerateConfig, Input, Resource, SinkConfig, SinkContext,
-        SinkDescription,
-    },
+    config::{AcknowledgementsConfig, GenerateConfig, Input, Resource, SinkConfig, SinkContext},
     event::{
         metric::{Metric, MetricData, MetricKind, MetricSeries, MetricValue},
         Event, EventStatus, Finalizable,
     },
-    internal_events::PrometheusServerRequestComplete,
+    http::Auth,
+    internal_events::{PrometheusNormalizationError, PrometheusServerRequestComplete},
     sinks::{
         util::{
             buffer::metrics::{MetricNormalize, MetricNormalizer, MetricSet},
@@ -50,6 +51,8 @@ use crate::{
 
 const MIN_FLUSH_PERIOD_SECS: u64 = 1;
 
+const LOCK_FAILED: &str = "Prometheus exporter data lock is poisoned";
+
 #[derive(Debug, Snafu)]
 enum BuildError {
     #[snafu(display("Flush period for sets must be greater or equal to {} secs", min))]
@@ -58,7 +61,7 @@ enum BuildError {
 
 /// Configuration for the `prometheus_exporter` sink.
 #[serde_as]
-#[configurable_component(sink)]
+#[configurable_component(sink("prometheus_exporter"))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct PrometheusExporterConfig {
@@ -71,13 +74,18 @@ pub struct PrometheusExporterConfig {
     ///
     /// [prom_naming_docs]: https://prometheus.io/docs/practices/naming/#metric-names
     #[serde(alias = "namespace")]
+    #[configurable(metadata(docs::advanced))]
     pub default_namespace: Option<String>,
 
     /// The address to expose for scraping.
     ///
     /// The metrics are exposed at the typical Prometheus exporter path, `/metrics`.
     #[serde(default = "default_address")]
+    #[configurable(metadata(docs::examples = "192.160.0.10:9598"))]
     pub address: SocketAddr,
+
+    #[configurable(derived)]
+    pub auth: Option<Auth>,
 
     #[configurable(derived)]
     pub tls: Option<TlsEnableableConfig>,
@@ -86,24 +94,27 @@ pub struct PrometheusExporterConfig {
     ///
     /// [dist_metric_docs]: https://vector.dev/docs/about/under-the-hood/architecture/data-model/metric/#distribution
     #[serde(default = "super::default_histogram_buckets")]
+    #[configurable(metadata(docs::advanced))]
     pub buckets: Vec<f64>,
 
     /// Quantiles to use for aggregating [distribution][dist_metric_docs] metrics into a summary.
     ///
     /// [dist_metric_docs]: https://vector.dev/docs/about/under-the-hood/architecture/data-model/metric/#distribution
     #[serde(default = "super::default_summary_quantiles")]
+    #[configurable(metadata(docs::advanced))]
     pub quantiles: Vec<f64>,
 
     /// Whether or not to render [distributions][dist_metric_docs] as an [aggregated histogram][prom_agg_hist_docs] or  [aggregated summary][prom_agg_summ_docs].
     ///
-    /// While Vector supports distributions as a lossless way to represent a set of samples for a
-    /// metric, Prometheus clients (the application being scraped, which is this sink) must
+    /// While distributions as a lossless way to represent a set of samples for a
+    /// metric is supported, Prometheus clients (the application being scraped, which is this sink) must
     /// aggregate locally into either an aggregated histogram or aggregated summary.
     ///
     /// [dist_metric_docs]: https://vector.dev/docs/about/under-the-hood/architecture/data-model/metric/#distribution
     /// [prom_agg_hist_docs]: https://prometheus.io/docs/concepts/metric_types/#histogram
     /// [prom_agg_summ_docs]: https://prometheus.io/docs/concepts/metric_types/#summary
     #[serde(default = "default_distributions_as_summaries")]
+    #[configurable(metadata(docs::advanced))]
     pub distributions_as_summaries: bool,
 
     /// The interval, in seconds, on which metrics are flushed.
@@ -114,6 +125,7 @@ pub struct PrometheusExporterConfig {
     /// Be sure to configure this value higher than your client’s scrape interval.
     #[serde(default = "default_flush_period_secs")]
     #[serde_as(as = "serde_with::DurationSeconds<u64>")]
+    #[configurable(metadata(docs::advanced))]
     pub flush_period_secs: Duration,
 
     /// Suppresses timestamps on the Prometheus output.
@@ -122,6 +134,7 @@ pub struct PrometheusExporterConfig {
     /// far in the past for Prometheus to allow them, such as when aggregating metrics over long
     /// time periods, or when replaying old metrics from a disk buffer.
     #[serde(default)]
+    #[configurable(metadata(docs::advanced))]
     pub suppress_timestamp: bool,
 
     #[configurable(derived)]
@@ -138,6 +151,7 @@ impl Default for PrometheusExporterConfig {
         Self {
             default_namespace: None,
             address: default_address(),
+            auth: None,
             tls: None,
             buckets: super::default_histogram_buckets(),
             quantiles: super::default_summary_quantiles(),
@@ -167,22 +181,13 @@ const fn default_suppress_timestamp() -> bool {
     false
 }
 
-inventory::submit! {
-    SinkDescription::new::<PrometheusExporterConfig>("prometheus")
-}
-
-inventory::submit! {
-    SinkDescription::new::<PrometheusExporterConfig>("prometheus_exporter")
-}
-
 impl GenerateConfig for PrometheusExporterConfig {
     fn generate_config() -> toml::Value {
-        toml::Value::try_from(&Self::default()).unwrap()
+        toml::Value::try_from(Self::default()).unwrap()
     }
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "prometheus_exporter")]
 impl SinkConfig for PrometheusExporterConfig {
     async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         if self.flush_period_secs.as_secs() < MIN_FLUSH_PERIOD_SECS {
@@ -203,48 +208,12 @@ impl SinkConfig for PrometheusExporterConfig {
         Input::metric()
     }
 
-    fn sink_type(&self) -> &'static str {
-        "prometheus_exporter"
-    }
-
     fn resources(&self) -> Vec<Resource> {
         vec![Resource::tcp(self.address)]
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
-    }
-}
-
-// Add a compatibility alias to avoid breaking existing configs
-#[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
-struct PrometheusCompatConfig {
-    #[serde(flatten)]
-    config: PrometheusExporterConfig,
-}
-
-#[async_trait::async_trait]
-#[typetag::serde(name = "prometheus")]
-impl SinkConfig for PrometheusCompatConfig {
-    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        self.config.build(cx).await
-    }
-
-    fn input(&self) -> Input {
-        self.config.input()
-    }
-
-    fn sink_type(&self) -> &'static str {
-        "prometheus"
-    }
-
-    fn resources(&self) -> Vec<Resource> {
-        self.config.resources()
-    }
-
-    fn acknowledgements(&self) -> &AcknowledgementsConfig {
-        self.config.acknowledgements()
     }
 }
 
@@ -276,7 +245,7 @@ impl MetricMetadata {
 
     /// Whether or not the referenced metric has expired yet.
     pub fn has_expired(&self, now: Instant) -> bool {
-        self.expires_at >= now
+        now >= self.expires_at
     }
 }
 
@@ -380,44 +349,106 @@ impl MetricNormalize for PrometheusExporterMetricNormalizer {
     }
 }
 
-fn handle(
-    req: Request<Body>,
-    default_namespace: Option<&str>,
-    buckets: &[f64],
-    quantiles: &[f64],
-    metrics: &IndexMap<MetricRef, (Metric, MetricMetadata)>,
-) -> Response<Body> {
-    let mut response = Response::new(Body::empty());
+fn authorized(req: &Request<Body>, auth: &Option<Auth>) -> bool {
+    if let Some(auth) = auth {
+        let headers = req.headers();
+        if let Some(auth_header) = headers.get(hyper::header::AUTHORIZATION) {
+            let encoded_credentials = match auth {
+                Auth::Basic { user, password } => HeaderValue::from_str(
+                    format!(
+                        "Basic {}",
+                        BASE64_STANDARD.encode(format!("{}:{}", user, password.inner()))
+                    )
+                    .as_str(),
+                ),
+                Auth::Bearer { token } => {
+                    HeaderValue::from_str(format!("Bearer {}", token.inner()).as_str())
+                }
+            };
 
-    match (req.method(), req.uri().path()) {
-        (&Method::GET, "/metrics") => {
-            let mut collector = StringCollector::new();
-
-            for (_, (metric, _)) in metrics {
-                collector.encode_metric(default_namespace, buckets, quantiles, metric);
+            if let Ok(encoded_credentials) = encoded_credentials {
+                if auth_header == encoded_credentials {
+                    return true;
+                }
             }
-
-            let body = collector.finish();
-            let body_size = body.size_of();
-
-            *response.body_mut() = body.into();
-
-            response.headers_mut().insert(
-                "Content-Type",
-                HeaderValue::from_static("text/plain; version=0.0.4"),
-            );
-
-            emit!(BytesSent {
-                byte_size: body_size,
-                protocol: "http",
-            });
         }
-        _ => {
-            *response.status_mut() = StatusCode::NOT_FOUND;
-        }
+    } else {
+        return true;
     }
 
-    response
+    false
+}
+
+#[derive(Clone)]
+struct Handler {
+    auth: Option<Auth>,
+    default_namespace: Option<String>,
+    buckets: Box<[f64]>,
+    quantiles: Box<[f64]>,
+    bytes_sent: Registered<BytesSent>,
+    events_sent: Registered<EventsSent>,
+}
+
+impl Handler {
+    fn handle(
+        &self,
+        req: Request<Body>,
+        metrics: &RwLock<IndexMap<MetricRef, (Metric, MetricMetadata)>>,
+    ) -> Response<Body> {
+        let mut response = Response::new(Body::empty());
+
+        match (authorized(&req, &self.auth), req.method(), req.uri().path()) {
+            (false, _, _) => {
+                *response.status_mut() = StatusCode::UNAUTHORIZED;
+                response.headers_mut().insert(
+                    http::header::WWW_AUTHENTICATE,
+                    HeaderValue::from_static("Basic, Bearer"),
+                );
+            }
+
+            (true, &Method::GET, "/metrics") => {
+                let metrics = metrics.read().expect(LOCK_FAILED);
+
+                let count = metrics.len();
+                let byte_size = metrics
+                    .iter()
+                    .map(|(_, (metric, _))| metric.estimated_json_encoded_size_of())
+                    .sum();
+
+                let mut collector = StringCollector::new();
+
+                for (_, (metric, _)) in metrics.iter() {
+                    collector.encode_metric(
+                        self.default_namespace.as_deref(),
+                        &self.buckets,
+                        &self.quantiles,
+                        metric,
+                    );
+                }
+
+                drop(metrics);
+
+                let body = collector.finish();
+                let body_size = body.size_of();
+
+                *response.body_mut() = body.into();
+
+                response.headers_mut().insert(
+                    "Content-Type",
+                    HeaderValue::from_static("text/plain; version=0.0.4"),
+                );
+
+                self.events_sent.emit(CountByteSize(count, byte_size));
+                self.bytes_sent.emit(ByteSize(body_size));
+            }
+
+            (true, _, _) => {
+                *response.status_mut() = StatusCode::NOT_FOUND;
+            }
+        }
+
+        response
+    }
 }
 
 impl PrometheusExporter {
@@ -429,48 +460,32 @@ impl PrometheusExporter {
         }
     }
 
-    async fn start_server_if_needed(&mut self) {
+    async fn start_server_if_needed(&mut self) -> crate::Result<()> {
         if self.server_shutdown_trigger.is_some() {
-            return;
+            return Ok(());
         }
+
+        let handler = Handler {
+            bytes_sent: register!(BytesSent::from(Protocol::HTTP)),
+            events_sent: register!(EventsSent::from(Output(None))),
+            default_namespace: self.config.default_namespace.clone(),
+            buckets: self.config.buckets.clone().into(),
+            quantiles: self.config.quantiles.clone().into(),
+            auth: self.config.auth.clone(),
+        };
 
         let span = Span::current();
         let metrics = Arc::clone(&self.metrics);
-        let default_namespace = self.config.default_namespace.clone();
-        let buckets = self.config.buckets.clone();
-        let quantiles = self.config.quantiles.clone();
 
         let new_service = make_service_fn(move |_| {
             let span = Span::current();
             let metrics = Arc::clone(&metrics);
-            let default_namespace = default_namespace.clone();
-            let buckets = buckets.clone();
-            let quantiles = quantiles.clone();
+            let handler = handler.clone();
 
             async move {
                 Ok::<_, Infallible>(service_fn(move |req| {
                     span.in_scope(|| {
-                        let metrics = metrics.read().unwrap();
-
-                        let count = metrics.len();
-                        let byte_size = metrics
-                            .iter()
-                            .map(|(_, (metric, _))| metric.size_of())
-                            .sum();
-
-                        let response = handle(
-                            req,
-                            default_namespace.as_deref(),
-                            &buckets,
-                            &quantiles,
-                            &metrics,
-                        );
-
-                        emit!(EventsSent {
-                            count,
-                            byte_size,
-                            output: None
-                        });
+                        let response = handler.handle(req, &metrics);
 
                         emit!(PrometheusServerRequestComplete {
                             status_code: response.status(),
@@ -487,35 +502,33 @@ impl PrometheusExporter {
         let tls = self.config.tls.clone();
         let address = self.config.address;
 
-        tokio::spawn(async move {
-            #[allow(clippy::print_stderr)]
-            let tls = MaybeTlsSettings::from_config(&tls, true)
-                .map_err(|error| eprintln!("Server TLS error: {}", error))?;
-            #[allow(clippy::print_stderr)]
-            let listener = tls
-                .bind(&address)
-                .await
-                .map_err(|error| eprintln!("Server bind error: {}", error))?;
+        let tls = MaybeTlsSettings::from_config(&tls, true)?;
+        let listener = tls.bind(&address).await?;
 
-            #[allow(clippy::print_stderr)]
+        tokio::spawn(async move {
+            info!(message = "Building HTTP server.", address = %address);
+
             Server::builder(hyper::server::accept::from_stream(listener.accept_stream()))
                 .serve(new_service)
                 .with_graceful_shutdown(tripwire.then(crate::shutdown::tripwire_handler))
                 .instrument(span)
                 .await
-                .map_err(|error| eprintln!("Server error: {}", error))?;
+                .map_err(|error| error!("Server error: {}.", error))?;
 
             Ok::<(), ()>(())
         });
 
         self.server_shutdown_trigger = Some(trigger);
+        Ok(())
     }
 }
 
 #[async_trait]
 impl StreamSink<Event> for PrometheusExporter {
     async fn run(mut self: Box<Self>, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
-        self.start_server_if_needed().await;
+        self.start_server_if_needed()
+            .await
+            .map_err(|error| error!("Failed to start Prometheus exporter: {}.", error))?;
 
         let mut last_flush = Instant::now();
         let flush_period = self.config.flush_period_secs;
@@ -536,18 +549,17 @@ impl StreamSink<Event> for PrometheusExporter {
             if last_flush.elapsed() > self.config.flush_period_secs {
                 last_flush = Instant::now();
 
-                let mut metrics = self.metrics.write().unwrap();
+                let mut metrics = self.metrics.write().expect(LOCK_FAILED);
 
-                let metrics_to_expire = metrics
-                    .iter()
-                    .filter(|(_, (_, metadata))| !metadata.has_expired(last_flush))
-                    .map(|(metric_ref, _)| metric_ref.clone())
-                    .collect::<Vec<_>>();
-
-                for metric_ref in metrics_to_expire {
-                    metrics.remove(&metric_ref);
-                    normalizer.get_state_mut().remove(&metric_ref.series);
-                }
+                let normalizer_mut = normalizer.get_state_mut();
+                metrics.retain(|metric_ref, (_, metadata)| {
+                    if metadata.has_expired(last_flush) {
+                        normalizer_mut.remove(&metric_ref.series);
+                        false
+                    } else {
+                        true
+                    }
+                });
             }
 
             // Now process the metric we got.
@@ -563,21 +575,23 @@ impl StreamSink<Event> for PrometheusExporter {
 
                 // We have a normalized metric, in absolute form.  If we're already aware of this
                 // metric, update its expiration deadline, otherwise, start tracking it.
-                let mut metrics = self.metrics.write().unwrap();
+                let mut metrics = self.metrics.write().expect(LOCK_FAILED);
 
-                let metric_ref = MetricRef::from_metric(&normalized);
-                match metrics.get_mut(&metric_ref) {
-                    Some((data, metadata)) => {
+                match metrics.entry(MetricRef::from_metric(&normalized)) {
+                    Entry::Occupied(mut entry) => {
+                        let (data, metadata) = entry.get_mut();
                         *data = normalized;
                         metadata.refresh();
                     }
-                    None => {
-                        metrics.insert(metric_ref, (normalized, MetricMetadata::new(flush_period)));
+                    Entry::Vacant(entry) => {
+                        entry.insert((normalized, MetricMetadata::new(flush_period)));
                     }
                 }
+                finalizers.update_status(EventStatus::Delivered);
+            } else {
+                emit!(PrometheusNormalizationError {});
+                finalizers.update_status(EventStatus::Errored);
             }
-
-            finalizers.update_status(EventStatus::Delivered);
         }
 
         Ok(())
@@ -589,10 +603,16 @@ mod tests {
     use chrono::{Duration, Utc};
     use futures::stream;
     use indoc::indoc;
-    use pretty_assertions::assert_eq;
+    use similar_asserts::assert_eq;
     use tokio::{sync::oneshot::error::TryRecvError, time};
-    use vector_common::finalization::{BatchNotifier, BatchStatus};
-    use vector_core::{event::StatisticKind, samples};
+    use vector_common::{
+        finalization::{BatchNotifier, BatchStatus},
+        sensitive_string::SensitiveString,
+    };
+    use vector_core::{
+        event::{MetricTags, StatisticKind},
+        metric_tags, samples,
+    };
 
     use super::*;
     use crate::{
@@ -622,6 +642,153 @@ mod tests {
         let mut tls_config = TlsEnableableConfig::test_config();
         tls_config.options.verify_hostname = Some(false);
         export_and_fetch_simple(Some(tls_config)).await;
+    }
+
+    #[tokio::test]
+    async fn prometheus_noauth() {
+        let (name1, event1) = create_metric_gauge(None, 123.4);
+        let (name2, event2) = tests::create_metric_set(None, vec!["0", "1", "2"]);
+        let events = vec![event1, event2];
+
+        let response_result = export_and_fetch_with_auth(None, None, events, false).await;
+
+        assert!(response_result.is_ok());
+
+        let body = response_result.expect("Cannot extract body from the response");
+
+        assert!(body.contains(&format!(
+            indoc! {r#"
+               # HELP {name} {name}
+               # TYPE {name} gauge
+               {name}{{some_tag="some_value"}} 123.4
+            "#},
+            name = name1
+        )));
+        assert!(body.contains(&format!(
+            indoc! {r#"
+               # HELP {name} {name}
+               # TYPE {name} gauge
+               {name}{{some_tag="some_value"}} 3
+            "#},
+            name = name2
+        )));
+    }
+
+    #[tokio::test]
+    async fn prometheus_successful_basic_auth() {
+        let (name1, event1) = create_metric_gauge(None, 123.4);
+        let (name2, event2) = tests::create_metric_set(None, vec!["0", "1", "2"]);
+        let events = vec![event1, event2];
+
+        let auth_config = Auth::Basic {
+            user: "user".to_string(),
+            password: SensitiveString::from("password".to_string()),
+        };
+
+        let response_result =
+            export_and_fetch_with_auth(Some(auth_config.clone()), Some(auth_config), events, false)
+                .await;
+
+        assert!(response_result.is_ok());
+
+        let body = response_result.expect("Cannot extract body from the response");
+
+        assert!(body.contains(&format!(
+            indoc! {r#"
+               # HELP {name} {name}
+               # TYPE {name} gauge
+               {name}{{some_tag="some_value"}} 123.4
+            "#},
+            name = name1
+        )));
+        assert!(body.contains(&format!(
+            indoc! {r#"
+               # HELP {name} {name}
+               # TYPE {name} gauge
+               {name}{{some_tag="some_value"}} 3
+            "#},
+            name = name2
+        )));
+    }
+
+    #[tokio::test]
+    async fn prometheus_successful_token_auth() {
+        let (name1, event1) = create_metric_gauge(None, 123.4);
+        let (name2, event2) = tests::create_metric_set(None, vec!["0", "1", "2"]);
+        let events = vec![event1, event2];
+
+        let auth_config = Auth::Bearer {
+            token: SensitiveString::from("token".to_string()),
+        };
+
+        let response_result =
+            export_and_fetch_with_auth(Some(auth_config.clone()), Some(auth_config), events, false)
+                .await;
+
+        assert!(response_result.is_ok());
+
+        let body = response_result.expect("Cannot extract body from the response");
+
+        assert!(body.contains(&format!(
+            indoc! {r#"
+               # HELP {name} {name}
+               # TYPE {name} gauge
+               {name}{{some_tag="some_value"}} 123.4
+            "#},
+            name = name1
+        )));
+        assert!(body.contains(&format!(
+            indoc! {r#"
+               # HELP {name} {name}
+               # TYPE {name} gauge
+               {name}{{some_tag="some_value"}} 3
+            "#},
+            name = name2
+        )));
+    }
+
+    #[tokio::test]
+    async fn prometheus_missing_auth() {
+        let (_, event1) = create_metric_gauge(None, 123.4);
+        let (_, event2) = tests::create_metric_set(None, vec!["0", "1", "2"]);
+        let events = vec![event1, event2];
+
+        let server_auth_config = Auth::Bearer {
+            token: SensitiveString::from("token".to_string()),
+        };
+
+        let response_result =
+            export_and_fetch_with_auth(Some(server_auth_config), None, events, false).await;
+
+        assert!(response_result.is_err());
+        assert_eq!(response_result.unwrap_err(), StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
+    async fn prometheus_wrong_auth() {
+        let (_, event1) = create_metric_gauge(None, 123.4);
+        let (_, event2) = tests::create_metric_set(None, vec!["0", "1", "2"]);
+        let events = vec![event1, event2];
+
+        let server_auth_config = Auth::Bearer {
+            token: SensitiveString::from("token".to_string()),
+        };
+
+        let client_auth_config = Auth::Basic {
+            user: "user".to_string(),
+            password: SensitiveString::from("password".to_string()),
+        };
+
+        let response_result = export_and_fetch_with_auth(
+            Some(server_auth_config),
+            Some(client_auth_config),
+            events,
+            false,
+        )
+        .await;
+
+        assert!(response_result.is_err());
+        assert_eq!(response_result.unwrap_err(), StatusCode::UNAUTHORIZED);
     }
 
     #[tokio::test]
@@ -669,6 +836,35 @@ mod tests {
                 name = name,
             )
         );
+    }
+
+    /// According to the [spec](https://github.com/OpenObservability/OpenMetrics/blob/main/specification/OpenMetrics.md?plain=1#L115)
+    /// > Label names MUST be unique within a LabelSet.
+    /// Prometheus itself will reject the metric with an error. Largely to remain backward compatible with older versions of Vector,
+    /// we only publish the last tag in the list.
+    #[tokio::test]
+    async fn prometheus_duplicate_labels() {
+        let (name, event) = create_metric_with_tags(
+            None,
+            MetricValue::Gauge { value: 123.4 },
+            Some(metric_tags!("code" => "200", "code" => "success")),
+        );
+        let events = vec![event];
+
+        let response_result = export_and_fetch_with_auth(None, None, events, false).await;
+
+        assert!(response_result.is_ok());
+
+        let body = response_result.expect("Cannot extract body from the response");
+
+        assert!(body.contains(&format!(
+            indoc! {r#"
+               # HELP {name} {name}
+               # TYPE {name} gauge
+               {name}{{code="success"}} 123.4
+            "# },
+            name = name
+        )));
     }
 
     async fn export_and_fetch(
@@ -733,6 +929,77 @@ mod tests {
         result
     }
 
+    async fn export_and_fetch_with_auth(
+        server_auth_config: Option<Auth>,
+        client_auth_config: Option<Auth>,
+        mut events: Vec<Event>,
+        suppress_timestamp: bool,
+    ) -> Result<String, http::status::StatusCode> {
+        trace_init();
+
+        let client_settings = MaybeTlsSettings::from_config(&None, false).unwrap();
+        let proto = client_settings.http_protocol_name();
+
+        let address = next_addr();
+        let config = PrometheusExporterConfig {
+            address,
+            auth: server_auth_config,
+            tls: None,
+            suppress_timestamp,
+            ..Default::default()
+        };
+
+        // Set up acknowledgement notification
+        let mut receiver = BatchNotifier::apply_to(&mut events[..]);
+        assert_eq!(receiver.try_recv(), Err(TryRecvError::Empty));
+
+        let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
+        let (_, delayed_event) = create_metric_gauge(Some("delayed".to_string()), 123.4);
+        let sink_handle = tokio::spawn(run_and_assert_sink_compliance(
+            sink,
+            stream::iter(events).chain(stream::once(async move {
+                // Wait a bit to have time to scrape metrics
+                time::sleep(time::Duration::from_millis(500)).await;
+                delayed_event
+            })),
+            &SINK_TAGS,
+        ));
+
+        time::sleep(time::Duration::from_millis(100)).await;
+
+        // Events are marked as delivered as soon as they are aggregated.
+        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+
+        let mut request = Request::get(format!("{}://{}/metrics", proto, address))
+            .body(Body::empty())
+            .expect("Error creating request.");
+
+        if let Some(client_auth_config) = client_auth_config {
+            client_auth_config.apply(&mut request);
+        }
+
+        let proxy = ProxyConfig::default();
+        let result = HttpClient::new(client_settings, &proxy)
+            .unwrap()
+            .send(request)
+            .await
+            .expect("Could not fetch query");
+
+        if !result.status().is_success() {
+            return Err(result.status());
+        }
+
+        let body = result.into_body();
+        let bytes = hyper::body::to_bytes(body)
+            .await
+            .expect("Reading body failed");
+        let result = String::from_utf8(bytes.to_vec()).unwrap();
+
+        sink_handle.await.unwrap();
+
+        Ok(result)
+    }
+
     async fn export_and_fetch_simple(tls_config: Option<TlsEnableableConfig>) {
         let (name1, event1) = create_metric_gauge(None, 123.4);
         let (name2, event2) = tests::create_metric_set(None, vec!["0", "1", "2"]);
@@ -772,13 +1039,17 @@ mod tests {
     }
 
     pub(self) fn create_metric(name: Option<String>, value: MetricValue) -> (String, Event) {
+        create_metric_with_tags(name, value, Some(metric_tags!("some_tag" => "some_value")))
+    }
+
+    pub(self) fn create_metric_with_tags(
+        name: Option<String>,
+        value: MetricValue,
+        tags: Option<MetricTags>,
+    ) -> (String, Event) {
         let name = name.unwrap_or_else(|| format!("vector_set_{}", random_string(16)));
         let event = Metric::new(name.clone(), MetricKind::Incremental, value)
-            .with_tags(Some(
-                vec![("some_tag".to_owned(), "some_value".to_owned())]
-                    .into_iter()
-                    .collect(),
-            ))
+            .with_tags(tags)
             .into();
         (name, event)
     }
@@ -798,17 +1069,9 @@ mod tests {
             MetricKind::Absolute,
             MetricValue::Counter { value: 32. },
         )
-        .with_tags(Some(
-            vec![("tag1".to_owned(), "value1".to_owned())]
-                .into_iter()
-                .collect(),
-        ));
+        .with_tags(Some(metric_tags!("tag1" => "value1")));
 
-        let m2 = m1.clone().with_tags(Some(
-            vec![("tag1".to_owned(), "value2".to_owned())]
-                .into_iter()
-                .collect(),
-        ));
+        let m2 = m1.clone().with_tags(Some(metric_tags!("tag1" => "value2")));
 
         let events = vec![
             Event::Metric(m1.clone().with_value(MetricValue::Counter { value: 32. })),
@@ -963,7 +1226,7 @@ mod tests {
         // that we check the internal metric data, which, when in this mode, will actually be a
         // sketch (so that we can merge without loss of accuracy).
         //
-        // The render code is actually what will end up rrendering those sketches as aggregated
+        // The render code is actually what will end up rendering those sketches as aggregated
         // summaries in the scrape output.
         let config = PrometheusExporterConfig {
             address: next_addr(), // Not actually bound, just needed to fill config

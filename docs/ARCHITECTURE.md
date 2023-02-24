@@ -123,7 +123,7 @@ Healthchecks are one-off tasks that run at startup with the goal of discovering
 any issues that may prevent the sink from running properly (e.g. permissions
 or connectivity issues) and notifying the user in a nice way. They can be
 enabled or disabled both individually and at a global level, and the user can
-choose whether or not a failing healthcheck should prevent Vector from starting.
+choose whether a failing healthcheck should prevent Vector from starting.
 
 Buffers are a configurable mechanism for dealing with backpressure. By default,
 like the rest of Vector, sinks will buffer some small-ish number of events in
@@ -137,7 +137,7 @@ the fact that they're persistent across both config reloads and process
 restarts. They are built normally with their corresponding sink most of the
 time, but they are also stashed to the side for the case when topology
 construction fails after a buffer has been built. This allows a subsequent build
-(likely of the previous configuration during a reload rollback) to pull from the
+(likely of the previous configuration during a rollback) to pull from the
 already-built buffer without worrying about the persistence of the contents.
 
 Once the healthcheck and buffer are built, the sink itself is constructed via
@@ -183,7 +183,7 @@ To wire up this topology, the `connect_diff` function on `RunningTopology` will
 see that `bar` specifies `foo` as an input, take a clone of `bar`'s input, and
 send that to `foo`'s output control channel. This results in the `Fanout`
 associated with the source `foo` adding a new sender to its list of destinations
-to write new events to. And voila, the sink will receive events from the source
+to write new events to. And voilà, the sink will receive events from the source
 on its input stream.
 
 The actual code for this logic (found in `src/topology/running.rs`) is

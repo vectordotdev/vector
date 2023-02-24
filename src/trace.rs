@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 use std::{
     collections::HashMap,
     marker::PhantomData,
@@ -9,7 +10,7 @@ use std::{
 };
 
 use futures_util::{future::ready, Stream, StreamExt};
-use lookup::path;
+use lookup::event_path;
 use metrics_tracing_context::MetricsLayer;
 use once_cell::sync::OnceCell;
 use tokio::sync::{
@@ -20,6 +21,7 @@ use tokio_stream::wrappers::BroadcastStream;
 use tracing::{Event, Subscriber};
 use tracing_limit::RateLimitedLayer;
 use tracing_subscriber::{
+    filter::LevelFilter,
     layer::{Context, SubscriberExt},
     registry::LookupSpan,
     util::SubscriberInitExt,
@@ -55,16 +57,17 @@ fn metrics_layer_enabled() -> bool {
     !matches!(std::env::var("DISABLE_INTERNAL_METRICS_TRACING_INTEGRATION"), Ok(x) if x == "true")
 }
 
-pub fn init(color: bool, json: bool, levels: &str) {
+pub fn init(color: bool, json: bool, levels: &str, internal_log_rate_limit: u64) {
     let fmt_filter = tracing_subscriber::filter::Targets::from_str(levels).expect(
         "logging filter targets were not formatted correctly or did not specify a valid level",
     );
 
-    let metrics_layer = metrics_layer_enabled()
-        .then(|| MetricsLayer::new().with_filter(tracing_subscriber::filter::LevelFilter::INFO));
+    let metrics_layer =
+        metrics_layer_enabled().then(|| MetricsLayer::new().with_filter(LevelFilter::INFO));
 
-    let broadcast_layer =
-        RateLimitedLayer::new(BroadcastLayer::new()).with_filter(fmt_filter.clone());
+    let broadcast_layer = RateLimitedLayer::new(BroadcastLayer::new())
+        .with_default_limit(internal_log_rate_limit)
+        .with_filter(fmt_filter.clone());
 
     let subscriber = tracing_subscriber::registry()
         .with(metrics_layer)
@@ -79,13 +82,22 @@ pub fn init(color: bool, json: bool, levels: &str) {
         subscriber.with(console_layer)
     };
 
+    #[cfg(feature = "allocation-tracing")]
+    let subscriber = {
+        let allocation_layer = crate::internal_telemetry::allocations::AllocationLayer::new()
+            .with_filter(LevelFilter::ERROR);
+
+        subscriber.with(allocation_layer)
+    };
+
     if json {
         let formatter = tracing_subscriber::fmt::layer().json().flatten_event(true);
 
         #[cfg(test)]
         let formatter = formatter.with_test_writer();
 
-        let rate_limited = RateLimitedLayer::new(formatter);
+        let rate_limited =
+            RateLimitedLayer::new(formatter).with_default_limit(internal_log_rate_limit);
         let subscriber = subscriber.with(rate_limited.with_filter(fmt_filter));
 
         let _ = subscriber.try_init();
@@ -97,7 +109,8 @@ pub fn init(color: bool, json: bool, levels: &str) {
         #[cfg(test)]
         let formatter = formatter.with_test_writer();
 
-        let rate_limited = RateLimitedLayer::new(formatter);
+        let rate_limited =
+            RateLimitedLayer::new(formatter).with_default_limit(internal_log_rate_limit);
         let subscriber = subscriber.with(rate_limited.with_filter(fmt_filter));
 
         let _ = subscriber.try_init();
@@ -149,7 +162,7 @@ fn try_broadcast_event(log: LogEvent) {
 ///
 /// # Panics
 ///
-/// If the early buffered events have already been consumes, this function will panic.
+/// If the early buffered events have already been consumed, this function will panic.
 fn consume_early_buffer() -> Vec<LogEvent> {
     get_early_buffer()
         .take()
@@ -206,17 +219,26 @@ fn try_register_for_early_events() -> Option<oneshot::Receiver<Vec<LogEvent>>> {
 /// This flushes any buffered log events to waiting subscribers and redirects log events from the buffer to the
 /// broadcast stream.
 pub fn stop_early_buffering() {
-    // First, consume any waiting subscribers. This causes new subscriptions to simply receive from
-    // the broadcast channel, and not bother trying to receive the early buffered events.
-    let subscribers = get_trace_subscriber_list().take();
+    // Try and disable early buffering.
+    //
+    // If it was already disabled, or we lost the race to disable it, just return.
+    if SHOULD_BUFFER
+        .compare_exchange(true, false, Ordering::SeqCst, Ordering::SeqCst)
+        .is_err()
+    {
+        return;
+    }
 
-    // Now that we have any waiting subscribers, actually disable early buffering and consume any
-    // buffered log events. Once we have the buffered events, send them to each subscriber.
-    SHOULD_BUFFER.store(false, Ordering::Release);
-    let buffered_events = consume_early_buffer();
-    for subscriber_tx in subscribers.into_iter().flatten() {
-        // Ignore any errors sending since the caller may have dropped or something else.
-        let _ = subscriber_tx.send(buffered_events.clone());
+    // We won the right to capture all buffered events and forward them to any waiting subscribers,
+    // so let's grab the subscriber list and see if there's actually anyone waiting.
+    let subscribers = get_trace_subscriber_list().take();
+    if let Some(subscribers_tx) = subscribers {
+        // Consume the early buffer, and send a copy of it to every waiting subscriber.
+        let buffered_events = consume_early_buffer();
+        for subscriber_tx in subscribers_tx {
+            // Ignore any errors sending since the caller may have dropped or something else.
+            let _ = subscriber_tx.send(buffered_events.clone());
+        }
     }
 }
 
@@ -259,7 +281,7 @@ impl TraceSubscription {
     /// Converts this subscription into a raw stream of log events.
     pub fn into_stream(self) -> impl Stream<Item = LogEvent> + Unpin {
         // We ignore errors because the only error we get is when the broadcast receiver lags, and there's nothing we
-        // can actully do about that so there's no reason to force callers to even deal with it.
+        // can actually do about that so there's no reason to force callers to even deal with it.
         BroadcastStream::new(self.trace_rx).filter_map(|event| ready(event.ok()))
     }
 }
@@ -288,7 +310,7 @@ where
                 for span in parent_span.scope().from_root() {
                     if let Some(fields) = span.extensions().get::<SpanFields>() {
                         for (k, v) in &fields.0 {
-                            log.insert(path!("vector", *k), v.clone());
+                            log.insert(event_path!("vector", *k), v.clone());
                         }
                     }
                 }

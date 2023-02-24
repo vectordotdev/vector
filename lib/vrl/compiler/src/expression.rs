@@ -510,7 +510,7 @@ impl DiagnosticMessage for Error {
             Missing { span, feature } => vec![
                 Label::primary("expression type is disabled in this version of vrl", span),
                 Label::context(
-                    format!("build vrl using the `{}` feature to enable it", feature),
+                    format!("build vrl using the `{feature}` feature to enable it"),
                     span,
                 ),
             ],

@@ -1,4 +1,5 @@
-use crate::config::SinkDescription;
+mod backpressure;
+pub use self::backpressure::BackpressureSinkConfig;
 
 mod basic;
 pub use self::basic::BasicSinkConfig;
@@ -6,17 +7,8 @@ pub use self::basic::BasicSinkConfig;
 mod error;
 pub use self::error::ErrorSinkConfig;
 
+mod oneshot;
+pub use self::oneshot::OneshotSinkConfig;
+
 mod panic;
 pub use self::panic::PanicSinkConfig;
-
-inventory::submit! {
-    SinkDescription::new::<BasicSinkConfig>("test_basic")
-}
-
-inventory::submit! {
-    SinkDescription::new::<ErrorSinkConfig>("test_error")
-}
-
-inventory::submit! {
-    SinkDescription::new::<PanicSinkConfig>("test_panic")
-}

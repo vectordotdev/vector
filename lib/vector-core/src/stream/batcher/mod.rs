@@ -4,12 +4,11 @@ pub mod limiter;
 
 use std::{
     pin::Pin,
-    task::{Context, Poll},
+    task::{ready, Context, Poll},
 };
 
 pub use config::BatchConfig;
 use futures::{
-    ready,
     stream::{Fuse, Stream},
     Future, StreamExt,
 };

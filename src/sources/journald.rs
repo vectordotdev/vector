@@ -1,7 +1,6 @@
 use std::{
     collections::{HashMap, HashSet},
     io::SeekFrom,
-    iter::FromIterator,
     path::PathBuf,
     process::Stdio,
     str::FromStr,
@@ -10,9 +9,10 @@ use std::{
 };
 
 use bytes::Bytes;
-use chrono::TimeZone;
+use chrono::{TimeZone, Utc};
 use codecs::{decoding::BoxedFramingError, CharacterDelimitedDecoder};
 use futures::{poll, stream::BoxStream, task::Poll, StreamExt};
+use lookup::{lookup_v2::parse_value_path, metadata_path, owned_value_path, path, PathPrefix};
 use nix::{
     sys::signal::{kill, Signal},
     unistd::Pid,
@@ -28,26 +28,35 @@ use tokio::{
     time::sleep,
 };
 use tokio_util::codec::FramedRead;
-use vector_common::internal_event::{
-    ByteSize, BytesReceived, InternalEventHandle as _, Protocol, Registered,
+use value::{kind::Collection, Kind, Value};
+use vector_common::{
+    finalizer::OrderedFinalizer,
+    internal_event::{
+        ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol, Registered,
+    },
 };
-use vector_common::{byte_size_of::ByteSizeOf, finalizer::OrderedFinalizer};
 use vector_config::configurable_component;
-use vector_core::config::LogNamespace;
+use vector_core::{
+    config::{LegacyKey, LogNamespace},
+    schema::Definition,
+    EstimatedJsonEncodedSizeOf,
+};
 
 use crate::{
-    config::{log_schema, AcknowledgementsConfig, DataType, Output, SourceConfig, SourceContext},
-    event::{BatchNotifier, BatchStatus, BatchStatusReceiver, LogEvent, Value},
+    config::{
+        log_schema, DataType, Output, SourceAcknowledgementsConfig, SourceConfig, SourceContext,
+    },
+    event::{BatchNotifier, BatchStatus, BatchStatusReceiver, LogEvent},
     internal_events::{
-        JournaldCheckpointFileOpenError, JournaldCheckpointSetError, JournaldInvalidRecordError,
-        JournaldReadError, JournaldStartJournalctlError, OldEventsReceived, StreamClosedError,
+        EventsReceived, JournaldCheckpointFileOpenError, JournaldCheckpointSetError,
+        JournaldInvalidRecordError, JournaldReadError, JournaldStartJournalctlError,
+        StreamClosedError,
     },
     serde::bool_or_struct,
     shutdown::ShutdownSignal,
     SourceSender,
 };
 
-const DEFAULT_BATCH_SIZE: usize = 16;
 const BATCH_TIMEOUT: Duration = Duration::from_millis(10);
 
 const CHECKPOINT_FILENAME: &str = "checkpoint.txt";
@@ -85,84 +94,123 @@ type Matches = HashMap<String, HashSet<String>>;
 
 /// Configuration for the `journald` source.
 #[configurable_component(source("journald"))]
-#[derive(Clone, Debug, Default)]
-#[serde(deny_unknown_fields, default)]
+#[derive(Clone, Debug)]
+#[serde(deny_unknown_fields)]
 pub struct JournaldConfig {
-    /// Only include entries that appended to the journal after Vector starts reading it.
-    pub since_now: Option<bool>,
+    /// Only include entries that appended to the journal after the entries have been read.
+    #[serde(default)]
+    pub since_now: bool,
 
     /// Only include entries that occurred after the current boot of the system.
-    pub current_boot_only: Option<bool>,
-
-    /// The list of unit names to monitor.
-    ///
-    /// If empty or not present, all units are accepted. Unit names lacking a "." will have ".service" appended to make them a valid service unit name.
-    // TODO: Why isn't this just an alias on `include_units`?
-    #[configurable(deprecated)]
-    pub units: Vec<String>,
+    #[serde(default = "crate::serde::default_true")]
+    pub current_boot_only: bool,
 
     /// A list of unit names to monitor.
     ///
-    /// If empty or not present, all units are accepted. Unit names lacking a "." will have ".service" appended to make them a valid service unit name.
+    /// If empty or not present, all units are accepted.
+    ///
+    /// Unit names lacking a `.` will have `.service` appended to make them a valid service unit name.
+    #[serde(default)]
+    #[configurable(metadata(docs::examples = "ntpd", docs::examples = "sysinit.target"))]
     pub include_units: Vec<String>,
 
     /// A list of unit names to exclude from monitoring.
     ///
-    /// Unit names lacking a "." will have ".service" appended to make them a valid service unit name.
+    /// Unit names lacking a `.` will have `.service` appended to make them a valid service unit
+    /// name.
+    #[serde(default)]
+    #[configurable(metadata(docs::examples = "badservice", docs::examples = "sysinit.target"))]
     pub exclude_units: Vec<String>,
 
     /// A list of sets of field/value pairs to monitor.
     ///
-    /// If empty or not present, all journal fields are accepted. If `include_units` is specified, it will be merged into this list.
+    /// If empty or not present, all journal fields are accepted.
+    ///
+    /// If `include_units` is specified, it will be merged into this list.
+    #[serde(default)]
+    #[configurable(metadata(
+        docs::additional_props_description = "The set of field values to match in journal entries that are to be included."
+    ))]
+    #[configurable(metadata(docs::examples = "matches_examples()"))]
     pub include_matches: Matches,
 
-    /// A list of sets of field/value pairs that, if any are present in a journal entry, will cause the entry to be excluded from this source.
+    /// A list of sets of field/value pairs that, if any are present in a journal entry, will cause
+    /// the entry to be excluded from this source.
     ///
     /// If `exclude_units` is specified, it will be merged into this list.
+    #[serde(default)]
+    #[configurable(metadata(
+        docs::additional_props_description = "The set of field values to match in journal entries that are to be excluded."
+    ))]
+    #[configurable(metadata(docs::examples = "matches_examples()"))]
     pub exclude_matches: Matches,
 
     /// The directory used to persist file checkpoint positions.
     ///
-    /// By default, the global `data_dir` option is used. Please make sure the user Vector is running as has write permissions to this directory.
+    /// By default, the global `data_dir` option is used. Make sure the running user has write
+    /// permissions to this directory.
+    #[serde(default)]
+    #[configurable(metadata(docs::examples = "/var/lib/vector"))]
     pub data_dir: Option<PathBuf>,
 
-    /// The `systemd` journal is read in batches, and a checkpoint is set at the end of each batch. This option limits the size of the batch.
-    pub batch_size: Option<usize>,
+    /// The systemd journal is read in batches, and a checkpoint is set at the end of each batch.
+    ///
+    /// This option limits the size of the batch.
+    #[serde(default = "default_batch_size")]
+    #[configurable(metadata(docs::type_unit = "events"))]
+    pub batch_size: usize,
 
     /// The full path of the `journalctl` executable.
     ///
-    /// If not set, Vector will search the path for `journalctl`.
+    /// If not set, a search is done for the `journalctl` path.
+    #[serde(default)]
     pub journalctl_path: Option<PathBuf>,
 
     /// The full path of the journal directory.
     ///
-    /// If not set, `journalctl` will use the default system journal paths.
+    /// If not set, `journalctl` will use the default system journal path.
+    #[serde(default)]
     pub journal_directory: Option<PathBuf>,
 
     #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
-    acknowledgements: AcknowledgementsConfig,
+    acknowledgements: SourceAcknowledgementsConfig,
 
     /// Enables remapping the `PRIORITY` field from an integer to string value.
     ///
     /// Has no effect unless the value of the field is already an integer.
     #[serde(default)]
-    #[configurable(deprecated)]
+    #[configurable(
+        deprecated = "This option has been deprecated, use the `remap` transform and `to_syslog_level` function instead."
+    )]
     remap_priority: bool,
+
+    /// The namespace to use for logs. This overrides the global setting.
+    #[configurable(metadata(docs::hidden))]
+    #[serde(default)]
+    log_namespace: Option<bool>,
+}
+
+const fn default_batch_size() -> usize {
+    16
+}
+
+fn matches_examples() -> HashMap<String, Vec<String>> {
+    HashMap::<_, _>::from_iter(
+        [
+            (
+                "_SYSTEMD_UNIT".to_owned(),
+                vec!["sshd.service".to_owned(), "ntpd.service".to_owned()],
+            ),
+            ("_TRANSPORT".to_owned(), vec!["kernel".to_owned()]),
+        ]
+        .into_iter(),
+    )
 }
 
 impl JournaldConfig {
-    fn merged_include_matches(&self) -> crate::Result<Matches> {
-        let include_units = match (!self.units.is_empty(), !self.include_units.is_empty()) {
-            (true, true) => return Err(BuildError::BothUnitsAndIncludeUnits.into()),
-            (true, false) => {
-                warn!("The `units` setting is deprecated, use `include_units` instead.");
-                &self.units
-            }
-            (false, _) => &self.include_units,
-        };
-
-        Ok(Self::merge_units(&self.include_matches, include_units))
+    fn merged_include_matches(&self) -> Matches {
+        Self::merge_units(&self.include_matches, &self.include_units)
     }
 
     fn merged_exclude_matches(&self) -> Matches {
@@ -177,6 +225,74 @@ impl JournaldConfig {
         }
         matches
     }
+
+    /// Builds the `schema::Definition` for this source using the provided `LogNamespace`.
+    fn schema_definition(&self, log_namespace: LogNamespace) -> Definition {
+        let schema_definition = match log_namespace {
+            LogNamespace::Vector => Definition::new_with_default_metadata(
+                Kind::bytes().or_null(),
+                [LogNamespace::Vector],
+            ),
+            LogNamespace::Legacy => Definition::new_with_default_metadata(
+                Kind::object(Collection::empty()),
+                [LogNamespace::Legacy],
+            ),
+        };
+
+        let mut schema_definition = schema_definition
+            .with_standard_vector_source_metadata()
+            // for metadata that is added to the events dynamically through the Record
+            .with_source_metadata(
+                JournaldConfig::NAME,
+                None,
+                &owned_value_path!("metadata"),
+                Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
+                None,
+            )
+            .with_source_metadata(
+                JournaldConfig::NAME,
+                None,
+                &owned_value_path!("timestamp"),
+                Kind::timestamp().or_undefined(),
+                Some("timestamp"),
+            )
+            .with_source_metadata(
+                JournaldConfig::NAME,
+                parse_value_path(log_schema().host_key())
+                    .ok()
+                    .map(LegacyKey::Overwrite),
+                &owned_value_path!("host"),
+                Kind::bytes().or_undefined(),
+                Some("host"),
+            );
+
+        // for metadata that is added to the events dynamically through the Record
+        if log_namespace == LogNamespace::Legacy {
+            schema_definition = schema_definition.unknown_fields(Kind::bytes());
+        }
+
+        schema_definition
+    }
+}
+
+impl Default for JournaldConfig {
+    fn default() -> Self {
+        Self {
+            since_now: false,
+            current_boot_only: true,
+            include_units: vec![],
+            exclude_units: vec![],
+            include_matches: Default::default(),
+            exclude_matches: Default::default(),
+            data_dir: None,
+            batch_size: default_batch_size(),
+            journalctl_path: None,
+            journal_directory: None,
+            acknowledgements: Default::default(),
+            remap_priority: false,
+            log_namespace: None,
+        }
+    }
 }
 
 impl_generate_config_from_default!(JournaldConfig);
@@ -187,7 +303,7 @@ type Record = HashMap<String, String>;
 impl SourceConfig for JournaldConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         if self.remap_priority {
-            warn!("Option `remap_priority` has been deprecated. Please use the `remap` transform and function `to_syslog_level` instead.");
+            warn!("DEPRECATION, option `remap_priority` has been deprecated. Please use the `remap` transform and function `to_syslog_level` instead.");
         }
 
         let data_dir = cx
@@ -204,7 +320,7 @@ impl SourceConfig for JournaldConfig {
             return Err(BuildError::DuplicatedUnit { unit }.into());
         }
 
-        let include_matches = self.merged_include_matches()?;
+        let include_matches = self.merged_include_matches();
         let exclude_matches = self.merged_exclude_matches();
 
         if let Some((field, value)) = find_duplicate_match(&include_matches, &exclude_matches) {
@@ -222,12 +338,13 @@ impl SourceConfig for JournaldConfig {
         let starter = StartJournalctl::new(
             journalctl_path,
             self.journal_directory.clone(),
-            self.current_boot_only.unwrap_or(true),
-            self.since_now.unwrap_or(false),
+            self.current_boot_only,
+            self.since_now,
         );
 
-        let batch_size = self.batch_size.unwrap_or(DEFAULT_BATCH_SIZE);
-        let acknowledgements = cx.do_acknowledgements(&self.acknowledgements);
+        let batch_size = self.batch_size;
+        let acknowledgements = cx.do_acknowledgements(self.acknowledgements);
+        let log_namespace = cx.log_namespace(self.log_namespace);
 
         Ok(Box::pin(
             JournaldSource {
@@ -239,13 +356,17 @@ impl SourceConfig for JournaldConfig {
                 out: cx.out,
                 acknowledgements,
                 starter,
+                log_namespace,
             }
             .run_shutdown(cx.shutdown),
         ))
     }
 
-    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
-        vec![Output::default(DataType::Log)]
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+        let schema_definition =
+            self.schema_definition(global_log_namespace.merge(self.log_namespace));
+
+        vec![Output::default(DataType::Log).with_schema_definition(schema_definition)]
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -262,6 +383,7 @@ struct JournaldSource {
     out: SourceSender,
     acknowledgements: bool,
     starter: StartJournalctl,
+    log_namespace: LogNamespace,
 }
 
 impl JournaldSource {
@@ -335,6 +457,7 @@ impl JournaldSource {
         mut shutdown: ShutdownSignal,
     ) -> bool {
         let bytes_received = register!(BytesReceived::from(Protocol::from("journald")));
+        let events_received = register!(EventsReceived);
 
         let batch_size = self.batch_size;
         loop {
@@ -363,7 +486,10 @@ impl JournaldSource {
                     }
                 }
             }
-            if let Some(x) = batch.finish(finalizer, &bytes_received).await {
+            if let Some(x) = batch
+                .finish(finalizer, &bytes_received, &events_received)
+                .await
+            {
                 break x;
             }
         }
@@ -418,7 +544,15 @@ impl<'a> Batch<'a> {
                             &self.source.exclude_matches,
                         ) {
                             self.record_size += bytes.len();
-                            let event = create_event(record, &self.batch);
+
+                            let mut event = create_log_event_from_record(
+                                record,
+                                &self.batch,
+                                self.source.log_namespace,
+                            );
+
+                            enrich_log_event(&mut event, self.source.log_namespace);
+
                             self.events.push(event);
                         }
                     }
@@ -438,6 +572,7 @@ impl<'a> Batch<'a> {
         mut self,
         finalizer: &Finalizer,
         bytes_received: &'a Registered<BytesReceived>,
+        events_received: &'a Registered<EventsReceived>,
     ) -> Option<bool> {
         drop(self.batch);
 
@@ -447,10 +582,8 @@ impl<'a> Batch<'a> {
 
         if !self.events.is_empty() {
             let count = self.events.len();
-            emit!(OldEventsReceived {
-                count,
-                byte_size: self.events.size_of(),
-            });
+            let byte_size = self.events.estimated_json_encoded_size_of();
+            events_received.emit(CountByteSize(count, byte_size));
 
             match self.source.out.send_batch(self.events).await {
                 Ok(_) => {
@@ -549,33 +682,95 @@ impl Drop for RunningJournalctl {
     }
 }
 
-fn create_event(record: Record, batch: &Option<BatchNotifier>) -> LogEvent {
-    let mut log = LogEvent::from_iter(record).with_batch_notifier_option(batch);
-
-    // Convert some journald-specific field names into Vector standard ones.
-    if let Some(message) = log.remove(MESSAGE) {
-        log.insert(log_schema().message_key(), message);
-    }
+fn enrich_log_event(log: &mut LogEvent, log_namespace: LogNamespace) {
     if let Some(host) = log.remove(HOSTNAME) {
-        log.insert(log_schema().host_key(), host);
+        log_namespace.insert_source_metadata(
+            JournaldConfig::NAME,
+            log,
+            parse_value_path(log_schema().host_key())
+                .ok()
+                .as_ref()
+                .map(LegacyKey::Overwrite),
+            path!("host"),
+            host,
+        );
     }
-    // Translate the timestamp, and so leave both old and new names.
-    if let Some(Value::Bytes(timestamp)) = log
+
+    // Create a Utc timestamp from an existing log field if present.
+    let timestamp = log
         .get(SOURCE_TIMESTAMP)
         .or_else(|| log.get(RECEIVED_TIMESTAMP))
-    {
-        if let Ok(timestamp) = String::from_utf8_lossy(timestamp).parse::<u64>() {
-            let timestamp = chrono::Utc.timestamp(
-                (timestamp / 1_000_000) as i64,
-                (timestamp % 1_000_000) as u32 * 1_000,
-            );
-            log.insert(log_schema().timestamp_key(), Value::Timestamp(timestamp));
+        .filter(|&ts| ts.is_bytes())
+        .and_then(|ts| {
+            String::from_utf8_lossy(ts.as_bytes().unwrap())
+                .parse::<u64>()
+                .ok()
+        })
+        .map(|ts| {
+            chrono::Utc
+                .timestamp_opt((ts / 1_000_000) as i64, (ts % 1_000_000) as u32 * 1_000)
+                .single()
+                .expect("invalid timestamp")
+        });
+
+    // Add timestamp.
+    match log_namespace {
+        LogNamespace::Vector => {
+            log.insert(metadata_path!("vector", "ingest_timestamp"), Utc::now());
+
+            if let Some(ts) = timestamp {
+                log.insert(metadata_path!(JournaldConfig::NAME, "timestamp"), ts);
+            }
+        }
+        LogNamespace::Legacy => {
+            if let Some(ts) = timestamp {
+                log.insert((PathPrefix::Event, log_schema().timestamp_key()), ts);
+            }
         }
     }
-    // Add source type
-    log.try_insert(log_schema().source_type_key(), Bytes::from("journald"));
 
-    log
+    // Add source type.
+    log_namespace.insert_vector_metadata(
+        log,
+        log_schema().source_type_key(),
+        path!("source_type"),
+        JournaldConfig::NAME,
+    );
+}
+
+fn create_log_event_from_record(
+    mut record: Record,
+    batch: &Option<BatchNotifier>,
+    log_namespace: LogNamespace,
+) -> LogEvent {
+    match log_namespace {
+        LogNamespace::Vector => {
+            let message_value = record
+                .remove(MESSAGE)
+                .map(|msg| Value::Bytes(Bytes::from(msg)))
+                .unwrap_or(Value::Null);
+
+            let mut log = LogEvent::from(message_value).with_batch_notifier_option(batch);
+
+            // Add the remaining fields from the Record to the log event into an object to avoid collisions.
+            record.iter().for_each(|(key, value)| {
+                log.metadata_mut()
+                    .value_mut()
+                    .insert(path!(JournaldConfig::NAME, "metadata", key), value.as_str());
+            });
+
+            log
+        }
+        LogNamespace::Legacy => {
+            let mut log = LogEvent::from_iter(record).with_batch_notifier_option(batch);
+
+            if let Some(message) = log.remove(MESSAGE) {
+                log.insert(log_schema().message_key(), message);
+            }
+
+            log
+        }
+    }
 }
 
 /// Map the given unit name into a valid systemd unit
@@ -849,6 +1044,7 @@ mod tests {
 
     use tempfile::tempdir;
     use tokio::time::{sleep, timeout, Duration, Instant};
+    use value::{kind::Collection, Value};
 
     use super::*;
     use crate::{
@@ -1156,7 +1352,7 @@ mod tests {
         let hashset =
             |v: &[&str]| -> HashSet<String> { v.iter().copied().map(String::from).collect() };
 
-        let matches = journald_config.merged_include_matches().unwrap();
+        let matches = journald_config.merged_include_matches();
         let units = matches.get("_SYSTEMD_UNIT").unwrap();
         assert_eq!(
             units,
@@ -1196,7 +1392,7 @@ mod tests {
 
     #[test]
     fn command_options() {
-        let path = PathBuf::from("jornalctl");
+        let path = PathBuf::from("journalctl");
 
         let journal_dir = None;
         let current_boot_only = false;
@@ -1247,10 +1443,130 @@ mod tests {
     }
 
     fn value_ts(secs: i64, usecs: u32) -> Value {
-        Value::Timestamp(chrono::Utc.timestamp(secs, usecs))
+        Value::Timestamp(
+            chrono::Utc
+                .timestamp_opt(secs, usecs)
+                .single()
+                .expect("invalid timestamp"),
+        )
     }
 
     fn priority(event: &Event) -> Value {
         event.as_log()["PRIORITY"].clone()
+    }
+
+    #[test]
+    fn output_schema_definition_vector_namespace() {
+        let config = JournaldConfig {
+            log_namespace: Some(true),
+            ..Default::default()
+        };
+
+        let definition = config.outputs(LogNamespace::Vector)[0]
+            .clone()
+            .log_schema_definition
+            .unwrap();
+
+        let expected_definition =
+            Definition::new_with_default_metadata(Kind::bytes().or_null(), [LogNamespace::Vector])
+                .with_metadata_field(
+                    &owned_value_path!("vector", "source_type"),
+                    Kind::bytes(),
+                    None,
+                )
+                .with_metadata_field(
+                    &owned_value_path!("vector", "ingest_timestamp"),
+                    Kind::timestamp(),
+                    None,
+                )
+                .with_metadata_field(
+                    &owned_value_path!(JournaldConfig::NAME, "metadata"),
+                    Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
+                    None,
+                )
+                .with_metadata_field(
+                    &owned_value_path!(JournaldConfig::NAME, "timestamp"),
+                    Kind::timestamp().or_undefined(),
+                    Some("timestamp"),
+                )
+                .with_metadata_field(
+                    &owned_value_path!(JournaldConfig::NAME, "host"),
+                    Kind::bytes().or_undefined(),
+                    Some("host"),
+                );
+
+        assert_eq!(definition, expected_definition)
+    }
+
+    #[test]
+    fn output_schema_definition_legacy_namespace() {
+        let config = JournaldConfig::default();
+
+        let definition = config.outputs(LogNamespace::Legacy)[0]
+            .clone()
+            .log_schema_definition
+            .unwrap();
+
+        let expected_definition = Definition::new_with_default_metadata(
+            Kind::object(Collection::empty()),
+            [LogNamespace::Legacy],
+        )
+        .with_event_field(&owned_value_path!("source_type"), Kind::bytes(), None)
+        .with_event_field(&owned_value_path!("timestamp"), Kind::timestamp(), None)
+        .with_event_field(
+            &owned_value_path!("host"),
+            Kind::bytes().or_undefined(),
+            Some("host"),
+        )
+        .unknown_fields(Kind::bytes());
+
+        assert_eq!(definition, expected_definition)
+    }
+
+    fn matches_schema(config: &JournaldConfig, namespace: LogNamespace) {
+        let record = r#"{
+            "PRIORITY":"6",
+            "SYSLOG_FACILITY":"3",
+            "SYSLOG_IDENTIFIER":"ntpd",
+            "_BOOT_ID":"124c781146e841ae8d9b4590df8b9231",
+            "_CAP_EFFECTIVE":"3fffffffff",
+            "_CMDLINE":"ntpd: [priv]",
+            "_COMM":"ntpd",
+            "_EXE":"/usr/sbin/ntpd",
+            "_GID":"0",
+            "_MACHINE_ID":"c36e9ea52800a19d214cb71b53263a28",
+            "_PID":"2156",
+            "_STREAM_ID":"92c79f4b45c4457490ebdefece29995e",
+            "_SYSTEMD_CGROUP":"/system.slice/ntpd.service",
+            "_SYSTEMD_INVOCATION_ID":"496ad5cd046d48e29f37f559a6d176f8",
+            "_SYSTEMD_SLICE":"system.slice",
+            "_SYSTEMD_UNIT":"ntpd.service",
+            "_TRANSPORT":"stdout",
+            "_UID":"0",
+            "__MONOTONIC_TIMESTAMP":"98694000446",
+            "__REALTIME_TIMESTAMP":"1564173027000443",
+            "host":"my-host.local",
+            "message":"reply from 192.168.1.2: offset -0.001791 delay 0.000176, next query 1500s",
+            "source_type":"journald"
+        }"#;
+
+        let json: serde_json::Value = serde_json::from_str(record).unwrap();
+        let mut event = Event::from(LogEvent::from(value::Value::from(json)));
+
+        event.as_mut_log().insert("timestamp", chrono::Utc::now());
+
+        let definition = config.outputs(namespace)[0]
+            .clone()
+            .log_schema_definition
+            .unwrap();
+
+        definition.assert_valid_for_event(&event)
+    }
+
+    #[test]
+    fn matches_schema_legacy() {
+        let config = JournaldConfig::default();
+
+        matches_schema(&config, LogNamespace::Legacy)
     }
 }

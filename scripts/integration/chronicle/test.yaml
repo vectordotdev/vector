@@ -1,0 +1,11 @@
+args:
+- --features
+- chronicle-integration-tests
+- --lib
+- '::chronicle_unstructured::'
+
+env:
+  CHRONICLE_ADDRESS: http://chronicle-emulator:3000
+
+matrix:
+  version: [latest]

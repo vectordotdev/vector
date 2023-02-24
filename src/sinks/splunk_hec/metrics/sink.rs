@@ -2,7 +2,9 @@ use std::{fmt, num::NonZeroUsize, sync::Arc};
 
 use async_trait::async_trait;
 use futures_util::{future, stream::BoxStream, StreamExt};
+use serde::Serialize;
 use tower::Service;
+use vector_buffers::EventCount;
 use vector_core::{
     event::{Event, Metric, MetricValue},
     partition::Partitioner,
@@ -49,7 +51,7 @@ where
         let default_namespace = self.default_namespace.as_deref();
 
         let builder_limit = NonZeroUsize::new(64);
-        let sink = input
+        input
             .map(|event| (event.size_of(), event.into_metric()))
             .filter_map(move |(event_byte_size, metric)| {
                 future::ready(process_metric(
@@ -73,9 +75,9 @@ where
                     Ok(req) => Some(req),
                 }
             })
-            .into_driver(self.service);
-
-        sink.run().await
+            .into_driver(self.service)
+            .run()
+            .await
     }
 }
 
@@ -104,6 +106,7 @@ impl Partitioner for EventPartitioner {
     }
 }
 
+#[derive(Serialize)]
 pub struct HecMetricsProcessedEventMetadata {
     pub event_byte_size: usize,
     pub sourcetype: Option<String>,
@@ -190,4 +193,11 @@ pub fn process_metric(
         event: metric,
         metadata,
     })
+}
+
+impl EventCount for HecProcessedEvent {
+    fn event_count(&self) -> usize {
+        // A HecProcessedEvent is mapped one-to-one with an event.
+        1
+    }
 }

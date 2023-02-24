@@ -8,7 +8,7 @@ fn to_int(value: Value) -> Resolved {
     match value {
         Integer(_) => Ok(value),
         Float(v) => Ok(Integer(v.into_inner() as i64)),
-        Boolean(v) => Ok(Integer(if v { 1 } else { 0 })),
+        Boolean(v) => Ok(Integer(i64::from(v))),
         Null => Ok(0.into()),
         Bytes(v) => Conversion::Integer
             .convert(v)
@@ -106,7 +106,7 @@ impl Function for ToInt {
         &self,
         _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
 

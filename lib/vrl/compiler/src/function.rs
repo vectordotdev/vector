@@ -1,7 +1,7 @@
 pub mod closure;
 
 use diagnostic::{DiagnosticMessage, Label, Note};
-use lookup::LookupBuf;
+use lookup::OwnedTargetPath;
 use parser::ast::Ident;
 use std::{
     collections::{BTreeMap, HashMap},
@@ -108,13 +108,8 @@ impl FunctionCompileContext {
     }
 
     #[must_use]
-    pub fn is_read_only_metadata_path(&self, path: &LookupBuf) -> bool {
-        self.config.is_read_only_metadata_path(path)
-    }
-
-    #[must_use]
-    pub fn is_read_only_event_path(&self, path: &LookupBuf) -> bool {
-        self.config.is_read_only_event_path(path)
+    pub fn is_read_only_path(&self, path: &OwnedTargetPath) -> bool {
+        self.config.is_read_only_path(path)
     }
 
     /// Consume the `FunctionCompileContext`, returning the (potentially mutated) `AnyMap`.
@@ -215,17 +210,19 @@ pub struct ArgumentList {
 }
 
 impl ArgumentList {
-    pub fn optional(&mut self, keyword: &'static str) -> Option<Box<dyn Expression>> {
+    #[must_use]
+    pub fn optional(&self, keyword: &'static str) -> Option<Box<dyn Expression>> {
         self.optional_expr(keyword).map(|v| Box::new(v) as _)
     }
 
-    pub fn required(&mut self, keyword: &'static str) -> Box<dyn Expression> {
+    #[must_use]
+    pub fn required(&self, keyword: &'static str) -> Box<dyn Expression> {
         Box::new(self.required_expr(keyword)) as _
     }
 
     #[cfg(feature = "expr-literal")]
     pub fn optional_literal(
-        &mut self,
+        &self,
         keyword: &'static str,
     ) -> Result<Option<crate::expression::Literal>, Error> {
         self.optional_expr(keyword)
@@ -252,14 +249,14 @@ impl ArgumentList {
 
     #[cfg(not(feature = "expr-literal"))]
     pub fn optional_literal(
-        &mut self,
+        &self,
         _: &'static str,
     ) -> Result<Option<crate::expression::Noop>, Error> {
         Ok(Some(crate::expression::Noop))
     }
 
     /// Returns the argument if it is a literal, an object or an array.
-    pub fn optional_value(&mut self, keyword: &'static str) -> Result<Option<Value>, Error> {
+    pub fn optional_value(&self, keyword: &'static str) -> Result<Option<Value>, Error> {
         self.optional_expr(keyword)
             .map(|expr| {
                 expr.try_into().map_err(|err| Error::UnexpectedExpression {
@@ -273,7 +270,7 @@ impl ArgumentList {
 
     #[cfg(feature = "expr-literal")]
     pub fn required_literal(
-        &mut self,
+        &self,
         keyword: &'static str,
     ) -> Result<crate::expression::Literal, Error> {
         Ok(required(self.optional_literal(keyword)?))
@@ -288,7 +285,7 @@ impl ArgumentList {
     }
 
     pub fn optional_enum(
-        &mut self,
+        &self,
         keyword: &'static str,
         variants: &[Value],
     ) -> Result<Option<Value>, Error> {
@@ -308,17 +305,13 @@ impl ArgumentList {
             .transpose()
     }
 
-    pub fn required_enum(
-        &mut self,
-        keyword: &'static str,
-        variants: &[Value],
-    ) -> Result<Value, Error> {
+    pub fn required_enum(&self, keyword: &'static str, variants: &[Value]) -> Result<Value, Error> {
         Ok(required(self.optional_enum(keyword, variants)?))
     }
 
     #[cfg(feature = "expr-query")]
     pub fn optional_query(
-        &mut self,
+        &self,
         keyword: &'static str,
     ) -> Result<Option<crate::expression::Query>, Error> {
         self.optional_expr(keyword)
@@ -334,14 +327,11 @@ impl ArgumentList {
     }
 
     #[cfg(feature = "expr-query")]
-    pub fn required_query(
-        &mut self,
-        keyword: &'static str,
-    ) -> Result<crate::expression::Query, Error> {
+    pub fn required_query(&self, keyword: &'static str) -> Result<crate::expression::Query, Error> {
         Ok(required(self.optional_query(keyword)?))
     }
 
-    pub fn optional_regex(&mut self, keyword: &'static str) -> Result<Option<regex::Regex>, Error> {
+    pub fn optional_regex(&self, keyword: &'static str) -> Result<Option<regex::Regex>, Error> {
         self.optional_expr(keyword)
             .map(|expr| match expr {
                 #[cfg(feature = "expr-literal")]
@@ -355,12 +345,12 @@ impl ArgumentList {
             .transpose()
     }
 
-    pub fn required_regex(&mut self, keyword: &'static str) -> Result<regex::Regex, Error> {
+    pub fn required_regex(&self, keyword: &'static str) -> Result<regex::Regex, Error> {
         Ok(required(self.optional_regex(keyword)?))
     }
 
     pub fn optional_object(
-        &mut self,
+        &self,
         keyword: &'static str,
     ) -> Result<Option<BTreeMap<String, Expr>>, Error> {
         self.optional_expr(keyword)
@@ -377,14 +367,11 @@ impl ArgumentList {
             .transpose()
     }
 
-    pub fn required_object(
-        &mut self,
-        keyword: &'static str,
-    ) -> Result<BTreeMap<String, Expr>, Error> {
+    pub fn required_object(&self, keyword: &'static str) -> Result<BTreeMap<String, Expr>, Error> {
         Ok(required(self.optional_object(keyword)?))
     }
 
-    pub fn optional_array(&mut self, keyword: &'static str) -> Result<Option<Vec<Expr>>, Error> {
+    pub fn optional_array(&self, keyword: &'static str) -> Result<Option<Vec<Expr>>, Error> {
         self.optional_expr(keyword)
             .map(|expr| match expr {
                 Expr::Container(Container {
@@ -399,7 +386,7 @@ impl ArgumentList {
             .transpose()
     }
 
-    pub fn required_array(&mut self, keyword: &'static str) -> Result<Vec<Expr>, Error> {
+    pub fn required_array(&self, keyword: &'static str) -> Result<Vec<Expr>, Error> {
         Ok(required(self.optional_array(keyword)?))
     }
 
@@ -429,11 +416,12 @@ impl ArgumentList {
         self.closure = Some(closure);
     }
 
-    pub(crate) fn optional_expr(&mut self, keyword: &'static str) -> Option<Expr> {
+    pub(crate) fn optional_expr(&self, keyword: &'static str) -> Option<Expr> {
         self.arguments.get(keyword).cloned()
     }
 
-    pub fn required_expr(&mut self, keyword: &'static str) -> Expr {
+    #[must_use]
+    pub fn required_expr(&self, keyword: &'static str) -> Expr {
         required(self.optional_expr(keyword))
     }
 }
@@ -563,11 +551,11 @@ impl diagnostic::DiagnosticMessage for Error {
                 expr,
             } => vec![
                 Label::primary(
-                    format!(r#"unexpected expression for argument "{}""#, keyword),
+                    format!(r#"unexpected expression for argument "{keyword}""#),
                     Span::default(),
                 ),
                 Label::context(format!("received: {}", expr.as_str()), Span::default()),
-                Label::context(format!("expected: {}", expected), Span::default()),
+                Label::context(format!("expected: {expected}"), Span::default()),
             ],
 
             InvalidEnumVariant {
@@ -576,10 +564,10 @@ impl diagnostic::DiagnosticMessage for Error {
                 variants,
             } => vec![
                 Label::primary(
-                    format!(r#"invalid enum variant for argument "{}""#, keyword),
+                    format!(r#"invalid enum variant for argument "{keyword}""#),
                     Span::default(),
                 ),
-                Label::context(format!("received: {}", value), Span::default()),
+                Label::context(format!("received: {value}"), Span::default()),
                 Label::context(
                     format!(
                         "expected one of: {}",
@@ -595,7 +583,7 @@ impl diagnostic::DiagnosticMessage for Error {
 
             ExpectedStaticExpression { keyword, expr } => vec![
                 Label::primary(
-                    format!(r#"expected static expression for argument "{}""#, keyword),
+                    format!(r#"expected static expression for argument "{keyword}""#),
                     Span::default(),
                 ),
                 Label::context(format!("received: {}", expr.as_str()), Span::default()),
@@ -606,12 +594,9 @@ impl diagnostic::DiagnosticMessage for Error {
                 value,
                 error,
             } => vec![
-                Label::primary(
-                    format!(r#"invalid argument "{}""#, keyword),
-                    Span::default(),
-                ),
-                Label::context(format!("received: {}", value), Span::default()),
-                Label::context(format!("error: {}", error), Span::default()),
+                Label::primary(format!(r#"invalid argument "{keyword}""#), Span::default()),
+                Label::context(format!("received: {value}"), Span::default()),
+                Label::context(format!("error: {error}"), Span::default()),
             ],
 
             ExpectedFunctionClosure => vec![],
@@ -672,7 +657,7 @@ mod tests {
                 required: false,
             };
 
-            assert_eq!(parameter.kind(), kind, "{}", title);
+            assert_eq!(parameter.kind(), kind, "{title}");
         }
     }
 }

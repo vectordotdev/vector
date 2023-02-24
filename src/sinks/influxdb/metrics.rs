@@ -1,8 +1,4 @@
-use std::{
-    collections::{BTreeMap, HashMap},
-    future::ready,
-    task::Poll,
-};
+use std::{collections::HashMap, future::ready, task::Poll};
 
 use bytes::{Bytes, BytesMut};
 use futures::{future::BoxFuture, stream, SinkExt};
@@ -10,17 +6,18 @@ use serde::Serialize;
 use tower::Service;
 use vector_config::configurable_component;
 use vector_core::{
-    event::metric::{MetricSketch, Quantile},
+    event::metric::{MetricSketch, MetricTags, Quantile},
     ByteSizeOf,
 };
 
 use crate::{
-    config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext, SinkDescription},
+    config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext},
     event::{
         metric::{Metric, MetricValue, Sample, StatisticKind},
         Event,
     },
     http::HttpClient,
+    internal_events::InfluxdbEncodingError,
     sinks::{
         influxdb::{
             encode_timestamp, healthcheck, influx_line_protocol, influxdb_settings, Field,
@@ -55,7 +52,7 @@ impl SinkBatchSettings for InfluxDbDefaultBatchSettings {
 }
 
 /// Configuration for the `influxdb_metrics` sink.
-#[configurable_component(sink)]
+#[configurable_component(sink("influxdb_metrics"))]
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct InfluxDbConfig {
@@ -64,9 +61,13 @@ pub struct InfluxDbConfig {
     /// This namespace is only used if a metric has no existing namespace. When a namespace is
     /// present, it is used as a prefix to the metric name, and separated with a period (`.`).
     #[serde(alias = "namespace")]
+    #[configurable(metadata(docs::examples = "service"))]
     pub default_namespace: Option<String>,
 
     /// The endpoint to send data to.
+    ///
+    /// This should be a full HTTP URI, including the scheme, host, and port.
+    #[configurable(metadata(docs::examples = "http://localhost:8086/"))]
     pub endpoint: String,
 
     #[serde(flatten)]
@@ -84,6 +85,8 @@ pub struct InfluxDbConfig {
     pub request: TowerRequestConfig,
 
     /// A map of additional tags, in the form of key/value pairs, to add to each measurement.
+    #[configurable(metadata(docs::additional_props_description = "A tag key/value pair."))]
+    #[configurable(metadata(docs::examples = "example_tags()"))]
     pub tags: Option<HashMap<String, String>>,
 
     #[configurable(derived)]
@@ -106,20 +109,19 @@ pub fn default_summary_quantiles() -> Vec<f64> {
     vec![0.5, 0.75, 0.9, 0.95, 0.99]
 }
 
+pub fn example_tags() -> HashMap<String, String> {
+    HashMap::from([("region".to_string(), "us-west-1".to_string())])
+}
+
 // https://v2.docs.influxdata.com/v2.0/write-data/#influxdb-api
 #[derive(Debug, Clone, PartialEq, Serialize)]
 struct InfluxDbRequest {
     series: Vec<String>,
 }
 
-inventory::submit! {
-    SinkDescription::new::<InfluxDbConfig>("influxdb_metrics")
-}
-
 impl_generate_config_from_default!(InfluxDbConfig);
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "influxdb_metrics")]
 impl SinkConfig for InfluxDbConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let tls_settings = TlsSettings::from_options(&self.tls)?;
@@ -137,10 +139,6 @@ impl SinkConfig for InfluxDbConfig {
 
     fn input(&self) -> Input {
         Input::metric()
-    }
-
-    fn sink_type(&self) -> &'static str {
-        "influxdb_metrics"
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
@@ -167,7 +165,7 @@ impl InfluxDbSvc {
 
         let uri = settings.write_uri(endpoint)?;
 
-        let http_service = HttpBatchService::new(client, create_build_request(uri, token));
+        let http_service = HttpBatchService::new(client, create_build_request(uri, token.inner()));
 
         let influxdb_http_service = InfluxDbSvc {
             config,
@@ -202,10 +200,12 @@ impl Service<Vec<Metric>> for InfluxDbSvc {
     type Error = crate::Error;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
+    // Emission of Error internal event is handled upstream by the caller
     fn poll_ready(&mut self, cx: &mut std::task::Context) -> Poll<Result<(), Self::Error>> {
         self.inner.poll_ready(cx)
     }
 
+    // Emission of Error internal event is handled upstream by the caller
     fn call(&mut self, items: Vec<Metric>) -> Self::Future {
         let input = encode_events(
             self.protocol_version,
@@ -222,7 +222,7 @@ impl Service<Vec<Metric>> for InfluxDbSvc {
 
 fn create_build_request(
     uri: http::Uri,
-    token: String,
+    token: &str,
 ) -> impl Fn(Bytes) -> BoxFuture<'static, crate::Result<hyper::Request<Bytes>>> + Sync + Send + 'static
 {
     let auth = format!("Token {}", token);
@@ -237,10 +237,7 @@ fn create_build_request(
     }
 }
 
-fn merge_tags(
-    event: &Metric,
-    tags: Option<&HashMap<String, String>>,
-) -> Option<BTreeMap<String, String>> {
+fn merge_tags(event: &Metric, tags: Option<&HashMap<String, String>>) -> Option<MetricTags> {
     match (event.tags().cloned(), tags) {
         (Some(mut event_tags), Some(config_tags)) => {
             event_tags.extend(config_tags.iter().map(|(k, v)| (k.clone(), v.clone())));
@@ -282,6 +279,8 @@ fn encode_events(
     quantiles: &[f64],
 ) -> BytesMut {
     let mut output = BytesMut::new();
+    let count = events.len();
+
     for event in events.into_iter() {
         let fullname = encode_namespace(event.namespace().or(default_namespace), '.', event.name());
         let ts = encode_timestamp(event.timestamp());
@@ -289,8 +288,9 @@ fn encode_events(
         let (metric_type, fields) = get_type_and_fields(event.value(), quantiles);
 
         let mut unwrapped_tags = tags.unwrap_or_default();
-        unwrapped_tags.insert("metric_type".to_owned(), metric_type.to_owned());
-        if let Err(error) = influx_line_protocol(
+        unwrapped_tags.replace("metric_type".to_owned(), metric_type.to_owned());
+
+        if let Err(error_message) = influx_line_protocol(
             protocol_version,
             &fullname,
             Some(unwrapped_tags),
@@ -298,7 +298,10 @@ fn encode_events(
             ts,
             &mut output,
         ) {
-            warn!(message = "Failed to encode event; dropping event.", %error, internal_log_rate_secs = 30);
+            emit!(InfluxdbEncodingError {
+                error_message,
+                count,
+            });
         };
     }
 
@@ -440,7 +443,7 @@ fn to_fields(value: f64) -> HashMap<String, Field> {
 #[cfg(test)]
 mod tests {
     use indoc::indoc;
-    use pretty_assertions::assert_eq;
+    use similar_asserts::assert_eq;
 
     use super::*;
     use crate::{
@@ -945,7 +948,8 @@ mod tests {
 mod integration_tests {
     use chrono::{SecondsFormat, Utc};
     use futures::stream;
-    use pretty_assertions::assert_eq;
+    use similar_asserts::assert_eq;
+    use vector_core::metric_tags;
 
     use crate::{
         config::{SinkConfig, SinkContext},
@@ -1090,7 +1094,7 @@ mod integration_tests {
             influxdb2_settings: Some(InfluxDb2Settings {
                 org: ORG.to_string(),
                 bucket: BUCKET.to_string(),
-                token: TOKEN.to_string(),
+                token: TOKEN.to_string().into(),
             }),
             quantiles: default_summary_quantiles(),
             batch: Default::default(),
@@ -1111,14 +1115,10 @@ mod integration_tests {
                     MetricValue::Counter { value: i as f64 },
                 )
                 .with_namespace(Some("ns"))
-                .with_tags(Some(
-                    vec![
-                        ("region".to_owned(), "us-west-1".to_owned()),
-                        ("production".to_owned(), "true".to_owned()),
-                    ]
-                    .into_iter()
-                    .collect(),
-                )),
+                .with_tags(Some(metric_tags!(
+                    "region" => "us-west-1",
+                    "production" => "true",
+                ))),
             );
             events.push(event);
         }
@@ -1196,14 +1196,10 @@ mod integration_tests {
                 MetricValue::Counter { value: i as f64 },
             )
             .with_namespace(Some("ns"))
-            .with_tags(Some(
-                vec![
-                    ("region".to_owned(), "us-west-1".to_owned()),
-                    ("production".to_owned(), "true".to_owned()),
-                ]
-                .into_iter()
-                .collect(),
-            ))
+            .with_tags(Some(metric_tags!(
+                "region" => "us-west-1",
+                "production" => "true",
+            )))
             .with_timestamp(Some(Utc::now())),
         )
     }

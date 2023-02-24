@@ -677,7 +677,7 @@ mod tests {
             ],
         );
 
-        // When we have a fized-size marker whose required acked marker ID lands right on the
+        // When we have a fixed-size marker whose required acked marker ID lands right on the
         // current acked marker ID, it should not be eligible unless there are enough unclaimed
         // acks to actually account for it:
         run_test_case(
@@ -790,7 +790,7 @@ mod tests {
                                 },
                                 PendingMarkerLength::Assumed(_) => panic!("should never have an assumed length at back"),
                                 PendingMarkerLength::Unknown => {
-                                    // Now that we have an ID range, we have enough infornation to
+                                    // Now that we have an ID range, we have enough information to
                                     // give the unknown length marker an assumed length.
                                     let len = id.wrapping_sub(back_id);
                                     let (_, back_len_mut) = marker_stack.back_mut().expect("must exist");
@@ -815,7 +815,7 @@ mod tests {
                                     marker_stack.push_back((id, len));
                                 }
                             },
-                            a => panic!("got unexpected action after adding pending marker: {:?}", a),
+                            a => panic!("got unexpected action after adding pending marker: {a:?}"),
                         }
                     },
                     Action::GetNextEligibleMarker => match sut.get_next_eligible_marker() {
@@ -836,7 +836,7 @@ mod tests {
                                 }
                                 (PendingMarkerLength::Unknown, _) =>
                                     panic!("SUT had eligible marker but marker stack had unknown length marker"),
-                                (a, b) => panic!("unknown SUT/model marker len combination: {:?}, {:?}", a, b),
+                                (a, b) => panic!("unknown SUT/model marker len combination: {a:?}, {b:?}"),
                             };
 
                             assert!(unclaimed_acks_to_consume <= unclaimed_acks,

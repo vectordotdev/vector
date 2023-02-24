@@ -40,7 +40,7 @@ impl Function for GetSecret {
         &self,
         _state: &TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let key = arguments.required("key");
         Ok(GetSecretFn { key }.as_expr())

@@ -53,10 +53,10 @@ impl HecMetricsEncoder {
         let fields = metric
             .tags()
             .into_iter()
-            .flatten()
+            .flat_map(|tags| tags.iter_single())
             // skip the metric tags used for templating
-            .filter(|(k, _)| !metadata.templated_field_keys.contains(k))
-            .map(|(k, v)| (k.as_str(), HecFieldValue::Str(v.as_str())))
+            .filter(|(k, _)| !metadata.templated_field_keys.iter().any(|f| f == k))
+            .map(|(k, v)| (k, HecFieldValue::Str(v)))
             .chain(iter::once((
                 "metric_name",
                 HecFieldValue::Str(metadata.metric_name.as_str()),

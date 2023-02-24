@@ -1,0 +1,12 @@
+args:
+- --features
+- prometheus-integration-tests
+- --lib
+- '::prometheus::remote_write::'
+
+env:
+  REMOTE_WRITE_SOURCE_RECEIVE_ADDRESS: runner:9102
+
+matrix:
+  prometheus: ['v2.33.4']
+  influxdb: ['1.8']

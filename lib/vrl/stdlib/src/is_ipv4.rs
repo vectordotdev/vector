@@ -49,7 +49,7 @@ impl Function for IsIpv4 {
         &self,
         _state: &TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
 

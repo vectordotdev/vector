@@ -1,16 +1,21 @@
-use serde::Serialize;
+use std::cell::RefCell;
+
+use indexmap::{IndexMap, IndexSet};
+use serde_json::Value;
 
 use crate::{
-    schema::{assert_string_schema_for_map, finalize_schema, generate_map_schema},
-    schemars::{gen::SchemaGenerator, schema::SchemaObject},
+    schema::{
+        assert_string_schema_for_map, generate_map_schema, generate_set_schema, SchemaGenerator,
+        SchemaObject,
+    },
     str::ConfigurableString,
-    Configurable, Metadata,
+    Configurable, GenerateError, Metadata, ToValue,
 };
 
-impl<K, V> Configurable for indexmap::IndexMap<K, V>
+impl<K, V> Configurable for IndexMap<K, V>
 where
-    K: ConfigurableString + Serialize + std::hash::Hash + Eq,
-    V: Configurable + Serialize,
+    K: ConfigurableString + ToValue + std::hash::Hash + Eq + 'static,
+    V: Configurable + ToValue + 'static,
 {
     fn is_optional() -> bool {
         // A hashmap with required fields would be... an object.  So if you want that, make a struct
@@ -18,24 +23,61 @@ where
         true
     }
 
-    fn generate_schema(gen: &mut SchemaGenerator, overrides: Metadata<Self>) -> SchemaObject {
+    fn metadata() -> Metadata {
+        Metadata::with_transparent(true)
+    }
+
+    fn validate_metadata(metadata: &Metadata) -> Result<(), GenerateError> {
+        let converted = metadata.convert();
+        V::validate_metadata(&converted)
+    }
+
+    fn generate_schema(gen: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
         // Make sure our key type is _truly_ a string schema.
-        assert_string_schema_for_map::<K, Self>(gen);
+        assert_string_schema_for_map(
+            &K::as_configurable_ref(),
+            gen,
+            std::any::type_name::<Self>(),
+        )?;
 
-        // We explicitly do not pass anything from the override metadata, because there's nothing to
-        // reasonably pass: if `V` is referenceable, using the description for `IndexMap<String, V>`
-        // likely makes no sense, nor would a default make sense, and so on.
-        //
-        // We do, however, set `V` to be "transparent", which means that during schema finalization,
-        // we will relax the rules we enforce, such as needing a description, knowing that they'll
-        // be enforced on the field using `IndexMap<String, V>` itself, where carrying that
-        // description forward to `V` might literally make no sense, such as when `V` is a primitive
-        // type like an integer or string.
-        let mut value_metadata = V::metadata();
-        value_metadata.set_transparent();
+        generate_map_schema(&V::as_configurable_ref(), gen)
+    }
+}
 
-        let mut schema = generate_map_schema(gen, value_metadata);
-        finalize_schema(gen, &mut schema, overrides);
-        schema
+impl<K, V> ToValue for IndexMap<K, V>
+where
+    K: ToString,
+    V: ToValue,
+{
+    fn to_value(&self) -> Value {
+        Value::Object(
+            self.iter()
+                .map(|(k, v)| (k.to_string(), v.to_value()))
+                .collect(),
+        )
+    }
+}
+
+impl<V> Configurable for IndexSet<V>
+where
+    V: Configurable + ToValue + std::hash::Hash + Eq + 'static,
+{
+    fn metadata() -> Metadata {
+        Metadata::with_transparent(true)
+    }
+
+    fn validate_metadata(metadata: &Metadata) -> Result<(), GenerateError> {
+        let converted = metadata.convert();
+        V::validate_metadata(&converted)
+    }
+
+    fn generate_schema(gen: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
+        generate_set_schema(&V::as_configurable_ref(), gen)
+    }
+}
+
+impl<V: ToValue> ToValue for IndexSet<V> {
+    fn to_value(&self) -> Value {
+        Value::Array(self.iter().map(ToValue::to_value).collect())
     }
 }

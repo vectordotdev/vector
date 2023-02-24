@@ -33,7 +33,7 @@ releases: "0.22.0": {
 		Be sure to check out the [upgrade guide](/highlights/2022-05-03-0-22-0-upgrade-guide) for breaking changes in
 		this release.
 
-		**Important**: as part of this release, we have promoted the new implemenation of disk buffers (`buffer.type
+		**Important**: as part of this release, we have promoted the new implementation of disk buffers (`buffer.type
 		= "disk_v2"`) to the default implementation (`buffer.type = "disk"`). Any existing disk buffers (`disk_v1`
 		or `disk`) will be automatically migrated. We have rigorously tested this migration, but recommend making
 		a back up of the disk buffers (in the configured `data_dir`, typically in `/var/lib/vector`) to roll back if
