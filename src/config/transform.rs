@@ -3,7 +3,6 @@ use std::collections::{HashMap, HashSet};
 
 use async_trait::async_trait;
 use dyn_clone::DynClone;
-use enum_dispatch::enum_dispatch;
 use serde::Serialize;
 use vector_config::{
     configurable_component,
@@ -170,7 +169,6 @@ impl TransformContext {
 
 /// Generalized interface for describing and building transform components.
 #[async_trait]
-#[enum_dispatch]
 #[typetag::serde(tag = "type")]
 pub trait TransformConfig: DynClone + NamedComponent + core::fmt::Debug + Send + Sync {
     /// Builds the transform with the given context.
