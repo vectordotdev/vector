@@ -376,6 +376,7 @@ zstd = { version = "0.12.3", default-features = false }
 chrono = { git = "https://github.com/vectordotdev/chrono.git", branch = "no-default-time-v0.4.22-1" }
 # The upgrade for `tokio-util` >= 0.6.9 is blocked on https://github.com/vectordotdev/vector/issues/11257.
 tokio-util = { git = "https://github.com/vectordotdev/tokio", branch = "tokio-util-0.7.4-framed-read-continue-on-error" }
+nix = { git = "https://github.com/vectordotdev/nix.git", branch = "memfd/gnu/musl" }
 
 [features]
 # Default features for *-unknown-linux-gnu and *-apple-darwin
