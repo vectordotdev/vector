@@ -21,6 +21,12 @@ pub struct TopologyBuilder {
     output_edge: Option<OutputEdge>,
 }
 
+pub const TEST_SOURCE_NAME: &str = "test_source";
+pub const TEST_SINK_NAME: &str = "test_sink";
+pub const TEST_TRANSFORM_NAME: &str = "test_transform";
+pub const TEST_INPUT_SOURCE_NAME: &str = "input_source";
+pub const TEST_OUTPUT_SINK_NAME: &str = "output_sink";
+
 impl TopologyBuilder {
     /// Creates a component topology for the given component configuration.
     pub fn from_configuration(configuration: &ValidationConfiguration) -> Self {
@@ -46,8 +52,8 @@ impl TopologyBuilder {
         let (output_edge, output_sink) = build_output_edge();
 
         let mut config_builder = ConfigBuilder::default();
-        config_builder.add_source("test_source", source);
-        config_builder.add_sink("output_sink", &["test_source"], output_sink);
+        config_builder.add_source(TEST_SOURCE_NAME, source);
+        config_builder.add_sink(TEST_OUTPUT_SINK_NAME, &[TEST_SOURCE_NAME], output_sink);
 
         Self {
             config_builder,
@@ -61,9 +67,9 @@ impl TopologyBuilder {
         let (output_edge, output_sink) = build_output_edge();
 
         let mut config_builder = ConfigBuilder::default();
-        config_builder.add_source("input_source", input_source);
-        config_builder.add_transform("test_transform", &["input_source"], transform);
-        config_builder.add_sink("output_sink", &["test_transform"], output_sink);
+        config_builder.add_source(TEST_INPUT_SOURCE_NAME, input_source);
+        config_builder.add_transform(TEST_TRANSFORM_NAME, &[TEST_INPUT_SOURCE_NAME], transform);
+        config_builder.add_sink(TEST_OUTPUT_SINK_NAME, &[TEST_TRANSFORM_NAME], output_sink);
 
         Self {
             config_builder,
@@ -76,8 +82,8 @@ impl TopologyBuilder {
         let (input_edge, input_source) = build_input_edge();
 
         let mut config_builder = ConfigBuilder::default();
-        config_builder.add_source("input_source", input_source);
-        config_builder.add_sink("test_sink", &["input_source"], sink);
+        config_builder.add_source(TEST_INPUT_SOURCE_NAME, input_source);
+        config_builder.add_sink(TEST_SINK_NAME, &[TEST_INPUT_SOURCE_NAME], sink);
 
         Self {
             config_builder,
