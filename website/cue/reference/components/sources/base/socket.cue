@@ -180,6 +180,16 @@ base: components: sources: socket: configuration: {
 			type: uint: unit: "seconds"
 		}
 	}
+	max_connection_duration_secs: {
+		description: """
+			Maximum duration to keep each connection open. Connections open for longer than this duration are closed.
+
+			This is helpful for load balancing long-lived connections.
+			"""
+		relevant_when: "mode = \"tcp\""
+		required:      false
+		type: uint: unit: "seconds"
+	}
 	max_length: {
 		deprecated:         true
 		deprecated_message: "This option has been deprecated. Configure `max_length` on the framing config instead."

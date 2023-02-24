@@ -79,7 +79,7 @@ pub struct TcpConfig {
     #[configurable(metadata(docs::type_unit = "bytes"))]
     receive_buffer_bytes: Option<usize>,
 
-    ///  Maximum duration to keep each connection open. Connections open for longer than  this duration are closed.
+    /// Maximum duration to keep each connection open. Connections open for longer than this duration are closed.
     ///
     /// This is helpful for load balancing long-lived connections.
     #[configurable(metadata(docs::type_unit = "seconds"))]
