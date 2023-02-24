@@ -133,7 +133,7 @@ impl Function for ForEachRecursive {
                         kind: VariableKind::Exact(Kind::array(Collection::any())),
                     },
                     Variable {
-                        kind: VariableKind::TargetInnerValue,
+                        kind: VariableKind::Exact(Kind::any()),
                     },
                 ],
                 output: Output::Kind(Kind::any()),
