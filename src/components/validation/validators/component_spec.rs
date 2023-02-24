@@ -1,6 +1,10 @@
+use std::fmt::{Display, Formatter};
+
 use vector_core::event::{Event, Metric};
 
 use crate::components::validation::{ComponentType, TestCaseExpectation, TestEvent};
+
+use crate::components::validation::runner::config::TEST_SOURCE_NAME;
 
 use super::Validator;
 
@@ -77,8 +81,8 @@ impl Validator for ComponentSpecValidator {
             format!("received {} telemetry events", telemetry_events.len()),
         ];
 
-        let mut out = validate_telemetry(component_type, inputs, outputs, telemetry_events)?;
-        run_out.append(&mut out);
+        let out = validate_telemetry(component_type, inputs, outputs, telemetry_events)?;
+        run_out.extend(out);
 
         Ok(run_out)
     }
@@ -95,12 +99,13 @@ fn validate_telemetry(
 
     match component_type {
         ComponentType::Source => {
-            match &mut validate_component_events_received(inputs, telemetry_events) {
-                Err(e) => errs.append(e),
-                Ok(m) => out.append(m),
+            match validate_component_events_received(inputs, telemetry_events) {
+                Err(e) => errs.extend(e),
+                Ok(m) => out.extend(m),
             }
         }
-        _ => {}
+        ComponentType::Sink => {}
+        ComponentType::Transform => {}
     }
 
     if errs.is_empty() {
@@ -119,9 +124,9 @@ fn validate_component_events_received(
     let mut metrics = Vec::<Metric>::new();
     for t in telemetry_events.iter() {
         if let vector_core::event::Event::Metric(m) = t {
-            if m.name() == SourceMetrics::ComponentEventsReceived.name() {
+            if m.name() == SourceMetrics::ComponentEventsReceived.to_string() {
                 if let Some(tags) = m.tags() {
-                    if tags.get("component_name").unwrap_or("") == "test_source" {
+                    if tags.get("component_name").unwrap_or("") == TEST_SOURCE_NAME {
                         metrics.push(m.clone());
                     }
                 }
@@ -132,7 +137,7 @@ fn validate_component_events_received(
     if metrics.is_empty() {
         errs.push(format!(
             "{}: no metrics were emitted.",
-            SourceMetrics::ComponentEventsReceived.name()
+            SourceMetrics::ComponentEventsReceived,
         ));
 
         return Err(errs);
@@ -140,7 +145,7 @@ fn validate_component_events_received(
 
     debug!(
         "{}: {} metrics found",
-        SourceMetrics::ComponentEventsReceived.name(),
+        SourceMetrics::ComponentEventsReceived,
         metrics.len(),
     );
 
@@ -151,7 +156,7 @@ fn validate_component_events_received(
             vector_core::event::MetricValue::Counter { value } => events += value,
             _ => errs.push(format!(
                 "{}: metric value is not a counter",
-                SourceMetrics::ComponentEventsReceived.name()
+                SourceMetrics::ComponentEventsReceived,
             )),
         }
     }
@@ -159,7 +164,7 @@ fn validate_component_events_received(
     if events != inputs.len() as f64 {
         errs.push(format!(
             "{}: expected {} events, but received {}",
-            SourceMetrics::ComponentEventsReceived.name(),
+            SourceMetrics::ComponentEventsReceived,
             inputs.len(),
             events
         ));
@@ -167,14 +172,14 @@ fn validate_component_events_received(
 
     debug!(
         "{}: {} total events",
-        SourceMetrics::ComponentEventsReceived.name(),
+        SourceMetrics::ComponentEventsReceived,
         events,
     );
 
     if errs.is_empty() {
         Ok(vec![format!(
             "{}: {}",
-            SourceMetrics::ComponentEventsReceived.name(),
+            SourceMetrics::ComponentEventsReceived,
             events,
         )])
     } else {
@@ -187,7 +192,7 @@ enum SourceMetrics {
 }
 
 impl SourceMetrics {
-    fn name(&self) -> &'static str {
+    const fn name(&self) -> &'static str {
         match self {
             SourceMetrics::ComponentEventsReceived => "component_received_events_total",
         }
@@ -198,5 +203,11 @@ impl SourceMetrics {
             "component_received_events_total" => Some(SourceMetrics::ComponentEventsReceived),
             _ => None,
         }
+    }
+}
+
+impl Display for SourceMetrics {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.name())
     }
 }
