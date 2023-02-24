@@ -38,7 +38,7 @@ jobs:
         id: experimental-meta
         run: |
           export WARMUP_SECONDS="45"
-          export REPLICAS="10"
+          export REPLICAS="20"
           export TOTAL_SAMPLES="600"
           export P_VALUE="0.1"
           export SMP_CRATE_VERSION="0.7.1"
@@ -417,7 +417,7 @@ jobs:
       - uses: actions/checkout@v3
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v1-node16
+        uses: aws-actions/configure-aws-credentials@v1.7.0
         with:
           aws-access-key-id: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_SECRET_ACCESS_KEY }}
