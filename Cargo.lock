@@ -9403,7 +9403,6 @@ dependencies = [
  "serde_with 2.2.0",
  "snafu",
  "toml 0.7.2",
- "typetag",
  "url",
  "vector-config-common",
  "vector-config-macros",
