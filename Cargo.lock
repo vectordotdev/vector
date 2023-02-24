@@ -5154,7 +5154,7 @@ dependencies = [
 [[package]]
 name = "nix"
 version = "0.26.2"
-source = "git+https://github.com/StephenWakely/nix.git?branch=memfd/gnu/musl#6c53a918d2d5bf4307fd60a19d9e10913ae71eeb"
+source = "git+https://github.com/vectordotdev/nix.git?branch=memfd/gnu/musl#6c53a918d2d5bf4307fd60a19d9e10913ae71eeb"
 dependencies = [
  "bitflags",
  "cfg-if",
