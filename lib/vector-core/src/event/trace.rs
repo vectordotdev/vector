@@ -1,18 +1,17 @@
 use std::{collections::BTreeMap, fmt::Debug};
 
-use lookup::LookupBuf;
 use serde::{Deserialize, Serialize};
 use vector_buffers::EventCount;
 use vector_common::EventDataEq;
 
 use super::{
-    BatchNotifier, EventFinalizer, EventFinalizers, EventMetadata, Finalizable, LogEvent, Value,
+    BatchNotifier, EstimatedJsonEncodedSizeOf, EventFinalizer, EventFinalizers, EventMetadata,
+    Finalizable, LogEvent, Value,
 };
 use crate::ByteSizeOf;
-use lookup::path;
 
 /// Traces are a newtype of `LogEvent`
-#[derive(Clone, Debug, Default, Deserialize, PartialEq, PartialOrd, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 pub struct TraceEvent(LogEvent);
 
 impl TraceEvent {
@@ -72,18 +71,6 @@ impl TraceEvent {
         self.0.get(key.as_ref())
     }
 
-    pub fn lookup(&self, path: &LookupBuf) -> Option<&Value> {
-        self.0.lookup(path)
-    }
-
-    pub fn lookup_mut(&mut self, path: &LookupBuf) -> Option<&mut Value> {
-        self.0.lookup_mut(path)
-    }
-
-    pub fn get_flat(&self, key: impl AsRef<str>) -> Option<&Value> {
-        self.0.get(path!(key.as_ref()))
-    }
-
     pub fn get_mut(&mut self, key: impl AsRef<str>) -> Option<&mut Value> {
         self.0.get_mut(key.as_ref())
     }
@@ -116,6 +103,12 @@ impl From<BTreeMap<String, Value>> for TraceEvent {
 impl ByteSizeOf for TraceEvent {
     fn allocated_bytes(&self) -> usize {
         self.0.allocated_bytes()
+    }
+}
+
+impl EstimatedJsonEncodedSizeOf for TraceEvent {
+    fn estimated_json_encoded_size_of(&self) -> usize {
+        self.0.estimated_json_encoded_size_of()
     }
 }
 

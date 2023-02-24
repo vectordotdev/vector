@@ -32,37 +32,11 @@ impl Function for Exists {
         ]
     }
 
-    fn compile_argument(
-        &self,
-        _args: &[(&'static str, Option<FunctionArgument>)],
-        _ctx: &mut FunctionCompileContext,
-        name: &str,
-        expr: Option<&expression::Expr>,
-    ) -> CompiledArgument {
-        match (name, expr) {
-            ("field", Some(expr)) => {
-                let query = match expr {
-                    expression::Expr::Query(query) => query,
-                    _ => {
-                        return Err(Box::new(vrl::function::Error::UnexpectedExpression {
-                            keyword: "field",
-                            expected: "query",
-                            expr: expr.clone(),
-                        }))
-                    }
-                };
-
-                Ok(Some(Box::new(query.clone()) as _))
-            }
-            _ => Ok(None),
-        }
-    }
-
     fn compile(
         &self,
         _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let query = arguments.required_query("field")?;
 
@@ -78,10 +52,10 @@ pub(crate) struct ExistsFn {
 fn exists(query: &expression::Query, ctx: &mut Context) -> Resolved {
     let path = query.path();
 
-    if query.is_external() {
+    if let Some(target_path) = query.external_path() {
         return Ok(ctx
             .target_mut()
-            .target_get(path)
+            .target_get(&target_path)
             .ok()
             .flatten()
             .is_some()
@@ -90,7 +64,7 @@ fn exists(query: &expression::Query, ctx: &mut Context) -> Resolved {
 
     if let Some(ident) = query.variable_ident() {
         return match ctx.state().variable(ident) {
-            Some(value) => Ok(value.get_by_path(path).is_some().into()),
+            Some(value) => Ok(value.get(path).is_some().into()),
             None => Ok(false.into()),
         };
     }
@@ -98,7 +72,7 @@ fn exists(query: &expression::Query, ctx: &mut Context) -> Resolved {
     if let Some(expr) = query.expression_target() {
         let value = expr.resolve(ctx)?;
 
-        return Ok(value.get_by_path(path).is_some().into());
+        return Ok(value.get(path).is_some().into());
     }
 
     Ok(false.into())

@@ -5,8 +5,10 @@ use futures::{stream::BoxStream, StreamExt};
 use tokio::{io, io::AsyncWriteExt};
 use tokio_util::codec::Encoder as _;
 use vector_core::{
-    internal_event::{BytesSent, EventsSent},
-    ByteSizeOf,
+    internal_event::{
+        ByteSize, BytesSent, CountByteSize, EventsSent, InternalEventHandle as _, Output, Protocol,
+    },
+    EstimatedJsonEncodedSizeOf,
 };
 
 use crate::{
@@ -27,8 +29,10 @@ where
     T: io::AsyncWrite + Send + Sync + Unpin,
 {
     async fn run(mut self: Box<Self>, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
+        let bytes_sent = register!(BytesSent::from(Protocol("console".into(),)));
+        let events_sent = register!(EventsSent::from(Output(None)));
         while let Some(mut event) = input.next().await {
-            let event_byte_size = event.size_of();
+            let event_byte_size = event.estimated_json_encoded_size_of();
             self.transformer.transform(&mut event);
 
             let finalizers = event.take_finalizers();
@@ -49,15 +53,8 @@ where
                 Ok(()) => {
                     finalizers.update_status(EventStatus::Delivered);
 
-                    emit!(EventsSent {
-                        byte_size: event_byte_size,
-                        count: 1,
-                        output: None,
-                    });
-                    emit!(BytesSent {
-                        byte_size: bytes.len(),
-                        protocol: "console"
-                    });
+                    events_sent.emit(CountByteSize(1, event_byte_size));
+                    bytes_sent.emit(ByteSize(bytes.len()));
                 }
             }
         }
@@ -68,7 +65,7 @@ where
 
 #[cfg(test)]
 mod test {
-    use codecs::{JsonSerializer, NewlineDelimitedEncoder};
+    use codecs::{JsonSerializerConfig, NewlineDelimitedEncoder};
     use futures::future::ready;
     use futures_util::stream;
     use vector_core::sink::VectorSink;
@@ -85,7 +82,7 @@ mod test {
 
         let encoder = Encoder::<Framer>::new(
             NewlineDelimitedEncoder::new().into(),
-            JsonSerializer::new().into(),
+            JsonSerializerConfig::default().build().into(),
         );
 
         let sink = WriterSink {

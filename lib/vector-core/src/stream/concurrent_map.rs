@@ -3,11 +3,10 @@ use std::{
     num::NonZeroUsize,
     panic,
     pin::Pin,
-    task::{Context, Poll},
+    task::{ready, Context, Poll},
 };
 
 use futures_util::{
-    ready,
     stream::{Fuse, FuturesOrdered},
     Stream, StreamExt,
 };

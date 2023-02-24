@@ -5,7 +5,7 @@ use vrl::prelude::*;
 fn to_regex(value: Value) -> Resolved {
     let string = value.try_bytes_utf8_lossy()?;
     let regex = regex::Regex::new(string.as_ref())
-        .map_err(|err| format!("could not create regex: {}", err))
+        .map_err(|err| format!("could not create regex: {err}"))
         .map(Into::into)?;
     Ok(regex)
 }
@@ -38,7 +38,7 @@ impl Function for ToRegex {
         &self,
         _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         warn!("`to_regex` is an expensive function that could impact throughput.");
         let value = arguments.required("value");

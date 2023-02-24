@@ -10,7 +10,7 @@ use std::{
 #[cfg(feature = "fuzz")]
 use arbitrary::Arbitrary;
 use diagnostic::Span;
-use lookup::LookupBuf;
+use lookup::lookup_v2::{OwnedTargetPath, OwnedValuePath, PathPrefix};
 use ordered_float::NotNan;
 
 use crate::{template_string::TemplateString, Error};
@@ -91,7 +91,7 @@ impl<T> Node<T> {
     where
         T: Deref,
     {
-        &**self.as_ref()
+        self.as_ref()
     }
 }
 
@@ -144,7 +144,7 @@ pub struct Program(pub Vec<Node<RootExpr>>);
 impl fmt::Debug for Program {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for expr in &self.0 {
-            writeln!(f, "{:?}", expr)?;
+            writeln!(f, "{expr:?}")?;
         }
 
         Ok(())
@@ -154,7 +154,7 @@ impl fmt::Debug for Program {
 impl fmt::Display for Program {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for expr in &self.0 {
-            writeln!(f, "{}", expr)?;
+            writeln!(f, "{expr}")?;
         }
 
         Ok(())
@@ -197,11 +197,11 @@ impl fmt::Debug for RootExpr {
         use RootExpr::{Error, Expr};
 
         let value = match self {
-            Expr(v) => format!("{:?}", v),
-            Error(v) => format!("{:?}", v),
+            Expr(v) => format!("{v:?}"),
+            Error(v) => format!("{v:?}"),
         };
 
-        write!(f, "RootExpr({})", value)
+        write!(f, "RootExpr({value})")
     }
 }
 
@@ -243,19 +243,19 @@ impl fmt::Debug for Expr {
         };
 
         let value = match self {
-            Literal(v) => format!("{:?}", v),
-            Container(v) => format!("{:?}", v),
-            Op(v) => format!("{:?}", v),
-            IfStatement(v) => format!("{:?}", v),
-            Assignment(v) => format!("{:?}", v),
-            Query(v) => format!("{:?}", v),
-            FunctionCall(v) => format!("{:?}", v),
-            Variable(v) => format!("{:?}", v),
-            Unary(v) => format!("{:?}", v),
-            Abort(v) => format!("{:?}", v),
+            Literal(v) => format!("{v:?}"),
+            Container(v) => format!("{v:?}"),
+            Op(v) => format!("{v:?}"),
+            IfStatement(v) => format!("{v:?}"),
+            Assignment(v) => format!("{v:?}"),
+            Query(v) => format!("{v:?}"),
+            FunctionCall(v) => format!("{v:?}"),
+            Variable(v) => format!("{v:?}"),
+            Unary(v) => format!("{v:?}"),
+            Abort(v) => format!("{v:?}"),
         };
 
-        write!(f, "Expr({})", value)
+        write!(f, "Expr({value})")
     }
 }
 
@@ -352,13 +352,13 @@ impl fmt::Display for Literal {
         use Literal::{Boolean, Float, Integer, Null, RawString, Regex, String, Timestamp};
 
         match self {
-            String(v) => write!(f, r#""{}""#, v),
-            RawString(v) => write!(f, r#"s'{}'"#, v),
+            String(v) => write!(f, r#""{v}""#),
+            RawString(v) => write!(f, r#"s'{v}'"#),
             Integer(v) => v.fmt(f),
             Float(v) => v.fmt(f),
             Boolean(v) => v.fmt(f),
-            Regex(v) => write!(f, "r'{}'", v),
-            Timestamp(v) => write!(f, "t'{}'", v),
+            Regex(v) => write!(f, "r'{v}'"),
+            Timestamp(v) => write!(f, "t'{v}'"),
             Null => f.write_str("null"),
         }
     }
@@ -366,7 +366,7 @@ impl fmt::Display for Literal {
 
 impl fmt::Debug for Literal {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Literal({})", self)
+        write!(f, "Literal({self})")
     }
 }
 
@@ -400,13 +400,13 @@ impl fmt::Debug for Container {
         use Container::{Array, Block, Group, Object};
 
         let value = match self {
-            Group(v) => format!("{:?}", v),
-            Block(v) => format!("{:?}", v),
-            Array(v) => format!("{:?}", v),
-            Object(v) => format!("{:?}", v),
+            Group(v) => format!("{v:?}"),
+            Block(v) => format!("{v:?}"),
+            Array(v) => format!("{v:?}"),
+            Object(v) => format!("{v:?}"),
         };
 
-        write!(f, "Container({})", value)
+        write!(f, "Container({value})")
     }
 }
 
@@ -509,7 +509,7 @@ impl fmt::Display for Array {
             .collect::<Vec<_>>()
             .join(", ");
 
-        write!(f, "[{}]", exprs)
+        write!(f, "[{exprs}]")
     }
 }
 
@@ -518,11 +518,11 @@ impl fmt::Debug for Array {
         let exprs = self
             .0
             .iter()
-            .map(|e| format!("{:?}", e))
+            .map(|e| format!("{e:?}"))
             .collect::<Vec<_>>()
             .join(", ");
 
-        write!(f, "Array([{}])", exprs)
+        write!(f, "Array([{exprs}])")
     }
 }
 
@@ -547,11 +547,11 @@ impl fmt::Display for Object {
         let exprs = self
             .0
             .iter()
-            .map(|(k, v)| format!(r#""{}": {}"#, k, v))
+            .map(|(k, v)| format!(r#""{k}": {v}"#))
             .collect::<Vec<_>>()
             .join(", ");
 
-        write!(f, "{{ {} }}", exprs)
+        write!(f, "{{ {exprs} }}")
     }
 }
 
@@ -560,11 +560,11 @@ impl fmt::Debug for Object {
         let exprs = self
             .0
             .iter()
-            .map(|(k, v)| format!(r#""{}": {:?}"#, k, v))
+            .map(|(k, v)| format!(r#""{k}": {v:?}"#))
             .collect::<Vec<_>>()
             .join(", ");
 
-        write!(f, "{{ {} }}", exprs)
+        write!(f, "{{ {exprs} }}")
     }
 }
 
@@ -591,7 +591,7 @@ pub struct IfStatement {
 impl fmt::Debug for IfStatement {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.else_node {
-            Some(alt) => write!(f, "{:?} ? {:?} : {:?}", self.predicate, self.if_node, alt),
+            Some(alt) => write!(f, "{:?} ? {:?} : {alt:?}", self.predicate, self.if_node),
             None => write!(f, "{:?} ? {:?}", self.predicate, self.if_node),
         }
     }
@@ -644,7 +644,7 @@ impl fmt::Display for Predicate {
 impl fmt::Debug for Predicate {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Predicate::One(expr) => write!(f, "Predicate({:?})", expr),
+            Predicate::One(expr) => write!(f, "Predicate({expr:?})"),
             Predicate::Many(exprs) => {
                 f.write_str("Predicate(")?;
 
@@ -689,7 +689,6 @@ pub enum Opcode {
     Div,
     Add,
     Sub,
-    Rem,
     Or,
     And,
     Err,
@@ -711,14 +710,13 @@ impl fmt::Display for Opcode {
 impl Opcode {
     #[must_use]
     pub fn as_str(self) -> &'static str {
-        use Opcode::{Add, And, Div, Eq, Err, Ge, Gt, Le, Lt, Merge, Mul, Ne, Or, Rem, Sub};
+        use Opcode::{Add, And, Div, Eq, Err, Ge, Gt, Le, Lt, Merge, Mul, Ne, Or, Sub};
 
         match self {
             Mul => "*",
             Div => "/",
             Add => "+",
             Sub => "-",
-            Rem => "%",
             Merge => "|",
 
             Or => "||",
@@ -741,14 +739,13 @@ impl FromStr for Opcode {
     type Err = ();
 
     fn from_str(s: &str) -> Result<Self, ()> {
-        use Opcode::{Add, And, Div, Eq, Err, Ge, Gt, Le, Lt, Merge, Mul, Ne, Or, Rem, Sub};
+        use Opcode::{Add, And, Div, Eq, Err, Ge, Gt, Le, Lt, Merge, Mul, Ne, Or, Sub};
 
         let op = match s {
             "*" => Mul,
             "/" => Div,
             "+" => Add,
             "-" => Sub,
-            "%" => Rem,
 
             "||" => Or,
             "&&" => And,
@@ -831,8 +828,8 @@ impl fmt::Display for Assignment {
         use Assignment::{Infallible, Single};
 
         match self {
-            Single { target, op, expr } => write!(f, "{} {} {}", target, op, expr),
-            Infallible { ok, err, op, expr } => write!(f, "{}, {} {} {}", ok, err, op, expr),
+            Single { target, op, expr } => write!(f, "{target} {op} {expr}"),
+            Infallible { ok, err, op, expr } => write!(f, "{ok}, {err} {op} {expr}"),
         }
     }
 }
@@ -842,9 +839,9 @@ impl fmt::Debug for Assignment {
         use Assignment::{Infallible, Single};
 
         match self {
-            Single { target, op, expr } => write!(f, "{:?} {:?} {:?}", target, op, expr),
+            Single { target, op, expr } => write!(f, "{target:?} {op:?} {expr:?}"),
             Infallible { ok, err, op, expr } => {
-                write!(f, "Ok({:?}), Err({:?}) {:?} {:?}", ok, err, op, expr)
+                write!(f, "Ok({ok:?}), Err({err:?}) {op:?} {expr:?}")
             }
         }
     }
@@ -854,8 +851,8 @@ impl fmt::Debug for Assignment {
 pub enum AssignmentTarget {
     Noop,
     Query(Query),
-    Internal(Ident, Option<LookupBuf>),
-    External(Option<LookupBuf>),
+    Internal(Ident, Option<OwnedValuePath>),
+    External(Option<OwnedTargetPath>),
 }
 
 impl AssignmentTarget {
@@ -877,8 +874,14 @@ impl AssignmentTarget {
             AssignmentTarget::External(path) => Expr::Query(Node::new(
                 span,
                 Query {
-                    target: Node::new(span, QueryTarget::External),
-                    path: Node::new(span, path.clone().unwrap_or_else(LookupBuf::root)),
+                    target: {
+                        let prefix = path.as_ref().map_or(PathPrefix::Event, |x| x.prefix);
+                        Node::new(span, QueryTarget::External(prefix))
+                    },
+                    path: Node::new(
+                        span,
+                        path.clone().map_or(OwnedValuePath::root(), |x| x.path),
+                    ),
                 },
             )),
         }
@@ -892,9 +895,9 @@ impl fmt::Display for AssignmentTarget {
         match self {
             Noop => f.write_str("_"),
             Query(query) => query.fmt(f),
-            Internal(ident, Some(path)) => write!(f, "{}{}", ident, path),
+            Internal(ident, Some(path)) => write!(f, "{ident}{path}"),
             Internal(ident, _) => ident.fmt(f),
-            External(Some(path)) => write!(f, ".{}", path),
+            External(Some(path)) => write!(f, "{path}"),
             External(_) => f.write_str("."),
         }
     }
@@ -907,9 +910,9 @@ impl fmt::Debug for AssignmentTarget {
         match self {
             Noop => f.write_str("Noop"),
             Query(query) => query.fmt(f),
-            Internal(ident, Some(path)) => write!(f, "Internal({}{})", ident, path),
-            Internal(ident, _) => write!(f, "Internal({})", ident),
-            External(Some(path)) => write!(f, "External({})", path),
+            Internal(ident, Some(path)) => write!(f, "Internal({ident}{path})"),
+            Internal(ident, _) => write!(f, "Internal({ident})"),
+            External(Some(path)) => write!(f, "External({path})"),
             External(_) => f.write_str("External(.)"),
         }
     }
@@ -922,7 +925,7 @@ impl fmt::Debug for AssignmentTarget {
 #[derive(Clone, PartialEq)]
 pub struct Query {
     pub target: Node<QueryTarget>,
-    pub path: Node<LookupBuf>,
+    pub path: Node<OwnedValuePath>,
 }
 
 impl fmt::Display for Query {
@@ -940,7 +943,7 @@ impl fmt::Debug for Query {
 #[derive(Clone, PartialEq)]
 pub enum QueryTarget {
     Internal(Ident),
-    External,
+    External(PathPrefix),
     FunctionCall(FunctionCall),
     Container(Container),
 }
@@ -951,7 +954,10 @@ impl fmt::Display for QueryTarget {
 
         match self {
             Internal(v) => v.fmt(f),
-            External => write!(f, "."),
+            External(prefix) => match prefix {
+                PathPrefix::Event => write!(f, "."),
+                PathPrefix::Metadata => write!(f, "&"),
+            },
             FunctionCall(v) => v.fmt(f),
             Container(v) => v.fmt(f),
         }
@@ -963,8 +969,11 @@ impl fmt::Debug for QueryTarget {
         use QueryTarget::{Container, External, FunctionCall, Internal};
 
         match self {
-            Internal(v) => write!(f, "Internal({:?})", v),
-            External => f.write_str("External"),
+            Internal(v) => write!(f, "Internal({v:?})"),
+            External(prefix) => match prefix {
+                PathPrefix::Event => f.write_str("External(Event)"),
+                PathPrefix::Metadata => f.write_str("External(Metadata)"),
+            },
             FunctionCall(v) => v.fmt(f),
             Container(v) => v.fmt(f),
         }
@@ -1054,7 +1063,7 @@ pub struct FunctionArgument {
 impl fmt::Display for FunctionArgument {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if let Some(ident) = &self.ident {
-            write!(f, "{}: ", ident)?;
+            write!(f, "{ident}: ")?;
         }
 
         self.expr.fmt(f)
@@ -1064,7 +1073,7 @@ impl fmt::Display for FunctionArgument {
 impl fmt::Debug for FunctionArgument {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if let Some(ident) = &self.ident {
-            write!(f, "Argument({:?}: {:?})", ident, self.expr)
+            write!(f, "Argument({ident:?}: {:?})", self.expr)
         } else {
             write!(f, "Argument({:?})", self.expr)
         }
@@ -1136,10 +1145,10 @@ impl fmt::Debug for Unary {
         use Unary::Not;
 
         let value = match self {
-            Not(v) => format!("{:?}", v),
+            Not(v) => format!("{v:?}"),
         };
 
-        write!(f, "Unary({})", value)
+        write!(f, "Unary({value})")
     }
 }
 
@@ -1184,7 +1193,7 @@ impl fmt::Display for Abort {
             &self
                 .message
                 .as_ref()
-                .map_or_else(|| "abort".to_owned(), |m| format!("abort: {}", m)),
+                .map_or_else(|| "abort".to_owned(), |m| format!("abort: {m}")),
         )
     }
 }

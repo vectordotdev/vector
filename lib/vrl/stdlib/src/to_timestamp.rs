@@ -3,7 +3,7 @@ use std::str::FromStr;
 use ::value::Value;
 use chrono::{TimeZone as _, Utc};
 use vector_common::{conversion::Conversion, TimeZone};
-use vrl::{function::Error, prelude::*};
+use vrl::prelude::*;
 
 fn to_timestamp(value: Value, unit: Unit) -> Resolved {
     use Value::{Bytes, Float, Integer, Timestamp};
@@ -15,14 +15,14 @@ fn to_timestamp(value: Value, unit: Unit) -> Resolved {
                 let t = Utc.timestamp_opt(v, 0).single();
                 match t {
                     Some(time) => time.into(),
-                    None => return Err(format!("unable to coerce {} into timestamp", v).into()),
+                    None => return Err(format!("unable to coerce {v} into timestamp").into()),
                 }
             }
             Unit::Milliseconds => {
                 let t = Utc.timestamp_millis_opt(v).single();
                 match t {
                     Some(time) => time.into(),
-                    None => return Err(format!("unable to coerce {} into timestamp", v).into()),
+                    None => return Err(format!("unable to coerce {v} into timestamp").into()),
                 }
             }
             Unit::Nanoseconds => Utc.timestamp_nanos(v).into(),
@@ -37,7 +37,7 @@ fn to_timestamp(value: Value, unit: Unit) -> Resolved {
                     .single();
                 match t {
                     Some(time) => time.into(),
-                    None => return Err(format!("unable to coerce {} into timestamp", v).into()),
+                    None => return Err(format!("unable to coerce {v} into timestamp").into()),
                 }
             }
             Unit::Milliseconds => {
@@ -49,7 +49,7 @@ fn to_timestamp(value: Value, unit: Unit) -> Resolved {
                     .single();
                 match t {
                     Some(time) => time.into(),
-                    None => return Err(format!("unable to coerce {} into timestamp", v).into()),
+                    None => return Err(format!("unable to coerce {v} into timestamp").into()),
                 }
             }
             Unit::Nanoseconds => {
@@ -61,7 +61,7 @@ fn to_timestamp(value: Value, unit: Unit) -> Resolved {
                     .single();
                 match t {
                     Some(time) => time.into(),
-                    None => return Err(format!("unable to coerce {} into timestamp", v).into()),
+                    None => return Err(format!("unable to coerce {v} into timestamp").into()),
                 }
             }
         },
@@ -184,7 +184,7 @@ impl Function for ToTimestamp {
         &self,
         _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
 
@@ -197,33 +197,6 @@ impl Function for ToTimestamp {
             .unwrap_or_default();
 
         Ok(ToTimestampFn { value, unit }.as_expr())
-    }
-
-    fn compile_argument(
-        &self,
-        _args: &[(&'static str, Option<FunctionArgument>)],
-        _ctx: &mut FunctionCompileContext,
-        name: &str,
-        expr: Option<&expression::Expr>,
-    ) -> CompiledArgument {
-        match (name, expr) {
-            ("unit", Some(expr)) => match expr.as_value() {
-                None => Ok(None),
-                Some(value) => {
-                    let s = value.try_bytes_utf8_lossy().expect("unit not bytes");
-                    Ok(Some(
-                        Unit::from_str(&s)
-                            .map(|unit| Box::new(unit) as Box<dyn std::any::Any + Send + Sync>)
-                            .map_err(|_| Error::InvalidEnumVariant {
-                                keyword: "unit",
-                                value,
-                                variants: Unit::all_value(),
-                            })?,
-                    ))
-                }
-            },
-            _ => Ok(None),
-        }
     }
 }
 
@@ -341,7 +314,7 @@ mod tests {
 
         integer {
              args: func_args![value: 1_431_648_000],
-             want: Ok(chrono::Utc.ymd(2015, 5, 15).and_hms(0, 0, 0)),
+             want: Ok(chrono::Utc.ymd(2015, 5, 15).and_hms_opt(0, 0, 0).expect("invalid timestamp")),
              tdef: TypeDef::timestamp().fallible(),
         }
 

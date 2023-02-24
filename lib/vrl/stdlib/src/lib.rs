@@ -28,6 +28,8 @@
 
 mod util;
 
+#[cfg(feature = "abs")]
+mod abs;
 #[cfg(feature = "append")]
 mod append;
 #[cfg(feature = "array")]
@@ -40,22 +42,38 @@ mod assert_eq;
 mod boolean;
 #[cfg(feature = "ceil")]
 mod ceil;
+#[cfg(feature = "chunks")]
+mod chunks;
 #[cfg(feature = "compact")]
 mod compact;
 #[cfg(feature = "contains")]
 mod contains;
+#[cfg(feature = "decode_base16")]
+mod decode_base16;
 #[cfg(feature = "decode_base64")]
 mod decode_base64;
+#[cfg(feature = "decode_gzip")]
+mod decode_gzip;
+#[cfg(feature = "decode_mime_q")]
+mod decode_mime_q;
 #[cfg(feature = "decode_percent")]
 mod decode_percent;
+#[cfg(feature = "decode_zlib")]
+mod decode_zlib;
+#[cfg(feature = "decode_zstd")]
+mod decode_zstd;
 #[cfg(feature = "decrypt")]
 mod decrypt;
 #[cfg(feature = "del")]
 mod del;
 #[cfg(feature = "downcase")]
 mod downcase;
+#[cfg(feature = "encode_base16")]
+mod encode_base16;
 #[cfg(feature = "encode_base64")]
 mod encode_base64;
+#[cfg(feature = "encode_gzip")]
+mod encode_gzip;
 #[cfg(feature = "encode_json")]
 mod encode_json;
 #[cfg(feature = "encode_key_value")]
@@ -64,6 +82,10 @@ mod encode_key_value;
 mod encode_logfmt;
 #[cfg(feature = "encode_percent")]
 mod encode_percent;
+#[cfg(feature = "encode_zlib")]
+mod encode_zlib;
+#[cfg(feature = "encode_zstd")]
+mod encode_zstd;
 #[cfg(feature = "encrypt")]
 mod encrypt;
 #[cfg(feature = "ends_with")]
@@ -144,6 +166,8 @@ mod is_string;
 mod is_timestamp;
 #[cfg(feature = "join")]
 mod join;
+#[cfg(feature = "keys")]
+mod keys;
 #[cfg(feature = "length")]
 mod length;
 #[cfg(feature = "log")]
@@ -170,6 +194,8 @@ mod match_datadog_query;
 mod md5;
 #[cfg(feature = "merge")]
 mod merge;
+#[cfg(feature = "mod")]
+mod mod_func;
 #[cfg(feature = "now")]
 mod now;
 #[cfg(feature = "object")]
@@ -184,6 +210,8 @@ mod parse_aws_alb_log;
 mod parse_aws_cloudwatch_log_subscription_message;
 #[cfg(feature = "parse_aws_vpc_flow_log")]
 mod parse_aws_vpc_flow_log;
+#[cfg(feature = "parse_cef")]
+mod parse_cef;
 #[cfg(feature = "parse_common_log")]
 mod parse_common_log;
 #[cfg(feature = "parse_csv")]
@@ -244,6 +272,8 @@ mod replace;
 mod reverse_dns;
 #[cfg(feature = "round")]
 mod round;
+#[cfg(feature = "seahash")]
+mod seahash;
 #[cfg(feature = "set")]
 mod set;
 #[cfg(feature = "sha1")]
@@ -306,9 +336,13 @@ mod unnest;
 mod upcase;
 #[cfg(feature = "uuid_v4")]
 mod uuid_v4;
+#[cfg(feature = "values")]
+mod values;
 
 // -----------------------------------------------------------------------------
 
+#[cfg(feature = "abs")]
+pub use abs::Abs;
 #[cfg(feature = "append")]
 pub use append::Append;
 #[cfg(feature = "assert")]
@@ -319,22 +353,38 @@ pub use assert_eq::AssertEq;
 pub use boolean::Boolean;
 #[cfg(feature = "ceil")]
 pub use ceil::Ceil;
+#[cfg(feature = "chunks")]
+pub use chunks::Chunks;
 #[cfg(feature = "compact")]
 pub use compact::Compact;
 #[cfg(feature = "contains")]
 pub use contains::Contains;
+#[cfg(feature = "decode_base16")]
+pub use decode_base16::DecodeBase16;
 #[cfg(feature = "decode_base64")]
 pub use decode_base64::DecodeBase64;
+#[cfg(feature = "decode_gzip")]
+pub use decode_gzip::DecodeGzip;
+#[cfg(feature = "decode_mime_q")]
+pub use decode_mime_q::DecodeMimeQ;
 #[cfg(feature = "decode_percent")]
 pub use decode_percent::DecodePercent;
+#[cfg(feature = "decode_zlib")]
+pub use decode_zlib::DecodeZlib;
+#[cfg(feature = "decode_zstd")]
+pub use decode_zstd::DecodeZstd;
 #[cfg(feature = "decrypt")]
 pub use decrypt::Decrypt;
 #[cfg(feature = "del")]
 pub use del::Del;
 #[cfg(feature = "downcase")]
 pub use downcase::Downcase;
+#[cfg(feature = "encode_base16")]
+pub use encode_base16::EncodeBase16;
 #[cfg(feature = "encode_base64")]
 pub use encode_base64::EncodeBase64;
+#[cfg(feature = "encode_gzip")]
+pub use encode_gzip::EncodeGzip;
 #[cfg(feature = "encode_json")]
 pub use encode_json::EncodeJson;
 #[cfg(feature = "encode_key_value")]
@@ -343,6 +393,10 @@ pub use encode_key_value::EncodeKeyValue;
 pub use encode_logfmt::EncodeLogfmt;
 #[cfg(feature = "encode_percent")]
 pub use encode_percent::EncodePercent;
+#[cfg(feature = "encode_zlib")]
+pub use encode_zlib::EncodeZlib;
+#[cfg(feature = "encode_zstd")]
+pub use encode_zstd::EncodeZstd;
 #[cfg(feature = "encrypt")]
 pub use encrypt::Encrypt;
 #[cfg(feature = "ends_with")]
@@ -423,6 +477,8 @@ pub use is_string::IsString;
 pub use is_timestamp::IsTimestamp;
 #[cfg(feature = "join")]
 pub use join::Join;
+#[cfg(feature = "keys")]
+pub use keys::Keys;
 #[cfg(feature = "length")]
 pub use length::Length;
 #[cfg(feature = "log")]
@@ -439,6 +495,8 @@ pub use match_array::MatchArray;
 pub use match_datadog_query::MatchDatadogQuery;
 #[cfg(feature = "merge")]
 pub use merge::Merge;
+#[cfg(feature = "mod")]
+pub use mod_func::Mod;
 #[cfg(feature = "now")]
 pub use now::Now;
 #[cfg(feature = "object")]
@@ -453,6 +511,8 @@ pub use parse_aws_alb_log::ParseAwsAlbLog;
 pub use parse_aws_cloudwatch_log_subscription_message::ParseAwsCloudWatchLogSubscriptionMessage;
 #[cfg(feature = "parse_aws_vpc_flow_log")]
 pub use parse_aws_vpc_flow_log::ParseAwsVpcFlowLog;
+#[cfg(feature = "parse_cef")]
+pub use parse_cef::ParseCef;
 #[cfg(feature = "parse_common_log")]
 pub use parse_common_log::ParseCommonLog;
 #[cfg(feature = "parse_csv")]
@@ -575,17 +635,23 @@ pub use unnest::Unnest;
 pub use upcase::Upcase;
 #[cfg(feature = "uuid_v4")]
 pub use uuid_v4::UuidV4;
+#[cfg(feature = "values")]
+pub use values::Values;
 
 #[cfg(feature = "array")]
 pub use crate::array::Array;
 #[cfg(feature = "md5")]
 pub use crate::md5::Md5;
+#[cfg(feature = "seahash")]
+pub use crate::seahash::Seahash;
 #[cfg(feature = "sha1")]
 pub use crate::sha1::Sha1;
 
 #[must_use]
 pub fn all() -> Vec<Box<dyn vrl::Function>> {
     vec![
+        #[cfg(feature = "abs")]
+        Box::new(Abs),
         #[cfg(feature = "append")]
         Box::new(Append),
         #[cfg(feature = "array")]
@@ -598,22 +664,38 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(Boolean),
         #[cfg(feature = "ceil")]
         Box::new(Ceil),
+        #[cfg(feature = "chunks")]
+        Box::new(Chunks),
         #[cfg(feature = "compact")]
         Box::new(Compact),
         #[cfg(feature = "contains")]
         Box::new(Contains),
+        #[cfg(feature = "decode_base16")]
+        Box::new(DecodeBase16),
         #[cfg(feature = "decode_base64")]
         Box::new(DecodeBase64),
+        #[cfg(feature = "decode_gzip")]
+        Box::new(DecodeGzip),
         #[cfg(feature = "decode_percent")]
         Box::new(DecodePercent),
+        #[cfg(feature = "decode_mime_q")]
+        Box::new(DecodeMimeQ),
+        #[cfg(feature = "decode_zlib")]
+        Box::new(DecodeZlib),
+        #[cfg(feature = "decode_zstd")]
+        Box::new(DecodeZstd),
         #[cfg(feature = "decrypt")]
         Box::new(Decrypt),
         #[cfg(feature = "del")]
         Box::new(Del),
         #[cfg(feature = "downcase")]
         Box::new(Downcase),
+        #[cfg(feature = "encode_base16")]
+        Box::new(EncodeBase16),
         #[cfg(feature = "encode_base64")]
         Box::new(EncodeBase64),
+        #[cfg(feature = "encode_gzip")]
+        Box::new(EncodeGzip),
         #[cfg(feature = "encode_json")]
         Box::new(EncodeJson),
         #[cfg(feature = "encode_key_value")]
@@ -622,6 +704,10 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(EncodeLogfmt),
         #[cfg(feature = "encode_percent")]
         Box::new(EncodePercent),
+        #[cfg(feature = "encode_zlib")]
+        Box::new(EncodeZlib),
+        #[cfg(feature = "encode_zstd")]
+        Box::new(EncodeZstd),
         #[cfg(feature = "encrypt")]
         Box::new(Encrypt),
         #[cfg(feature = "ends_with")]
@@ -702,6 +788,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(IsTimestamp),
         #[cfg(feature = "join")]
         Box::new(Join),
+        #[cfg(feature = "keys")]
+        Box::new(Keys),
         #[cfg(feature = "length")]
         Box::new(Length),
         #[cfg(feature = "log")]
@@ -722,6 +810,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(Md5),
         #[cfg(feature = "merge")]
         Box::new(Merge),
+        #[cfg(feature = "mod")]
+        Box::new(Mod),
         #[cfg(feature = "now")]
         Box::new(Now),
         // We are not sure if this is the way we want to expose this functionality yet
@@ -738,6 +828,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(ParseAwsCloudWatchLogSubscriptionMessage),
         #[cfg(feature = "parse_aws_vpc_flow_log")]
         Box::new(ParseAwsVpcFlowLog),
+        #[cfg(feature = "parse_cef")]
+        Box::new(ParseCef),
         #[cfg(feature = "parse_common_log")]
         Box::new(ParseCommonLog),
         #[cfg(feature = "parse_csv")]
@@ -798,6 +890,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(ReverseDns),
         #[cfg(feature = "round")]
         Box::new(Round),
+        #[cfg(feature = "seahash")]
+        Box::new(Seahash),
         #[cfg(feature = "set")]
         Box::new(Set),
         #[cfg(feature = "sha1")]
@@ -860,5 +954,7 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(Upcase),
         #[cfg(feature = "uuid_v4")]
         Box::new(UuidV4),
+        #[cfg(feature = "values")]
+        Box::new(Values),
     ]
 }

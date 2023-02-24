@@ -5,17 +5,17 @@ use std::{
     future::Future,
     pin::Pin,
     sync::Arc,
-    task::{Context, Poll},
+    task::{ready, Context, Poll},
 };
 
-use futures::{future, ready, FutureExt};
+use futures::{future, FutureExt};
 use stream_cancel::{Trigger, Tripwire};
 use tokio::time::{timeout_at, Instant};
 
 use crate::{config::ComponentKey, trigger::DisabledTrigger};
 
 pub async fn tripwire_handler(closed: bool) {
-    futures::future::poll_fn(|_| {
+    std::future::poll_fn(|_| {
         if closed {
             Poll::Ready(())
         } else {
@@ -72,6 +72,8 @@ impl Future for ShutdownSignal {
                     Poll::Pending
                 }
             }
+            // TODO: This should almost certainly be a panic to avoid deadlocking in the case of a
+            // poll-after-ready situation.
             None => Poll::Pending,
         }
     }
@@ -288,7 +290,7 @@ impl SourceShutdownCoordinator {
         )
     }
 
-    /// Returned future will finish once all sources have finished.
+    /// Returned future will finish once all *current* sources have finished.
     #[must_use]
     pub fn shutdown_tripwire(&self) -> future::BoxFuture<'static, ()> {
         let futures = self
@@ -297,9 +299,7 @@ impl SourceShutdownCoordinator {
             .cloned()
             .map(|tripwire| tripwire.then(tripwire_handler).boxed());
 
-        future::join_all(futures)
-            .map(|_| info!("All sources have finished."))
-            .boxed()
+        future::join_all(futures).map(|_| ()).boxed()
     }
 
     fn shutdown_source_complete(

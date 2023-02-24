@@ -1,0 +1,11 @@
+args:
+- --features
+- loki-integration-tests
+- --lib
+- '::loki::'
+
+env:
+  LOKI_ADDRESS: http://loki:3100
+
+matrix:
+  version: [2.4.1]

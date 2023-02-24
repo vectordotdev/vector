@@ -4,17 +4,15 @@ use futures_util::SinkExt;
 use http::{Request, StatusCode, Uri};
 use hyper::Body;
 use serde_json::json;
+use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
 
-#[cfg(feature = "apex-integration-tests")]
-#[cfg(test)]
+#[cfg(all(test, feature = "apex-integration-tests"))]
 mod integration_tests;
 
 use crate::{
     codecs::Transformer,
-    config::{
-        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription,
-    },
+    config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     event::Event,
     http::HttpClient,
     sinks::util::{
@@ -25,20 +23,20 @@ use crate::{
 };
 
 /// Configuration for the `apex` sink.
-#[configurable_component(sink)]
+#[configurable_component(sink("apex"))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct ApexSinkConfig {
     /// The base URI of the Apex instance.
     ///
-    /// Vector will append `/add_events` to this.
+    /// `/add_events` is appended to this.
     uri: UriSerde,
 
     /// The ID of the project to associate reported logs with.
     project_id: String,
 
     /// The API token to use to authenticate with Apex.
-    api_token: String,
+    api_token: SensitiveString,
 
     #[configurable(derived)]
     #[serde(default)]
@@ -57,10 +55,6 @@ pub struct ApexSinkConfig {
     acknowledgements: AcknowledgementsConfig,
 }
 
-inventory::submit! {
-    SinkDescription::new::<ApexSinkConfig>("apex")
-}
-
 impl GenerateConfig for ApexSinkConfig {
     fn generate_config() -> toml::Value {
         toml::from_str(
@@ -73,7 +67,6 @@ impl GenerateConfig for ApexSinkConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "apex")]
 impl SinkConfig for ApexSinkConfig {
     async fn build(
         &self,
@@ -103,10 +96,6 @@ impl SinkConfig for ApexSinkConfig {
 
     fn input(&self) -> Input {
         Input::log()
-    }
-
-    fn sink_type(&self) -> &'static str {
-        "apex"
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
@@ -143,7 +132,10 @@ impl HttpSink for ApexSinkConfig {
     async fn build_request(&self, events: Self::Output) -> crate::Result<http::Request<Bytes>> {
         let uri: Uri = self.uri.append_path("/add_events")?.uri;
         let request = Request::post(uri)
-            .header("Authorization", format!("Bearer {}", &self.api_token))
+            .header(
+                "Authorization",
+                format!("Bearer {}", self.api_token.inner()),
+            )
             .header("Content-Type", "application/json");
 
         let full_body_string = json!({
@@ -161,7 +153,10 @@ impl HttpSink for ApexSinkConfig {
 async fn healthcheck(config: ApexSinkConfig, client: HttpClient) -> crate::Result<()> {
     let uri = config.uri.with_default_parts();
     let request = Request::head(&uri.uri)
-        .header("Authorization", format!("Bearer {}", &config.api_token))
+        .header(
+            "Authorization",
+            format!("Bearer {}", config.api_token.inner()),
+        )
         .body(Body::empty())
         .unwrap();
     let response = client.send(request).await?;

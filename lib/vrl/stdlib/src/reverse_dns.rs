@@ -8,8 +8,8 @@ fn reverse_dns(value: Value) -> Resolved {
     let ip: IpAddr = value
         .try_bytes_utf8_lossy()?
         .parse()
-        .map_err(|err| format!("unable to parse IP address: {}", err))?;
-    let host = lookup_addr(&ip).map_err(|err| format!("unable to perform a lookup : {}", err))?;
+        .map_err(|err| format!("unable to parse IP address: {err}"))?;
+    let host = lookup_addr(&ip).map_err(|err| format!("unable to perform a lookup : {err}"))?;
 
     Ok(host.into())
 }
@@ -42,7 +42,7 @@ impl Function for ReverseDns {
         &self,
         _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
 

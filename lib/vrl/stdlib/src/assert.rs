@@ -15,7 +15,7 @@ fn assert(condition: Value, message: Option<Value>, format: Option<String>) -> R
                 })
             } else {
                 let message = match format {
-                    Some(string) => format!("assertion failed: {}", string),
+                    Some(string) => format!("assertion failed: {string}"),
                     None => "assertion failed".to_owned(),
                 };
                 Err(ExpressionError::from(message))
@@ -71,7 +71,7 @@ impl Function for Assert {
         &self,
         _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let condition = arguments.required("condition");
         let message = arguments.optional("message");

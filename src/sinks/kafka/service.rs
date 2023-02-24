@@ -9,8 +9,11 @@ use rdkafka::{
     util::Timeout,
 };
 use tower::Service;
+use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
 use vector_core::{
-    internal_event::{BytesSent, EventsSent},
+    internal_event::{
+        ByteSize, BytesSent, CountByteSize, InternalEventHandle as _, Protocol, Registered,
+    },
     stream::DriverResponse,
 };
 
@@ -22,7 +25,7 @@ use crate::{
 pub struct KafkaRequest {
     pub body: Bytes,
     pub metadata: KafkaRequestMetadata,
-    pub event_byte_size: usize,
+    pub request_metadata: RequestMetadata,
 }
 
 pub struct KafkaRequestMetadata {
@@ -42,12 +45,8 @@ impl DriverResponse for KafkaResponse {
         EventStatus::Delivered
     }
 
-    fn events_sent(&self) -> EventsSent {
-        EventsSent {
-            count: 1,
-            byte_size: self.event_byte_size,
-            output: None,
-        }
+    fn events_sent(&self) -> CountByteSize {
+        CountByteSize(1, self.event_byte_size)
     }
 }
 
@@ -57,15 +56,24 @@ impl Finalizable for KafkaRequest {
     }
 }
 
+impl MetaDescriptive for KafkaRequest {
+    fn get_metadata(&self) -> RequestMetadata {
+        self.request_metadata
+    }
+}
+
+#[derive(Clone)]
 pub struct KafkaService {
     kafka_producer: FutureProducer<KafkaStatisticsContext>,
+    bytes_sent: Registered<BytesSent>,
 }
 
 impl KafkaService {
-    pub(crate) const fn new(
-        kafka_producer: FutureProducer<KafkaStatisticsContext>,
-    ) -> KafkaService {
-        KafkaService { kafka_producer }
+    pub(crate) fn new(kafka_producer: FutureProducer<KafkaStatisticsContext>) -> KafkaService {
+        KafkaService {
+            kafka_producer,
+            bytes_sent: register!(BytesSent::from(Protocol("kafka".into()))),
+        }
     }
 }
 
@@ -79,9 +87,11 @@ impl Service<KafkaRequest> for KafkaService {
     }
 
     fn call(&mut self, request: KafkaRequest) -> Self::Future {
-        let kafka_producer = self.kafka_producer.clone();
+        let this = self.clone();
 
         Box::pin(async move {
+            let event_byte_size = request.get_metadata().events_byte_size();
+
             let mut record =
                 FutureRecord::to(&request.metadata.topic).payload(request.body.as_ref());
             if let Some(key) = &request.metadata.key {
@@ -94,18 +104,13 @@ impl Service<KafkaRequest> for KafkaService {
                 record = record.headers(headers);
             }
 
-            //rdkafka will internally retry forever if the queue is full
-
-            match kafka_producer.send(record, Timeout::Never).await {
+            // rdkafka will internally retry forever if the queue is full
+            match this.kafka_producer.send(record, Timeout::Never).await {
                 Ok((_partition, _offset)) => {
-                    emit!(BytesSent {
-                        byte_size: request.body.len()
-                            + request.metadata.key.map(|x| x.len()).unwrap_or(0),
-                        protocol: "kafka"
-                    });
-                    Ok(KafkaResponse {
-                        event_byte_size: request.event_byte_size,
-                    })
+                    this.bytes_sent.emit(ByteSize(
+                        request.body.len() + request.metadata.key.map(|x| x.len()).unwrap_or(0),
+                    ));
+                    Ok(KafkaResponse { event_byte_size })
                 }
                 Err((kafka_err, _original_record)) => Err(kafka_err),
             }

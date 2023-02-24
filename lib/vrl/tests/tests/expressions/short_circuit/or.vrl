@@ -1,0 +1,20 @@
+# result: true
+
+# This should be infallible (even though the right-hand side is fallible)
+true || (1/0)
+
+
+x = false
+true || {x = "string"}
+
+# The typedef of the RHS is not applied (since it is guaranteed to short-circuit)
+assert!(type_def(x) == { "boolean": true })
+
+# The typedef of RHS is conditionally applied (can't know if it will be resolved or not)
+.unknown || {x = "string"}
+assert!(type_def(x) == { "boolean": true, "bytes": true })
+
+
+# The typedef of RHS is always applied
+true && {x = "string"; true}
+assert!(type_def(x) == {"bytes": true })

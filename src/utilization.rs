@@ -1,11 +1,10 @@
 use std::{
     pin::Pin,
-    task::{Context, Poll},
+    task::{ready, Context, Poll},
     time::{Duration, Instant},
 };
 
 use futures::{Stream, StreamExt};
-use futures_util::ready;
 use metrics::gauge;
 use pin_project::pin_project;
 use tokio::time::interval;

@@ -137,7 +137,7 @@ fn encrypt(plaintext: Value, algorithm: Value, key: Value, iv: Value) -> Resolve
         "AES-256-CBC-ISO10126" => encrypt_padded!(Aes256Cbc, Iso10126, plaintext, key, iv),
         "AES-192-CBC-ISO10126" => encrypt_padded!(Aes192Cbc, Iso10126, plaintext, key, iv),
         "AES-128-CBC-ISO10126" => encrypt_padded!(Aes128Cbc, Iso10126, plaintext, key, iv),
-        other => return Err(format!("Invalid algorithm: {}", other).into()),
+        other => return Err(format!("Invalid algorithm: {other}").into()),
     };
 
     Ok(Value::Bytes(Bytes::from(ciphertext)))
@@ -188,7 +188,7 @@ impl Function for Encrypt {
         &self,
         _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let plaintext = arguments.required("plaintext");
         let algorithm = arguments.required("algorithm");

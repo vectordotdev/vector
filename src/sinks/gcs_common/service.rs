@@ -8,14 +8,13 @@ use http::{
 };
 use hyper::Body;
 use tower::Service;
-use vector_common::internal_event::BytesSent;
-use vector_core::{internal_event::EventsSent, stream::DriverResponse};
+use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
+use vector_core::{internal_event::CountByteSize, stream::DriverResponse};
 
 use crate::{
     event::{EventFinalizers, EventStatus, Finalizable},
     gcp::GcpAuthenticator,
-    http::{get_http_scheme_from_uri, HttpClient, HttpError},
-    sinks::util::metadata::RequestMetadata,
+    http::{HttpClient, HttpError},
 };
 
 #[derive(Debug, Clone)]
@@ -50,6 +49,12 @@ impl Finalizable for GcsRequest {
     }
 }
 
+impl MetaDescriptive for GcsRequest {
+    fn get_metadata(&self) -> RequestMetadata {
+        self.metadata
+    }
+}
+
 // Settings required to produce a request that do not change per
 // request. All possible values are pre-computed for direct use in
 // producing a request.
@@ -65,7 +70,6 @@ pub struct GcsRequestSettings {
 #[derive(Debug)]
 pub struct GcsResponse {
     pub inner: http::Response<Body>,
-    pub protocol: &'static str,
     pub metadata: RequestMetadata,
 }
 
@@ -80,19 +84,15 @@ impl DriverResponse for GcsResponse {
         }
     }
 
-    fn events_sent(&self) -> EventsSent {
-        EventsSent {
-            count: self.metadata.event_count(),
-            byte_size: self.metadata.events_byte_size(),
-            output: None,
-        }
+    fn events_sent(&self) -> CountByteSize {
+        CountByteSize(
+            self.metadata.event_count(),
+            self.metadata.events_estimated_json_encoded_byte_size(),
+        )
     }
 
-    fn bytes_sent(&self) -> Option<BytesSent> {
-        Some(BytesSent {
-            byte_size: self.metadata.request_encoded_size(),
-            protocol: self.protocol,
-        })
+    fn bytes_sent(&self) -> Option<usize> {
+        Some(self.metadata.request_encoded_size())
     }
 }
 
@@ -101,10 +101,12 @@ impl Service<GcsRequest> for GcsService {
     type Error = HttpError;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
+    // Emission of an internal event in case of errors is handled upstream by the caller.
     fn poll_ready(&mut self, _: &mut std::task::Context<'_>) -> Poll<Result<(), Self::Error>> {
         Poll::Ready(Ok(()))
     }
 
+    // Emission of internal events for errors and dropped events is handled upstream by the caller.
     fn call(&mut self, request: GcsRequest) -> Self::Future {
         let settings = request.settings;
         let metadata = request.metadata;
@@ -112,7 +114,6 @@ impl Service<GcsRequest> for GcsService {
         let uri = format!("{}{}", self.base_url, request.key)
             .parse::<Uri>()
             .unwrap();
-        let protocol = get_http_scheme_from_uri(&uri);
 
         let mut builder = Request::put(uri);
         let headers = builder.headers_mut().unwrap();
@@ -136,11 +137,7 @@ impl Service<GcsRequest> for GcsService {
         let mut client = self.client.clone();
         Box::pin(async move {
             let result = client.call(http_request).await;
-            result.map(|inner| GcsResponse {
-                inner,
-                protocol,
-                metadata,
-            })
+            result.map(|inner| GcsResponse { inner, metadata })
         })
     }
 }

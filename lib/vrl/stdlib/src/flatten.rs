@@ -72,7 +72,7 @@ impl Function for Flatten {
         &self,
         _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let separator = arguments
             .optional("separator")
@@ -142,7 +142,7 @@ impl<'a> MapFlatten<'a> {
     fn new_key(&self, key: &str) -> String {
         match self.parent {
             None => key.to_string(),
-            Some(ref parent) => format!("{}{}{}", parent, self.separator, key),
+            Some(ref parent) => format!("{parent}{}{key}", self.separator),
         }
     }
 }

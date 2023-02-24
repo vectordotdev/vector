@@ -34,12 +34,21 @@ impl CharacterDelimitedDecoderConfig {
 pub struct CharacterDelimitedDecoderOptions {
     /// The character that delimits byte sequences.
     #[serde(with = "vector_core::serde::ascii_char")]
-    delimiter: u8,
+    pub delimiter: u8,
+
     /// The maximum length of the byte buffer.
     ///
     /// This length does *not* include the trailing delimiter.
+    ///
+    /// By default, there is no maximum length enforced. If events are malformed, this can lead to
+    /// additional resource usage as events continue to be buffered in memory, and can potentially
+    /// lead to memory exhaustion in extreme cases.
+    ///
+    /// If there is a risk of processing malformed data, such as logs with user-controlled input,
+    /// consider setting the maximum length to a reasonably large value as a safety net. This will
+    /// ensure that processing is not truly unbounded.
     #[serde(skip_serializing_if = "vector_core::serde::skip_serializing_if_default")]
-    max_length: Option<usize>,
+    pub max_length: Option<usize>,
 }
 
 impl CharacterDelimitedDecoderOptions {
@@ -56,9 +65,9 @@ impl CharacterDelimitedDecoderOptions {
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct CharacterDelimitedDecoder {
     /// The delimiter used to separate byte sequences.
-    delimiter: u8,
+    pub delimiter: u8,
     /// The maximum length of the byte buffer.
-    max_length: usize,
+    pub max_length: usize,
 }
 
 impl CharacterDelimitedDecoder {
@@ -108,7 +117,7 @@ impl Decoder for CharacterDelimitedDecoder {
                             message = "Discarding frame larger than max_length.",
                             buf_len = buf.len(),
                             max_length = self.max_length,
-                            internal_log_rate_secs = 30
+                            internal_log_rate_limit = true
                         );
                         buf.advance(next_delimiter_idx + 1);
                     } else {
@@ -136,7 +145,7 @@ impl Decoder for CharacterDelimitedDecoder {
                         message = "Discarding frame larger than max_length.",
                         buf_len = buf.len(),
                         max_length = self.max_length,
-                        internal_log_rate_secs = 30
+                        internal_log_rate_limit = true
                     );
                     Ok(None)
                 } else {

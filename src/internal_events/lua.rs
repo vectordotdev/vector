@@ -1,8 +1,11 @@
 use metrics::{counter, gauge};
 use vector_core::internal_event::InternalEvent;
 
-use super::prelude::{error_stage, error_type};
+use crate::emit;
 use crate::transforms::lua::v2::BuildError;
+use vector_common::internal_event::{
+    error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL,
+};
 
 #[derive(Debug)]
 pub struct LuaGcTriggered {
@@ -23,12 +26,12 @@ pub struct LuaScriptError {
 impl InternalEvent for LuaScriptError {
     fn emit(self) {
         error!(
-            message = "Error in lua script; discarding event.",
+            message = "Error in lua script.",
             error = ?self.error,
             error_code = mlua_error_code(&self.error),
             error_type = error_type::COMMAND_FAILED,
             stage = error_stage::PROCESSING,
-            internal_log_rate_secs = 30,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,
@@ -36,12 +39,10 @@ impl InternalEvent for LuaScriptError {
             "error_type" => error_type::SCRIPT_FAILED,
             "stage" => error_stage::PROCESSING,
         );
-        counter!(
-            "component_discarded_events_total", 1,
-            "error_code" => mlua_error_code(&self.error),
-            "error_type" => error_type::SCRIPT_FAILED,
-            "stage" => error_stage::PROCESSING,
-        );
+        emit!(ComponentEventsDropped::<UNINTENTIONAL> {
+            count: 1,
+            reason: "Error in lua script.",
+        });
         // deprecated
         counter!("processing_errors_total", 1);
     }
@@ -54,13 +55,14 @@ pub struct LuaBuildError {
 
 impl InternalEvent for LuaBuildError {
     fn emit(self) {
+        let reason = "Error in building lua script.";
         error!(
-            message = "Error in lua script; discarding event.",
+            message = reason,
             error = ?self.error,
             error_type = error_type::SCRIPT_FAILED,
             error_code = lua_build_error_code(&self.error),
             stage = error_stage::PROCESSING,
-            internal_log_rate_secs = 30,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,
@@ -68,14 +70,14 @@ impl InternalEvent for LuaBuildError {
             "error_type" => error_type::SCRIPT_FAILED,
             "stage" => error_stage:: PROCESSING,
         );
-        counter!(
-            "component_discarded_events_total", 1,
-            "error_code" => lua_build_error_code(&self.error),
-            "error_type" => error_type::SCRIPT_FAILED,
-            "stage" => error_stage::PROCESSING,
-        );
+        emit!(ComponentEventsDropped::<UNINTENTIONAL> {
+            count: 1,
+            reason: "Error in lua build.",
+        });
         // deprecated
         counter!("processing_errors_total", 1);
+
+        emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason })
     }
 }
 

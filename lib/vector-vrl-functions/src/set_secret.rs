@@ -50,7 +50,7 @@ impl Function for SetSecret {
         &self,
         _state: &TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let key = arguments.required("key");
         let secret = arguments.required("secret");

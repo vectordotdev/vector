@@ -8,7 +8,7 @@ fn ip_pton(value: Value) -> Resolved {
     let ip: IpAddr = value
         .try_bytes_utf8_lossy()?
         .parse()
-        .map_err(|err| format!("unable to parse IP address: {}", err))?;
+        .map_err(|err| format!("unable to parse IP address: {err}"))?;
 
     let bytes = match ip {
         IpAddr::V4(ipv4) => Bytes::copy_from_slice(&ipv4.octets()),
@@ -53,7 +53,7 @@ impl Function for IpPton {
         &self,
         _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
 

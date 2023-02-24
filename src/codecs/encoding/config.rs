@@ -8,6 +8,7 @@ use vector_config::configurable_component;
 /// Encoding configuration.
 #[configurable_component]
 #[derive(Clone, Debug)]
+#[configurable(description = "Configures how events are encoded into raw bytes.")]
 pub struct EncodingConfig {
     #[serde(flatten)]
     encoding: SerializerConfig,
@@ -143,7 +144,7 @@ where
 
 #[cfg(test)]
 mod test {
-    use lookup::lookup_v2::parse_path;
+    use lookup::lookup_v2::parse_value_path;
 
     use super::*;
     use crate::codecs::encoding::TimestampFormat;
@@ -162,11 +163,14 @@ mod test {
         let encoding = serde_json::from_str::<EncodingConfig>(string).unwrap();
         let serializer = encoding.config();
 
-        assert!(matches!(serializer, SerializerConfig::Json));
+        assert!(matches!(serializer, SerializerConfig::Json(_)));
 
         let transformer = encoding.transformer();
 
-        assert_eq!(transformer.only_fields(), &Some(vec![parse_path("a.b[0]")]));
+        assert_eq!(
+            transformer.only_fields(),
+            &Some(vec![parse_value_path("a.b[0]").unwrap()])
+        );
         assert_eq!(
             transformer.except_fields(),
             &Some(vec!["ignore_me".to_owned()])
@@ -194,11 +198,14 @@ mod test {
         let (framing, serializer) = encoding.config();
 
         assert!(matches!(framing, Some(FramingConfig::NewlineDelimited)));
-        assert!(matches!(serializer, SerializerConfig::Json));
+        assert!(matches!(serializer, SerializerConfig::Json(_)));
 
         let transformer = encoding.transformer();
 
-        assert_eq!(transformer.only_fields(), &Some(vec![parse_path("a.b[0]")]));
+        assert_eq!(
+            transformer.only_fields(),
+            &Some(vec![parse_value_path("a.b[0]").unwrap()])
+        );
         assert_eq!(
             transformer.except_fields(),
             &Some(vec!["ignore_me".to_owned()])
@@ -223,11 +230,14 @@ mod test {
         let (framing, serializer) = encoding.config();
 
         assert!(matches!(framing, None));
-        assert!(matches!(serializer, SerializerConfig::Json));
+        assert!(matches!(serializer, SerializerConfig::Json(_)));
 
         let transformer = encoding.transformer();
 
-        assert_eq!(transformer.only_fields(), &Some(vec![parse_path("a.b[0]")]));
+        assert_eq!(
+            transformer.only_fields(),
+            &Some(vec![parse_value_path("a.b[0]").unwrap()])
+        );
         assert_eq!(
             transformer.except_fields(),
             &Some(vec!["ignore_me".to_owned()])

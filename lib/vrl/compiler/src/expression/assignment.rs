@@ -1,7 +1,8 @@
 use std::{convert::TryFrom, fmt};
 
 use diagnostic::{DiagnosticMessage, Label, Note};
-use lookup::{LookupBuf, SegmentBuf};
+use lookup::lookup_v2::OwnedTargetPath;
+use lookup::{LookupBuf, OwnedValuePath, PathPrefix, SegmentBuf};
 use value::{Kind, Value};
 
 use crate::{
@@ -60,7 +61,7 @@ impl Assignment {
                 let expr = expr.into_inner();
                 let target = Target::try_from(target.into_inner())?;
                 verify_mutable(&target, config, expr_span, assignment_span)?;
-                verify_overwriteable(
+                verify_overwritable(
                     &target,
                     state,
                     target_span,
@@ -115,7 +116,7 @@ impl Assignment {
                 // "err" target.
                 let ok = Target::try_from(ok.into_inner())?;
                 verify_mutable(&ok, config, expr_span, ok_span)?;
-                verify_overwriteable(
+                verify_overwritable(
                     &ok,
                     state,
                     ok_span,
@@ -131,7 +132,7 @@ impl Assignment {
                 // error message.
                 let err = Target::try_from(err.into_inner())?;
                 verify_mutable(&err, config, expr_span, err_span)?;
-                verify_overwriteable(
+                verify_overwritable(
                     &err,
                     state,
                     err_span,
@@ -178,8 +179,8 @@ fn verify_mutable(
     assignment_span: Span,
 ) -> Result<(), Error> {
     match target {
-        Target::External(lookup_buf) => {
-            if config.is_read_only_event_path(lookup_buf) {
+        Target::External(target_path) => {
+            if config.is_read_only_path(target_path) {
                 Err(Error {
                     variant: ErrorVariant::ReadOnly,
                     expr_span,
@@ -197,7 +198,7 @@ fn verify_mutable(
 ///
 /// This returns an error if an assignment is done to an object field or array
 /// index, while the parent of the field/index isn't an actual object/array.
-fn verify_overwriteable(
+fn verify_overwritable(
     target: &Target,
     state: &TypeState,
     target_span: Span,
@@ -205,7 +206,7 @@ fn verify_overwriteable(
     assignment_span: Span,
     rhs_expr: Expr,
 ) -> Result<(), Error> {
-    let mut path = target.lookup_buf();
+    let mut path = LookupBuf::from(target.path());
 
     let root_kind = match target {
         Target::Noop => Kind::any(),
@@ -228,11 +229,11 @@ fn verify_overwriteable(
         let (variant, segment_span, valid) = match last {
             segment @ (SegmentBuf::Field(_) | SegmentBuf::Coalesce(_)) => {
                 let segment_str = segment.to_string();
-                let segment_start = parent_span.end() - segment_str.len();
+                let segment_start = parent_span.end().saturating_sub(segment_str.len());
                 let segment_span = Span::new(segment_start, parent_span.end());
 
-                parent_span = Span::new(parent_span.start(), segment_start - 1);
-                remainder_str.insert_str(0, &format!(".{}", segment_str));
+                parent_span = Span::new(parent_span.start(), segment_start.saturating_sub(1));
+                remainder_str.insert_str(0, &format!(".{segment_str}"));
 
                 ("object", segment_span, parent_kind.contains_object())
             }
@@ -252,13 +253,13 @@ fn verify_overwriteable(
         }
 
         let parent_str = match target {
-            Target::Internal(ident, _) => format!("{ident}{}", path),
+            Target::Internal(ident, _) => format!("{ident}{path}"),
             Target::External(_) => {
                 if path.is_root() && remainder_str.starts_with('.') {
                     remainder_str = remainder_str[1..].to_owned();
                 }
 
-                format!(".{}", path)
+                format!(".{path}")
             }
             Target::Noop => unreachable!(),
         };
@@ -296,8 +297,8 @@ impl fmt::Display for Assignment {
         use Variant::{Infallible, Single};
 
         match &self.variant {
-            Single { target, expr } => write!(f, "{} = {}", target, expr),
-            Infallible { ok, err, expr, .. } => write!(f, "{}, {} = {}", ok, err, expr),
+            Single { target, expr } => write!(f, "{target} = {expr}"),
+            Infallible { ok, err, expr, .. } => write!(f, "{ok}, {err} = {expr}"),
         }
     }
 }
@@ -307,9 +308,9 @@ impl fmt::Debug for Assignment {
         use Variant::{Infallible, Single};
 
         match &self.variant {
-            Single { target, expr } => write!(f, "{:?} = {:?}", target, expr),
+            Single { target, expr } => write!(f, "{target:?} = {expr:?}"),
             Infallible { ok, err, expr, .. } => {
-                write!(f, "Ok({:?}), Err({:?}) = {:?}", ok, err, expr)
+                write!(f, "Ok({ok:?}), Err({err:?}) = {expr:?}")
             }
         }
     }
@@ -320,8 +321,8 @@ impl fmt::Debug for Assignment {
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub(crate) enum Target {
     Noop,
-    Internal(Ident, LookupBuf),
-    External(LookupBuf),
+    Internal(Ident, OwnedValuePath),
+    External(OwnedTargetPath),
 }
 
 impl Target {
@@ -330,26 +331,35 @@ impl Target {
             Self::Noop => {}
             Self::Internal(ident, path) => {
                 let type_def = match state.local.variable(ident) {
-                    None => TypeDef::null().with_type_inserted(path, new_type_def),
-                    Some(&Details { ref type_def, .. }) => {
-                        type_def.clone().with_type_inserted(path, new_type_def)
-                    }
+                    None => TypeDef::null().with_type_inserted(&path.clone().into(), new_type_def),
+                    Some(&Details { ref type_def, .. }) => type_def
+                        .clone()
+                        .with_type_inserted(&path.clone().into(), new_type_def),
                 };
 
                 let details = Details { type_def, value };
                 state.local.insert_variable(ident.clone(), details);
             }
 
-            Self::External(path) => {
-                state.external.update_target(Details {
-                    type_def: state
-                        .external
-                        .target()
-                        .type_def
-                        .clone()
-                        .with_type_inserted(path, new_type_def),
-                    value,
-                });
+            Self::External(target_path) => {
+                match target_path.prefix {
+                    PathPrefix::Event => {
+                        state.external.update_target(Details {
+                            type_def: state
+                                .external
+                                .target()
+                                .type_def
+                                .clone()
+                                .with_type_inserted(&target_path.path.clone().into(), new_type_def),
+                            value,
+                        });
+                    }
+                    PathPrefix::Metadata => {
+                        let mut kind = state.external.metadata_kind().clone();
+                        kind.insert(&target_path.path, new_type_def.kind().clone());
+                        state.external.update_metadata(kind);
+                    }
+                };
             }
         }
     }
@@ -370,7 +380,9 @@ impl Target {
                 // Update existing variable using the provided path, or create a
                 // new value in the store.
                 match ctx.state_mut().variable_mut(ident) {
-                    Some(stored) => stored.insert_by_path(path, value),
+                    Some(stored) => {
+                        stored.insert(path, value);
+                    }
                     None => ctx
                         .state_mut()
                         .insert_variable(ident.clone(), value.at_path(path)),
@@ -383,11 +395,11 @@ impl Target {
         }
     }
 
-    fn lookup_buf(&self) -> LookupBuf {
+    fn path(&self) -> OwnedValuePath {
         match self {
-            Self::Noop => LookupBuf::root(),
+            Self::Noop => OwnedValuePath::root(),
             Self::Internal(_, path) => path.clone(),
-            Self::External(path) => path.clone(),
+            Self::External(target_path) => target_path.path.clone(),
         }
     }
 }
@@ -399,9 +411,8 @@ impl fmt::Display for Target {
         match self {
             Noop => f.write_str("_"),
             Internal(ident, path) if path.is_root() => ident.fmt(f),
-            Internal(ident, path) => write!(f, "{}{}", ident, path),
-            External(path) if path.is_root() => f.write_str("."),
-            External(path) => write!(f, ".{}", path),
+            Internal(ident, path) => write!(f, "{ident}{path}"),
+            External(path) => write!(f, "{path}"),
         }
     }
 }
@@ -412,10 +423,14 @@ impl fmt::Debug for Target {
 
         match self {
             Noop => f.write_str("Noop"),
-            Internal(ident, path) if path.is_root() => write!(f, "Internal({})", ident),
-            Internal(ident, path) => write!(f, "Internal({}{})", ident, path),
-            External(path) if path.is_root() => f.write_str("External(.)"),
-            External(path) => write!(f, "External({})", path),
+            Internal(ident, path) => {
+                if path.is_root() {
+                    write!(f, "Internal({ident})")
+                } else {
+                    write!(f, "Internal({ident}{path})")
+                }
+            }
+            External(path) => write!(f, "External({path})"),
         }
     }
 }
@@ -438,7 +453,9 @@ impl TryFrom<ast::AssignmentTarget> for Target {
 
                 match target {
                     ast::QueryTarget::Internal(ident) => Internal(ident, path),
-                    ast::QueryTarget::External => External(path),
+                    ast::QueryTarget::External(prefix) => {
+                        External(OwnedTargetPath { prefix, path })
+                    }
                     _ => {
                         return Err(Error {
                             variant: ErrorVariant::InvalidTarget(span),
@@ -449,9 +466,11 @@ impl TryFrom<ast::AssignmentTarget> for Target {
                 }
             }
             ast::AssignmentTarget::Internal(ident, path) => {
-                Internal(ident, path.unwrap_or_else(LookupBuf::root))
+                Internal(ident, path.unwrap_or_else(OwnedValuePath::root))
             }
-            ast::AssignmentTarget::External(path) => External(path.unwrap_or_else(LookupBuf::root)),
+            ast::AssignmentTarget::External(path) => {
+                External(path.unwrap_or_else(OwnedTargetPath::event_root))
+            }
         };
 
         Ok(target)
@@ -557,8 +576,8 @@ where
         use Variant::{Infallible, Single};
 
         match self {
-            Single { target, expr } => write!(f, "{} = {}", target, expr),
-            Infallible { ok, err, expr, .. } => write!(f, "{}, {} = {}", ok, err, expr),
+            Single { target, expr } => write!(f, "{target} = {expr}"),
+            Infallible { ok, err, expr, .. } => write!(f, "{ok}, {err} = {expr}"),
         }
     }
 }
@@ -648,12 +667,12 @@ impl DiagnosticMessage for Error {
                     "or change this to an infallible assignment:",
                     self.assignment_span,
                 ),
-                Label::context(format!("{}, err = {}", target, expr), self.assignment_span),
+                Label::context(format!("{target}, err = {expr}"), self.assignment_span),
             ],
             InfallibleAssignment(target, expr, ok_span, err_span) => vec![
                 Label::primary("this error assignment is unnecessary", err_span),
                 Label::context("because this expression can't fail", self.expr_span),
-                Label::context(format!("use: {} = {}", target, expr), ok_span),
+                Label::context(format!("use: {target} = {expr}"), ok_span),
             ],
             InvalidTarget(span) => vec![
                 Label::primary("invalid assignment target", span),
@@ -679,7 +698,7 @@ impl DiagnosticMessage for Error {
                     segment_span,
                 ),
                 Label::context(
-                    format!("this path resolves to a value of type {}", parent_kind),
+                    format!("this path resolves to a value of type {parent_kind}"),
                     parent_span,
                 ),
             ],

@@ -32,8 +32,9 @@ mod integration_test {
             util::{BatchConfig, NoDefaultsBatchSettings},
             VectorSink,
         },
+        template::Template,
         test_util::{
-            components::{run_and_assert_sink_compliance, SINK_TAGS},
+            components::{assert_sink_compliance, SINK_TAGS},
             random_lines_with_stream, random_string, wait_for,
         },
         tls::{TlsConfig, TlsEnableableConfig, TEST_PEM_INTERMEDIATE_CA_PATH},
@@ -55,14 +56,14 @@ mod integration_test {
 
         let config = KafkaSinkConfig {
             bootstrap_servers: kafka_address(9091),
-            topic: topic.clone(),
+            topic: Template::try_from(topic.clone()).unwrap(),
             key_field: None,
-            encoding: TextSerializerConfig::new().into(),
+            encoding: TextSerializerConfig::default().into(),
             batch: BatchConfig::default(),
             compression: KafkaCompression::None,
             auth: KafkaAuthConfig::default(),
-            socket_timeout_ms: 60000,
-            message_timeout_ms: 300000,
+            socket_timeout_ms: Duration::from_millis(60000),
+            message_timeout_ms: Duration::from_millis(300000),
             librdkafka_options: HashMap::new(),
             headers_key: None,
             acknowledgements: Default::default(),
@@ -107,16 +108,16 @@ mod integration_test {
         let topic = format!("test-{}", random_string(10));
         let config = KafkaSinkConfig {
             bootstrap_servers: kafka_address(9091),
-            topic: format!("{}-%Y%m%d", topic),
+            topic: Template::try_from(format!("{}-%Y%m%d", topic)).unwrap(),
             compression: KafkaCompression::None,
-            encoding: TextSerializerConfig::new().into(),
+            encoding: TextSerializerConfig::default().into(),
             key_field: None,
             auth: KafkaAuthConfig {
                 sasl: None,
                 tls: None,
             },
-            socket_timeout_ms: 60000,
-            message_timeout_ms: 300000,
+            socket_timeout_ms: Duration::from_millis(60000),
+            message_timeout_ms: Duration::from_millis(300000),
             batch,
             librdkafka_options,
             headers_key: None,
@@ -220,8 +221,8 @@ mod integration_test {
             kafka_address(9093),
             Some(KafkaSaslConfig {
                 enabled: Some(true),
-                username: Some("admin".to_owned()),
-                password: Some("admin".to_owned()),
+                username: Some("admin".to_string()),
+                password: Some("admin".to_string().into()),
                 mechanism: Some("PLAIN".to_owned()),
             }),
             None,
@@ -241,22 +242,20 @@ mod integration_test {
         let kafka_auth = KafkaAuthConfig { sasl, tls };
         let config = KafkaSinkConfig {
             bootstrap_servers: server.clone(),
-            topic: format!("{}-%Y%m%d", topic),
+            topic: Template::try_from(format!("{}-%Y%m%d", topic)).unwrap(),
             key_field: None,
-            encoding: TextSerializerConfig::new().into(),
+            encoding: TextSerializerConfig::default().into(),
             batch: BatchConfig::default(),
             compression,
             auth: kafka_auth.clone(),
-            socket_timeout_ms: 60000,
-            message_timeout_ms: 300000,
+            socket_timeout_ms: Duration::from_millis(60000),
+            message_timeout_ms: Duration::from_millis(300000),
             librdkafka_options: HashMap::new(),
             headers_key: Some(headers_key.clone()),
             acknowledgements: Default::default(),
         };
         let topic = format!("{}-{}", topic, chrono::Utc::now().format("%Y%m%d"));
         println!("Topic name generated in test: {:?}", topic);
-        let sink = KafkaSink::new(config).unwrap();
-        let sink = VectorSink::from_event_streamsink(sink);
 
         let num_events = 1000;
         let (batch, mut receiver) = BatchNotifier::new_with_receiver();
@@ -276,7 +275,13 @@ mod integration_test {
             });
             events
         });
-        run_and_assert_sink_compliance(sink, input_events, &SINK_TAGS).await;
+        assert_sink_compliance(&SINK_TAGS, async move {
+            let sink = KafkaSink::new(config).unwrap();
+            let sink = VectorSink::from_event_streamsink(sink);
+            sink.run(input_events).await
+        })
+        .await
+        .expect("Running sink failed");
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
         // read back everything from the beginning
@@ -320,9 +325,9 @@ mod integration_test {
                 Some(Ok(msg)) => {
                     let s: &str = msg.payload_view().unwrap().unwrap();
                     out.push(s.to_owned());
-                    let (header_key, header_val) = msg.headers().unwrap().get(0).unwrap();
-                    assert_eq!(header_key, header_1_key);
-                    assert_eq!(header_val, header_1_value.as_bytes());
+                    let header = msg.headers().unwrap().get(0);
+                    assert_eq!(header.key, header_1_key);
+                    assert_eq!(header.value.unwrap(), header_1_value.as_bytes());
                 }
                 None if out.len() >= input.len() => break,
                 _ => {

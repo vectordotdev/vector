@@ -1,0 +1,11 @@
+args:
+- --features
+- kafka-integration-tests
+- --lib
+- '::kafka::'
+
+env:
+  KAFKA_HOST: kafka
+
+matrix:
+  version: [latest]

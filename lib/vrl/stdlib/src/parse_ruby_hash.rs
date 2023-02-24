@@ -48,7 +48,7 @@ impl Function for ParseRubyHash {
         &self,
         _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
         Ok(ParseRubyHashFn { value }.as_expr())
@@ -268,7 +268,7 @@ fn parse(input: &str) -> Result<Value> {
         .and_then(|(rest, result)| {
             rest.trim()
                 .is_empty()
-                .then(|| result)
+                .then_some(result)
                 .ok_or_else(|| "could not parse whole line successfully".into())
         })?;
 

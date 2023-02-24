@@ -36,58 +36,7 @@ components: sources: internal_metrics: {
 		platform_name: null
 	}
 
-	configuration: {
-		namespace: {
-			description: "The namespace of the metric."
-			common:      false
-			required:    false
-			type: string: {
-				default: "vector"
-			}
-		}
-		scrape_interval_secs: {
-			description: "The interval between metric gathering, in seconds."
-			common:      true
-			required:    false
-			type: float: {
-				default: 2.0
-				unit:    "seconds"
-			}
-		}
-		tags: {
-			common:      false
-			description: "Metric tag options."
-			required:    false
-
-			type: object: {
-				examples: []
-				options: {
-					host_key: {
-						category: "Context"
-						common:   false
-						description: """
-							If set, will add a tag using the provided key name with a value of the current the current host.
-							"""
-						required: false
-						type: string: {
-							default: null
-						}
-					}
-					pid_key: {
-						category: "Context"
-						common:   false
-						description: """
-							If set, will add a tag using the provided key name with a value of the current the current process ID.
-							"""
-						required: false
-						type: string: {
-							default: null
-						}
-					}
-				}
-			}
-		}
-	}
+	configuration: base.components.sources.internal_metrics.configuration
 
 	output: metrics: {
 		// Default internal metrics tags
@@ -214,25 +163,25 @@ components: sources: internal_metrics: {
 			description:       "The average round-trip time (RTT) for the current window."
 			type:              "histogram"
 			default_namespace: "vector"
-			tags:              _internal_metrics_tags
+			tags:              _component_tags
 		}
 		adaptive_concurrency_in_flight: {
 			description:       "The number of outbound requests currently awaiting a response."
 			type:              "histogram"
 			default_namespace: "vector"
-			tags:              _internal_metrics_tags
+			tags:              _component_tags
 		}
 		adaptive_concurrency_limit: {
 			description:       "The concurrency limit that the adaptive concurrency feature has decided on for this current window."
 			type:              "histogram"
 			default_namespace: "vector"
-			tags:              _internal_metrics_tags
+			tags:              _component_tags
 		}
 		adaptive_concurrency_observed_rtt: {
 			description:       "The observed round-trip time (RTT) for requests."
 			type:              "histogram"
 			default_namespace: "vector"
-			tags:              _internal_metrics_tags
+			tags:              _component_tags
 		}
 		checkpoint_write_errors_total: {
 			description:       "The total number of errors writing checkpoints. This metric is deprecated in favor of `component_errors_total`."
@@ -563,7 +512,8 @@ components: sources: internal_metrics: {
 		}
 		component_received_events_count: {
 			description: """
-				A histogram of Vector the number of events passed in each internal batch in Vector's internal topology.
+				A histogram of the number of events passed in each internal batch in Vector's internal topology.
+
 				Note that this is separate than sink-level batching. It is mostly useful for low level debugging
 				performance issues in Vector due to small internal batches.
 				"""
@@ -847,12 +797,6 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
-		lag_time_seconds: {
-			description:       "The difference between the timestamp recorded in each event and the time when it was ingested, expressed as fractional seconds."
-			type:              "histogram"
-			default_namespace: "vector"
-			tags:              _component_tags
-		}
 		logging_driver_errors_total: {
 			description: """
 				The total number of logging driver errors encountered caused by not using either
@@ -980,6 +924,12 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
+		source_lag_time_seconds: {
+			description:       "The difference between the timestamp recorded in each event and the time when it was ingested, expressed as fractional seconds."
+			type:              "histogram"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
 		splunk_pending_acks: {
 			description:       "The number of outstanding Splunk HEC indexer acknowledgement acks."
 			type:              "gauge"
@@ -1080,7 +1030,7 @@ components: sources: internal_metrics: {
 			description:       "The total number of seconds the Vector instance has been up."
 			type:              "gauge"
 			default_namespace: "vector"
-			tags:              _component_tags
+			tags:              _internal_metrics_tags
 		}
 		utf8_convert_errors_total: {
 			description:       "The total number of errors converting bytes to a UTF-8 string in UDP mode."
@@ -1101,6 +1051,33 @@ components: sources: internal_metrics: {
 			type:              "gauge"
 			default_namespace: "vector"
 			tags:              _component_tags
+		}
+		build_info: {
+			description:       "Has a fixed value of 1.0. Contains build information such as Rust and Vector versions."
+			type:              "gauge"
+			default_namespace: "vector"
+			tags:              _internal_metrics_tags & {
+				debug: {
+					description: "Whether this is a debug build of Vector"
+					required:    true
+				}
+				version: {
+					description: "Vector version."
+					required:    true
+				}
+				rust_version: {
+					description: "The Rust version from the package manifest."
+					required:    true
+				}
+				arch: {
+					description: "The target architecture being compiled for. (e.g. x86_64)"
+					required:    true
+				}
+				revision: {
+					description: "Revision identifer, related to versioned releases."
+					required:    true
+				}
+			}
 		}
 		value_limit_reached_total: {
 			description: """
@@ -1216,7 +1193,7 @@ components: sources: internal_metrics: {
 				"glob_failed":                 "The glob pattern match operation failed."
 				"http_error":                  "The HTTP request resulted in an error code."
 				"invalid_metric":              "The metric was invalid."
-				"kafka_offset_update":         "The comsumer offset update failed."
+				"kafka_offset_update":         "The consumer offset update failed."
 				"kafka_read":                  "The message from Kafka was invalid."
 				"mapping_failed":              "The mapping failed."
 				"match_failed":                "The match operation failed."

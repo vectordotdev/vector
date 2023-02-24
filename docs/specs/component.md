@@ -110,7 +110,7 @@ of these events:
 
 #### ComponentEventsReceived
 
-*All components* MUST emit a `ComponentEventsReceived` event that represents
+_All components_ MUST emit a `ComponentEventsReceived` event that represents
 the reception of Vector events from an upstream component.
 
 - Emission
@@ -128,13 +128,68 @@ the reception of Vector events from an upstream component.
     defined properties as key-value pairs.
   - MUST NOT be rate limited.
 
+#### ComponentBytesReceived
+
+*Sources* MUST emit a `ComponentBytesReceived` event immediately after receiving, decompressing
+and filtering bytes from the upstream source and before the creation of a Vector event.
+
+- Properties
+  - `byte_size`
+    - For UDP, TCP, and Unix protocols, the total number of bytes received from
+      the socket excluding the delimiter.
+    - For HTTP-based protocols, the total number of bytes in the HTTP body, as
+      represented by the `Content-Length` header.
+    - For files, the total number of bytes read from the file excluding the
+      delimiter.
+  - `protocol` - The protocol used to send the bytes (i.e., `tcp`, `udp`,
+    `unix`, `http`, `https`, `file`, etc.).
+  - `http_path` - If relevant, the HTTP path, excluding query strings.
+  - `socket` - If relevant, the socket number that bytes were received from.
+- Metrics
+  - MUST increment the `component_received_bytes_total` counter by the defined value with
+    the defined properties as metric tags.
+- Logs
+  - MUST log a `Bytes received.` message at the `trace` level with the
+    defined properties as key-value pairs.
+  - MUST NOT be rate limited.
+
+#### ComponentBytesSent
+
+*Sinks* that send events downstream, MUST emit a `ComponentBytesSent` event immediately after
+sending bytes to the downstream target, if the transmission was successful. The reported bytes MUST
+be before compression.
+
+Note that for sinks that simply expose data, but don't delete the data after
+sending it, like the `prometheus_exporter` sink, SHOULD NOT publish this metric.
+
+- Properties
+  - `byte_size`
+    - For UDP, TCP, and Unix protocols, the total number of bytes placed on the
+      socket excluding the delimiter.
+    - For HTTP-based protocols, the total number of bytes in the HTTP body, as
+      represented by the `Content-Length` header.
+    - For files, the total number of bytes written to the file excluding the
+      delimiter.
+  - `protocol` - The protocol used to send the bytes (i.e., `tcp`, `udp`,
+    `unix`, `http`, `https`, `file`, etc.).
+  - `endpoint` - If relevant, the endpoint that the bytes were sent to. For
+    HTTP, this MUST be the host and path only, excluding the query string.
+  - `file` - If relevant, the absolute path of the file.
+- Metrics
+  - MUST increment the `component_sent_bytes_total` counter by the defined value with the
+    defined properties as metric tags.
+- Logs
+  - MUST log a `Bytes sent.` message at the `trace` level with the
+    defined properties as key-value pairs.
+  - MUST NOT be rate limited.
+
 #### ComponentEventsSent
 
-*All components* MUST emit an `ComponentEventsSent` event that represents the
+_All components_ MUST emit an `ComponentEventsSent` event that represents the
 emission of Vector events to the next downstream component(s).
 
 - Emission
-  - MUST emit immediately after *successful* transmission of Vector events.
+  - MUST emit immediately after _successful_ transmission of Vector events.
     MUST NOT emit if the transmission was unsuccessful.
   - MUST NOT emit for pull-based sinks since they do not send events. For
     example, the `prometheus_exporter` sink MUST NOT emit this event.
@@ -158,7 +213,7 @@ emission of Vector events to the next downstream component(s).
 
 **Extends the [Error event].**
 
-*All components* MUST emit error events in accordance with the [Error event]
+_All components_ MUST emit error events in accordance with the [Error event]
 requirements.
 
 This specification does not list a standard set of errors that components must
@@ -168,25 +223,27 @@ implement since errors are specific to the component.
 
 **Extends the [EventsDropped event].**
 
-*All components* that can drop events MUST emit a `ComponentEventsDropped`
+_All components_ that can drop events MUST emit a `ComponentEventsDropped`
 event in accordance with the [EventsDropped event] requirements.
 
 #### SinkNetworkBytesSent
 
-*Sinks* MUST emit a `SinkNetworkBytesSent` that represents the egress of
-*raw network bytes*.
+(to be implemented)
+
+_Sinks_ MUST emit a `SinkNetworkBytesSent` that represents the egress of
+_raw network bytes_.
 
 - Emission
   - MUST emit immediately after egress of raw network bytes regardless
     of whether the transmission was successful or not.
     - This includes pull-based sinks, such as the `prometheus_exporter` sink,
       and SHOULD reflect the bytes sent to the client when requested (pulled).
-  - MUST emit *after* processing of the bytes (encryption, compression,
+  - MUST emit _after_ processing of the bytes (encryption, compression,
     filtering, etc.)
 - Properties
   - `byte_size` - The number of raw network bytes sent after processing.
     - SHOULD be the closest representation possible of raw network bytes based
-      on the sink's capabilities. For example, if the sink uses a HTTP
+      on the sink's capabilities. For example, if the sink uses an HTTP
       client that does not provide access to the total request byte size, then
       the sink should use the byte size of the payload/body.
 - Metrics
@@ -199,19 +256,21 @@ event in accordance with the [EventsDropped event] requirements.
 
 #### SourceNetworkBytesReceived
 
-*Sources* MUST emit a `SourceNetworkBytesReceived` event that represents the
-ingress of *raw network bytes*.
+(to be implemented)
+
+_Sources_ MUST emit a `SourceNetworkBytesReceived` event that represents the
+ingress of _raw network bytes_.
 
 - Emission
   - MUST emit immediately after ingress of raw network bytes.
-  - MUST emit *before* processing of the bytes (decryption, decompression,
+  - MUST emit _before_ processing of the bytes (decryption, decompression,
     filtering, etc.).
     - This includes pull-based sources that issue requests to ingest bytes.
 - Properties
   - `byte_size` - The number of raw network bytes received before
     processing (decryption, decompression, filtering, etc.).
     - SHOULD be the closest representation possible of raw network bytes based
-      on the source's capabilities. For example, if the source uses a HTTP
+      on the source's capabilities. For example, if the source uses an HTTP
       client that only provides access to the request body, then the raw
       request body bytes should be used.
 - Metrics
@@ -251,14 +310,14 @@ Further to the above, all sink components MUST support acknowledgements. This re
 configuration option named `acknowledgements` conforming to the `AcknowledgementsConfig` type, as
 well as updating the status of all finalizers deferred above after delivery of the events is
 completed. This update is automatically handled for all sinks that use the newer `StreamSink`
-framework.  Additionally, unit tests for the sink SHOULD ensure through unit tests that delivered
+framework. Additionally, unit tests for the sink SHOULD ensure through unit tests that delivered
 batches have their status updated properly for both normal delivery and delivery errors.
 
-[Configuration Specification]: configuration.md
-[Error event]: instrumentation.md#Error
-[EventsDropped event]: instrumentation.md#EventsDropped
+[configuration specification]: configuration.md
+[error event]: instrumentation.md#Error
+[eventsdropped event]: instrumentation.md#EventsDropped
 [high user experience expectations]: https://github.com/vectordotdev/vector/blob/master/docs/USER_EXPERIENCE_DESIGN.md
 [health checks]: ../DEVELOPING.md#sink-healthchecks
-[Instrumentation Specification]: instrumentation.md
+[instrumentation specification]: instrumentation.md
 [logical boundaries of components]: ../USER_EXPERIENCE_DESIGN.md#logical-boundaries
-[RFC 2119]: https://datatracker.ietf.org/doc/html/rfc2119
+[rfc 2119]: https://datatracker.ietf.org/doc/html/rfc2119

@@ -5,7 +5,7 @@ data_dir = "/var/lib/vector"
 [transforms.apache_sample]
   inputs       = ["apache_parser"]
   type         = "sample"
-  rate         = 50                            # only keep 50%
+  rate         = 2                             # only keep 50% (1/`rate`)
 
 # Send structured data to a cost-effective long-term storage
 [sinks.s3_archives]

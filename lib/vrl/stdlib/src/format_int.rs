@@ -20,7 +20,7 @@ fn format_int(value: Value, base: Option<Value>) -> Resolved {
         }
         None => 10u32,
     };
-    let converted = format_radix(value, base as u32);
+    let converted = format_radix(value, base);
     Ok(converted.into())
 }
 
@@ -51,7 +51,7 @@ impl Function for FormatInt {
         &self,
         _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
         let base = arguments.optional("base");

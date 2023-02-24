@@ -37,7 +37,7 @@ impl Function for RemoveSecret {
         &self,
         _state: &TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let key = arguments.required("key");
         Ok(RemoveSecretFn { key }.as_expr())

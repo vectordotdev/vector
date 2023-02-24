@@ -82,7 +82,7 @@ impl Op {
 
 impl Expression for Op {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        use ast::Opcode::{Add, And, Div, Eq, Err, Ge, Gt, Le, Lt, Merge, Mul, Ne, Or, Rem, Sub};
+        use ast::Opcode::{Add, And, Div, Eq, Err, Ge, Gt, Le, Lt, Merge, Mul, Ne, Or, Sub};
         use value::Value::{Boolean, Null};
 
         match self.opcode {
@@ -116,7 +116,6 @@ impl Expression for Op {
             Div => lhs.try_div(rhs),
             Add => lhs.try_add(rhs),
             Sub => lhs.try_sub(rhs),
-            Rem => lhs.try_rem(rhs),
             Eq => Ok(lhs.eq_lossy(&rhs).into()),
             Ne => Ok((!lhs.eq_lossy(&rhs)).into()),
             Gt => lhs.try_gt(rhs),
@@ -130,78 +129,103 @@ impl Expression for Op {
     }
 
     fn type_info(&self, state: &TypeState) -> TypeInfo {
-        use ast::Opcode::{Add, And, Div, Eq, Err, Ge, Gt, Le, Lt, Merge, Mul, Ne, Or, Rem, Sub};
+        use ast::Opcode::{Add, And, Div, Eq, Err, Ge, Gt, Le, Lt, Merge, Mul, Ne, Or, Sub};
         use value::Kind as K;
 
         let mut state = state.clone();
         let mut lhs_def = self.lhs.apply_type_info(&mut state);
+        let lhs_value = self.lhs.as_value();
 
         // TODO: this is incorrect, but matches the existing behavior of the compiler
         // see: https://github.com/vectordotdev/vector/issues/13789
         // and: https://github.com/vectordotdev/vector/issues/13791
 
-        let rhs_def = self.rhs.apply_type_info(&mut state);
+        // calculates state for an RHS that may or may not be resolved at runtime
+        // This merges the type definitions for state. If it is known at compile-time
+        // if the RHS will be resolved, this should not be used
+        let maybe_rhs = |state: &mut TypeState| {
+            let rhs_info = self.rhs.type_info(state);
+            *state = state.clone().merge(rhs_info.state);
+            rhs_info.result
+        };
 
         let result = match self.opcode {
-            // ok/err ?? ok
-            Err if rhs_def.is_infallible() => lhs_def.union(rhs_def).infallible(),
+            Err => {
+                let rhs_def = maybe_rhs(&mut state);
 
-            // ... ?? ...
-            Err => lhs_def.union(rhs_def),
+                // entire expression is only fallible if both lhs and rhs were fallible
+                let fallible = lhs_def.is_fallible() && rhs_def.is_fallible();
 
-            // null || ...
-            Or if lhs_def.is_null() => rhs_def,
-
-            // not null || ...
-            Or if !(lhs_def.is_superset(&K::null()) || lhs_def.is_superset(&K::boolean())) => {
-                lhs_def
+                lhs_def.union(rhs_def).with_fallibility(fallible)
             }
 
-            // ... || ...
-            Or if !lhs_def.is_boolean() => {
-                // We can remove Null from the lhs since we know that if the lhs is Null
-                // we will be taking the rhs and only the rhs type_def will then be relevant.
-                lhs_def.remove_null();
+            Or => {
+                if lhs_def.is_null() || lhs_value == Some(Value::Boolean(false)) {
+                    // lhs is always "false"
+                    self.rhs.apply_type_info(&mut state)
+                } else if !(lhs_def.contains_null() || lhs_def.contains_boolean())
+                    || lhs_value == Some(Value::Boolean(true))
+                {
+                    // lhs is always "true"
+                    lhs_def
+                } else {
+                    // not sure if lhs is true/false, merge both
 
-                lhs_def.union(rhs_def)
+                    // We can remove Null from the lhs since we know that if the lhs is Null
+                    // we will be returning the rhs and only the rhs type_def will then be relevant.
+                    lhs_def.remove_null();
+
+                    lhs_def.union(maybe_rhs(&mut state))
+                }
             }
-
-            Or => lhs_def.union(rhs_def),
 
             // ... | ...
-            Merge => lhs_def.merge_overwrite(rhs_def),
+            Merge => lhs_def.merge_overwrite(self.rhs.apply_type_info(&mut state)),
 
-            // null && ...
-            And if lhs_def.is_null() => rhs_def
-                .fallible_unless(K::null().or_boolean())
-                .with_kind(K::boolean()),
-
-            // ... && ...
-            And => lhs_def
-                .fallible_unless(K::null().or_boolean())
-                .union(rhs_def.fallible_unless(K::null().or_boolean()))
-                .with_kind(K::boolean()),
+            And => {
+                if lhs_def.is_null() || lhs_value == Some(Value::Boolean(false)) {
+                    // lhs is always "false"
+                    TypeDef::boolean()
+                } else if lhs_value == Some(Value::Boolean(true)) {
+                    // lhs is always "true"
+                    // keep the fallibility of RHS, but change it to a boolean
+                    self.rhs.apply_type_info(&mut state).with_kind(K::boolean())
+                } else {
+                    // unknown if lhs is true or false
+                    lhs_def
+                        .fallible_unless(K::null().or_boolean())
+                        .union(maybe_rhs(&mut state).fallible_unless(K::null().or_boolean()))
+                        .with_kind(K::boolean())
+                }
+            }
 
             // ... == ...
             // ... != ...
-            Eq | Ne => lhs_def.union(rhs_def).with_kind(K::boolean()),
-
-            // "b" >  "a"
-            // "a" >= "a"
-            // "a" <  "b"
-            // "b" <= "b"
-            Gt | Ge | Lt | Le if lhs_def.is_bytes() && rhs_def.is_bytes() => {
-                lhs_def.union(rhs_def).with_kind(K::boolean())
-            }
-
-            // ... >  ...
-            // ... >= ...
-            // ... <  ...
-            // ... <= ...
-            Gt | Ge | Lt | Le => lhs_def
-                .fallible_unless(K::integer().or_float())
-                .union(rhs_def.fallible_unless(K::integer().or_float()))
+            Eq | Ne => lhs_def
+                .union(self.rhs.apply_type_info(&mut state))
                 .with_kind(K::boolean()),
+
+            Gt | Ge | Lt | Le => {
+                let rhs_def = self.rhs.apply_type_info(&mut state);
+
+                // "b" >  "a"
+                // "a" >= "a"
+                // "a" <  "b"
+                // "b" <= "b"
+                if lhs_def.is_bytes() && rhs_def.is_bytes() {
+                    lhs_def.union(rhs_def).with_kind(K::boolean())
+                }
+                // ... >  ...
+                // ... >= ...
+                // ... <  ...
+                // ... <= ...
+                else {
+                    lhs_def
+                        .fallible_unless(K::integer().or_float())
+                        .union(rhs_def.fallible_unless(K::integer().or_float()))
+                        .with_kind(K::boolean())
+                }
+            }
 
             // ... / ...
             Div => {
@@ -218,71 +242,64 @@ impl Expression for Op {
                 }
             }
 
-            // ... % ...
-            Rem => {
-                // Division is infallible if the rhs is a literal normal float or integer.
-                match self.rhs.as_value() {
-                    Some(value) if lhs_def.is_float() || lhs_def.is_integer() => match value {
-                        Value::Float(v) if v.is_normal() => TypeDef::float().infallible(),
-                        Value::Float(_) => TypeDef::float().fallible(),
-                        Value::Integer(v) if v != 0 => TypeDef::integer().infallible(),
-                        Value::Integer(_) => TypeDef::integer().fallible(),
-                        _ => TypeDef::float().or_integer().fallible(),
-                    },
-                    _ => TypeDef::float().or_integer().fallible(),
+            Add | Sub | Mul => {
+                // none of these operations short-circuit, so the type of RHS can be applied
+                let rhs_def = self.rhs.apply_type_info(&mut state);
+
+                match self.opcode {
+                    // "bar" + ...
+                    // ... + "bar"
+                    Add if lhs_def.is_bytes() || rhs_def.is_bytes() => lhs_def
+                        .fallible_unless(K::bytes().or_null())
+                        .union(rhs_def.fallible_unless(K::bytes().or_null()))
+                        .with_kind(K::bytes()),
+
+                    // ... + 1.0
+                    // ... - 1.0
+                    // ... * 1.0
+                    // ... % 1.0
+                    // 1.0 + ...
+                    // 1.0 - ...
+                    // 1.0 * ...
+                    // 1.0 % ...
+                    Add | Sub | Mul if lhs_def.is_float() || rhs_def.is_float() => lhs_def
+                        .fallible_unless(K::integer().or_float())
+                        .union(rhs_def.fallible_unless(K::integer().or_float()))
+                        .with_kind(K::float()),
+
+                    // 1 + 1
+                    // 1 - 1
+                    // 1 * 1
+                    // 1 % 1
+                    Add | Sub | Mul if lhs_def.is_integer() && rhs_def.is_integer() => {
+                        lhs_def.union(rhs_def).with_kind(K::integer())
+                    }
+
+                    // "bar" * 1
+                    Mul if lhs_def.is_bytes() && rhs_def.is_integer() => {
+                        lhs_def.union(rhs_def).with_kind(K::bytes())
+                    }
+
+                    // 1 * "bar"
+                    Mul if lhs_def.is_integer() && rhs_def.is_bytes() => {
+                        lhs_def.union(rhs_def).with_kind(K::bytes())
+                    }
+
+                    // ... + ...
+                    // ... * ...
+                    Add | Mul => lhs_def
+                        .union(rhs_def)
+                        .fallible()
+                        .with_kind(K::bytes().or_integer().or_float()),
+
+                    // ... - ...
+                    Sub => lhs_def
+                        .union(rhs_def)
+                        .fallible()
+                        .with_kind(K::integer().or_float()),
+                    _ => unreachable!("Add, Sub, or Mul operation not handled"),
                 }
             }
-
-            // "bar" + ...
-            // ... + "bar"
-            Add if lhs_def.is_bytes() || rhs_def.is_bytes() => lhs_def
-                .fallible_unless(K::bytes().or_null())
-                .union(rhs_def.fallible_unless(K::bytes().or_null()))
-                .with_kind(K::bytes()),
-
-            // ... + 1.0
-            // ... - 1.0
-            // ... * 1.0
-            // ... % 1.0
-            // 1.0 + ...
-            // 1.0 - ...
-            // 1.0 * ...
-            // 1.0 % ...
-            Add | Sub | Mul if lhs_def.is_float() || rhs_def.is_float() => lhs_def
-                .fallible_unless(K::integer().or_float())
-                .union(rhs_def.fallible_unless(K::integer().or_float()))
-                .with_kind(K::float()),
-
-            // 1 + 1
-            // 1 - 1
-            // 1 * 1
-            // 1 % 1
-            Add | Sub | Mul if lhs_def.is_integer() && rhs_def.is_integer() => {
-                lhs_def.union(rhs_def).with_kind(K::integer())
-            }
-
-            // "bar" * 1
-            Mul if lhs_def.is_bytes() && rhs_def.is_integer() => {
-                lhs_def.union(rhs_def).with_kind(K::bytes())
-            }
-
-            // 1 * "bar"
-            Mul if lhs_def.is_integer() && rhs_def.is_bytes() => {
-                lhs_def.union(rhs_def).with_kind(K::bytes())
-            }
-
-            // ... + ...
-            // ... * ...
-            Add | Mul => lhs_def
-                .union(rhs_def)
-                .fallible()
-                .with_kind(K::bytes().or_integer().or_float()),
-
-            // ... - ...
-            Sub => lhs_def
-                .union(rhs_def)
-                .fallible()
-                .with_kind(K::integer().or_float()),
         };
         TypeInfo::new(state, result)
     }
@@ -402,7 +419,7 @@ mod tests {
 
     use ast::{
         Ident,
-        Opcode::{Add, And, Div, Eq, Err, Ge, Gt, Le, Lt, Mul, Ne, Or, Rem, Sub},
+        Opcode::{Add, And, Div, Eq, Err, Ge, Gt, Le, Lt, Mul, Ne, Or, Sub},
     };
     use ordered_float::NotNan;
 
@@ -421,12 +438,12 @@ mod tests {
 
         let lhs = match lhs.clone().try_into() {
             Ok(v) => v,
-            Err(_) => panic!("not a valid lhs expression: {:?}", lhs),
+            Err(_) => panic!("not a valid lhs expression: {lhs:?}"),
         };
 
         let rhs = match rhs.clone().try_into() {
             Ok(v) => v,
-            Err(_) => panic!("not a valid rhs expression: {:?}", rhs),
+            Err(_) => panic!("not a valid rhs expression: {rhs:?}"),
         };
 
         Op {
@@ -531,31 +548,6 @@ mod tests {
             want: TypeDef::bytes().or_integer().or_float().fallible(),
         }
 
-        remainder_integer {
-            expr: |_| op(Rem, 5, 5),
-            want: TypeDef::integer().infallible(),
-        }
-
-        remainder_integer_zero {
-            expr: |_| op(Rem, 5, 0),
-            want: TypeDef::integer().fallible(),
-        }
-
-        remainder_float {
-            expr: |_| op(Rem, 5.0, 5.0),
-            want: TypeDef::float().infallible(),
-        }
-
-        remainder_mixed {
-            expr: |_| op(Rem, 5, 5.0),
-            want: TypeDef::float().infallible(),
-        }
-
-        remainder_other {
-            expr: |_| op(Rem, 5, ()),
-            want: TypeDef::integer().or_float().fallible(),
-        }
-
         subtract_integer {
             expr: |_| op(Sub, 1, 1),
             want: TypeDef::integer().infallible(),
@@ -648,7 +640,7 @@ mod tests {
 
         and_other {
             expr: |_| op(And, (), "bar"),
-            want: TypeDef::boolean().fallible(),
+            want: TypeDef::boolean().infallible(),
         }
 
         equal {

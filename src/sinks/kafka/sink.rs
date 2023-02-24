@@ -1,5 +1,3 @@
-use std::convert::TryFrom;
-
 use async_trait::async_trait;
 use futures::{future, stream::BoxStream, StreamExt};
 use rdkafka::{
@@ -29,6 +27,7 @@ use crate::{
 };
 
 #[derive(Debug, Snafu)]
+#[snafu(visibility(pub(crate)))]
 pub(super) enum BuildError {
     #[snafu(display("creating kafka producer failed: {}", source))]
     KafkaCreateFailed { source: KafkaError },
@@ -67,7 +66,7 @@ impl KafkaSink {
             transformer,
             encoder,
             service: KafkaService::new(producer),
-            topic: Template::try_from(config.topic).context(TopicTemplateSnafu)?,
+            topic: config.topic,
             key_field: config.key_field,
         })
     }
@@ -83,20 +82,22 @@ impl KafkaSink {
             encoder: self.encoder,
             log_schema: log_schema(),
         };
-        let sink = input
-            .filter_map(|event| future::ready(request_builder.build_request(event)))
-            .into_driver(service);
-        sink.run().await
+
+        input
+            .filter_map(|event|
+                // request_builder is fallible but the places it can fail are emitting
+                // `Error` and `DroppedEvent` internal events appropriately so no need to here.
+                future::ready(request_builder.build_request(event)))
+            .into_driver(service)
+            .run()
+            .await
     }
 }
 
 pub(crate) async fn healthcheck(config: KafkaSinkConfig) -> crate::Result<()> {
     trace!("Healthcheck started.");
     let client = config.to_rdkafka(KafkaRole::Consumer).unwrap();
-    let topic = match Template::try_from(config.topic)
-        .context(TopicTemplateSnafu)?
-        .render_string(&LogEvent::from_str_legacy(""))
-    {
+    let topic = match config.topic.render_string(&LogEvent::from_str_legacy("")) {
         Ok(topic) => Some(topic),
         Err(error) => {
             warn!(

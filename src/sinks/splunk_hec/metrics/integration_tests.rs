@@ -2,8 +2,8 @@ use std::convert::TryFrom;
 
 use futures::{future::ready, stream};
 use serde_json::Value as JsonValue;
-use vector_common::btreemap;
 use vector_core::event::{BatchNotifier, BatchStatus, Event, MetricValue};
+use vector_core::metric_tags;
 
 use super::config::HecMetricsSinkConfig;
 use crate::{
@@ -28,7 +28,7 @@ async fn config() -> HecMetricsSinkConfig {
 
     HecMetricsSinkConfig {
         default_namespace: None,
-        default_token: get_token().await,
+        default_token: get_token().await.into(),
         endpoint: splunk_hec_address(),
         host_key: "host".into(),
         index: None,
@@ -49,7 +49,7 @@ fn get_gauge(batch: BatchNotifier) -> Event {
         MetricValue::Gauge { value: 26.28 },
     )
     .with_tags(Some(
-        btreemap! {"tag_gauge_test".to_string() => "tag_gauge_value".to_string()},
+        metric_tags! {"tag_gauge_test".to_string() => "tag_gauge_value".to_string()},
     ))
     .with_batch_notifier(&batch)
     .into()
@@ -62,7 +62,7 @@ fn get_counter(batch: BatchNotifier) -> Event {
         MetricValue::Counter { value: 26.28 },
     )
     .with_tags(Some(
-        btreemap! {"tag_counter_test".to_string() => "tag_counter_value".to_string()},
+        metric_tags! {"tag_counter_test".to_string() => "tag_counter_value".to_string()},
     ))
     .with_batch_notifier(&batch)
     .into()
@@ -170,7 +170,7 @@ async fn splunk_insert_multiple_gauge_metrics() {
 
 // It usually takes ~1 second for the metric to show up in search with all dimensions, so poll
 // multiple times.
-// Note, Splunk automatically addes [host, source, sourcetype] as default metric dimensions
+// Note, Splunk automatically adds [host, source, sourcetype] as default metric dimensions
 // https://docs.splunk.com/Documentation/SplunkCloud/latest/Metrics/Overview
 async fn metric_dimensions_exist(metric_name: &str, expected_dimensions: &[&str]) -> bool {
     for _ in 0..20usize {

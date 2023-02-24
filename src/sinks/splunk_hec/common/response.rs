@@ -1,4 +1,5 @@
-use vector_core::{event::EventStatus, internal_event::EventsSent, stream::DriverResponse};
+use vector_core::internal_event::CountByteSize;
+use vector_core::{event::EventStatus, stream::DriverResponse};
 
 pub struct HecResponse {
     pub event_status: EventStatus,
@@ -17,11 +18,7 @@ impl DriverResponse for HecResponse {
         self.event_status
     }
 
-    fn events_sent(&self) -> EventsSent {
-        EventsSent {
-            count: self.events_count,
-            byte_size: self.events_byte_size,
-            output: None,
-        }
+    fn events_sent(&self) -> CountByteSize {
+        CountByteSize(self.events_count, self.events_byte_size)
     }
 }

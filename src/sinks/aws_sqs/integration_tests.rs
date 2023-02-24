@@ -1,23 +1,21 @@
-use std::collections::HashMap;
-use std::str::FromStr;
+#![cfg(all(test, feature = "aws-sqs-integration-tests"))]
 
-use aws_sdk_sqs::model::QueueAttributeName;
-use aws_sdk_sqs::Client as SqsClient;
-use aws_sdk_sqs::{Endpoint, Region};
+use std::collections::HashMap;
+
+use aws_sdk_sqs::{model::QueueAttributeName, Client as SqsClient, Region};
 use codecs::TextSerializerConfig;
-use http::Uri;
 use tokio::time::{sleep, Duration};
 
-use super::config::SqsSinkConfig;
-use super::sink::SqsSink;
-use crate::aws::create_client;
-use crate::aws::{AwsAuthentication, RegionOrEndpoint};
-use crate::common::sqs::SqsClientBuilder;
-use crate::config::ProxyConfig;
-use crate::sinks::VectorSink;
-use crate::test_util::{
-    components::{run_and_assert_sink_compliance, AWS_SINK_TAGS},
-    random_lines_with_stream, random_string,
+use super::{config::SqsSinkConfig, sink::SqsSink};
+use crate::{
+    aws::{create_client, AwsAuthentication, RegionOrEndpoint},
+    common::sqs::SqsClientBuilder,
+    config::ProxyConfig,
+    sinks::VectorSink,
+    test_util::{
+        components::{run_and_assert_sink_compliance, AWS_SINK_TAGS},
+        random_lines_with_stream, random_string,
+    },
 };
 
 fn sqs_address() -> String {
@@ -32,7 +30,7 @@ async fn create_test_client() -> SqsClient {
     create_client::<SqsClientBuilder>(
         &auth,
         Some(Region::new("localstack")),
-        Some(Endpoint::immutable(Uri::from_str(&endpoint).unwrap())),
+        Some(endpoint),
         &proxy,
         &None,
         true,
@@ -52,7 +50,7 @@ async fn sqs_send_message_batch() {
     let config = SqsSinkConfig {
         queue_url: queue_url.clone(),
         region: RegionOrEndpoint::with_both("local", sqs_address().as_str()),
-        encoding: TextSerializerConfig::new().into(),
+        encoding: TextSerializerConfig::default().into(),
         message_group_id: None,
         message_deduplication_id: None,
         request: Default::default(),

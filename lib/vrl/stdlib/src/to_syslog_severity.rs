@@ -13,7 +13,7 @@ fn to_syslog_severity(level: Value) -> Resolved {
         "notice" => 5,
         "info" => 6,
         "debug" => 7,
-        _ => return Err(format!("syslog level {} not valid", level).into()),
+        _ => return Err(format!("syslog level {level} not valid").into()),
     };
     Ok(severity.into())
 }
@@ -55,7 +55,7 @@ impl Function for ToSyslogSeverity {
         &self,
         _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
 

@@ -88,6 +88,12 @@ to = "https://www.datadoghq.com/product/observability-pipelines"
 status = 301
 force = true
 
+# Removed pages redirects
+[[redirects]]
+from = "/docs/reference/configuration/field-path-notation/"
+to = "/docs/reference/vrl/expressions/#path"
+force = true
+
 # CORS headers for /index.json
 [[headers]]
 for = "/index.json"

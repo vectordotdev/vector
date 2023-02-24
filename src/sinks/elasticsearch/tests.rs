@@ -5,13 +5,19 @@ use crate::{
     event::{LogEvent, Metric, MetricKind, MetricValue, Value},
     sinks::{
         elasticsearch::{
-            sink::process_log, BulkAction, BulkConfig, DataStreamConfig, ElasticsearchCommon,
-            ElasticsearchConfig, ElasticsearchMode,
+            sink::process_log, BulkAction, BulkConfig, DataStreamConfig, ElasticsearchApiVersion,
+            ElasticsearchCommon, ElasticsearchConfig, ElasticsearchMode,
         },
         util::encoding::Encoder,
     },
     template::Template,
 };
+use lookup::owned_value_path;
+
+// helper to unwrap template strings for tests only
+fn parse_template(input: &str) -> Template {
+    Template::try_from(input).unwrap()
+}
 
 #[tokio::test]
 async fn sets_create_action_when_configured() {
@@ -21,18 +27,21 @@ async fn sets_create_action_when_configured() {
 
     let config = ElasticsearchConfig {
         bulk: Some(BulkConfig {
-            action: Some(String::from("{{ action }}te")),
-            index: Some(String::from("vector")),
+            action: parse_template("{{ action }}te"),
+            index: parse_template("vector"),
         }),
-        endpoint: String::from("https://example.com"),
+        endpoints: vec![String::from("https://example.com")],
+        api_version: ElasticsearchApiVersion::V6,
         ..Default::default()
     };
-    let es = ElasticsearchCommon::parse_config(&config).await.unwrap();
+    let es = ElasticsearchCommon::parse_single(&config).await.unwrap();
 
     let mut log = LogEvent::from("hello there");
     log.insert(
         log_schema().timestamp_key(),
-        Utc.ymd(2020, 12, 1).and_hms(1, 2, 3),
+        Utc.ymd(2020, 12, 1)
+            .and_hms_opt(1, 2, 3)
+            .expect("invalid timestamp"),
     );
     log.insert("action", "crea");
 
@@ -68,19 +77,22 @@ async fn encode_datastream_mode() {
 
     let config = ElasticsearchConfig {
         bulk: Some(BulkConfig {
-            action: None,
-            index: Some(String::from("vector")),
+            index: parse_template("vector"),
+            ..Default::default()
         }),
-        endpoint: String::from("https://example.com"),
+        endpoints: vec![String::from("https://example.com")],
         mode: ElasticsearchMode::DataStream,
+        api_version: ElasticsearchApiVersion::V6,
         ..Default::default()
     };
-    let es = ElasticsearchCommon::parse_config(&config).await.unwrap();
+    let es = ElasticsearchCommon::parse_single(&config).await.unwrap();
 
     let mut log = LogEvent::from("hello there");
     log.insert(
         log_schema().timestamp_key(),
-        Utc.ymd(2020, 12, 1).and_hms(1, 2, 3),
+        Utc.ymd(2020, 12, 1)
+            .and_hms_opt(1, 2, 3)
+            .expect("invalid timestamp"),
     );
     log.insert("data_stream", data_stream_body());
 
@@ -109,25 +121,28 @@ async fn encode_datastream_mode_no_routing() {
 
     let config = ElasticsearchConfig {
         bulk: Some(BulkConfig {
-            action: None,
-            index: Some(String::from("vector")),
+            index: parse_template("vector"),
+            ..Default::default()
         }),
-        endpoint: String::from("https://example.com"),
+        endpoints: vec![String::from("https://example.com")],
         mode: ElasticsearchMode::DataStream,
         data_stream: Some(DataStreamConfig {
             auto_routing: false,
             namespace: Template::try_from("something").unwrap(),
             ..Default::default()
         }),
+        api_version: ElasticsearchApiVersion::V6,
         ..Default::default()
     };
-    let es = ElasticsearchCommon::parse_config(&config).await.unwrap();
+    let es = ElasticsearchCommon::parse_single(&config).await.unwrap();
 
     let mut log = LogEvent::from("hello there");
     log.insert("data_stream", data_stream_body());
     log.insert(
         log_schema().timestamp_key(),
-        Utc.ymd(2020, 12, 1).and_hms(1, 2, 3),
+        Utc.ymd(2020, 12, 1)
+            .and_hms_opt(1, 2, 3)
+            .expect("invalid timestamp"),
     );
     let mut encoded = vec![];
     let encoded_size = es
@@ -150,13 +165,14 @@ async fn encode_datastream_mode_no_routing() {
 async fn handle_metrics() {
     let config = ElasticsearchConfig {
         bulk: Some(BulkConfig {
-            action: Some(String::from("create")),
-            index: Some(String::from("vector")),
+            action: parse_template("create"),
+            index: parse_template("vector"),
         }),
-        endpoint: String::from("https://example.com"),
+        endpoints: vec![String::from("https://example.com")],
+        api_version: ElasticsearchApiVersion::V6,
         ..Default::default()
     };
-    let es = ElasticsearchCommon::parse_config(&config).await.unwrap();
+    let es = ElasticsearchCommon::parse_single(&config).await.unwrap();
 
     let metric = Metric::new(
         "cpu",
@@ -191,13 +207,14 @@ async fn handle_metrics() {
 async fn decode_bulk_action_error() {
     let config = ElasticsearchConfig {
         bulk: Some(BulkConfig {
-            action: Some(String::from("{{ action }}")),
-            index: Some(String::from("vector")),
+            action: parse_template("{{ action }}"),
+            index: parse_template("vector"),
         }),
-        endpoint: String::from("https://example.com"),
+        endpoints: vec![String::from("https://example.com")],
+        api_version: ElasticsearchApiVersion::V7,
         ..Default::default()
     };
-    let es = ElasticsearchCommon::parse_config(&config).await.unwrap();
+    let es = ElasticsearchCommon::parse_single(&config).await.unwrap();
 
     let mut log = LogEvent::from("hello world");
     log.insert("foo", "bar");
@@ -210,13 +227,14 @@ async fn decode_bulk_action_error() {
 async fn decode_bulk_action() {
     let config = ElasticsearchConfig {
         bulk: Some(BulkConfig {
-            action: Some(String::from("create")),
-            index: Some(String::from("vector")),
+            action: parse_template("create"),
+            index: parse_template("vector"),
         }),
-        endpoint: String::from("https://example.com"),
+        endpoints: vec![String::from("https://example.com")],
+        api_version: ElasticsearchApiVersion::V7,
         ..Default::default()
     };
-    let es = ElasticsearchCommon::parse_config(&config).await.unwrap();
+    let es = ElasticsearchCommon::parse_single(&config).await.unwrap();
 
     let log = LogEvent::from("hello there");
     let action = es.mode.bulk_action(&log).unwrap();
@@ -231,26 +249,29 @@ async fn encode_datastream_mode_no_sync() {
 
     let config = ElasticsearchConfig {
         bulk: Some(BulkConfig {
-            action: None,
-            index: Some(String::from("vector")),
+            index: parse_template("vector"),
+            ..Default::default()
         }),
-        endpoint: String::from("https://example.com"),
+        endpoints: vec![String::from("https://example.com")],
         mode: ElasticsearchMode::DataStream,
         data_stream: Some(DataStreamConfig {
             namespace: Template::try_from("something").unwrap(),
             sync_fields: false,
             ..Default::default()
         }),
+        api_version: ElasticsearchApiVersion::V6,
         ..Default::default()
     };
 
-    let es = ElasticsearchCommon::parse_config(&config).await.unwrap();
+    let es = ElasticsearchCommon::parse_single(&config).await.unwrap();
 
     let mut log = LogEvent::from("hello there");
     log.insert("data_stream", data_stream_body());
     log.insert(
         log_schema().timestamp_key(),
-        Utc.ymd(2020, 12, 1).and_hms(1, 2, 3),
+        Utc.ymd(2020, 12, 1)
+            .and_hms_opt(1, 2, 3)
+            .expect("invalid timestamp"),
     );
 
     let mut encoded = vec![];
@@ -274,8 +295,8 @@ async fn encode_datastream_mode_no_sync() {
 async fn allows_using_except_fields() {
     let config = ElasticsearchConfig {
         bulk: Some(BulkConfig {
-            action: None,
-            index: Some(String::from("{{ idx }}")),
+            index: parse_template("{{ idx }}"),
+            ..Default::default()
         }),
         encoding: Transformer::new(
             None,
@@ -283,10 +304,11 @@ async fn allows_using_except_fields() {
             None,
         )
         .unwrap(),
-        endpoint: String::from("https://example.com"),
+        endpoints: vec![String::from("https://example.com")],
+        api_version: ElasticsearchApiVersion::V6,
         ..Default::default()
     };
-    let es = ElasticsearchCommon::parse_config(&config).await.unwrap();
+    let es = ElasticsearchCommon::parse_single(&config).await.unwrap();
 
     let mut log = LogEvent::from("hello there");
     log.insert("foo", "bar");
@@ -313,14 +335,15 @@ async fn allows_using_except_fields() {
 async fn allows_using_only_fields() {
     let config = ElasticsearchConfig {
         bulk: Some(BulkConfig {
-            action: None,
-            index: Some(String::from("{{ idx }}")),
+            index: parse_template("{{ idx }}"),
+            ..Default::default()
         }),
-        encoding: Transformer::new(Some(vec!["foo".to_string().into()]), None, None).unwrap(),
-        endpoint: String::from("https://example.com"),
+        encoding: Transformer::new(Some(vec![owned_value_path!("foo")]), None, None).unwrap(),
+        endpoints: vec![String::from("https://example.com")],
+        api_version: ElasticsearchApiVersion::V6,
         ..Default::default()
     };
-    let es = ElasticsearchCommon::parse_config(&config).await.unwrap();
+    let es = ElasticsearchCommon::parse_single(&config).await.unwrap();
 
     let mut log = LogEvent::from("hello there");
     log.insert("foo", "bar");

@@ -13,6 +13,7 @@ components: sinks: gcp_chronicle_unstructured: {
 	}
 
 	features: {
+		auto_generated:   true
 		acknowledgements: true
 		healthcheck: enabled: true
 		send: {
@@ -68,58 +69,7 @@ components: sinks: gcp_chronicle_unstructured: {
 		notices: []
 	}
 
-	configuration: {
-		api_key: configuration._gcp_api_key
-		credentials_path: {
-			category:    "Auth"
-			common:      true
-			description: "The filename for a Google Cloud service account credentials JSON file used to authenticate access to the Cloud Storage API. If this is unset, Vector checks the `GOOGLE_APPLICATION_CREDENTIALS` environment variable for a filename.\n\nIf no filename is named, Vector will attempt to fetch an instance service account for the compute instance the program is running on. If Vector is not running on a GCE instance, you must define a credentials file as above."
-			required:    false
-			type: string: {
-				default: null
-				examples: ["/path/to/credentials.json"]
-			}
-		}
-		endpoint: {
-			common:        false
-			description:   "The endpoint to send data to."
-			relevant_when: "region is not set"
-			required:      false
-			type: string: {
-				default: null
-				examples: ["127.0.0.1:8080", "example.com:12345"]
-			}
-		}
-		region: {
-			common:        false
-			description:   "The region to send data to."
-			required:      false
-			relevant_when: "endpoint is not set"
-			type: string: {
-				default: null
-				enum: {
-					us:   "United States"
-					eu:   "Europe"
-					asia: "Asia"
-				}
-			}
-		}
-		customer_id: {
-			description: "The Unique identifier (UUID) corresponding to the Chronicle instance."
-			required:    true
-			type: string: {
-				examples: ["c8c65bfa-5f2c-42d4-9189-64bb7b939f2c"]
-			}
-		}
-		log_type: {
-			description: "Identifies the log entry. This must be one of the supported log types, otherwise Chronicle will reject the entry with an error."
-			required:    true
-			type: string: {
-				examples: ["WINDOWS_DNS", "{{ log_type }}"]
-				syntax: "template"
-			}
-		}
-	}
+	configuration: base.components.sinks.gcp_chronicle_unstructured.configuration
 
 	input: {
 		logs:    true

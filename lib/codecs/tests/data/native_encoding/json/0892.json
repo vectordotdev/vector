@@ -1,1 +1,1 @@
-{"log":{"":false,"￹ £":",\u001c"}}
+{"metric":{"name":"l","tags":{"a":"k","b":"e"},"timestamp":"1970-01-01T07:04:53.000003848Z","kind":"absolute","distribution":{"samples":[{"value":-813888.0,"rate":4063927181},{"value":-751104.0,"rate":470282826},{"value":462080.0,"rate":3032291571},{"value":-395904.0,"rate":681245969},{"value":-238208.0,"rate":2290422104},{"value":-807296.0,"rate":1132595798},{"value":216576.0,"rate":1521423601},{"value":-162880.0,"rate":1644776510}],"statistic":"histogram"}}}

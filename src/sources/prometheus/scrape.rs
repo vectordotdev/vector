@@ -1,32 +1,29 @@
-use std::{
-    collections::HashMap,
-    future::ready,
-    time::{Duration, Instant},
-};
+use std::collections::HashMap;
+use std::time::Duration;
 
-use futures::{stream, FutureExt, StreamExt, TryFutureExt};
-use hyper::{Body, Request};
-use serde::{Deserialize, Serialize};
+use bytes::Bytes;
+use futures_util::FutureExt;
+use http::{response::Parts, Uri};
+use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
-use tokio_stream::wrappers::IntervalStream;
 use vector_config::configurable_component;
-use vector_core::config::LogNamespace;
-use vector_core::ByteSizeOf;
+use vector_core::{config::LogNamespace, event::Event};
 
 use super::parser;
+use crate::sources::util::http::HttpMethod;
 use crate::{
-    config::{
-        self, GenerateConfig, Output, ProxyConfig, SourceConfig, SourceContext, SourceDescription,
+    config::{self, GenerateConfig, Output, SourceConfig, SourceContext},
+    http::Auth,
+    internal_events::PrometheusParseError,
+    sources::{
+        self,
+        util::http_client::{
+            build_url, call, default_interval, GenericHttpClientInputs, HttpClientBuilder,
+            HttpClientContext,
+        },
     },
-    http::{Auth, HttpClient},
-    internal_events::{
-        EndpointBytesReceived, PrometheusEventsReceived, PrometheusHttpError,
-        PrometheusHttpResponseError, PrometheusParseError, RequestCompleted, StreamClosedError,
-    },
-    shutdown::ShutdownSignal,
-    sources,
     tls::{TlsConfig, TlsSettings},
-    SourceSender,
+    Result,
 };
 
 // pulled up, and split over multiple lines, because the long lines trip up rustfmt such that it
@@ -44,38 +41,41 @@ enum ConfigError {
 }
 
 /// Configuration for the `prometheus_scrape` source.
-#[configurable_component(source)]
+#[serde_as]
+#[configurable_component(source("prometheus_scrape"))]
 #[derive(Clone, Debug)]
 pub struct PrometheusScrapeConfig {
     /// Endpoints to scrape metrics from.
+    #[configurable(metadata(docs::examples = "http://localhost:9090/metrics"))]
     #[serde(alias = "hosts")]
     endpoints: Vec<String>,
 
     /// The interval between scrapes, in seconds.
-    #[serde(default = "default_scrape_interval_secs")]
-    scrape_interval_secs: u64,
+    #[serde(default = "default_interval")]
+    #[serde_as(as = "serde_with::DurationSeconds<u64>")]
+    #[serde(rename = "scrape_interval_secs")]
+    interval: Duration,
 
-    /// Overrides the name of the tag used to add the instance to each metric.
+    /// The tag name added to each event representing the scraped instance's host:port.
     ///
     /// The tag value will be the host/port of the scraped instance.
-    ///
-    /// By default, `"instance"` is used.
+    #[configurable(metadata(docs::advanced))]
     instance_tag: Option<String>,
 
-    /// Overrides the name of the tag used to add the endpoint to each metric.
+    /// The tag name added to each event representing the scraped instance's endpoint.
     ///
     /// The tag value will be the endpoint of the scraped instance.
-    ///
-    /// By default, `"endpoint"` is used.
+    #[configurable(metadata(docs::advanced))]
     endpoint_tag: Option<String>,
 
-    /// Controls how tag conflicts are handled if the scraped source has tags that Vector would add.
+    /// Controls how tag conflicts are handled if the scraped source has tags to be added.
     ///
-    /// If `true`, Vector will not add the new tag if the scraped metric has the tag already. If `false`, Vector will
-    /// rename the conflicting tag by prepending `exported_` to the name.
+    /// If `true`, the new tag is not added if the scraped metric has the tag already. If `false`, the conflicting tag
+    /// is renamed by prepending `exported_` to the original name.
     ///
     /// This matches Prometheus’ `honor_labels` configuration.
     #[serde(default = "crate::serde::default_false")]
+    #[configurable(metadata(docs::advanced))]
     honor_labels: bool,
 
     /// Custom parameters for the scrape request query string.
@@ -83,36 +83,37 @@ pub struct PrometheusScrapeConfig {
     /// One or more values for the same parameter key can be provided. The parameters provided in this option are
     /// appended to any parameters manually provided in the `endpoints` option. This option is especially useful when
     /// scraping the `/federate` endpoint.
-    query: Option<HashMap<String, Vec<String>>>,
+    #[serde(default)]
+    #[configurable(metadata(docs::additional_props_description = "A query string parameter."))]
+    #[configurable(metadata(docs::examples = "query_example()"))]
+    query: HashMap<String, Vec<String>>,
 
     #[configurable(derived)]
     tls: Option<TlsConfig>,
 
     #[configurable(derived)]
+    #[configurable(metadata(docs::advanced))]
     auth: Option<Auth>,
 }
 
-pub(crate) const fn default_scrape_interval_secs() -> u64 {
-    15
-}
-
-inventory::submit! {
-    SourceDescription::new::<PrometheusScrapeConfig>("prometheus")
-}
-
-inventory::submit! {
-    SourceDescription::new::<PrometheusScrapeConfig>("prometheus_scrape")
+fn query_example() -> serde_json::Value {
+    serde_json::json! ({
+        "match[]": [
+            "{job=\"somejob\"}",
+            "{__name__=~\"job:.*\"}"
+        ]
+    })
 }
 
 impl GenerateConfig for PrometheusScrapeConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
             endpoints: vec!["http://localhost:9090/metrics".to_string()],
-            scrape_interval_secs: default_scrape_interval_secs(),
+            interval: default_interval(),
             instance_tag: Some("instance".to_string()),
             endpoint_tag: Some("endpoint".to_string()),
             honor_labels: false,
-            query: None,
+            query: HashMap::new(),
             tls: None,
             auth: None,
         })
@@ -121,110 +122,38 @@ impl GenerateConfig for PrometheusScrapeConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "prometheus_scrape")]
 impl SourceConfig for PrometheusScrapeConfig {
-    async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
+    async fn build(&self, cx: SourceContext) -> Result<sources::Source> {
         let urls = self
             .endpoints
             .iter()
-            .map(|s| s.parse::<http::Uri>().context(sources::UriParseSnafu))
-            .map(|r| {
-                r.map(|uri| {
-                    let mut serializer = url::form_urlencoded::Serializer::new(String::new());
-                    if let Some(query) = uri.query() {
-                        serializer.extend_pairs(url::form_urlencoded::parse(query.as_bytes()));
-                    };
-                    if let Some(query) = &self.query {
-                        for (k, l) in query {
-                            for v in l {
-                                serializer.append_pair(k, v);
-                            }
-                        }
-                    };
-                    let mut builder = http::Uri::builder();
-                    if let Some(scheme) = uri.scheme() {
-                        builder = builder.scheme(scheme.clone());
-                    };
-                    if let Some(authority) = uri.authority() {
-                        builder = builder.authority(authority.clone());
-                    };
-                    builder = builder.path_and_query(match serializer.finish() {
-                        query if !query.is_empty() => format!("{}?{}", uri.path(), query),
-                        _ => uri.path().to_string(),
-                    });
-                    builder.build().expect("error building URI")
-                })
-            })
-            .collect::<Result<Vec<http::Uri>, sources::BuildError>>()?;
+            .map(|s| s.parse::<Uri>().context(sources::UriParseSnafu))
+            .map(|r| r.map(|uri| build_url(&uri, &self.query)))
+            .collect::<std::result::Result<Vec<Uri>, sources::BuildError>>()?;
         let tls = TlsSettings::from_options(&self.tls)?;
-        Ok(prometheus(
-            self.clone(),
-            urls,
-            tls,
-            cx.proxy.clone(),
-            cx.shutdown,
-            cx.out,
-        )
-        .boxed())
-    }
 
-    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
-        vec![Output::default(config::DataType::Metric)]
-    }
-
-    fn source_type(&self) -> &'static str {
-        "prometheus_scrape"
-    }
-
-    fn can_acknowledge(&self) -> bool {
-        false
-    }
-}
-
-// Add a compatibility alias to avoid breaking existing configs
-#[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
-struct PrometheusCompatConfig {
-    // Clone of PrometheusScrapeConfig to work around serde bug
-    // https://github.com/serde-rs/serde/issues/1504
-    #[serde(alias = "hosts")]
-    endpoints: Vec<String>,
-    instance_tag: Option<String>,
-    endpoint_tag: Option<String>,
-    #[serde(default = "crate::serde::default_false")]
-    honor_labels: bool,
-    query: Option<HashMap<String, Vec<String>>>,
-    #[serde(default = "default_scrape_interval_secs")]
-    scrape_interval_secs: u64,
-    tls: Option<TlsConfig>,
-    auth: Option<Auth>,
-}
-
-#[async_trait::async_trait]
-#[typetag::serde(name = "prometheus")]
-impl SourceConfig for PrometheusCompatConfig {
-    async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
-        // Workaround for serde bug
-        // https://github.com/serde-rs/serde/issues/1504
-        let config = PrometheusScrapeConfig {
-            endpoints: self.endpoints.clone(),
+        let builder = PrometheusScrapeBuilder {
+            honor_labels: self.honor_labels,
             instance_tag: self.instance_tag.clone(),
             endpoint_tag: self.endpoint_tag.clone(),
-            honor_labels: self.honor_labels,
-            query: self.query.clone(),
-            scrape_interval_secs: self.scrape_interval_secs,
-            tls: self.tls.clone(),
-            auth: self.auth.clone(),
         };
-        config.build(cx).await
+
+        let inputs = GenericHttpClientInputs {
+            urls,
+            interval: self.interval,
+            headers: HashMap::new(),
+            content_type: "text/plain".to_string(),
+            auth: self.auth.clone(),
+            tls,
+            proxy: cx.proxy.clone(),
+            shutdown: cx.shutdown,
+        };
+
+        Ok(call(inputs, builder, cx.out, HttpMethod::Get).boxed())
     }
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(config::DataType::Metric)]
-    }
-
-    fn source_type(&self) -> &'static str {
-        "prometheus_scrape"
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -252,33 +181,20 @@ struct EndpointInfo {
     honor_label: bool,
 }
 
-async fn prometheus(
-    config: PrometheusScrapeConfig,
-    urls: Vec<http::Uri>,
-    tls: TlsSettings,
-    proxy: ProxyConfig,
-    shutdown: ShutdownSignal,
-    mut out: SourceSender,
-) -> Result<(), ()> {
-    let mut stream = IntervalStream::new(tokio::time::interval(Duration::from_secs(
-        config.scrape_interval_secs,
-    )))
-    .take_until(shutdown)
-    .map(move |_| stream::iter(urls.clone()))
-    .flatten()
-    .map(move |url| {
-        let client = HttpClient::new(tls.clone(), &proxy).expect("Building HTTP client failed");
-        let endpoint = url.to_string();
+/// Captures the configuration options required to build request-specific context.
+#[derive(Clone)]
+struct PrometheusScrapeBuilder {
+    honor_labels: bool,
+    instance_tag: Option<String>,
+    endpoint_tag: Option<String>,
+}
 
-        let mut request = Request::get(&url)
-            .header(http::header::ACCEPT, "text/plain")
-            .body(Body::empty())
-            .expect("error creating request");
-        if let Some(auth) = &config.auth {
-            auth.apply(&mut request);
-        }
+impl HttpClientBuilder for PrometheusScrapeBuilder {
+    type Context = PrometheusScrapeContext;
 
-        let instance_info = config.instance_tag.as_ref().map(|tag| {
+    /// Expands the context with the instance info and endpoint info for the current request.
+    fn build(&self, url: &Uri) -> Self::Context {
+        let instance_info = self.instance_tag.as_ref().map(|tag| {
             let instance = format!(
                 "{}:{}",
                 url.host().unwrap_or_default(),
@@ -291,149 +207,98 @@ async fn prometheus(
             InstanceInfo {
                 tag: tag.to_string(),
                 instance,
-                honor_label: config.honor_labels,
+                honor_label: self.honor_labels,
             }
         });
-        let endpoint_info = config.endpoint_tag.as_ref().map(|tag| EndpointInfo {
+        let endpoint_info = self.endpoint_tag.as_ref().map(|tag| EndpointInfo {
             tag: tag.to_string(),
             endpoint: url.to_string(),
-            honor_label: config.honor_labels,
+            honor_label: self.honor_labels,
         });
-
-        let start = Instant::now();
-        client
-            .send(request)
-            .map_err(crate::Error::from)
-            .and_then(|response| async move {
-                let (header, body) = response.into_parts();
-                let body = hyper::body::to_bytes(body).await?;
-                emit!(EndpointBytesReceived {
-                    byte_size: body.len(),
-                    protocol: "http",
-                    endpoint: endpoint.as_str(),
-                });
-                Ok((header, body))
-            })
-            .into_stream()
-            .filter_map(move |response| {
-                let instance_info = instance_info.clone();
-                let endpoint_info = endpoint_info.clone();
-
-                ready(match response {
-                    Ok((header, body)) if header.status == hyper::StatusCode::OK => {
-                        emit!(RequestCompleted {
-                            start,
-                            end: Instant::now()
-                        });
-
-                        let body = String::from_utf8_lossy(&body);
-
-                        match parser::parse_text(&body) {
-                            Ok(events) => {
-                                emit!(PrometheusEventsReceived {
-                                    byte_size: events.size_of(),
-                                    count: events.len(),
-                                    uri: url.clone()
-                                });
-                                Some(stream::iter(events).map(move |mut event| {
-                                    let metric = event.as_mut_metric();
-                                    if let Some(InstanceInfo {
-                                        tag,
-                                        instance,
-                                        honor_label,
-                                    }) = &instance_info
-                                    {
-                                        match (honor_label, metric.tag_value(tag)) {
-                                            (false, Some(old_instance)) => {
-                                                metric.insert_tag(
-                                                    format!("exported_{}", tag),
-                                                    old_instance,
-                                                );
-                                                metric.insert_tag(tag.clone(), instance.clone());
-                                            }
-                                            (true, Some(_)) => {}
-                                            (_, None) => {
-                                                metric.insert_tag(tag.clone(), instance.clone());
-                                            }
-                                        }
-                                    }
-                                    if let Some(EndpointInfo {
-                                        tag,
-                                        endpoint,
-                                        honor_label,
-                                    }) = &endpoint_info
-                                    {
-                                        match (honor_label, metric.tag_value(tag)) {
-                                            (false, Some(old_endpoint)) => {
-                                                metric.insert_tag(
-                                                    format!("exported_{}", tag),
-                                                    old_endpoint,
-                                                );
-                                                metric.insert_tag(tag.clone(), endpoint.clone());
-                                            }
-                                            (true, Some(_)) => {}
-                                            (_, None) => {
-                                                metric.insert_tag(tag.clone(), endpoint.clone());
-                                            }
-                                        }
-                                    }
-                                    event
-                                }))
-                            }
-                            Err(error) => {
-                                if url.path() == "/" {
-                                    // https://github.com/vectordotdev/vector/pull/3801#issuecomment-700723178
-                                    warn!(
-                                        message = PARSE_ERROR_NO_PATH,
-                                        endpoint = %url,
-                                    );
-                                }
-                                emit!(PrometheusParseError {
-                                    error,
-                                    url: url.clone(),
-                                    body,
-                                });
-                                None
-                            }
-                        }
-                    }
-                    Ok((header, _)) => {
-                        if header.status == hyper::StatusCode::NOT_FOUND && url.path() == "/" {
-                            // https://github.com/vectordotdev/vector/pull/3801#issuecomment-700723178
-                            warn!(
-                                message = NOT_FOUND_NO_PATH,
-                                endpoint = %url,
-                            );
-                        }
-                        emit!(PrometheusHttpResponseError {
-                            code: header.status,
-                            url: url.clone(),
-                        });
-                        None
-                    }
-                    Err(error) => {
-                        emit!(PrometheusHttpError {
-                            error,
-                            url: url.clone(),
-                        });
-                        None
-                    }
-                })
-            })
-            .flatten()
-    })
-    .flatten()
-    .boxed();
-
-    match out.send_event_stream(&mut stream).await {
-        Ok(()) => {
-            info!("Finished sending.");
-            Ok(())
+        PrometheusScrapeContext {
+            instance_info,
+            endpoint_info,
         }
-        Err(error) => {
-            let (count, _) = stream.size_hint();
-            emit!(StreamClosedError { error, count });
-            Err(())
+    }
+}
+
+/// Request-specific context required for decoding into events.
+struct PrometheusScrapeContext {
+    instance_info: Option<InstanceInfo>,
+    endpoint_info: Option<EndpointInfo>,
+}
+
+impl HttpClientContext for PrometheusScrapeContext {
+    /// Parses the Prometheus HTTP response into metric events
+    fn on_response(&mut self, url: &Uri, _header: &Parts, body: &Bytes) -> Option<Vec<Event>> {
+        let body = String::from_utf8_lossy(body);
+
+        match parser::parse_text(&body) {
+            Ok(mut events) => {
+                for event in events.iter_mut() {
+                    let metric = event.as_mut_metric();
+                    if let Some(InstanceInfo {
+                        tag,
+                        instance,
+                        honor_label,
+                    }) = &self.instance_info
+                    {
+                        match (honor_label, metric.tag_value(tag)) {
+                            (false, Some(old_instance)) => {
+                                metric.replace_tag(format!("exported_{}", tag), old_instance);
+                                metric.replace_tag(tag.clone(), instance.clone());
+                            }
+                            (true, Some(_)) => {}
+                            (_, None) => {
+                                metric.replace_tag(tag.clone(), instance.clone());
+                            }
+                        }
+                    }
+                    if let Some(EndpointInfo {
+                        tag,
+                        endpoint,
+                        honor_label,
+                    }) = &self.endpoint_info
+                    {
+                        match (honor_label, metric.tag_value(tag)) {
+                            (false, Some(old_endpoint)) => {
+                                metric.replace_tag(format!("exported_{}", tag), old_endpoint);
+                                metric.replace_tag(tag.clone(), endpoint.clone());
+                            }
+                            (true, Some(_)) => {}
+                            (_, None) => {
+                                metric.replace_tag(tag.clone(), endpoint.clone());
+                            }
+                        }
+                    }
+                }
+                Some(events)
+            }
+            Err(error) => {
+                if url.path() == "/" {
+                    // https://github.com/vectordotdev/vector/pull/3801#issuecomment-700723178
+                    warn!(
+                        message = PARSE_ERROR_NO_PATH,
+                        endpoint = %url,
+                    );
+                }
+                emit!(PrometheusParseError {
+                    error,
+                    url: url.clone(),
+                    body,
+                });
+                None
+            }
+        }
+    }
+
+    fn on_http_response_error(&self, url: &Uri, header: &Parts) {
+        if header.status == hyper::StatusCode::NOT_FOUND && url.path() == "/" {
+            // https://github.com/vectordotdev/vector/pull/3801#issuecomment-700723178
+            warn!(
+                message = NOT_FOUND_NO_PATH,
+                endpoint = %url,
+            );
         }
     }
 }
@@ -444,7 +309,7 @@ mod test {
         service::{make_service_fn, service_fn},
         Body, Client, Response, Server,
     };
-    use pretty_assertions::assert_eq;
+    use similar_asserts::assert_eq;
     use tokio::time::{sleep, Duration};
     use warp::Filter;
 
@@ -453,10 +318,8 @@ mod test {
         config,
         sinks::prometheus::exporter::PrometheusExporterConfig,
         test_util::{
-            components::{
-                assert_source_compliance, run_and_assert_source_compliance, HTTP_PULL_SOURCE_TAGS,
-            },
-            next_addr, start_topology, wait_for_tcp,
+            components::{run_and_assert_source_compliance, HTTP_PULL_SOURCE_TAGS},
+            next_addr, start_topology, trace_init, wait_for_tcp,
         },
         Error,
     };
@@ -481,11 +344,11 @@ mod test {
 
         let config = PrometheusScrapeConfig {
             endpoints: vec![format!("http://{}/metrics", in_addr)],
-            scrape_interval_secs: 1,
+            interval: Duration::from_secs(1),
             instance_tag: Some("instance".to_string()),
             endpoint_tag: Some("endpoint".to_string()),
             honor_labels: true,
-            query: None,
+            query: HashMap::new(),
             auth: None,
             tls: None,
         };
@@ -514,11 +377,11 @@ mod test {
 
         let config = PrometheusScrapeConfig {
             endpoints: vec![format!("http://{}/metrics", in_addr)],
-            scrape_interval_secs: 1,
+            interval: Duration::from_secs(1),
             instance_tag: Some("instance".to_string()),
             endpoint_tag: Some("endpoint".to_string()),
             honor_labels: true,
-            query: None,
+            query: HashMap::new(),
             auth: None,
             tls: None,
         };
@@ -565,11 +428,11 @@ mod test {
 
         let config = PrometheusScrapeConfig {
             endpoints: vec![format!("http://{}/metrics", in_addr)],
-            scrape_interval_secs: 1,
+            interval: Duration::from_secs(1),
             instance_tag: Some("instance".to_string()),
             endpoint_tag: Some("endpoint".to_string()),
             honor_labels: false,
-            query: None,
+            query: HashMap::new(),
             auth: None,
             tls: None,
         };
@@ -611,6 +474,62 @@ mod test {
         }
     }
 
+    /// According to the [spec](https://github.com/OpenObservability/OpenMetrics/blob/main/specification/OpenMetrics.md?plain=1#L115)
+    /// > Label names MUST be unique within a LabelSet.
+    /// Prometheus itself will reject the metric with an error. Largely to remain backward compatible with older versions of Vector,
+    /// we accept the metric, but take the last label in the list.
+    #[tokio::test]
+    async fn test_prometheus_duplicate_tags() {
+        let in_addr = next_addr();
+
+        let dummy_endpoint = warp::path!("metrics").map(|| {
+            r#"
+                    metric_label{code="200",code="success"} 100 1612411516789
+            "#
+        });
+
+        tokio::spawn(warp::serve(dummy_endpoint).run(in_addr));
+        wait_for_tcp(in_addr).await;
+
+        let config = PrometheusScrapeConfig {
+            endpoints: vec![format!("http://{}/metrics", in_addr)],
+            interval: Duration::from_secs(1),
+            instance_tag: Some("instance".to_string()),
+            endpoint_tag: Some("endpoint".to_string()),
+            honor_labels: true,
+            query: HashMap::new(),
+            auth: None,
+            tls: None,
+        };
+
+        let events = run_and_assert_source_compliance(
+            config,
+            Duration::from_secs(3),
+            &HTTP_PULL_SOURCE_TAGS,
+        )
+        .await;
+        assert!(!events.is_empty());
+
+        let metrics: Vec<vector_core::event::Metric> = events
+            .into_iter()
+            .map(|event| event.into_metric())
+            .collect();
+        let metric = &metrics[0];
+
+        assert_eq!(metric.name(), "metric_label");
+
+        let code_tag = metric
+            .tags()
+            .unwrap()
+            .iter_all()
+            .filter(|(name, _value)| *name == "code")
+            .map(|(_name, value)| value)
+            .collect::<Vec<_>>();
+
+        assert_eq!(1, code_tag.len());
+        assert_eq!("success", code_tag[0].unwrap());
+    }
+
     #[tokio::test]
     async fn test_prometheus_request_query() {
         let in_addr = next_addr();
@@ -629,17 +548,17 @@ mod test {
 
         let config = PrometheusScrapeConfig {
             endpoints: vec![format!("http://{}/metrics?key1=val1", in_addr)],
-            scrape_interval_secs: 1,
+            interval: Duration::from_secs(1),
             instance_tag: Some("instance".to_string()),
             endpoint_tag: Some("endpoint".to_string()),
             honor_labels: false,
-            query: Some(HashMap::from([
+            query: HashMap::from([
                 ("key1".to_string(), vec!["val2".to_string()]),
                 (
                     "key2".to_string(),
                     vec!["val1".to_string(), "val2".to_string()],
                 ),
-            ])),
+            ]),
             auth: None,
             tls: None,
         };
@@ -683,8 +602,11 @@ mod test {
         }
     }
 
+    // Intentially not using assert_source_compliance here because this is a round-trip test which
+    // means source and sink will both emit `EventsSent` , triggering multi-emission check.
     #[tokio::test]
     async fn test_prometheus_routing() {
+        trace_init();
         let in_addr = next_addr();
         let out_addr = next_addr();
 
@@ -738,8 +660,8 @@ mod test {
                 instance_tag: None,
                 endpoint_tag: None,
                 honor_labels: false,
-                query: None,
-                scrape_interval_secs: 1,
+                query: HashMap::new(),
+                interval: Duration::from_secs(1),
                 tls: None,
                 auth: None,
             },
@@ -749,34 +671,34 @@ mod test {
             &["in"],
             PrometheusExporterConfig {
                 address: out_addr,
+                auth: None,
                 tls: None,
                 default_namespace: Some("vector".into()),
                 buckets: vec![1.0, 2.0, 4.0],
                 quantiles: vec![],
                 distributions_as_summaries: false,
-                flush_period_secs: Duration::from_secs(1),
+                flush_period_secs: Duration::from_secs(3),
                 suppress_timestamp: false,
                 acknowledgements: Default::default(),
             },
         );
 
-        assert_source_compliance(&HTTP_PULL_SOURCE_TAGS, async move {
-            let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
-            sleep(Duration::from_secs(1)).await;
+        let (topology, _) = start_topology(config.build().unwrap(), false).await;
+        sleep(Duration::from_secs(1)).await;
 
-            let response = Client::new()
-                .get(format!("http://{}/metrics", out_addr).parse().unwrap())
-                .await
-                .unwrap();
+        let response = Client::new()
+            .get(format!("http://{}/metrics", out_addr).parse().unwrap())
+            .await
+            .unwrap();
 
-            assert!(response.status().is_success());
-            let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
-            let lines = std::str::from_utf8(&body)
-                .unwrap()
-                .lines()
-                .collect::<Vec<_>>();
+        assert!(response.status().is_success());
+        let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
+        let lines = std::str::from_utf8(&body)
+            .unwrap()
+            .lines()
+            .collect::<Vec<_>>();
 
-            assert_eq!(lines, vec![
+        assert_eq!(lines, vec![
                 "# HELP vector_http_request_duration_seconds http_request_duration_seconds",
                 "# TYPE vector_http_request_duration_seconds histogram",
                 "vector_http_request_duration_seconds_bucket{le=\"0.05\"} 24054 1612411516789",
@@ -806,8 +728,7 @@ mod test {
                 ],
             );
 
-            topology.stop().await;
-        }).await;
+        topology.stop().await;
     }
 }
 
@@ -824,12 +745,12 @@ mod integration_tests {
     #[tokio::test]
     async fn scrapes_metrics() {
         let config = PrometheusScrapeConfig {
-            endpoints: vec!["http://localhost:9090/metrics".into()],
-            scrape_interval_secs: 1,
+            endpoints: vec!["http://prometheus:9090/metrics".into()],
+            interval: Duration::from_secs(1),
             instance_tag: Some("instance".to_string()),
             endpoint_tag: Some("endpoint".to_string()),
             honor_labels: false,
-            query: None,
+            query: HashMap::new(),
             auth: None,
             tls: None,
         };
@@ -862,11 +783,11 @@ mod integration_tests {
         assert!(build.tags().unwrap().contains_key("version"));
         assert_eq!(
             build.tag_value("instance"),
-            Some("localhost:9090".to_string())
+            Some("prometheus:9090".to_string())
         );
         assert_eq!(
             build.tag_value("endpoint"),
-            Some("http://localhost:9090/metrics".to_string())
+            Some("http://prometheus:9090/metrics".to_string())
         );
 
         let queries = find_metric("prometheus_engine_queries");
@@ -874,11 +795,11 @@ mod integration_tests {
         assert!(matches!(queries.value(), &MetricValue::Gauge { .. }));
         assert_eq!(
             queries.tag_value("instance"),
-            Some("localhost:9090".to_string())
+            Some("prometheus:9090".to_string())
         );
         assert_eq!(
             queries.tag_value("endpoint"),
-            Some("http://localhost:9090/metrics".to_string())
+            Some("http://prometheus:9090/metrics".to_string())
         );
 
         let go_info = find_metric("go_info");
@@ -887,11 +808,11 @@ mod integration_tests {
         assert!(go_info.tags().unwrap().contains_key("version"));
         assert_eq!(
             go_info.tag_value("instance"),
-            Some("localhost:9090".to_string())
+            Some("prometheus:9090".to_string())
         );
         assert_eq!(
             go_info.tag_value("endpoint"),
-            Some("http://localhost:9090/metrics".to_string())
+            Some("http://prometheus:9090/metrics".to_string())
         );
     }
 }

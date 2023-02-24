@@ -1,6 +1,7 @@
 use std::convert::TryFrom;
 
 use headers::{Authorization, HeaderMapExt};
+use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
 use warp::http::HeaderMap;
 
@@ -15,10 +16,14 @@ use super::error::ErrorMessage;
 #[derive(Clone, Debug)]
 pub struct HttpSourceAuthConfig {
     /// The username for basic authentication.
+    #[configurable(metadata(docs::examples = "AzureDiamond"))]
+    #[configurable(metadata(docs::examples = "admin"))]
     pub username: String,
 
     /// The password for basic authentication.
-    pub password: String,
+    #[configurable(metadata(docs::examples = "hunter2"))]
+    #[configurable(metadata(docs::examples = "${PASSWORD}"))]
+    pub password: SensitiveString,
 }
 
 impl TryFrom<Option<&HttpSourceAuthConfig>> for HttpSourceAuth {
@@ -28,7 +33,10 @@ impl TryFrom<Option<&HttpSourceAuthConfig>> for HttpSourceAuth {
         match auth {
             Some(auth) => {
                 let mut headers = HeaderMap::new();
-                headers.typed_insert(Authorization::basic(&auth.username, &auth.password));
+                headers.typed_insert(Authorization::basic(
+                    auth.username.as_str(),
+                    auth.password.inner(),
+                ));
                 match headers.get("authorization") {
                     Some(value) => {
                         let token = value

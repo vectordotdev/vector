@@ -1,14 +1,15 @@
 use std::collections::HashMap;
 
-use serde::{Deserialize, Serialize};
+use vector_common::sensitive_string::SensitiveString;
+use vector_config::configurable_component;
 
 use crate::{
     config::{
         log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig,
-        SinkContext, SinkDescription,
+        SinkContext,
     },
     sinks::{
-        elasticsearch::{ElasticsearchAuth, ElasticsearchConfig},
+        elasticsearch::{ElasticsearchApiVersion, ElasticsearchAuth, ElasticsearchConfig},
         util::{http::RequestConfig, Compression},
         Healthcheck, VectorSink,
     },
@@ -17,28 +18,52 @@ use crate::{
 
 static CLOUD_URL: &str = "https://cloud.axiom.co";
 
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
-pub(self) struct AxiomConfig {
+/// Configuration for the `axiom` sink.
+#[configurable_component(sink("axiom"))]
+#[derive(Clone, Debug, Default)]
+pub struct AxiomConfig {
+    /// URI of the Axiom endpoint to send data to.
+    ///
+    /// Only required if not using Axiom Cloud.
+    #[configurable(validation(format = "uri"))]
+    #[configurable(metadata(docs::examples = "https://axiom.my-domain.com"))]
+    #[configurable(metadata(docs::examples = "${AXIOM_URL}"))]
     url: Option<String>,
+
+    /// The Axiom organization ID.
+    ///
+    /// Only required when using personal tokens.
+    #[configurable(metadata(docs::examples = "${AXIOM_ORG_ID}"))]
+    #[configurable(metadata(docs::examples = "123abc"))]
     org_id: Option<String>,
-    token: String,
+
+    /// The Axiom API token.
+    #[configurable(metadata(docs::examples = "${AXIOM_TOKEN}"))]
+    #[configurable(metadata(docs::examples = "123abc"))]
+    token: SensitiveString,
+
+    /// The Axiom dataset to write to.
+    #[configurable(metadata(docs::examples = "vector.dev"))]
     dataset: String,
 
+    #[configurable(derived)]
     #[serde(default)]
     request: RequestConfig,
+
+    #[configurable(derived)]
     #[serde(default)]
     compression: Compression,
+
+    #[configurable(derived)]
     tls: Option<TlsConfig>,
+
+    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     acknowledgements: AcknowledgementsConfig,
-}
-
-inventory::submit! {
-    SinkDescription::new::<AxiomConfig>("axiom")
 }
 
 impl GenerateConfig for AxiomConfig {
@@ -54,7 +79,6 @@ impl GenerateConfig for AxiomConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "axiom")]
 impl SinkConfig for AxiomConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let mut request = self.request.clone();
@@ -74,7 +98,7 @@ impl SinkConfig for AxiomConfig {
         // This configuration wraps the Elasticsearch config to minimize the
         // amount of code.
         let elasticsearch_config = ElasticsearchConfig {
-            endpoint: self.build_endpoint(),
+            endpoints: vec![self.build_endpoint()],
             compression: self.compression,
             auth: Some(ElasticsearchAuth::Basic {
                 user: "axiom".to_string(),
@@ -83,6 +107,7 @@ impl SinkConfig for AxiomConfig {
             query: Some(query),
             tls: self.tls.clone(),
             request,
+            api_version: ElasticsearchApiVersion::V6,
             ..Default::default()
         };
 
@@ -91,10 +116,6 @@ impl SinkConfig for AxiomConfig {
 
     fn input(&self) -> Input {
         Input::new(DataType::Metric | DataType::Log)
-    }
-
-    fn sink_type(&self) -> &'static str {
-        "axiom"
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
@@ -128,6 +149,7 @@ mod integration_tests {
     use chrono::{DateTime, Duration, Utc};
     use futures::stream;
     use http::StatusCode;
+    use serde::{Deserialize, Serialize};
     use std::env;
     use tokio::time;
     use vector_core::event::{BatchNotifier, BatchStatus, Event, LogEvent};
@@ -322,7 +344,7 @@ mod integration_tests {
 
         let config = AxiomConfig {
             url: Some(url.clone()),
-            token: token.clone(),
+            token: token.clone().into(),
             dataset: dataset.clone(),
             ..Default::default()
         };

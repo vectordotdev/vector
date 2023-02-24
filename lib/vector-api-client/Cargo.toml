@@ -9,27 +9,28 @@ license = "MPL-2.0"
 [dependencies]
 
 # Serde
-serde = { version = "1.0.143", default-features = false, features = ["derive"] }
-serde_json = { version = "1.0.83", default-features = false, features = ["raw_value"] }
+serde = { version = "1.0.152", default-features = false, features = ["derive"] }
+serde_json = { version = "1.0.93", default-features = false, features = ["raw_value"] }
 
 # Error handling
-anyhow = { version = "1.0.62", default-features = false, features = ["std"] }
+anyhow = { version = "1.0.69", default-features = false, features = ["std"] }
 
 # Tokio / Futures
 async-trait = { version = "0.1", default-features = false }
 futures = { version = "0.3", default-features = false, features = ["compat", "io-compat"] }
-tokio = { version = "1.20.1", default-features = false, features = ["macros", "rt", "sync"] }
-tokio-stream = { version = "0.1.9", default-features = false, features = ["sync"] }
+tokio = { version = "1.25.0", default-features = false, features = ["macros", "rt", "sync"] }
+tokio-stream = { version = "0.1.12", default-features = false, features = ["sync"] }
 
 # GraphQL
-graphql_client = { version = "0.11.0", default-features = false, features = ["graphql_query_derive"] }
+graphql_client = { version = "0.12.0", default-features = false, features = ["graphql_query_derive"] }
 
 # HTTP / WebSockets
-reqwest = { version = "0.11.11", default-features = false, features = ["json"] }
-tokio-tungstenite = { version = "0.17.2", default-features = false, features = ["connect", "rustls"] }
+reqwest = { version = "0.11.14", default-features = false, features = ["json"] }
+tokio-tungstenite = { version = "0.18.0", default-features = false, features = ["connect", "rustls"] }
 
 # External libs
 chrono = { version = "0.4.6", default-features = false, features = ["serde"] }
-url = { version = "2.2.2", default-features = false }
+clap = { version = "4.1.6", default-features = false, features = ["derive"] }
+url = { version = "2.3.1", default-features = false }
 uuid = { version = "1", default-features = false, features = ["serde", "v4"] }
-indoc = { version = "1.0.7", default-features = false }
+indoc = { version = "2.0.0", default-features = false }

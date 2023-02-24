@@ -3,7 +3,7 @@ use std::{
     num::NonZeroU32,
 };
 
-use azure_core::{prelude::Range, HttpError};
+use azure_core::{error::HttpError, prelude::Range};
 use azure_storage_blobs::prelude::*;
 use bytes::{Buf, BytesMut};
 use codecs::{
@@ -24,7 +24,7 @@ use crate::{
         VectorSink,
     },
     test_util::{
-        components::{run_and_assert_sink_compliance, SINK_TAGS},
+        components::{assert_sink_compliance, SINK_TAGS},
         random_events_with_stream, random_lines, random_lines_with_stream, random_string,
     },
 };
@@ -33,9 +33,10 @@ use crate::{
 async fn azure_blob_healthcheck_passed() {
     let config = AzureBlobSinkConfig::new_emulator().await;
     let client = azure_common::config::build_client(
-        config.connection_string,
+        config.connection_string.map(Into::into),
         None,
         config.container_name.clone(),
+        None,
     )
     .expect("Failed to create client");
 
@@ -52,9 +53,10 @@ async fn azure_blob_healthcheck_unknown_container() {
         ..config
     };
     let client = azure_common::config::build_client(
-        config.connection_string,
-        config.storage_account,
+        config.connection_string.map(Into::into),
+        config.storage_account.map(Into::into),
         config.container_name.clone(),
+        config.endpoint.clone(),
     )
     .expect("Failed to create client");
 
@@ -73,15 +75,14 @@ async fn azure_blob_insert_lines_into_blob() {
     let blob_prefix = format!("lines/into/blob/{}", random_string(10));
     let config = AzureBlobSinkConfig::new_emulator().await;
     let config = AzureBlobSinkConfig {
-        blob_prefix: Some(blob_prefix.clone()),
+        blob_prefix: blob_prefix.clone().try_into().unwrap(),
         ..config
     };
-    let sink = config.to_sink();
     let (lines, input) = random_lines_with_stream(100, 10, None);
 
-    run_and_assert_sink_compliance(sink, input, &SINK_TAGS).await;
+    config.run_assert(input).await;
 
-    let blobs = config.list_blobs(blob_prefix.as_str()).await;
+    let blobs = config.list_blobs(blob_prefix).await;
     assert_eq!(blobs.len(), 1);
     assert!(blobs[0].clone().ends_with(".log"));
     let (blob, blob_lines) = config.get_blob(blobs[0].clone()).await;
@@ -94,20 +95,19 @@ async fn azure_blob_insert_json_into_blob() {
     let blob_prefix = format!("json/into/blob/{}", random_string(10));
     let config = AzureBlobSinkConfig::new_emulator().await;
     let config = AzureBlobSinkConfig {
-        blob_prefix: Some(blob_prefix.clone()),
+        blob_prefix: blob_prefix.clone().try_into().unwrap(),
         encoding: (
             Some(NewlineDelimitedEncoderConfig::new()),
-            JsonSerializerConfig::new(),
+            JsonSerializerConfig::default(),
         )
             .into(),
         ..config
     };
-    let sink = config.to_sink();
     let (events, input) = random_events_with_stream(100, 10, None);
 
-    run_and_assert_sink_compliance(sink, input, &SINK_TAGS).await;
+    config.run_assert(input).await;
 
-    let blobs = config.list_blobs(blob_prefix.as_str()).await;
+    let blobs = config.list_blobs(blob_prefix).await;
     assert_eq!(blobs.len(), 1);
     assert!(blobs[0].clone().ends_with(".log"));
     let (blob, blob_lines) = config.get_blob(blobs[0].clone()).await;
@@ -126,16 +126,15 @@ async fn azure_blob_insert_lines_into_blob_gzip() {
     let blob_prefix = format!("lines-gzip/into/blob/{}", random_string(10));
     let config = AzureBlobSinkConfig::new_emulator().await;
     let config = AzureBlobSinkConfig {
-        blob_prefix: Some(blob_prefix.clone()),
+        blob_prefix: blob_prefix.clone().try_into().unwrap(),
         compression: Compression::gzip_default(),
         ..config
     };
-    let sink = config.to_sink();
     let (lines, events) = random_lines_with_stream(100, 10, None);
 
-    run_and_assert_sink_compliance(sink, events, &SINK_TAGS).await;
+    config.run_assert(events).await;
 
-    let blobs = config.list_blobs(blob_prefix.as_str()).await;
+    let blobs = config.list_blobs(blob_prefix).await;
     assert_eq!(blobs.len(), 1);
     assert!(blobs[0].clone().ends_with(".log.gz"));
     let (blob, blob_lines) = config.get_blob(blobs[0].clone()).await;
@@ -154,21 +153,20 @@ async fn azure_blob_insert_json_into_blob_gzip() {
     let blob_prefix = format!("json-gzip/into/blob/{}", random_string(10));
     let config = AzureBlobSinkConfig::new_emulator().await;
     let config = AzureBlobSinkConfig {
-        blob_prefix: Some(blob_prefix.clone()),
+        blob_prefix: blob_prefix.clone().try_into().unwrap(),
         encoding: (
             Some(NewlineDelimitedEncoderConfig::new()),
-            JsonSerializerConfig::new(),
+            JsonSerializerConfig::default(),
         )
             .into(),
         compression: Compression::gzip_default(),
         ..config
     };
-    let sink = config.to_sink();
     let (events, input) = random_events_with_stream(100, 10, None);
 
-    run_and_assert_sink_compliance(sink, input, &SINK_TAGS).await;
+    config.run_assert(input).await;
 
-    let blobs = config.list_blobs(blob_prefix.as_str()).await;
+    let blobs = config.list_blobs(blob_prefix).await;
     assert_eq!(blobs.len(), 1);
     assert!(blobs[0].clone().ends_with(".log.gz"));
     let (blob, blob_lines) = config.get_blob(blobs[0].clone()).await;
@@ -194,16 +192,15 @@ async fn azure_blob_rotate_files_after_the_buffer_size_is_reached() {
     config.batch.max_bytes = Some(size_per_group);
 
     let config = AzureBlobSinkConfig {
-        blob_prefix: Some(blob_prefix.clone() + "{{key}}"),
+        blob_prefix: (blob_prefix.clone() + "{{key}}").try_into().unwrap(),
         blob_append_uuid: Some(false),
         batch: config.batch,
         ..config
     };
 
-    let sink = config.to_sink();
-    run_and_assert_sink_compliance(sink, input, &SINK_TAGS).await;
+    config.run_assert(input).await;
 
-    let blobs = config.list_blobs(blob_prefix.as_str()).await;
+    let blobs = config.list_blobs(blob_prefix).await;
     assert_eq!(blobs.len(), 3);
     let response = stream::iter(blobs)
         .fold(Vec::new(), |mut acc, blob| async {
@@ -222,13 +219,14 @@ impl AzureBlobSinkConfig {
     pub async fn new_emulator() -> AzureBlobSinkConfig {
         let address = std::env::var("AZURE_ADDRESS").unwrap_or_else(|_| "localhost".into());
         let config = AzureBlobSinkConfig {
-                connection_string: Some(format!("UseDevelopmentStorage=true;DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://{}:10000/devstoreaccount1;QueueEndpoint=http://{}:10001/devstoreaccount1;TableEndpoint=http://{}:10002/devstoreaccount1;", address, address, address)),
+                connection_string: Some(format!("UseDevelopmentStorage=true;DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://{}:10000/devstoreaccount1;QueueEndpoint=http://{}:10001/devstoreaccount1;TableEndpoint=http://{}:10002/devstoreaccount1;", address, address, address).into()),
                 storage_account: None,
                 container_name: "logs".to_string(),
-                blob_prefix: None,
+                endpoint: None,
+                blob_prefix: Default::default(),
                 blob_time_format: None,
                 blob_append_uuid: None,
-                encoding: (None::<FramingConfig>, TextSerializerConfig::new()).into(),
+                encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
                 compression: Compression::None,
                 batch: Default::default(),
                 request: TowerRequestConfig::default(),
@@ -240,22 +238,31 @@ impl AzureBlobSinkConfig {
         config
     }
 
-    pub fn to_sink(&self) -> VectorSink {
+    fn to_sink(&self) -> VectorSink {
         let client = azure_common::config::build_client(
-            self.connection_string.clone(),
-            self.storage_account.clone(),
+            self.connection_string.clone().map(Into::into),
+            self.storage_account.clone().map(Into::into),
             self.container_name.clone(),
+            self.endpoint.clone(),
         )
         .expect("Failed to create client");
 
         self.build_processor(client).expect("Failed to create sink")
     }
 
-    pub async fn list_blobs(&self, prefix: &str) -> Vec<String> {
+    async fn run_assert(&self, input: impl Stream<Item = EventArray> + Send) {
+        // `to_sink` needs to be inside the assertion check
+        assert_sink_compliance(&SINK_TAGS, async move { self.to_sink().run(input).await })
+            .await
+            .expect("Running sink failed");
+    }
+
+    pub async fn list_blobs(&self, prefix: String) -> Vec<String> {
         let client = azure_common::config::build_client(
-            self.connection_string.clone(),
-            self.storage_account.clone(),
+            self.connection_string.clone().map(Into::into),
+            self.storage_account.clone().map(Into::into),
             self.container_name.clone(),
+            self.endpoint.clone(),
         )
         .unwrap();
         let response = client
@@ -264,14 +271,15 @@ impl AzureBlobSinkConfig {
             .max_results(NonZeroU32::new(1000).unwrap())
             .delimiter("/")
             .include_metadata(true)
-            .execute()
+            .into_stream()
+            .next()
             .await
-            .expect("Failed to fetch blobs");
+            .expect("Failed to fetch blobs")
+            .unwrap();
 
         let blobs = response
             .blobs
-            .blobs
-            .iter()
+            .blobs()
             .map(|blob| blob.name.clone())
             .collect::<Vec<_>>();
 
@@ -280,20 +288,26 @@ impl AzureBlobSinkConfig {
 
     pub async fn get_blob(&self, blob: String) -> (Blob, Vec<String>) {
         let client = azure_common::config::build_client(
-            self.connection_string.clone(),
-            self.storage_account.clone(),
+            self.connection_string.clone().map(Into::into),
+            self.storage_account.clone().map(Into::into),
             self.container_name.clone(),
+            self.endpoint.clone(),
         )
         .unwrap();
         let response = client
-            .as_blob_client(blob.as_str())
+            .blob_client(blob)
             .get()
             .range(Range::new(0, 1024 * 1024))
-            .execute()
+            .into_stream()
+            .next()
             .await
-            .expect("Failed to get blob");
+            .expect("Failed to get blob")
+            .unwrap();
 
-        (response.blob, self.get_blob_content(response.data.to_vec()))
+        (
+            response.blob,
+            self.get_blob_content(response.data.collect().await.unwrap().to_vec()),
+        )
     }
 
     fn get_blob_content(&self, data: Vec<u8>) -> Vec<String> {
@@ -311,19 +325,23 @@ impl AzureBlobSinkConfig {
 
     async fn ensure_container(&self) {
         let client = azure_common::config::build_client(
-            self.connection_string.clone(),
-            self.storage_account.clone(),
+            self.connection_string.clone().map(Into::into),
+            self.storage_account.clone().map(Into::into),
             self.container_name.clone(),
+            self.endpoint.clone(),
         )
         .unwrap();
-        let request = client.create().public_access(PublicAccess::None).execute();
+        let request = client
+            .create()
+            .public_access(PublicAccess::None)
+            .into_future();
 
         let response = match request.await {
             Ok(_) => Ok(()),
             Err(reason) => match reason.downcast_ref::<HttpError>() {
-                Some(HttpError::StatusCode { status, .. }) => match *status {
-                    StatusCode::CONFLICT => Ok(()),
-                    status => Err(format!("Unexpected status code {}", status)),
+                Some(err) => match StatusCode::from_u16(err.status().into()) {
+                    Ok(StatusCode::CONFLICT) => Ok(()),
+                    _ => Err(format!("Unexpected status code {}", err.status())),
                 },
                 _ => Err(format!("Unexpected error {}", reason)),
             },

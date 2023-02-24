@@ -3,14 +3,10 @@ mod sink;
 
 pub use config::BlackholeConfig;
 
-use crate::config::SinkDescription;
-
-inventory::submit! {
-    SinkDescription::new::<BlackholeConfig>("blackhole")
-}
-
 #[cfg(test)]
 mod tests {
+
+    use std::time::Duration;
 
     use crate::{
         sinks::{
@@ -25,7 +21,7 @@ mod tests {
     #[tokio::test]
     async fn blackhole() {
         let config = BlackholeConfig {
-            print_interval_secs: 10,
+            print_interval_secs: Duration::from_secs(10),
             rate: None,
             acknowledgements: Default::default(),
         };

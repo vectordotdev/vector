@@ -64,7 +64,7 @@ impl Function for ParseAwsVpcFlowLog {
         &self,
         _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
         let format = arguments.optional("format");
@@ -160,7 +160,7 @@ fn identity<'a>(_key: &'a str, value: &'a str) -> ParseResult<&'a str> {
 fn parse_i64(key: &str, value: &str) -> ParseResult<i64> {
     value
         .parse()
-        .map_err(|_| format!("failed to parse value as i64 (key: `{}`): `{}`", key, value))
+        .map_err(|_| format!("failed to parse value as i64 (key: `{key}`): `{value}`"))
 }
 
 macro_rules! create_match {
@@ -222,8 +222,8 @@ fn parse_log(input: &str, format: Option<&str>) -> ParseResult<Value> {
 
                 continue;
             }
-            (None, Some(value)) => Err(format!("no key for value: `{}`", value)),
-            (Some(key), None) => Err(format!("no item for key: `{}`", key)),
+            (None, Some(value)) => Err(format!("no key for value: `{value}`")),
+            (Some(key), None) => Err(format!("no item for key: `{key}`")),
             (None, None) => Ok(log.into()),
         };
     }

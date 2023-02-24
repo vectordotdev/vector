@@ -1,23 +1,13 @@
 use std::time::Instant;
 
+use crate::emit;
 use metrics::{counter, histogram};
+pub use vector_core::internal_event::EventsReceived;
 use vector_core::internal_event::InternalEvent;
-pub use vector_core::internal_event::{EventsReceived, OldEventsReceived};
 
-use super::prelude::{error_stage, error_type};
-
-#[derive(Debug)]
-pub struct BytesReceived<'a> {
-    pub byte_size: usize,
-    pub protocol: &'a str,
-}
-
-impl<'a> InternalEvent for BytesReceived<'a> {
-    fn emit(self) {
-        trace!(message = "Bytes received.", byte_size = %self.byte_size, protocol = %self.protocol);
-        counter!("component_received_bytes_total", self.byte_size as u64, "protocol" => self.protocol.to_string());
-    }
-}
+use vector_common::internal_event::{
+    error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL,
+};
 
 #[derive(Debug)]
 pub struct EndpointBytesReceived<'a> {
@@ -65,6 +55,30 @@ impl<'a> InternalEvent for EndpointBytesSent<'a> {
     }
 }
 
+#[derive(Debug)]
+pub struct SocketOutgoingConnectionError<E> {
+    pub error: E,
+}
+
+impl<E: std::error::Error> InternalEvent for SocketOutgoingConnectionError<E> {
+    fn emit(self) {
+        error!(
+            message = "Unable to connect.",
+            error = %self.error,
+            error_code = "failed_connecting",
+            error_type = error_type::CONNECTION_FAILED,
+            stage = error_stage::SENDING,
+            internal_log_rate_limit = true,
+        );
+        counter!(
+            "component_errors_total", 1,
+            "error_code" => "failed_connecting",
+            "error_type" => error_type::CONNECTION_FAILED,
+            "stage" => error_stage::SENDING,
+        );
+    }
+}
+
 const STREAM_CLOSED: &str = "stream_closed";
 
 #[derive(Debug)]
@@ -76,13 +90,11 @@ pub struct StreamClosedError {
 impl InternalEvent for StreamClosedError {
     fn emit(self) {
         error!(
-            message = "Events dropped.",
-            reason = "Downstream is closed.",
+            message = "Failed to forward event(s), downstream is closed.",
             error_code = STREAM_CLOSED,
             error_type = error_type::WRITER_FAILED,
-            intentional = "false",
             stage = error_stage::SENDING,
-            count = %self.count,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,
@@ -90,13 +102,10 @@ impl InternalEvent for StreamClosedError {
             "error_type" => error_type::WRITER_FAILED,
             "stage" => error_stage::SENDING,
         );
-        counter!(
-            "component_discarded_events_total", self.count as u64,
-            "error_code" => STREAM_CLOSED,
-            "error_type" => error_type::WRITER_FAILED,
-            "intentional" => "false",
-            "stage" => error_stage::SENDING,
-        );
+        emit!(ComponentEventsDropped::<UNINTENTIONAL> {
+            count: self.count,
+            reason: "Downstream is closed.",
+        });
     }
 }
 
@@ -125,5 +134,30 @@ impl InternalEvent for CollectionCompleted {
         debug!(message = "Collection completed.");
         counter!("collect_completed_total", 1);
         histogram!("collect_duration_seconds", self.end - self.start);
+    }
+}
+
+#[derive(Debug)]
+pub struct SinkRequestBuildError<E> {
+    pub error: E,
+}
+
+impl<E: std::fmt::Display> InternalEvent for SinkRequestBuildError<E> {
+    fn emit(self) {
+        // Providing the name of the sink with the build error is not necessary because the emitted log
+        // message contains the sink name in `component_type` field thanks to `tracing` spans. For example:
+        // "<timestamp> ERROR sink{component_kind="sink" component_id=sink0 component_type=aws_s3 component_name=sink0}: vector::internal_events::common: Failed to build request."
+        error!(
+            message = format!("Failed to build request."),
+            error = %self.error,
+            error_type = error_type::ENCODER_FAILED,
+            stage = error_stage::PROCESSING,
+            internal_log_rate_limit = true,
+        );
+        counter!(
+            "component_errors_total", 1,
+            "error_type" => error_type::ENCODER_FAILED,
+            "stage" => error_stage::PROCESSING,
+        );
     }
 }

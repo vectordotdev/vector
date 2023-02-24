@@ -1,93 +1,123 @@
+use std::time::Duration;
+
 use futures::StreamExt;
+use serde_with::serde_as;
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
+use vector_common::internal_event::{CountByteSize, InternalEventHandle as _};
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
-use vector_core::ByteSizeOf;
+use vector_core::EstimatedJsonEncodedSizeOf;
 
 use crate::{
-    config::{DataType, Output, SourceConfig, SourceContext, SourceDescription},
-    internal_events::{EventsReceived, StreamClosedError},
+    config::{log_schema, DataType, Output, SourceConfig, SourceContext},
+    internal_events::{EventsReceived, InternalMetricsBytesReceived, StreamClosedError},
     metrics::Controller,
     shutdown::ShutdownSignal,
     SourceSender,
 };
 
 /// Configuration for the `internal_metrics` source.
-#[configurable_component(source)]
-#[derive(Clone, Debug, Derivative)]
-#[derivative(Default)]
+#[serde_as]
+#[configurable_component(source("internal_metrics"))]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields, default)]
 pub struct InternalMetricsConfig {
     /// The interval between metric gathering, in seconds.
-    #[derivative(Default(value = "2.0"))]
-    pub scrape_interval_secs: f64,
+    #[serde_as(as = "serde_with::DurationSeconds<f64>")]
+    #[serde(default = "default_scrape_interval")]
+    pub scrape_interval_secs: Duration,
 
     #[configurable(derived)]
     pub tags: TagsConfig,
 
     /// Overrides the default namespace for the metrics emitted by the source.
-    ///
-    /// By default, `vector` is used.
-    pub namespace: Option<String>,
+    #[serde(default = "default_namespace")]
+    pub namespace: String,
 }
 
-impl InternalMetricsConfig {
-    /// Set the interval to collect internal metrics.
-    pub fn scrape_interval_secs(&mut self, value: f64) {
-        self.scrape_interval_secs = value;
+impl Default for InternalMetricsConfig {
+    fn default() -> Self {
+        Self {
+            scrape_interval_secs: default_scrape_interval(),
+            tags: TagsConfig::default(),
+            namespace: default_namespace(),
+        }
     }
 }
 
 /// Tag configuration for the `internal_metrics` source.
 #[configurable_component]
-#[derive(Clone, Debug, Derivative)]
-#[derivative(Default)]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields, default)]
 pub struct TagsConfig {
-    /// Sets the name of the tag to use to add the current hostname to each metric.
+    /// Overrides the name of the tag used to add the peer host to each metric.
     ///
-    /// The value will be the current hostname for wherever Vector is running.
+    /// The value will be the peer host's address, including the port i.e. `1.2.3.4:9000`.
     ///
-    /// By default, this is not set and the tag will not be automatically added.
-    pub host_key: Option<String>,
+    /// By default, the [global `log_schema.host_key` option][global_host_key] is used.
+    ///
+    /// Set to `""` to suppress this key.
+    ///
+    /// [global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
+    #[serde(default = "default_host_key")]
+    pub host_key: String,
 
     /// Sets the name of the tag to use to add the current process ID to each metric.
     ///
-    /// The value will be the current process ID for Vector itself.
     ///
     /// By default, this is not set and the tag will not be automatically added.
+    #[configurable(metadata(docs::examples = "pid"))]
     pub pid_key: Option<String>,
 }
 
-inventory::submit! {
-    SourceDescription::new::<InternalMetricsConfig>("internal_metrics")
+impl Default for TagsConfig {
+    fn default() -> Self {
+        Self {
+            host_key: default_host_key(),
+            pid_key: None,
+        }
+    }
+}
+
+fn default_scrape_interval() -> Duration {
+    Duration::from_secs_f64(1.0)
+}
+
+fn default_namespace() -> String {
+    "vector".to_owned()
+}
+
+fn default_host_key() -> String {
+    log_schema().host_key().to_owned()
 }
 
 impl_generate_config_from_default!(InternalMetricsConfig);
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "internal_metrics")]
 impl SourceConfig for InternalMetricsConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
-        if self.scrape_interval_secs == 0.0 {
+        if self.scrape_interval_secs.is_zero() {
             warn!(
                 "Interval set to 0 secs, this could result in high CPU utilization. It is suggested to use interval >= 1 secs.",
             );
         }
-        let interval = time::Duration::from_secs_f64(self.scrape_interval_secs);
+        let interval = self.scrape_interval_secs;
+
+        // namespace for created metrics is already "vector" by default.
         let namespace = self.namespace.clone();
 
-        let host_key = self
-            .tags
-            .host_key
-            .as_deref()
-            .and_then(|tag| (!tag.is_empty()).then(|| tag.to_owned()));
+        let host_key = match self.tags.host_key.as_str() {
+            "" => None,
+            s => Some(s.to_owned()),
+        };
+
         let pid_key = self
             .tags
             .pid_key
             .as_deref()
             .and_then(|tag| (!tag.is_empty()).then(|| tag.to_owned()));
+
         Ok(Box::pin(
             InternalMetrics {
                 namespace,
@@ -106,17 +136,13 @@ impl SourceConfig for InternalMetricsConfig {
         vec![Output::default(DataType::Metric)]
     }
 
-    fn source_type(&self) -> &'static str {
-        "internal_metrics"
-    }
-
     fn can_acknowledge(&self) -> bool {
         false
     }
 }
 
 struct InternalMetrics<'a> {
-    namespace: Option<String>,
+    namespace: String,
     host_key: Option<String>,
     pid_key: Option<String>,
     controller: &'a Controller,
@@ -127,6 +153,7 @@ struct InternalMetrics<'a> {
 
 impl<'a> InternalMetrics<'a> {
     async fn run(mut self) -> Result<(), ()> {
+        let events_received = register!(EventsReceived);
         let mut interval =
             IntervalStream::new(time::interval(self.interval)).take_until(self.shutdown);
         while interval.next().await.is_some() {
@@ -135,23 +162,25 @@ impl<'a> InternalMetrics<'a> {
 
             let metrics = self.controller.capture_metrics();
             let count = metrics.len();
-            let byte_size = metrics.size_of();
-            emit!(EventsReceived { count, byte_size });
+            let byte_size = metrics.estimated_json_encoded_size_of();
+
+            emit!(InternalMetricsBytesReceived { byte_size });
+            events_received.emit(CountByteSize(count, byte_size));
 
             let batch = metrics.into_iter().map(|mut metric| {
                 // A metric starts out with a default "vector" namespace, but will be overridden
                 // if an explicit namespace is provided to this source.
-                if let Some(namespace) = &self.namespace {
-                    metric = metric.with_namespace(Some(namespace));
+                if self.namespace != "vector" {
+                    metric = metric.with_namespace(Some(self.namespace.clone()));
                 }
 
                 if let Some(host_key) = &self.host_key {
                     if let Ok(hostname) = &hostname {
-                        metric.insert_tag(host_key.to_owned(), hostname.to_owned());
+                        metric.replace_tag(host_key.to_owned(), hostname.to_owned());
                     }
                 }
                 if let Some(pid_key) = &self.pid_key {
-                    metric.insert_tag(pid_key.to_owned(), pid.clone());
+                    metric.replace_tag(pid_key.to_owned(), pid.clone());
                 }
                 metric
             });
@@ -171,6 +200,7 @@ mod tests {
     use std::collections::BTreeMap;
 
     use metrics::{counter, gauge, histogram};
+    use vector_core::metric_tags;
 
     use super::*;
     use crate::{
@@ -179,7 +209,10 @@ mod tests {
             Event,
         },
         metrics::Controller,
-        test_util, SourceSender,
+        test_util::{
+            self,
+            components::{run_and_assert_source_compliance, SOURCE_TAGS},
+        },
     };
 
     #[test]
@@ -252,29 +285,20 @@ mod tests {
             _ => panic!("wrong type"),
         }
 
-        let mut labels = BTreeMap::new();
-        labels.insert(String::from("host"), String::from("foo"));
+        let labels = metric_tags!("host" => "foo");
         assert_eq!(Some(&labels), output["quux"].tags());
     }
 
     async fn event_from_config(config: InternalMetricsConfig) -> Event {
-        test_util::trace_init();
+        let mut events = run_and_assert_source_compliance(
+            config,
+            time::Duration::from_millis(100),
+            &SOURCE_TAGS,
+        )
+        .await;
 
-        let (sender, mut recv) = SourceSender::new_test();
-
-        tokio::spawn(async move {
-            config
-                .build(SourceContext::new_test(sender, None))
-                .await
-                .unwrap()
-                .await
-                .unwrap()
-        });
-
-        time::timeout(time::Duration::from_millis(100), recv.next())
-            .await
-            .expect("fetch metrics timeout")
-            .expect("failed to get metrics from a stream")
+        assert!(!events.is_empty());
+        events.remove(0)
     }
 
     #[tokio::test]
@@ -288,7 +312,7 @@ mod tests {
     async fn sets_tags() {
         let event = event_from_config(InternalMetricsConfig {
             tags: TagsConfig {
-                host_key: Some(String::from("my_host_key")),
+                host_key: String::from("my_host_key"),
                 pid_key: Some(String::from("my_pid_key")),
             },
             ..Default::default()
@@ -302,13 +326,13 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn no_tags_by_default() {
+    async fn only_host_tags_by_default() {
         let event = event_from_config(InternalMetricsConfig::default()).await;
 
         let metric = event.as_metric();
 
-        assert!(metric.tag_value("my_host_key").is_none());
-        assert!(metric.tag_value("my_pid_key").is_none());
+        assert!(metric.tag_value("host").is_some());
+        assert!(metric.tag_value("pid").is_none());
     }
 
     #[tokio::test]
@@ -316,7 +340,7 @@ mod tests {
         let namespace = "totally_custom";
 
         let config = InternalMetricsConfig {
-            namespace: Some(namespace.to_owned()),
+            namespace: namespace.to_owned(),
             ..InternalMetricsConfig::default()
         };
 

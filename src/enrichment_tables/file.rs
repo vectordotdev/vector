@@ -1,3 +1,4 @@
+//! Handles enrichment tables for `type = file`.
 use std::{
     collections::{BTreeMap, HashMap},
     fs,
@@ -8,19 +9,32 @@ use std::{
 
 use bytes::Bytes;
 use enrichment::{Case, Condition, IndexHandle, Table};
-use serde::{Deserialize, Serialize};
 use tracing::trace;
 use value::Value;
 use vector_common::{conversion::Conversion, datetime::TimeZone};
+use vector_config::configurable_component;
 
-use crate::config::{EnrichmentTableConfig, EnrichmentTableDescription};
+use crate::config::EnrichmentTableConfig;
 
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
+/// File encoding configuration.
+#[configurable_component]
+#[derive(Clone, Debug, Eq, PartialEq)]
 #[serde(tag = "type", rename_all = "snake_case")]
 enum Encoding {
+    /// Decodes the file as a [CSV][csv] (comma-seperated values) file.
+    ///
+    /// [csv]: https://wikipedia.org/wiki/Comma-separated_values
     Csv {
+        /// Whether or not the file contains column headers.
+        ///
+        /// When set to `true`, the first row of the CSV file will be read as the header row, and
+        /// the values will be used for the names of each column. This is the default behavior.
+        ///
+        /// When set to `false`, columns are referred to by their numerical index.
         #[serde(default = "crate::serde::default_true")]
         include_headers: bool,
+
+        /// The delimiter used to separate fields in each row of the CSV file.
         #[serde(default = "default_delimiter")]
         delimiter: char,
     },
@@ -35,15 +49,71 @@ impl Default for Encoding {
     }
 }
 
-#[derive(Deserialize, Serialize, Default, Debug, Eq, PartialEq, Clone)]
-struct FileC {
+/// File-specific settings.
+#[configurable_component]
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+struct FileSettings {
+    /// The path of the enrichment table file.
+    ///
+    /// Currently, only [CSV][csv] files are supported.
+    ///
+    /// [csv]: https://en.wikipedia.org/wiki/Comma-separated_values
     path: PathBuf,
+
+    #[configurable(derived)]
     encoding: Encoding,
 }
 
-#[derive(Serialize, Deserialize, Default, Debug, Clone, PartialEq, Eq)]
+/// Configuration for the `file` enrichment table.
+#[configurable_component(enrichment_table("file"))]
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct FileConfig {
-    file: FileC,
+    #[configurable(derived)]
+    file: FileSettings,
+
+    /// Key/value pairs representing mapped log field names and types.
+    ///
+    /// This is used to coerce log fields from strings into their proper types. The available types are listed in the `Types` list below.
+    ///
+    /// Timestamp coercions need to be prefaced with `timestamp|`, for example `"timestamp|%F"`. Timestamp specifiers can use either of the following:
+    ///
+    /// 1. One of the built-in-formats listed in the `Timestamp Formats` table below.
+    /// 2. The [time format specifiers][chrono_fmt] from Rust’s `chrono` library.
+    ///
+    /// ### Types
+    ///
+    /// - **`bool`**
+    /// - **`string`**
+    /// - **`float`**
+    /// - **`integer`**
+    /// - **`date`**
+    /// - **`timestamp`** (see the table below for formats)
+    ///
+    /// ### Timestamp Formats
+    ///
+    /// | Format               | Description                                                                      | Example                          |
+    /// |----------------------|----------------------------------------------------------------------------------|----------------------------------|
+    /// | `%F %T`              | `YYYY-MM-DD HH:MM:SS`                                                            | `2020-12-01 02:37:54`            |
+    /// | `%v %T`              | `DD-Mmm-YYYY HH:MM:SS`                                                           | `01-Dec-2020 02:37:54`           |
+    /// | `%FT%T`              | [ISO 8601][iso8601]/[RFC 3339][rfc3339], without time zone                       | `2020-12-01T02:37:54`            |
+    /// | `%FT%TZ`             | [ISO 8601][iso8601]/[RFC 3339][rfc3339], UTC                                     | `2020-12-01T09:37:54Z`           |
+    /// | `%+`                 | [ISO 8601][iso8601]/[RFC 3339][rfc3339], UTC, with time zone                     | `2020-12-01T02:37:54-07:00`      |
+    /// | `%a, %d %b %Y %T`    | [RFC 822][rfc822]/[RFC 2822][rfc2822], without time zone                         | `Tue, 01 Dec 2020 02:37:54`      |
+    /// | `%a %b %e %T %Y`     | [ctime][ctime] format                                                            | `Tue Dec 1 02:37:54 2020`        |
+    /// | `%s`                 | [UNIX timestamp][unix_ts]                                                        | `1606790274`                     |
+    /// | `%a %d %b %T %Y`     | [date][date] command, without time zone                                          | `Tue 01 Dec 02:37:54 2020`       |
+    /// | `%a %d %b %T %Z %Y`  | [date][date] command, with time zone                                             | `Tue 01 Dec 02:37:54 PST 2020`   |
+    /// | `%a %d %b %T %z %Y`  | [date][date] command, with numeric time zone                                     | `Tue 01 Dec 02:37:54 -0700 2020` |
+    /// | `%a %d %b %T %#z %Y` | [date][date] command, with numeric time zone (minutes can be missing or present) | `Tue 01 Dec 02:37:54 -07 2020`   |
+    ///
+    /// [date]: https://man7.org/linux/man-pages/man1/date.1.html
+    /// [ctime]: https://www.cplusplus.com/reference/ctime
+    /// [unix_ts]: https://en.wikipedia.org/wiki/Unix_time
+    /// [rfc822]: https://tools.ietf.org/html/rfc822#section-5
+    /// [rfc2822]: https://tools.ietf.org/html/rfc2822#section-3.3
+    /// [iso8601]: https://en.wikipedia.org/wiki/ISO_8601
+    /// [rfc3339]: https://tools.ietf.org/html/rfc3339
+    /// [chrono_fmt]: https://docs.rs/chrono/latest/chrono/format/strftime/index.html#specifiers
     #[serde(default)]
     schema: HashMap<String, String>,
 }
@@ -68,7 +138,8 @@ impl FileConfig {
 
                 match (split.next(), split.next()) {
                     (Some("date"), None) => Value::Timestamp(
-                        chrono::FixedOffset::east(0)
+                        chrono::FixedOffset::east_opt(0)
+                            .expect("invalid timestamp")
                             .from_utc_datetime(
                                 &chrono::NaiveDate::parse_from_str(value, "%Y-%m-%d")
                                     .map_err(|_| {
@@ -77,12 +148,14 @@ impl FileConfig {
                                             value, row
                                         )
                                     })?
-                                    .and_hms(0, 0, 0),
+                                    .and_hms_opt(0, 0, 0)
+                                    .expect("invalid timestamp"),
                             )
                             .into(),
                     ),
                     (Some("date"), Some(format)) => Value::Timestamp(
-                        chrono::FixedOffset::east(0)
+                        chrono::FixedOffset::east_opt(0)
+                            .expect("invalid timestamp")
                             .from_utc_datetime(
                                 &chrono::NaiveDate::parse_from_str(value, format)
                                     .map_err(|_| {
@@ -91,7 +164,8 @@ impl FileConfig {
                                             value, row
                                         )
                                     })?
-                                    .and_hms(0, 0, 0),
+                                    .and_hms_opt(0, 0, 0)
+                                    .expect("invalid timestamp"),
                             )
                             .into(),
                     ),
@@ -163,24 +237,20 @@ impl FileConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "file")]
 impl EnrichmentTableConfig for FileConfig {
     async fn build(
         &self,
         globals: &crate::config::GlobalOptions,
     ) -> crate::Result<Box<dyn Table + Send + Sync>> {
-        let (headers, data, modified) = self.load_file(globals.timezone)?;
+        let (headers, data, modified) = self.load_file(globals.timezone())?;
 
         Ok(Box::new(File::new(self.clone(), modified, data, headers)))
     }
 }
 
-inventory::submit! {
-    EnrichmentTableDescription::new::<FileConfig>("file")
-}
-
 impl_generate_config_from_default!(FileConfig);
 
+/// A struct that implements [enrichment::Table] to handle loading enricment data from a CSV file.
 #[derive(Clone)]
 pub struct File {
     config: FileConfig,
@@ -195,6 +265,7 @@ pub struct File {
 }
 
 impl File {
+    /// Creates a new [File] based on the provided config.
     pub fn new(
         config: FileConfig,
         last_modified: SystemTime,
@@ -545,17 +616,32 @@ mod tests {
         );
 
         assert_eq!(
-            Ok(Value::from(chrono::Utc.ymd(2020, 3, 5).and_hms(0, 0, 0))),
+            Ok(Value::from(
+                chrono::Utc
+                    .ymd(2020, 3, 5)
+                    .and_hms_opt(0, 0, 0)
+                    .expect("invalid timestamp")
+            )),
             config.parse_column(Default::default(), "col2", 1, "2020-03-05")
         );
 
         assert_eq!(
-            Ok(Value::from(chrono::Utc.ymd(2020, 3, 5).and_hms(0, 0, 0))),
+            Ok(Value::from(
+                chrono::Utc
+                    .ymd(2020, 3, 5)
+                    .and_hms_opt(0, 0, 0)
+                    .expect("invalid timestamp")
+            )),
             config.parse_column(Default::default(), "col3", 1, "03/05/2020")
         );
 
         assert_eq!(
-            Ok(Value::from(chrono::Utc.ymd(2020, 3, 5).and_hms(0, 0, 0))),
+            Ok(Value::from(
+                chrono::Utc
+                    .ymd(2020, 3, 5)
+                    .and_hms_opt(0, 0, 0)
+                    .expect("invalid timestamp")
+            )),
             config.parse_column(Default::default(), "col3-spaces", 1, "03 05 2020")
         );
 
@@ -862,11 +948,21 @@ mod tests {
             vec![
                 vec![
                     "zip".into(),
-                    Value::Timestamp(chrono::Utc.ymd(2015, 12, 7).and_hms(0, 0, 0)),
+                    Value::Timestamp(
+                        chrono::Utc
+                            .ymd(2015, 12, 7)
+                            .and_hms_opt(0, 0, 0)
+                            .expect("invalid timestamp"),
+                    ),
                 ],
                 vec![
                     "zip".into(),
-                    Value::Timestamp(chrono::Utc.ymd(2016, 12, 7).and_hms(0, 0, 0)),
+                    Value::Timestamp(
+                        chrono::Utc
+                            .ymd(2016, 12, 7)
+                            .and_hms_opt(0, 0, 0)
+                            .expect("invalid timestamp"),
+                    ),
                 ],
             ],
             vec!["field1".to_string(), "field2".to_string()],
@@ -881,8 +977,14 @@ mod tests {
             },
             Condition::BetweenDates {
                 field: "field2",
-                from: chrono::Utc.ymd(2016, 1, 1).and_hms(0, 0, 0),
-                to: chrono::Utc.ymd(2017, 1, 1).and_hms(0, 0, 0),
+                from: chrono::Utc
+                    .ymd(2016, 1, 1)
+                    .and_hms_opt(0, 0, 0)
+                    .expect("invalid timestamp"),
+                to: chrono::Utc
+                    .ymd(2017, 1, 1)
+                    .and_hms_opt(0, 0, 0)
+                    .expect("invalid timestamp"),
             },
         ];
 
@@ -891,7 +993,12 @@ mod tests {
                 (String::from("field1"), Value::from("zip")),
                 (
                     String::from("field2"),
-                    Value::Timestamp(chrono::Utc.ymd(2016, 12, 7).and_hms(0, 0, 0))
+                    Value::Timestamp(
+                        chrono::Utc
+                            .ymd(2016, 12, 7)
+                            .and_hms_opt(0, 0, 0)
+                            .expect("invalid timestamp")
+                    )
                 )
             ])),
             file.find_table_row(Case::Sensitive, &conditions, None, Some(handle))

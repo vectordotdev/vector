@@ -1,19 +1,27 @@
+use serde_json::Value;
+
 use crate::{
-    schema::{finalize_schema, generate_array_schema},
+    schema::generate_array_schema,
     schemars::{gen::SchemaGenerator, schema::SchemaObject},
-    Configurable, Metadata,
+    Configurable, GenerateError, Metadata, ToValue,
 };
 
 impl Configurable for no_proxy::NoProxy {
-    fn generate_schema(gen: &mut SchemaGenerator, overrides: Metadata<Self>) -> SchemaObject {
-        // `NoProxy` (de)serializes itself as a vector of strings, without any constraints on the string value itself, so
-        // we just... do that. We do set the element metadata to be transparent, the same as we do for `Vec<T>`, because
-        // all of the pertinent information will be on `NoProxy` itself.
-        let mut element_metadata = String::metadata();
-        element_metadata.set_transparent();
+    fn metadata() -> Metadata {
+        // Any schema that maps to a scalar type needs to be marked as transparent... and since we
+        // generate a schema equivalent to a string, we need to mark ourselves as transparent, too.
+        Metadata::with_transparent(true)
+    }
 
-        let mut schema = generate_array_schema(gen, element_metadata);
-        finalize_schema(gen, &mut schema, overrides);
-        schema
+    fn generate_schema(gen: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
+        // `NoProxy` (de)serializes itself as a vector of strings, without any constraints on the string value itself, so
+        // we just... do that.
+        generate_array_schema::<String>(gen)
+    }
+}
+
+impl ToValue for no_proxy::NoProxy {
+    fn to_value(&self) -> Value {
+        serde_json::to_value(self).expect("Could not convert no-proxy list to JSON")
     }
 }

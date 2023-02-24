@@ -257,18 +257,18 @@ mod tests {
                             Kind::object(BTreeMap::from([
                                 ("qux".into(), Kind::bytes().or_integer()),
                                 ("quux".into(), Kind::boolean().or_regex()),
-                                ("this".into(), Kind::timestamp().or_null()),
-                                ("that".into(), Kind::null()),
+                                ("this".into(), Kind::timestamp().or_undefined()),
+                                ("that".into(), Kind::null().or_undefined()),
                             ])),
                         ),
-                        ("bar".into(), Kind::integer().or_null()),
-                        ("baz".into(), Kind::boolean().or_null()),
+                        ("bar".into(), Kind::integer().or_undefined()),
+                        ("baz".into(), Kind::boolean().or_undefined()),
                     ])),
                 },
             ),
         ]) {
             this.merge(other, strategy);
-            assert_eq!(this, merged, "{}", title);
+            assert_eq!(this, merged, "{title}");
         }
     }
 }

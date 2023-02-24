@@ -1,43 +1,51 @@
-use std::net::SocketAddr;
-
-use bytes::{Bytes, BytesMut};
+use bytes::BytesMut;
 use chrono::Utc;
 use codecs::{
     decoding::{DeserializerConfig, FramingConfig},
     StreamDecodingError,
 };
 use futures::StreamExt;
-use tokio::net::UdpSocket;
+use listenfd::ListenFd;
+use lookup::{lookup_v2::OptionalValuePath, owned_value_path, path};
 use tokio_util::codec::FramedRead;
-use vector_config::configurable_component;
-use vector_core::ByteSizeOf;
+use vector_common::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
+use vector_config::{configurable_component, NamedComponent};
+use vector_core::{
+    config::{LegacyKey, LogNamespace},
+    EstimatedJsonEncodedSizeOf,
+};
 
 use crate::{
     codecs::Decoder,
     config::log_schema,
     event::Event,
     internal_events::{
-        BytesReceived, SocketEventsReceived, SocketMode, SocketReceiveError, StreamClosedError,
+        SocketBindError, SocketEventsReceived, SocketMode, SocketReceiveError, StreamClosedError,
     },
     serde::{default_decoding, default_framing_message_based},
     shutdown::ShutdownSignal,
-    sources::Source,
+    sources::{
+        socket::SocketConfig,
+        util::net::{try_bind_udp_socket, SocketListenAddr},
+        Source,
+    },
     udp, SourceSender,
 };
 
 /// UDP configuration for the `socket` source.
 #[configurable_component]
-#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
+#[derive(Clone, Debug)]
 pub struct UdpConfig {
-    /// The address to listen for messages on.
-    address: SocketAddr,
+    #[configurable(derived)]
+    address: SocketListenAddr,
 
-    /// The maximum buffer size, in bytes, of incoming messages.
+    /// The maximum buffer size of incoming messages.
     ///
     /// Messages larger than this are truncated.
-    #[serde(default = "crate::serde::default_max_length")]
-    pub(super) max_length: usize,
+    #[serde(default = "default_max_length")]
+    #[configurable(metadata(docs::type_unit = "bytes"))]
+    pub(super) max_length: Option<usize>,
 
     /// Overrides the name of the log field used to add the peer host to each event.
     ///
@@ -45,19 +53,26 @@ pub struct UdpConfig {
     ///
     /// By default, the [global `log_schema.host_key` option][global_host_key] is used.
     ///
+    /// Set to `""` to suppress this key.
+    ///
     /// [global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
-    host_key: Option<String>,
+    #[serde(default = "default_host_key")]
+    host_key: OptionalValuePath,
 
     /// Overrides the name of the log field used to add the peer host's port to each event.
     ///
     /// The value will be the peer host's port i.e. `9000`.
     ///
     /// By default, `"port"` is used.
-    port_key: Option<String>,
-
-    /// The size, in bytes, of the receive buffer used for the listening socket.
     ///
-    /// This should not typically needed to be changed.
+    /// Set to `""` to suppress this key.
+    #[serde(default = "default_port_key")]
+    port_key: OptionalValuePath,
+
+    /// The size of the receive buffer used for the listening socket.
+    ///
+    /// Generally this should not need to be configured.
+    #[configurable(metadata(docs::type_unit = "bytes"))]
     receive_buffer_bytes: Option<usize>,
 
     #[configurable(derived)]
@@ -67,11 +82,32 @@ pub struct UdpConfig {
     #[configurable(derived)]
     #[serde(default = "default_decoding")]
     decoding: DeserializerConfig,
+
+    /// The namespace to use for logs. This overrides the global setting.
+    #[serde(default)]
+    #[configurable(metadata(docs::hidden))]
+    pub log_namespace: Option<bool>,
+}
+
+fn default_host_key() -> OptionalValuePath {
+    OptionalValuePath::from(owned_value_path!(log_schema().host_key()))
+}
+
+fn default_port_key() -> OptionalValuePath {
+    OptionalValuePath::from(owned_value_path!("port"))
+}
+
+fn default_max_length() -> Option<usize> {
+    Some(crate::serde::default_max_length())
 }
 
 impl UdpConfig {
-    pub(super) const fn host_key(&self) -> &Option<String> {
+    pub(super) const fn host_key(&self) -> &OptionalValuePath {
         &self.host_key
+    }
+
+    pub const fn port_key(&self) -> &OptionalValuePath {
+        &self.port_key
     }
 
     pub(super) const fn framing(&self) -> &FramingConfig {
@@ -82,34 +118,46 @@ impl UdpConfig {
         &self.decoding
     }
 
-    pub(super) const fn address(&self) -> SocketAddr {
+    pub(super) const fn address(&self) -> SocketListenAddr {
         self.address
     }
 
-    pub fn from_address(address: SocketAddr) -> Self {
+    pub fn from_address(address: SocketListenAddr) -> Self {
         Self {
             address,
-            max_length: crate::serde::default_max_length(),
-            host_key: None,
-            port_key: Some(String::from("port")),
+            max_length: default_max_length(),
+            host_key: default_host_key(),
+            port_key: default_port_key(),
             receive_buffer_bytes: None,
             framing: default_framing_message_based(),
             decoding: default_decoding(),
+            log_namespace: None,
         }
+    }
+
+    pub fn set_log_namespace(&mut self, val: Option<bool>) -> &mut Self {
+        self.log_namespace = val;
+        self
     }
 }
 
 pub(super) fn udp(
     config: UdpConfig,
-    host_key: String,
     decoder: Decoder,
     mut shutdown: ShutdownSignal,
     mut out: SourceSender,
+    log_namespace: LogNamespace,
 ) -> Source {
     Box::pin(async move {
-        let socket = UdpSocket::bind(&config.address)
+        let listenfd = ListenFd::from_env();
+        let socket = try_bind_udp_socket(config.address, listenfd)
             .await
-            .expect("Failed to bind to udp listener socket");
+            .map_err(|error| {
+                emit!(SocketBindError {
+                    mode: SocketMode::Udp,
+                    error,
+                })
+            })?;
 
         if let Some(receive_buffer_bytes) = config.receive_buffer_bytes {
             if let Err(error) = udp::set_receive_buffer_size(&socket, receive_buffer_bytes) {
@@ -117,10 +165,15 @@ pub(super) fn udp(
             }
         }
 
-        let max_length = match config.receive_buffer_bytes {
-            Some(receive_buffer_bytes) => std::cmp::min(config.max_length, receive_buffer_bytes),
-            None => config.max_length,
-        };
+        let mut max_length = config
+            .max_length
+            .unwrap_or_else(|| default_max_length().unwrap());
+
+        if let Some(receive_buffer_bytes) = config.receive_buffer_bytes {
+            max_length = std::cmp::min(max_length, receive_buffer_bytes);
+        }
+
+        let bytes_received = register!(BytesReceived::from(Protocol::UDP));
 
         info!(message = "Listening.", address = %config.address);
 
@@ -140,21 +193,20 @@ pub(super) fn udp(
                                     warn!(
                                         message = "Discarding frame larger than max_length.",
                                         max_length = max_length,
-                                        internal_log_rate_secs = 30
+                                        internal_log_rate_limit = true
                                     );
                                     continue;
                                 }
                             }
 
-                            let error = codecs::decoding::Error::FramingError(error.into());
                             return Err(emit!(SocketReceiveError {
                                 mode: SocketMode::Udp,
-                                error: &error
+                                error
                             }));
                        }
                     };
 
-                    emit!(BytesReceived { byte_size, protocol: "udp" });
+                    bytes_received.emit(ByteSize(byte_size));
 
                     let payload = buf.split_to(byte_size);
                     let truncated = byte_size == max_length + 1;
@@ -171,7 +223,7 @@ pub(super) fn udp(
                                     warn!(
                                         message = "Discarding frame larger than max_length.",
                                         max_length = max_length,
-                                        internal_log_rate_secs = 30
+                                        internal_log_rate_limit = true
                                     );
                                 }
 
@@ -182,7 +234,7 @@ pub(super) fn udp(
                                 let count = events.len();
                                 emit!(SocketEventsReceived {
                                     mode: SocketMode::Udp,
-                                    byte_size: events.size_of(),
+                                    byte_size: events.estimated_json_encoded_size_of(),
                                     count,
                                 });
 
@@ -190,13 +242,31 @@ pub(super) fn udp(
 
                                 for event in &mut events {
                                     if let Event::Log(ref mut log) = event {
-                                        log.try_insert(log_schema().source_type_key(), Bytes::from("socket"));
-                                        log.try_insert(log_schema().timestamp_key(), now);
-                                        log.try_insert(host_key.as_str(), address.ip().to_string());
+                                        log_namespace.insert_standard_vector_source_metadata(
+                                            log,
+                                            SocketConfig::NAME,
+                                            now,
+                                        );
 
-                                        if let Some(port_key) = &config.port_key {
-                                            log.try_insert(port_key.as_str(), address.port());
-                                        }
+                                        let legacy_host_key = config.host_key.clone().path;
+
+                                        log_namespace.insert_source_metadata(
+                                            SocketConfig::NAME,
+                                            log,
+                                            legacy_host_key.as_ref().map(LegacyKey::InsertIfEmpty),
+                                            path!("host"),
+                                            address.ip().to_string()
+                                        );
+
+                                        let legacy_port_key = config.port_key.clone().path;
+
+                                        log_namespace.insert_source_metadata(
+                                            SocketConfig::NAME,
+                                            log,
+                                            legacy_port_key.as_ref().map(LegacyKey::InsertIfEmpty),
+                                            path!("port"),
+                                            address.port()
+                                        );
                                     }
                                 }
 

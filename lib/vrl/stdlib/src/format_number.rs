@@ -45,7 +45,7 @@ fn format_number(
             let i = i as usize;
 
             if parts.len() == 1 {
-                parts.push("".to_owned())
+                parts.push(String::new())
             }
 
             if i > parts[1].len() {
@@ -118,7 +118,7 @@ impl Function for FormatNumber {
         &self,
         _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
         let scale = arguments.optional("scale");

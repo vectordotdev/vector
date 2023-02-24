@@ -3,6 +3,7 @@ use std::{fmt::Debug, sync::Arc};
 use futures::FutureExt;
 use http::Uri;
 use tower::ServiceBuilder;
+use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
 
 use super::{
@@ -74,15 +75,19 @@ impl RetryLogic for NewRelicApiRetry {
 }
 
 /// Configuration for the `new_relic` sink.
-#[configurable_component(sink)]
+#[configurable_component(sink("new_relic"))]
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct NewRelicConfig {
     /// A valid New Relic license key.
-    pub license_key: String,
+    #[configurable(metadata(docs::examples = "xxxx"))]
+    #[configurable(metadata(docs::examples = "${NEW_RELIC_LICENSE_KEY}"))]
+    pub license_key: SensitiveString,
 
     /// The New Relic account ID.
-    pub account_id: String,
+    #[configurable(metadata(docs::examples = "xxxx"))]
+    #[configurable(metadata(docs::examples = "${NEW_RELIC_ACCOUNT_KEY}"))]
+    pub account_id: SensitiveString,
 
     #[configurable(derived)]
     pub region: Option<NewRelicRegion>,
@@ -134,7 +139,6 @@ impl NewRelicConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "new_relic")]
 impl SinkConfig for NewRelicConfig {
     async fn build(
         &self,
@@ -159,7 +163,6 @@ impl SinkConfig for NewRelicConfig {
 
         let sink = NewRelicSink {
             service,
-
             transformer: self.encoding.clone(),
             encoder: NewRelicEncoder,
             credentials,
@@ -172,10 +175,6 @@ impl SinkConfig for NewRelicConfig {
 
     fn input(&self) -> Input {
         Input::new(DataType::Log | DataType::Metric)
-    }
-
-    fn sink_type(&self) -> &'static str {
-        "new_relic"
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
@@ -230,8 +229,8 @@ impl NewRelicCredentials {
 impl From<&NewRelicConfig> for NewRelicCredentials {
     fn from(config: &NewRelicConfig) -> Self {
         Self {
-            license_key: config.license_key.clone(),
-            account_id: config.account_id.clone(),
+            license_key: config.license_key.inner().to_string(),
+            account_id: config.account_id.inner().to_string(),
             api: config.api,
             region: config.region.unwrap_or(NewRelicRegion::Us),
             override_uri: config.override_uri.clone(),

@@ -6,7 +6,7 @@ use std::{
 };
 
 #[cfg(unix)]
-use notify::{raw_watcher, Op, RawEvent, RecommendedWatcher, RecursiveMode, Watcher};
+use notify::{recommended_watcher, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 
 use crate::Error;
 
@@ -43,8 +43,11 @@ pub fn spawn_thread<'a>(
 
     thread::spawn(move || loop {
         if let Some((mut watcher, receiver)) = watcher.take() {
-            while let Ok(RawEvent { op: Ok(event), .. }) = receiver.recv() {
-                if event.intersects(Op::CREATE | Op::REMOVE | Op::WRITE | Op::CLOSE_WRITE) {
+            while let Ok(Ok(event)) = receiver.recv() {
+                if matches!(
+                    event.kind,
+                    EventKind::Create(_) | EventKind::Remove(_) | EventKind::Modify(_)
+                ) {
                     debug!(message = "Configuration file change detected.", event = ?event);
 
                     // Consume events until delay amount of time has passed since the latest event.
@@ -107,10 +110,16 @@ fn raise_sighup() {
 #[cfg(unix)]
 fn create_watcher(
     config_paths: &[PathBuf],
-) -> Result<(RecommendedWatcher, Receiver<RawEvent>), Error> {
+) -> Result<
+    (
+        RecommendedWatcher,
+        Receiver<Result<notify::Event, notify::Error>>,
+    ),
+    Error,
+> {
     info!("Creating configuration file watcher.");
     let (sender, receiver) = channel();
-    let mut watcher = raw_watcher(sender)?;
+    let mut watcher = recommended_watcher(sender)?;
     add_paths(&mut watcher, config_paths)?;
     Ok((watcher, receiver))
 }

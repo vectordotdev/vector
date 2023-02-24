@@ -3,14 +3,12 @@ use std::{fmt, num::NonZeroUsize};
 use async_trait::async_trait;
 use futures::{future, stream::BoxStream, StreamExt};
 use tower::Service;
-use vector_core::{
-    stream::{BatcherSettings, DriverResponse},
-    ByteSizeOf,
-};
+use vector_core::stream::{BatcherSettings, DriverResponse};
 
 use crate::{
     codecs::Transformer,
     event::{Event, LogEvent, Value},
+    internal_events::SinkRequestBuildError,
     sinks::{
         elasticsearch::{
             encoder::ProcessedEvent, request_builder::ElasticsearchRequestBuilder,
@@ -21,21 +19,12 @@ use crate::{
     transforms::metric_to_log::MetricToLog,
 };
 
+use super::{ElasticsearchCommon, ElasticsearchConfig};
+
 #[derive(Clone, Eq, Hash, PartialEq)]
 pub struct PartitionKey {
     pub index: String,
     pub bulk_action: BulkAction,
-}
-
-pub struct BatchedEvents {
-    pub key: PartitionKey,
-    pub events: Vec<ProcessedEvent>,
-}
-
-impl ByteSizeOf for BatchedEvents {
-    fn allocated_bytes(&self) -> usize {
-        self.events.size_of()
-    }
 }
 
 pub struct ElasticsearchSink<S> {
@@ -46,6 +35,26 @@ pub struct ElasticsearchSink<S> {
     pub metric_to_log: MetricToLog,
     pub mode: ElasticsearchCommonMode,
     pub id_key_field: Option<String>,
+}
+
+impl<S> ElasticsearchSink<S> {
+    pub fn new(
+        common: &ElasticsearchCommon,
+        config: &ElasticsearchConfig,
+        service: S,
+    ) -> crate::Result<Self> {
+        let batch_settings = config.batch.into_batcher_settings()?;
+
+        Ok(ElasticsearchSink {
+            batch_settings,
+            request_builder: common.request_builder.clone(),
+            transformer: config.encoding.clone(),
+            service,
+            metric_to_log: common.metric_to_log.clone(),
+            mode: common.mode.clone(),
+            id_key_field: config.id_key.clone(),
+        })
+    }
 }
 
 impl<S> ElasticsearchSink<S>
@@ -62,12 +71,17 @@ where
         let id_key_field = self.id_key_field;
         let transformer = self.transformer.clone();
 
-        let sink = input
+        input
             .scan(self.metric_to_log, |metric_to_log, event| {
                 future::ready(Some(match event {
                     Event::Metric(metric) => metric_to_log.transform_one(metric),
                     Event::Log(log) => Some(log),
-                    _ => None,
+                    Event::Trace(_) => {
+                        // Although technically this will cause the event to be dropped, due to the sink
+                        // config it is not possible to send traces to this sink - so this situation can
+                        // never occur. We don't need to emit an `EventsDropped` event.
+                        None
+                    }
                 }))
             })
             .filter_map(|x| async move { x })
@@ -78,20 +92,22 @@ where
             .request_builder(request_builder_concurrency_limit, self.request_builder)
             .filter_map(|request| async move {
                 match request {
-                    Err(e) => {
-                        error!("Failed to build Elasticsearch request: {:?}.", e);
+                    Err(error) => {
+                        emit!(SinkRequestBuildError { error });
                         None
                     }
                     Ok(req) => Some(req),
                 }
             })
-            .into_driver(self.service);
-
-        sink.run().await
+            .into_driver(self.service)
+            .run()
+            .await
     }
 }
 
-pub fn process_log(
+/// Any `None` values returned from this function will already result in a `TemplateRenderingError`
+/// being emitted, so no further `EventsDropped` event needs emitting.
+pub(super) fn process_log(
     mut log: LogEvent,
     mode: &ElasticsearchCommonMode,
     id_key_field: &Option<String>,

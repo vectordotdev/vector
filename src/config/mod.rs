@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 use std::{
     collections::{HashMap, HashSet},
     fmt::{self, Display, Formatter},
@@ -6,21 +7,21 @@ use std::{
     path::PathBuf,
 };
 
-use async_trait::async_trait;
-use component::ComponentDescription;
-use indexmap::IndexMap; // IndexMap preserves insertion order, allowing us to output errors in the same order they are present in the file
-use serde::{Deserialize, Serialize};
-pub use vector_core::config::{AcknowledgementsConfig, DataType, GlobalOptions, Input, Output};
-pub use vector_core::transform::{TransformConfig, TransformContext};
+use indexmap::IndexMap;
+pub use vector_config::component::{GenerateConfig, SinkDescription, TransformDescription};
+use vector_config::configurable_component;
+pub use vector_core::config::{
+    AcknowledgementsConfig, DataType, GlobalOptions, Input, Output, SourceAcknowledgementsConfig,
+};
 
-use crate::{conditions, event::Metric, serde::OneOrMany};
+use crate::{conditions, event::Metric, secrets::SecretBackends, serde::OneOrMany};
 
 pub mod api;
 mod builder;
 mod cmd;
 mod compiler;
-pub mod component;
 mod diff;
+mod enrichment_table;
 #[cfg(feature = "enterprise")]
 pub mod enterprise;
 pub mod format;
@@ -28,11 +29,12 @@ mod graph;
 mod id;
 mod loading;
 pub mod provider;
-mod schema;
+pub mod schema;
+mod secret;
 mod sink;
 mod source;
 mod transform;
-mod unit_test;
+pub mod unit_test;
 mod validation;
 mod vars;
 pub mod watcher;
@@ -40,16 +42,18 @@ pub mod watcher;
 pub use builder::ConfigBuilder;
 pub use cmd::{cmd, Opts};
 pub use diff::ConfigDiff;
+pub use enrichment_table::{EnrichmentTableConfig, EnrichmentTableOuter};
 pub use format::{Format, FormatHint};
-pub use id::{ComponentKey, OutputId};
+pub use id::{ComponentKey, Inputs, OutputId};
 pub use loading::{
     load, load_builder_from_paths, load_from_paths, load_from_paths_with_provider_and_secrets,
-    load_from_str, load_source_from_paths, merge_path_lists, process_paths, SecretBackend,
-    CONFIG_PATHS,
+    load_from_str, load_source_from_paths, merge_path_lists, process_paths, CONFIG_PATHS,
 };
-pub use sink::{SinkConfig, SinkContext, SinkDescription, SinkHealthcheckOptions, SinkOuter};
-pub use source::{SourceConfig, SourceContext, SourceDescription, SourceOuter};
-pub use transform::{TransformDescription, TransformOuter};
+pub use provider::ProviderConfig;
+pub use secret::SecretBackend;
+pub use sink::{SinkConfig, SinkContext, SinkHealthcheckOptions, SinkOuter};
+pub use source::{SourceConfig, SourceContext, SourceOuter};
+pub use transform::{TransformConfig, TransformContext, TransformOuter};
 pub use unit_test::{build_unit_tests, build_unit_tests_main, UnitTestResult};
 pub use validation::warnings;
 pub use vector_core::config::{log_schema, proxy::ProxyConfig, LogSchema};
@@ -97,7 +101,7 @@ pub struct Config {
     #[cfg(feature = "api")]
     pub api: api::Options,
     pub schema: schema::Options,
-    pub version: Option<String>,
+    pub hash: Option<String>,
     #[cfg(feature = "enterprise")]
     pub enterprise: Option<enterprise::Options>,
     pub global: GlobalOptions,
@@ -107,8 +111,7 @@ pub struct Config {
     transforms: IndexMap<ComponentKey, TransformOuter<OutputId>>,
     pub enrichment_tables: IndexMap<ComponentKey, EnrichmentTableOuter>,
     tests: Vec<TestDefinition>,
-    expansions: IndexMap<ComponentKey, Vec<ComponentKey>>,
-    secret: IndexMap<ComponentKey, Box<dyn SecretBackend>>,
+    secret: IndexMap<ComponentKey, SecretBackends>,
 }
 
 impl Config {
@@ -143,18 +146,8 @@ impl Config {
     pub fn inputs_for_node(&self, id: &ComponentKey) -> Option<&[OutputId]> {
         self.transforms
             .get(id)
-            .map(|t| t.inputs.as_slice())
-            .or_else(|| self.sinks.get(id).map(|s| s.inputs.as_slice()))
-    }
-
-    /// Expand a logical component id (i.e. from the config file) into the ids of the
-    /// components it was expanded to as part of the macro process. Does not check that the
-    /// identifier is otherwise valid.
-    pub fn expand_input(&self, identifier: &ComponentKey) -> Vec<ComponentKey> {
-        self.expansions
-            .get(identifier)
-            .cloned()
-            .unwrap_or_else(|| vec![identifier.clone()])
+            .map(|t| &t.inputs[..])
+            .or_else(|| self.sinks.get(id).map(|s| &s.inputs[..]))
     }
 
     pub fn propagate_acknowledgements(&mut self) -> Result<(), Vec<String>> {
@@ -202,10 +195,21 @@ impl Config {
     }
 }
 
-#[derive(Debug, Clone, Copy, Deserialize, Serialize)]
+/// Healthcheck options.
+#[configurable_component]
+#[derive(Clone, Copy, Debug)]
 #[serde(default)]
 pub struct HealthcheckOptions {
+    /// Whether or not healthchecks are enabled for all sinks.
+    ///
+    /// Can be overridden on a per-sink basis.
     pub enabled: bool,
+
+    /// Whether or not to require a sink to report as being healthy during startup.
+    ///
+    /// When enabled and a sink reports not being healthy, Vector will exit during start-up.
+    ///
+    /// Can be alternatively set, and overridden by, the `--require-healthy` command-line flag.
     pub require_healthy: bool,
 }
 
@@ -231,45 +235,16 @@ impl Default for HealthcheckOptions {
     }
 }
 
-pub trait GenerateConfig {
-    fn generate_config() -> toml::Value;
-}
-
 #[macro_export]
 macro_rules! impl_generate_config_from_default {
     ($type:ty) => {
         impl $crate::config::GenerateConfig for $type {
-            fn generate_config() -> toml::Value {
-                toml::Value::try_from(&Self::default()).unwrap()
+            fn generate_config() -> toml::value::Value {
+                toml::value::Value::try_from(&Self::default()).unwrap()
             }
         }
     };
 }
-
-#[derive(Deserialize, Serialize, Debug)]
-pub struct EnrichmentTableOuter {
-    #[serde(flatten)]
-    pub inner: Box<dyn EnrichmentTableConfig>,
-}
-
-impl EnrichmentTableOuter {
-    pub fn new(inner: Box<dyn EnrichmentTableConfig>) -> Self {
-        EnrichmentTableOuter { inner }
-    }
-}
-
-#[async_trait]
-#[typetag::serde(tag = "type")]
-pub trait EnrichmentTableConfig: core::fmt::Debug + Send + Sync + dyn_clone::DynClone {
-    async fn build(
-        &self,
-        globals: &GlobalOptions,
-    ) -> crate::Result<Box<dyn enrichment::Table + Send + Sync>>;
-}
-
-pub type EnrichmentTableDescription = ComponentDescription<Box<dyn EnrichmentTableConfig>>;
-
-inventory::collect!(EnrichmentTableDescription);
 
 /// Unique thing, like port, of which only one owner can be.
 #[derive(Clone, Debug, Eq, PartialEq, Hash, Ord, PartialOrd)]
@@ -357,15 +332,26 @@ impl Display for Resource {
     }
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+/// A unit test definition.
+#[configurable_component]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
-pub struct TestDefinition<T = OutputId> {
+pub struct TestDefinition<T: 'static = OutputId> {
+    /// The name of the unit test.
     pub name: String,
+
+    /// An input event to test against.
     pub input: Option<TestInput>,
+
+    /// A set of input events to test against.
     #[serde(default)]
     pub inputs: Vec<TestInput>,
+
+    /// A set of expected output events after the test has run.
     #[serde(default)]
     pub outputs: Vec<TestOutput<T>>,
+
+    /// A set of component outputs that should not have emitted any events.
     #[serde(default)]
     pub no_outputs_from: Vec<T>,
 }
@@ -374,7 +360,6 @@ impl TestDefinition<String> {
     fn resolve_outputs(
         self,
         graph: &graph::Graph,
-        expansions: &IndexMap<String, Vec<String>>,
     ) -> Result<TestDefinition<OutputId>, Vec<String>> {
         let TestDefinition {
             name,
@@ -395,19 +380,7 @@ impl TestDefinition<String> {
                     conditions,
                 } = old;
 
-                let extract_from = extract_from
-                    .into_vec()
-                    .into_iter()
-                    .flat_map(|from| {
-                        if let Some(expanded) = expansions.get(&from) {
-                            expanded.to_vec()
-                        } else {
-                            vec![from]
-                        }
-                    })
-                    .collect::<Vec<_>>();
-
-                (extract_from, conditions)
+                (extract_from.to_vec(), conditions)
             })
             .filter_map(|(extract_from, conditions)| {
                 let mut outputs = Vec::new();
@@ -474,14 +447,13 @@ impl TestDefinition<OutputId> {
         let outputs = outputs
             .into_iter()
             .map(|old| TestOutput {
-                extract_from: match old.extract_from {
-                    OneOrMany::One(value) => value.to_string().into(),
-                    OneOrMany::Many(values) => values
-                        .iter()
-                        .map(|item| item.to_string())
-                        .collect::<Vec<_>>()
-                        .into(),
-                },
+                extract_from: old
+                    .extract_from
+                    .to_vec()
+                    .into_iter()
+                    .map(|item| item.to_string())
+                    .collect::<Vec<_>>()
+                    .into(),
                 conditions: old.conditions,
             })
             .collect();
@@ -498,23 +470,55 @@ impl TestDefinition<OutputId> {
     }
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+/// Value for a log field.
+#[configurable_component]
+#[derive(Clone, Debug)]
 #[serde(untagged)]
 pub enum TestInputValue {
+    /// A string.
     String(String),
+
+    /// An integer.
     Integer(i64),
+
+    /// A floating-point number.
     Float(f64),
+
+    /// A boolean.
     Boolean(bool),
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+/// A unit test input.
+///
+/// An input describes not only the type of event to insert, but also which transform within the
+/// configuration to insert it to.
+#[configurable_component]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct TestInput {
+    /// The name of the transform to insert the input event to.
     pub insert_at: ComponentKey,
+
+    /// The type of the input event.
+    ///
+    /// Can be either `raw`, `log`, or `metric.
     #[serde(default = "default_test_input_type", rename = "type")]
     pub type_str: String,
+
+    /// The raw string value to use as the input event.
+    ///
+    /// Use this only when the input event should be a raw event (i.e. unprocessed/undecoded log
+    /// event) and when the input type is set to `raw`.
     pub value: Option<String>,
+
+    /// The set of log fields to use when creating a log input event.
+    ///
+    /// Only relevant when `type` is `log`.
     pub log_fields: Option<IndexMap<String, TestInputValue>>,
+
+    /// The metric to use as an input event.
+    ///
+    /// Only relevant when `type` is `metric`.
     pub metric: Option<Metric>,
 }
 
@@ -522,10 +526,18 @@ fn default_test_input_type() -> String {
     "raw".to_string()
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+/// A unit test output.
+///
+/// An output describes what we expect a transform to emit when fed a certain event, or events, when
+/// running a unit test.
+#[configurable_component]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct TestOutput<T = OutputId> {
+    /// The transform outputs to extract events from.
     pub extract_from: OneOrMany<T>,
+
+    /// The conditions to run against the output to validate that they were transformed as expected.
     pub conditions: Option<Vec<conditions::AnyCondition>>,
 }
 
@@ -560,22 +572,22 @@ mod tests {
         let err = load(
             r#"
             [sources.in]
-            type = "basic_source"
+            type = "test_basic"
 
             [transforms.sample]
-            type = "basic_transform"
+            type = "test_basic"
             inputs = []
             suffix = "foo"
             increase = 1.25
 
             [transforms.sample2]
-            type = "basic_transform"
+            type = "test_basic"
             inputs = ["qwerty"]
             suffix = "foo"
             increase = 1.25
 
             [sinks.out]
-            type = "basic_sink"
+            type = "test_basic"
             inputs = ["asdf", "in", "in"]
             "#,
             Format::Toml,
@@ -599,19 +611,19 @@ mod tests {
         let err = load(
             r#"
             [sources.foo]
-            type = "basic_source"
+            type = "test_basic"
 
             [sources.bar]
-            type = "basic_source"
+            type = "test_basic"
 
             [transforms.foo]
-            type = "basic_transform"
+            type = "test_basic"
             inputs = ["bar"]
             suffix = "foo"
             increase = 1.25
 
             [sinks.out]
-            type = "basic_sink"
+            type = "test_basic"
             inputs = ["foo"]
             "#,
             Format::Toml,
@@ -638,7 +650,7 @@ mod tests {
             fd = 0
 
             [sinks.out]
-            type = "basic_sink"
+            type = "test_basic"
             inputs = ["stdin", "file_descriptor"]
             "#,
             Format::Toml,
@@ -659,13 +671,11 @@ mod tests {
             [sources.file_descriptor1]
             type = "file_descriptor"
             fd = 10
-
             [sources.file_descriptor2]
             type = "file_descriptor"
             fd = 10
-
             [sinks.out]
-            type = "basic_sink"
+            type = "test_basic"
             inputs = ["file_descriptor1", "file_descriptor2"]
             "#,
             Format::Toml,
@@ -692,7 +702,7 @@ mod tests {
             fd = 20
 
             [sinks.out]
-            type = "basic_sink"
+            type = "test_basic"
             inputs = ["file_descriptor1", "file_descriptor2"]
             "#,
             Format::Toml,
@@ -708,25 +718,25 @@ mod tests {
         let warnings = load(
             r#"
             [sources.in1]
-            type = "basic_source"
+            type = "test_basic"
 
             [sources.in2]
-            type = "basic_source"
+            type = "test_basic"
 
             [transforms.sample1]
-            type = "basic_transform"
+            type = "test_basic"
             inputs = ["in1"]
             suffix = "foo"
             increase = 1.25
 
             [transforms.sample2]
-            type = "basic_transform"
+            type = "test_basic"
             inputs = ["in1"]
             suffix = "foo"
             increase = 1.25
 
             [sinks.out]
-            type = "basic_sink"
+            type = "test_basic"
             inputs = ["sample1"]
             "#,
             Format::Toml,
@@ -748,34 +758,34 @@ mod tests {
         let errors = load(
             r#"
             [sources.in]
-            type = "basic_source"
+            type = "test_basic"
 
             [transforms.one]
-            type = "basic_transform"
+            type = "test_basic"
             inputs = ["in"]
             suffix = "foo"
             increase = 1.25
 
             [transforms.two]
-            type = "basic_transform"
+            type = "test_basic"
             inputs = ["one", "four"]
             suffix = "foo"
             increase = 1.25
 
             [transforms.three]
-            type = "basic_transform"
+            type = "test_basic"
             inputs = ["two"]
             suffix = "foo"
             increase = 1.25
 
             [transforms.four]
-            type = "basic_transform"
+            type = "test_basic"
             inputs = ["three"]
             suffix = "foo"
             increase = 1.25
 
             [sinks.out]
-            type = "basic_sink"
+            type = "test_basic"
             inputs = ["four"]
             "#,
             Format::Toml,
@@ -794,10 +804,10 @@ mod tests {
         let config = load_from_str(
             indoc! {r#"
                 [sources.in]
-                type = "basic_source"
+                type = "test_basic"
 
                 [sinks.out]
-                type = "basic_sink"
+                type = "test_basic"
                 inputs = ["in"]
             "#},
             Format::Toml,
@@ -815,10 +825,10 @@ mod tests {
         let config = load_from_str(
             indoc! {r#"
             [sources.in]
-            type = "basic_source"
+            type = "test_basic"
 
             [sinks.out]
-            type = "basic_sink"
+            type = "test_basic"
             inputs = ["in"]
             "#},
             Format::Toml,
@@ -846,10 +856,10 @@ mod tests {
                   timestamp_key = "then"
 
                 [sources.in]
-                  type = "basic_source"
+                  type = "test_basic"
 
                 [sinks.out]
-                  type = "basic_sink"
+                  type = "test_basic"
                   inputs = ["in"]
             "#},
             Format::Toml,
@@ -866,10 +876,10 @@ mod tests {
         let mut config: ConfigBuilder = format::deserialize(
             indoc! {r#"
                 [sources.in]
-                  type = "basic_source"
+                  type = "test_basic"
 
                 [sinks.out]
-                  type = "basic_sink"
+                  type = "test_basic"
                   inputs = ["in"]
             "#},
             Format::Toml,
@@ -886,7 +896,7 @@ mod tests {
                           http = "http://proxy.inc:3128"
 
                         [transforms.foo]
-                          type = "basic_transform"
+                          type = "test_basic"
                           inputs = [ "in" ]
                           suffix = "foo"
                           increase = 1.25
@@ -900,8 +910,8 @@ mod tests {
                           [[tests.outputs]]
                             extract_from = "foo"
                             [[tests.outputs.conditions]]
-                              type = "check_fields"
-                              "message.equals" = "Sorry, I'm busy this week Cecil"
+                              type = "vrl"
+                              source = ".message == \"Sorry, I'm busy this week Cecil\""
                     "#},
                     Format::Toml,
                 )
@@ -924,10 +934,10 @@ mod tests {
         let mut config: ConfigBuilder = format::deserialize(
             indoc! {r#"
                 [sources.in]
-                  type = "basic_source"
+                  type = "test_basic"
 
                 [sinks.out]
-                  type = "basic_sink"
+                  type = "test_basic"
                   inputs = ["in"]
             "#},
             Format::Toml,
@@ -939,16 +949,16 @@ mod tests {
                 format::deserialize(
                     indoc! {r#"
                         [sources.in]
-                          type = "basic_source"
+                          type = "test_basic"
 
                         [transforms.foo]
-                          type = "basic_transform"
+                          type = "test_basic"
                           inputs = [ "in" ]
                           suffix = "foo"
                           increase = 1.25
 
                         [sinks.out]
-                          type = "basic_sink"
+                          type = "test_basic"
                           inputs = ["in"]
                     "#},
                     Format::Toml,
@@ -1199,12 +1209,15 @@ mod acknowledgements_tests {
                 data_dir = "/tmp"
                 [sources.in1]
                     type = "file"
+                    include = ["/var/log/**/*.log"]
                 [sources.in2]
                     type = "file"
+                    include = ["/var/log/**/*.log"]
                 [sources.in3]
                     type = "file"
+                    include = ["/var/log/**/*.log"]
                 [transforms.parse3]
-                    type = "basic_transform"
+                    type = "test_basic"
                     inputs = ["in3"]
                     increase = 0.0
                     suffix = ""
@@ -1254,6 +1267,7 @@ mod resource_tests {
     };
 
     use indoc::indoc;
+    use vector_config::schema::generate_root_schema;
 
     use super::{load_from_str, Format, Resource};
 
@@ -1386,51 +1400,42 @@ mod resource_tests {
         )
         .is_err());
     }
-}
-
-#[cfg(all(
-    test,
-    feature = "sources-stdin",
-    feature = "sinks-console",
-    feature = "transforms-pipelines",
-    feature = "transforms-filter"
-))]
-mod pipelines_tests {
-    use indoc::indoc;
-
-    use super::{load_from_str, Format};
 
     #[test]
-    fn forbid_pipeline_nesting() {
-        let res = load_from_str(
-            indoc! {r#"
-                [sources.in]
-                  type = "stdin"
+    #[ignore]
+    #[allow(clippy::print_stdout)]
+    #[allow(clippy::print_stderr)]
+    fn generate_component_config_schema() {
+        use crate::config::{SinkOuter, SourceOuter, TransformOuter};
+        use indexmap::IndexMap;
+        use vector_common::config::ComponentKey;
+        use vector_config::configurable_component;
 
-                [transforms.processing]
-                  inputs = ["in"]
-                  type = "pipelines"
+        /// Top-level Vector configuration.
+        #[configurable_component]
+        #[derive(Clone)]
+        struct ComponentsOnlyConfig {
+            /// Configured sources.
+            #[serde(default)]
+            pub sources: IndexMap<ComponentKey, SourceOuter>,
 
-                  [[transforms.processing.logs]]
-                    name = "foo"
+            /// Configured transforms.
+            #[serde(default)]
+            pub transforms: IndexMap<ComponentKey, TransformOuter<String>>,
 
-                    [[transforms.processing.logs.transforms]]
-                      type = "pipelines"
+            /// Configured sinks.
+            #[serde(default)]
+            pub sinks: IndexMap<ComponentKey, SinkOuter<String>>,
+        }
 
-                      [[transforms.processing.logs.transforms.logs]]
-                        name = "bar"
+        match generate_root_schema::<ComponentsOnlyConfig>() {
+            Ok(schema) => {
+                let json = serde_json::to_string_pretty(&schema)
+                    .expect("rendering root schema to JSON should not fail");
 
-                          [[transforms.processing.logs.transforms.logs.transforms]]
-                            type = "filter"
-                            condition = ""
-
-                [sinks.out]
-                  type = "console"
-                  inputs = ["processing"]
-                  encoding.codec = "json"
-            "#},
-            Format::Toml,
-        );
-        assert!(res.is_err(), "should error");
+                println!("{}", json);
+            }
+            Err(e) => eprintln!("error while generating schema: {:?}", e),
+        }
     }
 }

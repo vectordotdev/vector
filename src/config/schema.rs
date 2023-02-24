@@ -1,17 +1,22 @@
-use serde::{Deserialize, Serialize};
+use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
 
 pub(crate) use crate::schema::Definition;
 
-#[derive(Debug, Deserialize, Serialize, PartialEq, Eq, Copy, Clone)]
+/// Schema options.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[serde(default, deny_unknown_fields)]
 pub struct Options {
+    /// Whether or not schema is enabled.
     #[serde(default = "default_enabled")]
     pub enabled: bool,
 
+    /// Whether or not schema validation is enabled.
     #[serde(default = "default_validation")]
     pub validation: bool,
 
+    /// Whether or not to enable log namespacing.
     pub log_namespace: Option<bool>,
 }
 

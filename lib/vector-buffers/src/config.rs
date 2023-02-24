@@ -1,20 +1,22 @@
 use std::{
     fmt,
     num::{NonZeroU64, NonZeroUsize},
-    path::PathBuf,
+    path::{Path, PathBuf},
+    slice,
 };
 
-use serde::{de, ser, Deserialize, Deserializer, Serialize, Serializer};
+use serde::{de, Deserialize, Deserializer, Serialize};
 use snafu::{ResultExt, Snafu};
 use tracing::Span;
-use vector_common::finalization::Finalizable;
+use vector_common::{config::ComponentKey, finalization::Finalizable};
+use vector_config::configurable_component;
 
 use crate::{
     topology::{
         builder::{TopologyBuilder, TopologyError},
         channel::{BufferReceiver, BufferSender},
     },
-    variants::{DiskV1Buffer, DiskV2Buffer, MemoryBuffer},
+    variants::{DiskV2Buffer, MemoryBuffer},
     Bufferable, WhenFull,
 };
 
@@ -32,8 +34,6 @@ pub enum BufferBuildError {
 enum BufferTypeKind {
     #[serde(rename = "memory")]
     Memory,
-    #[serde(rename = "disk_v1")]
-    DiskV1,
     #[serde(rename = "disk")]
     DiskV2,
 }
@@ -97,18 +97,6 @@ impl BufferTypeVisitor {
                     when_full,
                 })
             }
-            BufferTypeKind::DiskV1 => {
-                if max_events.is_some() {
-                    return Err(de::Error::unknown_field(
-                        "max_events",
-                        &["type", "max_size", "when_full"],
-                    ));
-                }
-                Ok(BufferType::DiskV1 {
-                    max_size: max_size.ok_or_else(|| de::Error::missing_field("max_size"))?,
-                    when_full,
-                })
-            }
             BufferTypeKind::DiskV2 => {
                 if max_events.is_some() {
                     return Err(de::Error::unknown_field(
@@ -149,101 +137,136 @@ impl<'de> Deserialize<'de> for BufferType {
     }
 }
 
-struct BufferConfigVisitor;
-
-impl<'de> de::Visitor<'de> for BufferConfigVisitor {
-    type Value = BufferConfig;
-
-    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        formatter.write_str("enum BufferType")
-    }
-
-    fn visit_map<A>(self, map: A) -> Result<Self::Value, A::Error>
-    where
-        A: de::MapAccess<'de>,
-    {
-        let stage = BufferTypeVisitor::visit_map_impl(map)?;
-        Ok(BufferConfig {
-            stages: vec![stage],
-        })
-    }
-
-    fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
-    where
-        A: de::SeqAccess<'de>,
-    {
-        let mut stages = Vec::new();
-        while let Some(stage) = seq.next_element()? {
-            stages.push(stage);
-        }
-        Ok(BufferConfig { stages })
-    }
-}
-
-impl<'de> Deserialize<'de> for BufferConfig {
-    fn deserialize<D>(deserializer: D) -> Result<BufferConfig, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        deserializer.deserialize_any(BufferConfigVisitor)
-    }
-}
-
-impl Serialize for BufferConfig {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        match self.stages.len() {
-            0 => Err(ser::Error::custom(
-                "buffer config cannot be empty when serializing",
-            )),
-            1 => self.stages.first().unwrap().serialize(serializer),
-            _ => self.stages.serialize(serializer),
-        }
-    }
-}
-
 pub const fn memory_buffer_default_max_events() -> NonZeroUsize {
     unsafe { NonZeroUsize::new_unchecked(500) }
 }
 
+/// Disk usage configuration for disk-backed buffers.
+#[derive(Debug)]
+pub struct DiskUsage {
+    id: ComponentKey,
+    data_dir: PathBuf,
+    max_size: NonZeroU64,
+}
+
+impl DiskUsage {
+    /// Creates a new `DiskUsage` with the given usage configuration.
+    pub fn new(id: ComponentKey, data_dir: PathBuf, max_size: NonZeroU64) -> Self {
+        Self {
+            id,
+            data_dir,
+            max_size,
+        }
+    }
+
+    /// Gets the component key for the component this buffer is attached to.
+    pub fn id(&self) -> &ComponentKey {
+        &self.id
+    }
+
+    /// Gets the maximum size, in bytes, that this buffer can consume on disk.
+    pub fn max_size(&self) -> u64 {
+        self.max_size.get()
+    }
+
+    /// Gets the data directory path that this buffer will store its files on disk.
+    pub fn data_dir(&self) -> &Path {
+        self.data_dir.as_path()
+    }
+}
+
 /// A specific type of buffer stage.
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize)]
-#[serde(tag = "type")]
-#[serde(rename_all = "snake_case")]
+#[configurable_component(no_deser)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[serde(rename_all = "snake_case", tag = "type")]
+#[configurable(metadata(docs::enum_tag_description = "The type of buffer to use."))]
 pub enum BufferType {
     /// A buffer stage backed by an in-memory channel provided by `tokio`.
+    ///
+    /// This is more performant, but less durable. Data will be lost if Vector is restarted
+    /// forcefully or crashes.
+    #[configurable(title = "Events are buffered in memory.")]
     #[serde(rename = "memory")]
     Memory {
+        /// The maximum number of events allowed in the buffer.
         #[serde(default = "memory_buffer_default_max_events")]
         max_events: NonZeroUsize,
+
+        #[configurable(derived)]
         #[serde(default)]
         when_full: WhenFull,
     },
-    /// A buffer stage backed by an on-disk database, powered by LevelDB.
-    #[serde(rename = "disk_v1")]
-    DiskV1 {
-        max_size: NonZeroU64,
-        #[serde(default)]
-        when_full: WhenFull,
-    },
+
     /// A buffer stage backed by disk.
+    ///
+    /// This is less performant, but more durable. Data that has been synchronized to disk will not
+    /// be lost if Vector is restarted forcefully or crashes.
+    ///
+    /// Data is synchronized to disk every 500ms.
+    #[configurable(title = "Events are buffered on disk.")]
     #[serde(rename = "disk")]
     DiskV2 {
+        /// The maximum size of the buffer on disk.
+        ///
+        /// Must be at least ~256 megabytes (268435488 bytes).
+        #[configurable(
+            validation(range(min = 268435488)),
+            metadata(docs::type_unit = "bytes")
+        )]
         max_size: NonZeroU64,
+
+        #[configurable(derived)]
         #[serde(default)]
         when_full: WhenFull,
     },
 }
 
 impl BufferType {
+    /// Gets the metadata around disk usage by the buffer, if supported.
+    ///
+    /// For buffer types that write to disk, `Some(value)` is returned with their usage metadata,
+    /// such as maximum size and data directory path.
+    ///
+    /// Otherwise, `None` is returned.
+    pub fn disk_usage(
+        &self,
+        global_data_dir: Option<PathBuf>,
+        id: &ComponentKey,
+    ) -> Option<DiskUsage> {
+        // All disk-backed buffers require the global data directory to be specified, and
+        // non-disk-backed buffers do not require it to be set... so if it's not set here, we ignore
+        // it because either:
+        // - it's a non-disk-backed buffer, in which case we can just ignore, or
+        // - this method is being called at a point before we actually check that a global data
+        //   directory is specified because we have a disk buffer present
+        //
+        // Since we're not able to emit/surface errors about a lack of a global data directory from
+        // where this method is called, we simply return `None` to let it reach the code that _does_
+        // emit/surface those errors... and once those errors are fixed, this code can return valid
+        // disk usage information, which will then be validated and emit any errors for _that_
+        // aspect.
+        match global_data_dir {
+            None => None,
+            Some(global_data_dir) => match self {
+                Self::Memory { .. } => None,
+                Self::DiskV2 { max_size, .. } => {
+                    let data_dir = crate::variants::disk_v2::get_disk_v2_data_dir_path(
+                        &global_data_dir,
+                        id.id(),
+                    );
+
+                    Some(DiskUsage::new(id.clone(), data_dir, *max_size))
+                }
+            },
+        }
+    }
+
     /// Adds this buffer type as a stage to an existing [`TopologyBuilder`].
     ///
     /// # Errors
     ///
     /// If a required parameter is missing, or if there is an error building the topology itself, an
-    /// error variant will be returned desribing the error
+    /// error variant will be returned describing the error
     pub fn add_to_builder<T>(
         &self,
         builder: &mut TopologyBuilder<T>,
@@ -260,13 +283,6 @@ impl BufferType {
             } => {
                 builder.stage(MemoryBuffer::new(max_events), when_full);
             }
-            BufferType::DiskV1 {
-                when_full,
-                max_size,
-            } => {
-                let data_dir = data_dir.ok_or(BufferBuildError::RequiresDataDir)?;
-                builder.stage(DiskV1Buffer::new(id, data_dir, max_size), when_full);
-            }
             BufferType::DiskV2 {
                 when_full,
                 max_size,
@@ -280,7 +296,7 @@ impl BufferType {
     }
 }
 
-/// A buffer configuration.
+/// Buffer configuration.
 ///
 /// Buffers are compromised of stages(*) that form a buffer _topology_, with input items being
 /// subject to configurable behavior when each stage reaches configured limits.  Buffers are
@@ -294,30 +310,44 @@ impl BufferType {
 /// functionality to allow chaining buffers together, you'll see "buffer topology" used in internal
 /// documentation to correctly reflect the internal structure.
 ///
-/// TODO: We need to limit chained buffers to only allowing a single copy of each buffer type to be
-/// defined, otherwise, for example, two instances of the same disk buffer type in a single chained
-/// buffer topology would try to both open the same buffer files on disk, which wouldn't work or
-/// would go horribly wrong.
+// TODO: We need to limit chained buffers to only allowing a single copy of each buffer type to be
+// defined, otherwise, for example, two instances of the same disk buffer type in a single chained
+// buffer topology would try to both open the same buffer files on disk, which wouldn't work or
+// would go horribly wrong.
+#[configurable_component]
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct BufferConfig {
-    pub stages: Vec<BufferType>,
+#[serde(untagged)]
+#[configurable(
+    title = "Configures the buffering behavior for this sink.",
+    description = r#"More information about the individual buffer types, and buffer behavior, can be found in the
+[Buffering Model][buffering_model] section.
+
+[buffering_model]: /docs/about/under-the-hood/architecture/buffering-model/"#
+)]
+pub enum BufferConfig {
+    /// A single stage buffer topology.
+    Single(BufferType),
+
+    /// A chained buffer topology.
+    Chained(Vec<BufferType>),
 }
 
 impl Default for BufferConfig {
     fn default() -> Self {
-        Self {
-            stages: vec![BufferType::Memory {
-                max_events: memory_buffer_default_max_events(),
-                when_full: WhenFull::default(),
-            }],
-        }
+        Self::Single(BufferType::Memory {
+            max_events: memory_buffer_default_max_events(),
+            when_full: WhenFull::default(),
+        })
     }
 }
 
 impl BufferConfig {
     /// Gets all of the configured stages for this buffer.
     pub fn stages(&self) -> &[BufferType] {
-        &self.stages
+        match self {
+            Self::Single(stage) => slice::from_ref(stage),
+            Self::Chained(stages) => stages.as_slice(),
+        }
     }
 
     /// Builds the buffer components represented by this configuration.
@@ -344,7 +374,7 @@ impl BufferConfig {
     {
         let mut builder = TopologyBuilder::default();
 
-        for stage in &self.stages {
+        for stage in self.stages() {
             stage.add_to_builder(&mut builder, data_dir.clone(), buffer_id.clone())?;
         }
 
@@ -363,14 +393,14 @@ mod test {
 
     fn check_single_stage(source: &str, expected: BufferType) {
         let config: BufferConfig = serde_yaml::from_str(source).unwrap();
-        assert_eq!(config.stages.len(), 1);
-        let actual = config.stages.first().unwrap();
+        assert_eq!(config.stages().len(), 1);
+        let actual = config.stages().first().unwrap();
         assert_eq!(actual, &expected);
     }
 
     fn check_multiple_stages(source: &str, expected_stages: &[BufferType]) {
         let config: BufferConfig = serde_yaml::from_str(source).unwrap();
-        assert_eq!(config.stages.len(), expected_stages.len());
+        assert_eq!(config.stages().len(), expected_stages.len());
         for (actual, expected) in config.stages().iter().zip(expected_stages) {
             assert_eq!(actual, expected);
         }
@@ -389,7 +419,7 @@ mod test {
         let error = serde_yaml::from_str::<BufferConfig>(source).unwrap_err();
         assert_eq!(
             error.to_string(),
-            "unknown field `foo`, expected one of `type`, `max_events`, `max_size`, `when_full` at line 1 column 4"
+            "data did not match any variant of untagged enum BufferConfig"
         );
     }
 
@@ -401,7 +431,7 @@ max_events: 42
         let error = serde_yaml::from_str::<BufferConfig>(source).unwrap_err();
         assert_eq!(
             error.to_string(),
-            "unknown field `max_size`, expected one of `type`, `max_events`, `when_full` at line 1 column 9"
+            "data did not match any variant of untagged enum BufferConfig"
         );
     }
 
@@ -441,17 +471,6 @@ max_events: 42
 
     #[test]
     fn ensure_field_defaults_for_all_types() {
-        check_single_stage(
-            r#"
-          type: disk_v1
-          max_size: 1024
-          "#,
-            BufferType::DiskV1 {
-                max_size: NonZeroU64::new(1024).unwrap(),
-                when_full: WhenFull::Block,
-            },
-        );
-
         check_single_stage(
             r#"
           type: memory

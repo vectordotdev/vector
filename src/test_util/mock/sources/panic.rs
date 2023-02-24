@@ -1,27 +1,24 @@
 use async_trait::async_trait;
-use serde::{Deserialize, Serialize};
+use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
 use vector_core::{
     config::{DataType, Output},
     source::Source,
 };
 
-use crate::config::{SourceConfig, SourceContext, SourceDescription};
+use crate::config::{SourceConfig, SourceContext};
 
-/// A test source that immediately panics.
-#[derive(Debug, Default, Deserialize, Serialize)]
+/// Configuration for the `test_panic` source.
+#[configurable_component(source("test_panic"))]
+#[derive(Clone, Debug, Default)]
 pub struct PanicSourceConfig {
-    dummy: Option<String>,
+    /// Meaningless field that only exists for triggering config diffs during topology reloading.
+    data: Option<String>,
 }
 
 impl_generate_config_from_default!(PanicSourceConfig);
 
-inventory::submit! {
-    SourceDescription::new::<PanicSourceConfig>("panic_source")
-}
-
 #[async_trait]
-#[typetag::serde(name = "panic_source")]
 impl SourceConfig for PanicSourceConfig {
     async fn build(&self, _cx: SourceContext) -> crate::Result<Source> {
         Ok(Box::pin(async { panic!() }))
@@ -29,10 +26,6 @@ impl SourceConfig for PanicSourceConfig {
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
-    }
-
-    fn source_type(&self) -> &'static str {
-        "panic_source"
     }
 
     fn can_acknowledge(&self) -> bool {

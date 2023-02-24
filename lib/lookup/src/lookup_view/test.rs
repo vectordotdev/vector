@@ -238,7 +238,7 @@ fn lookup_to_string_and_serialize() {
         .for_each(|fixture_file| match fixture_file {
             Ok(fixture_file) => {
                 let path = fixture_file.path();
-                let buf = parse_artifact(&path).unwrap();
+                let buf = parse_artifact(path).unwrap();
 
                 let buf_serialized =
                     serde_json::to_string(&serde_json::to_value(&buf).unwrap()).unwrap();

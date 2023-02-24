@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 //! Topology contains all topology based types.
 //!
 //! Topology is broken up into two main sections. The first
@@ -10,6 +11,7 @@ pub(super) use vector_core::fanout;
 pub mod schema;
 
 pub mod builder;
+mod controller;
 mod ready_arrays;
 mod running;
 mod task;
@@ -23,21 +25,21 @@ use std::{
     sync::{Arc, Mutex},
 };
 
+pub use controller::{ReloadOutcome, TopologyController};
 use futures::{Future, FutureExt};
 pub(super) use running::RunningTopology;
 use tokio::sync::{mpsc, watch};
 use vector_buffers::topology::channel::{BufferReceiverStream, BufferSender};
 
 use crate::{
-    config::{ComponentKey, Config, ConfigDiff, OutputId},
+    config::{ComponentKey, Config, ConfigDiff, Inputs, OutputId},
     event::EventArray,
-    topology::{
-        builder::Pieces,
-        task::{Task, TaskOutput},
-    },
+    topology::{builder::Pieces, task::Task},
 };
 
-type TaskHandle = tokio::task::JoinHandle<Result<TaskOutput, ()>>;
+use self::task::{TaskError, TaskResult};
+
+type TaskHandle = tokio::task::JoinHandle<TaskResult>;
 
 type BuiltBuffer = (
     BufferSender<EventArray>,
@@ -59,10 +61,10 @@ pub struct TapResource {
     // Outputs and their corresponding Fanout control
     pub outputs: HashMap<TapOutput, fanout::ControlChannel>,
     // Components (transforms, sinks) and their corresponding inputs
-    pub inputs: HashMap<ComponentKey, Vec<OutputId>>,
+    pub inputs: HashMap<ComponentKey, Inputs<OutputId>>,
     // Source component keys used to warn against invalid pattern matches
     pub source_keys: Vec<String>,
-    // Sink component keys used to warn against invalid pattern amtches
+    // Sink component keys used to warn against invalid pattern matches
     pub sink_keys: Vec<String>,
     // Components removed on a reload (used to drop TapSinks)
     pub removals: HashSet<ComponentKey>,
@@ -76,14 +78,38 @@ pub async fn start_validated(
     config: Config,
     diff: ConfigDiff,
     mut pieces: Pieces,
-) -> Option<(RunningTopology, mpsc::UnboundedReceiver<()>)> {
+) -> Option<(
+    RunningTopology,
+    (mpsc::UnboundedSender<()>, mpsc::UnboundedReceiver<()>),
+)> {
     let (abort_tx, abort_rx) = mpsc::unbounded_channel();
 
-    crate::metrics::Controller::get()
-        .expect("Metrics must be initialized")
-        .set_expiry(config.global.expire_metrics);
+    let expire_metrics = match (
+        config.global.expire_metrics,
+        config.global.expire_metrics_secs,
+    ) {
+        (Some(e), None) => {
+            warn!(
+                "DEPRECATED: `expire_metrics` setting is deprecated and will be removed in a future version. Use `expire_metrics_secs` instead."
+            );
+            Some(e.as_secs_f64())
+        }
+        (Some(_), Some(_)) => {
+            error!("Cannot set both `expire_metrics` and `expire_metrics_secs`.");
+            return None;
+        }
+        (None, e) => e,
+    };
 
-    let mut running_topology = RunningTopology::new(config, abort_tx);
+    if let Err(error) = crate::metrics::Controller::get()
+        .expect("Metrics must be initialized")
+        .set_expiry(expire_metrics)
+    {
+        error!(message = "Invalid metrics expiry.", %error);
+        return None;
+    }
+
+    let mut running_topology = RunningTopology::new(config, abort_tx.clone());
 
     if !running_topology
         .run_healthchecks(&diff, &mut pieces, running_topology.config.healthchecks)
@@ -94,7 +120,7 @@ pub async fn start_validated(
     running_topology.connect_diff(&diff, &mut pieces).await;
     running_topology.spawn_diff(&diff, pieces);
 
-    Some((running_topology, abort_rx))
+    Some((running_topology, (abort_tx, abort_rx)))
 }
 
 pub async fn build_or_log_errors(
@@ -124,17 +150,18 @@ pub(super) fn take_healthchecks(
 }
 
 async fn handle_errors(
-    task: impl Future<Output = Result<TaskOutput, ()>>,
+    task: impl Future<Output = TaskResult>,
     abort_tx: mpsc::UnboundedSender<()>,
-) -> Result<TaskOutput, ()> {
+) -> TaskResult {
     AssertUnwindSafe(task)
         .catch_unwind()
         .await
-        .map_err(|_| ())
+        .map_err(|_| TaskError::Panicked)
         .and_then(|res| res)
-        .map_err(|_| {
-            error!("An error occurred that Vector couldn't handle.");
+        .map_err(|e| {
+            error!("An error occurred that Vector couldn't handle: {}.", e);
             let _ = abort_tx.send(());
+            e
         })
 }
 

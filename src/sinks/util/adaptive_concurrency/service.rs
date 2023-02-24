@@ -3,12 +3,12 @@ use std::{
     future::Future,
     mem,
     sync::Arc,
-    task::{Context, Poll},
+    task::{ready, Context, Poll},
 };
 
-use futures::{future::BoxFuture, ready};
+use futures::future::BoxFuture;
 use tokio::sync::OwnedSemaphorePermit;
-use tower::Service;
+use tower::{load::Load, Service};
 
 use super::{controller::Controller, future::ResponseFuture, AdaptiveConcurrencySettings};
 use crate::sinks::util::retries::RetryLogic;
@@ -16,7 +16,6 @@ use crate::sinks::util::retries::RetryLogic;
 /// Enforces a limit on the concurrent number of requests the underlying
 /// service can handle. Automatically expands and contracts the actual
 /// concurrency limit depending on observed request response behavior.
-#[derive(Debug)]
 pub struct AdaptiveConcurrencyLimit<S, L> {
     inner: S,
     pub(super) controller: Arc<Controller<L>>,
@@ -84,6 +83,14 @@ where
         let future = self.inner.call(request);
 
         ResponseFuture::new(future, permit, Arc::clone(&self.controller))
+    }
+}
+
+impl<S, L> Load for AdaptiveConcurrencyLimit<S, L> {
+    type Metric = f64;
+
+    fn load(&self) -> Self::Metric {
+        self.controller.load()
     }
 }
 

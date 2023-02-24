@@ -18,20 +18,19 @@ use uuid::Uuid;
 use value::Kind;
 use vector_core::config::LogNamespace;
 
-use self::unit_test_components::{
+pub use self::unit_test_components::{
     UnitTestSinkCheck, UnitTestSinkConfig, UnitTestSinkResult, UnitTestSourceConfig,
+    UnitTestStreamSinkConfig, UnitTestStreamSourceConfig,
 };
-use super::{compiler::expand_globs, graph::Graph, OutputId};
+use super::{compiler::expand_globs, graph::Graph, OutputId, TransformConfig};
 use crate::{
     conditions::Condition,
     config::{
-        self, compiler::expand_macros, loading, ComponentKey, Config, ConfigBuilder, ConfigPath,
-        SinkOuter, SourceOuter, TestDefinition, TestInput, TestInputValue, TestOutput,
+        self, loading, ComponentKey, Config, ConfigBuilder, ConfigPath, SinkOuter, SourceOuter,
+        TestDefinition, TestInput, TestInputValue, TestOutput,
     },
     event::{Event, LogEvent, Value},
-    schema,
-    serde::OneOrMany,
-    signal,
+    schema, signal,
     topology::{
         self,
         builder::{self, Pieces},
@@ -166,22 +165,19 @@ impl UnitTestBuildMetadata {
                 .get(key)
                 .expect("Missing test source for a transform")
                 .clone();
-            transform.inputs.push(test_source_id);
+            transform.inputs.extend(Some(test_source_id));
 
             template_sources.insert(key.clone(), UnitTestSourceConfig::default());
         }
 
-        // In order to attach a sink to any valid extraction point, we need to
-        // expand relevant transforms
-        let mut builder = config_builder.clone();
-        let _ = expand_macros(&mut builder)?;
+        let builder = config_builder.clone();
         let available_extract_targets = builder
             .transforms
             .iter()
             .flat_map(|(key, transform)| {
                 transform
                     .inner
-                    .outputs(&schema::Definition::any())
+                    .outputs(&schema::Definition::any(), builder.schema.log_namespace())
                     .into_iter()
                     .map(|output| OutputId {
                         component: key.clone(),
@@ -272,7 +268,7 @@ impl UnitTestBuildMetadata {
             let sink_ids = ids.clone();
             let sink_config = UnitTestSinkConfig {
                 test_name: test_name.to_string(),
-                transform_ids: ids.stringify().into_vec(),
+                transform_ids: ids.iter().map(|id| id.to_string()).collect(),
                 result_tx: Arc::new(Mutex::new(Some(tx))),
                 check: UnitTestSinkCheck::Checks(checks),
             };
@@ -292,15 +288,17 @@ impl UnitTestBuildMetadata {
             };
 
             test_result_rxs.push(rx);
-            template_sinks.insert(id.clone().into(), sink_config);
+            template_sinks.insert(vec![id.clone()], sink_config);
         }
 
         let sinks = template_sinks
             .into_iter()
             .map(|(transform_ids, sink_config)| {
-                let transform_ids_str = transform_ids.stringify().into_vec();
+                let transform_ids_str = transform_ids
+                    .iter()
+                    .map(|s| s.to_string())
+                    .collect::<Vec<_>>();
                 let sink_ids = transform_ids
-                    .into_vec()
                     .iter()
                     .map(|transform_id| {
                         self.sink_ids
@@ -312,7 +310,7 @@ impl UnitTestBuildMetadata {
                 let sink_id = sink_ids.join(",");
                 (
                     ComponentKey::from(sink_id),
-                    SinkOuter::new(transform_ids_str, Box::new(sink_config)),
+                    SinkOuter::new(transform_ids_str, sink_config),
                 )
             })
             .collect::<IndexMap<_, _>>();
@@ -359,17 +357,14 @@ async fn build_unit_test(
     test: TestDefinition<String>,
     mut config_builder: ConfigBuilder,
 ) -> Result<UnitTest, Vec<String>> {
-    let mut transform_only_config = config_builder.clone();
-    let expansions = expand_macros(&mut transform_only_config)?;
-    let expansions = crate::config::compiler::to_string_expansions(&expansions);
+    let transform_only_config = config_builder.clone();
     let transform_only_graph = Graph::new_unchecked(
         &transform_only_config.sources,
         &transform_only_config.transforms,
         &transform_only_config.sinks,
-        &expansions,
         transform_only_config.schema,
     );
-    let test = test.resolve_outputs(&transform_only_graph, &expansions)?;
+    let test = test.resolve_outputs(&transform_only_graph)?;
 
     let sources = metadata.hydrate_into_sources(&test.inputs)?;
     let (test_result_rxs, sinks) =
@@ -379,18 +374,11 @@ async fn build_unit_test(
     config_builder.sinks = sinks;
     expand_globs(&mut config_builder);
 
-    // To properly identify all components relevant to the test, expand relevant
-    // transforms
-    let mut expanded_config = config_builder.clone();
-    let expansions = expand_macros(&mut expanded_config)?;
-    let expansions = crate::config::compiler::to_string_expansions(&expansions);
-
     let graph = Graph::new_unchecked(
-        &expanded_config.sources,
-        &expanded_config.transforms,
-        &expanded_config.sinks,
-        &expansions,
-        expanded_config.schema,
+        &config_builder.sources,
+        &config_builder.transforms,
+        &config_builder.sinks,
+        config_builder.schema,
     );
 
     let mut valid_components = get_relevant_test_components(
@@ -421,7 +409,6 @@ async fn build_unit_test(
         &config_builder.sources,
         &config_builder.transforms,
         &config_builder.sinks,
-        &expansions,
         config_builder.schema,
     );
     let valid_inputs = graph.input_map()?;
@@ -430,7 +417,7 @@ async fn build_unit_test(
         transform.inputs = inputs
             .into_iter()
             .filter(|input| valid_inputs.contains_key(input))
-            .collect::<Vec<_>>();
+            .collect();
     }
 
     if let Some(sink) = get_loose_end_outputs_sink(&config_builder) {
@@ -457,15 +444,17 @@ async fn build_unit_test(
 /// To avoid warning logs that occur when building such topologies, we construct
 /// a NoOp sink here whose sole purpose is to consume any "loose end" outputs.
 fn get_loose_end_outputs_sink(config: &ConfigBuilder) -> Option<SinkOuter<String>> {
-    let mut config = config.clone();
-    let _ = expand_macros(&mut config);
+    let config = config.clone();
     let transform_ids = config.transforms.iter().flat_map(|(key, transform)| {
         transform
             .inner
-            .outputs(&schema::Definition::new_with_default_metadata(
-                Kind::any(),
-                [LogNamespace::Legacy, LogNamespace::Vector],
-            ))
+            .outputs(
+                &schema::Definition::new_with_default_metadata(
+                    Kind::any(),
+                    [LogNamespace::Legacy, LogNamespace::Vector],
+                ),
+                config.schema.log_namespace(),
+            )
             .iter()
             .map(|output| {
                 if let Some(port) = &output.port {
@@ -501,7 +490,7 @@ fn get_loose_end_outputs_sink(config: &ConfigBuilder) -> Option<SinkOuter<String
             result_tx: Arc::new(Mutex::new(None)),
             check: UnitTestSinkCheck::NoOp,
         };
-        Some(SinkOuter::new(loose_end_outputs, Box::new(noop_sink)))
+        Some(SinkOuter::new(loose_end_outputs, noop_sink))
     }
 }
 
@@ -546,8 +535,8 @@ fn build_and_validate_inputs(
 
 fn build_outputs(
     test_outputs: &[TestOutput],
-) -> Result<IndexMap<OneOrMany<OutputId>, Vec<Vec<Condition>>>, Vec<String>> {
-    let mut outputs: IndexMap<OneOrMany<OutputId>, Vec<Vec<Condition>>> = IndexMap::new();
+) -> Result<IndexMap<Vec<OutputId>, Vec<Vec<Condition>>>, Vec<String>> {
+    let mut outputs: IndexMap<Vec<OutputId>, Vec<Vec<Condition>>> = IndexMap::new();
     let mut errors = Vec::new();
 
     for output in test_outputs {
@@ -569,7 +558,7 @@ fn build_outputs(
         }
 
         outputs
-            .entry(output.extract_from.clone())
+            .entry(output.extract_from.clone().to_vec())
             .and_modify(|existing_conditions| existing_conditions.push(conditions.clone()))
             .or_insert(vec![conditions.clone()]);
     }

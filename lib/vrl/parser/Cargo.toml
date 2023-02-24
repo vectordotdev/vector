@@ -17,7 +17,7 @@ paste = "1"
 thiserror = "1"
 
 [dev-dependencies]
-test-case = "2"
+test-case = "3"
 
 [build-dependencies]
 lalrpop = { version = "0.19.8", default-features = false }

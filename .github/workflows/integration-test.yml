@@ -32,7 +32,6 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  AUTOINSTALL: true
   AWS_ACCESS_KEY_ID: "dummy"
   AWS_SECRET_ACCESS_KEY: "dummy"
   CONTAINER_TOOL: "docker"
@@ -56,9 +55,11 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          - test: 'amqp'
           - test: 'apex'
           - test: 'aws'
-          - test: 'axiom'
+          # Database container currently fails to start due to failing to validate the license
+          #- test: 'axiom'
           - test: 'azure'
           - test: 'clickhouse'
           - test: 'datadog-agent'
@@ -72,6 +73,7 @@ jobs:
           - test: 'fluent'
           - test: 'gcp'
           - test: 'humio'
+          - test: 'http-client'
           - test: 'influxdb'
           - test: 'kafka'
           - test: 'logstash'
@@ -86,9 +88,7 @@ jobs:
           - test: 'redis'
           - test: 'shutdown'
           - test: 'splunk'
-            env:
-              SPLUNK_VERSION: 7.3.9
-          - test: 'splunk'
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v3
       - run: make ci-sweep
@@ -102,6 +102,9 @@ jobs:
         if: always()
       - run: make test-integration-${{ matrix.test }}-cleanup
         if: ${{ always() }}
+        env:
+          TEST_DATADOG_API_KEY: ${{ secrets.CI_TEST_DATADOG_API_KEY }}
+          SPLUNK_VERSION: ${{ matrix.env.SPLUNK_VERSION }}
 
   test-integration-check:
     name: test-integration-check

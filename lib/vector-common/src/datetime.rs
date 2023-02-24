@@ -3,17 +3,40 @@ use std::fmt::Debug;
 use chrono::{DateTime, Local, ParseError, TimeZone as _, Utc};
 use chrono_tz::Tz;
 use derivative::Derivative;
+use serde_json::Value;
 use vector_config::{
-    schema::{finalize_schema, generate_string_schema},
+    schema::{
+        apply_metadata, generate_const_string_schema, generate_one_of_schema,
+        get_or_generate_schema,
+    },
     schemars::{gen::SchemaGenerator, schema::SchemaObject},
-    Configurable, Metadata,
+    Configurable, GenerateError, Metadata, ToValue,
 };
+use vector_config_common::attributes::CustomAttribute;
 
+/// Timezone reference.
+///
+/// This can refer to any valid timezone as defined in the [TZ database][tzdb], or "local" which
+/// refers to the system local timezone.
+///
+/// [tzdb]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
+#[cfg_attr(
+    feature = "serde",
+    derive(::serde::Deserialize, ::serde::Serialize),
+    serde(try_from = "String", into = "String")
+)]
 #[derive(Clone, Copy, Debug, Derivative, Eq, PartialEq)]
 #[derivative(Default)]
 pub enum TimeZone {
+    /// System local timezone.
     #[derivative(Default)]
     Local,
+
+    /// A named timezone.
+    ///
+    /// Must be a valid name in the [TZ database][tzdb].
+    ///
+    /// [tzdb]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
     Named(Tz),
 }
 
@@ -46,60 +69,72 @@ impl TimeZone {
 
 /// Convert a timestamp with a non-UTC time zone into UTC
 pub(super) fn datetime_to_utc<TZ: chrono::TimeZone>(ts: &DateTime<TZ>) -> DateTime<Utc> {
-    Utc.timestamp(ts.timestamp(), ts.timestamp_subsec_nanos())
+    Utc.timestamp_opt(ts.timestamp(), ts.timestamp_subsec_nanos())
+        .single()
+        .expect("invalid timestamp")
 }
 
-#[cfg(feature = "serde")]
-pub mod ser_de {
-    use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
-
-    use super::TimeZone;
-
-    impl Serialize for TimeZone {
-        fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-            match self {
-                Self::Local => serializer.serialize_str("local"),
-                Self::Named(tz) => serializer.serialize_str(tz.name()),
-            }
-        }
-    }
-
-    impl<'de> Deserialize<'de> for TimeZone {
-        fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-            deserializer.deserialize_str(TimeZoneVisitor)
-        }
-    }
-
-    struct TimeZoneVisitor;
-
-    impl<'de> de::Visitor<'de> for TimeZoneVisitor {
-        type Value = TimeZone;
-
-        fn expecting(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            write!(f, "a time zone name")
-        }
-
-        fn visit_str<E: de::Error>(self, s: &str) -> Result<Self::Value, E> {
-            match TimeZone::parse(s) {
-                Some(tz) => Ok(tz),
-                None => Err(de::Error::custom("No such time zone")),
-            }
+impl From<TimeZone> for String {
+    fn from(tz: TimeZone) -> Self {
+        match tz {
+            TimeZone::Local => "local".to_string(),
+            TimeZone::Named(tz) => tz.name().to_string(),
         }
     }
 }
 
+impl TryFrom<String> for TimeZone {
+    type Error = String;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        match TimeZone::parse(&value) {
+            Some(tz) => Ok(tz),
+            None => Err("No such time zone".to_string()),
+        }
+    }
+}
+
+// TODO: Consider an approach for generating schema of "fixed string value, or remainder" structure
+// used by this type.
 impl Configurable for TimeZone {
     fn referenceable_name() -> Option<&'static str> {
-        Some("vector_common::TimeZone")
+        Some(std::any::type_name::<Self>())
     }
 
-    fn description() -> Option<&'static str> {
-        Some("Strongly-typed list of timezones as defined in the `tz` database.")
+    fn metadata() -> vector_config::Metadata {
+        let mut metadata = vector_config::Metadata::default();
+        metadata.set_title("Timezone reference.");
+        metadata.set_description(r#"This can refer to any valid timezone as defined in the [TZ database][tzdb], or "local" which refers to the system local timezone.
+
+[tzdb]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones"#);
+        metadata.add_custom_attribute(CustomAttribute::kv("docs::enum_tagging", "untagged"));
+        metadata.add_custom_attribute(CustomAttribute::kv("docs::examples", "local"));
+        metadata.add_custom_attribute(CustomAttribute::kv("docs::examples", "America/New_York"));
+        metadata.add_custom_attribute(CustomAttribute::kv("docs::examples", "EST5EDT"));
+        metadata
     }
 
-    fn generate_schema(gen: &mut SchemaGenerator, overrides: Metadata<Self>) -> SchemaObject {
-        let mut schema = generate_string_schema();
-        finalize_schema(gen, &mut schema, overrides);
-        schema
+    fn generate_schema(gen: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
+        let mut local_schema = generate_const_string_schema("local".to_string());
+        let mut local_metadata = Metadata::with_description("System local timezone.");
+        local_metadata.add_custom_attribute(CustomAttribute::kv("logical_name", "Local"));
+        apply_metadata::<()>(&mut local_schema, local_metadata);
+
+        let mut tz_metadata = Metadata::with_title("A named timezone.");
+        tz_metadata.set_description(
+            r#"Must be a valid name in the [TZ database][tzdb].
+
+[tzdb]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones"#,
+        );
+        tz_metadata.add_custom_attribute(CustomAttribute::kv("logical_name", "Named"));
+        let tz_schema = get_or_generate_schema::<Tz>(gen, Some(tz_metadata))?;
+
+        Ok(generate_one_of_schema(&[local_schema, tz_schema]))
+    }
+}
+
+impl ToValue for TimeZone {
+    fn to_value(&self) -> Value {
+        serde_json::to_value(self).expect("Could not convert time zone to JSON")
     }
 }

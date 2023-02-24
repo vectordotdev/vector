@@ -238,7 +238,7 @@ pub async fn smoke_check_first_line(log_reader: &mut Reader) {
         .read_line()
         .await
         .expect("unable to read first line");
-    let expected_pat = "INFO vector::app: Log level is enabled.";
+    let expected_pat = "INFO vector::app:";
     assert!(
         first_line.contains(expected_pat),
         "Expected a line ending with {:?} but got {:?}; vector might be malfunctioning",
@@ -281,7 +281,7 @@ where
                 // We got an EOF error, this is most likely some very long line,
                 // we don't produce lines this bing is our test cases, so we'll
                 // just skip the error - as if it wasn't a JSON string.
-                error!("The JSON line we just got was incomplete, most likely it was was too long, so we're skipping it");
+                error!("The JSON line we just got was incomplete, most likely it was too long, so we're skipping it");
                 continue;
             }
             Err(err) => return Err(err.into()),

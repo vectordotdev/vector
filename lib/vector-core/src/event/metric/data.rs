@@ -1,27 +1,41 @@
 use std::num::NonZeroU32;
 
 use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
 use vector_common::byte_size_of::ByteSizeOf;
+use vector_config::configurable_component;
 
 use super::{MetricKind, MetricValue};
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+/// Metric data.
+#[configurable_component]
+#[derive(Clone, Debug, PartialEq)]
 pub struct MetricData {
     #[serde(flatten)]
     pub time: MetricTime,
 
+    #[configurable(derived)]
     pub kind: MetricKind,
 
     #[serde(flatten)]
     pub value: MetricValue,
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
+/// Metric time.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct MetricTime {
+    /// The timestamp of when the metric was created.
+    ///
+    /// Metrics may sometimes have no timestamp, or have no meaningful value if the metric is an
+    /// aggregation or transformed heavily enough from its original form such that the original
+    /// timestamp would not represent a meaningful value.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub timestamp: Option<DateTime<Utc>>,
 
+    /// The interval, in milliseconds, of this metric.
+    ///
+    /// Intervals represent the time window over which this metric applies, and is generally only
+    /// used for tracking rates (change over time) on counters.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub interval_ms: Option<NonZeroU32>,
 }

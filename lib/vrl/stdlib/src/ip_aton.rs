@@ -7,7 +7,7 @@ fn ip_aton(value: Value) -> Resolved {
     let ip: Ipv4Addr = value
         .try_bytes_utf8_lossy()?
         .parse()
-        .map_err(|err| format!("unable to parse IPv4 address: {}", err))?;
+        .map_err(|err| format!("unable to parse IPv4 address: {err}"))?;
     Ok(u32::from(ip).into())
 }
 
@@ -39,7 +39,7 @@ impl Function for IpAton {
         &self,
         _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
 

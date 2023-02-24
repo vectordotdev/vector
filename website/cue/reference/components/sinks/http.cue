@@ -14,7 +14,11 @@ components: sinks: http: {
 
 	features: {
 		acknowledgements: true
-		healthcheck: enabled: true
+		auto_generated:   true
+		healthcheck: {
+			enabled:  true
+			uses_uri: true
+		}
 		send: {
 			batch: {
 				enabled:      true
@@ -70,42 +74,22 @@ components: sinks: http: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
+		notices: ["Input type support can depend on configured `encoding.codec`"]
 	}
 
-	configuration: {
-		auth: configuration._http_auth & {_args: {
-			password_example: "${HTTP_PASSWORD}"
-			username_example: "${HTTP_USERNAME}"
-		}}
-		uri: {
-			description: """
-				The full URI to make HTTP requests to. This should include the protocol and host,
-				but can also include the port, path, and any other valid part of a URI.
-				"""
-			required: true
-			type: string: {
-				examples: ["https://10.22.212.22:9000/endpoint"]
-			}
-		}
-		healthcheck: type: object: options: uri: {
-			common: false
-			description: """
-				The full URI to make HTTP health check request to. This should include the protocol and host,
-				but can also include the port, path, and any other valid part of a URI.
-				"""
-			required: false
-			type: string: {
-				default: null
-				examples: ["https://10.22.212.22:9000/health"]
-			}
-		}
-	}
+	configuration: base.components.sinks.http.configuration
 
 	input: {
-		logs:    true
-		metrics: null
-		traces:  false
+		logs: true
+		metrics: {
+			counter:      true
+			distribution: true
+			gauge:        true
+			histogram:    true
+			summary:      true
+			set:          true
+		}
+		traces: true
 	}
 
 	telemetry: metrics: {

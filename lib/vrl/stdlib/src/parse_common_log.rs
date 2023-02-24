@@ -13,7 +13,7 @@ fn parse_common_log(bytes: Value, timestamp_format: Option<Value>, ctx: &Context
     };
 
     log_util::parse_message(
-        &*log_util::REGEX_APACHE_COMMON_LOG,
+        &log_util::REGEX_APACHE_COMMON_LOG,
         &message,
         &timestamp_format,
         ctx.timezone(),
@@ -49,7 +49,7 @@ impl Function for ParseCommonLog {
         &self,
         _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
         let timestamp_format = arguments.optional("timestamp_format");

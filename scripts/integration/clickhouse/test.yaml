@@ -1,0 +1,11 @@
+args:
+- --features
+- clickhouse-integration-tests
+- --lib
+- '::clickhouse::'
+
+env:
+  CLICKHOUSE_ADDRESS: http://clickhouse:8123
+
+matrix:
+  version: ['19']

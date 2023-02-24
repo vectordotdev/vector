@@ -94,7 +94,7 @@ Partitioning, or “topics” in Kafka terminology, refers to separating data in
 #### Recommendations
 
 - Use memory buffers with `buffers.when_full` set to `block`. This will ensure back pressure flows upstream to your pub-sub system, where durable buffering should occur.
--  Enable [end-to-end acknowledgements](/docs/about/under-the-hood/architecture/end-to-end-acknowledgements/) for your Vector pub-sub source (i.e., the `kafka` source) to ensure data is persisted downstream before removing the data from your pub-sub systems.
+- Enable [end-to-end acknowledgements](/docs/about/under-the-hood/architecture/end-to-end-acknowledgements/) for your Vector pub-sub source (i.e., the `kafka` source) to ensure data is persisted downstream before removing the data from your pub-sub systems.
 
 ### Global Aggregation
 
@@ -111,4 +111,4 @@ This eliminates the need to deploy a single monolith aggregator, creating an unn
 
 ## Support
 
-For easy setup and maintenance of this architecture, consider the Vector’s [discussions](https://discussions.vector.dev) or [chat](https://chat.vector.dev). These are free best effort channels. For enterprise needs, consider Datadog Observability Pipelines, which comes with enterprise-level support. In addition, we offer Datadog Premier Support Services for expert architectural guidance. [Contact us for more information](https://www.datadoghq.com/about/contact/).
+For easy setup and maintenance of this architecture, consider the Vector’s [discussions](https://discussions.vector.dev) or [chat](https://chat.vector.dev). These are free best effort channels. For enterprise needs, consider Datadog Observability Pipelines, which comes with enterprise-level support. Read more about that product [here](https://www.datadoghq.com/product/observability-pipelines/).

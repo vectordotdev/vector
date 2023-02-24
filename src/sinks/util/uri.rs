@@ -142,7 +142,13 @@ fn get_basic_auth(authority: &Authority) -> (Authority, Option<Auth>) {
             .expect("unexpected empty authority")
             .clone();
 
-        (authority, Some(Auth::Basic { user, password }))
+        (
+            authority,
+            Some(Auth::Basic {
+                user,
+                password: password.into(),
+            }),
+        )
     } else {
         (authority.clone(), None)
     }
@@ -191,7 +197,7 @@ mod tests {
             expected_auth.map(|(user, password)| {
                 Auth::Basic {
                     user: user.to_owned(),
-                    password: password.to_owned(),
+                    password: password.to_owned().into(),
                 }
             })
         );

@@ -1,7 +1,7 @@
 //! All types related to finding a [`Kind`] nested into another one.
 
 use crate::Kind;
-use lookup::lookup_v2::{BorrowedSegment, Path};
+use lookup::lookup_v2::{BorrowedSegment, ValuePath};
 use std::borrow::Cow;
 
 impl Kind {
@@ -14,7 +14,7 @@ impl Kind {
     /// use `Kind::at_path` instead.
     #[must_use]
     #[allow(clippy::needless_pass_by_value)] // only references are implemented for `Path`
-    pub fn get<'a>(&self, path: impl Path<'a>) -> Self {
+    pub fn get<'a>(&self, path: impl ValuePath<'a>) -> Self {
         self.at_path(path).upgrade_undefined()
     }
 
@@ -23,7 +23,7 @@ impl Kind {
     /// It is viewing the type of a value in-place, before it is retrieved.
     #[must_use]
     #[allow(clippy::needless_pass_by_value)] // only references are implemented for `Path`
-    pub fn at_path<'a>(&self, path: impl Path<'a>) -> Self {
+    pub fn at_path<'a>(&self, path: impl ValuePath<'a>) -> Self {
         self.get_recursive(path.segment_iter())
     }
 
@@ -133,7 +133,6 @@ impl Kind {
 
                 // This is the resulting type, assuming the match succeeded.
                 let match_type = field_kind
-                    .clone()
                     // This type is only valid if the match succeeded, which means this type wasn't undefined.
                     .without_undefined()
                     .get_recursive(match_iter.into_iter());
@@ -157,8 +156,8 @@ impl Kind {
 
 #[cfg(test)]
 mod tests {
-    use lookup::lookup_v2::{parse_path, OwnedPath};
-    use lookup::owned_path;
+    use lookup::lookup_v2::{parse_value_path, OwnedValuePath};
+    use lookup::owned_value_path;
     use std::collections::BTreeMap;
 
     use super::*;
@@ -168,7 +167,7 @@ mod tests {
     fn test_at_path() {
         struct TestCase {
             kind: Kind,
-            path: OwnedPath,
+            path: OwnedValuePath,
             want: Kind,
         }
 
@@ -177,7 +176,7 @@ mod tests {
                 "get root",
                 TestCase {
                     kind: Kind::bytes(),
-                    path: owned_path!(),
+                    path: owned_value_path!(),
                     want: Kind::bytes(),
                 },
             ),
@@ -185,7 +184,7 @@ mod tests {
                 "get field from non-object",
                 TestCase {
                     kind: Kind::bytes(),
-                    path: owned_path!("foo"),
+                    path: owned_value_path!("foo"),
                     want: Kind::undefined(),
                 },
             ),
@@ -193,7 +192,7 @@ mod tests {
                 "get field from object",
                 TestCase {
                     kind: Kind::object(BTreeMap::from([("a".into(), Kind::integer())])),
-                    path: owned_path!("a"),
+                    path: owned_value_path!("a"),
                     want: Kind::integer(),
                 },
             ),
@@ -201,7 +200,7 @@ mod tests {
                 "get field from maybe an object",
                 TestCase {
                     kind: Kind::object(BTreeMap::from([("a".into(), Kind::integer())])).or_null(),
-                    path: owned_path!("a"),
+                    path: owned_value_path!("a"),
                     want: Kind::integer().or_undefined(),
                 },
             ),
@@ -209,7 +208,7 @@ mod tests {
                 "get unknown from object with no unknown",
                 TestCase {
                     kind: Kind::object(BTreeMap::from([("a".into(), Kind::integer())])),
-                    path: owned_path!("b"),
+                    path: owned_value_path!("b"),
                     want: Kind::undefined(),
                 },
             ),
@@ -220,7 +219,7 @@ mod tests {
                         Collection::from(BTreeMap::from([("a".into(), Kind::integer())]))
                             .with_unknown(Kind::bytes()),
                     ),
-                    path: owned_path!("b"),
+                    path: owned_value_path!("b"),
                     want: Kind::bytes().or_undefined(),
                 },
             ),
@@ -231,7 +230,7 @@ mod tests {
                         Collection::from(BTreeMap::from([("a".into(), Kind::integer())]))
                             .with_unknown(Kind::null()),
                     ),
-                    path: owned_path!("b"),
+                    path: owned_value_path!("b"),
                     want: Kind::null().or_undefined(),
                 },
             ),
@@ -248,7 +247,7 @@ mod tests {
                         )]))
                         .with_unknown(Kind::null()),
                     ),
-                    path: owned_path!("a", "b"),
+                    path: owned_value_path!("a", "b"),
                     want: Kind::integer(),
                 },
             ),
@@ -256,7 +255,7 @@ mod tests {
                 "get index from non-array",
                 TestCase {
                     kind: Kind::bytes(),
-                    path: owned_path!(1),
+                    path: owned_value_path!(1),
                     want: Kind::undefined(),
                 },
             ),
@@ -264,7 +263,7 @@ mod tests {
                 "get index from array",
                 TestCase {
                     kind: Kind::array(BTreeMap::from([(0.into(), Kind::integer())])),
-                    path: owned_path!(0),
+                    path: owned_value_path!(0),
                     want: Kind::integer(),
                 },
             ),
@@ -272,7 +271,7 @@ mod tests {
                 "get index from maybe array",
                 TestCase {
                     kind: Kind::array(BTreeMap::from([(0.into(), Kind::integer())])).or_bytes(),
-                    path: owned_path!(0),
+                    path: owned_value_path!(0),
                     want: Kind::integer().or_undefined(),
                 },
             ),
@@ -280,7 +279,7 @@ mod tests {
                 "get unknown from array with no unknown",
                 TestCase {
                     kind: Kind::array(BTreeMap::from([(0.into(), Kind::integer())])),
-                    path: owned_path!(1),
+                    path: owned_value_path!(1),
                     want: Kind::undefined(),
                 },
             ),
@@ -291,7 +290,7 @@ mod tests {
                         Collection::from(BTreeMap::from([(0.into(), Kind::integer())]))
                             .with_unknown(Kind::bytes()),
                     ),
-                    path: owned_path!(1),
+                    path: owned_value_path!(1),
                     want: Kind::bytes().or_undefined(),
                 },
             ),
@@ -302,7 +301,7 @@ mod tests {
                         Collection::from(BTreeMap::from([(0.into(), Kind::integer())]))
                             .with_unknown(Kind::null()),
                     ),
-                    path: owned_path!(1),
+                    path: owned_value_path!(1),
                     want: Kind::null().or_undefined(),
                 },
             ),
@@ -319,7 +318,7 @@ mod tests {
                         )]))
                         .with_unknown(Kind::null()),
                     ),
-                    path: owned_path!(0, 0),
+                    path: owned_value_path!(0, 0),
                     want: Kind::integer(),
                 },
             ),
@@ -330,7 +329,7 @@ mod tests {
                         0.into(),
                         Kind::integer(),
                     )]))),
-                    path: owned_path!(-2),
+                    path: owned_value_path!(-2),
                     want: Kind::undefined(),
                 },
             ),
@@ -341,7 +340,7 @@ mod tests {
                         0.into(),
                         Kind::integer(),
                     )]))),
-                    path: owned_path!(-1),
+                    path: owned_value_path!(-1),
                     want: Kind::integer(),
                 },
             ),
@@ -356,7 +355,7 @@ mod tests {
                         ]))
                         .with_unknown(Kind::boolean()),
                     ),
-                    path: owned_path!(-2),
+                    path: owned_value_path!(-2),
                     want: Kind::boolean().or_bytes().or_float(),
                 },
             ),
@@ -372,7 +371,7 @@ mod tests {
                         .with_unknown(Kind::boolean()),
                     )
                     .or_null(),
-                    path: owned_path!(-2),
+                    path: owned_value_path!(-2),
                     want: Kind::boolean().or_bytes().or_float().or_undefined(),
                 },
             ),
@@ -383,7 +382,7 @@ mod tests {
                         Collection::from(BTreeMap::from([(0.into(), Kind::integer())]))
                             .with_unknown(Kind::boolean()),
                     ),
-                    path: owned_path!(-2),
+                    path: owned_value_path!(-2),
                     want: Kind::boolean().or_integer().or_undefined(),
                 },
             ),
@@ -397,7 +396,7 @@ mod tests {
                                 Kind::bytes(),
                             )]))),
                     ),
-                    path: owned_path!(-2, "foo"),
+                    path: owned_value_path!(-2, "foo"),
                     want: Kind::bytes().or_undefined(),
                 },
             ),
@@ -408,7 +407,7 @@ mod tests {
                         "a".into(),
                         Kind::integer(),
                     )]))),
-                    path: parse_path(".(a|b)"),
+                    path: parse_value_path(".(a|b)").unwrap(),
                     want: Kind::integer(),
                 },
             ),
@@ -419,7 +418,7 @@ mod tests {
                         "b".into(),
                         Kind::integer(),
                     )]))),
-                    path: parse_path(".(a|b)"),
+                    path: parse_value_path(".(a|b)").unwrap(),
                     want: Kind::integer(),
                 },
             ),
@@ -430,7 +429,7 @@ mod tests {
                         Collection::from(BTreeMap::from([("a".into(), Kind::integer())]))
                             .with_unknown(Kind::bytes()),
                     ),
-                    path: parse_path(".(a|b)"),
+                    path: parse_value_path(".(a|b)").unwrap(),
                     want: Kind::integer(),
                 },
             ),
@@ -441,7 +440,7 @@ mod tests {
                         Collection::from(BTreeMap::from([("b".into(), Kind::integer())]))
                             .with_unknown(Kind::bytes()),
                     ),
-                    path: parse_path(".(a|b)"),
+                    path: parse_value_path(".(a|b)").unwrap(),
                     want: Kind::bytes().or_integer(),
                 },
             ),
@@ -455,7 +454,7 @@ mod tests {
                                 Kind::bytes(),
                             )]))),
                     ),
-                    path: parse_path(".(a|b).foo"),
+                    path: parse_value_path(".(a|b).foo").unwrap(),
                     want: Kind::bytes().or_undefined(),
                 },
             ),
@@ -463,12 +462,12 @@ mod tests {
                 "nested terminating expression",
                 TestCase {
                     kind: Kind::never(),
-                    path: owned_path!(".foo.bar"),
+                    path: owned_value_path!(".foo.bar"),
                     want: Kind::never(),
                 },
             ),
         ] {
-            assert_eq!(kind.at_path(&path), want, "test: {}", title);
+            assert_eq!(kind.at_path(&path), want, "test: {title}");
         }
     }
 }

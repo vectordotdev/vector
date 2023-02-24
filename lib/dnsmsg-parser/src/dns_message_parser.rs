@@ -81,7 +81,7 @@ impl DnsMessageParser {
             answer_section: self.parse_dns_message_section(msg.answers())?,
             authority_section: self.parse_dns_message_section(msg.name_servers())?,
             additional_section: self.parse_dns_message_section(msg.additionals())?,
-            opt_pserdo_section: edns_section,
+            opt_pseudo_section: edns_section,
         })
     }
 
@@ -823,13 +823,16 @@ fn parse_dns_update_message_header(dns_message: &TrustDnsMessage) -> UpdateHeade
 }
 
 fn parse_edns(dns_message: &TrustDnsMessage) -> Option<OptPseudoSection> {
-    dns_message.edns().map(|edns| OptPseudoSection {
-        extended_rcode: edns.rcode_high(),
-        version: edns.version(),
-        dnssec_ok: edns.dnssec_ok(),
-        udp_max_payload_size: edns.max_payload(),
-        options: parse_edns_options(edns),
-    })
+    dns_message
+        .extensions()
+        .as_ref()
+        .map(|edns| OptPseudoSection {
+            extended_rcode: edns.rcode_high(),
+            version: edns.version(),
+            dnssec_ok: edns.dnssec_ok(),
+            udp_max_payload_size: edns.max_payload(),
+            options: parse_edns_options(edns),
+        })
 }
 
 fn parse_edns_options(edns: &Edns) -> Vec<EdnsOptionEntry> {

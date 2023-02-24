@@ -15,12 +15,13 @@ components: sinks: file: {
 
 	features: {
 		acknowledgements: true
+		auto_generated:   true
 		healthcheck: enabled: true
 		send: {
 			compression: {
 				enabled: true
 				default: "none"
-				algorithms: ["none", "gzip"]
+				algorithms: ["none", "gzip", "zstd"]
 				levels: ["none", "fast", "default", "best", 0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
 			}
 			encoding: {
@@ -42,25 +43,7 @@ components: sinks: file: {
 		notices: []
 	}
 
-	configuration: {
-		idle_timeout_secs: {
-			common:      false
-			description: "The amount of time a file can be idle  and stay open. After not receiving any events for this timeout, the file will be flushed and closed.\n"
-			required:    false
-			type: uint: {
-				default: 30
-				unit:    null
-			}
-		}
-		path: {
-			description: "File name to write events to."
-			required:    true
-			type: string: {
-				examples: ["/tmp/vector-%Y-%m-%d.log", "/tmp/application-{{ application_id }}-%Y-%m-%d.log"]
-				syntax: "template"
-			}
-		}
-	}
+	configuration: base.components.sinks.file.configuration
 
 	input: {
 		logs:    true

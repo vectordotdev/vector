@@ -1,7 +1,10 @@
+use vector_config_common::attributes::CustomAttribute;
+
 use crate::{
-    schema::{finalize_schema, generate_number_schema},
+    num::NumberClass,
+    schema::generate_number_schema,
     schemars::{gen::SchemaGenerator, schema::SchemaObject},
-    Configurable, Metadata,
+    Configurable, GenerateError, Metadata,
 };
 
 // Blanket implementation of `Configurable` for any `serde_with` helper that is also `Configurable`.
@@ -14,27 +17,32 @@ where
         T::referenceable_name()
     }
 
-    fn description() -> Option<&'static str> {
-        // Forward to the underlying `T`.
-        T::description()
-    }
-
-    fn metadata() -> Metadata<Self> {
+    fn metadata() -> Metadata {
         // Forward to the underlying `T`.
         //
-        // We have to convert from `Metadata<T>` to `Metadata<Self>` which erases the default value,
+        // We have to convert from `Metadata` to `Metadata` which erases the default value,
         // notably, but `serde_with` helpers should never actually have default values, so this is
         // essentially a no-op.
-        T::metadata().convert::<Self>()
+        T::metadata().convert()
     }
 
-    fn generate_schema(gen: &mut SchemaGenerator, overrides: Metadata<Self>) -> SchemaObject {
+    fn validate_metadata(metadata: &Metadata) -> Result<(), GenerateError> {
         // Forward to the underlying `T`.
         //
-        // We have to convert from `Metadata<Self>` to `Metadata<T>` which erases the default value,
+        // We have to convert from `Metadata` to `Metadata` which erases the default value,
         // notably, but `serde_with` helpers should never actually have default values, so this is
         // essentially a no-op.
-        T::generate_schema(gen, overrides.convert::<T>())
+        let converted = metadata.convert();
+        T::validate_metadata(&converted)
+    }
+
+    fn generate_schema(gen: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
+        // Forward to the underlying `T`.
+        //
+        // We have to convert from `Metadata` to `Metadata` which erases the default value,
+        // notably, but `serde_with` helpers should never actually have default values, so this is
+        // essentially a no-op.
+        T::generate_schema(gen)
     }
 }
 
@@ -46,16 +54,21 @@ impl Configurable for serde_with::DurationSeconds<u64, serde_with::formats::Stri
         Some("serde_with::DurationSeconds")
     }
 
-    fn description() -> Option<&'static str> {
-        Some("A span of time, in whole seconds.")
+    fn metadata() -> Metadata {
+        let mut metadata = Metadata::default();
+        metadata.set_description("A span of time, in whole seconds.");
+        metadata.add_custom_attribute(CustomAttribute::kv(
+            "docs::numeric_type",
+            NumberClass::Unsigned,
+        ));
+        metadata.add_custom_attribute(CustomAttribute::kv("docs::type_unit", "seconds"));
+        metadata
     }
 
-    fn generate_schema(gen: &mut SchemaGenerator, overrides: Metadata<Self>) -> SchemaObject {
+    fn generate_schema(_: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
         // This boils down to a number schema, but we just need to shuttle around the metadata so
         // that we can call the relevant schema generation function.
-        let mut schema = generate_number_schema::<u64>();
-        finalize_schema(gen, &mut schema, overrides.convert::<u64>());
-        schema
+        Ok(generate_number_schema::<u64>())
     }
 }
 
@@ -67,15 +80,45 @@ impl Configurable for serde_with::DurationSeconds<f64, serde_with::formats::Stri
         Some("serde_with::DurationFractionalSeconds")
     }
 
-    fn description() -> Option<&'static str> {
-        Some("A span of time, in whole seconds.")
+    fn metadata() -> Metadata {
+        let mut metadata = Metadata::default();
+        metadata.set_description("A span of time, in fractional seconds.");
+        metadata.add_custom_attribute(CustomAttribute::kv(
+            "docs::numeric_type",
+            NumberClass::FloatingPoint,
+        ));
+        metadata.add_custom_attribute(CustomAttribute::kv("docs::type_unit", "seconds"));
+        metadata
     }
 
-    fn generate_schema(gen: &mut SchemaGenerator, overrides: Metadata<Self>) -> SchemaObject {
+    fn generate_schema(_: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
         // This boils down to a number schema, but we just need to shuttle around the metadata so
         // that we can call the relevant schema generation function.
-        let mut schema = generate_number_schema::<f64>();
-        finalize_schema(gen, &mut schema, overrides.convert::<f64>());
-        schema
+        Ok(generate_number_schema::<f64>())
+    }
+}
+
+impl Configurable for serde_with::DurationMilliSeconds<u64, serde_with::formats::Strict> {
+    fn referenceable_name() -> Option<&'static str> {
+        // We're masking the type parameters here because we only deal with whole milliseconds via this
+        // version.
+        Some("serde_with::DurationMilliSeconds")
+    }
+
+    fn metadata() -> Metadata {
+        let mut metadata = Metadata::default();
+        metadata.set_description("A span of time, in whole milliseconds.");
+        metadata.add_custom_attribute(CustomAttribute::kv(
+            "docs::numeric_type",
+            NumberClass::Unsigned,
+        ));
+        metadata.add_custom_attribute(CustomAttribute::kv("docs::type_unit", "milliseconds"));
+        metadata
+    }
+
+    fn generate_schema(_: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
+        // This boils down to a number schema, but we just need to shuttle around the metadata so
+        // that we can call the relevant schema generation function.
+        Ok(generate_number_schema::<u64>())
     }
 }

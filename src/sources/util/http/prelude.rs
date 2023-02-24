@@ -5,8 +5,9 @@ use bytes::Bytes;
 use futures::{FutureExt, TryFutureExt};
 use tracing::Span;
 use vector_core::{
+    config::SourceAcknowledgementsConfig,
     event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event},
-    ByteSizeOf,
+    EstimatedJsonEncodedSizeOf,
 };
 use warp::{
     filters::{
@@ -19,9 +20,11 @@ use warp::{
 };
 
 use crate::{
-    config::{AcknowledgementsConfig, SourceContext},
-    internal_events::{HttpBadRequest, HttpBytesReceived, HttpEventsReceived},
-    sources::http::HttpMethod,
+    config::SourceContext,
+    internal_events::{
+        HttpBadRequest, HttpBytesReceived, HttpEventsReceived, HttpInternalError, StreamClosedError,
+    },
+    sources::util::http::HttpMethod,
     tls::{MaybeTlsSettings, TlsEnableableConfig},
     SourceSender,
 };
@@ -52,13 +55,13 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
         tls: &Option<TlsEnableableConfig>,
         auth: &Option<HttpSourceAuthConfig>,
         cx: SourceContext,
-        acknowledgements: AcknowledgementsConfig,
+        acknowledgements: SourceAcknowledgementsConfig,
     ) -> crate::Result<crate::sources::Source> {
         let tls = MaybeTlsSettings::from_config(tls, true)?;
         let protocol = tls.http_protocol_name();
         let auth = HttpSourceAuth::try_from(auth.as_ref())?;
         let path = path.to_owned();
-        let acknowledgements = cx.do_acknowledgements(&acknowledgements);
+        let acknowledgements = cx.do_acknowledgements(acknowledgements);
         Ok(Box::pin(async move {
             let span = Span::current();
             let mut filter: BoxedFilter<()> = match method {
@@ -81,7 +84,9 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                     if !strict_path || tail.as_str().is_empty() {
                         Ok(())
                     } else {
-                        debug!(message = "Path rejected.");
+                        emit!(HttpInternalError {
+                            message: "Path not found."
+                        });
                         Err(warp::reject::custom(ErrorMessage::new(
                             StatusCode::NOT_FOUND,
                             "Not found".to_string(),
@@ -119,7 +124,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                             .map(|events| {
                                 emit!(HttpEventsReceived {
                                     count: events.len(),
-                                    byte_size: events.size_of(),
+                                    byte_size: events.estimated_json_encoded_size_of(),
                                     http_path,
                                     protocol,
                                 });
@@ -138,19 +143,29 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                     Ok(warp::reply::with_status(json, e_msg.status_code()))
                 } else {
                     //other internal error - will return 500 internal server error
+                    emit!(HttpInternalError {
+                        message: "Internal error."
+                    });
                     Err(r)
                 }
             });
 
             info!(message = "Building HTTP server.", address = %address);
 
-            let listener = tls.bind(&address).await.unwrap();
-            warp::serve(routes)
-                .serve_incoming_with_graceful_shutdown(
-                    listener.accept_stream(),
-                    cx.shutdown.map(|_| ()),
-                )
-                .await;
+            match tls.bind(&address).await {
+                Ok(listener) => {
+                    warp::serve(routes)
+                        .serve_incoming_with_graceful_shutdown(
+                            listener.accept_stream(),
+                            cx.shutdown.map(|_| ()),
+                        )
+                        .await;
+                }
+                Err(error) => {
+                    error!("An error occurred: {:?}.", error);
+                    return Err(());
+                }
+            }
             Ok(())
         }))
     }
@@ -175,12 +190,12 @@ async fn handle_request(
         Ok(mut events) => {
             let receiver = BatchNotifier::maybe_apply_to(acknowledgements, &mut events);
 
+            let count = events.len();
             out.send_batch(events)
                 .map_err(move |error: crate::source_sender::ClosedError| {
                     // can only fail if receiving end disconnected, so we are shutting down,
                     // probably not gracefully.
-                    error!(message = "Failed to forward events, downstream is closed.");
-                    error!(message = "Tried to send the following event.", %error);
+                    emit!(StreamClosedError { error, count });
                     warp::reject::custom(RejectShuttingDown)
                 })
                 .and_then(|_| handle_batch_status(receiver))

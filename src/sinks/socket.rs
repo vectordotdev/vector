@@ -8,15 +8,12 @@ use vector_config::configurable_component;
 use crate::sinks::util::unix::UnixSinkConfig;
 use crate::{
     codecs::{Encoder, EncodingConfig, EncodingConfigWithFraming, SinkType},
-    config::{
-        AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext,
-        SinkDescription,
-    },
+    config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext},
     sinks::util::{tcp::TcpSinkConfig, udp::UdpSinkConfig},
 };
 
 /// Configuration for the `socket` sink.
-#[configurable_component(sink)]
+#[configurable_component(sink("socket"))]
 #[derive(Clone, Debug)]
 pub struct SocketSinkConfig {
     #[serde(flatten)]
@@ -35,16 +32,17 @@ pub struct SocketSinkConfig {
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(tag = "mode", rename_all = "snake_case")]
+#[configurable(metadata(docs::enum_tag_description = "The type of socket to use."))]
 pub enum Mode {
-    /// TCP.
-    Tcp(#[configurable(transparent)] TcpMode),
+    /// Send over TCP.
+    Tcp(TcpMode),
 
-    /// UDP.
-    Udp(#[configurable(transparent)] UdpMode),
+    /// Send over UDP.
+    Udp(UdpMode),
 
-    /// Unix Domain Socket.
+    /// Send over a Unix domain socket (UDS).
     #[cfg(unix)]
-    Unix(#[configurable(transparent)] UnixMode),
+    Unix(UnixMode),
 }
 
 /// TCP configuration.
@@ -81,10 +79,6 @@ pub struct UnixMode {
     encoding: EncodingConfigWithFraming,
 }
 
-inventory::submit! {
-    SinkDescription::new::<SocketSinkConfig>("socket")
-}
-
 impl GenerateConfig for SocketSinkConfig {
     fn generate_config() -> toml::Value {
         toml::from_str(
@@ -111,7 +105,7 @@ impl SocketSinkConfig {
         Self::new(
             Mode::Tcp(TcpMode {
                 config: TcpSinkConfig::from_address(address),
-                encoding: (None::<FramingConfig>, TextSerializerConfig::new()).into(),
+                encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
             }),
             acknowledgements,
         )
@@ -119,7 +113,6 @@ impl SocketSinkConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "socket")]
 impl SinkConfig for SocketSinkConfig {
     async fn build(
         &self,
@@ -158,10 +151,6 @@ impl SinkConfig for SocketSinkConfig {
         Input::new(encoder_input_type & DataType::Log)
     }
 
-    fn sink_type(&self) -> &'static str {
-        "socket"
-    }
-
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
     }
@@ -190,7 +179,7 @@ mod test {
         config::SinkContext,
         event::{Event, LogEvent},
         test_util::{
-            components::{run_and_assert_sink_compliance, SINK_TAGS},
+            components::{assert_sink_compliance, run_and_assert_sink_compliance, SINK_TAGS},
             next_addr, next_addr_v6, random_lines_with_stream, trace_init, CountReceiver,
         },
     };
@@ -206,15 +195,20 @@ mod test {
         let config = SocketSinkConfig {
             mode: Mode::Udp(UdpMode {
                 config: UdpSinkConfig::from_address(addr.to_string()),
-                encoding: JsonSerializerConfig::new().into(),
+                encoding: JsonSerializerConfig::default().into(),
             }),
             acknowledgements: Default::default(),
         };
-        let context = SinkContext::new_test();
-        let (sink, _healthcheck) = config.build(context).await.unwrap();
 
-        let event = Event::Log(LogEvent::from("raw log line"));
-        run_and_assert_sink_compliance(sink, stream::once(ready(event)), &SINK_TAGS).await;
+        let context = SinkContext::new_test();
+        assert_sink_compliance(&SINK_TAGS, async move {
+            let (sink, _healthcheck) = config.build(context).await.unwrap();
+
+            let event = Event::Log(LogEvent::from("raw log line"));
+            sink.run(stream::once(ready(event.into()))).await
+        })
+        .await
+        .expect("Running sink failed");
 
         let mut buf = [0; 256];
         let (size, _src_addr) = receiver
@@ -251,18 +245,23 @@ mod test {
         let config = SocketSinkConfig {
             mode: Mode::Tcp(TcpMode {
                 config: TcpSinkConfig::from_address(addr.to_string()),
-                encoding: (None::<FramingConfig>, JsonSerializerConfig::new()).into(),
+                encoding: (None::<FramingConfig>, JsonSerializerConfig::default()).into(),
             }),
             acknowledgements: Default::default(),
         };
 
-        let context = SinkContext::new_test();
-        let (sink, _healthcheck) = config.build(context).await.unwrap();
-
         let mut receiver = CountReceiver::receive_lines(addr);
 
         let (lines, events) = random_lines_with_stream(10, 100, None);
-        run_and_assert_sink_compliance(sink, events, &SINK_TAGS).await;
+
+        assert_sink_compliance(&SINK_TAGS, async move {
+            let context = SinkContext::new_test();
+            let (sink, _healthcheck) = config.build(context).await.unwrap();
+
+            sink.run(events).await
+        })
+        .await
+        .expect("Running sink failed");
 
         // Wait for output to connect
         receiver.connected().await;
@@ -285,7 +284,6 @@ mod test {
     //
     // If this test hangs that means somewhere we are not collecting the correct
     // events.
-    #[cfg(all(feature = "sources-utils-tls", feature = "listenfd"))]
     #[tokio::test]
     async fn tcp_stream_detects_disconnect() {
         use std::{
@@ -297,7 +295,7 @@ mod test {
             task::Poll,
         };
 
-        use futures::{channel::mpsc, future, FutureExt, SinkExt, StreamExt};
+        use futures::{channel::mpsc, FutureExt, SinkExt, StreamExt};
         use tokio::{
             io::{AsyncRead, AsyncWriteExt, ReadBuf},
             net::TcpStream,
@@ -330,7 +328,7 @@ mod test {
                     }),
                     None,
                 ),
-                encoding: (None::<FramingConfig>, TextSerializerConfig::new()).into(),
+                encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
             }),
             acknowledgements: Default::default(),
         };
@@ -370,7 +368,7 @@ mod test {
 
                     let mut stream: MaybeTlsIncomingStream<TcpStream> = connection.unwrap();
 
-                    future::poll_fn(move |cx| loop {
+                    std::future::poll_fn(move |cx| loop {
                         if let Some(fut) = close_rx.as_mut() {
                             if let Poll::Ready(()) = fut.poll_unpin(cx) {
                                 stream
@@ -449,7 +447,7 @@ mod test {
         let config = SocketSinkConfig {
             mode: Mode::Tcp(TcpMode {
                 config: TcpSinkConfig::from_address(addr.to_string()),
-                encoding: (None::<FramingConfig>, TextSerializerConfig::new()).into(),
+                encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
             }),
             acknowledgements: Default::default(),
         };

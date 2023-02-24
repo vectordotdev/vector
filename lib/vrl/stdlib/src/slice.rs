@@ -18,7 +18,7 @@ fn slice(start: i64, end: Option<i64>, value: Value) -> Resolved {
 
         match () {
             _ if start < 0 || start > len => {
-                Err(format!(r#""start" must be between "{}" and "{}""#, -len, len).into())
+                Err(format!(r#""start" must be between "{}" and "{len}""#, -len).into())
             }
             _ if end < start => Err(r#""end" must be greater or equal to "start""#.into()),
             _ if end > len => Ok(start as usize..len as usize),
@@ -92,7 +92,7 @@ impl Function for Slice {
         &self,
         _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
         let start = arguments.required("start");

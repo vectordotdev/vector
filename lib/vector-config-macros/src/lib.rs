@@ -3,12 +3,14 @@
 use proc_macro::TokenStream;
 
 mod ast;
+mod attrs;
+mod component_name;
 mod configurable;
 mod configurable_component;
 
 /// Designates a type as being part of a Vector configuration.
 ///
-/// This will automatically derive the [`Configurable`][vector_config::Configurable] trait for the given struct/enum, as
+/// This will automatically derive the [`Configurable`][vector-config::Configurable] trait for the given struct/enum, as
 /// well as ensuring that serialization/deserialization (via `serde`) is derived.
 ///
 /// ## Basics
@@ -31,22 +33,25 @@ mod configurable_component;
 /// ## Component-specific modifiers
 ///
 /// Additionally, callers can specify the component type, when being used directly on the top-level configuration object
-/// for a component by specifying the component type (`source`, `transform`, or `sink`) as the sole parameter:
+/// for a component by specifying the component type (`enrichment_table`, `provider`, `sink`,
+/// `source`, or `transform`) and the name of the component:
 ///
-/// ```no_run
+/// ```ignore
 /// use vector_config::configurable_component;
 /// use serde;
 ///
 /// /// Configuration for the `kafka` source.
-/// #[configurable_component(source)]
+/// #[configurable_component(source("kafka"))]
 /// #[derive(Clone, Debug)]
 /// pub struct KafkaSourceConfig {
 ///   // ...
 /// }
 /// ```
 ///
-/// This adds special metadata to the generated schema for that type indicating that it represents the configuration of
-/// a component of the specified type.
+/// This adds special metadata to the generated schema for that type, which indicates that it
+/// represents the top-level configuration object as a component of the given type. Additionally,
+/// relevant traits and annotations will be added to register the component (using the given name)
+/// within Vector, for the purposes of example configuration generation, and so on.
 ///
 /// ## Opting out of automatic derives
 ///
@@ -75,15 +80,31 @@ mod configurable_component;
 /// }
 /// ```
 #[proc_macro_attribute]
-pub fn configurable_component(args: TokenStream, item: TokenStream) -> TokenStream {
-    configurable_component::configurable_component_impl(args, item)
+pub fn configurable_component(attrs: TokenStream, item: TokenStream) -> TokenStream {
+    configurable_component::configurable_component_impl(attrs, item)
 }
 
-/// Generates an implementation of `Configurable` trait for the given container.
+/// Generates an implementation of the `Configurable` trait for the given container.
 ///
 /// In general, `#[configurable_component]` should be preferred as it ensures the other necessary derives/trait
 /// implementations are provided, and offers other features related to describing specific configuration types, etc.
 #[proc_macro_derive(Configurable, attributes(configurable))]
 pub fn derive_configurable(input: TokenStream) -> TokenStream {
     configurable::derive_configurable_impl(input)
+}
+
+/// Generates an implementation of the `NamedComponent` trait for the given container.
+#[proc_macro_derive(
+    NamedComponent,
+    attributes(
+        enrichment_table_component,
+        provider_component,
+        secrets_component,
+        sink_component,
+        source_component,
+        transform_component
+    )
+)]
+pub fn derive_component_name(input: TokenStream) -> TokenStream {
+    component_name::derive_component_name_impl(input)
 }

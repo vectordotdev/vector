@@ -6,7 +6,7 @@ fn parse_timestamp(value: Value, format: Value, ctx: &Context) -> Resolved {
     match value {
         Value::Bytes(v) => {
             let format = format.try_bytes_utf8_lossy()?;
-            Conversion::parse(format!("timestamp|{}", format), *ctx.timezone())
+            Conversion::parse(format!("timestamp|{format}"), *ctx.timezone())
                 .map_err(|e| e.to_string())?
                 .convert(v)
                 .map_err(|e| e.to_string().into())
@@ -36,7 +36,7 @@ impl Function for ParseTimestamp {
         &self,
         _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
         let format = arguments.required("format");

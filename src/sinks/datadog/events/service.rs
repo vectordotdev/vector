@@ -8,8 +8,8 @@ use futures::{
 use http::Request;
 use hyper::Body;
 use tower::{Service, ServiceExt};
-use vector_common::internal_event::BytesSent;
-use vector_core::{internal_event::EventsSent, stream::DriverResponse};
+use vector_common::request_metadata::MetaDescriptive;
+use vector_core::{internal_event::CountByteSize, stream::DriverResponse};
 
 use crate::{
     event::EventStatus,
@@ -24,8 +24,6 @@ pub struct DatadogEventsResponse {
     pub(self) event_status: EventStatus,
     pub http_status: http::StatusCode,
     pub event_byte_size: usize,
-    raw_byte_size: usize,
-    protocol: String,
 }
 
 impl DriverResponse for DatadogEventsResponse {
@@ -33,25 +31,18 @@ impl DriverResponse for DatadogEventsResponse {
         self.event_status
     }
 
-    fn events_sent(&self) -> EventsSent {
-        EventsSent {
-            count: 1,
-            byte_size: self.event_byte_size,
-            output: None,
-        }
+    fn events_sent(&self) -> CountByteSize {
+        CountByteSize(1, self.event_byte_size)
     }
 
-    fn bytes_sent(&self) -> Option<BytesSent> {
-        Some(BytesSent {
-            byte_size: self.raw_byte_size,
-            protocol: &self.protocol,
-        })
+    fn bytes_sent(&self) -> Option<usize> {
+        // HttpBatchService emits EndpointBytesSend
+        None
     }
 }
 
 #[derive(Clone)]
 pub struct DatadogEventsService {
-    protocol: String,
     batch_http_service:
         HttpBatchService<Ready<Result<http::Request<Bytes>, crate::Error>>, DatadogEventsRequest>,
 }
@@ -62,8 +53,6 @@ impl DatadogEventsService {
         default_api_key: String,
         http_client: HttpClient<Body>,
     ) -> Self {
-        let protocol = endpoint.scheme_str().unwrap_or("http").to_string();
-
         let batch_http_service = HttpBatchService::new(http_client, move |req| {
             let req: DatadogEventsRequest = req;
 
@@ -81,10 +70,7 @@ impl DatadogEventsService {
             future::ready(request)
         });
 
-        Self {
-            batch_http_service,
-            protocol,
-        }
+        Self { batch_http_service }
     }
 }
 
@@ -93,18 +79,18 @@ impl Service<DatadogEventsRequest> for DatadogEventsService {
     type Error = crate::Error;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
+    // Emission of Error internal event is handled upstream by the caller
     fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         Poll::Ready(Ok(()))
     }
 
+    // Emission of Error internal event is handled upstream by the caller
     fn call(&mut self, req: DatadogEventsRequest) -> Self::Future {
         let mut http_service = self.batch_http_service.clone();
-        let protocol = self.protocol.clone();
 
         Box::pin(async move {
             http_service.ready().await?;
-            let event_byte_size = req.metadata.event_byte_size;
-            let raw_byte_size = req.body.len();
+            let event_byte_size = req.get_metadata().events_byte_size();
             let http_response = http_service.call(req).await?;
             let event_status = if http_response.is_successful() {
                 EventStatus::Delivered
@@ -117,8 +103,6 @@ impl Service<DatadogEventsRequest> for DatadogEventsService {
                 event_status,
                 http_status: http_response.status(),
                 event_byte_size,
-                raw_byte_size,
-                protocol,
             })
         })
     }

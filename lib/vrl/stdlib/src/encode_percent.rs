@@ -104,7 +104,7 @@ impl Function for EncodePercent {
         &self,
         _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
         let ascii_set = arguments
@@ -129,26 +129,6 @@ impl Function for EncodePercent {
                 result: Ok(r#"s'foo%40bar%3F'"#),
             },
         ]
-    }
-
-    fn compile_argument(
-        &self,
-        _args: &[(&'static str, Option<FunctionArgument>)],
-        _ctx: &mut FunctionCompileContext,
-        name: &str,
-        expr: Option<&expression::Expr>,
-    ) -> CompiledArgument {
-        match (name, expr) {
-            ("ascii_set", Some(expr)) => {
-                let set = expr
-                    .as_enum("ascii_set", ascii_sets())?
-                    .try_bytes()
-                    .expect("ascii set not bytes");
-                Ok(Some(Box::new(set) as _))
-            }
-            ("ascii_set", None) => Ok(Some(Box::new(Bytes::from("NON_ALPHANUMERIC")) as _)),
-            _ => Ok(None),
-        }
     }
 }
 

@@ -1,4 +1,5 @@
 use super::Kind;
+use lookup::OwnedValuePath;
 
 impl Kind {
     /// Returns `true` if all type states are valid.
@@ -229,53 +230,58 @@ impl Kind {
     ///
     /// Collection types are recursively checked (meaning, known fields in `self` also need to be
     /// a superset of `other`.
-    #[must_use]
-    pub fn is_superset(&self, other: &Self) -> bool {
+    ///
+    /// # Errors
+    /// If the type is not a superset, a path to one field that doesn't match is returned.
+    /// This is mostly useful for debugging.
+    pub fn is_superset(&self, other: &Self) -> Result<(), OwnedValuePath> {
         if let (None, Some(_)) = (self.bytes, other.bytes) {
-            return false;
+            return Err(OwnedValuePath::root());
         };
 
         if let (None, Some(_)) = (self.integer, other.integer) {
-            return false;
+            return Err(OwnedValuePath::root());
         };
 
         if let (None, Some(_)) = (self.float, other.float) {
-            return false;
+            return Err(OwnedValuePath::root());
         };
 
         if let (None, Some(_)) = (self.boolean, other.boolean) {
-            return false;
+            return Err(OwnedValuePath::root());
         };
 
         if let (None, Some(_)) = (self.timestamp, other.timestamp) {
-            return false;
+            return Err(OwnedValuePath::root());
         };
 
         if let (None, Some(_)) = (self.regex, other.regex) {
-            return false;
+            return Err(OwnedValuePath::root());
         };
 
         if let (None, Some(_)) = (self.null, other.null) {
-            return false;
+            return Err(OwnedValuePath::root());
         };
 
         if let (None, Some(_)) = (self.undefined, other.undefined) {
-            return false;
+            return Err(OwnedValuePath::root());
         };
 
         match (self.array.as_ref(), other.array.as_ref()) {
-            (None, Some(_)) => return false,
-            (Some(lhs), Some(rhs)) if !lhs.is_superset(rhs) => return false,
+            (None, Some(_)) => return Err(OwnedValuePath::root()),
+            (Some(lhs), Some(rhs)) => {
+                lhs.is_superset(rhs)?;
+            }
             _ => {}
         };
 
         match (self.object.as_ref(), other.object.as_ref()) {
-            (None, Some(_)) => return false,
-            (Some(lhs), Some(rhs)) if !lhs.is_superset(rhs) => return false,
+            (None, Some(_)) => return Err(OwnedValuePath::root()),
+            (Some(lhs), Some(rhs)) => lhs.is_superset(rhs)?,
             _ => {}
         };
 
-        true
+        Ok(())
     }
 
     /// Check if `self` intersects `other`.
@@ -399,6 +405,19 @@ impl Kind {
     pub const fn contains_object(&self) -> bool {
         self.object.is_some() || self.is_never()
     }
+
+    /// Returns `true` if the type contains _at least_ one non-collection type.
+    #[must_use]
+    pub const fn contains_primitive(&self) -> bool {
+        self.bytes.is_some()
+            || self.null.is_some()
+            || self.boolean.is_some()
+            || self.float.is_some()
+            || self.integer.is_some()
+            || self.regex.is_some()
+            || self.timestamp.is_some()
+            || self.undefined.is_some()
+    }
 }
 
 #[cfg(test)]
@@ -513,7 +532,7 @@ mod tests {
                 },
             ),
         ]) {
-            assert_eq!(this.is_superset(&other), want, "{}", title);
+            assert_eq!(this.is_superset(&other).is_ok(), want, "{title}");
         }
     }
 
@@ -603,7 +622,7 @@ mod tests {
                 },
             ),
         ]) {
-            assert_eq!(kind.is_exact(), want, "{}", title);
+            assert_eq!(kind.is_exact(), want, "{title}");
         }
     }
 }

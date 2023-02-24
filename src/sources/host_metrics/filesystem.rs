@@ -1,27 +1,49 @@
 use futures::StreamExt;
 use heim::units::information::byte;
-#[cfg(not(target_os = "windows"))]
+#[cfg(not(windows))]
 use heim::units::ratio::ratio;
-use vector_common::btreemap;
 use vector_config::configurable_component;
+use vector_core::metric_tags;
 
-use super::{filter_result, FilterList, HostMetrics};
+use crate::internal_events::{HostMetricsScrapeDetailError, HostMetricsScrapeFilesystemError};
+
+use super::{default_all_devices, example_devices, filter_result, FilterList, HostMetrics};
 
 /// Options for the “filesystem” metrics collector.
 #[configurable_component]
 #[derive(Clone, Debug, Default)]
 pub struct FilesystemConfig {
-    /// Lists of device name patterns to include or exclude.
-    #[serde(default)]
+    /// Lists of device name patterns to include or exclude in gathering
+    /// usage metrics.
+    #[serde(default = "default_all_devices")]
+    #[configurable(metadata(docs::examples = "example_devices()"))]
     devices: FilterList,
 
-    /// Lists of filesystem name patterns to include or exclude.
-    #[serde(default)]
+    /// Lists of filesystem name patterns to include or exclude in gathering
+    /// usage metrics.
+    #[serde(default = "default_all_devices")]
+    #[configurable(metadata(docs::examples = "example_filesystems()"))]
     filesystems: FilterList,
 
-    /// Lists of mount point path patterns to include or exclude.
-    #[serde(default)]
+    /// Lists of mount point path patterns to include or exclude in gathering
+    /// usage metrics.
+    #[serde(default = "default_all_devices")]
+    #[configurable(metadata(docs::examples = "example_mountpoints()"))]
     mountpoints: FilterList,
+}
+
+fn example_filesystems() -> FilterList {
+    FilterList {
+        includes: Some(vec!["ntfs".try_into().unwrap()]),
+        excludes: Some(vec!["ext*".try_into().unwrap()]),
+    }
+}
+
+fn example_mountpoints() -> FilterList {
+    FilterList {
+        includes: Some(vec!["/home".try_into().unwrap()]),
+        excludes: Some(vec!["/raid*".try_into().unwrap()]),
+    }
 }
 
 impl HostMetrics {
@@ -39,7 +61,7 @@ impl HostMetrics {
                             .filesystem
                             .mountpoints
                             .contains_path(Some(partition.mount_point()))
-                            .then(|| partition)
+                            .then_some(partition)
                     })
                     .filter_map(|partition| async { partition })
                     // Filter on configured devices
@@ -48,7 +70,7 @@ impl HostMetrics {
                             .filesystem
                             .devices
                             .contains_path(partition.device().map(|d| d.as_ref()))
-                            .then(|| partition)
+                            .then_some(partition)
                     })
                     .filter_map(|partition| async { partition })
                     // Filter on configured filesystems
@@ -57,7 +79,7 @@ impl HostMetrics {
                             .filesystem
                             .filesystems
                             .contains_str(Some(partition.file_system().as_str()))
-                            .then(|| partition)
+                            .then_some(partition)
                     })
                     .filter_map(|partition| async { partition })
                     // Load usage from the partition mount point
@@ -65,12 +87,15 @@ impl HostMetrics {
                         heim::disk::usage(partition.mount_point())
                             .await
                             .map_err(|error| {
-                                error!(
-                                    message = "Failed to load partition usage data.",
-                                    mount_point = ?partition.mount_point(),
-                                    %error,
-                                    internal_log_rate_secs = 60,
-                                )
+                                emit!(HostMetricsScrapeFilesystemError {
+                                    message: "Failed to load partitions info.",
+                                    mount_point: partition
+                                        .mount_point()
+                                        .to_str()
+                                        .unwrap_or("unknown")
+                                        .to_string(),
+                                    error,
+                                })
                             })
                             .map(|usage| (partition, usage))
                             .ok()
@@ -79,12 +104,12 @@ impl HostMetrics {
                     .await
                 {
                     let fs = partition.file_system();
-                    let mut tags = btreemap! {
+                    let mut tags = metric_tags! {
                         "filesystem" => fs.as_str(),
                         "mountpoint" => partition.mount_point().to_string_lossy()
                     };
                     if let Some(device) = partition.device() {
-                        tags.insert("device".into(), device.to_string_lossy().into());
+                        tags.replace("device".into(), device.to_string_lossy().to_string());
                     }
                     output.gauge(
                         "filesystem_free_bytes",
@@ -101,7 +126,7 @@ impl HostMetrics {
                         usage.used().get::<byte>() as f64,
                         tags.clone(),
                     );
-                    #[cfg(not(target_os = "windows"))]
+                    #[cfg(not(windows))]
                     output.gauge(
                         "filesystem_used_ratio",
                         usage.ratio().get::<ratio>() as f64,
@@ -110,7 +135,10 @@ impl HostMetrics {
                 }
             }
             Err(error) => {
-                error!(message = "Failed to load partitions info.", %error, internal_log_rate_secs = 60);
+                emit!(HostMetricsScrapeDetailError {
+                    message: "Failed to load partitions info.",
+                    error,
+                });
             }
         }
     }
@@ -126,7 +154,7 @@ mod tests {
         FilesystemConfig,
     };
 
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(not(windows))]
     #[tokio::test]
     async fn generates_filesystem_metrics() {
         let mut buffer = MetricsBuffer::new(None);
@@ -158,7 +186,7 @@ mod tests {
         assert_eq!(count_tag(&metrics, "mountpoint"), metrics.len());
     }
 
-    #[cfg(target_os = "windows")]
+    #[cfg(windows)]
     #[tokio::test]
     async fn generates_filesystem_metrics() {
         let mut buffer = MetricsBuffer::new(None);

@@ -1,7 +1,8 @@
+use codecs::decoding::BoxedFramingError;
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
-use super::prelude::{error_stage, error_type};
+use vector_common::internal_event::{error_stage, error_type};
 
 #[derive(Debug)]
 pub struct JournaldInvalidRecordError {
@@ -15,8 +16,9 @@ impl InternalEvent for JournaldInvalidRecordError {
             message = "Invalid record from journald, discarding.",
             error = ?self.error,
             text = %self.text,
-            stage = error_stage::PROCESSING,
             error_type = error_type::PARSER_FAILED,
+            stage = error_stage::PROCESSING,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,
@@ -28,24 +30,95 @@ impl InternalEvent for JournaldInvalidRecordError {
     }
 }
 
-pub struct JournaldNegativeAcknowledgmentError<'a> {
-    pub cursor: &'a str,
+#[derive(Debug)]
+pub struct JournaldStartJournalctlError {
+    pub error: crate::Error,
 }
 
-impl InternalEvent for JournaldNegativeAcknowledgmentError<'_> {
+impl InternalEvent for JournaldStartJournalctlError {
     fn emit(self) {
         error!(
-            message = "Event received a negative acknowledgment, journal has been stopped.",
-            error_code = "negative_acknowledgement",
-            error_type = error_type::ACKNOWLEDGMENT_FAILED,
-            stage = error_stage::SENDING,
-            cursor = self.cursor,
+            message = "Error starting journalctl process.",
+            error = %self.error,
+            error_type = error_type::COMMAND_FAILED,
+            stage = error_stage::RECEIVING,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,
-            "error_code" => "negative_acknowledgment",
-            "error_type" => error_type::ACKNOWLEDGMENT_FAILED,
-            "stage" => error_stage::SENDING,
+            "stage" => error_stage::RECEIVING,
+            "error_type" => error_type::COMMAND_FAILED,
+        );
+    }
+}
+
+#[derive(Debug)]
+pub struct JournaldReadError {
+    pub error: BoxedFramingError,
+}
+
+impl InternalEvent for JournaldReadError {
+    fn emit(self) {
+        error!(
+            message = "Could not read from journald.",
+            error = %self.error,
+            error_type = error_type::READER_FAILED,
+            stage = error_stage::PROCESSING,
+            internal_log_rate_limit = true,
+        );
+        counter!(
+            "component_errors_total",
+            1,
+            "stage" => error_stage::PROCESSING,
+            "error_type" => error_type::READER_FAILED,
+        );
+    }
+}
+
+#[derive(Debug)]
+pub struct JournaldCheckpointSetError {
+    pub error: std::io::Error,
+    pub filename: String,
+}
+
+impl InternalEvent for JournaldCheckpointSetError {
+    fn emit(self) {
+        error!(
+            message = "Could not set journald checkpoint.",
+            filename = ?self.filename,
+            error = %self.error,
+            error_type = error_type::IO_FAILED,
+            stage = error_stage::PROCESSING,
+            internal_log_rate_limit = true,
+        );
+        counter!(
+            "component_errors_total", 1,
+            "stage" => error_stage::PROCESSING,
+            "error_type" => error_type::IO_FAILED,
+        );
+    }
+}
+
+#[derive(Debug)]
+pub struct JournaldCheckpointFileOpenError {
+    pub error: std::io::Error,
+    pub path: String,
+}
+
+impl InternalEvent for JournaldCheckpointFileOpenError {
+    fn emit(self) {
+        error!(
+            message = "Unable to open checkpoint file.",
+            path = ?self.path,
+            error = %self.error,
+            error_type = error_type::IO_FAILED,
+            stage = error_stage::RECEIVING,
+            internal_log_rate_limit = true,
+        );
+        counter!(
+            "component_errors_total", 1,
+            "stage" => error_stage::RECEIVING,
+            "error_type" => error_type::IO_FAILED,
         );
     }
 }

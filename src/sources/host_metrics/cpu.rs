@@ -1,15 +1,14 @@
-use std::collections::BTreeMap;
-
+use crate::internal_events::{HostMetricsScrapeDetailError, HostMetricsScrapeError};
 use futures::StreamExt;
 #[cfg(target_os = "linux")]
 use heim::cpu::os::linux::CpuTimeExt;
 use heim::units::time::second;
-use vector_common::btreemap;
+use vector_core::{event::MetricTags, metric_tags};
 
 use super::{filter_result, HostMetrics};
 
 const MODE: &str = "mode";
-const NAME: &str = "cpu_seconds_total";
+const CPU_SECS_TOTAL: &str = "cpu_seconds_total";
 const LOGICAL_CPUS: &str = "logical_cpus";
 const PHYSICAL_CPUS: &str = "physical_cpus";
 
@@ -24,55 +23,54 @@ impl HostMetrics {
                     .await;
                 output.name = "cpu";
                 for (index, times) in times.into_iter().enumerate() {
-                    let tags = |name: &str| {
-                        BTreeMap::from([
-                            (String::from(MODE), String::from(name)),
-                            (String::from("cpu"), index.to_string()),
-                        ])
-                    };
-                    output.counter(NAME, times.idle().get::<second>(), tags("idle"));
+                    let tags = |name: &str| metric_tags!(MODE => name, "cpu" => index.to_string());
+                    output.counter(CPU_SECS_TOTAL, times.idle().get::<second>(), tags("idle"));
                     #[cfg(target_os = "linux")]
-                    output.counter(NAME, times.io_wait().get::<second>(), tags("io_wait"));
+                    output.counter(
+                        CPU_SECS_TOTAL,
+                        times.io_wait().get::<second>(),
+                        tags("io_wait"),
+                    );
                     #[cfg(target_os = "linux")]
-                    output.counter(NAME, times.nice().get::<second>(), tags("nice"));
-                    output.counter(NAME, times.system().get::<second>(), tags("system"));
-                    output.counter(NAME, times.user().get::<second>(), tags("user"));
+                    output.counter(CPU_SECS_TOTAL, times.nice().get::<second>(), tags("nice"));
+                    output.counter(
+                        CPU_SECS_TOTAL,
+                        times.system().get::<second>(),
+                        tags("system"),
+                    );
+                    output.counter(CPU_SECS_TOTAL, times.user().get::<second>(), tags("user"));
                 }
             }
             Err(error) => {
-                error!(message = "Failed to load CPU times.", %error, internal_log_rate_secs = 60);
+                emit!(HostMetricsScrapeDetailError {
+                    message: "Failed to load CPU times.",
+                    error,
+                });
             }
         }
         // adds the logical cpu count gauge
         match heim::cpu::logical_count().await {
-            Ok(count) => output.gauge(
-                NAME,
-                count as f64,
-                btreemap! {
-                    MODE => LOGICAL_CPUS,
-                },
-            ),
+            Ok(count) => output.gauge(LOGICAL_CPUS, count as f64, MetricTags::default()),
             Err(error) => {
-                error!(message = "Failed to load logical CPU count.", %error, internal_log_rate_secs = 60);
+                emit!(HostMetricsScrapeDetailError {
+                    message: "Failed to load logical CPU count.",
+                    error,
+                });
             }
         }
         // adds the physical cpu count gauge
         match heim::cpu::physical_count().await {
-            Ok(Some(count)) => output.gauge(
-                NAME,
-                count as f64,
-                btreemap! {
-                    MODE => PHYSICAL_CPUS
-                },
-            ),
+            Ok(Some(count)) => output.gauge(PHYSICAL_CPUS, count as f64, MetricTags::default()),
             Ok(None) => {
-                error!(
-                    message = "Unable to determine physical CPU count.",
-                    internal_log_rate_secs = 60
-                );
+                emit!(HostMetricsScrapeError {
+                    message: "Unable to determine physical CPU count.",
+                });
             }
             Err(error) => {
-                error!(message = "Failed to load physical CPU count.", %error, internal_log_rate_secs = 60);
+                emit!(HostMetricsScrapeDetailError {
+                    message: "Failed to load physical CPU count.",
+                    error,
+                });
             }
         }
     }
@@ -80,11 +78,8 @@ impl HostMetrics {
 
 #[cfg(test)]
 mod tests {
-    use super::super::{
-        tests::{count_name, count_tag},
-        HostMetrics, HostMetricsConfig, MetricsBuffer,
-    };
-    use super::{LOGICAL_CPUS, MODE, NAME, PHYSICAL_CPUS};
+    use super::super::{HostMetrics, HostMetricsConfig, MetricsBuffer};
+    use super::{CPU_SECS_TOTAL, LOGICAL_CPUS, MODE, PHYSICAL_CPUS};
 
     #[tokio::test]
     async fn generates_cpu_metrics() {
@@ -96,15 +91,40 @@ mod tests {
 
         assert!(!metrics.is_empty());
 
-        // They should all be named cpu_seconds_total
-        assert_eq!(metrics.len(), count_name(&metrics, NAME));
+        let mut n_physical_cpus = 0;
+        let mut n_logical_cpus = 0;
 
-        // They should all have a "mode" tag
-        assert_eq!(count_tag(&metrics, MODE), metrics.len());
+        for metric in metrics {
+            // the cpu_seconds_total metrics must have mode
+            if metric.name() == CPU_SECS_TOTAL {
+                let tags = metric.tags();
+                assert!(
+                    tags.is_some(),
+                    "Metric cpu_seconds_total must have a mode tag"
+                );
+                let tags = tags.unwrap();
+                assert!(
+                    tags.contains_key(MODE),
+                    "Metric cpu_seconds_total must have a mode tag"
+                );
+            } else if metric.name() == PHYSICAL_CPUS {
+                n_physical_cpus += 1;
+            } else if metric.name() == LOGICAL_CPUS {
+                n_logical_cpus += 1;
+            } else {
+                // catch any bogey
+                panic!("unrecognized metric name");
+            }
+        }
 
-        // cpu count metrics should be present
-        let mut iter = metrics.iter();
-        assert!(iter.any(|metric| { metric.tag_matches(MODE, LOGICAL_CPUS) }));
-        assert!(iter.any(|metric| { metric.tag_matches(MODE, PHYSICAL_CPUS) }));
+        // cpu count metrics should each be present once
+        assert_eq!(
+            n_logical_cpus, 1,
+            "There can only be one! (logical_cpus metric)"
+        );
+        assert_eq!(
+            n_physical_cpus, 1,
+            "There can only be one! (physical_cpus metric)"
+        );
     }
 }

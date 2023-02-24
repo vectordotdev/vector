@@ -4,6 +4,7 @@ use async_trait::async_trait;
 use chrono::{Duration, Utc};
 use futures::{future, stream::BoxStream, StreamExt};
 use tower::Service;
+use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
 use vector_core::{
     partition::Partitioner,
     sink::StreamSink,
@@ -48,8 +49,17 @@ where
                 let age_range = start..end;
                 future::ready(age_range.contains(&req.timestamp))
             })
-            .batched_partitioned(CloudwatchParititoner, batcher_settings)
-            .map(|(key, events)| BatchCloudwatchRequest { key, events })
+            .batched_partitioned(CloudwatchPartitioner, batcher_settings)
+            .map(|(key, events)| {
+                let metadata =
+                    RequestMetadata::from_batch(events.iter().map(|req| req.get_metadata()));
+
+                BatchCloudwatchRequest {
+                    key,
+                    events,
+                    metadata,
+                }
+            })
             .into_driver(service)
             .run()
             .await
@@ -60,6 +70,7 @@ where
 pub struct BatchCloudwatchRequest {
     pub key: CloudwatchKey,
     pub events: Vec<CloudwatchRequest>,
+    metadata: RequestMetadata,
 }
 
 impl Finalizable for BatchCloudwatchRequest {
@@ -68,9 +79,15 @@ impl Finalizable for BatchCloudwatchRequest {
     }
 }
 
-struct CloudwatchParititoner;
+impl MetaDescriptive for BatchCloudwatchRequest {
+    fn get_metadata(&self) -> RequestMetadata {
+        self.metadata
+    }
+}
 
-impl Partitioner for CloudwatchParititoner {
+struct CloudwatchPartitioner;
+
+impl Partitioner for CloudwatchPartitioner {
     type Item = CloudwatchRequest;
     type Key = CloudwatchKey;
 

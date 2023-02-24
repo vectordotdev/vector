@@ -1,7 +1,7 @@
-//! The Datadog Traces [`VectorSink`]
+//! The Datadog Traces [`vector_core::sink::VectorSink`]
 //!
-//! This module contains the [`VectorSink`] instance responsible for taking
-//! a stream of [`Event`], partition them following the right directions and
+//! This module contains the [`vector_core::sink::VectorSink`] instance responsible for taking
+//! a stream of [`vector_core::event::Event`], partition them following the right directions and
 //! sending them to the Datadog Trace intake.
 //! This module use the same protocol as the official Datadog trace-agent to
 //! submit traces to the Datadog intake.
@@ -11,13 +11,13 @@ mod integration_tests;
 #[cfg(test)]
 mod tests;
 
+pub(crate) mod apm_stats;
 mod config;
 mod request_builder;
 mod service;
 mod sink;
-mod stats;
 
-#[allow(warnings)]
+#[allow(warnings, clippy::pedantic, clippy::nursery)]
 pub(crate) mod ddsketch_full {
     include!(concat!(env!("OUT_DIR"), "/ddsketch_full.rs"));
 }
@@ -28,8 +28,3 @@ pub(crate) mod dd_proto {
 }
 
 pub use self::config::DatadogTracesConfig;
-use crate::config::SinkDescription;
-
-inventory::submit! {
-    SinkDescription::new::<DatadogTracesConfig>("datadog_traces")
-}

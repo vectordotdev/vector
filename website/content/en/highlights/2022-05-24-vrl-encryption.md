@@ -1,6 +1,6 @@
 ---
 date: "2022-05-24"
-title: "New encrytion functions for VRL"
+title: "New encryption functions for VRL"
 description: "Encrypt and decrypt data in VRL"
 authors: ["jszwedko"]
 pr_numbers: []
