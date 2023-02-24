@@ -7,34 +7,26 @@ Take a look at those mediums listed at <https://vector.dev/community>
 
 ## How to ask a question about Vector
 
-Whether in our community [Discord](https://chat.vector.dev/) server or [GitHub
-Discussions](https://github.com/vectordotdev/vector/discussions), framing your
-question well and providing the right level of details is essential to getting
-your question answered.
+Whether in our community [Discord][discord] server or [GitHub Discussions][discussions], framing
+your question well and providing the right level of details will improve your chances of getting
+your question answered. Here are some tips:
 
-Please follow the below guidelines when posting a question:
+### Before asking
 
-### Before posting
+Check the [Vector documentation](https://vector.dev/docs/) first to see if it answers your question.
+If your question is about VRL, you can also try out the [VRL playground](vrl_playground).
 
-#### Search for your question
+If the docs do not answer your question, try using the search feature [Discord][discord] or
+[GitHub][vector], to search for keywords related to your issue. It is quite possible someone has
+already asked your question before. This is especially useful if you have a specific error message
+you observing.
 
-Use the Discord or GitHub search bar, to search for keywords related to your
-issue. It is quite possible someone has already asked your question before.
-
-This is especially useful if you have a specific error message you observing.
-
-#### Check the docs
-
-<https://vector.dev/docs/>
-
-### Context and framing
-
-#### Provide details
+### Provide details
 
 Essential details to include:
 
 - What is the version of Vector (and the Helm chart if deploying via Helm) and
-  the versions of any other systems in use (like Elasticsearch, NATs, etc.).
+  the versions of any other systems in use (like Elasticsearch, NATS, etc.).
 - What is your Vector configuration. See the below section on [how to format
   your config](#formatting).
 - How are you [deploying](https://vector.dev/docs/setup/deployment/) Vector?
@@ -46,33 +38,14 @@ Situation specific (not exhaustive):
 - Did it occur after upgrading to a new version of Vector?
 - Are you trying out Vector for the first time, or did you have a previous
   working configuration?
-- Is this the first time you are using
-  [VRL](https://vector.dev/docs/reference/vrl/#learn)? If so, also try out the
-  [VRL playground](https://playground.vrl.dev/) to debug.
 
 These are just some examples of questions that may or may not apply to your
 situation.
 
-The more specifics you can provide, the more data we have to work with and the
-more likely we'll be able to help.
-
-#### Actually ask a question
-
-Hopefully it is obvious, but in case not if an error message is all that is
-provide in your post, there is not much we can do to help you.
-
 ### Formatting
 
-When providing snippets of configuration files, or log messages, **_please_**
-format these with backticks.
-
-This small effort (a few extra keystrokes) renders the text into a monospaced
-block which greatly improves the readability of your config, errors, and post in
-general.
-
-Formatting this way also can reveal configuration errors that you might have
-missed, and _not_ formatting your config can lead to those attempting to answer
-your question incorrectly reading it due to whitespace discrepancies.
+When providing snippets of configuration files, or log messages, format these with backticks to
+improve the legibility for readers.
 
 #### Blocks
 
@@ -81,11 +54,7 @@ Blocks should be formatted with three backticks (\`\`\`)
 This should be used for any configuration snippets of Vector, Helm values, etc.
 and for Vector console log messages.
 
-If you are not aware of how to format text this way, it is explained in the
-[Markdown documentation on fenced code
-blocks](https://www.markdownguide.org/extended-syntax/#fenced-code-blocks).
-
-For example (wrong way):
+For example:
 
 [sinks.sink0]
 
@@ -95,7 +64,7 @@ target = "stdout"
 
 type = "console"
 
-vs (right way):
+should be written as
 
 ```toml
 [sinks.sink0]
@@ -117,10 +86,15 @@ See the [markdown documentation
 
 For example:
 
-"We upgraded from v24 to 25.1 and are seeing the following error output from
-kafka."
+> We upgraded from v24 to 25.1 and are seeing the following error output from
+kafka.
 
-vs
+should be written as
 
-"We upgraded from `v0.24.0` to `v0.25.1` and are seeing the following error
-output from the `kafka` sink."
+> We upgraded from `v0.24.0` to `v0.25.1` and are seeing the following error
+output from the `kafka` sink.
+
+[discord]: https://chat.vector.dev
+[discussions]: https://github.com/vectordotdev/vector/discussions
+[vector]: https://github.com/vectordotdev/vector
+[vrl_playground]: https://playground.vrl.dev
