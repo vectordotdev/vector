@@ -293,7 +293,7 @@ impl AzureMonitorLogsSink {
         }
 
         let time_generated_key =
-            time_generated_key.unwrap_or(owned_value_path!(log_schema().timestamp_key()));
+            time_generated_key.unwrap_or_else(|| owned_value_path!(log_schema().timestamp_key()));
 
         let shared_key_bytes = base64::decode_block(config.shared_key.inner())?;
         let shared_key = pkey::PKey::hmac(&shared_key_bytes)?;
