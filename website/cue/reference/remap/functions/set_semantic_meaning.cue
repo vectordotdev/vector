@@ -38,7 +38,7 @@ remap: functions: set_semantic_meaning: {
 			source: #"""
 				set_semantic_meaning(.foo, "bar")
 				"""#
-			return: "null"
+			return: null
 		},
 	]
 }
