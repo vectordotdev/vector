@@ -1,2 +1,2 @@
 # result: {}
-(43 % to_int!("foo")) ?? 0
+(mod(43, to_int!("foo"))) ?? 0

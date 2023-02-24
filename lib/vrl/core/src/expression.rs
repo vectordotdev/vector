@@ -21,9 +21,9 @@ impl ExpressionError {
     #[must_use]
     pub fn abort(span: Span, message: Option<&str>) -> ExpressionError {
         let message = if let Some(message) = message {
-            format!("explicit abort at {}: {}", span, message)
+            format!("explicit abort at {span}: {message}")
         } else {
-            format!("explicit abort at {}", span)
+            format!("explicit abort at {span}")
         };
 
         ExpressionError::Abort {
