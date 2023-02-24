@@ -101,14 +101,13 @@ where
         &self,
         gen: &RefCell<SchemaGenerator>,
     ) -> Result<SchemaObject, GenerateError> {
-        let tag_schema = schema::generate_internal_tagged_variant_schema("type".to_string(), {
-            let mut tag_subschema =
-                schema::generate_const_string_schema(self.component_name.to_string());
-            let mut variant_tag_metadata = Metadata::default();
-            variant_tag_metadata.set_description(self.description);
-            schema::apply_base_metadata(&mut tag_subschema, variant_tag_metadata);
-            tag_subschema
-        });
+        let mut tag_subschema =
+            schema::generate_const_string_schema(self.component_name.to_string());
+        let variant_tag_metadata = Metadata::with_description(self.description);
+        schema::apply_base_metadata(&mut tag_subschema, variant_tag_metadata);
+
+        let tag_schema =
+            schema::generate_internal_tagged_variant_schema("type".to_string(), tag_subschema);
         let flattened_subschemas = vec![tag_schema];
 
         let mut field_metadata = Metadata::default();
