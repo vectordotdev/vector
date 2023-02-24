@@ -6,8 +6,8 @@ use http::{
     Request, StatusCode, Uri,
 };
 use hyper::Body;
-use lookup::lookup_v2::OptionalValuePath;
-use lookup::{owned_value_path, OwnedValuePath, PathPrefix};
+use lookup::lookup_v2::{parse_value_path, OptionalValuePath};
+use lookup::{OwnedValuePath, PathPrefix};
 use once_cell::sync::Lazy;
 use openssl::{base64, hash, pkey, sign};
 use regex::Regex;
@@ -292,8 +292,10 @@ impl AzureMonitorLogsSink {
             return Err("shared_key can't be an empty string".into());
         }
 
-        let time_generated_key =
-            time_generated_key.unwrap_or_else(|| owned_value_path!(log_schema().timestamp_key()));
+        let time_generated_key = time_generated_key.unwrap_or_else(|| {
+            parse_value_path(log_schema().timestamp_key())
+                .expect("global log_schema.timestamp_key to be valid path")
+        });
 
         let shared_key_bytes = base64::decode_block(config.shared_key.inner())?;
         let shared_key = pkey::PKey::hmac(&shared_key_bytes)?;
@@ -442,7 +444,8 @@ mod tests {
         let sink = AzureMonitorLogsSink {
             uri: mock_endpoint,
             customer_id: "weee".to_string(),
-            time_generated_key: owned_value_path!(log_schema().timestamp_key()),
+            time_generated_key: parse_value_path(log_schema().timestamp_key())
+                .expect("log_schema.timestamp_key to be valid path"),
             transformer: Default::default(),
             shared_key,
             default_headers: HeaderMap::new(),
