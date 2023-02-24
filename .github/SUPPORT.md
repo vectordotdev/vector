@@ -14,12 +14,13 @@ your question answered. Here are some tips:
 ### Before asking
 
 Check the [Vector documentation](https://vector.dev/docs/) first to see if it answers your question.
-If your question is about VRL, you can also try out the [VRL playground](vrl_playground).
+If your question is about [VRL](https://vector.dev/docs/reference/vrl/#learn), you can also try out
+the [VRL playground](vrl_playground).
 
-If the docs do not answer your question, try using the search feature [Discord][discord] or
+If the docs do not answer your question, try using the search feature on [Discord][discord] or
 [GitHub][vector], to search for keywords related to your issue. It is quite possible someone has
 already asked your question before. This is especially useful if you have a specific error message
-you observing.
+you are observing.
 
 ### Provide details
 
@@ -54,6 +55,9 @@ Blocks should be formatted with three backticks (\`\`\`)
 This should be used for any configuration snippets of Vector, Helm values, etc.
 and for Vector console log messages.
 
+See the [markdown documentation](https://www.markdownguide.org/basic-syntax/#fenced-code-blocks)
+for an explanation.
+
 For example:
 
 [sinks.sink0]
@@ -81,8 +85,8 @@ backticks (\`) around the word or phrase.
 This is less critical but also helps readability a lot and is greatly
 appreciated.
 
-See the [markdown documentation
-(#code)](https://www.markdownguide.org/basic-syntax/#code) for an explanation.
+See the [markdown documentation](https://www.markdownguide.org/basic-syntax/#code)
+for an explanation.
 
 For example:
 
