@@ -86,7 +86,7 @@ base: components: sinks: pulsar: configuration: {
 	batch: {
 		description: "Event batching behavior."
 		required:    false
-		type: object: options: batch_size: {
+		type: object: options: max_events: {
 			description: "The maximum size of a batch, in events, before it is flushed."
 			required:    false
 			type: uint: {
