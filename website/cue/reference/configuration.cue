@@ -253,26 +253,26 @@ configuration: {
 		}
 
 		log_namespacing: {
-			common: false
+			common:      false
 			description: """
 				Globally enables / disables log namespacing. See [Log Namespacing](\(urls.log_namespacing_blog))
 				for more details. If you want to enable individual sources, there is a config
 				option in the source configuration.
 				"""
-			required: false
+			required:    false
 			warnings: []
 			type: bool: default: false
 		}
 
 		log_schema: {
-			common: false
+			common:      false
 			description: """
 				Configures default log schema for all events. This is used by
 				Vector components to assign the fields on incoming
 				events.
 				These values are ignored if log namespacing is enabled. (See [Log Namespacing](\(urls.log_namespacing_blog)))
 				"""
-			required: false
+			required:    false
 			type: object: {
 				examples: []
 				options: {
