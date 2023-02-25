@@ -134,13 +134,13 @@ impl RunnerResults {
     }
 }
 
-pub struct Runner {
-    configuration: ValidationConfiguration,
+pub struct Runner<'a> {
+    configuration: ValidationConfiguration<'a>,
     test_case_data_path: PathBuf,
     validators: HashMap<String, Box<dyn Validator>>,
 }
 
-impl Runner {
+impl Runner<'_> {
     pub fn from_configuration(
         configuration: ValidationConfiguration,
         test_case_data_path: PathBuf,
@@ -321,6 +321,7 @@ impl Runner {
                 .values()
                 .map(|validator| {
                     validator.check_validation(
+                        self.configuration.clone(),
                         component_type,
                         expectation,
                         &input_events,
