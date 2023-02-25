@@ -221,7 +221,7 @@ impl SourceConfig for HttpClientConfig {
 }
 
 impl ValidatableComponent for HttpClientConfig {
-    fn validation_configuration() -> ValidationConfiguration {
+    fn validation_configuration() -> ValidationConfiguration<'static> {
         let uri = Uri::from_static("http://127.0.0.1:9898/logs");
 
         let config = Self {
@@ -237,7 +237,7 @@ impl ValidatableComponent for HttpClientConfig {
             config.get_decoding_config(None),
         );
 
-        ValidationConfiguration::from_source(Self::NAME, config, Some(external_resource))
+        ValidationConfiguration::from_source(Self::NAME, config, Some(external_resource), None)
     }
 }
 

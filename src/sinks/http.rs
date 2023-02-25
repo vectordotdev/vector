@@ -271,7 +271,7 @@ impl SinkConfig for HttpSinkConfig {
 }
 
 impl ValidatableComponent for HttpSinkConfig {
-    fn validation_configuration() -> ValidationConfiguration {
+    fn validation_configuration() -> ValidationConfiguration<'static> {
         use codecs::{JsonSerializerConfig, MetricTagValues};
         use std::str::FromStr;
 

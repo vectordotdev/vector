@@ -2,7 +2,9 @@ use std::fmt::{Display, Formatter};
 
 use vector_core::event::{Event, Metric};
 
-use crate::components::validation::{ComponentType, TestCaseExpectation, TestEvent};
+use crate::components::validation::{
+    ComponentType, EventData, TestCaseExpectation, TestEvent, ValidationConfiguration,
+};
 
 use crate::components::validation::runner::config::TEST_SOURCE_NAME;
 
@@ -26,6 +28,7 @@ impl Validator for ComponentSpecValidator {
 
     fn check_validation(
         &self,
+        configuration: ValidationConfiguration,
         component_type: ComponentType,
         expectation: TestCaseExpectation,
         inputs: &[TestEvent],
@@ -81,14 +84,51 @@ impl Validator for ComponentSpecValidator {
             format!("received {} telemetry events", telemetry_events.len()),
         ];
 
-        let out = validate_telemetry(component_type, inputs, outputs, telemetry_events)?;
+        let out = validate_telemetry(
+            configuration.component_spec_configuration.unwrap(),
+            component_type,
+            inputs,
+            outputs,
+            telemetry_events,
+        )?;
         run_out.extend(out);
 
         Ok(run_out)
     }
 }
 
+enum SourceMetrics {
+    ComponentEventsReceived,
+    ComponentEventsReceivedBytes,
+}
+
+impl SourceMetrics {
+    const fn name(&self) -> &'static str {
+        match self {
+            SourceMetrics::ComponentEventsReceived => "component_received_events_total",
+            SourceMetrics::ComponentEventsReceivedBytes => "component_received_event_bytes_total",
+        }
+    }
+
+    fn _from_name(name: &str) -> Option<Self> {
+        match name {
+            "component_received_events_total" => Some(SourceMetrics::ComponentEventsReceived),
+            "component_received_event_bytes_total" => {
+                Some(SourceMetrics::ComponentEventsReceivedBytes)
+            }
+            _ => None,
+        }
+    }
+}
+
+impl Display for SourceMetrics {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.name())
+    }
+}
+
 fn validate_telemetry(
+    component: impl CustomComponent,
     component_type: ComponentType,
     inputs: &[TestEvent],
     _outputs: &[Event],
@@ -99,9 +139,16 @@ fn validate_telemetry(
 
     match component_type {
         ComponentType::Source => {
-            match validate_component_events_received(inputs, telemetry_events) {
-                Err(e) => errs.extend(e),
-                Ok(m) => out.extend(m),
+            let validations = [
+                validate_component_events_received,
+                validate_component_event_bytes_received,
+            ];
+
+            for validation in validations.iter() {
+                match validation(component, inputs, telemetry_events) {
+                    Err(e) => errs.extend(e),
+                    Ok(m) => out.extend(m),
+                }
             }
         }
         ComponentType::Sink => {}
@@ -116,6 +163,7 @@ fn validate_telemetry(
 }
 
 fn validate_component_events_received(
+    _component: impl CustomComponent,
     inputs: &[TestEvent],
     telemetry_events: &[Event],
 ) -> Result<Vec<String>, Vec<String>> {
@@ -187,27 +235,101 @@ fn validate_component_events_received(
     }
 }
 
-enum SourceMetrics {
-    ComponentEventsReceived,
-}
-
-impl SourceMetrics {
-    const fn name(&self) -> &'static str {
-        match self {
-            SourceMetrics::ComponentEventsReceived => "component_received_events_total",
+pub trait CustomComponent {
+    fn component_event_bytes_received(&self, inputs: &[TestEvent]) -> u64 {
+        let mut bytes = 0;
+        for i in inputs {
+            match i {
+                TestEvent::Passthrough(EventData::Log(s)) => {
+                    bytes += s.len();
+                }
+                // TODO: do something
+                TestEvent::Modified { .. } => {}
+            }
         }
-    }
 
-    fn _from_name(name: &str) -> Option<Self> {
-        match name {
-            "component_received_events_total" => Some(SourceMetrics::ComponentEventsReceived),
-            _ => None,
-        }
+        bytes as u64
     }
 }
 
-impl Display for SourceMetrics {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.name())
+impl CustomComponent for &dyn CustomComponent {
+    fn component_event_bytes_received(&self, inputs: &[TestEvent]) -> u64 {
+        (**self).component_event_bytes_received(inputs)
+    }
+}
+
+fn validate_component_event_bytes_received(
+    component: impl CustomComponent,
+    inputs: &[TestEvent],
+    telemetry_events: &[Event],
+) -> Result<Vec<String>, Vec<String>> {
+    let mut errs: Vec<String> = Vec::new();
+
+    // TODO: extract
+    let mut metrics = Vec::<Metric>::new();
+    for t in telemetry_events.iter() {
+        if let vector_core::event::Event::Metric(m) = t {
+            if m.name() == SourceMetrics::ComponentEventsReceivedBytes.to_string() {
+                if let Some(tags) = m.tags() {
+                    if tags.get("component_name").unwrap_or("") == TEST_SOURCE_NAME {
+                        metrics.push(m.clone());
+                    }
+                }
+            }
+        }
+    }
+
+    // TODO: extract
+    if metrics.is_empty() {
+        errs.push(format!(
+            "{}: no metrics were emitted.",
+            SourceMetrics::ComponentEventsReceivedBytes,
+        ));
+
+        return Err(errs);
+    }
+
+    debug!(
+        "{}: {} metrics found",
+        SourceMetrics::ComponentEventsReceivedBytes,
+        metrics.len(),
+    );
+
+    let mut bytes: f64 = 0.0;
+
+    for m in metrics {
+        match m.value() {
+            vector_core::event::MetricValue::Counter { value } => bytes += value,
+            _ => errs.push(format!(
+                "{}: metric value is not a counter",
+                SourceMetrics::ComponentEventsReceivedBytes,
+            )),
+        }
+    }
+
+    let event_bytes = component.component_event_bytes_received(inputs) as f64;
+    if bytes != event_bytes {
+        errs.push(format!(
+            "{}: expected {} bytes, but received {}",
+            SourceMetrics::ComponentEventsReceivedBytes,
+            event_bytes,
+            bytes
+        ));
+    }
+
+    debug!(
+        "{}: {} total bytes",
+        SourceMetrics::ComponentEventsReceivedBytes,
+        bytes,
+    );
+
+    if errs.is_empty() {
+        Ok(vec![format!(
+            "{}: {}",
+            SourceMetrics::ComponentEventsReceivedBytes,
+            bytes,
+        )])
+    } else {
+        Err(errs)
     }
 }
