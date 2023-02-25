@@ -91,6 +91,7 @@ pub struct HttpRequestBuilder {
     pub http_request_config: RequestConfig,
     pub http_auth: Option<Auth>,
     pub credentials_provider: Option<SharedCredentialsProvider>,
+    pub aws_opensearch_serverless: bool,
 }
 
 impl HttpRequestBuilder {
@@ -103,6 +104,7 @@ impl HttpRequestBuilder {
             region: common.region.clone(),
             compression: config.compression,
             credentials_provider: common.aws_auth.clone(),
+            aws_opensearch_serverless: common.aws_opensearch_serverless,
         }
     }
 
@@ -135,7 +137,13 @@ impl HttpRequestBuilder {
             .expect("Invalid http request value used");
 
         if let Some(credentials_provider) = &self.credentials_provider {
-            sign_request(&mut request, credentials_provider, &self.region).await?;
+            sign_request(
+                &mut request,
+                credentials_provider,
+                &self.region,
+                self.aws_opensearch_serverless,
+            )
+            .await?;
         }
 
         Ok(request)

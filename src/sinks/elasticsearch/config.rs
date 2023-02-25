@@ -182,6 +182,10 @@ pub struct ElasticsearchConfig {
     )]
     #[configurable(derived)]
     pub acknowledgements: AcknowledgementsConfig,
+
+    /// If `true`, enables AWS OpenSearch Serverless mode.
+    #[serde(default)]
+    pub aws_opensearch_serverless: bool,
 }
 
 fn default_doc_type() -> String {
@@ -217,6 +221,7 @@ impl Default for ElasticsearchConfig {
             data_stream: None,
             metrics: None,
             acknowledgements: Default::default(),
+            aws_opensearch_serverless: false,
         }
     }
 }

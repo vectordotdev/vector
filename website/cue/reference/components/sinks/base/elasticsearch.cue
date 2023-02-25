@@ -188,6 +188,11 @@ base: components: sinks: elasticsearch: configuration: {
 			}
 		}
 	}
+	aws_opensearch_serverless: {
+		description: "If `true`, enables AWS OpenSearch Serverless mode."
+		required:    false
+		type: bool: default: false
+	}
 	batch: {
 		description: "Event batching behavior."
 		required:    false

@@ -38,6 +38,7 @@ pub struct ElasticsearchCommon {
     pub tls_settings: TlsSettings,
     pub region: Option<Region>,
     pub request: RequestConfig,
+    pub aws_opensearch_serverless: bool,
     pub query_params: HashMap<String, String>,
     pub metric_to_log: MetricToLog,
 }
@@ -60,6 +61,8 @@ impl ElasticsearchCommon {
             }
             .into());
         }
+
+        let aws_opensearch_serverless = config.aws_opensearch_serverless;
 
         let authorization = match &config.auth {
             Some(ElasticsearchAuth::Basic { user, password }) => Some(Auth::Basic {
@@ -140,6 +143,7 @@ impl ElasticsearchCommon {
                         &aws_auth,
                         &region,
                         &request,
+                        aws_opensearch_serverless,
                         &tls_settings,
                         proxy_config,
                     )
@@ -201,6 +205,7 @@ impl ElasticsearchCommon {
             region,
             tls_settings,
             metric_to_log,
+            aws_opensearch_serverless,
         })
     }
 
@@ -247,6 +252,7 @@ impl ElasticsearchCommon {
             &self.aws_auth,
             &self.region,
             &self.request,
+            self.aws_opensearch_serverless,
             client,
             "/_cluster/health",
         )
@@ -263,8 +269,14 @@ pub async fn sign_request(
     request: &mut http::Request<Bytes>,
     credentials_provider: &SharedCredentialsProvider,
     region: &Option<Region>,
+    aws_opensearch_serverless: bool,
 ) -> crate::Result<()> {
-    crate::aws::sign_request("es", request, credentials_provider, region).await
+    let service_name = if aws_opensearch_serverless {
+        "aoss"
+    } else {
+        "es"
+    };
+    crate::aws::sign_request(service_name, request, credentials_provider, region).await
 }
 
 async fn get_version(
@@ -273,6 +285,7 @@ async fn get_version(
     aws_auth: &Option<SharedCredentialsProvider>,
     region: &Option<Region>,
     request: &RequestConfig,
+    aws_opensearch_serverless: bool,
     tls_settings: &TlsSettings,
     proxy_config: &ProxyConfig,
 ) -> crate::Result<usize> {
@@ -288,6 +301,7 @@ async fn get_version(
         aws_auth,
         region,
         request,
+        aws_opensearch_serverless,
         client,
         "/_cluster/state/version",
     )
@@ -307,6 +321,7 @@ async fn get(
     aws_auth: &Option<SharedCredentialsProvider>,
     region: &Option<Region>,
     request: &RequestConfig,
+    aws_opensearch_serverless: bool,
     client: HttpClient,
     path: &str,
 ) -> crate::Result<Response<Body>> {
@@ -323,7 +338,13 @@ async fn get(
     let mut request = builder.body(Bytes::new())?;
 
     if let Some(credentials_provider) = aws_auth {
-        sign_request(&mut request, credentials_provider, region).await?;
+        sign_request(
+            &mut request,
+            credentials_provider,
+            region,
+            aws_opensearch_serverless,
+        )
+        .await?;
     }
     client
         .send(request.map(hyper::Body::from))
