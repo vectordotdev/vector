@@ -55,28 +55,25 @@ pub enum ComponentConfiguration {
 /// component, including the strongly-typed configuration for building a topology, as well as the
 /// definition of the external resource required to properly interact with the component.
 #[derive(Clone)]
-pub struct ValidationConfiguration<'a> {
+pub struct ValidationConfiguration {
     component_name: &'static str,
     component_type: ComponentType,
     component_configuration: ComponentConfiguration,
     external_resource: Option<ExternalResource>,
-    component_spec_configuration: Option<&'a dyn CustomComponent>,
 }
 
-impl ValidationConfiguration<'_> {
+impl ValidationConfiguration {
     /// Creates a new `ValidationConfiguration` for a source.
     pub fn from_source<C: Into<Sources>>(
         component_name: &'static str,
         config: C,
         external_resource: Option<ExternalResource>,
-        component_spec_configuration: Option<&dyn CustomComponent>,
     ) -> Self {
         Self {
             component_name,
             component_type: ComponentType::Source,
             component_configuration: ComponentConfiguration::Source(config.into()),
             external_resource,
-            component_spec_configuration,
         }
     }
 
@@ -87,7 +84,6 @@ impl ValidationConfiguration<'_> {
             component_type: ComponentType::Source,
             component_configuration: ComponentConfiguration::Transform(config.into()),
             external_resource: None,
-            component_spec_configuration: None,
         }
     }
 
@@ -102,7 +98,6 @@ impl ValidationConfiguration<'_> {
             component_type: ComponentType::Sink,
             component_configuration: ComponentConfiguration::Sink(config.into()),
             external_resource,
-            component_spec_configuration: None,
         }
     }
 
@@ -125,6 +120,15 @@ impl ValidationConfiguration<'_> {
     pub fn external_resource(&self) -> Option<ExternalResource> {
         self.external_resource.clone()
     }
+
+    pub fn spec_configuration(&self) -> Option<&dyn CustomComponent> {
+        match &self.component_configuration {
+            ComponentConfiguration::Source(Sources::HttpServer(c)) => {
+                Some(c as &dyn CustomComponent)
+            }
+            _ => None,
+        }
+    }
 }
 
 pub trait ValidatableComponent: Send + Sync {
@@ -133,12 +137,12 @@ pub trait ValidatableComponent: Send + Sync {
     /// The validation configuration compromises the two main requirements for validating a
     /// component: how to configure the component in a topology, and what external resources, if
     /// any, it depends on.
-    fn validation_configuration() -> ValidationConfiguration<'static>;
+    fn validation_configuration() -> ValidationConfiguration;
 }
 
 /// Description of a validatable component.
 pub struct ValidatableComponentDescription {
-    validation_configuration: fn() -> ValidationConfiguration<'static>,
+    validation_configuration: fn() -> ValidationConfiguration,
 }
 
 impl ValidatableComponentDescription {

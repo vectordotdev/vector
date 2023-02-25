@@ -134,13 +134,13 @@ impl RunnerResults {
     }
 }
 
-pub struct Runner<'a> {
-    configuration: ValidationConfiguration<'a>,
+pub struct Runner {
+    configuration: ValidationConfiguration,
     test_case_data_path: PathBuf,
     validators: HashMap<String, Box<dyn Validator>>,
 }
 
-impl Runner<'_> {
+impl Runner {
     pub fn from_configuration(
         configuration: ValidationConfiguration,
         test_case_data_path: PathBuf,

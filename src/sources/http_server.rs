@@ -252,7 +252,7 @@ impl Default for SimpleHttpConfig {
 impl_generate_config_from_default!(SimpleHttpConfig);
 
 impl ValidatableComponent for SimpleHttpConfig {
-    fn validation_configuration() -> ValidationConfiguration<'static> {
+    fn validation_configuration() -> ValidationConfiguration {
         let config = Self {
             decoding: Some(DeserializerConfig::Json),
             ..Default::default()
@@ -269,12 +269,7 @@ impl ValidatableComponent for SimpleHttpConfig {
                 .expect("should not fail to get decoding config"),
         );
 
-        ValidationConfiguration::from_source(
-            Self::NAME,
-            config,
-            Some(external_resource),
-            Some(&config),
-        )
+        ValidationConfiguration::from_source(Self::NAME, config, Some(external_resource))
     }
 }
 

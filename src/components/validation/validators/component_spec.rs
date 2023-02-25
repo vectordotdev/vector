@@ -85,7 +85,7 @@ impl Validator for ComponentSpecValidator {
         ];
 
         let out = validate_telemetry(
-            configuration.component_spec_configuration.unwrap(),
+            configuration.spec_configuration().unwrap(),
             component_type,
             inputs,
             outputs,
@@ -128,7 +128,7 @@ impl Display for SourceMetrics {
 }
 
 fn validate_telemetry(
-    component: impl CustomComponent,
+    component: &dyn CustomComponent,
     component_type: ComponentType,
     inputs: &[TestEvent],
     _outputs: &[Event],
@@ -163,7 +163,7 @@ fn validate_telemetry(
 }
 
 fn validate_component_events_received(
-    _component: impl CustomComponent,
+    _component: &dyn CustomComponent,
     inputs: &[TestEvent],
     telemetry_events: &[Event],
 ) -> Result<Vec<String>, Vec<String>> {
@@ -252,14 +252,8 @@ pub trait CustomComponent {
     }
 }
 
-impl CustomComponent for &dyn CustomComponent {
-    fn component_event_bytes_received(&self, inputs: &[TestEvent]) -> u64 {
-        (**self).component_event_bytes_received(inputs)
-    }
-}
-
 fn validate_component_event_bytes_received(
-    component: impl CustomComponent,
+    component: &dyn CustomComponent,
     inputs: &[TestEvent],
     telemetry_events: &[Event],
 ) -> Result<Vec<String>, Vec<String>> {
