@@ -369,7 +369,7 @@ async fn client() -> S3Client {
     create_client::<S3ClientBuilder>(
         &auth,
         region.region(),
-        region.endpoint().unwrap(),
+        region.endpoint(),
         &proxy,
         &tls_options,
         true,

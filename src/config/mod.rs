@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 use std::{
     collections::{HashMap, HashSet},
     fmt::{self, Display, Formatter},
@@ -335,7 +336,7 @@ impl Display for Resource {
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
-pub struct TestDefinition<T = OutputId> {
+pub struct TestDefinition<T: 'static = OutputId> {
     /// The name of the unit test.
     pub name: String,
 
@@ -532,7 +533,7 @@ fn default_test_input_type() -> String {
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
-pub struct TestOutput<T = OutputId> {
+pub struct TestOutput<T: 'static = OutputId> {
     /// The transform outputs to extract events from.
     pub extract_from: OneOrMany<T>,
 

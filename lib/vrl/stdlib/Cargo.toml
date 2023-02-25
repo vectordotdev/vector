@@ -53,6 +53,7 @@ roxmltree = { version = "0.18.0", optional = true }
 woothee = { version = "0.13.0", optional = true }
 uaparser = { version = "0.6.0", default-features = false, optional = true }
 utf8-width = { version = "0.1.6", optional = true }
+zstd = { version = "0.12.2", default-features = false, features = ["wasm"], optional = true }
 
 # Cryptography
 aes = { version = "0.8.2", optional = true }
@@ -92,6 +93,7 @@ default = [
     "decode_percent",
     "decode_mime_q",
     "decode_zlib",
+    "decode_zstd",
     "decrypt",
     "del",
     "downcase",
@@ -103,6 +105,7 @@ default = [
     "encode_logfmt",
     "encode_percent",
     "encode_zlib",
+    "encode_zstd",
     "encrypt",
     "ends_with",
     "exists",
@@ -244,6 +247,7 @@ decode_gzip = ["dep:flate2"]
 decode_percent = ["dep:percent-encoding"]
 decode_mime_q = ["dep:data-encoding","dep:charset","dep:quoted_printable"]
 decode_zlib = ["dep:flate2"]
+decode_zstd = ["dep:zstd"]
 decrypt = ["cryptography", "random_bytes", "encrypt"]
 del = []
 downcase = []
@@ -255,6 +259,7 @@ encode_key_value = ["vector-common/encoding", "value/json"]
 encode_logfmt = ["encode_key_value"]
 encode_percent = ["dep:percent-encoding"]
 encode_zlib = ["dep:flate2"]
+encode_zstd = ["dep:zstd"]
 encrypt = ["cryptography", "random_bytes", "decrypt"]
 ends_with = []
 exists = []

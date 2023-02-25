@@ -1,14 +1,14 @@
-use std::{collections::BTreeSet, fmt};
+use std::{cell::RefCell, collections::BTreeSet, fmt};
 
 use indexmap::IndexMap;
 use serde::{de, ser};
 use serde_json::Value;
 use vector_config::{
     schema::{
-        apply_metadata, generate_const_string_schema, generate_enum_schema, generate_one_of_schema,
-        generate_struct_schema, get_or_generate_schema,
+        apply_base_metadata, generate_const_string_schema, generate_enum_schema,
+        generate_one_of_schema, generate_struct_schema, get_or_generate_schema, SchemaGenerator,
+        SchemaObject,
     },
-    schemars::{gen::SchemaGenerator, schema::SchemaObject},
     Configurable, GenerateError, Metadata, ToValue,
 };
 use vector_config_common::attributes::CustomAttribute;
@@ -212,7 +212,7 @@ impl Configurable for Compression {
         Some(std::any::type_name::<Self>())
     }
 
-    fn metadata() -> Metadata<Self> {
+    fn metadata() -> Metadata {
         let mut metadata = Metadata::default();
         metadata.set_title("Compression configuration.");
         metadata.set_description("All compression algorithms use the default compression level unless otherwise specified.");
@@ -221,7 +221,7 @@ impl Configurable for Compression {
         metadata
     }
 
-    fn generate_schema(gen: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
+    fn generate_schema(gen: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
         const ALGORITHM_NAME: &str = "algorithm";
         const LEVEL_NAME: &str = "level";
         const LOGICAL_NAME: &str = "logical_name";
@@ -232,18 +232,18 @@ impl Configurable for Compression {
                                       description: &'static str|
          -> SchemaObject {
             let mut const_schema = generate_const_string_schema(logical_name.to_lowercase());
-            let mut const_metadata = Metadata::<()>::with_description(description);
+            let mut const_metadata = Metadata::with_description(description);
             if let Some(title) = title {
                 const_metadata.set_title(title);
             }
             const_metadata.add_custom_attribute(CustomAttribute::kv(LOGICAL_NAME, logical_name));
-            apply_metadata(&mut const_schema, const_metadata);
+            apply_base_metadata(&mut const_schema, const_metadata);
             const_schema
         };
 
         // First, we'll create the string-only subschemas for each algorithm, and wrap those up
         // within a one-of schema.
-        let mut string_metadata = Metadata::<()>::with_description("Compression algorithm.");
+        let mut string_metadata = Metadata::with_description("Compression algorithm.");
         string_metadata.add_custom_attribute(CustomAttribute::kv(ENUM_TAGGING_MODE, "external"));
 
         let none_string_subschema = generate_string_schema("None", None, "No compression.");
@@ -263,7 +263,7 @@ impl Configurable for Compression {
             gzip_string_subschema,
             zlib_string_subschema,
         ]);
-        apply_metadata(&mut all_string_oneof_subschema, string_metadata.clone());
+        apply_base_metadata(&mut all_string_oneof_subschema, string_metadata);
 
         // Next we'll create a full schema for the given algorithms.
         //
@@ -278,7 +278,8 @@ impl Configurable for Compression {
         // generation, where we need to be able to generate the right enum key/value pair for the
         // `none` algorithm as part of the overall set of enum values declared for the `algorithm`
         // field in the "full" schema version.
-        let compression_level_schema = get_or_generate_schema::<CompressionLevel>(gen, None)?;
+        let compression_level_schema =
+            get_or_generate_schema(&CompressionLevel::as_configurable_ref(), gen, None)?;
 
         let mut required = BTreeSet::new();
         required.insert(ALGORITHM_NAME.to_string());
@@ -291,9 +292,9 @@ impl Configurable for Compression {
         properties.insert(LEVEL_NAME.to_string(), compression_level_schema);
 
         let mut full_subschema = generate_struct_schema(properties, required, None);
-        let mut full_metadata = Metadata::<()>::with_description("");
+        let mut full_metadata = Metadata::with_description("");
         full_metadata.add_custom_attribute(CustomAttribute::flag("docs::hidden"));
-        apply_metadata(&mut full_subschema, full_metadata);
+        apply_base_metadata(&mut full_subschema, full_metadata);
 
         // Finally, we zip both schemas together.
         Ok(generate_one_of_schema(&[
@@ -425,13 +426,13 @@ impl Configurable for CompressionLevel {
         Some(std::any::type_name::<Self>())
     }
 
-    fn metadata() -> Metadata<Self> {
+    fn metadata() -> Metadata {
         let mut metadata = Metadata::default();
         metadata.set_description("Compression level.");
         metadata
     }
 
-    fn generate_schema(_: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
+    fn generate_schema(_: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
         let string_consts = ["none", "fast", "best", "default"]
             .iter()
             .map(|s| serde_json::Value::from(*s));

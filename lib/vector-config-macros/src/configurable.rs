@@ -111,7 +111,7 @@ fn build_metadata_fn(container: &Container<'_>) -> proc_macro2::TokenStream {
     let container_metadata = generate_container_metadata(&meta_ident, container);
 
     quote! {
-        fn metadata() -> ::vector_config::Metadata<Self> {
+        fn metadata() -> ::vector_config::Metadata {
             #container_metadata
             #meta_ident
         }
@@ -129,8 +129,12 @@ fn build_to_value_fn(_container: &Container<'_>) -> proc_macro2::TokenStream {
 
 fn build_virtual_newtype_schema_fn(virtual_ty: Type) -> proc_macro2::TokenStream {
     quote! {
-        fn generate_schema(schema_gen: &mut ::vector_config::schemars::gen::SchemaGenerator) -> std::result::Result<::vector_config::schemars::schema::SchemaObject, ::vector_config::GenerateError> {
-            ::vector_config::schema::get_or_generate_schema::<#virtual_ty>(schema_gen, None)
+        fn generate_schema(schema_gen: &::std::cell::RefCell<::vector_config::schema::SchemaGenerator>) -> std::result::Result<::vector_config::schema::SchemaObject, ::vector_config::GenerateError> {
+            ::vector_config::schema::get_or_generate_schema(
+                &<#virtual_ty as ::vector_config::Configurable>::as_configurable_ref(),
+                schema_gen,
+                None,
+            )
         }
     }
 }
@@ -143,7 +147,7 @@ fn build_enum_generate_schema_fn(variants: &[Variant<'_>]) -> proc_macro2::Token
         .map(generate_enum_variant_schema);
 
     quote! {
-        fn generate_schema(schema_gen: &mut ::vector_config::schemars::gen::SchemaGenerator) -> std::result::Result<::vector_config::schemars::schema::SchemaObject, ::vector_config::GenerateError> {
+        fn generate_schema(schema_gen: &::std::cell::RefCell<::vector_config::schema::SchemaGenerator>) -> std::result::Result<::vector_config::schema::SchemaObject, ::vector_config::GenerateError> {
             let mut subschemas = ::std::vec::Vec::new();
 
             #(#mapped_variants)*
@@ -169,9 +173,14 @@ fn build_struct_generate_schema_fn(
 fn generate_struct_field(field: &Field<'_>) -> proc_macro2::TokenStream {
     let field_metadata_ref = Ident::new("field_metadata", Span::call_site());
     let field_metadata = generate_field_metadata(&field_metadata_ref, field);
+    let field_schema_ty = get_field_schema_ty(field);
 
     let spanned_generate_schema = quote_spanned! {field.span()=>
-        ::vector_config::schema::get_or_generate_schema(schema_gen, Some(#field_metadata_ref))?
+        ::vector_config::schema::get_or_generate_schema(
+            &<#field_schema_ty as ::vector_config::Configurable>::as_configurable_ref(),
+            schema_gen,
+            Some(#field_metadata_ref),
+        )?
     };
 
     quote! {
@@ -263,7 +272,7 @@ fn build_named_struct_generate_schema_fn(
         .map(|field| generate_named_struct_field(container, field));
 
     quote! {
-        fn generate_schema(schema_gen: &mut ::vector_config::schemars::gen::SchemaGenerator) -> std::result::Result<::vector_config::schemars::schema::SchemaObject, ::vector_config::GenerateError> {
+        fn generate_schema(schema_gen: &::std::cell::RefCell<::vector_config::schema::SchemaGenerator>) -> std::result::Result<::vector_config::schema::SchemaObject, ::vector_config::GenerateError> {
             let mut properties = ::vector_config::indexmap::IndexMap::new();
             let mut required = ::std::collections::BTreeSet::new();
             let mut flattened_subschemas = ::std::vec::Vec::new();
@@ -308,7 +317,7 @@ fn build_tuple_struct_generate_schema_fn(fields: &[Field<'_>]) -> proc_macro2::T
         .map(generate_tuple_struct_field);
 
     quote! {
-        fn generate_schema(schema_gen: &mut ::vector_config::schemars::gen::SchemaGenerator) -> std::result::Result<::vector_config::schemars::schema::SchemaObject, ::vector_config::GenerateError> {
+        fn generate_schema(schema_gen: &::std::cell::RefCell<::vector_config::schema::SchemaGenerator>) -> std::result::Result<::vector_config::schema::SchemaObject, ::vector_config::GenerateError> {
             let mut subschemas = ::std::collections::Vec::new();
 
             #(#mapped_fields)*
@@ -334,7 +343,7 @@ fn build_newtype_struct_generate_schema_fn(fields: &[Field<'_>]) -> proc_macro2:
     let field_schema = mapped_fields.remove(0);
 
     quote! {
-        fn generate_schema(schema_gen: &mut ::vector_config::schemars::gen::SchemaGenerator) -> std::result::Result<::vector_config::schemars::schema::SchemaObject, ::vector_config::GenerateError> {
+        fn generate_schema(schema_gen: &::std::cell::RefCell<::vector_config::schema::SchemaGenerator>) -> std::result::Result<::vector_config::schema::SchemaObject, ::vector_config::GenerateError> {
             #field_schema
 
             Ok(subschema)
@@ -411,7 +420,7 @@ fn generate_field_metadata(meta_ident: &Ident, field: &Field<'_>) -> proc_macro2
     let maybe_custom_attributes = get_metadata_custom_attributes(meta_ident, field.metadata());
 
     quote! {
-        let mut #meta_ident = ::vector_config::Metadata::<#field_schema_ty>::default();
+        let mut #meta_ident = ::vector_config::Metadata::default();
         #maybe_clear_title_description
         #maybe_title
         #maybe_description
@@ -457,7 +466,7 @@ fn generate_variant_metadata(
     // container it exists within. We also don't want to use the metadata of the enum container, as
     // it might have values that would conflict with the metadata of this specific variant.
     quote! {
-        let mut #meta_ident = ::vector_config::Metadata::<()>::default();
+        let mut #meta_ident = ::vector_config::Metadata::default();
         #maybe_title
         #maybe_description
         #maybe_deprecated
@@ -481,7 +490,7 @@ fn generate_variant_tag_metadata(
     // container it exists within. We also don't want to use the metadata of the enum container, as
     // it might have values that would conflict with the metadata of this specific variant.
     quote! {
-        let mut #meta_ident = ::vector_config::Metadata::<()>::default();
+        let mut #meta_ident = ::vector_config::Metadata::default();
         #maybe_title
         #maybe_description
     }
@@ -927,7 +936,7 @@ fn generate_enum_variant_apply_metadata(variant: &Variant<'_>) -> proc_macro2::T
 
     quote! {
         #variant_metadata
-        ::vector_config::schema::apply_metadata(&mut subschema, #variant_metadata_ref);
+        ::vector_config::schema::apply_base_metadata(&mut subschema, #variant_metadata_ref);
     }
 }
 
@@ -937,7 +946,7 @@ fn generate_enum_variant_tag_apply_metadata(variant: &Variant<'_>) -> proc_macro
 
     quote! {
         #variant_tag_metadata
-        ::vector_config::schema::apply_metadata(&mut tag_subschema, #variant_tag_metadata_ref);
+        ::vector_config::schema::apply_base_metadata(&mut tag_subschema, #variant_tag_metadata_ref);
     }
 }
 

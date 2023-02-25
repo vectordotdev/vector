@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 use enum_dispatch::enum_dispatch;
 use futures::future::BoxFuture;
 use snafu::Snafu;
@@ -6,8 +7,6 @@ pub mod util;
 
 #[cfg(feature = "sinks-amqp")]
 pub mod amqp;
-#[cfg(feature = "sinks-apex")]
-pub mod apex;
 #[cfg(feature = "sinks-aws_cloudwatch_logs")]
 pub mod aws_cloudwatch_logs;
 #[cfg(feature = "sinks-aws_cloudwatch_metrics")]
@@ -35,6 +34,8 @@ pub mod blackhole;
 pub mod clickhouse;
 #[cfg(feature = "sinks-console")]
 pub mod console;
+#[cfg(feature = "sinks-databend")]
+pub mod databend;
 #[cfg(any(
     feature = "sinks-datadog_events",
     feature = "sinks-datadog_logs",
@@ -138,11 +139,6 @@ pub enum Sinks {
     #[configurable(metadata(docs::label = "AMQP"))]
     Amqp(amqp::AmqpSinkConfig),
 
-    /// Deliver log events to Apex.
-    #[cfg(feature = "sinks-apex")]
-    #[configurable(metadata(docs::label = "Apex"))]
-    Apex(apex::ApexSinkConfig),
-
     /// Publish log events to AWS CloudWatch Logs.
     #[cfg(feature = "sinks-aws_cloudwatch_logs")]
     #[configurable(metadata(docs::label = "AWS CloudWatch Logs"))]
@@ -202,6 +198,10 @@ pub enum Sinks {
     #[cfg(feature = "sinks-console")]
     #[configurable(metadata(docs::label = "Console"))]
     Console(console::ConsoleSinkConfig),
+
+    /// Deliver log data to a Databend database.
+    #[cfg(feature = "sinks-databend")]
+    Databend(databend::DatabendConfig),
 
     /// Send events to Datadog Archives.
     #[cfg(feature = "sinks-datadog_archives")]
@@ -416,14 +416,10 @@ pub enum Sinks {
 }
 
 impl NamedComponent for Sinks {
-    const NAME: &'static str = "_invalid_usage";
-
     fn get_component_name(&self) -> &'static str {
         match self {
             #[cfg(feature = "sinks-amqp")]
             Self::Amqp(config) => config.get_component_name(),
-            #[cfg(feature = "sinks-apex")]
-            Self::Apex(config) => config.get_component_name(),
             #[cfg(feature = "sinks-aws_cloudwatch_logs")]
             Self::AwsCloudwatchLogs(config) => config.get_component_name(),
             #[cfg(feature = "sinks-aws_cloudwatch_metrics")]
@@ -448,6 +444,8 @@ impl NamedComponent for Sinks {
             Self::Clickhouse(config) => config.get_component_name(),
             #[cfg(feature = "sinks-console")]
             Self::Console(config) => config.get_component_name(),
+            #[cfg(feature = "sinks-databend")]
+            Self::Databend(config) => config.get_component_name(),
             #[cfg(feature = "sinks-datadog_archives")]
             Self::DatadogArchives(config) => config.get_component_name(),
             #[cfg(feature = "sinks-datadog_events")]

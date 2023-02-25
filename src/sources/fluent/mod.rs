@@ -15,7 +15,7 @@ use smallvec::{smallvec, SmallVec};
 use tokio_util::codec::Decoder;
 use value::kind::Collection;
 use value::{Kind, Value};
-use vector_config::{configurable_component, NamedComponent};
+use vector_config::configurable_component;
 use vector_core::config::{LegacyKey, LogNamespace};
 use vector_core::schema::Definition;
 
