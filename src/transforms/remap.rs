@@ -865,7 +865,7 @@ mod tests {
             "#}),
             file: None,
             drop_on_error: true,
-            drop_on_abort: false,
+            drop_on_abort: true,
             ..Default::default()
         };
         let mut tform = remap(conf).unwrap();
