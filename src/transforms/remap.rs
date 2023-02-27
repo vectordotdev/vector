@@ -1151,7 +1151,7 @@ mod tests {
             serde_json::json!({
                 "dropped": {
                     "reason": "abort",
-                    "message": "aborted",
+                    "message": "explicit abort at (196:201)",
                     "component_id": "remapper",
                     "component_type": "remap",
                     "component_kind": "transform",
@@ -1232,7 +1232,7 @@ mod tests {
                 )
                 .with_tags(Some(metric_tags! {
                     "not_hello" => "oops",
-                    "metadata.dropped.reason" => "error",
+                    "metadata.dropped.reason" => "abort",
                     "metadata.dropped.component_id" => "remapper",
                     "metadata.dropped.component_type" => "remap",
                     "metadata.dropped.component_kind" => "transform",
@@ -1249,7 +1249,7 @@ mod tests {
             Event::try_from(serde_json::json!({"hello": 0})).unwrap();
         let conf = RemapConfig {
             source: Some(formatdoc! {r#"
-                assert_eq!(.hello, 0, "custom message here")
+                assert_eq!(.hello, 0, "function call error for \"assert_eq\" at (0:44): custom message here")
                 assert_eq!(.hello, 1)
             "#}),
             drop_on_error: true,
@@ -1272,8 +1272,8 @@ mod tests {
             log["metadata"],
             serde_json::json!({
                 "dropped": {
-                    "reason": "error",
-                    "message": "custom message here",
+                    "reason": "abort",
+                    "message": "function call error for \"assert_eq\" at (0:93): function call error for \"assert_eq\" at (0:44): custom message here",
                     "component_id": "remapper",
                     "component_type": "remap",
                     "component_kind": "transform",
@@ -1292,8 +1292,8 @@ mod tests {
             log["metadata"],
             serde_json::json!({
                 "dropped": {
-                    "reason": "error",
-                    "message": "function call error for \"assert_eq\" at (45:66): assertion failed: 0 == 1",
+                    "reason": "abort",
+                    "message": "function call error for \"assert_eq\" at (94:115): assertion failed: 0 == 1",
                     "component_id": "remapper",
                     "component_type": "remap",
                     "component_kind": "transform",
@@ -1331,7 +1331,7 @@ mod tests {
             serde_json::json!({
                 "dropped": {
                     "reason": "abort",
-                    "message": "custom message here",
+                    "message": "explicit abort at (0:5): custom message here",
                     "component_id": "remapper",
                     "component_type": "remap",
                     "component_kind": "transform",
