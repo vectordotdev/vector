@@ -282,7 +282,7 @@ impl Resource {
             for resource in resources {
                 if let Resource::Port(address, protocol) = &resource {
                     if address.ip().is_unspecified() {
-                        unspecified.push((key.clone(), address.port(), *protocol));
+                        unspecified.push((key.clone(), *address, *protocol));
                     }
                 }
 
@@ -296,10 +296,13 @@ impl Resource {
         // Port with unspecified address will bind to all network interfaces
         // so we have to check for all Port resources if they share the same
         // port.
-        for (key, port, protocol0) in unspecified {
+        for (key, address0, protocol0) in unspecified {
             for (resource, components) in resource_map.iter_mut() {
                 if let Resource::Port(address, protocol) = resource {
-                    if address.port() == port && &protocol0 == protocol {
+                    // IP addresses can either be v4 or v6.
+                    // Therefore we check if the ip version matches, the port matches and if the protocol (TCP/UDP) matches
+                    // when checking for equality.
+                    if &address0 == address && &protocol0 == protocol {
                         components.insert(key.clone());
                     }
                 }
@@ -1259,20 +1262,38 @@ mod acknowledgements_tests {
     }
 }
 
-#[cfg(all(test, feature = "sources-stdin", feature = "sinks-console"))]
+#[cfg(test)]
 mod resource_tests {
     use std::{
         collections::{HashMap, HashSet},
-        net::{Ipv4Addr, SocketAddr},
+        net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
     };
 
-    use indoc::indoc;
-    use vector_config::schema::generate_root_schema;
+    use proptest::prelude::*;
 
-    use super::{load_from_str, Format, Resource};
+    use super::Resource;
 
-    fn localhost(port: u16) -> Resource {
-        Resource::tcp(SocketAddr::new(Ipv4Addr::LOCALHOST.into(), port))
+    fn tcp(addr: impl Into<IpAddr>, port: u16) -> Resource {
+        Resource::tcp(SocketAddr::new(addr.into(), port))
+    }
+
+    fn udp(addr: impl Into<IpAddr>, port: u16) -> Resource {
+        Resource::udp(SocketAddr::new(addr.into(), port))
+    }
+
+    fn unspecified() -> impl Strategy<Value = IpAddr> {
+        prop_oneof![
+            Just(Ipv4Addr::UNSPECIFIED.into()),
+            Just(Ipv6Addr::UNSPECIFIED.into()),
+        ]
+    }
+
+    fn specaddr() -> impl Strategy<Value = IpAddr> {
+        any::<IpAddr>().prop_filter("Must be specific address", |addr| !addr.is_unspecified())
+    }
+
+    fn specport() -> impl Strategy<Value = u16> {
+        any::<u16>().prop_filter("Must be specific port", |&port| port > 0)
     }
 
     fn hashmap(conflicts: Vec<(Resource, Vec<&str>)>) -> HashMap<Resource, HashSet<&str>> {
@@ -1282,104 +1303,98 @@ mod resource_tests {
             .collect()
     }
 
+    proptest! {
+        #[test]
+        fn valid(addr: IpAddr, port1 in specport(), port2 in specport()) {
+            let components = vec![
+                ("sink_0", vec![tcp(addr, 0)]),
+                ("sink_1", vec![tcp(addr, port1)]),
+                ("sink_2", vec![tcp(addr, port2)]),
+            ];
+            let conflicting = Resource::conflicts(components);
+            assert_eq!(conflicting, HashMap::new());
+        }
+
+        #[test]
+        fn conflicting_pair(addr: IpAddr, port in specport()) {
+            let components = vec![
+                ("sink_0", vec![tcp(addr, 0)]),
+                ("sink_1", vec![tcp(addr, port)]),
+                ("sink_2", vec![tcp(addr, port)]),
+            ];
+            let conflicting = Resource::conflicts(components);
+            assert_eq!(
+                conflicting,
+                hashmap(vec![(tcp(addr, port), vec!["sink_1", "sink_2"])])
+            );
+        }
+
+        #[test]
+        fn conflicting_multi(addr: IpAddr, port in specport()) {
+            let components = vec![
+                ("sink_0", vec![tcp(addr, 0)]),
+                ("sink_1", vec![tcp(addr, port), tcp(addr, 0)]),
+                ("sink_2", vec![tcp(addr, port)]),
+            ];
+            let conflicting = Resource::conflicts(components);
+            assert_eq!(
+                conflicting,
+                hashmap(vec![
+                    (tcp(addr, 0), vec!["sink_0", "sink_1"]),
+                    (tcp(addr, port), vec!["sink_1", "sink_2"])
+                ])
+            );
+        }
+
+        #[test]
+        fn different_network_interface(addr1: IpAddr, addr2: IpAddr, port: u16) {
+            prop_assume!(addr1 != addr2);
+            let components = vec![
+                ("sink_0", vec![tcp(addr1, port)]),
+                ("sink_1", vec![tcp(addr2, port)]),
+            ];
+            let conflicting = Resource::conflicts(components);
+            assert_eq!(conflicting, HashMap::new());
+        }
+
+        #[test]
+        fn unspecified_network_interface(addr in specaddr(), unspec in unspecified(), port: u16) {
+            let components = vec![
+                ("sink_0", vec![tcp(addr, port)]),
+                ("sink_1", vec![tcp(unspec, port)]),
+            ];
+            let conflicting = Resource::conflicts(components);
+            assert_eq!(conflicting, HashMap::new());
+        }
+
+        #[test]
+        fn different_protocol(addr: IpAddr) {
+            let components = vec![
+                ("sink_0", vec![tcp(addr, 0)]),
+                ("sink_1", vec![udp(addr, 0)]),
+            ];
+            let conflicting = Resource::conflicts(components);
+            assert_eq!(conflicting, HashMap::new());
+        }
+    }
+
     #[test]
-    fn valid() {
+    fn different_unspecified_ip_version() {
         let components = vec![
-            ("sink_0", vec![localhost(0)]),
-            ("sink_1", vec![localhost(1)]),
-            ("sink_2", vec![localhost(2)]),
+            ("sink_0", vec![tcp(Ipv4Addr::UNSPECIFIED, 0)]),
+            ("sink_1", vec![tcp(Ipv6Addr::UNSPECIFIED, 0)]),
         ];
         let conflicting = Resource::conflicts(components);
         assert_eq!(conflicting, HashMap::new());
     }
+}
 
-    #[test]
-    fn conflicting_pair() {
-        let components = vec![
-            ("sink_0", vec![localhost(0)]),
-            ("sink_1", vec![localhost(2)]),
-            ("sink_2", vec![localhost(2)]),
-        ];
-        let conflicting = Resource::conflicts(components);
-        assert_eq!(
-            conflicting,
-            hashmap(vec![(localhost(2), vec!["sink_1", "sink_2"])])
-        );
-    }
+#[cfg(all(test, feature = "sources-stdin", feature = "sinks-console"))]
+mod resource_config_tests {
+    use indoc::indoc;
+    use vector_config::schema::generate_root_schema;
 
-    #[test]
-    fn conflicting_multi() {
-        let components = vec![
-            ("sink_0", vec![localhost(0)]),
-            ("sink_1", vec![localhost(2), localhost(0)]),
-            ("sink_2", vec![localhost(2)]),
-        ];
-        let conflicting = Resource::conflicts(components);
-        assert_eq!(
-            conflicting,
-            hashmap(vec![
-                (localhost(0), vec!["sink_0", "sink_1"]),
-                (localhost(2), vec!["sink_1", "sink_2"])
-            ])
-        );
-    }
-
-    #[test]
-    fn different_network_interface() {
-        let components = vec![
-            ("sink_0", vec![localhost(0)]),
-            (
-                "sink_1",
-                vec![Resource::tcp(SocketAddr::new(
-                    Ipv4Addr::new(127, 0, 0, 2).into(),
-                    0,
-                ))],
-            ),
-        ];
-        let conflicting = Resource::conflicts(components);
-        assert_eq!(conflicting, HashMap::new());
-    }
-
-    #[test]
-    fn unspecified_network_interface() {
-        let components = vec![
-            ("sink_0", vec![localhost(0)]),
-            (
-                "sink_1",
-                vec![Resource::tcp(SocketAddr::new(
-                    Ipv4Addr::UNSPECIFIED.into(),
-                    0,
-                ))],
-            ),
-        ];
-        let conflicting = Resource::conflicts(components);
-        assert_eq!(
-            conflicting,
-            hashmap(vec![(localhost(0), vec!["sink_0", "sink_1"])])
-        );
-    }
-
-    #[test]
-    fn different_protocol() {
-        let components = vec![
-            (
-                "sink_0",
-                vec![Resource::tcp(SocketAddr::new(
-                    Ipv4Addr::LOCALHOST.into(),
-                    0,
-                ))],
-            ),
-            (
-                "sink_1",
-                vec![Resource::udp(SocketAddr::new(
-                    Ipv4Addr::LOCALHOST.into(),
-                    0,
-                ))],
-            ),
-        ];
-        let conflicting = Resource::conflicts(components);
-        assert_eq!(conflicting, HashMap::new());
-    }
+    use super::{load_from_str, Format};
 
     #[test]
     fn config_conflict_detected() {
