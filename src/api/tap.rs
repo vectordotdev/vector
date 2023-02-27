@@ -872,6 +872,7 @@ mod tests {
             RemapConfig {
                 source: Some("assert_eq!(.message, \"test1\")".to_string()),
                 drop_on_error: true,
+                drop_on_abort: true,
                 reroute_dropped: true,
                 ..Default::default()
             },
