@@ -37,7 +37,7 @@ impl ComponentType {
 
 /// Component type-specific configuration.
 #[allow(clippy::large_enum_variant)]
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum ComponentConfiguration {
     /// A source component.
     Source(Sources),
@@ -119,15 +119,6 @@ impl ValidationConfiguration {
     /// Gets the external resource definition for validating the component, if any.
     pub fn external_resource(&self) -> Option<ExternalResource> {
         self.external_resource.clone()
-    }
-
-    pub fn spec_configuration(&self) -> Option<&dyn CustomComponent> {
-        match &self.component_configuration {
-            ComponentConfiguration::Source(Sources::HttpServer(c)) => {
-                Some(c as &dyn CustomComponent)
-            }
-            _ => None,
-        }
     }
 }
 

@@ -1,9 +1,9 @@
 mod component_spec;
-pub use self::component_spec::{ComponentSpecValidator, CustomComponent};
+pub use self::component_spec::{ComponentSpecValidator, CustomComponent, CustomComponentBase};
 
 use vector_core::event::Event;
 
-use super::{ComponentType, TestCaseExpectation, TestEvent, ValidationConfiguration};
+use super::{ComponentConfiguration, ComponentType, TestCaseExpectation, TestEvent};
 
 /// A component validator.
 ///
@@ -19,7 +19,7 @@ pub trait Validator {
     /// provided as well.
     fn check_validation(
         &self,
-        configuration: ValidationConfiguration,
+        configuration: ComponentConfiguration,
         component_type: ComponentType,
         expectation: TestCaseExpectation,
         inputs: &[TestEvent],

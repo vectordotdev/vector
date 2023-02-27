@@ -35,6 +35,7 @@ use vector_config::configurable_component;
 use vector_core::{
     config::{log_schema, LogNamespace, Output},
     event::Event,
+    EstimatedJsonEncodedSizeOf,
 };
 
 /// Configuration for the `http_client` source.
@@ -244,7 +245,7 @@ impl ValidatableComponent for HttpClientConfig {
 register_validatable_component!(HttpClientConfig);
 
 impl HttpClientConfig {
-    fn get_decoding_config(&self, log_namespace: Option<LogNamespace>) -> DecodingConfig {
+    pub fn get_decoding_config(&self, log_namespace: Option<LogNamespace>) -> DecodingConfig {
         let decoding = self.decoding.clone();
         let framing = self.framing.clone();
         let log_namespace =
@@ -256,9 +257,9 @@ impl HttpClientConfig {
 
 /// Captures the configuration options required to decode the incoming requests into events.
 #[derive(Clone)]
-struct HttpClientContext {
-    decoder: Decoder,
-    log_namespace: LogNamespace,
+pub struct HttpClientContext {
+    pub decoder: Decoder,
+    pub log_namespace: LogNamespace,
 }
 
 impl HttpClientContext {
@@ -285,7 +286,7 @@ impl HttpClientContext {
     }
 
     /// Enriches events with source_type, timestamp
-    fn enrich_events(&self, events: &mut Vec<Event>) {
+    pub fn enrich_events(&self, events: &mut Vec<Event>) {
         let now = Utc::now();
 
         for event in events {
@@ -333,6 +334,8 @@ impl http_client::HttpClientContext for HttpClientContext {
 
         // decode and enrich
         let mut events = self.decode_events(&mut buf);
+        dbg!(events.len());
+        dbg!(events.estimated_json_encoded_size_of());
         self.enrich_events(&mut events);
 
         Some(events)

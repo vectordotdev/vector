@@ -275,11 +275,23 @@ impl ValidatableComponent for SimpleHttpConfig {
 
 register_validatable_component!(SimpleHttpConfig);
 
-impl CustomComponent for SimpleHttpConfig {
-    fn component_event_bytes_received(&self, _inputs: &[TestEvent]) -> u64 {
-        0
-    }
-}
+// impl CustomComponent for SimpleHttpConfig {
+//     fn component_event_bytes_received(&self, inputs: &[TestEvent]) -> u64 {
+//         let mut bytes = 0;
+//         for i in inputs {
+//             // match i {
+//             //     TestEvent::Passthrough(EventData::Log(s)) => {
+//             //         bytes += s.len();
+//             //     }
+//             //     // TODO: do something
+//             //     TestEvent::Modified { .. } => {}
+//             // }
+//             bytes += i.clone().into_event().estimated_json_encoded_size_of()
+//         }
+
+//         bytes as u64
+//     }
+// }
 
 const fn default_http_method() -> HttpMethod {
     HttpMethod::Post
