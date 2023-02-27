@@ -6,7 +6,7 @@ edition = "2021"
 publish = false
 
 [dependencies]
-lookup = { path = "../../lookup" }
+lookup = { path = "../lookup" }
 value = { path = "../../value" }
 diagnostic = { package = "vrl-diagnostic", path = "../diagnostic" }
 

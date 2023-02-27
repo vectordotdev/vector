@@ -95,7 +95,7 @@ members = [
   "lib/k8s-e2e-tests",
   "lib/k8s-test-framework",
   "lib/loki-logproto",
-  "lib/lookup",
+  "lib/vector-lookup",
   "lib/portpicker",
   "lib/prometheus-parser",
   "lib/opentelemetry-proto",
@@ -108,6 +108,7 @@ members = [
   "lib/vector-config-common",
   "lib/vector-config-macros",
   "lib/vector-core",
+  "lib/vector-lookup",
   "lib/vector-vrl-functions",
   "lib/vrl/cli",
   "lib/vrl/compiler",
@@ -129,7 +130,7 @@ dnsmsg-parser = { path = "lib/dnsmsg-parser", optional = true }
 enrichment = { path = "lib/enrichment" }
 fakedata = { path = "lib/fakedata", optional = true }
 file-source = { path = "lib/file-source", optional = true }
-lookup = { path = "lib/lookup" }
+lookup = { package = "vector-lookup", path = "lib/vector-lookup" }
 portpicker = { path = "lib/portpicker" }
 prometheus-parser = { path = "lib/prometheus-parser", optional = true }
 opentelemetry-proto = { path = "lib/opentelemetry-proto", optional = true }

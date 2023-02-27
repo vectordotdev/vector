@@ -22,7 +22,7 @@ thiserror = { version = "1", default-features = false }
 tracing = { version = "0.1.34", default-features = false }
 
 # Internal
-lookup = { path = "../../lookup" }
+lookup = { path = "../../vrl/lookup" }
 value = {path = "../../value", features = ["json", "test"]}
 vector-common = { path = "../../vector-common" }
 vrl-compiler = { path = "../../vrl/compiler" }

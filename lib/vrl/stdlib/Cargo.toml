@@ -13,7 +13,7 @@ value = { path = "../../value", default-features = false }
 datadog-filter = { path = "../../datadog/filter", optional = true }
 datadog-grok = { path = "../../datadog/grok", optional = true }
 datadog-search-syntax = { path = "../../datadog/search-syntax", optional = true }
-lookup_lib = {package = "lookup", path = "../../lookup", optional = true }
+lookup_lib = {package = "lookup", path = "../lookup", optional = true }
 vector-common = { path = "../../vector-common", default-features = false, optional = true }
 
 base16 = { version = "0.2", optional = true }

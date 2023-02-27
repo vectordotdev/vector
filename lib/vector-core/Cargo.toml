@@ -23,7 +23,7 @@ headers = { version = "0.3.8", default-features = false }
 http = { version = "0.2.9", default-features = false }
 hyper-proxy = { version = "0.9.1", default-features = false, features = ["openssl-tls"] }
 indexmap = { version = "~1.9.2", default-features = false, features = ["serde"] }
-lookup = { path = "../lookup", features = ["arbitrary"] }
+lookup = { package = "vector-lookup", path = "../vector-lookup", features = ["arbitrary"] }
 metrics = "0.20.1"
 metrics-tracing-context = { version = "0.12.0", default-features = false }
 metrics-util = { version = "0.14.0", default-features = false, features = ["registry"] }

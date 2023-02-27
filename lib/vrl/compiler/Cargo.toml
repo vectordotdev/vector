@@ -31,7 +31,7 @@ test = []
 core = { package = "vrl-core", path = "../core", default-features = false }
 diagnostic = { package = "vrl-diagnostic", path = "../diagnostic" }
 parser = { package = "vrl-parser", path = "../parser" }
-lookup = { path = "../../lookup" }
+lookup = { path = "../lookup" }
 vector-common = { path = "../../vector-common", default-features = false, features = ["conversion", "serde"] }
 vector-config = { path = "../../vector-config" }
 vector-config-common = { path = "../../vector-config-common" }
