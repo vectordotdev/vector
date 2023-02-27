@@ -64,10 +64,14 @@ impl IntegrationTest {
         for (key, value) in config_env(&self.env_config) {
             env_vars.insert(key, Some(value));
         }
-        let mut args = self.config.args.clone();
+
+        let mut args = match self.config.args {
+            Some(ref a) => a.clone(),
+            None => Vec::new(),
+        };
 
         args.push("--features".to_string());
-        args.extend(self.config.features.clone());
+        args.push(self.config.features.join(","));
 
         // if the test field is present in the struct append the test name
         // if not then use the --lib flag
