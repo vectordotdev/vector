@@ -225,6 +225,9 @@ tui = { version = "0.19.0", optional = true, default-features = false, features 
 hex = { version = "0.4.3", default-features = false, optional = true }
 sha2 = { version = "0.10.7", default-features = false, optional = true }
 
+# Greptime
+greptimedb-client = { path = "/home/sunng/greptime/greptimedb/src/client", package = "client", optional = true }
+
 # VRL Lang
 vrl = { package = "vrl", version = "0.4.0", features = ["cli", "test"] }
 
@@ -641,6 +644,7 @@ sinks-metrics = [
   "sinks-blackhole",
   "sinks-console",
   "sinks-datadog_metrics",
+  "sinks-greptimedb",
   "sinks-humio",
   "sinks-influxdb",
   "sinks-kafka",
@@ -675,6 +679,7 @@ sinks-datadog_traces = ["protobuf-build", "dep:rmpv", "dep:rmp-serde", "dep:serd
 sinks-elasticsearch = ["aws-core", "transforms-metric_to_log"]
 sinks-file = ["dep:async-compression"]
 sinks-gcp = ["dep:base64", "gcp"]
+sinks-greptimedb = ["dep:greptimedb-client"]
 sinks-honeycomb = []
 sinks-http = []
 sinks-humio = ["sinks-splunk_hec", "transforms-metric_to_log"]
