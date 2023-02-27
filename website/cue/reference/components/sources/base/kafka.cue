@@ -209,11 +209,6 @@ base: components: sources: kafka: configuration: {
 		required:    true
 		type: string: examples: ["consumer-group-name"]
 	}
-	group_instance_id: {
-		description: "Override dynamic membership and broker assignment behavior with static membership, using a group instance (member) id."
-		required:    false
-		type: string: examples: ["kafka-streams-instance-1"]
-	}
 	headers_key: {
 		description: """
 			Overrides the name of the log field used to add the headers to each event.
@@ -260,6 +255,15 @@ base: components: sources: kafka: configuration: {
 				required:    true
 				type: string: {}
 			}
+		}
+	}
+	metrics: {
+		description: "Metrics configuration."
+		required:    false
+		type: object: options: topic_lag_metric: {
+			description: "Expose topic lag metrics for all topics and partitions. Metric names are `kafka_consumer_lag`."
+			required:    false
+			type: bool: default: false
 		}
 	}
 	offset_key: {

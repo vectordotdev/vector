@@ -22,7 +22,7 @@ use tokio_stream::wrappers::IntervalStream;
 use tokio_util::codec::FramedRead;
 use value::Kind;
 use vector_common::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
-use vector_config::{configurable_component, NamedComponent};
+use vector_config::configurable_component;
 use vector_core::{config::LegacyKey, EstimatedJsonEncodedSizeOf};
 
 use crate::{

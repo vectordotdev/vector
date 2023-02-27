@@ -18,7 +18,7 @@ pub use vector_core::config::ComponentKey;
     docs::examples = "prefix-*"
 ))]
 #[derive(Clone, Debug)]
-pub struct Inputs<T>(Vec<T>);
+pub struct Inputs<T: 'static>(Vec<T>);
 
 impl<T> Inputs<T> {
     /// Returns `true` if no inputs are present.

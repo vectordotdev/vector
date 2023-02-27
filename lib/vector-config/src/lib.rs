@@ -130,14 +130,12 @@
 pub mod indexmap {
     pub use indexmap::*;
 }
-pub mod schemars {
-    pub use schemars::*;
-}
+
 pub use serde_json;
 
 pub mod component;
 mod configurable;
-pub use self::configurable::{Configurable, ToValue};
+pub use self::configurable::{Configurable, ConfigurableRef, ToValue};
 mod errors;
 pub use self::errors::{BoundDirection, GenerateError};
 mod external;
@@ -147,13 +145,16 @@ mod named;
 pub use self::named::NamedComponent;
 mod num;
 pub use self::num::ConfigurableNumber;
-pub mod schema;
+mod schema_gen;
 pub mod ser;
 mod stdlib;
 mod str;
 pub use self::str::ConfigurableString;
 
-use vector_config_common::attributes::CustomAttribute;
+pub mod schema {
+    pub use super::schema_gen::*;
+    pub use vector_config_common::schema::*;
+}
 
 // Re-export of the `#[configurable_component]` and `#[derive(Configurable)]` proc macros.
 pub use vector_config_macros::*;

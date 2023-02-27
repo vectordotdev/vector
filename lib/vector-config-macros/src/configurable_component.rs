@@ -1,4 +1,5 @@
 use darling::{Error, FromMeta};
+use itertools::Itertools as _;
 use proc_macro::TokenStream;
 use proc_macro2::{Ident, Span};
 use quote::{quote, quote_spanned};
@@ -88,6 +89,7 @@ struct TypedComponent {
     span: Span,
     component_type: ComponentType,
     component_name: Option<LitStr>,
+    description: Option<LitStr>,
 }
 
 impl TypedComponent {
@@ -102,6 +104,7 @@ impl TypedComponent {
                 span: path.span(),
                 component_type,
                 component_name: None,
+                description: None,
             })
     }
 
@@ -110,18 +113,24 @@ impl TypedComponent {
     /// If the meta list does not have a path that matches a known component type, `None` is
     /// returned. Otherwise, `Some(...)` is returned with a valid `TypedComponent`.
     fn from_meta_list(ml: &MetaList) -> Option<Self> {
+        let mut items = ml.nested.iter();
         ComponentType::try_from(&ml.path)
             .ok()
-            .map(|component_type| match ml.nested.first() {
-                Some(NestedMeta::Lit(Lit::Str(component_name))) => {
-                    (component_type, Some(component_name.clone()))
+            .map(|component_type| {
+                let component_name = match items.next() {
+                    Some(NestedMeta::Lit(Lit::Str(component_name))) => Some(component_name.clone()),
+                    _ => None,
+                };
+                let description = match items.next() {
+                    Some(NestedMeta::Lit(Lit::Str(description))) => Some(description.clone()),
+                    _ => None,
+                };
+                Self {
+                    span: ml.span(),
+                    component_type,
+                    component_name,
+                    description,
                 }
-                _ => (component_type, None),
-            })
-            .map(|(component_type, component_name)| Self {
-                span: ml.span(),
-                component_type,
-                component_name,
             })
     }
 
@@ -159,9 +168,28 @@ impl TypedComponent {
                 }
             };
 
+            // Derive the label from the component name, but capitalized.
+            let label = capitalize_words(&component_name.value());
+
+            // Derive the logical name from the config type, with the trailing "Config" dropped.
+            let logical_name = config_ty.to_string();
+            let logical_name = logical_name.strip_suffix("Config").unwrap_or(&logical_name);
+
+            // TODO: Make this an `expect` once all component types have been converted.
+            let description = self
+                .description
+                .as_ref()
+                .map(LitStr::value)
+                .unwrap_or_else(|| "This component is missing a description.".into());
+
             quote! {
                 ::inventory::submit! {
-                    #desc_ty::new::<#config_ty>(#component_name)
+                    #desc_ty::new::<#config_ty>(
+                        #component_name,
+                        #label,
+                        #logical_name,
+                        #description,
+                    )
                 }
             }
         })
@@ -370,4 +398,16 @@ pub fn configurable_component_impl(args: TokenStream, item: TokenStream) -> Toke
     };
 
     derived.into()
+}
+
+fn capitalize(s: &str) -> String {
+    let mut iter = s.chars();
+    match iter.next() {
+        None => String::new(),
+        Some(first) => first.to_uppercase().collect::<String>() + iter.as_str(),
+    }
+}
+
+fn capitalize_words(s: &str) -> String {
+    s.split('_').map(capitalize).join(" ")
 }

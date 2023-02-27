@@ -207,7 +207,7 @@ rmp-serde = { version = "1.1.1", default-features = false, optional = true }
 rmpv = { version = "1.0.0", default-features = false, features = ["with-serde"], optional = true }
 
 # Prost
-prost = { version = "0.11.6", default-features = false, features = ["std"] }
+prost = { version = "0.11.7", default-features = false, features = ["std"] }
 prost-types = { version = "0.11.6", default-features = false, optional = true }
 
 # GCP
@@ -376,6 +376,7 @@ zstd = { version = "0.12.3", default-features = false }
 chrono = { git = "https://github.com/vectordotdev/chrono.git", branch = "no-default-time-v0.4.22-1" }
 # The upgrade for `tokio-util` >= 0.6.9 is blocked on https://github.com/vectordotdev/vector/issues/11257.
 tokio-util = { git = "https://github.com/vectordotdev/tokio", branch = "tokio-util-0.7.4-framed-read-continue-on-error" }
+nix = { git = "https://github.com/vectordotdev/nix.git", branch = "memfd/gnu/musl" }
 
 [features]
 # Default features for *-unknown-linux-gnu and *-apple-darwin
@@ -613,6 +614,7 @@ sinks-logs = [
   "sinks-chronicle",
   "sinks-clickhouse",
   "sinks-console",
+  "sinks-databend",
   "sinks-datadog_archives",
   "sinks-datadog_events",
   "sinks-datadog_logs",
@@ -668,6 +670,7 @@ sinks-blackhole = []
 sinks-chronicle = []
 sinks-clickhouse = []
 sinks-console = []
+sinks-databend = []
 sinks-datadog_archives = ["sinks-aws_s3", "sinks-azure_blob", "sinks-gcp"]
 sinks-datadog_events = []
 sinks-datadog_logs = []
@@ -722,6 +725,7 @@ all-integration-tests = [
   "azure-integration-tests",
   "chronicle-integration-tests",
   "clickhouse-integration-tests",
+  "databend-integration-tests",
   "datadog-agent-integration-tests",
   "datadog-logs-integration-tests",
   "datadog-metrics-integration-tests",
@@ -780,6 +784,7 @@ axiom-integration-tests = ["sinks-axiom"]
 azure-blob-integration-tests = ["sinks-azure_blob"]
 chronicle-integration-tests = ["sinks-gcp"]
 clickhouse-integration-tests = ["sinks-clickhouse"]
+databend-integration-tests = ["sinks-databend"]
 datadog-agent-integration-tests = ["sources-datadog_agent"]
 datadog-logs-integration-tests = ["sinks-datadog_logs"]
 datadog-metrics-integration-tests = ["sinks-datadog_metrics"]

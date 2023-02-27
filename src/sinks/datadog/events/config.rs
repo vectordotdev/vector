@@ -1,4 +1,3 @@
-use futures::FutureExt;
 use indoc::indoc;
 use tower::ServiceBuilder;
 use value::Kind;
@@ -13,88 +12,46 @@ use crate::{
     http::HttpClient,
     sinks::{
         datadog::{
-            default_site,
             events::{
                 service::{DatadogEventsResponse, DatadogEventsService},
                 sink::DatadogEventsSink,
             },
-            get_api_base_endpoint, get_api_validate_endpoint, healthcheck,
+            get_api_base_endpoint, DatadogCommonConfig,
         },
         util::{http::HttpStatusRetryLogic, ServiceBuilderExt, TowerRequestConfig},
         Healthcheck, VectorSink,
     },
-    tls::{MaybeTlsSettings, TlsEnableableConfig},
+    tls::MaybeTlsSettings,
 };
 
 /// Configuration for the `datadog_events` sink.
 #[configurable_component(sink("datadog_events"))]
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct DatadogEventsConfig {
-    /// The endpoint to send events to.
+    #[serde(flatten)]
+    pub dd_common: DatadogCommonConfig,
+
+    /// The default Datadog [API key][api_key] to use in authentication of HTTP requests.
     ///
-    /// The endpoint must contain an HTTP scheme, and may specify a
-    /// hostname or IP address and port.
+    /// If an event has a Datadog [API key][api_key] set explicitly in its metadata, it will take
+    /// precedence over this setting.
     ///
-    /// If set, overrides the `site` option.
-    #[configurable(metadata(docs::advanced))]
-    #[configurable(metadata(docs::examples = "http://127.0.0.1:8080"))]
-    #[configurable(metadata(docs::examples = "http://example.com:12345"))]
-    #[serde(default)]
-    pub endpoint: Option<String>,
+    /// [api_key]: https://docs.datadoghq.com/api/?lang=bash#authentication
+    // TODO: After `api_key` (a deprecated name for this setting in the DD logs and metrics sinks) is
+    // removed in v0.29.0, this entire setting should be migrated to the `DatadogCommonConfig` struct.
+    #[configurable(metadata(docs::examples = "${DATADOG_API_KEY_ENV_VAR}"))]
+    #[configurable(metadata(docs::examples = "ef8d5de700e7989468166c40fc8a0ccd"))]
+    pub default_api_key: SensitiveString,
 
     /// The Datadog region to send events to.
     #[configurable(deprecated = "This option has been deprecated, use the `site` option instead.")]
     #[serde(default)]
     pub region: Option<Region>,
 
-    /// The Datadog [site][dd_site] to send events to.
-    ///
-    /// [dd_site]: https://docs.datadoghq.com/getting_started/site
-    #[configurable(metadata(docs::examples = "us3.datadoghq.com"))]
-    #[configurable(metadata(docs::examples = "datadoghq.eu"))]
-    #[serde(default = "default_site")]
-    pub site: String,
-
-    /// The default Datadog [API key][api_key] to send events with.
-    ///
-    /// If an event has a Datadog [API key][api_key] set explicitly in its metadata, it will take
-    /// precedence over this setting.
-    ///
-    /// [api_key]: https://docs.datadoghq.com/api/?lang=bash#authentication
-    #[configurable(metadata(docs::examples = "${DATADOG_API_KEY_ENV_VAR}"))]
-    #[configurable(metadata(docs::examples = "ef8d5de700e7989468166c40fc8a0ccd"))]
-    pub default_api_key: SensitiveString,
-
-    #[configurable(derived)]
-    #[serde(default)]
-    pub(super) tls: Option<TlsEnableableConfig>,
-
     #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
-
-    #[configurable(derived)]
-    #[serde(
-        default,
-        deserialize_with = "crate::serde::bool_or_struct",
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
-    )]
-    acknowledgements: AcknowledgementsConfig,
-}
-
-impl Default for DatadogEventsConfig {
-    fn default() -> Self {
-        Self {
-            endpoint: None,
-            region: None,
-            site: default_site(),
-            default_api_key: Default::default(),
-            tls: None,
-            request: TowerRequestConfig::default(),
-            acknowledgements: AcknowledgementsConfig::default(),
-        }
-    }
 }
 
 impl GenerateConfig for DatadogEventsConfig {
@@ -109,8 +66,8 @@ impl GenerateConfig for DatadogEventsConfig {
 impl DatadogEventsConfig {
     fn get_api_events_endpoint(&self) -> http::Uri {
         let api_base_endpoint = get_api_base_endpoint(
-            self.endpoint.as_ref(),
-            get_base_domain_region(self.site.as_str(), self.region),
+            self.dd_common.endpoint.as_ref(),
+            get_base_domain_region(self.dd_common.site.as_str(), self.region.as_ref()),
         );
 
         // We know this URI will be valid since we have just built it up ourselves.
@@ -118,22 +75,9 @@ impl DatadogEventsConfig {
     }
 
     fn build_client(&self, proxy: &ProxyConfig) -> crate::Result<HttpClient> {
-        let tls = MaybeTlsSettings::from_config(&self.tls, false)?;
+        let tls = MaybeTlsSettings::from_config(&self.dd_common.tls, false)?;
         let client = HttpClient::new(tls, proxy)?;
         Ok(client)
-    }
-
-    fn build_healthcheck(&self, client: HttpClient) -> crate::Result<Healthcheck> {
-        let validate_endpoint = get_api_validate_endpoint(
-            self.endpoint.as_ref(),
-            get_base_domain_region(self.site.as_str(), self.region),
-        )?;
-        Ok(healthcheck(
-            client,
-            validate_endpoint,
-            self.default_api_key.clone().into(),
-        )
-        .boxed())
     }
 
     fn build_sink(&self, client: HttpClient) -> crate::Result<VectorSink> {
@@ -161,7 +105,11 @@ impl DatadogEventsConfig {
 impl SinkConfig for DatadogEventsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let client = self.build_client(cx.proxy())?;
-        let healthcheck = self.build_healthcheck(client.clone())?;
+        let healthcheck = self.dd_common.build_healthcheck(
+            client.clone(),
+            self.default_api_key.clone().into(),
+            self.region.as_ref(),
+        )?;
         let sink = self.build_sink(client)?;
 
         Ok((sink, healthcheck))
@@ -177,7 +125,7 @@ impl SinkConfig for DatadogEventsConfig {
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
-        &self.acknowledgements
+        &self.dd_common.acknowledgements
     }
 }
 

@@ -6,6 +6,15 @@ releases: "0.27.0": {
 
 	whats_next: []
 
+	known_issues: [
+		"""
+			Vector sources do not correctly tag the `component_events_in_total` and
+			`component_events_out_total` internal metrics with their component tags (`component_id`,
+			`component_kind`, and `component_type`). This affects reporting in `vector top`.
+			Fixed in v0.27.1.
+			""",
+	]
+
 	description: """
 		The Vector team is pleased to announce version 0.27.0!
 
