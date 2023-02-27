@@ -117,6 +117,11 @@ base: components: sinks: gcp_pubsub: configuration: {
 
 						[apache_avro]: https://avro.apache.org/
 						"""
+					csv: """
+						Encodes an event as an CSV message.
+
+						This codec must be configured with fields to encode.
+						"""
 					gelf: """
 						Encodes an event as a [GELF][gelf] message.
 
@@ -172,6 +177,12 @@ base: components: sinks: gcp_pubsub: configuration: {
 			except_fields: {
 				description: "List of fields that will be excluded from the encoded event."
 				required:    false
+				type: array: items: type: string: {}
+			}
+			fields: {
+				description:   "The CSV fields."
+				relevant_when: "codec = \"csv\""
+				required:      true
 				type: array: items: type: string: {}
 			}
 			metric_tag_values: {
