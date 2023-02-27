@@ -20,7 +20,7 @@ impl Cli {
                 let error = String::from_utf8_lossy(&head.stderr);
                 bail!("Error running `git describe`:\n{error}");
             }
-            let tag = String::from_utf8_lossy(&head.stdout);
+            let tag = String::from_utf8_lossy(&head.stdout).trim().to_string();
             if tag != format!("v{version}") {
                 bail!("On latest release channel and tag {tag:?} is different from Cargo.toml {version:?}. Aborting");
             }
