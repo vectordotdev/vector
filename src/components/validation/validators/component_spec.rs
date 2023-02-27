@@ -1,6 +1,5 @@
 use std::fmt::{Display, Formatter};
 
-use vector_core::config::LogNamespace;
 use vector_core::event::{Event, Metric};
 use vector_core::EstimatedJsonEncodedSizeOf;
 
@@ -9,8 +8,6 @@ use crate::components::validation::{
 };
 
 use crate::components::validation::runner::config::TEST_SOURCE_NAME;
-use crate::sources::http_client::client::HttpClientContext;
-use crate::sources::Sources;
 
 use super::Validator;
 
@@ -135,7 +132,7 @@ fn validate_telemetry(
     configuration: ComponentConfiguration,
     component_type: ComponentType,
     inputs: &[TestEvent],
-    _outputs: &[Event],
+    outputs: &[Event],
     telemetry_events: &[Event],
 ) -> Result<Vec<String>, Vec<String>> {
     let mut out: Vec<String> = Vec::new();
@@ -149,7 +146,7 @@ fn validate_telemetry(
             ];
 
             for validation in validations.iter() {
-                match validation(&configuration, inputs, telemetry_events) {
+                match validation(&configuration, inputs, outputs, telemetry_events) {
                     Err(e) => errs.extend(e),
                     Ok(m) => out.extend(m),
                 }
@@ -169,6 +166,7 @@ fn validate_telemetry(
 fn validate_component_events_received(
     _configuration: &ComponentConfiguration,
     inputs: &[TestEvent],
+    _outputs: &[Event],
     telemetry_events: &[Event],
 ) -> Result<Vec<String>, Vec<String>> {
     let mut errs: Vec<String> = Vec::new();
@@ -239,64 +237,23 @@ fn validate_component_events_received(
     }
 }
 
-pub trait CustomComponent {
-    fn component_event_bytes_received(
-        &self,
-        configuration: &ComponentConfiguration,
-        inputs: &[TestEvent],
-    ) -> u64 {
-        let mut bytes = 0;
-
-        match configuration {
-            ComponentConfiguration::Source(Sources::HttpClient(c)) => {
-                // TODO: what to do about LN's?
-                // let rc: ResourceCodec = c.get_decoding_config(None).into();
-                // rc.into_encoder()
-                let decoder = c.get_decoding_config(None).build();
-                let context = HttpClientContext {
-                    decoder,
-                    log_namespace: LogNamespace::Legacy,
-                };
-
-                let mut events: Vec<Event> = inputs.iter().map(|i| i.clone().into_event()).collect();
-
-                context.enrich_events(&mut events);
-
-                for e in events {
-                    bytes += vec!(e).estimated_json_encoded_size_of();
-                }
-            },
-            _ => {todo!()}
-            // ComponentConfiguration::Transform(_) => todo!(),
-            // ComponentConfiguration::Sink(_) => todo!(),
-        };
-
-        // for i in inputs {
-        //     // let mut buffer = BytesMut::new();
-        //     // encode_test_event(&mut encoder, &mut buffer, event);
-
-        //     bytes += i.clone().into_event().estimated_json_encoded_size_of();
-        //     // match i {
-        //     //     TestEvent::Passthrough(EventData::Log(s)) => {
-        //     //         // bytes += s.len();
-        //     //         bytes += i.clone().into_event().estimated_json_encoded_size_of();
-        //     //     }
-        //     //     // TODO: do something
-        //     //     TestEvent::Modified { .. } => {}
-        //     // }
-        // }
-
-        bytes as u64
+fn source_component_event_bytes_received(
+    _configuration: &ComponentConfiguration,
+    _inputs: &[TestEvent],
+    outputs: &[Event],
+) -> u64 {
+    let mut bytes = 0;
+    for e in outputs {
+        bytes += vec![e].estimated_json_encoded_size_of();
     }
+
+    bytes as u64
 }
-
-pub struct CustomComponentBase;
-
-impl CustomComponent for CustomComponentBase {}
 
 fn validate_component_event_bytes_received(
     configuration: &ComponentConfiguration,
     inputs: &[TestEvent],
+    outputs: &[Event],
     telemetry_events: &[Event],
 ) -> Result<Vec<String>, Vec<String>> {
     let mut errs: Vec<String> = Vec::new();
@@ -311,12 +268,6 @@ fn validate_component_event_bytes_received(
                         metrics.push(m.clone());
                     }
                 }
-                // if let Some(_tags) = m.tags() {
-                //     // dbg!(m.tags().unwrap());
-                //     // if tags.get("component_kind").unwrap_or("") == "source" {
-                //     metrics.push(m.clone());
-                //     // }
-                // }
             }
         }
     }
@@ -349,9 +300,7 @@ fn validate_component_event_bytes_received(
         }
     }
 
-    let c = CustomComponentBase {};
-
-    let event_bytes = c.component_event_bytes_received(configuration, inputs) as f64;
+    let event_bytes = source_component_event_bytes_received(configuration, inputs, outputs) as f64;
     if bytes != event_bytes {
         errs.push(format!(
             "{}: expected {} bytes, but received {}",
