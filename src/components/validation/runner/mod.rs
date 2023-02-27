@@ -321,7 +321,7 @@ impl Runner {
                 .values()
                 .map(|validator| {
                     validator.check_validation(
-                        self.configuration.clone(),
+                        self.configuration.component_configuration.clone(),
                         component_type,
                         expectation,
                         &input_events,
