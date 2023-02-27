@@ -1,5 +1,5 @@
 mod component_spec;
-pub use self::component_spec::{ComponentSpecValidator, CustomComponent, CustomComponentBase};
+pub use self::component_spec::ComponentSpecValidator;
 
 use vector_core::event::Event;
 
