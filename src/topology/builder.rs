@@ -42,8 +42,8 @@ use super::{
 use crate::{
     config::{
         ComponentKey, DataType, EnrichmentTableConfig, Input, Inputs, Output, OutputId,
-        ProxyConfig, SinkConfig, SinkContext, SourceConfig, SourceContext, TransformConfig,
-        TransformContext, TransformOuter,
+        ProxyConfig, SinkConfig, SinkContext, SourceConfig, SourceContext, TransformContext,
+        TransformOuter,
     },
     event::{EventArray, EventContainer},
     internal_events::EventsReceived,

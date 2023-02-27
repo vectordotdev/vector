@@ -53,7 +53,7 @@ pub use provider::ProviderConfig;
 pub use secret::SecretBackend;
 pub use sink::{SinkConfig, SinkContext, SinkHealthcheckOptions, SinkOuter};
 pub use source::{SourceConfig, SourceContext, SourceOuter};
-pub use transform::{TransformConfig, TransformContext, TransformOuter};
+pub use transform::{BoxedTransform, TransformConfig, TransformContext, TransformOuter};
 pub use unit_test::{build_unit_tests, build_unit_tests_main, UnitTestResult};
 pub use validation::warnings;
 pub use vector_core::config::{log_schema, proxy::ProxyConfig, LogSchema};

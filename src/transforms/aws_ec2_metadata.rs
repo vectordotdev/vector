@@ -76,7 +76,10 @@ static TOKEN_HEADER: Lazy<Bytes> = Lazy::new(|| Bytes::from("X-aws-ec2-metadata-
 
 /// Configuration for the `aws_ec2_metadata` transform.
 #[serde_as]
-#[configurable_component(transform("aws_ec2_metadata"))]
+#[configurable_component(transform(
+    "aws_ec2_metadata",
+    "Parse metadata emitted by AWS EC2 instances."
+))]
 #[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
 pub struct Ec2Metadata {
@@ -189,6 +192,7 @@ struct Keys {
 impl_generate_config_from_default!(Ec2Metadata);
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "aws_ec2_metadata")]
 impl TransformConfig for Ec2Metadata {
     async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
         let state = Arc::new(ArcSwap::new(Arc::new(vec![])));

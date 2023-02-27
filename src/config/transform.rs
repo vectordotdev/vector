@@ -1,20 +1,49 @@
+use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 
 use async_trait::async_trait;
-use enum_dispatch::enum_dispatch;
+use dyn_clone::DynClone;
 use serde::Serialize;
-use vector_config::{configurable_component, Configurable, NamedComponent};
-use vector_core::config::LogNamespace;
+use vector_config::{
+    configurable_component,
+    schema::{SchemaGenerator, SchemaObject},
+    Configurable, GenerateError, Metadata, NamedComponent,
+};
+use vector_config_common::attributes::CustomAttribute;
 use vector_core::{
-    config::{GlobalOptions, Input, Output},
+    config::{GlobalOptions, Input, LogNamespace, Output},
     schema,
     transform::Transform,
 };
 
-use crate::transforms::Transforms;
-
 use super::schema::Options as SchemaOptions;
 use super::{id::Inputs, ComponentKey};
+
+pub type BoxedTransform = Box<dyn TransformConfig>;
+
+impl Configurable for BoxedTransform {
+    fn referenceable_name() -> Option<&'static str> {
+        Some("vector::transforms::Transforms")
+    }
+
+    fn metadata() -> Metadata {
+        let mut metadata = Metadata::default();
+        metadata.set_description("Configurable transforms in Vector.");
+        metadata.add_custom_attribute(CustomAttribute::kv("docs::enum_tagging", "internal"));
+        metadata.add_custom_attribute(CustomAttribute::kv("docs::enum_tag_field", "type"));
+        metadata
+    }
+
+    fn generate_schema(gen: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
+        vector_config::component::TransformDescription::generate_schemas(gen)
+    }
+}
+
+impl<T: TransformConfig + 'static> From<T> for BoxedTransform {
+    fn from(that: T) -> Self {
+        Box::new(that)
+    }
+}
 
 /// Fully resolved transform component.
 #[configurable_component]
@@ -29,7 +58,7 @@ where
 
     #[configurable(metadata(docs::hidden))]
     #[serde(flatten)]
-    pub inner: Transforms,
+    pub inner: BoxedTransform,
 }
 
 impl<T> TransformOuter<T>
@@ -39,12 +68,11 @@ where
     pub(crate) fn new<I, IT>(inputs: I, inner: IT) -> Self
     where
         I: IntoIterator<Item = T>,
-        IT: Into<Transforms>,
+        IT: Into<BoxedTransform>,
     {
-        TransformOuter {
-            inputs: Inputs::from_iter(inputs),
-            inner: inner.into(),
-        }
+        let inputs = Inputs::from_iter(inputs);
+        let inner = inner.into();
+        TransformOuter { inputs, inner }
     }
 
     pub(super) fn map_inputs<U>(self, f: impl Fn(&T) -> U) -> TransformOuter<U>
@@ -141,8 +169,8 @@ impl TransformContext {
 
 /// Generalized interface for describing and building transform components.
 #[async_trait]
-#[enum_dispatch]
-pub trait TransformConfig: NamedComponent + core::fmt::Debug + Send + Sync {
+#[typetag::serde(tag = "type")]
+pub trait TransformConfig: DynClone + NamedComponent + core::fmt::Debug + Send + Sync {
     /// Builds the transform with the given context.
     ///
     /// If the transform is built successfully, `Ok(...)` is returned containing the transform.
@@ -203,3 +231,5 @@ pub trait TransformConfig: NamedComponent + core::fmt::Debug + Send + Sync {
         true
     }
 }
+
+dyn_clone::clone_trait_object!(TransformConfig);

@@ -9401,6 +9401,7 @@ name = "vector-config-macros"
 version = "0.1.0"
 dependencies = [
  "darling 0.13.4",
+ "itertools",
  "proc-macro2 1.0.51",
  "quote 1.0.23",
  "serde",
