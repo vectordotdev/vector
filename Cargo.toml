@@ -215,7 +215,7 @@ goauth = { version = "0.13.1", optional = true }
 smpl_jwt = { version = "0.7.1", default-features = false, optional = true }
 
 # AMQP
-lapin = { version = "2.1.1", default-features = false, optional = true }
+lapin = { version = "2.1.1", default-features = false, features = ["native-tls"], optional = true }
 
 # API
 async-graphql = { version = "5.0.6", default-features = false, optional = true, features = ["chrono"] }

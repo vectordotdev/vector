@@ -7878,6 +7878,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "09a4b0a70bac0a58ca6a7659d1328e34ee462339c70b0fa49f72bad1f278910a"
 dependencies = [
  "cfg-if",
+ "native-tls",
+ "rustls-pemfile 1.0.1",
 ]
 
 [[package]]
