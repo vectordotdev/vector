@@ -41,7 +41,7 @@ impl Cli {
                 if let Some(args) = &config.args {
                     println!("Test args: {}", args.join(" "));
                 } else {
-                    println!("Test args: ");
+                    println!("Test args: N/A");
                 }
                 
 
