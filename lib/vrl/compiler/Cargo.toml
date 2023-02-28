@@ -41,7 +41,7 @@ getrandom = { version = "0.2", features = ["js"] }
 
 bytes = { version = "1.4.0", default-features = false }
 chrono = { version = "0.4", default-features = false }
-dyn-clone = { version = "1.0.10", default-features = false }
+dyn-clone = { version = "1.0.11", default-features = false }
 lalrpop-util = { version = "0.19", default-features = false }
 ordered-float = { version = "3", default-features = false }
 paste = { version = "1", default-features = false }
