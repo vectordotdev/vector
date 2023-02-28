@@ -9498,18 +9498,8 @@ dependencies = [
 name = "vector-lookup"
 version = "0.1.0"
 dependencies = [
- "criterion",
- "inherent",
- "lalrpop",
- "lalrpop-util",
  "lookup",
- "once_cell",
- "quickcheck",
- "regex",
  "serde",
- "serde_json",
- "snafu",
- "tracing 0.1.37",
  "vector-config",
  "vector-config-macros",
 ]

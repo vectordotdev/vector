@@ -1,13 +1,10 @@
-mod concat;
 mod optional_path;
 
-pub use concat::PathConcat;
 pub use optional_path::{OptionalTargetPath, OptionalValuePath};
-// use serde::{Deserialize, Serialize};
 use vector_config_macros::configurable_component;
 
 pub use lookup::lookup_v2::{
-    parse_target_path, parse_value_path, BorrowedSegment, OwnedSegment, OwnedValuePath,
+    parse_target_path, parse_value_path, BorrowedSegment, OwnedSegment, OwnedValuePath, PathConcat,
     PathParseError, PathPrefix, TargetPath, ValuePath,
 };
 
