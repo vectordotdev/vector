@@ -163,6 +163,47 @@ fn validate_telemetry(
     }
 }
 
+fn filter_events_by_metric_and_component<'a>(
+    telemetry_events: &'a [Event],
+    metric: SourceMetrics,
+    component_name: &'a str,
+) -> Result<Vec<&'a Metric>, Vec<String>> {
+    let metrics: Vec<&Metric> = telemetry_events
+        .iter()
+        .map(|e| {
+            if let vector_core::event::Event::Metric(m) = e {
+                Some(m)
+            } else {
+                None
+            }
+        })
+        .filter(|m| m.is_some())
+        .map(|m| m.unwrap())
+        .filter(|&m| {
+            if m.name() == metric.to_string() {
+                if let Some(tags) = m.tags() {
+                    if tags.get("component_name").unwrap_or("") == component_name {
+                        return true;
+                    }
+                }
+            }
+
+            false
+        })
+        .collect();
+
+    debug!("{}: {} metrics found", metric.to_string(), metrics.len(),);
+
+    if metrics.len() == 0 {
+        return Err(vec![format!(
+            "{}: no metrics were emitted.",
+            metric.to_string(),
+        )]);
+    }
+
+    Ok(metrics)
+}
+
 fn validate_component_events_received(
     _configuration: &ComponentConfiguration,
     inputs: &[TestEvent],
@@ -171,36 +212,13 @@ fn validate_component_events_received(
 ) -> Result<Vec<String>, Vec<String>> {
     let mut errs: Vec<String> = Vec::new();
 
-    let mut metrics = Vec::<Metric>::new();
-    for t in telemetry_events.iter() {
-        if let vector_core::event::Event::Metric(m) = t {
-            if m.name() == SourceMetrics::ComponentEventsReceived.to_string() {
-                if let Some(tags) = m.tags() {
-                    if tags.get("component_name").unwrap_or("") == TEST_SOURCE_NAME {
-                        metrics.push(m.clone());
-                    }
-                }
-            }
-        }
-    }
-
-    if metrics.is_empty() {
-        errs.push(format!(
-            "{}: no metrics were emitted.",
-            SourceMetrics::ComponentEventsReceived,
-        ));
-
-        return Err(errs);
-    }
-
-    debug!(
-        "{}: {} metrics found",
+    let metrics = filter_events_by_metric_and_component(
+        telemetry_events,
         SourceMetrics::ComponentEventsReceived,
-        metrics.len(),
-    );
+        TEST_SOURCE_NAME,
+    )?;
 
     let mut events: f64 = 0.0;
-
     for m in metrics {
         match m.value() {
             vector_core::event::MetricValue::Counter { value } => events += value,
@@ -211,6 +229,13 @@ fn validate_component_events_received(
         }
     }
 
+    debug!(
+        "{}: {} events, {} expected events",
+        SourceMetrics::ComponentEventsReceived,
+        events,
+        inputs.len()
+    );
+
     if events != inputs.len() as f64 {
         errs.push(format!(
             "{}: expected {} events, but received {}",
@@ -219,12 +244,6 @@ fn validate_component_events_received(
             events
         ));
     }
-
-    debug!(
-        "{}: {} total events",
-        SourceMetrics::ComponentEventsReceived,
-        events,
-    );
 
     if errs.is_empty() {
         Ok(vec![format!(
@@ -237,62 +256,24 @@ fn validate_component_events_received(
     }
 }
 
-fn source_component_event_bytes_received(
+fn validate_component_event_bytes_received(
     _configuration: &ComponentConfiguration,
     _inputs: &[TestEvent],
-    outputs: &[Event],
-) -> u64 {
-    let mut bytes = 0;
-    for e in outputs {
-        bytes += vec![e].estimated_json_encoded_size_of();
-    }
-
-    bytes as u64
-}
-
-fn validate_component_event_bytes_received(
-    configuration: &ComponentConfiguration,
-    inputs: &[TestEvent],
     outputs: &[Event],
     telemetry_events: &[Event],
 ) -> Result<Vec<String>, Vec<String>> {
     let mut errs: Vec<String> = Vec::new();
 
-    // TODO: extract
-    let mut metrics = Vec::<Metric>::new();
-    for t in telemetry_events.iter() {
-        if let vector_core::event::Event::Metric(m) = t {
-            if m.name() == SourceMetrics::ComponentEventsReceivedBytes.to_string() {
-                if let Some(tags) = m.tags() {
-                    if tags.get("component_name").unwrap_or("") == TEST_SOURCE_NAME {
-                        metrics.push(m.clone());
-                    }
-                }
-            }
-        }
-    }
-
-    // TODO: extract
-    if metrics.is_empty() {
-        errs.push(format!(
-            "{}: no metrics were emitted.",
-            SourceMetrics::ComponentEventsReceivedBytes,
-        ));
-
-        return Err(errs);
-    }
-
-    debug!(
-        "{}: {} metrics found",
+    let metrics = filter_events_by_metric_and_component(
+        telemetry_events,
         SourceMetrics::ComponentEventsReceivedBytes,
-        metrics.len(),
-    );
+        TEST_SOURCE_NAME,
+    )?;
 
-    let mut bytes: f64 = 0.0;
-
+    let mut metric_bytes: f64 = 0.0;
     for m in metrics {
         match m.value() {
-            vector_core::event::MetricValue::Counter { value } => bytes += value,
+            vector_core::event::MetricValue::Counter { value } => metric_bytes += value,
             _ => errs.push(format!(
                 "{}: metric value is not a counter",
                 SourceMetrics::ComponentEventsReceivedBytes,
@@ -300,27 +281,32 @@ fn validate_component_event_bytes_received(
         }
     }
 
-    let event_bytes = source_component_event_bytes_received(configuration, inputs, outputs) as f64;
-    if bytes != event_bytes {
-        errs.push(format!(
-            "{}: expected {} bytes, but received {}",
-            SourceMetrics::ComponentEventsReceivedBytes,
-            event_bytes,
-            bytes
-        ));
+    let mut expected_bytes = 0;
+    for e in outputs {
+        expected_bytes += vec![e].estimated_json_encoded_size_of();
     }
 
     debug!(
-        "{}: {} total bytes",
+        "{}: {} bytes, {} expected bytes",
         SourceMetrics::ComponentEventsReceivedBytes,
-        bytes,
+        metric_bytes,
+        expected_bytes,
     );
+
+    if metric_bytes != expected_bytes as f64 {
+        errs.push(format!(
+            "{}: expected {} bytes, but received {}",
+            SourceMetrics::ComponentEventsReceivedBytes,
+            expected_bytes,
+            metric_bytes
+        ));
+    }
 
     if errs.is_empty() {
         Ok(vec![format!(
             "{}: {}",
             SourceMetrics::ComponentEventsReceivedBytes,
-            bytes,
+            metric_bytes,
         )])
     } else {
         Err(errs)
