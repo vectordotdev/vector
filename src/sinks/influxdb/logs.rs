@@ -215,7 +215,6 @@ impl HttpEventEncoder<BytesMut> for InfluxDbLogsEncoder {
             self.tags.replace(host_path);
         }
         self.tags.replace(log.source_type_path().to_string());
-        dbg!(log.clone());
 
         // Tags + Fields
         let mut tags = MetricTags::from([("metric_type".to_string(), "logs".to_string())]);
@@ -867,9 +866,9 @@ mod integration_tests {
         drop(batch);
 
         let events = vec![
-            Event::Log(namespaced_log),
             Event::Log(event1),
             Event::Log(event2),
+            Event::Log(namespaced_log),
         ];
 
         run_and_assert_sink_compliance(sink, stream::iter(events), &HTTP_SINK_TAGS).await;
@@ -895,10 +894,12 @@ mod integration_tests {
             .unwrap();
         let string = res.text().await.unwrap();
 
-        let lines = string.split('\n').collect::<Vec<&str>>();
+        let lines = dbg!(string.split('\n').collect::<Vec<&str>>());
         let header = lines[0].split(',').collect::<Vec<&str>>();
         let record1 = lines[1].split(',').collect::<Vec<&str>>();
         let record2 = lines[2].split(',').collect::<Vec<&str>>();
+        let header_ns = lines[4].split(',').collect::<Vec<&str>>();
+        let record_ns = dbg!(lines[5].split(',').collect::<Vec<&str>>());
 
         // measurement
         assert_eq!(
@@ -911,6 +912,14 @@ mod integration_tests {
         );
         assert_eq!(
             record2[header
+                .iter()
+                .position(|&r| r.trim() == "_measurement")
+                .unwrap()]
+            .trim(),
+            measure.clone()
+        );
+        assert_eq!(
+            record_ns[header_ns
                 .iter()
                 .position(|&r| r.trim() == "_measurement")
                 .unwrap()]
@@ -936,11 +945,23 @@ mod integration_tests {
             "logs"
         );
         assert_eq!(
+            record_ns[header_ns
+                .iter()
+                .position(|&r| r.trim() == "metric_type")
+                .unwrap()]
+            .trim(),
+            "logs"
+        );
+        assert_eq!(
             record1[header.iter().position(|&r| r.trim() == "host").unwrap()].trim(),
             "aws.cloud.eur"
         );
         assert_eq!(
             record2[header.iter().position(|&r| r.trim() == "host").unwrap()].trim(),
+            "aws.cloud.eur"
+        );
+        assert_eq!(
+            record_ns[header_ns.iter().position(|&r| r.trim() == "host").unwrap()].trim(),
             "aws.cloud.eur"
         );
         assert_eq!(
@@ -959,6 +980,14 @@ mod integration_tests {
             .trim(),
             "file"
         );
+        assert_eq!(
+            record_ns[header_ns
+                .iter()
+                .position(|&r| r.trim() == "source_type")
+                .unwrap()]
+            .trim(),
+            "file"
+        );
 
         // field
         assert_eq!(
@@ -970,11 +999,27 @@ mod integration_tests {
             "message"
         );
         assert_eq!(
+            record_ns[header_ns
+                .iter()
+                .position(|&r| r.trim() == "_field")
+                .unwrap()]
+            .trim(),
+            "message"
+        );
+        assert_eq!(
             record1[header.iter().position(|&r| r.trim() == "_value").unwrap()].trim(),
             "message_1"
         );
         assert_eq!(
             record2[header.iter().position(|&r| r.trim() == "_value").unwrap()].trim(),
+            "message_2"
+        );
+        assert_eq!(
+            record_ns[header_ns
+                .iter()
+                .position(|&r| r.trim() == "_value")
+                .unwrap()]
+            .trim(),
             "message_2"
         );
     }
