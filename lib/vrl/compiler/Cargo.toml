@@ -36,7 +36,7 @@ vector-common = { path = "../../vector-common", default-features = false, featur
 vector-config = { path = "../../vector-config" }
 vector-config-common = { path = "../../vector-config-common" }
 vector-config-macros = { path = "../../vector-config-macros" }
-value = { path = "../../value" }
+value = { path = "../value" }
 getrandom = { version = "0.2", features = ["js"] }
 
 bytes = { version = "1.4.0", default-features = false }

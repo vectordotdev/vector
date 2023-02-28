@@ -60,7 +60,7 @@ tracing-subscriber = { version = "0.3.16", default-features = false, features = 
 typetag = { version = "0.2.5", default-features = false }
 twox-hash = { version = "1.6.3", default-features = false }
 url = { version = "2", default-features = false }
-value = { path = "../value", default-features = false, features = ["lua", "toml", "json", "api"] }
+value = { path = "../vrl/value", default-features = false, features = ["lua", "toml", "json", "api"] }
 vector-buffers = { path = "../vector-buffers", default-features = false }
 vector-common = { path = "../vector-common" }
 vector-config = { path = "../vector-config" }
@@ -97,7 +97,7 @@ rand = "0.8.5"
 rand_distr = "0.4.3"
 tracing-subscriber = { version = "0.3.16", default-features = false, features = ["env-filter", "fmt", "ansi", "registry"] }
 vector-common = { path = "../vector-common", default-features = false, features = ["test"] }
-value = { path = "../value", default-features = false, features = ["lua", "toml", "json", "api", "arbitrary", "test"] }
+value = { path = "../vrl/value", default-features = false, features = ["lua", "toml", "json", "api", "arbitrary", "test"] }
 
 [features]
 api = ["dep:async-graphql", "value/api"]

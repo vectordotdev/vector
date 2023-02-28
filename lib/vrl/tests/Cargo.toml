@@ -11,7 +11,7 @@ lookup = { path = "../lookup" }
 stdlib = { package = "vrl-stdlib", path = "../stdlib" }
 vector-common = { path = "../../vector-common", default-features = false }
 vrl = { path = "../vrl" }
-value = { path = "../../value" }
+value = { path = "../value" }
 vector-vrl-functions = { path = "../../vector-vrl-functions" }
 
 ansi_term = "0.12"
