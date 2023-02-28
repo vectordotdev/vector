@@ -76,8 +76,8 @@ impl IntegrationTest {
             Some(ref test_arg) => {
                 args.push("--test".to_string());
                 args.push(test_arg.to_string());
-            },
-            None => args.push("--lib".to_string())
+            }
+            None => args.push("--lib".to_string()),
         }
         args.extend(extra_args);
         self.runner

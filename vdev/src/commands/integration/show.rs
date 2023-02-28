@@ -43,7 +43,7 @@ impl Cli {
                 } else {
                     println!("Test args: N/A");
                 }
-                
+
 
                 println!("Environment:");
                 print_env("  ", &config.env);

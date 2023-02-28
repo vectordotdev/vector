@@ -1,4 +1,4 @@
-features: 
+features:
 - redis-integration-tests
 
 test_filter: "::redis::"

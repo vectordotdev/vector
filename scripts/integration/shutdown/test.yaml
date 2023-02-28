@@ -2,7 +2,7 @@ args:
 - --test-threads
 - '4'
 
-features: 
+features:
 - shutdown-tests
 
 test: "integration"
