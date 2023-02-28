@@ -360,7 +360,7 @@ similar-asserts = "1.4.2"
 proptest = "1.1"
 quickcheck = "1.0.3"
 reqwest = { version = "0.11", features = ["json"] }
-tempfile = "3.3.0"
+tempfile = "3.4.0"
 test-generator = "0.3.1"
 tokio-test = "0.4.2"
 tokio = { version = "1.25.0", features = ["test-util"] }
