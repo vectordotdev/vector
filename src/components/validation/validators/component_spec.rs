@@ -326,20 +326,59 @@ fn validate_component_received_bytes_total(
     _outputs: &[Event],
     telemetry_events: &[Event],
 ) -> Result<Vec<String>, Vec<String>> {
-    let mut _errs: Vec<String> = Vec::new();
+    let mut errs: Vec<String> = Vec::new();
 
-    let _metrics = filter_events_by_metric_and_component(
+    let metrics = filter_events_by_metric_and_component(
         telemetry_events,
         SourceMetrics::ComponentReceivedBytesTotal,
         TEST_SOURCE_NAME,
     )?;
 
-    if let ComponentConfiguration::Source(Sources::HttpClient(c)) = configuration {
-        let mut encoder = ResourceCodec::from(c.get_decoding_config(None)).into_encoder();
-        let mut buffer = BytesMut::new();
-
-        encode_test_event(&mut encoder, &mut buffer, inputs[0].clone());
+    let mut metric_bytes: f64 = 0.0;
+    for m in metrics {
+        match m.value() {
+            vector_core::event::MetricValue::Counter { value } => metric_bytes += value,
+            _ => errs.push(format!(
+                "{}: metric value is not a counter",
+                SourceMetrics::ComponentReceivedBytesTotal,
+            )),
+        }
     }
 
-    Ok(vec![])
+    let mut expected_bytes = 0;
+    if let ComponentConfiguration::Source(Sources::HttpClient(c)) = configuration {
+        let mut encoder = ResourceCodec::from(c.get_decoding_config(None)).into_encoder();
+
+        for i in inputs {
+            let mut buffer = BytesMut::new();
+            encode_test_event(&mut encoder, &mut buffer, i.clone());
+            expected_bytes += buffer.len()
+        }
+    }
+
+    debug!(
+        "{}: {} bytes, {} expected bytes",
+        SourceMetrics::ComponentReceivedBytesTotal,
+        metric_bytes,
+        expected_bytes,
+    );
+
+    if metric_bytes != expected_bytes as f64 {
+        errs.push(format!(
+            "{}: expected {} bytes, but received {}",
+            SourceMetrics::ComponentReceivedBytesTotal,
+            expected_bytes,
+            metric_bytes
+        ));
+    }
+
+    if errs.is_empty() {
+        Ok(vec![format!(
+            "{}: {}",
+            SourceMetrics::ComponentReceivedBytesTotal,
+            expected_bytes,
+        )])
+    } else {
+        Err(errs)
+    }
 }
