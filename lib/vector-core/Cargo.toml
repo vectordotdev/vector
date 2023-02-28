@@ -89,6 +89,7 @@ quickcheck_macros = "1"
 proptest = "1.1"
 similar-asserts = "1.4.2"
 tokio-test = "0.4.2"
+toml = { version = "0.7.2", default-features = false, features = ["parse"] }
 ndarray = "0.15.6"
 ndarray-stats = "0.5.1"
 noisy_float = "0.2.0"
