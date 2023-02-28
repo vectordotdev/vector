@@ -77,6 +77,8 @@ impl Encoder<Event> for CsvSerializer {
                     // Array, Regex, Object are not supported by the CSV format.
                     _ => wtr.write_field("NaN")?,
                 }
+            } else {
+                wtr.write_field("NaN")?;
             }
         }
 
@@ -135,7 +137,7 @@ mod tests {
 
         assert_eq!(
             bytes.freeze(),
-            b"bar,123,\"abc,bcd\",3.1415925,sp ace,2023-02-27T07:04:49.363+00:00,\"the \"\"quote\"\" should be escaped\",true".as_slice()
+            b"bar,123,\"abc,bcd\",3.1415925,NaN,sp ace,2023-02-27T07:04:49.363+00:00,\"the \"\"quote\"\" should be escaped\",true".as_slice()
         );
     }
 }
