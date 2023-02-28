@@ -70,8 +70,7 @@ impl IntegrationTest {
         args.push("--features".to_string());
         args.push(self.config.features.join(","));
 
-        // if the test field is present in the struct append the test name
-        // if not then use the --lib flag
+        // If the test field is not present then use the --lib flag
         match self.config.test {
             Some(ref test_arg) => {
                 args.push("--test".to_string());
