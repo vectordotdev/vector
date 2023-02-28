@@ -9492,6 +9492,7 @@ dependencies = [
  "inherent",
  "lalrpop",
  "lalrpop-util",
+ "lookup",
  "once_cell",
  "quickcheck",
  "regex",

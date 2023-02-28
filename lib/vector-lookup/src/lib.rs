@@ -7,8 +7,12 @@ use std::{
 
 pub use error::LookupError;
 pub use lookup_buf::{FieldBuf, LookupBuf, SegmentBuf};
-pub use lookup_v2::{OwnedTargetPath, OwnedValuePath, PathPrefix};
+pub use lookup_v2::PathPrefix;
 pub use lookup_view::{Field, Lookup, Segment};
+
+pub use lookup::{
+    event_path, metadata_path, owned_value_path, path, OwnedTargetPath, OwnedValuePath,
+};
 
 mod error;
 mod field;

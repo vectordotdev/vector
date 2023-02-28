@@ -16,6 +16,7 @@ once_cell = { version = "1.17" }
 quickcheck = { version = "1.0.3", optional = true }
 vector-config = { path = "../vector-config" }
 vector-config-macros = { path = "../vector-config-macros" }
+lookup = {path = "../vrl/lookup"}
 
 [dev-dependencies]
 criterion = { version = "0.4.0", features = ["html_reports", "async_tokio"] }
@@ -28,10 +29,3 @@ lalrpop = "0.19.8"
 
 [features]
 arbitrary = ["dep:quickcheck"]
-
-[[bench]]
-name = "lookup"
-path = "benches/lookup.rs"
-harness = false
-test = false
-required-features = []
