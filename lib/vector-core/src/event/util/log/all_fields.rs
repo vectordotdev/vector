@@ -132,11 +132,7 @@ impl<'a> Iterator for FieldsIter<'a> {
                     }
                 },
                 Some(LeafIter::Root((value, visited))) => {
-                    let result = if *visited {
-                        None
-                    } else {
-                        Some(("message".to_owned(), *value))
-                    };
+                    let result = (!*visited).then(|| ("message".to_owned(), *value));
                     *visited = true;
                     return result;
                 }
