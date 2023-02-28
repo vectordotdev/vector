@@ -401,7 +401,7 @@ fn socketaddr_from_uri(uri: &Uri) -> SocketAddr {
     SocketAddr::from((uri_host, uri_port))
 }
 
-fn encode_test_event(
+pub fn encode_test_event(
     encoder: &mut Encoder<encoding::Framer>,
     buf: &mut BytesMut,
     event: TestEvent,

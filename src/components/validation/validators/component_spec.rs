@@ -1,13 +1,16 @@
 use std::fmt::{Display, Formatter};
 
+use bytes::BytesMut;
 use vector_core::event::{Event, Metric};
 use vector_core::EstimatedJsonEncodedSizeOf;
 
 use crate::components::validation::{
-    ComponentConfiguration, ComponentType, TestCaseExpectation, TestEvent,
+    encode_test_event, ComponentConfiguration, ComponentType, ResourceCodec, TestCaseExpectation,
+    TestEvent,
 };
 
 use crate::components::validation::runner::config::TEST_SOURCE_NAME;
+use crate::sources::Sources;
 
 use super::Validator;
 
@@ -101,6 +104,7 @@ impl Validator for ComponentSpecValidator {
 enum SourceMetrics {
     ComponentEventsReceived,
     ComponentEventsReceivedBytes,
+    ComponentReceivedBytesTotal,
 }
 
 impl SourceMetrics {
@@ -108,6 +112,7 @@ impl SourceMetrics {
         match self {
             SourceMetrics::ComponentEventsReceived => "component_received_events_total",
             SourceMetrics::ComponentEventsReceivedBytes => "component_received_event_bytes_total",
+            SourceMetrics::ComponentReceivedBytesTotal => "component_received_bytes_total",
         }
     }
 
@@ -117,6 +122,7 @@ impl SourceMetrics {
             "component_received_event_bytes_total" => {
                 Some(SourceMetrics::ComponentEventsReceivedBytes)
             }
+            "component_received_bytes_total" => Some(SourceMetrics::ComponentReceivedBytesTotal),
             _ => None,
         }
     }
@@ -143,6 +149,7 @@ fn validate_telemetry(
             let validations = [
                 validate_component_events_received,
                 validate_component_event_bytes_received,
+                validate_component_received_bytes_total,
             ];
 
             for validation in validations.iter() {
@@ -311,4 +318,28 @@ fn validate_component_event_bytes_received(
     } else {
         Err(errs)
     }
+}
+
+fn validate_component_received_bytes_total(
+    configuration: &ComponentConfiguration,
+    inputs: &[TestEvent],
+    _outputs: &[Event],
+    telemetry_events: &[Event],
+) -> Result<Vec<String>, Vec<String>> {
+    let mut _errs: Vec<String> = Vec::new();
+
+    let _metrics = filter_events_by_metric_and_component(
+        telemetry_events,
+        SourceMetrics::ComponentReceivedBytesTotal,
+        TEST_SOURCE_NAME,
+    )?;
+
+    if let ComponentConfiguration::Source(Sources::HttpClient(c)) = configuration {
+        let mut encoder = ResourceCodec::from(c.get_decoding_config(None)).into_encoder();
+        let mut buffer = BytesMut::new();
+
+        encode_test_event(&mut encoder, &mut buffer, inputs[0].clone());
+    }
+
+    Ok(vec![])
 }
