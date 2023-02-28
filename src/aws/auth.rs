@@ -1,7 +1,13 @@
 use std::time::Duration;
 
 use aws_config::{
-    default_provider::credentials::DefaultCredentialsChain, imds, sts::AssumeRoleProviderBuilder,
+    default_provider::credentials::DefaultCredentialsChain,
+    imds,
+    profile::{
+        profile_file::{ProfileFileKind, ProfileFiles},
+        ProfileFileCredentialsProvider,
+    },
+    sts::AssumeRoleProviderBuilder,
 };
 use aws_types::{credentials::SharedCredentialsProvider, region::Region, Credentials};
 use serde_with::serde_as;
@@ -11,6 +17,7 @@ use vector_config::configurable_component;
 // matches default load timeout from the SDK as of 0.10.1, but lets us confidently document the
 // default rather than relying on the SDK default to not change
 const DEFAULT_LOAD_TIMEOUT: Duration = Duration::from_secs(5);
+const DEFAULT_PROFILE_NAME: &str = "default";
 
 /// IMDS Client Configuration for authenticating with AWS.
 #[serde_as]
@@ -138,8 +145,21 @@ impl AwsAuthentication {
                 secret_access_key.inner(),
                 None,
             ))),
-            AwsAuthentication::File { .. } => {
-                Err("Overriding the credentials file is not supported.".into())
+            AwsAuthentication::File {
+                credentials_file,
+                profile,
+            } => {
+                // The SDK uses the default profile out of the box, but doesn't provide an optional
+                // type in the builder. We can just hardcode it so that everything works.
+                let profile_name = profile.clone().unwrap_or(DEFAULT_PROFILE_NAME.to_string());
+                let pfiles = ProfileFiles::builder()
+                    .with_file(ProfileFileKind::Credentials, credentials_file)
+                    .build();
+                let pfile = ProfileFileCredentialsProvider::builder()
+                    .profile_files(pfiles)
+                    .profile_name(profile_name)
+                    .build();
+                Ok(SharedCredentialsProvider::new(pfile))
             }
             AwsAuthentication::Role {
                 assume_role,
