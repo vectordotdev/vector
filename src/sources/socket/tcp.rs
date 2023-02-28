@@ -40,7 +40,6 @@ pub struct TcpConfig {
         deprecated = "This option has been deprecated. Configure `max_length` on the framing config instead."
     )]
     #[configurable(metadata(docs::type_unit = "bytes"))]
-    #[serde(default = "default_max_length")]
     max_length: Option<usize>,
 
     /// The timeout before a connection is forcefully closed during shutdown.
