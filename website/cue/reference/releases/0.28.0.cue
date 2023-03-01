@@ -3,6 +3,18 @@ package metadata
 releases: "0.28.0": {
 	date: "2023-02-23"
 
+	known_issues: [
+		"""
+			AWS components are not functional due to issues with request signing. This will be fixed
+			in 0.28.1.
+			""",
+		"""
+			The `framing.*.max_length` configuration options cannot be used on the `socket` source
+			as Vector returns an error about them conflicting with the deprecated top-level
+			`max_length` configuration option. This This will be fixed in 0.28.1.
+			""",
+	]
+
 	description: """
 		The Vector team is pleased to announce version 0.28.0!
 
