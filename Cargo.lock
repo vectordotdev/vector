@@ -1845,9 +1845,9 @@ dependencies = [
 
 [[package]]
 name = "clap"
-version = "4.1.7"
+version = "4.1.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2f3061d6db6d8fcbbd4b05e057f2acace52e64e96b498c08c2d7a4e65addd340"
+checksum = "c3d7ae14b20b94cb02149ed21a86c423859cbe18dc7ed69845cace50e52b40a5"
 dependencies = [
  "bitflags",
  "clap_derive",
@@ -1865,7 +1865,7 @@ version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "23e2b6c3dcdb73299f48ae05b294da14e2f560b3ed2c09e742269eb1b22af231"
 dependencies = [
- "clap 4.1.7",
+ "clap 4.1.8",
  "log",
 ]
 
@@ -1875,14 +1875,14 @@ version = "4.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "501ff0a401473ea1d4c3b125ff95506b62c5bc5768d818634195fbb7c4ad5ff4"
 dependencies = [
- "clap 4.1.7",
+ "clap 4.1.8",
 ]
 
 [[package]]
 name = "clap_derive"
-version = "4.1.7"
+version = "4.1.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "34d122164198950ba84a918270a3bb3f7ededd25e15f7451673d986f55bd2667"
+checksum = "44bec8e5c9d09e439c4335b1af0abaab56dcf3b94999a936e1bb47b9134288f0"
 dependencies = [
  "heck 0.4.0",
  "proc-macro-error",
@@ -9041,7 +9041,7 @@ dependencies = [
  "anyhow",
  "atty",
  "cached",
- "clap 4.1.7",
+ "clap 4.1.8",
  "clap-verbosity-flag",
  "clap_complete",
  "confy",
@@ -9110,7 +9110,7 @@ dependencies = [
  "bytesize",
  "chrono",
  "cidr-utils",
- "clap 4.1.7",
+ "clap 4.1.8",
  "codecs",
  "colored",
  "console-subscriber",
@@ -9272,7 +9272,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "chrono",
- "clap 4.1.7",
+ "clap 4.1.8",
  "futures 0.3.26",
  "graphql_client",
  "indoc",
@@ -9295,7 +9295,7 @@ dependencies = [
  "async-trait",
  "bytecheck",
  "bytes 1.4.0",
- "clap 4.1.7",
+ "clap 4.1.8",
  "crc32fast",
  "criterion",
  "crossbeam-queue",
@@ -9539,7 +9539,7 @@ dependencies = [
 name = "vrl-cli"
 version = "0.1.0"
 dependencies = [
- "clap 4.1.7",
+ "clap 4.1.8",
  "exitcode",
  "indoc",
  "lookup",
@@ -9686,7 +9686,7 @@ dependencies = [
  "ansi_term",
  "chrono",
  "chrono-tz",
- "clap 4.1.7",
+ "clap 4.1.8",
  "enrichment",
  "glob",
  "lookup",

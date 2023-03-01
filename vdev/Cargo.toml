@@ -11,7 +11,7 @@ publish = false
 anyhow = "1.0.69"
 atty = "0.2.14"
 cached = "0.42.0"
-clap = { version = "4.1.7", features = ["derive"] }
+clap = { version = "4.1.8", features = ["derive"] }
 clap-verbosity-flag = "2.0.0"
 clap_complete = "4.1.4"
 confy = "0.5.1"
