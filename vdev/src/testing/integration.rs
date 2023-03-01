@@ -80,7 +80,9 @@ impl IntegrationTest {
         }
 
         // Ensure the test_filter args are passed as well
-        args.push(self.config.test_filter.clone().unwrap_or("".to_string()));
+        if let Some(ref filter) = self.config.test_filter {
+            args.push(filter.to_string());
+        }
         args.extend(extra_args);
         self.runner
             .test(&env_vars, &self.config.runner.env, &args)?;
