@@ -1,6 +1,6 @@
 [package]
 name = "vector"
-version = "0.28.0"
+version = "0.29.0"
 authors = ["Vector Contributors <vector@datadoghq.com>"]
 edition = "2021"
 description = "A lightweight and ultra-fast tool for building observability pipelines"
@@ -181,7 +181,7 @@ aws-sigv4 = { version = "0.54.1", default-features = false, features = ["sign-ht
 aws-config = { version = "0.54.1", default-features = false, features = ["native-tls"], optional = true }
 aws-credential-types = { version = "0.54.1", default-features = false, features = ["hardcoded-credentials"], optional = true }
 aws-smithy-async = { version = "0.54.4", default-features = false, optional = true }
-aws-smithy-client = { version = "0.54.3", default-features = false, features = ["client-hyper"], optional = true}
+aws-smithy-client = { version = "0.54.4", default-features = false, features = ["client-hyper"], optional = true}
 aws-smithy-http = { version = "0.54.1", default-features = false, features = ["event-stream"], optional = true }
 aws-smithy-http-tower = { version = "0.54.4", default-features = false, optional = true }
 aws-smithy-types = { version = "0.54.1", default-features = false, optional = true }
@@ -209,7 +209,7 @@ rmpv = { version = "1.0.0", default-features = false, features = ["with-serde"],
 
 # Prost
 prost = { version = "0.11.8", default-features = false, features = ["std"] }
-prost-types = { version = "0.11.6", default-features = false, optional = true }
+prost-types = { version = "0.11.8", default-features = false, optional = true }
 
 # GCP
 goauth = { version = "0.13.1", optional = true }
@@ -251,7 +251,7 @@ bytes = { version = "1.4.0", default-features = false, features = ["serde"] }
 bytesize = { version = "1.2.0", default-features = false }
 chrono = { version = "0.4.22", default-features = false, features = ["serde"] }
 cidr-utils = { version = "0.5.10", default-features = false }
-clap = { version = "4.1.7", default-features = false, features = ["derive", "error-context", "env", "help", "std", "string", "usage", "wrap_help"] }
+clap = { version = "4.1.8", default-features = false, features = ["derive", "error-context", "env", "help", "std", "string", "usage", "wrap_help"] }
 colored = { version = "2.0.0", default-features = false }
 csv = { version = "1.2", default-features = false }
 derivative = { version = "2.2.0", default-features = false }
@@ -325,6 +325,7 @@ typetag = { version = "0.2.5", default-features = false }
 url = { version = "2.3.1", default-features = false, features = ["serde"] }
 uuid = { version = "1", default-features = false, features = ["serde", "v4"] }
 warp = { version = "0.3.3", default-features = false }
+zstd = { version = "0.12.3", default-features = false }
 arr_macro = { version = "0.2.1" }
 
 # depending on fork for bumped nix dependency
