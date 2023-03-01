@@ -6,7 +6,7 @@ mod test_case;
 pub mod util;
 mod validators;
 
-use crate::{sinks::Sinks, sources::Sources, transforms::Transforms};
+use crate::{config::BoxedTransform, sinks::Sinks, sources::Sources};
 
 pub use self::resources::*;
 #[cfg(feature = "component-validation-runner")]
@@ -43,7 +43,7 @@ pub enum ComponentConfiguration {
     Source(Sources),
 
     /// A transform component.
-    Transform(Transforms),
+    Transform(BoxedTransform),
 
     /// A sink component.
     Sink(Sinks),
@@ -78,7 +78,7 @@ impl ValidationConfiguration {
     }
 
     /// Creates a new `ValidationConfiguration` for a transform.
-    pub fn from_transform<C: Into<Transforms>>(component_name: &'static str, config: C) -> Self {
+    pub fn from_transform(component_name: &'static str, config: impl Into<BoxedTransform>) -> Self {
         Self {
             component_name,
             component_type: ComponentType::Source,

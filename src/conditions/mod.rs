@@ -52,7 +52,7 @@ impl Condition {
     ///
     /// The event should not be modified, it is only mutable so it can be passed into VRL, but VRL type checking prevents mutation.
     #[allow(dead_code)]
-    pub(crate) fn check(&self, e: Event) -> (bool, Event) {
+    pub fn check(&self, e: Event) -> (bool, Event) {
         match self {
             Condition::IsLog => check_is_log(e),
             Condition::IsMetric => check_is_metric(e),

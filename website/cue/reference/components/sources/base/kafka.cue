@@ -209,11 +209,6 @@ base: components: sources: kafka: configuration: {
 		required:    true
 		type: string: examples: ["consumer-group-name"]
 	}
-	group_instance_id: {
-		description: "Override dynamic membership and broker assignment behavior with static membership, using a group instance (member) id."
-		required:    false
-		type: string: examples: ["kafka-streams-instance-1"]
-	}
 	headers_key: {
 		description: """
 			Overrides the name of the log field used to add the headers to each event.

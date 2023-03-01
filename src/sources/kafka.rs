@@ -94,10 +94,6 @@ pub struct KafkaSourceConfig {
     #[configurable(metadata(docs::examples = "consumer-group-name"))]
     group_id: String,
 
-    /// Override dynamic membership and broker assignment behavior with static membership, using a group instance (member) id.
-    #[configurable(metadata(docs::examples = "kafka-streams-instance-1"))]
-    group_instance_id: Option<String>,
-
     /// If offsets for consumer group do not exist, set them using this strategy.
     ///
     /// See the [librdkafka documentation](https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md) for the `auto.offset.reset` option for further clarification.
@@ -702,10 +698,6 @@ fn create_consumer(config: &KafkaSourceConfig) -> crate::Result<StreamConsumer<C
         for (key, value) in librdkafka_options {
             client_config.set(key.as_str(), value.as_str());
         }
-    }
-
-    if let Some(group_instance_id) = &config.group_instance_id {
-        client_config.set("group.instance.id", group_instance_id);
     }
 
     let consumer = client_config

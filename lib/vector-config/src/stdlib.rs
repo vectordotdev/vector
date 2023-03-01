@@ -11,7 +11,6 @@ use std::{
     time::Duration,
 };
 
-use crate::schema_gen::{SchemaGenerator, SchemaObject};
 use indexmap::IndexMap;
 use serde_json::{Number, Value};
 use vector_config_common::{attributes::CustomAttribute, validation::Validation};
@@ -21,7 +20,7 @@ use crate::{
     schema::{
         assert_string_schema_for_map, generate_array_schema, generate_bool_schema,
         generate_map_schema, generate_number_schema, generate_optional_schema, generate_set_schema,
-        generate_string_schema,
+        generate_string_schema, SchemaGenerator, SchemaObject,
     },
     str::ConfigurableString,
     Configurable, GenerateError, Metadata, ToValue,
@@ -44,7 +43,7 @@ impl ToValue for () {
 // Null and boolean.
 impl<T> Configurable for Option<T>
 where
-    T: Configurable + ToValue,
+    T: Configurable + ToValue + 'static,
 {
     fn referenceable_name() -> Option<&'static str> {
         match T::referenceable_name() {
@@ -68,7 +67,7 @@ where
     }
 
     fn generate_schema(gen: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
-        generate_optional_schema::<T>(gen)
+        generate_optional_schema(&T::as_configurable_ref(), gen)
     }
 }
 
@@ -193,7 +192,7 @@ impl_configurable_numeric!(NonZeroUsize => |v: NonZeroUsize| v.get().into());
 // Arrays and maps.
 impl<T> Configurable for Vec<T>
 where
-    T: Configurable + ToValue,
+    T: Configurable + ToValue + 'static,
 {
     fn metadata() -> Metadata {
         T::metadata().convert()
@@ -205,7 +204,7 @@ where
     }
 
     fn generate_schema(gen: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
-        generate_array_schema::<T>(gen)
+        generate_array_schema(&T::as_configurable_ref(), gen)
     }
 }
 
@@ -217,8 +216,8 @@ impl<T: ToValue> ToValue for Vec<T> {
 
 impl<K, V> Configurable for BTreeMap<K, V>
 where
-    K: ConfigurableString + Ord + ToValue,
-    V: Configurable + ToValue,
+    K: ConfigurableString + Ord + ToValue + 'static,
+    V: Configurable + ToValue + 'static,
 {
     fn is_optional() -> bool {
         // A map with required fields would be... an object.  So if you want that, make a struct
@@ -237,9 +236,13 @@ where
 
     fn generate_schema(gen: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
         // Make sure our key type is _truly_ a string schema.
-        assert_string_schema_for_map::<K, Self>(gen)?;
+        assert_string_schema_for_map(
+            &K::as_configurable_ref(),
+            gen,
+            std::any::type_name::<Self>(),
+        )?;
 
-        generate_map_schema::<V>(gen)
+        generate_map_schema(&V::as_configurable_ref(), gen)
     }
 }
 
@@ -259,7 +262,7 @@ where
 
 impl<V> Configurable for BTreeSet<V>
 where
-    V: Configurable + ToValue + Eq + Hash,
+    V: Configurable + ToValue + Eq + Hash + 'static,
 {
     fn metadata() -> Metadata {
         Metadata::with_transparent(true)
@@ -271,7 +274,7 @@ where
     }
 
     fn generate_schema(gen: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
-        generate_set_schema::<V>(gen)
+        generate_set_schema(&V::as_configurable_ref(), gen)
     }
 }
 
@@ -283,8 +286,8 @@ impl<V: ToValue> ToValue for BTreeSet<V> {
 
 impl<K, V> Configurable for HashMap<K, V>
 where
-    K: ConfigurableString + ToValue + Hash + Eq,
-    V: Configurable + ToValue,
+    K: ConfigurableString + ToValue + Hash + Eq + 'static,
+    V: Configurable + ToValue + 'static,
 {
     fn is_optional() -> bool {
         // A map with required fields would be... an object.  So if you want that, make a struct
@@ -303,9 +306,13 @@ where
 
     fn generate_schema(gen: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
         // Make sure our key type is _truly_ a string schema.
-        assert_string_schema_for_map::<K, Self>(gen)?;
+        assert_string_schema_for_map(
+            &K::as_configurable_ref(),
+            gen,
+            std::any::type_name::<Self>(),
+        )?;
 
-        generate_map_schema::<V>(gen)
+        generate_map_schema(&V::as_configurable_ref(), gen)
     }
 }
 
@@ -325,7 +332,7 @@ where
 
 impl<V> Configurable for HashSet<V>
 where
-    V: Configurable + ToValue + Eq + Hash,
+    V: Configurable + ToValue + Eq + Hash + 'static,
 {
     fn metadata() -> Metadata {
         Metadata::with_transparent(true)
@@ -337,7 +344,7 @@ where
     }
 
     fn generate_schema(gen: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
-        generate_set_schema::<V>(gen)
+        generate_set_schema(&V::as_configurable_ref(), gen)
     }
 }
 

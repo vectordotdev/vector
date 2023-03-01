@@ -8,7 +8,7 @@ use serde::Serialize;
 use serde_json::Number;
 use vector_config_common::num::{NUMERIC_ENFORCED_LOWER_BOUND, NUMERIC_ENFORCED_UPPER_BOUND};
 
-use crate::schema_gen::InstanceType;
+use crate::schema::InstanceType;
 
 /// The class of a numeric type.
 #[derive(Clone, Copy, Serialize)]
