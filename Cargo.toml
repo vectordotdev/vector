@@ -324,6 +324,7 @@ typetag = { version = "0.2.5", default-features = false }
 url = { version = "2.3.1", default-features = false, features = ["serde"] }
 uuid = { version = "1", default-features = false, features = ["serde", "v4"] }
 warp = { version = "0.3.3", default-features = false }
+zstd = { version = "0.12.3", default-features = false }
 arr_macro = { version = "0.2.1" }
 
 # depending on fork for bumped nix dependency
