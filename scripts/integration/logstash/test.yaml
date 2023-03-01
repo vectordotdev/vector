@@ -1,7 +1,8 @@
-features:
+args:
+- --features
 - logstash-integration-tests
-
-test_filter: '::logstash::integration_tests::'
+- --lib
+- '::logstash::integration_tests::'
 
 env:
   HEARTBEAT_ADDRESS: 0.0.0.0:8080

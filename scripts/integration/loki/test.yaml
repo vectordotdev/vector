@@ -1,7 +1,8 @@
-features:
+args:
+- --features
 - loki-integration-tests
-
-test_filter: '::loki::'
+- --lib
+- '::loki::'
 
 env:
   LOKI_ADDRESS: http://loki:3100

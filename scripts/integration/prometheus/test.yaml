@@ -1,7 +1,8 @@
-test_filter: '::prometheus::remote_write::'
-
-features:
+args:
+- --features
 - prometheus-integration-tests
+- --lib
+- '::prometheus::remote_write::'
 
 env:
   REMOTE_WRITE_SOURCE_RECEIVE_ADDRESS: runner:9102

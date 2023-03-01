@@ -1,7 +1,8 @@
-features:
+args:
+- --features
 - chronicle-integration-tests
-
-test_filter: '::chronicle_unstructured::'
+- --lib
+- '::chronicle_unstructured::'
 
 env:
   CHRONICLE_ADDRESS: http://chronicle-emulator:3000
