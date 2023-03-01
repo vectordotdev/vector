@@ -9,6 +9,8 @@ publish = false
 lookup = { path = "../lookup" }
 value = { path = "../value" }
 diagnostic = { package = "vrl-diagnostic", path = "../diagnostic" }
+chrono-tz = { version = "0.8.1", default-features = false } #, features = ["serde"]
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
 
 [features]
 default = ["expressions"]

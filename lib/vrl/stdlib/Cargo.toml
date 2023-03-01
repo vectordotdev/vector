@@ -15,6 +15,7 @@ datadog-grok = { path = "../../datadog/grok", optional = true }
 datadog-search-syntax = { path = "../../datadog/search-syntax", optional = true }
 lookup_lib = {package = "lookup", path = "../lookup", optional = true }
 vector-common = { path = "../../vector-common", default-features = false, optional = true }
+vrl-core = { path = "../core" }
 
 base16 = { version = "0.2", optional = true }
 base64 = { version = "0.21", optional = true }
@@ -72,7 +73,6 @@ criterion = "0.4"
 tracing-test = "0.2"
 value = { path = "../value", features = ["test"] }
 vrl-core = { path = "../../vrl/core", features = ["test"] }
-vector-common = { path = "../../vector-common", default-features = false, features = ["btreemap"] }
 vrl = { path = "../vrl" , features = ["test"]}
 
 [features]
@@ -234,7 +234,7 @@ abs = []
 append = []
 array = []
 assert = []
-assert_eq = ["vector-common/conversion"]
+assert_eq = []
 boolean = []
 ceil = []
 chunks = []
@@ -255,7 +255,7 @@ encode_base16 = ["dep:base16"]
 encode_base64 = ["dep:base64"]
 encode_gzip = ["dep:flate2"]
 encode_json = ["dep:serde_json", "value/json", "dep:chrono", "dep:regex"]
-encode_key_value = ["vector-common/encoding", "value/json"]
+encode_key_value = ["value/json"]
 encode_logfmt = ["encode_key_value"]
 encode_percent = ["dep:percent-encoding"]
 encode_zlib = ["dep:flate2"]
@@ -315,7 +315,7 @@ merge = []
 mod = []
 now = ["dep:chrono"]
 object = []
-parse_apache_log = ["dep:chrono", "dep:once_cell", "dep:regex", "vector-common/conversion"]
+parse_apache_log = ["dep:chrono", "dep:once_cell", "dep:regex"]
 parse_aws_alb_log = ["dep:nom"]
 parse_aws_cloudwatch_log_subscription_message = ["dep:serde_json", "vector-common/aws_cloudwatch_logs_subscription", "dep:chrono"]
 parse_aws_vpc_flow_log = []

@@ -1,15 +1,16 @@
 use ::value::Value;
-use vector_common::conversion::Conversion;
 use vrl::prelude::*;
 
-fn parse_timestamp(value: Value, format: Value, ctx: &Context) -> Resolved {
+fn parse_timestamp(value: Value, _format: Value, _ctx: &Context) -> Resolved {
     match value {
-        Value::Bytes(v) => {
-            let format = format.try_bytes_utf8_lossy()?;
-            Conversion::parse(format!("timestamp|{format}"), *ctx.timezone())
-                .map_err(|e| e.to_string())?
-                .convert(v)
-                .map_err(|e| e.to_string().into())
+        Value::Bytes(_v) => {
+            // let format = format.try_bytes_utf8_lossy()?;
+            // FIX ME !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            unimplemented!()
+            // Conversion::parse(format!("timestamp|{format}"), *ctx.timezone())
+            //     .map_err(|e| e.to_string())?
+            //     .convert(v)
+            //     .map_err(|e| e.to_string().into())
         }
         Value::Timestamp(_) => Ok(value),
         _ => Err("unable to convert value to timestamp".into()),

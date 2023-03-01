@@ -9536,7 +9536,6 @@ dependencies = [
  "ordered-float 3.4.0",
  "serde_json",
  "value",
- "vector-common",
  "vrl-compiler",
  "vrl-core",
  "vrl-diagnostic",
@@ -9558,7 +9557,6 @@ dependencies = [
  "serde_json",
  "thiserror",
  "value",
- "vector-common",
  "vector-lookup",
  "vector-vrl-functions",
  "vrl",
@@ -9599,6 +9597,8 @@ dependencies = [
 name = "vrl-core"
 version = "0.1.0"
 dependencies = [
+ "chrono",
+ "chrono-tz",
  "lookup",
  "value",
  "vrl-diagnostic",
@@ -9706,7 +9706,6 @@ dependencies = [
  "tikv-jemallocator",
  "tracing-subscriber",
  "value",
- "vector-common",
  "vector-vrl-functions",
  "vrl",
  "vrl-stdlib",

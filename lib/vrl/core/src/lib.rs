@@ -16,7 +16,9 @@
 mod expression;
 mod r#macro;
 mod target;
+mod timezone;
 
 pub use expression::{ExpressionError, Resolved};
 pub use target::{SecretTarget, Target, TargetValue, TargetValueRef};
+pub use timezone::TimeZone;
 pub use value::Value;
