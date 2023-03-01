@@ -64,8 +64,21 @@ impl IntegrationTest {
         for (key, value) in config_env(&self.env_config) {
             env_vars.insert(key, Some(value));
         }
+
         env_vars.insert("TEST_LOG".to_string(), Some("info".into()));
-        let mut args = self.config.args.clone();
+        let mut args = self.config.args.clone().unwrap_or_default();
+
+        args.push("--features".to_string());
+        args.push(self.config.features.join(","));
+
+        // If the test field is not present then use the --lib flag
+        match self.config.test {
+            Some(ref test_arg) => {
+                args.push("--test".to_string());
+                args.push(test_arg.to_string());
+            }
+            None => args.push("--lib".to_string()),
+        }
         args.extend(extra_args);
         // The below line generates this error: Error: command: "docker" "exec" "--tty" "--env" "CARGO_BUILD_TARGET_DIR=/home/target" "--env" "CONFIG_VERSION" "--env" "REDIS_URL" "--env" "TEST_LOG" "vector-test-runner-redis-1.66.1" "cargo" "nextest" "run" "--no-fail-fast" "--no-default-features" "--features" "redis-integration-tests" "--lib" "::redis::" "--" "--no-capture"
         // args.extend(vec!["--".to_string(), "--no-capture".to_string()]);
