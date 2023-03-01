@@ -6,7 +6,6 @@
 {{ $version := .File.BaseFileName }}
 {{ $release := index site.Data.docs.releases $version }}
 {{ $highlights := where (where site.RegularPages "Section" "highlights") ".Params.release" "eq" $version }}
-
 {{ $groups := dict "enhancement" "enhancements" "feat" "new features" "fix" "bug fixes" "deprecation" "deprecations"}}
 <div class="max-w-3xl md:max-w-5xl px-6 lg:px-8 mx-auto">
   <div class="my-16">
