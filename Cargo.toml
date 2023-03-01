@@ -100,7 +100,6 @@ members = [
   "lib/prometheus-parser",
   "lib/opentelemetry-proto",
   "lib/tracing-limit",
-  "lib/value",
   "lib/vector-api-client",
   "lib/vector-buffers",
   "lib/vector-common",
@@ -118,6 +117,7 @@ members = [
   "lib/vrl/stdlib",
   "lib/vrl/tests",
   "lib/vrl/proptests",
+  "lib/vrl/value",
   "lib/vrl/vrl",
   "lib/vrl/web-playground",
   "vdev",
@@ -135,7 +135,7 @@ portpicker = { path = "lib/portpicker" }
 prometheus-parser = { path = "lib/prometheus-parser", optional = true }
 opentelemetry-proto = { path = "lib/opentelemetry-proto", optional = true }
 tracing-limit = { path = "lib/tracing-limit" }
-value = { path = "lib/value" }
+value = { path = "lib/vrl/value" }
 vector-api-client = { path = "lib/vector-api-client", optional = true }
 vector-buffers = { path = "lib/vector-buffers", default-features = false }
 vector-common = { path = "lib/vector-common" }
@@ -367,7 +367,7 @@ test-generator = "0.3.1"
 tokio-test = "0.4.2"
 tokio = { version = "1.25.0", features = ["test-util"] }
 tower-test = "0.4.0"
-value = { path = "lib/value", features = ["test"] }
+value = { path = "lib/vrl/value", features = ["test"] }
 vector-core = { path = "lib/vector-core", default-features = false, features = ["vrl", "test"] }
 wiremock = "0.5.17"
 zstd = { version = "0.12.3", default-features = false }

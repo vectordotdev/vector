@@ -8,7 +8,7 @@ license = "MPL-2.0"
 
 [dependencies]
 vrl = { path = "../vrl" }
-value = { path = "../../value", default-features = false }
+value = { path = "../value", default-features = false }
 
 datadog-filter = { path = "../../datadog/filter", optional = true }
 datadog-grok = { path = "../../datadog/grok", optional = true }
@@ -70,7 +70,7 @@ anyhow = "1"
 chrono-tz = "0.8"
 criterion = "0.4"
 tracing-test = "0.2"
-value = { path = "../../value", features = ["test"] }
+value = { path = "../value", features = ["test"] }
 vrl-core = { path = "../../vrl/core", features = ["test"] }
 vector-common = { path = "../../vector-common", default-features = false, features = ["btreemap"] }
 vrl = { path = "../vrl" , features = ["test"]}

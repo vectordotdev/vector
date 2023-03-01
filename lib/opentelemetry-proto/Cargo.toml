@@ -17,5 +17,5 @@ lookup = { package = "vector-lookup", path = "../vector-lookup", default-feature
 ordered-float = { version = "3.4.0", default-features = false }
 prost = { version = "0.11.8", default-features = false, features = ["std"] }
 tonic = { version = "0.8", default-features = false, features = ["codegen", "gzip", "prost", "tls", "tls-roots", "transport"] }
-value = { path = "../value"}
+value = { path = "../vrl/value"}
 vector-core = { path = "../vector-core", default-features = false }
