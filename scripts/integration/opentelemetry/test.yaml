@@ -1,7 +1,8 @@
-features:
+args:
+- --features
 - opentelemetry-integration-tests
-
-test_filter: '::opentelemetry::'
+- --lib
+- '::opentelemetry::'
 
 runner:
   env:

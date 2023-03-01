@@ -38,12 +38,7 @@ impl Cli {
                 let envs_dir = state::EnvsDir::new(&integration);
                 let active_env = envs_dir.active()?;
 
-                if let Some(args) = &config.args {
-                    println!("Test args: {}", args.join(" "));
-                } else {
-                    println!("Test args: N/A");
-                }
-
+                println!("Test args: {}", config.args.join(" "));
 
                 println!("Environment:");
                 print_env("  ", &config.env);

@@ -1,7 +1,8 @@
-features:
+args:
+- --features
 - datadog-traces-integration-tests
-
-test_filter: '::datadog::traces::'
+- --lib
+- '::datadog::traces::'
 
 env:
   AGENT_PORT: '8082'

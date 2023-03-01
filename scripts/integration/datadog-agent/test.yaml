@@ -1,7 +1,8 @@
-features:
+args:
+- --features
 - datadog-agent-integration-tests
-
-test_filter: 'sources::datadog_agent::integration_tests::'
+- --lib
+- 'sources::datadog_agent::integration_tests::'
 
 env:
   AGENT_ADDRESS: datadog-agent:8181

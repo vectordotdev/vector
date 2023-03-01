@@ -1,7 +1,8 @@
-features:
+args:
+- --features
 - azure-integration-tests
-
-test_filter: ::azure_
+- --lib
+- ::azure_
 
 env:
   AZURE_ADDRESS: local-azure-blob

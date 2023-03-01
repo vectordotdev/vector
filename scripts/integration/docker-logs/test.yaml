@@ -1,7 +1,8 @@
-features:
+args:
+- --features
 - docker-logs-integration-tests
-
-test_filter: "::docker_logs::"
+- --lib
+- "::docker_logs::"
 
 runner:
   needs_docker_socket: true

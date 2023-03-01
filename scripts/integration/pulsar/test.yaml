@@ -1,7 +1,8 @@
-features:
+args:
+- --features
 - pulsar-integration-tests
-
-test_filter: '::pulsar::'
+- --lib
+- '::pulsar::'
 
 env:
   PULSAR_ADDRESS: pulsar://pulsar:6650

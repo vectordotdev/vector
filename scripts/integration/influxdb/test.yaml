@@ -1,7 +1,8 @@
-features:
+args:
+- --features
 - influxdb-integration-tests
-
-test_filter: '::influxdb::'
+- --lib
+- '::influxdb::'
 
 env:
   INFLUXDB_V1_HTTPS_ADDRESS: https://influxdb-v1-tls:8086
