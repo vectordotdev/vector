@@ -64,8 +64,11 @@ impl IntegrationTest {
         for (key, value) in config_env(&self.env_config) {
             env_vars.insert(key, Some(value));
         }
+        env_vars.insert("TEST_LOG".to_string(), Some("info".into()));
         let mut args = self.config.args.clone();
         args.extend(extra_args);
+        args.extend(vec!["--".to_string(), "--no-capture".to_string()]);
+
         self.runner
             .test(&env_vars, &self.config.runner.env, &args)?;
 
