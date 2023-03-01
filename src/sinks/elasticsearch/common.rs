@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use aws_credential_types::provider::SharedCredentialsProvider;
+use aws_types::credentials::SharedCredentialsProvider;
 use aws_types::region::Region;
 use bytes::{Buf, Bytes};
 use http::{Response, StatusCode, Uri};

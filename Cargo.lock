@@ -225,7 +225,7 @@ checksum = "9c6368f9ae5c6ec403ca910327ae0c9437b0a85255b6950c90d497e6177f6e5e"
 dependencies = [
  "proc-macro-hack",
  "quote 1.0.23",
- "syn 1.0.109",
+ "syn 1.0.107",
 ]
 
 [[package]]
@@ -260,17 +260,6 @@ name = "ascii_utils"
 version = "0.9.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "71938f30533e4d95a6d17aa530939da3842c2ab6f4f84b9dae68447e4129f74a"
-
-[[package]]
-name = "assert-json-diff"
-version = "1.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4259cbe96513d2f1073027a259fc2ca917feb3026a5a8d984e3628e490255cc0"
-dependencies = [
- "extend",
- "serde",
- "serde_json",
-]
 
 [[package]]
 name = "assert-json-diff"
@@ -420,7 +409,7 @@ dependencies = [
  "proc-macro-crate 1.2.1",
  "proc-macro2 1.0.51",
  "quote 1.0.23",
- "syn 1.0.109",
+ "syn 1.0.107",
  "thiserror",
 ]
 
@@ -540,7 +529,7 @@ checksum = "3b015a331cc64ebd1774ba119538573603427eaace0a1950c423ab971f903796"
 dependencies = [
  "proc-macro2 1.0.51",
  "quote 1.0.23",
- "syn 1.0.109",
+ "syn 1.0.107",
 ]
 
 [[package]]
@@ -562,7 +551,7 @@ checksum = "e4655ae1a7b0cdf149156f780c5bf3f1352bc53cbd9e0a361a7ef7b22947e965"
 dependencies = [
  "proc-macro2 1.0.51",
  "quote 1.0.23",
- "syn 1.0.109",
+ "syn 1.0.107",
 ]
 
 [[package]]
@@ -579,7 +568,7 @@ checksum = "1cd7fce9ba8c3c042128ce72d8b2ddbf3a05747efb67ea0313c635e10bda47a2"
 dependencies = [
  "proc-macro2 1.0.51",
  "quote 1.0.23",
- "syn 1.0.109",
+ "syn 1.0.107",
 ]
 
 [[package]]
@@ -613,20 +602,19 @@ checksum = "d468802bab17cbc0cc575e9b053f41e72aa36bfa6b7f55e3529ffa43161b97fa"
 
 [[package]]
 name = "aws-config"
-version = "0.54.1"
+version = "0.51.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3c3d1e2a1f1ab3ac6c4b884e37413eaa03eb9d901e4fc68ee8f5c1d49721680e"
+checksum = "56a636c44c77fa18bdba56126a34d30cfe5538fe88f7d34988fa731fee143ddd"
 dependencies = [
- "aws-credential-types",
  "aws-http",
  "aws-sdk-sso",
  "aws-sdk-sts",
  "aws-smithy-async",
  "aws-smithy-client",
- "aws-smithy-http",
- "aws-smithy-http-tower",
+ "aws-smithy-http 0.51.0",
+ "aws-smithy-http-tower 0.51.0",
  "aws-smithy-json",
- "aws-smithy-types",
+ "aws-smithy-types 0.51.0",
  "aws-types",
  "bytes 1.4.0",
  "hex",
@@ -641,26 +629,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "aws-credential-types"
-version = "0.54.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bb0696a0523a39a19087747e4dafda0362dc867531e3d72a3f195564c84e5e08"
-dependencies = [
- "aws-smithy-async",
- "aws-smithy-types",
- "tokio",
- "tracing 0.1.37",
- "zeroize",
-]
-
-[[package]]
 name = "aws-endpoint"
-version = "0.54.1"
+version = "0.51.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "80a4f935ab6a1919fbfd6102a80c4fccd9ff5f47f94ba154074afe1051903261"
+checksum = "6ca8f374874f6459aaa88dc861d7f5d834ca1ff97668eae190e97266b5f6c3fb"
 dependencies = [
- "aws-smithy-http",
- "aws-smithy-types",
+ "aws-smithy-http 0.51.0",
+ "aws-smithy-types 0.51.0",
  "aws-types",
  "http",
  "regex",
@@ -669,13 +644,12 @@ dependencies = [
 
 [[package]]
 name = "aws-http"
-version = "0.54.1"
+version = "0.51.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "82976ca4e426ee9ca3ffcf919d9b2c8d14d0cd80d43cc02173737a8f07f28d4d"
+checksum = "78d41e19e779b73463f5f0c21b3aacc995f4ba783ab13a7ae9f5dfb159a551b4"
 dependencies = [
- "aws-credential-types",
- "aws-smithy-http",
- "aws-smithy-types",
+ "aws-smithy-http 0.51.0",
+ "aws-smithy-types 0.51.0",
  "aws-types",
  "bytes 1.4.0",
  "http",
@@ -688,246 +662,218 @@ dependencies = [
 
 [[package]]
 name = "aws-sdk-cloudwatch"
-version = "0.24.0"
+version = "0.21.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ca35aa6f343ca08847b0f1bbebf2cf8518e2d0e6db7409e410001113536d98cd"
+checksum = "520b1ac14f0850d0d6a69136d15ba7702d41ee7f4014a5d2d1bf4a86e74f7a6b"
 dependencies = [
- "aws-credential-types",
  "aws-endpoint",
  "aws-http",
  "aws-sig-auth",
  "aws-smithy-async",
  "aws-smithy-client",
- "aws-smithy-http",
- "aws-smithy-http-tower",
- "aws-smithy-json",
+ "aws-smithy-http 0.51.0",
+ "aws-smithy-http-tower 0.51.0",
  "aws-smithy-query",
- "aws-smithy-types",
+ "aws-smithy-types 0.51.0",
  "aws-smithy-xml",
  "aws-types",
  "bytes 1.4.0",
  "http",
- "regex",
  "tokio-stream",
  "tower",
 ]
 
 [[package]]
 name = "aws-sdk-cloudwatchlogs"
-version = "0.24.0"
+version = "0.21.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d4f8dbe7e86cb0c5999cb5911e052ec1e6e3f4abbbcb1333a63538b4aecdaa9b"
+checksum = "89415e55b57044a09a7eb0a885c2d0af1aa7f95b373e0e898f71a28d7e7d10f9"
 dependencies = [
- "aws-credential-types",
  "aws-endpoint",
  "aws-http",
  "aws-sig-auth",
  "aws-smithy-async",
  "aws-smithy-client",
- "aws-smithy-http",
- "aws-smithy-http-tower",
+ "aws-smithy-http 0.51.0",
+ "aws-smithy-http-tower 0.51.0",
  "aws-smithy-json",
- "aws-smithy-types",
+ "aws-smithy-types 0.51.0",
  "aws-types",
  "bytes 1.4.0",
  "http",
- "regex",
  "tokio-stream",
  "tower",
 ]
 
 [[package]]
 name = "aws-sdk-elasticsearch"
-version = "0.24.0"
+version = "0.21.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a26b30b456954c76df16bcc07b53c76416add85b5f17764e6051b8289572f7af"
+checksum = "e9f4cc10278701dbc0d386ddd8cddfda2695eae7103a54eae11b981f28779ff2"
 dependencies = [
- "aws-credential-types",
  "aws-endpoint",
  "aws-http",
  "aws-sig-auth",
  "aws-smithy-async",
  "aws-smithy-client",
- "aws-smithy-http",
- "aws-smithy-http-tower",
+ "aws-smithy-http 0.51.0",
+ "aws-smithy-http-tower 0.51.0",
  "aws-smithy-json",
- "aws-smithy-types",
+ "aws-smithy-types 0.51.0",
  "aws-types",
  "bytes 1.4.0",
  "http",
- "regex",
  "tokio-stream",
  "tower",
 ]
 
 [[package]]
 name = "aws-sdk-firehose"
-version = "0.24.0"
+version = "0.21.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e5f8c3898ce8ad0ae8c81c340fdd30f0b12785ffbce242d3d9854e5196f81113"
+checksum = "c68310f9d7860b4fe73c58e5cec4d7a310a658d1a983fdf176eb35149939896a"
 dependencies = [
- "aws-credential-types",
  "aws-endpoint",
  "aws-http",
  "aws-sig-auth",
  "aws-smithy-async",
  "aws-smithy-client",
- "aws-smithy-http",
- "aws-smithy-http-tower",
+ "aws-smithy-http 0.51.0",
+ "aws-smithy-http-tower 0.51.0",
  "aws-smithy-json",
- "aws-smithy-types",
+ "aws-smithy-types 0.51.0",
  "aws-types",
  "bytes 1.4.0",
  "http",
- "regex",
  "tower",
 ]
 
 [[package]]
 name = "aws-sdk-kinesis"
-version = "0.24.0"
+version = "0.21.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f85f773996e276281696482efe866719d12e962041bb75f326f8375fb8ac574d"
+checksum = "37766fdf50feab317b4f939b1c9ee58a2a1c51785974328ce84cff1eea7a1bb8"
 dependencies = [
- "aws-credential-types",
  "aws-endpoint",
  "aws-http",
  "aws-sig-auth",
  "aws-smithy-async",
  "aws-smithy-client",
- "aws-smithy-http",
- "aws-smithy-http-tower",
+ "aws-smithy-http 0.51.0",
+ "aws-smithy-http-tower 0.51.0",
  "aws-smithy-json",
- "aws-smithy-types",
+ "aws-smithy-types 0.51.0",
  "aws-types",
  "bytes 1.4.0",
  "http",
- "regex",
  "tokio-stream",
  "tower",
 ]
 
 [[package]]
 name = "aws-sdk-s3"
-version = "0.24.0"
+version = "0.21.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1533be023eeac69668eb718b1c48af7bd5e26305ed770553d2877ab1f7507b68"
+checksum = "a9f08665c8e03aca8cb092ef01e617436ebfa977fddc1240e1b062488ab5d48a"
 dependencies = [
- "aws-credential-types",
  "aws-endpoint",
  "aws-http",
  "aws-sig-auth",
- "aws-sigv4",
+ "aws-sigv4 0.51.0",
  "aws-smithy-async",
  "aws-smithy-checksums",
  "aws-smithy-client",
  "aws-smithy-eventstream",
- "aws-smithy-http",
- "aws-smithy-http-tower",
- "aws-smithy-json",
- "aws-smithy-types",
+ "aws-smithy-http 0.51.0",
+ "aws-smithy-http-tower 0.51.0",
+ "aws-smithy-types 0.51.0",
  "aws-smithy-xml",
  "aws-types",
  "bytes 1.4.0",
  "bytes-utils",
- "fastrand",
  "http",
  "http-body",
- "once_cell",
- "percent-encoding",
- "regex",
  "tokio-stream",
  "tower",
  "tracing 0.1.37",
- "url",
 ]
 
 [[package]]
 name = "aws-sdk-sqs"
-version = "0.24.0"
+version = "0.21.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4b2afbc1dfbf260945ad1cc19a1d2109f588663b053ffd828faacb29b02c9260"
+checksum = "8b26bb3d12238492cb12bde0de8486679b007daada21fdb110913b32a2a38275"
 dependencies = [
- "aws-credential-types",
  "aws-endpoint",
  "aws-http",
  "aws-sig-auth",
  "aws-smithy-async",
  "aws-smithy-client",
- "aws-smithy-http",
- "aws-smithy-http-tower",
- "aws-smithy-json",
+ "aws-smithy-http 0.51.0",
+ "aws-smithy-http-tower 0.51.0",
  "aws-smithy-query",
- "aws-smithy-types",
+ "aws-smithy-types 0.51.0",
  "aws-smithy-xml",
  "aws-types",
  "bytes 1.4.0",
  "http",
- "regex",
  "tokio-stream",
  "tower",
 ]
 
 [[package]]
 name = "aws-sdk-sso"
-version = "0.24.0"
+version = "0.21.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ca0119bacf0c42f587506769390983223ba834e605f049babe514b2bd646dbb2"
+checksum = "86dcb1cb71aa8763b327542ead410424515cff0cde5b753eedd2917e09c63734"
 dependencies = [
- "aws-credential-types",
  "aws-endpoint",
  "aws-http",
  "aws-sig-auth",
  "aws-smithy-async",
  "aws-smithy-client",
- "aws-smithy-http",
- "aws-smithy-http-tower",
+ "aws-smithy-http 0.51.0",
+ "aws-smithy-http-tower 0.51.0",
  "aws-smithy-json",
- "aws-smithy-types",
+ "aws-smithy-types 0.51.0",
  "aws-types",
  "bytes 1.4.0",
  "http",
- "regex",
  "tokio-stream",
  "tower",
 ]
 
 [[package]]
 name = "aws-sdk-sts"
-version = "0.24.0"
+version = "0.21.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "270b6a33969ebfcb193512fbd5e8ee5306888ad6c6d5d775cdbfb2d50d94de26"
+checksum = "fdfcf584297c666f6b472d5368a78de3bc714b6e0a53d7fbf76c3e347c292ab1"
 dependencies = [
- "aws-credential-types",
  "aws-endpoint",
  "aws-http",
  "aws-sig-auth",
  "aws-smithy-async",
  "aws-smithy-client",
- "aws-smithy-http",
- "aws-smithy-http-tower",
- "aws-smithy-json",
+ "aws-smithy-http 0.51.0",
+ "aws-smithy-http-tower 0.51.0",
  "aws-smithy-query",
- "aws-smithy-types",
+ "aws-smithy-types 0.51.0",
  "aws-smithy-xml",
  "aws-types",
  "bytes 1.4.0",
  "http",
- "regex",
  "tower",
- "tracing 0.1.37",
 ]
 
 [[package]]
 name = "aws-sig-auth"
-version = "0.54.1"
+version = "0.51.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "660a02a98ab1af83bd8d714afbab2d502ba9b18c49e7e4cddd6bf8837ff778cb"
+checksum = "12cbe7b2be9e185c1fbce27fc9c41c66b195b32d89aa099f98768d9544221308"
 dependencies = [
- "aws-credential-types",
- "aws-sigv4",
+ "aws-sigv4 0.51.0",
  "aws-smithy-eventstream",
- "aws-smithy-http",
+ "aws-smithy-http 0.51.0",
  "aws-types",
  "http",
  "tracing 0.1.37",
@@ -935,13 +881,31 @@ dependencies = [
 
 [[package]]
 name = "aws-sigv4"
-version = "0.54.1"
+version = "0.51.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cdaf11005b7444e6cd66f600d09861a3aeb6eb89a0f003c7c9820dbab2d15297"
+checksum = "03ff4cff8c4a101962d593ba94e72cd83891aecd423f0c6e3146bff6fb92c9e3"
 dependencies = [
  "aws-smithy-eventstream",
- "aws-smithy-http",
+ "aws-smithy-http 0.51.0",
  "bytes 1.4.0",
+ "form_urlencoded",
+ "hex",
+ "http",
+ "once_cell",
+ "percent-encoding",
+ "regex",
+ "ring",
+ "time",
+ "tracing 0.1.37",
+]
+
+[[package]]
+name = "aws-sigv4"
+version = "0.53.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "eee0d796882321e91ca7b991ab6193864e04b605be3a6c18adb9134a90d5a860"
+dependencies = [
+ "aws-smithy-http 0.53.1",
  "form_urlencoded",
  "hex",
  "hmac",
@@ -956,9 +920,9 @@ dependencies = [
 
 [[package]]
 name = "aws-smithy-async"
-version = "0.54.4"
+version = "0.51.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "63c712a28a4f2f2139759235c08bf98aca99d4fdf1b13c78c5f95613df0a5db9"
+checksum = "7b3442b4c5d3fc39891a2e5e625735fba6b24694887d49c6518460fde98247a9"
 dependencies = [
  "futures-util",
  "pin-project-lite",
@@ -968,12 +932,12 @@ dependencies = [
 
 [[package]]
 name = "aws-smithy-checksums"
-version = "0.54.2"
+version = "0.51.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "596e886b87ac17cb182b01af6452f45ec27c49a199cfc1f2fb81136ace4141af"
+checksum = "cc227e36e346f45298288359f37123e1a92628d1cec6b11b5eb335553278bd9e"
 dependencies = [
- "aws-smithy-http",
- "aws-smithy-types",
+ "aws-smithy-http 0.51.0",
+ "aws-smithy-types 0.51.0",
  "bytes 1.4.0",
  "crc32c",
  "crc32fast",
@@ -989,25 +953,21 @@ dependencies = [
 
 [[package]]
 name = "aws-smithy-client"
-version = "0.54.4"
+version = "0.51.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "104ca17f56cde00a10207169697dfe9c6810db339d52fb352707e64875b30a44"
+checksum = "ff28d553714f8f54cd921227934fc13a536a1c03f106e56b362fd57e16d450ad"
 dependencies = [
  "aws-smithy-async",
- "aws-smithy-http",
- "aws-smithy-http-tower",
- "aws-smithy-protocol-test",
- "aws-smithy-types",
+ "aws-smithy-http 0.51.0",
+ "aws-smithy-http-tower 0.51.0",
+ "aws-smithy-types 0.51.0",
  "bytes 1.4.0",
  "fastrand",
  "http",
  "http-body",
  "hyper",
- "hyper-rustls",
  "hyper-tls",
- "lazy_static",
  "pin-project-lite",
- "serde",
  "tokio",
  "tower",
  "tracing 0.1.37",
@@ -1015,23 +975,63 @@ dependencies = [
 
 [[package]]
 name = "aws-smithy-eventstream"
-version = "0.54.4"
+version = "0.51.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ac250d8c0e42af0097a6837ffc5a6fb9f8ba4107bb53124c047c91bc2a58878f"
+checksum = "d7ea0df7161ce65b5c8ca6eb709a1a907376fa18226976e41c748ce02ccccf24"
 dependencies = [
- "aws-smithy-types",
+ "aws-smithy-types 0.51.0",
  "bytes 1.4.0",
  "crc32fast",
 ]
 
 [[package]]
 name = "aws-smithy-http"
-version = "0.54.4"
+version = "0.51.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "873f316f1833add0d3aa54ed1b0cd252ddd88c792a0cf839886400099971e844"
+checksum = "bf58ed4fefa61dbf038e5421a521cbc2c448ef69deff0ab1d915d8a10eda5664"
 dependencies = [
  "aws-smithy-eventstream",
- "aws-smithy-types",
+ "aws-smithy-types 0.51.0",
+ "bytes 1.4.0",
+ "bytes-utils",
+ "futures-core",
+ "http",
+ "http-body",
+ "hyper",
+ "once_cell",
+ "percent-encoding",
+ "pin-project-lite",
+ "pin-utils",
+ "tracing 0.1.37",
+]
+
+[[package]]
+name = "aws-smithy-http"
+version = "0.53.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "29dcab29afbea7726f5c10c7be0c38666d7eb07db551580b3b26ed7cfb5d1935"
+dependencies = [
+ "aws-smithy-types 0.53.1",
+ "bytes 1.4.0",
+ "bytes-utils",
+ "futures-core",
+ "http",
+ "http-body",
+ "hyper",
+ "once_cell",
+ "percent-encoding",
+ "pin-project-lite",
+ "pin-utils",
+ "tracing 0.1.37",
+]
+
+[[package]]
+name = "aws-smithy-http"
+version = "0.54.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b5bd86f48d7e36fb24ee922d04d79c8353e01724b1c38757ed92593179223aa7"
+dependencies = [
+ "aws-smithy-types 0.54.1",
  "bytes 1.4.0",
  "bytes-utils",
  "futures-core",
@@ -1047,12 +1047,27 @@ dependencies = [
 
 [[package]]
 name = "aws-smithy-http-tower"
-version = "0.54.4"
+version = "0.51.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4f38231d3f5dac9ac7976f44e12803add1385119ffca9e5f050d8e980733d164"
+checksum = "20c96d7bd35e7cf96aca1134b2f81b1b59ffe493f7c6539c051791cbbf7a42d3"
 dependencies = [
- "aws-smithy-http",
- "aws-smithy-types",
+ "aws-smithy-http 0.51.0",
+ "bytes 1.4.0",
+ "http",
+ "http-body",
+ "pin-project-lite",
+ "tower",
+ "tracing 0.1.37",
+]
+
+[[package]]
+name = "aws-smithy-http-tower"
+version = "0.54.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c8972d1b4ae3aba1a10e7106fed53a5a36bc8ef86170a84f6ddd33d36fac12ad"
+dependencies = [
+ "aws-smithy-http 0.54.1",
+ "aws-smithy-types 0.54.1",
  "bytes 1.4.0",
  "http",
  "http-body",
@@ -1063,43 +1078,53 @@ dependencies = [
 
 [[package]]
 name = "aws-smithy-json"
-version = "0.54.2"
+version = "0.51.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "33123c0a5c876eede87c170c93cfc49ab8fd5619e3f0a1acae6047ba3f43c8c9"
+checksum = "d8324ba98c8a94187723cc16c37aefa09504646ee65c3d2c3af495bab5ea701b"
 dependencies = [
- "aws-smithy-types",
-]
-
-[[package]]
-name = "aws-smithy-protocol-test"
-version = "0.54.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d4d1c9bcb35ce11055ec128dab2c66a7ed47e2dfff99883e32c21a1ab6d6bee6"
-dependencies = [
- "assert-json-diff 1.1.0",
- "http",
- "pretty_assertions",
- "regex",
- "roxmltree 0.14.1",
- "serde_json",
- "thiserror",
+ "aws-smithy-types 0.51.0",
 ]
 
 [[package]]
 name = "aws-smithy-query"
-version = "0.54.2"
+version = "0.51.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a7ab0ca83b86080618294164cbfb333e4bbce9f13b4c5993afa58043a96cd077"
+checksum = "83834ed2ff69ea6f6657baf205267dc2c0abe940703503a3e5d60ce23be3d306"
 dependencies = [
- "aws-smithy-types",
+ "aws-smithy-types 0.51.0",
  "urlencoding",
 ]
 
 [[package]]
 name = "aws-smithy-types"
-version = "0.54.4"
+version = "0.51.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8161232eda10290f5136610a1eb9de56aceaccd70c963a26a260af20ac24794f"
+checksum = "8b02e06ea63498c43bc0217ea4d16605d4e58d85c12fc23f6572ff6d0a840c61"
+dependencies = [
+ "itoa",
+ "num-integer",
+ "ryu",
+ "time",
+]
+
+[[package]]
+name = "aws-smithy-types"
+version = "0.53.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2013465a070decdeb3e85ceb3370ae85ba05f56f914abfd89858d7281c4f12c3"
+dependencies = [
+ "base64-simd",
+ "itoa",
+ "num-integer",
+ "ryu",
+ "time",
+]
+
+[[package]]
+name = "aws-smithy-types"
+version = "0.54.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "da7e499c4b15bab8eb6b234df31833cc83a1bdaa691ba72d5d81efc109d9d705"
 dependencies = [
  "base64-simd",
  "itoa",
@@ -1110,27 +1135,27 @@ dependencies = [
 
 [[package]]
 name = "aws-smithy-xml"
-version = "0.54.2"
+version = "0.51.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0f57927651cde61bf181874694ea19b1c59f2bcb6e2efba4adaef222d570ec8d"
+checksum = "246e9f83dd1fdf5d347fa30ae4ad30a9d1d42ce4cd74a93d94afa874646f94cd"
 dependencies = [
  "xmlparser",
 ]
 
 [[package]]
 name = "aws-types"
-version = "0.54.1"
+version = "0.51.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f8f15b34253b68cde08e39b0627cc6101bcca64351229484b4743392c035d057"
+checksum = "05701d32da168b44f7ee63147781aed8723e792cc131cb9b18363b5393f17f70"
 dependencies = [
- "aws-credential-types",
  "aws-smithy-async",
  "aws-smithy-client",
- "aws-smithy-http",
- "aws-smithy-types",
+ "aws-smithy-http 0.51.0",
+ "aws-smithy-types 0.51.0",
  "http",
  "rustc_version 0.4.0",
  "tracing 0.1.37",
+ "zeroize",
 ]
 
 [[package]]
@@ -1305,12 +1330,11 @@ checksum = "a4a4ddaa51a5bc52a6948f74c06d20aaaddb71924eab79b8c97a8c556e942d6a"
 
 [[package]]
 name = "base64-simd"
-version = "0.8.0"
+version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "339abbe78e73178762e23bea9dfd08e697eb3f3301cd4be981c0f78ba5859195"
+checksum = "781dd20c3aff0bd194fe7d2a977dd92f21c173891f3a03b677359e5fa457e5d5"
 dependencies = [
- "outref",
- "vsimd",
+ "simd-abstraction",
 ]
 
 [[package]]
@@ -1362,7 +1386,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fd9e32d7420c85055e8107e5b2463c4eeefeaac18b52359fe9f9c08a18f342b2"
 dependencies = [
  "quote 1.0.23",
- "syn 1.0.109",
+ "syn 1.0.107",
 ]
 
 [[package]]
@@ -1483,7 +1507,7 @@ dependencies = [
  "borsh-schema-derive-internal",
  "proc-macro-crate 0.1.5",
  "proc-macro2 1.0.51",
- "syn 1.0.109",
+ "syn 1.0.107",
 ]
 
 [[package]]
@@ -1494,7 +1518,7 @@ checksum = "61820b4c5693eafb998b1e67485423c923db4a75f72585c247bdee32bad81e7b"
 dependencies = [
  "proc-macro2 1.0.51",
  "quote 1.0.23",
- "syn 1.0.109",
+ "syn 1.0.107",
 ]
 
 [[package]]
@@ -1505,7 +1529,7 @@ checksum = "c76cdbfa13def20d1f8af3ae7b3c6771f06352a74221d8851262ac384c122b8e"
 dependencies = [
  "proc-macro2 1.0.51",
  "quote 1.0.23",
- "syn 1.0.109",
+ "syn 1.0.107",
 ]
 
 [[package]]
@@ -1574,7 +1598,7 @@ checksum = "13e576ebe98e605500b3c8041bb888e966653577172df6dd97398714eb30b9bf"
 dependencies = [
  "proc-macro2 1.0.51",
  "quote 1.0.23",
- "syn 1.0.109",
+ "syn 1.0.107",
 ]
 
 [[package]]
@@ -1659,7 +1683,7 @@ dependencies = [
  "darling 0.14.2",
  "proc-macro2 1.0.51",
  "quote 1.0.23",
- "syn 1.0.109",
+ "syn 1.0.107",
 ]
 
 [[package]]
@@ -1888,7 +1912,7 @@ dependencies = [
  "proc-macro-error",
  "proc-macro2 1.0.51",
  "quote 1.0.23",
- "syn 1.0.109",
+ "syn 1.0.107",
 ]
 
 [[package]]
@@ -2344,7 +2368,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6d2301688392eb071b0bf1a37be05c469d3cc4dbbd95df672fe28ab021e6a096"
 dependencies = [
  "quote 1.0.23",
- "syn 1.0.109",
+ "syn 1.0.107",
 ]
 
 [[package]]
@@ -2399,7 +2423,7 @@ dependencies = [
  "proc-macro2 1.0.51",
  "quote 1.0.23",
  "scratch",
- "syn 1.0.109",
+ "syn 1.0.107",
 ]
 
 [[package]]
@@ -2416,7 +2440,7 @@ checksum = "a08a6e2fcc370a089ad3b4aaf54db3b1b4cee38ddabce5896b33eb693275f470"
 dependencies = [
  "proc-macro2 1.0.51",
  "quote 1.0.23",
- "syn 1.0.109",
+ "syn 1.0.107",
 ]
 
 [[package]]
@@ -2450,7 +2474,7 @@ dependencies = [
  "proc-macro2 1.0.51",
  "quote 1.0.23",
  "strsim 0.10.0",
- "syn 1.0.109",
+ "syn 1.0.107",
 ]
 
 [[package]]
@@ -2464,7 +2488,7 @@ dependencies = [
  "proc-macro2 1.0.51",
  "quote 1.0.23",
  "strsim 0.10.0",
- "syn 1.0.109",
+ "syn 1.0.107",
 ]
 
 [[package]]
@@ -2475,7 +2499,7 @@ checksum = "9c972679f83bdf9c42bd905396b6c3588a843a17f0f16dfcfa3e2c5d57441835"
 dependencies = [
  "darling_core 0.13.4",
  "quote 1.0.23",
- "syn 1.0.109",
+ "syn 1.0.107",
 ]
 
 [[package]]
@@ -2486,7 +2510,7 @@ checksum = "7618812407e9402654622dd402b0a89dff9ba93badd6540781526117b92aab7e"
 dependencies = [
  "darling_core 0.14.2",
  "quote 1.0.23",
- "syn 1.0.109",
+ "syn 1.0.107",
 ]
 
 [[package]]
@@ -2608,7 +2632,7 @@ checksum = "fcc3dd5e9e9c0b295d6e1e4d811fb6f157d5ffd784b8d202fc62eac8035a770b"
 dependencies = [
  "proc-macro2 1.0.51",
  "quote 1.0.23",
- "syn 1.0.109",
+ "syn 1.0.107",
 ]
 
 [[package]]
@@ -2619,7 +2643,7 @@ checksum = "8beee4701e2e229e8098bbdecdca12449bc3e322f137d269182fa1291e20bd00"
 dependencies = [
  "proc-macro2 1.0.51",
  "quote 1.0.23",
- "syn 1.0.109",
+ "syn 1.0.107",
 ]
 
 [[package]]
@@ -2632,7 +2656,7 @@ dependencies = [
  "proc-macro2 1.0.51",
  "quote 1.0.23",
  "rustc_version 0.4.0",
- "syn 1.0.109",
+ "syn 1.0.107",
 ]
 
 [[package]]
@@ -2854,7 +2878,7 @@ dependencies = [
  "heck 0.4.0",
  "proc-macro2 1.0.51",
  "quote 1.0.23",
- "syn 1.0.109",
+ "syn 1.0.107",
 ]
 
 [[package]]
@@ -2866,7 +2890,7 @@ dependencies = [
  "heck 0.4.0",
  "proc-macro2 1.0.51",
  "quote 1.0.23",
- "syn 1.0.109",
+ "syn 1.0.107",
 ]
 
 [[package]]
@@ -2878,7 +2902,7 @@ dependencies = [
  "once_cell",
  "proc-macro2 1.0.51",
  "quote 1.0.23",
- "syn 1.0.109",
+ "syn 1.0.107",
 ]
 
 [[package]]
@@ -2898,7 +2922,7 @@ checksum = "f58dc3c5e468259f19f2d46304a6b28f1c3d034442e14b322d2b850e36f6d5ae"
 dependencies = [
  "proc-macro2 1.0.51",
  "quote 1.0.23",
- "syn 1.0.109",
+ "syn 1.0.107",
 ]
 
 [[package]]
@@ -2949,7 +2973,7 @@ dependencies = [
  "proc-macro2 1.0.51",
  "quote 1.0.23",
  "rustversion",
- "syn 1.0.109",
+ "syn 1.0.107",
  "synstructure",
 ]
 
@@ -3013,18 +3037,6 @@ name = "exitcode"
 version = "1.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "de853764b47027c2e862a995c34978ffa63c1501f2e15f987ba11bd4f9bba193"
-
-[[package]]
-name = "extend"
-version = "0.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f47da3a72ec598d9c8937a7ebca8962a5c7a1f28444e38c2b33c771ba3f55f05"
-dependencies = [
- "proc-macro-error",
- "proc-macro2 1.0.51",
- "quote 1.0.23",
- "syn 1.0.109",
-]
 
 [[package]]
 name = "fakedata"
@@ -3128,7 +3140,7 @@ checksum = "e4c81935e123ab0741c4c4f0d9b8377e5fb21d3de7e062fa4b1263b1fbcba1ea"
 dependencies = [
  "proc-macro2 1.0.51",
  "quote 1.0.23",
- "syn 1.0.109",
+ "syn 1.0.107",
 ]
 
 [[package]]
@@ -3297,7 +3309,7 @@ checksum = "95a73af87da33b5acf53acfebdc339fe592ecf5357ac7c0a7734ab9d8c876a70"
 dependencies = [
  "proc-macro2 1.0.51",
  "quote 1.0.23",
- "syn 1.0.109",
+ "syn 1.0.107",
 ]
 
 [[package]]
@@ -3380,7 +3392,7 @@ checksum = "eb19fe8de3ea0920d282f7b77dd4227aea6b8b999b42cdf0ca41b2472b14443a"
 dependencies = [
  "proc-macro2 1.0.51",
  "quote 1.0.23",
- "syn 1.0.109",
+ "syn 1.0.107",
 ]
 
 [[package]]
@@ -3482,7 +3494,7 @@ dependencies = [
  "quote 1.0.23",
  "serde",
  "serde_json",
- "syn 1.0.109",
+ "syn 1.0.107",
 ]
 
 [[package]]
@@ -3493,7 +3505,7 @@ checksum = "d52fc9cde811f44b15ec0692b31e56a3067f6f431c5ace712f286e47c1dacc98"
 dependencies = [
  "graphql_client_codegen",
  "proc-macro2 1.0.51",
- "syn 1.0.109",
+ "syn 1.0.107",
 ]
 
 [[package]]
@@ -4075,13 +4087,13 @@ checksum = "a898e4b7951673fce96614ce5751d13c40fc5674bc2d759288e46c3ab62598b3"
 
 [[package]]
 name = "inherent"
-version = "1.0.4"
+version = "1.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cb659d59c4af6c9dc568b13db431174ab5fa961aa53f5aad7f42fb710c06bc46"
+checksum = "a036328c11e86e024522cb1e9b78ba9df3e316995e004e98854a18e4a326d2e1"
 dependencies = [
  "proc-macro2 1.0.51",
  "quote 1.0.23",
- "syn 1.0.109",
+ "syn 1.0.107",
 ]
 
 [[package]]
@@ -4859,7 +4871,7 @@ checksum = "731f8ecebd9f3a4aa847dfe75455e4757a45da40a7793d2f0b1f9b6ed18b23f3"
 dependencies = [
  "proc-macro2 1.0.51",
  "quote 1.0.23",
- "syn 1.0.109",
+ "syn 1.0.107",
 ]
 
 [[package]]
@@ -5363,7 +5375,7 @@ dependencies = [
  "proc-macro-crate 1.2.1",
  "proc-macro2 1.0.51",
  "quote 1.0.23",
- "syn 1.0.109",
+ "syn 1.0.107",
 ]
 
 [[package]]
@@ -5421,9 +5433,9 @@ dependencies = [
 
 [[package]]
 name = "once_cell"
-version = "1.17.1"
+version = "1.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b7e5500299e16ebb147ae15a00a942af264cf3688f47923b8fc2cd5858f23ad3"
+checksum = "6f61fba1741ea2b3d6a1e3178721804bb716a68a6aeba1149b5d52e3d464ea66"
 
 [[package]]
 name = "onig"
@@ -5506,7 +5518,7 @@ checksum = "b501e44f11665960c7e7fcf062c7d96a14ade4aa98116c004b2e37b5be7d736c"
 dependencies = [
  "proc-macro2 1.0.51",
  "quote 1.0.23",
- "syn 1.0.109",
+ "syn 1.0.107",
 ]
 
 [[package]]
@@ -5600,19 +5612,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9b7820b9daea5457c9f21c69448905d723fbd21136ccf521748f23fd49e723ee"
 
 [[package]]
-name = "output_vt100"
-version = "0.1.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "628223faebab4e3e40667ee0b2336d34a5b960ff60ea743ddfdbcf7770bcfb66"
-dependencies = [
- "winapi",
-]
-
-[[package]]
 name = "outref"
-version = "0.5.1"
+version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4030760ffd992bef45b0ae3f10ce1aba99e33464c90d14dd7c039884963ddc7a"
+checksum = "7f222829ae9293e33a9f5e9f440c6760a3d450a64affe1846486b140db81c1f4"
 
 [[package]]
 name = "overload"
@@ -5742,7 +5745,7 @@ dependencies = [
  "pest_meta",
  "proc-macro2 1.0.51",
  "quote 1.0.23",
- "syn 1.0.109",
+ "syn 1.0.107",
 ]
 
 [[package]]
@@ -5836,7 +5839,7 @@ checksum = "069bdb1e05adc7a8990dce9cc75370895fbe4e3d58b9b73bf1aee56359344a55"
 dependencies = [
  "proc-macro2 1.0.51",
  "quote 1.0.23",
- "syn 1.0.109",
+ "syn 1.0.107",
 ]
 
 [[package]]
@@ -6025,18 +6028,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "pretty_assertions"
-version = "1.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a25e9bcb20aa780fd0bb16b72403a9064d6b3f22f026946029acb941a50af755"
-dependencies = [
- "ctor",
- "diff",
- "output_vt100",
- "yansi",
-]
-
-[[package]]
 name = "prettydiff"
 version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6054,7 +6045,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c142c0e46b57171fe0c528bee8c5b7569e80f0c17e377cd0e30ea57dbc11bb51"
 dependencies = [
  "proc-macro2 1.0.51",
- "syn 1.0.109",
+ "syn 1.0.107",
 ]
 
 [[package]]
@@ -6100,7 +6091,7 @@ dependencies = [
  "proc-macro-error-attr",
  "proc-macro2 1.0.51",
  "quote 1.0.23",
- "syn 1.0.109",
+ "syn 1.0.107",
  "version_check",
 ]
 
@@ -6220,7 +6211,7 @@ dependencies = [
  "prost",
  "prost-types",
  "regex",
- "syn 1.0.109",
+ "syn 1.0.107",
  "tempfile",
  "which",
 ]
@@ -6235,7 +6226,7 @@ dependencies = [
  "itertools",
  "proc-macro2 1.0.51",
  "quote 1.0.23",
- "syn 1.0.109",
+ "syn 1.0.107",
 ]
 
 [[package]]
@@ -6264,7 +6255,7 @@ checksum = "16b845dbfca988fa33db069c0e230574d15a3088f147a87b64c7589eb662c9ac"
 dependencies = [
  "proc-macro2 1.0.51",
  "quote 1.0.23",
- "syn 1.0.109",
+ "syn 1.0.107",
 ]
 
 [[package]]
@@ -6359,7 +6350,7 @@ checksum = "b22a693222d716a9587786f37ac3f6b4faedb5b80c23914e7303ff5a1d8016e9"
 dependencies = [
  "proc-macro2 1.0.51",
  "quote 1.0.23",
- "syn 1.0.109",
+ "syn 1.0.107",
 ]
 
 [[package]]
@@ -6753,7 +6744,7 @@ checksum = "ff26ed6c7c4dfc2aa9480b86a60e3c7233543a270a680e10758a507c5a4ce476"
 dependencies = [
  "proc-macro2 1.0.51",
  "quote 1.0.23",
- "syn 1.0.109",
+ "syn 1.0.107",
 ]
 
 [[package]]
@@ -6805,15 +6796,6 @@ dependencies = [
  "bytemuck",
  "byteorder",
  "retain_mut",
-]
-
-[[package]]
-name = "roxmltree"
-version = "0.14.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "921904a62e410e37e215c40381b7117f830d9d89ba60ab5236170541dd25646b"
-dependencies = [
- "xmlparser",
 ]
 
 [[package]]
@@ -7234,7 +7216,7 @@ checksum = "af487d118eecd09402d70a5d72551860e788df87b464af30e5ea6a38c75c541e"
 dependencies = [
  "proc-macro2 1.0.51",
  "quote 1.0.23",
- "syn 1.0.109",
+ "syn 1.0.107",
 ]
 
 [[package]]
@@ -7245,7 +7227,7 @@ checksum = "85bf8229e7920a9f636479437026331ce11aa132b4dde37d121944a44d6e5f3c"
 dependencies = [
  "proc-macro2 1.0.51",
  "quote 1.0.23",
- "syn 1.0.109",
+ "syn 1.0.107",
 ]
 
 [[package]]
@@ -7297,7 +7279,7 @@ checksum = "1fe39d9fbb0ebf5eb2c7cb7e2a47e4f462fad1379f1166b8ae49ad9eae89a7ca"
 dependencies = [
  "proc-macro2 1.0.51",
  "quote 1.0.23",
- "syn 1.0.109",
+ "syn 1.0.107",
 ]
 
 [[package]]
@@ -7356,7 +7338,7 @@ dependencies = [
  "darling 0.13.4",
  "proc-macro2 1.0.51",
  "quote 1.0.23",
- "syn 1.0.109",
+ "syn 1.0.107",
 ]
 
 [[package]]
@@ -7368,7 +7350,7 @@ dependencies = [
  "darling 0.14.2",
  "proc-macro2 1.0.51",
  "quote 1.0.23",
- "syn 1.0.109",
+ "syn 1.0.107",
 ]
 
 [[package]]
@@ -7520,6 +7502,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "74233d3b3b2f6d4b006dc19dee745e73e2a6bfb6f93607cd3b02bd5b00797d7c"
 
 [[package]]
+name = "simd-abstraction"
+version = "0.7.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9cadb29c57caadc51ff8346233b5cec1d240b68ce55cf1afc764818791876987"
+dependencies = [
+ "outref",
+]
+
+[[package]]
 name = "similar"
 version = "2.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7630,7 +7621,7 @@ dependencies = [
  "heck 0.4.0",
  "proc-macro2 1.0.51",
  "quote 1.0.23",
- "syn 1.0.109",
+ "syn 1.0.107",
 ]
 
 [[package]]
@@ -7761,7 +7752,7 @@ dependencies = [
  "proc-macro-error",
  "proc-macro2 1.0.51",
  "quote 1.0.23",
- "syn 1.0.109",
+ "syn 1.0.107",
 ]
 
 [[package]]
@@ -7780,7 +7771,7 @@ dependencies = [
  "proc-macro2 1.0.51",
  "quote 1.0.23",
  "rustversion",
- "syn 1.0.109",
+ "syn 1.0.107",
 ]
 
 [[package]]
@@ -7812,9 +7803,9 @@ dependencies = [
 
 [[package]]
 name = "syn"
-version = "1.0.109"
+version = "1.0.107"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "72b64191b275b66ffe2469e8af2c1cfe3bafa67b529ead792a6d0160888b4237"
+checksum = "1f4064b5b16e03ae50984a5a8ed5d4f8803e6bc1fd170a3cda91a1be4b18e3f5"
 dependencies = [
  "proc-macro2 1.0.51",
  "quote 1.0.23",
@@ -7835,7 +7826,7 @@ checksum = "f36bdaa60a83aca3921b5259d5400cbf5e90fc51931376a9bd4a0eb79aa7210f"
 dependencies = [
  "proc-macro2 1.0.51",
  "quote 1.0.23",
- "syn 1.0.109",
+ "syn 1.0.107",
  "unicode-xid 0.2.4",
 ]
 
@@ -7963,7 +7954,7 @@ dependencies = [
  "proc-macro-error",
  "proc-macro2 1.0.51",
  "quote 1.0.23",
- "syn 1.0.109",
+ "syn 1.0.107",
 ]
 
 [[package]]
@@ -7975,7 +7966,7 @@ dependencies = [
  "proc-macro-error",
  "proc-macro2 1.0.51",
  "quote 1.0.23",
- "syn 1.0.109",
+ "syn 1.0.107",
  "test-case-core",
 ]
 
@@ -8023,7 +8014,7 @@ checksum = "1fb327af4685e4d03fa8cbcf1716380da910eeb2bb8be417e7f9fd3fb164f36f"
 dependencies = [
  "proc-macro2 1.0.51",
  "quote 1.0.23",
- "syn 1.0.109",
+ "syn 1.0.107",
 ]
 
 [[package]]
@@ -8169,7 +8160,7 @@ checksum = "9724f9a975fb987ef7a3cd9be0350edcbe130698af5b8f7a631e23d42d052484"
 dependencies = [
  "proc-macro2 1.0.51",
  "quote 1.0.23",
- "syn 1.0.109",
+ "syn 1.0.107",
 ]
 
 [[package]]
@@ -8382,7 +8373,7 @@ dependencies = [
  "proc-macro2 1.0.51",
  "prost-build",
  "quote 1.0.23",
- "syn 1.0.109",
+ "syn 1.0.107",
 ]
 
 [[package]]
@@ -8504,7 +8495,7 @@ checksum = "4017f8f45139870ca7e672686113917c71c7a6e02d4924eda67186083c03081a"
 dependencies = [
  "proc-macro2 1.0.51",
  "quote 1.0.23",
- "syn 1.0.109",
+ "syn 1.0.107",
 ]
 
 [[package]]
@@ -8631,7 +8622,7 @@ checksum = "258bc1c4f8e2e73a977812ab339d503e6feeb92700f6d07a6de4d321522d5c08"
 dependencies = [
  "lazy_static",
  "quote 1.0.23",
- "syn 1.0.109",
+ "syn 1.0.107",
 ]
 
 [[package]]
@@ -8799,7 +8790,7 @@ checksum = "89851716b67b937e393b3daa8423e67ddfc4bbbf1654bcf05488e95e0828db0c"
 dependencies = [
  "proc-macro2 1.0.51",
  "quote 1.0.23",
- "syn 1.0.109",
+ "syn 1.0.107",
 ]
 
 [[package]]
@@ -8829,7 +8820,7 @@ checksum = "8f9568611f0de5e83e0993b85c54679cd0afd659adcfcb0233f16280b980492e"
 dependencies = [
  "proc-macro2 1.0.51",
  "quote 1.0.23",
- "syn 1.0.109",
+ "syn 1.0.107",
 ]
 
 [[package]]
@@ -9081,7 +9072,6 @@ dependencies = [
  "async-trait",
  "atty",
  "aws-config",
- "aws-credential-types",
  "aws-sdk-cloudwatch",
  "aws-sdk-cloudwatchlogs",
  "aws-sdk-elasticsearch",
@@ -9089,12 +9079,12 @@ dependencies = [
  "aws-sdk-kinesis",
  "aws-sdk-s3",
  "aws-sdk-sqs",
- "aws-sigv4",
+ "aws-sigv4 0.53.0",
  "aws-smithy-async",
  "aws-smithy-client",
- "aws-smithy-http",
- "aws-smithy-http-tower",
- "aws-smithy-types",
+ "aws-smithy-http 0.51.0",
+ "aws-smithy-http-tower 0.54.1",
+ "aws-smithy-types 0.51.0",
  "aws-types",
  "axum",
  "azure_core",
@@ -9392,7 +9382,7 @@ dependencies = [
  "quote 1.0.23",
  "serde",
  "serde_json",
- "syn 1.0.109",
+ "syn 1.0.107",
 ]
 
 [[package]]
@@ -9405,7 +9395,7 @@ dependencies = [
  "quote 1.0.23",
  "serde",
  "serde_derive_internals",
- "syn 1.0.109",
+ "syn 1.0.107",
  "vector-config",
  "vector-config-common",
 ]
@@ -9663,7 +9653,7 @@ dependencies = [
  "quoted_printable",
  "rand 0.8.5",
  "regex",
- "roxmltree 0.18.0",
+ "roxmltree",
  "rust_decimal",
  "seahash",
  "serde",
@@ -9724,12 +9714,6 @@ dependencies = [
  "vrl-stdlib",
  "wasm-bindgen",
 ]
-
-[[package]]
-name = "vsimd"
-version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5c3082ca00d5a5ef149bb8b555a72ae84c9c59f7250f013ac822ac2e49b19c64"
 
 [[package]]
 name = "vte"
@@ -9857,7 +9841,7 @@ dependencies = [
  "once_cell",
  "proc-macro2 1.0.51",
  "quote 1.0.23",
- "syn 1.0.109",
+ "syn 1.0.107",
  "wasm-bindgen-shared",
 ]
 
@@ -9891,7 +9875,7 @@ checksum = "2aff81306fcac3c7515ad4e177f521b5c9a15f2b08f4e32d823066102f35a5f6"
 dependencies = [
  "proc-macro2 1.0.51",
  "quote 1.0.23",
- "syn 1.0.109",
+ "syn 1.0.107",
  "wasm-bindgen-backend",
  "wasm-bindgen-shared",
 ]
@@ -10167,7 +10151,7 @@ version = "0.5.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "12316b50eb725e22b2f6b9c4cbede5b7b89984274d113a7440c86e5c3fc6f99b"
 dependencies = [
- "assert-json-diff 2.0.2",
+ "assert-json-diff",
  "async-trait",
  "base64 0.13.1",
  "deadpool",
@@ -10215,12 +10199,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "yansi"
-version = "0.5.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "09041cd90cf85f7f8b2df60c646f853b7f535ce68f85244eb6731cf89fa498ec"
-
-[[package]]
 name = "zerocopy"
 version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -10238,7 +10216,7 @@ checksum = "6505e6815af7de1746a08f69c69606bb45695a17149517680f3b2149713b19a3"
 dependencies = [
  "proc-macro2 1.0.51",
  "quote 1.0.23",
- "syn 1.0.109",
+ "syn 1.0.107",
 ]
 
 [[package]]
@@ -10258,7 +10236,7 @@ checksum = "3f8f187641dad4f680d25c4bfc4225b418165984179f26ca76ec4fb6441d3a17"
 dependencies = [
  "proc-macro2 1.0.51",
  "quote 1.0.23",
- "syn 1.0.109",
+ "syn 1.0.107",
  "synstructure",
 ]
 
