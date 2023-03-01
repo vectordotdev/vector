@@ -102,33 +102,31 @@ impl Validator for ComponentSpecValidator {
 }
 
 enum SourceMetrics {
-    ComponentEventsReceived,
-    ComponentEventsReceivedBytes,
-    ComponentReceivedBytesTotal,
-    ComponentSentEventsTotal,
-    ComponentSentEventBytesTotal,
+    EventsReceived,
+    EventsReceivedBytes,
+    ReceivedBytesTotal,
+    SentEventsTotal,
+    SentEventBytesTotal,
 }
 
 impl SourceMetrics {
     const fn name(&self) -> &'static str {
         match self {
-            SourceMetrics::ComponentEventsReceived => "component_received_events_total",
-            SourceMetrics::ComponentEventsReceivedBytes => "component_received_event_bytes_total",
-            SourceMetrics::ComponentReceivedBytesTotal => "component_received_bytes_total",
-            SourceMetrics::ComponentSentEventsTotal => "component_sent_events_total",
-            SourceMetrics::ComponentSentEventBytesTotal => "component_sent_event_bytes_total",
+            SourceMetrics::EventsReceived => "component_received_events_total",
+            SourceMetrics::EventsReceivedBytes => "component_received_event_bytes_total",
+            SourceMetrics::ReceivedBytesTotal => "component_received_bytes_total",
+            SourceMetrics::SentEventsTotal => "component_sent_events_total",
+            SourceMetrics::SentEventBytesTotal => "component_sent_event_bytes_total",
         }
     }
 
     fn _from_name(name: &str) -> Option<Self> {
         match name {
-            "component_received_events_total" => Some(SourceMetrics::ComponentEventsReceived),
-            "component_received_event_bytes_total" => {
-                Some(SourceMetrics::ComponentEventsReceivedBytes)
-            }
-            "component_received_bytes_total" => Some(SourceMetrics::ComponentReceivedBytesTotal),
-            "component_sent_events_total" => Some(SourceMetrics::ComponentSentEventsTotal),
-            "component_sent_event_bytes_total" => Some(SourceMetrics::ComponentSentEventBytesTotal),
+            "component_received_events_total" => Some(SourceMetrics::EventsReceived),
+            "component_received_event_bytes_total" => Some(SourceMetrics::EventsReceivedBytes),
+            "component_received_bytes_total" => Some(SourceMetrics::ReceivedBytesTotal),
+            "component_sent_events_total" => Some(SourceMetrics::SentEventsTotal),
+            "component_sent_event_bytes_total" => Some(SourceMetrics::SentEventBytesTotal),
             _ => None,
         }
     }
@@ -185,15 +183,13 @@ fn filter_events_by_metric_and_component<'a>(
 ) -> Result<Vec<&'a Metric>, Vec<String>> {
     let metrics: Vec<&Metric> = telemetry_events
         .iter()
-        .map(|e| {
+        .flat_map(|e| {
             if let vector_core::event::Event::Metric(m) = e {
                 Some(m)
             } else {
                 None
             }
         })
-        .filter(|m| m.is_some())
-        .map(|m| m.unwrap())
         .filter(|&m| {
             if m.name() == metric.to_string() {
                 if let Some(tags) = m.tags() {
@@ -209,11 +205,8 @@ fn filter_events_by_metric_and_component<'a>(
 
     debug!("{}: {} metrics found", metric.to_string(), metrics.len(),);
 
-    if metrics.len() == 0 {
-        return Err(vec![format!(
-            "{}: no metrics were emitted.",
-            metric.to_string(),
-        )]);
+    if metrics.is_empty() {
+        return Err(vec![format!("{}: no metrics were emitted.", metric)]);
     }
 
     Ok(metrics)
@@ -229,7 +222,7 @@ fn validate_component_events_received(
 
     let metrics = filter_events_by_metric_and_component(
         telemetry_events,
-        SourceMetrics::ComponentEventsReceived,
+        SourceMetrics::EventsReceived,
         TEST_SOURCE_NAME,
     )?;
 
@@ -239,14 +232,14 @@ fn validate_component_events_received(
             vector_core::event::MetricValue::Counter { value } => events += value,
             _ => errs.push(format!(
                 "{}: metric value is not a counter",
-                SourceMetrics::ComponentEventsReceived,
+                SourceMetrics::EventsReceived,
             )),
         }
     }
 
     debug!(
         "{}: {} events, {} expected events",
-        SourceMetrics::ComponentEventsReceived,
+        SourceMetrics::EventsReceived,
         events,
         inputs.len()
     );
@@ -254,21 +247,21 @@ fn validate_component_events_received(
     if events != inputs.len() as f64 {
         errs.push(format!(
             "{}: expected {} events, but received {}",
-            SourceMetrics::ComponentEventsReceived,
+            SourceMetrics::EventsReceived,
             inputs.len(),
             events
         ));
     }
 
-    if errs.is_empty() {
-        Ok(vec![format!(
-            "{}: {}",
-            SourceMetrics::ComponentEventsReceived,
-            events,
-        )])
-    } else {
-        Err(errs)
+    if !errs.is_empty() {
+        return Err(errs);
     }
+
+    Ok(vec![format!(
+        "{}: {}",
+        SourceMetrics::EventsReceived,
+        events,
+    )])
 }
 
 fn validate_component_event_bytes_received(
@@ -281,7 +274,7 @@ fn validate_component_event_bytes_received(
 
     let metrics = filter_events_by_metric_and_component(
         telemetry_events,
-        SourceMetrics::ComponentEventsReceivedBytes,
+        SourceMetrics::EventsReceivedBytes,
         TEST_SOURCE_NAME,
     )?;
 
@@ -291,7 +284,7 @@ fn validate_component_event_bytes_received(
             vector_core::event::MetricValue::Counter { value } => metric_bytes += value,
             _ => errs.push(format!(
                 "{}: metric value is not a counter",
-                SourceMetrics::ComponentEventsReceivedBytes,
+                SourceMetrics::EventsReceivedBytes,
             )),
         }
     }
@@ -303,7 +296,7 @@ fn validate_component_event_bytes_received(
 
     debug!(
         "{}: {} bytes, {} expected bytes",
-        SourceMetrics::ComponentEventsReceivedBytes,
+        SourceMetrics::EventsReceivedBytes,
         metric_bytes,
         expected_bytes,
     );
@@ -311,21 +304,21 @@ fn validate_component_event_bytes_received(
     if metric_bytes != expected_bytes as f64 {
         errs.push(format!(
             "{}: expected {} bytes, but received {}",
-            SourceMetrics::ComponentEventsReceivedBytes,
+            SourceMetrics::EventsReceivedBytes,
             expected_bytes,
             metric_bytes
         ));
     }
 
-    if errs.is_empty() {
-        Ok(vec![format!(
-            "{}: {}",
-            SourceMetrics::ComponentEventsReceivedBytes,
-            metric_bytes,
-        )])
-    } else {
-        Err(errs)
+    if !errs.is_empty() {
+        return Err(errs);
     }
+
+    Ok(vec![format!(
+        "{}: {}",
+        SourceMetrics::EventsReceivedBytes,
+        metric_bytes,
+    )])
 }
 
 fn validate_component_received_bytes_total(
@@ -338,7 +331,7 @@ fn validate_component_received_bytes_total(
 
     let metrics = filter_events_by_metric_and_component(
         telemetry_events,
-        SourceMetrics::ComponentReceivedBytesTotal,
+        SourceMetrics::ReceivedBytesTotal,
         TEST_SOURCE_NAME,
     )?;
 
@@ -348,7 +341,7 @@ fn validate_component_received_bytes_total(
             vector_core::event::MetricValue::Counter { value } => metric_bytes += value,
             _ => errs.push(format!(
                 "{}: metric value is not a counter",
-                SourceMetrics::ComponentReceivedBytesTotal,
+                SourceMetrics::ReceivedBytesTotal,
             )),
         }
     }
@@ -366,7 +359,7 @@ fn validate_component_received_bytes_total(
 
     debug!(
         "{}: {} bytes, {} expected bytes",
-        SourceMetrics::ComponentReceivedBytesTotal,
+        SourceMetrics::ReceivedBytesTotal,
         metric_bytes,
         expected_bytes,
     );
@@ -374,21 +367,21 @@ fn validate_component_received_bytes_total(
     if metric_bytes != expected_bytes as f64 {
         errs.push(format!(
             "{}: expected {} bytes, but received {}",
-            SourceMetrics::ComponentReceivedBytesTotal,
+            SourceMetrics::ReceivedBytesTotal,
             expected_bytes,
             metric_bytes
         ));
     }
 
-    if errs.is_empty() {
-        Ok(vec![format!(
-            "{}: {}",
-            SourceMetrics::ComponentReceivedBytesTotal,
-            expected_bytes,
-        )])
-    } else {
-        Err(errs)
+    if !errs.is_empty() {
+        return Err(errs);
     }
+
+    Ok(vec![format!(
+        "{}: {}",
+        SourceMetrics::ReceivedBytesTotal,
+        metric_bytes,
+    )])
 }
 
 fn validate_component_sent_events_total(
@@ -401,7 +394,7 @@ fn validate_component_sent_events_total(
 
     let metrics = filter_events_by_metric_and_component(
         telemetry_events,
-        SourceMetrics::ComponentSentEventsTotal,
+        SourceMetrics::SentEventsTotal,
         TEST_SOURCE_NAME,
     )?;
 
@@ -411,14 +404,14 @@ fn validate_component_sent_events_total(
             vector_core::event::MetricValue::Counter { value } => events += value,
             _ => errs.push(format!(
                 "{}: metric value is not a counter",
-                SourceMetrics::ComponentSentEventsTotal,
+                SourceMetrics::SentEventsTotal,
             )),
         }
     }
 
     debug!(
         "{}: {} events, {} expected events",
-        SourceMetrics::ComponentSentEventsTotal,
+        SourceMetrics::SentEventsTotal,
         events,
         inputs.len()
     );
@@ -426,21 +419,21 @@ fn validate_component_sent_events_total(
     if events != inputs.len() as f64 {
         errs.push(format!(
             "{}: expected {} events, but received {}",
-            SourceMetrics::ComponentSentEventsTotal,
+            SourceMetrics::SentEventsTotal,
             inputs.len(),
             events
         ));
     }
 
-    if errs.is_empty() {
-        Ok(vec![format!(
-            "{}: {}",
-            SourceMetrics::ComponentSentEventsTotal,
-            events,
-        )])
-    } else {
-        Err(errs)
+    if !errs.is_empty() {
+        return Err(errs);
     }
+
+    Ok(vec![format!(
+        "{}: {}",
+        SourceMetrics::SentEventsTotal,
+        events,
+    )])
 }
 
 fn validate_component_sent_event_bytes_total(
@@ -453,7 +446,7 @@ fn validate_component_sent_event_bytes_total(
 
     let metrics = filter_events_by_metric_and_component(
         telemetry_events,
-        SourceMetrics::ComponentSentEventBytesTotal,
+        SourceMetrics::SentEventBytesTotal,
         TEST_SOURCE_NAME,
     )?;
 
@@ -463,7 +456,7 @@ fn validate_component_sent_event_bytes_total(
             vector_core::event::MetricValue::Counter { value } => metric_bytes += value,
             _ => errs.push(format!(
                 "{}: metric value is not a counter",
-                SourceMetrics::ComponentSentEventBytesTotal,
+                SourceMetrics::SentEventBytesTotal,
             )),
         }
     }
@@ -475,7 +468,7 @@ fn validate_component_sent_event_bytes_total(
 
     debug!(
         "{}: {} bytes, {} expected bytes",
-        SourceMetrics::ComponentSentEventBytesTotal,
+        SourceMetrics::SentEventBytesTotal,
         metric_bytes,
         expected_bytes,
     );
@@ -483,19 +476,19 @@ fn validate_component_sent_event_bytes_total(
     if metric_bytes != expected_bytes as f64 {
         errs.push(format!(
             "{}: expected {} bytes, but received {}",
-            SourceMetrics::ComponentSentEventBytesTotal,
+            SourceMetrics::SentEventBytesTotal,
             expected_bytes,
             metric_bytes
         ));
     }
 
-    if errs.is_empty() {
-        Ok(vec![format!(
-            "{}: {}",
-            SourceMetrics::ComponentSentEventBytesTotal,
-            metric_bytes,
-        )])
-    } else {
-        Err(errs)
+    if !errs.is_empty() {
+        return Err(errs);
     }
+
+    Ok(vec![format!(
+        "{}: {}",
+        SourceMetrics::SentEventBytesTotal,
+        metric_bytes,
+    )])
 }
