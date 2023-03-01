@@ -103,10 +103,12 @@ pub struct AzureMonitorLogsConfig {
     #[serde(default)]
     pub request: TowerRequestConfig,
 
-    /// Event field to store the value used to populate the [`TimeGenerated`][1] column.
+    /// Use this option to customize the log field used as [`TimeGenerated`][1] in Azure.
     ///
-    /// If unset, the global `log_schema.timestamp_key` is used. This should only be changed if an
-    /// existing `timestamp` field is present, but shouldn't be used for the `TimeGenerated` column.
+    /// The setting of `log_schema.timestamp_key`, usually `timestamp`, is used here by default.
+    /// This field should be used in rare cases where `TimeGenerated` should point to specific log
+    /// field. For example, use this field to set the log field `source_timestamp` as holding the
+    /// value that should be used as `TimeGenerated` on the Azure side.
     ///
     /// [1]: https://learn.microsoft.com/en-us/azure/azure-monitor/logs/log-standard-columns#timegenerated
     #[configurable(metadata(docs::examples = "time_generated"))]
