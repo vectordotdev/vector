@@ -44,6 +44,13 @@ impl Cli {
                     println!("Test args: N/A");
                 }
 
+                if config.features.is_empty() {
+                    println!("Features: N/A");
+                } else {
+                    println!("Features: {}", config.features.join(","));
+                }
+
+                println!("Test filter: {}", config.test_filter.as_deref().unwrap_or("N/A"));
 
                 println!("Environment:");
                 print_env("  ", &config.env);
