@@ -50,6 +50,7 @@ async fn send_test_events(count: u32, queue_url: &str, client: &aws_sdk_sqs::Cli
 }
 
 async fn get_sqs_client() -> aws_sdk_sqs::Client {
+    let endpoint = sqs_address().clone();
     let config = aws_sdk_sqs::config::Builder::new()
         .credentials_provider(
             AwsAuthentication::test_auth()
@@ -57,7 +58,7 @@ async fn get_sqs_client() -> aws_sdk_sqs::Client {
                 .await
                 .unwrap(),
         )
-        .endpoint_url(sqs_address())
+        .endpoint_url(endpoint)
         .region(Some(Region::new("us-east-1")))
         .build();
 
