@@ -65,7 +65,7 @@ impl IntegrationTest {
             env_vars.insert(key, Some(value));
         }
 
-        let mut args = self.config.args.clone().unwrap_or(Vec::new());
+        let mut args = self.config.args.clone().unwrap_or_default();
 
         args.push("--features".to_string());
         args.push(self.config.features.join(","));
