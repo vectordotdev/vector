@@ -10,7 +10,7 @@ publish = false
 [dependencies]
 bytes = { version = "1.4.0", default-features = false, features = ["serde"] }
 chrono = { version = "0.4.19", default-features = false, features = ["serde", "std"] }
-lookup = { path = "../lookup", default-features = false }
+lookup = { path = "../vrl/lookup", default-features = false }
 ordered-float = { version = "3.4.0", default-features = false }
 regex = { version = "1.7.1", default-features = false, features = ["std", "perf"]}
 snafu = { version = "0.7.4", default-features = false }
@@ -35,7 +35,7 @@ arbitrary = ["dep:quickcheck"]
 async-graphql = { version = "5.0.6", default-features = false }
 indoc = { version = "2.0.0", default-features = false }
 quickcheck = "1.0.3"
-lookup = { path = "../lookup", default-features = false, features = ["arbitrary"] }
+lookup = { path = "../vrl/lookup", default-features = false, features = ["arbitrary"] }
 serde = { version = "1.0.152", default-features = false, features = ["derive", "rc"]}
 serde_json = { version = "1.0.93"}
 toml = { version = "0.7.2", default-features = false }

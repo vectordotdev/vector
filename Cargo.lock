@@ -1940,7 +1940,6 @@ dependencies = [
  "dyn-clone",
  "futures 0.3.26",
  "indoc",
- "lookup",
  "memchr",
  "once_cell",
  "ordered-float 3.4.0",
@@ -1961,6 +1960,7 @@ dependencies = [
  "vector-config-common",
  "vector-config-macros",
  "vector-core",
+ "vector-lookup",
 ]
 
 [[package]]
@@ -4665,8 +4665,6 @@ dependencies = [
  "serde_json",
  "snafu",
  "tracing 0.1.37",
- "vector-config",
- "vector-config-macros",
 ]
 
 [[package]]
@@ -5547,7 +5545,6 @@ dependencies = [
  "bytes 1.4.0",
  "chrono",
  "hex",
- "lookup",
  "ordered-float 3.4.0",
  "prost",
  "prost-build",
@@ -5555,6 +5552,7 @@ dependencies = [
  "tonic-build",
  "value",
  "vector-core",
+ "vector-lookup",
 ]
 
 [[package]]
@@ -9160,7 +9158,6 @@ dependencies = [
  "listenfd",
  "logfmt",
  "loki-logproto",
- "lookup",
  "lru",
  "maxminddb",
  "md-5",
@@ -9255,6 +9252,7 @@ dependencies = [
  "vector-config-common",
  "vector-config-macros",
  "vector-core",
+ "vector-lookup",
  "vector-vrl-functions",
  "vrl",
  "vrl-cli",
@@ -9437,7 +9435,6 @@ dependencies = [
  "http",
  "hyper-proxy",
  "indexmap",
- "lookup",
  "metrics",
  "metrics-tracing-context",
  "metrics-util",
@@ -9492,15 +9489,26 @@ dependencies = [
  "vector-config",
  "vector-config-common",
  "vector-config-macros",
+ "vector-lookup",
  "vrl",
+]
+
+[[package]]
+name = "vector-lookup"
+version = "0.1.0"
+dependencies = [
+ "lookup",
+ "serde",
+ "vector-config",
+ "vector-config-macros",
 ]
 
 [[package]]
 name = "vector-vrl-functions"
 version = "0.1.0"
 dependencies = [
- "lookup",
  "value",
+ "vector-lookup",
  "vrl",
 ]
 
@@ -9542,7 +9550,6 @@ dependencies = [
  "clap 4.1.8",
  "exitcode",
  "indoc",
- "lookup",
  "once_cell",
  "prettytable-rs",
  "regex",
@@ -9551,6 +9558,7 @@ dependencies = [
  "thiserror",
  "value",
  "vector-common",
+ "vector-lookup",
  "vector-vrl-functions",
  "vrl",
  "vrl-core",
