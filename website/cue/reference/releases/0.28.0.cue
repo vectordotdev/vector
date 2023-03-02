@@ -163,7 +163,7 @@ releases: "0.28.0": {
 			scopes: ["observability"]
 			description: """
 				Vector no longer panics when attempting to create more than 254 allocation groups
-				for memory allocation tracking. This wolud happen when there were more than 254
+				for memory allocation tracking. This would happen when there were more than 254
 				components in a config or during unit tests where a lot of components are spun up
 				independently.
 				"""
