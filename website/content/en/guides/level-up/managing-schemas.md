@@ -55,7 +55,7 @@ Not all sources use the `host` field.
 {{< /warning >}}
 
 We find this feature is useful when used with simple configs! As your number of components grows, your needs will change
-and you'll likely need to configure this at a more fine grained level.
+and you'll likely need to configure this at a more fine-grained level.
 
 
 ### Example: Custom timestamp field
