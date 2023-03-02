@@ -181,7 +181,7 @@ releases: "0.28.0": {
 		},
 		{
 			type: "chore"
-			scopes: ["journld source"]
+			scopes: ["journald source"]
 			description: """
 				The deprecated `units` of the `journald` source was removed. `include_units` should
 				be used instead. See [the upgrade
