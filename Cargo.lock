@@ -4081,9 +4081,9 @@ checksum = "64e9829a50b42bb782c1df523f78d332fe371b10c661e78b7a3c34b0198e9fac"
 
 [[package]]
 name = "infer"
-version = "0.12.0"
+version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a898e4b7951673fce96614ce5751d13c40fc5674bc2d759288e46c3ab62598b3"
+checksum = "f551f8c3a39f68f986517db0d1759de85881894fdc7db798bd2a9df9cb04b7fc"
 
 [[package]]
 name = "inherent"
@@ -9138,7 +9138,7 @@ dependencies = [
  "hyper-proxy",
  "indexmap",
  "indoc",
- "infer 0.12.0",
+ "infer 0.13.0",
  "inventory",
  "itertools",
  "k8s-openapi",
