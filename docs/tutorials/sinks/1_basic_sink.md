@@ -14,7 +14,7 @@ Provide some module level comments to explain what the sink does.
 
 ```rust
 //! `Basic` sink.
-//! A sink that will send it's output to standard out for pedalogical purposes.
+//! A sink that will send it's output to standard out for pedagogical purposes.
 ```
 
 # Imports
