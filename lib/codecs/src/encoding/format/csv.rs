@@ -1,6 +1,6 @@
 use crate::encoding::BuildError;
 use bytes::{BufMut, BytesMut};
-use lookup::lookup_v2::OwnedValuePath;
+use lookup::lookup_v2::ConfigOwnedValuePath;
 use tokio_util::codec::Encoder;
 use vector_core::{
     config::DataType,
@@ -12,22 +12,22 @@ use vector_core::{
 #[crate::configurable_component]
 #[derive(Debug, Clone, Default)]
 pub struct CsvSerializerConfig {
-    /// The CSV fields.
-    pub fields: Vec<OwnedValuePath>,
+    /// The CSV Serializer Options.
+    pub csv: CsvSerializerOptions,
 }
 
 impl CsvSerializerConfig {
     /// Creates a new `CsvSerializerConfig`.
-    pub const fn new(fields: Vec<OwnedValuePath>) -> Self {
-        Self { fields }
+    pub const fn new(csv: CsvSerializerOptions) -> Self {
+        Self { csv }
     }
 
     /// Build the `CsvSerializer` from this configuration.
     pub fn build(&self) -> Result<CsvSerializer, BuildError> {
-        if self.fields.is_empty() {
+        if self.csv.fields.is_empty() {
             Err("At least one CSV field must be specified".into())
         } else {
-            Ok(CsvSerializer::new(self.fields.clone()))
+            Ok(CsvSerializer::new(self.csv.fields.clone()))
         }
     }
 
@@ -44,15 +44,31 @@ impl CsvSerializerConfig {
     }
 }
 
+/// Config used to build a `CsvSerializer`.
+#[crate::configurable_component]
+#[derive(Debug, Clone, Default)]
+pub struct CsvSerializerOptions {
+    /// The CSV Serializer fields.
+    ///
+    /// The order of the fields determines the order of the columns in the CSV output.
+    /// Make sure to use the same order when parsing the CSV output.
+    ///
+    /// If a field is not present in the event, the output will be `NaN`.
+    ///
+    /// Some value types: Array, Regex, Object are not supported by the CSV format.
+    /// If a field is of an unsupported type, the output will be `NaN`.
+    pub fields: Vec<ConfigOwnedValuePath>,
+}
+
 /// Serializer that converts an `Event` to bytes using the CSV format.
 #[derive(Debug, Clone)]
 pub struct CsvSerializer {
-    fields: Vec<OwnedValuePath>,
+    fields: Vec<ConfigOwnedValuePath>,
 }
 
 impl CsvSerializer {
     /// Creates a new `CsvSerializer`.
-    pub const fn new(fields: Vec<OwnedValuePath>) -> Self {
+    pub const fn new(fields: Vec<ConfigOwnedValuePath>) -> Self {
         Self { fields }
     }
 }
@@ -96,9 +112,10 @@ mod tests {
 
     #[test]
     fn build_error_on_empty_fields() {
-        let config = CsvSerializerConfig::new(vec![]);
+        let opts = CsvSerializerOptions::default();
+        let config = CsvSerializerConfig::new(opts);
         let err = config.build().unwrap_err();
-        assert_eq!(err.to_string(), "At least one csv field must be specified");
+        assert_eq!(err.to_string(), "At least one CSV field must be specified");
     }
 
     #[test]
@@ -116,17 +133,17 @@ mod tests {
         }));
 
         let fields = vec![
-            OwnedValuePath::try_from("foo".to_string()).unwrap(),
-            OwnedValuePath::try_from("int".to_string()).unwrap(),
-            OwnedValuePath::try_from("comma".to_string()).unwrap(),
-            OwnedValuePath::try_from("float".to_string()).unwrap(),
-            OwnedValuePath::try_from("missing".to_string()).unwrap(),
-            OwnedValuePath::try_from("space".to_string()).unwrap(),
-            OwnedValuePath::try_from("time".to_string()).unwrap(),
-            OwnedValuePath::try_from("quote".to_string()).unwrap(),
-            OwnedValuePath::try_from("bool".to_string()).unwrap(),
+            ConfigOwnedValuePath::try_from("foo".to_string()).unwrap(),
+            ConfigOwnedValuePath::try_from("int".to_string()).unwrap(),
+            ConfigOwnedValuePath::try_from("comma".to_string()).unwrap(),
+            ConfigOwnedValuePath::try_from("float".to_string()).unwrap(),
+            ConfigOwnedValuePath::try_from("missing".to_string()).unwrap(),
+            ConfigOwnedValuePath::try_from("space".to_string()).unwrap(),
+            ConfigOwnedValuePath::try_from("time".to_string()).unwrap(),
+            ConfigOwnedValuePath::try_from("quote".to_string()).unwrap(),
+            ConfigOwnedValuePath::try_from("bool".to_string()).unwrap(),
         ];
-        let config = CsvSerializerConfig::new(fields);
+        let config = CsvSerializerConfig::new(CsvSerializerOptions { fields });
         let mut serializer = config.build().unwrap();
         let mut bytes = BytesMut::new();
 
