@@ -22,7 +22,7 @@ Data comes in all shapes and sizes. Vector has an array (let's call it a vector 
 decoding your events in the right format, transforming them into the right shape, and passing that data on downstream.
 
 While your first uses of Vector might be connecting `stdin` to `honeycomb`, eventually you're going to have other
-requirements. Maybe regional laws prevent you from shipping certain data, or you need to do some data mudging to conform
+requirements. Maybe regional laws prevent you from shipping certain data, or you need to do some data munging to conform
 some logs to the rest of your system. With a little configuration we can teach Vector to solve all these problems!
 
 ## Overriding Global Field Names
@@ -55,7 +55,7 @@ Not all sources use the `host` field.
 {{< /warning >}}
 
 We find this feature is useful when used with simple configs! As your number of components grows, your needs will change
-and you'll likely need to configure this at a more fine grained level.
+and you'll likely need to configure this at a more fine-grained level.
 
 
 ### Example: Custom timestamp field
