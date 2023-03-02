@@ -85,7 +85,12 @@ impl IntegrationTest {
             args.push(filter.to_string());
         }
         args.extend(extra_args);
-        args.push("--no-capture".to_string());
+
+        // Some arguments are not compatible with the --no-capture arg
+        let forbidden_args = vec!["--test-threads"];
+        if forbidden_args.iter().any(|a| !args.contains(&a.to_string())) {
+            args.push("--no-capture".to_string());
+        }
         self.runner
             .test(&env_vars, &self.config.runner.env, &args)?;
 
