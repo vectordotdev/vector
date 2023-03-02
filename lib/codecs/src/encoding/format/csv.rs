@@ -66,19 +66,16 @@ impl Encoder<Event> for CsvSerializer {
         let mut wtr = csv::Writer::from_writer(vec![]);
 
         for field in &self.fields {
-            if let Some(value) = values.get(field) {
-                match value {
-                    Value::Bytes(bytes) => wtr.write_field(String::from_utf8(bytes.to_vec())?)?,
-                    Value::Integer(int) => wtr.write_field(int.to_string())?,
-                    Value::Float(float) => wtr.write_field(float.to_string())?,
-                    Value::Boolean(bool) => wtr.write_field(bool.to_string())?,
-                    Value::Timestamp(timestamp) => wtr.write_field(timestamp.to_rfc3339())?,
-                    Value::Null => wtr.write_field("NaN")?,
-                    // Array, Regex, Object are not supported by the CSV format.
-                    _ => wtr.write_field("NaN")?,
-                }
-            } else {
-                wtr.write_field("NaN")?;
+            match values.get(field) {
+                Some(Value::Bytes(bytes)) => wtr.write_field(String::from_utf8(bytes.to_vec())?)?,
+                Some(Value::Integer(int)) => wtr.write_field(int.to_string())?,
+                Some(Value::Float(float)) => wtr.write_field(float.to_string())?,
+                Some(Value::Boolean(bool)) => wtr.write_field(bool.to_string())?,
+                Some(Value::Timestamp(timestamp)) => wtr.write_field(timestamp.to_rfc3339())?,
+                Some(Value::Null) => wtr.write_field("NaN")?,
+                // Other value types: Array, Regex, Object are not supported by the CSV format.
+                Some(_) => wtr.write_field("NaN")?,
+                None => wtr.write_field("NaN")?,
             }
         }
 
