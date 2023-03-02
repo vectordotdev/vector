@@ -51,6 +51,18 @@ pub fn list_files() -> Result<Vec<String>> {
         .collect())
 }
 
+// Get a list of files that have been modified, as a vector of strings
+pub fn get_modified_files() -> Result<Vec<String>> {
+    let args = vec![
+        "ls-files",
+        "--full-name",
+        "--modified",
+        "--others",
+        "--exclude-standard",
+    ];
+    Ok(capture_output(&args)?.lines().map(str::to_owned).collect())
+}
+
 // Gets path of the current Git repository's .git directory by the git rev-parse --git-dir command.
 pub fn get_git_dir() -> Result<String> {
     let output = capture_output(&["rev-parse", "--git-dir"])?;
