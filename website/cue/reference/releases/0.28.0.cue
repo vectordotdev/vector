@@ -214,7 +214,7 @@ releases: "0.28.0": {
 			type: "enhancement"
 			scopes: ["pulsar sink"]
 			description: """
-				The `pulsar` sink now supports batching via the the added `batch.max_events`
+				The `pulsar` sink now supports batching via the added `batch.max_events`
 				configuration option.
 				"""
 			contributors: ["zamazan4ik"]
