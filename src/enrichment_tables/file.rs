@@ -250,7 +250,7 @@ impl EnrichmentTableConfig for FileConfig {
 
 impl_generate_config_from_default!(FileConfig);
 
-/// A struct that implements [enrichment::Table] to handle loading enricment data from a CSV file.
+/// A struct that implements [enrichment::Table] to handle loading enrichment data from a CSV file.
 #[derive(Clone)]
 pub struct File {
     config: FileConfig,
