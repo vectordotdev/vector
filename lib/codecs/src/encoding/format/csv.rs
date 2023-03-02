@@ -119,7 +119,7 @@ mod tests {
     }
 
     #[test]
-    fn serialize_csv() {
+    fn serialize_fields() {
         let event = Event::Log(LogEvent::from(btreemap! {
             "foo" => Value::from("bar"),
             "int" => Value::from(123),
@@ -152,6 +152,33 @@ mod tests {
         assert_eq!(
             bytes.freeze(),
             b"bar,123,\"abc,bcd\",3.1415925,NaN,sp ace,2023-02-27T07:04:49.363+00:00,\"the \"\"quote\"\" should be escaped\",true".as_slice()
+        );
+    }
+
+    #[test]
+    fn serialize_order() {
+        let event = Event::Log(LogEvent::from(btreemap! {
+            "field1" => Value::from("value1"),
+            "field2" => Value::from("value2"),
+            "field3" => Value::from("value3"),
+            "field4" => Value::from("value4"),
+            "field5" => Value::from("value5"),
+        }));
+        let fields = vec![
+            ConfigOwnedValuePath::try_from("field1".to_string()).unwrap(),
+            ConfigOwnedValuePath::try_from("field5".to_string()).unwrap(),
+            ConfigOwnedValuePath::try_from("field5".to_string()).unwrap(),
+            ConfigOwnedValuePath::try_from("field3".to_string()).unwrap(),
+            ConfigOwnedValuePath::try_from("field2".to_string()).unwrap(),
+        ];
+        let config = CsvSerializerConfig::new(CsvSerializerOptions { fields });
+        let mut serializer = config.build().unwrap();
+        let mut bytes = BytesMut::new();
+        serializer.encode(event, &mut bytes).unwrap();
+
+        assert_eq!(
+            bytes.freeze(),
+            b"value1,value5,value5,value3,value2".as_slice()
         );
     }
 }
