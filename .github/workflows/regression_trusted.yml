@@ -38,7 +38,7 @@ jobs:
         id: experimental-meta
         run: |
           export WARMUP_SECONDS="45"
-          export REPLICAS="20"
+          export REPLICAS="10"
           export TOTAL_SAMPLES="600"
           export P_VALUE="0.1"
           export SMP_CRATE_VERSION="0.7.1"

@@ -8,7 +8,7 @@ build = "build.rs" # LALRPOP preprocessing
 
 [dependencies]
 diagnostic = { package = "vrl-diagnostic", path = "../diagnostic" }
-lookup = { path = "../../lookup" }
+lookup = { path = "../lookup" }
 arbitrary = { version = "1", optional = true, features = ["derive"] }
 
 lalrpop-util = "0.19"

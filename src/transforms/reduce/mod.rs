@@ -34,7 +34,10 @@ use vector_core::config::LogNamespace;
 
 /// Configuration for the `reduce` transform.
 #[serde_as]
-#[configurable_component(transform("reduce"))]
+#[configurable_component(transform(
+    "reduce",
+    "Collapse multiple log events into a single event based on a set of conditions and merge strategies.",
+))]
 #[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
 #[serde(deny_unknown_fields)]
@@ -112,6 +115,7 @@ const fn default_flush_period_ms() -> Duration {
 impl_generate_config_from_default!(ReduceConfig);
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "reduce")]
 impl TransformConfig for ReduceConfig {
     async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
         Reduce::new(self, &context.enrichment_tables).map(Transform::event_task)

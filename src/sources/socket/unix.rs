@@ -50,7 +50,6 @@ pub struct UnixConfig {
     #[configurable(
         deprecated = "This option has been deprecated. Configure `max_length` on the framing config instead."
     )]
-    #[serde(default = "default_max_length")]
     #[configurable(metadata(docs::type_unit = "bytes"))]
     pub max_length: Option<usize>,
 

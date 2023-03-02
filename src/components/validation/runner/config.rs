@@ -4,11 +4,10 @@ use crate::{
         util::GrpcAddress,
         ComponentConfiguration, ComponentType, ValidationConfiguration,
     },
-    config::ConfigBuilder,
+    config::{BoxedTransform, ConfigBuilder},
     sinks::{vector::VectorConfig as VectorSinkConfig, Sinks},
     sources::{vector::VectorConfig as VectorSourceConfig, Sources},
     test_util::next_addr,
-    transforms::Transforms,
 };
 
 use super::{
@@ -57,7 +56,7 @@ impl TopologyBuilder {
         }
     }
 
-    fn from_transform(transform: Transforms) -> Self {
+    fn from_transform(transform: BoxedTransform) -> Self {
         let (input_edge, input_source) = build_input_edge();
         let (output_edge, output_sink) = build_output_edge();
 
