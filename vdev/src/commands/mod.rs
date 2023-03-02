@@ -80,6 +80,7 @@ cli_commands! {
     mod generate,
     mod info,
     mod integration,
+    mod install_git_hooks,
     mod meta,
     mod package,
     mod release,

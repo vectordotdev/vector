@@ -14,11 +14,10 @@ impl Cli {
         let _ = env::set_current_dir(path).context("Could not change directory");
 
         #[allow(clippy::case_sensitive_file_extension_comparisons)]
-        let res = app::exec(
+        app::exec(
             "cargo",
             ["run", "--", "--runtime=ast"].into_iter(),
             false,
-        );
-        res
+        )
     }
 }

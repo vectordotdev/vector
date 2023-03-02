@@ -1,7 +1,8 @@
 #!/bin/bash
 set -euo pipefail
 
-# Automatically signs off your commits.
+# Used by vdev/src/commands/install_git_hooks.rs to
+# automatically sign off your commits.
 #
 # Installation:
 #

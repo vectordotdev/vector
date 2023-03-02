@@ -51,6 +51,12 @@ pub fn list_files() -> Result<Vec<String>> {
         .collect())
 }
 
+// Gets path of the current Git repository's .git directory by the git rev-parse --git-dir command.
+pub fn get_git_dir() -> Result<String> {
+    let output = capture_output(&["rev-parse", "--git-dir"])?;
+    Ok(output.trim_end().to_string())
+}
+
 fn capture_output(args: &[&str]) -> Result<String> {
     Command::new("git").in_repo().args(args).capture_output()
 }
