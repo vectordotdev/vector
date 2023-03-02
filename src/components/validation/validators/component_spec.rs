@@ -1,7 +1,7 @@
 use std::fmt::{Display, Formatter};
 
 use bytes::BytesMut;
-use vector_core::event::{Event, Metric};
+use vector_core::event::{Event, Metric, MetricKind};
 use vector_core::EstimatedJsonEncodedSizeOf;
 
 use crate::components::validation::{
@@ -151,8 +151,8 @@ fn validate_telemetry(
     match component_type {
         ComponentType::Source => {
             let validations = [
-                validate_component_events_received,
-                validate_component_event_bytes_received,
+                validate_component_received_events_total,
+                validate_component_received_event_bytes_total,
                 validate_component_received_bytes_total,
                 validate_component_sent_events_total,
                 validate_component_sent_event_bytes_total,
@@ -212,7 +212,7 @@ fn filter_events_by_metric_and_component<'a>(
     Ok(metrics)
 }
 
-fn validate_component_events_received(
+fn validate_component_received_events_total(
     _configuration: &ComponentConfiguration,
     inputs: &[TestEvent],
     _outputs: &[Event],
@@ -229,7 +229,13 @@ fn validate_component_events_received(
     let mut events: f64 = 0.0;
     for m in metrics {
         match m.value() {
-            vector_core::event::MetricValue::Counter { value } => events += value,
+            vector_core::event::MetricValue::Counter { value } => {
+                if let MetricKind::Absolute = m.data().kind {
+                    events = *value
+                } else {
+                    events += value
+                }
+            }
             _ => errs.push(format!(
                 "{}: metric value is not a counter",
                 SourceMetrics::EventsReceived,
@@ -237,18 +243,25 @@ fn validate_component_events_received(
         }
     }
 
+    let expected_events = inputs.iter().fold(0, |acc, i| {
+        if let TestEvent::Passthrough(_) = i {
+            return acc + 1;
+        }
+        acc
+    });
+
     debug!(
         "{}: {} events, {} expected events",
         SourceMetrics::EventsReceived,
         events,
-        inputs.len()
+        expected_events,
     );
 
-    if events != inputs.len() as f64 {
+    if events != expected_events as f64 {
         errs.push(format!(
             "{}: expected {} events, but received {}",
             SourceMetrics::EventsReceived,
-            inputs.len(),
+            expected_events,
             events
         ));
     }
@@ -264,10 +277,10 @@ fn validate_component_events_received(
     )])
 }
 
-fn validate_component_event_bytes_received(
+fn validate_component_received_event_bytes_total(
     _configuration: &ComponentConfiguration,
-    _inputs: &[TestEvent],
-    outputs: &[Event],
+    inputs: &[TestEvent],
+    _outputs: &[Event],
     telemetry_events: &[Event],
 ) -> Result<Vec<String>, Vec<String>> {
     let mut errs: Vec<String> = Vec::new();
@@ -290,8 +303,8 @@ fn validate_component_event_bytes_received(
     }
 
     let mut expected_bytes = 0;
-    for e in outputs {
-        expected_bytes += vec![e].estimated_json_encoded_size_of();
+    for e in inputs {
+        expected_bytes += vec![e.clone().into_event()].estimated_json_encoded_size_of();
     }
 
     debug!(
