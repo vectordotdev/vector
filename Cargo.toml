@@ -95,12 +95,11 @@ members = [
   "lib/k8s-e2e-tests",
   "lib/k8s-test-framework",
   "lib/loki-logproto",
-  "lib/lookup",
+  "lib/vector-lookup",
   "lib/portpicker",
   "lib/prometheus-parser",
   "lib/opentelemetry-proto",
   "lib/tracing-limit",
-  "lib/value",
   "lib/vector-api-client",
   "lib/vector-buffers",
   "lib/vector-common",
@@ -108,6 +107,7 @@ members = [
   "lib/vector-config-common",
   "lib/vector-config-macros",
   "lib/vector-core",
+  "lib/vector-lookup",
   "lib/vector-vrl-functions",
   "lib/vrl/cli",
   "lib/vrl/compiler",
@@ -117,6 +117,7 @@ members = [
   "lib/vrl/stdlib",
   "lib/vrl/tests",
   "lib/vrl/proptests",
+  "lib/vrl/value",
   "lib/vrl/vrl",
   "lib/vrl/web-playground",
   "vdev",
@@ -129,12 +130,12 @@ dnsmsg-parser = { path = "lib/dnsmsg-parser", optional = true }
 enrichment = { path = "lib/enrichment" }
 fakedata = { path = "lib/fakedata", optional = true }
 file-source = { path = "lib/file-source", optional = true }
-lookup = { path = "lib/lookup" }
+lookup = { package = "vector-lookup", path = "lib/vector-lookup" }
 portpicker = { path = "lib/portpicker" }
 prometheus-parser = { path = "lib/prometheus-parser", optional = true }
 opentelemetry-proto = { path = "lib/opentelemetry-proto", optional = true }
 tracing-limit = { path = "lib/tracing-limit" }
-value = { path = "lib/value" }
+value = { path = "lib/vrl/value" }
 vector-api-client = { path = "lib/vector-api-client", optional = true }
 vector-buffers = { path = "lib/vector-buffers", default-features = false }
 vector-common = { path = "lib/vector-common" }
@@ -168,22 +169,21 @@ metrics = "0.20.1"
 metrics-tracing-context = { version = "0.12.0", default-features = false }
 
 # AWS - Official SDK
-aws-sdk-s3 = { version = "0.24.0", default-features = false, features = ["native-tls"], optional = true }
-aws-sdk-sqs = { version = "0.24.0", default-features = false, features = ["native-tls"], optional = true }
-aws-sdk-cloudwatch = { version = "0.24.0", default-features = false, features = ["native-tls"], optional = true }
-aws-sdk-cloudwatchlogs = { version = "0.24.0", default-features = false, features = ["native-tls"], optional = true }
-aws-sdk-elasticsearch = {version = "0.24.0", default-features = false, features = ["native-tls"], optional = true }
-aws-sdk-firehose = { version = "0.24.0", default-features = false, features = ["native-tls"], optional = true }
-aws-sdk-kinesis = { version = "0.24.0", default-features = false, features = ["native-tls"], optional = true }
-aws-types = { version = "0.54.1", default-features = false, optional = true }
-aws-sigv4 = { version = "0.54.1", default-features = false, features = ["sign-http"], optional = true }
-aws-config = { version = "0.54.1", default-features = false, features = ["native-tls"], optional = true }
-aws-credential-types = { version = "0.54.1", default-features = false, features = ["hardcoded-credentials"], optional = true }
-aws-smithy-async = { version = "0.54.4", default-features = false, optional = true }
-aws-smithy-client = { version = "0.54.3", default-features = false, features = ["client-hyper"], optional = true}
-aws-smithy-http = { version = "0.54.1", default-features = false, features = ["event-stream"], optional = true }
-aws-smithy-http-tower = { version = "0.54.4", default-features = false, optional = true }
-aws-smithy-types = { version = "0.54.1", default-features = false, optional = true }
+aws-sdk-s3 = { version = "0.21.0", default-features = false, features = ["native-tls"], optional = true }
+aws-sdk-sqs = { version = "0.21.0", default-features = false, features = ["native-tls"], optional = true }
+aws-sdk-cloudwatch = { version = "0.21.0", default-features = false, features = ["native-tls"], optional = true }
+aws-sdk-cloudwatchlogs = { version = "0.21.0", default-features = false, features = ["native-tls"], optional = true }
+aws-sdk-elasticsearch = {version = "0.21.0", default-features = false, features = ["native-tls"], optional = true }
+aws-sdk-firehose = { version = "0.21.0", default-features = false, features = ["native-tls"], optional = true }
+aws-sdk-kinesis = { version = "0.21.0", default-features = false, features = ["native-tls"], optional = true }
+aws-types = { version = "0.51.0", default-features = false, features = ["hardcoded-credentials"], optional = true }
+aws-sigv4 = { version = "0.53.0", default-features = false, features = ["sign-http"], optional = true }
+aws-config = { version = "0.51.0", default-features = false, features = ["native-tls"], optional = true }
+aws-smithy-async = { version = "0.51.0", default-features = false, optional = true }
+aws-smithy-client = { version = "0.51.0", default-features = false, features = ["client-hyper"], optional = true}
+aws-smithy-http = { version = "0.51.0", default-features = false, features = ["event-stream"], optional = true }
+aws-smithy-http-tower = { version = "0.54.1", default-features = false, optional = true }
+aws-smithy-types = { version = "0.51.0", default-features = false, optional = true }
 
 # Azure
 azure_core = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "b4544d4920fa3064eb921340054cd9cc130b7664", default-features = false, features = ["enable_reqwest"], optional = true }
@@ -208,7 +208,7 @@ rmpv = { version = "1.0.0", default-features = false, features = ["with-serde"],
 
 # Prost
 prost = { version = "0.11.8", default-features = false, features = ["std"] }
-prost-types = { version = "0.11.6", default-features = false, optional = true }
+prost-types = { version = "0.11.8", default-features = false, optional = true }
 
 # GCP
 goauth = { version = "0.13.1", optional = true }
@@ -250,7 +250,7 @@ bytes = { version = "1.4.0", default-features = false, features = ["serde"] }
 bytesize = { version = "1.2.0", default-features = false }
 chrono = { version = "0.4.22", default-features = false, features = ["serde"] }
 cidr-utils = { version = "0.5.10", default-features = false }
-clap = { version = "4.1.7", default-features = false, features = ["derive", "error-context", "env", "help", "std", "string", "usage", "wrap_help"] }
+clap = { version = "4.1.8", default-features = false, features = ["derive", "error-context", "env", "help", "std", "string", "usage", "wrap_help"] }
 colored = { version = "2.0.0", default-features = false }
 csv = { version = "1.2", default-features = false }
 derivative = { version = "2.2.0", default-features = false }
@@ -324,6 +324,7 @@ typetag = { version = "0.2.5", default-features = false }
 url = { version = "2.3.1", default-features = false, features = ["serde"] }
 uuid = { version = "1", default-features = false, features = ["serde", "v4"] }
 warp = { version = "0.3.3", default-features = false }
+zstd = { version = "0.12.3", default-features = false }
 arr_macro = { version = "0.2.1" }
 
 # depending on fork for bumped nix dependency
@@ -365,7 +366,7 @@ test-generator = "0.3.1"
 tokio-test = "0.4.2"
 tokio = { version = "1.25.0", features = ["test-util"] }
 tower-test = "0.4.0"
-value = { path = "lib/value", features = ["test"] }
+value = { path = "lib/vrl/value", features = ["test"] }
 vector-core = { path = "lib/vector-core", default-features = false, features = ["vrl", "test"] }
 wiremock = "0.5.17"
 zstd = { version = "0.12.3", default-features = false }
@@ -441,7 +442,6 @@ api-client = [
 
 aws-core = [
   "aws-config",
-  "dep:aws-credential-types",
   "dep:aws-sigv4",
   "dep:aws-types",
   "dep:aws-smithy-async",

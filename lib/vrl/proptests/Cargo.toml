@@ -12,4 +12,4 @@ proptest = "1.1"
 ordered-float = "3"
 parser = { package = "vrl-parser", path = "../parser/" }
 diagnostic = { package = "vrl-diagnostic", path = "../diagnostic/" }
-lookup = { path = "../../lookup/" }
+lookup = { path = "../lookup/" }

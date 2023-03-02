@@ -254,6 +254,18 @@ url = "https://chat.vector.dev"
 parent = "community"
 weight = 3
 
+[[languages.en.menus.footer]]
+name = "Download"
+url = "/download"
+identifier = "download"
+weight = 5
+
+[[languages.en.menus.footer]]
+name = "Releases"
+url = "/releases"
+weight = 1
+parent = "download"
+
 # Extra links under the "Meta" section in the docs
 [[languages.en.menus.meta]]
 name = "Security"

@@ -11,7 +11,7 @@ bytes = { version = "1", default-features = false }
 chrono = { version = "0.4", default-features = false }
 derivative = { version = "2", default-features = false }
 dyn-clone = { version = "1", default-features = false }
-lookup = { path = "../lookup", default-features = false }
+lookup = { package = "vector-lookup", path = "../vector-lookup", default-features = false }
 memchr = { version = "2", default-features = false }
 once_cell = { version = "1.17", default-features = false }
 ordered-float = { version = "3.4.0", default-features = false }
@@ -24,7 +24,7 @@ snafu = { version = "0.7.4", default-features = false, features = ["futures"] }
 syslog_loose = { version = "0.18", default-features = false, optional = true }
 tokio-util = { version = "0.7", default-features = false, features = ["codec"] }
 tracing = { version = "0.1", default-features = false }
-value = { path = "../value", default-features = false }
+value = { path = "../vrl/value", default-features = false }
 vector-common = { path = "../vector-common", default-features = false }
 vector-config = { path = "../vector-config", default-features = false }
 vector-config-common = { path = "../vector-config-common", default-features = false }

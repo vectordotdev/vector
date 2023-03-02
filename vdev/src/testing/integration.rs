@@ -79,6 +79,11 @@ impl IntegrationTest {
             }
             None => args.push("--lib".to_string()),
         }
+
+        // Ensure the test_filter args are passed as well
+        if let Some(ref filter) = self.config.test_filter {
+            args.push(filter.to_string());
+        }
         args.extend(extra_args);
         args.push("--no-capture".to_string());
         self.runner
