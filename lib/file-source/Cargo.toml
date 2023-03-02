@@ -69,14 +69,14 @@ default-features = false
 features = []
 
 [dependencies.tokio]
-version = "1.25.0"
+version = "1.26.0"
 default-features = false
 features = ["full"]
 
 [dev-dependencies]
 criterion = "0.4"
 quickcheck = "1"
-tempfile = "3.3.0"
+tempfile = "3.4.0"
 similar-asserts = "1.4.2"
 
 [[bench]]

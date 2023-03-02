@@ -160,10 +160,10 @@ components: sources: aws_kinesis_firehose: {
 					parsed = parse_aws_cloudwatch_log_subscription_message!(.message)
 					. = unnest(parsed.log_events)
 					. = map_values(.) -> |value| {
-						event = del(value.log_events)
-						value |= event
-						message = del(.message)
-						. |= object!(parse_json!(message))
+					  event = del(value.log_events)
+					  value |= event
+					  message = string!(del(.message))
+					  merge(value, object!(parse_json!(message)))
 					}
 					'''
 

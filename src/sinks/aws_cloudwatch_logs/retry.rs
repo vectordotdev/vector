@@ -32,13 +32,11 @@ impl<T: Send + Sync + 'static> RetryLogic for CloudwatchRetryLogic<T> {
     type Error = CloudwatchError;
     type Response = T;
 
-    // TODO this match may not be necessary given the logic in `is_retriable_error()`
     #[allow(clippy::cognitive_complexity)] // long, but just a hair over our limit
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
         match error {
             CloudwatchError::Put(err) => {
-                if let SdkError::ServiceError(inner) = err {
-                    let err = inner.err();
+                if let SdkError::ServiceError { err, raw: _ } = err {
                     if let PutLogEventsErrorKind::ServiceUnavailableException(_) = err.kind {
                         return true;
                     }
@@ -46,8 +44,7 @@ impl<T: Send + Sync + 'static> RetryLogic for CloudwatchRetryLogic<T> {
                 is_retriable_error(err)
             }
             CloudwatchError::Describe(err) => {
-                if let SdkError::ServiceError(inner) = err {
-                    let err = inner.err();
+                if let SdkError::ServiceError { err, raw: _ } = err {
                     if let DescribeLogStreamsErrorKind::ServiceUnavailableException(_) = err.kind {
                         return true;
                     }
@@ -55,8 +52,7 @@ impl<T: Send + Sync + 'static> RetryLogic for CloudwatchRetryLogic<T> {
                 is_retriable_error(err)
             }
             CloudwatchError::CreateStream(err) => {
-                if let SdkError::ServiceError(inner) = err {
-                    let err = inner.err();
+                if let SdkError::ServiceError { err, raw: _ } = err {
                     if let CreateLogStreamErrorKind::ServiceUnavailableException(_) = err.kind {
                         return true;
                     }
@@ -70,7 +66,7 @@ impl<T: Send + Sync + 'static> RetryLogic for CloudwatchRetryLogic<T> {
 
 #[cfg(test)]
 mod test {
-    use aws_sdk_cloudwatchlogs::error::PutLogEventsError;
+    use aws_sdk_cloudwatchlogs::error::{PutLogEventsError, PutLogEventsErrorKind};
     use aws_sdk_cloudwatchlogs::types::SdkError;
     use aws_smithy_http::body::SdkBody;
     use aws_smithy_http::operation::Response;
@@ -93,10 +89,13 @@ mod test {
         *http_response.status_mut() = http::StatusCode::BAD_REQUEST;
         let raw = Response::new(http_response);
 
-        let err = CloudwatchError::Put(SdkError::service_error(
-            PutLogEventsError::unhandled(meta_err),
+        let err = CloudwatchError::Put(SdkError::ServiceError {
+            err: PutLogEventsError::new(
+                PutLogEventsErrorKind::Unhandled(Box::new(meta_err.clone())),
+                meta_err,
+            ),
             raw,
-        ));
+        });
         assert!(retry_logic.is_retriable_error(&err));
     }
 }

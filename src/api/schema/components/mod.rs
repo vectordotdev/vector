@@ -20,7 +20,7 @@ use crate::{
         filter::{self, filter_items},
         relay, sort,
     },
-    config::{ComponentKey, Config, TransformConfig},
+    config::{ComponentKey, Config},
     filter_check,
 };
 use crate::{config::SourceConfig, topology::schema::merged_definition};

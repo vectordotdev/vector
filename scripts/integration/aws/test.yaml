@@ -1,8 +1,7 @@
-args:
-- --features
+features:
 - aws-integration-tests
-- --lib
-- ::aws_
+
+test_filter: ::aws_
 
 env:
   AWS_ACCESS_KEY_ID: dummy

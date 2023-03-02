@@ -203,7 +203,10 @@ impl AwsS3Config {
             .region()
             .ok_or(CreateSqsIngestorError::RegionMissing)?;
 
-        let endpoint = self.region.endpoint();
+        let endpoint = self
+            .region
+            .endpoint()
+            .map_err(|_| CreateSqsIngestorError::InvalidEndpoint)?;
 
         let s3_client = create_client::<S3ClientBuilder>(
             &self.auth,
@@ -890,7 +893,7 @@ mod integration_tests {
         create_client::<S3ClientBuilder>(
             &auth,
             region_endpoint.region(),
-            region_endpoint.endpoint(),
+            region_endpoint.endpoint().unwrap(),
             &proxy_config,
             &None,
             false,
@@ -909,7 +912,7 @@ mod integration_tests {
         create_client::<SqsClientBuilder>(
             &auth,
             region_endpoint.region(),
-            region_endpoint.endpoint(),
+            region_endpoint.endpoint().unwrap(),
             &proxy_config,
             &None,
             false,

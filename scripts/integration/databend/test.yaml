@@ -1,8 +1,7 @@
-args:
-- --features
+features:
 - databend-integration-tests
-- --lib
-- '::databend::'
+
+test_filter: '::databend::'
 
 runner:
   env:
