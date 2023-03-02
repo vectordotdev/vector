@@ -154,7 +154,7 @@ base: components: sinks: http: configuration: {
 						[apache_avro]: https://avro.apache.org/
 						"""
 					csv: """
-						Encodes an event as an CSV message.
+						Encodes an event as a CSV message.
 
 						This codec must be configured with fields to encode.
 						"""
@@ -210,15 +210,29 @@ base: components: sinks: http: configuration: {
 						"""
 				}
 			}
+			csv: {
+				description:   "The CSV Serializer Options."
+				relevant_when: "codec = \"csv\""
+				required:      true
+				type: object: options: fields: {
+					description: """
+						The CSV Serializer fields.
+
+						The order of the fields determines the order of the columns in the CSV output.
+						Make sure to use the same order when parsing the CSV output.
+
+						If a field is not present in the event, the output will be `NaN`.
+
+						Some value types: Array, Regex, Object are not supported by the CSV format.
+						If a field is of an unsupported type, the output will be `NaN`.
+						"""
+					required: true
+					type: array: items: type: string: {}
+				}
+			}
 			except_fields: {
 				description: "List of fields that will be excluded from the encoded event."
 				required:    false
-				type: array: items: type: string: {}
-			}
-			fields: {
-				description:   "The CSV fields."
-				relevant_when: "codec = \"csv\""
-				required:      true
 				type: array: items: type: string: {}
 			}
 			metric_tag_values: {
