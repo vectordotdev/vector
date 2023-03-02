@@ -197,7 +197,7 @@ pub enum SerializerConfig {
         avro: AvroSerializerOptions,
     },
 
-    /// Encodes an event as an CSV message.
+    /// Encodes an event as a CSV message.
     ///
     /// This codec must be configured with fields to encode.
     ///
@@ -406,7 +406,7 @@ impl SerializerConfig {
 pub enum Serializer {
     /// Uses an `AvroSerializer` for serialization.
     Avro(AvroSerializer),
-    /// Uses an `CsvSerializer` for serialization.
+    /// Uses a `CsvSerializer` for serialization.
     Csv(CsvSerializer),
     /// Uses a `GelfSerializer` for serialization.
     Gelf(GelfSerializer),

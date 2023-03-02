@@ -25,13 +25,13 @@ impl CsvSerializerConfig {
     /// Build the `CsvSerializer` from this configuration.
     pub fn build(&self) -> Result<CsvSerializer, BuildError> {
         if self.fields.is_empty() {
-            Err("At least one csv field must be specified".into())
+            Err("At least one CSV field must be specified".into())
         } else {
             Ok(CsvSerializer::new(self.fields.clone()))
         }
     }
 
-    /// The data type of events that are accepted by `JsonSerializer`.
+    /// The data type of events that are accepted by `CsvSerializer`.
     pub fn input_type(&self) -> DataType {
         DataType::Log
     }
