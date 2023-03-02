@@ -11,7 +11,7 @@ pub struct Cli {}
 impl Cli {
     pub fn exec(self) -> Result<()> {
         let path: PathBuf = [app::path(), "lib", "vrl", "tests"].into_iter().collect();
-        let _ = env::set_current_dir(path).context("Could not change directory");
+        env::set_current_dir(path).context("Could not change directory")?;
 
         #[allow(clippy::case_sensitive_file_extension_comparisons)]
         app::exec(
