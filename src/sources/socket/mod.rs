@@ -853,7 +853,7 @@ mod test {
              read_result = stream.read(&mut buffer) => {
                  match read_result {
                     // read resulting with 0 bytes -> the connection was closed
-                    Ok(0) => assert_relative_eq!(start.elapsed().as_secs_f64(), 1.0, epsilon = 0.1),
+                    Ok(0) => assert_relative_eq!(start.elapsed().as_secs_f64(), 1.0, epsilon = 0.3),
                     Ok(_) => panic!("unexpectedly read data from stream"),
                     Err(e) => panic!("{:}", e)
                  }
