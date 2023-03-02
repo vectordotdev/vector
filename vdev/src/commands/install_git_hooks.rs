@@ -16,14 +16,14 @@ pub struct Cli {
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
-        let mode = self.mode.unwrap_or("all".to_string());
+        let mode = self.mode.unwrap_or_else(|| "all".to_string());
         let git_dir = git::get_git_dir()?;
 
         // Create a new directory named hooks in the .git directory if it
         // doesn't already exist.
         let mut command = Command::new("mkdir");
         command.in_repo();
-        command.args(["-p", &format!("{}/hooks", git_dir)]);
+        command.args(["-p", &format!("{git_dir}/hooks")]);
 
         command.check_run()?;
 
@@ -31,8 +31,9 @@ impl Cli {
         // .git/hooks/commit-msg file
         if mode == "all" || mode == "signoff" {
             command = Command::new("cp");
-            command.args(["scripts/signoff-git-hook.sh", &format!("{}/hooks/commit-msg", git_dir)]);
+            command.args(["scripts/signoff-git-hook.sh", &format!("{git_dir}/hooks/commit-msg")]);
             command.check_run()?;
+            println!("Copied scripts/signoff-git-hook.sh to {git_dir}/hooks/commit-msg");
         }
         Ok(())
     }
