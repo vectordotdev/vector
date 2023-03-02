@@ -178,7 +178,7 @@ dependencies = [
  "strum_macros",
  "thiserror",
  "typed-builder",
- "uuid 1.3.0",
+ "uuid",
  "zerocopy",
 ]
 
@@ -1230,7 +1230,7 @@ dependencies = [
  "serde_json",
  "time",
  "url",
- "uuid 1.3.0",
+ "uuid",
 ]
 
 [[package]]
@@ -1250,7 +1250,7 @@ dependencies = [
  "serde_json",
  "time",
  "url",
- "uuid 1.3.0",
+ "uuid",
 ]
 
 [[package]]
@@ -1274,7 +1274,7 @@ dependencies = [
  "sha2 0.10.6",
  "time",
  "url",
- "uuid 1.3.0",
+ "uuid",
 ]
 
 [[package]]
@@ -1296,7 +1296,7 @@ dependencies = [
  "serde_json",
  "time",
  "url",
- "uuid 1.3.0",
+ "uuid",
 ]
 
 [[package]]
@@ -1534,9 +1534,9 @@ dependencies = [
 
 [[package]]
 name = "bson"
-version = "2.4.0"
+version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "99d76085681585d39016f4d3841eb019201fc54d2dd0d92ad1e4fab3bfb32754"
+checksum = "8746d07211bb12a7c34d995539b4a2acd4e0b0e757de98ce2ab99bcf17443fad"
 dependencies = [
  "ahash 0.7.6",
  "base64 0.13.1",
@@ -1548,7 +1548,7 @@ dependencies = [
  "serde_bytes",
  "serde_json",
  "time",
- "uuid 1.3.0",
+ "uuid",
 ]
 
 [[package]]
@@ -4615,7 +4615,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "14e4fcc00ff6731d94b70e16e71f43bda62883461f31230742e3bc6dddf12988"
 dependencies = [
  "libc",
- "uuid 1.3.0",
+ "uuid",
  "winapi",
 ]
 
@@ -4978,9 +4978,9 @@ checksum = "717e29a243b81f8130e31e24e04fb151b04a44b5a7d05370935f7d937e9de06d"
 
 [[package]]
 name = "mongodb"
-version = "2.3.1"
+version = "2.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b5a1df476ac9541b0e4fdc8e2cc48884e66c92c933cd17a1fd75e68caf75752e"
+checksum = "a37fe10c1485a0cd603468e284a1a8535b4ecf46808f5f7de3639a1e1252dbf8"
 dependencies = [
  "async-trait",
  "base64 0.13.1",
@@ -4988,20 +4988,21 @@ dependencies = [
  "bson",
  "chrono",
  "derivative",
+ "derive_more",
  "futures-core",
  "futures-executor",
+ "futures-io",
  "futures-util",
  "hex",
  "hmac",
  "lazy_static",
  "md-5",
- "os_info",
  "pbkdf2",
  "percent-encoding",
  "rand 0.8.5",
  "rustc_version_runtime",
  "rustls 0.20.7",
- "rustls-pemfile 0.3.0",
+ "rustls-pemfile 1.0.1",
  "serde",
  "serde_bytes",
  "serde_with 1.14.0",
@@ -5018,7 +5019,7 @@ dependencies = [
  "trust-dns-proto 0.21.2",
  "trust-dns-resolver",
  "typed-builder",
- "uuid 0.8.2",
+ "uuid",
  "webpki-roots",
 ]
 
@@ -5678,9 +5679,9 @@ checksum = "d01a5bd0424d00070b0098dd17ebca6f961a959dead1dbcbbbc1d1cd8d3deeba"
 
 [[package]]
 name = "pbkdf2"
-version = "0.10.1"
+version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "271779f35b581956db91a3e55737327a03aa051e90b1c47aeb189508533adfd7"
+checksum = "83a0692ec44e4cf1ef28ca317f14f8f07da2d95ec3fa01f86e4467b725e60917"
 dependencies = [
  "digest 0.10.6",
 ]
@@ -6293,7 +6294,7 @@ dependencies = [
  "tokio-native-tls",
  "tokio-util",
  "url",
- "uuid 1.3.0",
+ "uuid",
  "zstd 0.11.2+zstd.1.5.2",
 ]
 
@@ -6941,15 +6942,6 @@ name = "rustls-pemfile"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5eebeaeb360c87bfb72e84abdb3447159c0eaececf1bef2aecd65a8be949d1c9"
-dependencies = [
- "base64 0.13.1",
-]
-
-[[package]]
-name = "rustls-pemfile"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1ee86d63972a7c661d1536fefe8c3c8407321c3df668891286de28abcd087360"
 dependencies = [
  "base64 0.13.1",
 ]
@@ -8277,6 +8269,7 @@ source = "git+https://github.com/vectordotdev/tokio?branch=tokio-util-0.7.4-fram
 dependencies = [
  "bytes 1.4.0",
  "futures-core",
+ "futures-io",
  "futures-sink",
  "pin-project-lite",
  "slab",
@@ -8973,15 +8966,6 @@ checksum = "936e4b492acfd135421d8dca4b1aa80a7bfc26e702ef3af710e0752684df5372"
 
 [[package]]
 name = "uuid"
-version = "0.8.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bc5cf98d8186244414c848017f0e2676b3fcb46807f6668a97dfe67359a3c4b7"
-dependencies = [
- "getrandom 0.2.8",
-]
-
-[[package]]
-name = "uuid"
 version = "1.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1674845326ee10d37ca60470760d4288a6f80f304007d92e5c53bab78c9cfd79"
@@ -9233,7 +9217,7 @@ dependencies = [
  "tui",
  "typetag",
  "url",
- "uuid 1.3.0",
+ "uuid",
  "value",
  "vector-api-client",
  "vector-buffers",
@@ -9271,7 +9255,7 @@ dependencies = [
  "tokio-stream",
  "tokio-tungstenite 0.18.0",
  "url",
- "uuid 1.3.0",
+ "uuid",
 ]
 
 [[package]]
@@ -9668,7 +9652,7 @@ dependencies = [
  "uaparser",
  "url",
  "utf8-width",
- "uuid 1.3.0",
+ "uuid",
  "value",
  "vector-common",
  "vrl",
