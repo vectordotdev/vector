@@ -62,7 +62,7 @@ comments must be included above the struct - Vector won't compile if they
 aren't.
 
 We also include a single member in our struct - `acknowledgements`.  This
-struct configures end-to-end acknowledments for the sink, which is the ability
+struct configures end-to-end acknowledgements for the sink, which is the ability
 for the sink to inform the upstream sources if the event has been successfully
 delivered. See Vector's [documentation][acknowledgements] for more details. We
 will make this a configurable option.
