@@ -13,10 +13,9 @@ impl Cli {
         let path: PathBuf = [app::path(), "lib", "vrl", "tests"].into_iter().collect();
         env::set_current_dir(path).context("Could not change directory")?;
 
-        #[allow(clippy::case_sensitive_file_extension_comparisons)]
         app::exec(
             "cargo",
-            ["run", "--", "--runtime=ast"].into_iter(),
+            ["run"].into_iter(),
             false,
         )
     }
