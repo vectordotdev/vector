@@ -42,15 +42,10 @@ git interpret-trailers --if-exists doNothing --trailer \
 /// that all commits have been signed off.
 #[derive(clap::Args, Debug)]
 #[command()]
-pub struct Cli {
-    /// The mode argument. Can be used to control which hook(s) are installed,
-    /// with the default being to install all available hooks.
-    mode: Option<String>
-}
+pub struct Cli {}
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
-        let mode = self.mode.unwrap_or_else(|| "all".to_string());
         let git_dir = git::get_git_dir()?;
 
         // Create a new directory named hooks in the .git directory if it
@@ -61,13 +56,12 @@ impl Cli {
 
         command.check_run()?;
 
-        if mode == "all" || mode == "signoff" {
-            let hook_path = Path::new(&git_dir).join("hooks").join("commit-msg");
-            let mut file = File::create(hook_path)?;
-            file.write_all(SIGNOFF_HOOK.as_bytes())?;
-            file.metadata()?.permissions().set_mode(0o755);
-            println!("Created signoff script in {git_dir}/hooks/commit-msg");
-        }
+        let hook_path = Path::new(&git_dir).join("hooks").join("commit-msg");
+        let mut file = File::create(hook_path)?;
+        file.write_all(SIGNOFF_HOOK.as_bytes())?;
+        file.metadata()?.permissions().set_mode(0o755);
+        println!("Created signoff script in {git_dir}/hooks/commit-msg");
+
         Ok(())
     }
 }
