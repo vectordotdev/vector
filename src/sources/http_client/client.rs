@@ -35,7 +35,6 @@ use vector_config::configurable_component;
 use vector_core::{
     config::{log_schema, LogNamespace, Output},
     event::Event,
-    EstimatedJsonEncodedSizeOf,
 };
 
 /// Configuration for the `http_client` source.
@@ -286,7 +285,7 @@ impl HttpClientContext {
     }
 
     /// Enriches events with source_type, timestamp
-    pub fn enrich_events(&self, events: &mut Vec<Event>) {
+    pub fn _enrich_events(&self, events: &mut Vec<Event>) {
         let now = Utc::now();
 
         for event in events {
@@ -333,10 +332,8 @@ impl http_client::HttpClientContext for HttpClientContext {
         buf.extend_from_slice(body.as_bytes());
 
         // decode and enrich
-        let mut events = self.decode_events(&mut buf);
-        dbg!(events.len());
-        dbg!(events.estimated_json_encoded_size_of());
-        self.enrich_events(&mut events);
+        let events = self.decode_events(&mut buf);
+        // self.enrich_events(&mut events);
 
         Some(events)
     }

@@ -293,8 +293,15 @@ fn validate_component_received_event_bytes_total(
 
     let mut metric_bytes: f64 = 0.0;
     for m in metrics {
+        dbg!(m);
         match m.value() {
-            vector_core::event::MetricValue::Counter { value } => metric_bytes += value,
+            vector_core::event::MetricValue::Counter { value } => {
+                if let MetricKind::Absolute = m.data().kind {
+                    metric_bytes = *value
+                } else {
+                    metric_bytes += value
+                }
+            }
             _ => errs.push(format!(
                 "{}: metric value is not a counter",
                 SourceMetrics::EventsReceivedBytes,
@@ -302,10 +309,12 @@ fn validate_component_received_event_bytes_total(
         }
     }
 
-    let mut expected_bytes = 0;
-    for e in inputs {
-        expected_bytes += vec![e.clone().into_event()].estimated_json_encoded_size_of();
-    }
+    let expected_bytes = inputs.iter().fold(0, |acc, i| {
+        if let TestEvent::Passthrough(_) = i {
+            return acc + vec![i.clone().into_event()].estimated_json_encoded_size_of();
+        }
+        acc
+    });
 
     debug!(
         "{}: {} bytes, {} expected bytes",
@@ -351,7 +360,13 @@ fn validate_component_received_bytes_total(
     let mut metric_bytes: f64 = 0.0;
     for m in metrics {
         match m.value() {
-            vector_core::event::MetricValue::Counter { value } => metric_bytes += value,
+            vector_core::event::MetricValue::Counter { value } => {
+                if let MetricKind::Absolute = m.data().kind {
+                    metric_bytes = *value
+                } else {
+                    metric_bytes += value
+                }
+            }
             _ => errs.push(format!(
                 "{}: metric value is not a counter",
                 SourceMetrics::ReceivedBytesTotal,
@@ -360,6 +375,8 @@ fn validate_component_received_bytes_total(
     }
 
     let mut expected_bytes = 0;
+
+    // TODO: extract this to somewhere else
     if let ComponentConfiguration::Source(Sources::HttpClient(c)) = configuration {
         let mut encoder = ResourceCodec::from(c.get_decoding_config(None)).into_encoder();
 

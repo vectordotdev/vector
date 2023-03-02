@@ -157,6 +157,8 @@ pub(crate) async fn call<
                 .and_then(|response| async move {
                     let (header, body) = response.into_parts();
                     let body = hyper::body::to_bytes(body).await?;
+                    dbg!(&body);
+                    dbg!(&body.len());
                     emit!(EndpointBytesReceived {
                         byte_size: body.len(),
                         protocol: "http",
