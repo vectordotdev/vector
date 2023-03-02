@@ -336,7 +336,7 @@ emit the event. Change the body of `run_inner` to look like the following:
 [`EventSent`][events_sent] is emmitted by each component in Vector to
 instrument how many bytes have been sent to the next downstream component.
 
-Add the following after emmitting `BytesSent`:
+Add the following after emitting `BytesSent`:
 
 ```diff
 +     let event_byte_size = event.estimated_json_encoded_size_of();
