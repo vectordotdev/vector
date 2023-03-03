@@ -4,16 +4,18 @@ use indexmap::{IndexMap, IndexSet};
 use serde_json::Value;
 
 use crate::{
-    schema::{assert_string_schema_for_map, generate_map_schema, generate_set_schema},
-    schema_gen::{SchemaGenerator, SchemaObject},
+    schema::{
+        assert_string_schema_for_map, generate_map_schema, generate_set_schema, SchemaGenerator,
+        SchemaObject,
+    },
     str::ConfigurableString,
     Configurable, GenerateError, Metadata, ToValue,
 };
 
 impl<K, V> Configurable for IndexMap<K, V>
 where
-    K: ConfigurableString + ToValue + std::hash::Hash + Eq,
-    V: Configurable + ToValue,
+    K: ConfigurableString + ToValue + std::hash::Hash + Eq + 'static,
+    V: Configurable + ToValue + 'static,
 {
     fn is_optional() -> bool {
         // A hashmap with required fields would be... an object.  So if you want that, make a struct
@@ -32,9 +34,13 @@ where
 
     fn generate_schema(gen: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
         // Make sure our key type is _truly_ a string schema.
-        assert_string_schema_for_map::<K, Self>(gen)?;
+        assert_string_schema_for_map(
+            &K::as_configurable_ref(),
+            gen,
+            std::any::type_name::<Self>(),
+        )?;
 
-        generate_map_schema::<V>(gen)
+        generate_map_schema(&V::as_configurable_ref(), gen)
     }
 }
 
@@ -54,7 +60,7 @@ where
 
 impl<V> Configurable for IndexSet<V>
 where
-    V: Configurable + ToValue + std::hash::Hash + Eq,
+    V: Configurable + ToValue + std::hash::Hash + Eq + 'static,
 {
     fn metadata() -> Metadata {
         Metadata::with_transparent(true)
@@ -66,7 +72,7 @@ where
     }
 
     fn generate_schema(gen: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
-        generate_set_schema::<V>(gen)
+        generate_set_schema(&V::as_configurable_ref(), gen)
     }
 }
 

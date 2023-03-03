@@ -1,8 +1,7 @@
-args:
-- --features
+features:
 - dnstap-integration-tests
-- --lib
-- '::dnstap::'
+
+test_filter: '::dnstap::'
 
 runner:
   env:

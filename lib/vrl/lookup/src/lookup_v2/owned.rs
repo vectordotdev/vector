@@ -2,12 +2,11 @@ use crate::lookup_v2::{
     parse_target_path, parse_value_path, BorrowedSegment, PathParseError, ValuePath,
 };
 use crate::PathPrefix;
+use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Display, Formatter};
-use vector_config::configurable_component;
 
 /// A lookup path.
-#[configurable_component]
-#[derive(Debug, Clone, PartialEq, Eq, Default, Hash, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(try_from = "String", into = "String")]
 pub struct OwnedValuePath {
     pub segments: Vec<OwnedSegment>,
@@ -113,8 +112,7 @@ impl OwnedValuePath {
 }
 
 /// An owned path that contains a target (pointing to either an Event or Metadata)
-#[configurable_component]
-#[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(try_from = "String", into = "String")]
 pub struct OwnedTargetPath {
     pub prefix: PathPrefix,

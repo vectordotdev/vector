@@ -38,7 +38,10 @@ use crate::{
 const DROPPED: &str = "dropped";
 
 /// Configuration for the `remap` transform.
-#[configurable_component(transform("remap"))]
+#[configurable_component(transform(
+    "remap",
+    "Modify your observability data as it passes through your topology using Vector Remap Language (VRL)."
+))]
 #[derive(Clone, Debug, Derivative)]
 #[serde(deny_unknown_fields)]
 #[derivative(Default)]
@@ -193,6 +196,7 @@ impl RemapConfig {
 impl_generate_config_from_default!(RemapConfig);
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "remap")]
 impl TransformConfig for RemapConfig {
     async fn build(&self, context: &TransformContext) -> Result<Transform> {
         let (transform, warnings) = match self.runtime {

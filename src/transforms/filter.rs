@@ -12,7 +12,7 @@ use crate::{
 };
 
 /// Configuration for the `filter` transform.
-#[configurable_component(transform("filter"))]
+#[configurable_component(transform("filter", "Filter events based on a set of conditions."))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct FilterConfig {
@@ -36,6 +36,7 @@ impl GenerateConfig for FilterConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "filter")]
 impl TransformConfig for FilterConfig {
     async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
         Ok(Transform::function(Filter::new(

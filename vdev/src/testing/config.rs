@@ -62,7 +62,7 @@ impl ComposeConfig {
 #[serde(deny_unknown_fields)]
 pub struct IntegrationTestConfig {
     /// The list of arguments to add to the command line for the test runner
-    pub args: Vec<String>,
+    pub args: Option<Vec<String>>,
     /// The set of environment variables to set in both the services and the runner. Variables with
     /// no value are treated as "passthrough" -- they must be set by the caller of `vdev` and are
     /// passed into the containers.
@@ -73,6 +73,12 @@ pub struct IntegrationTestConfig {
     /// Configuration specific to the compose services.
     #[serde(default)]
     pub runner: IntegrationRunnerConfig,
+
+    pub features: Vec<String>,
+
+    pub test: Option<String>,
+
+    pub test_filter: Option<String>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize)]
