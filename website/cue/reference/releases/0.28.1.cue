@@ -5,7 +5,7 @@ releases: "0.28.1": {
 	codename: ""
 
 	description: """
-		This patch release contains a few fixes for regressions in 0.28.1.
+		This patch release contains a few fixes for regressions in 0.28.0.
 
 		**Note:** Please see the release notes for [`v0.28.0`](/releases/0.28.0/) for additional changes if upgrading from
 		`v0.27.X`. In particular, the upgrade guide for breaking changes.
