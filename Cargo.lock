@@ -6906,7 +6906,6 @@ dependencies = [
  "percent-encoding",
  "pin-project-lite",
  "rustls 0.20.7",
- "rustls-native-certs 0.6.2",
  "rustls-pemfile 1.0.1",
  "serde",
  "serde_json",
@@ -9232,12 +9231,9 @@ checksum = "338b31dd1314f68f3aabf3ed57ab922df95ffcd902476ca7ba3c4ce7b908c46d"
 dependencies = [
  "base64 0.13.1",
  "log",
+ "native-tls",
  "once_cell",
- "rustls 0.20.7",
- "rustls-native-certs 0.6.2",
  "url",
- "webpki 0.22.0",
- "webpki-roots",
 ]
 
 [[package]]
