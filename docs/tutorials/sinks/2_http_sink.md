@@ -61,7 +61,7 @@ These are used to generate documentation for the Sink. The metadata
 attribute added here is used to generate examples for the documentation.
 (This is possible because the config struct is annotated with
 `#[configurable_component(sink("basic"))]`). Since the comments here are
-used for for user-facing documentation they should be good grammar and be
+used for user-facing documentation they should be good grammar and be
 correctly capitalized and punctuated.
 
 We then want to update our sink to take the endpoint from the config. At the

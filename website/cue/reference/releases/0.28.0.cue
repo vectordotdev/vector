@@ -11,7 +11,7 @@ releases: "0.28.0": {
 		"""
 			The `framing.*.max_length` configuration options cannot be used on the `socket` source
 			as Vector returns an error about them conflicting with the deprecated top-level
-			`max_length` configuration option. This This will be fixed in 0.28.1.
+			`max_length` configuration option. This will be fixed in 0.28.1.
 			""",
 	]
 
@@ -163,7 +163,7 @@ releases: "0.28.0": {
 			scopes: ["observability"]
 			description: """
 				Vector no longer panics when attempting to create more than 254 allocation groups
-				for memory allocation tracking. This wolud happen when there were more than 254
+				for memory allocation tracking. This would happen when there were more than 254
 				components in a config or during unit tests where a lot of components are spun up
 				independently.
 				"""
@@ -181,7 +181,7 @@ releases: "0.28.0": {
 		},
 		{
 			type: "chore"
-			scopes: ["journld source"]
+			scopes: ["journald source"]
 			description: """
 				The deprecated `units` of the `journald` source was removed. `include_units` should
 				be used instead. See [the upgrade
@@ -214,7 +214,7 @@ releases: "0.28.0": {
 			type: "enhancement"
 			scopes: ["pulsar sink"]
 			description: """
-				The `pulsar` sink now supports batching via the the added `batch.max_events`
+				The `pulsar` sink now supports batching via the added `batch.max_events`
 				configuration option.
 				"""
 			contributors: ["zamazan4ik"]
