@@ -41,6 +41,12 @@ use crate::{
     },
 };
 
+/// OpenDalSink provides generic a service upon OpenDAL.
+///
+/// # Notes
+///
+/// OpenDAL based service only need to provide a `<Service>Config`, and
+/// implement `build_processor` like `WebHdfs` does.
 pub struct OpenDalSink<Svc> {
     service: Svc,
     request_builder: OpenDalRequestBuilder,
@@ -49,6 +55,7 @@ pub struct OpenDalSink<Svc> {
 }
 
 impl<Svc> OpenDalSink<Svc> {
+    /// Build a new OpenDalSink via given input
     pub const fn new(
         service: Svc,
         request_builder: OpenDalRequestBuilder,
@@ -120,6 +127,8 @@ where
     }
 }
 
+/// OpenDalService is just a simple wrapper of `opendal::Operator` to
+/// implement traits we needed.
 #[derive(Debug, Clone)]
 pub struct OpenDalService {
     op: Operator,
@@ -131,6 +140,10 @@ impl OpenDalService {
     }
 }
 
+/// OpenDalRequest is request will be handled by opendal services.
+///
+/// It will carry all information that opendal needed, like payload and
+/// metadata.
 #[derive(Clone)]
 pub struct OpenDalRequest {
     pub payload: Bytes,
@@ -150,6 +163,7 @@ impl Finalizable for OpenDalRequest {
     }
 }
 
+/// OpenDalMetadata carries metadata that opendal service needed to write.
 #[derive(Clone)]
 pub struct OpenDalMetadata {
     pub partition_key: String,
@@ -158,6 +172,8 @@ pub struct OpenDalMetadata {
     pub finalizers: EventFinalizers,
 }
 
+/// OpenDalRequestBuilder will collect and encode input events to build a
+/// valid [`OpenDalRequest`].
 pub struct OpenDalRequestBuilder {
     pub encoder: (Transformer, Encoder<Framer>),
     pub compression: Compression,
@@ -217,6 +233,7 @@ impl RequestBuilder<(String, Vec<Event>)> for OpenDalRequestBuilder {
     }
 }
 
+/// OpenDalResponse is the response returned by OpenDAL services.
 #[derive(Debug)]
 pub struct OpenDalResponse {
     pub count: usize,
@@ -268,6 +285,11 @@ impl Service<OpenDalRequest> for OpenDalService {
     }
 }
 
+/// OpenDalError is the error returned by opendal services.
+///
+/// # TODO
+///
+/// We need to provide more context about opendal errors.
 #[derive(Debug, Snafu)]
 pub enum OpenDalError {
     #[snafu(display("Failed to call OpenDal: {}", source))]
