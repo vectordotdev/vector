@@ -85,7 +85,7 @@ async fn hdfs_rotate_files_after_the_buffer_size_is_reached() {
         .into_iter()
         .filter(|o| o.blocking_mode().unwrap() == ObjectMode::FILE)
         .collect();
-    // Sort file path in order, becuase we have the event id in path.
+    // Sort file path in order, because we have the event id in path.
     objects.sort_by(|l, r| l.path().cmp(r.path()));
     assert_eq!(objects.len(), 3);
 
