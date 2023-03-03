@@ -53,16 +53,16 @@ remap: functions: hmac: {
 		{
 			title: "Calculate message HMAC (defaults: SHA-256, base64-encoded result)"
 			source: #"""
-				hmac("Hello there", "supersecretkey")
+				hmac("Hello there", "super-secret-key")
 				"""#
-			return: "kmpc79vrb6SODvg4LwivUnb443+IhR9SSW55KcBPKo8="
+			return: "eLGE8YMviv85NPXgISRUZxstBNSU47JQdcXkUWcClmI="
 		},
 		{
 			title: "Calculate message HMAC (SHA-224, hex-encoded result)"
 			source: #"""
-				hmac("Hello there", "supersecretkey", algorithm: "SHA-224", encoding: "hex")
+				hmac("Hello there", "super-secret-key", algorithm: "SHA-224", encoding: "hex")
 				"""#
-			return: "5e3204bc7ac3212178db2ccbe715d3714482dd6f625de19d19682380"
+			return: "42fccbc2b7d22a143b92f265a8046187558a94d11ddbb30622207e90"
 		},
 	]
 }

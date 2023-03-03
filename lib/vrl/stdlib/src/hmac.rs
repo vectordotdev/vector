@@ -1,3 +1,4 @@
+use base64::Engine;
 use ::value::Value;
 use hmac::{Hmac as HmacHasher, Mac};
 use sha1::Sha1;
@@ -31,7 +32,7 @@ fn hmac(value: Value, key: Value, algorithm: Value, encoding: Value) -> Resolved
 
     let hash = match encoding.as_str() {
         "hex" => hex::encode(code_bytes),
-        "base64" => base64::encode(code_bytes),
+        "base64" => base64::engine::general_purpose::STANDARD.encode(code_bytes),
         _ => return Err(format!("Invalid encoding: {}", encoding).into())
     };
     Ok(hash.into())
@@ -77,20 +78,20 @@ impl Function for Hmac {
         &[
             Example {
                 title: "default (SHA-256, base64-encoded result)",
-                source: r#"hmac("Hello there", "supersecretkey")"#,
-                result: Ok("kmpc79vrb6SODvg4LwivUnb443+IhR9SSW55KcBPKo8="),
+                source: r#"hmac("Hello there", "super-secret-key")"#,
+                result: Ok("eLGE8YMviv85NPXgISRUZxstBNSU47JQdcXkUWcClmI="),
             },
 
             Example {
                 title: "SHA-256, hex encoded result",
-                source: r#"hmac("Hello there", "supersecretkey", encoding: "hex")"#,
-                result: Ok("926a5cefdbeb6fa48e0ef8382f08af5276f8e37f88851f52496e7929c04f2a8f")
+                source: r#"hmac("Hello there", "super-secret-key", encoding: "hex")"#,
+                result: Ok("78b184f1832f8aff3934f5e0212454671b2d04d494e3b25075c5e45167029662")
             },
 
             Example {
                 title: "SHA1, base64-encoded result",
-                source: r#"hmac("Hello there", "supersecretkey", algorithm: "SHA1")"#,
-                result: Ok("795HKoopDtOb45EOUroxeHz1OWo=")
+                source: r#"hmac("Hello there", "super-secret-key", algorithm: "SHA1")"#,
+                result: Ok("MiyBIHO8Set9+6crALiwkS0yFPE=")
             }
         ]
     }
@@ -135,7 +136,34 @@ impl FunctionExpression for HmacFn {
     }
 
     fn type_def(&self, _: &state::TypeState) -> TypeDef {
-        TypeDef::bytes().fallible()
+        let valid_algorithms = vec!["SHA1", "SHA-224", "SHA-256", "SHA-384", "SHA-512"];
+        let valid_encodings = vec!["base64", "hex"];
+
+        let mut valid_static_algo = false;
+        let mut valid_static_enc = false;
+        if let Some(algorithm) = self.algorithm.as_ref() {
+            if let Some(algorithm) = algorithm.as_value() {
+                if let Ok(algorithm) = algorithm.try_bytes_utf8_lossy() {
+                    let algorithm = algorithm.to_uppercase();
+                    valid_static_algo = valid_algorithms.contains(&algorithm.as_str());
+                }
+            }
+        } else { valid_static_algo = true }
+
+        if let Some(encoding) = self.encoding.as_ref() {
+            if let Some(encoding) = encoding.as_value() {
+                if let Ok(encoding) = encoding.try_bytes_utf8_lossy() {
+                    let encoding = encoding.to_lowercase();
+                    valid_static_enc = valid_encodings.contains(&encoding.as_str());
+                }
+            }
+        } else { valid_static_enc = true }
+
+        if valid_static_algo && valid_static_enc {
+            TypeDef::bytes().infallible()
+        } else {
+            TypeDef::bytes().fallible()
+        }
     }
 }
 
@@ -147,63 +175,63 @@ mod tests {
         hmac => Hmac;
 
         hmac {
-            args: func_args![key: "supersecretkey", value: "Hello there"],
-            want: Ok(value!("kmpc79vrb6SODvg4LwivUnb443+IhR9SSW55KcBPKo8=")),
-            tdef: TypeDef::bytes().fallible(),
+            args: func_args![key: "super-secret-key", value: "Hello there"],
+            want: Ok(value!("eLGE8YMviv85NPXgISRUZxstBNSU47JQdcXkUWcClmI=")),
+            tdef: TypeDef::bytes().infallible(),
         }
 
         hmac_hex {
-            args: func_args![key: "supersecretkey", value: "Hello there", encoding: "hex"],
-            want: Ok(value!("926a5cefdbeb6fa48e0ef8382f08af5276f8e37f88851f52496e7929c04f2a8f")),
-            tdef: TypeDef::bytes().fallible(),
+            args: func_args![key: "super-secret-key", value: "Hello there", encoding: "hex"],
+            want: Ok(value!("78b184f1832f8aff3934f5e0212454671b2d04d494e3b25075c5e45167029662")),
+            tdef: TypeDef::bytes().infallible(),
         }
 
         hmac_sha1 {
-            args: func_args![key: "supersecretkey", value: "Hello there", algorithm: "SHA1"],
-            want: Ok(value!("795HKoopDtOb45EOUroxeHz1OWo=")),
-            tdef: TypeDef::bytes().fallible(),
+            args: func_args![key: "super-secret-key", value: "Hello there", algorithm: "SHA1"],
+            want: Ok(value!("MiyBIHO8Set9+6crALiwkS0yFPE=")),
+            tdef: TypeDef::bytes().infallible(),
         }
 
         hmac_sha1_hex {
-            args: func_args![key: "supersecretkey", value: "Hello there", algorithm: "SHA1", encoding: "hex"],
-            want: Ok(value!("efde472a8a290ed39be3910e52ba31787cf5396a")),
-            tdef: TypeDef::bytes().fallible(),
+            args: func_args![key: "super-secret-key", value: "Hello there", algorithm: "SHA1", encoding: "hex"],
+            want: Ok(value!("322c812073bc49eb7dfba72b00b8b0912d3214f1")),
+            tdef: TypeDef::bytes().infallible(),
         }
 
         hmac_sha224 {
-            args: func_args![key: "supersecretkey", value: "Hello there", algorithm: "SHA-224"],
-            want: Ok(value!("XjIEvHrDISF42yzL5xXTcUSC3W9iXeGdGWgjgA==")),
-            tdef: TypeDef::bytes().fallible(),
+            args: func_args![key: "super-secret-key", value: "Hello there", algorithm: "SHA-224"],
+            want: Ok(value!("QvzLwrfSKhQ7kvJlqARhh1WKlNEd27MGIiB+kA==")),
+            tdef: TypeDef::bytes().infallible(),
         }
 
         hmac_sha224_hex {
-            args: func_args![key: "supersecretkey", value: "Hello there", algorithm: "SHA-224", encoding: "hex"],
-            want: Ok(value!("5e3204bc7ac3212178db2ccbe715d3714482dd6f625de19d19682380")),
-            tdef: TypeDef::bytes().fallible(),
+            args: func_args![key: "super-secret-key", value: "Hello there", algorithm: "SHA-224", encoding: "hex"],
+            want: Ok(value!("42fccbc2b7d22a143b92f265a8046187558a94d11ddbb30622207e90")),
+            tdef: TypeDef::bytes().infallible(),
         }
 
         hmac_sha384 {
-            args: func_args![key: "supersecretkey", value: "Hello there", algorithm: "SHA-384"],
-            want: Ok(value!("KSUHHqzGBNqYp2g8AEFtjnFK2L3KxbBoPx5G5siNuFuKI4bDhnzWE28O09JghdWQ")),
-            tdef: TypeDef::bytes().fallible(),
+            args: func_args![key: "super-secret-key", value: "Hello there", algorithm: "SHA-384"],
+            want: Ok(value!("4lE3xNfeosy5JiNg9XOITVuBjz0Nt5KXNj9mQpTziPD5tYwEwR2IBrVguA3gP+0N")),
+            tdef: TypeDef::bytes().infallible(),
         }
 
         hmac_sha384_hex {
-            args: func_args![key: "supersecretkey", value: "Hello there", algorithm: "SHA-384", encoding: "hex"],
-            want: Ok(value!("2925071eacc604da98a7683c00416d8e714ad8bdcac5b0683f1e46e6c88db85b8a2386c3867cd6136f0ed3d26085d590")),
-            tdef: TypeDef::bytes().fallible(),
+            args: func_args![key: "super-secret-key", value: "Hello there", algorithm: "SHA-384", encoding: "hex"],
+            want: Ok(value!("e25137c4d7dea2ccb9262360f573884d5b818f3d0db79297363f664294f388f0f9b58c04c11d8806b560b80de03fed0d")),
+            tdef: TypeDef::bytes().infallible(),
         }
 
         hmac_sha512 {
-            args: func_args![key: "supersecretkey", value: "Hello there", algorithm: "SHA-512"],
-            want: Ok(value!("8hyG6QeWoMOeD9/Ys5EDmlFc2szaMoTzV4uXJ8HCxZ8WqiR4gJCEgDs0MnRBih05M2mZCbwuvDunUx1SbDQDSQ==")),
-            tdef: TypeDef::bytes().fallible(),
+            args: func_args![key: "super-secret-key", value: "Hello there", algorithm: "SHA-512"],
+            want: Ok(value!("IMkqB2si80Mr/pGN/kMU0CQ8hQhkOrHX13mlZYSBzi/UCCEEQBDpeME2UX9Y/8jmwfJYMHOIWDA88KcQc8YOlg==")),
+            tdef: TypeDef::bytes().infallible(),
         }
 
         hmac_sha512_hex {
-            args: func_args![key: "supersecretkey", value: "Hello there", algorithm: "SHA-512", encoding: "hex"],
-            want: Ok(value!("f21c86e90796a0c39e0fdfd8b391039a515cdaccda3284f3578b9727c1c2c59f16aa2478809084803b343274418a1d3933699909bc2ebc3ba7531d526c340349")),
-            tdef: TypeDef::bytes().fallible(),
+            args: func_args![key: "super-secret-key", value: "Hello there", algorithm: "SHA-512", encoding: "hex"],
+            want: Ok(value!("20c92a076b22f3432bfe918dfe4314d0243c8508643ab1d7d779a5658481ce2fd40821044010e978c136517f58ffc8e6c1f25830738858303cf0a71073c60e96")),
+            tdef: TypeDef::bytes().infallible(),
         }
     ];
 }
