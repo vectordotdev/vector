@@ -16,9 +16,16 @@
 mod expression;
 mod r#macro;
 mod target;
-mod timezone;
 
+// TODO: add cfg macros
+// pub mod time;
+pub mod conversion;
+mod datetime;
+pub mod encode_key_value;
+pub mod encode_logfmt;
+pub mod tokenize;
+
+pub use datetime::TimeZone;
 pub use expression::{ExpressionError, Resolved};
 pub use target::{SecretTarget, Target, TargetValue, TargetValueRef};
-pub use timezone::TimeZone;
 pub use value::Value;

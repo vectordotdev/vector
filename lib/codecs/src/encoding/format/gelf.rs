@@ -225,8 +225,8 @@ mod tests {
     use crate::encoding::SerializerConfig;
 
     use super::*;
+    use value::btreemap;
     use value::Value;
-    use vector_common::btreemap;
     use vector_core::event::{Event, EventMetadata};
 
     fn do_serialize(

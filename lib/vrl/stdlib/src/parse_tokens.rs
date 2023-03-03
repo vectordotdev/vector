@@ -1,6 +1,6 @@
 use ::value::Value;
-use vector_common::tokenize;
 use vrl::prelude::*;
+use vrl_core::tokenize;
 
 fn parse_tokens(value: Value) -> Resolved {
     let string = value.try_bytes_utf8_lossy()?;

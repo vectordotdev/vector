@@ -1,16 +1,15 @@
 use ::value::Value;
 use vrl::prelude::*;
+use vrl_core::conversion::Conversion;
 
-fn parse_timestamp(value: Value, _format: Value, _ctx: &Context) -> Resolved {
+fn parse_timestamp(value: Value, format: Value, ctx: &Context) -> Resolved {
     match value {
-        Value::Bytes(_v) => {
-            // let format = format.try_bytes_utf8_lossy()?;
-            // FIX ME !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-            unimplemented!()
-            // Conversion::parse(format!("timestamp|{format}"), *ctx.timezone())
-            //     .map_err(|e| e.to_string())?
-            //     .convert(v)
-            //     .map_err(|e| e.to_string().into())
+        Value::Bytes(v) => {
+            let format = format.try_bytes_utf8_lossy()?;
+            Conversion::parse(format!("timestamp|{format}"), *ctx.timezone())
+                .map_err(|e| e.to_string())?
+                .convert(v)
+                .map_err(|e| e.to_string().into())
         }
         Value::Timestamp(_) => Ok(value),
         _ => Err("unable to convert value to timestamp".into()),
@@ -101,7 +100,7 @@ mod tests {
                     .with_timezone(&Utc)
             )),
             tdef: TypeDef::timestamp().fallible(),
-            tz: vector_common::TimeZone::default(),
+            tz: vrl_core::TimeZone::default(),
         }
 
         parse_text {
@@ -115,7 +114,7 @@ mod tests {
                     .with_timezone(&Utc)
             )),
             tdef: TypeDef::timestamp().fallible(),
-            tz: vector_common::TimeZone::default(),
+            tz: vrl_core::TimeZone::default(),
         }
 
         parse_text_with_tz {
@@ -129,7 +128,7 @@ mod tests {
                     .with_timezone(&Utc)
             )),
             tdef: TypeDef::timestamp().fallible(),
-            tz: vector_common::TimeZone::Named(chrono_tz::Europe::Paris),
+            tz: vrl_core::TimeZone::Named(chrono_tz::Europe::Paris),
         }
     ];
 }

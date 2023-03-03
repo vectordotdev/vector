@@ -44,7 +44,7 @@ impl TimeZone {
 }
 
 /// Convert a timestamp with a non-UTC time zone into UTC
-fn datetime_to_utc<TZ: chrono::TimeZone>(ts: &DateTime<TZ>) -> DateTime<Utc> {
+pub fn datetime_to_utc<TZ: chrono::TimeZone>(ts: &DateTime<TZ>) -> DateTime<Utc> {
     Utc.timestamp_opt(ts.timestamp(), ts.timestamp_subsec_nanos())
         .single()
         .expect("invalid timestamp")

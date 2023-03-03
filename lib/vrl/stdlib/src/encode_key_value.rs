@@ -1,9 +1,9 @@
 use std::result::Result;
 
 use ::value::Value;
-use vector_common::encode_key_value;
 use vrl::prelude::expression::FunctionExpression;
 use vrl::prelude::*;
+use vrl_core::encode_key_value;
 
 /// Also used by `encode_logfmt`.
 pub(crate) fn encode_key_value(
@@ -171,7 +171,7 @@ impl FunctionExpression for EncodeKeyValueFn {
 
 #[cfg(test)]
 mod tests {
-    use vector_common::btreemap;
+    use ::value::btreemap;
 
     use super::*;
 

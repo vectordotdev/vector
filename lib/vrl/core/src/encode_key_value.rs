@@ -498,7 +498,7 @@ mod tests {
     use serde_json::{json, Value};
 
     use super::*;
-    use crate::btreemap;
+    use value::btreemap;
 
     #[test]
     fn single_element() {

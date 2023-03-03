@@ -832,8 +832,8 @@ mod test {
     use http::StatusCode;
     use indexmap::IndexMap;
     use tokio::time::sleep;
+    use value::btreemap;
     use value::Kind;
-    use vector_common::btreemap;
     use vector_core::config::proxy::ProxyConfig;
     use vrl::prelude::Collection;
     use vrl::CompileConfig;

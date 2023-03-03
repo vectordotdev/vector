@@ -189,8 +189,8 @@ fn kind_error() -> BTreeMap<Field, Kind> {
 
 #[cfg(test)]
 mod tests {
+    use ::value::btreemap;
     use chrono::prelude::*;
-    use vector_common::btreemap;
 
     use super::*;
 
@@ -214,7 +214,7 @@ mod tests {
                 "size" => 2326,
             }),
             tdef: TypeDef::object(kind_common()).fallible(),
-            tz: vector_common::TimeZone::default(),
+            tz: vrl_core::TimeZone::default(),
         }
 
         combined_line_valid {
@@ -236,7 +236,7 @@ mod tests {
                 "agent" => "Mozilla/5.0 (X11; Linux i686; rv:5.0) Gecko/1945-10-12 Firefox/37.0",
             }),
             tdef: TypeDef::object(kind_combined()).fallible(),
-            tz: vector_common::TimeZone::default(),
+            tz: vrl_core::TimeZone::default(),
         }
 
         combined_line_missing_fields_valid {
@@ -256,7 +256,7 @@ mod tests {
                 "size" => 84170,
             }),
             tdef: TypeDef::object(kind_combined()).fallible(),
-            tz: vector_common::TimeZone::default(),
+            tz: vrl_core::TimeZone::default(),
         }
 
         error_line_valid {
@@ -274,7 +274,7 @@ mod tests {
                 "port" => 24259
             }),
             tdef: TypeDef::object(kind_error()).fallible(),
-            tz: vector_common::TimeZone::default(),
+            tz: vrl_core::TimeZone::default(),
         }
 
         error_line_ip_v6 {
@@ -292,7 +292,7 @@ mod tests {
                 "port" => 24259
             }),
             tdef: TypeDef::object(kind_error()).fallible(),
-            tz: vector_common::TimeZone::default(),
+            tz: vrl_core::TimeZone::default(),
         }
 
         error_line_thread_id {
@@ -312,7 +312,7 @@ mod tests {
 
             }),
             tdef: TypeDef::object(kind_error()).fallible(),
-            tz: vector_common::TimeZone::Named(chrono_tz::Tz::UTC),
+            tz: vrl_core::TimeZone::Named(chrono_tz::Tz::UTC),
         }
 
         error_line_threaded_mpms_valid {
@@ -328,7 +328,7 @@ mod tests {
                 "pid" => 23964,
             }),
             tdef: TypeDef::object(kind_error()).fallible(),
-            tz: vector_common::TimeZone::default(),
+            tz: vrl_core::TimeZone::default(),
         }
 
         log_line_valid_empty {
@@ -337,7 +337,7 @@ mod tests {
             ],
             want: Ok(BTreeMap::new()),
             tdef: TypeDef::object(kind_common()).fallible(),
-            tz: vector_common::TimeZone::default(),
+            tz: vrl_core::TimeZone::default(),
         }
 
         log_line_valid_empty_variant {
@@ -346,7 +346,7 @@ mod tests {
             ],
             want: Ok(BTreeMap::new()),
             tdef: TypeDef::object(kind_common()).fallible(),
-            tz: vector_common::TimeZone::default(),
+            tz: vrl_core::TimeZone::default(),
         }
 
         log_line_valid_with_local_timestamp_format {
@@ -362,7 +362,7 @@ mod tests {
                 "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2000-10-10T20:55:36Z").unwrap().into()),
             }),
             tdef: TypeDef::object(kind_error()).fallible(),
-            tz: vector_common::TimeZone::default(),
+            tz: vrl_core::TimeZone::default(),
         }
 
         log_line_valid_with_timezone {
@@ -375,7 +375,7 @@ mod tests {
                 "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2021-06-03T07:30:50Z").unwrap().into()),
             }),
             tdef: TypeDef::object(kind_error()).fallible(),
-            tz: vector_common::TimeZone::Named(chrono_tz::Europe::Paris),
+            tz: vrl_core::TimeZone::Named(chrono_tz::Europe::Paris),
         }
 
         log_line_invalid {
@@ -384,7 +384,7 @@ mod tests {
             ],
             want: Err("failed parsing common log line"),
             tdef: TypeDef::object(kind_common()).fallible(),
-            tz: vector_common::TimeZone::default(),
+            tz: vrl_core::TimeZone::default(),
         }
 
         log_line_invalid_timestamp {
@@ -393,7 +393,7 @@ mod tests {
             ],
             want: Err("failed parsing timestamp 1234 using format %d/%b/%Y:%T %z: input contains invalid characters"),
             tdef: TypeDef::object(kind_combined()).fallible(),
-            tz: vector_common::TimeZone::default(),
+            tz: vrl_core::TimeZone::default(),
         }
     ];
 }
