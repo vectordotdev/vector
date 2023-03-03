@@ -84,9 +84,11 @@ databend
 datacenter
 datadog
 datadoghq
+datanode
 DEBHELPER
 debian
 demuxing
+dfs
 discriminants
 distro
 distroless
@@ -148,6 +150,7 @@ grafana
 graphiql
 gvisor
 gws
+hadoop
 Haier
 Haipad
 Hannspree
@@ -260,6 +263,7 @@ Multilaser
 Mumbai
 Mytab
 Nabi
+namenode
 netcat
 netdata
 Netflix
@@ -278,6 +282,7 @@ nslookup
 nsupdate
 ntfs
 Odys
+opendal
 Openpeak
 opensearch
 opentelemetry
@@ -382,6 +387,7 @@ userguide
 Verizon
 Videocon
 Viewsonic
+webhdfs
 Wellcom
 Wii
 Wiko
