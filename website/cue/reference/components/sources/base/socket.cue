@@ -2,25 +2,28 @@ package metadata
 
 base: components: sources: socket: configuration: {
 	address: {
-		description:   "The address to listen for connections on."
+		description: """
+			The socket address to listen for connections on, or `systemd{#N}` to use the Nth socket passed by
+			systemd socket activation.
+
+			If a socket address is used, it _must_ include a port.
+			"""
 		relevant_when: "mode = \"tcp\" or mode = \"udp\""
 		required:      true
-		type: {
-			number: {}
-			string: syntax: "literal"
-		}
+		type: string: examples: ["0.0.0.0:9000", "systemd", "systemd#3"]
 	}
 	connection_limit: {
 		description:   "The maximum number of TCP connections that will be allowed at any given time."
 		relevant_when: "mode = \"tcp\""
 		required:      false
-		type: uint: {}
+		type: uint: unit: "connections"
 	}
 	decoding: {
 		description: "Configures how events are decoded from raw bytes."
 		required:    false
 		type: object: options: codec: {
-			required: false
+			description: "The codec to use for decoding events."
+			required:    false
 			type: string: {
 				default: "bytes"
 				enum: {
@@ -36,13 +39,17 @@ base: components: sources: socket: configuration: {
 						[json]: https://www.json.org/
 						"""
 					native: """
-						Decodes the raw bytes as Vector’s [native Protocol Buffers format][vector_native_protobuf] ([EXPERIMENTAL][experimental]).
+						Decodes the raw bytes as Vector’s [native Protocol Buffers format][vector_native_protobuf].
+
+						This codec is **[experimental][experimental]**.
 
 						[vector_native_protobuf]: https://github.com/vectordotdev/vector/blob/master/lib/vector-core/proto/event.proto
 						[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
 						"""
 					native_json: """
-						Decodes the raw bytes as Vector’s [native JSON format][vector_native_json] ([EXPERIMENTAL][experimental]).
+						Decodes the raw bytes as Vector’s [native JSON format][vector_native_json].
+
+						This codec is **[experimental][experimental]**.
 
 						[vector_native_json]: https://github.com/vectordotdev/vector/blob/master/lib/codecs/tests/data/native_encoding/schema.cue
 						[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
@@ -85,6 +92,14 @@ base: components: sources: socket: configuration: {
 																The maximum length of the byte buffer.
 
 																This length does *not* include the trailing delimiter.
+
+																By default, there is no maximum length enforced. If events are malformed, this can lead to
+																additional resource usage as events continue to be buffered in memory, and can potentially
+																lead to memory exhaustion in extreme cases.
+
+																If there is a risk of processing malformed data, such as logs with user-controlled input,
+																consider setting the maximum length to a reasonably large value as a safety net. This will
+																ensure that processing is not truly unbounded.
 																"""
 						required: false
 						type: uint: {}
@@ -92,7 +107,8 @@ base: components: sources: socket: configuration: {
 				}
 			}
 			method: {
-				required: true
+				description: "The framing method."
+				required:    true
 				type: string: enum: {
 					bytes:               "Byte frames are passed through as-is according to the underlying I/O boundaries (e.g. split between messages or stream segments)."
 					character_delimited: "Byte frames which are delimited by a chosen character."
@@ -114,6 +130,14 @@ base: components: sources: socket: configuration: {
 						The maximum length of the byte buffer.
 
 						This length does *not* include the trailing delimiter.
+
+						By default, there is no maximum length enforced. If events are malformed, this can lead to
+						additional resource usage as events continue to be buffered in memory, and can potentially
+						lead to memory exhaustion in extreme cases.
+
+						If there is a risk of processing malformed data, such as logs with user-controlled input,
+						consider setting the maximum length to a reasonably large value as a safety net. This will
+						ensure that processing is not truly unbounded.
 						"""
 					required: false
 					type: uint: {}
@@ -139,42 +163,42 @@ base: components: sources: socket: configuration: {
 
 			By default, the [global `log_schema.host_key` option][global_host_key] is used.
 
+			Set to `""` to suppress this key.
+
 			[global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
 			"""
 		required: false
-		type: string: syntax: "literal"
+		type: string: default: "host"
 	}
 	keepalive: {
 		description:   "TCP keepalive settings for socket-based components."
 		relevant_when: "mode = \"tcp\""
 		required:      false
 		type: object: options: time_secs: {
-			description: "The time to wait, in seconds, before starting to send TCP keepalive probes on an idle connection."
+			description: "The time to wait before starting to send TCP keepalive probes on an idle connection."
 			required:    false
-			type: uint: {}
+			type: uint: unit: "seconds"
 		}
 	}
-	log_namespace: {
-		description: "The namespace to use for logs. This overrides the global setting."
-		required:    false
-		type: bool: {}
-	}
 	max_length: {
+		deprecated:         true
+		deprecated_message: "This option has been deprecated. Configure `max_length` on the framing config instead."
 		description: """
-			The maximum buffer size, in bytes, of incoming messages.
+			The maximum buffer size of incoming messages.
 
 			Messages larger than this are truncated.
 			"""
 		required: false
-		type: uint: {}
+		type: uint: unit: "bytes"
 	}
 	mode: {
-		required: true
+		description: "The type of socket to use."
+		required:    true
 		type: string: enum: {
 			tcp:           "Listen on TCP."
 			udp:           "Listen on UDP."
-			unix_datagram: "Listen on UDS, in datagram mode. (Unix domain socket)"
-			unix_stream:   "Listen on UDS, in stream mode. (Unix domain socket)"
+			unix_datagram: "Listen on a Unix domain socket (UDS), in datagram mode."
+			unix_stream:   "Listen on a Unix domain socket (UDS), in stream mode."
 		}
 	}
 	path: {
@@ -185,7 +209,7 @@ base: components: sources: socket: configuration: {
 			"""
 		relevant_when: "mode = \"unix_datagram\" or mode = \"unix_stream\""
 		required:      true
-		type: string: syntax: "literal"
+		type: string: examples: ["/path/to/socket"]
 	}
 	port_key: {
 		description: """
@@ -194,26 +218,31 @@ base: components: sources: socket: configuration: {
 			The value will be the peer host's port i.e. `9000`.
 
 			By default, `"port"` is used.
+
+			Set to `""` to suppress this key.
 			"""
 		relevant_when: "mode = \"tcp\" or mode = \"udp\""
 		required:      false
-		type: string: syntax: "literal"
+		type: string: default: "port"
 	}
 	receive_buffer_bytes: {
 		description: """
-			The size, in bytes, of the receive buffer used for each connection.
+			The size of the receive buffer used for each connection.
 
-			This should not typically needed to be changed.
+			Generally this should not need to be configured.
 			"""
 		relevant_when: "mode = \"tcp\" or mode = \"udp\""
 		required:      false
-		type: uint: {}
+		type: uint: unit: "bytes"
 	}
 	shutdown_timeout_secs: {
-		description:   "The timeout, in seconds, before a connection is forcefully closed during shutdown."
+		description:   "The timeout before a connection is forcefully closed during shutdown."
 		relevant_when: "mode = \"tcp\""
 		required:      false
-		type: uint: default: 30
+		type: uint: {
+			default: 30
+			unit:    "seconds"
+		}
 	}
 	socket_file_mode: {
 		description: """
@@ -224,7 +253,7 @@ base: components: sources: socket: configuration: {
 			"""
 		relevant_when: "mode = \"unix_datagram\" or mode = \"unix_stream\""
 		required:      false
-		type: uint: {}
+		type: uint: examples: [511, 384, 508]
 	}
 	tls: {
 		description:   "TlsEnableableConfig for `sources`, adding metadata from the client certificate"
@@ -239,7 +268,7 @@ base: components: sources: socket: configuration: {
 					they are defined.
 					"""
 				required: false
-				type: array: items: type: string: syntax: "literal"
+				type: array: items: type: string: examples: ["h2"]
 			}
 			ca_file: {
 				description: """
@@ -248,12 +277,12 @@ base: components: sources: socket: configuration: {
 					The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: examples: ["/path/to/certificate_authority.crt"]
 			}
 			client_metadata_key: {
 				description: "Event field for client certificate metadata."
 				required:    false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			crt_file: {
 				description: """
@@ -265,7 +294,7 @@ base: components: sources: socket: configuration: {
 					If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: examples: ["/path/to/host_certificate.crt"]
 			}
 			enabled: {
 				description: """
@@ -284,7 +313,7 @@ base: components: sources: socket: configuration: {
 					The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: examples: ["/path/to/host_certificate.key"]
 			}
 			key_pass: {
 				description: """
@@ -293,7 +322,7 @@ base: components: sources: socket: configuration: {
 					This has no effect unless `key_file` is set.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: examples: ["${KEY_PASS_ENV_VAR}", "PassWord1"]
 			}
 			verify_certificate: {
 				description: """

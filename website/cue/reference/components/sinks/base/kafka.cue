@@ -5,7 +5,7 @@ base: components: sinks: kafka: configuration: {
 		description: """
 			Controls how acknowledgements are handled for this sink.
 
-			See [End-to-end Acknowledgements][e2e_acks] for more information on how Vector handles event acknowledgement.
+			See [End-to-end Acknowledgements][e2e_acks] for more information on how event acknowledgement is handled.
 
 			[e2e_acks]: https://vector.dev/docs/about/under-the-hood/architecture/end-to-end-acknowledgements/
 			"""
@@ -39,28 +39,34 @@ base: components: sinks: kafka: configuration: {
 					serialized / compressed.
 					"""
 				required: false
-				type: uint: {}
+				type: uint: unit: "bytes"
 			}
 			max_events: {
-				description: "The maximum size of a batch, in events, before it is flushed."
+				description: "The maximum size of a batch before it is flushed."
 				required:    false
-				type: uint: {}
+				type: uint: unit: "events"
 			}
 			timeout_secs: {
-				description: "The maximum age of a batch, in seconds, before it is flushed."
+				description: "The maximum age of a batch before it is flushed."
 				required:    false
-				type: float: {}
+				type: float: {
+					default: 1.0
+					unit:    "seconds"
+				}
 			}
 		}
 	}
 	bootstrap_servers: {
 		description: """
-			A comma-separated list of the initial Kafka brokers to connect to.
+			A comma-separated list of Kafka bootstrap servers.
 
-			Each value must be in the form of `<host>` or `<host>:<port>`, and separated by a comma.
+			These are the servers in a Kafka cluster that a client should use to "bootstrap" its
+			connection to the cluster, allowing discovering all other hosts in the cluster.
+
+			Must be in the form of `host:port`, and comma-separated.
 			"""
 		required: true
-		type: string: syntax: "literal"
+		type: string: examples: ["10.14.22.123:9092,10.14.23.332:9092"]
 	}
 	compression: {
 		description: "Supported compression types for Kafka."
@@ -77,7 +83,7 @@ base: components: sinks: kafka: configuration: {
 		}
 	}
 	encoding: {
-		description: "Encoding configuration."
+		description: "Configures how events are encoded into raw bytes."
 		required:    true
 		type: object: options: {
 			avro: {
@@ -87,11 +93,12 @@ base: components: sinks: kafka: configuration: {
 				type: object: options: schema: {
 					description: "The Avro schema."
 					required:    true
-					type: string: syntax: "literal"
+					type: string: examples: ["{ \"type\": \"record\", \"name\": \"log\", \"fields\": [{ \"name\": \"message\", \"type\": \"string\" }] }"]
 				}
 			}
 			codec: {
-				required: true
+				description: "The codec to use for encoding events."
+				required:    true
 				type: string: enum: {
 					avro: """
 						Encodes an event as an [Apache Avro][apache_avro] message.
@@ -114,13 +121,17 @@ base: components: sinks: kafka: configuration: {
 						[logfmt]: https://brandur.org/logfmt
 						"""
 					native: """
-						Encodes an event in Vector’s [native Protocol Buffers format][vector_native_protobuf]([EXPERIMENTAL][experimental]).
+						Encodes an event in Vector’s [native Protocol Buffers format][vector_native_protobuf].
+
+						This codec is **[experimental][experimental]**.
 
 						[vector_native_protobuf]: https://github.com/vectordotdev/vector/blob/master/lib/vector-core/proto/event.proto
 						[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
 						"""
 					native_json: """
-						Encodes an event in Vector’s [native JSON format][vector_native_json]([EXPERIMENTAL][experimental]).
+						Encodes an event in Vector’s [native JSON format][vector_native_json].
+
+						This codec is **[experimental][experimental]**.
 
 						[vector_native_json]: https://github.com/vectordotdev/vector/blob/master/lib/codecs/tests/data/native_encoding/schema.cue
 						[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
@@ -135,9 +146,10 @@ base: components: sinks: kafka: configuration: {
 						could lead to the encoding emitting empty strings for the given event.
 						"""
 					text: """
-						Plaintext encoding.
+						Plain text encoding.
 
-						This "encoding" simply uses the `message` field of a log event.
+						This "encoding" simply uses the `message` field of a log event. For metrics, it uses an
+						encoding that resembles the Prometheus export format.
 
 						Users should take care if they're modifying their log events (such as by using a `remap`
 						transform, etc) and removing the message field while doing additional parsing on it, as this
@@ -148,12 +160,33 @@ base: components: sinks: kafka: configuration: {
 			except_fields: {
 				description: "List of fields that will be excluded from the encoded event."
 				required:    false
-				type: array: items: type: string: syntax: "literal"
+				type: array: items: type: string: {}
+			}
+			metric_tag_values: {
+				description: """
+					Controls how metric tag values are encoded.
+
+					When set to `single`, only the last non-bare value of tags will be displayed with the
+					metric.  When set to `full`, all metric tags will be exposed as separate assignments.
+					"""
+				relevant_when: "codec = \"json\" or codec = \"text\""
+				required:      false
+				type: string: {
+					default: "single"
+					enum: {
+						full: "All tags will be exposed as arrays of either string or null values."
+						single: """
+															Tag values will be exposed as single strings, the same as they were before this config
+															option. Tags with multiple values will show the last assigned value, and null values will be
+															ignored.
+															"""
+					}
+				}
 			}
 			only_fields: {
 				description: "List of fields that will be included in the encoded event."
 				required:    false
-				type: array: items: type: string: syntax: "literal"
+				type: array: items: type: string: {}
 			}
 			timestamp_format: {
 				description: "Format used for timestamp fields."
@@ -172,18 +205,20 @@ base: components: sinks: kafka: configuration: {
 			If omitted, no headers will be written.
 			"""
 		required: false
-		type: string: syntax: "literal"
+		type: string: examples: ["headers"]
 	}
 	key_field: {
 		description: """
 			The log field name or tags key to use for the topic key.
 
-			If the field does not exist in the log or in tags, a blank value will be used. If unspecified, the key is not sent.
+			If the field does not exist in the log or in tags, a blank value will be used. If
+			unspecified, the key is not sent.
 
-			Kafka uses a hash of the key to choose the partition or uses round-robin if the record has no key.
+			Kafka uses a hash of the key to choose the partition or uses round-robin if the record has
+			no key.
 			"""
 		required: false
-		type: string: syntax: "literal"
+		type: string: examples: ["user_id"]
 	}
 	librdkafka_options: {
 		description: """
@@ -194,22 +229,27 @@ base: components: sinks: kafka: configuration: {
 			[config_props_docs]: https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md
 			"""
 		required: false
-		type: object: options: "*": {
-			description: """
-				A map of advanced options to pass directly to the underlying `librdkafka` client.
-
-				For more information on configuration options, see [Configuration properties][config_props_docs].
-
-				[config_props_docs]: https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md
-				"""
-			required: true
-			type: string: syntax: "literal"
+		type: object: {
+			examples: [{
+				"client.id":                "${ENV_VAR}"
+				"fetch.error.backoff.ms":   "1000"
+				"socket.send.buffer.bytes": "100"
+			}]
+			options: "*": {
+				description: "A librdkafka configuration option."
+				required:    true
+				type: string: {}
+			}
 		}
 	}
 	message_timeout_ms: {
 		description: "Local message timeout, in milliseconds."
 		required:    false
-		type: uint: default: 300000
+		type: uint: {
+			default: 300000
+			examples: [150000, 450000]
+			unit: "milliseconds"
+		}
 	}
 	sasl: {
 		description: "Configuration for SASL authentication when interacting with Kafka."
@@ -233,24 +273,28 @@ base: components: sinks: kafka: configuration: {
 			mechanism: {
 				description: "The SASL mechanism to use."
 				required:    false
-				type: string: syntax: "literal"
+				type: string: examples: ["SCRAM-SHA-256", "SCRAM-SHA-512"]
 			}
 			password: {
 				description: "The SASL password."
 				required:    false
-				type: string: syntax: "literal"
+				type: string: examples: ["password"]
 			}
 			username: {
 				description: "The SASL username."
 				required:    false
-				type: string: syntax: "literal"
+				type: string: examples: ["username"]
 			}
 		}
 	}
 	socket_timeout_ms: {
 		description: "Default timeout, in milliseconds, for network requests."
 		required:    false
-		type: uint: default: 60000
+		type: uint: {
+			default: 60000
+			examples: [30000, 60000]
+			unit: "milliseconds"
+		}
 	}
 	tls: {
 		description: "Configures the TLS options for incoming/outgoing connections."
@@ -264,7 +308,7 @@ base: components: sinks: kafka: configuration: {
 					they are defined.
 					"""
 				required: false
-				type: array: items: type: string: syntax: "literal"
+				type: array: items: type: string: examples: ["h2"]
 			}
 			ca_file: {
 				description: """
@@ -273,7 +317,7 @@ base: components: sinks: kafka: configuration: {
 					The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: examples: ["/path/to/certificate_authority.crt"]
 			}
 			crt_file: {
 				description: """
@@ -285,7 +329,7 @@ base: components: sinks: kafka: configuration: {
 					If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: examples: ["/path/to/host_certificate.crt"]
 			}
 			enabled: {
 				description: """
@@ -304,7 +348,7 @@ base: components: sinks: kafka: configuration: {
 					The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: examples: ["/path/to/host_certificate.key"]
 			}
 			key_pass: {
 				description: """
@@ -313,7 +357,7 @@ base: components: sinks: kafka: configuration: {
 					This has no effect unless `key_file` is set.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: examples: ["${KEY_PASS_ENV_VAR}", "PassWord1"]
 			}
 			verify_certificate: {
 				description: """
@@ -350,6 +394,9 @@ base: components: sinks: kafka: configuration: {
 	topic: {
 		description: "The Kafka topic name to write events to."
 		required:    true
-		type: string: syntax: "template"
+		type: string: {
+			examples: ["topic-1234", "logs-{{unit}}-%Y-%m-%d"]
+			syntax: "template"
+		}
 	}
 }

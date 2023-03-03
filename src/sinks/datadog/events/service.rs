@@ -35,7 +35,7 @@ impl DriverResponse for DatadogEventsResponse {
         CountByteSize(1, self.event_byte_size)
     }
 
-    fn bytes_sent(&self) -> Option<(usize, &str)> {
+    fn bytes_sent(&self) -> Option<usize> {
         // HttpBatchService emits EndpointBytesSend
         None
     }

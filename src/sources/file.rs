@@ -4,21 +4,21 @@ use bytes::Bytes;
 use chrono::Utc;
 use codecs::{BytesDeserializer, BytesDeserializerConfig};
 use file_source::{
+    calculate_ignore_before,
     paths_provider::glob::{Glob, MatchOptions},
     Checkpointer, FileFingerprint, FileServer, FingerprintStrategy, Fingerprinter, Line, ReadFrom,
+    ReadFromConfig,
 };
 use futures::{FutureExt, Stream, StreamExt, TryFutureExt};
-use lookup::{
-    lookup_v2::{parse_value_path, OptionalValuePath},
-    owned_value_path, path, OwnedValuePath,
-};
+use lookup::{lookup_v2::OptionalValuePath, owned_value_path, path, OwnedValuePath};
 use regex::bytes::Regex;
+use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
 use tokio::{sync::oneshot, task::spawn_blocking};
 use tracing::{Instrument, Span};
 use value::Kind;
 use vector_common::finalizer::OrderedFinalizer;
-use vector_config::{configurable_component, NamedComponent};
+use vector_config::configurable_component;
 use vector_core::config::{LegacyKey, LogNamespace};
 
 use super::util::{EncodingConfig, MultilineConfig};
@@ -68,33 +68,38 @@ enum BuildError {
 }
 
 /// Configuration for the `file` source.
+#[serde_as]
 #[configurable_component(source("file"))]
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct FileConfig {
     /// Array of file patterns to include. [Globbing](https://vector.dev/docs/reference/configuration/sources/file/#globbing) is supported.
+    #[configurable(metadata(docs::examples = "/var/log/**/*.log"))]
     pub include: Vec<PathBuf>,
 
     /// Array of file patterns to exclude. [Globbing](https://vector.dev/docs/reference/configuration/sources/file/#globbing) is supported.
     ///
-    /// Takes precedence over the `include` option. Note that the `exclude` patterns are applied _after_ Vector attempts to glob everything
-    /// in `include`. That is, Vector will still try to list all of the files matched by `include` and then filter them by the `exclude`
-    /// patterns. This can be impactful if `include` contains directories with contents that vector does not have access to.
+    /// Takes precedence over the `include` option. Note: The `exclude` patterns are applied _after_ the attempt to glob everything
+    /// in `include`. This means that all files are first matched by `include` and then filtered by the `exclude`
+    /// patterns. This can be impactful if `include` contains directories with contents that are not accessible.
     #[serde(default)]
+    #[configurable(metadata(docs::examples = "/var/log/binary-file.log"))]
     pub exclude: Vec<PathBuf>,
 
     /// Overrides the name of the log field used to add the file path to each event.
     ///
     /// The value will be the full path to the file where the event was read message.
     ///
-    /// By default, `file` is used.
+    /// Set to `""` to suppress this key.
     #[serde(default = "default_file_key")]
-    pub file_key: Option<OptionalValuePath>,
+    #[configurable(metadata(docs::examples = "path"))]
+    pub file_key: OptionalValuePath,
 
     /// Whether or not to start reading from the beginning of a new file.
-    ///
-    /// DEPRECATED: This is a deprecated option -- replaced by `ignore_checkpoints`/`read_from` -- and should be removed.
-    #[configurable(deprecated)]
+    #[configurable(
+        deprecated = "This option has been deprecated, use `ignore_checkpoints`/`read_from` instead."
+    )]
+    #[configurable(metadata(docs::hidden))]
     #[serde(default)]
     pub start_at_beginning: Option<bool>,
 
@@ -104,34 +109,42 @@ pub struct FileConfig {
     #[serde(default)]
     pub ignore_checkpoints: Option<bool>,
 
+    #[serde(default = "default_read_from")]
     #[configurable(derived)]
-    #[serde(default)]
-    pub read_from: Option<ReadFromConfig>,
+    pub read_from: ReadFromConfig,
 
     /// Ignore files with a data modification date older than the specified number of seconds.
     #[serde(alias = "ignore_older", default)]
+    #[configurable(metadata(docs::type_unit = "seconds"))]
+    #[configurable(metadata(docs::examples = 600))]
     pub ignore_older_secs: Option<u64>,
 
-    /// The maximum number of bytes a line can contain before being discarded.
+    /// The maximum size of a line before it will be discarded.
     ///
     /// This protects against malformed lines or tailing incorrect files.
     #[serde(default = "default_max_line_bytes")]
+    #[configurable(metadata(docs::type_unit = "bytes"))]
     pub max_line_bytes: usize,
 
     /// Overrides the name of the log field used to add the current hostname to each event.
     ///
-    /// The value will be the current hostname for wherever Vector is running.
-    ///
     /// By default, the [global `log_schema.host_key` option][global_host_key] is used.
     ///
+    /// Set to `""` to suppress this key.
+    ///
     /// [global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
-    #[serde(default)]
-    pub host_key: Option<OptionalValuePath>,
+    #[serde(default = "default_host_key")]
+    #[configurable(metadata(docs::examples = "hostname"))]
+    pub host_key: OptionalValuePath,
 
     /// The directory used to persist file checkpoint positions.
     ///
-    /// By default, the global `data_dir` option is used. Please make sure the user Vector is running as has write permissions to this directory.
+    /// By default, the [global `data_dir` option][global_data_dir] is used. Make sure the running user has write
+    /// permissions to this directory.
+    ///
+    /// [global_data_dir]: https://vector.dev/docs/reference/configuration/global-options/#data_dir
     #[serde(default)]
+    #[configurable(metadata(docs::examples = "/var/local/lib/vector/"))]
     pub data_dir: Option<PathBuf>,
 
     /// Enables adding the file offset to each event and sets the name of the log field used.
@@ -140,16 +153,21 @@ pub struct FileConfig {
     ///
     /// Off by default, the offset is only added to the event if this is set.
     #[serde(default)]
+    #[configurable(metadata(docs::examples = "offset"))]
     pub offset_key: Option<OptionalValuePath>,
 
-    /// Delay between file discovery calls, in milliseconds.
+    /// Delay between file discovery calls.
     ///
-    /// This controls the interval at which Vector searches for files. Higher value result in greater chances of some short living files being missed between searches, but lower value increases the performance impact of file discovery.
+    /// This controls the interval at which files are searched. A higher value results in greater
+    /// chances of some short-lived files being missed between searches, but a lower value increases
+    /// the performance impact of file discovery.
     #[serde(
         alias = "glob_minimum_cooldown",
         default = "default_glob_minimum_cooldown_ms"
     )]
-    pub glob_minimum_cooldown_ms: u64,
+    #[serde_as(as = "serde_with::DurationMilliSeconds<u64>")]
+    #[configurable(metadata(docs::type_unit = "milliseconds"))]
+    pub glob_minimum_cooldown_ms: Duration,
 
     #[configurable(derived)]
     #[serde(alias = "fingerprinting", default)]
@@ -162,27 +180,27 @@ pub struct FileConfig {
     pub ignore_not_found: bool,
 
     /// String value used to identify the start of a multi-line message.
-    ///
-    /// DEPRECATED: This is a deprecated option -- replaced by `multiline` -- and should be removed.
-    #[configurable(deprecated)]
+    #[configurable(deprecated = "This option has been deprecated, use `multiline` instead.")]
+    #[configurable(metadata(docs::hidden))]
     #[serde(default)]
     pub message_start_indicator: Option<String>,
 
     /// How long to wait for more data when aggregating a multi-line message, in milliseconds.
-    ///
-    /// DEPRECATED: This is a deprecated option -- replaced by `multiline` -- and should be removed.
-    #[configurable(deprecated)]
+    #[configurable(deprecated = "This option has been deprecated, use `multiline` instead.")]
+    #[configurable(metadata(docs::hidden))]
     #[serde(default = "default_multi_line_timeout")]
     pub multi_line_timeout: u64,
 
     /// Multiline aggregation configuration.
     ///
     /// If not specified, multiline aggregation is disabled.
+    #[configurable(derived)]
     #[serde(default)]
     pub multiline: Option<MultilineConfig>,
 
     /// An approximate limit on the amount of data read from a single file at a given time.
     #[serde(default = "default_max_read_bytes")]
+    #[configurable(metadata(docs::type_unit = "bytes"))]
     pub max_read_bytes: usize,
 
     /// Instead of balancing read capacity fairly across all watched files, prioritize draining the oldest files before moving on to read data from younger files.
@@ -193,10 +211,15 @@ pub struct FileConfig {
     ///
     /// If not specified, files will not be removed.
     #[serde(alias = "remove_after", default)]
+    #[configurable(metadata(docs::type_unit = "seconds"))]
+    #[configurable(metadata(docs::examples = 0))]
+    #[configurable(metadata(docs::examples = 5))]
+    #[configurable(metadata(docs::examples = 60))]
     pub remove_after_secs: Option<u64>,
 
     /// String sequence used to separate one file line from another.
     #[serde(default = "default_line_delimiter")]
+    #[configurable(metadata(docs::examples = "\r\n"))]
     pub line_delimiter: String,
 
     #[configurable(derived)]
@@ -217,17 +240,25 @@ fn default_max_line_bytes() -> usize {
     bytesize::kib(100u64) as usize
 }
 
-fn default_file_key() -> Option<OptionalValuePath> {
-    Some(OptionalValuePath::from(owned_value_path!("file")))
+fn default_file_key() -> OptionalValuePath {
+    OptionalValuePath::from(owned_value_path!("file"))
 }
 
-const fn default_glob_minimum_cooldown_ms() -> u64 {
-    1000
+fn default_host_key() -> OptionalValuePath {
+    OptionalValuePath::from(owned_value_path!(log_schema().host_key()))
+}
+
+const fn default_read_from() -> ReadFromConfig {
+    ReadFromConfig::Beginning
+}
+
+const fn default_glob_minimum_cooldown_ms() -> Duration {
+    Duration::from_millis(1000)
 }
 
 const fn default_multi_line_timeout() -> u64 {
     1000
-}
+} // deprecated
 
 const fn default_max_read_bytes() -> usize {
     2048
@@ -243,19 +274,25 @@ fn default_line_delimiter() -> String {
 #[configurable_component]
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[serde(tag = "strategy", rename_all = "snake_case")]
+#[configurable(metadata(
+    docs::enum_tag_description = "The strategy used to uniquely identify files.\n\nThis is important for checkpointing when file rotation is used."
+))]
 pub enum FingerprintConfig {
     /// Read lines from the beginning of the file and compute a checksum over them.
     Checksum {
         /// Maximum number of bytes to use, from the lines that are read, for generating the checksum.
         ///
-        /// TODO: Should we properly expose this in the documentation? There could definitely be value in allowing more
-        /// bytes to be used for the checksum generation, but we should commit to exposing it rather than hiding it.
+        // TODO: Should we properly expose this in the documentation? There could definitely be value in allowing more
+        // bytes to be used for the checksum generation, but we should commit to exposing it rather than hiding it.
         #[serde(alias = "fingerprint_bytes")]
+        #[configurable(metadata(docs::hidden))]
+        #[configurable(metadata(docs::type_unit = "bytes"))]
         bytes: Option<usize>,
 
         /// The number of bytes to skip ahead (or ignore) when reading the data used for generating the checksum.
         ///
         /// This can be helpful if all files share a common header that should be skipped.
+        #[configurable(metadata(docs::type_unit = "bytes"))]
         ignored_header_bytes: usize,
 
         /// The number of lines to read for generating the checksum.
@@ -264,10 +301,13 @@ pub enum FingerprintConfig {
         ///
         /// If the file has less than this amount of lines, it won’t be read at all.
         #[serde(default = "default_lines")]
+        #[configurable(metadata(docs::type_unit = "lines"))]
         lines: usize,
     },
 
-    /// Use the [device and inode](https://en.wikipedia.org/wiki/Inode) as the identifier.
+    /// Use the [device and inode][inode] as the identifier.
+    ///
+    /// [inode]: https://en.wikipedia.org/wiki/Inode
     #[serde(rename = "device_and_inode")]
     DevInode,
 }
@@ -284,26 +324,6 @@ impl Default for FingerprintConfig {
 
 const fn default_lines() -> usize {
     1
-}
-/// File position to use when reading a new file.
-#[configurable_component]
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
-pub enum ReadFromConfig {
-    /// Read from the beginning of the file.
-    Beginning,
-
-    /// Start reading from the current end of the file.
-    End,
-}
-
-impl From<ReadFromConfig> for ReadFrom {
-    fn from(rfc: ReadFromConfig) -> Self {
-        match rfc {
-            ReadFromConfig::Beginning => ReadFrom::Beginning,
-            ReadFromConfig::End => ReadFrom::End,
-        }
-    }
 }
 
 impl From<FingerprintConfig> for FingerprintStrategy {
@@ -346,15 +366,15 @@ impl Default for FileConfig {
             file_key: default_file_key(),
             start_at_beginning: None,
             ignore_checkpoints: None,
-            read_from: None,
+            read_from: default_read_from(),
             ignore_older_secs: None,
             max_line_bytes: default_max_line_bytes(),
             fingerprint: FingerprintConfig::default(),
             ignore_not_found: false,
-            host_key: None,
+            host_key: default_host_key(),
             offset_key: None,
             data_dir: None,
-            glob_minimum_cooldown_ms: default_glob_minimum_cooldown_ms(), // millis
+            glob_minimum_cooldown_ms: default_glob_minimum_cooldown_ms(),
             message_start_indicator: None,
             multi_line_timeout: default_multi_line_timeout(), // millis
             multiline: None,
@@ -411,21 +431,8 @@ impl SourceConfig for FileConfig {
     }
 
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
-        let file_key = self
-            .file_key
-            .clone()
-            .and_then(|k| k.path)
-            .map(LegacyKey::Overwrite);
-
-        // `host_key` defaults to the `log_schema().host_key()` if it's not configured in the source.
-        let host_key = self
-            .host_key
-            .clone()
-            .map_or_else(
-                || parse_value_path(log_schema().host_key()).ok(),
-                |k| k.path,
-            )
-            .map(LegacyKey::Overwrite);
+        let file_key = self.file_key.clone().path.map(LegacyKey::Overwrite);
+        let host_key = self.host_key.clone().path.map(LegacyKey::Overwrite);
 
         let offset_key = self
             .offset_key
@@ -480,14 +487,12 @@ pub fn file_source(
         return Box::pin(future::ready(Err(())));
     }
 
-    let ignore_before = config
-        .ignore_older_secs
-        .map(|secs| Utc::now() - chrono::Duration::seconds(secs as i64));
-    let glob_minimum_cooldown = Duration::from_millis(config.glob_minimum_cooldown_ms);
+    let ignore_before = calculate_ignore_before(config.ignore_older_secs);
+    let glob_minimum_cooldown = config.glob_minimum_cooldown_ms;
     let (ignore_checkpoints, read_from) = reconcile_position_options(
         config.start_at_beginning,
         config.ignore_checkpoints,
-        config.read_from,
+        Some(config.read_from),
     );
 
     let paths_provider = Glob::new(
@@ -530,12 +535,9 @@ pub fn file_source(
     };
 
     let event_metadata = EventMetadata {
-        host_key: config.host_key.clone().map_or_else(
-            || parse_value_path(log_schema().host_key()).ok(),
-            |k| k.path,
-        ),
+        host_key: config.host_key.clone().path,
         hostname: crate::get_hostname().ok(),
-        file_key: config.file_key.clone().and_then(|k| k.path),
+        file_key: config.file_key.clone().path,
         offset_key: config.offset_key.clone().and_then(|k| k.path),
     };
 
@@ -616,9 +618,7 @@ pub fn file_source(
         // Once file server ends this will run until it has finished processing remaining
         // logs in the queue.
         let span = Span::current();
-        let span2 = span.clone();
         let mut messages = messages.map(move |line| {
-            let _enter = span2.enter();
             let mut event = create_event(
                 line.text,
                 line.start_offset,
@@ -801,7 +801,6 @@ mod tests {
     };
 
     use encoding_rs::UTF_16LE;
-    use lookup::LookupBuf;
     use similar_asserts::assert_eq;
     use tempfile::tempdir;
     use tokio::time::{sleep, timeout, Duration};
@@ -830,7 +829,7 @@ mod tests {
                 lines: 1,
             },
             data_dir: Some(dir.path().to_path_buf()),
-            glob_minimum_cooldown_ms: 100, // millis
+            glob_minimum_cooldown_ms: Duration::from_millis(100),
             ..Default::default()
         }
     }
@@ -908,7 +907,7 @@ mod tests {
         "#,
         )
         .unwrap();
-        assert_eq!(config.read_from, Some(ReadFromConfig::Beginning));
+        assert_eq!(config.read_from, ReadFromConfig::Beginning);
 
         let config: FileConfig = toml::from_str(
             r#"
@@ -917,7 +916,7 @@ mod tests {
         "#,
         )
         .unwrap();
-        assert_eq!(config.read_from, Some(ReadFromConfig::End));
+        assert_eq!(config.read_from, ReadFromConfig::End);
     }
 
     #[test]
@@ -950,18 +949,24 @@ mod tests {
         assert_eq!(
             definition,
             Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
-                .with_meaning(LookupBuf::root(), "message")
-                .with_metadata_field(&owned_value_path!("vector", "source_type"), Kind::bytes())
+                .with_meaning(OwnedTargetPath::event_root(), "message")
+                .with_metadata_field(
+                    &owned_value_path!("vector", "source_type"),
+                    Kind::bytes(),
+                    None
+                )
                 .with_metadata_field(
                     &owned_value_path!("vector", "ingest_timestamp"),
-                    Kind::timestamp()
+                    Kind::timestamp(),
+                    None
                 )
                 .with_metadata_field(
                     &owned_value_path!("file", "host"),
-                    Kind::bytes().or_undefined()
+                    Kind::bytes().or_undefined(),
+                    Some("host")
                 )
-                .with_metadata_field(&owned_value_path!("file", "offset"), Kind::integer())
-                .with_metadata_field(&owned_value_path!("file", "path"), Kind::bytes())
+                .with_metadata_field(&owned_value_path!("file", "offset"), Kind::integer(), None)
+                .with_metadata_field(&owned_value_path!("file", "path"), Kind::bytes(), None)
         )
     }
 
@@ -1351,7 +1356,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn file_key_nonacknowledged() {
+    async fn file_key_no_acknowledge() {
         file_key(NoAcks).await
     }
 
@@ -1388,7 +1393,7 @@ mod tests {
             let dir = tempdir().unwrap();
             let config = file::FileConfig {
                 include: vec![dir.path().join("*")],
-                file_key: Some(OptionalValuePath::from(owned_value_path!("source"))),
+                file_key: OptionalValuePath::from(owned_value_path!("source")),
                 ..test_default_file_config(&dir)
             };
 
@@ -1416,7 +1421,6 @@ mod tests {
             let dir = tempdir().unwrap();
             let config = file::FileConfig {
                 include: vec![dir.path().join("*")],
-                file_key: None,
                 ..test_default_file_config(&dir)
             };
 
@@ -1436,6 +1440,10 @@ mod tests {
             assert_eq!(
                 received[0].as_log().keys().unwrap().collect::<HashSet<_>>(),
                 vec![
+                    default_file_key()
+                        .path
+                        .expect("file key to exist")
+                        .to_string(),
                     log_schema().host_key().to_string(),
                     log_schema().message_key().to_string(),
                     log_schema().timestamp_key().to_string(),
@@ -1455,7 +1463,7 @@ mod tests {
 
     #[cfg(target_os = "linux")] // see #7988
     #[tokio::test]
-    async fn file_start_position_server_restart_nonacknowledged() {
+    async fn file_start_position_server_restart_no_acknowledge() {
         file_start_position_server_restart(NoAcks).await
     }
 
@@ -1501,7 +1509,7 @@ mod tests {
             let config = file::FileConfig {
                 include: vec![dir.path().join("*")],
                 ignore_checkpoints: Some(true),
-                read_from: Some(ReadFromConfig::Beginning),
+                read_from: ReadFromConfig::Beginning,
                 ..test_default_file_config(&dir)
             };
             let received = run_file_source(&config, false, acking, LogNamespace::Legacy, async {
@@ -1563,7 +1571,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn file_start_position_server_restart_with_file_rotation_nonacknowledged() {
+    async fn file_start_position_server_restart_with_file_rotation_no_acknowledge() {
         file_start_position_server_restart_with_file_rotation(NoAcks).await
     }
 
@@ -1787,7 +1795,7 @@ mod tests {
                 start_pattern: "INFO".to_owned(),
                 condition_pattern: "INFO".to_owned(),
                 mode: line_agg::Mode::HaltBefore,
-                timeout_ms: 25, // less than 50 in sleep()
+                timeout_ms: Duration::from_millis(25), // less than 50 in sleep()
             }),
             ..test_default_file_config(&dir)
         };
@@ -1846,7 +1854,7 @@ mod tests {
                 start_pattern: "INFO".to_owned(),
                 condition_pattern: "INFO".to_owned(),
                 mode: line_agg::Mode::HaltBefore,
-                timeout_ms: 25, // less than 50 in sleep()
+                timeout_ms: Duration::from_millis(25), // less than 50 in sleep()
             }),
             ..test_default_file_config(&dir)
         };
@@ -2181,6 +2189,7 @@ mod tests {
         Unfinalized, // Acknowledgement handling but no finalization
         Acks,        // Full acknowledgements and proper finalization
     }
+    use lookup::OwnedTargetPath;
     use AckingMode::*;
 
     async fn run_file_source(

@@ -58,7 +58,11 @@ impl DefaultValue for Kind {
         }
 
         if self.is_timestamp() {
-            return Utc.timestamp(0, 0).into();
+            return Utc
+                .timestamp_opt(0, 0)
+                .single()
+                .expect("invalid timestamp")
+                .into();
         }
 
         if self.is_regex() {
@@ -170,7 +174,7 @@ mod tests {
                 },
             ),
         ]) {
-            assert_eq!(Kind::from(value), want, "{}", title);
+            assert_eq!(Kind::from(value), want, "{title}");
         }
     }
 }

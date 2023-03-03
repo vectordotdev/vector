@@ -243,7 +243,7 @@ fn parse_log(mut input: &str) -> Result<Value> {
 
     match input.is_empty() {
         true => Ok(log.into()),
-        false => Err(format!(r#"Log should be fully consumed: "{}""#, input).into()),
+        false => Err(format!(r#"Log should be fully consumed: "{input}""#).into()),
     }
 }
 

@@ -13,7 +13,7 @@ use crate::{
 
 /// A decoder that can decode structured events from a byte stream / byte
 /// messages.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Decoder {
     framer: Framer,
     deserializer: Deserializer,

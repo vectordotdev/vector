@@ -1,0 +1,7 @@
+features:
+- eventstoredb_metrics-integration-tests
+
+test_filter: '::eventstoredb_metrics::'
+
+matrix:
+  version: [latest]

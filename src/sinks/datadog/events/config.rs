@@ -1,11 +1,13 @@
-use futures::FutureExt;
 use indoc::indoc;
 use tower::ServiceBuilder;
+use value::Kind;
 use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
 use vector_core::config::proxy::ProxyConfig;
+use vector_core::schema;
 
 use crate::{
+    common::datadog::{get_base_domain_region, Region},
     config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     http::HttpClient,
     sinks::{
@@ -14,55 +16,42 @@ use crate::{
                 service::{DatadogEventsResponse, DatadogEventsService},
                 sink::DatadogEventsSink,
             },
-            get_api_base_endpoint, get_api_validate_endpoint, healthcheck, Region,
+            get_api_base_endpoint, DatadogCommonConfig,
         },
         util::{http::HttpStatusRetryLogic, ServiceBuilderExt, TowerRequestConfig},
         Healthcheck, VectorSink,
     },
-    tls::{MaybeTlsSettings, TlsEnableableConfig},
+    tls::MaybeTlsSettings,
 };
 
 /// Configuration for the `datadog_events` sink.
 #[configurable_component(sink("datadog_events"))]
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct DatadogEventsConfig {
-    /// The endpoint to send events to.
-    pub endpoint: Option<String>,
+    #[serde(flatten)]
+    pub dd_common: DatadogCommonConfig,
 
-    /// The Datadog region to send events to.
-    ///
-    /// This option is deprecated, and the `site` field should be used instead.
-    #[configurable(deprecated)]
-    pub region: Option<Region>,
-
-    /// The Datadog [site][dd_site] to send events to.
-    ///
-    /// [dd_site]: https://docs.datadoghq.com/getting_started/site
-    pub site: Option<String>,
-
-    /// The default Datadog [API key][api_key] to send events with.
+    /// The default Datadog [API key][api_key] to use in authentication of HTTP requests.
     ///
     /// If an event has a Datadog [API key][api_key] set explicitly in its metadata, it will take
-    /// precedence over the default.
+    /// precedence over this setting.
     ///
     /// [api_key]: https://docs.datadoghq.com/api/?lang=bash#authentication
+    // TODO: After `api_key` (a deprecated name for this setting in the DD logs and metrics sinks) is
+    // removed in v0.29.0, this entire setting should be migrated to the `DatadogCommonConfig` struct.
+    #[configurable(metadata(docs::examples = "${DATADOG_API_KEY_ENV_VAR}"))]
+    #[configurable(metadata(docs::examples = "ef8d5de700e7989468166c40fc8a0ccd"))]
     pub default_api_key: SensitiveString,
 
-    #[configurable(derived)]
-    pub(super) tls: Option<TlsEnableableConfig>,
+    /// The Datadog region to send events to.
+    #[configurable(deprecated = "This option has been deprecated, use the `site` option instead.")]
+    #[serde(default)]
+    pub region: Option<Region>,
 
     #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
-
-    #[configurable(derived)]
-    #[serde(
-        default,
-        deserialize_with = "crate::serde::bool_or_struct",
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
-    )]
-    acknowledgements: AcknowledgementsConfig,
 }
 
 impl GenerateConfig for DatadogEventsConfig {
@@ -76,28 +65,19 @@ impl GenerateConfig for DatadogEventsConfig {
 
 impl DatadogEventsConfig {
     fn get_api_events_endpoint(&self) -> http::Uri {
-        let api_base_endpoint =
-            get_api_base_endpoint(self.endpoint.as_ref(), self.site.as_ref(), self.region);
+        let api_base_endpoint = get_api_base_endpoint(
+            self.dd_common.endpoint.as_ref(),
+            get_base_domain_region(self.dd_common.site.as_str(), self.region.as_ref()),
+        );
 
         // We know this URI will be valid since we have just built it up ourselves.
         http::Uri::try_from(format!("{}/api/v1/events", api_base_endpoint)).expect("URI not valid")
     }
 
     fn build_client(&self, proxy: &ProxyConfig) -> crate::Result<HttpClient> {
-        let tls = MaybeTlsSettings::from_config(&self.tls, false)?;
+        let tls = MaybeTlsSettings::from_config(&self.dd_common.tls, false)?;
         let client = HttpClient::new(tls, proxy)?;
         Ok(client)
-    }
-
-    fn build_healthcheck(&self, client: HttpClient) -> crate::Result<Healthcheck> {
-        let validate_endpoint =
-            get_api_validate_endpoint(self.endpoint.as_ref(), self.site.as_ref(), self.region)?;
-        Ok(healthcheck(
-            client,
-            validate_endpoint,
-            self.default_api_key.clone().into(),
-        )
-        .boxed())
     }
 
     fn build_sink(&self, client: HttpClient) -> crate::Result<VectorSink> {
@@ -125,18 +105,27 @@ impl DatadogEventsConfig {
 impl SinkConfig for DatadogEventsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let client = self.build_client(cx.proxy())?;
-        let healthcheck = self.build_healthcheck(client.clone())?;
+        let healthcheck = self.dd_common.build_healthcheck(
+            client.clone(),
+            self.default_api_key.clone().into(),
+            self.region.as_ref(),
+        )?;
         let sink = self.build_sink(client)?;
 
         Ok((sink, healthcheck))
     }
 
     fn input(&self) -> Input {
-        Input::log()
+        let requirement = schema::Requirement::empty()
+            .required_meaning("message", Kind::bytes())
+            .optional_meaning("host", Kind::bytes())
+            .optional_meaning("timestamp", Kind::timestamp());
+
+        Input::log().with_schema_requirement(requirement)
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
-        &self.acknowledgements
+        &self.dd_common.acknowledgements
     }
 }
 

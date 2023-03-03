@@ -12,6 +12,7 @@ use rustyline::{
     error::ReadlineError,
     highlight::{Highlighter, MatchingBracketHighlighter},
     hint::{Hinter, HistoryHinter},
+    history::MemHistory,
     validate::{self, ValidationResult, Validator},
     Context, Editor, Helper,
 };
@@ -61,12 +62,12 @@ pub(crate) fn run(
     let mut state = TypeState::default();
 
     let mut rt = Runtime::new(state::Runtime::default());
-    let mut rl = Editor::<Repl>::new()?;
+    let mut rl = Editor::<Repl, MemHistory>::new()?;
     rl.set_helper(Some(Repl::new()));
 
     #[allow(clippy::print_stdout)]
     {
-        println!("{}", BANNER_TEXT);
+        println!("{BANNER_TEXT}");
     }
 
     loop {
@@ -83,7 +84,7 @@ pub(crate) fn run(
             // Capture "help docs <func_name>"
             Ok(line) if func_docs_regex.is_match(line) => show_func_docs(line, &func_docs_regex),
             Ok(line) => {
-                rl.add_history_entry(line);
+                rl.add_history_entry(line)?;
 
                 let command = match line {
                     "next" => {
@@ -135,14 +136,14 @@ pub(crate) fn run(
 
                 #[allow(clippy::print_stdout)]
                 {
-                    println!("{}\n", string);
+                    println!("{string}\n");
                 }
             }
             Err(ReadlineError::Interrupted | ReadlineError::Eof) => break,
             Err(err) => {
                 #[allow(clippy::print_stdout)]
                 {
-                    println!("unable to read line: {}", err);
+                    println!("unable to read line: {err}");
                 }
                 break;
             }
@@ -358,7 +359,7 @@ fn print_function_list() {
 fn print_help_text() {
     #[allow(clippy::print_stdout)]
     {
-        println!("{}", HELP_TEXT);
+        println!("{HELP_TEXT}");
     }
 }
 
@@ -382,12 +383,12 @@ fn show_func_docs(line: &str, pattern: &Regex) {
     let func_name = matches.get(1).unwrap().as_str();
 
     if stdlib::all().iter().any(|f| f.identifier() == func_name) {
-        let func_url = format!("{}/functions/#{}", DOCS_URL, func_name);
+        let func_url = format!("{DOCS_URL}/functions/#{func_name}");
         open_url(&func_url);
     } else {
         #[allow(clippy::print_stdout)]
         {
-            println!("function name {} not recognized", func_name);
+            println!("function name {func_name} not recognized");
         }
     }
 }
@@ -398,12 +399,12 @@ fn show_error_docs(line: &str, pattern: &Regex) {
     let error_code = matches.get(1).unwrap().as_str();
 
     if ERRORS.iter().any(|e| e == error_code) {
-        let error_code_url = format!("{}/{}", ERRORS_URL_ROOT, error_code);
+        let error_code_url = format!("{ERRORS_URL_ROOT}/{error_code}");
         open_url(&error_code_url);
     } else {
         #[allow(clippy::print_stdout)]
         {
-            println!("error code {} not recognized", error_code);
+            println!("error code {error_code} not recognized");
         }
     }
 }

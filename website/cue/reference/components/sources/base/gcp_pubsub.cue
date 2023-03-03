@@ -2,9 +2,15 @@ package metadata
 
 base: components: sources: gcp_pubsub: configuration: {
 	ack_deadline_seconds: {
-		description: "Deprecated, old name of `ack_deadline_secs`."
-		required:    false
-		type: int: {}
+		deprecated:         true
+		deprecated_message: "This option has been deprecated, use `ack_deadline_secs` instead."
+		description: """
+			The acknowledgement deadline, in seconds, to use for this stream.
+
+			Messages that are not acknowledged when this deadline expires may be retransmitted.
+			"""
+		required: false
+		type: uint: {}
 	}
 	ack_deadline_secs: {
 		description: """
@@ -13,15 +19,21 @@ base: components: sources: gcp_pubsub: configuration: {
 			Messages that are not acknowledged when this deadline expires may be retransmitted.
 			"""
 		required: false
-		type: int: {}
+		type: uint: {
+			default: 600
+			unit:    "seconds"
+		}
 	}
 	acknowledgements: {
+		deprecated: true
 		description: """
 			Controls how acknowledgements are handled by this source.
 
-			This setting is **deprecated** in favor of enabling `acknowledgements` at the [global][global_acks] or sink level. Enabling or disabling acknowledgements at the source level has **no effect** on acknowledgement behavior.
+			This setting is **deprecated** in favor of enabling `acknowledgements` at the [global][global_acks] or sink level.
 
-			See [End-to-end Acknowledgements][e2e_acks] for more information on how Vector handles event acknowledgement.
+			Enabling or disabling acknowledgements at the source level has **no effect** on acknowledgement behavior.
+
+			See [End-to-end Acknowledgements][e2e_acks] for more information on how event acknowledgement is handled.
 
 			[global_acks]: https://vector.dev/docs/reference/configuration/global-options/#acknowledgements
 			[e2e_acks]: https://vector.dev/docs/about/under-the-hood/architecture/end-to-end-acknowledgements/
@@ -35,37 +47,42 @@ base: components: sources: gcp_pubsub: configuration: {
 	}
 	api_key: {
 		description: """
-			An API key. ([documentation](https://cloud.google.com/docs/authentication/api-keys))
+			An [API key][gcp_api_key].
 
 			Either an API key, or a path to a service account credentials JSON file can be specified.
 
-			If both are unset, Vector checks the `GOOGLE_APPLICATION_CREDENTIALS` environment variable for a filename. If no
-			filename is named, Vector will attempt to fetch an instance service account for the compute instance the program is
-			running on. If Vector is not running on a GCE instance, then you must define eith an API key or service account
+			If both are unset, the `GOOGLE_APPLICATION_CREDENTIALS` environment variable is checked for a filename. If no
+			filename is named, an attempt is made to fetch an instance service account for the compute instance the program is
+			running on. If this is not on a GCE instance, then you must define it with an API key or service account
 			credentials JSON file.
+
+			[gcp_api_key]: https://cloud.google.com/docs/authentication/api-keys
 			"""
 		required: false
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	credentials_path: {
 		description: """
-			Path to a service account credentials JSON file. ([documentation](https://cloud.google.com/docs/authentication/production#manually))
+			Path to a [service account] credentials JSON file.
 
 			Either an API key, or a path to a service account credentials JSON file can be specified.
 
-			If both are unset, Vector checks the `GOOGLE_APPLICATION_CREDENTIALS` environment variable for a filename. If no
-			filename is named, Vector will attempt to fetch an instance service account for the compute instance the program is
-			running on. If Vector is not running on a GCE instance, then you must define eith an API key or service account
+			If both are unset, the `GOOGLE_APPLICATION_CREDENTIALS` environment variable is checked for a filename. If no
+			filename is named, an attempt is made to fetch an instance service account for the compute instance the program is
+			running on. If this is not on a GCE instance, then you must define it with an API key or service account
 			credentials JSON file.
+
+			[gcp_service_account_credentials]: https://cloud.google.com/docs/authentication/production#manually
 			"""
 		required: false
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	decoding: {
 		description: "Configures how events are decoded from raw bytes."
 		required:    false
 		type: object: options: codec: {
-			required: false
+			description: "The codec to use for decoding events."
+			required:    false
 			type: string: {
 				default: "bytes"
 				enum: {
@@ -81,13 +98,17 @@ base: components: sources: gcp_pubsub: configuration: {
 						[json]: https://www.json.org/
 						"""
 					native: """
-						Decodes the raw bytes as Vector’s [native Protocol Buffers format][vector_native_protobuf] ([EXPERIMENTAL][experimental]).
+						Decodes the raw bytes as Vector’s [native Protocol Buffers format][vector_native_protobuf].
+
+						This codec is **[experimental][experimental]**.
 
 						[vector_native_protobuf]: https://github.com/vectordotdev/vector/blob/master/lib/vector-core/proto/event.proto
 						[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
 						"""
 					native_json: """
-						Decodes the raw bytes as Vector’s [native JSON format][vector_native_json] ([EXPERIMENTAL][experimental]).
+						Decodes the raw bytes as Vector’s [native JSON format][vector_native_json].
+
+						This codec is **[experimental][experimental]**.
 
 						[vector_native_json]: https://github.com/vectordotdev/vector/blob/master/lib/codecs/tests/data/native_encoding/schema.cue
 						[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
@@ -108,7 +129,10 @@ base: components: sources: gcp_pubsub: configuration: {
 	endpoint: {
 		description: "The endpoint from which to pull data."
 		required:    false
-		type: string: syntax: "literal"
+		type: string: {
+			default: "https://pubsub.googleapis.com"
+			examples: ["https://us-central1-pubsub.googleapis.com"]
+		}
 	}
 	framing: {
 		description: """
@@ -135,6 +159,14 @@ base: components: sources: gcp_pubsub: configuration: {
 																The maximum length of the byte buffer.
 
 																This length does *not* include the trailing delimiter.
+
+																By default, there is no maximum length enforced. If events are malformed, this can lead to
+																additional resource usage as events continue to be buffered in memory, and can potentially
+																lead to memory exhaustion in extreme cases.
+
+																If there is a risk of processing malformed data, such as logs with user-controlled input,
+																consider setting the maximum length to a reasonably large value as a safety net. This will
+																ensure that processing is not truly unbounded.
 																"""
 						required: false
 						type: uint: {}
@@ -142,7 +174,8 @@ base: components: sources: gcp_pubsub: configuration: {
 				}
 			}
 			method: {
-				required: false
+				description: "The framing method."
+				required:    false
 				type: string: {
 					default: "bytes"
 					enum: {
@@ -167,6 +200,14 @@ base: components: sources: gcp_pubsub: configuration: {
 						The maximum length of the byte buffer.
 
 						This length does *not* include the trailing delimiter.
+
+						By default, there is no maximum length enforced. If events are malformed, this can lead to
+						additional resource usage as events continue to be buffered in memory, and can potentially
+						lead to memory exhaustion in extreme cases.
+
+						If there is a risk of processing malformed data, such as logs with user-controlled input,
+						consider setting the maximum length to a reasonably large value as a safety net. This will
+						ensure that processing is not truly unbounded.
 						"""
 					required: false
 					type: uint: {}
@@ -189,6 +230,9 @@ base: components: sources: gcp_pubsub: configuration: {
 			The number of messages in a response to mark a stream as
 			"busy". This is used to determine if more streams should be
 			started.
+
+			The GCP Pub/Sub servers send responses with 100 or more messages when
+			the subscription is busy.
 			"""
 		required: false
 		type: uint: default: 100
@@ -200,7 +244,10 @@ base: components: sources: gcp_pubsub: configuration: {
 			`60`, you may see periodic errors sent from the server.
 			"""
 		required: false
-		type: float: default: 60.0
+		type: float: {
+			default: 60.0
+			unit:    "seconds"
+		}
 	}
 	max_concurrency: {
 		description: "The maximum number of concurrent stream connections to open at once."
@@ -213,32 +260,35 @@ base: components: sources: gcp_pubsub: configuration: {
 			are all busy and so open a new stream.
 			"""
 		required: false
-		type: float: default: 2.0
+		type: float: {
+			default: 2.0
+			unit:    "seconds"
+		}
 	}
 	project: {
 		description: "The project name from which to pull logs."
 		required:    true
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	retry_delay_seconds: {
-		description: "Deprecated, old name of `retry_delay_secs`."
-		required:    false
+		deprecated:         true
+		deprecated_message: "This option has been deprecated, use `retry_delay_secs` instead."
+		description:        "The amount of time, in seconds, to wait between retry attempts after an error."
+		required:           false
 		type: float: {}
 	}
 	retry_delay_secs: {
 		description: "The amount of time, in seconds, to wait between retry attempts after an error."
 		required:    false
-		type: float: {}
-	}
-	skip_authentication: {
-		description: "Skip all authentication handling. For use with integration tests only."
-		required:    false
-		type: bool: default: false
+		type: float: {
+			default: 1.0
+			unit:    "seconds"
+		}
 	}
 	subscription: {
 		description: "The subscription within the project which is configured to receive logs."
 		required:    true
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	tls: {
 		description: "TLS configuration."
@@ -252,7 +302,7 @@ base: components: sources: gcp_pubsub: configuration: {
 					they are defined.
 					"""
 				required: false
-				type: array: items: type: string: syntax: "literal"
+				type: array: items: type: string: examples: ["h2"]
 			}
 			ca_file: {
 				description: """
@@ -261,7 +311,7 @@ base: components: sources: gcp_pubsub: configuration: {
 					The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: examples: ["/path/to/certificate_authority.crt"]
 			}
 			crt_file: {
 				description: """
@@ -273,7 +323,7 @@ base: components: sources: gcp_pubsub: configuration: {
 					If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: examples: ["/path/to/host_certificate.crt"]
 			}
 			key_file: {
 				description: """
@@ -282,7 +332,7 @@ base: components: sources: gcp_pubsub: configuration: {
 					The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: examples: ["/path/to/host_certificate.key"]
 			}
 			key_pass: {
 				description: """
@@ -291,7 +341,7 @@ base: components: sources: gcp_pubsub: configuration: {
 					This has no effect unless `key_file` is set.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: examples: ["${KEY_PASS_ENV_VAR}", "PassWord1"]
 			}
 			verify_certificate: {
 				description: """

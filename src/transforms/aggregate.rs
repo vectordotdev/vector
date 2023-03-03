@@ -18,7 +18,7 @@ use crate::{
 };
 
 /// Configuration for the `aggregate` transform.
-#[configurable_component(transform("aggregate"))]
+#[configurable_component(transform("aggregate", "Aggregate metrics passing through a topology."))]
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct AggregateConfig {
@@ -36,6 +36,7 @@ const fn default_interval_ms() -> u64 {
 impl_generate_config_from_default!(AggregateConfig);
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "aggregate")]
 impl TransformConfig for AggregateConfig {
     async fn build(&self, _context: &TransformContext) -> crate::Result<Transform> {
         Aggregate::new(self).map(Transform::event_task)

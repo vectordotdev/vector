@@ -9,12 +9,14 @@ use crate::{
     config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     event::{Event, EventFinalizers, EventStatus, Finalizable},
     internal_events::PulsarSendingError,
+    schema,
     sinks::util::metadata::RequestMetadataBuilder,
 };
 use bytes::BytesMut;
 use codecs::{encoding::SerializerConfig, TextSerializerConfig};
 use futures::{future::BoxFuture, stream::FuturesUnordered, FutureExt, Sink, Stream};
 use pulsar::authentication::oauth2::{OAuth2Authentication, OAuth2Params};
+use pulsar::compression;
 use pulsar::error::AuthenticationError;
 use pulsar::{
     message::proto, producer::SendFuture, proto::CommandSendReceipt, Authentication,
@@ -22,7 +24,7 @@ use pulsar::{
 };
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::Encoder as _;
-use value::Value;
+use value::{Kind, Value};
 use vector_common::{
     internal_event::{
         ByteSize, BytesSent, CountByteSize, EventsSent, InternalEventHandle as _, Output, Protocol,
@@ -32,7 +34,6 @@ use vector_common::{
     sensitive_string::SensitiveString,
 };
 use vector_config::configurable_component;
-use vector_core::config::log_schema;
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -45,14 +46,30 @@ enum BuildError {
 #[derive(Clone, Debug)]
 pub struct PulsarSinkConfig {
     /// The endpoint to which the Pulsar client should connect to.
+    ///
+    /// The endpoint should specify the pulsar protocol and port.
     #[serde(alias = "address")]
+    #[configurable(metadata(docs::examples = "pulsar://127.0.0.1:6650"))]
     endpoint: String,
 
     /// The Pulsar topic name to write events to.
+    #[configurable(metadata(docs::examples = "topic-1234"))]
     topic: String,
+
+    /// The name of the producer. If not specified, the default name assigned by Pulsar will be used.
+    #[configurable(metadata(docs::examples = "producer-name"))]
+    producer_name: Option<String>,
 
     #[configurable(derived)]
     pub encoding: EncodingConfig,
+
+    #[configurable(derived)]
+    #[serde(default)]
+    batch: BatchConfig,
+
+    #[configurable(derived)]
+    #[serde(default)]
+    compression: PulsarCompression,
 
     #[configurable(derived)]
     auth: Option<AuthConfig>,
@@ -65,8 +82,20 @@ pub struct PulsarSinkConfig {
     )]
     pub acknowledgements: AcknowledgementsConfig,
 
-    /// Log field to use as Pulsar message key
+    /// Log field to use as Pulsar message key.
+    #[configurable(metadata(docs::examples = "message"))]
+    #[configurable(metadata(docs::examples = "my_field"))]
     partition_key_field: Option<String>,
+}
+
+/// Event batching behavior.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct BatchConfig {
+    /// The maximum size of a batch before it is flushed.
+    #[configurable(metadata(docs::type_unit = "events"))]
+    #[configurable(metadata(docs::examples = 1000))]
+    pub max_events: Option<u32>,
 }
 
 /// Authentication configuration.
@@ -77,35 +106,71 @@ struct AuthConfig {
     ///
     /// This can be used either for basic authentication (username/password) or JWT authentication.
     /// When used for JWT, the value should be `token`.
+    #[configurable(metadata(docs::examples = "${PULSAR_NAME}"))]
+    #[configurable(metadata(docs::examples = "name123"))]
     name: Option<String>,
 
     /// Basic authentication password/token.
     ///
     /// This can be used either for basic authentication (username/password) or JWT authentication.
     /// When used for JWT, the value should be the signed JWT, in the compact representation.
+    #[configurable(metadata(docs::examples = "${PULSAR_TOKEN}"))]
+    #[configurable(metadata(docs::examples = "123456789"))]
     token: Option<SensitiveString>,
 
     #[configurable(derived)]
     oauth2: Option<OAuth2Config>,
 }
 
-/// OAuth2-specific authenticatgion configuration.
+/// OAuth2-specific authentication configuration.
 #[configurable_component]
 #[derive(Clone, Debug)]
 pub struct OAuth2Config {
     /// The issuer URL.
+    #[configurable(metadata(docs::examples = "${OAUTH2_ISSUER_URL}"))]
+    #[configurable(metadata(docs::examples = "https://oauth2.issuer"))]
     issuer_url: String,
 
     /// The credentials URL.
     ///
     /// A data URL is also supported.
+    #[configurable(metadata(docs::examples = "{OAUTH2_CREDENTIALS_URL}"))]
+    #[configurable(metadata(docs::examples = "file:///oauth2_credentials"))]
+    #[configurable(metadata(docs::examples = "data:application/json;base64,cHVsc2FyCg=="))]
     credentials_url: String,
 
     /// The OAuth2 audience.
+    #[configurable(metadata(docs::examples = "${OAUTH2_AUDIENCE}"))]
+    #[configurable(metadata(docs::examples = "pulsar"))]
     audience: Option<String>,
 
     /// The OAuth2 scope.
+    #[configurable(metadata(docs::examples = "${OAUTH2_SCOPE}"))]
+    #[configurable(metadata(docs::examples = "admin"))]
     scope: Option<String>,
+}
+
+/// Supported compression types for Pulsar.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Derivative)]
+#[derivative(Default)]
+#[serde(rename_all = "lowercase")]
+pub enum PulsarCompression {
+    /// No compression.
+    #[derivative(Default)]
+    None,
+
+    /// LZ4.
+    Lz4,
+
+    /// Zlib.
+    Zlib,
+
+    /// Zstandard.
+    Zstd,
+
+    /// Snappy.
+    Snappy,
 }
 
 type PulsarProducer = Producer<TokioExecutor>;
@@ -151,10 +216,13 @@ impl GenerateConfig for PulsarSinkConfig {
         toml::Value::try_from(Self {
             endpoint: "pulsar://127.0.0.1:6650".to_string(),
             topic: "topic-1234".to_string(),
-            partition_key_field: Some("message".to_string()),
-            encoding: TextSerializerConfig::new().into(),
+            partition_key_field: None,
+            compression: Default::default(),
+            encoding: TextSerializerConfig::default().into(),
             auth: None,
             acknowledgements: Default::default(),
+            producer_name: None,
+            batch: Default::default(),
         })
         .unwrap()
     }
@@ -167,7 +235,7 @@ impl SinkConfig for PulsarSinkConfig {
         _cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let producer = self
-            .create_pulsar_producer()
+            .create_pulsar_producer(false)
             .await
             .context(CreatePulsarSinkSnafu)?;
 
@@ -183,7 +251,7 @@ impl SinkConfig for PulsarSinkConfig {
         )?;
 
         let producer = self
-            .create_pulsar_producer()
+            .create_pulsar_producer(true)
             .await
             .context(CreatePulsarSinkSnafu)?;
         let healthcheck = healthcheck(producer).boxed();
@@ -192,7 +260,10 @@ impl SinkConfig for PulsarSinkConfig {
     }
 
     fn input(&self) -> Input {
-        Input::log()
+        let requirement =
+            schema::Requirement::empty().optional_meaning("timestamp", Kind::timestamp());
+
+        Input::log().with_schema_requirement(requirement)
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
@@ -201,7 +272,10 @@ impl SinkConfig for PulsarSinkConfig {
 }
 
 impl PulsarSinkConfig {
-    async fn create_pulsar_producer(&self) -> Result<PulsarProducer, PulsarError> {
+    async fn create_pulsar_producer(
+        &self,
+        is_healthcheck: bool,
+    ) -> Result<PulsarProducer, PulsarError> {
         let mut builder = Pulsar::builder(&self.endpoint, TokioExecutor);
         if let Some(auth) = &self.auth {
             builder = match (
@@ -229,23 +303,48 @@ impl PulsarSinkConfig {
         }
 
         let pulsar = builder.build().await?;
-        if let SerializerConfig::Avro { avro } = self.encoding.config() {
-            pulsar
-                .producer()
-                .with_options(pulsar::producer::ProducerOptions {
-                    schema: Some(proto::Schema {
-                        schema_data: avro.schema.as_bytes().into(),
-                        r#type: proto::schema::Type::Avro as i32,
-                        ..Default::default()
-                    }),
-                    ..Default::default()
-                })
-                .with_topic(&self.topic)
-                .build()
-                .await
-        } else {
-            pulsar.producer().with_topic(&self.topic).build().await
+        let mut pulsar_builder = pulsar.producer().with_topic(&self.topic);
+
+        if let Some(producer_name) = self.producer_name.clone() {
+            pulsar_builder = pulsar_builder.with_name(if is_healthcheck {
+                format!("{}-healthcheck", producer_name)
+            } else {
+                producer_name
+            });
         }
+
+        let mut producer_options = pulsar::ProducerOptions {
+            compression: Some(match self.compression {
+                PulsarCompression::None => compression::Compression::None,
+                PulsarCompression::Lz4 => {
+                    compression::Compression::Lz4(compression::CompressionLz4::default())
+                }
+                PulsarCompression::Zlib => {
+                    compression::Compression::Zlib(compression::CompressionZlib::default())
+                }
+                PulsarCompression::Zstd => {
+                    compression::Compression::Zstd(compression::CompressionZstd::default())
+                }
+                PulsarCompression::Snappy => {
+                    compression::Compression::Snappy(compression::CompressionSnappy::default())
+                }
+            }),
+            ..Default::default()
+        };
+
+        if !is_healthcheck {
+            producer_options.batch_size = self.batch.max_events;
+        }
+
+        if let SerializerConfig::Avro { avro } = self.encoding.config() {
+            producer_options.schema = Some(proto::Schema {
+                schema_data: avro.schema.as_bytes().into(),
+                r#type: proto::schema::Type::Avro as i32,
+                ..Default::default()
+            });
+        }
+
+        pulsar_builder.with_options(producer_options).build().await
     }
 }
 
@@ -313,7 +412,7 @@ impl Sink<Event> for PulsarSink {
 
         let event_time: Option<u64> = event
             .maybe_as_log()
-            .and_then(|log| log.get(log_schema().timestamp_key()))
+            .and_then(|log| log.get_timestamp())
             .and_then(|value| value.as_timestamp())
             .map(|ts| ts.timestamp_millis())
             .map(|i| i as u64);
@@ -437,10 +536,13 @@ mod integration_tests {
         let cnf = PulsarSinkConfig {
             endpoint: pulsar_address(),
             topic: topic.clone(),
-            encoding: TextSerializerConfig::new().into(),
+            producer_name: None,
+            compression: PulsarCompression::None,
+            encoding: TextSerializerConfig::default().into(),
             auth: None,
             acknowledgements: Default::default(),
             partition_key_field: Some("message".to_string()),
+            batch: Default::default(),
         };
 
         let pulsar = Pulsar::<TokioExecutor>::builder(&cnf.endpoint, TokioExecutor)
@@ -461,7 +563,7 @@ mod integration_tests {
             .await
             .unwrap();
 
-        let producer = cnf.create_pulsar_producer().await.unwrap();
+        let producer = cnf.create_pulsar_producer(false).await.unwrap();
         let transformer = cnf.encoding.transformer();
         let serializer = cnf.encoding.build().unwrap();
         let encoder = Encoder::<()>::new(serializer);

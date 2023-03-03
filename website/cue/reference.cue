@@ -21,7 +21,7 @@ _values: {
 //
 // * `none` - compression is not applied
 // * `gzip` - gzip compression applied
-#CompressionAlgorithm: "none" | "gzip" | "lz4" | "snappy" | "zstd"
+#CompressionAlgorithm: "none" | "gzip" | "lz4" | "snappy" | "zstd" | "zlib"
 
 #CompressionLevel: "none" | "fast" | "default" | "best" | >=0 & <=9
 
@@ -309,6 +309,15 @@ _values: {
 	// via the key you use.
 	name: string
 
+	// `deprecated` sets if the given field has been deprecated.
+	deprecated: bool | *false
+
+	if deprecated {
+		// If a field has been deprecated we can optionally set a deprecated
+		// message to be displayed.
+		deprecated_message?: string
+	}
+
 	// `relevant_when` clarifies when an option is relevant.
 	//
 	// For example, if an option depends on the value of another option you can
@@ -329,7 +338,7 @@ _values: {
 	warnings: [...string] | *[]
 
 	if !required {
-		// `common` specifes that the option is commonly used. It will bring the
+		// `common` specifies that the option is commonly used. It will bring the
 		// option to the top of the documents, surfacing it from other
 		// less common, options.
 		common?: bool
@@ -468,14 +477,14 @@ _values: {
 	//
 	// For example, the `sinks.http.headers.*` option allows for arbitrary
 	// key/value pairs.
-	{"*": {}} |
-	{"bool": #TypeBool & {_args: required: Args.required}} |
-	{"float": #TypeFloat & {_args: required: Args.required}} |
-	{"object": #TypeObject & {_args: required: Args.required}} |
-	{"string": #TypeString & {_args: required: Args.required}} |
-	{"ascii_char": #TypeAsciiChar & {_args: required: Args.required}} |
-	{"timestamp": #TypeTimestamp & {_args: required: Args.required}} |
-	{"uint": #TypeUint & {_args: required: Args.required}}
+	"*"?: {}
+	"bool"?:       #TypeBool & {_args: required:      Args.required}
+	"float"?:      #TypeFloat & {_args: required:     Args.required}
+	"object"?:     #TypeObject & {_args: required:    Args.required}
+	"string"?:     #TypeString & {_args: required:    Args.required}
+	"ascii_char"?: #TypeAsciiChar & {_args: required: Args.required}
+	"timestamp"?:  #TypeTimestamp & {_args: required: Args.required}
+	"uint"?:       #TypeUint & {_args: required:      Args.required}
 }
 
 #TypeArray: {
@@ -486,7 +495,7 @@ _values: {
 
 	if !Args.required {
 		// `default` sets the default value.
-		default: [...] | null
+		default: [...] | *null
 	}
 
 	examples?: [...[...Type.items.type]]
@@ -502,7 +511,7 @@ _values: {
 
 	if !Args.required {
 		// `default` sets the default value.
-		default: bool | null
+		default: bool | *null
 	}
 }
 
@@ -512,7 +521,7 @@ _values: {
 
 	if !Args.required {
 		// `default` sets the default value.
-		default: float | null
+		default: float | *null
 	}
 
 	// `examples` clarify values through examples. This should be used
@@ -541,7 +550,7 @@ _values: {
 
 	if !Args.required {
 		// `default` sets the default value.
-		default: string | null | *""
+		default: string | *null
 	}
 
 	// `enum` restricts the value to a set of values.
@@ -573,7 +582,7 @@ _values: {
 
 	if !Args.required {
 		// `default` sets the default value.
-		default: string | null
+		default: string | *null
 	}
 
 	examples?: [string, ...string]
@@ -585,7 +594,7 @@ _values: {
 
 	if !Args.required {
 		// `default` sets the default value.
-		default: #Timestamp | null
+		default: #Timestamp | *null
 	}
 
 	// `examples` clarify values through examples. This should be used
@@ -600,7 +609,7 @@ _values: {
 
 	if !Args.required {
 		// `default` sets the default value.
-		default: uint | null
+		default: uint | *null
 	}
 
 	// `examples` clarify values through examples. This should be used
@@ -613,7 +622,7 @@ _values: {
 	unit?: #Unit | null
 }
 
-#Unit: "bytes" | "events" | "milliseconds" | "nanoseconds" | "requests" | "seconds" | "lines" | "concurrency"
+#Unit: "bytes" | "events" | "milliseconds" | "nanoseconds" | "requests" | "seconds" | "lines" | "concurrency" | "connections" | "tasks" | "retries"
 
 administration: _
 components:     _
@@ -637,7 +646,7 @@ _coercing_fields: """
 	2. The [time format specifiers](\(urls.chrono_time_formats)) from Rust's
 	   `chrono` library.
 
-	### Types
+	**Types**
 
 	* `bool`
 	* `string`
@@ -646,7 +655,7 @@ _coercing_fields: """
 	* `date`
 	* `timestamp` (see the table below for formats)
 
-	### Timestamp Formats
+	**Timestamp Formats**
 
 	Format | Description | Example
 	:------|:------------|:-------

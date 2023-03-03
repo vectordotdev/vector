@@ -27,8 +27,7 @@ use crate::sinks::{
 };
 use crate::{
     codecs::{Encoder, Transformer},
-    config::log_schema,
-    http::HttpClient,
+    http::{get_http_scheme_from_uri, HttpClient},
     internal_events::{
         LokiEventUnlabeled, LokiOutOfOrderEventDropped, LokiOutOfOrderEventRewritten,
         SinkRequestBuildError, TemplateRenderingError,
@@ -210,15 +209,13 @@ impl EventEncoder {
         let mut labels = self.build_labels(&event);
         self.remove_label_fields(&mut event);
 
-        let schema = log_schema();
-        let timestamp_key = schema.timestamp_key();
-        let timestamp = match event.as_log().get(timestamp_key) {
+        let timestamp = match event.as_log().get_timestamp() {
             Some(Value::Timestamp(ts)) => ts.timestamp_nanos(),
             _ => chrono::Utc::now().timestamp_nanos(),
         };
 
         if self.remove_timestamp {
-            event.as_mut_log().remove(timestamp_key);
+            event.as_mut_log().remove_timestamp();
         }
 
         self.transformer.transform(&mut event);
@@ -233,7 +230,7 @@ impl EventEncoder {
             labels = vec![("agent".to_string(), "vector".to_string())]
         }
 
-        let partition = PartitionKey::new(tenant_id, &mut labels);
+        let partition = PartitionKey { tenant_id };
 
         Some(LokiRecord {
             labels,
@@ -326,6 +323,7 @@ pub struct LokiSink {
     batch_settings: BatcherSettings,
     out_of_order_action: OutOfOrderAction,
     service: Svc<LokiService, LokiRetryLogic>,
+    protocol: &'static str,
 }
 
 impl LokiSink {
@@ -333,7 +331,7 @@ impl LokiSink {
     pub fn new(config: LokiConfig, client: HttpClient) -> crate::Result<Self> {
         let compression = config.compression;
 
-        // if Vector is configured to allow events with out of order timestamps, then then we can
+        // if Vector is configured to allow events with out of order timestamps, then we can
         // safely enable concurrency settings.
         //
         // For rewritten timestamps, we use a static concurrency of 1 to avoid out-of-order
@@ -350,6 +348,7 @@ impl LokiSink {
             }
         };
 
+        let protocol = get_http_scheme_from_uri(&config.endpoint.uri);
         let service = tower::ServiceBuilder::new()
             .settings(request_limits, LokiRetryLogic)
             .service(LokiService::new(
@@ -385,6 +384,7 @@ impl LokiSink {
             batch_settings: config.batch.into_batcher_settings()?,
             out_of_order_action: config.out_of_order_action,
             service,
+            protocol,
         })
     }
 
@@ -401,7 +401,7 @@ impl LokiSink {
             }
         };
 
-        let sink = input
+        input
             .map(|event| encoder.encode_event(event))
             .filter_map(|event| async { event })
             .map(|record| filter.filter_record(record))
@@ -438,9 +438,10 @@ impl LokiSink {
                     Ok(req) => Some(req),
                 }
             })
-            .into_driver(self.service);
-
-        sink.run().await
+            .into_driver(self.service)
+            .protocol(self.protocol)
+            .run()
+            .await
     }
 }
 
@@ -465,7 +466,7 @@ mod tests {
         convert::TryFrom,
     };
 
-    use codecs::JsonSerializer;
+    use codecs::JsonSerializerConfig;
     use futures::stream::StreamExt;
     use vector_core::event::{Event, LogEvent, Value};
 
@@ -480,7 +481,7 @@ mod tests {
         let mut encoder = EventEncoder {
             key_partitioner: KeyPartitioner::new(None),
             transformer: Default::default(),
-            encoder: Encoder::<()>::new(JsonSerializer::new().into()),
+            encoder: Encoder::<()>::new(JsonSerializerConfig::default().build().into()),
             labels: HashMap::default(),
             remove_label_fields: false,
             remove_timestamp: false,
@@ -519,7 +520,7 @@ mod tests {
         let mut encoder = EventEncoder {
             key_partitioner: KeyPartitioner::new(None),
             transformer: Default::default(),
-            encoder: Encoder::<()>::new(JsonSerializer::new().into()),
+            encoder: Encoder::<()>::new(JsonSerializerConfig::default().build().into()),
             labels,
             remove_label_fields: false,
             remove_timestamp: false,
@@ -551,7 +552,7 @@ mod tests {
         let mut encoder = EventEncoder {
             key_partitioner: KeyPartitioner::new(None),
             transformer: Default::default(),
-            encoder: Encoder::<()>::new(JsonSerializer::new().into()),
+            encoder: Encoder::<()>::new(JsonSerializerConfig::default().build().into()),
             labels: HashMap::default(),
             remove_label_fields: false,
             remove_timestamp: true,
@@ -579,7 +580,7 @@ mod tests {
         let mut encoder = EventEncoder {
             key_partitioner: KeyPartitioner::new(None),
             transformer: Default::default(),
-            encoder: Encoder::<()>::new(JsonSerializer::new().into()),
+            encoder: Encoder::<()>::new(JsonSerializerConfig::default().build().into()),
             labels,
             remove_label_fields: true,
             remove_timestamp: false,
@@ -598,7 +599,7 @@ mod tests {
         let mut encoder = EventEncoder {
             key_partitioner: KeyPartitioner::new(None),
             transformer: Default::default(),
-            encoder: Encoder::<()>::new(JsonSerializer::new().into()),
+            encoder: Encoder::<()>::new(JsonSerializerConfig::default().build().into()),
             labels: HashMap::default(),
             remove_label_fields: false,
             remove_timestamp: false,

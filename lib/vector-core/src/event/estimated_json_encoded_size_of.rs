@@ -29,7 +29,7 @@ const EPOCH_RFC3339_9: &str = "1970-01-01T00:00:00.000000000Z";
 ///
 /// It should *NOT* be used for exact size calculations, as it may lead to incorrect results.
 ///
-/// Implementaors of this trait should strive to provide as accurate numbers as possible, without
+/// Implementers of this trait should strive to provide as accurate numbers as possible, without
 /// introducing a significant performance penalty.
 ///
 /// As an example, the size of a type that results in a JSON string should not iterate over
@@ -133,7 +133,7 @@ impl<T: EstimatedJsonEncodedSizeOf + Copy> EstimatedJsonEncodedSizeOf for NotNan
     }
 }
 
-/// JSON only support string keys, so `K` is constrainted to anything that can be converted into a
+/// JSON only support string keys, so `K` is constrained to anything that can be converted into a
 /// `str`.
 impl<K, V> EstimatedJsonEncodedSizeOf for BTreeMap<K, V>
 where
@@ -156,7 +156,7 @@ where
     }
 }
 
-/// JSON only support string keys, so `K` is constrainted to anything that can be converted into a
+/// JSON only support string keys, so `K` is constrained to anything that can be converted into a
 /// `str`.
 impl<K, V, S> EstimatedJsonEncodedSizeOf for HashMap<K, V, S>
 where

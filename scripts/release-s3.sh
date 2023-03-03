@@ -7,8 +7,8 @@ set -euo pipefail
 #
 #   Uploads archives and packages to S3
 
-CHANNEL="${CHANNEL:-"$(scripts/release-channel.sh)"}"
-VERSION="${VECTOR_VERSION:-"$(scripts/version.sh)"}"
+CHANNEL="${CHANNEL:-"$(cargo vdev release channel)"}"
+VERSION="${VECTOR_VERSION:-"$(cargo vdev version)"}"
 DATE="${DATE:-"$(date -u +%Y-%m-%d)"}"
 VERIFY_TIMEOUT="${VERIFY_TIMEOUT:-"30"}" # seconds
 VERIFY_RETRIES="${VERIFY_RETRIES:-"2"}"
@@ -79,9 +79,6 @@ if [[ "$CHANNEL" == "nightly" ]]; then
   verify_artifact \
     "https://packages.timber.io/vector/nightly/latest/vector-nightly-x86_64-unknown-linux-gnu.tar.gz" \
     "$td_nightly/vector-nightly-x86_64-unknown-linux-gnu.tar.gz"
-  verify_artifact \
-    "https://packages.timber.io/vector/nightly/latest/vector-nightly-x86_64-unknown-linux-gnu-debug.tar.gz" \
-    "$td_nightly/vector-nightly-x86_64-unknown-linux-gnu-debug.tar.gz"
 elif [[ "$CHANNEL" == "latest" ]]; then
   VERSION_EXACT="$VERSION"
   # shellcheck disable=SC2001

@@ -386,7 +386,7 @@ mod tests {
                     } },
                 ] },
             },
-            // Non existent, the types we know are moved into the returned array.
+            // Nonexistent, the types we know are moved into the returned array.
             TestCase {
                 old: type_def! { object {
                     "nonk" => type_def! { bytes },
@@ -400,7 +400,7 @@ mod tests {
         for case in cases {
             let path = parse_value_path(case.path).unwrap();
             let new = invert_array_at_path(&case.old, &path);
-            assert_eq!(case.new, new, "{}", path);
+            assert_eq!(case.new, new, "{path}");
         }
     }
 

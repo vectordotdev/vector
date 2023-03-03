@@ -160,7 +160,7 @@ where
 /// in flight batches.
 ///
 /// This type is similar to `BatchSink` with the added benefit that it has
-/// more fine grained partitioning ability. It will hold many different batches
+/// more fine-grained partitioning ability. It will hold many different batches
 /// of events and contain linger timeouts for each.
 ///
 /// Note that, unlike `BatchSink`, the `batch` given to this sink is
@@ -175,7 +175,7 @@ where
 /// in all requests will not be acked until r1 has completed.
 ///
 /// # Ordering
-/// Per partition ordering can be achived by holding onto future of a request
+/// Per partition ordering can be achieved by holding onto future of a request
 /// until it finishes. Until then all further requests in that partition are
 /// delayed.
 ///

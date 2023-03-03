@@ -1,0 +1,26 @@
+# result: {
+#   "a": { "boolean": true },
+#   "b": { "boolean": true, "bytes": true },
+#   "c": {"bytes": true }
+# }
+
+# This should be infallible (even though the right-hand side is fallible)
+false && (1/0)
+
+x = false
+false && {x = "string"}
+# The typedef of the RHS is not applied (since it is guaranteed to short-circuit)
+result.a = type_def(x)
+assert!(type_def(x) == { "boolean": true })
+
+# The typedef of RHS is conditionally applied (can't know if it will be resolved or not)
+.unknown || {x = "string"}
+result.b = type_def(x)
+assert!(type_def(x) == { "boolean": true, "bytes": true })
+
+# The typedef of RHS is always applied
+false || {x = "string"; true}
+result.c = type_def(x)
+assert!(type_def(x) == {"bytes": true })
+
+result

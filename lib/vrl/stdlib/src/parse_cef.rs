@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use ::value::Value;
 use nom::{
     self,
@@ -12,6 +14,37 @@ use nom::{
 };
 use vrl::prelude::*;
 
+fn build_map() -> HashMap<&'static str, (usize, CustomField)> {
+    [
+        ("c6a1Label", "c6a1"),
+        ("c6a2Label", "c6a2"),
+        ("c6a3Label", "c6a3"),
+        ("c6a4Label", "c6a4"),
+        ("cfp1Label", "cfp1"),
+        ("cfp2Label", "cfp2"),
+        ("cfp3Label", "cfp3"),
+        ("cfp4Label", "cfp4"),
+        ("cn1Label", "cn1"),
+        ("cn2Label", "cn2"),
+        ("cn3Label", "cn3"),
+        ("cs1Label", "cs1"),
+        ("cs2Label", "cs2"),
+        ("cs3Label", "cs3"),
+        ("cs4Label", "cs4"),
+        ("cs5Label", "cs5"),
+        ("cs6Label", "cs6"),
+        ("deviceCustomDate1Label", "deviceCustomDate1"),
+        ("deviceCustomDate2Label", "deviceCustomDate2"),
+        ("flexDate1Label", "flexDate1"),
+        ("flexString1Label", "flexString1"),
+        ("flexString2Label", "flexString2"),
+    ]
+    .iter()
+    .enumerate()
+    .flat_map(|(i, (k, v))| [(*k, (i, CustomField::Label)), (*v, (i, CustomField::Value))])
+    .collect()
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct ParseCef;
 
@@ -21,11 +54,18 @@ impl Function for ParseCef {
     }
 
     fn parameters(&self) -> &'static [Parameter] {
-        &[Parameter {
-            keyword: "value",
-            kind: kind::BYTES,
-            required: true,
-        }]
+        &[
+            Parameter {
+                keyword: "value",
+                kind: kind::BYTES,
+                required: true,
+            },
+            Parameter {
+                keyword: "translate_custom_fields",
+                kind: kind::BOOLEAN,
+                required: false,
+            },
+        ]
     }
 
     fn examples(&self) -> &'static [Example] {
@@ -65,6 +105,13 @@ impl Function for ParseCef {
                     r#"{"cefVersion":"0","deviceVendor":"security","deviceProduct":"threatmanager","deviceVersion":"1.0","deviceEventClassId":"100","name":"Detected a | in message. No action needed.","severity":"10","src":"10.0.0.1","msg":"Detected a threat.\n No action needed","act":"blocked a =", "dst":"1.1.1.1"}"#,
                 ),
             },
+            Example {
+                title: "translate custom fields",
+                source: r#"parse_cef!("CEF:0|CyberArk|PTA|12.6|1|\"Suspected credentials theft\"|8|suser=mike2@prod1.domain.com shost=prod1.domain.com c6a1=2345:0425:2CA1:0000:0000:0567:5673:23b5 c6a1Label=Device IPv6 Address", translate_custom_fields: true)"#,
+                result: Ok(
+                    r#"{"cefVersion":"0","deviceVendor":"CyberArk","deviceProduct":"PTA","deviceVersion":"12.6","deviceEventClassId":"1","name":"Suspected credentials theft","severity":"8","suser":"mike2@prod1.domain.com","shost":"prod1.domain.com","Device IPv6 Address":"2345:0425:2CA1:0000:0000:0567:5673:23b5"}"#,
+                ),
+            },
         ]
     }
 
@@ -75,22 +122,75 @@ impl Function for ParseCef {
         arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
+        let translate_custom_fields = arguments.optional("translate_custom_fields");
+        let custom_field_map = build_map();
 
-        Ok(ParseCefFn { value }.as_expr())
+        Ok(ParseCefFn {
+            value,
+            translate_custom_fields,
+            custom_field_map,
+        }
+        .as_expr())
     }
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct ParseCefFn {
     pub(crate) value: Box<dyn Expression>,
+    pub(crate) translate_custom_fields: Option<Box<dyn Expression>>,
+    custom_field_map: HashMap<&'static str, (usize, CustomField)>,
 }
 
 impl FunctionExpression for ParseCefFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let bytes = self.value.resolve(ctx)?;
         let bytes = bytes.try_bytes_utf8_lossy()?;
+        let translate_custom_fields = if let Some(field) = self.translate_custom_fields.as_ref() {
+            field.resolve(ctx)?.try_boolean()?
+        } else {
+            false
+        };
 
-        parse(&bytes).map(Iterator::collect)
+        let result = parse(&bytes)?;
+
+        if translate_custom_fields {
+            let mut custom_fields = HashMap::<_, [Option<String>; 2]>::new();
+
+            let mut result = result
+                .filter_map(|(k, v)| {
+                    if let Some(&(i, custom_field)) = self.custom_field_map.get(k.as_str()) {
+                        let previous =
+                            custom_fields.entry(i).or_default()[custom_field as usize].replace(v);
+                        if previous.is_some() {
+                            return Some(Err(format!(
+                                "Custom field with duplicate {}",
+                                match custom_field {
+                                    CustomField::Label => "label",
+                                    CustomField::Value => "value",
+                                }
+                            )
+                            .into()));
+                        }
+                        None
+                    } else {
+                        Some(Ok((k, v.into())))
+                    }
+                })
+                .collect::<Result<BTreeMap<String, Value>>>()?;
+
+            for (_, fields) in custom_fields {
+                match fields {
+                    [Some(label), value] => {
+                        result.insert(label, value.into());
+                    }
+                    _ => return Err("Custom field with missing label or value".into()),
+                }
+            }
+
+            Ok(Value::Object(result))
+        } else {
+            Ok(result.map(|(k, v)| (k, v.into())).collect())
+        }
     }
 
     fn type_def(&self, _: &state::TypeState) -> TypeDef {
@@ -98,7 +198,13 @@ impl FunctionExpression for ParseCefFn {
     }
 }
 
-fn parse(input: &str) -> Result<impl Iterator<Item = (String, Value)> + '_> {
+#[derive(Debug, Clone, Copy)]
+enum CustomField {
+    Label = 0,
+    Value = 1,
+}
+
+fn parse(input: &str) -> Result<impl Iterator<Item = (String, String)> + '_> {
     let (rest, (header, mut extension)) =
         pair(parse_header, parse_extension)(input).map_err(|e| match e {
             nom::Err::Error(e) | nom::Err::Failure(e) => {
@@ -136,7 +242,7 @@ fn parse(input: &str) -> Result<impl Iterator<Item = (String, Value)> + '_> {
                 }
                 (key, value)
             })
-            .map(|(key, value)| (key.to_string(), value.into()));
+            .map(|(key, value)| (key.to_string(), value));
 
         Ok(result)
     } else {
@@ -155,7 +261,7 @@ fn parse_header_value(input: &str) -> IResult<&str, String, VerboseError<&str>> 
     preceded(
         opt(char('|')),
         alt((
-            map(peek(char('|')), |_| "".to_string()),
+            map(peek(char('|')), |_| String::new()),
             escaped_transform(
                 take_till1(|c: char| c == '\\' || c == '|'),
                 '\\',
@@ -175,7 +281,7 @@ fn parse_key_value(input: &str) -> IResult<&str, (&str, String), VerboseError<&s
 
 fn parse_value(input: &str) -> IResult<&str, String, VerboseError<&str>> {
     alt((
-        map(peek(parse_key), |_| "".to_string()),
+        map(peek(parse_key), |_| String::new()),
         escaped_transform(
             take_till1_input(|input| alt((tag("\\"), tag("="), parse_key))(input).is_ok()),
             '\\',
@@ -279,15 +385,15 @@ mod test {
     fn test_parse_empty_value() {
         assert_eq!(
             Ok(vec![
-                ("src".to_string(), "".into()),
+                ("src".to_string(), String::new()),
                 ("dst".to_string(), "2.1.2.2".into()),
                 ("cefVersion".to_string(), "1".into()),
                 ("deviceVendor".to_string(), "Security".into()),
                 ("deviceProduct".to_string(), "threatmanager".into()),
-                ("deviceVersion".to_string(), "".into()),
+                ("deviceVersion".to_string(), String::new()),
                 ("deviceEventClassId".to_string(), "100".into()),
                 ("name".to_string(), "worm successfully stopped".into()),
-                ("severity".to_string(), "".into()),
+                ("severity".to_string(), String::new()),
             ]),
             parse("CEF:1|Security|threatmanager||100|worm successfully stopped||src= dst=2.1.2.2")
                 .map(Iterator::collect)
@@ -537,6 +643,29 @@ mod test {
             tdef: type_def(),
         }
 
+
+        translate_custom_fields {
+            args: func_args! [
+                value: r#"CEF:0|CyberArk|PTA|12.6|1|Suspected credentials theft|8|suser=mike2@prod1.domain.com cn1=1254323565 shost=prod1.domain.com src=1.1.1.1 cfp1Label=Uptime hours cfp1=35.46 cn1Label=Internal ID"#,
+                translate_custom_fields: true
+            ],
+            want: Ok(value!({
+                "cefVersion":"0",
+                "deviceVendor":"CyberArk",
+                "deviceProduct":"PTA",
+                "deviceVersion":"12.6",
+                "deviceEventClassId":"1",
+                "name":"Suspected credentials theft",
+                "severity":"8",
+                "suser":"mike2@prod1.domain.com",
+                "shost":"prod1.domain.com",
+                "src":"1.1.1.1",
+                "Uptime hours":"35.46",
+                "Internal ID":"1254323565",
+            })),
+            tdef: type_def(),
+        }
+
         missing_value {
             args: func_args! [
                 value: r#"CEF:0|CyberArk|PTA|12.6||Suspected credentials theft||suser=mike2@prod1.domain.com shost= src=1.1.1.1"#,
@@ -586,6 +715,24 @@ mod test {
                 "severity":"5",
                 "TestField": r#"{'blabla': 'blabla\xc3\xaablabla'}"#,
             })),
+            tdef: type_def(),
+        }
+
+        missing_custom_label {
+            args: func_args! [
+                value: r#"CEF:0|CyberArk|PTA|12.6|1|Suspected credentials theft|8|cfp1=1.23"#,
+                translate_custom_fields: true
+            ],
+            want: Err("Custom field with missing label or value"),
+            tdef: type_def(),
+        }
+
+        duplicate_value {
+            args: func_args! [
+                value: r#"CEF:0|CyberArk|PTA|12.6|1|Suspected credentials theft|8|flexString1=1.23 flexString1=1.24 flexString1Label=Version"#,
+                translate_custom_fields: true
+            ],
+            want: Err("Custom field with duplicate value"),
             tdef: type_def(),
         }
 

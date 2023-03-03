@@ -4,7 +4,7 @@ use async_graphql::{InputObject, InputType};
 
 use super::components::{source, ComponentKind};
 
-/// Takes an &Option<bool> and returns early if false
+/// Takes an `&Option<bool>` and returns early if false
 #[macro_export]
 macro_rules! filter_check {
     ($($match:expr),+) => {

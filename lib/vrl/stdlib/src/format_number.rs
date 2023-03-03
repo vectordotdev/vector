@@ -45,7 +45,7 @@ fn format_number(
             let i = i as usize;
 
             if parts.len() == 1 {
-                parts.push("".to_owned())
+                parts.push(String::new())
             }
 
             if i > parts[1].len() {

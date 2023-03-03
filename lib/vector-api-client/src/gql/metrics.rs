@@ -159,7 +159,7 @@ impl component_sent_events_throughputs_subscription::ComponentSentEventsThroughp
             .map(|output| {
                 (
                     output.output_id.clone(),
-                    output.throughput as i64,
+                    output.throughput,
                 )
             })
             .collect()

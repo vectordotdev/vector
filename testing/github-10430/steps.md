@@ -12,7 +12,7 @@ something about the code to read the buffer size is wrong and there _is_ still d
 Start by grabbing Vector binaries for 0.18.1, 0.19.0, and build one from the fix branch.  We'll use
 a simple configuration that will read records from stdin and attempt to send them to an HTTP sink.
 
-For the HTTP sink, we'll simply set it to a non-existent endpoint.  Since Vector will retry
+For the HTTP sink, we'll simply set it to a nonexistent endpoint.  Since Vector will retry
 "connection refused" errors, and retry them infinitely, the messages will never be acknowledged,
 which ensures they remain in the buffer.  For the purposes of verifying that the same data that went
 in is still present after renaming the data directory, etc, we can use `netcat` to listen on the

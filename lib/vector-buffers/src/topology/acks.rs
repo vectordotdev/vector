@@ -230,7 +230,7 @@ where
     /// - if we have no pending markers, `MarkerOffset::Gap` is returned, and contains the delta
     ///   between the given ID and the next expected marker ID
     /// - if we have pending markers, and the given ID is logically behind the next expected marker
-    ///   ID, `MarkerOffset::MontonicityViolation` is returned, indicating that the monotonicity
+    ///   ID, `MarkerOffset::MonotonicityViolation` is returned, indicating that the monotonicity
     ///   invariant has been violated
     /// - if we have pending markers, and the given ID is logically ahead of the next expected
     ///   marker, `MarkerOffset::Gap` is returned, specifying how far ahead of the next expected
@@ -677,7 +677,7 @@ mod tests {
             ],
         );
 
-        // When we have a fized-size marker whose required acked marker ID lands right on the
+        // When we have a fixed-size marker whose required acked marker ID lands right on the
         // current acked marker ID, it should not be eligible unless there are enough unclaimed
         // acks to actually account for it:
         run_test_case(
@@ -790,7 +790,7 @@ mod tests {
                                 },
                                 PendingMarkerLength::Assumed(_) => panic!("should never have an assumed length at back"),
                                 PendingMarkerLength::Unknown => {
-                                    // Now that we have an ID range, we have enough infornation to
+                                    // Now that we have an ID range, we have enough information to
                                     // give the unknown length marker an assumed length.
                                     let len = id.wrapping_sub(back_id);
                                     let (_, back_len_mut) = marker_stack.back_mut().expect("must exist");
@@ -815,7 +815,7 @@ mod tests {
                                     marker_stack.push_back((id, len));
                                 }
                             },
-                            a => panic!("got unexpected action after adding pending marker: {:?}", a),
+                            a => panic!("got unexpected action after adding pending marker: {a:?}"),
                         }
                     },
                     Action::GetNextEligibleMarker => match sut.get_next_eligible_marker() {
@@ -836,7 +836,7 @@ mod tests {
                                 }
                                 (PendingMarkerLength::Unknown, _) =>
                                     panic!("SUT had eligible marker but marker stack had unknown length marker"),
-                                (a, b) => panic!("unknown SUT/model marker len combination: {:?}, {:?}", a, b),
+                                (a, b) => panic!("unknown SUT/model marker len combination: {a:?}, {b:?}"),
                             };
 
                             assert!(unclaimed_acks_to_consume <= unclaimed_acks,

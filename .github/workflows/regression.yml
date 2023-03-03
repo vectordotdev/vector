@@ -21,6 +21,8 @@ on:
       - "docs/**"
       - "rfcs/**"
       - "website/**"
+  merge_group:
+    types: [checks_requested]
 
 jobs:
   cancel-previous:
@@ -100,10 +102,10 @@ jobs:
 
       - name: Set up Docker Buildx
         id: buildx
-        uses: docker/setup-buildx-action@v2.2.1
+        uses: docker/setup-buildx-action@v2.4.1
 
       - name: Build 'vector' target image
-        uses: docker/build-push-action@v3
+        uses: docker/build-push-action@v4.0.0
         with:
           context: baseline-vector/
           cache-from: type=gha
@@ -137,10 +139,10 @@ jobs:
 
       - name: Set up Docker Buildx
         id: buildx
-        uses: docker/setup-buildx-action@v2.2.1
+        uses: docker/setup-buildx-action@v2.4.1
 
       - name: Build 'vector' target image
-        uses: docker/build-push-action@v3
+        uses: docker/build-push-action@v4.0.0
         with:
           context: comparison-vector/
           cache-from: type=gha

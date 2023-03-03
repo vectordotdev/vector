@@ -51,7 +51,10 @@ impl SyncTransform for Route {
 }
 
 /// Configuration for the `route` transform.
-#[configurable_component(transform("route"))]
+#[configurable_component(transform(
+    "route",
+    "Split a stream of events into multiple sub-streams based on user-supplied conditions."
+))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct RouteConfig {
@@ -61,16 +64,10 @@ pub struct RouteConfig {
     /// `<transform_name>.<route_id>`. If an event doesn’t match any route, it will be sent to the
     /// `<transform_name>._unmatched` output.
     ///
-    /// Both `_unmatched`, as well as `_default`, are reserved output names and cannot be used as a
-    /// route name.
+    /// Both `_unmatched`, as well as `_default`, are reserved output names and thus cannot be used
+    /// as a route name.
+    #[configurable(metadata(docs::additional_props_description = "An individual route."))]
     route: IndexMap<String, AnyCondition>,
-}
-
-#[cfg(feature = "transforms-pipelines")]
-impl RouteConfig {
-    pub(crate) const fn new(route: IndexMap<String, AnyCondition>) -> Self {
-        Self { route }
-    }
 }
 
 impl GenerateConfig for RouteConfig {
@@ -83,6 +80,7 @@ impl GenerateConfig for RouteConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "route")]
 impl TransformConfig for RouteConfig {
     async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
         let route = Route::new(self, context)?;

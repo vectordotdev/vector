@@ -1,0 +1,11 @@
+test_filter: '::prometheus::remote_write::'
+
+features:
+- prometheus-integration-tests
+
+env:
+  REMOTE_WRITE_SOURCE_RECEIVE_ADDRESS: runner:9102
+
+matrix:
+  prometheus: ['v2.33.4']
+  influxdb: ['1.8']

@@ -7,7 +7,7 @@ use vrl::prelude::*;
 fn parse_aws_cloudwatch_log_subscription_message(bytes: Value) -> Resolved {
     let bytes = bytes.try_bytes()?;
     let message = serde_json::from_slice::<AwsCloudWatchLogsSubscriptionMessage>(&bytes)
-        .map_err(|e| format!("unable to parse: {}", e))?;
+        .map_err(|e| format!("unable to parse: {e}"))?;
     let map = Value::from(BTreeMap::from([
         (String::from("owner"), Value::from(message.owner)),
         (
@@ -192,11 +192,11 @@ mod tests {
                 (String::from("subscription_filters"), Value::from(vec![Value::from("Destination")])),
                 (String::from("log_events"), Value::from(vec![Value::from(BTreeMap::from([
                     (String::from("id"), Value::from( "35683658089614582423604394983260738922885519999578275840")),
-                    (String::from("timestamp"), Value::from(Utc.timestamp(1_600_110_569, 39_000_000))),
+                    (String::from("timestamp"), Value::from(Utc.timestamp_opt(1_600_110_569, 39_000_000).single().expect("invalid timestamp"))),
                     (String::from("message"), Value::from("{\"bytes\":26780,\"datetime\":\"14/Sep/2020:11:45:41 -0400\",\"host\":\"157.130.216.193\",\"method\":\"PUT\",\"protocol\":\"HTTP/1.0\",\"referer\":\"https://www.principalcross-platform.io/markets/ubiquitous\",\"request\":\"/expedite/convergence\",\"source_type\":\"stdin\",\"status\":301,\"user-identifier\":\"-\"}")),
                 ])), Value::from(BTreeMap::from([
                     (String::from("id"), Value::from("35683658089659183914001456229543810359430816722590236673")),
-                    (String::from("timestamp"), Value::from(Utc.timestamp(1_600_110_569, 41_000_000))),
+                    (String::from("timestamp"), Value::from(Utc.timestamp_opt(1_600_110_569, 41_000_000).single().expect("invalid timestamp"))),
                     (String::from("message"), Value::from("{\"bytes\":17707,\"datetime\":\"14/Sep/2020:11:45:41 -0400\",\"host\":\"109.81.244.252\",\"method\":\"GET\",\"protocol\":\"HTTP/2.0\",\"referer\":\"http://www.investormission-critical.io/24/7/vortals\",\"request\":\"/scale/functionalities/optimize\",\"source_type\":\"stdin\",\"status\":502,\"user-identifier\":\"feeney1708\"}")),
                 ]))])),
                 ]))),

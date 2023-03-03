@@ -90,8 +90,14 @@ pub fn derive_component_name_impl(input: TokenStream) -> TokenStream {
     // We have a single, valid component name, so let's actually spit out our derive.
     let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
     let derived = quote! {
+        impl #impl_generics #ident #ty_generics #where_clause {
+            pub(super) const NAME: &'static str = #component_name;
+        }
+
         impl #impl_generics ::vector_config::NamedComponent for #ident #ty_generics #where_clause {
-            const NAME: &'static str = #component_name;
+            fn get_component_name(&self) -> &'static str {
+                #component_name
+            }
         }
     };
     derived.into()

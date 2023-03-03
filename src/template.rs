@@ -1,3 +1,4 @@
+//! Functionality for managing template fields used by Vector's sinks.
 use std::{borrow::Cow, convert::TryFrom, fmt, hash::Hash, path::PathBuf};
 
 use bytes::Bytes;
@@ -18,6 +19,8 @@ use crate::{
 
 static RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"\{\{(?P<key>[^\}]+)\}\}").unwrap());
 
+/// Errors raised whilst parsing a Template field.
+#[allow(missing_docs)]
 #[derive(Clone, Debug, Eq, PartialEq, Snafu)]
 pub enum TemplateParseError {
     #[snafu(display("Invalid strftime item"))]
@@ -26,6 +29,8 @@ pub enum TemplateParseError {
     InvalidPathSyntax { path: String },
 }
 
+/// Errors raised whilst rendering a Template.
+#[allow(missing_docs)]
 #[derive(Clone, Debug, Eq, PartialEq, Snafu)]
 pub enum TemplateRenderingError {
     #[snafu(display("Missing fields on event: {:?}", missing_keys))]
@@ -132,6 +137,7 @@ impl fmt::Display for Template {
 impl ConfigurableString for Template {}
 
 impl Template {
+    /// Renders the given template with data from the event.
     pub fn render<'a>(
         &self,
         event: impl Into<EventRef<'a>>,
@@ -139,6 +145,7 @@ impl Template {
         self.render_string(event.into()).map(Into::into)
     }
 
+    /// Renders the given template with data from the event.
     pub fn render_string<'a>(
         &self,
         event: impl Into<EventRef<'a>>,
@@ -164,7 +171,7 @@ impl Template {
                             EventRef::Metric(metric) => {
                                 render_metric_field(key, metric).map(Cow::Borrowed)
                             }
-                            EventRef::Trace(trace) => trace.get(&key).map(Value::to_string_lossy),
+                            EventRef::Trace(trace) => trace.get(key).map(Value::to_string_lossy),
                         }
                         .unwrap_or_else(|| {
                             missing_keys.push(key.to_owned());
@@ -181,6 +188,7 @@ impl Template {
         }
     }
 
+    /// Returns the names of the fields that are rendered in this template.
     pub fn get_fields(&self) -> Option<Vec<String>> {
         let parts: Vec<_> = self
             .parts
@@ -196,6 +204,7 @@ impl Template {
         (!parts.is_empty()).then_some(parts)
     }
 
+    /// Returns a reference to the template string.
     pub fn get_ref(&self) -> &str {
         &self.src
     }
@@ -205,6 +214,7 @@ impl Template {
         self.src.is_empty()
     }
 
+    /// A dynamic template string contains sections that depend on the input event or time.
     pub const fn is_dynamic(&self) -> bool {
         !self.is_static
     }
@@ -472,7 +482,10 @@ mod tests {
 
     #[test]
     fn render_log_timestamp_strftime_style() {
-        let ts = Utc.ymd(2001, 2, 3).and_hms(4, 5, 6);
+        let ts = Utc
+            .ymd(2001, 2, 3)
+            .and_hms_opt(4, 5, 6)
+            .expect("invalid timestamp");
 
         let mut event = Event::Log(LogEvent::from("hello world"));
         event.as_mut_log().insert(log_schema().timestamp_key(), ts);
@@ -484,7 +497,10 @@ mod tests {
 
     #[test]
     fn render_log_timestamp_multiple_strftime_style() {
-        let ts = Utc.ymd(2001, 2, 3).and_hms(4, 5, 6);
+        let ts = Utc
+            .ymd(2001, 2, 3)
+            .and_hms_opt(4, 5, 6)
+            .expect("invalid timestamp");
 
         let mut event = Event::Log(LogEvent::from("hello world"));
         event.as_mut_log().insert(log_schema().timestamp_key(), ts);
@@ -499,7 +515,10 @@ mod tests {
 
     #[test]
     fn render_log_dynamic_with_strftime() {
-        let ts = Utc.ymd(2001, 2, 3).and_hms(4, 5, 6);
+        let ts = Utc
+            .ymd(2001, 2, 3)
+            .and_hms_opt(4, 5, 6)
+            .expect("invalid timestamp");
 
         let mut event = Event::Log(LogEvent::from("hello world"));
         event.as_mut_log().insert("foo", "butts");
@@ -515,7 +534,10 @@ mod tests {
 
     #[test]
     fn render_log_dynamic_with_nested_strftime() {
-        let ts = Utc.ymd(2001, 2, 3).and_hms(4, 5, 6);
+        let ts = Utc
+            .ymd(2001, 2, 3)
+            .and_hms_opt(4, 5, 6)
+            .expect("invalid timestamp");
 
         let mut event = Event::Log(LogEvent::from("hello world"));
         event.as_mut_log().insert("format", "%F");
@@ -531,7 +553,10 @@ mod tests {
 
     #[test]
     fn render_log_dynamic_with_reverse_nested_strftime() {
-        let ts = Utc.ymd(2001, 2, 3).and_hms(4, 5, 6);
+        let ts = Utc
+            .ymd(2001, 2, 3)
+            .and_hms_opt(4, 5, 6)
+            .expect("invalid timestamp");
 
         let mut event = Event::Log(LogEvent::from("hello world"));
         event.as_mut_log().insert("\"%F\"", "foo");
@@ -607,7 +632,11 @@ mod tests {
             MetricKind::Absolute,
             MetricValue::Counter { value: 1.1 },
         )
-        .with_timestamp(Some(Utc.ymd(2002, 3, 4).and_hms(5, 6, 7)))
+        .with_timestamp(Some(
+            Utc.ymd(2002, 3, 4)
+                .and_hms_opt(5, 6, 7)
+                .expect("invalid timestamp"),
+        ))
     }
 
     #[test]

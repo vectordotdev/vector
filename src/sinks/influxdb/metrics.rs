@@ -61,9 +61,13 @@ pub struct InfluxDbConfig {
     /// This namespace is only used if a metric has no existing namespace. When a namespace is
     /// present, it is used as a prefix to the metric name, and separated with a period (`.`).
     #[serde(alias = "namespace")]
+    #[configurable(metadata(docs::examples = "service"))]
     pub default_namespace: Option<String>,
 
     /// The endpoint to send data to.
+    ///
+    /// This should be a full HTTP URI, including the scheme, host, and port.
+    #[configurable(metadata(docs::examples = "http://localhost:8086/"))]
     pub endpoint: String,
 
     #[serde(flatten)]
@@ -81,6 +85,8 @@ pub struct InfluxDbConfig {
     pub request: TowerRequestConfig,
 
     /// A map of additional tags, in the form of key/value pairs, to add to each measurement.
+    #[configurable(metadata(docs::additional_props_description = "A tag key/value pair."))]
+    #[configurable(metadata(docs::examples = "example_tags()"))]
     pub tags: Option<HashMap<String, String>>,
 
     #[configurable(derived)]
@@ -101,6 +107,10 @@ pub struct InfluxDbConfig {
 
 pub fn default_summary_quantiles() -> Vec<f64> {
     vec![0.5, 0.75, 0.9, 0.95, 0.99]
+}
+
+pub fn example_tags() -> HashMap<String, String> {
+    HashMap::from([("region".to_string(), "us-west-1".to_string())])
 }
 
 // https://v2.docs.influxdata.com/v2.0/write-data/#influxdb-api

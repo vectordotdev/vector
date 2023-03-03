@@ -17,7 +17,7 @@ use tokio_util::codec::Decoder as _;
 use value::{kind::Collection, Kind};
 use warp::http::{HeaderMap, StatusCode};
 
-use vector_config::{configurable_component, NamedComponent};
+use vector_config::configurable_component;
 use vector_core::{
     config::{LegacyKey, LogNamespace},
     schema::Definition,
@@ -43,13 +43,16 @@ use crate::{
 #[configurable_component(source("heroku_logs"))]
 #[derive(Clone, Debug)]
 pub struct LogplexConfig {
-    /// The address to listen for connections on.
+    /// The socket address to listen for connections on.
+    #[configurable(metadata(docs::examples = "0.0.0.0:80"))]
+    #[configurable(metadata(docs::examples = "localhost:80"))]
     address: SocketAddr,
 
     /// A list of URL query parameters to include in the log event.
     ///
     /// These will override any values included in the body with conflicting names.
     #[serde(default)]
+    #[configurable(metadata(docs::examples = "application", docs::examples = "source"))]
     query_parameters: Vec<String>,
 
     #[configurable(derived)]
@@ -92,7 +95,9 @@ impl LogplexConfig {
             )
             .with_source_metadata(
                 LogplexConfig::NAME,
-                Some(LegacyKey::InsertIfEmpty(owned_value_path!("host"))),
+                Some(LegacyKey::InsertIfEmpty(owned_value_path!(
+                    log_schema().host_key()
+                ))),
                 &owned_value_path!("host"),
                 Kind::bytes(),
                 Some("host"),
@@ -153,14 +158,10 @@ impl GenerateConfig for LogplexConfig {
 #[async_trait::async_trait]
 impl SourceConfig for LogplexConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
-        let decoder = DecodingConfig::new(
-            self.framing.clone(),
-            self.decoding.clone(),
-            LogNamespace::Legacy,
-        )
-        .build();
-
         let log_namespace = cx.log_namespace(self.log_namespace);
+
+        let decoder =
+            DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace).build();
 
         let source = LogplexSource {
             query_parameters: self.query_parameters.clone(),
@@ -394,10 +395,9 @@ mod tests {
 
     use chrono::{DateTime, Utc};
     use futures::Stream;
-    use lookup::{owned_value_path, LookupBuf};
+    use lookup::{owned_value_path, OwnedTargetPath};
     use similar_asserts::assert_eq;
     use value::{kind::Collection, Kind};
-    use vector_config::NamedComponent;
     use vector_core::{
         config::LogNamespace,
         event::{Event, EventStatus, Value},
@@ -457,7 +457,7 @@ mod tests {
         query: &str,
     ) -> u16 {
         let len = body.lines().count();
-        let mut req = reqwest::Client::new().post(&format!("http://{}/events?{}", address, query));
+        let mut req = reqwest::Client::new().post(format!("http://{}/events?{}", address, query));
         if let Some(auth) = auth {
             req = req.basic_auth(auth.username, Some(auth.password.inner()));
         }
@@ -655,31 +655,41 @@ mod tests {
 
         let expected_definition =
             Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
-                .with_meaning(LookupBuf::root(), "message")
-                .with_metadata_field(&owned_value_path!("vector", "source_type"), Kind::bytes())
+                .with_meaning(OwnedTargetPath::event_root(), "message")
+                .with_metadata_field(
+                    &owned_value_path!("vector", "source_type"),
+                    Kind::bytes(),
+                    None,
+                )
                 .with_metadata_field(
                     &owned_value_path!("vector", "ingest_timestamp"),
                     Kind::timestamp(),
+                    None,
                 )
                 .with_metadata_field(
                     &owned_value_path!(LogplexConfig::NAME, "timestamp"),
                     Kind::timestamp().or_undefined(),
+                    Some("timestamp"),
                 )
                 .with_metadata_field(
                     &owned_value_path!(LogplexConfig::NAME, "host"),
                     Kind::bytes(),
+                    Some("host"),
                 )
                 .with_metadata_field(
                     &owned_value_path!(LogplexConfig::NAME, "app_name"),
                     Kind::bytes(),
+                    None,
                 )
                 .with_metadata_field(
                     &owned_value_path!(LogplexConfig::NAME, "proc_id"),
                     Kind::bytes(),
+                    None,
                 )
                 .with_metadata_field(
                     &owned_value_path!(LogplexConfig::NAME, "query_parameters"),
                     Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
+                    None,
                 );
 
         assert_eq!(definition, expected_definition)

@@ -1,0 +1,5 @@
+# result: ["foo", "bar", null]
+
+. = ["foo", "bar", null]
+filter(.) -> |_index, value| { is_string(value) }
+.

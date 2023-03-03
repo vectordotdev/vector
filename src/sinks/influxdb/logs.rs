@@ -44,18 +44,26 @@ pub struct InfluxDbLogsConfig {
     ///
     /// When specified, the measurement name will be `<namespace>.vector`.
     ///
-    /// This field is deprecated, and `measurement` should be used instead.
-    #[configurable(deprecated)]
+    #[configurable(
+        deprecated = "This field is deprecated, and `measurement` should be used instead."
+    )]
+    #[configurable(metadata(docs::examples = "service"))]
     pub namespace: Option<String>,
 
     /// The name of the InfluxDB measurement that will be written to.
+    #[configurable(metadata(docs::examples = "vector-logs"))]
     pub measurement: Option<String>,
 
     /// The endpoint to send data to.
+    ///
+    /// This should be a full HTTP URI, including the scheme, host, and port.
+    #[configurable(metadata(docs::examples = "http://localhost:8086"))]
     pub endpoint: String,
 
     /// The list of names of log fields that should be added as tags to each measurement.
     #[serde(default)]
+    #[configurable(metadata(docs::examples = "field1"))]
+    #[configurable(metadata(docs::examples = "parent.child_field"))]
     pub tags: Vec<String>,
 
     #[serde(flatten)]
@@ -683,7 +691,10 @@ mod tests {
             let mut event = LogEvent::from(line.to_string()).with_batch_notifier(&batch);
             event.insert(format!("key{}", i).as_str(), format!("value{}", i));
 
-            let timestamp = Utc.ymd(1970, 1, 1).and_hms_nano(0, 0, (i as u32) + 1, 0);
+            let timestamp = Utc
+                .ymd(1970, 1, 1)
+                .and_hms_nano_opt(0, 0, (i as u32) + 1, 0)
+                .expect("invalid timestamp");
             event.insert("timestamp", timestamp);
             event.insert("source_type", "file");
 

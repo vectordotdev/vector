@@ -42,7 +42,7 @@ for FILE in $(git ls-files); do
     lib/datadog/grok/patterns/*.pattern) continue;;
   esac
 
-  # Skip all directories (usually theis only happens when we have symlinks).
+  # Skip all directories (usually this only happens when we have symlinks).
   if [[ -d "$FILE" ]]; then
     continue
   fi

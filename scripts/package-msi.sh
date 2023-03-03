@@ -9,8 +9,7 @@ set -euo pipefail
 
 set -x
 
-PROJECT_ROOT="$(pwd)"
-ARCHIVE_VERSION="${VECTOR_VERSION:-"$("$PROJECT_ROOT"/scripts/version.sh)"}"
+ARCHIVE_VERSION="${VECTOR_VERSION:-"$(cargo vdev version)"}"
 
 rm -rf target/msi-x64
 cp -R distribution/msi target/msi-x64

@@ -121,13 +121,21 @@ mod tests {
                     BTreeMap::from([
                         (
                             "from".into(),
-                            (expression::Literal::from(Utc.ymd(2015, 5, 15).and_hms(0, 0, 0)))
-                                .into(),
+                            (expression::Literal::from(
+                                Utc.ymd(2015, 5, 15)
+                                    .and_hms_opt(0, 0, 0)
+                                    .expect("invalid timestamp"),
+                            ))
+                            .into(),
                         ),
                         (
                             "to".into(),
-                            (expression::Literal::from(Utc.ymd(2015, 6, 15).and_hms(0, 0, 0)))
-                                .into(),
+                            (expression::Literal::from(
+                                Utc.ymd(2015, 6, 15)
+                                    .and_hms_opt(0, 0, 0)
+                                    .expect("invalid timestamp"),
+                            ))
+                            .into(),
                         ),
                     ])
                     .into(),

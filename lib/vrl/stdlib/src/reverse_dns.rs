@@ -8,8 +8,8 @@ fn reverse_dns(value: Value) -> Resolved {
     let ip: IpAddr = value
         .try_bytes_utf8_lossy()?
         .parse()
-        .map_err(|err| format!("unable to parse IP address: {}", err))?;
-    let host = lookup_addr(&ip).map_err(|err| format!("unable to perform a lookup : {}", err))?;
+        .map_err(|err| format!("unable to parse IP address: {err}"))?;
+    let host = lookup_addr(&ip).map_err(|err| format!("unable to perform a lookup : {err}"))?;
 
     Ok(host.into())
 }
