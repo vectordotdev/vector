@@ -46,7 +46,7 @@ use crate::{
 ///                      └────────────┘
 /// ```
 ///
-/// Webhdfs will connect to the HTTP RESTful API of hdfs.
+/// WebHDFS will connect to the HTTP RESTful API of HDFS.
 ///
 /// For more information, please refer to:
 ///
@@ -57,7 +57,7 @@ use crate::{
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct WebHdfsConfig {
-    /// The root path for WEBHDFS.
+    /// The root path for WebHDFS.
     ///
     /// Must be a valid directory.
     ///
@@ -76,9 +76,9 @@ pub struct WebHdfsConfig {
     #[configurable(metadata(docs::templateable))]
     pub prefix: String,
 
-    /// An hdfs cluster consists of a single NameNode, a master server that manages the file system namespace and regulates access to files by clients.
+    /// An HDFS cluster consists of a single NameNode, a master server that manages the file system namespace and regulates access to files by clients.
     ///
-    /// The endpoint is the hdfs's web restful HTTP API endpoint.
+    /// The endpoint is the HDFS's web restful HTTP API endpoint.
     ///
     /// For more information, see the [HDFS Architecture][hdfs_arch] documentation.
     ///

@@ -261,9 +261,9 @@ pub enum Sinks {
     #[configurable(metadata(docs::label = "GCP Pub/Sub"))]
     GcpPubsub(gcp::pubsub::PubsubConfig),
 
-    /// WEBHDFS.
+    /// WebHDFS.
     #[cfg(feature = "sinks-webhdfs")]
-    #[configurable(metadata(docs::label = "WEBHDFS"))]
+    #[configurable(metadata(docs::label = "WebHDFS"))]
     WebHdfs(webhdfs::WebHdfsConfig),
 
     /// Deliver log events to Honeycomb.
