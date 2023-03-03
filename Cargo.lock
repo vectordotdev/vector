@@ -1027,11 +1027,11 @@ dependencies = [
 
 [[package]]
 name = "aws-smithy-http"
-version = "0.54.1"
+version = "0.54.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b5bd86f48d7e36fb24ee922d04d79c8353e01724b1c38757ed92593179223aa7"
+checksum = "873f316f1833add0d3aa54ed1b0cd252ddd88c792a0cf839886400099971e844"
 dependencies = [
- "aws-smithy-types 0.54.1",
+ "aws-smithy-types 0.54.4",
  "bytes 1.4.0",
  "bytes-utils",
  "futures-core",
@@ -1062,12 +1062,12 @@ dependencies = [
 
 [[package]]
 name = "aws-smithy-http-tower"
-version = "0.54.1"
+version = "0.54.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c8972d1b4ae3aba1a10e7106fed53a5a36bc8ef86170a84f6ddd33d36fac12ad"
+checksum = "4f38231d3f5dac9ac7976f44e12803add1385119ffca9e5f050d8e980733d164"
 dependencies = [
- "aws-smithy-http 0.54.1",
- "aws-smithy-types 0.54.1",
+ "aws-smithy-http 0.54.4",
+ "aws-smithy-types 0.54.4",
  "bytes 1.4.0",
  "http",
  "http-body",
@@ -1113,7 +1113,7 @@ version = "0.53.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2013465a070decdeb3e85ceb3370ae85ba05f56f914abfd89858d7281c4f12c3"
 dependencies = [
- "base64-simd",
+ "base64-simd 0.7.0",
  "itoa",
  "num-integer",
  "ryu",
@@ -1122,11 +1122,11 @@ dependencies = [
 
 [[package]]
 name = "aws-smithy-types"
-version = "0.54.1"
+version = "0.54.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "da7e499c4b15bab8eb6b234df31833cc83a1bdaa691ba72d5d81efc109d9d705"
+checksum = "8161232eda10290f5136610a1eb9de56aceaccd70c963a26a260af20ac24794f"
 dependencies = [
- "base64-simd",
+ "base64-simd 0.8.0",
  "itoa",
  "num-integer",
  "ryu",
@@ -1335,6 +1335,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "781dd20c3aff0bd194fe7d2a977dd92f21c173891f3a03b677359e5fa457e5d5"
 dependencies = [
  "simd-abstraction",
+]
+
+[[package]]
+name = "base64-simd"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "339abbe78e73178762e23bea9dfd08e697eb3f3301cd4be981c0f78ba5859195"
+dependencies = [
+ "outref 0.5.1",
+ "vsimd",
 ]
 
 [[package]]
@@ -5619,6 +5629,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f222829ae9293e33a9f5e9f440c6760a3d450a64affe1846486b140db81c1f4"
 
 [[package]]
+name = "outref"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4030760ffd992bef45b0ae3f10ce1aba99e33464c90d14dd7c039884963ddc7a"
+
+[[package]]
 name = "overload"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7499,7 +7515,7 @@ version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9cadb29c57caadc51ff8346233b5cec1d240b68ce55cf1afc764818791876987"
 dependencies = [
- "outref",
+ "outref 0.1.0",
 ]
 
 [[package]]
@@ -9067,7 +9083,7 @@ dependencies = [
  "aws-smithy-async",
  "aws-smithy-client",
  "aws-smithy-http 0.51.0",
- "aws-smithy-http-tower 0.54.1",
+ "aws-smithy-http-tower 0.54.4",
  "aws-smithy-types 0.51.0",
  "aws-types",
  "axum",
@@ -9698,6 +9714,12 @@ dependencies = [
  "vrl-stdlib",
  "wasm-bindgen",
 ]
+
+[[package]]
+name = "vsimd"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5c3082ca00d5a5ef149bb8b555a72ae84c9c59f7250f013ac822ac2e49b19c64"
 
 [[package]]
 name = "vte"
