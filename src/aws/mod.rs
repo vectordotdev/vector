@@ -11,9 +11,10 @@ use std::time::{Duration, SystemTime};
 
 pub use auth::{AwsAuthentication, ImdsAuthentication};
 use aws_config::meta::region::ProvideRegion;
+use aws_sdk_cloudwatch::config::Sleep;
+use aws_sdk_sqs::config::AsyncSleep;
 use aws_sigv4::http_request::{SignableRequest, SigningSettings};
 use aws_sigv4::SigningParams;
-use aws_smithy_async::rt::sleep::{AsyncSleep, Sleep};
 use aws_smithy_client::bounds::SmithyMiddleware;
 use aws_smithy_client::erase::{DynConnector, DynMiddleware};
 use aws_smithy_client::{Builder, SdkError};
