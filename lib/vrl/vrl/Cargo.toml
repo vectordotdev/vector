@@ -37,6 +37,7 @@ ordered-float = "3"
 parser = { package = "vrl-parser", path = "../parser" }
 value = { path = "../value", default-features = false }
 vrl-core = { path = "../core" }
+#vector-common = { path = "../../vector-common", default-features = false }
 
 [dev-dependencies]
 criterion = "0.4"

@@ -14,9 +14,8 @@ use aws_sdk_cloudwatchlogs::model::InputLogEvent;
 use aws_sdk_cloudwatchlogs::output::{DescribeLogStreamsOutput, PutLogEventsOutput};
 use aws_sdk_cloudwatchlogs::types::SdkError;
 use aws_sdk_cloudwatchlogs::Client as CloudwatchLogsClient;
+use aws_smithy_http::operation::{Operation, Request};
 use futures::{future::BoxFuture, FutureExt};
-use http::header::HeaderName;
-use http::HeaderValue;
 use indexmap::IndexMap;
 use tokio::sync::oneshot;
 
@@ -102,9 +101,9 @@ impl Future for CloudwatchFuture {
                     let response = match ready!(fut.poll_unpin(cx)) {
                         Ok(response) => response,
                         Err(err) => {
-                            if let SdkError::ServiceError(inner) = &err {
+                            if let SdkError::ServiceError { err, raw: _ } = &err {
                                 if let DescribeLogStreamsErrorKind::ResourceNotFoundException(_) =
-                                    inner.err().kind
+                                    err.kind
                                 {
                                     if self.create_missing_group {
                                         info!("Log group provided does not exist; creating a new one.");
@@ -149,8 +148,8 @@ impl Future for CloudwatchFuture {
                         Ok(_) => {}
                         Err(err) => {
                             let resource_already_exists = match &err {
-                                SdkError::ServiceError(inner) => matches!(
-                                    inner.err().kind,
+                                SdkError::ServiceError { err, raw: _ } => matches!(
+                                    err.kind,
                                     CreateLogGroupErrorKind::ResourceAlreadyExistsException(_)
                                 ),
                                 _ => false,
@@ -174,8 +173,8 @@ impl Future for CloudwatchFuture {
                         Ok(_) => {}
                         Err(err) => {
                             let resource_already_exists = match &err {
-                                SdkError::ServiceError(inner) => matches!(
-                                    inner.err().kind,
+                                SdkError::ServiceError { err, raw: _ } => matches!(
+                                    err.kind,
                                     CreateLogStreamErrorKind::ResourceAlreadyExistsException(_)
                                 ),
                                 _ => false,
@@ -228,31 +227,39 @@ impl Client {
         let group_name = self.group_name.clone();
         let stream_name = self.stream_name.clone();
         let headers = self.headers.clone();
-
         Box::pin(async move {
-            let mut op = PutLogEvents::builder()
+            // #12760 this is a relatively convoluted way of changing the headers of a request
+            // about to be sent. https://github.com/awslabs/aws-sdk-rust/issues/537 should
+            // eventually make this better.
+            let op = PutLogEvents::builder()
                 .set_log_events(Some(log_events))
                 .set_sequence_token(sequence_token)
                 .log_group_name(group_name)
                 .log_stream_name(stream_name)
                 .build()
-                .map_err(SdkError::construction_failure)?
+                .map_err(|err| SdkError::ConstructionFailure(err.into()))?
                 .make_operation(cw_client.conf())
                 .await
-                .map_err(SdkError::construction_failure)?;
+                .map_err(|err| SdkError::ConstructionFailure(err.into()))?;
 
+            let (req, parts) = op.into_request_response();
+            let (mut body, props) = req.into_parts();
             for (header, value) in headers.iter() {
                 let owned_header = header.clone();
                 let owned_value = value.clone();
-                op.request_mut().headers_mut().insert(
-                    HeaderName::from_bytes(owned_header.as_bytes())
-                        .map_err(SdkError::construction_failure)?,
-                    HeaderValue::from_str(owned_value.as_str())
-                        .map_err(SdkError::construction_failure)?,
+                body.headers_mut().insert(
+                    http::header::HeaderName::from_bytes(owned_header.as_bytes())
+                        .map_err(|err| SdkError::ConstructionFailure(err.into()))?,
+                    http::HeaderValue::from_str(owned_value.as_str())
+                        .map_err(|err| SdkError::ConstructionFailure(err.into()))?,
                 );
             }
-
-            client.call(op).await
+            client
+                .call(Operation::from_parts(
+                    Request::from_parts(body, props),
+                    parts,
+                ))
+                .await
         })
     }
 

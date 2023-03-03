@@ -3,11 +3,7 @@ use std::time::Duration;
 use aws_config::{
     default_provider::credentials::DefaultCredentialsChain, imds, sts::AssumeRoleProviderBuilder,
 };
-use aws_credential_types::{
-    cache::CredentialsCache, provider::SharedCredentialsProvider, Credentials,
-};
-use aws_types::region::Region;
-
+use aws_types::{credentials::SharedCredentialsProvider, region::Region, Credentials};
 use serde_with::serde_as;
 use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
@@ -129,27 +125,6 @@ pub enum AwsAuthentication {
 }
 
 impl AwsAuthentication {
-    pub async fn credentials_cache(&self) -> crate::Result<CredentialsCache> {
-        match self {
-            AwsAuthentication::Role {
-                load_timeout_secs, ..
-            }
-            | AwsAuthentication::Default {
-                load_timeout_secs, ..
-            } => {
-                let credentials_cache = CredentialsCache::lazy_builder()
-                    .load_timeout(
-                        load_timeout_secs
-                            .map(Duration::from_secs)
-                            .unwrap_or(DEFAULT_LOAD_TIMEOUT),
-                    )
-                    .into_credentials_cache();
-
-                Ok(credentials_cache)
-            }
-            _ => Ok(CredentialsCache::lazy()),
-        }
-    }
     pub async fn credentials_provider(
         &self,
         service_region: Region,
@@ -168,19 +143,25 @@ impl AwsAuthentication {
             }
             AwsAuthentication::Role {
                 assume_role,
+                load_timeout_secs,
                 imds,
                 region,
-                ..
             } => {
                 let auth_region = region.clone().map(Region::new).unwrap_or(service_region);
                 let provider = AssumeRoleProviderBuilder::new(assume_role)
                     .region(auth_region.clone())
-                    .build(default_credentials_provider(auth_region, *imds).await?);
+                    .build(
+                        default_credentials_provider(auth_region, *load_timeout_secs, *imds)
+                            .await?,
+                    );
 
                 Ok(SharedCredentialsProvider::new(provider))
             }
-            AwsAuthentication::Default { imds, .. } => Ok(SharedCredentialsProvider::new(
-                default_credentials_provider(service_region, *imds).await?,
+            AwsAuthentication::Default {
+                load_timeout_secs,
+                imds,
+            } => Ok(SharedCredentialsProvider::new(
+                default_credentials_provider(service_region, *load_timeout_secs, *imds).await?,
             )),
         }
     }
@@ -196,6 +177,7 @@ impl AwsAuthentication {
 
 async fn default_credentials_provider(
     region: Region,
+    load_timeout_secs: Option<u64>,
     imds: ImdsAuthentication,
 ) -> crate::Result<SharedCredentialsProvider> {
     let client = imds::Client::builder()
@@ -205,13 +187,16 @@ async fn default_credentials_provider(
         .build()
         .await?;
 
-    let credentials_provider = DefaultCredentialsChain::builder()
+    let chain = DefaultCredentialsChain::builder()
         .region(region)
         .imds_client(client)
-        .build()
-        .await;
+        .load_timeout(
+            load_timeout_secs
+                .map(Duration::from_secs)
+                .unwrap_or(DEFAULT_LOAD_TIMEOUT),
+        );
 
-    Ok(SharedCredentialsProvider::new(credentials_provider))
+    Ok(SharedCredentialsProvider::new(chain.build().await))
 }
 
 #[cfg(test)]

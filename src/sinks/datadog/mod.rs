@@ -30,7 +30,7 @@ pub(crate) fn default_site() -> String {
 /// Shared configuration for Datadog sinks.
 /// Contains the maximum set of common settings that applies to all DD sink components.
 // TODO: The `default_api_key` option should be included in this struct once the `api_key`
-// (a deprecated alias to default_api_key` is fully erradicated, which is targeted for v0.29.0.
+// (a deprecated alias to default_api_key` is fully eradicated, which is targeted for v0.29.0.
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]

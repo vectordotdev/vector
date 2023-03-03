@@ -21,7 +21,7 @@ use crate::config::EnrichmentTableConfig;
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[serde(tag = "type", rename_all = "snake_case")]
 enum Encoding {
-    /// Decodes the file as a [CSV][csv] (comma-seperated values) file.
+    /// Decodes the file as a [CSV][csv] (comma-separated values) file.
     ///
     /// [csv]: https://wikipedia.org/wiki/Comma-separated_values
     Csv {
@@ -250,7 +250,7 @@ impl EnrichmentTableConfig for FileConfig {
 
 impl_generate_config_from_default!(FileConfig);
 
-/// A struct that implements [enrichment::Table] to handle loading enricment data from a CSV file.
+/// A struct that implements [enrichment::Table] to handle loading enrichment data from a CSV file.
 #[derive(Clone)]
 pub struct File {
     config: FileConfig,

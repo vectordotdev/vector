@@ -9,6 +9,9 @@
 {{ $groups := dict "enhancement" "enhancements" "feat" "new features" "fix" "bug fixes" "deprecation" "deprecations"}}
 <div class="max-w-3xl md:max-w-5xl px-6 lg:px-8 mx-auto">
   <div class="my-16">
+    <div class="mb-4 md:mb-6">
+      {{ partial "breadcrumb.html" . }}
+    </div>
     <div class="pb-8 md:pb-10 lg:pb-12">
       {{ partial "hero.html" . }}
     </div>
