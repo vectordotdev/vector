@@ -1,14 +1,11 @@
-args:
-- --features
+test_filter: '::webhdfs::'
+
+features:
 - webhdfs-integration-tests
-- --lib
-- '::webhdfs::'
 
 env:
   WEBHDFS_ENDPOINT: http://namenode.local:9870
   LD_LIBRARY_PATH: $LD_LIBRARY_PATH:/usr/lib/jvm/default/lib/server
-  RUST_LOG: debug
-  TEST_LOG: debug
 
 matrix:
   hadoop: ['2.0.0-hadoop3.2.1-java8']
