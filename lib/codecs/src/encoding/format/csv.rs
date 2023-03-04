@@ -1,6 +1,6 @@
 use crate::encoding::BuildError;
 use bytes::{BufMut, BytesMut};
-use lookup::lookup_v2::ConfigOwnedValuePath;
+use lookup::lookup_v2::ConfigOwnedTargetPath;
 use tokio_util::codec::Encoder;
 use vector_core::{
     config::DataType,
@@ -57,18 +57,18 @@ pub struct CsvSerializerOptions {
     ///
     /// Some value types: Array, Regex, Object are not supported by the CSV format.
     /// If a field is of an unsupported type, the output will be `NaN`.
-    pub fields: Vec<ConfigOwnedValuePath>,
+    pub fields: Vec<ConfigOwnedTargetPath>,
 }
 
 /// Serializer that converts an `Event` to bytes using the CSV format.
 #[derive(Debug, Clone)]
 pub struct CsvSerializer {
-    fields: Vec<ConfigOwnedValuePath>,
+    fields: Vec<ConfigOwnedTargetPath>,
 }
 
 impl CsvSerializer {
     /// Creates a new `CsvSerializer`.
-    pub const fn new(fields: Vec<ConfigOwnedValuePath>) -> Self {
+    pub const fn new(fields: Vec<ConfigOwnedTargetPath>) -> Self {
         Self { fields }
     }
 }
@@ -78,10 +78,9 @@ impl Encoder<Event> for CsvSerializer {
 
     fn encode(&mut self, event: Event, buffer: &mut BytesMut) -> Result<(), Self::Error> {
         let log = event.into_log();
-        let values = log.value();
         let mut wtr = csv::Writer::from_writer(buffer.writer());
         for field in &self.fields {
-            match values.get(field) {
+            match log.get(field) {
                 Some(Value::Bytes(bytes)) => {
                     wtr.write_field(String::from_utf8_lossy(bytes).to_string())?
                 }
@@ -133,15 +132,15 @@ mod tests {
         }));
 
         let fields = vec![
-            ConfigOwnedValuePath::try_from("foo".to_string()).unwrap(),
-            ConfigOwnedValuePath::try_from("int".to_string()).unwrap(),
-            ConfigOwnedValuePath::try_from("comma".to_string()).unwrap(),
-            ConfigOwnedValuePath::try_from("float".to_string()).unwrap(),
-            ConfigOwnedValuePath::try_from("missing".to_string()).unwrap(),
-            ConfigOwnedValuePath::try_from("space".to_string()).unwrap(),
-            ConfigOwnedValuePath::try_from("time".to_string()).unwrap(),
-            ConfigOwnedValuePath::try_from("quote".to_string()).unwrap(),
-            ConfigOwnedValuePath::try_from("bool".to_string()).unwrap(),
+            ConfigOwnedTargetPath::try_from("foo".to_string()).unwrap(),
+            ConfigOwnedTargetPath::try_from("int".to_string()).unwrap(),
+            ConfigOwnedTargetPath::try_from("comma".to_string()).unwrap(),
+            ConfigOwnedTargetPath::try_from("float".to_string()).unwrap(),
+            ConfigOwnedTargetPath::try_from("missing".to_string()).unwrap(),
+            ConfigOwnedTargetPath::try_from("space".to_string()).unwrap(),
+            ConfigOwnedTargetPath::try_from("time".to_string()).unwrap(),
+            ConfigOwnedTargetPath::try_from("quote".to_string()).unwrap(),
+            ConfigOwnedTargetPath::try_from("bool".to_string()).unwrap(),
         ];
         let config = CsvSerializerConfig::new(CsvSerializerOptions { fields });
         let mut serializer = config.build().unwrap();
@@ -165,11 +164,11 @@ mod tests {
             "field5" => Value::from("value5"),
         }));
         let fields = vec![
-            ConfigOwnedValuePath::try_from("field1".to_string()).unwrap(),
-            ConfigOwnedValuePath::try_from("field5".to_string()).unwrap(),
-            ConfigOwnedValuePath::try_from("field5".to_string()).unwrap(),
-            ConfigOwnedValuePath::try_from("field3".to_string()).unwrap(),
-            ConfigOwnedValuePath::try_from("field2".to_string()).unwrap(),
+            ConfigOwnedTargetPath::try_from("field1".to_string()).unwrap(),
+            ConfigOwnedTargetPath::try_from("field5".to_string()).unwrap(),
+            ConfigOwnedTargetPath::try_from("field5".to_string()).unwrap(),
+            ConfigOwnedTargetPath::try_from("field3".to_string()).unwrap(),
+            ConfigOwnedTargetPath::try_from("field2".to_string()).unwrap(),
         ];
         let config = CsvSerializerConfig::new(CsvSerializerOptions { fields });
         let mut serializer = config.build().unwrap();
