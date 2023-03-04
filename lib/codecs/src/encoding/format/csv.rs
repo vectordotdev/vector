@@ -83,7 +83,9 @@ impl Encoder<Event> for CsvSerializer {
 
         for field in &self.fields {
             match values.get(field) {
-                Some(Value::Bytes(bytes)) => wtr.write_field(String::from_utf8(bytes.to_vec())?)?,
+                Some(Value::Bytes(bytes)) => {
+                    wtr.write_field(String::from_utf8_lossy(bytes).to_string())?
+                }
                 Some(Value::Integer(int)) => wtr.write_field(int.to_string())?,
                 Some(Value::Float(float)) => wtr.write_field(float.to_string())?,
                 Some(Value::Boolean(bool)) => wtr.write_field(bool.to_string())?,
