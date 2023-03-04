@@ -89,10 +89,10 @@ impl Encoder<Event> for CsvSerializer {
                 Some(Value::Float(float)) => wtr.write_field(float.to_string())?,
                 Some(Value::Boolean(bool)) => wtr.write_field(bool.to_string())?,
                 Some(Value::Timestamp(timestamp)) => wtr.write_field(timestamp.to_rfc3339())?,
-                Some(Value::Null) => wtr.write_field("NaN")?,
+                Some(Value::Null) => wtr.write_field("")?,
                 // Other value types: Array, Regex, Object are not supported by the CSV format.
-                Some(_) => wtr.write_field("NaN")?,
-                None => wtr.write_field("NaN")?,
+                Some(_) => wtr.write_field("")?,
+                None => wtr.write_field("")?,
             }
         }
         wtr.flush()?;
@@ -151,7 +151,7 @@ mod tests {
 
         assert_eq!(
             bytes.freeze(),
-            b"bar,123,\"abc,bcd\",3.1415925,NaN,sp ace,2023-02-27T07:04:49.363+00:00,\"the \"\"quote\"\" should be escaped\",true".as_slice()
+            b"bar,123,\"abc,bcd\",3.1415925,,sp ace,2023-02-27T07:04:49.363+00:00,\"the \"\"quote\"\" should be escaped\",true".as_slice()
         );
     }
 
