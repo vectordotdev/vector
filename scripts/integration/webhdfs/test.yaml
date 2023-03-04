@@ -5,7 +5,6 @@ features:
 
 env:
   WEBHDFS_ENDPOINT: http://namenode.local:9870
-  LD_LIBRARY_PATH: $LD_LIBRARY_PATH:/usr/lib/jvm/default/lib/server
 
 matrix:
   hadoop: ['2.0.0-hadoop3.2.1-java8']
