@@ -79,8 +79,7 @@ impl Encoder<Event> for CsvSerializer {
     fn encode(&mut self, event: Event, buffer: &mut BytesMut) -> Result<(), Self::Error> {
         let log = event.into_log();
         let values = log.value();
-        let mut wtr = csv::Writer::from_writer(vec![]);
-
+        let mut wtr = csv::Writer::from_writer(buffer.writer());
         for field in &self.fields {
             match values.get(field) {
                 Some(Value::Bytes(bytes)) => {
@@ -96,8 +95,7 @@ impl Encoder<Event> for CsvSerializer {
                 None => wtr.write_field("NaN")?,
             }
         }
-
-        buffer.put_slice(wtr.into_inner()?.as_ref());
+        wtr.flush()?;
         Ok(())
     }
 }
