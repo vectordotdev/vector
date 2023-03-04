@@ -51,7 +51,7 @@ concerns have to do with.
 
 - Timeline. There's six weeks left in Jonathan's internship
 
-- Lack of customizeability, current alternatives will provide bottlenecks in the long term future for adding more features
+- Lack of customizability, current alternatives will provide bottlenecks in the long term future for adding more features
 
 ## Proposal
 
@@ -70,7 +70,7 @@ Each with the possibility to expand with features that will
 accomplish the stretch goals.
 
 - Live deploy => we would likely require a robust component for the editors, one that handles state and context so we can add additional logic to expand to live deployment to vector instances.
-- Auto completion => we can investigate adding the AST onto the monaco editors and keeping that logic in a seperate module similar to how graphiql created codemirror-graphql we can create monaco-vrl.
+- Auto completion => we can investigate adding the AST onto the monaco editors and keeping that logic in a separate module similar to how graphiql created codemirror-graphql we can create monaco-vrl.
 - UI building blocks => will allow us to implement tabs, docs, editor buttons (sharing, copy code, etc), toolbars
 
 ## Rationale
@@ -113,7 +113,7 @@ considered due to concerns about maintainability, scope,
 
 - Utilize graphiql as a front-end library and add run_vrl
 
-This would buy us a lot of front end componenets, but after
+This would buy us a lot of front end components, but after
 diving deep into the repository, some dependencies must be
 re-written, and stripped from the context of graphql. This means
 that the project will likely cause tech debt in the long term
@@ -123,14 +123,14 @@ with a lot of css, familiarize with the build tools used, etc.
 Jean estimates a week or two of effort to strip down the graphiql
 mono repo to solely use code-mirror instead of code-mirror-graphql
 the difference between these two dependencies the latter has tight
-coupiling of syntax highlighting and autocompletion logic for
+coupling of syntax highlighting and autocompletion logic for
 graphql schemas.
 
 We already have an implementation of running VRL within the graphiql
 context but as mentioned earlier in the RFC, would likely introduce
 unnecessary tech-debt in the long term, Steve mentioned the
 graphiql-react library seems to be an implementation of another
-UI library, which we should at least expirement with first before
+UI library, which we should at least experiment with first before
 solely utilizing graphiql.
 
 - Utilize a rust web framework
@@ -148,7 +148,7 @@ in a rust web framework.
 
 ## Outstanding Questions
 
-- What would obersvablity pipelines team like to see in a VRL playground effort, npm modules?, more vrl-js docs?
+- What would observability pipelines team like to see in a VRL playground effort, npm modules?, more vrl-js docs?
 - What would customers like to see for the VRL playground?
 
 ## Plan Of Attack

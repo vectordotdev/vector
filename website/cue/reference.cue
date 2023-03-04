@@ -646,7 +646,7 @@ _coercing_fields: """
 	2. The [time format specifiers](\(urls.chrono_time_formats)) from Rust's
 	   `chrono` library.
 
-	### Types
+	**Types**
 
 	* `bool`
 	* `string`
@@ -655,7 +655,7 @@ _coercing_fields: """
 	* `date`
 	* `timestamp` (see the table below for formats)
 
-	### Timestamp Formats
+	**Timestamp Formats**
 
 	Format | Description | Example
 	:------|:------------|:-------

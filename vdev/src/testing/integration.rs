@@ -64,8 +64,33 @@ impl IntegrationTest {
         for (key, value) in config_env(&self.env_config) {
             env_vars.insert(key, Some(value));
         }
-        let mut args = self.config.args.clone();
+
+        env_vars.insert("TEST_LOG".to_string(), Some("info".into()));
+        let mut args = self.config.args.clone().unwrap_or_default();
+
+        args.push("--features".to_string());
+        args.push(self.config.features.join(","));
+
+        // If the test field is not present then use the --lib flag
+        match self.config.test {
+            Some(ref test_arg) => {
+                args.push("--test".to_string());
+                args.push(test_arg.to_string());
+            }
+            None => args.push("--lib".to_string()),
+        }
+
+        // Ensure the test_filter args are passed as well
+        if let Some(ref filter) = self.config.test_filter {
+            args.push(filter.to_string());
+        }
         args.extend(extra_args);
+
+        // Some arguments are not compatible with the --no-capture arg
+        if !args.contains(&"--test-threads".to_string()) {
+            args.push("--no-capture".to_string());
+        }
+
         self.runner
             .test(&env_vars, &self.config.runner.env, &args)?;
 
