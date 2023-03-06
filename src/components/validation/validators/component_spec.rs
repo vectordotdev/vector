@@ -293,7 +293,6 @@ fn validate_component_received_event_bytes_total(
 
     let mut metric_bytes: f64 = 0.0;
     for m in metrics {
-        dbg!(m);
         match m.value() {
             vector_core::event::MetricValue::Counter { value } => {
                 if let MetricKind::Absolute = m.data().kind {
@@ -311,9 +310,13 @@ fn validate_component_received_event_bytes_total(
 
     let expected_bytes = inputs.iter().fold(0, |acc, i| {
         if let TestEvent::Passthrough(_) = i {
-            return acc + vec![i.clone().into_event()].estimated_json_encoded_size_of();
+            let size = vec![i.clone().into_event()].estimated_json_encoded_size_of();
+            return acc + size;
         }
-        acc
+
+        // If we don't have a valid event, we'll just add the JSON length of an empty container,
+        // like []
+        acc + 2
     });
 
     debug!(
@@ -431,7 +434,13 @@ fn validate_component_sent_events_total(
     let mut events: f64 = 0.0;
     for m in metrics {
         match m.value() {
-            vector_core::event::MetricValue::Counter { value } => events += value,
+            vector_core::event::MetricValue::Counter { value } => {
+                if let MetricKind::Absolute = m.data().kind {
+                    events = *value
+                } else {
+                    events += value
+                }
+            }
             _ => errs.push(format!(
                 "{}: metric value is not a counter",
                 SourceMetrics::SentEventsTotal,
@@ -439,14 +448,21 @@ fn validate_component_sent_events_total(
         }
     }
 
+    let expected_events = inputs.iter().fold(0, |acc, i| {
+        if let TestEvent::Passthrough(_) = i {
+            return acc + 1;
+        }
+        acc
+    });
+
     debug!(
         "{}: {} events, {} expected events",
         SourceMetrics::SentEventsTotal,
         events,
-        inputs.len()
+        expected_events,
     );
 
-    if events != inputs.len() as f64 {
+    if events != expected_events as f64 {
         errs.push(format!(
             "{}: expected {} events, but received {}",
             SourceMetrics::SentEventsTotal,
@@ -483,7 +499,13 @@ fn validate_component_sent_event_bytes_total(
     let mut metric_bytes: f64 = 0.0;
     for m in metrics {
         match m.value() {
-            vector_core::event::MetricValue::Counter { value } => metric_bytes += value,
+            vector_core::event::MetricValue::Counter { value } => {
+                if let MetricKind::Absolute = m.data().kind {
+                    metric_bytes = *value
+                } else {
+                    metric_bytes += value
+                }
+            }
             _ => errs.push(format!(
                 "{}: metric value is not a counter",
                 SourceMetrics::SentEventBytesTotal,

@@ -331,10 +331,12 @@ impl http_client::HttpClientContext for HttpClientContext {
         let body = String::from_utf8_lossy(body);
         buf.extend_from_slice(body.as_bytes());
 
-        // decode and enrich
         let events = self.decode_events(&mut buf);
-        self.enrich_events(&mut events);
 
         Some(events)
+    }
+
+    fn enrich<'a>(&'a mut self, events: &'a mut Vec<Event>) {
+        self.enrich_events(events);
     }
 }

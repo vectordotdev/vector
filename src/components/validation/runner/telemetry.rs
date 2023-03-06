@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use tokio::{select, sync::mpsc, task::JoinHandle};
 use vector_core::event::Event;
 
@@ -37,8 +39,12 @@ impl Telemetry {
         // Attach an internal logs and internal metrics source, and send them on to a dedicated Vector
         // sink that we'll spawn a listener for to collect everything.
         let internal_logs = InternalLogsConfig::default();
-        let internal_metrics = InternalMetricsConfig::default();
-        let vector_sink = VectorSinkConfig::from_address(listen_addr.as_uri());
+        let internal_metrics = InternalMetricsConfig {
+            scrape_interval_secs: Duration::from_millis(100),
+            ..Default::default()
+        };
+        let mut vector_sink = VectorSinkConfig::from_address(listen_addr.as_uri());
+        vector_sink.batch.max_events = Some(1);
 
         config_builder.add_source(INTERNAL_LOGS_KEY, internal_logs);
         config_builder.add_source(INTERNAL_METRICS_KEY, internal_metrics);
@@ -59,13 +65,14 @@ impl Telemetry {
 
     pub fn into_collector(
         self,
-        task_coordinator: &TaskCoordinator<Configuring>,
+        telemetry_task_coordinator: &TaskCoordinator<Configuring>,
+        _output_task_coordinator: &TaskCoordinator<Configuring>,
     ) -> TelemetryCollector {
-        let telemetry_started = task_coordinator.track_started();
-        let telemetry_completed = task_coordinator.track_completed();
-        let mut telemetry_shutdown_handle = task_coordinator.register_for_shutdown();
+        let telemetry_started = telemetry_task_coordinator.track_started();
+        let telemetry_completed = telemetry_task_coordinator.track_completed();
+        let mut telemetry_shutdown_handle = telemetry_task_coordinator.register_for_shutdown();
 
-        spawn_grpc_server(self.listen_addr, self.service, task_coordinator);
+        spawn_grpc_server(self.listen_addr, self.service, telemetry_task_coordinator);
 
         let mut rx = self.rx;
         let driver_handle = tokio::spawn(async move {
@@ -75,6 +82,13 @@ impl Telemetry {
             loop {
                 select! {
                     _ = telemetry_shutdown_handle.wait() => break,
+                    // _ = telemetry_shutdown_handle.wait() => {
+                    //     match rx.recv().await {
+                    //         None => break,
+                    //         Some(telemetry_event) => telemetry_events.push(telemetry_event),
+                    //     }
+                    //     break
+                    // },
                     maybe_telemetry_event = rx.recv() => match maybe_telemetry_event {
                         None => break,
                         Some(telemetry_event) => telemetry_events.push(telemetry_event),

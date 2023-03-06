@@ -193,6 +193,7 @@ impl Runner {
             let input_task_coordinator = TaskCoordinator::new();
             let output_task_coordinator = TaskCoordinator::new();
             let topology_task_coordinator = TaskCoordinator::new();
+            let telemetry_task_coordinator = TaskCoordinator::new();
 
             // First, we get a topology builder for the given component being validated.
             //
@@ -205,8 +206,12 @@ impl Runner {
             // any controlled edges (channel sender/receiver to the aforementioned filler
             // components) and a telemetry client for collecting internal telemetry.
             let topology_builder = TopologyBuilder::from_configuration(&self.configuration);
-            let (config_builder, controlled_edges, telemetry_collector) =
-                topology_builder.finalize(&input_task_coordinator, &output_task_coordinator);
+            let (config_builder, controlled_edges, telemetry_collector) = topology_builder
+                .finalize(
+                    &input_task_coordinator,
+                    &output_task_coordinator,
+                    &telemetry_task_coordinator,
+                );
             debug!("Component topology configuration built and telemetry collector spawned.");
 
             // After that, we'll build the external resource necessary for this component, if any.
@@ -233,6 +238,9 @@ impl Runner {
             // listening, etc.
             let input_task_coordinator = input_task_coordinator.started().await;
             debug!("All input task(s) started.");
+
+            let telemetry_task_coordinator = telemetry_task_coordinator.started().await;
+            debug!("All telemetry task(s) started.");
 
             let output_task_coordinator = output_task_coordinator.started().await;
             debug!("All output task(s) started.");
@@ -297,11 +305,18 @@ impl Runner {
             input_task_coordinator.shutdown().await;
             debug!("Input task(s) have been shutdown.");
 
+            // TODO: have inputs flush fast
+            // TODO: poll more quickly from telemetry tasks
+            tokio::time::sleep(Duration::from_millis(500)).await;
+
             topology_task_coordinator.shutdown().await;
             debug!("Component topology task has been shutdown.");
 
             output_task_coordinator.shutdown().await;
             debug!("Output task(s) have been shutdown.");
+
+            telemetry_task_coordinator.shutdown().await;
+            debug!("Telemetry task(s) have been shutdown.");
 
             let output_events = output_driver
                 .await

@@ -66,6 +66,8 @@ pub(crate) trait HttpClientContext {
 
     /// (Optional) Called if the HTTP response is not 200 ('OK').
     fn on_http_response_error(&self, _uri: &Uri, _header: &Parts) {}
+
+    fn enrich<'a>(&'a mut self, _events: &'a mut Vec<Event>) {}
 }
 
 /// Builds a url for the HTTP requests.
@@ -157,8 +159,6 @@ pub(crate) async fn call<
                 .and_then(|response| async move {
                     let (header, body) = response.into_parts();
                     let body = hyper::body::to_bytes(body).await?;
-                    dbg!(&body);
-                    dbg!(&body.len());
                     emit!(EndpointBytesReceived {
                         byte_size: body.len(),
                         protocol: "http",
@@ -174,12 +174,17 @@ pub(crate) async fn call<
                                 start,
                                 end: Instant::now()
                             });
-                            context.on_response(&url, &header, &body).map(|events| {
+                            context.on_response(&url, &header, &body).map(|mut events| {
                                 emit!(HttpClientEventsReceived {
                                     byte_size: events.estimated_json_encoded_size_of(),
                                     count: events.len(),
                                     url: url.to_string()
                                 });
+
+                                // We'll enrich after receiving the events so that the byte sizes
+                                // are accurate.
+                                context.enrich(&mut events);
+
                                 stream::iter(events)
                             })
                         }

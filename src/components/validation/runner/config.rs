@@ -102,6 +102,7 @@ impl TopologyBuilder {
         mut self,
         input_task_coordinator: &TaskCoordinator<Configuring>,
         output_task_coordinator: &TaskCoordinator<Configuring>,
+        telemetry_task_coordinator: &TaskCoordinator<Configuring>,
     ) -> (ConfigBuilder, ControlledEdges, TelemetryCollector) {
         let controlled_edges = ControlledEdges {
             input: self
@@ -113,7 +114,8 @@ impl TopologyBuilder {
         };
 
         let telemetry = Telemetry::attach_to_config(&mut self.config_builder);
-        let telemetry_collector = telemetry.into_collector(output_task_coordinator);
+        let telemetry_collector =
+            telemetry.into_collector(telemetry_task_coordinator, output_task_coordinator);
 
         (self.config_builder, controlled_edges, telemetry_collector)
     }
@@ -133,7 +135,9 @@ fn build_output_edge() -> (OutputEdge, impl Into<Sinks>) {
     let output_listen_addr = GrpcAddress::from(next_addr());
     debug!(endpoint = %output_listen_addr, "Creating controlled output edge.");
 
-    let output_sink = VectorSinkConfig::from_address(output_listen_addr.as_uri());
+    let mut output_sink = VectorSinkConfig::from_address(output_listen_addr.as_uri());
+    output_sink.batch.max_events = Some(1);
+
     let output_edge = OutputEdge::from_address(output_listen_addr);
 
     (output_edge, output_sink)

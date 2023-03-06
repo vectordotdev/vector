@@ -19,8 +19,6 @@ impl InternalEvent for HttpClientEventsReceived {
             byte_size = %self.byte_size,
             url = %self.url,
         );
-        dbg!(&self);
-        dbg!(&self.count);
         counter!(
             "component_received_events_total", self.count as u64,
             "uri" => self.url.clone(),
