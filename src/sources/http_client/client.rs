@@ -285,7 +285,7 @@ impl HttpClientContext {
     }
 
     /// Enriches events with source_type, timestamp
-    pub fn _enrich_events(&self, events: &mut Vec<Event>) {
+    pub fn enrich_events(&self, events: &mut Vec<Event>) {
         let now = Utc::now();
 
         for event in events {
@@ -333,7 +333,7 @@ impl http_client::HttpClientContext for HttpClientContext {
 
         // decode and enrich
         let events = self.decode_events(&mut buf);
-        // self.enrich_events(&mut events);
+        self.enrich_events(&mut events);
 
         Some(events)
     }
