@@ -87,7 +87,11 @@ jobs:
       - name: Bootstrap runner environment (generic)
         run: bash scripts/environment/prepare.sh
       - name: Build Vector
-        run: make package-x86_64-unknown-linux-gnu-all
+        run: |
+          # If set, MODE will be used to set the "channel", which is the dir/namespace packages are organized into.
+          # the Workflow of "custom_builds" utilizes this feature.
+          export MODE="${{ inputs.mode }}"
+          make package-x86_64-unknown-linux-gnu-all
       - name: Stage package artifacts for publish
         uses: actions/upload-artifact@v3
         with:
@@ -141,7 +145,11 @@ jobs:
       - name: Build Vector
         env:
           DOCKER_PRIVILEGED: "true"
-        run: make package-aarch64-unknown-linux-gnu-all
+        run: |
+          # If set, MODE will be used to set the "channel", which is the dir/namespace packages are organized into.
+          # the Workflow of "custom_builds" utilizes this feature.
+          export MODE="${{ inputs.mode }}"
+          make package-aarch64-unknown-linux-gnu-all
       - name: Stage package artifacts for publish
         uses: actions/upload-artifact@v3
         with:
@@ -168,7 +176,11 @@ jobs:
       - name: Build Vector
         env:
           DOCKER_PRIVILEGED: "true"
-        run: make package-armv7-unknown-linux-gnueabihf-all
+        run: |
+          # If set, MODE will be used to set the "channel", which is the dir/namespace packages are organized into.
+          # the Workflow of "custom_builds" utilizes this feature.
+          export MODE="${{ inputs.mode }}"
+          make package-armv7-unknown-linux-gnueabihf-all
       - name: Stage package artifacts for publish
         uses: actions/upload-artifact@v3
         with:
@@ -232,6 +244,7 @@ jobs:
 
   build-x86_64-pc-windows-msvc-packages:
     name: Build Vector for x86_64-pc-windows-msvc (.zip)
+    if: ${{ inputs.mode != 'custom' }}
     runs-on: [windows, release-builder]
     needs: generate-publish-metadata
     env:
