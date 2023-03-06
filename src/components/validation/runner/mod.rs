@@ -305,18 +305,16 @@ impl Runner {
             input_task_coordinator.shutdown().await;
             debug!("Input task(s) have been shutdown.");
 
-            // TODO: have inputs flush fast
-            // TODO: poll more quickly from telemetry tasks
             tokio::time::sleep(Duration::from_millis(500)).await;
+
+            telemetry_task_coordinator.shutdown().await;
+            debug!("Telemetry task(s) have been shutdown.");
 
             topology_task_coordinator.shutdown().await;
             debug!("Component topology task has been shutdown.");
 
             output_task_coordinator.shutdown().await;
             debug!("Output task(s) have been shutdown.");
-
-            telemetry_task_coordinator.shutdown().await;
-            debug!("Telemetry task(s) have been shutdown.");
 
             let output_events = output_driver
                 .await

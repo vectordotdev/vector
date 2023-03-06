@@ -81,14 +81,13 @@ impl Telemetry {
             let mut telemetry_events = Vec::new();
             loop {
                 select! {
-                    _ = telemetry_shutdown_handle.wait() => break,
-                    // _ = telemetry_shutdown_handle.wait() => {
-                    //     match rx.recv().await {
-                    //         None => break,
-                    //         Some(telemetry_event) => telemetry_events.push(telemetry_event),
-                    //     }
-                    //     break
-                    // },
+                    _ = telemetry_shutdown_handle.wait() => {
+                        match rx.recv().await {
+                            None => break,
+                            Some(telemetry_event) => telemetry_events.push(telemetry_event),
+                        }
+                        break
+                    },
                     maybe_telemetry_event = rx.recv() => match maybe_telemetry_event {
                         None => break,
                         Some(telemetry_event) => telemetry_events.push(telemetry_event),
