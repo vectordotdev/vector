@@ -78,6 +78,12 @@ elif [[ "$CHANNEL" == "nightly" ]]; then
     build distroless-static "$VERSION_TAG"
     build distroless-libc "$VERSION_TAG"
   done
+elif [[ "$CHANNEL" == "custom" ]]; then
+  VER="${DATE}-${VERSION}"
+  build alpine "$VER"
+  build debian "$VER"
+  build distroless-static "$VER"
+  build distroless-libc "$VER"
 elif [[ "$CHANNEL" == "test" ]]; then
   build "${BASE:-"alpine"}" "${TAG:-"test"}"
   build "${BASE:-"distroless-libc"}" "${TAG:-"test"}"

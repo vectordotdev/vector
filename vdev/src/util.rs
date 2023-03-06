@@ -37,6 +37,20 @@ pub fn git_head() -> Result<Output> {
         .context("Could not execute `git`")
 }
 
+pub fn git_short_hash() -> Result<Output> {
+    Command::new("git")
+        .args(["rev-parse", "--short", "HEAD"])
+        .output()
+        .context("Could not execute `git`")
+}
+
+pub fn git_current_branch() -> Result<Output> {
+    Command::new("git")
+        .args(["rev-parse", "--abbrev-ref", "HEAD"])
+        .output()
+        .context("Could not execute `git`")
+}
+
 /// Calculate the release channel from `git describe`
 pub fn release_channel(mode: Option<&String>) -> Result<&str> {
     if let Some(mode) = mode {
