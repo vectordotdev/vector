@@ -16,7 +16,7 @@ use crate::config::{GenerateConfig, TransformConfig, TransformContext};
 use super::TransformType;
 
 /// Configuration for the `test_noop` transform.
-#[configurable_component(transform("test_noop"))]
+#[configurable_component(transform("test_noop", "Test (no-op)"))]
 #[derive(Clone, Debug)]
 pub struct NoopTransformConfig {
     #[configurable(derived)]
@@ -33,6 +33,7 @@ impl GenerateConfig for NoopTransformConfig {
 }
 
 #[async_trait]
+#[typetag::serde(name = "test_noop")]
 impl TransformConfig for NoopTransformConfig {
     fn input(&self) -> Input {
         Input::all()

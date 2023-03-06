@@ -16,7 +16,7 @@ use snafu::{ResultExt, Snafu};
 use tokio_util::codec::Decoder;
 use value::kind::Collection;
 use value::Kind;
-use vector_config::{configurable_component, NamedComponent};
+use vector_config::configurable_component;
 use vector_core::{
     config::{LegacyKey, LogNamespace},
     schema::Definition,
@@ -159,6 +159,7 @@ impl SourceConfig for LogstashConfig {
             tls,
             tls_client_metadata_key,
             self.receive_buffer_bytes,
+            None,
             cx,
             self.acknowledgements,
             self.connection_limit,
@@ -676,7 +677,7 @@ impl From<LogstashEventFrame> for SmallVec<[Event; 1]> {
 #[cfg(test)]
 mod test {
     use bytes::BufMut;
-    use lookup::LookupBuf;
+    use lookup::OwnedTargetPath;
     use rand::{thread_rng, Rng};
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
     use value::kind::Collection;
@@ -795,23 +796,31 @@ mod test {
 
         let expected_definition =
             Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
-                .with_meaning(LookupBuf::root(), "message")
-                .with_metadata_field(&owned_value_path!("vector", "source_type"), Kind::bytes())
+                .with_meaning(OwnedTargetPath::event_root(), "message")
+                .with_metadata_field(
+                    &owned_value_path!("vector", "source_type"),
+                    Kind::bytes(),
+                    None,
+                )
                 .with_metadata_field(
                     &owned_value_path!("vector", "ingest_timestamp"),
                     Kind::timestamp(),
+                    None,
                 )
                 .with_metadata_field(
                     &owned_value_path!(LogstashConfig::NAME, "timestamp"),
                     Kind::timestamp().or_undefined(),
+                    Some("timestamp"),
                 )
                 .with_metadata_field(
                     &owned_value_path!(LogstashConfig::NAME, "host"),
                     Kind::bytes(),
+                    Some("host"),
                 )
                 .with_metadata_field(
                     &owned_value_path!(LogstashConfig::NAME, "tls_client_metadata"),
                     Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
+                    None,
                 );
 
         assert_eq!(definition, expected_definition)

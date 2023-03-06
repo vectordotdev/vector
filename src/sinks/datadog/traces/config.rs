@@ -1,6 +1,5 @@
 use std::sync::{Arc, Mutex};
 
-use futures::FutureExt;
 use http::Uri;
 use indoc::indoc;
 use snafu::ResultExt;
@@ -19,11 +18,11 @@ use crate::{
     http::HttpClient,
     sinks::{
         datadog::{
-            default_site, get_api_validate_endpoint, healthcheck,
             traces::{
                 request_builder::DatadogTracesRequestBuilder, service::TraceApiService,
                 sink::TracesSink,
             },
+            DatadogCommonConfig,
         },
         util::{
             service::ServiceBuilderExt, BatchConfig, Compression, SinkBatchSettings,
@@ -57,42 +56,23 @@ impl SinkBatchSettings for DatadogTracesDefaultBatchSettings {
 
 /// Configuration for the `datadog_traces` sink.
 #[configurable_component(sink("datadog_traces"))]
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct DatadogTracesConfig {
-    /// The endpoint to send traces to.
-    ///
-    /// The endpoint must contain an HTTP scheme, and may specify a
-    /// hostname or IP address and port.
-    ///
-    /// If set, overrides the `site` option.
-    #[configurable(metadata(docs::advanced))]
-    #[configurable(metadata(docs::examples = "http://127.0.0.1:8080"))]
-    #[configurable(metadata(docs::examples = "http://example.com:12345"))]
-    #[serde(default)]
-    pub(crate) endpoint: Option<String>,
+    #[serde(flatten)]
+    pub dd_common: DatadogCommonConfig,
 
-    /// The Datadog [site][dd_site] to send traces to.
+    /// The default Datadog [API key][api_key] to use in authentication of HTTP requests.
     ///
-    /// [dd_site]: https://docs.datadoghq.com/getting_started/site
-    #[configurable(metadata(docs::examples = "us3.datadoghq.com"))]
-    #[configurable(metadata(docs::examples = "datadoghq.eu"))]
-    #[serde(default = "default_site")]
-    pub site: String,
-
-    /// The default Datadog [API key][api_key] to send traces with.
-    ///
-    /// If a trace has a Datadog [API key][api_key] set explicitly in its metadata, it will take
+    /// If an event has a Datadog [API key][api_key] set explicitly in its metadata, it will take
     /// precedence over this setting.
     ///
     /// [api_key]: https://docs.datadoghq.com/api/?lang=bash#authentication
+    // TODO: After `api_key` (a deprecated name for this setting in the DD logs and metrics sinks) is
+    // removed in v0.29.0, this entire setting should be migrated to the `DatadogCommonConfig` struct.
     #[configurable(metadata(docs::examples = "${DATADOG_API_KEY_ENV_VAR}"))]
     #[configurable(metadata(docs::examples = "ef8d5de700e7989468166c40fc8a0ccd"))]
     pub default_api_key: SensitiveString,
-
-    #[configurable(derived)]
-    #[serde(default)]
-    pub tls: Option<TlsEnableableConfig>,
 
     #[configurable(derived)]
     #[serde(default)]
@@ -105,14 +85,6 @@ pub struct DatadogTracesConfig {
     #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
-
-    #[configurable(derived)]
-    #[serde(
-        default,
-        deserialize_with = "crate::serde::bool_or_struct",
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
-    )]
-    pub acknowledgements: AcknowledgementsConfig,
 }
 
 impl GenerateConfig for DatadogTracesConfig {
@@ -150,9 +122,10 @@ impl DatadogTracesEndpointConfiguration {
 
 impl DatadogTracesConfig {
     fn get_base_uri(&self) -> String {
-        self.endpoint
+        self.dd_common
+            .endpoint
             .clone()
-            .unwrap_or_else(|| format!("https://trace.agent.{}", self.site))
+            .unwrap_or_else(|| format!("https://trace.agent.{}", self.dd_common.site))
     }
 
     fn generate_traces_endpoint_configuration(
@@ -228,21 +201,11 @@ impl DatadogTracesConfig {
         Ok(VectorSink::from_event_streamsink(sink))
     }
 
-    pub fn build_healthcheck(&self, client: HttpClient) -> crate::Result<Healthcheck> {
-        let validate_endpoint =
-            get_api_validate_endpoint(self.endpoint.as_ref(), self.site.as_ref())?;
-        Ok(healthcheck(
-            client,
-            validate_endpoint,
-            self.default_api_key.inner().to_string(),
-        )
-        .boxed())
-    }
-
     pub fn build_client(&self, proxy: &ProxyConfig) -> crate::Result<HttpClient> {
         let tls_settings = MaybeTlsSettings::from_config(
             &Some(
-                self.tls
+                self.dd_common
+                    .tls
                     .clone()
                     .unwrap_or_else(TlsEnableableConfig::enabled),
             ),
@@ -264,8 +227,13 @@ impl DatadogTracesConfig {
 impl SinkConfig for DatadogTracesConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let client = self.build_client(&cx.proxy)?;
-        let healthcheck = self.build_healthcheck(client.clone())?;
+        let healthcheck = self.dd_common.build_healthcheck(
+            client.clone(),
+            self.default_api_key.clone().into(),
+            None,
+        )?;
         let sink = self.build_sink(client)?;
+
         Ok((sink, healthcheck))
     }
 
@@ -274,7 +242,7 @@ impl SinkConfig for DatadogTracesConfig {
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
-        &self.acknowledgements
+        &self.dd_common.acknowledgements
     }
 }
 

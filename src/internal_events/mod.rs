@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 pub mod prelude;
 
 mod adaptive_concurrency;

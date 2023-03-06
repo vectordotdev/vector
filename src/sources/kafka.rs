@@ -26,7 +26,7 @@ use tokio_util::codec::FramedRead;
 
 use value::{kind::Collection, Kind};
 use vector_common::finalizer::OrderedFinalizer;
-use vector_config::{configurable_component, NamedComponent};
+use vector_config::configurable_component;
 use vector_core::{
     config::{LegacyKey, LogNamespace},
     EstimatedJsonEncodedSizeOf,
@@ -54,6 +54,14 @@ enum BuildError {
     KafkaCreateError { source: rdkafka::error::KafkaError },
     #[snafu(display("Could not subscribe to Kafka topics: {}", source))]
     KafkaSubscribeError { source: rdkafka::error::KafkaError },
+}
+
+/// Metrics configuration.
+#[configurable_component]
+#[derive(Clone, Debug, Default)]
+struct Metrics {
+    /// Expose topic lag metrics for all topics and partitions. Metric names are `kafka_consumer_lag`.
+    pub topic_lag_metric: bool,
 }
 
 /// Configuration for the `kafka` source.
@@ -85,10 +93,6 @@ pub struct KafkaSourceConfig {
     /// The consumer group name to be used to consume events from Kafka.
     #[configurable(metadata(docs::examples = "consumer-group-name"))]
     group_id: String,
-
-    /// Override dynamic membership and broker assignment behavior with static membership, using a group instance (member) id.
-    #[configurable(metadata(docs::examples = "kafka-streams-instance-1"))]
-    group_instance_id: Option<String>,
 
     /// If offsets for consumer group do not exist, set them using this strategy.
     ///
@@ -201,6 +205,10 @@ pub struct KafkaSourceConfig {
     #[configurable(metadata(docs::hidden))]
     #[serde(default)]
     log_namespace: Option<bool>,
+
+    #[configurable(derived)]
+    #[serde(default)]
+    metrics: Metrics,
 }
 
 impl KafkaSourceConfig {
@@ -692,12 +700,10 @@ fn create_consumer(config: &KafkaSourceConfig) -> crate::Result<StreamConsumer<C
         }
     }
 
-    if let Some(group_instance_id) = &config.group_instance_id {
-        client_config.set("group.instance.id", group_instance_id);
-    }
-
     let consumer = client_config
-        .create_with_context::<_, StreamConsumer<_>>(CustomContext::default())
+        .create_with_context::<_, StreamConsumer<_>>(CustomContext::new(
+            config.metrics.topic_lag_metric,
+        ))
         .context(KafkaCreateSnafu)?;
     let topics: Vec<&str> = config.topics.iter().map(|s| s.as_str()).collect();
     consumer.subscribe(&topics).context(KafkaSubscribeSnafu)?;
@@ -709,6 +715,15 @@ fn create_consumer(config: &KafkaSourceConfig) -> crate::Result<StreamConsumer<C
 struct CustomContext {
     stats: kafka::KafkaStatisticsContext,
     finalizer: OnceCell<Arc<OrderedFinalizer<FinalizerEntry>>>,
+}
+
+impl CustomContext {
+    fn new(expose_lag_metrics: bool) -> Self {
+        Self {
+            stats: kafka::KafkaStatisticsContext { expose_lag_metrics },
+            ..Default::default()
+        }
+    }
 }
 
 impl ClientContext for CustomContext {
@@ -729,7 +744,7 @@ impl ConsumerContext for CustomContext {
 
 #[cfg(test)]
 mod test {
-    use lookup::LookupBuf;
+    use lookup::OwnedTargetPath;
     use vector_core::schema::Definition;
 
     use super::*;
@@ -782,21 +797,39 @@ mod test {
         assert_eq!(
             definition,
             Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
-                .with_meaning(LookupBuf::root(), "message")
-                .with_metadata_field(&owned_value_path!("kafka", "timestamp"), Kind::timestamp())
-                .with_metadata_field(&owned_value_path!("kafka", "message_key"), Kind::bytes())
-                .with_metadata_field(&owned_value_path!("kafka", "topic"), Kind::bytes())
-                .with_metadata_field(&owned_value_path!("kafka", "partition"), Kind::bytes())
-                .with_metadata_field(&owned_value_path!("kafka", "offset"), Kind::bytes())
+                .with_meaning(OwnedTargetPath::event_root(), "message")
+                .with_metadata_field(
+                    &owned_value_path!("kafka", "timestamp"),
+                    Kind::timestamp(),
+                    Some("timestamp")
+                )
+                .with_metadata_field(
+                    &owned_value_path!("kafka", "message_key"),
+                    Kind::bytes(),
+                    None
+                )
+                .with_metadata_field(&owned_value_path!("kafka", "topic"), Kind::bytes(), None)
+                .with_metadata_field(
+                    &owned_value_path!("kafka", "partition"),
+                    Kind::bytes(),
+                    None
+                )
+                .with_metadata_field(&owned_value_path!("kafka", "offset"), Kind::bytes(), None)
                 .with_metadata_field(
                     &owned_value_path!("kafka", "headers"),
-                    Kind::object(Collection::empty().with_unknown(Kind::bytes()))
+                    Kind::object(Collection::empty().with_unknown(Kind::bytes())),
+                    None
                 )
                 .with_metadata_field(
                     &owned_value_path!("vector", "ingest_timestamp"),
-                    Kind::timestamp()
+                    Kind::timestamp(),
+                    None
                 )
-                .with_metadata_field(&owned_value_path!("vector", "source_type"), Kind::bytes())
+                .with_metadata_field(
+                    &owned_value_path!("vector", "source_type"),
+                    Kind::bytes(),
+                    None
+                )
         )
     }
 

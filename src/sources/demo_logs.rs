@@ -14,7 +14,7 @@ use tokio_util::codec::FramedRead;
 use vector_common::internal_event::{
     ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol,
 };
-use vector_config::{configurable_component, NamedComponent};
+use vector_config::configurable_component;
 use vector_core::{config::LogNamespace, EstimatedJsonEncodedSizeOf};
 
 use crate::{

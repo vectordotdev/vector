@@ -4,7 +4,9 @@ use codecs::JsonSerializerConfig;
 use futures::FutureExt;
 use rdkafka::ClientConfig;
 use serde_with::serde_as;
+use value::Kind;
 use vector_config::configurable_component;
+use vector_core::schema::Requirement;
 
 use crate::{
     codecs::EncodingConfig,
@@ -271,7 +273,10 @@ impl SinkConfig for KafkaSinkConfig {
     }
 
     fn input(&self) -> Input {
+        let requirements = Requirement::empty().optional_meaning("timestamp", Kind::timestamp());
+
         Input::new(self.encoding.config().input_type() & (DataType::Log | DataType::Metric))
+            .with_schema_requirement(requirements)
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {

@@ -4,7 +4,7 @@ use futures::{stream, StreamExt};
 use lookup::lookup_v2::OptionalValuePath;
 use lookup::{owned_value_path, path, OwnedValuePath};
 use value::Kind;
-use vector_config::{configurable_component, NamedComponent};
+use vector_config::configurable_component;
 use vector_core::config::log_schema;
 use vector_core::{
     config::{LegacyKey, LogNamespace},
@@ -198,7 +198,7 @@ async fn run(
 #[cfg(test)]
 mod tests {
     use futures::Stream;
-    use lookup::LookupBuf;
+    use lookup::OwnedTargetPath;
     use tokio::time::{sleep, Duration};
     use value::kind::Collection;
     use vector_core::event::Value;
@@ -306,7 +306,7 @@ mod tests {
                 assert_eq!(log["vector.component_type"], "internal_logs".into());
             } else {
                 // The last event occurs in a nested span. Here, we expect
-                // parent fields to be preservered (unless overwritten), new
+                // parent fields to be preserved (unless overwritten), new
                 // fields to be added, and filtered fields to not exist.
                 assert_eq!(log["vector.component_id"], "foo".into());
                 assert_eq!(log["vector.component_kind"], "bar".into());
@@ -342,19 +342,26 @@ mod tests {
 
         let expected_definition =
             Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
-                .with_meaning(LookupBuf::root(), "message")
-                .with_metadata_field(&owned_value_path!("vector", "source_type"), Kind::bytes())
+                .with_meaning(OwnedTargetPath::event_root(), "message")
+                .with_metadata_field(
+                    &owned_value_path!("vector", "source_type"),
+                    Kind::bytes(),
+                    None,
+                )
                 .with_metadata_field(
                     &owned_value_path!(InternalLogsConfig::NAME, "pid"),
                     Kind::integer(),
+                    None,
                 )
                 .with_metadata_field(
                     &owned_value_path!("vector", "ingest_timestamp"),
                     Kind::timestamp(),
+                    None,
                 )
                 .with_metadata_field(
                     &owned_value_path!(InternalLogsConfig::NAME, "host"),
                     Kind::bytes().or_undefined(),
+                    Some("host"),
                 );
 
         assert_eq!(definition, expected_definition)

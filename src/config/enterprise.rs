@@ -25,7 +25,10 @@ use crate::{
     conditions::AnyCondition,
     http::{HttpClient, HttpError},
     sinks::{
-        datadog::{default_site, logs::DatadogLogsConfig, metrics::DatadogMetricsConfig},
+        datadog::{
+            default_site, logs::DatadogLogsConfig, metrics::DatadogMetricsConfig,
+            DatadogCommonConfig,
+        },
         util::{http::RequestConfig, retries::ExponentialBackoff},
     },
     sources::{
@@ -478,9 +481,12 @@ fn setup_logs_reporting(
 
     // Create a Datadog logs sink to consume and emit internal logs.
     let datadog_logs = DatadogLogsConfig {
+        dd_common: DatadogCommonConfig {
+            endpoint: datadog.endpoint.clone(),
+            site: datadog.site.clone(),
+            ..Default::default()
+        },
         default_api_key: api_key.into(),
-        endpoint: datadog.endpoint.clone(),
-        site: datadog.site.clone(),
         region: datadog.region,
         request: RequestConfig {
             headers: IndexMap::from([(
@@ -583,9 +589,12 @@ fn setup_metrics_reporting(
 
     // Create a Datadog metrics sink to consume and emit internal + host metrics.
     let datadog_metrics = DatadogMetricsConfig {
+        dd_common: DatadogCommonConfig {
+            endpoint: datadog.endpoint.clone(),
+            site: datadog.site.clone(),
+            ..Default::default()
+        },
         default_api_key: api_key.into(),
-        endpoint: datadog.endpoint.clone(),
-        site: datadog.site.clone(),
         region: datadog.region,
         ..Default::default()
     };
@@ -715,7 +724,7 @@ fn get_reporting_endpoint(
     region: Option<Region>,
     configuration_key: &str,
 ) -> String {
-    let base = get_base_domain_region(site, region);
+    let base = get_base_domain_region(site, region.as_ref());
 
     format!(
         "{}{}/{}/versions",

@@ -17,7 +17,7 @@ use vector_core::{
 use crate::config::{TransformConfig, TransformContext};
 
 /// Configuration for the `test_basic` transform.
-#[configurable_component(transform("test_basic"))]
+#[configurable_component(transform("test_basic", "Test (basic)"))]
 #[derive(Clone, Debug, Default)]
 pub struct BasicTransformConfig {
     /// Suffix to add to the message of any log event.
@@ -36,6 +36,7 @@ impl BasicTransformConfig {
 }
 
 #[async_trait]
+#[typetag::serde(name = "test_basic")]
 impl TransformConfig for BasicTransformConfig {
     async fn build(&self, _globals: &TransformContext) -> crate::Result<Transform> {
         Ok(Transform::function(BasicTransform {

@@ -12,7 +12,7 @@ use value::Kind;
 use vector_common::internal_event::{
     ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol, Registered,
 };
-use vector_config::{configurable_component, NamedComponent};
+use vector_config::configurable_component;
 use vector_core::{
     config::{LegacyKey, LogNamespace},
     EstimatedJsonEncodedSizeOf,
