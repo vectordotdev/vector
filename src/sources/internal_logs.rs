@@ -306,7 +306,7 @@ mod tests {
                 assert_eq!(log["vector.component_type"], "internal_logs".into());
             } else {
                 // The last event occurs in a nested span. Here, we expect
-                // parent fields to be preservered (unless overwritten), new
+                // parent fields to be preserved (unless overwritten), new
                 // fields to be added, and filtered fields to not exist.
                 assert_eq!(log["vector.component_id"], "foo".into());
                 assert_eq!(log["vector.component_kind"], "bar".into());

@@ -40,7 +40,6 @@ pub struct TcpConfig {
         deprecated = "This option has been deprecated. Configure `max_length` on the framing config instead."
     )]
     #[configurable(metadata(docs::type_unit = "bytes"))]
-    #[serde(default = "default_max_length")]
     max_length: Option<usize>,
 
     /// The timeout before a connection is forcefully closed during shutdown.
@@ -79,6 +78,12 @@ pub struct TcpConfig {
     #[configurable(metadata(docs::type_unit = "bytes"))]
     receive_buffer_bytes: Option<usize>,
 
+    /// Maximum duration to keep each connection open. Connections open for longer than this duration are closed.
+    ///
+    /// This is helpful for load balancing long-lived connections.
+    #[configurable(metadata(docs::type_unit = "seconds"))]
+    max_connection_duration_secs: Option<u64>,
+
     /// The maximum number of TCP connections that will be allowed at any given time.
     #[configurable(metadata(docs::type_unit = "connections"))]
     pub connection_limit: Option<u32>,
@@ -115,6 +120,7 @@ impl TcpConfig {
             port_key: default_port_key(),
             tls: None,
             receive_buffer_bytes: None,
+            max_connection_duration_secs: None,
             framing: None,
             decoding: default_decoding(),
             connection_limit: None,
@@ -160,6 +166,15 @@ impl TcpConfig {
 
     pub const fn receive_buffer_bytes(&self) -> Option<usize> {
         self.receive_buffer_bytes
+    }
+
+    pub const fn max_connection_duration_secs(&self) -> Option<u64> {
+        self.max_connection_duration_secs
+    }
+
+    pub fn set_max_connection_duration_secs(&mut self, val: Option<u64>) -> &mut Self {
+        self.max_connection_duration_secs = val;
+        self
     }
 
     pub fn set_max_length(&mut self, val: Option<usize>) -> &mut Self {

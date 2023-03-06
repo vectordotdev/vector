@@ -276,6 +276,20 @@ base: components: sinks: azure_monitor_logs: configuration: {
 		required: true
 		type: string: examples: ["SERsIYhgMVlJB6uPsq49gCxNiruf6v0vhMYE+lfzbSGcXjdViZdV/e5pEMTYtw9f8SkVLf4LFlLCc2KxtRZfCA==", "${AZURE_MONITOR_SHARED_KEY_ENV_VAR}"]
 	}
+	time_generated_key: {
+		description: """
+			Use this option to customize the log field used as [`TimeGenerated`][1] in Azure.
+
+			The setting of `log_schema.timestamp_key`, usually `timestamp`, is used here by default.
+			This field should be used in rare cases where `TimeGenerated` should point to a specific log
+			field. For example, use this field to set the log field `source_timestamp` as holding the
+			value that should be used as `TimeGenerated` on the Azure side.
+
+			[1]: https://learn.microsoft.com/en-us/azure/azure-monitor/logs/log-standard-columns#timegenerated
+			"""
+		required: false
+		type: string: examples: ["time_generated"]
+	}
 	tls: {
 		description: "TLS configuration."
 		required:    false

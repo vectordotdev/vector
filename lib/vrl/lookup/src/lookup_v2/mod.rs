@@ -2,7 +2,6 @@ mod borrowed;
 mod compat;
 mod concat;
 mod jit;
-mod optional_path;
 mod owned;
 
 use self::jit::{JitValuePath, JitValuePathIter};
@@ -11,7 +10,6 @@ use std::fmt::Debug;
 
 pub use borrowed::BorrowedSegment;
 pub use concat::PathConcat;
-pub use optional_path::{OptionalTargetPath, OptionalValuePath};
 pub use owned::{OwnedSegment, OwnedTargetPath, OwnedValuePath};
 
 #[derive(Clone, Debug, Eq, PartialEq, Snafu)]

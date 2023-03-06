@@ -1,14 +1,12 @@
-args:
-- --features
+features:
 - influxdb-integration-tests
-- --lib
-- 'sinks::influxdb::logs::integration_tests'
+
+test_filter: 'sinks::influxdb::logs::integration_tests'
 
 env:
   INFLUXDB_V1_HTTPS_ADDRESS: https://influxdb-v1-tls:8086
   INFLUXDB_V1_HTTP_ADDRESS: http://influxdb-v1:8086
   INFLUXDB_V2_ADDRESS: http://influxdb-v2:8086
-  TEST_LOG: debug
 
 matrix:
   version: ['1.8']

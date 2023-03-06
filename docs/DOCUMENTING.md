@@ -61,7 +61,7 @@ properly formatted. To run CUE's autoformatting, first [install cue](https://cue
 then run this command from the `vector` root:
 
 ```bash
-cue fmt ./docs/**/*.cue
+cue fmt ./website/**/*.cue
 ```
 
 If that rewrites any files, make sure to commit your changes or else you'll see
