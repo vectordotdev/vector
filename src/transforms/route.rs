@@ -51,7 +51,10 @@ impl SyncTransform for Route {
 }
 
 /// Configuration for the `route` transform.
-#[configurable_component(transform("route"))]
+#[configurable_component(transform(
+    "route",
+    "Split a stream of events into multiple sub-streams based on user-supplied conditions."
+))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct RouteConfig {
@@ -77,6 +80,7 @@ impl GenerateConfig for RouteConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "route")]
 impl TransformConfig for RouteConfig {
     async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
         let route = Route::new(self, context)?;

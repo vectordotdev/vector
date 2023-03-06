@@ -6,6 +6,15 @@ releases: "0.27.0": {
 
 	whats_next: []
 
+	known_issues: [
+		"""
+			Vector sources do not correctly tag the `component_events_in_total` and
+			`component_events_out_total` internal metrics with their component tags (`component_id`,
+			`component_kind`, and `component_type`). This affects reporting in `vector top`.
+			Fixed in v0.27.1.
+			""",
+	]
+
 	description: """
 		The Vector team is pleased to announce version 0.27.0!
 
@@ -52,7 +61,7 @@ releases: "0.27.0": {
 			type: "enhancement"
 			scopes: ["vrl: compiler"]
 			description: """
-				VRL no longer rejects querying an object retured by the `merge` function. This fixes
+				VRL no longer rejects querying an object returned by the `merge` function. This fixes
 				programs that look like:
 
 				```
@@ -156,7 +165,7 @@ releases: "0.27.0": {
 			type: "fix"
 			scopes: ["sink: elasticsearch"]
 			description: """
-				The `elasticsearch` sink now accepts reading compressed responess. It uses the
+				The `elasticsearch` sink now accepts reading compressed responses. It uses the
 				`compression` option to set an `Accept-Encoding` option in requests to Elasticsearch.
 				"""
 			pr_numbers: [15478]

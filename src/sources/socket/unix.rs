@@ -5,7 +5,7 @@ use chrono::Utc;
 use codecs::decoding::{DeserializerConfig, FramingConfig};
 use lookup::{lookup_v2::OptionalValuePath, path};
 use vector_common::shutdown::ShutdownSignal;
-use vector_config::{configurable_component, NamedComponent};
+use vector_config::configurable_component;
 use vector_core::config::{LegacyKey, LogNamespace};
 
 use crate::{
@@ -50,7 +50,6 @@ pub struct UnixConfig {
     #[configurable(
         deprecated = "This option has been deprecated. Configure `max_length` on the framing config instead."
     )]
-    #[serde(default = "default_max_length")]
     #[configurable(metadata(docs::type_unit = "bytes"))]
     pub max_length: Option<usize>,
 

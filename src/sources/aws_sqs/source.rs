@@ -222,7 +222,6 @@ mod tests {
     use crate::codecs::DecodingConfig;
     use chrono::SecondsFormat;
     use lookup::path;
-    use vector_config::NamedComponent;
 
     use super::*;
     use crate::config::{log_schema, SourceConfig};

@@ -71,18 +71,21 @@ pub struct RemoteWriteConfig {
     ///
     /// [prom_naming_docs]: https://prometheus.io/docs/practices/naming/#metric-names
     #[configurable(metadata(docs::examples = "service"))]
+    #[configurable(metadata(docs::advanced))]
     pub default_namespace: Option<String>,
 
     /// Default buckets to use for aggregating [distribution][dist_metric_docs] metrics into histograms.
     ///
     /// [dist_metric_docs]: https://vector.dev/docs/about/under-the-hood/architecture/data-model/metric/#distribution
     #[serde(default = "super::default_histogram_buckets")]
+    #[configurable(metadata(docs::advanced))]
     pub buckets: Vec<f64>,
 
     /// Quantiles to use for aggregating [distribution][dist_metric_docs] metrics into a summary.
     ///
     /// [dist_metric_docs]: https://vector.dev/docs/about/under-the-hood/architecture/data-model/metric/#distribution
     #[serde(default = "super::default_summary_quantiles")]
+    #[configurable(metadata(docs::advanced))]
     pub quantiles: Vec<f64>,
 
     #[configurable(derived)]
@@ -100,6 +103,7 @@ pub struct RemoteWriteConfig {
     /// This may be used by Cortex or other remote services to identify the tenant making the request.
     #[serde(default)]
     #[configurable(metadata(docs::examples = "my-domain"))]
+    #[configurable(metadata(docs::advanced))]
     pub tenant_id: Option<Template>,
 
     #[configurable(derived)]
@@ -109,6 +113,7 @@ pub struct RemoteWriteConfig {
     pub auth: Option<PrometheusRemoteWriteAuth>,
 
     #[configurable(derived)]
+    #[configurable(metadata(docs::advanced))]
     pub aws: Option<RegionOrEndpoint>,
 
     #[configurable(derived)]

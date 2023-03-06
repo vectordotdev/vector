@@ -3,7 +3,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 
 use super::{
     schema, ComponentKey, DataType, Output, OutputId, SinkConfig, SinkOuter, SourceConfig,
-    SourceOuter, TransformConfig, TransformOuter,
+    SourceOuter, TransformOuter,
 };
 
 #[derive(Debug, Clone)]

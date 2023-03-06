@@ -304,7 +304,7 @@ base: components: sinks: aws_kinesis_streams: configuration: {
 			If not specified, a unique partition key will be generated for each Kinesis record.
 			"""
 		required: false
-		type: string: {}
+		type: string: examples: ["user_id"]
 	}
 	region: {
 		description: """
@@ -465,7 +465,7 @@ base: components: sinks: aws_kinesis_streams: configuration: {
 			[stream_name]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html
 			"""
 		required: true
-		type: string: {}
+		type: string: examples: ["my-stream"]
 	}
 	tls: {
 		description: "TLS configuration."

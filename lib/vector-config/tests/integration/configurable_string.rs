@@ -10,6 +10,12 @@ pub struct FakeString(u64);
 
 impl ConfigurableString for FakeString {}
 
+impl ToString for FakeString {
+    fn to_string(&self) -> String {
+        self.0.to_string()
+    }
+}
+
 #[test]
 #[should_panic]
 fn non_string_key_schema_stdlib_hashmap() {

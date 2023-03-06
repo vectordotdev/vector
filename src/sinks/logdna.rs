@@ -4,6 +4,7 @@ use bytes::Bytes;
 use futures::{FutureExt, SinkExt};
 use http::{Request, StatusCode, Uri};
 use serde_json::json;
+use value::Kind;
 use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
 
@@ -12,6 +13,7 @@ use crate::{
     config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     event::Event,
     http::{Auth, HttpClient},
+    schema,
     sinks::util::{
         http::{HttpEventEncoder, HttpSink, PartitionHttpSink},
         BatchConfig, BoxedRawValue, JsonArrayBuffer, PartitionBuffer, PartitionInnerBuffer,
@@ -142,7 +144,11 @@ impl SinkConfig for LogdnaConfig {
     }
 
     fn input(&self) -> Input {
-        Input::log()
+        let requirement = schema::Requirement::empty()
+            .optional_meaning("timestamp", Kind::timestamp())
+            .optional_meaning("message", Kind::bytes());
+
+        Input::log().with_schema_requirement(requirement)
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
@@ -210,10 +216,13 @@ impl HttpEventEncoder<PartitionInnerBuffer<serde_json::Value, PartitionKey>>
         let mut log = event.into_log();
 
         let line = log
-            .remove(crate::config::log_schema().message_key())
+            .message_path()
+            .and_then(|path| log.remove(path.as_str()))
             .unwrap_or_else(|| String::from("").into());
-        let timestamp = log
-            .remove(crate::config::log_schema().timestamp_key())
+
+        let timestamp: value::Value = log
+            .timestamp_path()
+            .and_then(|path| log.remove(path.as_str()))
             .unwrap_or_else(|| chrono::Utc::now().into());
 
         let mut map = serde_json::map::Map::new();

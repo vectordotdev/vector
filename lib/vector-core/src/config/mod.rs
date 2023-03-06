@@ -357,13 +357,13 @@ impl LogNamespace {
     ) {
         self.insert_vector_metadata(
             log,
-            path!(log_schema().source_type_key()),
+            log_schema().source_type_key(),
             path!("source_type"),
             Bytes::from_static(source_name.as_bytes()),
         );
         self.insert_vector_metadata(
             log,
-            path!(log_schema().timestamp_key()),
+            log_schema().timestamp_key(),
             path!("ingest_timestamp"),
             now,
         );
@@ -420,5 +420,34 @@ impl LogNamespace {
     #[must_use]
     pub fn merge(&self, override_value: Option<impl Into<LogNamespace>>) -> LogNamespace {
         override_value.map_or(*self, Into::into)
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::config::{init_log_schema, LogNamespace, LogSchema};
+    use crate::event::LogEvent;
+    use chrono::Utc;
+    use lookup::event_path;
+
+    #[test]
+    fn test_insert_standard_vector_source_metadata() {
+        let nested_path = "a.b.c.d";
+
+        init_log_schema(
+            || {
+                let mut schema = LogSchema::default();
+                schema.set_source_type_key(nested_path.to_owned());
+                Ok(schema)
+            },
+            false,
+        )
+        .unwrap();
+
+        let namespace = LogNamespace::Legacy;
+        let mut event = LogEvent::from("log");
+        namespace.insert_standard_vector_source_metadata(&mut event, "source", Utc::now());
+
+        assert!(event.get(event_path!("a", "b", "c", "d")).is_some());
     }
 }

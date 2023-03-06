@@ -3,7 +3,7 @@ use std::num::NonZeroUsize;
 use codecs::decoding::{DeserializerConfig, FramingConfig};
 use lookup::owned_value_path;
 use value::Kind;
-use vector_config::{configurable_component, NamedComponent};
+use vector_config::configurable_component;
 use vector_core::config::{LegacyKey, LogNamespace};
 
 use crate::aws::create_client;

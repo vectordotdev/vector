@@ -9,6 +9,7 @@ use crate::{
     config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     event::{Event, EventFinalizers, EventStatus, Finalizable},
     internal_events::PulsarSendingError,
+    schema,
     sinks::util::metadata::RequestMetadataBuilder,
 };
 use bytes::BytesMut;
@@ -23,7 +24,7 @@ use pulsar::{
 };
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::Encoder as _;
-use value::Value;
+use value::{Kind, Value};
 use vector_common::{
     internal_event::{
         ByteSize, BytesSent, CountByteSize, EventsSent, InternalEventHandle as _, Output, Protocol,
@@ -33,7 +34,6 @@ use vector_common::{
     sensitive_string::SensitiveString,
 };
 use vector_config::configurable_component;
-use vector_core::config::log_schema;
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -57,6 +57,7 @@ pub struct PulsarSinkConfig {
     topic: String,
 
     /// The name of the producer. If not specified, the default name assigned by Pulsar will be used.
+    #[configurable(metadata(docs::examples = "producer-name"))]
     producer_name: Option<String>,
 
     #[configurable(derived)]
@@ -91,10 +92,10 @@ pub struct PulsarSinkConfig {
 #[configurable_component]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct BatchConfig {
-    /// The maximum size of a batch, in events, before it is flushed.
+    /// The maximum size of a batch before it is flushed.
     #[configurable(metadata(docs::type_unit = "events"))]
     #[configurable(metadata(docs::examples = 1000))]
-    pub batch_size: Option<u32>,
+    pub max_events: Option<u32>,
 }
 
 /// Authentication configuration.
@@ -259,7 +260,10 @@ impl SinkConfig for PulsarSinkConfig {
     }
 
     fn input(&self) -> Input {
-        Input::log()
+        let requirement =
+            schema::Requirement::empty().optional_meaning("timestamp", Kind::timestamp());
+
+        Input::log().with_schema_requirement(requirement)
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
@@ -329,7 +333,7 @@ impl PulsarSinkConfig {
         };
 
         if !is_healthcheck {
-            producer_options.batch_size = self.batch.batch_size;
+            producer_options.batch_size = self.batch.max_events;
         }
 
         if let SerializerConfig::Avro { avro } = self.encoding.config() {
@@ -408,7 +412,7 @@ impl Sink<Event> for PulsarSink {
 
         let event_time: Option<u64> = event
             .maybe_as_log()
-            .and_then(|log| log.get(log_schema().timestamp_key()))
+            .and_then(|log| log.get_timestamp())
             .and_then(|value| value.as_timestamp())
             .map(|ts| ts.timestamp_millis())
             .map(|i| i as u64);

@@ -86,8 +86,8 @@ base: components: sinks: pulsar: configuration: {
 	batch: {
 		description: "Event batching behavior."
 		required:    false
-		type: object: options: batch_size: {
-			description: "The maximum size of a batch, in events, before it is flushed."
+		type: object: options: max_events: {
+			description: "The maximum size of a batch before it is flushed."
 			required:    false
 			type: uint: {
 				examples: [1000]
@@ -242,7 +242,7 @@ base: components: sinks: pulsar: configuration: {
 	producer_name: {
 		description: "The name of the producer. If not specified, the default name assigned by Pulsar will be used."
 		required:    false
-		type: string: {}
+		type: string: examples: ["producer-name"]
 	}
 	topic: {
 		description: "The Pulsar topic name to write events to."

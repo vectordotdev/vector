@@ -37,6 +37,12 @@ pub struct Template {
 
 impl ConfigurableString for Template {}
 
+impl ToString for Template {
+    fn to_string(&self) -> String {
+        self.src.clone()
+    }
+}
+
 impl TryFrom<String> for Template {
     type Error = String;
 
@@ -120,7 +126,7 @@ pub enum Encoding {
 #[derive(Clone)]
 #[configurable_component]
 #[configurable(metadata(docs::examples = "Self::default()"))]
-pub struct TlsEnablableConfig {
+pub struct TlsEnableableConfig {
     /// Whether or not TLS is enabled.
     pub enabled: bool,
 
@@ -128,7 +134,7 @@ pub struct TlsEnablableConfig {
     pub options: TlsConfig,
 }
 
-impl Default for TlsEnablableConfig {
+impl Default for TlsEnableableConfig {
     fn default() -> Self {
         Self {
             enabled: true,
@@ -342,7 +348,7 @@ pub struct AdvancedSinkConfig {
 
     /// Overridden TLS description.
     #[configurable(derived)]
-    tls: Option<TlsEnablableConfig>,
+    tls: Option<TlsEnableableConfig>,
 
     /// The partition key to use for each event.
     #[configurable(metadata(docs::templateable))]

@@ -17,7 +17,7 @@ use crate::sinks::{util::UriSerde, Healthcheck, Sinks};
 #[derive(Clone, Debug)]
 pub struct SinkOuter<T>
 where
-    T: Configurable + Serialize,
+    T: Configurable + Serialize + 'static,
 {
     #[configurable(derived)]
     pub inputs: Inputs<T>,
@@ -26,12 +26,10 @@ where
     ///
     /// This must be a valid URI, which requires at least the scheme and host. All other
     /// components -- port, path, etc -- are allowed as well.
-    #[configurable(deprecated)]
-    #[configurable(metadata(docs::hidden))]
-    #[configurable(validation(format = "uri"))]
+    #[configurable(deprecated, metadata(docs::hidden), validation(format = "uri"))]
     healthcheck_uri: Option<UriSerde>,
 
-    #[configurable(derived)]
+    #[configurable(derived, metadata(docs::advanced))]
     #[serde(default, deserialize_with = "crate::serde::bool_or_struct")]
     healthcheck: SinkHealthcheckOptions,
 

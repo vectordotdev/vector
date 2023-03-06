@@ -66,7 +66,7 @@ base: components: sinks: influxdb_logs: configuration: {
 			Only relevant when using InfluxDB v2.x and above.
 			"""
 		required: true
-		type: string: {}
+		type: string: examples: ["vector-bucket", "4d2225e4d3d49f75"]
 	}
 	consistency: {
 		description: """
@@ -75,7 +75,7 @@ base: components: sinks: influxdb_logs: configuration: {
 			Only relevant when using InfluxDB v0.x/v1.x.
 			"""
 		required: false
-		type: string: {}
+		type: string: examples: ["any", "one", "quorum", "all"]
 	}
 	database: {
 		description: """
@@ -84,7 +84,7 @@ base: components: sinks: influxdb_logs: configuration: {
 			Only relevant when using InfluxDB v0.x/v1.x.
 			"""
 		required: true
-		type: string: {}
+		type: string: examples: ["vector-database", "iot-store"]
 	}
 	encoding: {
 		description: "Transformations to prepare an event for serialization."
@@ -111,26 +111,29 @@ base: components: sinks: influxdb_logs: configuration: {
 		}
 	}
 	endpoint: {
-		description: "The endpoint to send data to."
-		required:    true
-		type: string: {}
+		description: """
+			The endpoint to send data to.
+
+			This should be a full HTTP URI, including the scheme, host, and port.
+			"""
+		required: true
+		type: string: examples: ["http://localhost:8086"]
 	}
 	measurement: {
 		description: "The name of the InfluxDB measurement that will be written to."
 		required:    false
-		type: string: {}
+		type: string: examples: ["vector-logs"]
 	}
 	namespace: {
-		deprecated: true
+		deprecated:         true
+		deprecated_message: "This field is deprecated, and `measurement` should be used instead."
 		description: """
 			The namespace of the measurement name to use.
 
 			When specified, the measurement name will be `<namespace>.vector`.
-
-			This field is deprecated, and `measurement` should be used instead.
 			"""
 		required: false
-		type: string: {}
+		type: string: examples: ["service"]
 	}
 	org: {
 		description: """
@@ -139,7 +142,7 @@ base: components: sinks: influxdb_logs: configuration: {
 			Only relevant when using InfluxDB v2.x and above.
 			"""
 		required: true
-		type: string: {}
+		type: string: examples: ["my-org", "33f2cff0a28e5b63"]
 	}
 	password: {
 		description: """
@@ -148,7 +151,7 @@ base: components: sinks: influxdb_logs: configuration: {
 			Only relevant when using InfluxDB v0.x/v1.x.
 			"""
 		required: false
-		type: string: {}
+		type: string: examples: ["${INFLUXDB_PASSWORD}", "influxdb4ever"]
 	}
 	request: {
 		description: """
@@ -300,14 +303,14 @@ base: components: sinks: influxdb_logs: configuration: {
 			Only relevant when using InfluxDB v0.x/v1.x.
 			"""
 		required: false
-		type: string: {}
+		type: string: examples: ["autogen", "one_day_only"]
 	}
 	tags: {
 		description: "The list of names of log fields that should be added as tags to each measurement."
 		required:    false
 		type: array: {
 			default: []
-			items: type: string: {}
+			items: type: string: examples: ["field1", "parent.child_field"]
 		}
 	}
 	tls: {
@@ -404,7 +407,7 @@ base: components: sinks: influxdb_logs: configuration: {
 			[token_docs]: https://v2.docs.influxdata.com/v2.0/security/tokens/
 			"""
 		required: true
-		type: string: {}
+		type: string: examples: ["${INFLUXDB_TOKEN}", "ef8d5de700e7989468166c40fc8a0ccd"]
 	}
 	username: {
 		description: """
@@ -413,6 +416,6 @@ base: components: sinks: influxdb_logs: configuration: {
 			Only relevant when using InfluxDB v0.x/v1.x.
 			"""
 		required: false
-		type: string: {}
+		type: string: examples: ["todd", "vector-source"]
 	}
 }

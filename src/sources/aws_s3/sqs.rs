@@ -23,7 +23,7 @@ use tracing::Instrument;
 use vector_common::internal_event::{
     ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol, Registered,
 };
-use vector_config::{configurable_component, NamedComponent};
+use vector_config::configurable_component;
 
 use crate::{
     config::{SourceAcknowledgementsConfig, SourceContext},
@@ -60,6 +60,7 @@ pub(super) struct Config {
     #[configurable(metadata(
         docs::examples = "https://sqs.us-east-2.amazonaws.com/123456789012/MyQueue"
     ))]
+    #[configurable(validation(format = "uri"))]
     pub(super) queue_url: String,
 
     /// How long to wait while polling the queue for new messages, in seconds.

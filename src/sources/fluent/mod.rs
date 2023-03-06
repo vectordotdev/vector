@@ -15,7 +15,7 @@ use smallvec::{smallvec, SmallVec};
 use tokio_util::codec::Decoder;
 use value::kind::Collection;
 use value::{Kind, Value};
-use vector_config::{configurable_component, NamedComponent};
+use vector_config::configurable_component;
 use vector_core::config::{LegacyKey, LogNamespace};
 use vector_core::schema::Definition;
 
@@ -104,6 +104,7 @@ impl SourceConfig for FluentConfig {
             tls,
             tls_client_metadata_key,
             self.receive_buffer_bytes,
+            None,
             cx,
             self.acknowledgements,
             self.connection_limit,
@@ -622,7 +623,7 @@ impl From<FluentEvent<'_>> for LogEvent {
 mod tests {
     use bytes::BytesMut;
     use chrono::{DateTime, Utc};
-    use lookup::LookupBuf;
+    use lookup::OwnedTargetPath;
     use rmp_serde::Serializer;
     use serde::Serialize;
     use std::collections::BTreeMap;
@@ -963,22 +964,37 @@ mod tests {
 
         let expected_definition =
             Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
-                .with_meaning(LookupBuf::root(), "message")
-                .with_metadata_field(&owned_value_path!("vector", "source_type"), Kind::bytes())
-                .with_metadata_field(&owned_value_path!("fluent", "tag"), Kind::bytes())
-                .with_metadata_field(&owned_value_path!("fluent", "timestamp"), Kind::timestamp())
+                .with_meaning(OwnedTargetPath::event_root(), "message")
+                .with_metadata_field(
+                    &owned_value_path!("vector", "source_type"),
+                    Kind::bytes(),
+                    None,
+                )
+                .with_metadata_field(&owned_value_path!("fluent", "tag"), Kind::bytes(), None)
+                .with_metadata_field(
+                    &owned_value_path!("fluent", "timestamp"),
+                    Kind::timestamp(),
+                    Some("timestamp"),
+                )
                 .with_metadata_field(
                     &owned_value_path!("fluent", "record"),
                     Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
+                    None,
                 )
                 .with_metadata_field(
                     &owned_value_path!("vector", "ingest_timestamp"),
                     Kind::timestamp(),
+                    None,
                 )
-                .with_metadata_field(&owned_value_path!("fluent", "host"), Kind::bytes())
+                .with_metadata_field(
+                    &owned_value_path!("fluent", "host"),
+                    Kind::bytes(),
+                    Some("host"),
+                )
                 .with_metadata_field(
                     &owned_value_path!("fluent", "tls_client_metadata"),
                     Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
+                    None,
                 );
 
         assert_eq!(definition, expected_definition)

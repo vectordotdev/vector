@@ -675,6 +675,21 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
+		kafka_consumer_lag: {
+			description:       "The Kafka consumer lag."
+			type:              "gauge"
+			default_namespace: "vector"
+			tags:              _component_tags & {
+				topic_id: {
+					description: "The Kafka topic id."
+					required:    true
+				}
+				partition_id: {
+					description: "The Kafka partition id."
+					required:    true
+				}
+			}
+		}
 		file_delete_errors_total: {
 			description:       "The total number of failures to delete a file. This metric is deprecated in favor of `component_errors_total`."
 			type:              "counter"
