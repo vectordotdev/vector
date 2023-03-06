@@ -13,9 +13,7 @@
 #![deny(unused_comparisons)]
 
 #[cfg(feature = "btreemap")]
-// pub mod btreemap {
 pub use value::btreemap;
-// }
 
 #[cfg(feature = "byte_size_of")]
 pub mod byte_size_of;
@@ -25,10 +23,7 @@ pub mod config;
 #[cfg(feature = "conversion")]
 pub use vrl_core::TimeZone;
 
-// #[cfg(feature = "encoding")]
-// pub mod encode_key_value;
-// #[cfg(feature = "encoding")]
-// pub mod encode_logfmt;
+#[cfg(feature = "encoding")]
 pub mod encode_logfmt {
     pub use vrl_core::encode_logfmt::*;
 }
@@ -55,9 +50,6 @@ pub mod shutdown;
 
 #[cfg(feature = "sensitive_string")]
 pub mod sensitive_string;
-
-// #[cfg(feature = "tokenize")]
-// pub mod tokenize;
 
 pub mod trigger;
 
