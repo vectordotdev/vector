@@ -61,7 +61,6 @@ typetag = { version = "0.2.5", default-features = false }
 twox-hash = { version = "1.6.3", default-features = false }
 url = { version = "2", default-features = false }
 value = { path = "../vrl/value", default-features = false, features = ["lua", "toml", "json", "api"] }
-
 vector-buffers = { path = "../vector-buffers", default-features = false }
 vector-common = { path = "../vector-common" }
 vector-config = { path = "../vector-config" }
