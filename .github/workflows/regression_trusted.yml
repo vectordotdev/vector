@@ -314,7 +314,7 @@ jobs:
 
       - name: Submit job
         env:
-          RUST_LOG: debug
+          RUST_LOG: info
         run: |
           chmod +x ${{ runner.temp }}/bin/smp
 
