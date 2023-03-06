@@ -32,9 +32,11 @@ impl Cli {
                 let error = String::from_utf8_lossy(&branch_out.stderr);
                 bail!("Error getting current branch running `git rev-parse`:\n{error}");
             }
+            // replace slashes so they aren't interpreted in packaging scripts as directory paths.
             let branch = String::from_utf8_lossy(&branch_out.stdout)
                 .trim()
-                .to_string();
+                .to_string()
+                .replace('/', "-");
 
             let short_hash_out = util::git_short_hash()?;
             if !short_hash_out.status.success() {
