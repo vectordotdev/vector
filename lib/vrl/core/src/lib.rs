@@ -17,8 +17,6 @@ mod expression;
 mod r#macro;
 mod target;
 
-// TODO: add cfg macros
-// pub mod time;
 pub mod conversion;
 mod datetime;
 pub mod encode_key_value;
