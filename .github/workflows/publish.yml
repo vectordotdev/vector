@@ -41,7 +41,8 @@ jobs:
         run: |
           # If set, MODE will be used to set the "channel", which is the dir/namespace packages are organized into.
           # the Workflow of "custom_builds" utilizes this feature.
-          export MODE="${{ inputs.mode }}"
+          MODE="${{ inputs.mode }}"
+          echo "MODE=${MODE}" >> $MODE
           make ci-generate-publish-metadata
 
   build-x86_64-unknown-linux-musl-packages:
