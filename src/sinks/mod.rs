@@ -300,12 +300,13 @@ pub enum Sinks {
 
     /// Mezmo (formerly LogDNA).
     #[cfg(feature = "sinks-mezmo")]
+    #[configurable(metadata(docs::label = "Mezmo"))]
     Mezmo(mezmo::MezmoConfig),
 
     /// Deliver log event data to LogDNA.
-    #[cfg(feature = "sinks-logdna")]
+    #[cfg(feature = "sinks-mezmo")]
     #[configurable(metadata(docs::label = "LogDNA"))]
-    Logdna(logdna::LogdnaConfig),
+    Logdna(mezmo::LogdnaConfig),
 
     /// Deliver log event data to the Loki aggregation system.
     #[cfg(feature = "sinks-loki")]
@@ -490,6 +491,8 @@ impl NamedComponent for Sinks {
             Self::Kafka(config) => config.get_component_name(),
             #[cfg(feature = "sinks-mezmo")]
             Self::Mezmo(config) => config.get_component_name(),
+            #[cfg(feature = "sinks-mezmo")]
+            Self::Logdna(config) => config.get_component_name(),
             #[cfg(feature = "sinks-loki")]
             Self::Loki(config) => config.get_component_name(),
             #[cfg(feature = "sinks-nats")]

@@ -24,6 +24,36 @@ use crate::{
 
 const PATH: &str = "/logs/ingest";
 
+/// Configuration for the `LogDNA` source.
+#[configurable_component(sink("logdna"))]
+#[configurable(metadata(deprecated))]
+#[derive(Clone, Debug)]
+pub struct LogdnaConfig(MezmoConfig);
+
+impl GenerateConfig for LogdnaConfig {
+    fn generate_config() -> toml::Value {
+        <MezmoConfig as GenerateConfig>::generate_config()
+    }
+}
+
+#[async_trait::async_trait]
+impl SinkConfig for LogdnaConfig {
+    async fn build(
+        &self,
+        cx: SinkContext,
+    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
+        self.0.build(cx).await
+    }
+
+    fn input(&self) -> Input {
+        self.0.input()
+    }
+
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        self.0.acknowledgements()
+    }
+}
+
 /// Configuration for the `mezmo` (formerly `logdna`) sink.
 #[configurable_component(sink("mezmo"))]
 #[derive(Clone, Debug)]

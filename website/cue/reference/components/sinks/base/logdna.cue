@@ -1,6 +1,6 @@
 package metadata
 
-base: components: sinks: mezmo: configuration: {
+base: components: sinks: logdna: configuration: {
 	acknowledgements: {
 		description: """
 			Controls how acknowledgements are handled for this sink.
