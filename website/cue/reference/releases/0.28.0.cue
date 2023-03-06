@@ -11,11 +11,7 @@ releases: "0.28.0": {
 		"""
 			The `framing.*.max_length` configuration options cannot be used on the `socket` source
 			as Vector returns an error about them conflicting with the deprecated top-level
-<<<<<<< HEAD
-			`max_length` configuration option. This will be fixed in 0.28.1.
-=======
 			`max_length` configuration option. This is fixed in v0.28.1.
->>>>>>> ff15924be (chore(releasing): Prepare v0.28.1 release)
 			""",
 	]
 
