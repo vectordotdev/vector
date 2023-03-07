@@ -44,13 +44,6 @@ pub fn git_short_hash() -> Result<Output> {
         .context("Could not execute `git`")
 }
 
-pub fn git_current_branch() -> Result<Output> {
-    Command::new("git")
-        .args(["branch", "--show-current"])
-        .output()
-        .context("Could not execute `git`")
-}
-
 /// Calculate the release channel from `git describe`
 pub fn release_channel() -> Result<&'static str> {
     git_head().map(|output| {

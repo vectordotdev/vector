@@ -26,18 +26,6 @@ impl Cli {
                 bail!("On latest release channel and tag {tag:?} is different from Cargo.toml {version:?}. Aborting");
             }
         } else if channel == "custom" {
-            let branch_out = util::git_current_branch()?;
-            if !branch_out.status.success() {
-                let error = String::from_utf8_lossy(&branch_out.stderr);
-                bail!("Error getting current branch`:\n{error}");
-            }
-            // replace slashes so they aren't interpreted in packaging scripts as directory paths,
-            // and to avoid conflicts with rpm packaging.
-            let branch = String::from_utf8_lossy(&branch_out.stdout)
-                .trim()
-                .to_string()
-                .replace('/', "_");
-
             let short_hash_out = util::git_short_hash()?;
             if !short_hash_out.status.success() {
                 let error = String::from_utf8_lossy(&short_hash_out.stderr);
@@ -47,9 +35,9 @@ impl Cli {
                 .trim()
                 .to_string();
 
-            // use '_' instead of '-' to avoid issues with rpm package naming which converts '-'
-            // to '.'
-            version = format!("{version}_{branch}_{short_hash}");
+            // use '.' instead of '-' or '_' to avoid issues with rpm and deb package naming
+            // format requirements.
+            version = format!("{version}.custom.{short_hash}");
         }
 
         println!("{version}");
