@@ -305,6 +305,15 @@ impl Runner {
             input_task_coordinator.shutdown().await;
             debug!("Input task(s) have been shutdown.");
 
+            // We sleep here to enable the internal_metrics source to scrape
+            // metrics. This process isn't governed by any of the task
+            // coordinators, so we need to wait for it to complete before
+            // shutting down the topology. This isn't a great solution since
+            // every other task has a task coordinator, but there isn't a way to
+            // hook into the source's internal logic to ensure it has processed
+            // the metrics that we'll want to validate.
+            //
+            // TODO(@davidhuie-dd)
             tokio::time::sleep(Duration::from_millis(500)).await;
 
             telemetry_task_coordinator.shutdown().await;
