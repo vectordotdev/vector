@@ -30,6 +30,7 @@ use super::sync::{Configuring, TaskCoordinator};
 pub enum ResourceCodec {
     /// Component encodes events.
     ///
+    ///
     /// As opposed to `EncodingWithFramer`, this variant uses the default framing method defined by
     /// the encoding itself.
     ///
