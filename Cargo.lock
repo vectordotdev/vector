@@ -4202,9 +4202,9 @@ dependencies = [
 
 [[package]]
 name = "inventory"
-version = "0.3.3"
+version = "0.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "16fe3b35d64bd1f72917f06425e7573a2f63f74f42c8f56e53ea6826dde3a2b5"
+checksum = "498ae1c9c329c7972b917506239b557a60386839192f1cf0ca034f345b65db99"
 dependencies = [
  "ctor",
  "ghost",
