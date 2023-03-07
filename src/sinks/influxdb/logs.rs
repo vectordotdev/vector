@@ -4,9 +4,11 @@ use bytes::{Bytes, BytesMut};
 use futures::SinkExt;
 use http::{Request, Uri};
 use indoc::indoc;
-use lookup::event_path;
+use lookup::lookup_v2::{parse_value_path, OptionalValuePath};
+use lookup::{OwnedValuePath, PathPrefix};
 use value::Kind;
 use vector_config::configurable_component;
+use vector_core::config::log_schema;
 use vector_core::schema;
 
 use crate::{
@@ -65,7 +67,8 @@ pub struct InfluxDbLogsConfig {
 
     /// The list of names of log fields that should be added as tags to each measurement.
     ///
-    /// By default Vector adds `host`, `metric_type`, and `source_type`.
+    /// By default Vector adds `metric_type` as well as the configured `log_schema.host_key` and
+    /// `log_schema.source_type_key` options.
     #[serde(default)]
     #[configurable(metadata(docs::examples = "field1"))]
     #[configurable(metadata(docs::examples = "parent.child_field"))]
@@ -102,6 +105,24 @@ pub struct InfluxDbLogsConfig {
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     acknowledgements: AcknowledgementsConfig,
+
+    /// Use this option to customize the key containing the hostname.
+    ///
+    /// The setting of `log_schema.host_key`, usually `host`, is used here by default.
+    #[configurable(metadata(docs::examples = "hostname"))]
+    pub host_key: Option<OptionalValuePath>,
+
+    /// Use this option to customize the key containing the message.
+    ///
+    /// The setting of `log_schema.message_key`, usually `message`, is used here by default.
+    #[configurable(metadata(docs::examples = "text"))]
+    pub message_key: Option<OptionalValuePath>,
+
+    /// Use this option to customize the key containing the source_type.
+    ///
+    /// The setting of `log_schema.source_type_key`, usually `source_type`, is used here by default.
+    #[configurable(metadata(docs::examples = "source"))]
+    pub source_type_key: Option<OptionalValuePath>,
 }
 
 #[derive(Debug)]
@@ -112,6 +133,9 @@ struct InfluxDbLogsSink {
     measurement: String,
     tags: HashSet<String>,
     transformer: Transformer,
+    host_key: OwnedValuePath,
+    message_key: OwnedValuePath,
+    source_type_key: OwnedValuePath,
 }
 
 impl GenerateConfig for InfluxDbLogsConfig {
@@ -156,6 +180,33 @@ impl SinkConfig for InfluxDbLogsConfig {
         let token = settings.token();
         let protocol_version = settings.protocol_version();
 
+        let host_key = self
+            .host_key
+            .clone()
+            .and_then(|k| k.path)
+            .unwrap_or_else(|| {
+                parse_value_path(log_schema().host_key())
+                    .expect("global log_schema.host_key to be valid path")
+            });
+
+        let message_key = self
+            .message_key
+            .clone()
+            .and_then(|k| k.path)
+            .unwrap_or_else(|| {
+                parse_value_path(log_schema().message_key())
+                    .expect("global log_schema.message_key to be valid path")
+            });
+
+        let source_type_key = self
+            .source_type_key
+            .clone()
+            .and_then(|k| k.path)
+            .unwrap_or_else(|| {
+                parse_value_path(log_schema().source_type_key())
+                    .expect("global log_schema.source_type_key to be valid path")
+            });
+
         let sink = InfluxDbLogsSink {
             uri,
             token: token.inner().to_owned(),
@@ -163,6 +214,9 @@ impl SinkConfig for InfluxDbLogsConfig {
             measurement,
             tags,
             transformer: self.encoding.clone(),
+            host_key,
+            message_key,
+            source_type_key,
         };
 
         let sink = BatchedHttpSink::new(
@@ -196,6 +250,9 @@ struct InfluxDbLogsEncoder {
     measurement: String,
     tags: HashSet<String>,
     transformer: Transformer,
+    host_key: OwnedValuePath,
+    message_key: OwnedValuePath,
+    source_type_key: OwnedValuePath,
 }
 
 impl HttpEventEncoder<BytesMut> for InfluxDbLogsEncoder {
@@ -214,15 +271,21 @@ impl HttpEventEncoder<BytesMut> for InfluxDbLogsEncoder {
         // Ensure the "message" isn't overwritten if the event wasn't an object
         // TODO: add a `TargetPath::is_event_root()` to conditionally rename?
         if let Some(message_path) = log.message_path() {
-            log.rename_key(message_path.as_str(), event_path!("message"))
+            log.rename_key(
+                message_path.as_str(),
+                (PathPrefix::Event, &self.message_key),
+            )
         }
         // Add the `host` and `source_type` to the HashSet of tags to include
         if let Some(host_path) = log.host_path() {
             self.tags.replace(host_path.clone());
-            log.rename_key(host_path.as_str(), event_path!("host"));
+            log.rename_key(host_path.as_str(), (PathPrefix::Event, &self.host_key));
         }
         self.tags.replace(log.source_type_path().to_string());
-        log.rename_key(log.source_type_path(), event_path!("source_type"));
+        log.rename_key(
+            log.source_type_path(),
+            (PathPrefix::Event, &self.source_type_key),
+        );
 
         // Tags + Fields
         let mut tags = MetricTags::from([("metric_type".to_string(), "logs".to_string())]);
@@ -267,6 +330,9 @@ impl HttpSink for InfluxDbLogsSink {
             measurement: self.measurement.clone(),
             tags: self.tags.clone(),
             transformer: self.transformer.clone(),
+            host_key: self.host_key.clone(),
+            message_key: self.message_key.clone(),
+            source_type_key: self.source_type_key.clone(),
         }
     }
 
@@ -780,6 +846,9 @@ mod tests {
             measurement,
             tags,
             transformer: Default::default(),
+            host_key: Default::default(),
+            message_key: Default::default(),
+            source_type_key: Default::default(),
         }
     }
 }
@@ -832,6 +901,9 @@ mod integration_tests {
             request: Default::default(),
             tls: None,
             acknowledgements: Default::default(),
+            host_key: None,
+            message_key: None,
+            source_type_key: None,
         };
 
         let (sink, _) = config.build(cx).await.unwrap();
@@ -907,8 +979,6 @@ mod integration_tests {
         let record1 = lines[1].split(',').collect::<Vec<&str>>();
         let record2 = lines[2].split(',').collect::<Vec<&str>>();
         let record_ns = lines[3].split(',').collect::<Vec<&str>>();
-        // let header_ns = lines[4].split(',').collect::<Vec<&str>>();
-        // let record_ns = dbg!(lines[5].split(',').collect::<Vec<&str>>());
 
         // measurement
         assert_eq!(
