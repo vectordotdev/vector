@@ -32,7 +32,7 @@
 //! # String Paths
 //! [ValuePath] and [TargetPath] are implemented for [&str]. That means a raw / unparsed string can
 //! be used as a path. This use is discouraged, and may be removed in the future. It mostly
-//! exists for backwkards compatibility in places where String paths are used instead of owned paths.
+//! exists for backwards compatibility in places where String paths are used instead of owned paths.
 //! Using string paths is still very performant, but it's easy to introduce bugs since some type
 //! information is missing, such as whether it's a target vs value path, or if the entire string
 //! is meant to be treated as a single segment vs being parsed as a path.
