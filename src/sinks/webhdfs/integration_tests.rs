@@ -4,8 +4,8 @@ use std::{
 };
 
 use codecs::{encoding::FramingConfig, TextSerializerConfig};
-use futures::{stream, TryStreamExt};
-use opendal::ObjectMode;
+use futures::stream;
+use opendal::ObjectMetakey;
 use similar_asserts::assert_eq;
 use vector_core::event::{Event, LogEvent};
 
@@ -76,15 +76,16 @@ async fn hdfs_rotate_files_after_the_buffer_size_is_reached() {
 
     let mut objects: Vec<_> = op
         .object("/")
-        .scan()
-        .await
+        .blocking_scan()
         .unwrap()
-        .try_collect::<Vec<_>>()
-        .await
-        .unwrap()
-        .into_iter()
-        .filter(|o| o.blocking_mode().unwrap() == ObjectMode::FILE)
-        .collect();
+        .map(|x| x.unwrap())
+        .filter(|o| {
+            o.blocking_metadata(ObjectMetakey::Mode)
+                .unwrap()
+                .mode()
+                .is_file()
+        })
+        .collect::<Vec<_>>();
     // Sort file path in order, because we have the event id in path.
     objects.sort_by(|l, r| l.path().cmp(r.path()));
     assert_eq!(objects.len(), 3);
