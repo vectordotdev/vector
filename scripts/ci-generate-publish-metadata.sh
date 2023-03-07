@@ -22,7 +22,6 @@ CURRENT_DATE=$(date +%Y-%m-%d)
 echo "vector_build_desc=${GIT_SHA} ${CURRENT_DATE}" >> "${GITHUB_OUTPUT}"
 
 # Figure out what our release channel is.
-echo "mode=${MODE}"
 CHANNEL="${CHANNEL:-"$(cargo vdev release channel "${MODE}")"}"
 echo "vector_release_channel=${CHANNEL}" >> "${GITHUB_OUTPUT}"
 

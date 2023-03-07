@@ -12,9 +12,8 @@ impl Cli {
     pub(super) fn exec(self) -> Result<()> {
         app::set_repo_dir()?;
         let mut version = env::var("VERSION").or_else(|_| util::read_version())?;
-        let mode = env::var("MODE").ok();
         let channel = env::var("CHANNEL")
-            .or_else(|_| util::release_channel(mode.as_ref()).map(Into::into))?;
+            .or_else(|_| env::var("MODE").or_else(|_| util::release_channel().map(Into::into)))?;
 
         if channel == "latest" {
             let head = util::git_head()?;
