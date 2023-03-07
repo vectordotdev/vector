@@ -1,3 +1,54 @@
+//! This crate contains all of the logic for lookup paths.
+//!
+//! # Traits
+//! There are 2 main traits that define a path.
+//! - [ValuePath] is a path that points inside of a `Value`
+//! - [TargetPath] is a path that points to a `target`. A `target` in VRL refers to
+//! the external data being processed by a VRL script. A `target` has 2 main sections that can be
+//! pointed to, `event` and `metadata`.  [TargetPath::prefix] identifies the section, and
+//! [TargetPath::value_path] is a [ValuePath] pointing into that section.
+//!
+//! Note that for performance reasons, since [ValuePath] and [TargetPath] require [Clone], these
+//! traits are only implemented on types that are cheap to clone (usually references). That means
+//! when passing in a value (e.g. [OwnedValuePath]) into a function that requires `impl ValuePath`,
+//! you will generally need to pass it in as a reference.
+//!
+//! # Owned Paths
+//! [OwnedValuePath] and [OwnedTargetPath] are fully parsed paths. These contain heap-allocated
+//! segments.
+//!
+//! Owned paths should generally be preferred over other types (such as strings) whenever feasible
+//! However since owned paths are allocated / pre-parsed, if a path is being created and will
+//! only be used once, it may make sense to use other types. For example, if you have an
+//! [OwnedValuePath] and want to append a segment to it before querying a `Value` you could:
+//! - Use [OwnedValuePath::with_field_appended] to create a new [OwnedValuePath] and use that. This
+//! method is preferred if the new path will be used multiple times and the path adjustment can be
+//! done in a non performance-critical part of the code (e.g. at startup).
+//! - Use [ValuePath::concat] which con concatenate two [ValuePath]'s very efficiently without
+//! allocating on the heap.
+//!
+//! To convert a string into an owned path, you can use either [parse_value_path] or [parse_target_path].
+//!
+//! # String Paths
+//! [ValuePath] and [TargetPath] are implemented for [&str]. That means a raw / unparsed string can
+//! be used as a path. This use is discouraged, and may be removed in the future. It mostly
+//! exists for backwkards compatibility in places where String paths are used instead of owned paths.
+//! Using string paths is still very performant, but it's easy to introduce bugs since some type
+//! information is missing, such as whether it's a target vs value path, or if the entire string
+//! is meant to be treated as a single segment vs being parsed as a path.
+//!
+//! # Macros
+//! Several macros exist to make creating paths easier. These are used if you already know
+//! the structure of the path being created. <strong>The macros do not parse paths</strong>. If you need
+//! to parse a path, use [parse_value_path] or [parse_target_path] instead.
+//!
+//! You need to pass in each segment into the macro as separate arguments. A single argument is treated as
+//! a single segment. This is true for all of the path macros.
+//!
+//! For example, you can use [owned_value_path!][crate::owned_value_path] to easily created owned paths.
+//! - `owned_value_path!("foo.bar", "x")` will create a path with *two* segments. Equivalent to `."foo.bar".x`
+//!
+
 mod borrowed;
 mod compat;
 mod concat;
