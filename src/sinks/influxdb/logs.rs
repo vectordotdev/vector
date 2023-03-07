@@ -974,7 +974,7 @@ mod integration_tests {
             .unwrap();
         let string = res.text().await.unwrap();
 
-        let lines = dbg!(string.split('\n').collect::<Vec<&str>>());
+        let lines = string.split('\n').collect::<Vec<&str>>();
         let header = lines[0].split(',').collect::<Vec<&str>>();
         let record1 = lines[1].split(',').collect::<Vec<&str>>();
         let record2 = lines[2].split(',').collect::<Vec<&str>>();
