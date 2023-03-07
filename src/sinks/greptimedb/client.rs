@@ -46,9 +46,8 @@ impl GreptimeDBService {
                 // TODO(sunng87):
                 stream::iter({
                     let byte_size = event.size_of();
-                    normalizer
-                        .normalize(event.into_metric())
-                        .map(|metric| Ok(EncodedEvent::new(metric, byte_size)))
+                    let metric = event.into_metric();
+                    Ok(EncodedEvent::new(metric, byte_size))
                 })
             })
             .sink_map_err(|e| error!(message = "Fatal greptimedb sink error.", %e));
@@ -66,7 +65,7 @@ impl Service<Vec<Metric>> for GreptimeDBService {
         self.inner.poll_ready(cx)
     }
 
-    // Emission of Error internal event is handled upstream by the caller
+    // Convert vector metrics into GreptimeDB format and send them in batch
     fn call(&mut self, items: Vec<Metric>) -> Self::Future {
         // TODO(sunng87):
         todo!()
