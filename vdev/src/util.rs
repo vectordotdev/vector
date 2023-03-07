@@ -46,7 +46,7 @@ pub fn git_short_hash() -> Result<Output> {
 
 pub fn git_current_branch() -> Result<Output> {
     Command::new("git")
-        .args(["rev-parse", "--abbrev-ref", "HEAD"])
+        .args(["branch", "--show-current"])
         .output()
         .context("Could not execute `git`")
 }

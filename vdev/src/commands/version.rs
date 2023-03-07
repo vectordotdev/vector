@@ -29,13 +29,14 @@ impl Cli {
             let branch_out = util::git_current_branch()?;
             if !branch_out.status.success() {
                 let error = String::from_utf8_lossy(&branch_out.stderr);
-                bail!("Error getting current branch running `git rev-parse`:\n{error}");
+                bail!("Error getting current branch`:\n{error}");
             }
-            // replace slashes so they aren't interpreted in packaging scripts as directory paths.
+            // replace slashes so they aren't interpreted in packaging scripts as directory paths,
+            // and to avoid conflicts with rpm packaging.
             let branch = String::from_utf8_lossy(&branch_out.stdout)
                 .trim()
                 .to_string()
-                .replace('/', "-");
+                .replace('/', "_");
 
             let short_hash_out = util::git_short_hash()?;
             if !short_hash_out.status.success() {
@@ -46,7 +47,9 @@ impl Cli {
                 .trim()
                 .to_string();
 
-            version = format!("{version}-{branch}-{short_hash}");
+            // use '_' instead of '-' to avoid issues with rpm package naming which converts '-'
+            // to '.'
+            version = format!("{version}_{branch}_{short_hash}");
         }
 
         println!("{version}");
