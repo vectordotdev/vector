@@ -24,9 +24,11 @@ use crate::{
 
 const PATH: &str = "/logs/ingest";
 
-/// Configuration for the `LogDNA` source.
+/// Configuration for the `logdna` sink.
 #[configurable_component(sink("logdna"))]
-#[configurable(metadata(deprecated))]
+#[configurable(metadata(
+    deprecated = "The `logdna` sink has been renamed. Please use `mezmo` instead."
+))]
 #[derive(Clone, Debug)]
 pub struct LogdnaConfig(MezmoConfig);
 
@@ -42,6 +44,7 @@ impl SinkConfig for LogdnaConfig {
         &self,
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
+        warn!("The `logdna` sink has been renamed. Please use `mezmo` instead.");
         self.0.build(cx).await
     }
 

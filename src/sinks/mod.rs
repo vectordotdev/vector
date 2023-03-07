@@ -298,7 +298,7 @@ pub enum Sinks {
     #[configurable(metadata(docs::label = "Kafka"))]
     Kafka(kafka::KafkaSinkConfig),
 
-    /// Mezmo (formerly LogDNA).
+    /// Deliver log event data to Mezmo.
     #[cfg(feature = "sinks-mezmo")]
     #[configurable(metadata(docs::label = "Mezmo"))]
     Mezmo(mezmo::MezmoConfig),
