@@ -18,6 +18,7 @@ TARGET="${TARGET:?"You must specify a target triple, ex: x86_64-apple-darwin"}"
 #
 
 PACKAGE_VERSION="$(cargo vdev version)"
+CHANNEL="${CHANNEL:-"$(cargo vdev release channel)"}"
 ARCHIVE_NAME="vector-$PACKAGE_VERSION-$TARGET.tar.gz"
 ARCHIVE_PATH="target/artifacts/$ARCHIVE_NAME"
 
@@ -39,7 +40,11 @@ export RELEASE=1
 # The RPM spec does not like a leading `v` or `-` in the version name.
 # Therefore we clean the version so that the `rpmbuild` command does
 # not fail.
-export CLEANED_VERSION="${PACKAGE_VERSION//-/.}"
+if [[ "$CHANNEL" != "custom" ]]; then
+  export CLEANED_VERSION="${PACKAGE_VERSION//-/.}"
+else
+  export CLEANED_VERSION="${PACKAGE_VERSION}"
+fi
 
 # The arch is the first part of the target
 # For some architectures, like armv7hl it doesn't match the arch
