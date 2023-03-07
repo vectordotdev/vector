@@ -84,9 +84,11 @@ databend
 datacenter
 datadog
 datadoghq
+datanode
 DEBHELPER
 debian
 demuxing
+dfs
 discriminants
 distro
 distroless
@@ -148,9 +150,11 @@ grafana
 graphiql
 gvisor
 gws
+hadoop
 Haier
 Haipad
 Hannspree
+hdfs
 healthcheck
 healthchecks
 Hena
@@ -260,6 +264,7 @@ Multilaser
 Mumbai
 Mytab
 Nabi
+namenode
 netcat
 netdata
 Netflix
@@ -278,6 +283,7 @@ nslookup
 nsupdate
 ntfs
 Odys
+opendal
 Openpeak
 opensearch
 opentelemetry
@@ -311,6 +317,7 @@ Positivo
 postgresql
 Prestigio
 Proscan
+proxyuser
 pseudocode
 Qmobilevn
 qwerty
@@ -354,6 +361,7 @@ Sogou
 solarwinds
 splunk
 ssh
+staticuser
 symbian
 Tagi
 Tecmobile
@@ -382,6 +390,7 @@ userguide
 Verizon
 Videocon
 Viewsonic
+webhdfs
 Wellcom
 Wii
 Wiko

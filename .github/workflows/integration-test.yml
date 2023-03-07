@@ -88,6 +88,7 @@ jobs:
           - test: 'redis'
           - test: 'shutdown'
           - test: 'splunk'
+          - test: 'webhdfs'
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v3
