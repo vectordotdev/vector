@@ -248,7 +248,7 @@ apache-avro = { version = "0.14.0", default-features = false, optional = true }
 axum = { version = "0.6.7", default-features = false, features = ["http1", "json"] }
 base64 = { version = "0.21.0", default-features = false, optional = true }
 bloom = { version = "0.3.2", default-features = false, optional = true }
-bollard = { version = "0.14.0", default-features = false, features = ["ssl", "chrono"] }
+bollard = { version = "0.14.0", default-features = false, features = ["ssl", "chrono"], optional = true }
 bytes = { version = "1.4.0", default-features = false, features = ["serde"] }
 bytesize = { version = "1.2.0", default-features = false }
 chrono = { version = "0.4.22", default-features = false, features = ["serde"] }
@@ -422,7 +422,7 @@ allocation-tracing = []
 # transforms and sinks should depend on this feature.
 kubernetes = ["dep:k8s-openapi", "dep:kube"]
 
-docker = ["dep:dirs-next"]
+docker = ["dep:bollard", "dep:dirs-next"]
 
 # API
 api = [
@@ -816,7 +816,7 @@ prometheus-integration-tests = ["sinks-prometheus", "sources-prometheus", "sinks
 pulsar-integration-tests = ["sinks-pulsar"]
 redis-integration-tests = ["sinks-redis", "sources-redis"]
 splunk-integration-tests = ["sinks-splunk_hec"]
-dnstap-integration-tests = ["sources-dnstap"]
+dnstap-integration-tests = ["sources-dnstap", "dep:bollard"]
 webhdfs-integration-tests = ["sinks-webhdfs"]
 disable-resolv-conf = []
 shutdown-tests = ["api", "sinks-blackhole", "sinks-console", "sinks-prometheus", "sources", "transforms-lua", "transforms-remap", "unix"]
