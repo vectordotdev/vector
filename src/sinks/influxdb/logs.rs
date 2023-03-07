@@ -212,6 +212,7 @@ impl HttpEventEncoder<BytesMut> for InfluxDbLogsEncoder {
         });
 
         // Ensure the "message" isn't overwritten if the event wasn't an object
+        // TODO: add a `TargetPath::is_event_root()` to conditionally rename?
         if let Some(message_path) = log.message_path() {
             log.rename_key(message_path.as_str(), event_path!("message"))
         }
