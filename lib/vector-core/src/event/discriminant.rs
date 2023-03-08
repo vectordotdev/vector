@@ -48,7 +48,7 @@ impl PartialEq for Discriminant {
 
 impl Eq for Discriminant {}
 
-// Equality check for for discriminant purposes.
+// Equality check for discriminant purposes.
 fn value_eq(this: &Value, other: &Value) -> bool {
     match (this, other) {
         // Trivial.

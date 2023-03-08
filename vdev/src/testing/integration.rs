@@ -65,6 +65,7 @@ impl IntegrationTest {
             env_vars.insert(key, Some(value));
         }
 
+        env_vars.insert("TEST_LOG".to_string(), Some("info".into()));
         let mut args = self.config.args.clone().unwrap_or_default();
 
         args.push("--features".to_string());
@@ -84,6 +85,12 @@ impl IntegrationTest {
             args.push(filter.to_string());
         }
         args.extend(extra_args);
+
+        // Some arguments are not compatible with the --no-capture arg
+        if !args.contains(&"--test-threads".to_string()) {
+            args.push("--no-capture".to_string());
+        }
+
         self.runner
             .test(&env_vars, &self.config.runner.env, &args)?;
 

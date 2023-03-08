@@ -14,7 +14,7 @@ Provide some module level comments to explain what the sink does.
 
 ```rust
 //! `Basic` sink.
-//! A sink that will send it's output to standard out for pedalogical purposes.
+//! A sink that will send it's output to standard out for pedagogical purposes.
 ```
 
 # Imports
@@ -62,7 +62,7 @@ comments must be included above the struct - Vector won't compile if they
 aren't.
 
 We also include a single member in our struct - `acknowledgements`.  This
-struct configures end-to-end acknowledments for the sink, which is the ability
+struct configures end-to-end acknowledgements for the sink, which is the ability
 for the sink to inform the upstream sources if the event has been successfully
 delivered. See Vector's [documentation][acknowledgements] for more details. We
 will make this a configurable option.
@@ -336,7 +336,7 @@ emit the event. Change the body of `run_inner` to look like the following:
 [`EventSent`][events_sent] is emmitted by each component in Vector to
 instrument how many bytes have been sent to the next downstream component.
 
-Add the following after emmitting `BytesSent`:
+Add the following after emitting `BytesSent`:
 
 ```diff
 +     let event_byte_size = event.estimated_json_encoded_size_of();

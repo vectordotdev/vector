@@ -38,7 +38,6 @@ impl AmqpConfig {
     pub(crate) async fn connect(
         &self,
     ) -> Result<(lapin::Connection, lapin::Channel), Box<dyn std::error::Error + Send + Sync>> {
-        debug!("Connecting to {}.", self.connection_string);
         let addr = self.connection_string.clone();
         let conn = match &self.tls {
             Some(tls) => {
