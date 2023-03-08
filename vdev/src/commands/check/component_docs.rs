@@ -1,6 +1,5 @@
-use anyhow::{Result, Ok};
 use crate::git;
-
+use anyhow::{Ok, Result};
 
 /// Check that component documentation is up-to-date
 #[derive(clap::Args, Debug)]
@@ -11,8 +10,7 @@ impl Cli {
     pub fn exec(self) -> Result<()> {
         let files: Vec<String> = git::get_modified_files()?;
         let dirty_component_files: Vec<String> = files
-            .iter()
-            .cloned()
+            .into_iter()
             .filter(|file| file.starts_with("website/cue/reference/components"))
             .collect();
 
