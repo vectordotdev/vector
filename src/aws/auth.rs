@@ -74,6 +74,8 @@ pub enum AwsAuthentication {
     /// Authenticate using credentials stored in a file.
     ///
     /// Additionally, the specific credential profile to use can be set.
+    /// The file format must match the credentials file format outlined in
+    /// https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html.
     File {
         /// Path to the credentials file.
         #[configurable(metadata(docs::examples = "/my/aws/credentials"))]
@@ -83,7 +85,8 @@ pub enum AwsAuthentication {
         ///
         /// Used to select AWS credentials from a provided credentials file.
         #[configurable(metadata(docs::examples = "develop"))]
-        profile: Option<String>,
+        #[serde(default = "default_profile")]
+        profile: String,
     },
 
     /// Assume the given role ARN.
@@ -131,6 +134,10 @@ pub enum AwsAuthentication {
     },
 }
 
+fn default_profile() -> String {
+    DEFAULT_PROFILE_NAME.to_string()
+}
+
 impl AwsAuthentication {
     pub async fn credentials_provider(
         &self,
@@ -151,7 +158,7 @@ impl AwsAuthentication {
             } => {
                 // The SDK uses the default profile out of the box, but doesn't provide an optional
                 // type in the builder. We can just hardcode it so that everything works.
-                let profile_name = profile.clone().unwrap_or(DEFAULT_PROFILE_NAME.to_string());
+                let profile_name = profile;
                 let pfiles = ProfileFiles::builder()
                     .with_file(ProfileFileKind::Credentials, credentials_file)
                     .build();
