@@ -3,8 +3,9 @@ use std::env;
 use anyhow::Result;
 use clap::Args;
 
-use crate::util;
 use crate::git;
+use crate::util;
+use itertools::Itertools;
 
 /// Pushes new versions produced by `make release` to the repository
 #[derive(Args, Debug)]
@@ -14,10 +15,7 @@ pub struct Cli {}
 impl Cli {
     pub fn exec(self) -> Result<()> {
         let version = env::var("VECTOR_VERSION").or_else(|_| util::read_version())?;
-        let version_minor = version.split('.')
-            .take(2)
-            .collect::<Vec<&str>>()
-            .join(".");
+        let version_minor = version.split('.').take(2).join(".");
 
         let current_branch = git::current_branch()?;
         println!("Preparing the branch and the tag...");

@@ -10,7 +10,11 @@ pub fn current_branch() -> Result<String> {
 }
 
 pub fn checkout_branch(branch_name: &str) -> Result<()> {
-    let _output = capture_output(&["checkout", "-b", branch_name])?;
+    if branch_exists(branch_name)? {
+        checkout_branch_to_existing(branch_name)?;
+    } else {
+        checkout_branch_to_new(branch_name)?;
+    }
     Ok(())
 }
 
@@ -20,7 +24,7 @@ pub fn merge_branch(branch_name: &str) -> Result<()> {
 }
 
 pub fn tag_version(version: &str) -> Result<()> {
-    let _output = capture_output(&["tag", "-a", version, "-m", version])?;
+    let _output = capture_output(&["tag", "--annotate", version, "--message", version])?;
     Ok(())
 }
 
@@ -69,6 +73,21 @@ pub fn list_files() -> Result<Vec<String>> {
         .lines()
         .map(str::to_owned)
         .collect())
+}
+
+fn branch_exists(branch_name: &str) -> Result<bool> {
+    let output = capture_output(&["rev-parse", "--verify", branch_name])?;
+    Ok(!output.is_empty())
+}
+
+fn checkout_branch_to_existing(branch_name: &str) -> Result<()> {
+    let _output = capture_output(&["checkout", branch_name])?;
+    Ok(())
+}
+
+fn checkout_branch_to_new(branch_name: &str) -> Result<()> {
+    let _output = capture_output(&["checkout", "-b", branch_name])?;
+    Ok(())
 }
 
 fn capture_output(args: &[&str]) -> Result<String> {
