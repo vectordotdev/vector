@@ -159,14 +159,14 @@ impl AwsAuthentication {
                 // The SDK uses the default profile out of the box, but doesn't provide an optional
                 // type in the builder. We can just hardcode it so that everything works.
                 let profile_name = profile;
-                let pfiles = ProfileFiles::builder()
+                let profile_files = ProfileFiles::builder()
                     .with_file(ProfileFileKind::Credentials, credentials_file)
                     .build();
-                let pfile = ProfileFileCredentialsProvider::builder()
-                    .profile_files(pfiles)
+                let profile_provider = ProfileFileCredentialsProvider::builder()
+                    .profile_files(profile_files)
                     .profile_name(profile_name)
                     .build();
-                Ok(SharedCredentialsProvider::new(pfile))
+                Ok(SharedCredentialsProvider::new(profile_provider))
             }
             AwsAuthentication::Role {
                 assume_role,
