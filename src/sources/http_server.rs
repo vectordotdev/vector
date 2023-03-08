@@ -454,8 +454,6 @@ impl HttpSource for SimpleHttpSource {
             }
         }
 
-        /*         self.enrich_events(&mut events, request_path, header_map, query_parameters); */
-
         Ok(events)
     }
 }
