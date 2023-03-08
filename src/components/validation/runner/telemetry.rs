@@ -44,7 +44,8 @@ impl Telemetry {
             ..Default::default()
         };
         let mut vector_sink = VectorSinkConfig::from_address(listen_addr.as_uri());
-        vector_sink.batch.max_events = Some(1);
+        vector_sink.batch.timeout_secs = Some(0.1);
+        vector_sink.request.retry_attempts = Some(0);
 
         config_builder.add_source(INTERNAL_LOGS_KEY, internal_logs);
         config_builder.add_source(INTERNAL_METRICS_KEY, internal_metrics);

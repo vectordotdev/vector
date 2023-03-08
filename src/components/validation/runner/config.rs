@@ -136,7 +136,8 @@ fn build_output_edge() -> (OutputEdge, impl Into<Sinks>) {
     debug!(endpoint = %output_listen_addr, "Creating controlled output edge.");
 
     let mut output_sink = VectorSinkConfig::from_address(output_listen_addr.as_uri());
-    output_sink.batch.max_events = Some(1);
+    output_sink.batch.timeout_secs = Some(0.1);
+    output_sink.request.retry_attempts = Some(0);
 
     let output_edge = OutputEdge::from_address(output_listen_addr);
 

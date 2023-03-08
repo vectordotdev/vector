@@ -175,8 +175,14 @@ pub(crate) async fn call<
                                 end: Instant::now()
                             });
                             context.on_response(&url, &header, &body).map(|mut events| {
+                                let byte_size = if events.is_empty() {
+                                    0
+                                } else {
+                                    events.estimated_json_encoded_size_of()
+                                };
+
                                 emit!(HttpClientEventsReceived {
-                                    byte_size: events.estimated_json_encoded_size_of(),
+                                    byte_size,
                                     count: events.len(),
                                     url: url.to_string()
                                 });

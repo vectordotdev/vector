@@ -3,7 +3,7 @@ mod sources;
 use vector_core::event::{Event, Metric};
 
 use crate::components::validation::{
-    ComponentConfiguration, ComponentType, TestCaseExpectation, TestEvent,
+    ComponentType, TestCaseExpectation, TestEvent, ValidationConfiguration,
 };
 
 use super::Validator;
@@ -28,7 +28,7 @@ impl Validator for ComponentSpecValidator {
 
     fn check_validation(
         &self,
-        configuration: ComponentConfiguration,
+        configuration: ValidationConfiguration,
         component_type: ComponentType,
         expectation: TestCaseExpectation,
         inputs: &[TestEvent],
@@ -98,7 +98,7 @@ impl Validator for ComponentSpecValidator {
 }
 
 fn validate_telemetry(
-    configuration: ComponentConfiguration,
+    configuration: ValidationConfiguration,
     component_type: ComponentType,
     inputs: &[TestEvent],
     outputs: &[Event],

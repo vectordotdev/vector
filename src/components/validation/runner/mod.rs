@@ -320,6 +320,7 @@ impl Runner {
             debug!("Telemetry task(s) have been shutdown.");
 
             topology_task_coordinator.shutdown().await;
+
             debug!("Component topology task has been shutdown.");
 
             output_task_coordinator.shutdown().await;
@@ -343,7 +344,7 @@ impl Runner {
                 .values()
                 .map(|validator| {
                     validator.check_validation(
-                        self.configuration.component_configuration.clone(),
+                        self.configuration.clone(),
                         component_type,
                         expectation,
                         &input_events,

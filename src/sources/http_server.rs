@@ -187,7 +187,7 @@ impl SimpleHttpConfig {
         schema_definition
     }
 
-    fn get_decoding_config(&self) -> crate::Result<DecodingConfig> {
+    pub fn get_decoding_config(&self) -> crate::Result<DecodingConfig> {
         if self.encoding.is_some() && (self.framing.is_some() || self.decoding.is_some()) {
             return Err("Using `encoding` is deprecated and does not have any effect when `decoding` or `framing` is provided. Configure `framing` and `decoding` instead.".into());
         }
@@ -367,7 +367,10 @@ struct SimpleHttpSource {
     log_namespace: LogNamespace,
 }
 
-impl SimpleHttpSource {
+/* impl SimpleHttpSource {
+
+*/
+impl HttpSource for SimpleHttpSource {
     /// Enriches the passed in events with metadata for the `request_path` and for each of the headers.
     fn enrich_events(
         &self,
@@ -421,15 +424,13 @@ impl SimpleHttpSource {
             );
         }
     }
-}
 
-impl HttpSource for SimpleHttpSource {
     fn build_events(
         &self,
         body: Bytes,
-        header_map: HeaderMap,
-        query_parameters: HashMap<String, String>,
-        request_path: &str,
+        _header_map: HeaderMap,
+        _query_parameters: HashMap<String, String>,
+        _request_path: &str,
     ) -> Result<Vec<Event>, ErrorMessage> {
         let mut decoder = self.decoder.clone();
         let mut events = Vec::new();
@@ -453,7 +454,7 @@ impl HttpSource for SimpleHttpSource {
             }
         }
 
-        self.enrich_events(&mut events, request_path, header_map, query_parameters);
+        /*         self.enrich_events(&mut events, request_path, header_map, query_parameters); */
 
         Ok(events)
     }

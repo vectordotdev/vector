@@ -4,12 +4,9 @@ use bytes::BytesMut;
 use vector_core::event::{Event, MetricKind};
 use vector_core::EstimatedJsonEncodedSizeOf;
 
-use crate::components::validation::{
-    encode_test_event, ComponentConfiguration, ResourceCodec, TestEvent,
-};
+use crate::components::validation::{encode_test_event, TestEvent, ValidationConfiguration};
 
 use crate::components::validation::runner::config::TEST_SOURCE_NAME;
-use crate::sources::Sources;
 
 use super::filter_events_by_metric_and_component;
 
@@ -35,7 +32,7 @@ impl SourceMetrics {
     pub const fn validation(
         &self,
     ) -> fn(
-        &ComponentConfiguration,
+        &ValidationConfiguration,
         &[TestEvent],
         &[Event],
         &[Event],
@@ -67,7 +64,7 @@ impl Display for SourceMetrics {
 }
 
 fn validate_component_received_events_total(
-    _configuration: &ComponentConfiguration,
+    _configuration: &ValidationConfiguration,
     inputs: &[TestEvent],
     _outputs: &[Event],
     telemetry_events: &[Event],
@@ -132,7 +129,7 @@ fn validate_component_received_events_total(
 }
 
 fn validate_component_received_event_bytes_total(
-    _configuration: &ComponentConfiguration,
+    _configuration: &ValidationConfiguration,
     inputs: &[TestEvent],
     _outputs: &[Event],
     telemetry_events: &[Event],
@@ -168,9 +165,7 @@ fn validate_component_received_event_bytes_total(
             return acc + size;
         }
 
-        // If we don't have a valid event, we'll just add the JSON length of an empty container,
-        // like []
-        acc + 2
+        acc
     });
 
     debug!(
@@ -201,7 +196,7 @@ fn validate_component_received_event_bytes_total(
 }
 
 fn validate_component_received_bytes_total(
-    configuration: &ComponentConfiguration,
+    configuration: &ValidationConfiguration,
     inputs: &[TestEvent],
     _outputs: &[Event],
     telemetry_events: &[Event],
@@ -232,11 +227,8 @@ fn validate_component_received_bytes_total(
     }
 
     let mut expected_bytes = 0;
-
-    // TODO: this is a bit of a hack
-    if let ComponentConfiguration::Source(Sources::HttpClient(c)) = configuration {
-        let mut encoder = ResourceCodec::from(c.get_decoding_config(None)).into_encoder();
-
+    if let Some(c) = &configuration.external_resource {
+        let mut encoder = c.codec.into_encoder();
         for i in inputs {
             let mut buffer = BytesMut::new();
             encode_test_event(&mut encoder, &mut buffer, i.clone());
@@ -272,7 +264,7 @@ fn validate_component_received_bytes_total(
 }
 
 fn validate_component_sent_events_total(
-    _configuration: &ComponentConfiguration,
+    _configuration: &ValidationConfiguration,
     inputs: &[TestEvent],
     _outputs: &[Event],
     telemetry_events: &[Event],
@@ -337,7 +329,7 @@ fn validate_component_sent_events_total(
 }
 
 fn validate_component_sent_event_bytes_total(
-    _configuration: &ComponentConfiguration,
+    _configuration: &ValidationConfiguration,
     _inputs: &[TestEvent],
     outputs: &[Event],
     telemetry_events: &[Event],

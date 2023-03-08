@@ -277,7 +277,7 @@ impl From<HttpResourceConfig> for ResourceDefinition {
 pub struct ExternalResource {
     direction: ResourceDirection,
     definition: ResourceDefinition,
-    codec: ResourceCodec,
+    pub codec: ResourceCodec,
 }
 
 impl ExternalResource {
