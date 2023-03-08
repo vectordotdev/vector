@@ -60,8 +60,6 @@ pub struct DatadogCommonConfig {
     /// precedence over this setting.
     ///
     /// [api_key]: https://docs.datadoghq.com/api/?lang=bash#authentication
-    // TODO: `api_key` is a deprecated name for this setting and should be removed in v0.29.0
-    #[serde(alias = "api_key")]
     #[configurable(metadata(docs::examples = "${DATADOG_API_KEY_ENV_VAR}"))]
     #[configurable(metadata(docs::examples = "ef8d5de700e7989468166c40fc8a0ccd"))]
     pub default_api_key: SensitiveString,
