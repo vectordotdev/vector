@@ -1,9 +1,12 @@
-use anyhow::{Result, Ok};
+use anyhow::{Ok, Result};
 use std::fs::File;
 use std::io::Write;
+
+#[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
-use std::path::Path;
+
 use crate::app;
+use std::path::Path;
 
 const SIGNOFF_HOOK: &str = r#"#!/bin/bash
 set -euo pipefail
@@ -54,7 +57,10 @@ impl Cli {
         let file_path = hook_dir.join("commit-msg");
         let mut file = File::create(&file_path)?;
         file.write_all(SIGNOFF_HOOK.as_bytes())?;
-        file.metadata()?.permissions().set_mode(0o755);
+        #[cfg(unix)]
+        {
+            file.metadata()?.permissions().set_mode(0o755);
+        }
         println!("Created signoff script in {}", file_path.display());
 
         Ok(())
