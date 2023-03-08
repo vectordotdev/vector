@@ -1,8 +1,7 @@
-args:
-- --features
+features:
 - es-integration-tests
-- --lib
-- '::elasticsearch::integration_tests::'
+
+test_filter: '::elasticsearch::integration_tests::'
 
 env:
   AWS_ACCESS_KEY_ID: dummy

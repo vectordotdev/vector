@@ -1,10 +1,11 @@
 args:
-- --features
-- shutdown-tests
-- --test
-- integration
 - --test-threads
 - '4'
+
+features:
+- shutdown-tests
+
+test: "integration"
 
 env:
   KAFKA_HOST: kafka

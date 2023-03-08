@@ -71,6 +71,8 @@ pub mod loki;
 pub mod nats;
 #[cfg(feature = "sinks-new_relic")]
 pub mod new_relic;
+#[cfg(feature = "sinks-webhdfs")]
+pub mod opendal_common;
 #[cfg(feature = "sinks-papertrail")]
 pub mod papertrail;
 #[cfg(feature = "sinks-prometheus")]
@@ -94,6 +96,8 @@ pub mod splunk_hec;
 pub mod statsd;
 #[cfg(feature = "sinks-vector")]
 pub mod vector;
+#[cfg(feature = "sinks-webhdfs")]
+pub mod webhdfs;
 #[cfg(feature = "sinks-websocket")]
 pub mod websocket;
 
@@ -262,6 +266,11 @@ pub enum Sinks {
     #[cfg(feature = "sinks-gcp")]
     #[configurable(metadata(docs::label = "GCP Pub/Sub"))]
     GcpPubsub(gcp::pubsub::PubsubConfig),
+
+    /// WebHDFS.
+    #[cfg(feature = "sinks-webhdfs")]
+    #[configurable(metadata(docs::label = "WebHDFS"))]
+    WebHdfs(webhdfs::WebHdfsConfig),
 
     /// Deliver log events to Honeycomb.
     #[cfg(feature = "sinks-honeycomb")]
@@ -470,6 +479,8 @@ impl NamedComponent for Sinks {
             Self::GcpCloudStorage(config) => config.get_component_name(),
             #[cfg(feature = "sinks-gcp")]
             Self::GcpPubsub(config) => config.get_component_name(),
+            #[cfg(feature = "sinks-webhdfs")]
+            Self::WebHdfs(config) => config.get_component_name(),
             #[cfg(feature = "sinks-honeycomb")]
             Self::Honeycomb(config) => config.get_component_name(),
             #[cfg(feature = "sinks-http")]

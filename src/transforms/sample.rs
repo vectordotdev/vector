@@ -11,7 +11,10 @@ use crate::{
 };
 
 /// Configuration for the `sample` transform.
-#[configurable_component(transform("sample"))]
+#[configurable_component(transform(
+    "sample",
+    "Sample events from an event stream based on supplied criteria and at a configurable rate."
+))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct SampleConfig {
@@ -46,6 +49,7 @@ impl GenerateConfig for SampleConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "sample")]
 impl TransformConfig for SampleConfig {
     async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
         Ok(Transform::function(Sample::new(

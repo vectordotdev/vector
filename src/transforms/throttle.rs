@@ -20,7 +20,7 @@ use crate::{
 
 /// Configuration for the `throttle` transform.
 #[serde_as]
-#[configurable_component(transform("throttle"))]
+#[configurable_component(transform("throttle", "Rate limit logs passing through a topology."))]
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct ThrottleConfig {
@@ -49,6 +49,7 @@ pub struct ThrottleConfig {
 impl_generate_config_from_default!(ThrottleConfig);
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "throttle")]
 impl TransformConfig for ThrottleConfig {
     async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
         Throttle::new(self, context, clock::MonotonicClock).map(Transform::event_task)

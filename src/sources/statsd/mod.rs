@@ -165,6 +165,7 @@ impl SourceConfig for StatsdConfig {
                     tls,
                     tls_client_metadata_key,
                     config.receive_buffer_bytes,
+                    None,
                     cx,
                     false.into(),
                     config.connection_limit,

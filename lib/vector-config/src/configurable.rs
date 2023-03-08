@@ -17,15 +17,15 @@ use crate::{
 /// `Configurable` provides the machinery to allow describing and encoding the shape of a type, recursively, so that by
 /// instrumenting all transitive types of the configuration, the schema can be discovered by generating the schema from
 /// some root type.
-pub trait Configurable
-where
-    Self: Sized,
-{
+pub trait Configurable {
     /// Gets the referenceable name of this value, if any.
     ///
     /// When specified, this implies the value is both complex and standardized, and should be
     /// reused within any generated schema it is present in.
-    fn referenceable_name() -> Option<&'static str> {
+    fn referenceable_name() -> Option<&'static str>
+    where
+        Self: Sized,
+    {
         None
     }
 
@@ -38,12 +38,18 @@ where
     /// Maps, by definition, are inherently free-form, and thus inherently optional. Thus, this
     /// method should likely not be overridden except for implementing `Configurable` for map
     /// types. If you're using it for something else, you are expected to know what you're doing.
-    fn is_optional() -> bool {
+    fn is_optional() -> bool
+    where
+        Self: Sized,
+    {
         false
     }
 
     /// Gets the metadata for this value.
-    fn metadata() -> Metadata {
+    fn metadata() -> Metadata
+    where
+        Self: Sized,
+    {
         Metadata::default()
     }
 
@@ -54,7 +60,10 @@ where
     /// numeric types, there is a limited amount of validation that can occur within the
     /// `Configurable` derive macro, and additional validation must happen at runtime when the
     /// `Configurable` trait is being used, which this method allows for.
-    fn validate_metadata(_metadata: &Metadata) -> Result<(), GenerateError> {
+    fn validate_metadata(_metadata: &Metadata) -> Result<(), GenerateError>
+    where
+        Self: Sized,
+    {
         Ok(())
     }
 
@@ -64,12 +73,14 @@ where
     ///
     /// If an error occurs while generating the schema, an error variant will be returned describing
     /// the issue.
-    fn generate_schema(gen: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError>;
+    fn generate_schema(gen: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError>
+    where
+        Self: Sized;
 
     /// Create a new configurable reference table.
     fn as_configurable_ref() -> ConfigurableRef
     where
-        Self: 'static,
+        Self: Sized + 'static,
     {
         ConfigurableRef::new::<Self>()
     }
@@ -98,7 +109,7 @@ pub struct ConfigurableRef {
 
 impl ConfigurableRef {
     /// Create a new configurable reference table.
-    pub const fn new<T: Configurable + ?Sized + 'static>() -> Self {
+    pub const fn new<T: Configurable + 'static>() -> Self {
         Self {
             type_name: std::any::type_name::<T>,
             referenceable_name: T::referenceable_name,
