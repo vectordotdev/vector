@@ -211,10 +211,12 @@ fn outputs(
     decoding: &DeserializerConfig,
     source_name: &'static str,
 ) -> Vec<Output> {
-    let legacy_host_key = host_key
-        .clone()
-        .and_then(|k| k.path)
-        .map(LegacyKey::InsertIfEmpty);
+    let legacy_host_key = Some(LegacyKey::InsertIfEmpty(
+        host_key
+            .clone()
+            .and_then(|k| k.path)
+            .unwrap_or_else(|| owned_value_path!(log_schema().host_key())),
+    ));
 
     let schema_definition = decoding
         .schema_definition(log_namespace)
