@@ -17,6 +17,12 @@ cp target/artifacts/vector-"${ARCHIVE_VERSION}"-x86_64-pc-windows-msvc.zip targe
 pushd target/msi-x64
 # shellcheck disable=SC2016
 powershell '$progressPreference = "silentlyContinue"; Expand-Archive vector-'"$ARCHIVE_VERSION"'-x86_64-pc-windows-msvc.zip'
-./build.sh "${ARCHIVE_VERSION}"
+
+# building the MSI package requires the version to be purely numerical (eg 0.0.0),
+# which is not the case if MODE env var is set (as with custom build workflow)
+PACKAGE_VERSION="${VECTOR_VERSION:-"$(unset MODE; cargo vdev version)"}"
+
+./build.sh "${ARCHIVE_VERSION}" "${PACKAGE_VERSION}"
+
 popd
 cp target/msi-x64/vector.msi target/artifacts/vector-"${ARCHIVE_VERSION}"-x64.msi

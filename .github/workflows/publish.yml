@@ -244,7 +244,6 @@ jobs:
 
   build-x86_64-pc-windows-msvc-packages:
     name: Build Vector for x86_64-pc-windows-msvc (.zip)
-    if: ${{ inputs.mode != 'custom' }}
     runs-on: [windows, release-builder]
     needs: generate-publish-metadata
     env:
