@@ -1,4 +1,5 @@
 use anyhow::Result;
+use std::env;
 
 use crate::util;
 
@@ -12,11 +13,7 @@ pub struct Cli {}
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
-        let channel = std::env::var("MODE").unwrap_or_else(|_| {
-            util::release_channel()
-                .expect("error determining release channel")
-                .to_string()
-        });
+        let channel = env::var("MODE").or_else(|_| util::release_channel().map(Into::into))?;
 
         println!("{channel}");
         Ok(())
