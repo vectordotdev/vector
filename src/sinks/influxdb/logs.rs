@@ -256,27 +256,18 @@ struct InfluxDbLogsEncoder {
 }
 
 impl HttpEventEncoder<BytesMut> for InfluxDbLogsEncoder {
-    fn encode_event(&mut self, mut event: Event) -> Option<BytesMut> {
-        let mut log = {
-            self.transformer.transform(&mut event);
-            event.into_log()
-        };
-
-        // Timestamp
-        let timestamp = encode_timestamp(match log.remove_timestamp() {
-            Some(Value::Timestamp(ts)) => Some(ts),
-            _ => None,
-        });
-
+    fn encode_event(&mut self, event: Event) -> Option<BytesMut> {
+        let mut log = event.into_log();
         // Ensure the "message" isn't overwritten if the event wasn't an object
         // TODO: add a `TargetPath::is_event_root()` to conditionally rename?
         if let Some(message_path) = log.message_path() {
             log.rename_key(
                 message_path.as_str(),
-                (PathPrefix::Event, &self.message_key),
+                (PathPrefix::Event, dbg!(&self.message_key)),
             )
         }
         // Add the `host` and `source_type` to the HashSet of tags to include
+        // Ensure those paths are on the event to be encoded, rather than metadata
         if let Some(host_path) = log.host_path() {
             self.tags.replace(host_path.clone());
             log.rename_key(host_path.as_str(), (PathPrefix::Event, &self.host_key));
@@ -286,9 +277,22 @@ impl HttpEventEncoder<BytesMut> for InfluxDbLogsEncoder {
             log.source_type_path(),
             (PathPrefix::Event, &self.source_type_key),
         );
+        log.insert("metric_type", "logs");
+
+        // Timestamp
+        let timestamp = encode_timestamp(match log.remove_timestamp() {
+            Some(Value::Timestamp(ts)) => Some(ts),
+            _ => None,
+        });
+
+        let log = {
+            let mut event = Event::from(log);
+            self.transformer.transform(&mut event);
+            event.into_log()
+        };
 
         // Tags + Fields
-        let mut tags = MetricTags::from([("metric_type".to_string(), "logs".to_string())]);
+        let mut tags = MetricTags::default();
         let mut fields: HashMap<String, Field> = HashMap::new();
         log.convert_to_fields().for_each(|(key, value)| {
             if self.tags.contains(&key) {
@@ -391,9 +395,13 @@ fn to_field(value: &Value) -> Field {
 #[cfg(test)]
 mod tests {
     use chrono::{offset::TimeZone, Utc};
+    use codecs::BytesDeserializerConfig;
     use futures::{channel::mpsc, stream, StreamExt};
     use http::{request::Parts, StatusCode};
     use indoc::indoc;
+    use lookup::owned_value_path;
+    use std::sync::Arc;
+    use vector_core::config::LogNamespace;
     use vector_core::event::{BatchNotifier, BatchStatus, Event, LogEvent};
 
     use super::*;
@@ -447,6 +455,23 @@ mod tests {
         let mut event = Event::Log(LogEvent::from("hello"));
         event.as_mut_log().insert("host", "aws.cloud.eur");
         event.as_mut_log().insert("timestamp", ts());
+        let schema = BytesDeserializerConfig
+            .schema_definition(LogNamespace::Legacy)
+            .with_event_field(
+                &owned_value_path!("message"),
+                Kind::bytes(),
+                Some("message"),
+            )
+            .with_event_field(&owned_value_path!("host"), Kind::bytes(), Some("host"))
+            .with_event_field(
+                &owned_value_path!("timestamp"),
+                Kind::timestamp(),
+                Some("timestamp"),
+            );
+
+        event
+            .metadata_mut()
+            .set_schema_definition(&Arc::new(schema));
 
         let mut sink = create_sink(
             "http://localhost:9999",
