@@ -411,7 +411,7 @@ mod tests {
                 profile,
             } => {
                 assert_eq!(&credentials_file, "/path/to/file");
-                assert_eq!(&profile.unwrap(), "foo");
+                assert_eq!(&profile, "foo");
             }
             _ => panic!(),
         }
@@ -429,7 +429,7 @@ mod tests {
                 profile,
             } => {
                 assert_eq!(&credentials_file, "/path/to/file");
-                assert_eq!(profile, None);
+                assert_eq!(profile, "default".to_string());
             }
             _ => panic!(),
         }
