@@ -93,8 +93,8 @@ pub struct LokiConfig {
     ///
     /// Both keys and values are templateable, which enables you to attach dynamic labels to events.
     ///
-    /// Labels can be `*` or prefixes ending with `*` to allow the expansion of objects into
-    /// multiple labels, see [Label expansion][label_expansion] for more information.
+    /// Valid label keys include `*`,  and prefixes ending with `*`, to allow for the expansion of
+    /// objects into multiple labels. See [Label expansion][label_expansion] for more information.
     ///
     /// Note: If the set of labels has high cardinality, this can cause drastic performance issues
     /// with Loki. To prevent this from happening, reduce the number of unique label keys and
