@@ -7,7 +7,7 @@ crate::cli_subcommands! {
     github,
     homebrew,
     mod prepare,
-    push,
+    mod push,
     s3,
 }
 
@@ -30,10 +30,6 @@ crate::script_wrapper! {
 crate::script_wrapper! {
     homebrew = "Releases latest version to the vectordotdev homebrew tap"
         => "release-homebrew.sh"
-}
-crate::script_wrapper! {
-    push = "Pushes new versions produced by `make release` to the repository"
-        => "release-push.sh"
 }
 crate::script_wrapper! {
     s3 = "Uploads archives and packages to AWS S3"
