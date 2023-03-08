@@ -223,7 +223,7 @@ fn outputs(
             legacy_host_key,
             &owned_value_path!("host"),
             Kind::bytes(),
-            None,
+            Some("host"),
         )
         .with_standard_vector_source_metadata();
 

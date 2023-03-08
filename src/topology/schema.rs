@@ -231,7 +231,7 @@ pub(super) fn validate_sink_expectations(
 
     // Validate each individual definition against the sink requirement.
     for definition in definitions {
-        if let Err(err) = requirement.validate(&definition) {
+        if let Err(err) = requirement.validate(&definition, config.schema.validation) {
             errors.append(
                 &mut err
                     .errors()

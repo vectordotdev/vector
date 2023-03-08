@@ -72,11 +72,17 @@ impl Requirement {
     }
 
     /// Validate the provided [`Definition`] against the current requirement.
+    /// If `validate_schema_type` is true, validation ensure the types match,
+    /// otherwise it only ensures the required fields exist.
     ///
     /// # Errors
     ///
     /// Returns a list of errors if validation fails.
-    pub fn validate(&self, definition: &Definition) -> Result<(), ValidationErrors> {
+    pub fn validate(
+        &self,
+        definition: &Definition,
+        validate_schema_type: bool,
+    ) -> Result<(), ValidationErrors> {
         let mut errors = vec![];
 
         for (identifier, req_meaning) in &self.meaning {
@@ -96,7 +102,7 @@ impl Requirement {
             });
 
             match maybe_meaning_path {
-                Some(target_path) => {
+                Some(target_path) if validate_schema_type => {
                     // Get the kind at the path for the given semantic meaning.
                     let definition_kind = definition.kind_at(target_path);
 
@@ -232,6 +238,18 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_doesnt_validate_types() {
+        let requirement = Requirement::empty().required_meaning("foo", Kind::boolean());
+        let definition = Definition::empty_legacy_namespace().with_event_field(
+            &owned_value_path!("foo"),
+            Kind::integer(),
+            Some("foo"),
+        );
+
+        assert_eq!(Ok(()), requirement.validate(&definition, false));
+    }
+
+    #[test]
     #[allow(clippy::too_many_lines)]
     fn test_validate() {
         struct TestCase {
@@ -348,7 +366,7 @@ mod tests {
                 },
             ),
         ]) {
-            let got = requirement.validate(&definition);
+            let got = requirement.validate(&definition, true);
             let want = if errors.is_empty() {
                 Ok(())
             } else {
