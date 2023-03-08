@@ -263,7 +263,7 @@ impl HttpEventEncoder<BytesMut> for InfluxDbLogsEncoder {
         if let Some(message_path) = log.message_path() {
             log.rename_key(
                 message_path.as_str(),
-                (PathPrefix::Event, dbg!(&self.message_key)),
+                (PathPrefix::Event, &self.message_key),
             )
         }
         // Add the `host` and `source_type` to the HashSet of tags to include
@@ -277,6 +277,7 @@ impl HttpEventEncoder<BytesMut> for InfluxDbLogsEncoder {
             log.source_type_path(),
             (PathPrefix::Event, &self.source_type_key),
         );
+        self.tags.replace("metric_type".to_string());
         log.insert("metric_type", "logs");
 
         // Timestamp
@@ -395,13 +396,10 @@ fn to_field(value: &Value) -> Field {
 #[cfg(test)]
 mod tests {
     use chrono::{offset::TimeZone, Utc};
-    use codecs::BytesDeserializerConfig;
     use futures::{channel::mpsc, stream, StreamExt};
     use http::{request::Parts, StatusCode};
     use indoc::indoc;
     use lookup::owned_value_path;
-    use std::sync::Arc;
-    use vector_core::config::LogNamespace;
     use vector_core::event::{BatchNotifier, BatchStatus, Event, LogEvent};
 
     use super::*;
@@ -455,23 +453,6 @@ mod tests {
         let mut event = Event::Log(LogEvent::from("hello"));
         event.as_mut_log().insert("host", "aws.cloud.eur");
         event.as_mut_log().insert("timestamp", ts());
-        let schema = BytesDeserializerConfig
-            .schema_definition(LogNamespace::Legacy)
-            .with_event_field(
-                &owned_value_path!("message"),
-                Kind::bytes(),
-                Some("message"),
-            )
-            .with_event_field(&owned_value_path!("host"), Kind::bytes(), Some("host"))
-            .with_event_field(
-                &owned_value_path!("timestamp"),
-                Kind::timestamp(),
-                Some("timestamp"),
-            );
-
-        event
-            .metadata_mut()
-            .set_schema_definition(&Arc::new(schema));
 
         let mut sink = create_sink(
             "http://localhost:9999",
@@ -871,9 +852,9 @@ mod tests {
             measurement,
             tags,
             transformer: Default::default(),
-            host_key: Default::default(),
-            message_key: Default::default(),
-            source_type_key: Default::default(),
+            host_key: owned_value_path!("host"),
+            message_key: owned_value_path!("message"),
+            source_type_key: owned_value_path!("source_type"),
         }
     }
 }
