@@ -237,7 +237,7 @@ impl ElasticsearchConfig {
     pub fn common_mode(&self) -> crate::Result<ElasticsearchCommonMode> {
         match self.mode {
             ElasticsearchMode::Bulk => Ok(ElasticsearchCommonMode::Bulk {
-                index: self.index().expect("index should not be undefined"),
+                index: self.index().ok_or("index should not be undefined")?,
                 action: self.bulk_action(),
             }),
             ElasticsearchMode::DataStream => Ok(ElasticsearchCommonMode::DataStream(
