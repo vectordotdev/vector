@@ -3,9 +3,7 @@ use std::fs::File;
 use std::io::Write;
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
-use std::process::Command;
-use crate::git;
-use crate::app::CommandExt as _;
+use crate::app;
 
 const SIGNOFF_HOOK: &str = r#"#!/bin/bash
 set -euo pipefail
@@ -46,21 +44,18 @@ pub struct Cli {}
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
-        let git_dir = git::get_git_dir()?;
+        let hook_dir = Path::new(app::path()).join(".git").join("hooks");
 
         // Create a new directory named hooks in the .git directory if it
         // doesn't already exist.
-        let mut command = Command::new("mkdir");
-        command.in_repo();
-        command.args(["-p", &format!("{git_dir}/hooks")]);
+        // Use create_dir_all to avoid Error: File exists (os error 17)"
+        std::fs::create_dir_all(&hook_dir)?;
 
-        command.check_run()?;
-
-        let hook_path = Path::new(&git_dir).join("hooks").join("commit-msg");
-        let mut file = File::create(hook_path)?;
+        let file_path = hook_dir.join("commit-msg");
+        let mut file = File::create(&file_path)?;
         file.write_all(SIGNOFF_HOOK.as_bytes())?;
         file.metadata()?.permissions().set_mode(0o755);
-        println!("Created signoff script in {git_dir}/hooks/commit-msg");
+        println!("Created signoff script in {}", file_path.display());
 
         Ok(())
     }
