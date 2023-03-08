@@ -9,6 +9,26 @@ pub fn current_branch() -> Result<String> {
     Ok(output.trim_end().to_string())
 }
 
+pub fn checkout_branch(branch_name: &str) -> Result<()> {
+    let _output = capture_output(&["checkout", "-b", branch_name])?;
+    Ok(())
+}
+
+pub fn merge_branch(branch_name: &str) -> Result<()> {
+    let _output = capture_output(&["merge", "--ff", branch_name])?;
+    Ok(())
+}
+
+pub fn tag_version(version: &str) -> Result<()> {
+    let _output = capture_output(&["tag", "-a", version, "-m", version])?;
+    Ok(())
+}
+
+pub fn push_branch(branch_name: &str) -> Result<()> {
+    let _output = capture_output(&["push", "origin", branch_name])?;
+    Ok(())
+}
+
 pub fn changed_files() -> Result<Vec<String>> {
     let mut files = HashSet::new();
 

@@ -1,14 +1,10 @@
 use std::env;
-// use std::process::Command;
 
 use anyhow::Result;
 use clap::Args;
 
 use crate::util;
-
-
-// use crate::app::CommandExt as _;
-// use crate::platform;
+use crate::git;
 
 /// Pushes new versions produced by `make release` to the repository
 #[derive(Args, Debug)]
@@ -17,8 +13,22 @@ pub struct Cli {}
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
-        let _version = env::var("VECTOR_VERSION").or_else(|_| util::read_version())?;
-        
+        let version = env::var("VECTOR_VERSION").or_else(|_| util::read_version())?;
+        let version_minor = version.split('.')
+            .take(2)
+            .collect::<Vec<&str>>()
+            .join(".");
+
+        let current_branch = git::current_branch()?;
+        println!("Preparing the branch and the tag...");
+        git::checkout_branch(&format!("v{version_minor}"))?;
+        git::merge_branch(&current_branch)?;
+        git::tag_version(&format!("v{version}"))?;
+
+        println!("Pushing the branch and the tag...");
+        git::push_branch(&format!("v{version_minor}"))?;
+        git::push_branch(&format!("v{version}"))?;
+
         Ok(())
     }
 }
