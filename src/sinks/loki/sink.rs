@@ -163,7 +163,8 @@ pub(super) struct EventEncoder {
 
 impl EventEncoder {
     fn build_labels(&self, event: &Event) -> Vec<(String, String)> {
-        let mut vec: Vec<(String, String)> = Vec::new();
+        let mut static_vec: HashMap<String, String> = HashMap::new();
+        let mut dynamic_vec: HashMap<String, String> = HashMap::new();
 
         for (key_template, value_template) in self.labels.iter() {
             if let (Ok(key), Ok(value)) = (
@@ -176,19 +177,21 @@ impl EventEncoder {
 
                     if let Ok(output) = output {
                         // key_* -> key_one, key_two, key_three
+                        // * -> one, two, three
                         for (k, v) in output {
-                            vec.push((
+                            dynamic_vec.insert(
                                 slugify_text(format!("{}{}", opening_prefix, k)),
                                 Value::from(v).to_string_lossy().into_owned(),
-                            ))
+                            );
                         }
                     }
                 } else {
-                    vec.push((key, value));
+                    static_vec.insert(key, value);
                 }
             }
         }
-        vec
+        dynamic_vec.extend(static_vec);
+        Vec::from_iter(dynamic_vec)
     }
 
     fn remove_label_fields(&self, event: &mut Event) {
@@ -545,6 +548,60 @@ mod tests {
         assert_eq!(labels["foo"], "bar".to_string());
         assert_eq!(labels["test_key_one"], "foo".to_string());
         assert_eq!(labels["test_key_two"], "baz".to_string());
+    }
+
+    #[test]
+    fn encoder_with_dynamic_labels() -> Result<(), serde_json::Error> {
+        let mut labels = HashMap::default();
+        labels.insert(
+            Template::try_from("pod_labels_*").unwrap(),
+            Template::try_from("{{ kubernetes.pod_labels }}").unwrap(),
+        );
+        labels.insert(
+            Template::try_from("*").unwrap(),
+            Template::try_from("{{ metadata }}").unwrap(),
+        );
+        labels.insert(
+            Template::try_from("cluster_name").unwrap(),
+            Template::try_from("static_cluster_name").unwrap(),
+        );
+
+        let mut encoder = EventEncoder {
+            key_partitioner: KeyPartitioner::new(None),
+            transformer: Default::default(),
+            encoder: Encoder::<()>::new(JsonSerializerConfig::default().build().into()),
+            labels,
+            remove_label_fields: false,
+            remove_timestamp: false,
+        };
+
+        let message = r###"
+        {
+        	"kubernetes": {
+        		"pod_labels": {
+        			"app": "web-server",
+        			"name": "unicorn"
+        		}
+        	},
+        	"metadata": {
+        		"cluster_name": "operations",
+        		"cluster_environment": "development",
+        		"cluster_version": "1.2.3"
+        	}
+        }
+        "###;
+        let msg: BTreeMap<String, Value> = serde_json::from_str(message)?;
+        let event = Event::Log(LogEvent::from(msg));
+        let record = encoder.encode_event(event).unwrap();
+
+        assert_eq!(record.labels.len(), 5);
+        let labels: HashMap<String, String> = record.labels.into_iter().collect();
+        assert_eq!(labels["pod_labels_app"], "web-server".to_string());
+        assert_eq!(labels["pod_labels_name"], "unicorn".to_string());
+        assert_eq!(labels["cluster_name"], "static_cluster_name".to_string());
+        assert_eq!(labels["cluster_environment"], "development".to_string());
+        assert_eq!(labels["cluster_version"], "1.2.3".to_string());
+        Ok(())
     }
 
     #[test]
