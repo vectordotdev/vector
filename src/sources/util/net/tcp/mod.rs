@@ -5,6 +5,7 @@ use std::{collections::BTreeMap, io, mem::drop, net::SocketAddr, time::Duration}
 use bytes::Bytes;
 use codecs::StreamDecodingError;
 use futures::{future::BoxFuture, FutureExt, StreamExt};
+use futures_util::future::OptionFuture;
 use listenfd::ListenFd;
 use lookup::{path, OwnedValuePath};
 use smallvec::SmallVec;
@@ -112,6 +113,7 @@ where
         tls: MaybeTlsSettings,
         tls_client_metadata_key: Option<OwnedValuePath>,
         receive_buffer_bytes: Option<usize>,
+        max_connection_duration_secs: Option<u64>,
         cx: SourceContext,
         acknowledgements: SourceAcknowledgementsConfig,
         max_connections: Option<u32>,
@@ -199,6 +201,7 @@ where
                                 socket,
                                 keepalive,
                                 receive_buffer_bytes,
+                                max_connection_duration_secs,
                                 source,
                                 tripwire,
                                 peer_addr,
@@ -232,6 +235,7 @@ async fn handle_stream<T>(
     mut socket: MaybeTlsIncomingStream<TcpStream>,
     keepalive: Option<TcpKeepaliveConfig>,
     receive_buffer_bytes: Option<usize>,
+    max_connection_duration_secs: Option<u64>,
     source: T,
     mut tripwire: BoxFuture<'static, ()>,
     peer_addr: SocketAddr,
@@ -285,9 +289,22 @@ async fn handle_stream<T>(
     let reader = FramedRead::new(socket, source.decoder());
     let mut reader = ReadyFrames::new(reader);
 
+    let connection_close_timeout = OptionFuture::from(
+        max_connection_duration_secs
+            .map(|timeout_secs| tokio::time::sleep(Duration::from_secs(timeout_secs))),
+    );
+
+    tokio::pin!(connection_close_timeout);
+
     loop {
         let mut permit = tokio::select! {
             _ = &mut tripwire => break,
+            Some(_) = &mut connection_close_timeout  => {
+                if close_socket(reader.get_ref().get_ref().get_ref()) {
+                    break;
+                }
+                None
+            },
             _ = &mut shutdown_signal => {
                 if close_socket(reader.get_ref().get_ref().get_ref()) {
                     break;
