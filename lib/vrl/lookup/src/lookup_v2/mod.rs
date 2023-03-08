@@ -1,9 +1,33 @@
-//! This crate contains all of the logic for lookup paths.
+//! This crate contains all of the logic for paths.
+//!
+//! Paths can be thought of as similar to file paths (in an operating system) pointing
+//! to specific files inside of a directory.
+//! A `Value` is a data structure that can contain recursively nested fields. Paths
+//! allow referring to a specific field inside of a `Value`.
+//!
+//! # Example
+//! ```json
+//! {
+//!   "foo": {
+//!       "bar": 1
+//!    },
+//!    "baz": ["a", "b", "c"]
+//! }
+//! ```
+//!
+//! | path   | value it points to                    |
+//! |--------|---------------------------------------|
+//! | `.foo.bar` | 1
+//! | `.foo` | { "bar": 1 }
+//! | `.`    | { "foo" : { "bar" : 1 }, "baz" : ["a", "b", "c"] }
+//! | `.baz[0]` | "a"
+//! | `.baz` | ["a", "b", "c"]
+//!
 //!
 //! # Traits
 //! There are 2 main traits that define a path.
-//! - [ValuePath] is a path that points inside of a `Value`
-//! - [TargetPath] is a path that points to a `target`. A `target` in VRL refers to
+//! - [ValuePath] is a path that points to a field inside of a `Value`
+//! - [TargetPath] is a path that points inside of a `target`. A `target` in VRL refers to
 //! the external data being processed by a VRL script. A `target` has 2 main sections that can be
 //! pointed to, `event` and `metadata`.  [TargetPath::prefix] identifies the section, and
 //! [TargetPath::value_path] is a [ValuePath] pointing into that section.
