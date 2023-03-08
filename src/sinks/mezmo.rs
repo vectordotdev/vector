@@ -44,7 +44,7 @@ impl SinkConfig for LogdnaConfig {
         &self,
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
-        warn!("The `logdna` sink has been renamed. Please use `mezmo` instead.");
+        warn!("DEPRECATED: The `logdna` sink has been renamed. Please use `mezmo` instead.");
         self.0.build(cx).await
     }
 
