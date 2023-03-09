@@ -23,6 +23,9 @@ const INTERNAL_LOGS_KEY: &str = "_telemetry_logs";
 const INTERNAL_METRICS_KEY: &str = "_telemetry_metrics";
 const VECTOR_SINK_KEY: &str = "_telemetry_out";
 
+// The metrics event to monitor for before shutting down a telemetry collector.
+const INTERNAL_METRICS_SHUTDOWN_EVENT: &str = "component_received_events_total";
+
 /// Telemetry collector for a component under validation.
 pub struct Telemetry {
     listen_addr: GrpcAddress,
@@ -113,9 +116,9 @@ impl Telemetry {
 
                                     if let Event::Metric(metric) = telemetry_event {
                                         if let Some(tags) = metric.tags() {
-                                            if metric.name() == "component_received_events_total" &&
-                                               tags.get("component_name") == Some(INTERNAL_LOGS_KEY) &&
-                                               metric.data().timestamp().unwrap() > &current_time {
+                                            if metric.name() == INTERNAL_METRICS_SHUTDOWN_EVENT &&
+                                                tags.get("component_name") == Some(INTERNAL_LOGS_KEY) &&
+                                                metric.data().timestamp().unwrap() > &current_time {
                                                 debug!("telemetry: processed one component_received_events_total event");
 
                                                 events_seen += 1;
