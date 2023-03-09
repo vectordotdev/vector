@@ -74,6 +74,7 @@ async fn hdfs_rotate_files_after_the_buffer_size_is_reached() {
     // Hard-coded sleeps are bad, but we're waiting on localstack's state to converge.
     tokio::time::sleep(Duration::from_secs(1)).await;
 
+    // blocking_scan isn't supported
     let objects: Vec<Object> = op
         .object("/")
         .scan()
