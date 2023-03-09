@@ -9,11 +9,11 @@ pub fn current_branch() -> Result<String> {
     Ok(output.trim_end().to_string())
 }
 
-pub fn checkout_branch(branch_name: &str) -> Result<()> {
+pub fn checkout_or_create_branch(branch_name: &str) -> Result<()> {
     if branch_exists(branch_name)? {
-        checkout_branch_to_existing(branch_name)?;
+        checkout_branch(branch_name)?;
     } else {
-        checkout_branch_to_new(branch_name)?;
+        create_branch(branch_name)?;
     }
     Ok(())
 }
@@ -75,17 +75,17 @@ pub fn list_files() -> Result<Vec<String>> {
         .collect())
 }
 
-fn branch_exists(branch_name: &str) -> Result<bool> {
+pub fn branch_exists(branch_name: &str) -> Result<bool> {
     let output = capture_output(&["rev-parse", "--verify", branch_name])?;
     Ok(!output.is_empty())
 }
 
-fn checkout_branch_to_existing(branch_name: &str) -> Result<()> {
+pub fn checkout_branch(branch_name: &str) -> Result<()> {
     let _output = capture_output(&["checkout", branch_name])?;
     Ok(())
 }
 
-fn checkout_branch_to_new(branch_name: &str) -> Result<()> {
+pub fn create_branch(branch_name: &str) -> Result<()> {
     let _output = capture_output(&["checkout", "-b", branch_name])?;
     Ok(())
 }
