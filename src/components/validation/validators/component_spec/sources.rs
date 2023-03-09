@@ -237,15 +237,19 @@ fn validate_component_received_bytes_total(
     }
 
     debug!(
-        "{}: {} bytes, {} expected bytes",
+        "{}: {} bytes, expected at least {} bytes",
         SourceMetrics::ReceivedBytesTotal,
         metric_bytes,
         expected_bytes,
     );
 
-    if metric_bytes != expected_bytes as f64 {
+    // We'll just establish a lower bound because we can't guarantee that the
+    // source will receive an exact number of bytes, since we can't synchronize
+    // with its internal logic. For example, some sources push or pull metrics
+    // on a schedule (http_client).
+    if metric_bytes < expected_bytes as f64 {
         errs.push(format!(
-            "{}: expected {} bytes, but received {}",
+            "{}: expected at least {} bytes, but received {}",
             SourceMetrics::ReceivedBytesTotal,
             expected_bytes,
             metric_bytes
