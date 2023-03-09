@@ -10,4 +10,4 @@ license = "MPL-2.0"
 datadog-search-syntax = { path = "../search-syntax" }
 
 regex = "1"
-dyn-clone = { version = "1.0.10", default-features = false }
+dyn-clone = { version = "1.0.11", default-features = false }

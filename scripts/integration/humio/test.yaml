@@ -1,8 +1,7 @@
-args:
-- --features
+features:
 - humio-integration-tests
-- --lib
-- '::humio::'
+
+test_filter: '::humio::'
 
 runner:
   env:

@@ -117,7 +117,7 @@ scopes:
   - honeycomb service # Anything `honeycomb` service provider related
   - humio service # Anything `humio` service provider related
   - influxdata service # Anything `influxdata` service provider related
-  - logdna service # Anything `logdna` service provider related
+  - mezmo service # Anything `mezmo` service provider related
   - new relic service # Anything `new relic` service provider related
   - papertrail service # Anything `papertrail` service provider related
   - sematext service # Anything `sematext` service provider related
@@ -216,7 +216,7 @@ scopes:
   - influxdb_logs sink # Anything `influxdb_logs` sink related
   - influxdb_metrics sink # Anything `influxdb_metrics` sink related
   - kafka sink # Anything `kafka` sink related
-  - logdna sink # Anything `logdna` sink related
+  - mezmo sink # Anything `mezmo` sink related
   - loki sink # Anything `loki` sink related
   - nats sink # Anything `nats` sink related
   - new sink # A request for a new sink

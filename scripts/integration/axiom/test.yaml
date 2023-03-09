@@ -1,8 +1,7 @@
-args:
-- --features
+features:
 - axiom-integration-tests
-- --lib
-- '::axiom::'
+
+test_filter: '::axiom::'
 
 runner:
   env:

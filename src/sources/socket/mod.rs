@@ -152,6 +152,7 @@ impl SourceConfig for SocketConfig {
                     tls,
                     tls_client_metadata_key,
                     config.receive_buffer_bytes(),
+                    config.max_connection_duration_secs(),
                     cx,
                     false.into(),
                     config.connection_limit,
@@ -343,6 +344,7 @@ fn default_max_length() -> Option<usize> {
 
 #[cfg(test)]
 mod test {
+    use approx::assert_relative_eq;
     use std::{
         collections::{BTreeMap, HashMap},
         net::{SocketAddr, UdpSocket},
@@ -359,6 +361,8 @@ mod test {
     use codecs::{decoding::CharacterDelimitedDecoderOptions, CharacterDelimitedDecoderConfig};
     use futures::{stream, StreamExt};
     use lookup::{lookup_v2::OptionalValuePath, owned_value_path, path};
+    use tokio::io::AsyncReadExt;
+    use tokio::net::TcpStream;
     use tokio::{
         task::JoinHandle,
         time::{timeout, Duration, Instant},
@@ -816,6 +820,45 @@ mod test {
 
         let source_result = source_handle.await.expect("source task should not panic");
         assert_eq!(source_result, Ok(()));
+    }
+
+    #[tokio::test]
+    async fn tcp_connection_close_after_max_duration() {
+        let (tx, _) = SourceSender::new_test();
+        let addr = next_addr();
+
+        let mut source_config = TcpConfig::from_address(addr.into());
+        source_config.set_max_connection_duration_secs(Some(1));
+        let source_task = SocketConfig::from(source_config)
+            .build(SourceContext::new_test(tx, None))
+            .await
+            .unwrap();
+
+        // Spawn the source task and wait until we're sure it's listening:
+        let _ = tokio::spawn(source_task);
+        wait_for_tcp(addr).await;
+
+        let mut stream: TcpStream = TcpStream::connect(addr)
+            .await
+            .expect("stream should be able to connect");
+        let start = Instant::now();
+
+        let timeout = tokio::time::sleep(Duration::from_millis(1200));
+        let mut buffer = [0u8; 10];
+
+        tokio::select! {
+             _ = timeout => {
+                 panic!("timed out waiting for stream to close")
+             },
+             read_result = stream.read(&mut buffer) => {
+                 match read_result {
+                    // read resulting with 0 bytes -> the connection was closed
+                    Ok(0) => assert_relative_eq!(start.elapsed().as_secs_f64(), 1.0, epsilon = 0.3),
+                    Ok(_) => panic!("unexpectedly read data from stream"),
+                    Err(e) => panic!("{:}", e)
+                 }
+             }
+        }
     }
 
     //////// UDP TESTS ////////

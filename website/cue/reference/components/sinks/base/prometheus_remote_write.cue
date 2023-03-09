@@ -108,7 +108,10 @@ base: components: sinks: prometheus_remote_write: configuration: {
 					"""
 				relevant_when: "strategy = \"aws\""
 				required:      false
-				type: string: examples: ["develop"]
+				type: string: {
+					default: "default"
+					examples: ["develop"]
+				}
 			}
 			region: {
 				description: """

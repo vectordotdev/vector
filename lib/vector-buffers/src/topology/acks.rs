@@ -230,7 +230,7 @@ where
     /// - if we have no pending markers, `MarkerOffset::Gap` is returned, and contains the delta
     ///   between the given ID and the next expected marker ID
     /// - if we have pending markers, and the given ID is logically behind the next expected marker
-    ///   ID, `MarkerOffset::MontonicityViolation` is returned, indicating that the monotonicity
+    ///   ID, `MarkerOffset::MonotonicityViolation` is returned, indicating that the monotonicity
     ///   invariant has been violated
     /// - if we have pending markers, and the given ID is logically ahead of the next expected
     ///   marker, `MarkerOffset::Gap` is returned, specifying how far ahead of the next expected

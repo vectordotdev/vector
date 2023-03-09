@@ -62,7 +62,10 @@ pub struct LuaConfigV2 {
 }
 
 /// Configuration for the `lua` transform.
-#[configurable_component(transform("lua"))]
+#[configurable_component(transform(
+    "lua",
+    "Modify event data using the Lua programming language."
+))]
 #[derive(Clone, Debug)]
 #[serde(untagged)]
 pub enum LuaConfig {
@@ -84,6 +87,7 @@ impl GenerateConfig for LuaConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "lua")]
 impl TransformConfig for LuaConfig {
     async fn build(&self, _context: &TransformContext) -> crate::Result<Transform> {
         match self {

@@ -249,7 +249,7 @@ impl WebSocketSink {
     {
         const PING: &[u8] = b"PING";
 
-        // tokio::time::Interval panics if the period arg is zero. Since the struct memebers are
+        // tokio::time::Interval panics if the period arg is zero. Since the struct members are
         // using NonZeroU64 that is not something we need to account for.
         let mut ping_interval = PingInterval::new(self.ping_interval.map(u64::from));
 

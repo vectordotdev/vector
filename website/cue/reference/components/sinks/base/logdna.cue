@@ -114,7 +114,7 @@ base: components: sinks: logdna: configuration: {
 			"""
 		required: false
 		type: string: {
-			default: "https://logs.logdna.com/"
+			default: "https://logs.mezmo.com/"
 			examples: ["http://127.0.0.1", "http://example.com"]
 		}
 	}

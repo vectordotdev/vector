@@ -61,6 +61,7 @@ jobs:
           - test: 'axiom'
           - test: 'azure'
           - test: 'clickhouse'
+          - test: 'databend'
           - test: 'datadog-agent'
           - test: 'datadog-logs'
           - test: 'datadog-metrics'
@@ -87,6 +88,7 @@ jobs:
           - test: 'redis'
           - test: 'shutdown'
           - test: 'splunk'
+          - test: 'webhdfs'
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v3

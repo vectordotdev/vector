@@ -265,8 +265,8 @@ base: components: sinks: loki: configuration: {
 
 			Both keys and values are templateable, which enables you to attach dynamic labels to events.
 
-			Labels can be suffixed with a `*` to allow the expansion of objects into multiple labels,
-			see [Label expansion][label_expansion] for more information.
+			Valid label keys include `*`, and prefixes ending with `*`, to allow for the expansion of
+			objects into multiple labels. See [Label expansion][label_expansion] for more information.
 
 			Note: If the set of labels has high cardinality, this can cause drastic performance issues
 			with Loki. To prevent this from happening, reduce the number of unique label keys and
@@ -277,7 +277,8 @@ base: components: sinks: loki: configuration: {
 		required: false
 		type: object: {
 			examples: [{
-				"pod_labels_*":      "{{ kubernetes.pod_labels }}"
+				"\"*\"":             "{{ metadata }}"
+				"\"pod_labels_*\"":  "{{ kubernetes.pod_labels }}"
 				source:              "vector"
 				"{{ event_field }}": "{{ some_other_event_field }}"
 			}]

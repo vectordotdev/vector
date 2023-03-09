@@ -32,11 +32,11 @@ bytes = "1.4.0"
 compiler = { package = "vrl-compiler", path = "../compiler", default-features = false }
 diagnostic = { package = "vrl-diagnostic", path = "../diagnostic" }
 indoc = "2"
-lookup = { path = "../../lookup" }
+lookup = { path = "../lookup" }
 ordered-float = "3"
 parser = { package = "vrl-parser", path = "../parser" }
 vector-common = { path = "../../vector-common", default-features = false }
-value = { path = "../../value", default-features = false }
+value = { path = "../value", default-features = false }
 
 [dev-dependencies]
 criterion = "0.4"
