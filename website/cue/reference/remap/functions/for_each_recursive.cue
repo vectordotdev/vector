@@ -6,9 +6,8 @@ remap: functions: for_each_recursive: {
 		Iterate recursively through an object.
 
         This function exposes the parent keys and value for
-        every key iterated through in the object. The keys include
-		the parent keys and the current key in an array, effectively
-		the path to the value in the object.
+        every key iterated through in objects. For arrays the parent
+		indexes are provided.
 
 		The function uses the "function closure syntax" to allow reading
 		the keys/value combination for each item in the
@@ -26,9 +25,9 @@ remap: functions: for_each_recursive: {
 	arguments: [
 		{
 			name:        "value"
-			description: "The object to iterate."
+			description: "The array or object to iterate."
 			required:    true
-			type: ["object"]
+			type: ["array", "object"]
 		},
 	]
 	internal_failure_reasons: []
