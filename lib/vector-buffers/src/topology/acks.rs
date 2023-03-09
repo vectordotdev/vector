@@ -714,8 +714,7 @@ mod tests {
             let actual_result = apply_action_sut(&mut sut, action);
             assert_eq!(
                 expected_result, actual_result,
-                "{}: ran action {:?} expecting result {:?}, but got result {:?} instead",
-                name, action, expected_result, actual_result
+                "{name}: ran action {action:?} expecting result {expected_result:?}, but got result {actual_result:?} instead"
             );
         }
     }
@@ -862,8 +861,7 @@ mod tests {
                                         let effective_offset = acked_marker_id.wrapping_add(unclaimed_acks);
                                         let is_eligible = required_acked_offset <= effective_offset && required_acked_offset >= *marker_id;
                                         assert!(!is_eligible,
-                                            "SUT returned None but next fixed-size marker on stack is eligible: id: {}, len: {}, acked_id_offset: {}",
-                                            marker_id, len, acked_marker_id);
+                                            "SUT returned None but next fixed-size marker on stack is eligible: id: {marker_id}, len: {len}, acked_id_offset: {acked_marker_id}");
                                     },
                                     PendingMarkerLength::Unknown => {
                                         // If we have an unknown marker, the only we shouldn't be

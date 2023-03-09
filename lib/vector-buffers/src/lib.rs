@@ -42,12 +42,14 @@ use vector_common::{byte_size_of::ByteSizeOf, finalization::AddBatchNotifier};
 #[configurable_component]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[serde(rename_all = "snake_case")]
+#[derive(Default)]
 pub enum WhenFull {
     /// Wait for free space in the buffer.
     ///
     /// This applies backpressure up the topology, signalling that sources should slow down
     /// the acceptance/consumption of events. This means that while no data is lost, data will pile
     /// up at the edge.
+    #[default]
     Block,
 
     /// Drops the event instead of waiting for free space in buffer.
@@ -69,11 +71,7 @@ pub enum WhenFull {
     Overflow,
 }
 
-impl Default for WhenFull {
-    fn default() -> Self {
-        WhenFull::Block
-    }
-}
+
 
 #[cfg(test)]
 impl Arbitrary for WhenFull {

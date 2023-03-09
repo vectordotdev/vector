@@ -332,7 +332,7 @@ impl Target {
             Self::Internal(ident, path) => {
                 let type_def = match state.local.variable(ident) {
                     None => TypeDef::null().with_type_inserted(&path.clone().into(), new_type_def),
-                    Some(&Details { ref type_def, .. }) => type_def
+                    Some(Details { type_def, .. }) => type_def
                         .clone()
                         .with_type_inserted(&path.clone().into(), new_type_def),
                 };

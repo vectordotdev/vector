@@ -436,9 +436,8 @@ mod tests {
             Err(_) => panic!("not a valid lhs expression: {lhs:?}"),
         };
 
-        let rhs = match rhs.clone().try_into() {
-            Ok(v) => v,
-            Err(_) => panic!("not a valid rhs expression: {rhs:?}"),
+        let Ok(rhs) = rhs.clone().try_into() else {
+            panic!("not a valid rhs expression: {rhs:?}")
         };
 
         Op {
