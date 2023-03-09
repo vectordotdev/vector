@@ -360,6 +360,23 @@ impl<'a> Builder<'a> {
 
                                     (kind.into(), None)
                                 }
+
+                                // The variable kind is expected to be equal to
+                                // the kind of all keys within the target
+                                // collection type.
+                                //
+                                // This means it's either a collection of 
+                                // strings for an object or a collection of
+                                // integers for an array.
+                                VariableKind::TargetInnerKeys => {
+                                    let mut kind = Kind::never();
+
+                                    if type_def.is_array() {
+                                        kind.add_array(value::kind::Collection::any());
+                                    } 
+             
+                                    (kind.into(), None)
+                                }
                             };
 
                             let details = Details { type_def, value };

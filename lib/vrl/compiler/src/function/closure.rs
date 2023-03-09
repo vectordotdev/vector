@@ -93,6 +93,12 @@ pub enum VariableKind {
     /// a `Value::bytes()`, if it's known to be exactly an array, it is
     /// a `Value::integer()`, otherwise it is one of the two.
     TargetInnerKey,
+
+    /// The variable [`Kind`] is inferred from the key or index type of the
+    /// target. If the target is known to be exactly an object, this is always
+    /// a `Value::Array(Value::bytes())`, if it's known to be exactly an array,
+    /// it is a `Value::Array(Value::integer())`.
+    TargetInnerKeys,
 }
 
 /// The output type required by the closure block.
