@@ -19,11 +19,12 @@ pushd target/msi-x64
 powershell '$progressPreference = "silentlyContinue"; Expand-Archive vector-'"$ARCHIVE_VERSION"'-x86_64-pc-windows-msvc.zip'
 
 # building the MSI package requires the version to be purely numerical (eg 0.0.0),
-# which is not the case if MODE env var is set (as with custom build workflow)
+# which is not the case if with custom build workflow.
 CHANNEL="${CHANNEL:-"$(cargo vdev release channel)"}"
 
 if [[ "$CHANNEL" == "custom" ]]; then
-    PACKAGE_VERSION="$(unset MODE; unset VERSION; unset CHANNEL; cargo vdev version)"
+    # "0.29.0.custom.a28ecdc" -> "0.29.0"
+    PACKAGE_VERSION= "${ARCHIVE_VERSION%.custom*}"
 else
     PACKAGE_VERSION="${ARCHIVE_VERSION}"
 fi
