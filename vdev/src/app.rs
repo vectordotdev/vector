@@ -8,6 +8,7 @@ use log::LevelFilter;
 use once_cell::sync::{Lazy, OnceCell};
 
 use crate::config::Config;
+use crate::util;
 
 // Use the `bash` interpreter included as part of the standard `git` install for our default shell
 // if nothing is specified in the environment.
@@ -41,6 +42,10 @@ pub fn path() -> &'static String {
 
 pub fn set_repo_dir() -> Result<()> {
     env::set_current_dir(path()).context("Could not change directory")
+}
+
+pub fn version() -> Result<String> {
+    env::var("VERSION").or_else(|_| util::read_version())
 }
 
 /// Overlay some extra helper functions onto `std::process::Command`
