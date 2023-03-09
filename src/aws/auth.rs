@@ -9,8 +9,6 @@ use aws_config::{
     },
     sts::AssumeRoleProviderBuilder,
 };
-use aws_config::profile::profile_file::{ProfileFileKind, ProfileFiles};
-use aws_config::profile::ProfileFileCredentialsProvider;
 use aws_types::{credentials::SharedCredentialsProvider, region::Region, Credentials};
 use serde_with::serde_as;
 use vector_common::sensitive_string::SensitiveString;
