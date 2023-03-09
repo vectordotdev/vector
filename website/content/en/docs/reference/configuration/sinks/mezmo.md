@@ -4,6 +4,7 @@ description: Deliver log event data to [Mezmo](https://mezmo.com)
 kind: sink
 layout: component
 tags: ["logdna", "mezmo", "component", "sink", "logs"]
+aliases: ["/docs/reference/configuration/sinks/logdna"]
 ---
 
 {{/*
