@@ -23,7 +23,7 @@ powershell '$progressPreference = "silentlyContinue"; Expand-Archive vector-'"$A
 CHANNEL="${CHANNEL:-"$(cargo vdev release channel)"}"
 
 if [[ "$CHANNEL" == "custom" ]]; then
-    PACKAGE_VERSION="$(unset MODE; unset VERSION; unset CHANNEL; cargo vdev versio)"
+    PACKAGE_VERSION="$(unset MODE; unset VERSION; unset CHANNEL; cargo vdev version)"
 else
     PACKAGE_VERSION="${ARCHIVE_VERSION}"
 fi
