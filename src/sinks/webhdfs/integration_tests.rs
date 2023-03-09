@@ -4,8 +4,8 @@ use std::{
 };
 
 use codecs::{encoding::FramingConfig, TextSerializerConfig};
-use futures::stream;
-use opendal::ObjectMetakey;
+use futures::{stream, StreamExt};
+use opendal::{Object, ObjectMetakey};
 use similar_asserts::assert_eq;
 use vector_core::event::{Event, LogEvent};
 
@@ -74,11 +74,17 @@ async fn hdfs_rotate_files_after_the_buffer_size_is_reached() {
     // Hard-coded sleeps are bad, but we're waiting on localstack's state to converge.
     tokio::time::sleep(Duration::from_secs(1)).await;
 
-    let mut objects: Vec<_> = op
+    let objects: Vec<Object> = op
         .object("/")
-        .blocking_scan()
+        .scan()
+        .await
         .unwrap()
         .map(|x| x.unwrap())
+        .collect()
+        .await;
+
+    let mut objects = objects
+        .into_iter()
         .filter(|o| {
             o.blocking_metadata(ObjectMetakey::Mode)
                 .unwrap()
@@ -86,6 +92,7 @@ async fn hdfs_rotate_files_after_the_buffer_size_is_reached() {
                 .is_file()
         })
         .collect::<Vec<_>>();
+
     // Sort file path in order, because we have the event id in path.
     objects.sort_by(|l, r| l.path().cmp(r.path()));
     assert_eq!(objects.len(), 3);
