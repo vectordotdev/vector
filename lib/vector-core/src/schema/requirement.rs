@@ -250,11 +250,6 @@ mod tests {
         let requirement = Requirement::empty().required_meaning("foo", Kind::boolean());
         let definition = Definition::default_for_namespace(&[LogNamespace::Vector].into())
             .with_event_field(&owned_value_path!("foo"), Kind::integer(), Some("foo"));
-        let definition = Definition::empty_legacy_namespace().with_event_field(
-            &owned_value_path!("foo"),
-            Kind::integer(),
-            Some("foo"),
-        );
 
         assert_eq!(Ok(()), requirement.validate(&definition, false));
     }
