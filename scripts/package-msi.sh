@@ -20,9 +20,14 @@ powershell '$progressPreference = "silentlyContinue"; Expand-Archive vector-'"$A
 
 # building the MSI package requires the version to be purely numerical (eg 0.0.0),
 # which is not the case if MODE env var is set (as with custom build workflow)
-PACKAGE_VERSION="${VECTOR_VERSION:-"$(unset MODE; unset VERSION; unset CHANNEL; cargo vdev version)"}"
+CHANNEL="${CHANNEL:-"$(cargo vdev release channel)"}"
+
+if [[ "$CHANNEL" == "custom" ]]; then
+    PACKAGE_VERSION="$(unset MODE; unset VERSION; unset CHANNEL; cargo vdev versio)"
+else
+    PACKAGE_VERSION="${ARCHIVE_VERSION}"
+fi
 
 ./build.sh "${ARCHIVE_VERSION}" "${PACKAGE_VERSION}"
-
 popd
 cp target/msi-x64/vector.msi target/artifacts/vector-"${ARCHIVE_VERSION}"-x64.msi
