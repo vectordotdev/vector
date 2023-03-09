@@ -113,15 +113,13 @@ base: components: sinks: console: configuration: {
 				required:      true
 				type: object: options: fields: {
 					description: """
-						The CSV Serializer fields.
+						Configures the fields that will be encoded, as well as the order in which they
+						appear in the output.
 
-						The order of the fields determines the order of the columns in the CSV output.
-						Make sure to use the same order when parsing the CSV output.
+						If a field is not present in the event, the output will be an empty string.
 
-						If a field is not present in the event, the output will be `NaN`.
-
-						Some value types: Array, Regex, Object are not supported by the CSV format.
-						If a field is of an unsupported type, the output will be `NaN`.
+						Values of type `Array`, `Object`, and `Regex` are not supported and the
+						output will be an empty string.
 						"""
 					required: true
 					type: array: items: type: string: {}
