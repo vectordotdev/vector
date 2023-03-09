@@ -7,8 +7,15 @@ where
     T: Fn(&mut Context) -> Resolved,
 {
     match value {
+        Value::Array(arr) => {
+            let map_parent = ArrayParents::new(arr.iter());
+            for (keys, val) in map_parent {
+                runner.run_indexes_value(ctx, keys, val)?;
+            }
+            Ok(().into())
+        }
         Value::Object(map) => {
-            let map_parent = MapParent::new(map.iter());
+            let map_parent = ObjectParents::new(map.iter());
             for (keys, val) in map_parent {
                 runner.run_keys_value(ctx, keys, val)?;
             }
@@ -16,20 +23,20 @@ where
         }
         value => Err(value::Error::Expected {
             got: value.kind(),
-            expected: Kind::object(Collection::any()),
+            expected: Kind::array(Collection::any()) | Kind::object(Collection::any()),
         }
         .into()),
     }
 }
 
 /// An iterator to go through the maps allowing the full path to the value to be provided.
-struct MapParent<'a> {
+struct ObjectParents<'a> {
     values: btree_map::Iter<'a, String, Value>,
-    inner: Option<Box<MapParent<'a>>>,
+    inner: Option<Box<ObjectParents<'a>>>,
     parent: Option<Vec<String>>,
 }
 
-impl<'a> MapParent<'a> {
+impl<'a> ObjectParents<'a> {
     fn new(values: btree_map::Iter<'a, String, Value>) -> Self {
         Self {
             values,
@@ -58,7 +65,7 @@ impl<'a> MapParent<'a> {
     }
 }
 
-impl<'a> std::iter::Iterator for MapParent<'a> {
+impl<'a> std::iter::Iterator for ObjectParents<'a> {
     type Item = (Vec<String>, &'a Value);
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -73,13 +80,79 @@ impl<'a> std::iter::Iterator for MapParent<'a> {
         let next = self.values.next();
         match next {
             Some((key, Value::Object(value))) => {
-                self.inner = Some(Box::new(MapParent::new_from_parent(
+                self.inner = Some(Box::new(ObjectParents::new_from_parent(
                     self.new_key(key),
                     value.iter(),
                 )));
                 self.next()
             }
             Some((key, value)) => Some((self.new_key(key), value)),
+            None => None,
+        }
+    }
+}
+struct ArrayParents<'a> {
+    values: std::slice::Iter<'a, Value>,
+    index: usize,
+    inner: Option<Box<ArrayParents<'a>>>,
+    parent: Option<Vec<usize>>,
+}
+
+impl<'a> ArrayParents<'a> {
+    fn new(values: std::slice::Iter<'a, Value>) -> Self {
+        Self {
+            values,
+            index: 0,
+            inner: None,
+            parent: None,
+        }
+    }
+
+    fn new_from_parent(parent: Vec<usize>, values: std::slice::Iter<'a, Value>) -> Self {
+        Self {
+            values,
+            index: 0,
+            inner: None,
+            parent: Some(parent),
+        }
+    }
+
+    fn new_key(&self, key: &usize) -> Vec<usize> {
+        match &self.parent {
+            None => vec![*key],
+            Some(parent) => {
+                let mut copy = parent.clone();
+                copy.push(*key);
+                copy
+            }
+        }
+    }
+}
+
+impl<'a> std::iter::Iterator for ArrayParents<'a> {
+    type Item = (Vec<usize>, &'a Value);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if let Some(ref mut inner) = self.inner {
+            let next = inner.next();
+            match next {
+                Some(_) => return next,
+                None => self.inner = None,
+            }
+        }
+
+        self.index += 1;
+        let next = self.values.next();
+
+        match next {
+            Some(Value::Array(value)) => {
+                self.inner = Some(Box::new(ArrayParents::new_from_parent(
+                    self.new_key(&(self.index - 1)),
+                    value.iter(),
+                )));
+                self.next()
+            }
+            Some(value) => Some((self.new_key(&(self.index - 1)), value)),
             None => None,
         }
     }
@@ -96,7 +169,7 @@ impl Function for ForEachRecursive {
     fn parameters(&self) -> &'static [Parameter] {
         &[Parameter {
             keyword: "value",
-            kind: kind::OBJECT,
+            kind: kind::OBJECT | kind::ARRAY,
             required: true,
         }]
     }
@@ -130,7 +203,7 @@ impl Function for ForEachRecursive {
                 kind: Kind::object(Collection::any()).or_array(Collection::any()),
                 variables: vec![
                     Variable {
-                        kind: VariableKind::Exact(Kind::array(Collection::any())),
+                        kind: VariableKind::TargetInnerKeys,
                     },
                     Variable {
                         kind: VariableKind::Exact(Kind::any()),
