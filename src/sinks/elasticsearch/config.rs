@@ -163,7 +163,7 @@ pub struct ElasticsearchConfig {
     #[serde(rename = "distribution")]
     pub endpoint_health: Option<HealthConfig>,
 
-    #[serde(alias = "normal", default)]
+    #[serde(alias = "normal", default = "default_bulk")]
     #[configurable(derived)]
     pub bulk: Option<BulkConfig>,
 
@@ -190,6 +190,10 @@ fn default_doc_type() -> String {
 
 fn query_examples() -> HashMap<String, String> {
     HashMap::<_, _>::from_iter([("X-Powered-By".to_owned(), "Vector".to_owned())].into_iter())
+}
+
+fn default_bulk() -> Option<BulkConfig> {
+    Some(BulkConfig::default())
 }
 
 impl Default for ElasticsearchConfig {
@@ -611,5 +615,16 @@ mod tests {
         )
         .unwrap();
         assert_eq!(config.api_version, ElasticsearchApiVersion::Auto);
+    }
+
+    #[test]
+    fn parse_default_bulk() {
+        let config = toml::from_str::<ElasticsearchConfig>(
+            r#"
+            endpoints = [""]
+        "#,
+        )
+        .unwrap();
+        assert_eq!(config.bulk, Some(BulkConfig::default()));
     }
 }
