@@ -424,12 +424,14 @@ pub async fn build_pieces(
         let typetag = sink.inner.get_component_name();
         let input_type = sink.inner.input().data_type();
 
-        // At this point, we've validated that all transforms are valid, including any
-        // transform that mutates the schema provided by their sources. We can now validate the
-        // schema expectations of each individual sink.
-        if let Err(mut err) = schema::validate_sink_expectations(key, sink, config) {
-            errors.append(&mut err);
-        };
+        if config.schema.validation {
+            // At this point, we've validated that all transforms are valid, including any
+            // transform that mutates the schema provided by their sources. We can now validate the
+            // schema expectations of each individual sink.
+            if let Err(mut err) = schema::validate_sink_expectations(key, sink, config) {
+                errors.append(&mut err);
+            };
+        }
 
         let (tx, rx) = if let Some(buffer) = buffers.remove(key) {
             buffer
