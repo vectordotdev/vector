@@ -212,10 +212,9 @@ fn outputs(
     source_name: &'static str,
 ) -> Vec<Output> {
     let legacy_host_key = Some(LegacyKey::InsertIfEmpty(
-        host_key
-            .clone()
-            .and_then(|k| k.path)
-            .unwrap_or_else(|| owned_value_path!(log_schema().host_key())),
+        host_key.clone().and_then(|k| k.path).unwrap_or_else(|| {
+            parse_value_path(log_schema().host_key()).expect("log_schema.host_key to be valid path")
+        }),
     ));
 
     let schema_definition = decoding
