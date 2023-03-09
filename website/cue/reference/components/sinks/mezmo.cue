@@ -1,14 +1,15 @@
 package metadata
 
-components: sinks: logdna: {
-	title: "LogDNA"
+components: sinks: mezmo: {
+	title: "Mezmo (formerly LogDNA)"
+	alias: "logdna"
 
 	classes: {
 		commonly_used: false
 		delivery:      "at_least_once"
 		development:   "stable"
 		egress_method: "batch"
-		service_providers: ["LogDNA"]
+		service_providers: ["Mezmo"]
 		stateful: false
 	}
 
@@ -35,7 +36,7 @@ components: sinks: logdna: {
 			}
 			tls: enabled: false
 			to: {
-				service: services.logdna
+				service: services.mezmo
 
 				interface: {
 					socket: {
@@ -54,7 +55,7 @@ components: sinks: logdna: {
 		notices: []
 	}
 
-	configuration: base.components.sinks.logdna.configuration
+	configuration: base.components.sinks.mezmo.configuration
 
 	input: {
 		logs:    true
