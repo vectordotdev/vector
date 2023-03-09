@@ -105,6 +105,7 @@ const fn default_idle_timeout() -> Duration {
 #[configurable_component]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[serde(rename_all = "snake_case")]
+#[derive(Default)]
 pub enum Compression {
     /// [Gzip][gzip] compression.
     ///
@@ -117,14 +118,11 @@ pub enum Compression {
     Zstd,
 
     /// No compression.
+    #[default]
     None,
 }
 
-impl Default for Compression {
-    fn default() -> Self {
-        Compression::None
-    }
-}
+
 
 enum OutFile {
     Regular(File),

@@ -11,8 +11,10 @@ pub type FormatHint = Option<Format>;
 
 /// The format used to represent the configuration data.
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Default)]
 pub enum Format {
     /// TOML format is used.
+    #[default]
     Toml,
     /// JSON format is used.
     Json,
@@ -20,11 +22,7 @@ pub enum Format {
     Yaml,
 }
 
-impl Default for Format {
-    fn default() -> Self {
-        Format::Toml
-    }
-}
+
 
 impl Format {
     /// Obtain the format from the file path using extension as a hint.

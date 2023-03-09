@@ -34,16 +34,14 @@ impl_generate_config_from_default!(BasicSinkConfig);
 
 #[derive(Debug, Clone)]
 #[allow(clippy::large_enum_variant)]
+#[derive(Default)]
 enum Mode {
     Normal(SourceSender),
+    #[default]
     Dead,
 }
 
-impl Default for Mode {
-    fn default() -> Self {
-        Mode::Dead
-    }
-}
+
 
 impl BasicSinkConfig {
     pub const fn new(sink: SourceSender, healthy: bool) -> Self {

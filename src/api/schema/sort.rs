@@ -15,16 +15,14 @@ use crate::api::schema::{
 };
 
 #[derive(Enum, Copy, Clone, PartialEq, Eq)]
+#[derive(Default)]
 pub enum Direction {
+    #[default]
     Asc,
     Desc,
 }
 
-impl Default for Direction {
-    fn default() -> Self {
-        Direction::Asc
-    }
-}
+
 
 #[derive(InputObject)]
 #[graphql(concrete(name = "ComponentsSortField", params(ComponentsSortFieldName)))]

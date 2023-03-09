@@ -431,9 +431,8 @@ mod tests {
     ) -> Op {
         use std::result::Result::Err;
 
-        let lhs = match lhs.clone().try_into() {
-            Ok(v) => v,
-            Err(_) => panic!("not a valid lhs expression: {lhs:?}"),
+        let Ok(lhs) = lhs.clone().try_into() else {
+            panic!("not a valid lhs expression: {lhs:?}")
         };
 
         let Ok(rhs) = rhs.clone().try_into() else {
