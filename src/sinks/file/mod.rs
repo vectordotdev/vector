@@ -103,9 +103,8 @@ const fn default_idle_timeout() -> Duration {
 // TODO: Why doesn't this already use `crate::sinks::util::Compression`
 // `crate::sinks::util::Compression` doesn't support zstd yet
 #[configurable_component]
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 #[serde(rename_all = "snake_case")]
-#[derive(Default)]
 pub enum Compression {
     /// [Gzip][gzip] compression.
     ///
@@ -121,8 +120,6 @@ pub enum Compression {
     #[default]
     None,
 }
-
-
 
 enum OutFile {
     Regular(File),

@@ -23,16 +23,13 @@ use vector_config::configurable_component;
 
 pub type FilePosition = u64;
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-#[derive(Default)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
 pub enum ReadFrom {
     #[default]
     Beginning,
     End,
     Checkpoint(FilePosition),
 }
-
-
 
 /// File position to use when reading a new file.
 #[configurable_component]

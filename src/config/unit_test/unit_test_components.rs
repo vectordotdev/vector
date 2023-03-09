@@ -104,8 +104,7 @@ impl SourceConfig for UnitTestStreamSourceConfig {
     }
 }
 
-#[derive(Clone)]
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub enum UnitTestSinkCheck {
     /// Check all events that are received against the list of conditions.
     Checks(Vec<Vec<Condition>>),
@@ -117,8 +116,6 @@ pub enum UnitTestSinkCheck {
     #[default]
     NoOp,
 }
-
-
 
 #[derive(Debug)]
 pub struct UnitTestSinkResult {

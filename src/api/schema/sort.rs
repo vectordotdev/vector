@@ -14,15 +14,12 @@ use crate::api::schema::{
     metrics::source::file::FileSourceMetricFilesSortFieldName,
 };
 
-#[derive(Enum, Copy, Clone, PartialEq, Eq)]
-#[derive(Default)]
+#[derive(Enum, Copy, Clone, Default, PartialEq, Eq)]
 pub enum Direction {
     #[default]
     Asc,
     Desc,
 }
-
-
 
 #[derive(InputObject)]
 #[graphql(concrete(name = "ComponentsSortField", params(ComponentsSortFieldName)))]

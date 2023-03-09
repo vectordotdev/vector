@@ -10,8 +10,7 @@ use serde::de;
 pub type FormatHint = Option<Format>;
 
 /// The format used to represent the configuration data.
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
-#[derive(Default)]
+#[derive(Debug, Default, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub enum Format {
     /// TOML format is used.
     #[default]
@@ -21,8 +20,6 @@ pub enum Format {
     /// YAML format is used.
     Yaml,
 }
-
-
 
 impl Format {
     /// Obtain the format from the file path using extension as a hint.
