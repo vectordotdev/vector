@@ -265,7 +265,7 @@ jobs:
         shell: bash
         run: |
           export PATH="/c/wix:$PATH"
-          ./scripts/package-msi.sh
+          cargo vdev package msi
       - name: Stage package artifacts for publish
         uses: actions/upload-artifact@v3
         with:
