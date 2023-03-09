@@ -165,8 +165,7 @@ fn parse_time(
         .or_else(|_| DateTime::parse_from_str(time, format).map(Into::into))
         .map_err(|err| {
             format!(
-                "failed parsing timestamp {} using format {}: {}",
-                time, format, err
+                "failed parsing timestamp {time} using format {format}: {err}"
             )
         })
 }

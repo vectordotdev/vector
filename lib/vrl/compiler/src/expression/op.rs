@@ -429,8 +429,6 @@ mod tests {
         lhs: impl TryInto<Literal> + fmt::Debug + Clone,
         rhs: impl TryInto<Literal> + fmt::Debug + Clone,
     ) -> Op {
-        use std::result::Result::Err;
-
         let Ok(lhs) = lhs.clone().try_into() else {
             panic!("not a valid lhs expression: {lhs:?}")
         };

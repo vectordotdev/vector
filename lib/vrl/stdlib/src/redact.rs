@@ -239,7 +239,9 @@ impl Filter {
 
 /// The recipe for redacting the matched filters.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Default)]
 enum Redactor {
+    #[default]
     Full,
 }
 
@@ -253,11 +255,7 @@ impl Redactor {
     }
 }
 
-impl Default for Redactor {
-    fn default() -> Self {
-        Redactor::Full
-    }
-}
+
 
 impl FromStr for Redactor {
     type Err = &'static str;
