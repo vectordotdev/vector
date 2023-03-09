@@ -187,6 +187,7 @@ jobs:
     env:
       CARGO_INCREMENTAL: 0
     strategy:
+      fail-fast: false
       matrix:
         target:
           - x86_64-unknown-linux-gnu
