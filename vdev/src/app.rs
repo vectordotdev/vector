@@ -45,7 +45,22 @@ pub fn set_repo_dir() -> Result<()> {
 }
 
 pub fn version() -> Result<String> {
-    env::var("VERSION").or_else(|_| util::read_version())
+    let version = env::var("VERSION").or_else(|_| util::read_version())?;
+    let channel = env::var("CHANNEL").or_else(|_| util::release_channel().map(Into::into))?;
+
+    if channel == "latest" {
+        let head = util::git_head()?;
+        if !head.status.success() {
+            let error = String::from_utf8_lossy(&head.stderr);
+            bail!("Error running `git describe`:\n{error}");
+        }
+        let tag = String::from_utf8_lossy(&head.stdout).trim().to_string();
+        if tag != format!("v{version}") {
+            bail!("On latest release channel and tag {tag:?} is different from Cargo.toml {version:?}. Aborting");
+        }
+    }
+
+    Ok(version)
 }
 
 /// Overlay some extra helper functions onto `std::process::Command`
