@@ -198,12 +198,12 @@ opendal = {version = "0.27.2", default-features = false, features = ["native-tls
 tower = { version = "0.4.13", default-features = false, features = ["buffer", "limit", "retry", "timeout", "util", "balance", "discover"] }
 tower-http = { version = "0.4.0", default-features = false, features = ["decompression-gzip"]}
 # Serde
-serde = { version = "1.0.152", default-features = false, features = ["derive"] }
+serde = { version = "1.0.154", default-features = false, features = ["derive"] }
 serde-toml-merge = { version = "0.3.0", default-features = false }
 serde_bytes = { version = "0.11.9", default-features = false, features = ["std"], optional = true }
 serde_json = { version = "1.0.93", default-features = false, features = ["raw_value"] }
 serde_with = { version = "2.2.0", default-features = false, features = ["macros", "std"] }
-serde_yaml = { version = "0.9.17", default-features = false }
+serde_yaml = { version = "0.9.19", default-features = false }
 
 # Messagepack
 rmp-serde = { version = "1.1.1", default-features = false, optional = true }
@@ -280,7 +280,7 @@ hyper-proxy = { version = "0.9.1", default-features = false, features = ["openss
 indexmap = { version = "~1.9.2", default-features = false, features = ["serde"] }
 infer = { version = "0.13.0", default-features = false, optional = true}
 indoc = { version = "2.0.0", default-features = false }
-inventory = { version = "0.3.3", default-features = false }
+inventory = { version = "0.3.4", default-features = false }
 k8s-openapi = { version = "0.16.0", default-features = false, features = ["api", "v1_19"], optional = true }
 kube = { version = "0.75.0", default-features = false, features = ["client", "native-tls", "runtime"], optional = true }
 listenfd = { version = "1.0.0", default-features = false, optional = true }
@@ -338,7 +338,7 @@ heim = { git = "https://github.com/vectordotdev/heim.git", branch = "update-nix"
 mlua = { version = "0.8.8", default-features = false, features = ["lua54", "send", "vendored"], optional = true }
 
 [target.'cfg(windows)'.dependencies]
-windows-service = "0.5.0"
+windows-service = "0.6.0"
 
 [target.'cfg(unix)'.dependencies]
 atty = { version = "0.2.14", default-features = false }
