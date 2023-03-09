@@ -290,7 +290,7 @@ base: components: sinks: http: configuration: {
 		description: "The HTTP method to use when making the request."
 		required:    false
 		type: string: {
-			default: "get"
+			default: "post"
 			enum: {
 				delete:  "DELETE."
 				get:     "GET."
