@@ -1,6 +1,7 @@
 use crate::{gelf_fields::*, VALID_FIELD_REGEX};
 use bytes::{BufMut, BytesMut};
 use lookup::event_path;
+use ordered_float::NotNan;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use tokio_util::codec::Encoder;
@@ -8,6 +9,7 @@ use vector_core::{
     config::{log_schema, DataType},
     event::Event,
     event::LogEvent,
+    event::Value,
     schema,
 };
 
@@ -165,6 +167,19 @@ fn coerce_field_names_and_values(
                     if !(value.is_timestamp() || value.is_integer()) {
                         err_invalid_type(field, "timestamp or integer", value.kind_str())?;
                     }
+
+                    // timestamp to gelf compatible f64 (milliseconds as decimal)
+                    if let Value::Timestamp(ts) = value {
+                        if ts.timestamp_subsec_millis() > 0 {
+                            *value = Value::Float(
+                                NotNan::new(ts.timestamp_millis() as f64 / 1000.0).unwrap(),
+                            );
+                        } else {
+                            // keep full range of representable time if no milliseconds are set
+                            // but still convert to numeric according to gelf protocol
+                            *value = Value::Integer(ts.timestamp())
+                        }
+                    }
                 }
                 LEVEL => {
                     if !value.is_integer() {
@@ -225,6 +240,7 @@ mod tests {
     use crate::encoding::SerializerConfig;
 
     use super::*;
+    use chrono::{DateTime, NaiveDateTime, Utc};
     use value::Value;
     use vector_common::btreemap;
     use vector_core::event::{Event, EventMetadata};
@@ -319,6 +335,47 @@ mod tests {
 
             let jsn = do_serialize(true, event_fields).unwrap();
             assert_eq!(jsn.get(SHORT_MESSAGE).unwrap(), "Some message");
+        }
+    }
+
+    #[test]
+    fn gelf_serializing_timestamp() {
+        // floating point in case of sub second timestamp
+        {
+            let dt = DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(61, 1_000_000), Utc);
+
+            let event_fields = btreemap! {
+                VERSION => "1.1",
+                SHORT_MESSAGE => "Some message",
+                HOST => "example.org",
+                TIMESTAMP => dt,
+            };
+
+            let jsn = do_serialize(true, event_fields).unwrap();
+            assert_eq!(true, jsn.get(TIMESTAMP).unwrap().is_f64());
+            assert_eq!(
+                jsn.get(TIMESTAMP).unwrap().as_f64().unwrap(),
+                dt.timestamp_millis() as f64 / 1000.0
+            );
+        }
+
+        // integer in case of no sub second timestamp
+        {
+            let dt = DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(61, 0), Utc);
+
+            let event_fields = btreemap! {
+                VERSION => "1.1",
+                SHORT_MESSAGE => "Some message",
+                HOST => "example.org",
+                TIMESTAMP => dt,
+            };
+
+            let jsn = do_serialize(true, event_fields).unwrap();
+            assert_eq!(true, jsn.get(TIMESTAMP).unwrap().is_i64());
+            assert_eq!(
+                jsn.get(TIMESTAMP).unwrap().as_f64().unwrap(),
+                (dt.timestamp_millis() as f64 / 1000.0)
+            );
         }
     }
 
