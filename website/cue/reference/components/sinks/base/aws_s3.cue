@@ -171,7 +171,10 @@ base: components: sinks: aws_s3: configuration: {
 					Used to select AWS credentials from a provided credentials file.
 					"""
 				required: false
-				type: string: examples: ["develop"]
+				type: string: {
+					default: "default"
+					examples: ["develop"]
+				}
 			}
 			region: {
 				description: """
