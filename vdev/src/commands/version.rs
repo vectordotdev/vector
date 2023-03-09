@@ -11,7 +11,7 @@ pub(super) struct Cli {}
 impl Cli {
     pub(super) fn exec(self) -> Result<()> {
         app::set_repo_dir()?;
-        let version = env::var("VERSION").or_else(|_| util::read_version())?;
+        let version = app::version()?;
         let channel = env::var("CHANNEL").or_else(|_| util::release_channel().map(Into::into))?;
 
         if channel == "latest" {
