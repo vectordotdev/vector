@@ -4,7 +4,7 @@ data_dir = "/var/lib/vector"
 ## Enterprise
 ##
 [enterprise]
-api_key = "${DD_API_KEY}"
+default_api_key = "${DD_API_KEY}"
 configuration_key = "${DD_CONFIGURATION_KEY}"
 endpoint = "http://localhost:8080"
 
