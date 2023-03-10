@@ -106,6 +106,9 @@ pub struct InfluxDbLogsConfig {
     )]
     acknowledgements: AcknowledgementsConfig,
 
+    // The following three members are `Option` as we want `vector generate` to produce a config
+    // with these as `None`, to not accidentally override a users configured `log_schema`.
+    // Generating is constrained by build-time and can't account for changes to the default `log_schema`.
     /// Use this option to customize the key containing the hostname.
     ///
     /// The setting of `log_schema.host_key`, usually `host`, is used here by default.
