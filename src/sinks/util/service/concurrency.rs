@@ -17,9 +17,6 @@ use serde::{
 };
 
 /// Configuration for outbound request concurrency.
-///
-/// Aside from the listed values, you can also specify an integer to indicate a static level of
-/// concurrency.
 #[derive(Clone, Copy, Debug, Derivative, Eq, PartialEq)]
 pub enum Concurrency {
     /// A fixed concurrency of 1.
