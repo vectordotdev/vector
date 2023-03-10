@@ -98,7 +98,7 @@ impl TopologyBuilder {
     /// topology itself. All controlled edges are built and spawned, and a channel sender/receiver
     /// is provided for them. Additionally, the telemetry collector is also spawned and a channel
     /// receiver for telemetry events is provided.
-    pub fn finalize(
+    pub async fn finalize(
         mut self,
         input_task_coordinator: &TaskCoordinator<Configuring>,
         output_task_coordinator: &TaskCoordinator<Configuring>,
@@ -114,8 +114,7 @@ impl TopologyBuilder {
         };
 
         let telemetry = Telemetry::attach_to_config(&mut self.config_builder);
-        let telemetry_collector =
-            telemetry.into_collector(telemetry_task_coordinator, output_task_coordinator);
+        let telemetry_collector = telemetry.into_collector(telemetry_task_coordinator).await;
 
         (self.config_builder, controlled_edges, telemetry_collector)
     }
