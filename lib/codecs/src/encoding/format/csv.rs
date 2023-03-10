@@ -10,7 +10,7 @@ use vector_core::{
 
 /// Config used to build a `CsvSerializer`.
 #[crate::configurable_component]
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct CsvSerializerConfig {
     /// The CSV Serializer Options.
     pub csv: CsvSerializerOptions,
@@ -46,7 +46,7 @@ impl CsvSerializerConfig {
 
 /// Config used to build a `CsvSerializer`.
 #[crate::configurable_component]
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct CsvSerializerOptions {
     /// Configures the fields that will be encoded, as well as the order in which they
     /// appear in the output.
@@ -109,7 +109,7 @@ mod tests {
 
     #[test]
     fn build_error_on_empty_fields() {
-        let opts = CsvSerializerOptions::default();
+        let opts = CsvSerializerOptions { fields: vec![] };
         let config = CsvSerializerConfig::new(opts);
         let err = config.build().unwrap_err();
         assert_eq!(err.to_string(), "At least one CSV field must be specified");

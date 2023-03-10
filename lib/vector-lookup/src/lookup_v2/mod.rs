@@ -57,15 +57,6 @@ impl From<ConfigOwnedTargetPath> for String {
     }
 }
 
-impl Default for ConfigOwnedTargetPath {
-    fn default() -> Self {
-        Self(OwnedTargetPath {
-            prefix: PathPrefix::Event,
-            path: OwnedValuePath::default(),
-        })
-    }
-}
-
 impl<'a> TargetPath<'a> for &'a ConfigOwnedTargetPath {
     type ValuePath = &'a OwnedValuePath;
 
