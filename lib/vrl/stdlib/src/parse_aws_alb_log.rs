@@ -236,7 +236,7 @@ fn parse_log(mut input: &str) -> Result<Value> {
     );
     field_raw!(
         "target_status_code_list",
-        take_maybe_quoted_list(|c| matches!(c, '0'..='9'))
+        take_maybe_quoted_list(|c| c.is_ascii_digit())
     );
     field_raw!("classification", take_quoted1);
     field_raw!("classification_reason", take_quoted1);

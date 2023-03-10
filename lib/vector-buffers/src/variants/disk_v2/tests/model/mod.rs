@@ -374,8 +374,7 @@ impl ReaderModel {
 
                 assert!(
                     self.filesystem.delete_file(file_id),
-                    "invariant violation: tried to delete file id {}, but file does not exist",
-                    file_id
+                    "invariant violation: tried to delete file id {file_id}, but file does not exist"
                 );
             } else {
                 // Not enough delete acks to proceed, so we can't do anything more.

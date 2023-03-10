@@ -281,7 +281,7 @@ fn inner_kind() -> Kind {
 }
 
 /// Process an XML node, and return a VRL `Value`.
-fn process_node<'a>(node: Node, config: &ParseXmlConfig<'a>) -> Value {
+fn process_node(node: Node, config: &ParseXmlConfig) -> Value {
     // Helper to recurse over a `Node`s children, and build an object.
     let recurse = |node: Node| -> BTreeMap<String, Value> {
         let mut map = BTreeMap::new();
@@ -296,11 +296,7 @@ fn process_node<'a>(node: Node, config: &ParseXmlConfig<'a>) -> Value {
             }
         }
 
-        for n in node
-            .children()
-            .into_iter()
-            .filter(|n| n.is_element() || n.is_text())
-        {
+        for n in node.children().filter(|n| n.is_element() || n.is_text()) {
             let name = match n.node_type() {
                 NodeType::Element => n.tag_name().name().to_string(),
                 NodeType::Text => config.text_key.to_string(),
@@ -352,11 +348,7 @@ fn process_node<'a>(node: Node, config: &ParseXmlConfig<'a>) -> Value {
                     // For a single node, 'flatten' the object if necessary.
                     1 => {
                         // Expect a single element.
-                        let node = node
-                            .children()
-                            .into_iter()
-                            .next()
-                            .expect("expected 1 XML node");
+                        let node = node.children().next().expect("expected 1 XML node");
 
                         // If the node is an element, treat it as an object.
                         if node.is_element() {

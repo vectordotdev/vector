@@ -397,10 +397,7 @@ impl Filter<Value> for VrlFilter {
 fn resolve_value(buf: LookupBuf, match_fn: Box<dyn Matcher<Value>>) -> Box<dyn Matcher<Value>> {
     let func = move |obj: &Value| {
         // Get the value by path, or return early with `false` if it doesn't exist.
-        let value = match obj.get_by_path(&buf) {
-            Some(v) => v,
-            _ => return false,
-        };
+        let Some(value) = obj.get_by_path(&buf) else {return false};
 
         match_fn.run(value)
     };

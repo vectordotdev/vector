@@ -835,7 +835,7 @@ mod test {
             .unwrap();
 
         // Spawn the source task and wait until we're sure it's listening:
-        let _ = tokio::spawn(source_task);
+        drop(tokio::spawn(source_task));
         wait_for_tcp(addr).await;
 
         let mut stream: TcpStream = TcpStream::connect(addr)

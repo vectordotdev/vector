@@ -140,10 +140,7 @@ impl Value {
     where
         T: Iterator<Item = &'a SegmentBuf>,
     {
-        let segment = match segments.next() {
-            Some(segment) => segment,
-            None => return Some(self),
-        };
+        let Some(segment) = segments.next() else {return Some(self)};
 
         self.get_by_segment(segment)
             .and_then(|value| value.get_by_segments(segments))
@@ -174,10 +171,7 @@ impl Value {
     where
         T: Iterator<Item = &'a SegmentBuf>,
     {
-        let segment = match segments.next() {
-            Some(segments) => segments,
-            None => return Some(self),
-        };
+        let Some(segment) = segments.next() else {return Some(self)};
 
         self.get_by_segment_mut(segment)
             .and_then(|value| value.get_by_segments_mut(segments))
@@ -215,22 +209,19 @@ impl Value {
     where
         T: Iterator<Item = &'a SegmentBuf> + Clone,
     {
-        let segment = match segments.next() {
-            Some(segments) => segments,
-            None => {
-                return match self {
-                    Self::Object(v) => {
-                        let v = std::mem::take(v);
-                        Some(Self::Object(v))
-                    }
-                    Self::Array(v) => {
-                        let v = std::mem::take(v);
-                        Some(Self::Array(v))
-                    }
-                    _ => {
-                        let v = std::mem::replace(self, Self::Null);
-                        Some(v)
-                    }
+        let Some(segment) = segments.next() else {
+            return match self {
+                Self::Object(v) => {
+                    let v = std::mem::take(v);
+                    Some(Self::Object(v))
+                }
+                Self::Array(v) => {
+                    let v = std::mem::take(v);
+                    Some(Self::Array(v))
+                }
+                _ => {
+                    let v = std::mem::replace(self, Self::Null);
+                    Some(v)
                 }
             }
         };
@@ -288,10 +279,7 @@ impl Value {
     where
         T: Iterator<Item = &'a SegmentBuf> + Clone,
     {
-        let segment = match segments.peek() {
-            Some(segment) => segment,
-            None => return *self = new,
-        };
+        let Some(segment) = segments.peek() else {return *self = new};
 
         // As long as the provided segments match the shape of the value, we'll
         // traverse down the tree. Once we encounter a value kind that does not
@@ -311,10 +299,7 @@ impl Value {
     where
         T: Iterator<Item = &'a SegmentBuf> + Clone,
     {
-        let segment = match segments.next() {
-            Some(segments) => segments,
-            None => return,
-        };
+        let Some(segment) = segments.next() else {return};
 
         let mut handle_field = |field: &str, new, mut segments: Peekable<T>| {
             let key = field.to_owned();
@@ -325,10 +310,7 @@ impl Value {
                 *self = BTreeMap::default().into();
             }
 
-            let map = match self {
-                Self::Object(map) => map,
-                _ => unreachable!("see invariant above"),
-            };
+            let Self::Object(map) = self else {unreachable!("see invariant above")};
 
             match segments.peek() {
                 // If there are no other segments to traverse, we'll add the new
@@ -359,10 +341,7 @@ impl Value {
                 // result in an actual value, so none of the fields match an
                 // existing field. We'll pick the last field in the list to
                 // insert the new value into.
-                let field = match fields.last() {
-                    Some(field) => field,
-                    None => return,
-                };
+                let Some(field) = fields.last() else {return};
 
                 handle_field(field.as_str(), new, segments);
             }

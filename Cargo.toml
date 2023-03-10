@@ -10,6 +10,7 @@ readme = "README.md"
 publish = false
 default-run = "vector"
 autobenches = false # our benchmarks are not runnable on their own either way
+# Minimum supported rust version
 rust-version = "1.66.0"
 
 [[bin]]
