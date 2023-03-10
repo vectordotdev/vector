@@ -2,6 +2,9 @@ use anyhow::Result;
 use chrono::prelude::*;
 
 use crate::{git, util};
+use std::env;
+use std::fs::OpenOptions;
+use std::io::{self, Write};
 
 /// Setting necessary metadata for our publish workflow in CI
 #[derive(clap::Args, Debug)]
@@ -27,11 +30,24 @@ impl Cli {
         };
 
         // Set the output variables
-        println!("vector_version={version}" );
-        println!("vector_build_desc={build_desc}");
-        println!("vector_release_channel={channel}");
-        println!("vector_cloudsmith_repo={cloudsmith_repo}");
+        let version_output = format!("vector_version={version}");
+        let build_desc_output = format!("vector_build_desc={build_desc}");
+        let channel_output = format!("vector_release_channel={channel}");
+        let cloudsmith_repo_output = format!("vector_cloudsmith_repo={cloudsmith_repo}");
 
+        let mut output_file: Box<dyn Write> = match env::var("GITHUB_OUTPUT") {
+            Ok(file_name) if !file_name.is_empty() => {
+                let mut options = OpenOptions::new();
+                options.write(true).append(true).create(true);
+                let file = options.open(file_name)?;
+                Box::new(file)
+            },
+            _ => Box::new(io::stdout()),
+        };
+        writeln!(output_file, "{version_output}")?;
+        writeln!(output_file, "{build_desc_output}")?;
+        writeln!(output_file, "{channel_output}")?;
+        writeln!(output_file, "{cloudsmith_repo_output}")?;
         Ok(())
     }
 }
