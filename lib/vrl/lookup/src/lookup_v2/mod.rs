@@ -6,6 +6,7 @@
 //! allow referring to a specific field inside of a `Value`.
 //!
 //! # Example
+//! Below is a sample `Value`. Different fields can be accessed with paths.
 //! ```json
 //! {
 //!   "foo": {
@@ -17,59 +18,66 @@
 //!
 //! | path   | value it points to                    |
 //! |--------|---------------------------------------|
-//! | `.foo.bar` | 1
-//! | `.foo` | { "bar": 1 }
-//! | `.`    | { "foo" : { "bar" : 1 }, "baz" : ["a", "b", "c"] }
-//! | `.baz[0]` | "a"
-//! | `.baz` | ["a", "b", "c"]
+//! | `.foo.bar` | `1`
+//! | `.foo` | `{ "bar": 1 }`
+//! | `.`    | `{ "foo" : { "bar" : 1 }, "baz" : ["a", "b", "c"] }`
+//! | `.baz[0]` | `"a"`
+//! | `.baz` | `["a", "b", "c"]`
 //!
 //!
 //! # Traits
-//! There are 2 main traits that define a path.
-//! - [ValuePath] is a path that points to a field inside of a `Value`
-//! - [TargetPath] is a path that points inside of a `target`. A `target` in VRL refers to
-//! the external data being processed by a VRL script. A `target` has 2 main sections that can be
+//! There are 2 main traits that define a path. Most functions that use a path for querying
+//! will require one of these traits, rather than a concrete type.
+//!
+//! - [ValuePath] is a path that points to a field inside of a `Value`.
+//! - [TargetPath] is a path that points to a field inside of a `target`. A `target` in VRL refers to
+//! the external data being processed by a VRL script. A `target` has two main sections that can be
 //! pointed to, `event` and `metadata`.  [TargetPath::prefix] identifies the section, and
 //! [TargetPath::value_path] is a [ValuePath] pointing into that section.
 //!
 //! Note that for performance reasons, since [ValuePath] and [TargetPath] require [Clone], these
 //! traits are only implemented on types that are cheap to clone (usually references). That means
 //! when passing in a value (e.g. [OwnedValuePath]) into a function that requires `impl ValuePath`,
-//! you will generally need to pass it in as a reference.
+//! it will generally need to be passed in as a reference.
 //!
 //! # Owned Paths
-//! [OwnedValuePath] and [OwnedTargetPath] are fully parsed paths. These contain heap-allocated
-//! segments.
+//! [OwnedValuePath] and [OwnedTargetPath] are pre-parsed paths. That means that accessing fields
+//! using an owned path is very fast. There is an upfront cost however, since owned paths are parsed
+//! when they are created, and the segments are heap allocated. Owned paths should be preferred
+//! when they can be created when performance isn't as much of a concern (e.g. startup time)
+//! and it can be stored to use multiple times.
+//! Owned paths tend to be easier to work with since you can directly access / manipulate the
+//! segments that make up the path.
 //!
-//! Owned paths should generally be preferred over other types (such as strings) whenever feasible
-//! However since owned paths are allocated / pre-parsed, if a path is being created and will
-//! only be used once, it may make sense to use other types. For example, if you have an
-//! [OwnedValuePath] and want to append a segment to it before querying a `Value` you could:
+//! If a path is being created and will only be used once, it may make sense to use other types.
+//! For example here are two different ways to append a segment to a [OwnedValuePath]  before querying
+//! a `Value`:
 //! - Use [OwnedValuePath::with_field_appended] to create a new [OwnedValuePath] and use that. This
 //! method is preferred if the new path will be used multiple times and the path adjustment can be
 //! done in a non performance-critical part of the code (e.g. at startup).
 //! - Use [ValuePath::concat] which con concatenate two [ValuePath]'s very efficiently without
 //! allocating on the heap.
 //!
-//! To convert a string into an owned path, you can use either [parse_value_path] or [parse_target_path].
+//! To convert a string into an owned path, use either [parse_value_path] or [parse_target_path].
 //!
 //! # String Paths
 //! [ValuePath] and [TargetPath] are implemented for [&str]. That means a raw / unparsed string can
 //! be used as a path. This use is discouraged, and may be removed in the future. It mostly
 //! exists for backwards compatibility in places where String paths are used instead of owned paths.
-//! Using string paths is still very performant, but it's easy to introduce bugs since some type
-//! information is missing, such as whether it's a target vs value path, or if the entire string
-//! is meant to be treated as a single segment vs being parsed as a path.
+//! Using string paths is slightly slower than using an owned path (it's still very fast),
+//! but it's easy to introduce bugs since some type information is missing, such as whether it's a
+//! target vs value path, or if the entire string is meant to be treated as a single segment vs
+//! being parsed as a path.
 //!
 //! # Macros
-//! Several macros exist to make creating paths easier. These are used if you already know
-//! the structure of the path being created. <strong>The macros do not parse paths</strong>. If you need
-//! to parse a path, use [parse_value_path] or [parse_target_path] instead.
+//! Several macros exist to make creating paths easier. These are used if the structure of the
+//! path being created is already known. <strong>The macros do not parse paths</strong>. Use
+//! [parse_value_path] or [parse_target_path] instead if the path needs to be parsed.
 //!
 //! You need to pass in each segment into the macro as separate arguments. A single argument is treated as
 //! a single segment. This is true for all of the path macros.
 //!
-//! For example, you can use [owned_value_path!][crate::owned_value_path] to easily created owned paths.
+//! For example, [owned_value_path!][crate::owned_value_path] can be used to easily created owned paths.
 //! - `owned_value_path!("foo.bar", "x")` will create a path with *two* segments. Equivalent to `."foo.bar".x`
 //!
 
@@ -134,7 +142,7 @@ macro_rules! owned_value_path {
     }};
 }
 
-/// Use if you want to pre-parse a path.
+/// Used to pre-parse a path.
 /// The return value (when borrowed) implements `Path` so it can be used directly.
 /// This parses a value path, which is a path without a target prefix.
 ///
@@ -147,7 +155,7 @@ pub fn parse_value_path(path: &str) -> Result<OwnedValuePath, PathParseError> {
         })
 }
 
-/// Use if you want to pre-parse a path.
+/// Used to pre-parse a path.
 /// The return value (when borrowed) implements `Path` so it can be used directly.
 /// This parses a target path, which is a path that contains a target prefix.
 ///
