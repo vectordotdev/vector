@@ -77,10 +77,10 @@ async fn firehose_put_records() {
             imds: ImdsAuthentication::default(),
         })),
         endpoints: vec![elasticsearch_address()],
-        bulk: Some(BulkConfig {
+        bulk: BulkConfig {
             index: Template::try_from(stream.clone()).expect("unable to parse Template"),
             ..Default::default()
-        }),
+        },
         aws: Some(region),
         ..Default::default()
     };
