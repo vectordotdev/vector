@@ -119,12 +119,12 @@ impl SourceConfig for SocketConfig {
                 // decoding.default_stream_framing().
                 let framing = match (config.framing().clone(), config.max_length()) {
                     (Some(framing), Some(_)) => {
-                        warn!(message = "The `max_length` setting is deprecated and will be removed in an upcoming release. Since a `framing` setting was provided, the `max_length` setting has no effect.");
+                        warn!(message = "DEPRECATION: The `max_length` setting is deprecated and will be removed in an upcoming release. Since a `framing` setting was provided, the `max_length` setting has no effect.");
                         framing
                     }
                     (Some(framing), None) => framing,
                     (None, Some(max_length)) => {
-                        warn!(message = "The `max_length` setting is deprecated and will be removed in an upcoming release. Please configure the `max_length` from the `framing` setting instead.");
+                        warn!(message = "DEPRECATION: The `max_length` setting is deprecated and will be removed in an upcoming release. Please configure the `max_length` from the `framing` setting instead.");
                         NewlineDelimitedDecoderConfig::new_with_max_length(max_length).into()
                     }
                     (None, None) => decoding.default_stream_framing(),
@@ -197,12 +197,12 @@ impl SourceConfig for SocketConfig {
                 // decoding.default_stream_framing().
                 let framing = match (config.framing.clone(), config.max_length) {
                     (Some(framing), Some(_)) => {
-                        warn!(message = "The `max_length` setting is deprecated and will be removed in an upcoming release. Since a `framing` setting was provided, the `max_length` setting has no effect.");
+                        warn!(message = "DEPRECATION: The `max_length` setting is deprecated and will be removed in an upcoming release. Since a `framing` setting was provided, the `max_length` setting has no effect.");
                         framing
                     }
                     (Some(framing), None) => framing,
                     (None, Some(max_length)) => {
-                        warn!(message = "The `max_length` setting is deprecated and will be removed in an upcoming release. Please configure the `max_length` from the `framing` setting instead.");
+                        warn!(message = "DEPRECATION: The `max_length` setting is deprecated and will be removed in an upcoming release. Please configure the `max_length` from the `framing` setting instead.");
                         NewlineDelimitedDecoderConfig::new_with_max_length(max_length).into()
                     }
                     (None, None) => decoding.default_stream_framing(),
