@@ -5,7 +5,6 @@ use vector_core::event::{Event, MetricKind};
 use vector_core::EstimatedJsonEncodedSizeOf;
 
 use crate::components::validation::{encode_test_event, TestEvent, ValidationConfiguration};
-
 use crate::components::validation::runner::config::TEST_SOURCE_NAME;
 
 use super::filter_events_by_metric_and_component;
