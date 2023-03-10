@@ -283,9 +283,7 @@ mod test {
             assert!(
                 test_fn
                     .call::<_, bool>(value.clone())
-                    .unwrap_or_else(|_| panic!(
-                        "Failed to call {test_src} for value {value:?}"
-                    )),
+                    .unwrap_or_else(|_| panic!("Failed to call {test_src} for value {value:?}")),
                 "Test function: {test_src}, value: {value:?}"
             );
         }

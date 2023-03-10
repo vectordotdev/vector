@@ -526,10 +526,7 @@ mod tests {
         let output = sent_requests.lock().unwrap();
         assert_eq!(
             &*output,
-            &vec![
-                (0..10).collect::<Vec<_>>(),
-                (10..20).collect::<Vec<_>>(),
-            ]
+            &vec![(0..10).collect::<Vec<_>>(), (10..20).collect::<Vec<_>>(),]
         );
     }
 

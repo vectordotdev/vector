@@ -1083,9 +1083,7 @@ mod tests {
         let mut sink = PartitionBatchSink::new(svc, VecBuffer::new(batch_settings.size), TIMEOUT);
         sink.ordered();
 
-        let input = (0..20)
-            .map(|i| (0, i))
-            .chain((0..20).map(|i| (1, i)));
+        let input = (0..20).map(|i| (0, i)).chain((0..20).map(|i| (1, i)));
         sink.sink_map_err(drop)
             .send_all(&mut stream::iter(input).map(|item| Ok(EncodedEvent::new(item, 0))))
             .await
