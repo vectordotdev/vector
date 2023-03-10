@@ -18,7 +18,7 @@ impl Cli {
         for crate_name in crates {
             println!("Compiling lib/vrl/{crate_name} to wasm32-unknown-unknown");
             std::env::set_current_dir(vrl_path.join(crate_name))?;
-            app::exec("cargo", &args, false)?;
+            app::exec("cargo", args.clone(), false)?;
         }
         Ok(())
     }
