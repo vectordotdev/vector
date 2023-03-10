@@ -659,4 +659,4 @@ cargo-install-%:
 
 .PHONY: ci-generate-publish-metadata
 ci-generate-publish-metadata: ## Generates the necessary metadata required for building/publishing Vector.
-	@scripts/ci-generate-publish-metadata.sh
+	cargo vdev generate publish-metadata
