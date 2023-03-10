@@ -1,9 +1,9 @@
 ---
-title: LogDNA
-description: Deliver log event data to [LogDNA](https://logdna.com)
+title: WebHDFS
+description: Output observability events into WebHDFS
 kind: sink
 layout: component
-tags: ["logdna", "component", "sink", "logs"]
+tags: ["webhdfs", "component", "sink"]
 ---
 
 {{/*

@@ -5,9 +5,8 @@ title: "Vector [version] release"
 labels: "domain: releasing"
 ---
 
-The week before the release:
+Before the release:
 
-- [ ] Create a new release branch from master to freeze commits
 - [ ] Create a new release preparation branch from the current release branch
   - `git fetch && git checkout v0.<current minor version> && git checkout -b prepare-v0.<new version number>`
 - [ ] Cherry-pick in all commits to be released from the associated release milestone
@@ -31,14 +30,14 @@ The week before the release:
 On the day of release:
 
 - [ ] Rebase the release preparation branch on the release branch
+    - [ ] Ensure release date in cue matches current date.
     - [ ] Squash the release preparation commits (but not the cherry-picked commits!) to a single
         commit. This makes it easier to cherry-pick to master after the release. 
-    - [ ] Ensure release date in cue matches current date.
 - [ ] Merge release preparation branch into the release branch
-    - `git co v0.<current minor version> && git merge --ff-only prepare-v0.<new version number>`
+    - `git co v0.<current minor version> && git merge --ff-only prepare-v0.<current minor version>.<patch>`
 - [ ] Tag new release
   - [ ] `git tag v0.<minor>.<patch> -a -m v0.<minor>.<patch>`
-  - [ ] `git push origin v0.<minor>.0`
+  - [ ] `git push origin v0.<minor>.<patch>`
 - [ ] Wait for release workflow to complete
   - Discoverable via [https://github.com/timberio/vector/actions/workflows/release.yml](https://github.com/timberio/vector/actions/workflows/release.yml)
 - [ ] Release updated Helm chart. See [releasing Helm chart](https://github.com/vectordotdev/helm-charts#releasing).

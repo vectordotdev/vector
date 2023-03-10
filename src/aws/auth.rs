@@ -1,7 +1,13 @@
 use std::time::Duration;
 
 use aws_config::{
-    default_provider::credentials::DefaultCredentialsChain, imds, sts::AssumeRoleProviderBuilder,
+    default_provider::credentials::DefaultCredentialsChain,
+    imds,
+    profile::{
+        profile_file::{ProfileFileKind, ProfileFiles},
+        ProfileFileCredentialsProvider,
+    },
+    sts::AssumeRoleProviderBuilder,
 };
 use aws_types::{credentials::SharedCredentialsProvider, region::Region, Credentials};
 use serde_with::serde_as;
@@ -11,6 +17,7 @@ use vector_config::configurable_component;
 // matches default load timeout from the SDK as of 0.10.1, but lets us confidently document the
 // default rather than relying on the SDK default to not change
 const DEFAULT_LOAD_TIMEOUT: Duration = Duration::from_secs(5);
+const DEFAULT_PROFILE_NAME: &str = "default";
 
 /// IMDS Client Configuration for authenticating with AWS.
 #[serde_as]
@@ -67,6 +74,8 @@ pub enum AwsAuthentication {
     /// Authenticate using credentials stored in a file.
     ///
     /// Additionally, the specific credential profile to use can be set.
+    /// The file format must match the credentials file format outlined in
+    /// https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html.
     File {
         /// Path to the credentials file.
         #[configurable(metadata(docs::examples = "/my/aws/credentials"))]
@@ -76,7 +85,8 @@ pub enum AwsAuthentication {
         ///
         /// Used to select AWS credentials from a provided credentials file.
         #[configurable(metadata(docs::examples = "develop"))]
-        profile: Option<String>,
+        #[serde(default = "default_profile")]
+        profile: String,
     },
 
     /// Assume the given role ARN.
@@ -124,6 +134,10 @@ pub enum AwsAuthentication {
     },
 }
 
+fn default_profile() -> String {
+    DEFAULT_PROFILE_NAME.to_string()
+}
+
 impl AwsAuthentication {
     pub async fn credentials_provider(
         &self,
@@ -138,8 +152,20 @@ impl AwsAuthentication {
                 secret_access_key.inner(),
                 None,
             ))),
-            AwsAuthentication::File { .. } => {
-                Err("Overriding the credentials file is not supported.".into())
+            AwsAuthentication::File {
+                credentials_file,
+                profile,
+            } => {
+                // The SDK uses the default profile out of the box, but doesn't provide an optional
+                // type in the builder. We can just hardcode it so that everything works.
+                let profile_files = ProfileFiles::builder()
+                    .with_file(ProfileFileKind::Credentials, credentials_file)
+                    .build();
+                let profile_provider = ProfileFileCredentialsProvider::builder()
+                    .profile_files(profile_files)
+                    .profile_name(profile)
+                    .build();
+                Ok(SharedCredentialsProvider::new(profile_provider))
             }
             AwsAuthentication::Role {
                 assume_role,
@@ -384,7 +410,7 @@ mod tests {
                 profile,
             } => {
                 assert_eq!(&credentials_file, "/path/to/file");
-                assert_eq!(&profile.unwrap(), "foo");
+                assert_eq!(&profile, "foo");
             }
             _ => panic!(),
         }
@@ -402,7 +428,7 @@ mod tests {
                 profile,
             } => {
                 assert_eq!(&credentials_file, "/path/to/file");
-                assert_eq!(profile, None);
+                assert_eq!(profile, "default".to_string());
             }
             _ => panic!(),
         }

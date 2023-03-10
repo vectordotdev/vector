@@ -10,7 +10,7 @@ pub use lookup::lookup_v2::{
 
 /// A wrapper around `OwnedValuePath` that allows it to be used in Vector config
 #[configurable_component]
-#[derive(Debug, Clone, PartialEq, Eq, Default, Hash, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[serde(try_from = "String", into = "String")]
 pub struct ConfigOwnedValuePath(pub OwnedValuePath);
 

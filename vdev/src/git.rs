@@ -51,6 +51,18 @@ pub fn list_files() -> Result<Vec<String>> {
         .collect())
 }
 
+// Get a list of files that have been modified, as a vector of strings
+pub fn get_modified_files() -> Result<Vec<String>> {
+    let args = vec![
+        "ls-files",
+        "--full-name",
+        "--modified",
+        "--others",
+        "--exclude-standard",
+    ];
+    Ok(capture_output(&args)?.lines().map(str::to_owned).collect())
+}
+
 fn capture_output(args: &[&str]) -> Result<String> {
     Command::new("git").in_repo().args(args).capture_output()
 }

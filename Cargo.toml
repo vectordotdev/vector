@@ -149,7 +149,7 @@ loki-logproto = { path = "lib/loki-logproto", optional = true }
 
 # Tokio / Futures
 async-stream = { version = "0.3.4", default-features = false }
-async-trait = { version = "0.1.64", default-features = false }
+async-trait = { version = "0.1.66", default-features = false }
 futures = { version = "0.3.26", default-features = false, features = ["compat", "io-compat"], package = "futures" }
 tokio = { version = "1.26.0", default-features = false, features = ["full"] }
 tokio-openssl = { version = "0.6.3", default-features = false }
@@ -191,16 +191,19 @@ azure_identity = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev 
 azure_storage = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "b4544d4920fa3064eb921340054cd9cc130b7664", default-features = false, optional = true }
 azure_storage_blobs = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "b4544d4920fa3064eb921340054cd9cc130b7664", default-features = false, optional = true }
 
+# OpenDAL
+opendal = {version = "0.29.1", default-features = false, features = ["native-tls"], optional = true}
+
 # Tower
 tower = { version = "0.4.13", default-features = false, features = ["buffer", "limit", "retry", "timeout", "util", "balance", "discover"] }
 tower-http = { version = "0.4.0", default-features = false, features = ["decompression-gzip"]}
 # Serde
-serde = { version = "1.0.152", default-features = false, features = ["derive"] }
+serde = { version = "1.0.154", default-features = false, features = ["derive"] }
 serde-toml-merge = { version = "0.3.0", default-features = false }
 serde_bytes = { version = "0.11.9", default-features = false, features = ["std"], optional = true }
-serde_json = { version = "1.0.93", default-features = false, features = ["raw_value"] }
+serde_json = { version = "1.0.94", default-features = false, features = ["raw_value"] }
 serde_with = { version = "2.2.0", default-features = false, features = ["macros", "std"] }
-serde_yaml = { version = "0.9.17", default-features = false }
+serde_yaml = { version = "0.9.19", default-features = false }
 
 # Messagepack
 rmp-serde = { version = "1.1.1", default-features = false, optional = true }
@@ -245,7 +248,7 @@ apache-avro = { version = "0.14.0", default-features = false, optional = true }
 axum = { version = "0.6.7", default-features = false, features = ["http1", "json"] }
 base64 = { version = "0.21.0", default-features = false, optional = true }
 bloom = { version = "0.3.2", default-features = false, optional = true }
-bollard = { version = "0.14.0", default-features = false, features = ["ssl", "chrono"] }
+bollard = { version = "0.14.0", default-features = false, features = ["ssl", "chrono"], optional = true }
 bytes = { version = "1.4.0", default-features = false, features = ["serde"] }
 bytesize = { version = "1.2.0", default-features = false }
 chrono = { version = "0.4.22", default-features = false, features = ["serde"] }
@@ -276,13 +279,13 @@ hyper-openssl = { version = "0.9.2", default-features = false }
 hyper-proxy = { version = "0.9.1", default-features = false, features = ["openssl-tls"] }
 indexmap = { version = "~1.9.2", default-features = false, features = ["serde"] }
 infer = { version = "0.13.0", default-features = false, optional = true}
-indoc = { version = "2.0.0", default-features = false }
-inventory = { version = "0.3.3", default-features = false }
+indoc = { version = "2.0.1", default-features = false }
+inventory = { version = "0.3.4", default-features = false }
 k8s-openapi = { version = "0.16.0", default-features = false, features = ["api", "v1_19"], optional = true }
 kube = { version = "0.75.0", default-features = false, features = ["client", "native-tls", "runtime"], optional = true }
 listenfd = { version = "1.0.0", default-features = false, optional = true }
 logfmt = { version = "0.0.2", default-features = false, optional = true }
-lru = { version = "0.9.0", default-features = false, optional = true }
+lru = { version = "0.10.0", default-features = false, optional = true }
 maxminddb = { version = "0.23.0", default-features = false, optional = true }
 md-5 = { version = "0.10", default-features = false, optional = true }
 mongodb = { version = "2.4.0", default-features = false, features = ["tokio-runtime"], optional = true }
@@ -294,7 +297,7 @@ once_cell = { version = "1.17", default-features = false }
 openssl = { version = "0.10.45", default-features = false, features = ["vendored"] }
 openssl-probe = { version = "0.1.5", default-features = false }
 ordered-float = { version = "3.4.0", default-features = false }
-paste = "1.0.11"
+paste = "1.0.12"
 percent-encoding = { version = "2.2.0", default-features = false }
 pin-project = { version = "1.0.12", default-features = false }
 postgres-openssl = { version = "0.5.0", default-features = false, features = ["runtime"], optional = true }
@@ -320,7 +323,7 @@ tokio-tungstenite = {version = "0.18.0", default-features = false, features = ["
 toml = { version = "0.7.2", default-features = false, features = ["parse", "display"] }
 tonic = { version = "0.8", optional = true, default-features = false, features = ["transport", "codegen", "prost", "tls", "tls-roots", "gzip"] }
 trust-dns-proto = { version = "0.22.0", default-features = false, features = ["dnssec"], optional = true }
-typetag = { version = "0.2.5", default-features = false }
+typetag = { version = "0.2.6", default-features = false }
 url = { version = "2.3.1", default-features = false, features = ["serde"] }
 uuid = { version = "1", default-features = false, features = ["serde", "v4"] }
 warp = { version = "0.3.3", default-features = false }
@@ -332,10 +335,10 @@ arr_macro = { version = "0.2.1" }
 heim = { git = "https://github.com/vectordotdev/heim.git", branch = "update-nix", default-features = false, features = ["disk"] }
 
 # make sure to update the external docs when the Lua version changes
-mlua = { version = "0.8.7", default-features = false, features = ["lua54", "send", "vendored"], optional = true }
+mlua = { version = "0.8.8", default-features = false, features = ["lua54", "send", "vendored"], optional = true }
 
 [target.'cfg(windows)'.dependencies]
-windows-service = "0.5.0"
+windows-service = "0.6.0"
 
 [target.'cfg(unix)'.dependencies]
 atty = { version = "0.2.14", default-features = false }
@@ -419,7 +422,7 @@ allocation-tracing = []
 # transforms and sinks should depend on this feature.
 kubernetes = ["dep:k8s-openapi", "dep:kube"]
 
-docker = ["dep:dirs-next"]
+docker = ["dep:bollard", "dep:dirs-next"]
 
 # API
 api = [
@@ -627,7 +630,7 @@ sinks-logs = [
   "sinks-humio",
   "sinks-influxdb",
   "sinks-kafka",
-  "sinks-logdna",
+  "sinks-mezmo",
   "sinks-loki",
   "sinks-nats",
   "sinks-new_relic_logs",
@@ -684,7 +687,7 @@ sinks-http = []
 sinks-humio = ["sinks-splunk_hec", "transforms-metric_to_log"]
 sinks-influxdb = []
 sinks-kafka = ["dep:rdkafka"]
-sinks-logdna = []
+sinks-mezmo = []
 sinks-loki = ["loki-logproto"]
 sinks-nats = ["dep:nats", "dep:nkeys"]
 sinks-new_relic_logs = ["sinks-http"]
@@ -700,6 +703,7 @@ sinks-statsd = ["sinks-utils-udp", "tokio-util/net"]
 sinks-utils-udp = []
 sinks-vector = ["sinks-utils-udp", "dep:tonic", "protobuf-build"]
 sinks-websocket = ["dep:tokio-tungstenite"]
+sinks-webhdfs = ["dep:opendal"]
 
 # Datadog integration
 enterprise = [
@@ -753,6 +757,7 @@ all-integration-tests = [
   "redis-integration-tests",
   "splunk-integration-tests",
   "dnstap-integration-tests",
+  "webhdfs-integration-tests",
 ]
 
 amqp-integration-tests = ["sources-amqp", "sinks-amqp"]
@@ -811,7 +816,8 @@ prometheus-integration-tests = ["sinks-prometheus", "sources-prometheus", "sinks
 pulsar-integration-tests = ["sinks-pulsar"]
 redis-integration-tests = ["sinks-redis", "sources-redis"]
 splunk-integration-tests = ["sinks-splunk_hec"]
-dnstap-integration-tests = ["sources-dnstap"]
+dnstap-integration-tests = ["sources-dnstap", "dep:bollard"]
+webhdfs-integration-tests = ["sinks-webhdfs"]
 disable-resolv-conf = []
 shutdown-tests = ["api", "sinks-blackhole", "sinks-console", "sinks-prometheus", "sources", "transforms-lua", "transforms-remap", "unix"]
 cli-tests = ["sinks-blackhole", "sinks-socket", "sources-demo_logs", "sources-file"]
