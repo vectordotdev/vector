@@ -1,5 +1,5 @@
-use base64::Engine;
 use ::value::Value;
+use base64::Engine;
 use hmac::{Hmac as HmacHasher, Mac};
 use sha1::Sha1;
 use sha_2::{Sha224, Sha256, Sha384, Sha512};
@@ -7,7 +7,8 @@ use vrl::prelude::*;
 
 macro_rules! hmac {
     ($algorithm:ty, $key:expr, $val:expr) => {{
-        let mut mac = <HmacHasher<$algorithm>>::new_from_slice($key.as_ref()).expect("key is bytes");
+        let mut mac =
+            <HmacHasher<$algorithm>>::new_from_slice($key.as_ref()).expect("key is bytes");
         mac.update($val.as_ref());
         let result = mac.finalize();
         let code_bytes = result.into_bytes();
@@ -27,13 +28,13 @@ fn hmac(value: Value, key: Value, algorithm: Value, encoding: Value) -> Resolved
         "SHA-256" => hmac!(Sha256, key, value),
         "SHA-384" => hmac!(Sha384, key, value),
         "SHA-512" => hmac!(Sha512, key, value),
-        _ => return Err(format!("Invalid algorithm: {}", algorithm).into())
+        _ => return Err(format!("Invalid algorithm: {}", algorithm).into()),
     };
 
     let hash = match encoding.as_str() {
         "hex" => hex::encode(code_bytes),
         "base64" => base64::engine::general_purpose::STANDARD.encode(code_bytes),
-        _ => return Err(format!("Invalid encoding: {}", encoding).into())
+        _ => return Err(format!("Invalid encoding: {}", encoding).into()),
     };
     Ok(hash.into())
 }
@@ -53,24 +54,21 @@ impl Function for Hmac {
                 kind: kind::BYTES,
                 required: true,
             },
-
             Parameter {
                 keyword: "key",
                 kind: kind::BYTES,
                 required: true,
             },
-
             Parameter {
                 keyword: "algorithm",
                 kind: kind::BYTES,
-                required: false
+                required: false,
             },
-
             Parameter {
                 keyword: "encoding",
                 kind: kind::BYTES,
-                required: false
-            }
+                required: false,
+            },
         ]
     }
 
@@ -81,18 +79,16 @@ impl Function for Hmac {
                 source: r#"hmac("Hello there", "super-secret-key")"#,
                 result: Ok("eLGE8YMviv85NPXgISRUZxstBNSU47JQdcXkUWcClmI="),
             },
-
             Example {
                 title: "SHA-256, hex encoded result",
                 source: r#"hmac("Hello there", "super-secret-key", encoding: "hex")"#,
-                result: Ok("78b184f1832f8aff3934f5e0212454671b2d04d494e3b25075c5e45167029662")
+                result: Ok("78b184f1832f8aff3934f5e0212454671b2d04d494e3b25075c5e45167029662"),
             },
-
             Example {
                 title: "SHA1, base64-encoded result",
                 source: r#"hmac("Hello there", "super-secret-key", algorithm: "SHA1")"#,
-                result: Ok("MiyBIHO8Set9+6crALiwkS0yFPE=")
-            }
+                result: Ok("MiyBIHO8Set9+6crALiwkS0yFPE="),
+            },
         ]
     }
 
@@ -107,7 +103,13 @@ impl Function for Hmac {
         let algorithm = arguments.optional("algorithm");
         let encoding = arguments.optional("encoding");
 
-        Ok(HmacFn { value, key, algorithm, encoding }.as_expr())
+        Ok(HmacFn {
+            value,
+            key,
+            algorithm,
+            encoding,
+        }
+        .as_expr())
     }
 }
 
@@ -125,11 +127,11 @@ impl FunctionExpression for HmacFn {
         let key = self.key.resolve(ctx)?;
         let algorithm = match &self.algorithm {
             Some(algorithm) => algorithm.resolve(ctx)?,
-            None => value!("SHA-256")
+            None => value!("SHA-256"),
         };
         let encoding = match &self.encoding {
             Some(encoding) => encoding.resolve(ctx)?,
-            None => value!("base64")
+            None => value!("base64"),
         };
 
         hmac(value, key, algorithm, encoding)
@@ -148,7 +150,9 @@ impl FunctionExpression for HmacFn {
                     valid_static_algo = valid_algorithms.contains(&algorithm.as_str());
                 }
             }
-        } else { valid_static_algo = true }
+        } else {
+            valid_static_algo = true
+        }
 
         if let Some(encoding) = self.encoding.as_ref() {
             if let Some(encoding) = encoding.as_value() {
@@ -157,7 +161,9 @@ impl FunctionExpression for HmacFn {
                     valid_static_enc = valid_encodings.contains(&encoding.as_str());
                 }
             }
-        } else { valid_static_enc = true }
+        } else {
+            valid_static_enc = true
+        }
 
         if valid_static_algo && valid_static_enc {
             TypeDef::bytes().infallible()

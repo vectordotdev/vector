@@ -343,6 +343,8 @@ mod values;
 
 // -----------------------------------------------------------------------------
 
+#[cfg(feature = "hmac")]
+pub use crate::hmac::Hmac;
 #[cfg(feature = "abs")]
 pub use abs::Abs;
 #[cfg(feature = "append")]
@@ -429,8 +431,6 @@ pub use get::Get;
 pub use get_env_var::GetEnvVar;
 #[cfg(feature = "get_hostname")]
 pub use get_hostname::GetHostname;
-#[cfg(feature = "hmac")]
-pub use crate::hmac::Hmac;
 #[cfg(feature = "includes")]
 pub use includes::Includes;
 #[cfg(feature = "integer")]
