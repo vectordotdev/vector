@@ -390,7 +390,7 @@ impl Target {
             }
 
             External(path) => {
-                let _ = ctx.target_mut().target_insert(path, value);
+                drop(ctx.target_mut().target_insert(path, value));
             }
         }
     }

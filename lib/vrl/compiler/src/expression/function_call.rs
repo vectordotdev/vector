@@ -414,7 +414,7 @@ impl<'a> Builder<'a> {
             .map_err(|error| Error::Compilation { call_span, error })?;
 
         // Re-insert the external context into the compiler state.
-        let _ = std::mem::replace(config, compile_ctx.into_config());
+        *config = compile_ctx.into_config();
 
         // Asking for an infallible function to abort on error makes no sense.
         // We consider this an error at compile-time, because it makes the
