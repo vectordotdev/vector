@@ -258,7 +258,9 @@ struct InfluxDbLogsEncoder {
 impl HttpEventEncoder<BytesMut> for InfluxDbLogsEncoder {
     fn encode_event(&mut self, event: Event) -> Option<BytesMut> {
         let mut log = event.into_log();
-        // Ensure the "message" isn't overwritten if the event wasn't an object
+        // If the event isn't an object (`. = "foo"`), inserting or renaming will result in losing
+        // the original value that was assigned to the root. To avoid this we intentionally rename
+        // the path that points to "message" such that it has a dedicated key.
         // TODO: add a `TargetPath::is_event_root()` to conditionally rename?
         if let Some(message_path) = log.message_path() {
             log.rename_key(
