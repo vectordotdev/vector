@@ -24,7 +24,7 @@ impl Cli {
         let channel = util::release_channel()?;
 
         // Depending on the channel, this influences which Cloudsmith repository we publish to.
-        let cloudsmith_repo = match channel.as_ref() {
+        let cloudsmith_repo = match channel {
             "nightly" => "vector-nightly",
             _ => "vector"
         };
