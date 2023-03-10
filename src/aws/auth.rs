@@ -175,10 +175,10 @@ impl AwsAuthentication {
                     let provider = AssumeRoleProviderBuilder::new(assume_role)
                         .region(auth_region)
                         .build(provider);
-                    return Ok(SharedCredentialsProvider::new(provider))
+                    return Ok(SharedCredentialsProvider::new(provider));
                 }
                 Ok(provider)
-            },
+            }
             AwsAuthentication::File {
                 credentials_file,
                 profile,
@@ -442,10 +442,13 @@ mod tests {
                 ..
             } => {
                 assert_eq!(&access_key_id, &SensitiveString::from("key".to_string()));
-                assert_eq!(&secret_access_key, &SensitiveString::from("other".to_string()));
+                assert_eq!(
+                    &secret_access_key,
+                    &SensitiveString::from("other".to_string())
+                );
                 assert_eq!(&assume_role, &Some("root".to_string()));
-            },
-            _ => panic!()
+            }
+            _ => panic!(),
         }
     }
 
