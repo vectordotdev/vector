@@ -1995,6 +1995,7 @@ dependencies = [
  "apache-avro",
  "bytes 1.4.0",
  "chrono",
+ "csv",
  "derivative",
  "dyn-clone",
  "futures 0.3.26",
