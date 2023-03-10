@@ -367,9 +367,6 @@ struct SimpleHttpSource {
     log_namespace: LogNamespace,
 }
 
-/* impl SimpleHttpSource {
-
-*/
 impl HttpSource for SimpleHttpSource {
     /// Enriches the passed in events with metadata for the `request_path` and for each of the headers.
     fn enrich_events(
