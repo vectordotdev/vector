@@ -47,6 +47,11 @@ impl Telemetry {
             ..Default::default()
         };
         let mut vector_sink = VectorSinkConfig::from_address(listen_addr.as_uri());
+
+        // We want to ensure that the output sink is flushed as soon as
+        // possible, so we set the batch timeout to a very low value. We also
+        // disable retries, as we don't want to waste time performing retries,
+        // especially when the test harness is shutting down.
         vector_sink.batch.timeout_secs = Some(0.1);
         vector_sink.request.retry_attempts = Some(0);
 

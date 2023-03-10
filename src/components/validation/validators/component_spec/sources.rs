@@ -77,14 +77,14 @@ fn validate_component_received_events_total(
         TEST_SOURCE_NAME,
     )?;
 
-    let mut events: f64 = 0.0;
+    let mut events = 0;
     for m in metrics {
         match m.value() {
             vector_core::event::MetricValue::Counter { value } => {
                 if let MetricKind::Absolute = m.data().kind {
-                    events = *value
+                    events = *value as i32
                 } else {
-                    events += value
+                    events += *value as i32
                 }
             }
             _ => errs.push(format!(
@@ -108,7 +108,7 @@ fn validate_component_received_events_total(
         expected_events,
     );
 
-    if events != expected_events as f64 {
+    if events != expected_events {
         errs.push(format!(
             "{}: expected {} events, but received {}",
             SourceMetrics::EventsReceived,
@@ -281,14 +281,14 @@ fn validate_component_sent_events_total(
         TEST_SOURCE_NAME,
     )?;
 
-    let mut events: f64 = 0.0;
+    let mut events = 0;
     for m in metrics {
         match m.value() {
             vector_core::event::MetricValue::Counter { value } => {
                 if let MetricKind::Absolute = m.data().kind {
-                    events = *value
+                    events = *value as i32
                 } else {
-                    events += value
+                    events += *value as i32
                 }
             }
             _ => errs.push(format!(
@@ -312,7 +312,7 @@ fn validate_component_sent_events_total(
         expected_events,
     );
 
-    if events != expected_events as f64 {
+    if events != expected_events {
         errs.push(format!(
             "{}: expected {} events, but received {}",
             SourceMetrics::SentEventsTotal,

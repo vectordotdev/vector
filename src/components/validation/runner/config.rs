@@ -135,6 +135,11 @@ fn build_output_edge() -> (OutputEdge, impl Into<Sinks>) {
     debug!(endpoint = %output_listen_addr, "Creating controlled output edge.");
 
     let mut output_sink = VectorSinkConfig::from_address(output_listen_addr.as_uri());
+
+    // We want to ensure that the output sink is flushed as soon as possible, so
+    // we set the batch timeout to a very low value. We also disable retries, as
+    // we don't want to waste time performing retries, especially when the test
+    // harness is shutting down.
     output_sink.batch.timeout_secs = Some(0.1);
     output_sink.request.retry_attempts = Some(0);
 

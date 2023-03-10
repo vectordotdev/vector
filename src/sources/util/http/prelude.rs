@@ -37,6 +37,9 @@ use super::{
 
 #[async_trait]
 pub trait HttpSource: Clone + Send + Sync + 'static {
+    // This function can be defined to enrich events with additional HTTP
+    // metadata. This function should be used rather than internal enrichment so
+    // that accurate byte count metrics can be emitted.
     fn enrich_events(
         &self,
         _events: &mut [Event],

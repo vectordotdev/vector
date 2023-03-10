@@ -283,9 +283,32 @@ impl HttpClientContext {
         }
         events
     }
+}
+
+impl HttpClientBuilder for HttpClientContext {
+    type Context = HttpClientContext;
+
+    /// No additional context from request data is needed from this particular client.
+    fn build(&self, _uri: &Uri) -> Self::Context {
+        self.clone()
+    }
+}
+
+impl http_client::HttpClientContext for HttpClientContext {
+    /// Decodes the HTTP response body into events per the decoder configured.
+    fn on_response(&mut self, _url: &Uri, _header: &Parts, body: &Bytes) -> Option<Vec<Event>> {
+        // get the body into a byte array
+        let mut buf = BytesMut::new();
+        let body = String::from_utf8_lossy(body);
+        buf.extend_from_slice(body.as_bytes());
+
+        let events = self.decode_events(&mut buf);
+
+        Some(events)
+    }
 
     /// Enriches events with source_type, timestamp
-    pub fn enrich_events(&self, events: &mut Vec<Event>) {
+    fn enrich_events(&mut self, events: &mut Vec<Event>) {
         let now = Utc::now();
 
         for event in events {
@@ -311,32 +334,5 @@ impl HttpClientContext {
                 }
             }
         }
-    }
-}
-
-impl HttpClientBuilder for HttpClientContext {
-    type Context = HttpClientContext;
-
-    /// No additional context from request data is needed from this particular client.
-    fn build(&self, _uri: &Uri) -> Self::Context {
-        self.clone()
-    }
-}
-
-impl http_client::HttpClientContext for HttpClientContext {
-    /// Decodes the HTTP response body into events per the decoder configured.
-    fn on_response(&mut self, _url: &Uri, _header: &Parts, body: &Bytes) -> Option<Vec<Event>> {
-        // get the body into a byte array
-        let mut buf = BytesMut::new();
-        let body = String::from_utf8_lossy(body);
-        buf.extend_from_slice(body.as_bytes());
-
-        let events = self.decode_events(&mut buf);
-
-        Some(events)
-    }
-
-    fn enrich<'a>(&'a mut self, events: &'a mut Vec<Event>) {
-        self.enrich_events(events);
     }
 }

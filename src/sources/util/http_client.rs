@@ -67,7 +67,10 @@ pub(crate) trait HttpClientContext {
     /// (Optional) Called if the HTTP response is not 200 ('OK').
     fn on_http_response_error(&self, _uri: &Uri, _header: &Parts) {}
 
-    fn enrich<'a>(&'a mut self, _events: &'a mut Vec<Event>) {}
+    // This function can be defined to enrich events with additional HTTP
+    // metadata. This function should be used rather than internal enrichment so
+    // that accurate byte count metrics can be emitted.
+    fn enrich_events(&mut self, _events: &mut Vec<Event>) {}
 }
 
 /// Builds a url for the HTTP requests.
@@ -176,6 +179,14 @@ pub(crate) async fn call<
                             });
                             context.on_response(&url, &header, &body).map(|mut events| {
                                 let byte_size = if events.is_empty() {
+                                    // We need to explicitly set the byte size
+                                    // to 0 since
+                                    // `estimated_json_encoded_size_of` returns
+                                    // at least 1 for an empty collection. For
+                                    // the purposes of the
+                                    // HttpClientEventsReceived event, we should
+                                    // emit 0 when there aren't any usable
+                                    // metrics.
                                     0
                                 } else {
                                     events.estimated_json_encoded_size_of()
@@ -187,9 +198,9 @@ pub(crate) async fn call<
                                     url: url.to_string()
                                 });
 
-                                // We'll enrich after receiving the events so that the byte sizes
-                                // are accurate.
-                                context.enrich(&mut events);
+                                // We'll enrich after receiving the events so
+                                // that the byte sizes are accurate.
+                                context.enrich_events(&mut events);
 
                                 stream::iter(events)
                             })

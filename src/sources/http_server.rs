@@ -187,7 +187,7 @@ impl SimpleHttpConfig {
         schema_definition
     }
 
-    pub fn get_decoding_config(&self) -> crate::Result<DecodingConfig> {
+    fn get_decoding_config(&self) -> crate::Result<DecodingConfig> {
         if self.encoding.is_some() && (self.framing.is_some() || self.decoding.is_some()) {
             return Err("Using `encoding` is deprecated and does not have any effect when `decoding` or `framing` is provided. Configure `framing` and `decoding` instead.".into());
         }
