@@ -24,7 +24,7 @@ CHANNEL="${CHANNEL:-"$(cargo vdev release channel)"}"
 
 if [[ "$CHANNEL" == "custom" ]]; then
     # "0.29.0.custom.a28ecdc" -> "0.29.0"
-    PACKAGE_VERSION= "${ARCHIVE_VERSION%.custom*}"
+    PACKAGE_VERSION="${ARCHIVE_VERSION%.custom*}"
 else
     PACKAGE_VERSION="${ARCHIVE_VERSION}"
 fi
