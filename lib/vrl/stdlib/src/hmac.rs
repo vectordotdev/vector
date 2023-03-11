@@ -28,13 +28,13 @@ fn hmac(value: Value, key: Value, algorithm: Value, encoding: Value) -> Resolved
         "SHA-256" => hmac!(Sha256, key, value),
         "SHA-384" => hmac!(Sha384, key, value),
         "SHA-512" => hmac!(Sha512, key, value),
-        _ => return Err(format!("Invalid algorithm: {}", algorithm).into()),
+        _ => return Err(format!("Invalid algorithm: {algorithm}").into()),
     };
 
     let hash = match encoding.as_str() {
         "hex" => hex::encode(code_bytes),
         "base64" => base64::engine::general_purpose::STANDARD.encode(code_bytes),
-        _ => return Err(format!("Invalid encoding: {}", encoding).into()),
+        _ => return Err(format!("Invalid encoding: {encoding}").into()),
     };
     Ok(hash.into())
 }
