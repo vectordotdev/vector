@@ -37,8 +37,9 @@ where
 }
 
 pub struct KinesisResponse {
-    count: usize,
-    events_byte_size: JsonSize,
+    pub(crate) count: usize,
+    pub(crate) failure_count: usize,
+    pub(crate) events_byte_size: JsonSize,
 }
 
 impl DriverResponse for KinesisResponse {
@@ -72,7 +73,6 @@ where
         let events_byte_size = requests
             .get_metadata()
             .events_estimated_json_encoded_byte_size();
-        let count = requests.get_metadata().event_count();
 
         let records = requests
             .events
@@ -84,16 +84,10 @@ where
         let stream_name = self.stream_name.clone();
 
         Box::pin(async move {
-            // Returning a Result (a trait that implements Try) is not a stable feature,
-            // so instead we have to explicitly check for error and return.
-            // https://github.com/rust-lang/rust/issues/84277
-            if let Some(e) = client.send(records, stream_name).await {
-                return Err(e);
-            }
-
-            Ok(KinesisResponse {
-                count,
-                events_byte_size,
+            client.send(records, stream_name).await.map(|mut r| {
+                // augment the response
+                r.events_byte_size = events_byte_size;
+                r
             })
         })
     }
