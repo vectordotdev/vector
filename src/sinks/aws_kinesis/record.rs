@@ -1,3 +1,4 @@
+use crate::sinks::aws_kinesis::KinesisResponse;
 use async_trait::async_trait;
 use aws_smithy_client::SdkError;
 use bytes::Bytes;
@@ -24,5 +25,9 @@ pub trait SendRecord {
     type E;
 
     /// Sends the records.
-    async fn send(&self, records: Vec<Self::T>, stream_name: String) -> Option<SdkError<Self::E>>;
+    async fn send(
+        &self,
+        records: Vec<Self::T>,
+        stream_name: String,
+    ) -> Result<KinesisResponse, SdkError<Self::E>>;
 }

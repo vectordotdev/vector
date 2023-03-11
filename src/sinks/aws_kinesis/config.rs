@@ -58,6 +58,13 @@ pub struct KinesisSinkBaseConfig {
     #[serde(default)]
     pub auth: AwsAuthentication,
 
+    /// Whether or not to retry successful requests containing partial failures.
+    ///
+    /// Note: this will cause duplicates in firehose.
+    #[serde(default)]
+    #[configurable(metadata(docs::advanced))]
+    pub request_retry_partial: bool,
+
     #[configurable(derived)]
     #[serde(
         default,
@@ -83,6 +90,7 @@ pub async fn build_sink<C, R, RR, E, RT>(
     partition_key_field: Option<String>,
     batch_settings: BatcherSettings,
     client: C,
+    retry_logic: RT,
 ) -> crate::Result<VectorSink>
 where
     C: SendRecord + Clone + Send + Sync + 'static,
@@ -98,7 +106,7 @@ where
 
     let region = config.region.region();
     let service = ServiceBuilder::new()
-        .settings::<RT, BatchKinesisRequest<RR>>(request_limits, RT::default())
+        .settings::<RT, BatchKinesisRequest<RR>>(request_limits, retry_logic)
         .service(KinesisService::<C, R, E> {
             client,
             stream_name: config.stream_name.clone(),

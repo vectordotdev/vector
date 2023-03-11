@@ -33,6 +33,7 @@ async fn check_batch_size() {
         request: Default::default(),
         tls: None,
         auth: Default::default(),
+        request_retry_partial: false,
         acknowledgements: Default::default(),
     };
 
@@ -62,6 +63,7 @@ async fn check_batch_events() {
         request: Default::default(),
         tls: None,
         auth: Default::default(),
+        request_retry_partial: false,
         acknowledgements: Default::default(),
     };
 
