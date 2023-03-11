@@ -237,6 +237,18 @@ base: components: sources: kubernetes_logs: configuration: {
 					examples: [".k8s.container_image", "k8s.container_image", ""]
 				}
 			}
+			container_image_id: {
+				description: """
+					Event field for the Container's image ID.
+
+					Set to `""` to suppress this key.
+					"""
+				required: false
+				type: string: {
+					default: ".kubernetes.container_image_id"
+					examples: [".k8s.container_image_id", "k8s.container_image_id", ""]
+				}
+			}
 			container_name: {
 				description: """
 					Event field for the Container's name.
