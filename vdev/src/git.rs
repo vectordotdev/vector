@@ -1,6 +1,6 @@
-use std::{collections::HashSet, process::Command};
+use std::{collections::HashSet, process::Command, process::Output};
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 
 use crate::app::CommandExt as _;
 
@@ -61,6 +61,62 @@ pub fn get_modified_files() -> Result<Vec<String>> {
         "--exclude-standard",
     ];
     Ok(capture_output(&args)?.lines().map(str::to_owned).collect())
+}
+
+pub fn set_config_values(config_values: Vec<(&str, &str)>) -> Result<String> {
+    let mut args = Vec::new();
+    args.push("config");
+    // args.push("--global");
+
+    for (key, value) in config_values {
+        args.push(key);
+        args.push(value);
+    }
+
+    capture_output(&args)
+}
+
+// Checks if the current directory's repo is clean
+pub fn check_git_repository_clean() -> Result<bool> {
+    let output = Command::new("git")
+        .arg("diff-index")
+        .arg("--quiet")
+        .arg("HEAD")
+        .output()
+        .map_err(|e| anyhow!("{}", e))?;
+
+    Ok(output.status.success())
+}
+
+// Commits changes from the current repo
+pub fn commit(commit_message: &str) -> Result<Output> {
+    let output = Command::new("git")
+        .arg("-am")
+        .arg(commit_message)
+        .output()
+        .map_err(|e| anyhow!("{}", e))?;
+
+    Ok(output)
+}
+
+// Pushes changes from the current repo
+pub fn push() -> Result<Output> {
+    let output = Command::new("git")
+        .arg("push")
+        .output()
+        .map_err(|e| anyhow!("{}", e))?;
+
+    Ok(output)
+}
+
+pub fn clone(repo_url: &str) -> Result<Output> {
+    let output = Command::new("git")
+        .arg("clone")
+        .arg(repo_url)
+        .output()
+        .map_err(|e| anyhow!("{}", e))?;
+
+    Ok(output)
 }
 
 fn capture_output(args: &[&str]) -> Result<String> {
