@@ -344,7 +344,6 @@ mod tests {
             let naive_dt =
                 NaiveDateTime::parse_from_str("1970-01-01 00:00:00.1", "%Y-%m-%d %H:%M:%S%.f");
             let dt = DateTime::<Utc>::from_utc(naive_dt.unwrap(), Utc);
-            dbg!(dt);
 
             let event_fields = btreemap! {
                 VERSION => "1.1",
