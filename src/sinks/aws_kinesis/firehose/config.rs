@@ -193,7 +193,7 @@ impl RetryLogic for KinesisRetryLogic {
             let msg = format!("partial error count {}", response.failure_count);
             return RetryAction::Retry(msg.into());
         } else {
-            RetryAction::DontRetry("ok".into())
+            RetryAction::Successful
         }
     }
 }
