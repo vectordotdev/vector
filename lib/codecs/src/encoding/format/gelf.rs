@@ -168,7 +168,7 @@ fn coerce_field_names_and_values(
                         err_invalid_type(field, "timestamp or integer", value.kind_str())?;
                     }
 
-                    // timestamp to gelf compatible f64 (milliseconds as decimal)
+                    // convert a `Value::Timestamp` to a GELF specified timestamp where milliseconds are represented by the fractional part of a float.
                     if let Value::Timestamp(ts) = value {
                         if ts.timestamp_subsec_millis() > 0 {
                             *value = Value::Float(
