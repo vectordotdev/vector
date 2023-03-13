@@ -4,10 +4,11 @@ use bytes::BytesMut;
 use vector_core::event::{Event, MetricKind};
 use vector_core::EstimatedJsonEncodedSizeOf;
 
-use crate::components::validation::runner::TEST_SOURCE_NAME;
 use crate::components::validation::{encode_test_event, TestEvent, ValidationConfiguration};
 
 use super::filter_events_by_metric_and_component;
+
+const TEST_SOURCE_NAME: &str = "test_source";
 
 pub enum SourceMetrics {
     EventsReceived,
