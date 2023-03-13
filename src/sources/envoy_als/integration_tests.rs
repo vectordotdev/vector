@@ -48,7 +48,7 @@ async fn receive_logs() {
             .get(format!("{}/", envoy_url()))
             .send()
             .await
-            .expect("Failed reqeust to Envoy.");
+            .expect("Failed request to Envoy.");
 
         let output = collect_n(recv, 1).await;
         assert_eq!(output.len(), 1);
