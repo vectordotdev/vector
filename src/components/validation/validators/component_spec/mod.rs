@@ -155,7 +155,7 @@ fn filter_events_by_metric_and_component<'a>(
         })
         .collect();
 
-    debug!("{}: {} metrics found", metric.to_string(), metrics.len(),);
+    debug!("{}: {} metrics found.", metric.to_string(), metrics.len(),);
 
     if metrics.is_empty() {
         return Err(vec![format!("{}: no metrics were emitted.", metric)]);

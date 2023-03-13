@@ -108,7 +108,7 @@ impl Telemetry {
                         // emitted. Thus, two events ensure that all component
                         // events have been emitted.
 
-                        debug!("telemetry: waiting for final internal_metrics events before shutting down");
+                        debug!("Telemetry: waiting for final internal_metrics events before shutting down.");
 
                         let mut events_seen = 0;
                         let current_time = chrono::Utc::now();
@@ -124,7 +124,7 @@ impl Telemetry {
                                             if metric.name() == INTERNAL_METRICS_SHUTDOWN_EVENT &&
                                                 tags.get("component_name") == Some(INTERNAL_LOGS_KEY) &&
                                                 metric.data().timestamp().unwrap() > &current_time {
-                                                debug!("telemetry: processed one component_received_events_total event");
+                                                debug!("Telemetry: processed one component_received_events_total event.");
 
                                                 events_seen += 1;
                                                 if events_seen == 2 {
@@ -145,7 +145,7 @@ impl Telemetry {
             }
 
             grpc_task_coordinator.shutdown().await;
-            debug!("gRPC task(s) have been shutdown.");
+            debug!("GRPC task(s) have been shutdown.");
 
             telemetry_completed.mark_as_done();
 

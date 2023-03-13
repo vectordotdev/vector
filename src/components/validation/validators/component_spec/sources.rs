@@ -102,7 +102,7 @@ fn validate_component_received_events_total(
     });
 
     debug!(
-        "{}: {} events, {} expected events",
+        "{}: {} events, {} expected events.",
         SourceMetrics::EventsReceived,
         events,
         expected_events,
@@ -169,7 +169,7 @@ fn validate_component_received_event_bytes_total(
     });
 
     debug!(
-        "{}: {} bytes, {} expected bytes",
+        "{}: {} bytes, {} expected bytes.",
         SourceMetrics::EventsReceivedBytes,
         metric_bytes,
         expected_bytes,
@@ -237,7 +237,7 @@ fn validate_component_received_bytes_total(
     }
 
     debug!(
-        "{}: {} bytes, expected at least {} bytes",
+        "{}: {} bytes, expected at least {} bytes.",
         SourceMetrics::ReceivedBytesTotal,
         metric_bytes,
         expected_bytes,
@@ -306,7 +306,7 @@ fn validate_component_sent_events_total(
     });
 
     debug!(
-        "{}: {} events, {} expected events",
+        "{}: {} events, {} expected events.",
         SourceMetrics::SentEventsTotal,
         events,
         expected_events,
@@ -369,7 +369,7 @@ fn validate_component_sent_event_bytes_total(
     }
 
     debug!(
-        "{}: {} bytes, {} expected bytes",
+        "{}: {} bytes, {} expected bytes.",
         SourceMetrics::SentEventBytesTotal,
         metric_bytes,
         expected_bytes,
@@ -377,7 +377,7 @@ fn validate_component_sent_event_bytes_total(
 
     if metric_bytes != expected_bytes as f64 {
         errs.push(format!(
-            "{}: expected {} bytes, but received {}",
+            "{}: expected {} bytes, but received {}.",
             SourceMetrics::SentEventBytesTotal,
             expected_bytes,
             metric_bytes
