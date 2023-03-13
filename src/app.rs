@@ -74,26 +74,7 @@ impl Application {
     pub fn prepare_from_opts(opts: Opts) -> Result<Self, exitcode::ExitCode> {
         openssl_probe::init_ssl_cert_env_vars();
 
-        let level = std::env::var("VECTOR_LOG")
-            .or_else(|_| {
-                warn!(message = "Use of $LOG is deprecated. Please use $VECTOR_LOG instead.");
-                std::env::var("LOG")
-            })
-            .unwrap_or_else(|_| match opts.log_level() {
-                "off" => "off".to_owned(),
-                level => [
-                    format!("vector={}", level),
-                    format!("codec={}", level),
-                    format!("vrl={}", level),
-                    format!("file_source={}", level),
-                    "tower_limit=trace".to_owned(),
-                    format!("rdkafka={}", level),
-                    format!("buffers={}", level),
-                    format!("lapin={}", level),
-                    format!("kube={}", level),
-                ]
-                .join(","),
-            });
+        let level = get_log_levels(opts.log_level());
 
         let root_opts = opts.root;
         let sub_command = opts.sub_command;
@@ -454,4 +435,27 @@ async fn sources_finished(mutex: Arc<Mutex<TopologyController>>) {
             continue;
         }
     }
+}
+
+fn get_log_levels(default: &str) -> String {
+    std::env::var("VECTOR_LOG")
+        .or_else(|_| {
+            warn!(message = "Use of $LOG is deprecated. Please use $VECTOR_LOG instead.");
+            std::env::var("LOG")
+        })
+        .unwrap_or_else(|_| match default {
+            "off" => "off".to_owned(),
+            level => [
+                format!("vector={}", level),
+                format!("codec={}", level),
+                format!("vrl={}", level),
+                format!("file_source={}", level),
+                "tower_limit=trace".to_owned(),
+                format!("rdkafka={}", level),
+                format!("buffers={}", level),
+                format!("lapin={}", level),
+                format!("kube={}", level),
+            ]
+            .join(","),
+        })
 }
