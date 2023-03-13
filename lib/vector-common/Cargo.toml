@@ -62,7 +62,7 @@ paste = "1.0.12"
 pin-project = { version = "1.0.12", default-features = false }
 ryu = { version = "1", default-features = false }
 serde_json = { version = "1.0.94", default-features = false, features = ["std", "raw_value"] }
-serde = { version = "1.0.154", optional = true, features = ["derive"] }
+serde = { version = "1.0.155", optional = true, features = ["derive"] }
 smallvec = { version = "1", default-features = false }
 snafu = { version = "0.7", optional = true }
 stream-cancel = { version = "0.8.1", default-features = false }
