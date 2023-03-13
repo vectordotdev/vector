@@ -279,6 +279,10 @@ impl Encoder<Event> for StatsdEncoder {
             }
         };
 
+        // TODO: this properly encodes aggregate histograms, but it does not handle sketches. There
+        // are complications with applying this to sketches, as it is required to extract the
+        // buckets and unpack the sketch in order to get the real values for distribution samples.
+        // Tracked in #11661.
         let msg: String = match metric.value() {
             MetricValue::Distribution { .. } => buf.join("\n"),
             _ => encode_namespace(
