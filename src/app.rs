@@ -76,10 +76,7 @@ impl Application {
 
         let level = get_log_levels(opts.log_level());
 
-        let root_opts = opts.root;
-        let sub_command = opts.sub_command;
-
-        let color = match root_opts.color {
+        let color = match opts.root.color {
             #[cfg(unix)]
             Color::Auto => atty::is(atty::Stream::Stdout),
             #[cfg(windows)]
@@ -88,7 +85,7 @@ impl Application {
             Color::Never => false,
         };
 
-        let json = match &root_opts.log_format {
+        let json = match &opts.root.log_format {
             LogFormat::Text => false,
             LogFormat::Json => true,
         };
@@ -99,7 +96,7 @@ impl Application {
         let mut rt_builder = runtime::Builder::new_multi_thread();
         rt_builder.enable_all().thread_name("vector-worker");
 
-        if let Some(threads) = root_opts.threads {
+        if let Some(threads) = opts.root.threads {
             if threads < 1 {
                 #[allow(clippy::print_stderr)]
                 {
@@ -117,21 +114,21 @@ impl Application {
         let rt = rt_builder.build().expect("Unable to create async runtime");
 
         let config = {
-            let config_paths = root_opts.config_paths_with_formats();
-            let watch_config = root_opts.watch_config;
-            let require_healthy = root_opts.require_healthy;
+            let config_paths = opts.root.config_paths_with_formats();
+            let watch_config = opts.root.watch_config;
+            let require_healthy = opts.root.require_healthy;
 
             rt.block_on(async move {
-                trace::init(color, json, &level, root_opts.internal_log_rate_limit);
+                trace::init(color, json, &level, opts.root.internal_log_rate_limit);
                 info!(
                     message = "Internal log rate limit configured.",
-                    internal_log_rate_secs = root_opts.internal_log_rate_limit
+                    internal_log_rate_secs = opts.root.internal_log_rate_limit
                 );
                 // Signal handler for OS and provider messages.
                 let (mut signal_handler, signal_rx) = signal::SignalHandler::new();
                 signal_handler.forever(signal::os_signals());
 
-                if let Some(s) = sub_command {
+                if let Some(s) = opts.sub_command {
                     let code = match s {
                         SubCommand::Generate(g) => generate::cmd(&g),
                         SubCommand::GenerateSchema => generate_schema::cmd(),
@@ -233,7 +230,7 @@ impl Application {
         }?;
 
         Ok(Application {
-            opts: root_opts,
+            opts: opts.root,
             config,
             runtime: rt,
         })
