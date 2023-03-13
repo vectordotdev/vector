@@ -26,7 +26,7 @@ use crate::service;
 #[cfg(feature = "api")]
 use crate::{api, internal_events::ApiStarted};
 use crate::{
-    cli::{handle_config_errors, Color, LogFormat, Opts, RootOpts, SubCommand},
+    cli::{handle_config_errors, LogFormat, Opts, RootOpts, SubCommand},
     config, generate, generate_schema, graph, heartbeat, list,
     signal::{self, SignalTo},
     topology::{self, ReloadOutcome, RunningTopology, TopologyController},
@@ -76,14 +76,7 @@ impl Application {
 
         let level = get_log_levels(opts.log_level());
 
-        let color = match opts.root.color {
-            #[cfg(unix)]
-            Color::Auto => atty::is(atty::Stream::Stdout),
-            #[cfg(windows)]
-            Color::Auto => false, // ANSI colors are not supported by cmd.exe
-            Color::Always => true,
-            Color::Never => false,
-        };
+        let color = opts.root.color.use_color();
 
         let json = match &opts.root.log_format {
             LogFormat::Text => false,
