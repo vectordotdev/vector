@@ -60,6 +60,130 @@ pub struct Application {
     pub config: ApplicationConfig,
 }
 
+impl ApplicationConfig {
+    pub async fn prepare_from_opts(opts: &Opts) -> Result<Self, ExitCode> {
+        let color = opts.root.color.use_color();
+
+        let json = match &opts.root.log_format {
+            LogFormat::Text => false,
+            LogFormat::Json => true,
+        };
+
+        let level = get_log_levels(opts.log_level());
+
+        let config_paths = opts.root.config_paths_with_formats();
+        let watch_config = opts.root.watch_config;
+        let require_healthy = opts.root.require_healthy;
+
+        trace::init(color, json, &level, opts.root.internal_log_rate_limit);
+        info!(
+            message = "Internal log rate limit configured.",
+            internal_log_rate_secs = opts.root.internal_log_rate_limit
+        );
+        // Signal handler for OS and provider messages.
+        let (mut signal_handler, signal_rx) = signal::SignalHandler::new();
+        signal_handler.forever(signal::os_signals());
+
+        if let Some(s) = &opts.sub_command {
+            let code = match s {
+                SubCommand::Generate(g) => generate::cmd(g),
+                SubCommand::GenerateSchema => generate_schema::cmd(),
+                SubCommand::Graph(g) => graph::cmd(g),
+                SubCommand::Config(c) => config::cmd(c),
+                SubCommand::List(l) => list::cmd(l),
+                SubCommand::Test(t) => unit_test::cmd(t, &mut signal_handler).await,
+                #[cfg(windows)]
+                SubCommand::Service(s) => service::cmd(s),
+                #[cfg(feature = "api-client")]
+                SubCommand::Top(t) => top::cmd(t).await,
+                #[cfg(feature = "api-client")]
+                SubCommand::Tap(t) => tap::cmd(t, signal_rx).await,
+
+                SubCommand::Validate(v) => validate::validate(v, color).await,
+                #[cfg(feature = "vrl-cli")]
+                SubCommand::Vrl(s) => vrl_cli::cmd::cmd(s),
+            };
+
+            return Err(code);
+        };
+
+        info!(message = "Log level is enabled.", level = ?level);
+
+        let config_paths = config::process_paths(&config_paths).ok_or(exitcode::CONFIG)?;
+
+        if watch_config {
+            // Start listening for config changes immediately.
+            config::watcher::spawn_thread(config_paths.iter().map(Into::into), None).map_err(
+                |error| {
+                    error!(message = "Unable to start config watcher.", %error);
+                    exitcode::CONFIG
+                },
+            )?;
+        }
+
+        info!(
+            message = "Loading configs.",
+            paths = ?config_paths.iter().map(<&PathBuf>::from).collect::<Vec<_>>()
+        );
+
+        #[cfg(not(feature = "enterprise-tests"))]
+        config::init_log_schema(&config_paths, true).map_err(handle_config_errors)?;
+
+        let mut config =
+            config::load_from_paths_with_provider_and_secrets(&config_paths, &mut signal_handler)
+                .await
+                .map_err(handle_config_errors)?;
+
+        if !config.healthchecks.enabled {
+            info!("Health checks are disabled.");
+        }
+        config.healthchecks.set_require_healthy(require_healthy);
+
+        #[cfg(feature = "enterprise")]
+        // Enable enterprise features, if applicable.
+        let enterprise = match EnterpriseMetadata::try_from(&config) {
+            Ok(metadata) => {
+                let enterprise = EnterpriseReporter::new();
+
+                attach_enterprise_components(&mut config, &metadata);
+                enterprise.send(report_configuration(config_paths.clone(), metadata));
+
+                Some(enterprise)
+            }
+            Err(EnterpriseError::MissingApiKey) => {
+                error!("Enterprise configuration incomplete: missing API key.");
+                return Err(exitcode::CONFIG);
+            }
+            Err(_) => None,
+        };
+
+        let diff = config::ConfigDiff::initial(&config);
+        let pieces = topology::build_or_log_errors(&config, &diff, HashMap::new())
+            .await
+            .ok_or(exitcode::CONFIG)?;
+
+        #[cfg(feature = "api")]
+        let api = config.api;
+
+        let result = topology::start_validated(config, diff, pieces).await;
+        let (topology, (graceful_crash_sender, graceful_crash_receiver)) =
+            result.ok_or(exitcode::CONFIG)?;
+
+        Ok(Self {
+            config_paths,
+            topology,
+            graceful_crash_sender,
+            graceful_crash_receiver,
+            #[cfg(feature = "api")]
+            api,
+            #[cfg(feature = "enterprise")]
+            enterprise,
+            signal_handler,
+            signal_rx,
+        })
+    }
+}
+
 impl Application {
     pub fn prepare() -> Result<(Runtime, Self), ExitCode> {
         let opts = Opts::get_matches().map_err(|error| {
@@ -74,135 +198,11 @@ impl Application {
     pub fn prepare_from_opts(opts: Opts) -> Result<(Runtime, Self), ExitCode> {
         openssl_probe::init_ssl_cert_env_vars();
 
-        let level = get_log_levels(opts.log_level());
-
-        let color = opts.root.color.use_color();
-
-        let json = match &opts.root.log_format {
-            LogFormat::Text => false,
-            LogFormat::Json => true,
-        };
-
         #[cfg(not(feature = "enterprise-tests"))]
         metrics::init_global().expect("metrics initialization failed");
 
         let runtime = build_runtime(opts.root.threads, "vector-worker")?;
-
-        let config = {
-            let config_paths = opts.root.config_paths_with_formats();
-            let watch_config = opts.root.watch_config;
-            let require_healthy = opts.root.require_healthy;
-
-            runtime.block_on(async move {
-                trace::init(color, json, &level, opts.root.internal_log_rate_limit);
-                info!(
-                    message = "Internal log rate limit configured.",
-                    internal_log_rate_secs = opts.root.internal_log_rate_limit
-                );
-                // Signal handler for OS and provider messages.
-                let (mut signal_handler, signal_rx) = signal::SignalHandler::new();
-                signal_handler.forever(signal::os_signals());
-
-                if let Some(s) = opts.sub_command {
-                    let code = match s {
-                        SubCommand::Generate(g) => generate::cmd(&g),
-                        SubCommand::GenerateSchema => generate_schema::cmd(),
-                        SubCommand::Graph(g) => graph::cmd(&g),
-                        SubCommand::Config(c) => config::cmd(&c),
-                        SubCommand::List(l) => list::cmd(&l),
-                        SubCommand::Test(t) => unit_test::cmd(&t, &mut signal_handler).await,
-                        #[cfg(windows)]
-                        SubCommand::Service(s) => service::cmd(&s),
-                        #[cfg(feature = "api-client")]
-                        SubCommand::Top(t) => top::cmd(&t).await,
-                        #[cfg(feature = "api-client")]
-                        SubCommand::Tap(t) => tap::cmd(&t, signal_rx).await,
-
-                        SubCommand::Validate(v) => validate::validate(&v, color).await,
-                        #[cfg(feature = "vrl-cli")]
-                        SubCommand::Vrl(s) => vrl_cli::cmd::cmd(&s),
-                    };
-
-                    return Err(code);
-                };
-
-                info!(message = "Log level is enabled.", level = ?level);
-
-                let config_paths = config::process_paths(&config_paths).ok_or(exitcode::CONFIG)?;
-
-                if watch_config {
-                    // Start listening for config changes immediately.
-                    config::watcher::spawn_thread(config_paths.iter().map(Into::into), None)
-                        .map_err(|error| {
-                            error!(message = "Unable to start config watcher.", %error);
-                            exitcode::CONFIG
-                        })?;
-                }
-
-                info!(
-                    message = "Loading configs.",
-                    paths = ?config_paths.iter().map(<&PathBuf>::from).collect::<Vec<_>>()
-                );
-
-                #[cfg(not(feature = "enterprise-tests"))]
-                config::init_log_schema(&config_paths, true).map_err(handle_config_errors)?;
-
-                let mut config = config::load_from_paths_with_provider_and_secrets(
-                    &config_paths,
-                    &mut signal_handler,
-                )
-                .await
-                .map_err(handle_config_errors)?;
-
-                if !config.healthchecks.enabled {
-                    info!("Health checks are disabled.");
-                }
-                config.healthchecks.set_require_healthy(require_healthy);
-
-                #[cfg(feature = "enterprise")]
-                // Enable enterprise features, if applicable.
-                let enterprise = match EnterpriseMetadata::try_from(&config) {
-                    Ok(metadata) => {
-                        let enterprise = EnterpriseReporter::new();
-
-                        attach_enterprise_components(&mut config, &metadata);
-                        enterprise.send(report_configuration(config_paths.clone(), metadata));
-
-                        Some(enterprise)
-                    }
-                    Err(EnterpriseError::MissingApiKey) => {
-                        error!("Enterprise configuration incomplete: missing API key.");
-                        return Err(exitcode::CONFIG);
-                    }
-                    Err(_) => None,
-                };
-
-                let diff = config::ConfigDiff::initial(&config);
-                let pieces = topology::build_or_log_errors(&config, &diff, HashMap::new())
-                    .await
-                    .ok_or(exitcode::CONFIG)?;
-
-                #[cfg(feature = "api")]
-                let api = config.api;
-
-                let result = topology::start_validated(config, diff, pieces).await;
-                let (topology, (graceful_crash_sender, graceful_crash_receiver)) =
-                    result.ok_or(exitcode::CONFIG)?;
-
-                Ok(ApplicationConfig {
-                    config_paths,
-                    topology,
-                    graceful_crash_sender,
-                    graceful_crash_receiver,
-                    #[cfg(feature = "api")]
-                    api,
-                    #[cfg(feature = "enterprise")]
-                    enterprise,
-                    signal_handler,
-                    signal_rx,
-                })
-            })
-        }?;
+        let config = runtime.block_on(ApplicationConfig::prepare_from_opts(&opts))?;
 
         Ok((
             runtime,
