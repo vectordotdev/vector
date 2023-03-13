@@ -1,6 +1,7 @@
 #![allow(missing_docs)]
 use std::{collections::HashMap, num::NonZeroUsize, path::PathBuf, sync::Arc};
 
+use exitcode::ExitCode;
 use futures::StreamExt;
 #[cfg(feature = "enterprise")]
 use futures_util::future::BoxFuture;
@@ -61,7 +62,7 @@ pub struct Application {
 }
 
 impl Application {
-    pub fn prepare() -> Result<Self, exitcode::ExitCode> {
+    pub fn prepare() -> Result<Self, ExitCode> {
         let opts = Opts::get_matches().map_err(|error| {
             // Printing to stdout/err can itself fail; ignore it.
             let _ = error.print();
@@ -71,7 +72,7 @@ impl Application {
         Self::prepare_from_opts(opts)
     }
 
-    pub fn prepare_from_opts(opts: Opts) -> Result<Self, exitcode::ExitCode> {
+    pub fn prepare_from_opts(opts: Opts) -> Result<Self, ExitCode> {
         openssl_probe::init_ssl_cert_env_vars();
 
         let level = get_log_levels(opts.log_level());
@@ -86,25 +87,7 @@ impl Application {
         #[cfg(not(feature = "enterprise-tests"))]
         metrics::init_global().expect("metrics initialization failed");
 
-        let mut rt_builder = runtime::Builder::new_multi_thread();
-        rt_builder.enable_all().thread_name("vector-worker");
-
-        if let Some(threads) = opts.root.threads {
-            if threads < 1 {
-                #[allow(clippy::print_stderr)]
-                {
-                    eprintln!("The `threads` argument must be greater or equal to 1.");
-                }
-                return Err(exitcode::CONFIG);
-            } else {
-                WORKER_THREADS
-                    .set(NonZeroUsize::new(threads).expect("already checked"))
-                    .expect("double thread initialization");
-                rt_builder.worker_threads(threads);
-            }
-        }
-
-        let rt = rt_builder.build().expect("Unable to create async runtime");
+        let rt = build_runtime(opts.root.threads, "vector-worker")?;
 
         let config = {
             let config_paths = opts.root.config_paths_with_formats();
@@ -448,4 +431,26 @@ fn get_log_levels(default: &str) -> String {
             ]
             .join(","),
         })
+}
+
+pub fn build_runtime(threads: Option<usize>, thread_name: &str) -> Result<Runtime, ExitCode> {
+    let mut rt_builder = runtime::Builder::new_multi_thread();
+    rt_builder.enable_all().thread_name(thread_name);
+
+    if let Some(threads) = threads {
+        if threads < 1 {
+            #[allow(clippy::print_stderr)]
+            {
+                eprintln!("The `threads` argument must be greater or equal to 1.");
+            }
+            return Err(exitcode::CONFIG);
+        } else {
+            WORKER_THREADS
+                .set(NonZeroUsize::new(threads).expect("already checked"))
+                .expect("double thread initialization");
+            rt_builder.worker_threads(threads);
+        }
+    }
+
+    Ok(rt_builder.build().expect("Unable to create async runtime"))
 }
