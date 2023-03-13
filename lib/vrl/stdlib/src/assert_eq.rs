@@ -14,8 +14,7 @@ fn assert_eq(left: Value, right: Value, message: Option<Value>) -> Resolved {
         })
     } else {
         Err(ExpressionError::from(format!(
-            "assertion failed: {} == {}",
-            left, right
+            "assertion failed: {left} == {right}"
         )))
     }
 }

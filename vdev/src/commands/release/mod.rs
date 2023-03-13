@@ -1,10 +1,10 @@
 crate::cli_subcommands! {
-    "Manage the release process"
+    "Manage the release process..."
     generate_cue,
     mod channel,
     commit,
     docker,
-    github,
+    mod github,
     homebrew,
     mod prepare,
     push,
@@ -22,10 +22,6 @@ crate::script_wrapper! {
 crate::script_wrapper! {
     docker = "Build the Vector docker images and optionally push it to the registry"
         => "build-docker.sh"
-}
-crate::script_wrapper! {
-    github = "Determine the appropriate release channel (nightly or latest) based on Git HEAD"
-        => "release-github.sh"
 }
 crate::script_wrapper! {
     homebrew = "Releases latest version to the vectordotdev homebrew tap"

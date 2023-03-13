@@ -35,19 +35,23 @@ base: components: sinks: prometheus_remote_write: configuration: {
 				description:   "The AWS access key ID."
 				relevant_when: "strategy = \"aws\""
 				required:      true
-				type: string: {}
+				type: string: examples: ["AKIAIOSFODNN7EXAMPLE"]
 			}
 			assume_role: {
-				description:   "The ARN of the role to assume."
+				description: """
+					The ARN of an [IAM role][iam_role] to assume.
+
+					[iam_role]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles.html
+					"""
 				relevant_when: "strategy = \"aws\""
 				required:      true
-				type: string: {}
+				type: string: examples: ["arn:aws:iam::123456789098:role/my_role"]
 			}
 			credentials_file: {
 				description:   "Path to the credentials file."
 				relevant_when: "strategy = \"aws\""
 				required:      true
-				type: string: {}
+				type: string: examples: ["/my/aws/credentials"]
 			}
 			imds: {
 				description:   "Configuration for authenticating with AWS through IMDS."
@@ -78,10 +82,17 @@ base: components: sinks: prometheus_remote_write: configuration: {
 				}
 			}
 			load_timeout_secs: {
-				description:   "Timeout for successfully loading any credentials, in seconds."
+				description: """
+					Timeout for successfully loading any credentials, in seconds.
+
+					Relevant when the default credentials chain is used or `assume_role`.
+					"""
 				relevant_when: "strategy = \"aws\""
 				required:      false
-				type: uint: {}
+				type: uint: {
+					examples: [30]
+					unit: "seconds"
+				}
 			}
 			password: {
 				description:   "Basic authentication password."
@@ -90,27 +101,36 @@ base: components: sinks: prometheus_remote_write: configuration: {
 				type: string: {}
 			}
 			profile: {
-				description:   "The credentials profile to use."
-				relevant_when: "strategy = \"aws\""
-				required:      false
-				type: string: {}
-			}
-			region: {
 				description: """
-					The AWS region to send STS requests to.
+					The credentials profile to use.
 
-					If not set, this will default to the configured region
-					for the service itself.
+					Used to select AWS credentials from a provided credentials file.
 					"""
 				relevant_when: "strategy = \"aws\""
 				required:      false
-				type: string: {}
+				type: string: {
+					default: "default"
+					examples: ["develop"]
+				}
+			}
+			region: {
+				description: """
+					The [AWS region][aws_region] to send STS requests to.
+
+					If not set, this will default to the configured region
+					for the service itself.
+
+					[aws_region]: https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints
+					"""
+				relevant_when: "strategy = \"aws\""
+				required:      false
+				type: string: examples: ["us-west-2"]
 			}
 			secret_access_key: {
 				description:   "The AWS secret access key."
 				relevant_when: "strategy = \"aws\""
 				required:      true
-				type: string: {}
+				type: string: examples: ["wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"]
 			}
 			strategy: {
 				description: "The authentication strategy to use."
@@ -144,14 +164,18 @@ base: components: sinks: prometheus_remote_write: configuration: {
 		required:    false
 		type: object: options: {
 			endpoint: {
-				description: "The API endpoint of the service."
+				description: "Custom endpoint for use with AWS-compatible services."
 				required:    false
-				type: string: {}
+				type: string: examples: ["http://127.0.0.0:5000/path/to/service"]
 			}
 			region: {
-				description: "The AWS region to use."
-				required:    false
-				type: string: {}
+				description: """
+					The [AWS region][aws_region] of the target service.
+
+					[aws_region]: https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints
+					"""
+				required: false
+				type: string: examples: ["us-east-1"]
 			}
 		}
 	}
@@ -167,17 +191,23 @@ base: components: sinks: prometheus_remote_write: configuration: {
 					serialized / compressed.
 					"""
 				required: false
-				type: uint: {}
+				type: uint: unit: "bytes"
 			}
 			max_events: {
-				description: "The maximum size of a batch, in events, before it is flushed."
+				description: "The maximum size of a batch before it is flushed."
 				required:    false
-				type: uint: {}
+				type: uint: {
+					default: 1000
+					unit:    "events"
+				}
 			}
 			timeout_secs: {
-				description: "The maximum age of a batch, in seconds, before it is flushed."
+				description: "The maximum age of a batch before it is flushed."
 				required:    false
-				type: float: {}
+				type: float: {
+					default: 1.0
+					unit:    "seconds"
+				}
 			}
 		}
 	}
@@ -190,7 +220,7 @@ base: components: sinks: prometheus_remote_write: configuration: {
 		required: false
 		type: array: {
 			default: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0]
-			items: type: number: {}
+			items: type: float: {}
 		}
 	}
 	default_namespace: {
@@ -205,12 +235,16 @@ base: components: sinks: prometheus_remote_write: configuration: {
 			[prom_naming_docs]: https://prometheus.io/docs/practices/naming/#metric-names
 			"""
 		required: false
-		type: string: {}
+		type: string: examples: ["service"]
 	}
 	endpoint: {
-		description: "The endpoint to send data to."
-		required:    true
-		type: string: {}
+		description: """
+			The endpoint to send data to.
+
+			The endpoint should include the scheme and the path to write to.
+			"""
+		required: true
+		type: string: examples: ["https://localhost:8087/api/v1/write"]
 	}
 	quantiles: {
 		description: """
@@ -221,7 +255,7 @@ base: components: sinks: prometheus_remote_write: configuration: {
 		required: false
 		type: array: {
 			default: [0.5, 0.75, 0.9, 0.95, 0.99]
-			items: type: number: {}
+			items: type: float: {}
 		}
 	}
 	request: {
@@ -305,14 +339,20 @@ base: components: sinks: prometheus_remote_write: configuration: {
 				}
 			}
 			rate_limit_duration_secs: {
-				description: "The time window, in seconds, used for the `rate_limit_num` option."
+				description: "The time window used for the `rate_limit_num` option."
 				required:    false
-				type: uint: default: 1
+				type: uint: {
+					default: 1
+					unit:    "seconds"
+				}
 			}
 			rate_limit_num: {
 				description: "The maximum number of requests allowed within the `rate_limit_duration_secs` time window."
 				required:    false
-				type: uint: default: 9223372036854775807
+				type: uint: {
+					default: 9223372036854775807
+					unit:    "requests"
+				}
 			}
 			retry_attempts: {
 				description: """
@@ -321,7 +361,10 @@ base: components: sinks: prometheus_remote_write: configuration: {
 					The default, for all intents and purposes, represents an infinite number of retries.
 					"""
 				required: false
-				type: uint: default: 9223372036854775807
+				type: uint: {
+					default: 9223372036854775807
+					unit:    "retries"
+				}
 			}
 			retry_initial_backoff_secs: {
 				description: """
@@ -330,22 +373,31 @@ base: components: sinks: prometheus_remote_write: configuration: {
 					After the first retry has failed, the fibonacci sequence will be used to select future backoffs.
 					"""
 				required: false
-				type: uint: default: 1
+				type: uint: {
+					default: 1
+					unit:    "seconds"
+				}
 			}
 			retry_max_duration_secs: {
-				description: "The maximum amount of time, in seconds, to wait between retries."
+				description: "The maximum amount of time to wait between retries."
 				required:    false
-				type: uint: default: 3600
+				type: uint: {
+					default: 3600
+					unit:    "seconds"
+				}
 			}
 			timeout_secs: {
 				description: """
-					The maximum time a request can take before being aborted.
+					The time a request can take before being aborted.
 
 					It is highly recommended that you do not lower this value below the service’s internal timeout, as this could
 					create orphaned requests, pile on retries, and result in duplicate data downstream.
 					"""
 				required: false
-				type: uint: default: 60
+				type: uint: {
+					default: 60
+					unit:    "seconds"
+				}
 			}
 		}
 	}
@@ -358,7 +410,10 @@ base: components: sinks: prometheus_remote_write: configuration: {
 			This may be used by Cortex or other remote services to identify the tenant making the request.
 			"""
 		required: false
-		type: string: syntax: "template"
+		type: string: {
+			examples: ["my-domain"]
+			syntax: "template"
+		}
 	}
 	tls: {
 		description: "TLS configuration."

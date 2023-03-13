@@ -9,6 +9,7 @@ use crate::{
     config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     event::{Event, EventFinalizers, EventStatus, Finalizable},
     internal_events::PulsarSendingError,
+    schema,
     sinks::util::metadata::RequestMetadataBuilder,
 };
 use bytes::BytesMut;
@@ -23,7 +24,7 @@ use pulsar::{
 };
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::Encoder as _;
-use value::Value;
+use value::{Kind, Value};
 use vector_common::{
     internal_event::{
         ByteSize, BytesSent, CountByteSize, EventsSent, InternalEventHandle as _, Output, Protocol,
@@ -33,7 +34,6 @@ use vector_common::{
     sensitive_string::SensitiveString,
 };
 use vector_config::configurable_component;
-use vector_core::config::log_schema;
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -46,17 +46,26 @@ enum BuildError {
 #[derive(Clone, Debug)]
 pub struct PulsarSinkConfig {
     /// The endpoint to which the Pulsar client should connect to.
+    ///
+    /// The endpoint should specify the pulsar protocol and port.
     #[serde(alias = "address")]
+    #[configurable(metadata(docs::examples = "pulsar://127.0.0.1:6650"))]
     endpoint: String,
 
     /// The Pulsar topic name to write events to.
+    #[configurable(metadata(docs::examples = "topic-1234"))]
     topic: String,
 
     /// The name of the producer. If not specified, the default name assigned by Pulsar will be used.
+    #[configurable(metadata(docs::examples = "producer-name"))]
     producer_name: Option<String>,
 
     #[configurable(derived)]
     pub encoding: EncodingConfig,
+
+    #[configurable(derived)]
+    #[serde(default)]
+    batch: BatchConfig,
 
     #[configurable(derived)]
     #[serde(default)]
@@ -74,7 +83,19 @@ pub struct PulsarSinkConfig {
     pub acknowledgements: AcknowledgementsConfig,
 
     /// Log field to use as Pulsar message key.
+    #[configurable(metadata(docs::examples = "message"))]
+    #[configurable(metadata(docs::examples = "my_field"))]
     partition_key_field: Option<String>,
+}
+
+/// Event batching behavior.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct BatchConfig {
+    /// The maximum size of a batch before it is flushed.
+    #[configurable(metadata(docs::type_unit = "events"))]
+    #[configurable(metadata(docs::examples = 1000))]
+    pub max_events: Option<u32>,
 }
 
 /// Authentication configuration.
@@ -85,12 +106,16 @@ struct AuthConfig {
     ///
     /// This can be used either for basic authentication (username/password) or JWT authentication.
     /// When used for JWT, the value should be `token`.
+    #[configurable(metadata(docs::examples = "${PULSAR_NAME}"))]
+    #[configurable(metadata(docs::examples = "name123"))]
     name: Option<String>,
 
     /// Basic authentication password/token.
     ///
     /// This can be used either for basic authentication (username/password) or JWT authentication.
     /// When used for JWT, the value should be the signed JWT, in the compact representation.
+    #[configurable(metadata(docs::examples = "${PULSAR_TOKEN}"))]
+    #[configurable(metadata(docs::examples = "123456789"))]
     token: Option<SensitiveString>,
 
     #[configurable(derived)]
@@ -102,17 +127,26 @@ struct AuthConfig {
 #[derive(Clone, Debug)]
 pub struct OAuth2Config {
     /// The issuer URL.
+    #[configurable(metadata(docs::examples = "${OAUTH2_ISSUER_URL}"))]
+    #[configurable(metadata(docs::examples = "https://oauth2.issuer"))]
     issuer_url: String,
 
     /// The credentials URL.
     ///
     /// A data URL is also supported.
+    #[configurable(metadata(docs::examples = "{OAUTH2_CREDENTIALS_URL}"))]
+    #[configurable(metadata(docs::examples = "file:///oauth2_credentials"))]
+    #[configurable(metadata(docs::examples = "data:application/json;base64,cHVsc2FyCg=="))]
     credentials_url: String,
 
     /// The OAuth2 audience.
+    #[configurable(metadata(docs::examples = "${OAUTH2_AUDIENCE}"))]
+    #[configurable(metadata(docs::examples = "pulsar"))]
     audience: Option<String>,
 
     /// The OAuth2 scope.
+    #[configurable(metadata(docs::examples = "${OAUTH2_SCOPE}"))]
+    #[configurable(metadata(docs::examples = "admin"))]
     scope: Option<String>,
 }
 
@@ -182,12 +216,13 @@ impl GenerateConfig for PulsarSinkConfig {
         toml::Value::try_from(Self {
             endpoint: "pulsar://127.0.0.1:6650".to_string(),
             topic: "topic-1234".to_string(),
-            partition_key_field: Some("message".to_string()),
+            partition_key_field: None,
             compression: Default::default(),
             encoding: TextSerializerConfig::default().into(),
             auth: None,
             acknowledgements: Default::default(),
             producer_name: None,
+            batch: Default::default(),
         })
         .unwrap()
     }
@@ -225,7 +260,10 @@ impl SinkConfig for PulsarSinkConfig {
     }
 
     fn input(&self) -> Input {
-        Input::log()
+        let requirement =
+            schema::Requirement::empty().optional_meaning("timestamp", Kind::timestamp());
+
+        Input::log().with_schema_requirement(requirement)
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
@@ -293,6 +331,10 @@ impl PulsarSinkConfig {
             }),
             ..Default::default()
         };
+
+        if !is_healthcheck {
+            producer_options.batch_size = self.batch.max_events;
+        }
 
         if let SerializerConfig::Avro { avro } = self.encoding.config() {
             producer_options.schema = Some(proto::Schema {
@@ -370,7 +412,7 @@ impl Sink<Event> for PulsarSink {
 
         let event_time: Option<u64> = event
             .maybe_as_log()
-            .and_then(|log| log.get(log_schema().timestamp_key()))
+            .and_then(|log| log.get_timestamp())
             .and_then(|value| value.as_timestamp())
             .map(|ts| ts.timestamp_millis())
             .map(|i| i as u64);
@@ -500,6 +542,7 @@ mod integration_tests {
             auth: None,
             acknowledgements: Default::default(),
             partition_key_field: Some("message".to_string()),
+            batch: Default::default(),
         };
 
         let pulsar = Pulsar::<TokioExecutor>::builder(&cnf.endpoint, TokioExecutor)

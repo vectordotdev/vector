@@ -86,6 +86,7 @@ cli_commands! {
     mod run,
     mod status,
     mod test,
+    mod test_vrl,
     mod version,
 }
 

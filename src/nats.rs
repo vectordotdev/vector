@@ -94,6 +94,7 @@ pub(crate) struct NatsAuthToken {
 #[serde(deny_unknown_fields)]
 pub(crate) struct NatsAuthCredentialsFile {
     /// Path to credentials file.
+    #[configurable(metadata(docs::examples = "/etc/nats/nats.creds"))]
     pub(crate) path: String,
 }
 

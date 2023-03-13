@@ -39,7 +39,7 @@ base: components: sinks: pulsar: configuration: {
 					When used for JWT, the value should be `token`.
 					"""
 				required: false
-				type: string: {}
+				type: string: examples: ["${PULSAR_NAME}", "name123"]
 			}
 			oauth2: {
 				description: "OAuth2-specific authentication configuration."
@@ -48,7 +48,7 @@ base: components: sinks: pulsar: configuration: {
 					audience: {
 						description: "The OAuth2 audience."
 						required:    false
-						type: string: {}
+						type: string: examples: ["${OAUTH2_AUDIENCE}", "pulsar"]
 					}
 					credentials_url: {
 						description: """
@@ -57,17 +57,17 @@ base: components: sinks: pulsar: configuration: {
 																A data URL is also supported.
 																"""
 						required: true
-						type: string: {}
+						type: string: examples: ["{OAUTH2_CREDENTIALS_URL}", "file:///oauth2_credentials", "data:application/json;base64,cHVsc2FyCg=="]
 					}
 					issuer_url: {
 						description: "The issuer URL."
 						required:    true
-						type: string: {}
+						type: string: examples: ["${OAUTH2_ISSUER_URL}", "https://oauth2.issuer"]
 					}
 					scope: {
 						description: "The OAuth2 scope."
 						required:    false
-						type: string: {}
+						type: string: examples: ["${OAUTH2_SCOPE}", "admin"]
 					}
 				}
 			}
@@ -79,7 +79,19 @@ base: components: sinks: pulsar: configuration: {
 					When used for JWT, the value should be the signed JWT, in the compact representation.
 					"""
 				required: false
-				type: string: {}
+				type: string: examples: ["${PULSAR_TOKEN}", "123456789"]
+			}
+		}
+	}
+	batch: {
+		description: "Event batching behavior."
+		required:    false
+		type: object: options: max_events: {
+			description: "The maximum size of a batch before it is flushed."
+			required:    false
+			type: uint: {
+				examples: [1000]
+				unit: "events"
 			}
 		}
 	}
@@ -119,6 +131,11 @@ base: components: sinks: pulsar: configuration: {
 						Encodes an event as an [Apache Avro][apache_avro] message.
 
 						[apache_avro]: https://avro.apache.org/
+						"""
+					csv: """
+						Encodes an event as a CSV message.
+
+						This codec must be configured with fields to encode.
 						"""
 					gelf: """
 						Encodes an event as a [GELF][gelf] message.
@@ -172,6 +189,24 @@ base: components: sinks: pulsar: configuration: {
 						"""
 				}
 			}
+			csv: {
+				description:   "The CSV Serializer Options."
+				relevant_when: "codec = \"csv\""
+				required:      true
+				type: object: options: fields: {
+					description: """
+						Configures the fields that will be encoded, as well as the order in which they
+						appear in the output.
+
+						If a field is not present in the event, the output will be an empty string.
+
+						Values of type `Array`, `Object`, and `Regex` are not supported and the
+						output will be an empty string.
+						"""
+					required: true
+					type: array: items: type: string: {}
+				}
+			}
 			except_fields: {
 				description: "List of fields that will be excluded from the encoded event."
 				required:    false
@@ -214,23 +249,27 @@ base: components: sinks: pulsar: configuration: {
 		}
 	}
 	endpoint: {
-		description: "The endpoint to which the Pulsar client should connect to."
-		required:    true
-		type: string: {}
+		description: """
+			The endpoint to which the Pulsar client should connect to.
+
+			The endpoint should specify the pulsar protocol and port.
+			"""
+		required: true
+		type: string: examples: ["pulsar://127.0.0.1:6650"]
 	}
 	partition_key_field: {
 		description: "Log field to use as Pulsar message key."
 		required:    false
-		type: string: {}
+		type: string: examples: ["message", "my_field"]
 	}
 	producer_name: {
 		description: "The name of the producer. If not specified, the default name assigned by Pulsar will be used."
 		required:    false
-		type: string: {}
+		type: string: examples: ["producer-name"]
 	}
 	topic: {
 		description: "The Pulsar topic name to write events to."
 		required:    true
-		type: string: {}
+		type: string: examples: ["topic-1234"]
 	}
 }

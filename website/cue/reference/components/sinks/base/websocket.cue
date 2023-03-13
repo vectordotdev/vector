@@ -37,10 +37,10 @@ base: components: sinks: websocket: configuration: {
 		required: false
 		type: object: options: {
 			password: {
-				description:   "The password to send."
+				description:   "The basic authentication password."
 				relevant_when: "strategy = \"basic\""
 				required:      true
-				type: string: {}
+				type: string: examples: ["${PASSWORD}", "password"]
 			}
 			strategy: {
 				description: "The authentication strategy to use."
@@ -61,16 +61,16 @@ base: components: sinks: websocket: configuration: {
 				}
 			}
 			token: {
-				description:   "The bearer token to send."
+				description:   "The bearer authentication token."
 				relevant_when: "strategy = \"bearer\""
 				required:      true
 				type: string: {}
 			}
 			user: {
-				description:   "The username to send."
+				description:   "The basic authentication username."
 				relevant_when: "strategy = \"basic\""
 				required:      true
-				type: string: {}
+				type: string: examples: ["${USERNAME}", "username"]
 			}
 		}
 	}
@@ -96,6 +96,11 @@ base: components: sinks: websocket: configuration: {
 						Encodes an event as an [Apache Avro][apache_avro] message.
 
 						[apache_avro]: https://avro.apache.org/
+						"""
+					csv: """
+						Encodes an event as a CSV message.
+
+						This codec must be configured with fields to encode.
 						"""
 					gelf: """
 						Encodes an event as a [GELF][gelf] message.
@@ -149,6 +154,24 @@ base: components: sinks: websocket: configuration: {
 						"""
 				}
 			}
+			csv: {
+				description:   "The CSV Serializer Options."
+				relevant_when: "codec = \"csv\""
+				required:      true
+				type: object: options: fields: {
+					description: """
+						Configures the fields that will be encoded, as well as the order in which they
+						appear in the output.
+
+						If a field is not present in the event, the output will be an empty string.
+
+						Values of type `Array`, `Object`, and `Regex` are not supported and the
+						output will be an empty string.
+						"""
+					required: true
+					type: array: items: type: string: {}
+				}
+			}
 			except_fields: {
 				description: "List of fields that will be excluded from the encoded event."
 				required:    false
@@ -191,18 +214,29 @@ base: components: sinks: websocket: configuration: {
 		}
 	}
 	ping_interval: {
-		description: "The interval, in seconds, between sending PINGs to the remote peer."
-		required:    false
-		type: uint: {}
+		description: """
+			The interval, in seconds, between sending [Ping][ping]s to the remote peer.
+
+			If this option is not configured, pings are not sent on an interval.
+
+			If the `ping_timeout` is not set, pings are still sent but there is no expectation of pong
+			response times.
+
+			[ping]: https://www.rfc-editor.org/rfc/rfc6455#section-5.5.2
+			"""
+		required: false
+		type: uint: unit: "seconds"
 	}
 	ping_timeout: {
 		description: """
-			The timeout, in seconds, while waiting for a PONG response from the remote peer.
+			The number of seconds to wait for a [Pong][pong] response from the remote peer.
 
-			If a response is not received in this time, the connection is reestablished.
+			If a response is not received within this time, the connection is re-established.
+
+			[pong]: https://www.rfc-editor.org/rfc/rfc6455#section-5.5.3
 			"""
 		required: false
-		type: uint: {}
+		type: uint: unit: "seconds"
 	}
 	tls: {
 		description: "Configures the TLS options for incoming/outgoing connections."

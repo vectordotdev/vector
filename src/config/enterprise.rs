@@ -10,7 +10,7 @@ use indexmap::IndexMap;
 use rand::Rng;
 use serde::Serialize;
 use tokio::{
-    sync::mpsc::{self},
+    sync::mpsc,
     time::{sleep, Duration},
 };
 use url::{ParseError, Url};
@@ -21,11 +21,14 @@ use super::{
     SourceOuter, TransformOuter,
 };
 use crate::{
-    common::datadog::{get_api_base_endpoint, Region},
+    common::datadog::{get_api_base_endpoint, get_base_domain_region, Region},
     conditions::AnyCondition,
     http::{HttpClient, HttpError},
     sinks::{
-        datadog::{logs::DatadogLogsConfig, metrics::DatadogMetricsConfig},
+        datadog::{
+            default_site, logs::DatadogLogsConfig, metrics::DatadogMetricsConfig,
+            DatadogCommonConfig,
+        },
         util::{http::RequestConfig, retries::ExponentialBackoff},
     },
     sources::{
@@ -73,8 +76,8 @@ pub struct Options {
     /// The Datadog [site][dd_site] to send data to.
     ///
     /// [dd_site]: https://docs.datadoghq.com/getting_started/site
-    #[serde(default)]
-    site: Option<String>,
+    #[serde(default = "default_site")]
+    site: String,
 
     /// The Datadog region to send data to.
     ///
@@ -130,7 +133,7 @@ impl Default for Options {
         Self {
             enabled: default_enabled(),
             enable_logs_reporting: default_enable_logs_reporting(),
-            site: None,
+            site: default_site(),
             region: None,
             endpoint: None,
             api_key: None,
@@ -478,9 +481,12 @@ fn setup_logs_reporting(
 
     // Create a Datadog logs sink to consume and emit internal logs.
     let datadog_logs = DatadogLogsConfig {
-        default_api_key: api_key.into(),
-        endpoint: datadog.endpoint.clone(),
-        site: datadog.site.clone(),
+        dd_common: DatadogCommonConfig {
+            endpoint: datadog.endpoint.clone(),
+            site: datadog.site.clone(),
+            default_api_key: api_key.into(),
+            ..Default::default()
+        },
         region: datadog.region,
         request: RequestConfig {
             headers: IndexMap::from([(
@@ -583,9 +589,12 @@ fn setup_metrics_reporting(
 
     // Create a Datadog metrics sink to consume and emit internal + host metrics.
     let datadog_metrics = DatadogMetricsConfig {
-        default_api_key: api_key.into(),
-        endpoint: datadog.endpoint.clone(),
-        site: datadog.site.clone(),
+        dd_common: DatadogCommonConfig {
+            endpoint: datadog.endpoint.clone(),
+            site: datadog.site.clone(),
+            default_api_key: api_key.into(),
+            ..Default::default()
+        },
         region: datadog.region,
         ..Default::default()
     };
@@ -674,7 +683,7 @@ pub(crate) fn report_configuration(
         // Endpoint to report a config to Datadog OP.
         let endpoint = get_reporting_endpoint(
             opts.endpoint.as_ref(),
-            opts.site.as_ref(),
+            opts.site.as_str(),
             opts.region,
             &opts.configuration_key,
         );
@@ -711,13 +720,15 @@ pub(crate) fn report_configuration(
 /// Returns the full URL endpoint of where to POST a Datadog Vector configuration.
 fn get_reporting_endpoint(
     endpoint: Option<&String>,
-    site: Option<&String>,
+    site: &str,
     region: Option<Region>,
     configuration_key: &str,
 ) -> String {
+    let base = get_base_domain_region(site, region.as_ref());
+
     format!(
         "{}{}/{}/versions",
-        get_api_base_endpoint(endpoint, site, region),
+        get_api_base_endpoint(endpoint, base),
         DATADOG_REPORTING_PATH_STUB,
         configuration_key
     )

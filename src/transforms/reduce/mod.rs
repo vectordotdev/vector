@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 use std::{
+    cmp::min,
     collections::{hash_map, HashMap},
     num::NonZeroUsize,
     pin::Pin,
@@ -33,7 +34,10 @@ use vector_core::config::LogNamespace;
 
 /// Configuration for the `reduce` transform.
 #[serde_as]
-#[configurable_component(transform("reduce"))]
+#[configurable_component(transform(
+    "reduce",
+    "Collapse multiple log events into a single event based on a set of conditions and merge strategies.",
+))]
 #[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
 #[serde(deny_unknown_fields)]
@@ -111,6 +115,7 @@ const fn default_flush_period_ms() -> Duration {
 impl_generate_config_from_default!(ReduceConfig);
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "reduce")]
 impl TransformConfig for ReduceConfig {
     async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
         Reduce::new(self, &context.enrichment_tables).map(Transform::event_task)
@@ -213,6 +218,7 @@ struct ReduceState {
     events: usize,
     fields: HashMap<String, Box<dyn ReduceValueMerger>>,
     stale_since: Instant,
+    last_flushed_at: Instant,
     metadata: EventMetadata,
 }
 
@@ -224,6 +230,7 @@ impl ReduceState {
         Self {
             events: 0,
             stale_since: Instant::now(),
+            last_flushed_at: Instant::now(),
             fields,
             metadata,
         }
@@ -326,9 +333,11 @@ impl Reduce {
 
     fn flush_into(&mut self, output: &mut Vec<Event>) {
         let mut flush_discriminants = Vec::new();
-        for (k, t) in &self.reduce_merge_states {
-            if t.stale_since.elapsed() >= self.expire_after {
+        let now = Instant::now();
+        for (k, t) in &mut self.reduce_merge_states {
+            if now - min(t.stale_since, t.last_flushed_at) >= self.expire_after {
                 flush_discriminants.push(k.clone());
+                t.last_flushed_at = Instant::now();
             }
         }
         for k in &flush_discriminants {
@@ -404,8 +413,6 @@ impl Reduce {
         } else {
             self.push_or_new_reduce_state(event, discriminant)
         }
-
-        self.flush_into(output);
     }
 }
 
@@ -457,7 +464,8 @@ impl TaskTransform<Event> for Reduce {
 #[cfg(test)]
 mod test {
     use serde_json::json;
-    use tokio::sync::mpsc;
+    use tokio::sync::mpsc::{self, Sender};
+    use tokio::time::sleep;
     use tokio_stream::wrappers::ReceiverStream;
     use value::Kind;
 
@@ -696,9 +704,9 @@ max_events = 0
 
         match reduce_config {
             Ok(_conf) => unreachable!("max_events=0 should be rejected."),
-            Err(err) => assert!(err.to_string().contains(
-                "invalid value: integer `0`, expected a nonzero usize for key `max_events`"
-            )),
+            Err(err) => assert!(err
+                .to_string()
+                .contains("invalid value: integer `0`, expected a nonzero usize")),
         }
     }
 
@@ -882,6 +890,49 @@ merge_strategies.bar = "concat"
             drop(tx);
             topology.stop().await;
             assert_eq!(out.recv().await, None);
+        })
+        .await;
+    }
+
+    /// Tests the case where both starts_when and ends_when are not defined,
+    /// and aggregation continues on and on, without flushing as long as events
+    /// arrive in rate that is faster than the rate of expire_ms between events.
+    #[tokio::test]
+    async fn last_flush_at() {
+        let reduce_config = toml::from_str::<ReduceConfig>(
+            r#"
+group_by = [ "user_id" ]
+expire_after_ms = 200
+flush_period_ms = 250
+            "#,
+        )
+        .unwrap();
+
+        assert_transform_compliance(async move {
+            let (tx, rx) = mpsc::channel(1);
+            let (topology, mut out) = create_topology(ReceiverStream::new(rx), reduce_config).await;
+
+            async fn send_event(tx: &Sender<Event>, user_id: i32) {
+                let mut log_event = LogEvent::from("test message");
+                log_event.insert("user_id", user_id.to_string());
+                tx.send(log_event.into()).await.unwrap();
+            }
+
+            // send in a rate that is double than the rate of of expire_ms between events
+            for _ in 0..5 {
+                send_event(&tx, 1).await;
+                sleep(Duration::from_millis(50)).await;
+                send_event(&tx, 2).await;
+                sleep(Duration::from_millis(50)).await;
+            }
+
+            // verify messages arrive during this time
+            out.try_recv().expect("No message arrived");
+            sleep(Duration::from_millis(10)).await;
+            out.try_recv().expect("No message arrived");
+
+            drop(tx);
+            topology.stop().await;
         })
         .await;
     }

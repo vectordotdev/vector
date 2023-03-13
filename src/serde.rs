@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 use codecs::{
     decoding::{DeserializerConfig, FramingConfig},
     BytesDecoderConfig, BytesDeserializerConfig,
@@ -100,7 +101,7 @@ impl<V: 'static> Fields<V> {
 #[configurable_component]
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 #[serde(untagged)]
-pub enum OneOrMany<T> {
+pub enum OneOrMany<T: 'static> {
     One(T),
     Many(Vec<T>),
 }

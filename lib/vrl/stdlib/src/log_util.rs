@@ -163,12 +163,7 @@ fn parse_time(
     timezone
         .datetime_from_str(time, format)
         .or_else(|_| DateTime::parse_from_str(time, format).map(Into::into))
-        .map_err(|err| {
-            format!(
-                "failed parsing timestamp {} using format {}: {}",
-                time, format, err
-            )
-        })
+        .map_err(|err| format!("failed parsing timestamp {time} using format {format}: {err}"))
 }
 
 /// Takes the field as a string and returns a `Value`.

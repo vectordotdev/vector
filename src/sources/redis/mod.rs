@@ -12,7 +12,7 @@ use value::Kind;
 use vector_common::internal_event::{
     ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol, Registered,
 };
-use vector_config::{configurable_component, NamedComponent};
+use vector_config::configurable_component;
 use vector_core::{
     config::{LegacyKey, LogNamespace},
     EstimatedJsonEncodedSizeOf,
@@ -108,9 +108,11 @@ pub struct RedisSourceConfig {
     /// The Redis URL to connect to.
     ///
     /// The URL must take the form of `protocol://server:port/db` where the `protocol` can either be `redis` or `rediss` for connections secured via TLS.
+    #[configurable(metadata(docs::examples = "redis://127.0.0.1:6379/0"))]
     url: String,
 
     /// The Redis key to read messages from.
+    #[configurable(metadata(docs::examples = "vector"))]
     key: String,
 
     /// Sets the name of the log field to use to add the key to each event.
@@ -118,6 +120,7 @@ pub struct RedisSourceConfig {
     /// The value will be the Redis key that the event was read from.
     ///
     /// By default, this is not set and the field will not be automatically added.
+    #[configurable(metadata(docs::examples = "redis_key"))]
     redis_key: Option<OptionalValuePath>,
 
     #[configurable(derived)]

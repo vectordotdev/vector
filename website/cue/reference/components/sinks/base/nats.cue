@@ -38,7 +38,7 @@ base: components: sinks: nats: configuration: {
 				type: object: options: path: {
 					description: "Path to credentials file."
 					required:    true
-					type: string: {}
+					type: string: examples: ["/etc/nats/nats.creds"]
 				}
 			}
 			nkey: {
@@ -114,9 +114,18 @@ base: components: sinks: nats: configuration: {
 		}
 	}
 	connection_name: {
-		description: "A name assigned to the NATS connection."
-		required:    false
-		type: string: default: "vector"
+		description: """
+			A NATS [name][nats_connection_name] assigned to the NATS connection.
+
+			[nats_connection_name]: https://docs.nats.io/using-nats/developer/connecting/name
+			"""
+		required: false
+		type: string: {
+			default: "vector"
+			examples: [
+				"foo",
+			]
+		}
 	}
 	encoding: {
 		description: "Configures how events are encoded into raw bytes."
@@ -140,6 +149,11 @@ base: components: sinks: nats: configuration: {
 						Encodes an event as an [Apache Avro][apache_avro] message.
 
 						[apache_avro]: https://avro.apache.org/
+						"""
+					csv: """
+						Encodes an event as a CSV message.
+
+						This codec must be configured with fields to encode.
 						"""
 					gelf: """
 						Encodes an event as a [GELF][gelf] message.
@@ -193,6 +207,24 @@ base: components: sinks: nats: configuration: {
 						"""
 				}
 			}
+			csv: {
+				description:   "The CSV Serializer Options."
+				relevant_when: "codec = \"csv\""
+				required:      true
+				type: object: options: fields: {
+					description: """
+						Configures the fields that will be encoded, as well as the order in which they
+						appear in the output.
+
+						If a field is not present in the event, the output will be an empty string.
+
+						Values of type `Array`, `Object`, and `Regex` are not supported and the
+						output will be an empty string.
+						"""
+					required: true
+					type: array: items: type: string: {}
+				}
+			}
 			except_fields: {
 				description: "List of fields that will be excluded from the encoded event."
 				required:    false
@@ -235,9 +267,16 @@ base: components: sinks: nats: configuration: {
 		}
 	}
 	subject: {
-		description: "The NATS subject to publish messages to."
-		required:    true
-		type: string: syntax: "template"
+		description: """
+			The NATS [subject][nats_subject] to publish messages to.
+
+			[nats_subject]: https://docs.nats.io/nats-concepts/subjects
+			"""
+		required: true
+		type: string: {
+			examples: ["{{ host }}", "foo", "time.us.east", "time.*.east", "time.>", ">"]
+			syntax: "template"
+		}
 	}
 	tls: {
 		description: "Configures the TLS options for incoming/outgoing connections."
@@ -336,11 +375,14 @@ base: components: sinks: nats: configuration: {
 	}
 	url: {
 		description: """
-			The NATS URL to connect to.
+			The NATS [URL][nats_url] to connect to.
 
 			The URL must take the form of `nats://server:port`.
+			If the port is not specified it defaults to 4222.
+
+			[nats_url]: https://docs.nats.io/using-nats/developer/connecting#nats-url
 			"""
 		required: true
-		type: string: {}
+		type: string: examples: ["nats://demo.nats.io", "nats://127.0.0.1:4242"]
 	}
 }

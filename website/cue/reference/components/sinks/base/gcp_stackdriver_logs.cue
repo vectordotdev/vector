@@ -29,7 +29,7 @@ base: components: sinks: gcp_stackdriver_logs: configuration: {
 	}
 	api_key: {
 		description: """
-			An API key. ([documentation](https://cloud.google.com/docs/authentication/api-keys))
+			An [API key][gcp_api_key].
 
 			Either an API key, or a path to a service account credentials JSON file can be specified.
 
@@ -37,6 +37,8 @@ base: components: sinks: gcp_stackdriver_logs: configuration: {
 			filename is named, an attempt is made to fetch an instance service account for the compute instance the program is
 			running on. If this is not on a GCE instance, then you must define it with an API key or service account
 			credentials JSON file.
+
+			[gcp_api_key]: https://cloud.google.com/docs/authentication/api-keys
 			"""
 		required: false
 		type: string: {}
@@ -53,28 +55,38 @@ base: components: sinks: gcp_stackdriver_logs: configuration: {
 					serialized / compressed.
 					"""
 				required: false
-				type: uint: {}
+				type: uint: {
+					default: 10000000
+					unit:    "bytes"
+				}
 			}
 			max_events: {
-				description: "The maximum size of a batch, in events, before it is flushed."
+				description: "The maximum size of a batch before it is flushed."
 				required:    false
-				type: uint: {}
+				type: uint: unit: "events"
 			}
 			timeout_secs: {
-				description: "The maximum age of a batch, in seconds, before it is flushed."
+				description: "The maximum age of a batch before it is flushed."
 				required:    false
-				type: float: {}
+				type: float: {
+					default: 1.0
+					unit:    "seconds"
+				}
 			}
 		}
 	}
 	billing_account_id: {
-		description: "The billing account ID to which to publish logs."
-		required:    true
+		description: """
+			The billing account ID to which to publish logs.
+
+			Exactly one of `billing_account_id`, `folder_id`, `organization_id`, or `project_id` must be set.
+			"""
+		required: true
 		type: string: {}
 	}
 	credentials_path: {
 		description: """
-			Path to a service account credentials JSON file. ([documentation](https://cloud.google.com/docs/authentication/production#manually))
+			Path to a [service account] credentials JSON file.
 
 			Either an API key, or a path to a service account credentials JSON file can be specified.
 
@@ -82,6 +94,8 @@ base: components: sinks: gcp_stackdriver_logs: configuration: {
 			filename is named, an attempt is made to fetch an instance service account for the compute instance the program is
 			running on. If this is not on a GCE instance, then you must define it with an API key or service account
 			credentials JSON file.
+
+			[gcp_service_account_credentials]: https://cloud.google.com/docs/authentication/production#manually
 			"""
 		required: false
 		type: string: {}
@@ -116,6 +130,8 @@ base: components: sinks: gcp_stackdriver_logs: configuration: {
 
 			See the [Google Cloud Platform folder documentation][folder_docs] for more details.
 
+			Exactly one of `billing_account_id`, `folder_id`, `organization_id`, or `project_id` must be set.
+
 			[folder_docs]: https://cloud.google.com/resource-manager/docs/creating-managing-folders
 			"""
 		required: true
@@ -135,6 +151,8 @@ base: components: sinks: gcp_stackdriver_logs: configuration: {
 			The organization ID to which to publish logs.
 
 			This would be the identifier assigned to your organization on Google Cloud Platform.
+
+			Exactly one of `billing_account_id`, `folder_id`, `organization_id`, or `project_id` must be set.
 			"""
 		required: true
 		type: string: {}
@@ -144,6 +162,8 @@ base: components: sinks: gcp_stackdriver_logs: configuration: {
 			The project ID to which to publish logs.
 
 			See the [Google Cloud Platform project management documentation][project_docs] for more details.
+
+			Exactly one of `billing_account_id`, `folder_id`, `organization_id`, or `project_id` must be set.
 
 			[project_docs]: https://cloud.google.com/resource-manager/docs/creating-managing-projects
 			"""
@@ -231,14 +251,20 @@ base: components: sinks: gcp_stackdriver_logs: configuration: {
 				}
 			}
 			rate_limit_duration_secs: {
-				description: "The time window, in seconds, used for the `rate_limit_num` option."
+				description: "The time window used for the `rate_limit_num` option."
 				required:    false
-				type: uint: default: 1
+				type: uint: {
+					default: 1
+					unit:    "seconds"
+				}
 			}
 			rate_limit_num: {
 				description: "The maximum number of requests allowed within the `rate_limit_duration_secs` time window."
 				required:    false
-				type: uint: default: 9223372036854775807
+				type: uint: {
+					default: 9223372036854775807
+					unit:    "requests"
+				}
 			}
 			retry_attempts: {
 				description: """
@@ -247,7 +273,10 @@ base: components: sinks: gcp_stackdriver_logs: configuration: {
 					The default, for all intents and purposes, represents an infinite number of retries.
 					"""
 				required: false
-				type: uint: default: 9223372036854775807
+				type: uint: {
+					default: 9223372036854775807
+					unit:    "retries"
+				}
 			}
 			retry_initial_backoff_secs: {
 				description: """
@@ -256,42 +285,61 @@ base: components: sinks: gcp_stackdriver_logs: configuration: {
 					After the first retry has failed, the fibonacci sequence will be used to select future backoffs.
 					"""
 				required: false
-				type: uint: default: 1
+				type: uint: {
+					default: 1
+					unit:    "seconds"
+				}
 			}
 			retry_max_duration_secs: {
-				description: "The maximum amount of time, in seconds, to wait between retries."
+				description: "The maximum amount of time to wait between retries."
 				required:    false
-				type: uint: default: 3600
+				type: uint: {
+					default: 3600
+					unit:    "seconds"
+				}
 			}
 			timeout_secs: {
 				description: """
-					The maximum time a request can take before being aborted.
+					The time a request can take before being aborted.
 
 					It is highly recommended that you do not lower this value below the service’s internal timeout, as this could
 					create orphaned requests, pile on retries, and result in duplicate data downstream.
 					"""
 				required: false
-				type: uint: default: 60
+				type: uint: {
+					default: 60
+					unit:    "seconds"
+				}
 			}
 		}
 	}
 	resource: {
 		description: "The monitored resource to associate the logs with."
 		required:    true
-		type: object: options: {
-			"*": {
-				description: "A type-specific label."
-				required:    true
-				type: string: syntax: "template"
-			}
-			type: {
-				description: """
-					The monitored resource type.
+		type: object: {
+			examples: [{
+				instanceId: "Twilight"
+				zone:       "{{ zone }}"
+			}]
+			options: {
+				"*": {
+					description: "A type-specific label."
+					required:    true
+					type: string: syntax: "template"
+				}
+				type: {
+					description: """
+						The monitored resource type.
 
-					For example, the type of a Compute Engine VM instance is `gce_instance`.
-					"""
-				required: true
-				type: string: {}
+						For example, the type of a Compute Engine VM instance is `gce_instance`.
+						See the [Google Cloud Platform monitored resource documentation][gcp_resources] for
+						more details.
+
+						[gcp_resources]: https://cloud.google.com/monitoring/api/resources
+						"""
+					required: true
+					type: string: {}
+				}
 			}
 		}
 	}
@@ -312,12 +360,7 @@ base: components: sinks: gcp_stackdriver_logs: configuration: {
 			[logsev_docs]: https://cloud.google.com/logging/docs/reference/v2/rest/v2/LogEntry#logseverity
 			"""
 		required: false
-		type: string: {}
-	}
-	skip_authentication: {
-		description: "Skip all authentication handling. For use with integration tests only."
-		required:    false
-		type: bool: default: false
+		type: string: examples: ["severity"]
 	}
 	tls: {
 		description: "TLS configuration."

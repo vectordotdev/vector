@@ -61,7 +61,7 @@ struct Component {
     r#type: String,
 }
 
-pub fn load_and_extract(filename: &Path) -> Result<String> {
+pub fn load_and_extract(filename: &Path) -> Result<Vec<String>> {
     let config =
         fs::read_to_string(filename).with_context(|| format!("failed to read {filename:?}"))?;
 
@@ -81,7 +81,7 @@ pub fn load_and_extract(filename: &Path) -> Result<String> {
     Ok(from_config(config))
 }
 
-pub fn from_config(config: VectorConfig) -> String {
+pub fn from_config(config: VectorConfig) -> Vec<String> {
     let mut features = FeatureSet::default();
     add_option(&mut features, "api", &config.api);
     add_option(&mut features, "enterprise", &config.enterprise);
@@ -104,7 +104,7 @@ pub fn from_config(config: VectorConfig) -> String {
     // not be emitted as they don't actually have a feature flag because we always compile them.
     features.remove("transforms-log_to_metric");
 
-    features.into_iter().collect::<Vec<_>>().join(",")
+    features.into_iter().collect()
 }
 
 fn add_option<T>(features: &mut FeatureSet, name: &str, field: &Option<T>) {

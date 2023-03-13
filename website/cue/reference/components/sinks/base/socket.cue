@@ -31,11 +31,13 @@ base: components: sinks: socket: configuration: {
 		description: """
 			The address to connect to.
 
+			Both IP address and hostname are accepted formats.
+
 			The address _must_ include a port.
 			"""
 		relevant_when: "mode = \"tcp\" or mode = \"udp\""
 		required:      true
-		type: string: {}
+		type: string: examples: ["92.12.333.224:5000", "https://somehost:5000"]
 	}
 	encoding: {
 		description: "Configures how events are encoded into raw bytes."
@@ -59,6 +61,11 @@ base: components: sinks: socket: configuration: {
 						Encodes an event as an [Apache Avro][apache_avro] message.
 
 						[apache_avro]: https://avro.apache.org/
+						"""
+					csv: """
+						Encodes an event as a CSV message.
+
+						This codec must be configured with fields to encode.
 						"""
 					gelf: """
 						Encodes an event as a [GELF][gelf] message.
@@ -110,6 +117,24 @@ base: components: sinks: socket: configuration: {
 						transform, etc) and removing the message field while doing additional parsing on it, as this
 						could lead to the encoding emitting empty strings for the given event.
 						"""
+				}
+			}
+			csv: {
+				description:   "The CSV Serializer Options."
+				relevant_when: "codec = \"csv\""
+				required:      true
+				type: object: options: fields: {
+					description: """
+						Configures the fields that will be encoded, as well as the order in which they
+						appear in the output.
+
+						If a field is not present in the event, the output will be an empty string.
+
+						Values of type `Array`, `Object`, and `Regex` are not supported and the
+						output will be an empty string.
+						"""
+					required: true
+					type: array: items: type: string: {}
 				}
 			}
 			except_fields: {
@@ -189,9 +214,9 @@ base: components: sinks: socket: configuration: {
 		relevant_when: "mode = \"tcp\""
 		required:      false
 		type: object: options: time_secs: {
-			description: "The time to wait, in seconds, before starting to send TCP keepalive probes on an idle connection."
+			description: "The time to wait before starting to send TCP keepalive probes on an idle connection."
 			required:    false
-			type: uint: {}
+			type: uint: unit: "seconds"
 		}
 	}
 	mode: {
@@ -211,17 +236,22 @@ base: components: sinks: socket: configuration: {
 			"""
 		relevant_when: "mode = \"unix\""
 		required:      true
-		type: string: {}
+		type: string: examples: ["/path/to/socket"]
 	}
 	send_buffer_bytes: {
 		description: """
-			The size, in bytes, of the socket's send buffer.
+			The size of the socket's send buffer.
 
 			If set, the value of the setting is passed via the `SO_SNDBUF` option.
 			"""
 		relevant_when: "mode = \"tcp\" or mode = \"udp\""
 		required:      false
-		type: uint: {}
+		type: uint: {
+			examples: [
+				65536,
+			]
+			unit: "bytes"
+		}
 	}
 	tls: {
 		description:   "Configures the TLS options for incoming/outgoing connections."

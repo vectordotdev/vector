@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 use std::{
     fmt,
     task::{Context, Poll},
@@ -243,10 +244,14 @@ pub enum Auth {
     ///
     /// [base64]: https://en.wikipedia.org/wiki/Base64
     Basic {
-        /// The username to send.
+        /// The basic authentication username.
+        #[configurable(metadata(docs::examples = "${USERNAME}"))]
+        #[configurable(metadata(docs::examples = "username"))]
         user: String,
 
-        /// The password to send.
+        /// The basic authentication password.
+        #[configurable(metadata(docs::examples = "${PASSWORD}"))]
+        #[configurable(metadata(docs::examples = "password"))]
         password: SensitiveString,
     },
 
@@ -254,7 +259,7 @@ pub enum Auth {
     ///
     /// The bearer token value (OAuth2, JWT, etc) is passed as-is.
     Bearer {
-        /// The bearer token to send.
+        /// The bearer authentication token.
         token: SensitiveString,
     },
 }

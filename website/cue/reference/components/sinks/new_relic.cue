@@ -13,6 +13,7 @@ components: sinks: new_relic: {
 	}
 
 	features: {
+		auto_generated:   true
 		acknowledgements: true
 		healthcheck: enabled: true
 		send: {
@@ -63,53 +64,7 @@ components: sinks: new_relic: {
 		notices: []
 	}
 
-	configuration: {
-		license_key: {
-			description: "Your New Relic license key."
-			required:    true
-			warnings: []
-			type: string: {
-				examples: ["xxxx", "${NEW_RELIC_LICENSE_KEY}"]
-				syntax: "literal"
-			}
-		}
-		account_id: {
-			description: "Your New Relic account ID."
-			required:    true
-			warnings: []
-			type: string: {
-				examples: ["xxxx", "${NEW_RELIC_ACCOUNT_ID}"]
-				syntax: "literal"
-			}
-		}
-		region: {
-			common:      true
-			description: "The region to send data to."
-			required:    false
-			warnings: []
-			type: string: {
-				default: "us"
-				enum: {
-					us: "United States"
-					eu: "Europe"
-				}
-				syntax: "literal"
-			}
-		}
-		api: {
-			description: "The API selected to send data to."
-			required:    true
-			warnings: []
-			type: string: {
-				enum: {
-					events:  "Event API"
-					metrics: "Metric API"
-					logs:    "Log API"
-				}
-				syntax: "literal"
-			}
-		}
-	}
+	configuration: base.components.sinks.new_relic.configuration
 
 	input: {
 		logs: true

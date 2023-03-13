@@ -2,10 +2,13 @@ package metadata
 
 base: components: sources: aws_sqs: configuration: {
 	acknowledgements: {
+		deprecated: true
 		description: """
 			Controls how acknowledgements are handled by this source.
 
-			This setting is **deprecated** in favor of enabling `acknowledgements` at the [global][global_acks] or sink level. Enabling or disabling acknowledgements at the source level has **no effect** on acknowledgement behavior.
+			This setting is **deprecated** in favor of enabling `acknowledgements` at the [global][global_acks] or sink level.
+
+			Enabling or disabling acknowledgements at the source level has **no effect** on acknowledgement behavior.
 
 			See [End-to-end Acknowledgements][e2e_acks] for more information on how event acknowledgement is handled.
 
@@ -26,17 +29,21 @@ base: components: sources: aws_sqs: configuration: {
 			access_key_id: {
 				description: "The AWS access key ID."
 				required:    true
-				type: string: {}
+				type: string: examples: ["AKIAIOSFODNN7EXAMPLE"]
 			}
 			assume_role: {
-				description: "The ARN of the role to assume."
-				required:    true
-				type: string: {}
+				description: """
+					The ARN of an [IAM role][iam_role] to assume.
+
+					[iam_role]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles.html
+					"""
+				required: true
+				type: string: examples: ["arn:aws:iam::123456789098:role/my_role"]
 			}
 			credentials_file: {
 				description: "Path to the credentials file."
 				required:    true
-				type: string: {}
+				type: string: examples: ["/my/aws/credentials"]
 			}
 			imds: {
 				description: "Configuration for authenticating with AWS through IMDS."
@@ -66,29 +73,45 @@ base: components: sources: aws_sqs: configuration: {
 				}
 			}
 			load_timeout_secs: {
-				description: "Timeout for successfully loading any credentials, in seconds."
-				required:    false
-				type: uint: {}
+				description: """
+					Timeout for successfully loading any credentials, in seconds.
+
+					Relevant when the default credentials chain is used or `assume_role`.
+					"""
+				required: false
+				type: uint: {
+					examples: [30]
+					unit: "seconds"
+				}
 			}
 			profile: {
-				description: "The credentials profile to use."
-				required:    false
-				type: string: {}
+				description: """
+					The credentials profile to use.
+
+					Used to select AWS credentials from a provided credentials file.
+					"""
+				required: false
+				type: string: {
+					default: "default"
+					examples: ["develop"]
+				}
 			}
 			region: {
 				description: """
-					The AWS region to send STS requests to.
+					The [AWS region][aws_region] to send STS requests to.
 
 					If not set, this will default to the configured region
 					for the service itself.
+
+					[aws_region]: https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints
 					"""
 				required: false
-				type: string: {}
+				type: string: examples: ["us-west-2"]
 			}
 			secret_access_key: {
 				description: "The AWS secret access key."
 				required:    true
-				type: string: {}
+				type: string: examples: ["wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"]
 			}
 		}
 	}
@@ -98,10 +121,11 @@ base: components: sources: aws_sqs: configuration: {
 
 			Defaults to the number of available CPUs on the system.
 
-			Should not typically need to be changed, but it can sometimes be beneficial to raise this value when there is a
-			high rate of messages being pushed into the queue and the messages being fetched are small. In these cases,
-			System resources may not be fully utilized without fetching more messages per second, as it spends more time
-			fetching the messages than processing them.
+			Should not typically need to be changed, but it can sometimes be beneficial to raise this
+			value when there is a high rate of messages being pushed into the queue and the messages
+			being fetched are small. In these cases, system resources may not be fully utilized without
+			fetching more messages per second, as it spends more time fetching the messages than
+			processing them.
 			"""
 		required: false
 		type: uint: {}
@@ -165,9 +189,9 @@ base: components: sources: aws_sqs: configuration: {
 		type: bool: default: true
 	}
 	endpoint: {
-		description: "The API endpoint of the service."
+		description: "Custom endpoint for use with AWS-compatible services."
 		required:    false
-		type: string: {}
+		type: string: examples: ["http://127.0.0.0:5000/path/to/service"]
 	}
 	framing: {
 		description: """
@@ -194,6 +218,14 @@ base: components: sources: aws_sqs: configuration: {
 																The maximum length of the byte buffer.
 
 																This length does *not* include the trailing delimiter.
+
+																By default, there is no maximum length enforced. If events are malformed, this can lead to
+																additional resource usage as events continue to be buffered in memory, and can potentially
+																lead to memory exhaustion in extreme cases.
+
+																If there is a risk of processing malformed data, such as logs with user-controlled input,
+																consider setting the maximum length to a reasonably large value as a safety net. This will
+																ensure that processing is not truly unbounded.
 																"""
 						required: false
 						type: uint: {}
@@ -227,6 +259,14 @@ base: components: sources: aws_sqs: configuration: {
 						The maximum length of the byte buffer.
 
 						This length does *not* include the trailing delimiter.
+
+						By default, there is no maximum length enforced. If events are malformed, this can lead to
+						additional resource usage as events continue to be buffered in memory, and can potentially
+						lead to memory exhaustion in extreme cases.
+
+						If there is a risk of processing malformed data, such as logs with user-controlled input,
+						consider setting the maximum length to a reasonably large value as a safety net. This will
+						ensure that processing is not truly unbounded.
 						"""
 					required: false
 					type: uint: {}
@@ -248,21 +288,28 @@ base: components: sources: aws_sqs: configuration: {
 		description: """
 			How long to wait while polling the queue for new messages, in seconds.
 
-			Generally should not be changed unless instructed to do so, as if messages are available, they will always be
-			consumed, regardless of the value of `poll_secs`.
+			Generally should not be changed unless instructed to do so, as if messages are available,
+			they will always be consumed, regardless of the value of `poll_secs`.
 			"""
 		required: false
-		type: uint: default: 15
+		type: uint: {
+			default: 15
+			unit:    "seconds"
+		}
 	}
 	queue_url: {
 		description: "The URL of the SQS queue to poll for messages."
 		required:    true
-		type: string: {}
+		type: string: examples: ["https://sqs.us-east-2.amazonaws.com/123456789012/MyQueue"]
 	}
 	region: {
-		description: "The AWS region to use."
-		required:    false
-		type: string: {}
+		description: """
+			The [AWS region][aws_region] of the target service.
+
+			[aws_region]: https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints
+			"""
+		required: false
+		type: string: examples: ["us-east-1"]
 	}
 	tls: {
 		description: "TLS configuration."
@@ -359,6 +406,9 @@ base: components: sources: aws_sqs: configuration: {
 			This can happen if there is an issue between consuming a message and deleting it.
 			"""
 		required: false
-		type: uint: default: 300
+		type: uint: {
+			default: 300
+			unit:    "seconds"
+		}
 	}
 }

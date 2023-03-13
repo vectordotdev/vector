@@ -3,7 +3,9 @@ use aws_smithy_types::retry::RetryConfig;
 use codecs::JsonSerializerConfig;
 use futures::FutureExt;
 use tower::ServiceBuilder;
+use value::Kind;
 use vector_config::configurable_component;
+use vector_core::schema;
 
 use crate::{
     aws::{
@@ -12,8 +14,8 @@ use crate::{
     },
     codecs::{Encoder, EncodingConfig},
     config::{
-        log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Input, ProxyConfig,
-        SinkConfig, SinkContext,
+        AcknowledgementsConfig, DataType, GenerateConfig, Input, ProxyConfig, SinkConfig,
+        SinkContext,
     },
     sinks::{
         aws_cloudwatch_logs::{
@@ -54,17 +56,20 @@ pub struct CloudwatchLogsSinkConfig {
     /// The [group name][group_name] of the target CloudWatch Logs stream.
     ///
     /// [group_name]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html
+    #[configurable(metadata(docs::examples = "group-name"))]
+    #[configurable(metadata(docs::examples = "{{ file }}"))]
     pub group_name: Template,
 
     /// The [stream name][stream_name] of the target CloudWatch Logs stream.
     ///
-    /// There can only be one writer to a log stream at a time. If you have multiple
-    /// instances writing to the same log group, you must include an identifier in the
-    /// stream name that is guaranteed to be unique per instance.
-    ///
-    /// For example, you might choose `host`.
+    /// There can only be one writer to a log stream at a time. If multiple instances are writing to
+    /// the same log group, the stream name must include an identifier that is guaranteed to be
+    /// unique per instance.
     ///
     /// [stream_name]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html
+    #[configurable(metadata(docs::examples = "{{ host }}"))]
+    #[configurable(metadata(docs::examples = "%Y-%m-%d"))]
+    #[configurable(metadata(docs::examples = "stream-name"))]
     pub stream_name: Template,
 
     /// The [AWS region][aws_region] of the target service.
@@ -79,12 +84,14 @@ pub struct CloudwatchLogsSinkConfig {
     /// the first stream.
     ///
     /// [log_group]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html
-    pub create_missing_group: Option<bool>,
+    #[serde(default = "crate::serde::default_true")]
+    pub create_missing_group: bool,
 
     /// Dynamically create a [log stream][log_stream] if it does not already exist.
     ///
     /// [log_stream]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html
-    pub create_missing_stream: Option<bool>,
+    #[serde(default = "crate::serde::default_true")]
+    pub create_missing_stream: bool,
 
     #[configurable(derived)]
     pub encoding: EncodingConfig,
@@ -179,7 +186,6 @@ impl SinkConfig for CloudwatchLogsSinkConfig {
             request_builder: CloudwatchRequestBuilder {
                 group_template: self.group_name.clone(),
                 stream_template: self.stream_name.clone(),
-                log_schema: log_schema().clone(),
                 transformer,
                 encoder,
             },
@@ -191,7 +197,11 @@ impl SinkConfig for CloudwatchLogsSinkConfig {
     }
 
     fn input(&self) -> Input {
+        let requirement =
+            schema::Requirement::empty().optional_meaning("timestamp", Kind::timestamp());
+
         Input::new(self.encoding.config().input_type() & DataType::Log)
+            .with_schema_requirement(requirement)
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
@@ -211,8 +221,8 @@ fn default_config(encoding: EncodingConfig) -> CloudwatchLogsSinkConfig {
         group_name: Default::default(),
         stream_name: Default::default(),
         region: Default::default(),
-        create_missing_group: Default::default(),
-        create_missing_stream: Default::default(),
+        create_missing_group: true,
+        create_missing_stream: true,
         compression: Default::default(),
         batch: Default::default(),
         request: Default::default(),

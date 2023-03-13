@@ -3,7 +3,6 @@ use chrono::{DateTime, Utc};
 use lookup::path;
 use serde_json::Value as JsonValue;
 use snafu::{OptionExt, ResultExt, Snafu};
-use vector_config::NamedComponent;
 use vector_core::config::{LegacyKey, LogNamespace};
 
 use crate::{

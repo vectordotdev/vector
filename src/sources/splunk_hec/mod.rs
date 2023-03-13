@@ -18,7 +18,7 @@ use tracing::Span;
 use value::{kind::Collection, Kind};
 use vector_common::internal_event::{CountByteSize, InternalEventHandle as _, Registered};
 use vector_common::sensitive_string::SensitiveString;
-use vector_config::{configurable_component, NamedComponent};
+use vector_config::configurable_component;
 use vector_core::{
     config::{LegacyKey, LogNamespace},
     event::BatchNotifier,
@@ -71,7 +71,7 @@ pub struct SplunkConfig {
     /// it was communicating with the Splunk HEC endpoint directly.
     ///
     /// If _not_ supplied, the `Authorization` header will be ignored and requests will not be authenticated.
-    #[configurable(deprecated)]
+    #[configurable(deprecated = "This option has been deprecated, use `valid_tokens` instead.")]
     token: Option<SensitiveString>,
 
     /// Optional list of valid authorization tokens.
@@ -80,6 +80,7 @@ pub struct SplunkConfig {
     /// would if it was communicating with the Splunk HEC endpoint directly.
     ///
     /// If _not_ supplied, the `Authorization` header will be ignored and requests will not be authenticated.
+    #[configurable(metadata(docs::examples = "A94A8FE5CCB19BA61C4C08"))]
     valid_tokens: Option<Vec<SensitiveString>>,
 
     /// Whether or not to forward the Splunk HEC authentication token with events.
@@ -2379,18 +2380,40 @@ mod tests {
             Kind::object(Collection::empty()).or_bytes(),
             [LogNamespace::Vector],
         )
-        .with_metadata_field(&owned_value_path!("vector", "source_type"), Kind::bytes())
+        .with_metadata_field(
+            &owned_value_path!("vector", "source_type"),
+            Kind::bytes(),
+            None,
+        )
         .with_metadata_field(
             &owned_value_path!("vector", "ingest_timestamp"),
             Kind::timestamp(),
+            None,
         )
-        .with_metadata_field(&owned_value_path!("splunk_hec", "host"), Kind::bytes())
-        .with_metadata_field(&owned_value_path!("splunk_hec", "index"), Kind::bytes())
-        .with_metadata_field(&owned_value_path!("splunk_hec", "source"), Kind::bytes())
-        .with_metadata_field(&owned_value_path!("splunk_hec", "channel"), Kind::bytes())
+        .with_metadata_field(
+            &owned_value_path!("splunk_hec", "host"),
+            Kind::bytes(),
+            Some("host"),
+        )
+        .with_metadata_field(
+            &owned_value_path!("splunk_hec", "index"),
+            Kind::bytes(),
+            None,
+        )
+        .with_metadata_field(
+            &owned_value_path!("splunk_hec", "source"),
+            Kind::bytes(),
+            None,
+        )
+        .with_metadata_field(
+            &owned_value_path!("splunk_hec", "channel"),
+            Kind::bytes(),
+            None,
+        )
         .with_metadata_field(
             &owned_value_path!("splunk_hec", "sourcetype"),
             Kind::bytes(),
+            None,
         );
 
         assert_eq!(definition, expected_definition);

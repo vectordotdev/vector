@@ -14,6 +14,7 @@ components: sinks: socket: {
 
 	features: {
 		acknowledgements: true
+		auto_generated:   true
 		healthcheck: enabled: true
 		send: {
 			compression: enabled: false
@@ -58,35 +59,7 @@ components: sinks: socket: {
 		notices: []
 	}
 
-	configuration: {
-		address: {
-			description:   "The address to connect to. The address _must_ include a port."
-			relevant_when: "mode = `tcp` or `udp`"
-			required:      true
-			type: string: {
-				examples: ["92.12.333.224:5000"]
-			}
-		}
-		mode: {
-			description: "The type of socket to use."
-			required:    true
-			type: string: {
-				enum: {
-					tcp:  "TCP socket"
-					udp:  "UDP socket"
-					unix: "Unix domain socket"
-				}
-			}
-		}
-		path: {
-			description:   "The unix socket path. This should be the absolute path."
-			relevant_when: "mode = `unix`"
-			required:      true
-			type: string: {
-				examples: ["/path/to/socket"]
-			}
-		}
-	}
+	configuration: base.components.sinks.socket.configuration
 
 	input: {
 		logs:    true

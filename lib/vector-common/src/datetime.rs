@@ -1,15 +1,15 @@
-use std::fmt::Debug;
+use std::{cell::RefCell, fmt::Debug};
 
 use chrono::{DateTime, Local, ParseError, TimeZone as _, Utc};
 use chrono_tz::Tz;
 use derivative::Derivative;
+use serde_json::Value;
 use vector_config::{
     schema::{
-        apply_metadata, generate_const_string_schema, generate_one_of_schema,
-        get_or_generate_schema,
+        apply_base_metadata, generate_const_string_schema, generate_one_of_schema,
+        get_or_generate_schema, SchemaGenerator, SchemaObject,
     },
-    schemars::{gen::SchemaGenerator, schema::SchemaObject},
-    Configurable, GenerateError, Metadata,
+    Configurable, GenerateError, Metadata, ToValue,
 };
 use vector_config_common::attributes::CustomAttribute;
 
@@ -100,7 +100,7 @@ impl Configurable for TimeZone {
         Some(std::any::type_name::<Self>())
     }
 
-    fn metadata() -> vector_config::Metadata<Self> {
+    fn metadata() -> vector_config::Metadata {
         let mut metadata = vector_config::Metadata::default();
         metadata.set_title("Timezone reference.");
         metadata.set_description(r#"This can refer to any valid timezone as defined in the [TZ database][tzdb], or "local" which refers to the system local timezone.
@@ -113,11 +113,11 @@ impl Configurable for TimeZone {
         metadata
     }
 
-    fn generate_schema(gen: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
+    fn generate_schema(gen: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
         let mut local_schema = generate_const_string_schema("local".to_string());
-        let mut local_metadata = Metadata::<()>::with_description("System local timezone.");
+        let mut local_metadata = Metadata::with_description("System local timezone.");
         local_metadata.add_custom_attribute(CustomAttribute::kv("logical_name", "Local"));
-        apply_metadata(&mut local_schema, local_metadata);
+        apply_base_metadata(&mut local_schema, local_metadata);
 
         let mut tz_metadata = Metadata::with_title("A named timezone.");
         tz_metadata.set_description(
@@ -126,8 +126,14 @@ impl Configurable for TimeZone {
 [tzdb]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones"#,
         );
         tz_metadata.add_custom_attribute(CustomAttribute::kv("logical_name", "Named"));
-        let tz_schema = get_or_generate_schema::<Tz>(gen, tz_metadata)?;
+        let tz_schema = get_or_generate_schema(&Tz::as_configurable_ref(), gen, Some(tz_metadata))?;
 
         Ok(generate_one_of_schema(&[local_schema, tz_schema]))
+    }
+}
+
+impl ToValue for TimeZone {
+    fn to_value(&self) -> Value {
+        serde_json::to_value(self).expect("Could not convert time zone to JSON")
     }
 }

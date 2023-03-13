@@ -1,9 +1,7 @@
-use anyhow::{Context, Result};
+use anyhow::Result;
 use clap::Args;
-use std::path::PathBuf;
 
-use crate::app;
-use crate::testing::{config::IntegrationTestConfig, state};
+use crate::testing::{config::Environment, config::IntegrationTestConfig, state};
 
 /// Show information about integrations
 #[derive(Args, Debug)]
@@ -17,40 +15,84 @@ impl Cli {
     pub fn exec(self) -> Result<()> {
         match self.integration {
             None => {
-                let mut entries = vec![];
-                let root_dir: PathBuf = [app::path(), "scripts", "integration"].iter().collect();
-                for entry in root_dir
-                    .read_dir()
-                    .with_context(|| format!("failed to read directory {}", root_dir.display()))?
-                {
-                    let entry = entry?;
-                    if entry.path().is_dir() {
-                        entries.push(entry.file_name().into_string().unwrap());
-                    }
-                }
-                entries.sort();
-
-                for integration in &entries {
-                    display!("{integration}");
+                let entries = IntegrationTestConfig::collect_all()?;
+                let width = entries
+                    .keys()
+                    .fold(16, |width, entry| width.max(entry.len()));
+                println!("{:width$}  Environment Name(s)", "Integration Name");
+                println!("{:width$}  -------------------", "----------------");
+                for (integration, config) in entries {
+                    let envs_dir = state::EnvsDir::new(&integration);
+                    let active_env = envs_dir.active()?;
+                    let environments = config
+                        .environments()
+                        .keys()
+                        .map(|environment| format(&active_env, environment))
+                        .collect::<Vec<_>>()
+                        .join("  ");
+                    println!("{integration:width$}  {environments}");
                 }
             }
             Some(integration) => {
                 let (_test_dir, config) = IntegrationTestConfig::load(&integration)?;
-                let envs_dir = state::envs_dir(&integration);
-                let active_envs = state::active_envs(&envs_dir)?;
+                let envs_dir = state::EnvsDir::new(&integration);
+                let active_env = envs_dir.active()?;
 
-                display!("Test args: {}", config.args.join(" "));
+                if let Some(args) = &config.args {
+                    println!("Test args: {}", args.join(" "));
+                } else {
+                    println!("Test args: N/A");
+                }
 
-                display!("Environments:");
-                for environment in config.environments().keys() {
-                    if active_envs.contains(environment) {
-                        display!("  {} (active)", environment);
-                    } else {
-                        display!("  {}", environment);
+                if config.features.is_empty() {
+                    println!("Features: N/A");
+                } else {
+                    println!("Features: {}", config.features.join(","));
+                }
+
+                println!("Test filter: {}", config.test_filter.as_deref().unwrap_or("N/A"));
+
+                println!("Environment:");
+                print_env("  ", &config.env);
+                println!("Runner:");
+                println!("  Environment:");
+                print_env("    ", &config.runner.env);
+                println!("  Volumes:");
+                if config.runner.volumes.is_empty() {
+                    println!("    N/A");
+                } else {
+                    for (target, mount) in &config.runner.volumes {
+                        println!("    {target} => {mount}");
                     }
+                }
+                println!("  Needs docker socket: {}", config.runner.needs_docker_socket);
+
+                println!("Environments:");
+                for environment in config.environments().keys() {
+                    println!("  {}", format(&active_env, environment));
                 }
             }
         }
         Ok(())
+    }
+}
+
+fn format(active_env: &Option<String>, environment: &str) -> String {
+    match active_env {
+        Some(active) if active == environment => format!("{environment} (active)"),
+        _ => environment.into(),
+    }
+}
+
+fn print_env(prefix: &str, environment: &Environment) {
+    if environment.is_empty() {
+        println!("{prefix}N/A");
+    } else {
+        for (key, value) in environment {
+            match value {
+                Some(value) => println!("{prefix}{key}={value:?}"),
+                None => println!("{prefix}{key} (passthrough)"),
+            }
+        }
     }
 }

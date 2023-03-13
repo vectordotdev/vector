@@ -1,3 +1,4 @@
+//! Handles enrichment tables for `type = file`.
 use std::{
     collections::{BTreeMap, HashMap},
     fs,
@@ -15,12 +16,14 @@ use vector_config::configurable_component;
 
 use crate::config::EnrichmentTableConfig;
 
-/// File encoding options.
+/// File encoding configuration.
 #[configurable_component]
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[serde(tag = "type", rename_all = "snake_case")]
 enum Encoding {
-    /// Comma-separated values.
+    /// Decodes the file as a [CSV][csv] (comma-separated values) file.
+    ///
+    /// [csv]: https://wikipedia.org/wiki/Comma-separated_values
     Csv {
         /// Whether or not the file contains column headers.
         ///
@@ -247,6 +250,7 @@ impl EnrichmentTableConfig for FileConfig {
 
 impl_generate_config_from_default!(FileConfig);
 
+/// A struct that implements [enrichment::Table] to handle loading enrichment data from a CSV file.
 #[derive(Clone)]
 pub struct File {
     config: FileConfig,
@@ -261,6 +265,7 @@ pub struct File {
 }
 
 impl File {
+    /// Creates a new [File] based on the provided config.
     pub fn new(
         config: FileConfig,
         last_modified: SystemTime,

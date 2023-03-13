@@ -9,8 +9,7 @@ fn parse_int(value: Value, base: Option<Value>) -> Resolved {
 
             if !(2..=36).contains(&base) {
                 return Err(format!(
-                    "invalid base {}: must be be between 2 and 36 (inclusive)",
-                    value
+                    "invalid base {value}: must be be between 2 and 36 (inclusive)"
                 )
                 .into());
             }

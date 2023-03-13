@@ -47,13 +47,10 @@ impl<'a> Builder<'a> {
         let (ident_span, ident) = ident.take();
 
         // Check if function exists.
-        let (function_id, function) = if let Some(function) = funcs
+        let Some((function_id, function)) = funcs
             .iter()
             .enumerate()
-            .find(|(_pos, f)| f.identifier() == ident.as_ref())
-        {
-            function
-        } else {
+            .find(|(_pos, f)| f.identifier() == ident.as_ref()) else {
             let idents = funcs
                 .iter()
                 .map(|func| func.identifier())
@@ -417,7 +414,7 @@ impl<'a> Builder<'a> {
             .map_err(|error| Error::Compilation { call_span, error })?;
 
         // Re-insert the external context into the compiler state.
-        let _ = std::mem::replace(config, compile_ctx.into_config());
+        *config = compile_ctx.into_config();
 
         // Asking for an infallible function to abort on error makes no sense.
         // We consider this an error at compile-time, because it makes the
@@ -990,8 +987,7 @@ impl DiagnosticMessage for Error {
             } => {
                 vec![Label::primary(
                     format!(
-                        r#"required argument missing: "{}" (position {})"#,
-                        keyword, position
+                        r#"required argument missing: "{keyword}" (position {position})"#
                     ),
                     call_span,
                 )]

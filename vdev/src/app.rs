@@ -106,10 +106,8 @@ impl CommandExt for Command {
 
         let result = self.output();
         progress_bar.finish_and_clear();
-        let output = match result {
-            Ok(output) => output,
-            Err(_) => bail!("could not run command"),
-        };
+
+        let Ok(output) = result else {bail!("could not run command")};
 
         if output.status.success() {
             Ok(())
@@ -127,6 +125,14 @@ impl CommandExt for Command {
         debug!("Executing: {self:?}");
         if let Some(cwd) = self.get_current_dir() {
             debug!("  in working directory {cwd:?}");
+        }
+        for (key, value) in self.get_envs() {
+            let key = key.to_string_lossy();
+            if let Some(value) = value {
+                debug!("  ${key}={:?}", value.to_string_lossy());
+            } else {
+                debug!("  unset ${key}");
+            }
         }
     }
 }

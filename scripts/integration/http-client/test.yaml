@@ -1,0 +1,12 @@
+features:
+- http-client-integration-tests
+
+test_filter: 'sources::http_client::'
+
+env:
+  DUFS_ADDRESS: http://dufs:5000
+  DUFS_AUTH_ADDRESS: http://dufs-auth:5000
+  DUFS_HTTPS_ADDRESS: https://dufs-https:5000
+
+matrix:
+  version: [latest]

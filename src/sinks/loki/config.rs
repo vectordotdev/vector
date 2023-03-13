@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use futures::future::FutureExt;
+use value::Kind;
 use vector_config::configurable_component;
 
 use super::{healthcheck::healthcheck, sink::LokiSink};
@@ -8,6 +9,7 @@ use crate::{
     codecs::EncodingConfig,
     config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext},
     http::{Auth, HttpClient, MaybeAuth},
+    schema,
     sinks::{
         util::{BatchConfig, Compression, SinkBatchSettings, TowerRequestConfig, UriSerde},
         VectorSink,
@@ -91,12 +93,14 @@ pub struct LokiConfig {
     ///
     /// Both keys and values are templateable, which enables you to attach dynamic labels to events.
     ///
-    /// Labels can be suffixed with a “*” to allow the expansion of objects into multiple labels,
-    /// see “How it works” for more information.
+    /// Valid label keys include `*`, and prefixes ending with `*`, to allow for the expansion of
+    /// objects into multiple labels. See [Label expansion][label_expansion] for more information.
     ///
     /// Note: If the set of labels has high cardinality, this can cause drastic performance issues
     /// with Loki. To prevent this from happening, reduce the number of unique label keys and
     /// values.
+    ///
+    /// [label_expansion]: https://vector.dev/docs/reference/configuration/sinks/loki/#label-expansion
     #[configurable(metadata(docs::examples = "loki_labels_examples()"))]
     #[configurable(metadata(docs::additional_props_description = "A Loki label."))]
     pub labels: HashMap<Template, Template>,
@@ -146,9 +150,10 @@ fn loki_labels_examples() -> HashMap<String, String> {
     let mut examples = HashMap::new();
     examples.insert("source".to_string(), "vector".to_string());
     examples.insert(
-        "labels".to_string(),
+        "\"pod_labels_*\"".to_string(),
         "{{ kubernetes.pod_labels }}".to_string(),
     );
+    examples.insert("\"*\"".to_string(), "{{ metadata }}".to_string());
     examples.insert(
         "{{ event_field }}".to_string(),
         "{{ some_other_event_field }}".to_string(),
@@ -245,7 +250,11 @@ impl SinkConfig for LokiConfig {
     }
 
     fn input(&self) -> Input {
+        let requirement =
+            schema::Requirement::empty().optional_meaning("timestamp", Kind::timestamp());
+
         Input::new(self.encoding.config().input_type() & DataType::Log)
+            .with_schema_requirement(requirement)
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
@@ -273,7 +282,7 @@ pub fn valid_label_name(label: &Template) -> bool {
             (ch.is_ascii_alphabetic() || ch == '_')
                 && label_chars.all(|ch| ch.is_ascii_alphanumeric() || ch == '_')
         } else {
-            false
+            label.get_ref().trim() == "*"
         }
     }
 }
@@ -292,9 +301,9 @@ mod tests {
         assert!(valid_label_name(&"a09b".try_into().unwrap()));
         assert!(valid_label_name(&"abc_*".try_into().unwrap()));
         assert!(valid_label_name(&"_*".try_into().unwrap()));
+        assert!(valid_label_name(&"*".try_into().unwrap()));
 
         assert!(!valid_label_name(&"0ab".try_into().unwrap()));
-        assert!(!valid_label_name(&"*".try_into().unwrap()));
         assert!(!valid_label_name(&"".try_into().unwrap()));
         assert!(!valid_label_name(&" ".try_into().unwrap()));
 

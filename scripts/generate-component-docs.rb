@@ -287,7 +287,9 @@ def get_docs_type_for_value(schema, value)
   if ['number', 'integer'].include?(value_type)
     numeric_type = get_schema_metadata(schema, 'docs::numeric_type')
     if numeric_type.nil?
-      @logger.error "All fields with numeric types should have 'docs::numeric_type' metadata included."
+      @logger.error "All fields with numeric types should have 'docs::numeric_type' metadata included." +
+        "e.g. #[configurable(metadata(docs::numeric_type = \"bytes\"))]"
+      @logger.error "Value: #{value} (type: #{value_type})"
       exit 1
     end
 
@@ -807,6 +809,15 @@ def resolve_schema(root_schema, schema)
   description = get_rendered_description_from_schema(schema)
   resolved['description'] = description unless description.empty?
 
+  ## Resolve the deprecated flag. An optional deprecated message can also be set in the metadata.
+  if schema.fetch('deprecated', false)
+    resolved['deprecated'] = true
+    message = get_schema_metadata(schema, 'deprecated_message')
+    if message
+      resolved['deprecated_message'] = message
+    end
+  end
+
   # Reconcile the resolve schema, which essentially gives us a chance to, once the schema is
   # entirely resolved, check it for logical inconsistencies, fix up anything that we reasonably can,
   # and so on.
@@ -965,25 +976,43 @@ end
 def resolve_enum_schema(root_schema, schema)
   # Filter out all subschemas which are purely null schemas used for indicating optionality, as well
   # as any subschemas that are marked as being hidden.
+  is_optional = get_schema_metadata(schema, 'docs::optional')
   subschemas = schema['oneOf']
     .reject { |subschema| subschema['type'] == 'null' }
     .reject { |subschema| get_schema_metadata(subschema, 'docs::hidden') }
   subschema_count = subschemas.count
 
-  # If we only have one subschema after filtering, check to see if it's an `allOf` schema. If so, we
-  # unwrap it such that we end up with a copy of `schema` that looks like it was an `allOf` schema
-  # all along. We do this to properly resolve `allOf` schemas that were wrapped as `oneOf` w/ a null
-  # schema in order to establish optionality.
-  if subschema_count == 1 && get_json_schema_type(subschemas[0]) == 'all-of'
-    @logger.debug "Detected optional all-of schema, unwrapping all-of schema to resolve..."
+  # If we only have one subschema after filtering, check to see if it's an `allOf` or `oneOf` schema
+  # and `is_optional` is true.
+  #
+  # If it's an `allOf` subschema, then that means we originally had an `allOf` schema that we had to
+  # make optional, thus converting it to a `oneOf` with subschemas in the shape of `[null, allOf]`.
+  # In this case, we'll just remove the `oneOf` and move the `allOf` subschema up, as if it this
+  # schema was a `allOf` one all along.
+  #
+  # If so, we unwrap it such that we end up with a copy of `schema` that looks like it was an
+  # `allOf` schema all along. We do this to properly resolve `allOf` schemas that were wrapped as
+  # `oneOf` w/ a null schema in order to establish optionality.
+  if is_optional && subschema_count == 1
+    if get_json_schema_type(subschemas[0]) == 'all-of'
+      @logger.debug "Detected optional all-of schema, unwrapping all-of schema to resolve..."
 
-    # Copy the current schema and drop `oneOf` and set `allOf`, which will get us the correct
-    # unwrapped structure.
-    unwrapped_schema = deep_copy(schema)
-    unwrapped_schema.delete('oneOf')
-    unwrapped_schema['allOf'] = deep_copy(subschemas[0]['allOf'])
+      # Copy the current schema and drop `oneOf` and set `allOf` with the subschema, which will get us the correct
+      # unwrapped structure.
+      unwrapped_schema = deep_copy(schema)
+      unwrapped_schema.delete('oneOf')
+      unwrapped_schema['allOf'] = deep_copy(subschemas[0]['allOf'])
 
-    return { '_resolved' => resolve_schema(root_schema, unwrapped_schema) }
+      return { '_resolved' => resolve_schema(root_schema, unwrapped_schema) }
+    else
+      # For all other subschema types, we copy the current schema, drop the `oneOf`, and merge the
+      # subschema into it. This essentially unnests the schema.
+      unwrapped_schema = deep_copy(schema)
+      unwrapped_schema.delete('oneOf')
+      unwrapped_schema = schema_aware_nested_merge(unwrapped_schema, subschemas[0])
+
+      return { '_resolved' => resolve_schema(root_schema, unwrapped_schema) }
+    end
   end
 
   # Collect all of the tagging mode information upfront.

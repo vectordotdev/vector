@@ -2,10 +2,13 @@ package metadata
 
 base: components: sources: kafka: configuration: {
 	acknowledgements: {
+		deprecated: true
 		description: """
 			Controls how acknowledgements are handled by this source.
 
-			This setting is **deprecated** in favor of enabling `acknowledgements` at the [global][global_acks] or sink level. Enabling or disabling acknowledgements at the source level has **no effect** on acknowledgement behavior.
+			This setting is **deprecated** in favor of enabling `acknowledgements` at the [global][global_acks] or sink level.
+
+			Enabling or disabling acknowledgements at the source level has **no effect** on acknowledgement behavior.
 
 			See [End-to-end Acknowledgements][e2e_acks] for more information on how event acknowledgement is handled.
 
@@ -135,6 +138,14 @@ base: components: sources: kafka: configuration: {
 																The maximum length of the byte buffer.
 
 																This length does *not* include the trailing delimiter.
+
+																By default, there is no maximum length enforced. If events are malformed, this can lead to
+																additional resource usage as events continue to be buffered in memory, and can potentially
+																lead to memory exhaustion in extreme cases.
+
+																If there is a risk of processing malformed data, such as logs with user-controlled input,
+																consider setting the maximum length to a reasonably large value as a safety net. This will
+																ensure that processing is not truly unbounded.
 																"""
 						required: false
 						type: uint: {}
@@ -168,6 +179,14 @@ base: components: sources: kafka: configuration: {
 						The maximum length of the byte buffer.
 
 						This length does *not* include the trailing delimiter.
+
+						By default, there is no maximum length enforced. If events are malformed, this can lead to
+						additional resource usage as events continue to be buffered in memory, and can potentially
+						lead to memory exhaustion in extreme cases.
+
+						If there is a risk of processing malformed data, such as logs with user-controlled input,
+						consider setting the maximum length to a reasonably large value as a safety net. This will
+						ensure that processing is not truly unbounded.
 						"""
 					required: false
 					type: uint: {}
@@ -189,11 +208,6 @@ base: components: sources: kafka: configuration: {
 		description: "The consumer group name to be used to consume events from Kafka."
 		required:    true
 		type: string: examples: ["consumer-group-name"]
-	}
-	group_instance_id: {
-		description: "Override dynamic membership and broker assignment behavior with static membership, using a group instance (member) id."
-		required:    false
-		type: string: examples: ["kafka-streams-instance-1"]
 	}
 	headers_key: {
 		description: """
@@ -241,6 +255,15 @@ base: components: sources: kafka: configuration: {
 				required:    true
 				type: string: {}
 			}
+		}
+	}
+	metrics: {
+		description: "Metrics configuration."
+		required:    false
+		type: object: options: topic_lag_metric: {
+			description: "Expose topic lag metrics for all topics and partitions. Metric names are `kafka_consumer_lag`."
+			required:    false
+			type: bool: default: false
 		}
 	}
 	offset_key: {

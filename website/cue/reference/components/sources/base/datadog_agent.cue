@@ -2,10 +2,13 @@ package metadata
 
 base: components: sources: datadog_agent: configuration: {
 	acknowledgements: {
+		deprecated: true
 		description: """
 			Controls how acknowledgements are handled by this source.
 
-			This setting is **deprecated** in favor of enabling `acknowledgements` at the [global][global_acks] or sink level. Enabling or disabling acknowledgements at the source level has **no effect** on acknowledgement behavior.
+			This setting is **deprecated** in favor of enabling `acknowledgements` at the [global][global_acks] or sink level.
+
+			Enabling or disabling acknowledgements at the source level has **no effect** on acknowledgement behavior.
 
 			See [End-to-end Acknowledgements][e2e_acks] for more information on how event acknowledgement is handled.
 
@@ -21,12 +24,12 @@ base: components: sources: datadog_agent: configuration: {
 	}
 	address: {
 		description: """
-			The address to accept connections on.
+			The socket address to accept connections on.
 
-			The address _must_ include a port.
+			It _must_ include a port.
 			"""
 		required: true
-		type: string: {}
+		type: string: examples: ["0.0.0.0:80", "localhost:80"]
 	}
 	decoding: {
 		description: "Configures how events are decoded from raw bytes."
@@ -78,17 +81,17 @@ base: components: sources: datadog_agent: configuration: {
 		}
 	}
 	disable_logs: {
-		description: "If this settings is set to `true`, logs won't be accepted by the component."
+		description: "If this is set to `true`, logs won't be accepted by the component."
 		required:    false
 		type: bool: default: false
 	}
 	disable_metrics: {
-		description: "If this settings is set to `true`, metrics won't be accepted by the component."
+		description: "If this is set to `true`, metrics won't be accepted by the component."
 		required:    false
 		type: bool: default: false
 	}
 	disable_traces: {
-		description: "If this settings is set to `true`, traces won't be accepted by the component."
+		description: "If this is set to `true`, traces won't be accepted by the component."
 		required:    false
 		type: bool: default: false
 	}
@@ -117,6 +120,14 @@ base: components: sources: datadog_agent: configuration: {
 																The maximum length of the byte buffer.
 
 																This length does *not* include the trailing delimiter.
+
+																By default, there is no maximum length enforced. If events are malformed, this can lead to
+																additional resource usage as events continue to be buffered in memory, and can potentially
+																lead to memory exhaustion in extreme cases.
+
+																If there is a risk of processing malformed data, such as logs with user-controlled input,
+																consider setting the maximum length to a reasonably large value as a safety net. This will
+																ensure that processing is not truly unbounded.
 																"""
 						required: false
 						type: uint: {}
@@ -150,6 +161,14 @@ base: components: sources: datadog_agent: configuration: {
 						The maximum length of the byte buffer.
 
 						This length does *not* include the trailing delimiter.
+
+						By default, there is no maximum length enforced. If events are malformed, this can lead to
+						additional resource usage as events continue to be buffered in memory, and can potentially
+						lead to memory exhaustion in extreme cases.
+
+						If there is a risk of processing malformed data, such as logs with user-controlled input,
+						consider setting the maximum length to a reasonably large value as a safety net. This will
+						ensure that processing is not truly unbounded.
 						"""
 					required: false
 					type: uint: {}
@@ -169,18 +188,19 @@ base: components: sources: datadog_agent: configuration: {
 	}
 	multiple_outputs: {
 		description: """
-			If this setting is set to `true` logs, metrics and traces will be sent to different outputs.
+			If this is set to `true` logs, metrics and traces will be sent to different outputs.
 
-			For a source component named `agent` the received logs, metrics, and traces can then be accessed by specifying
-			`agent.logs`, `agent.metrics`, and `agent.traces`, respectively, as the input to another component.
+			For a source component named `agent`, the received logs, metrics, and traces can then be
+			configured as input to other components by specifying `agent.logs`, `agent.metrics`, and
+			`agent.traces`, respectively.
 			"""
 		required: false
 		type: bool: default: false
 	}
 	store_api_key: {
 		description: """
-			When incoming events contain a Datadog API key, if this setting is set to `true` the key will kept in the event
-			metadata and will be used if the event is sent to a Datadog sink.
+			If this is set to `true`, when incoming events contain a Datadog API key, it will be
+			stored in the event metadata and will be used if the event is sent to a Datadog sink.
 			"""
 		required: false
 		type: bool: default: true

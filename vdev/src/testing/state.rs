@@ -1,75 +1,89 @@
-use std::collections::HashSet;
-use std::fs;
 use std::path::{Path, PathBuf};
+use std::{fs, io::ErrorKind};
 
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
+use once_cell::sync::Lazy;
+use serde::{Deserialize, Serialize};
 
-use crate::platform;
+use super::config::Environment;
+use crate::{platform, util};
 
-const CONFIG_FILE: &str = "config.json";
+static DATA_DIR: Lazy<PathBuf> = Lazy::new(|| {
+    [platform::data_dir().as_path(), Path::new("integration")]
+        .into_iter()
+        .collect()
+});
 
-pub fn envs_dir(integration: &str) -> PathBuf {
-    [
-        &platform::data_dir(),
-        Path::new("integration/envs"),
-        Path::new(integration),
-    ]
-    .iter()
-    .collect()
+pub struct EnvsDir {
+    path: PathBuf,
 }
 
-pub fn env_exists(envs_dir: &Path, environment: &str) -> bool {
-    let dir: PathBuf = [envs_dir, Path::new(environment)].iter().collect();
-    dir.is_dir()
+#[derive(Deserialize, Serialize)]
+pub struct State {
+    pub active: String,
+    pub config: Environment,
 }
 
-pub fn active_envs(envs_dir: &Path) -> Result<HashSet<String>> {
-    let mut environments = HashSet::new();
-    if !envs_dir.is_dir() {
-        return Ok(environments);
+impl EnvsDir {
+    pub fn new(integration: &str) -> Self {
+        let config = format!("{integration}.json");
+        let path = [&DATA_DIR, Path::new(&config)].iter().collect();
+        Self { path }
     }
 
-    for entry in envs_dir
-        .read_dir()
-        .with_context(|| format!("failed to read directory {}", envs_dir.display()))?
-    {
-        let entry = entry
-            .with_context(|| format!("failed to read directory entry {}", envs_dir.display()))?;
-        if entry.path().is_dir() {
-            environments.insert(entry.file_name().into_string().unwrap());
+    /// Check if the named environment is active. If the current config could not be loaded or a
+    /// different environment is active, an error is returned.
+    pub fn check_active(&self, name: &str) -> Result<bool> {
+        match self.active()? {
+            None => Ok(false),
+            Some(active) if active == name => Ok(true),
+            Some(active) => Err(anyhow!(
+                "Requested environment {name:?} does not match active one {active:?}"
+            )),
         }
     }
 
-    Ok(environments)
-}
-
-pub fn save_env(envs_dir: &Path, environment: &str, config: &str) -> Result<()> {
-    let mut path = envs_dir.join(environment);
-    if !path.is_dir() {
-        fs::create_dir_all(&path)
-            .with_context(|| format!("failed to create directory {}", path.display()))?;
+    /// Return the currently active environment name.
+    pub fn active(&self) -> Result<Option<String>> {
+        self.load().map(|state| state.map(|config| config.active))
     }
 
-    path.push(CONFIG_FILE);
-    fs::write(&path, config).with_context(|| format!("failed to write file {}", path.display()))?;
-
-    Ok(())
-}
-
-pub fn read_env_config(envs_dir: &Path, environment: &str) -> Result<String> {
-    let mut config_file = envs_dir.join(environment);
-    config_file.push(CONFIG_FILE);
-
-    fs::read_to_string(&config_file)
-        .with_context(|| format!("failed to write file {}", config_file.display()))
-}
-
-pub fn remove_env(envs_dir: &Path, environment: &str) -> Result<()> {
-    let env_path = envs_dir.join(environment);
-    if env_path.is_dir() {
-        fs::remove_dir_all(&env_path)
-            .with_context(|| format!("failed to remove directory {env_path:?}"))?;
+    /// Load the currently active state data.
+    pub fn load(&self) -> Result<Option<State>> {
+        let json = match fs::read_to_string(&self.path) {
+            Ok(json) => json,
+            Err(error) if error.kind() == ErrorKind::NotFound => return Ok(None),
+            Err(error) => {
+                return Err(error).context(format!("Could not read state file {:?}", self.path))
+            }
+        };
+        let state: State = serde_json::from_str(&json)
+            .with_context(|| format!("Could not parse state file {:?}", self.path))?;
+        Ok(Some(state))
     }
 
-    Ok(())
+    pub fn save(&self, environment: &str, config: &Environment) -> Result<()> {
+        let config = State {
+            active: environment.into(),
+            config: config.clone(),
+        };
+        let path = &*DATA_DIR;
+        if !path.is_dir() {
+            fs::create_dir_all(path)
+                .with_context(|| format!("failed to create directory {path:?}"))?;
+        }
+
+        let config = serde_json::to_string(&config)?;
+        fs::write(&self.path, config)
+            .with_context(|| format!("failed to write file {:?}", self.path))
+    }
+
+    pub fn remove(&self) -> Result<()> {
+        if util::exists(&self.path)? {
+            fs::remove_file(&self.path)
+                .with_context(|| format!("failed to remove {:?}", self.path))?;
+        }
+
+        Ok(())
+    }
 }

@@ -4,9 +4,9 @@ pub mod udp;
 mod unix;
 
 use codecs::{decoding::DeserializerConfig, NewlineDelimitedDecoderConfig};
-use lookup::{lookup_v2::parse_value_path, owned_value_path};
+use lookup::{lookup_v2::OptionalValuePath, owned_value_path};
 use value::{kind::Collection, Kind};
-use vector_config::{configurable_component, NamedComponent};
+use vector_config::configurable_component;
 use vector_core::config::{log_schema, LegacyKey, LogNamespace};
 
 #[cfg(unix)]
@@ -152,6 +152,7 @@ impl SourceConfig for SocketConfig {
                     tls,
                     tls_client_metadata_key,
                     config.receive_buffer_bytes(),
+                    config.max_connection_duration_secs(),
                     cx,
                     false.into(),
                     config.connection_limit,
@@ -231,20 +232,9 @@ impl SourceConfig for SocketConfig {
 
         let schema_definition = match &self.mode {
             Mode::Tcp(config) => {
-                let legacy_host_key = config
-                    .host_key()
-                    .as_ref()
-                    .map_or_else(
-                        || parse_value_path(log_schema().host_key()).ok(),
-                        |k| k.path.clone(),
-                    )
-                    .map(LegacyKey::InsertIfEmpty);
+                let legacy_host_key = config.host_key().clone().path.map(LegacyKey::InsertIfEmpty);
 
-                let legacy_port_key = config
-                    .port_key()
-                    .as_ref()
-                    .map_or_else(|| parse_value_path("port").ok(), |k| k.path.clone())
-                    .map(LegacyKey::InsertIfEmpty);
+                let legacy_port_key = config.port_key().clone().path.map(LegacyKey::InsertIfEmpty);
 
                 let tls_client_metadata_path = config
                     .tls()
@@ -259,7 +249,7 @@ impl SourceConfig for SocketConfig {
                         legacy_host_key,
                         &owned_value_path!("host"),
                         Kind::bytes(),
-                        None,
+                        Some("host"),
                     )
                     .with_source_metadata(
                         Self::NAME,
@@ -278,20 +268,9 @@ impl SourceConfig for SocketConfig {
                     )
             }
             Mode::Udp(config) => {
-                let legacy_host_key = config
-                    .host_key()
-                    .as_ref()
-                    .map_or_else(
-                        || parse_value_path(log_schema().host_key()).ok(),
-                        |k| k.path.clone(),
-                    )
-                    .map(LegacyKey::InsertIfEmpty);
+                let legacy_host_key = config.host_key().clone().path.map(LegacyKey::InsertIfEmpty);
 
-                let legacy_port_key = config
-                    .port_key()
-                    .as_ref()
-                    .map_or_else(|| parse_value_path("port").ok(), |k| k.path.clone())
-                    .map(LegacyKey::InsertIfEmpty);
+                let legacy_port_key = config.port_key().clone().path.map(LegacyKey::InsertIfEmpty);
 
                 schema_definition
                     .with_source_metadata(
@@ -311,14 +290,7 @@ impl SourceConfig for SocketConfig {
             }
             #[cfg(unix)]
             Mode::UnixDatagram(config) => {
-                let legacy_host_key = config
-                    .host_key()
-                    .as_ref()
-                    .map_or_else(
-                        || parse_value_path(log_schema().host_key()).ok(),
-                        |k| k.path.clone(),
-                    )
-                    .map(LegacyKey::InsertIfEmpty);
+                let legacy_host_key = config.host_key().clone().path.map(LegacyKey::InsertIfEmpty);
 
                 schema_definition.with_source_metadata(
                     Self::NAME,
@@ -330,14 +302,7 @@ impl SourceConfig for SocketConfig {
             }
             #[cfg(unix)]
             Mode::UnixStream(config) => {
-                let legacy_host_key = config
-                    .host_key()
-                    .as_ref()
-                    .map_or_else(
-                        || parse_value_path(log_schema().host_key()).ok(),
-                        |k| k.path.clone(),
-                    )
-                    .map(LegacyKey::InsertIfEmpty);
+                let legacy_host_key = config.host_key().clone().path.map(LegacyKey::InsertIfEmpty);
 
                 schema_definition.with_source_metadata(
                     Self::NAME,
@@ -369,8 +334,17 @@ impl SourceConfig for SocketConfig {
     }
 }
 
+pub(crate) fn default_host_key() -> OptionalValuePath {
+    OptionalValuePath::from(owned_value_path!(log_schema().host_key()))
+}
+
+fn default_max_length() -> Option<usize> {
+    Some(crate::serde::default_max_length())
+}
+
 #[cfg(test)]
 mod test {
+    use approx::assert_relative_eq;
     use std::{
         collections::{BTreeMap, HashMap},
         net::{SocketAddr, UdpSocket},
@@ -387,12 +361,13 @@ mod test {
     use codecs::{decoding::CharacterDelimitedDecoderOptions, CharacterDelimitedDecoderConfig};
     use futures::{stream, StreamExt};
     use lookup::{lookup_v2::OptionalValuePath, owned_value_path, path};
+    use tokio::io::AsyncReadExt;
+    use tokio::net::TcpStream;
     use tokio::{
         task::JoinHandle,
         time::{timeout, Duration, Instant},
     };
     use vector_common::btreemap;
-    use vector_config::NamedComponent;
     use vector_core::event::EventContainer;
     #[cfg(unix)]
     use {
@@ -847,6 +822,45 @@ mod test {
         assert_eq!(source_result, Ok(()));
     }
 
+    #[tokio::test]
+    async fn tcp_connection_close_after_max_duration() {
+        let (tx, _) = SourceSender::new_test();
+        let addr = next_addr();
+
+        let mut source_config = TcpConfig::from_address(addr.into());
+        source_config.set_max_connection_duration_secs(Some(1));
+        let source_task = SocketConfig::from(source_config)
+            .build(SourceContext::new_test(tx, None))
+            .await
+            .unwrap();
+
+        // Spawn the source task and wait until we're sure it's listening:
+        drop(tokio::spawn(source_task));
+        wait_for_tcp(addr).await;
+
+        let mut stream: TcpStream = TcpStream::connect(addr)
+            .await
+            .expect("stream should be able to connect");
+        let start = Instant::now();
+
+        let timeout = tokio::time::sleep(Duration::from_millis(1200));
+        let mut buffer = [0u8; 10];
+
+        tokio::select! {
+             _ = timeout => {
+                 panic!("timed out waiting for stream to close")
+             },
+             read_result = stream.read(&mut buffer) => {
+                 match read_result {
+                    // read resulting with 0 bytes -> the connection was closed
+                    Ok(0) => assert_relative_eq!(start.elapsed().as_secs_f64(), 1.0, epsilon = 0.3),
+                    Ok(_) => panic!("unexpectedly read data from stream"),
+                    Err(e) => panic!("{:}", e)
+                 }
+             }
+        }
+    }
+
     //////// UDP TESTS ////////
     fn send_lines_udp(addr: SocketAddr, lines: impl IntoIterator<Item = String>) -> SocketAddr {
         let bind = next_addr();
@@ -1015,7 +1029,7 @@ mod test {
             let (tx, rx) = SourceSender::new_test();
             let address = next_addr();
             let mut config = UdpConfig::from_address(address.into());
-            config.max_length = 11;
+            config.max_length = Some(11);
             let address = init_udp_with_config(tx, config).await;
 
             send_lines_udp(
@@ -1051,7 +1065,7 @@ mod test {
             let (tx, rx) = SourceSender::new_test();
             let address = next_addr();
             let mut config = UdpConfig::from_address(address.into());
-            config.max_length = 10;
+            config.max_length = Some(10);
             config.framing = CharacterDelimitedDecoderConfig {
                 character_delimited: CharacterDelimitedDecoderOptions::new(b',', None),
             }

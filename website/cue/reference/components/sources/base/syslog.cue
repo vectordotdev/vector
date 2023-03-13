@@ -2,13 +2,15 @@ package metadata
 
 base: components: sources: syslog: configuration: {
 	address: {
-		description:   "The socket address to listen for connections on."
+		description: """
+			The socket address to listen for connections on, or `systemd{#N}` to use the Nth socket passed by
+			systemd socket activation.
+
+			If a socket address is used, it _must_ include a port.
+			"""
 		relevant_when: "mode = \"tcp\" or mode = \"udp\""
 		required:      true
-		type: {
-			number: {}
-			string: {}
-		}
+		type: string: examples: ["0.0.0.0:9000", "systemd", "systemd#3"]
 	}
 	connection_limit: {
 		description:   "The maximum number of TCP connections that will be allowed at any given time."
@@ -35,9 +37,9 @@ base: components: sources: syslog: configuration: {
 		relevant_when: "mode = \"tcp\""
 		required:      false
 		type: object: options: time_secs: {
-			description: "The time to wait, in seconds, before starting to send TCP keepalive probes on an idle connection."
+			description: "The time to wait before starting to send TCP keepalive probes on an idle connection."
 			required:    false
-			type: uint: {}
+			type: uint: unit: "seconds"
 		}
 	}
 	max_length: {
@@ -47,7 +49,10 @@ base: components: sources: syslog: configuration: {
 			Messages larger than this are truncated.
 			"""
 		required: false
-		type: uint: default: 102400
+		type: uint: {
+			default: 102400
+			unit:    "bytes"
+		}
 	}
 	mode: {
 		description: "The type of socket to use."
@@ -66,17 +71,17 @@ base: components: sources: syslog: configuration: {
 			"""
 		relevant_when: "mode = \"unix\""
 		required:      true
-		type: string: {}
+		type: string: examples: ["/path/to/socket"]
 	}
 	receive_buffer_bytes: {
 		description: """
-			The size, in bytes, of the receive buffer used for each connection.
+			The size of the receive buffer used for each connection.
 
 			This should not typically needed to be changed.
 			"""
 		relevant_when: "mode = \"tcp\" or mode = \"udp\""
 		required:      false
-		type: uint: {}
+		type: uint: unit: "bytes"
 	}
 	socket_file_mode: {
 		description: """

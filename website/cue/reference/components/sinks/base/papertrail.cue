@@ -50,6 +50,11 @@ base: components: sinks: papertrail: configuration: {
 
 						[apache_avro]: https://avro.apache.org/
 						"""
+					csv: """
+						Encodes an event as a CSV message.
+
+						This codec must be configured with fields to encode.
+						"""
 					gelf: """
 						Encodes an event as a [GELF][gelf] message.
 
@@ -102,6 +107,24 @@ base: components: sinks: papertrail: configuration: {
 						"""
 				}
 			}
+			csv: {
+				description:   "The CSV Serializer Options."
+				relevant_when: "codec = \"csv\""
+				required:      true
+				type: object: options: fields: {
+					description: """
+						Configures the fields that will be encoded, as well as the order in which they
+						appear in the output.
+
+						If a field is not present in the event, the output will be an empty string.
+
+						Values of type `Array`, `Object`, and `Regex` are not supported and the
+						output will be an empty string.
+						"""
+					required: true
+					type: array: items: type: string: {}
+				}
+			}
 			except_fields: {
 				description: "List of fields that will be excluded from the encoded event."
 				required:    false
@@ -144,23 +167,27 @@ base: components: sinks: papertrail: configuration: {
 		}
 	}
 	endpoint: {
-		description: "The endpoint to send logs to."
+		description: "The TCP endpoint to send logs to."
 		required:    true
-		type: string: {}
+		type: string: examples: ["logs.papertrailapp.com:12345"]
 	}
 	keepalive: {
 		description: "TCP keepalive settings for socket-based components."
 		required:    false
 		type: object: options: time_secs: {
-			description: "The time to wait, in seconds, before starting to send TCP keepalive probes on an idle connection."
+			description: "The time to wait before starting to send TCP keepalive probes on an idle connection."
 			required:    false
-			type: uint: {}
+			type: uint: unit: "seconds"
 		}
 	}
 	process: {
 		description: "The value to use as the `process` in Papertrail."
 		required:    false
-		type: string: syntax: "template"
+		type: string: {
+			default: "vector"
+			examples: ["{{ process }}", "my-process"]
+			syntax: "template"
+		}
 	}
 	send_buffer_bytes: {
 		description: "Configures the send buffer size using the `SO_SNDBUF` option on the socket."

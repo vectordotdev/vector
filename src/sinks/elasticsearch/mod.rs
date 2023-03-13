@@ -31,7 +31,7 @@ use crate::{
     template::{Template, TemplateParseError},
 };
 
-/// Authentication strategies.
+/// Elasticsearch Authentication strategies.
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields, rename_all = "snake_case", tag = "strategy")]
@@ -40,9 +40,13 @@ pub enum ElasticsearchAuth {
     /// HTTP Basic Authentication.
     Basic {
         /// Basic authentication username.
+        #[configurable(metadata(docs::examples = "${ELASTICSEARCH_USERNAME}"))]
+        #[configurable(metadata(docs::examples = "username"))]
         user: String,
 
         /// Basic authentication password.
+        #[configurable(metadata(docs::examples = "${ELASTICSEARCH_PASSWORD}"))]
+        #[configurable(metadata(docs::examples = "password"))]
         password: SensitiveString,
     },
 
@@ -50,7 +54,7 @@ pub enum ElasticsearchAuth {
     Aws(AwsAuthentication),
 }
 
-/// Indexing mode.
+/// Elasticsearch Indexing mode.
 #[configurable_component]
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
@@ -116,10 +120,7 @@ impl_generate_config_from_default!(ElasticsearchConfig);
 
 #[derive(Debug, Clone)]
 pub enum ElasticsearchCommonMode {
-    Bulk {
-        index: Template,
-        action: Option<Template>,
-    },
+    Bulk { index: Template, action: Template },
     DataStream(DataStreamConfig),
 }
 
@@ -143,22 +144,19 @@ impl ElasticsearchCommonMode {
     fn bulk_action<'a>(&self, event: impl Into<EventRef<'a>>) -> Option<BulkAction> {
         match self {
             ElasticsearchCommonMode::Bulk {
-                action: bulk_action,
+                action: bulk_action_template,
                 ..
-            } => match bulk_action {
-                Some(template) => template
-                    .render_string(event)
-                    .map_err(|error| {
-                        emit!(TemplateRenderingError {
-                            error,
-                            field: Some("bulk_action"),
-                            drop_event: true,
-                        });
-                    })
-                    .ok()
-                    .and_then(|value| BulkAction::try_from(value.as_str()).ok()),
-                None => Some(BulkAction::Index),
-            },
+            } => bulk_action_template
+                .render_string(event)
+                .map_err(|error| {
+                    emit!(TemplateRenderingError {
+                        error,
+                        field: Some("bulk_action"),
+                        drop_event: true,
+                    });
+                })
+                .ok()
+                .and_then(|value| BulkAction::try_from(value.as_str()).ok()),
             // avoid the interpolation
             ElasticsearchCommonMode::DataStream(_) => Some(BulkAction::Create),
         }
@@ -172,12 +170,20 @@ impl ElasticsearchCommonMode {
     }
 }
 
-/// Configuration for api version.
+/// Configuration for Elasticsearch API version.
 #[configurable_component]
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
 pub enum ElasticsearchApiVersion {
-    /// Auto-detect the api version. Will fail if endpoint isn't reachable.
+    /// Auto-detect the API version.
+    ///
+    /// If the [cluster state version endpoint][es_version] isn't reachable, a warning is logged to
+    /// stdout, and the version is assumed to be V6 if the `suppress_type_name` option is set to
+    /// true. Otherwise, the version is assumed to be V8. In the future, the sink will instead
+    /// return an Error during configuration parsing, since a wronly assumed version could lead to
+    /// incorrect API calls.
+    ///
+    /// [es_version]: https://www.elastic.co/guide/en/elasticsearch/reference/current/cluster-state.html#cluster-state-api-path-params
     Auto,
     /// Use the Elasticsearch 6.x API.
     V6,

@@ -193,7 +193,7 @@ components: sources: http_server: {
 			title: "Decompression"
 			body: """
 				Received body is decompressed according to `Content-Encoding` header.
-				Supported algorithms are `gzip`, `deflate`, and `snappy`.
+				Supported algorithms are `gzip`, `deflate`, `snappy`, and `zstd`.
 				"""
 		}
 	}

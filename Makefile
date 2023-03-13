@@ -330,49 +330,19 @@ test-behavior: test-behavior-transforms test-behavior-formats test-behavior-conf
 
 .PHONY: test-integration
 test-integration: ## Runs all integration tests
-test-integration: test-integration-amqp test-integration-apex test-integration-aws test-integration-axiom test-integration-azure test-integration-chronicle test-integration-clickhouse
-test-integration: test-integration-docker-logs test-integration-elasticsearch test-integration-envoy-als
+test-integration: test-integration-amqp test-integration-aws test-integration-axiom test-integration-azure test-integration-chronicle test-integration-clickhouse
+test-integration: test-integration-databend test-integration-docker-logs test-integration-elasticsearch test-integration-envoy-als
 test-integration: test-integration-eventstoredb test-integration-fluent test-integration-gcp test-integration-humio test-integration-http-client test-integration-influxdb
 test-integration: test-integration-kafka test-integration-logstash test-integration-loki test-integration-mongodb test-integration-nats
 test-integration: test-integration-nginx test-integration-opentelemetry test-integration-postgres test-integration-prometheus test-integration-pulsar
 test-integration: test-integration-redis test-integration-splunk test-integration-dnstap test-integration-datadog-agent test-integration-datadog-logs
 test-integration: test-integration-datadog-traces test-integration-shutdown
 
-.PHONY: test-integration-aws-s3
-test-integration-aws-s3: ## Runs AWS S3 integration tests
-	FILTER=::aws_s3 make test-integration-aws
-
-.PHONY: test-integration-aws-sqs
-test-integration-aws-sqs: ## Runs AWS SQS integration tests
-	FILTER=::aws_sqs make test-integration-aws
-
-.PHONY: test-integration-aws-cloudwatch-logs
-test-integration-aws-cloudwatch-logs: ## Runs AWS Cloudwatch Logs integration tests
-	FILTER=::aws_cloudwatch_logs make test-integration-aws
-
-.PHONY: test-integration-aws-cloudwatch-metrics
-test-integration-aws-cloudwatch-metrics: ## Runs AWS Cloudwatch Metrics integration tests
-	FILTER=::aws_cloudwatch_metrics make test-integration-aws
-
-.PHONY: test-integration-aws-kinesis
-test-integration-aws-kinesis: ## Runs AWS Kinesis integration tests
-	FILTER=::aws_kinesis make test-integration-aws
-
-.PHONY: test-integration-datadog-agent
-test-integration-datadog-agent: ## Runs Datadog Agent integration tests
-	@test $${TEST_DATADOG_API_KEY?TEST_DATADOG_API_KEY must be set}
-	RUST_VERSION=${RUST_VERSION} ${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.datadog-agent.yml build
-	RUST_VERSION=${RUST_VERSION} ${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.datadog-agent.yml run --rm runner
-ifeq ($(AUTODESPAWN), true)
-	make test-integration-datadog-agent-cleanup
-endif
-
 test-integration-%-cleanup:
-	${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.$*.yml rm --force --stop -v
+	cargo vdev --verbose integration stop $*
 
 test-integration-%:
-	RUST_VERSION=${RUST_VERSION} ${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.$*.yml build
-	RUST_VERSION=${RUST_VERSION} ${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.$*.yml run --rm runner
+	cargo vdev --verbose integration test $*
 ifeq ($(AUTODESPAWN), true)
 	make test-integration-$*-cleanup
 endif
@@ -441,7 +411,7 @@ bench-all: bench-remap-functions
 
 .PHONY: check
 check: ## Run prerequisite code checks
-	${MAYBE_ENVIRONMENT_EXEC} cargo check --workspace --all-targets --features all-integration-tests
+	${MAYBE_ENVIRONMENT_EXEC} cargo vdev check rust
 
 .PHONY: check-all
 check-all: ## Check everything
@@ -455,7 +425,7 @@ check-component-features: ## Check that all component features are setup properl
 
 .PHONY: check-clippy
 check-clippy: ## Check code with Clippy
-	${MAYBE_ENVIRONMENT_EXEC} cargo clippy --workspace --all-targets --features all-integration-tests -- -D warnings
+	${MAYBE_ENVIRONMENT_EXEC} cargo vdev check rust --clippy
 
 .PHONY: check-docs
 check-docs: ## Check that all /docs file are valid
@@ -637,10 +607,6 @@ compile-vrl-wasm: ## Compile VRL crates to WASM target
 	@scripts/compile-vrl-wasm.sh
 
 ##@ Utility
-
-.PHONY: build-ci-docker-images
-build-ci-docker-images: ## Rebuilds all Docker images used in CI
-	@scripts/build-ci-docker-images.sh
 
 .PHONY: clean
 clean: environment-clean ## Clean everything

@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 use std::{collections::HashMap, env, path::PathBuf};
 
 use bollard::{
@@ -197,6 +198,7 @@ impl Container {
 
         let options = Some(CreateContainerOptions {
             name: format!("vector_test_{}", uuid::Uuid::new_v4()),
+            platform: None,
         });
 
         let config = Config {

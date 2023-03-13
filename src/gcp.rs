@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 use std::{
     sync::{Arc, RwLock},
     time::Duration,
@@ -67,7 +68,7 @@ pub enum GcpError {
 #[configurable_component]
 #[derive(Clone, Debug, Default)]
 pub struct GcpAuthConfig {
-    /// An API key. ([documentation](https://cloud.google.com/docs/authentication/api-keys))
+    /// An [API key][gcp_api_key].
     ///
     /// Either an API key, or a path to a service account credentials JSON file can be specified.
     ///
@@ -75,9 +76,11 @@ pub struct GcpAuthConfig {
     /// filename is named, an attempt is made to fetch an instance service account for the compute instance the program is
     /// running on. If this is not on a GCE instance, then you must define it with an API key or service account
     /// credentials JSON file.
+    ///
+    /// [gcp_api_key]: https://cloud.google.com/docs/authentication/api-keys
     pub api_key: Option<SensitiveString>,
 
-    /// Path to a service account credentials JSON file. ([documentation](https://cloud.google.com/docs/authentication/production#manually))
+    /// Path to a [service account] credentials JSON file.
     ///
     /// Either an API key, or a path to a service account credentials JSON file can be specified.
     ///
@@ -85,10 +88,13 @@ pub struct GcpAuthConfig {
     /// filename is named, an attempt is made to fetch an instance service account for the compute instance the program is
     /// running on. If this is not on a GCE instance, then you must define it with an API key or service account
     /// credentials JSON file.
+    ///
+    /// [gcp_service_account_credentials]: https://cloud.google.com/docs/authentication/production#manually
     pub credentials_path: Option<String>,
 
     /// Skip all authentication handling. For use with integration tests only.
     #[serde(default, skip_serializing)]
+    #[configurable(metadata(docs::hidden))]
     pub skip_authentication: bool,
 }
 

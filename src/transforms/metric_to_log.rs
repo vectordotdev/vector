@@ -23,7 +23,7 @@ use crate::{
 };
 
 /// Configuration for the `metric_to_log` transform.
-#[configurable_component(transform("metric_to_log"))]
+#[configurable_component(transform("metric_to_log", "Convert metric events to log events."))]
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct MetricToLogConfig {
@@ -56,6 +56,8 @@ pub struct MetricToLogConfig {
     /// When set to `single`, only the last non-bare value of tags will be displayed with the
     /// metric.  When set to `full`, all metric tags will be exposed as separate assignments as
     /// described by [the `native_json` codec][vector_native_json].
+    ///
+    /// [vector_native_json]: https://github.com/vectordotdev/vector/blob/master/lib/codecs/tests/data/native_encoding/schema.cue
     #[serde(default)]
     pub metric_tag_values: MetricTagValues,
 }
@@ -73,6 +75,7 @@ impl GenerateConfig for MetricToLogConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "metric_to_log")]
 impl TransformConfig for MetricToLogConfig {
     async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
         Ok(Transform::function(MetricToLog::new(
@@ -203,6 +206,7 @@ impl TransformConfig for MetricToLogConfig {
                 schema_definition = schema_definition.with_metadata_field(
                     &owned_value_path!("vector"),
                     Kind::object(Collection::empty()),
+                    None,
                 );
             }
             LogNamespace::Legacy => {

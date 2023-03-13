@@ -34,7 +34,7 @@ base: components: sinks: azure_monitor_logs: configuration: {
 			[resource_id]: https://docs.microsoft.com/en-us/azure/azure-monitor/platform/data-collector-api#request-headers
 			"""
 		required: false
-		type: string: {}
+		type: string: examples: ["/subscriptions/11111111-1111-1111-1111-111111111111/resourceGroups/otherResourceGroup/providers/Microsoft.Storage/storageAccounts/examplestorage", "/subscriptions/11111111-1111-1111-1111-111111111111/resourceGroups/examplegroup/providers/Microsoft.SQL/servers/serverName/databases/databaseName"]
 	}
 	batch: {
 		description: "Event batching behavior."
@@ -48,17 +48,23 @@ base: components: sinks: azure_monitor_logs: configuration: {
 					serialized / compressed.
 					"""
 				required: false
-				type: uint: {}
+				type: uint: {
+					default: 10000000
+					unit:    "bytes"
+				}
 			}
 			max_events: {
-				description: "The maximum size of a batch, in events, before it is flushed."
+				description: "The maximum size of a batch before it is flushed."
 				required:    false
-				type: uint: {}
+				type: uint: unit: "events"
 			}
 			timeout_secs: {
-				description: "The maximum age of a batch, in seconds, before it is flushed."
+				description: "The maximum age of a batch before it is flushed."
 				required:    false
-				type: float: {}
+				type: float: {
+					default: 1.0
+					unit:    "seconds"
+				}
 			}
 		}
 	}
@@ -69,7 +75,7 @@ base: components: sinks: azure_monitor_logs: configuration: {
 			[uniq_id]: https://docs.microsoft.com/en-us/azure/azure-monitor/platform/data-collector-api#request-uri-parameters
 			"""
 		required: true
-		type: string: {}
+		type: string: examples: ["5ce893d9-2c32-4b6c-91a9-b0887c2de2d6", "97ce69d9-b4be-4241-8dbd-d265edcf06c4"]
 	}
 	encoding: {
 		description: "Transformations to prepare an event for serialization."
@@ -102,7 +108,10 @@ base: components: sinks: azure_monitor_logs: configuration: {
 			[alt_host]: https://docs.azure.cn/en-us/articles/guidance/developerdifferences#check-endpoints-in-azure
 			"""
 		required: false
-		type: string: default: "ods.opinsights.azure.com"
+		type: string: {
+			default: "ods.opinsights.azure.com"
+			examples: ["ods.opinsights.azure.us", "ods.opinsights.azure.cn"]
+		}
 	}
 	log_type: {
 		description: """
@@ -113,7 +122,7 @@ base: components: sinks: azure_monitor_logs: configuration: {
 			[record_type]: https://docs.microsoft.com/en-us/azure/azure-monitor/platform/data-collector-api#request-headers
 			"""
 		required: true
-		type: string: {}
+		type: string: examples: ["MyTableName", "MyRecordType"]
 	}
 	request: {
 		description: """
@@ -196,14 +205,20 @@ base: components: sinks: azure_monitor_logs: configuration: {
 				}
 			}
 			rate_limit_duration_secs: {
-				description: "The time window, in seconds, used for the `rate_limit_num` option."
+				description: "The time window used for the `rate_limit_num` option."
 				required:    false
-				type: uint: default: 1
+				type: uint: {
+					default: 1
+					unit:    "seconds"
+				}
 			}
 			rate_limit_num: {
 				description: "The maximum number of requests allowed within the `rate_limit_duration_secs` time window."
 				required:    false
-				type: uint: default: 9223372036854775807
+				type: uint: {
+					default: 9223372036854775807
+					unit:    "requests"
+				}
 			}
 			retry_attempts: {
 				description: """
@@ -212,7 +227,10 @@ base: components: sinks: azure_monitor_logs: configuration: {
 					The default, for all intents and purposes, represents an infinite number of retries.
 					"""
 				required: false
-				type: uint: default: 9223372036854775807
+				type: uint: {
+					default: 9223372036854775807
+					unit:    "retries"
+				}
 			}
 			retry_initial_backoff_secs: {
 				description: """
@@ -221,22 +239,31 @@ base: components: sinks: azure_monitor_logs: configuration: {
 					After the first retry has failed, the fibonacci sequence will be used to select future backoffs.
 					"""
 				required: false
-				type: uint: default: 1
+				type: uint: {
+					default: 1
+					unit:    "seconds"
+				}
 			}
 			retry_max_duration_secs: {
-				description: "The maximum amount of time, in seconds, to wait between retries."
+				description: "The maximum amount of time to wait between retries."
 				required:    false
-				type: uint: default: 3600
+				type: uint: {
+					default: 3600
+					unit:    "seconds"
+				}
 			}
 			timeout_secs: {
 				description: """
-					The maximum time a request can take before being aborted.
+					The time a request can take before being aborted.
 
 					It is highly recommended that you do not lower this value below the service’s internal timeout, as this could
 					create orphaned requests, pile on retries, and result in duplicate data downstream.
 					"""
 				required: false
-				type: uint: default: 60
+				type: uint: {
+					default: 60
+					unit:    "seconds"
+				}
 			}
 		}
 	}
@@ -247,7 +274,21 @@ base: components: sinks: azure_monitor_logs: configuration: {
 			[shared_key]: https://docs.microsoft.com/en-us/azure/azure-monitor/platform/data-collector-api#authorization
 			"""
 		required: true
-		type: string: {}
+		type: string: examples: ["SERsIYhgMVlJB6uPsq49gCxNiruf6v0vhMYE+lfzbSGcXjdViZdV/e5pEMTYtw9f8SkVLf4LFlLCc2KxtRZfCA==", "${AZURE_MONITOR_SHARED_KEY_ENV_VAR}"]
+	}
+	time_generated_key: {
+		description: """
+			Use this option to customize the log field used as [`TimeGenerated`][1] in Azure.
+
+			The setting of `log_schema.timestamp_key`, usually `timestamp`, is used here by default.
+			This field should be used in rare cases where `TimeGenerated` should point to a specific log
+			field. For example, use this field to set the log field `source_timestamp` as holding the
+			value that should be used as `TimeGenerated` on the Azure side.
+
+			[1]: https://learn.microsoft.com/en-us/azure/azure-monitor/logs/log-standard-columns#timegenerated
+			"""
+		required: false
+		type: string: examples: ["time_generated"]
 	}
 	tls: {
 		description: "TLS configuration."

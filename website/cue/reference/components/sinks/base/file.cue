@@ -28,14 +28,22 @@ base: components: sinks: file: configuration: {
 		}
 	}
 	compression: {
-		description: "Compression algorithm."
+		description: "Compression configuration."
 		required:    false
 		type: string: {
 			default: "none"
 			enum: {
-				gzip: "Gzip compression."
+				gzip: """
+					[Gzip][gzip] compression.
+
+					[gzip]: https://www.gzip.org/
+					"""
 				none: "No compression."
-				zstd: "Zstandard compression."
+				zstd: """
+					[Zstandard][zstd] compression.
+
+					[zstd]: https://facebook.github.io/zstd/
+					"""
 			}
 		}
 	}
@@ -61,6 +69,11 @@ base: components: sinks: file: configuration: {
 						Encodes an event as an [Apache Avro][apache_avro] message.
 
 						[apache_avro]: https://avro.apache.org/
+						"""
+					csv: """
+						Encodes an event as a CSV message.
+
+						This codec must be configured with fields to encode.
 						"""
 					gelf: """
 						Encodes an event as a [GELF][gelf] message.
@@ -112,6 +125,24 @@ base: components: sinks: file: configuration: {
 						transform, etc) and removing the message field while doing additional parsing on it, as this
 						could lead to the encoding emitting empty strings for the given event.
 						"""
+				}
+			}
+			csv: {
+				description:   "The CSV Serializer Options."
+				relevant_when: "codec = \"csv\""
+				required:      true
+				type: object: options: fields: {
+					description: """
+						Configures the fields that will be encoded, as well as the order in which they
+						appear in the output.
+
+						If a field is not present in the event, the output will be an empty string.
+
+						Values of type `Array`, `Object`, and `Regex` are not supported and the
+						output will be an empty string.
+						"""
+					required: true
+					type: array: items: type: string: {}
 				}
 			}
 			except_fields: {
@@ -187,16 +218,29 @@ base: components: sinks: file: configuration: {
 	}
 	idle_timeout_secs: {
 		description: """
-			The amount of time, in seconds, that a file can be idle and stay open.
+			The amount of time that a file can be idle and stay open.
 
 			After not receiving any events in this amount of time, the file will be flushed and closed.
 			"""
 		required: false
-		type: uint: {}
+		type: uint: {
+			default: 30
+			examples: [
+				600,
+			]
+			unit: "seconds"
+		}
 	}
 	path: {
-		description: "File name to write events to."
-		required:    true
-		type: string: syntax: "template"
+		description: """
+			File path to write events to.
+
+			Compression format extension must be explicit.
+			"""
+		required: true
+		type: string: {
+			examples: ["/tmp/vector-%Y-%m-%d.log", "/tmp/application-{{ application_id }}-%Y-%m-%d.log", "/tmp/vector-%Y-%m-%d.log.zst"]
+			syntax: "template"
+		}
 	}
 }

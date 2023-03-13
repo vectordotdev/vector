@@ -113,7 +113,7 @@ pub struct Output {
     ///
     /// For *sources*, a `None` schema is identical to a `Some(Definition::source_default())`.
     ///
-    /// For a *transform*, a schema [`Definition`] is required if `Datatype` is Log.
+    /// For a *transform*, a schema [`schema::Definition`] is required if `Datatype` is Log.
     pub log_schema_definition: Option<schema::Definition>,
 }
 
@@ -151,9 +151,11 @@ impl Output {
 /// setting, as it is deprecated, and we still need to maintain a way to expose it in the
 /// documentation before it's removed while also making sure people know it shouldn't be used.
 #[configurable_component]
+#[configurable(deprecated)]
 #[configurable(title = "Controls how acknowledgements are handled by this source.")]
 #[configurable(
-    description = "This setting is **deprecated** in favor of enabling `acknowledgements` at the [global][global_acks] or sink level. \
+    description = "This setting is **deprecated** in favor of enabling `acknowledgements` at the [global][global_acks] or sink level.
+
 Enabling or disabling acknowledgements at the source level has **no effect** on acknowledgement behavior.
 
 See [End-to-end Acknowledgements][e2e_acks] for more information on how event acknowledgement is handled.
@@ -355,13 +357,13 @@ impl LogNamespace {
     ) {
         self.insert_vector_metadata(
             log,
-            path!(log_schema().source_type_key()),
+            log_schema().source_type_key(),
             path!("source_type"),
             Bytes::from_static(source_name.as_bytes()),
         );
         self.insert_vector_metadata(
             log,
-            path!(log_schema().timestamp_key()),
+            log_schema().timestamp_key(),
             path!("ingest_timestamp"),
             now,
         );
@@ -418,5 +420,34 @@ impl LogNamespace {
     #[must_use]
     pub fn merge(&self, override_value: Option<impl Into<LogNamespace>>) -> LogNamespace {
         override_value.map_or(*self, Into::into)
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::config::{init_log_schema, LogNamespace, LogSchema};
+    use crate::event::LogEvent;
+    use chrono::Utc;
+    use lookup::event_path;
+
+    #[test]
+    fn test_insert_standard_vector_source_metadata() {
+        let nested_path = "a.b.c.d";
+
+        init_log_schema(
+            || {
+                let mut schema = LogSchema::default();
+                schema.set_source_type_key(nested_path.to_owned());
+                Ok(schema)
+            },
+            false,
+        )
+        .unwrap();
+
+        let namespace = LogNamespace::Legacy;
+        let mut event = LogEvent::from("log");
+        namespace.insert_standard_vector_source_metadata(&mut event, "source", Utc::now());
+
+        assert!(event.get(event_path!("a", "b", "c", "d")).is_some());
     }
 }

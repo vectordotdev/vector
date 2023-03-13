@@ -55,7 +55,7 @@ _values: {
 // * `removed` - The component has been removed.
 #DevelopmentStatus: "beta" | "stable" | "deprecated" | "removed"
 
-#EncodingCodec: "json" | "logfmt" | "text" | "native" | "native_json" | "avro" | "gelf"
+#EncodingCodec: "json" | "logfmt" | "text" | "csv" | "native" | "native_json" | "avro" | "gelf"
 
 #Endpoint: {
 	description: string
@@ -308,6 +308,15 @@ _values: {
 	// `name` sets the name for this option. It is automatically set for you
 	// via the key you use.
 	name: string
+
+	// `deprecated` sets if the given field has been deprecated.
+	deprecated: bool | *false
+
+	if deprecated {
+		// If a field has been deprecated we can optionally set a deprecated
+		// message to be displayed.
+		deprecated_message?: string
+	}
 
 	// `relevant_when` clarifies when an option is relevant.
 	//
@@ -613,7 +622,7 @@ _values: {
 	unit?: #Unit | null
 }
 
-#Unit: "bytes" | "events" | "milliseconds" | "nanoseconds" | "requests" | "seconds" | "lines" | "concurrency"
+#Unit: "bytes" | "events" | "milliseconds" | "nanoseconds" | "requests" | "seconds" | "lines" | "concurrency" | "connections" | "tasks" | "retries"
 
 administration: _
 components:     _
@@ -637,7 +646,7 @@ _coercing_fields: """
 	2. The [time format specifiers](\(urls.chrono_time_formats)) from Rust's
 	   `chrono` library.
 
-	### Types
+	**Types**
 
 	* `bool`
 	* `string`
@@ -646,7 +655,7 @@ _coercing_fields: """
 	* `date`
 	* `timestamp` (see the table below for formats)
 
-	### Timestamp Formats
+	**Timestamp Formats**
 
 	Format | Description | Example
 	:------|:------------|:-------

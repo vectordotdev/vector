@@ -11,7 +11,7 @@ use http::{
 use hyper::Body;
 use indexmap::IndexMap;
 use tokio_util::codec::Encoder as _;
-use vector_config::{configurable_component, NamedComponent};
+use vector_config::configurable_component;
 
 use crate::{
     codecs::{Encoder, EncodingConfigWithFraming, SinkType, Transformer},
@@ -37,17 +37,21 @@ pub struct HttpSinkConfig {
     /// The full URI to make HTTP requests to.
     ///
     /// This should include the protocol and host, but can also include the port, path, and any other valid part of a URI.
+    #[configurable(metadata(docs::examples = "https://10.22.212.22:9000/endpoint"))]
     pub uri: UriSerde,
 
     /// The HTTP method to use when making the request.
-    pub method: Option<HttpMethod>,
+    #[serde(default)]
+    pub method: HttpMethod,
 
     #[configurable(derived)]
     pub auth: Option<Auth>,
 
     /// A list of custom headers to add to each request.
     #[configurable(deprecated)]
-    #[configurable(metadata(docs::additional_props_description = "An HTTP request header."))]
+    #[configurable(metadata(
+        docs::additional_props_description = "An HTTP request header and it's value."
+    ))]
     pub headers: Option<IndexMap<String, String>>,
 
     #[configurable(derived)]
@@ -60,6 +64,7 @@ pub struct HttpSinkConfig {
     /// A string to prefix the payload with.
     ///
     /// This option is ignored if the encoding is not character delimited JSON.
+    ///
     /// If specified, the `payload_suffix` must also be specified and together they must produce a valid JSON object.
     #[configurable(metadata(docs::examples = "{\"data\":"))]
     #[serde(default)]
@@ -68,6 +73,7 @@ pub struct HttpSinkConfig {
     /// A string to suffix the payload with.
     ///
     /// This option is ignored if the encoding is not character delimited JSON.
+    ///
     /// If specified, the `payload_prefix` must also be specified and together they must produce a valid JSON object.
     #[configurable(metadata(docs::examples = "}"))]
     #[serde(default)]
@@ -104,15 +110,13 @@ pub struct HttpSinkConfig {
 #[derivative(Default)]
 pub enum HttpMethod {
     /// GET.
-    ///
-    /// This is the default.
-    #[derivative(Default)]
     Get,
 
     /// HEAD.
     Head,
 
     /// POST.
+    #[derivative(Default)]
     Post,
 
     /// PUT.
@@ -165,7 +169,7 @@ impl HttpSinkConfig {
 
 struct HttpSink {
     pub uri: UriSerde,
-    pub method: Option<HttpMethod>,
+    pub method: HttpMethod,
     pub auth: Option<Auth>,
     pub payload_prefix: String,
     pub payload_suffix: String,
@@ -270,7 +274,7 @@ impl ValidatableComponent for HttpSinkConfig {
         let config = Self {
             uri: UriSerde::from_str("http://127.0.0.1:9000/endpoint")
                 .expect("should never fail to parse"),
-            method: Some(HttpMethod::Post),
+            method: HttpMethod::Post,
             encoding: EncodingConfigWithFraming::new(
                 None,
                 JsonSerializerConfig::new(MetricTagValues::Full).into(),
@@ -289,7 +293,7 @@ impl ValidatableComponent for HttpSinkConfig {
 
         let external_resource = ExternalResource::new(
             ResourceDirection::Push,
-            HttpResourceConfig::from_parts(config.uri.uri.clone(), config.method.map(Into::into)),
+            HttpResourceConfig::from_parts(config.uri.uri.clone(), Some(config.method.into())),
             config.encoding.clone(),
         );
 
@@ -329,16 +333,7 @@ impl util::http::HttpSink for HttpSink {
     }
 
     async fn build_request(&self, mut body: Self::Output) -> crate::Result<http::Request<Bytes>> {
-        let method = match &self.method.unwrap_or(HttpMethod::Post) {
-            HttpMethod::Get => Method::GET,
-            HttpMethod::Head => Method::HEAD,
-            HttpMethod::Post => Method::POST,
-            HttpMethod::Put => Method::PUT,
-            HttpMethod::Delete => Method::DELETE,
-            HttpMethod::Options => Method::OPTIONS,
-            HttpMethod::Trace => Method::TRACE,
-            HttpMethod::Patch => Method::PATCH,
-        };
+        let method: Method = self.method.into();
         let uri: Uri = self.uri.uri.clone();
 
         let content_type = {
@@ -665,7 +660,6 @@ mod tests {
         run_sink(
             r#"
         method = "put"
-
         [auth]
         strategy = "basic"
         user = "waldo"
@@ -828,6 +822,7 @@ mod tests {
         uri = "http://$IN_ADDR/frames"
         compression = "gzip"
         encoding.codec = "json"
+        method = "post"
 
         [auth]
         strategy = "basic"
@@ -888,6 +883,7 @@ mod tests {
         encoding.codec = "json"
         payload_prefix = '{"data":'
         payload_suffix = "}"
+        method = "post"
 
         [auth]
         strategy = "basic"
@@ -978,6 +974,7 @@ mod tests {
 
     async fn build_sink(extra_config: &str) -> (std::net::SocketAddr, crate::sinks::VectorSink) {
         let in_addr = next_addr();
+
         let config = format!(
             r#"
                 uri = "http://{addr}/frames"
@@ -987,7 +984,7 @@ mod tests {
                 {extras}
             "#,
             addr = in_addr,
-            extras = extra_config
+            extras = extra_config,
         );
         let config: HttpSinkConfig = toml::from_str(&config).unwrap();
 

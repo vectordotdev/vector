@@ -33,34 +33,48 @@ base: components: sinks: elasticsearch: configuration: {
 		type: string: {
 			default: "auto"
 			enum: {
-				auto: "Auto-detect the api version. Will fail if endpoint isn't reachable."
-				v6:   "Use the Elasticsearch 6.x API."
-				v7:   "Use the Elasticsearch 7.x API."
-				v8:   "Use the Elasticsearch 8.x API."
+				auto: """
+					Auto-detect the API version.
+
+					If the [cluster state version endpoint][es_version] isn't reachable, a warning is logged to
+					stdout, and the version is assumed to be V6 if the `suppress_type_name` option is set to
+					true. Otherwise, the version is assumed to be V8. In the future, the sink will instead
+					return an Error during configuration parsing, since a wronly assumed version could lead to
+					incorrect API calls.
+
+					[es_version]: https://www.elastic.co/guide/en/elasticsearch/reference/current/cluster-state.html#cluster-state-api-path-params
+					"""
+				v6: "Use the Elasticsearch 6.x API."
+				v7: "Use the Elasticsearch 7.x API."
+				v8: "Use the Elasticsearch 8.x API."
 			}
 		}
 	}
 	auth: {
-		description: "Authentication strategies."
+		description: "Elasticsearch Authentication strategies."
 		required:    false
 		type: object: options: {
 			access_key_id: {
 				description:   "The AWS access key ID."
 				relevant_when: "strategy = \"aws\""
 				required:      true
-				type: string: {}
+				type: string: examples: ["AKIAIOSFODNN7EXAMPLE"]
 			}
 			assume_role: {
-				description:   "The ARN of the role to assume."
+				description: """
+					The ARN of an [IAM role][iam_role] to assume.
+
+					[iam_role]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles.html
+					"""
 				relevant_when: "strategy = \"aws\""
 				required:      true
-				type: string: {}
+				type: string: examples: ["arn:aws:iam::123456789098:role/my_role"]
 			}
 			credentials_file: {
 				description:   "Path to the credentials file."
 				relevant_when: "strategy = \"aws\""
 				required:      true
-				type: string: {}
+				type: string: examples: ["/my/aws/credentials"]
 			}
 			imds: {
 				description:   "Configuration for authenticating with AWS through IMDS."
@@ -91,39 +105,55 @@ base: components: sinks: elasticsearch: configuration: {
 				}
 			}
 			load_timeout_secs: {
-				description:   "Timeout for successfully loading any credentials, in seconds."
+				description: """
+					Timeout for successfully loading any credentials, in seconds.
+
+					Relevant when the default credentials chain is used or `assume_role`.
+					"""
 				relevant_when: "strategy = \"aws\""
 				required:      false
-				type: uint: {}
+				type: uint: {
+					examples: [30]
+					unit: "seconds"
+				}
 			}
 			password: {
 				description:   "Basic authentication password."
 				relevant_when: "strategy = \"basic\""
 				required:      true
-				type: string: {}
+				type: string: examples: ["${ELASTICSEARCH_PASSWORD}", "password"]
 			}
 			profile: {
-				description:   "The credentials profile to use."
-				relevant_when: "strategy = \"aws\""
-				required:      false
-				type: string: {}
-			}
-			region: {
 				description: """
-					The AWS region to send STS requests to.
+					The credentials profile to use.
 
-					If not set, this will default to the configured region
-					for the service itself.
+					Used to select AWS credentials from a provided credentials file.
 					"""
 				relevant_when: "strategy = \"aws\""
 				required:      false
-				type: string: {}
+				type: string: {
+					default: "default"
+					examples: ["develop"]
+				}
+			}
+			region: {
+				description: """
+					The [AWS region][aws_region] to send STS requests to.
+
+					If not set, this will default to the configured region
+					for the service itself.
+
+					[aws_region]: https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints
+					"""
+				relevant_when: "strategy = \"aws\""
+				required:      false
+				type: string: examples: ["us-west-2"]
 			}
 			secret_access_key: {
 				description:   "The AWS secret access key."
 				relevant_when: "strategy = \"aws\""
 				required:      true
-				type: string: {}
+				type: string: examples: ["wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"]
 			}
 			strategy: {
 				description: "The authentication strategy to use."
@@ -137,7 +167,7 @@ base: components: sinks: elasticsearch: configuration: {
 				description:   "Basic authentication username."
 				relevant_when: "strategy = \"basic\""
 				required:      true
-				type: string: {}
+				type: string: examples: ["${ELASTICSEARCH_USERNAME}", "username"]
 			}
 		}
 	}
@@ -146,14 +176,18 @@ base: components: sinks: elasticsearch: configuration: {
 		required:    false
 		type: object: options: {
 			endpoint: {
-				description: "The API endpoint of the service."
+				description: "Custom endpoint for use with AWS-compatible services."
 				required:    false
-				type: string: {}
+				type: string: examples: ["http://127.0.0.0:5000/path/to/service"]
 			}
 			region: {
-				description: "The AWS region to use."
-				required:    false
-				type: string: {}
+				description: """
+					The [AWS region][aws_region] of the target service.
+
+					[aws_region]: https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints
+					"""
+				required: false
+				type: string: examples: ["us-east-1"]
 			}
 		}
 	}
@@ -169,33 +203,53 @@ base: components: sinks: elasticsearch: configuration: {
 					serialized / compressed.
 					"""
 				required: false
-				type: uint: {}
+				type: uint: {
+					default: 10000000
+					unit:    "bytes"
+				}
 			}
 			max_events: {
-				description: "The maximum size of a batch, in events, before it is flushed."
+				description: "The maximum size of a batch before it is flushed."
 				required:    false
-				type: uint: {}
+				type: uint: unit: "events"
 			}
 			timeout_secs: {
-				description: "The maximum age of a batch, in seconds, before it is flushed."
+				description: "The maximum age of a batch before it is flushed."
 				required:    false
-				type: float: {}
+				type: float: {
+					default: 1.0
+					unit:    "seconds"
+				}
 			}
 		}
 	}
 	bulk: {
-		description: "Bulk mode configuration."
+		description: "Elasticsearch bulk mode configuration."
 		required:    false
 		type: object: options: {
 			action: {
-				description: "The bulk action to use."
-				required:    false
-				type: string: {}
+				description: """
+					Action to use when making requests to the [Elasticsearch Bulk API][es_bulk].
+
+					Currently, Vector only supports `index` and `create`. `update` and `delete` actions are not supported.
+
+					[es_bulk]: https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html
+					"""
+				required: false
+				type: string: {
+					default: "index"
+					examples: ["create", "{{ action }}"]
+					syntax: "template"
+				}
 			}
 			index: {
-				description: "The name of the index to use."
+				description: "The name of the index to write events to."
 				required:    false
-				type: string: {}
+				type: string: {
+					default: "vector-%Y.%m.%d"
+					examples: ["application-{{ application_id }}-%Y-%m-%d", "{{ index }}"]
+					syntax: "template"
+				}
 			}
 		}
 	}
@@ -216,7 +270,7 @@ base: components: sinks: elasticsearch: configuration: {
 					"""
 				none: "No compression."
 				zlib: """
-					[Zlib]][zlib] compression.
+					[Zlib][zlib] compression.
 
 					[zlib]: https://zlib.net/
 					"""
@@ -224,7 +278,7 @@ base: components: sinks: elasticsearch: configuration: {
 		}
 	}
 	data_stream: {
-		description: "Data stream mode configuration."
+		description: "Elasticsearch data stream mode configuration."
 		required:    false
 		type: object: options: {
 			auto_routing: {
@@ -246,7 +300,8 @@ base: components: sinks: elasticsearch: configuration: {
 				required:    false
 				type: string: {
 					default: "generic"
-					syntax:  "template"
+					examples: ["generic", "nginx", "{{ service }}"]
+					syntax: "template"
 				}
 			}
 			namespace: {
@@ -254,7 +309,8 @@ base: components: sinks: elasticsearch: configuration: {
 				required:    false
 				type: string: {
 					default: "default"
-					syntax:  "template"
+					examples: ["{{ environment }}"]
+					syntax: "template"
 				}
 			}
 			sync_fields: {
@@ -271,36 +327,45 @@ base: components: sinks: elasticsearch: configuration: {
 				required:    false
 				type: string: {
 					default: "logs"
-					syntax:  "template"
+					examples: ["metrics", "synthetics", "{{ type }}"]
+					syntax: "template"
 				}
 			}
 		}
 	}
 	distribution: {
-		description: "Options for determining health of an endpoint."
+		description: "Options for determining the health of an endpoint."
 		required:    false
 		type: object: options: {
 			retry_initial_backoff_secs: {
-				description: "Initial timeout, in seconds, between attempts to reactivate endpoints once they become unhealthy."
+				description: "Initial delay between attempts to reactivate endpoints once they become unhealthy."
 				required:    false
-				type: uint: {}
+				type: uint: {
+					default: 1
+					unit:    "seconds"
+				}
 			}
 			retry_max_duration_secs: {
-				description: "Maximum timeout, in seconds, between attempts to reactivate endpoints once they become unhealthy."
+				description: "Maximum delay between attempts to reactivate endpoints once they become unhealthy."
 				required:    false
-				type: uint: {}
+				type: uint: {
+					default: 3600
+					unit:    "seconds"
+				}
 			}
 		}
 	}
 	doc_type: {
 		description: """
-			The `doc_type` for your index data.
+			The [`doc_type`][doc_type] for your index data.
 
 			This is only relevant for Elasticsearch <= 6.X. If you are using >= 7.0 you do not need to
 			set this option since Elasticsearch has removed it.
+
+			[doc_type]: https://www.elastic.co/guide/en/elasticsearch/reference/6.8/actions-index.html
 			"""
 		required: false
-		type: string: {}
+		type: string: default: "_doc"
 	}
 	encoding: {
 		description: "Transformations to prepare an event for serialization."
@@ -327,24 +392,28 @@ base: components: sinks: elasticsearch: configuration: {
 		}
 	}
 	endpoint: {
+		deprecated:         true
+		deprecated_message: "This option has been deprecated, the `endpoints` option should be used instead."
 		description: """
 			The Elasticsearch endpoint to send logs to.
 
-			This should be the full URL as shown in the example.
+			The endpoint must contain an HTTP scheme, and may specify a
+			hostname or IP address and port.
 			"""
 		required: false
 		type: string: {}
 	}
 	endpoints: {
 		description: """
-			The Elasticsearch endpoints to send logs to.
+			A list of Elasticsearch endpoints to send logs to.
 
-			Each endpoint should be the full URL as shown in the example.
+			The endpoint must contain an HTTP scheme, and may specify a
+			hostname or IP address and port.
 			"""
 		required: false
 		type: array: {
 			default: []
-			items: type: string: {}
+			items: type: string: examples: ["http://10.24.32.122:9000", "https://example.com", "https://user:password@example.com"]
 		}
 	}
 	id_key: {
@@ -358,7 +427,7 @@ base: components: sinks: elasticsearch: configuration: {
 			[perf_doc]: https://www.elastic.co/guide/en/elasticsearch/reference/master/tune-for-indexing-speed.html#_use_auto_generated_ids
 			"""
 		required: false
-		type: string: {}
+		type: string: examples: ["id", "_id"]
 	}
 	metrics: {
 		description: "Configuration for the `metric_to_log` transform."
@@ -383,6 +452,8 @@ base: components: sinks: elasticsearch: configuration: {
 					When set to `single`, only the last non-bare value of tags will be displayed with the
 					metric.  When set to `full`, all metric tags will be exposed as separate assignments as
 					described by [the `native_json` codec][vector_native_json].
+
+					[vector_native_json]: https://github.com/vectordotdev/vector/blob/master/lib/codecs/tests/data/native_encoding/schema.cue
 					"""
 				required: false
 				type: string: {
@@ -414,7 +485,7 @@ base: components: sinks: elasticsearch: configuration: {
 		}
 	}
 	mode: {
-		description: "Indexing mode."
+		description: "Elasticsearch Indexing mode."
 		required:    false
 		type: string: {
 			default: "bulk"
@@ -431,15 +502,20 @@ base: components: sinks: elasticsearch: configuration: {
 	pipeline: {
 		description: "The name of the pipeline to apply."
 		required:    false
-		type: string: {}
+		type: string: examples: ["pipeline-name"]
 	}
 	query: {
-		description: "Custom parameters to add to the query string of each request sent to Elasticsearch."
+		description: "Custom parameters to add to the query string for each HTTP request sent to Elasticsearch."
 		required:    false
-		type: object: options: "*": {
-			description: "A query string parameter."
-			required:    true
-			type: string: {}
+		type: object: {
+			examples: [{
+				"X-Powered-By": "Vector"
+			}]
+			options: "*": {
+				description: "A query string parameter."
+				required:    true
+				type: string: {}
+			}
 		}
 	}
 	request: {
@@ -521,21 +597,33 @@ base: components: sinks: elasticsearch: configuration: {
 			headers: {
 				description: "Additional HTTP headers to add to every HTTP request."
 				required:    false
-				type: object: options: "*": {
-					description: "An HTTP request header."
-					required:    true
-					type: string: {}
+				type: object: {
+					examples: [{
+						Accept:               "text/plain"
+						"X-My-Custom-Header": "A-Value"
+					}]
+					options: "*": {
+						description: "An HTTP request header and it's value."
+						required:    true
+						type: string: {}
+					}
 				}
 			}
 			rate_limit_duration_secs: {
-				description: "The time window, in seconds, used for the `rate_limit_num` option."
+				description: "The time window used for the `rate_limit_num` option."
 				required:    false
-				type: uint: default: 1
+				type: uint: {
+					default: 1
+					unit:    "seconds"
+				}
 			}
 			rate_limit_num: {
 				description: "The maximum number of requests allowed within the `rate_limit_duration_secs` time window."
 				required:    false
-				type: uint: default: 9223372036854775807
+				type: uint: {
+					default: 9223372036854775807
+					unit:    "requests"
+				}
 			}
 			retry_attempts: {
 				description: """
@@ -544,7 +632,10 @@ base: components: sinks: elasticsearch: configuration: {
 					The default, for all intents and purposes, represents an infinite number of retries.
 					"""
 				required: false
-				type: uint: default: 9223372036854775807
+				type: uint: {
+					default: 9223372036854775807
+					unit:    "retries"
+				}
 			}
 			retry_initial_backoff_secs: {
 				description: """
@@ -553,22 +644,31 @@ base: components: sinks: elasticsearch: configuration: {
 					After the first retry has failed, the fibonacci sequence will be used to select future backoffs.
 					"""
 				required: false
-				type: uint: default: 1
+				type: uint: {
+					default: 1
+					unit:    "seconds"
+				}
 			}
 			retry_max_duration_secs: {
-				description: "The maximum amount of time, in seconds, to wait between retries."
+				description: "The maximum amount of time to wait between retries."
 				required:    false
-				type: uint: default: 3600
+				type: uint: {
+					default: 3600
+					unit:    "seconds"
+				}
 			}
 			timeout_secs: {
 				description: """
-					The maximum time a request can take before being aborted.
+					The time a request can take before being aborted.
 
 					It is highly recommended that you do not lower this value below the service’s internal timeout, as this could
 					create orphaned requests, pile on retries, and result in duplicate data downstream.
 					"""
 				required: false
-				type: uint: default: 60
+				type: uint: {
+					default: 60
+					unit:    "seconds"
+				}
 			}
 		}
 	}
@@ -582,17 +682,17 @@ base: components: sinks: elasticsearch: configuration: {
 		type: bool: default: false
 	}
 	suppress_type_name: {
+		deprecated:         true
+		deprecated_message: "This option has been deprecated, the `api_version` option should be used instead."
 		description: """
 			Whether or not to send the `type` field to Elasticsearch.
 
-			`type` field was deprecated in Elasticsearch 7.x and removed in Elasticsearch 8.x.
+			The `type` field was deprecated in Elasticsearch 7.x and removed in Elasticsearch 8.x.
 
 			If enabled, the `doc_type` option will be ignored.
-
-			This option has been deprecated, the `api_version` option should be used instead.
 			"""
 		required: false
-		type: bool: {}
+		type: bool: default: false
 	}
 	tls: {
 		description: "TLS configuration."

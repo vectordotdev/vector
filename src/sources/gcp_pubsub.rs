@@ -25,7 +25,7 @@ use vector_common::internal_event::{
     ByteSize, BytesReceived, EventsReceived, InternalEventHandle as _, Protocol, Registered,
 };
 use vector_common::{byte_size_of::ByteSizeOf, finalizer::UnorderedFinalizer};
-use vector_config::{configurable_component, NamedComponent};
+use vector_config::configurable_component;
 use vector_core::config::{LegacyKey, LogNamespace};
 
 use crate::{
@@ -167,8 +167,12 @@ pub struct PubsubConfig {
     #[serde_as(as = "serde_with::DurationSeconds<u64>")]
     pub ack_deadline_secs: Duration,
 
-    /// Deprecated, old name of `ack_deadline_secs`.
-    #[configurable(deprecated)]
+    /// The acknowledgement deadline, in seconds, to use for this stream.
+    ///
+    /// Messages that are not acknowledged when this deadline expires may be retransmitted.
+    #[configurable(
+        deprecated = "This option has been deprecated, use `ack_deadline_secs` instead."
+    )]
     pub ack_deadline_seconds: Option<u16>,
 
     /// The amount of time, in seconds, to wait between retry attempts after an error.
@@ -176,8 +180,10 @@ pub struct PubsubConfig {
     #[serde_as(as = "serde_with::DurationSeconds<f64>")]
     pub retry_delay_secs: Duration,
 
-    /// Deprecated, old name of `retry_delay_secs`.
-    #[configurable(deprecated)]
+    /// The amount of time, in seconds, to wait between retry attempts after an error.
+    #[configurable(
+        deprecated = "This option has been deprecated, use `retry_delay_secs` instead."
+    )]
     pub retry_delay_seconds: Option<f64>,
 
     /// The amount of time, in seconds, with no received activity
@@ -729,7 +735,7 @@ impl Future for Task {
 
 #[cfg(test)]
 mod tests {
-    use lookup::LookupBuf;
+    use lookup::OwnedTargetPath;
     use vector_core::schema::Definition;
 
     use super::*;
@@ -753,23 +759,31 @@ mod tests {
 
         let expected_definition =
             Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
-                .with_meaning(LookupBuf::root(), "message")
-                .with_metadata_field(&owned_value_path!("vector", "source_type"), Kind::bytes())
+                .with_meaning(OwnedTargetPath::event_root(), "message")
+                .with_metadata_field(
+                    &owned_value_path!("vector", "source_type"),
+                    Kind::bytes(),
+                    None,
+                )
                 .with_metadata_field(
                     &owned_value_path!("vector", "ingest_timestamp"),
                     Kind::timestamp(),
+                    None,
                 )
                 .with_metadata_field(
                     &owned_value_path!("gcp_pubsub", "timestamp"),
                     Kind::timestamp().or_undefined(),
+                    Some("timestamp"),
                 )
                 .with_metadata_field(
                     &owned_value_path!("gcp_pubsub", "attributes"),
                     Kind::object(Collection::empty().with_unknown(Kind::bytes())),
+                    None,
                 )
                 .with_metadata_field(
                     &owned_value_path!("gcp_pubsub", "message_id"),
                     Kind::bytes(),
+                    None,
                 );
 
         assert_eq!(definition, expected_definition);
