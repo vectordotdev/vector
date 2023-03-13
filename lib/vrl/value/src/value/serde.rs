@@ -280,8 +280,7 @@ mod test {
                                 };
                                 assert!(
                                     is_match,
-                                    "Typecheck failure. Wanted {}, got {:?}.",
-                                    expected_type, vector_value
+                                    "Typecheck failure. Wanted {expected_type}, got {vector_value:?}."
                                 );
                                 let _value: serde_json::Value = vector_value.try_into().unwrap();
                             },

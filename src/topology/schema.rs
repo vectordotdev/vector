@@ -138,29 +138,32 @@ pub(super) fn expanded_definitions(
 
         // If the input is a source, it'll always have schema definition attached, even if it is an
         // "empty" schema.
+        // We take the full schema definition regardless of `config.schema_enabled()`, the assumption
+        // being that the receiving component will not be validating the schema if schema checking is
+        // not enabled.
         if let Some(outputs) = config.source_outputs(key) {
             // After getting the source matching to the given input, we need to further narrow the
             // actual output of the source feeding into this input, and then get the definition
             // belonging to that output.
-            let maybe_source_definition = outputs.iter().find_map(|output| {
-                if output.port == input.port {
-                    Some(
-                        output
-                            .log_schema_definition
-                            .clone()
-                            .unwrap_or_else(Definition::default_legacy_namespace),
-                    )
-                } else {
-                    None
-                }
-            });
-
-            let source_definition = match maybe_source_definition {
-                Some(source_definition) => source_definition,
-                // If we find no match, it means the topology is misconfigured. This is a fatal
-                // error, but other parts of the topology builder deal with this state.
-                None => unreachable!("source output mis-configured"),
-            };
+            let source_definition = outputs
+                .iter()
+                .find_map(|output| {
+                    if output.port == input.port {
+                        Some(
+                            output
+                                .log_schema_definition
+                                .clone()
+                                .unwrap_or_else(Definition::default_legacy_namespace),
+                        )
+                    } else {
+                        None
+                    }
+                })
+                .unwrap_or_else(|| {
+                    // If we find no match, it means the topology is misconfigured. This is a fatal
+                    // error, but other parts of the topology builder deal with this state.
+                    unreachable!("source output mis-configured")
+                });
 
             definitions.push(source_definition);
 
@@ -231,7 +234,7 @@ pub(super) fn validate_sink_expectations(
 
     // Validate each individual definition against the sink requirement.
     for definition in definitions {
-        if let Err(err) = requirement.validate(&definition) {
+        if let Err(err) = requirement.validate(&definition, config.schema.validation) {
             errors.append(
                 &mut err
                     .errors()

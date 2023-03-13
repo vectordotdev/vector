@@ -120,6 +120,14 @@ pub struct FieldsSpec {
     #[configurable(metadata(docs::examples = "k8s.container_image"))]
     #[configurable(metadata(docs::examples = ""))]
     pub container_image: OptionalTargetPath,
+
+    /// Event field for the Container's image ID.
+    ///
+    /// Set to `""` to suppress this key.
+    #[configurable(metadata(docs::examples = ".k8s.container_image_id"))]
+    #[configurable(metadata(docs::examples = "k8s.container_image_id"))]
+    #[configurable(metadata(docs::examples = ""))]
+    pub container_image_id: OptionalTargetPath,
 }
 
 impl Default for FieldsSpec {
@@ -151,6 +159,11 @@ impl Default for FieldsSpec {
             container_image: OwnedTargetPath::event(owned_value_path!(
                 "kubernetes",
                 "container_image"
+            ))
+            .into(),
+            container_image_id: OwnedTargetPath::event(owned_value_path!(
+                "kubernetes",
+                "container_image_id"
             ))
             .into(),
         }
@@ -424,6 +437,21 @@ fn annotate_from_container_status(
             value.to_owned(),
         )
     }
+
+    let legacy_key = fields_spec
+        .container_image_id
+        .path
+        .as_ref()
+        .map(|k| &k.path)
+        .map(LegacyKey::Overwrite);
+
+    log_namespace.insert_source_metadata(
+        Config::NAME,
+        log,
+        legacy_key,
+        path!("container_image_id"),
+        container_status.image_id.to_owned(),
+    )
 }
 
 fn annotate_from_container(
@@ -921,7 +949,11 @@ mod tests {
             (
                 FieldsSpec::default(),
                 ContainerStatus::default(),
-                LogEvent::default(),
+                {
+                    let mut log = LogEvent::default();
+                    log.insert(event_path!("kubernetes", "container_image_id"), "");
+                    log
+                },
                 LogNamespace::Legacy,
             ),
             (
@@ -930,6 +962,7 @@ mod tests {
                 },
                 ContainerStatus {
                     container_id: Some("container_id_foo".to_owned()),
+                    image_id: "test_image_id".to_owned(),
                     ..ContainerStatus::default()
                 },
                 {
@@ -937,6 +970,10 @@ mod tests {
                     log.insert(
                         event_path!("kubernetes", "container_id"),
                         "container_id_foo",
+                    );
+                    log.insert(
+                        event_path!("kubernetes", "container_image_id"),
+                        "test_image_id",
                     );
                     log
                 },

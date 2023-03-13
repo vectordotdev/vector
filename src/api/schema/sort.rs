@@ -14,16 +14,11 @@ use crate::api::schema::{
     metrics::source::file::FileSourceMetricFilesSortFieldName,
 };
 
-#[derive(Enum, Copy, Clone, PartialEq, Eq)]
+#[derive(Enum, Copy, Clone, Default, PartialEq, Eq)]
 pub enum Direction {
+    #[default]
     Asc,
     Desc,
-}
-
-impl Default for Direction {
-    fn default() -> Self {
-        Direction::Asc
-    }
 }
 
 #[derive(InputObject)]

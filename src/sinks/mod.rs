@@ -63,14 +63,16 @@ pub mod humio;
 pub mod influxdb;
 #[cfg(feature = "sinks-kafka")]
 pub mod kafka;
-#[cfg(feature = "sinks-logdna")]
-pub mod logdna;
 #[cfg(feature = "sinks-loki")]
 pub mod loki;
+#[cfg(feature = "sinks-mezmo")]
+pub mod mezmo;
 #[cfg(feature = "sinks-nats")]
 pub mod nats;
 #[cfg(feature = "sinks-new_relic")]
 pub mod new_relic;
+#[cfg(feature = "sinks-webhdfs")]
+pub mod opendal_common;
 #[cfg(feature = "sinks-papertrail")]
 pub mod papertrail;
 #[cfg(feature = "sinks-prometheus")]
@@ -94,6 +96,8 @@ pub mod splunk_hec;
 pub mod statsd;
 #[cfg(feature = "sinks-vector")]
 pub mod vector;
+#[cfg(feature = "sinks-webhdfs")]
+pub mod webhdfs;
 #[cfg(feature = "sinks-websocket")]
 pub mod websocket;
 
@@ -263,6 +267,11 @@ pub enum Sinks {
     #[configurable(metadata(docs::label = "GCP Pub/Sub"))]
     GcpPubsub(gcp::pubsub::PubsubConfig),
 
+    /// WebHDFS.
+    #[cfg(feature = "sinks-webhdfs")]
+    #[configurable(metadata(docs::label = "WebHDFS"))]
+    WebHdfs(webhdfs::WebHdfsConfig),
+
     /// Deliver log events to Honeycomb.
     #[cfg(feature = "sinks-honeycomb")]
     #[configurable(metadata(docs::label = "Honeycomb"))]
@@ -298,10 +307,15 @@ pub enum Sinks {
     #[configurable(metadata(docs::label = "Kafka"))]
     Kafka(kafka::KafkaSinkConfig),
 
+    /// Deliver log event data to Mezmo.
+    #[cfg(feature = "sinks-mezmo")]
+    #[configurable(metadata(docs::label = "Mezmo"))]
+    Mezmo(mezmo::MezmoConfig),
+
     /// Deliver log event data to LogDNA.
-    #[cfg(feature = "sinks-logdna")]
+    #[cfg(feature = "sinks-mezmo")]
     #[configurable(metadata(docs::label = "LogDNA"))]
-    Logdna(logdna::LogdnaConfig),
+    Logdna(mezmo::LogdnaConfig),
 
     /// Deliver log event data to the Loki aggregation system.
     #[cfg(feature = "sinks-loki")]
@@ -470,6 +484,8 @@ impl NamedComponent for Sinks {
             Self::GcpCloudStorage(config) => config.get_component_name(),
             #[cfg(feature = "sinks-gcp")]
             Self::GcpPubsub(config) => config.get_component_name(),
+            #[cfg(feature = "sinks-webhdfs")]
+            Self::WebHdfs(config) => config.get_component_name(),
             #[cfg(feature = "sinks-honeycomb")]
             Self::Honeycomb(config) => config.get_component_name(),
             #[cfg(feature = "sinks-http")]
@@ -484,7 +500,9 @@ impl NamedComponent for Sinks {
             Self::InfluxdbMetrics(config) => config.get_component_name(),
             #[cfg(feature = "sinks-kafka")]
             Self::Kafka(config) => config.get_component_name(),
-            #[cfg(feature = "sinks-logdna")]
+            #[cfg(feature = "sinks-mezmo")]
+            Self::Mezmo(config) => config.get_component_name(),
+            #[cfg(feature = "sinks-mezmo")]
             Self::Logdna(config) => config.get_component_name(),
             #[cfg(feature = "sinks-loki")]
             Self::Loki(config) => config.get_component_name(),

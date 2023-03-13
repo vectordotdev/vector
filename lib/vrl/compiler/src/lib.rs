@@ -14,7 +14,6 @@
     clippy::cast_precision_loss, // allowed in initial deny commit
     clippy::cast_sign_loss, // allowed in initial deny commit
     clippy::if_not_else, // allowed in initial deny commit
-    clippy::let_underscore_drop, // allowed in initial deny commit
     clippy::match_bool, // allowed in initial deny commit
     clippy::match_same_arms, // allowed in initial deny commit
     clippy::match_wild_err_arm, // allowed in initial deny commit
@@ -26,6 +25,7 @@
     clippy::semicolon_if_nothing_returned,  // allowed in initial deny commit
     clippy::similar_names, // allowed in initial deny commit
     clippy::too_many_lines, // allowed in initial deny commit
+    let_underscore_drop, // allowed in initial deny commit
 )]
 
 mod compile_config;

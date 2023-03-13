@@ -97,7 +97,6 @@ fn main() {
 
     let tests = glob("tests/**/*.vrl")
         .expect("valid pattern")
-        .into_iter()
         .filter_map(|entry| {
             let path = entry.ok()?;
             Some(Test::from_path(&path))

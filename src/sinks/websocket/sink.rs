@@ -491,7 +491,7 @@ mod tests {
             time::sleep(Duration::from_millis(10)).await;
             event
         });
-        let _ = tokio::spawn(sink.run(events));
+        drop(tokio::spawn(sink.run(events)));
 
         receiver.connected().await;
         time::sleep(Duration::from_millis(500)).await;
