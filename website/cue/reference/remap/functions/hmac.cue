@@ -4,7 +4,14 @@ remap: functions: hmac: {
 	category:    "Cryptography"
 	description: """
 		Calculates a [HMAC](\(urls.hmac)) of the `value` using the given `key`.
-		Both the hashing `algorithm` and the `encoding` format for the byte-string result can be optionally specified.
+		The hashing `algorithm` used can be optionally specified.
+
+		For most use cases, the resulting bytestream should be encoded into a hex or base64
+		string using either [encode_base16](\(urls.vrl_functions)/#encode_base16) or
+		[encode_base64](\(urls.vrl_functions)/#encode_base64).
+
+		This function is infallible if either the default `algorithm` value, or a recognized-valid compile-time
+		`algorithm` string literal is used. Otherwise it is fallible.
 		"""
 
 	arguments: [
@@ -33,17 +40,6 @@ remap: functions: hmac: {
 			required: false
 			default:  "SHA-256"
 			type: ["string"]
-		},
-		{
-			name:        "encoding"
-			description: "The byte-string encoding to use for the result."
-			enum: {
-				"base64":  "Base64 encoding"
-				"hex":     "Hex string encoding"
-			}
-			required: false
-			default:  "base64"
-			type: ["string"]
 		}
 	]
 	internal_failure_reasons: []
@@ -51,18 +47,29 @@ remap: functions: hmac: {
 
 	examples: [
 		{
-			title: "Calculate message HMAC (defaults: SHA-256, base64-encoded result)"
+			title: "Calculate message HMAC (defaults: SHA-256), encoding to a base64 string"
 			source: #"""
-				hmac("Hello there", "super-secret-key")
+				encode_base64(hmac("Hello there", "super-secret-key"))
 				"""#
 			return: "eLGE8YMviv85NPXgISRUZxstBNSU47JQdcXkUWcClmI="
 		},
 		{
-			title: "Calculate message HMAC (SHA-224, hex-encoded result)"
+			title: "Calculate message HMAC using SHA-224, encoding to a hex-encoded string"
 			source: #"""
-				hmac("Hello there", "super-secret-key", algorithm: "SHA-224", encoding: "hex")
+				encode_base16(hmac("Hello there", "super-secret-key", algorithm: "SHA-224"))
 				"""#
 			return: "42fccbc2b7d22a143b92f265a8046187558a94d11ddbb30622207e90"
 		},
+		{
+			title: "Calculate message HMAC using a variable hash algorithm"
+			source: #"""
+			  .hash_algo = "SHA-256"
+			  hmac_bytes, err = hmac("Hello there", "super-secret-key", algorithm: .hash_algo)
+			  if err == null {
+			    .hmac = encode_base16(hmac_bytes)
+			  }
+			"""#
+			return: "78b184f1832f8aff3934f5e0212454671b2d04d494e3b25075c5e45167029662"
+		}
 	]
 }
