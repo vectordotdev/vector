@@ -100,22 +100,7 @@ impl ApplicationConfig {
         #[cfg(feature = "enterprise")]
         let mut config = config;
         #[cfg(feature = "enterprise")]
-        // Enable enterprise features, if applicable.
-        let enterprise = match EnterpriseMetadata::try_from(&config) {
-            Ok(metadata) => {
-                let enterprise = EnterpriseReporter::new();
-
-                attach_enterprise_components(&mut config, &metadata);
-                enterprise.send(report_configuration(config_paths.clone(), metadata));
-
-                Some(enterprise)
-            }
-            Err(EnterpriseError::MissingApiKey) => {
-                error!("Enterprise configuration incomplete: missing API key.");
-                return Err(exitcode::CONFIG);
-            }
-            Err(_) => None,
-        };
+        let enterprise = build_enterprise(&mut config, config_paths.clone())?;
 
         let diff = config::ConfigDiff::initial(&config);
         let pieces = topology::build_or_log_errors(&config, &diff, HashMap::new())
@@ -463,4 +448,27 @@ pub async fn load_configs(
     config.healthchecks.set_require_healthy(require_healthy);
 
     Ok(config)
+}
+
+#[cfg(feature = "enterprise")]
+// Enable enterprise features, if applicable.
+fn build_enterprise(
+    config: &mut Config,
+    config_paths: Vec<ConfigPath>,
+) -> Result<Option<EnterpriseReporter<BoxFuture<'static, ()>>>, ExitCode> {
+    match EnterpriseMetadata::try_from(&*config) {
+        Ok(metadata) => {
+            let enterprise = EnterpriseReporter::new();
+
+            attach_enterprise_components(config, &metadata);
+            enterprise.send(report_configuration(config_paths, metadata));
+
+            Ok(Some(enterprise))
+        }
+        Err(EnterpriseError::MissingApiKey) => {
+            error!("Enterprise configuration incomplete: missing API key.");
+            Err(exitcode::CONFIG)
+        }
+        Err(_) => Ok(None),
+    }
 }
