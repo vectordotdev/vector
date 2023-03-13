@@ -15,5 +15,5 @@ chrono = { version = "0.4.22", default-features = false, features = ["serde"] }
 prost = { version = "0.11.3", default-features = false, features = ["std"] }
 prost-types = { version = "0.11.2", default-features = false, features = ["std"] }
 vector-core = { path = "../vector-core", default-features = false }
-value = { path = "../value" }
+value = { path = "../vrl/value" }
 ordered-float = { version = "3.4.0", default-features = false }
