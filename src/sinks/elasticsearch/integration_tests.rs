@@ -111,10 +111,10 @@ async fn ensure_pipeline_in_params() {
 
     let config = ElasticsearchConfig {
         endpoints: vec![http_server()],
-        bulk: Some(BulkConfig {
+        bulk: BulkConfig {
             index,
             ..Default::default()
-        }),
+        },
         pipeline: Some(pipeline.clone()),
         batch: batch_settings(),
         ..Default::default()
@@ -131,10 +131,10 @@ async fn structures_events_correctly() {
     let index = gen_index();
     let config = ElasticsearchConfig {
         endpoints: vec![http_server()],
-        bulk: Some(BulkConfig {
+        bulk: BulkConfig {
             index: index.clone(),
             ..Default::default()
-        }),
+        },
         doc_type: "log_lines".to_string(),
         id_key: Some("my_id".into()),
         compression: Compression::None,
@@ -422,10 +422,10 @@ async fn insert_events_in_data_stream() {
     let cfg = ElasticsearchConfig {
         endpoints: vec![http_server()],
         mode: ElasticsearchMode::DataStream,
-        bulk: Some(BulkConfig {
+        bulk: BulkConfig {
             index: Template::try_from(stream_index.clone()).expect("unable to parse template"),
             ..Default::default()
-        }),
+        },
         batch: batch_settings(),
         ..Default::default()
     };
@@ -464,10 +464,10 @@ async fn distributed_insert_events() {
         batch: batch_settings(),
         ..Default::default()
     };
-    config.bulk = Some(BulkConfig {
+    config.bulk = BulkConfig {
         index: gen_index(),
         ..Default::default()
-    });
+    };
     run_insert_tests_with_multiple_endpoints(&config).await;
 }
 
@@ -495,10 +495,10 @@ async fn distributed_insert_events_failover() {
         batch: batch_settings(),
         ..Default::default()
     };
-    config.bulk = Some(BulkConfig {
+    config.bulk = BulkConfig {
         index: gen_index(),
         ..Default::default()
-    });
+    };
     run_insert_tests_with_multiple_endpoints(&config).await;
 }
 
@@ -507,10 +507,10 @@ async fn run_insert_tests(
     break_events: bool,
     status: BatchStatus,
 ) {
-    config.bulk = Some(BulkConfig {
+    config.bulk = BulkConfig {
         index: gen_index(),
         ..Default::default()
-    });
+    };
     run_insert_tests_with_config(&config, break_events, status).await;
 }
 
@@ -543,7 +543,7 @@ async fn run_insert_tests_with_config(
             "{}",
             Utc::now().format(".ds-logs-generic-default-%Y.%m.%d-000001")
         ),
-        ElasticsearchMode::Bulk => config.bulk.as_ref().unwrap().index.to_string(),
+        ElasticsearchMode::Bulk => config.bulk.index.to_string(),
     };
     let base_url = common.base_url.clone();
 
@@ -641,7 +641,7 @@ async fn run_insert_tests_with_multiple_endpoints(config: &ElasticsearchConfig) 
             "{}",
             Utc::now().format(".ds-logs-generic-default-%Y.%m.%d-000001")
         ),
-        ElasticsearchMode::Bulk => config.bulk.as_ref().unwrap().index.to_string(),
+        ElasticsearchMode::Bulk => config.bulk.index.to_string(),
     };
 
     let (sink, healthcheck) = config

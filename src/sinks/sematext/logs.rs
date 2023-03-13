@@ -93,11 +93,11 @@ impl SinkConfig for SematextLogsConfig {
             doc_type: "\
                 logs"
                 .to_string(),
-            bulk: Some(BulkConfig {
+            bulk: BulkConfig {
                 index: Template::try_from(self.token.inner())
                     .expect("unable to parse token as Template"),
                 ..Default::default()
-            }),
+            },
             batch: self.batch,
             request: RequestConfig {
                 tower: self.request,
