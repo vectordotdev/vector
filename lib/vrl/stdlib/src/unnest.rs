@@ -119,7 +119,7 @@ impl UnnestFn {
         Self {
             path: expression::Query::new(
                 expression::Target::External(PathPrefix::Event),
-                parse_value_path(path),
+                parse_value_path(path).unwrap(),
             ),
         }
     }
@@ -159,9 +159,7 @@ impl FunctionExpression for UnnestFn {
 pub(crate) fn invert_array_at_path(typedef: &TypeDef, path: &OwnedValuePath) -> TypeDef {
     let kind = typedef.kind().at_path(path);
 
-    let mut array = if let Some(array) = kind.into_array() {
-        array
-    } else {
+    let Some(mut array) = kind.into_array() else {
         // Guaranteed fallible.
         // This can't actually be set to "fallible", or it will cause problems due to
         // https://github.com/vectordotdev/vector/issues/13527
@@ -386,7 +384,7 @@ mod tests {
                     } },
                 ] },
             },
-            // Non existent, the types we know are moved into the returned array.
+            // Nonexistent, the types we know are moved into the returned array.
             TestCase {
                 old: type_def! { object {
                     "nonk" => type_def! { bytes },
@@ -398,9 +396,9 @@ mod tests {
         ];
 
         for case in cases {
-            let path = parse_value_path(case.path);
+            let path = parse_value_path(case.path).unwrap();
             let new = invert_array_at_path(&case.old, &path);
-            assert_eq!(case.new, new, "{}", path);
+            assert_eq!(case.new, new, "{path}");
         }
     }
 

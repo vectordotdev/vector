@@ -10,11 +10,10 @@ use indexmap::IndexMap;
 use rand::Rng;
 use serde::Serialize;
 use tokio::{
-    sync::mpsc::{self},
+    sync::mpsc,
     time::{sleep, Duration},
 };
 use url::{ParseError, Url};
-use vector_common::sensitive_string::SensitiveString;
 use vector_core::config::proxy::ProxyConfig;
 
 use super::{
@@ -22,12 +21,15 @@ use super::{
     SourceOuter, TransformOuter,
 };
 use crate::{
-    common::datadog::{get_api_base_endpoint, Region},
+    common::datadog::{get_api_base_endpoint, get_base_domain_region, Region},
     conditions::AnyCondition,
     http::{HttpClient, HttpError},
     sinks::{
-        datadog::{logs::DatadogLogsConfig, metrics::DatadogMetricsConfig},
-        util::retries::ExponentialBackoff,
+        datadog::{
+            default_site, logs::DatadogLogsConfig, metrics::DatadogMetricsConfig,
+            DatadogCommonConfig,
+        },
+        util::{http::RequestConfig, retries::ExponentialBackoff},
     },
     sources::{
         host_metrics::{Collector, HostMetricsConfig},
@@ -74,8 +76,8 @@ pub struct Options {
     /// The Datadog [site][dd_site] to send data to.
     ///
     /// [dd_site]: https://docs.datadoghq.com/getting_started/site
-    #[serde(default)]
-    site: Option<String>,
+    #[serde(default = "default_site")]
+    site: String,
 
     /// The Datadog region to send data to.
     ///
@@ -96,16 +98,16 @@ pub struct Options {
     ///
     /// [api_key]: https://docs.datadoghq.com/api/?lang=bash#authentication
     #[serde(default)]
-    pub api_key: Option<SensitiveString>,
+    pub api_key: Option<String>,
 
     /// The Datadog application key.
     ///
     /// This is deprecated.
     #[configurable(deprecated)]
-    pub application_key: Option<SensitiveString>,
+    pub application_key: Option<String>,
 
     /// The configuration key for Observability Pipelines.
-    pub configuration_key: SensitiveString,
+    pub configuration_key: String,
 
     /// The amount of time, in seconds, between reporting host metrics to Observability Pipelines.
     #[serde(default = "default_reporting_interval_secs")]
@@ -131,12 +133,12 @@ impl Default for Options {
         Self {
             enabled: default_enabled(),
             enable_logs_reporting: default_enable_logs_reporting(),
-            site: None,
+            site: default_site(),
             region: None,
             endpoint: None,
             api_key: None,
             application_key: None,
-            configuration_key: "".to_owned().into(),
+            configuration_key: "".to_owned(),
             reporting_interval_secs: default_reporting_interval_secs(),
             max_retries: default_max_retries(),
             proxy: ProxyConfig::default(),
@@ -320,7 +322,7 @@ impl TryFrom<&Config> for EnterpriseMetadata {
 
         let api_key = match &opts.api_key {
             // API key provided explicitly.
-            Some(api_key) => api_key.inner().to_owned(),
+            Some(api_key) => api_key.clone(),
             // No API key; attempt to get it from the environment.
             None => match env::var(DATADOG_API_KEY_ENV_VAR_FULL)
                 .or_else(|_| env::var(DATADOG_API_KEY_ENV_VAR_SHORT))
@@ -479,11 +481,20 @@ fn setup_logs_reporting(
 
     // Create a Datadog logs sink to consume and emit internal logs.
     let datadog_logs = DatadogLogsConfig {
-        default_api_key: api_key.into(),
-        endpoint: datadog.endpoint.clone(),
-        site: datadog.site.clone(),
+        dd_common: DatadogCommonConfig {
+            endpoint: datadog.endpoint.clone(),
+            site: datadog.site.clone(),
+            default_api_key: api_key.into(),
+            ..Default::default()
+        },
         region: datadog.region,
-        enterprise: true,
+        request: RequestConfig {
+            headers: IndexMap::from([(
+                "DD-EVP-ORIGIN".to_string(),
+                "vector-enterprise".to_string(),
+            )]),
+            ..Default::default()
+        },
         ..Default::default()
     };
 
@@ -525,7 +536,7 @@ fn setup_metrics_reporting(
     // systems' performance. To avoid this, we explicitly set `collectors`.
     let host_metrics = HostMetricsConfig {
         namespace: Some("vector.host".to_owned()),
-        scrape_interval_secs: datadog.reporting_interval_secs,
+        scrape_interval_secs: Duration::from_secs_f64(datadog.reporting_interval_secs),
         collectors: Some(vec![
             Collector::Cpu,
             Collector::Disk,
@@ -541,8 +552,8 @@ fn setup_metrics_reporting(
         // While the default namespace for internal metrics is already "vector",
         // setting the namespace here is meant for clarity and resistance
         // against any future or accidental changes.
-        namespace: Some("vector".to_owned()),
-        scrape_interval_secs: datadog.reporting_interval_secs,
+        namespace: "vector".to_owned(),
+        scrape_interval_secs: Duration::from_secs_f64(datadog.reporting_interval_secs),
         ..Default::default()
     };
 
@@ -578,9 +589,12 @@ fn setup_metrics_reporting(
 
     // Create a Datadog metrics sink to consume and emit internal + host metrics.
     let datadog_metrics = DatadogMetricsConfig {
-        default_api_key: api_key.into(),
-        endpoint: datadog.endpoint.clone(),
-        site: datadog.site.clone(),
+        dd_common: DatadogCommonConfig {
+            endpoint: datadog.endpoint.clone(),
+            site: datadog.site.clone(),
+            default_api_key: api_key.into(),
+            ..Default::default()
+        },
         region: datadog.region,
         ..Default::default()
     };
@@ -669,9 +683,9 @@ pub(crate) fn report_configuration(
         // Endpoint to report a config to Datadog OP.
         let endpoint = get_reporting_endpoint(
             opts.endpoint.as_ref(),
-            opts.site.as_ref(),
+            opts.site.as_str(),
             opts.region,
-            opts.configuration_key.inner(),
+            &opts.configuration_key,
         );
         // Datadog uses a JSON:API, so we'll serialize the config to a JSON
         let payload = PipelinesVersionPayload::new(&table, &fields);
@@ -706,13 +720,15 @@ pub(crate) fn report_configuration(
 /// Returns the full URL endpoint of where to POST a Datadog Vector configuration.
 fn get_reporting_endpoint(
     endpoint: Option<&String>,
-    site: Option<&String>,
+    site: &str,
     region: Option<Region>,
     configuration_key: &str,
 ) -> String {
+    let base = get_base_domain_region(site, region.as_ref());
+
     format!(
         "{}{}/{}/versions",
-        get_api_base_endpoint(endpoint, site, region),
+        get_api_base_endpoint(endpoint, base),
         DATADOG_REPORTING_PATH_STUB,
         configuration_key
     )

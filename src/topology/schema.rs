@@ -4,10 +4,7 @@ use value::Kind;
 pub(super) use crate::schema::Definition;
 
 use crate::{
-    config::{
-        ComponentKey, Config, Output, OutputId, SinkConfig, SinkOuter, SourceConfig,
-        TransformConfig,
-    },
+    config::{ComponentKey, Config, Output, OutputId, SinkConfig, SinkOuter, SourceConfig},
     topology,
 };
 
@@ -141,29 +138,32 @@ pub(super) fn expanded_definitions(
 
         // If the input is a source, it'll always have schema definition attached, even if it is an
         // "empty" schema.
+        // We take the full schema definition regardless of `config.schema_enabled()`, the assumption
+        // being that the receiving component will not be validating the schema if schema checking is
+        // not enabled.
         if let Some(outputs) = config.source_outputs(key) {
             // After getting the source matching to the given input, we need to further narrow the
             // actual output of the source feeding into this input, and then get the definition
             // belonging to that output.
-            let maybe_source_definition = outputs.iter().find_map(|output| {
-                if output.port == input.port {
-                    Some(
-                        output
-                            .log_schema_definition
-                            .clone()
-                            .unwrap_or_else(Definition::default_legacy_namespace),
-                    )
-                } else {
-                    None
-                }
-            });
-
-            let source_definition = match maybe_source_definition {
-                Some(source_definition) => source_definition,
-                // If we find no match, it means the topology is misconfigured. This is a fatal
-                // error, but other parts of the topology builder deal with this state.
-                None => unreachable!("source output mis-configured"),
-            };
+            let source_definition = outputs
+                .iter()
+                .find_map(|output| {
+                    if output.port == input.port {
+                        Some(
+                            output
+                                .log_schema_definition
+                                .clone()
+                                .unwrap_or_else(Definition::default_legacy_namespace),
+                        )
+                    } else {
+                        None
+                    }
+                })
+                .unwrap_or_else(|| {
+                    // If we find no match, it means the topology is misconfigured. This is a fatal
+                    // error, but other parts of the topology builder deal with this state.
+                    unreachable!("source output mis-configured")
+                });
 
             definitions.push(source_definition);
 
@@ -234,7 +234,7 @@ pub(super) fn validate_sink_expectations(
 
     // Validate each individual definition against the sink requirement.
     for definition in definitions {
-        if let Err(err) = requirement.validate(&definition) {
+        if let Err(err) = requirement.validate(&definition, config.schema.validation) {
             errors.append(
                 &mut err
                     .errors()
@@ -317,8 +317,7 @@ impl ComponentContainer for Config {
     }
 
     fn transform_inputs(&self, key: &ComponentKey) -> Option<&[OutputId]> {
-        self.transform(key)
-            .map(|transform| transform.inputs.as_slice())
+        self.transform(key).map(|transform| &transform.inputs[..])
     }
 
     fn transform_outputs(
@@ -326,8 +325,11 @@ impl ComponentContainer for Config {
         key: &ComponentKey,
         merged_definition: &Definition,
     ) -> Option<Vec<Output>> {
-        self.transform(key)
-            .map(|source| source.inner.outputs(merged_definition))
+        self.transform(key).map(|source| {
+            source
+                .inner
+                .outputs(merged_definition, self.schema.log_namespace())
+        })
     }
 }
 
@@ -336,7 +338,9 @@ mod tests {
     use std::collections::HashMap;
 
     use indexmap::IndexMap;
-    use pretty_assertions::assert_eq;
+    use lookup::lookup_v2::parse_target_path;
+    use lookup::owned_value_path;
+    use similar_asserts::assert_eq;
     use value::Kind;
     use vector_core::config::{DataType, Output};
 
@@ -399,16 +403,16 @@ mod tests {
                     sources: IndexMap::from([(
                         "source-foo",
                         vec![Output::default(DataType::all()).with_schema_definition(
-                            Definition::empty_legacy_namespace().with_field(
-                                "foo",
+                            Definition::empty_legacy_namespace().with_event_field(
+                                &owned_value_path!("foo"),
                                 Kind::integer().or_bytes(),
                                 Some("foo bar"),
                             ),
                         )],
                     )]),
                     transforms: IndexMap::default(),
-                    want: Definition::empty_legacy_namespace().with_field(
-                        "foo",
+                    want: Definition::empty_legacy_namespace().with_event_field(
+                        &owned_value_path!("foo"),
                         Kind::integer().or_bytes(),
                         Some("foo bar"),
                     ),
@@ -422,8 +426,8 @@ mod tests {
                         (
                             "source-foo",
                             vec![Output::default(DataType::all()).with_schema_definition(
-                                Definition::empty_legacy_namespace().with_field(
-                                    "foo",
+                                Definition::empty_legacy_namespace().with_event_field(
+                                    &owned_value_path!("foo"),
                                     Kind::integer().or_bytes(),
                                     Some("foo bar"),
                                 ),
@@ -432,8 +436,8 @@ mod tests {
                         (
                             "source-bar",
                             vec![Output::default(DataType::all()).with_schema_definition(
-                                Definition::empty_legacy_namespace().with_field(
-                                    "foo",
+                                Definition::empty_legacy_namespace().with_event_field(
+                                    &owned_value_path!("foo"),
                                     Kind::timestamp(),
                                     Some("baz qux"),
                                 ),
@@ -442,12 +446,12 @@ mod tests {
                     ]),
                     transforms: IndexMap::default(),
                     want: Definition::empty_legacy_namespace()
-                        .with_field(
-                            "foo",
+                        .with_event_field(
+                            &owned_value_path!("foo"),
                             Kind::integer().or_bytes().or_timestamp(),
                             Some("foo bar"),
                         )
-                        .with_meaning("foo", "baz qux"),
+                        .with_meaning(parse_target_path("foo").unwrap(), "baz qux"),
                 },
             ),
         ]) {
@@ -523,16 +527,16 @@ mod tests {
                     sources: IndexMap::from([(
                         "source-foo",
                         vec![Output::default(DataType::all()).with_schema_definition(
-                            Definition::empty_legacy_namespace().with_field(
-                                "foo",
+                            Definition::empty_legacy_namespace().with_event_field(
+                                &owned_value_path!("foo"),
                                 Kind::integer().or_bytes(),
                                 Some("foo bar"),
                             ),
                         )],
                     )]),
                     transforms: IndexMap::default(),
-                    want: vec![Definition::empty_legacy_namespace().with_field(
-                        "foo",
+                    want: vec![Definition::empty_legacy_namespace().with_event_field(
+                        &owned_value_path!("foo"),
                         Kind::integer().or_bytes(),
                         Some("foo bar"),
                     )],
@@ -546,8 +550,8 @@ mod tests {
                         (
                             "source-foo",
                             vec![Output::default(DataType::all()).with_schema_definition(
-                                Definition::empty_legacy_namespace().with_field(
-                                    "foo",
+                                Definition::empty_legacy_namespace().with_event_field(
+                                    &owned_value_path!("foo"),
                                     Kind::integer().or_bytes(),
                                     Some("foo bar"),
                                 ),
@@ -556,8 +560,8 @@ mod tests {
                         (
                             "source-bar",
                             vec![Output::default(DataType::all()).with_schema_definition(
-                                Definition::empty_legacy_namespace().with_field(
-                                    "foo",
+                                Definition::empty_legacy_namespace().with_event_field(
+                                    &owned_value_path!("foo"),
                                     Kind::timestamp(),
                                     Some("baz qux"),
                                 ),
@@ -566,13 +570,13 @@ mod tests {
                     ]),
                     transforms: IndexMap::default(),
                     want: vec![
-                        Definition::empty_legacy_namespace().with_field(
-                            "foo",
+                        Definition::empty_legacy_namespace().with_event_field(
+                            &owned_value_path!("foo"),
                             Kind::integer().or_bytes(),
                             Some("foo bar"),
                         ),
-                        Definition::empty_legacy_namespace().with_field(
-                            "foo",
+                        Definition::empty_legacy_namespace().with_event_field(
+                            &owned_value_path!("foo"),
                             Kind::timestamp(),
                             Some("baz qux"),
                         ),
@@ -587,8 +591,8 @@ mod tests {
                         (
                             "source-foo",
                             vec![Output::default(DataType::all()).with_schema_definition(
-                                Definition::empty_legacy_namespace().with_field(
-                                    "foo",
+                                Definition::empty_legacy_namespace().with_event_field(
+                                    &owned_value_path!("foo"),
                                     Kind::boolean(),
                                     Some("foo"),
                                 ),
@@ -597,8 +601,8 @@ mod tests {
                         (
                             "source-bar",
                             vec![Output::default(DataType::all()).with_schema_definition(
-                                Definition::empty_legacy_namespace().with_field(
-                                    "bar",
+                                Definition::empty_legacy_namespace().with_event_field(
+                                    &owned_value_path!("bar"),
                                     Kind::integer(),
                                     Some("bar"),
                                 ),
@@ -610,8 +614,8 @@ mod tests {
                         (
                             vec![OutputId::from("source-foo")],
                             vec![Output::default(DataType::all()).with_schema_definition(
-                                Definition::empty_legacy_namespace().with_field(
-                                    "baz",
+                                Definition::empty_legacy_namespace().with_event_field(
+                                    &owned_value_path!("baz"),
                                     Kind::regex(),
                                     Some("baz"),
                                 ),
@@ -619,13 +623,13 @@ mod tests {
                         ),
                     )]),
                     want: vec![
-                        Definition::empty_legacy_namespace().with_field(
-                            "bar",
+                        Definition::empty_legacy_namespace().with_event_field(
+                            &owned_value_path!("bar"),
                             Kind::integer(),
                             Some("bar"),
                         ),
-                        Definition::empty_legacy_namespace().with_field(
-                            "baz",
+                        Definition::empty_legacy_namespace().with_event_field(
+                            &owned_value_path!("baz"),
                             Kind::regex(),
                             Some("baz"),
                         ),
@@ -648,8 +652,8 @@ mod tests {
                         (
                             "Source 1",
                             vec![Output::default(DataType::all()).with_schema_definition(
-                                Definition::empty_legacy_namespace().with_field(
-                                    "source-1",
+                                Definition::empty_legacy_namespace().with_event_field(
+                                    &owned_value_path!("source-1"),
                                     Kind::boolean(),
                                     Some("source-1"),
                                 ),
@@ -658,8 +662,8 @@ mod tests {
                         (
                             "Source 2",
                             vec![Output::default(DataType::all()).with_schema_definition(
-                                Definition::empty_legacy_namespace().with_field(
-                                    "source-2",
+                                Definition::empty_legacy_namespace().with_event_field(
+                                    &owned_value_path!("source-2"),
                                     Kind::integer(),
                                     Some("source-2"),
                                 ),
@@ -672,8 +676,8 @@ mod tests {
                             (
                                 vec![OutputId::from("Source 1")],
                                 vec![Output::default(DataType::all()).with_schema_definition(
-                                    Definition::empty_legacy_namespace().with_field(
-                                        "transform-1",
+                                    Definition::empty_legacy_namespace().with_event_field(
+                                        &owned_value_path!("transform-1"),
                                         Kind::regex(),
                                         None,
                                     ),
@@ -685,8 +689,8 @@ mod tests {
                             (
                                 vec![OutputId::from("Source 2")],
                                 vec![Output::default(DataType::all()).with_schema_definition(
-                                    Definition::empty_legacy_namespace().with_field(
-                                        "transform-2",
+                                    Definition::empty_legacy_namespace().with_event_field(
+                                        &owned_value_path!("transform-2"),
                                         Kind::float().or_null(),
                                         Some("transform-2"),
                                     ),
@@ -698,8 +702,8 @@ mod tests {
                             (
                                 vec![OutputId::from("Source 2")],
                                 vec![Output::default(DataType::all()).with_schema_definition(
-                                    Definition::empty_legacy_namespace().with_field(
-                                        "transform-3",
+                                    Definition::empty_legacy_namespace().with_event_field(
+                                        &owned_value_path!("transform-3"),
                                         Kind::integer(),
                                         Some("transform-3"),
                                     ),
@@ -711,8 +715,8 @@ mod tests {
                             (
                                 vec![OutputId::from("Source 2")],
                                 vec![Output::default(DataType::all()).with_schema_definition(
-                                    Definition::empty_legacy_namespace().with_field(
-                                        "transform-4",
+                                    Definition::empty_legacy_namespace().with_event_field(
+                                        &owned_value_path!("transform-4"),
                                         Kind::timestamp().or_bytes(),
                                         Some("transform-4"),
                                     ),
@@ -724,8 +728,8 @@ mod tests {
                             (
                                 vec![OutputId::from("Transform 3"), OutputId::from("Transform 4")],
                                 vec![Output::default(DataType::all()).with_schema_definition(
-                                    Definition::empty_legacy_namespace().with_field(
-                                        "transform-5",
+                                    Definition::empty_legacy_namespace().with_event_field(
+                                        &owned_value_path!("transform-5"),
                                         Kind::boolean(),
                                         Some("transform-5"),
                                     ),
@@ -735,26 +739,26 @@ mod tests {
                     ]),
                     want: vec![
                         // Pipeline 1
-                        Definition::empty_legacy_namespace().with_field(
-                            "transform-1",
+                        Definition::empty_legacy_namespace().with_event_field(
+                            &owned_value_path!("transform-1"),
                             Kind::regex(),
                             None,
                         ),
                         // Pipeline 2
-                        Definition::empty_legacy_namespace().with_field(
-                            "transform-2",
+                        Definition::empty_legacy_namespace().with_event_field(
+                            &owned_value_path!("transform-2"),
                             Kind::float().or_null(),
                             Some("transform-2"),
                         ),
                         // Pipeline 3
-                        Definition::empty_legacy_namespace().with_field(
-                            "transform-5",
+                        Definition::empty_legacy_namespace().with_event_field(
+                            &owned_value_path!("transform-5"),
                             Kind::boolean(),
                             Some("transform-5"),
                         ),
                         // Pipeline 4
-                        Definition::empty_legacy_namespace().with_field(
-                            "transform-5",
+                        Definition::empty_legacy_namespace().with_event_field(
+                            &owned_value_path!("transform-5"),
                             Kind::boolean(),
                             Some("transform-5"),
                         ),

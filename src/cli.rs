@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 use std::path::PathBuf;
 
 use clap::{ArgAction, CommandFactory, FromArgMatches, Parser};
@@ -156,6 +157,20 @@ pub struct RootOpts {
         default_value = "10"
     )]
     pub internal_log_rate_limit: u64,
+
+    /// Set runtime allocation tracing
+    #[cfg(feature = "allocation-tracing")]
+    #[arg(long, env = "ALLOCATION_TRACING", default_value = "false")]
+    pub allocation_tracing: bool,
+
+    /// Set allocation tracing reporting rate in milliseconds.
+    #[cfg(feature = "allocation-tracing")]
+    #[arg(
+        long,
+        env = "ALLOCATION_TRACING_REPORTING_INTERVAL_MS",
+        default_value = "5000"
+    )]
+    pub allocation_tracing_reporting_interval_ms: u64,
 }
 
 impl RootOpts {
@@ -191,7 +206,7 @@ pub enum SubCommand {
     /// A JSON Schema document will be written to stdout that represents the valid schema for a
     /// Vector configuration. This schema is based on the "full" configuration, such that for usages
     /// where a configuration is split into multiple files, the schema would apply to those files
-    /// only when concatentated together.
+    /// only when concatenated together.
     GenerateSchema,
 
     /// Output a provided Vector configuration file/dir as a single JSON object, useful for checking in to version control.

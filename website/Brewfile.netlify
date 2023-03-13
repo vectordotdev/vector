@@ -1,4 +1,2 @@
-tap "cue-lang/tap"
-
-brew "cue-lang/tap/cue"
+brew "cue"
 brew "htmltest"

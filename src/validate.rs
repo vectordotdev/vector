@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 use std::{collections::HashMap, fmt, fs::remove_dir_all, path::PathBuf};
 
 use clap::Parser;
@@ -140,14 +141,6 @@ pub fn validate_config(opts: &Opts, fmt: &mut Formatter) -> Option<Config> {
     let (builder, load_warnings) = config::load_builder_from_paths(&paths)
         .map_err(&mut report_error)
         .ok()?;
-
-    // Check secrets in configuration
-    #[cfg(feature = "enterprise")]
-    {
-        config::loading::schema::check_sensitive_fields_from_paths(&paths, &builder)
-            .map_err(&mut report_error)
-            .ok()?;
-    }
 
     // Build
     let (config, build_warnings) = builder

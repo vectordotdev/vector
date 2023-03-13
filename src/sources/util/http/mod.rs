@@ -8,7 +8,7 @@ mod method;
 #[cfg(feature = "sources-utils-http-prelude")]
 mod prelude;
 #[cfg(any(
-    feature = "sources-http",
+    feature = "sources-http_server",
     feature = "sources-heroku_logs",
     feature = "sources-utils-http-query"
 ))]

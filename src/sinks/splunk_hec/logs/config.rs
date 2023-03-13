@@ -35,11 +35,22 @@ use crate::{
 pub struct HecLogsSinkConfig {
     /// Default Splunk HEC token.
     ///
-    /// If an event has a token set in its metadata, it will prevail over the one set here.
+    /// If an event has a token set in its secrets (`splunk_hec_token`), it will prevail over the one set here.
     #[serde(alias = "token")]
     pub default_token: SensitiveString,
 
     /// The base URL of the Splunk instance.
+    ///
+    /// The scheme (`http` or `https`) must be specified. No path should be included since the paths defined
+    /// by the [`Splunk`][splunk] API are used.
+    ///
+    /// [splunk]: https://docs.splunk.com/Documentation/Splunk/8.0.0/Data/HECRESTendpoints
+    #[configurable(metadata(
+        docs::examples = "https://http-inputs-hec.splunkcloud.com",
+        docs::examples = "https://hec.splunk.com:8088",
+        docs::examples = "http://example.com"
+    ))]
+    #[configurable(validation(format = "uri"))]
     pub endpoint: String,
 
     /// Overrides the name of the log field used to grab the hostname to send to Splunk HEC.
@@ -47,25 +58,29 @@ pub struct HecLogsSinkConfig {
     /// By default, the [global `log_schema.host_key` option][global_host_key] is used.
     ///
     /// [global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
+    #[configurable(metadata(docs::advanced))]
     #[serde(default = "host_key")]
     pub host_key: String,
 
     /// Fields to be [added to Splunk index][splunk_field_index_docs].
     ///
     /// [splunk_field_index_docs]: https://docs.splunk.com/Documentation/Splunk/8.0.0/Data/IFXandHEC
+    #[configurable(metadata(docs::advanced))]
     #[serde(default)]
+    #[configurable(metadata(docs::examples = "field1", docs::examples = "field2"))]
     pub indexed_fields: Vec<String>,
 
-    /// The name of the index where to send the events to.
+    /// The name of the index to send events to.
     ///
-    /// If not specified, the default index is used.
-    #[configurable(metadata(templateable))]
+    /// If not specified, the default index defined within Splunk is used.
+    #[configurable(metadata(docs::examples = "{{ host }}", docs::examples = "custom_index"))]
     pub index: Option<Template>,
 
     /// The sourcetype of events sent to this sink.
     ///
     /// If unset, Splunk will default to `httpevent`.
-    #[configurable(metadata(templateable))]
+    #[configurable(metadata(docs::advanced))]
+    #[configurable(metadata(docs::examples = "{{ sourcetype }}", docs::examples = "_json",))]
     pub sourcetype: Option<Template>,
 
     /// The source of events sent to this sink.
@@ -73,7 +88,12 @@ pub struct HecLogsSinkConfig {
     /// This is typically the filename the logs originated from.
     ///
     /// If unset, the Splunk collector will set it.
-    #[configurable(metadata(templateable))]
+    #[configurable(metadata(docs::advanced))]
+    #[configurable(metadata(
+        docs::examples = "{{ file }}",
+        docs::examples = "/var/log/syslog",
+        docs::examples = "UDP:514"
+    ))]
     pub source: Option<Template>,
 
     #[configurable(derived)]
@@ -104,14 +124,29 @@ pub struct HecLogsSinkConfig {
     pub timestamp_nanos_key: Option<String>,
 
     /// Overrides the name of the log field used to grab the timestamp to send to Splunk HEC.
+    /// When set to `“”`, vector omits setting a timestamp in the events sent to Splunk HEC.
     ///
     /// By default, the [global `log_schema.timestamp_key` option][global_timestamp_key] is used.
     ///
     /// [global_timestamp_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.timestamp_key
+    #[configurable(metadata(docs::advanced))]
     #[serde(default = "crate::sinks::splunk_hec::common::timestamp_key")]
+    #[configurable(metadata(docs::examples = "timestamp", docs::examples = ""))]
     pub timestamp_key: String,
 
+    /// Passes the `auto_extract_timestamp` option to Splunk.
+    ///
+    /// This option is only relevant to Splunk v8.x and above, and is only applied when
+    /// `endpoint_target` is set to `event`.
+    ///
+    /// Setting this to `true` will cause Splunk to extract the timestamp from the message text
+    /// rather than use the timestamp embedded in the event. The timestamp must be in the format
+    /// `yyyy-mm-dd hh:mm:ss`.
+    #[serde(default)]
+    pub auto_extract_timestamp: Option<bool>,
+
     #[configurable(derived)]
+    #[configurable(metadata(docs::advanced))]
     #[serde(default = "default_endpoint_target")]
     pub endpoint_target: EndpointTarget,
 }
@@ -130,7 +165,7 @@ impl GenerateConfig for HecLogsSinkConfig {
             index: None,
             sourcetype: None,
             source: None,
-            encoding: TextSerializerConfig::new().into(),
+            encoding: TextSerializerConfig::default().into(),
             compression: Compression::default(),
             batch: BatchConfig::default(),
             request: TowerRequestConfig::default(),
@@ -138,6 +173,7 @@ impl GenerateConfig for HecLogsSinkConfig {
             acknowledgements: Default::default(),
             timestamp_nanos_key: None,
             timestamp_key: timestamp_key(),
+            auto_extract_timestamp: None,
             endpoint_target: EndpointTarget::Event,
         })
         .unwrap()
@@ -147,6 +183,10 @@ impl GenerateConfig for HecLogsSinkConfig {
 #[async_trait::async_trait]
 impl SinkConfig for HecLogsSinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+        if self.auto_extract_timestamp.is_some() && self.endpoint_target == EndpointTarget::Raw {
+            return Err("`auto_extract_timestamp` cannot be set for the `raw` endpoint.".into());
+        }
+
         let client = create_client(&self.tls, cx.proxy())?;
         let healthcheck = build_healthcheck(
             self.endpoint.clone(),
@@ -186,6 +226,7 @@ impl HecLogsSinkConfig {
         let encoder = HecLogsEncoder {
             transformer,
             encoder,
+            auto_extract_timestamp: self.auto_extract_timestamp.unwrap_or_default(),
         };
         let request_builder = HecLogsRequestBuilder {
             encoder,
@@ -205,6 +246,7 @@ impl HecLogsSinkConfig {
                 client,
                 Arc::clone(&http_request_builder),
                 self.endpoint_target,
+                self.auto_extract_timestamp.unwrap_or_default(),
             ));
 
         let service = HecService::new(

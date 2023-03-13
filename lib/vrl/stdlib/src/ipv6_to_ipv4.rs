@@ -7,12 +7,12 @@ fn ipv6_to_ipv4(value: Value) -> Resolved {
     let ip = value
         .try_bytes_utf8_lossy()?
         .parse()
-        .map_err(|err| format!("unable to parse IP address: {}", err))?;
+        .map_err(|err| format!("unable to parse IP address: {err}"))?;
     match ip {
         IpAddr::V4(addr) => Ok(addr.to_string().into()),
         IpAddr::V6(addr) => match addr.to_ipv4() {
             Some(addr) => Ok(addr.to_string().into()),
-            None => Err(format!("IPV6 address {} is not compatible with IPV4", addr).into()),
+            None => Err(format!("IPV6 address {addr} is not compatible with IPV4").into()),
         },
     }
 }

@@ -119,7 +119,7 @@ impl Function for Del {
         if let Some(target_path) = query.external_path() {
             if ctx.is_read_only_path(&target_path) {
                 return Err(vrl::function::Error::ReadOnlyMutation {
-                    context: format!("{} is read-only, and cannot be deleted", query),
+                    context: format!("{query} is read-only, and cannot be deleted"),
                 }
                 .into());
             }
@@ -143,7 +143,7 @@ impl DelFn {
         Self {
             query: expression::Query::new(
                 expression::Target::External(PathPrefix::Event),
-                parse_value_path(path),
+                parse_value_path(path).unwrap(),
             ),
             compact: None,
         }
@@ -178,7 +178,24 @@ impl Expression for DelFn {
 
         let return_type = self.query.apply_type_info(&mut state);
 
-        self.query.delete_type_def(&mut state.external);
+        let compact: Option<bool> = self
+            .compact
+            .as_ref()
+            .and_then(|compact| compact.as_value())
+            .and_then(|compact| compact.as_boolean());
+
+        if let Some(compact) = compact {
+            self.query.delete_type_def(&mut state.external, compact);
+        } else {
+            let mut false_result = state.external.clone();
+            self.query.delete_type_def(&mut false_result, false);
+
+            let mut true_result = state.external.clone();
+            self.query.delete_type_def(&mut true_result, true);
+
+            state.external = false_result.merge(true_result);
+        }
+
         TypeInfo::new(state, return_type)
     }
 }

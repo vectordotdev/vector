@@ -1,0 +1,12 @@
+features:
+- fluent-integration-tests
+
+test_filter: "::fluent::"
+
+runner:
+  needs_docker_socket: true
+  volumes:
+    /tmp: /tmp
+
+matrix:
+  default: ["default"]

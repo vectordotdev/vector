@@ -6,7 +6,7 @@ fn split(value: Value, limit: Value, pattern: Value) -> Resolved {
     let limit = limit.try_integer()? as usize;
     match pattern {
         Value::Regex(pattern) => Ok(pattern
-            .splitn(string.as_ref(), limit as usize)
+            .splitn(string.as_ref(), limit)
             .collect::<Vec<_>>()
             .into()),
         Value::Bytes(bytes) => {

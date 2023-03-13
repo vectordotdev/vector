@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 use std::{
     net::{IpAddr, Ipv4Addr, SocketAddr, ToSocketAddrs},
     task::{Context, Poll},

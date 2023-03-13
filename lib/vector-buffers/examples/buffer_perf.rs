@@ -265,16 +265,6 @@ where
                 when_full,
             }
         }
-        "disk-v1" => {
-            info!(
-                "[buffer-perf] creating disk v1 buffer with max_size={}, in blocking mode",
-                max_size_bytes
-            );
-            BufferType::DiskV1 {
-                max_size: max_size_bytes,
-                when_full,
-            }
-        }
         "disk-v2" => {
             info!(
                 "[buffer-perf] creating disk v2 buffer with max_size={}, in blocking mode",

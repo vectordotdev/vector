@@ -8,10 +8,9 @@ components: sources: syslog: {
 	classes: sources.socket.classes
 
 	features: {
+		auto_generated:   true
 		acknowledgements: sources.socket.features.acknowledgements
-
-		multiline: sources.socket.features.multiline
-
+		multiline:        sources.socket.features.multiline
 		receive: {
 			from: {
 				service: services.syslog
@@ -48,67 +47,7 @@ components: sources: syslog: {
 		platform_name: null
 	}
 
-	configuration: {
-		address: {
-			description:   "The address to listen for connections on, or `systemd#N` to use the Nth socket passed by systemd socket activation. If an address is used it _must_ include a port."
-			relevant_when: "mode = `tcp` or `udp`"
-			required:      true
-			type: string: {
-				examples: ["0.0.0.0:\(_port)", "systemd", "systemd#3"]
-			}
-		}
-		host_key: {
-			category:    "Context"
-			common:      false
-			description: """
-				The key name added to each event representing the current host. This can also be globally set via the
-				[global `host_key` option](\(urls.vector_configuration)/global-options#log_schema.host_key).
-				"""
-			required:    false
-			type: string: {
-				default: "host"
-			}
-		}
-		max_length: {
-			common:      true
-			description: "The maximum buffer size of incoming messages. Messages larger than this are truncated."
-			required:    false
-			type: uint: {
-				default: 102400
-				unit:    "bytes"
-			}
-		}
-		mode: {
-			description: "The type of socket to use."
-			required:    true
-			type: string: {
-				enum: {
-					tcp:  "TCP socket."
-					udp:  "UDP socket."
-					unix: "Unix domain stream socket."
-				}
-			}
-		}
-		path: {
-			description:   "The unix socket path. *This should be an absolute path*."
-			relevant_when: "mode = `unix`"
-			required:      true
-			type: string: {
-				examples: ["/path/to/socket"]
-			}
-		}
-		socket_file_mode: sources.socket.configuration.socket_file_mode
-		connection_limit: {
-			common:        false
-			description:   "The max number of TCP connections that will be processed."
-			relevant_when: "mode = `tcp`"
-			required:      false
-			type: uint: {
-				default: null
-				unit:    "concurrency"
-			}
-		}
-	}
+	configuration: base.components.sources.syslog.configuration
 
 	output: logs: line: {
 		description: "An individual Syslog event"

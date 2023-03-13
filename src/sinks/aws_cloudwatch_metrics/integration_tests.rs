@@ -1,8 +1,6 @@
-#![cfg(feature = "aws-cloudwatch-metrics-integration-tests")]
-#![cfg(test)]
-
 use chrono::{offset::TimeZone, Utc};
 use rand::seq::SliceRandom;
+use vector_core::metric_tags;
 
 use super::*;
 use crate::{
@@ -51,15 +49,11 @@ async fn cloudwatch_metrics_put_data() {
                 MetricKind::Incremental,
                 MetricValue::Counter { value: i as f64 },
             )
-            .with_tags(Some(
-                vec![
-                    ("region".to_owned(), "us-west-1".to_owned()),
-                    ("production".to_owned(), "true".to_owned()),
-                    ("e".to_owned(), "".to_owned()),
-                ]
-                .into_iter()
-                .collect(),
-            )),
+            .with_tags(Some(metric_tags!(
+                "region" => "us-west-1",
+                "production" => "true",
+                "e" => "",
+            ))),
         );
         events.push(event);
     }
@@ -86,7 +80,9 @@ async fn cloudwatch_metrics_put_data() {
                 },
             )
             .with_timestamp(Some(
-                Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 123456789),
+                Utc.ymd(2018, 11, 14)
+                    .and_hms_nano_opt(8, 9, 10, 123456789)
+                    .expect("invalid timestamp"),
             )),
         );
         events.push(event);

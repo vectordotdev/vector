@@ -1,5 +1,5 @@
 //! This sink sends data to Google Chronicles unstructured log entries endpoint.
-//! See https://cloud.google.com/chronicle/docs/reference/ingestion-api#unstructuredlogentries
+//! See <https://cloud.google.com/chronicle/docs/reference/ingestion-api#unstructuredlogentries>
 //! for more information.
 use bytes::{Bytes, BytesMut};
 use futures_util::{future::BoxFuture, task::Poll};
@@ -12,6 +12,8 @@ use snafu::Snafu;
 use std::io;
 use tokio_util::codec::Encoder as _;
 use tower::{Service, ServiceBuilder};
+use value::Kind;
+use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
 use vector_config::configurable_component;
 use vector_core::{
     config::{AcknowledgementsConfig, Input},
@@ -21,9 +23,10 @@ use vector_core::{
 
 use crate::{
     codecs::{self, EncodingConfig},
-    config::{log_schema, GenerateConfig, SinkConfig, SinkContext},
+    config::{GenerateConfig, SinkConfig, SinkContext},
     gcp::{GcpAuthConfig, GcpAuthenticator},
     http::HttpClient,
+    schema,
     sinks::{
         gcs_common::{
             config::{healthcheck_response, GcsRetryLogic},
@@ -32,7 +35,7 @@ use crate::{
         },
         util::{
             encoding::{as_tracked_write, Encoder},
-            metadata::{RequestMetadata, RequestMetadataBuilder},
+            metadata::RequestMetadataBuilder,
             partitioner::KeyPartitioner,
             request_builder::EncodeResult,
             BatchConfig, Compression, RequestBuilder, SinkBatchSettings, TowerRequestConfig,
@@ -98,13 +101,19 @@ impl SinkBatchSettings for ChronicleUnstructuredDefaultBatchSettings {
 #[derive(Clone, Debug)]
 pub struct ChronicleUnstructuredConfig {
     /// The endpoint to send data to.
+    #[configurable(metadata(
+        docs::examples = "127.0.0.1:8080",
+        docs::examples = "example.com:12345"
+    ))]
     pub endpoint: Option<String>,
 
+    /// The GCP region to use.
     #[configurable(derived)]
     pub region: Option<Region>,
 
     /// The Unique identifier (UUID) corresponding to the Chronicle instance.
     #[configurable(validation(format = "uuid"))]
+    #[configurable(metadata(docs::examples = "c8c65bfa-5f2c-42d4-9189-64bb7b939f2c"))]
     pub customer_id: String,
 
     #[serde(flatten)]
@@ -130,7 +139,7 @@ pub struct ChronicleUnstructuredConfig {
     /// Chronicle will reject the entry with an error.
     ///
     /// [unstructured_log_types_doc]: https://cloud.google.com/chronicle/docs/ingestion/parser-list/supported-default-parsers
-    #[configurable(metadata(templateable))]
+    #[configurable(metadata(docs::examples = "WINDOWS_DNS", docs::examples = "{{ log_type }}"))]
     pub log_type: Template,
 
     #[configurable(derived)]
@@ -166,7 +175,7 @@ pub fn build_healthcheck(
         auth.apply(&mut request);
 
         let response = client.send(request).await?;
-        healthcheck_response(response, auth, GcsHealthcheckError::NotFound.into())
+        healthcheck_response(response, GcsHealthcheckError::NotFound.into())
     };
 
     Ok(Box::pin(healthcheck))
@@ -194,13 +203,17 @@ impl SinkConfig for ChronicleUnstructuredConfig {
         let healthcheck_endpoint = self.create_endpoint("v2/logtypes")?;
 
         let healthcheck = build_healthcheck(client.clone(), &healthcheck_endpoint, creds.clone())?;
+        creds.spawn_regenerate_token();
         let sink = self.build_sink(client, endpoint, creds)?;
 
         Ok((sink, healthcheck))
     }
 
     fn input(&self) -> Input {
-        Input::log()
+        let requirement =
+            schema::Requirement::empty().required_meaning("timestamp", Kind::timestamp());
+
+        Input::log().with_schema_requirement(requirement)
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
@@ -232,7 +245,7 @@ impl ChronicleUnstructuredConfig {
 
         let request_settings = RequestSettings::new(self)?;
 
-        let sink = GcsSink::new(svc, request_settings, partitioner, batch_settings);
+        let sink = GcsSink::new(svc, request_settings, partitioner, batch_settings, "http");
 
         Ok(VectorSink::from_event_streamsink(sink))
     }
@@ -259,12 +272,18 @@ impl ChronicleUnstructuredConfig {
 pub struct ChronicleRequest {
     pub body: Bytes,
     pub finalizers: EventFinalizers,
-    pub metadata: RequestMetadata,
+    metadata: RequestMetadata,
 }
 
 impl Finalizable for ChronicleRequest {
     fn take_finalizers(&mut self) -> EventFinalizers {
         std::mem::take(&mut self.finalizers)
+    }
+}
+
+impl MetaDescriptive for ChronicleRequest {
+    fn get_metadata(&self) -> RequestMetadata {
+        self.metadata
     }
 }
 
@@ -288,7 +307,7 @@ impl Encoder<(String, Vec<Event>)> for ChronicleEncoder {
             .filter_map(|mut event| {
                 let timestamp = event
                     .as_log()
-                    .get(log_schema().timestamp_key())
+                    .get_timestamp()
                     .and_then(|ts| ts.as_timestamp())
                     .cloned();
                 let mut bytes = BytesMut::new();
@@ -351,7 +370,7 @@ impl AsRef<[u8]> for ChronicleRequestPayload {
 }
 
 impl RequestBuilder<(String, Vec<Event>)> for RequestSettings {
-    type Metadata = (EventFinalizers, RequestMetadataBuilder);
+    type Metadata = EventFinalizers;
     type Events = (String, Vec<Event>);
     type Encoder = ChronicleEncoder;
     type Payload = ChronicleRequestPayload;
@@ -366,26 +385,25 @@ impl RequestBuilder<(String, Vec<Event>)> for RequestSettings {
         &self.encoder
     }
 
-    fn split_input(&self, input: (String, Vec<Event>)) -> (Self::Metadata, Self::Events) {
+    fn split_input(
+        &self,
+        input: (String, Vec<Event>),
+    ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
         let (partition_key, mut events) = input;
         let finalizers = events.take_finalizers();
 
-        let metadata = RequestMetadata::builder(&events);
-        ((finalizers, metadata), (partition_key, events))
+        let builder = RequestMetadataBuilder::from_events(&events);
+        (finalizers, builder, (partition_key, events))
     }
 
     fn build_request(
         &self,
-        metadata: Self::Metadata,
+        finalizers: Self::Metadata,
+        metadata: RequestMetadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
-        let (finalizers, metadata_builder) = metadata;
-
-        let metadata = metadata_builder.build(&payload);
-        let body = payload.into_payload().bytes;
-
         ChronicleRequest {
-            body,
+            body: payload.into_payload().bytes,
             finalizers,
             metadata,
         }
@@ -452,6 +470,8 @@ impl Service<ChronicleRequest> for ChronicleService {
             HeaderValue::from_str(&request.body.len().to_string()).unwrap(),
         );
 
+        let metadata = request.get_metadata();
+
         let mut http_request = builder.body(Body::from(request.body)).unwrap();
         self.creds.apply(&mut http_request);
 
@@ -460,12 +480,10 @@ impl Service<ChronicleRequest> for ChronicleService {
             match client.call(http_request).await {
                 Ok(response) => {
                     let status = response.status();
-
                     if status.is_success() {
                         Ok(GcsResponse {
                             inner: response,
-                            protocol: "http",
-                            metadata: request.metadata,
+                            metadata,
                         })
                     } else {
                         Err(ChronicleResponseError::ServerError { code: status })
@@ -524,9 +542,12 @@ mod integration_tests {
         trace_init();
 
         let log_type = random_string(10);
-        let (sink, healthcheck) = config_build(&log_type, "/chronicleauth.json")
-            .await
-            .expect("Building sink failed");
+        let (sink, healthcheck) = config_build(
+            &log_type,
+            "/home/vector/scripts/integration/chronicle/auth.json",
+        )
+        .await
+        .expect("Building sink failed");
 
         healthcheck.await.expect("Health check failed");
 
@@ -554,7 +575,11 @@ mod integration_tests {
 
         let log_type = random_string(10);
         // Test with an auth file that doesnt match the public key sent to the dummy chronicle server.
-        let sink = config_build(&log_type, "/invalidchronicleauth.json").await;
+        let sink = config_build(
+            &log_type,
+            "/home/vector/scripts/integration/chronicle/invalidauth.json",
+        )
+        .await;
 
         assert!(sink.is_err())
     }
@@ -566,9 +591,12 @@ mod integration_tests {
         // The chronicle-emulator we are testing against is setup so a `log_type` of "INVALID"
         // will return a `400 BAD_REQUEST`.
         let log_type = "INVALID";
-        let (sink, healthcheck) = config_build(log_type, "/chronicleauth.json")
-            .await
-            .expect("Building sink failed");
+        let (sink, healthcheck) = config_build(
+            log_type,
+            "/home/vector/scripts/integration/chronicle/auth.json",
+        )
+        .await
+        .expect("Building sink failed");
 
         healthcheck.await.expect("Health check failed");
 

@@ -1,10 +1,13 @@
 #![deny(missing_docs)]
 
 use core::fmt::Debug;
+use std::collections::BTreeMap;
 
+use lookup::lookup_v2::ConfigOwnedValuePath;
 use lookup::{
     event_path,
     lookup_v2::{parse_value_path, OwnedValuePath},
+    PathPrefix,
 };
 use serde::{Deserialize, Deserializer};
 use value::Value;
@@ -19,7 +22,7 @@ use crate::{event::Event, serde::skip_serializing_if_default};
 pub struct Transformer {
     /// List of fields that will be included in the encoded event.
     #[serde(default, skip_serializing_if = "skip_serializing_if_default")]
-    only_fields: Option<Vec<OwnedValuePath>>,
+    only_fields: Option<Vec<ConfigOwnedValuePath>>,
 
     /// List of fields that will be excluded from the encoded event.
     #[serde(default, skip_serializing_if = "skip_serializing_if_default")]
@@ -68,6 +71,7 @@ impl Transformer {
     ) -> Result<Self, crate::Error> {
         Self::validate_fields(only_fields.as_ref(), except_fields.as_ref())?;
 
+        let only_fields = only_fields.map(|x| x.into_iter().map(ConfigOwnedValuePath).collect());
         Ok(Self {
             only_fields,
             except_fields,
@@ -76,7 +80,8 @@ impl Transformer {
     }
 
     /// Get the `Transformer`'s `only_fields`.
-    pub const fn only_fields(&self) -> &Option<Vec<OwnedValuePath>> {
+    #[cfg(test)]
+    pub const fn only_fields(&self) -> &Option<Vec<ConfigOwnedValuePath>> {
         &self.only_fields
     }
 
@@ -99,7 +104,7 @@ impl Transformer {
     ) -> crate::Result<()> {
         if let (Some(only_fields), Some(except_fields)) = (only_fields, except_fields) {
             if except_fields.iter().any(|f| {
-                let path_iter = parse_value_path(f);
+                let path_iter = parse_value_path(f).unwrap();
                 only_fields.iter().any(|v| v == &path_iter)
             }) {
                 return Err(
@@ -123,25 +128,12 @@ impl Transformer {
 
     fn apply_only_fields(&self, log: &mut LogEvent) {
         if let Some(only_fields) = self.only_fields.as_ref() {
-            let mut to_remove = match log.keys() {
-                Some(keys) => keys
-                    .filter(|field| {
-                        let field_path = parse_value_path(field);
-                        !only_fields
-                            .iter()
-                            .any(|only| field_path.segments.starts_with(&only.segments[..]))
-                    })
-                    .collect::<Vec<_>>(),
-                None => vec![],
-            };
+            let old_value = std::mem::replace(log.value_mut(), Value::Object(BTreeMap::new()));
 
-            // reverse sort so that we delete array elements at the end first rather than
-            // the start so that any `nulls` at the end are dropped and empty arrays are
-            // pruned
-            to_remove.sort_by(|a, b| b.cmp(a));
-
-            for removal in to_remove {
-                log.remove_prune(removal.as_str(), true);
+            for field in only_fields {
+                if let Some(value) = old_value.get(field) {
+                    log.insert((PathPrefix::Event, field), value.clone());
+                }
             }
         }
     }
@@ -190,8 +182,15 @@ impl Transformer {
     ///
     /// Returns `Err` if the new `except_fields` fail validation, i.e. are not mutually exclusive
     /// with `only_fields`.
+    #[cfg(test)]
     pub fn set_except_fields(&mut self, except_fields: Option<Vec<String>>) -> crate::Result<()> {
-        Self::validate_fields(self.only_fields.as_ref(), except_fields.as_ref())?;
+        Self::validate_fields(
+            self.only_fields
+                .clone()
+                .map(|x| x.into_iter().map(|x| x.0).collect())
+                .as_ref(),
+            except_fields.as_ref(),
+        )?;
 
         self.except_fields = except_fields;
 
@@ -276,7 +275,7 @@ mod tests {
     #[test]
     fn deserialize_and_transform_only() {
         let transformer: Transformer =
-            toml::from_str(r#"only_fields = ["a.b.c", "b", "c[0].y", "g\\.z"]"#).unwrap();
+            toml::from_str(r#"only_fields = ["a.b.c", "b", "c[0].y", "\"g.z\""]"#).unwrap();
         let mut log = LogEvent::default();
         {
             log.insert("a", 1);

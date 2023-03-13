@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 use std::{
     collections::HashMap,
     convert::Infallible,
@@ -91,8 +92,10 @@ pub fn test_generate_config<T>()
 where
     for<'de> T: GenerateConfig + serde::Deserialize<'de>,
 {
-    let cfg = T::generate_config().to_string();
-    toml::from_str::<T>(&cfg).expect("Invalid config generated");
+    let cfg = toml::to_string(&T::generate_config()).unwrap();
+
+    toml::from_str::<T>(&cfg)
+        .unwrap_or_else(|e| panic!("Invalid config generated from string:\n\n{}\n'{}'", e, cfg));
 }
 
 pub fn open_fixture(path: impl AsRef<Path>) -> crate::Result<serde_json::Value> {
@@ -130,12 +133,7 @@ pub fn trace_init() {
     trace::init(color, false, &levels, 10);
 
     // Initialize metrics as well
-    if let Err(error) = vector_core::metrics::init_test() {
-        // Handle multiple initializations.
-        if error != vector_core::metrics::Error::AlreadyInitialized {
-            panic!("Failed to initialize metrics recorder: {:?}", error);
-        }
-    }
+    vector_core::metrics::init_test();
 }
 
 pub async fn send_lines(
@@ -342,7 +340,7 @@ pub fn random_maps(
 
 pub async fn collect_n<S>(rx: S, n: usize) -> Vec<S::Item>
 where
-    S: Stream + Unpin,
+    S: Stream,
 {
     rx.take(n).collect().await
 }
@@ -682,7 +680,13 @@ impl CountReceiver<Event> {
 pub async fn start_topology(
     mut config: Config,
     require_healthy: impl Into<Option<bool>>,
-) -> (RunningTopology, tokio::sync::mpsc::UnboundedReceiver<()>) {
+) -> (
+    RunningTopology,
+    (
+        tokio::sync::mpsc::UnboundedSender<()>,
+        tokio::sync::mpsc::UnboundedReceiver<()>,
+    ),
+) {
     config.healthchecks.set_require_healthy(require_healthy);
     let diff = ConfigDiff::initial(&config);
     let pieces = topology::build_or_log_errors(&config, &diff, HashMap::new())
@@ -701,7 +705,7 @@ pub async fn start_topology(
 pub async fn spawn_collect_n<F, S>(future: F, stream: S, n: usize) -> Vec<Event>
 where
     F: Future<Output = ()> + Send + 'static,
-    S: Stream<Item = Event> + Unpin,
+    S: Stream<Item = Event>,
 {
     // TODO: Switch to using `select!` so that we can drive `future` to completion while also driving `collect_n`,
     // such that if `future` panics, we break out and don't continue driving `collect_n`. In most cases, `future`

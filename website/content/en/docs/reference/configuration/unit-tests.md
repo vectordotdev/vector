@@ -255,7 +255,7 @@ Each condition in the `conditions` array has two fields:
 
 Parameter | Type | Description
 :---------|:-----|:-----------
-`type` | string | The type of condition you're providing. As the original `check_fields` syntax is now deprecated, [`vrl`][vrl] is currently the only valid value.
+`type` | string | The type of condition you're providing. [`vrl`][vrl] is currently the only valid value.
 `source` | string (VRL Boolean expression) | Explained in detail [above](#verifying).
 
 Here's an example `outputs` declaration:
@@ -271,12 +271,6 @@ assert!(is_string(.id))
 assert!(exists(.tags))
 '''
 ```
-
-{{< danger title="`check_fields` conditions now deprecated" >}}
-Vector initially provided a `check_fields` condition type that enabled you to specify Boolean
-test conditions using a special configuration-based system. `check_fields` is now deprecated. We
-strongly recommend converting any existing `check_fields` tests to `vrl` conditions.
-{{< /danger >}}
 
 #### Asserting no output
 
@@ -349,6 +343,17 @@ To specify a structured log event as your test input, use `log_fields`:
 message = "successful transaction"
 code = 200
 id = "38c5b0d0-5e7e-42aa-ae86-2b642ad2d1b8"
+```
+
+If there are hyphens in the field name, you will need to quote this part (at least in YAML):
+
+```yaml
+  - name: hyphens
+    inputs:
+      - insert_at: hyphens
+        type: log
+        log_fields:
+          labels."this-has-hyphens": "this is a test"
 ```
 
 ##### Raw string value

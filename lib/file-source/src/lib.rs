@@ -15,22 +15,39 @@ pub mod paths_provider;
 
 pub use self::{
     checkpointer::{Checkpointer, CheckpointsView, CHECKPOINT_FILE_NAME},
-    file_server::{FileServer, Line, Shutdown as FileServerShutdown},
+    file_server::{calculate_ignore_before, FileServer, Line, Shutdown as FileServerShutdown},
     fingerprinter::{FileFingerprint, FingerprintStrategy, Fingerprinter},
     internal_events::FileSourceInternalEvents,
 };
+use vector_config::configurable_component;
 
 pub type FilePosition = u64;
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
 pub enum ReadFrom {
+    #[default]
     Beginning,
     End,
     Checkpoint(FilePosition),
 }
 
-impl Default for ReadFrom {
-    fn default() -> Self {
-        ReadFrom::Beginning
+/// File position to use when reading a new file.
+#[configurable_component]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ReadFromConfig {
+    /// Read from the beginning of the file.
+    Beginning,
+
+    /// Start reading from the current end of the file.
+    End,
+}
+
+impl From<ReadFromConfig> for ReadFrom {
+    fn from(rfc: ReadFromConfig) -> Self {
+        match rfc {
+            ReadFromConfig::Beginning => ReadFrom::Beginning,
+            ReadFromConfig::End => ReadFrom::End,
+        }
     }
 }

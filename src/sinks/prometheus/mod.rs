@@ -1,3 +1,4 @@
+use vector_common::sensitive_string::SensitiveString;
 #[cfg(test)]
 use vector_core::event::Metric;
 
@@ -13,6 +14,7 @@ use crate::aws::AwsAuthentication;
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields, rename_all = "snake_case", tag = "strategy")]
+#[configurable(metadata(docs::enum_tag_description = "The authentication strategy to use."))]
 pub enum PrometheusRemoteWriteAuth {
     /// HTTP Basic Authentication.
     Basic {
@@ -23,8 +25,16 @@ pub enum PrometheusRemoteWriteAuth {
         password: String,
     },
 
+    /// Bearer authentication.
+    ///
+    /// A bearer token (OAuth2, JWT, etc) is passed as-is.
+    Bearer {
+        /// The bearer token to send.
+        token: SensitiveString,
+    },
+
     /// Amazon Prometheus Service-specific authentication.
-    Aws(#[configurable(derived)] AwsAuthentication),
+    Aws(AwsAuthentication),
 }
 
 fn default_histogram_buckets() -> Vec<f64> {

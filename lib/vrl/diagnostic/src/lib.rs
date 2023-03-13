@@ -77,23 +77,23 @@ impl Urls {
 
     #[must_use]
     pub fn func_docs(ident: &str) -> String {
-        format!("{}/{}", VRL_FUNCS_ROOT_URL, ident)
+        format!("{VRL_FUNCS_ROOT_URL}/{ident}")
     }
 
     fn error_handling_url() -> String {
-        format!("{}/#handling", VRL_ERROR_DOCS_ROOT_URL)
+        format!("{VRL_ERROR_DOCS_ROOT_URL}/#handling")
     }
 
     fn error_code_url(code: usize) -> String {
-        format!("{}/{}", VRL_ERROR_DOCS_ROOT_URL, code)
+        format!("{VRL_ERROR_DOCS_ROOT_URL}/{code}")
     }
 
     #[must_use]
     pub fn expression_docs_url(expr: &str) -> String {
-        format!("{}/expressions/{}", VRL_DOCS_ROOT_URL, expr)
+        format!("{VRL_DOCS_ROOT_URL}/expressions/{expr}")
     }
 
     fn example_docs() -> String {
-        format!("{}/examples", VRL_DOCS_ROOT_URL)
+        format!("{VRL_DOCS_ROOT_URL}/examples")
     }
 }

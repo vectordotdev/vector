@@ -4,25 +4,26 @@ version = "0.1.0"
 authors = ["Vector Contributors <vector@datadoghq.com>"]
 edition = "2021"
 build = "build.rs" # LALRPOP preprocessing
+license = "MPL-2.0"
 
 [dependencies]
-bytes = { version = "1.2.1", default-features = false }
+bytes = { version = "1.4.0", default-features = false }
 chrono = { version = "0.4.19", default-features = false }
-chrono-tz = { version = "0.6.3", default-features = false }
+chrono-tz = { version = "0.8.1", default-features = false }
 lalrpop-util = { version = "0.19", default-features = false }
-nom = { version = "7.1.1", default-features = false, features = ["std"] }
-once_cell = { version = "1.15", default-features = false, features = ["std"] }
+nom = { version = "7.1.3", default-features = false, features = ["std"] }
+once_cell = { version = "1.17", default-features = false, features = ["std"] }
 onig = { version = "6.4", default-features = false }
 ordered-float = { version = "3", default-features = false }
 peeking_take_while = { version = "1.0.0", default-features = false }
-regex = { version = "1.6", default-features = false, features = ["perf"] }
-serde_json = { version = "1.0.85", default-features = false }
+regex = { version = "1.7", default-features = false, features = ["perf"] }
+serde_json = { version = "1.0.94", default-features = false }
 thiserror = { version = "1", default-features = false }
 tracing = { version = "0.1.34", default-features = false }
 
 # Internal
-lookup = { path = "../../lookup" }
-value = {path = "../../value", features = ["json", "test"]}
+lookup = { path = "../../vrl/lookup" }
+value = {path = "../../vrl/value", features = ["json", "test"]}
 vector-common = { path = "../../vector-common" }
 vrl-compiler = { path = "../../vrl/compiler" }
 

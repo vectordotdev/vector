@@ -163,12 +163,7 @@ fn parse_time(
     timezone
         .datetime_from_str(time, format)
         .or_else(|_| DateTime::parse_from_str(time, format).map(Into::into))
-        .map_err(|err| {
-            format!(
-                "failed parsing timestamp {} using format {}: {}",
-                time, format, err
-            )
-        })
+        .map_err(|err| format!("failed parsing timestamp {time} using format {format}: {err}"))
 }
 
 /// Takes the field as a string and returns a `Value`.
@@ -185,12 +180,12 @@ fn capture_value(
         "status" | "size" | "pid" | "tid" | "cid" | "port" => Value::Integer(
             value
                 .parse()
-                .map_err(|_| format!("failed parsing {}", name))?,
+                .map_err(|_| format!("failed parsing {name}"))?,
         ),
         "excess" => Value::Float(
             value
                 .parse()
-                .map_err(|_| format!("failed parsing {}", name))?,
+                .map_err(|_| format!("failed parsing {name}"))?,
         ),
         _ => Value::Bytes(value.to_owned().into()),
     })
@@ -232,5 +227,5 @@ pub(crate) fn parse_message(
             return log_fields(regex, &captures, timestamp_format, timezone);
         }
     }
-    Err(format!("failed parsing {} log line", log_type))
+    Err(format!("failed parsing {log_type} log line"))
 }

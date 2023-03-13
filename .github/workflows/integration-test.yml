@@ -34,6 +34,7 @@ concurrency:
 env:
   AWS_ACCESS_KEY_ID: "dummy"
   AWS_SECRET_ACCESS_KEY: "dummy"
+  AXIOM_TOKEN: ${{ secrets.AXIOM_TOKEN }}
   CONTAINER_TOOL: "docker"
   DD_ENV: "ci"
   DD_API_KEY: ${{ secrets.DD_API_KEY }}
@@ -56,11 +57,11 @@ jobs:
       matrix:
         include:
           - test: 'amqp'
-          - test: 'apex'
           - test: 'aws'
           - test: 'axiom'
           - test: 'azure'
           - test: 'clickhouse'
+          - test: 'databend'
           - test: 'datadog-agent'
           - test: 'datadog-logs'
           - test: 'datadog-metrics'
@@ -72,7 +73,7 @@ jobs:
           - test: 'fluent'
           - test: 'gcp'
           - test: 'humio'
-          - test: 'http-scrape'
+          - test: 'http-client'
           - test: 'influxdb'
           - test: 'kafka'
           - test: 'logstash'
@@ -87,9 +88,8 @@ jobs:
           - test: 'redis'
           - test: 'shutdown'
           - test: 'splunk'
-            env:
-              SPLUNK_VERSION: 7.3.9
-          - test: 'splunk'
+          - test: 'webhdfs'
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v3
       - run: make ci-sweep

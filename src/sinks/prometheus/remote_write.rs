@@ -8,6 +8,7 @@ use futures::{future::BoxFuture, stream, FutureExt, SinkExt};
 use http::{Request, Uri};
 use prost::Message;
 use snafu::{ResultExt, Snafu};
+use tower::Service;
 use vector_config::configurable_component;
 use vector_core::ByteSizeOf;
 
@@ -56,6 +57,9 @@ enum Errors {
 #[serde(deny_unknown_fields)]
 pub struct RemoteWriteConfig {
     /// The endpoint to send data to.
+    ///
+    /// The endpoint should include the scheme and the path to write to.
+    #[configurable(metadata(docs::examples = "https://localhost:8087/api/v1/write"))]
     pub endpoint: String,
 
     /// The default namespace for any metrics sent.
@@ -66,18 +70,22 @@ pub struct RemoteWriteConfig {
     /// It should follow the Prometheus [naming conventions][prom_naming_docs].
     ///
     /// [prom_naming_docs]: https://prometheus.io/docs/practices/naming/#metric-names
+    #[configurable(metadata(docs::examples = "service"))]
+    #[configurable(metadata(docs::advanced))]
     pub default_namespace: Option<String>,
 
     /// Default buckets to use for aggregating [distribution][dist_metric_docs] metrics into histograms.
     ///
     /// [dist_metric_docs]: https://vector.dev/docs/about/under-the-hood/architecture/data-model/metric/#distribution
     #[serde(default = "super::default_histogram_buckets")]
+    #[configurable(metadata(docs::advanced))]
     pub buckets: Vec<f64>,
 
     /// Quantiles to use for aggregating [distribution][dist_metric_docs] metrics into a summary.
     ///
     /// [dist_metric_docs]: https://vector.dev/docs/about/under-the-hood/architecture/data-model/metric/#distribution
     #[serde(default = "super::default_summary_quantiles")]
+    #[configurable(metadata(docs::advanced))]
     pub quantiles: Vec<f64>,
 
     #[configurable(derived)]
@@ -93,8 +101,9 @@ pub struct RemoteWriteConfig {
     /// If set, a header named `X-Scope-OrgID` will be added to outgoing requests with the value of this setting.
     ///
     /// This may be used by Cortex or other remote services to identify the tenant making the request.
-    #[configurable(metadata(templateable))]
     #[serde(default)]
+    #[configurable(metadata(docs::examples = "my-domain"))]
+    #[configurable(metadata(docs::advanced))]
     pub tenant_id: Option<Template>,
 
     #[configurable(derived)]
@@ -104,6 +113,7 @@ pub struct RemoteWriteConfig {
     pub auth: Option<PrometheusRemoteWriteAuth>,
 
     #[configurable(derived)]
+    #[configurable(metadata(docs::advanced))]
     pub aws: Option<RegionOrEndpoint>,
 
     #[configurable(derived)]
@@ -138,6 +148,13 @@ impl SinkConfig for RemoteWriteConfig {
                 Some(Auth::Basic {
                     user: user.clone(),
                     password: password.clone().into(),
+                }),
+                None,
+                None,
+            ),
+            Some(PrometheusRemoteWriteAuth::Bearer { token }) => (
+                Some(Auth::Bearer {
+                    token: token.clone(),
                 }),
                 None,
                 None,
@@ -278,15 +295,17 @@ impl RemoteWriteService {
     }
 }
 
-impl tower::Service<PartitionInnerBuffer<Vec<Metric>, PartitionKey>> for RemoteWriteService {
+impl Service<PartitionInnerBuffer<Vec<Metric>, PartitionKey>> for RemoteWriteService {
     type Response = http::Response<Bytes>;
     type Error = crate::Error;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
+    // Emission of an internal event in case of errors is handled upstream by the caller.
     fn poll_ready(&mut self, _task: &mut task::Context<'_>) -> task::Poll<Result<(), Self::Error>> {
         task::Poll::Ready(Ok(()))
     }
 
+    // Emission of internal events for errors and dropped events is handled upstream by the caller.
     fn call(&mut self, buffer: PartitionInnerBuffer<Vec<Metric>, PartitionKey>) -> Self::Future {
         let (events, key) = buffer.into_parts();
         let body = self.encode_events(events);
@@ -378,6 +397,7 @@ mod tests {
     use http::HeaderMap;
     use indoc::indoc;
     use prometheus_parser::proto;
+    use vector_core::metric_tags;
 
     use super::*;
     use crate::{
@@ -581,14 +601,10 @@ mod tests {
 
     pub(super) fn create_event(name: String, value: f64) -> Event {
         Metric::new(name, MetricKind::Absolute, MetricValue::Gauge { value })
-            .with_tags(Some(
-                vec![
-                    ("region".to_owned(), "us-west-1".to_owned()),
-                    ("production".to_owned(), "true".to_owned()),
-                ]
-                .into_iter()
-                .collect(),
-            ))
+            .with_tags(Some(metric_tags!(
+                "region" => "us-west-1",
+                "production" => "true",
+            )))
             .with_timestamp(Some(chrono::Utc::now()))
             .into()
     }
@@ -619,8 +635,8 @@ mod integration_tests {
         tls::{self, TlsConfig},
     };
 
-    const HTTP_URL: &str = "http://localhost:8086";
-    const HTTPS_URL: &str = "https://localhost:8087";
+    const HTTP_URL: &str = "http://influxdb-v1:8086";
+    const HTTPS_URL: &str = "https://influxdb-v1-tls:8087";
 
     #[tokio::test]
     async fn insert_metrics_over_http() {
@@ -674,8 +690,8 @@ mod integration_tests {
                     }
                     _ => panic!("Unhandled metric value, fix the test"),
                 }
-                for (tag, value) in metric.tags().unwrap() {
-                    assert_eq!(output[&tag[..]], Value::String(value.to_string()));
+                for (tag, value) in metric.tags().unwrap().iter_single() {
+                    assert_eq!(output[tag], Value::String(value.to_string()));
                 }
                 let timestamp =
                     format_timestamp(metric.timestamp().unwrap(), chrono::SecondsFormat::Millis);

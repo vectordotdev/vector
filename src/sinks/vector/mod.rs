@@ -23,8 +23,8 @@ pub enum VectorSinkError {
     #[snafu(display("Request failed: {}", source))]
     Request { source: tonic::Status },
 
-    #[snafu(display("Vector source unhealthy"))]
-    Health,
+    #[snafu(display("Vector source unhealthy: {:?}", status))]
+    Health { status: Option<&'static str> },
 
     #[snafu(display("URL has no host."))]
     NoHost,
@@ -169,7 +169,12 @@ mod tests {
             let mut events = Vec::with_capacity(req.events.len());
             for event in req.events {
                 let event: Event = event.into();
-                let string = event.as_log().get("message").unwrap().to_string_lossy();
+                let string = event
+                    .as_log()
+                    .get("message")
+                    .unwrap()
+                    .to_string_lossy()
+                    .into_owned();
                 events.push(string)
             }
 
@@ -179,6 +184,7 @@ mod tests {
         .await
         .into_iter()
         .flatten()
+        .map(Into::into)
         .collect()
     }
 

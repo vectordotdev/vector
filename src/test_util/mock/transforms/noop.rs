@@ -3,6 +3,7 @@ use std::pin::Pin;
 use async_trait::async_trait;
 use futures_util::Stream;
 use vector_config::configurable_component;
+use vector_core::config::LogNamespace;
 use vector_core::{
     config::{DataType, Input, Output},
     event::{Event, EventContainer},
@@ -15,7 +16,7 @@ use crate::config::{GenerateConfig, TransformConfig, TransformContext};
 use super::TransformType;
 
 /// Configuration for the `test_noop` transform.
-#[configurable_component(transform("test_noop"))]
+#[configurable_component(transform("test_noop", "Test (no-op)"))]
 #[derive(Clone, Debug)]
 pub struct NoopTransformConfig {
     #[configurable(derived)]
@@ -32,12 +33,13 @@ impl GenerateConfig for NoopTransformConfig {
 }
 
 #[async_trait]
+#[typetag::serde(name = "test_noop")]
 impl TransformConfig for NoopTransformConfig {
     fn input(&self) -> Input {
         Input::all()
     }
 
-    fn outputs(&self, _: &Definition) -> Vec<Output> {
+    fn outputs(&self, _: &Definition, _: LogNamespace) -> Vec<Output> {
         vec![Output::default(DataType::all())]
     }
 

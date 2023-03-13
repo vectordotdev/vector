@@ -21,21 +21,19 @@ use crate::{
         s3_common::{
             self,
             config::{S3Options, S3RetryLogic},
+            partitioner::S3KeyPartitioner,
             service::S3Service,
             sink::S3Sink,
         },
         util::{
-            partitioner::KeyPartitioner, BatchConfig, BulkSizeBasedDefaultBatchSettings,
-            Compression, ServiceBuilderExt, TowerRequestConfig,
+            BatchConfig, BulkSizeBasedDefaultBatchSettings, Compression, ServiceBuilderExt,
+            TowerRequestConfig,
         },
         Healthcheck,
     },
+    template::Template,
     tls::TlsConfig,
 };
-
-const DEFAULT_KEY_PREFIX: &str = "date=%F/";
-const DEFAULT_FILENAME_TIME_FORMAT: &str = "%s";
-const DEFAULT_FILENAME_APPEND_UUID: bool = true;
 
 /// Configuration for the `aws_s3` sink.
 #[configurable_component(sink("aws_s3"))]
@@ -45,15 +43,20 @@ pub struct S3SinkConfig {
     /// The S3 bucket name.
     ///
     /// This must not include a leading `s3://` or a trailing `/`.
+    #[configurable(metadata(docs::examples = "my-bucket"))]
     pub bucket: String,
 
     /// A prefix to apply to all object keys.
     ///
     /// Prefixes are useful for partitioning objects, such as by creating an object key that
     /// stores objects under a particular "directory". If using a prefix for this purpose, it must end
-    /// in `/` in order to act as a directory path: Vector will **not** add a trailing `/` automatically.
-    #[configurable(metadata(templateable))]
-    pub key_prefix: Option<String>,
+    /// in `/` to act as a directory path. A trailing `/` is **not** automatically added.
+    #[serde(default = "default_key_prefix")]
+    #[configurable(metadata(docs::templateable))]
+    #[configurable(metadata(docs::examples = "date=%F/hour=%H"))]
+    #[configurable(metadata(docs::examples = "year=%Y/month=%m/day=%d"))]
+    #[configurable(metadata(docs::examples = "application_id={{ application_id }}/date=%F"))]
+    pub key_prefix: String,
 
     /// The timestamp format for the time component of the object key.
     ///
@@ -71,7 +74,8 @@ pub struct S3SinkConfig {
     /// When set to an empty string, no timestamp will be appended to the key prefix.
     ///
     /// [chrono_strftime_specifiers]: https://docs.rs/chrono/latest/chrono/format/strftime/index.html#specifiers
-    pub filename_time_format: Option<String>,
+    #[serde(default = "default_filename_time_format")]
+    pub filename_time_format: String,
 
     /// Whether or not to append a UUID v4 token to the end of the object key.
     ///
@@ -81,9 +85,13 @@ pub struct S3SinkConfig {
     ///
     /// This ensures there are no name collisions, and can be useful in high-volume workloads where
     /// object keys must be unique.
-    pub filename_append_uuid: Option<bool>,
+    #[serde(default = "crate::serde::default_true")]
+    pub filename_append_uuid: bool,
 
     /// The filename extension to use in the object key.
+    ///
+    /// This overrides setting the extension based on the configured `compression`.
+    #[configurable(metadata(docs::examples = "json"))]
     pub filename_extension: Option<String>,
 
     #[serde(flatten)]
@@ -95,6 +103,12 @@ pub struct S3SinkConfig {
     #[serde(flatten)]
     pub encoding: EncodingConfigWithFraming,
 
+    /// Compression configuration.
+    ///
+    /// All compression algorithms use the default compression level unless otherwise specified.
+    ///
+    /// Some cloud storage API clients and browsers will handle decompression transparently, so
+    /// files may not always appear to be compressed depending how they are accessed.
     #[configurable(derived)]
     #[serde(default = "Compression::gzip_default")]
     pub compression: Compression,
@@ -123,17 +137,25 @@ pub struct S3SinkConfig {
     pub acknowledgements: AcknowledgementsConfig,
 }
 
+pub(super) fn default_key_prefix() -> String {
+    "date=%F".to_string()
+}
+
+pub(super) fn default_filename_time_format() -> String {
+    "%s".to_string()
+}
+
 impl GenerateConfig for S3SinkConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
             bucket: "".to_owned(),
-            key_prefix: None,
-            filename_time_format: None,
-            filename_append_uuid: None,
+            key_prefix: default_key_prefix(),
+            filename_time_format: default_filename_time_format(),
+            filename_append_uuid: true,
             filename_extension: None,
             options: S3Options::default(),
             region: RegionOrEndpoint::default(),
-            encoding: (None::<FramingConfig>, TextSerializerConfig::new()).into(),
+            encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
             compression: Compression::gzip_default(),
             batch: BatchConfig::default(),
             request: TowerRequestConfig::default(),
@@ -176,23 +198,15 @@ impl S3SinkConfig {
 
         // Configure our partitioning/batching.
         let batch_settings = self.batch.into_batcher_settings()?;
-        let key_prefix = self
-            .key_prefix
+        let key_prefix = self.key_prefix.clone().try_into()?;
+        let ssekms_key_id = self
+            .options
+            .ssekms_key_id
             .as_ref()
             .cloned()
-            .unwrap_or_else(|| DEFAULT_KEY_PREFIX.into())
-            .try_into()?;
-        let partitioner = KeyPartitioner::new(key_prefix);
-
-        // And now collect all of the S3-specific options and configuration knobs.
-        let filename_time_format = self
-            .filename_time_format
-            .as_ref()
-            .cloned()
-            .unwrap_or_else(|| DEFAULT_FILENAME_TIME_FORMAT.into());
-        let filename_append_uuid = self
-            .filename_append_uuid
-            .unwrap_or(DEFAULT_FILENAME_APPEND_UUID);
+            .map(|ssekms_key_id| Template::try_from(ssekms_key_id.as_str()))
+            .transpose()?;
+        let partitioner = S3KeyPartitioner::new(key_prefix, ssekms_key_id);
 
         let transformer = self.encoding.transformer();
         let (framer, serializer) = self.encoding.build(SinkType::MessageBased)?;
@@ -202,8 +216,8 @@ impl S3SinkConfig {
             bucket: self.bucket.clone(),
             api_options: self.options.clone(),
             filename_extension: self.filename_extension.clone(),
-            filename_time_format,
-            filename_append_uuid,
+            filename_time_format: self.filename_time_format.clone(),
+            filename_append_uuid: self.filename_append_uuid,
             encoder: (transformer, encoder),
             compression: self.compression,
         };

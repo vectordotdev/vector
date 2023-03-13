@@ -14,21 +14,25 @@ use std::{
 };
 
 use azure_storage_blobs::prelude::ContainerClient;
+use base64::prelude::{Engine as _, BASE64_STANDARD};
 use bytes::{BufMut, Bytes, BytesMut};
 use chrono::{SecondsFormat, Utc};
-use codecs::{encoding::Framer, JsonSerializer, NewlineDelimitedEncoder};
+use codecs::{encoding::Framer, JsonSerializerConfig, NewlineDelimitedEncoder};
 use goauth::scopes::Scope;
 use http::header::{HeaderName, HeaderValue};
+use http::Uri;
 use lookup::event_path;
 use rand::{thread_rng, Rng};
 use snafu::Snafu;
 use tower::ServiceBuilder;
 use uuid::Uuid;
+use value::Kind;
+use vector_common::request_metadata::RequestMetadata;
 use vector_config::{configurable_component, NamedComponent};
 use vector_core::{
-    config::{log_schema, AcknowledgementsConfig, LogSchema},
+    config::AcknowledgementsConfig,
     event::{Event, EventFinalizers, Finalizable},
-    ByteSizeOf,
+    schema, ByteSizeOf,
 };
 
 use crate::{
@@ -36,7 +40,7 @@ use crate::{
     codecs::{Encoder, Transformer},
     config::{GenerateConfig, Input, SinkConfig, SinkContext},
     gcp::{GcpAuthConfig, GcpAuthenticator},
-    http::HttpClient,
+    http::{get_http_scheme_from_uri, HttpClient},
     serde::json::to_string,
     sinks::{
         azure_common::{
@@ -56,15 +60,14 @@ use crate::{
             config::{
                 create_service, S3CannedAcl, S3RetryLogic, S3ServerSideEncryption, S3StorageClass,
             },
+            partitioner::{S3KeyPartitioner, S3PartitionKey},
             service::{S3Metadata, S3Request, S3Service},
             sink::S3Sink,
         },
         util::{
-            metadata::{RequestMetadata, RequestMetadataBuilder},
-            partitioner::KeyPartitioner,
-            request_builder::EncodeResult,
-            BatchConfig, Compression, RequestBuilder, ServiceBuilderExt, SinkBatchSettings,
-            TowerRequestConfig,
+            metadata::RequestMetadataBuilder, partitioner::KeyPartitioner,
+            request_builder::EncodeResult, BatchConfig, Compression, RequestBuilder,
+            ServiceBuilderExt, SinkBatchSettings, TowerRequestConfig,
         },
         VectorSink,
     },
@@ -102,7 +105,7 @@ pub struct DatadogArchivesSinkConfig {
     ///
     /// Prefixes are useful for partitioning objects, such as by creating an object key that
     /// stores objects under a particular "directory". If using a prefix for this purpose, it must end
-    /// in `/` in order to act as a directory path: Vector will **not** add a trailing `/` automatically.
+    /// in `/` to act as a directory path. A trailing `/` is **not** automatically added.
     pub key_prefix: Option<String>,
 
     #[configurable(derived)]
@@ -213,9 +216,10 @@ pub struct S3Options {
     /// For more information, see [Using Amazon S3 storage classes][storage_classes].
     ///
     /// [storage_classes]: https://docs.aws.amazon.com/AmazonS3/latest/dev/storage-class-intro.html
-    pub storage_class: Option<S3StorageClass>,
+    pub storage_class: S3StorageClass,
 
     /// The tag-set for the object.
+    #[configurable(metadata(docs::additional_props_description = "A single tag."))]
     pub tags: Option<BTreeMap<String, String>>,
 }
 
@@ -246,6 +250,7 @@ pub struct GcsConfig {
     /// For more information, see [Custom metadata][custom_metadata].
     ///
     /// [custom_metadata]: https://cloud.google.com/storage/docs/metadata#custom-metadata
+    #[configurable(metadata(docs::additional_props_description = "A key/value pair."))]
     metadata: Option<HashMap<String, String>>,
 
     #[serde(flatten)]
@@ -281,10 +286,7 @@ enum ConfigError {
 const KEY_TEMPLATE: &str = "/dt=%Y%m%d/hour=%H/";
 
 impl DatadogArchivesSinkConfig {
-    async fn build_sink(
-        &self,
-        cx: SinkContext,
-    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
+    async fn build_sink(&self, cx: SinkContext) -> crate::Result<(VectorSink, super::Healthcheck)> {
         match &self.service[..] {
             "aws_s3" => {
                 let s3_config = self.aws_s3.as_ref().expect("s3 config wasn't provided");
@@ -309,6 +311,7 @@ impl DatadogArchivesSinkConfig {
                     Some(azure_config.connection_string.clone()),
                     None,
                     self.bucket.clone(),
+                    None,
                 )?;
                 let svc = self
                     .build_azure_sink(Arc::<ContainerClient>::clone(&client))
@@ -348,16 +351,16 @@ impl DatadogArchivesSinkConfig {
         &self,
         s3_options: &S3Options,
         service: S3Service,
-    ) -> std::result::Result<VectorSink, ConfigError> {
+    ) -> Result<VectorSink, ConfigError> {
         // we use lower default limits, because we send 100mb batches,
-        // thus no need of the higher number of outcoming requests
+        // thus no need of the higher number of outgoing requests
         let request_limits = self.request.unwrap_with(&Default::default());
         let service = ServiceBuilder::new()
             .settings(request_limits, S3RetryLogic)
             .service(service);
 
         match s3_options.storage_class {
-            Some(class @ S3StorageClass::DeepArchive) | Some(class @ S3StorageClass::Glacier) => {
+            class @ S3StorageClass::DeepArchive | class @ S3StorageClass::Glacier => {
                 return Err(ConfigError::UnsupportedStorageClass {
                     storage_class: format!("{:?}", class),
                 });
@@ -369,7 +372,10 @@ impl DatadogArchivesSinkConfig {
             .into_batcher_settings()
             .expect("invalid batch settings");
 
-        let partitioner = DatadogArchivesSinkConfig::build_partitioner();
+        let partitioner = S3KeyPartitioner::new(
+            Template::try_from(KEY_TEMPLATE).expect("invalid object key format"),
+            None,
+        );
 
         let s3_config = self
             .aws_s3
@@ -395,6 +401,7 @@ impl DatadogArchivesSinkConfig {
         auth: GcpAuthenticator,
     ) -> crate::Result<VectorSink> {
         let request = self.request.unwrap_with(&Default::default());
+        let protocol = get_http_scheme_from_uri(&base_url.parse::<Uri>()?);
 
         let batcher_settings = BatchConfig::<DatadogArchivesDefaultBatchSettings>::default()
             .into_batcher_settings()
@@ -437,7 +444,13 @@ impl DatadogArchivesSinkConfig {
 
         let partitioner = DatadogArchivesSinkConfig::build_partitioner();
 
-        let sink = GcsSink::new(svc, request_builder, partitioner, batcher_settings);
+        let sink = GcsSink::new(
+            svc,
+            request_builder,
+            partitioner,
+            batcher_settings,
+            protocol,
+        );
 
         Ok(VectorSink::from_event_streamsink(sink))
     }
@@ -479,7 +492,6 @@ struct DatadogArchivesEncoding {
     reserved_attributes: HashSet<&'static str>,
     id_rnd_bytes: [u8; 8],
     id_seq_number: AtomicU32,
-    log_schema: &'static LogSchema,
 }
 
 impl DatadogArchivesEncoding {
@@ -503,7 +515,7 @@ impl DatadogArchivesEncoding {
         let id_seq_number = self.id_seq_number.fetch_add(1, Ordering::Relaxed);
         id.put_u32(id_seq_number);
 
-        base64::encode(id.freeze())
+        BASE64_STANDARD.encode(id.freeze())
     }
 }
 
@@ -514,24 +526,24 @@ impl DatadogArchivesEncoding {
                 transformer,
                 Encoder::<Framer>::new(
                     NewlineDelimitedEncoder::new().into(),
-                    JsonSerializer::new().into(),
+                    JsonSerializerConfig::default().build().into(),
                 ),
             ),
             reserved_attributes: RESERVED_ATTRIBUTES.iter().copied().collect(),
             id_rnd_bytes: thread_rng().gen::<[u8; 8]>(),
             id_seq_number: AtomicU32::new(0),
-            log_schema: log_schema(),
         }
     }
 }
 
 impl crate::sinks::util::encoding::Encoder<Vec<Event>> for DatadogArchivesEncoding {
     /// Applies the following transformations to align event's schema with DD:
-    /// - `_id` is generated in the sink(format described below);
-    /// - `date` is set from the Global Log Schema's `timestamp` mapping, or to the current time if missing;
-    /// - `message`,`host` are set from the corresponding Global Log Schema mappings;
+    /// - (required) `_id` is generated in the sink(format described below);
+    /// - (required) `date` is set from the `timestamp` meaning or Global Log Schema mapping, or to the current time if missing;
+    /// - `message`,`host` are set from the corresponding meanings or Global Log Schema mappings;
     /// - `source`, `service`, `status`, `tags` and other reserved attributes are left as is;
     /// - the rest of the fields is moved to `attributes`.
+    // TODO: All reserved attributes could have specific meanings, rather than specific paths
     fn encode_input(&self, mut input: Vec<Event>, writer: &mut dyn Write) -> io::Result<usize> {
         for event in input.iter_mut() {
             let log_event = event.as_mut_log();
@@ -539,18 +551,24 @@ impl crate::sinks::util::encoding::Encoder<Vec<Event>> for DatadogArchivesEncodi
             log_event.insert("_id", self.generate_log_id());
 
             let timestamp = log_event
-                .remove(self.log_schema.timestamp_key())
-                .unwrap_or_else(|| chrono::Utc::now().timestamp_millis().into());
+                .remove_timestamp()
+                .unwrap_or_else(|| Utc::now().timestamp_millis().into());
             log_event.insert(
                 "date",
                 timestamp
                     .as_timestamp()
                     .cloned()
-                    .unwrap_or_else(chrono::Utc::now)
+                    .unwrap_or_else(Utc::now)
                     .to_rfc3339_opts(SecondsFormat::Millis, true),
             );
-            log_event.rename_key(self.log_schema.message_key(), event_path!("message"));
-            log_event.rename_key(self.log_schema.host_key(), event_path!("host"));
+
+            if let Some(message_path) = log_event.message_path() {
+                log_event.rename_key(message_path.as_str(), event_path!("message"));
+            }
+
+            if let Some(host_path) = log_event.host_path() {
+                log_event.rename_key(host_path.as_str(), event_path!("host"));
+            }
 
             let mut attributes = BTreeMap::new();
 
@@ -598,7 +616,7 @@ impl DatadogS3RequestBuilder {
     }
 }
 
-impl RequestBuilder<(String, Vec<Event>)> for DatadogS3RequestBuilder {
+impl RequestBuilder<(S3PartitionKey, Vec<Event>)> for DatadogS3RequestBuilder {
     type Metadata = S3Metadata;
     type Events = Vec<Event>;
     type Encoder = DatadogArchivesEncoding;
@@ -614,32 +632,38 @@ impl RequestBuilder<(String, Vec<Event>)> for DatadogS3RequestBuilder {
         &self.encoding
     }
 
-    fn split_input(&self, input: (String, Vec<Event>)) -> (Self::Metadata, Self::Events) {
+    fn split_input(
+        &self,
+        input: (S3PartitionKey, Vec<Event>),
+    ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
         let (partition_key, mut events) = input;
         let finalizers = events.take_finalizers();
-        let metadata = S3Metadata {
+        let s3_key_prefix = partition_key.key_prefix.clone();
+
+        let builder = RequestMetadataBuilder::from_events(&events);
+
+        let s3metadata = S3Metadata {
             partition_key,
-            count: events.len(),
-            byte_size: events.size_of(),
+            s3_key: s3_key_prefix,
             finalizers,
         };
 
-        (metadata, events)
+        (s3metadata, builder, events)
     }
 
     fn build_request(
         &self,
         mut metadata: Self::Metadata,
+        request_metadata: RequestMetadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
-        metadata.partition_key =
-            generate_object_key(self.key_prefix.clone(), metadata.partition_key);
+        metadata.s3_key = generate_object_key(self.key_prefix.clone(), metadata.s3_key);
 
         let body = payload.into_payload();
         trace!(
             message = "Sending events.",
             bytes = ?body.len(),
-            events_len = ?metadata.byte_size,
+            events_len = ?request_metadata.events_byte_size(),
             bucket = ?self.bucket,
             key = ?metadata.partition_key
         );
@@ -649,6 +673,7 @@ impl RequestBuilder<(String, Vec<Event>)> for DatadogS3RequestBuilder {
             body,
             bucket: self.bucket.clone(),
             metadata,
+            request_metadata,
             content_encoding: DEFAULT_COMPRESSION.content_encoding(),
             options: s3_common::config::S3Options {
                 acl: s3_options.acl,
@@ -659,7 +684,7 @@ impl RequestBuilder<(String, Vec<Event>)> for DatadogS3RequestBuilder {
                 server_side_encryption: s3_options.server_side_encryption,
                 ssekms_key_id: s3_options.ssekms_key_id,
                 storage_class: s3_options.storage_class,
-                tags: s3_options.tags,
+                tags: s3_options.tags.map(|tags| tags.into_iter().collect()),
                 content_encoding: None,
                 content_type: None,
             },
@@ -679,31 +704,34 @@ struct DatadogGcsRequestBuilder {
 }
 
 impl RequestBuilder<(String, Vec<Event>)> for DatadogGcsRequestBuilder {
-    type Metadata = (String, EventFinalizers, RequestMetadataBuilder);
+    type Metadata = (String, EventFinalizers);
     type Events = Vec<Event>;
     type Payload = Bytes;
     type Request = GcsRequest;
     type Encoder = DatadogArchivesEncoding;
     type Error = io::Error;
 
-    fn split_input(&self, input: (String, Vec<Event>)) -> (Self::Metadata, Self::Events) {
+    fn split_input(
+        &self,
+        input: (String, Vec<Event>),
+    ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
         let (partition_key, mut events) = input;
-        let metadata_builder = RequestMetadata::builder(&events);
+        let metadata_builder = RequestMetadataBuilder::from_events(&events);
         let finalizers = events.take_finalizers();
 
-        ((partition_key, finalizers, metadata_builder), events)
+        ((partition_key, finalizers), metadata_builder, events)
     }
 
     fn build_request(
         &self,
-        metadata: Self::Metadata,
+        dd_metadata: Self::Metadata,
+        metadata: RequestMetadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
-        let (key, finalizers, metadata_builder) = metadata;
+        let (key, finalizers) = dd_metadata;
 
         let key = generate_object_key(self.key_prefix.clone(), key);
 
-        let metadata = metadata_builder.build(&payload);
         let body = payload.into_payload();
 
         trace!(
@@ -747,7 +775,7 @@ fn generate_object_key(key_prefix: Option<String>, partition_key: String) -> Str
     let filename = Uuid::new_v4().to_string();
 
     format!(
-        "{}/{}{}.{}",
+        "{}/{}/archive_{}.{}",
         key_prefix.unwrap_or_default(),
         partition_key,
         filename,
@@ -779,7 +807,10 @@ impl RequestBuilder<(String, Vec<Event>)> for DatadogAzureRequestBuilder {
         &self.encoding
     }
 
-    fn split_input(&self, input: (String, Vec<Event>)) -> (Self::Metadata, Self::Events) {
+    fn split_input(
+        &self,
+        input: (String, Vec<Event>),
+    ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
         let (partition_key, mut events) = input;
         let finalizers = events.take_finalizers();
         let metadata = AzureBlobMetadata {
@@ -788,13 +819,15 @@ impl RequestBuilder<(String, Vec<Event>)> for DatadogAzureRequestBuilder {
             byte_size: events.size_of(),
             finalizers,
         };
+        let builder = RequestMetadataBuilder::from_events(&events);
 
-        (metadata, events)
+        (metadata, builder, events)
     }
 
     fn build_request(
         &self,
         mut metadata: Self::Metadata,
+        request_metadata: RequestMetadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
         metadata.partition_key =
@@ -815,6 +848,7 @@ impl RequestBuilder<(String, Vec<Event>)> for DatadogAzureRequestBuilder {
             content_encoding: DEFAULT_COMPRESSION.content_encoding(),
             content_type: "application/gzip",
             metadata,
+            request_metadata,
         }
     }
 }
@@ -825,21 +859,31 @@ impl RequestBuilder<(String, Vec<Event>)> for DatadogAzureRequestBuilder {
 //
 // TODO: When the sink is fully supported and we expose it for use/within the docs, remove this.
 impl NamedComponent for DatadogArchivesSinkConfig {
-    const NAME: &'static str = "datadog_archives";
+    fn get_component_name(&self) -> &'static str {
+        "datadog_archives"
+    }
 }
 
 #[async_trait::async_trait]
 impl SinkConfig for DatadogArchivesSinkConfig {
-    async fn build(
-        &self,
-        cx: SinkContext,
-    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
+    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, super::Healthcheck)> {
         let sink_and_healthcheck = self.build_sink(cx).await?;
         Ok(sink_and_healthcheck)
     }
 
     fn input(&self) -> Input {
-        Input::log()
+        let requirements = schema::Requirement::empty()
+            .optional_meaning("host", Kind::bytes())
+            .optional_meaning("message", Kind::bytes())
+            .optional_meaning("source", Kind::bytes())
+            .optional_meaning("service", Kind::bytes())
+            .optional_meaning("severity", Kind::bytes())
+            // TODO: A `timestamp` is required for rehydration, however today we generate a `Utc::now()`
+            // timestamp if it's not found in the event. We could require this meaning instead.
+            .optional_meaning("timestamp", Kind::timestamp())
+            .optional_meaning("trace_id", Kind::bytes());
+
+        Input::log().with_schema_requirement(requirements)
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
@@ -1026,7 +1070,9 @@ mod tests {
     /// - base64-encoded,
     /// - first 6 bytes - a "now" timestamp in millis
     fn validate_event_id(id: &str) {
-        let bytes = base64::decode(id).expect("_id is not base64-encoded");
+        let bytes = BASE64_STANDARD
+            .decode(id)
+            .expect("_id is not base64-encoded");
         assert_eq!(bytes.len(), 18);
         let mut timestamp: [u8; 8] = [0; 8];
         for (i, b) in bytes[..6].iter().enumerate() {
@@ -1045,7 +1091,10 @@ mod tests {
             .expect("invalid test case")
             .with_timezone(&Utc);
         log.as_mut_log().insert("timestamp", timestamp);
-        let partitioner = DatadogArchivesSinkConfig::build_partitioner();
+        let partitioner = S3KeyPartitioner::new(
+            Template::try_from(KEY_TEMPLATE).expect("invalid object key format"),
+            None,
+        );
         let key = partitioner.partition(&log).expect("key wasn't provided");
 
         let request_builder = DatadogS3RequestBuilder::new(
@@ -1055,26 +1104,34 @@ mod tests {
             Default::default(),
         );
 
-        let (metadata, _events) = request_builder.split_input((key, vec![log]));
-        let req =
-            request_builder.build_request(metadata, EncodeResult::uncompressed(fake_buf.clone()));
-        let expected_key_prefix = "audit/dt=20210823/hour=16/";
+        let (metadata, metadata_request_builder, _events) =
+            request_builder.split_input((key, vec![log]));
+
+        let payload = EncodeResult::uncompressed(fake_buf.clone());
+        let request_metadata = metadata_request_builder.build(&payload);
+        let req = request_builder.build_request(metadata, request_metadata, payload);
+
+        let expected_key_prefix = "audit/dt=20210823/hour=16/archive_";
         let expected_key_ext = ".json.gz";
-        println!("{}", req.metadata.partition_key);
-        assert!(req.metadata.partition_key.starts_with(expected_key_prefix));
-        assert!(req.metadata.partition_key.ends_with(expected_key_ext));
-        let uuid1 = &req.metadata.partition_key
-            [expected_key_prefix.len()..req.metadata.partition_key.len() - expected_key_ext.len()];
+        println!("{}", req.metadata.s3_key);
+        assert!(req.metadata.s3_key.starts_with(expected_key_prefix));
+        assert!(req.metadata.s3_key.ends_with(expected_key_ext));
+        let uuid1 = &req.metadata.s3_key
+            [expected_key_prefix.len()..req.metadata.s3_key.len() - expected_key_ext.len()];
         assert_eq!(uuid1.len(), 36);
 
         // check that the second batch has a different UUID
         let log2 = LogEvent::default().into();
 
         let key = partitioner.partition(&log2).expect("key wasn't provided");
-        let (metadata, _events) = request_builder.split_input((key, vec![log2]));
-        let req = request_builder.build_request(metadata, EncodeResult::uncompressed(fake_buf));
-        let uuid2 = &req.metadata.partition_key
-            [expected_key_prefix.len()..req.metadata.partition_key.len() - expected_key_ext.len()];
+        let (metadata, metadata_request_builder, _events) =
+            request_builder.split_input((key, vec![log2]));
+        let payload = EncodeResult::uncompressed(fake_buf);
+        let request_metadata = metadata_request_builder.build(&payload);
+        let req = request_builder.build_request(metadata, request_metadata, payload);
+
+        let uuid2 = &req.metadata.s3_key
+            [expected_key_prefix.len()..req.metadata.s3_key.len() - expected_key_ext.len()];
 
         assert_ne!(uuid1, uuid2);
     }
@@ -1097,7 +1154,7 @@ mod tests {
                 request: TowerRequestConfig::default(),
                 aws_s3: Some(S3Config {
                     options: S3Options {
-                        storage_class: Some(class),
+                        storage_class: class,
                         ..Default::default()
                     },
                     region: RegionOrEndpoint::with_region("us-east-1".to_owned()),

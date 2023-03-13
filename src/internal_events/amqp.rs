@@ -36,7 +36,7 @@ pub mod source {
                    error = ?self.error,
                    error_type = error_type::REQUEST_FAILED,
                    stage = error_stage::RECEIVING,
-                   internal_log_rate_secs = 10
+                   internal_log_rate_limit = true,
             );
             counter!(
                 "component_errors_total", 1,
@@ -57,7 +57,7 @@ pub mod source {
                    error = ?self.error,
                    error_type = error_type::ACKNOWLEDGMENT_FAILED,
                    stage = error_stage::RECEIVING,
-                   internal_log_rate_secs = 10
+                   internal_log_rate_limit = true,
             );
             counter!(
                 "component_errors_total", 1,
@@ -78,7 +78,7 @@ pub mod source {
                    error = ?self.error,
                    error_type = error_type::COMMAND_FAILED,
                    stage = error_stage::RECEIVING,
-                   internal_log_rate_secs = 10
+                   internal_log_rate_limit = true,
             );
             counter!(
                 "component_errors_total", 1,
@@ -91,12 +91,11 @@ pub mod source {
 
 #[cfg(feature = "sinks-amqp")]
 pub mod sink {
-    use crate::{
-        emit,
-        internal_events::{ComponentEventsDropped, UNINTENTIONAL},
-    };
+    use crate::emit;
     use metrics::counter;
-    use vector_common::internal_event::{error_stage, error_type};
+    use vector_common::internal_event::{
+        error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL,
+    };
     use vector_core::internal_event::InternalEvent;
 
     #[derive(Debug)]
@@ -112,7 +111,7 @@ pub mod sink {
                    error = ?self.error,
                    error_type = error_type::REQUEST_FAILED,
                    stage = error_stage::SENDING,
-                   internal_log_rate_secs = 10
+                   internal_log_rate_limit = true,
             );
             counter!(
                 "component_errors_total", 1,
@@ -139,7 +138,7 @@ pub mod sink {
                    error = ?self.error,
                    error_type = error_type::REQUEST_FAILED,
                    stage = error_stage::SENDING,
-                   internal_log_rate_secs = 10
+                   internal_log_rate_limit = true,
             );
             counter!(
                 "component_errors_total", 1,

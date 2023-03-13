@@ -11,7 +11,7 @@ use nom::{
     character::complete::{char, satisfy, space0},
     combinator::{eof, map, opt, peek, recognize, rest, verify},
     error::{ContextError, ParseError, VerboseError},
-    multi::{many1, many_m_n, separated_list1},
+    multi::{many0, many1, many_m_n, separated_list1},
     sequence::{delimited, preceded, terminated, tuple},
     IResult,
 };
@@ -309,7 +309,7 @@ fn parse_field_delimiter<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
         if field_delimiter == " " {
             map(many1(tag(field_delimiter)), |_| " ")(input)
         } else {
-            preceded(space0, tag(field_delimiter))(input)
+            preceded(many0(tag(" ")), tag(field_delimiter))(input)
         }
     }
 }
@@ -608,6 +608,12 @@ mod test {
             ]),
             parse("foo:bar ,   foobar   ", ":", ",", Whitespace::Strict, true)
         );
+    }
+
+    #[test]
+    fn test_parse_tab_delimiter() {
+        let res = parse_field_delimiter::<VerboseError<&str>>("\t")(" \tzonk");
+        assert_eq!(("zonk", "\t"), res.unwrap());
     }
 
     #[test]

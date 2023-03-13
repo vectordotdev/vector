@@ -10,6 +10,7 @@ use http::{
 use hyper::Body;
 use snafu::ResultExt;
 use tower::Service;
+use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
 use vector_core::{
     event::{EventFinalizers, EventStatus, Finalizable},
     internal_event::CountByteSize,
@@ -60,8 +61,8 @@ pub struct DatadogMetricsRequest {
     pub uri: Uri,
     pub content_type: &'static str,
     pub finalizers: EventFinalizers,
-    pub batch_size: usize,
     pub raw_bytes: usize,
+    pub metadata: RequestMetadata,
 }
 
 impl DatadogMetricsRequest {
@@ -88,7 +89,7 @@ impl DatadogMetricsRequest {
             .header("DD-API-KEY", api_key)
             // TODO: The Datadog Agent sends this header to indicate the version of the Go library
             // it uses which contains the Protocol Buffers definitions used for the Sketches API.
-            // We've copypastaed the proto file for now -- `proto/ddsketch.rs`, a partial chunk of
+            // We've copypasted the proto file for now -- `proto/ddsketch.rs`, a partial chunk of
             // `DataDog/agent-payload/proto/metrics/agent_payload.proto` -- and are thus hardcoding
             // the version that we copypasted from.
             //
@@ -110,6 +111,12 @@ impl Finalizable for DatadogMetricsRequest {
     }
 }
 
+impl MetaDescriptive for DatadogMetricsRequest {
+    fn get_metadata(&self) -> RequestMetadata {
+        self.metadata
+    }
+}
+
 // Generalized wrapper around the raw response from Hyper.
 #[derive(Debug)]
 pub struct DatadogMetricsResponse {
@@ -118,7 +125,6 @@ pub struct DatadogMetricsResponse {
     batch_size: usize,
     byte_size: usize,
     raw_byte_size: usize,
-    protocol: String,
 }
 
 impl DriverResponse for DatadogMetricsResponse {
@@ -136,8 +142,8 @@ impl DriverResponse for DatadogMetricsResponse {
         CountByteSize(self.batch_size, self.byte_size)
     }
 
-    fn bytes_sent(&self) -> Option<(usize, &str)> {
-        Some((self.raw_byte_size, &self.protocol))
+    fn bytes_sent(&self) -> Option<usize> {
+        Some(self.raw_byte_size)
     }
 }
 
@@ -163,20 +169,21 @@ impl Service<DatadogMetricsRequest> for DatadogMetricsService {
     type Error = DatadogApiError;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
+    // Emission of Error internal event is handled upstream by the caller
     fn poll_ready(&mut self, cx: &mut Context) -> Poll<Result<(), Self::Error>> {
         self.client
             .poll_ready(cx)
             .map_err(|error| DatadogApiError::HttpError { error })
     }
 
+    // Emission of Error internal event is handled upstream by the caller
     fn call(&mut self, request: DatadogMetricsRequest) -> Self::Future {
         let client = self.client.clone();
         let api_key = self.api_key.clone();
 
         Box::pin(async move {
-            let byte_size = request.payload.len();
-            let batch_size = request.batch_size;
-            let protocol = request.uri.scheme_str().unwrap_or("http").to_string();
+            let byte_size = request.get_metadata().events_byte_size();
+            let batch_size = request.get_metadata().event_count();
             let raw_byte_size = request.raw_bytes;
 
             let request = request
@@ -199,7 +206,6 @@ impl Service<DatadogMetricsRequest> for DatadogMetricsService {
                 batch_size,
                 byte_size,
                 raw_byte_size,
-                protocol,
             })
         })
     }

@@ -1,6 +1,5 @@
 use std::{
     cmp,
-    collections::BTreeMap,
     io::{self, Write},
     mem,
     sync::Arc,
@@ -12,7 +11,7 @@ use prost::Message;
 use snafu::{ResultExt, Snafu};
 use vector_core::{
     config::{log_schema, LogSchema},
-    event::{metric::MetricSketch, Metric, MetricValue},
+    event::{metric::MetricSketch, Metric, MetricTags, MetricValue},
 };
 
 use super::config::{
@@ -82,7 +81,7 @@ impl FinishError {
     pub const fn as_error_type(&self) -> &'static str {
         match self {
             Self::CompressionFailed { .. } => "compression_failed",
-            Self::PendingEncodeFailed { .. } => "pendiong_encode_failed",
+            Self::PendingEncodeFailed { .. } => "pending_encode_failed",
             Self::TooLarge { .. } => "too_large",
         }
     }
@@ -392,10 +391,13 @@ fn get_namespaced_name(metric: &Metric, default_namespace: &Option<Arc<str>>) ->
     )
 }
 
-fn encode_tags(tags: &BTreeMap<String, String>) -> Vec<String> {
+fn encode_tags(tags: &MetricTags) -> Vec<String> {
     let mut pairs: Vec<_> = tags
-        .iter()
-        .map(|(name, value)| format!("{}:{}", name, value))
+        .iter_all()
+        .map(|(name, value)| match value {
+            Some(value) => format!("{}:{}", name, value),
+            None => name.into(),
+        })
         .collect();
     pairs.sort();
     pairs
@@ -598,7 +600,7 @@ const fn validate_payload_size_limits(
     //
     // This only matters for series metrics at the moment, since sketches are encoded in a single
     // shot to their Protocol Buffers representation.  We're "wasting" `header_len` bytes in the
-    // case of sketches, but we're alsdo talking about like 10 bytes: not enough to care about.
+    // case of sketches, but we're also talking about like 10 bytes: not enough to care about.
     let header_len = max_uncompressed_header_len();
     if uncompressed_limit <= header_len {
         return None;
@@ -655,7 +657,6 @@ fn write_payload_footer(
 #[cfg(test)]
 mod tests {
     use std::{
-        collections::BTreeMap,
         io::{self, copy},
         num::NonZeroU32,
     };
@@ -669,7 +670,8 @@ mod tests {
     };
     use vector_core::{
         config::log_schema,
-        event::{Metric, MetricKind, MetricValue},
+        event::{metric::TagValue, Metric, MetricKind, MetricTags, MetricValue},
+        metric_tags,
         metrics::AgentDDSketch,
     };
 
@@ -720,24 +722,32 @@ mod tests {
     }
 
     fn ts() -> DateTime<Utc> {
-        Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 11)
+        Utc.ymd(2018, 11, 14)
+            .and_hms_nano_opt(8, 9, 10, 11)
+            .expect("invalid timestamp")
     }
 
-    fn tags() -> BTreeMap<String, String> {
-        vec![
-            ("normal_tag".to_owned(), "value".to_owned()),
-            ("true_tag".to_owned(), "true".to_owned()),
-            ("empty_tag".to_owned(), "".to_owned()),
-        ]
-        .into_iter()
-        .collect()
+    fn tags() -> MetricTags {
+        metric_tags! {
+            "normal_tag" => "value",
+            "true_tag" => "true",
+            "empty_tag" => TagValue::Bare,
+            "multi_value" => "one",
+            "multi_value" => "two",
+        }
     }
 
     #[test]
     fn test_encode_tags() {
         assert_eq!(
             encode_tags(&tags()),
-            vec!["empty_tag:", "normal_tag:value", "true_tag:true"]
+            vec![
+                "empty_tag",
+                "multi_value:one",
+                "multi_value:two",
+                "normal_tag:value",
+                "true_tag:true",
+            ]
         );
     }
 
@@ -749,7 +759,7 @@ mod tests {
 
     #[test]
     fn incorrect_metric_for_endpoint_causes_error() {
-        // Series metrics can't gbo to the sketches endpoint.
+        // Series metrics can't go to the sketches endpoint.
         let mut sketch_encoder = DatadogMetricsEncoder::new(DatadogMetricsEndpoint::Sketches, None)
             .expect("default payload size limits should be valid");
         let series_result = sketch_encoder.try_encode(get_simple_counter());
@@ -759,7 +769,7 @@ mod tests {
         ));
 
         // And sketches can't go to the series endpoint.
-        // Series metrics can't gbo to the sketches endpoint.
+        // Series metrics can't go to the sketches endpoint.
         let mut series_encoder = DatadogMetricsEncoder::new(DatadogMetricsEndpoint::Series, None)
             .expect("default payload size limits should be valid");
         let sketch_result = series_encoder.try_encode(get_simple_sketch());
@@ -960,7 +970,7 @@ mod tests {
             any::<u64>().prop_map(|v| v.to_string()),
             0..64,
         )
-        .prop_map(|tags| if tags.is_empty() { None } else { Some(tags) });
+        .prop_map(|tags| (!tags.is_empty()).then(|| MetricTags::from(tags)));
 
         (name, value, tags).prop_map(|(metric_name, metric_value, metric_tags)| {
             let metric_value = MetricValue::Counter {

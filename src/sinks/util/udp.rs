@@ -11,11 +11,12 @@ use futures::{future::BoxFuture, stream::BoxStream, FutureExt, StreamExt};
 use snafu::{ResultExt, Snafu};
 use tokio::{net::UdpSocket, sync::oneshot, time::sleep};
 use tokio_util::codec::Encoder;
+use tower::Service;
 use vector_common::internal_event::{
     ByteSize, BytesSent, InternalEventHandle, Protocol, Registered,
 };
 use vector_config::configurable_component;
-use vector_core::ByteSizeOf;
+use vector_core::EstimatedJsonEncodedSizeOf;
 
 use super::SinkBuildError;
 use crate::{
@@ -23,8 +24,8 @@ use crate::{
     dns,
     event::{Event, EventStatus, Finalizable},
     internal_events::{
-        SocketEventsSent, SocketMode, UdpSendIncompleteError, UdpSocketConnectionError,
-        UdpSocketConnectionEstablished, UdpSocketError,
+        SocketEventsSent, SocketMode, SocketSendError, UdpSendIncompleteError,
+        UdpSocketConnectionEstablished, UdpSocketOutgoingConnectionError,
     },
     sinks::{
         util::{retries::ExponentialBackoff, StreamSink},
@@ -55,12 +56,18 @@ pub enum UdpError {
 pub struct UdpSinkConfig {
     /// The address to connect to.
     ///
+    /// Both IP address and hostname are accepted formats.
+    ///
     /// The address _must_ include a port.
+    #[configurable(metadata(docs::examples = "92.12.333.224:5000"))]
+    #[configurable(metadata(docs::examples = "https://somehost:5000"))]
     address: String,
 
-    /// The size, in bytes, of the socket's send buffer.
+    /// The size of the socket's send buffer.
     ///
     /// If set, the value of the setting is passed via the `SO_SNDBUF` option.
+    #[configurable(metadata(docs::type_unit = "bytes"))]
+    #[configurable(metadata(docs::examples = 65536))]
     send_buffer_bytes: Option<usize>,
 }
 
@@ -157,7 +164,7 @@ impl UdpConnector {
                     return socket;
                 }
                 Err(error) => {
-                    emit!(UdpSocketConnectionError { error });
+                    emit!(UdpSocketOutgoingConnectionError { error });
                     sleep(backoff.next().unwrap()).await;
                 }
             }
@@ -192,11 +199,12 @@ impl UdpService {
     }
 }
 
-impl tower::Service<BytesMut> for UdpService {
+impl Service<BytesMut> for UdpService {
     type Response = ();
     type Error = UdpError;
     type Future = BoxFuture<'static, Result<(), Self::Error>>;
 
+    // Emission of an internal event in case of errors is handled upstream by the caller.
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         loop {
             self.state = match &mut self.state {
@@ -223,6 +231,7 @@ impl tower::Service<BytesMut> for UdpService {
         Poll::Ready(Ok(()))
     }
 
+    // Emission of internal events for errors and dropped events is handled upstream by the caller.
     fn call(&mut self, msg: BytesMut) -> Self::Future {
         let (sender, receiver) = oneshot::channel();
         let byte_size = msg.len();
@@ -289,12 +298,14 @@ where
         while Pin::new(&mut input).peek().await.is_some() {
             let mut socket = self.connector.connect_backoff().await;
             while let Some(mut event) = input.next().await {
-                let byte_size = event.size_of();
+                let byte_size = event.estimated_json_encoded_size_of();
 
                 self.transformer.transform(&mut event);
 
                 let finalizers = event.take_finalizers();
                 let mut bytes = BytesMut::new();
+
+                // Errors are handled by `Encoder`.
                 if encoder.encode(event, &mut bytes).is_err() {
                     continue;
                 }
@@ -311,7 +322,10 @@ where
                         finalizers.update_status(EventStatus::Delivered);
                     }
                     Err(error) => {
-                        emit!(UdpSocketError { error });
+                        emit!(SocketSendError {
+                            mode: SocketMode::Udp,
+                            error
+                        });
                         finalizers.update_status(EventStatus::Errored);
                         break;
                     }

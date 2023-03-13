@@ -10,26 +10,30 @@ use vector_buffers::topology::channel::BufferSender;
 use crate::{config::ComponentKey, event::EventArray};
 
 pub enum ControlMessage {
+    /// Adds a new sink to the fanout.
     Add(ComponentKey, BufferSender<EventArray>),
+
+    /// Removes a sink from the fanout.
     Remove(ComponentKey),
-    /// Will stop accepting events until Some with given id is replaced.
-    Replace(ComponentKey, Option<BufferSender<EventArray>>),
+
+    /// Pauses a sink in the fanout.
+    ///
+    /// If a fanout has any paused sinks, subsequent sends cannot proceed until all paused sinks
+    /// have been replaced.
+    Pause(ComponentKey),
+
+    /// Replaces a paused sink with its new sender.
+    Replace(ComponentKey, BufferSender<EventArray>),
 }
 
 impl fmt::Debug for ControlMessage {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "ControlMessage::")?;
         match self {
-            Self::Add(id, _) => write!(f, "Add({:?})", id),
-            Self::Remove(id) => write!(f, "Remove({:?})", id),
-            Self::Replace(id, sink) => {
-                let status = if sink.is_none() {
-                    "pausing"
-                } else {
-                    "unpausing"
-                };
-                write!(f, "Replace({:?}, {})", id, status)
-            }
+            Self::Add(id, _) => write!(f, "Add({id:?})"),
+            Self::Remove(id) => write!(f, "Remove({id:?})"),
+            Self::Pause(id) => write!(f, "Pause({id:?})"),
+            Self::Replace(id, _) => write!(f, "Replace({id:?})"),
         }
     }
 }
@@ -71,7 +75,7 @@ impl Fanout {
     fn remove(&mut self, id: &ComponentKey) {
         assert!(
             self.senders.remove(id).is_some(),
-            "Removing non-existent sink from fanout: {id}"
+            "Removing nonexistent sink from fanout: {id}"
         );
     }
 
@@ -97,7 +101,7 @@ impl Fanout {
                 // control operations has been applied.
                 assert!(
                     sender.take().is_some(),
-                    "Pausing non-existent sink is not valid: {id}"
+                    "Pausing nonexistent sink is not valid: {id}"
                 );
             }
             None => panic!("Pausing unknown sink from fanout: {id}"),
@@ -113,19 +117,37 @@ impl Fanout {
         match message {
             ControlMessage::Add(id, sink) => self.add(id, sink),
             ControlMessage::Remove(id) => self.remove(&id),
-            ControlMessage::Replace(id, None) => self.pause(&id),
-            ControlMessage::Replace(id, Some(sink)) => self.replace(&id, sink),
+            ControlMessage::Pause(id) => self.pause(&id),
+            ControlMessage::Replace(id, sink) => self.replace(&id, sink),
         }
     }
 
-    /// If any sink is awaiting replacement (i.e. it was temporarily replaced with `None`), read
-    /// and process messages from the control channel until that is no longer true.
+    /// Waits for all paused sinks to be replaced.
+    ///
+    /// Control messages are processed until all senders have been replaced, so it is guaranteed
+    /// that when this method returns, all senders are ready for the next send to be triggered.
     async fn wait_for_replacements(&mut self) {
         while self.senders.values().any(Option::is_none) {
             if let Some(msg) = self.control_channel.recv().await {
                 self.apply_control_message(msg);
             } else {
                 // If the control channel is closed, there's nothing else we can do.
+
+                // TODO: It _seems_ like we should probably panic here, or at least return.
+                //
+                // Essentially, we should only land here if the control channel is closed but we
+                // haven't yet replaced all of the paused sinks... and we shouldn't have any paused
+                // sinks if Vector is stopping normally/gracefully, so like... we'd only get
+                // here during a configuration reload where we panicked in another thread due to
+                // an error of some sort, and the control channel got dropped, closed itself, and
+                // we're never going to be able to recover.
+                //
+                // The flipside is that by leaving it as-is, in the above hypothesized scenario,
+                // we'd avoid emitting additional panics/error logging when the root cause error was
+                // already doing so, like there's little value in knowing the fanout also hit an
+                // unrecoverable state if the whole process is about to come crashing down
+                // anyways... but it still does feel weird to have that encoded here by virtue of
+                // only a comment, and not an actual terminating expression. *shrug*
             }
         }
     }
@@ -138,7 +160,7 @@ impl Fanout {
     /// # Panics
     ///
     /// This method can panic if the fanout receives a control message that violates some invariant
-    /// about its current state (e.g. remove a non-existent sink, etc.). This would imply a bug in
+    /// about its current state (e.g. remove a nonexistent sink, etc.). This would imply a bug in
     /// Vector's config reloading logic.
     ///
     /// # Errors
@@ -164,7 +186,7 @@ impl Fanout {
     /// # Panics
     ///
     /// This method can panic if the fanout receives a control message that violates some invariant
-    /// about its current state (e.g. remove a non-existent sink, etc). This would imply a bug in
+    /// about its current state (e.g. remove a nonexistent sink, etc). This would imply a bug in
     /// Vector's config reloading logic.
     ///
     /// # Errors
@@ -172,12 +194,12 @@ impl Fanout {
     /// If an error occurs while sending events to any of the connected sinks, an error variant will be
     /// returned detailing the cause.
     pub async fn send(&mut self, events: EventArray) -> crate::Result<()> {
-        // First, process any available control messages in a non-blocking fashion.  If any of our
-        // senders were replaced, we additionally wait until they're replaced.
+        // First, process any available control messages in a non-blocking fashion.
         while let Ok(message) = self.control_channel.try_recv() {
             self.apply_control_message(message);
         }
 
+        // Wait for any senders that are paused to be replaced first before continuing with the send.
         self.wait_for_replacements().await;
 
         // Nothing to send if we have no sender.
@@ -217,11 +239,11 @@ impl Fanout {
                         Some(ControlMessage::Remove(id)) => {
                             send_group.remove(&id);
                         },
-                        Some(ControlMessage::Replace(id, Some(sink))) => {
-                            send_group.replace(&id, Sender::new(sink));
-                        },
-                        Some(ControlMessage::Replace(id, None)) => {
+                        Some(ControlMessage::Pause(id)) => {
                             send_group.pause(&id);
+                        },
+                        Some(ControlMessage::Replace(id, sink)) => {
+                            send_group.replace(&id, Sender::new(sink));
                         },
                         None => {
                             // Control channel is closed, which means Vector is shutting down.
@@ -285,7 +307,7 @@ impl<'a> SendGroup<'a> {
         Self { senders, sends }
     }
 
-    fn try_detach_send(&mut self, id: &ComponentKey) {
+    fn try_detach_send(&mut self, id: &ComponentKey) -> bool {
         if let Some(send) = self.sends.remove(id) {
             tokio::spawn(async move {
                 if let Err(e) = send.await {
@@ -295,6 +317,9 @@ impl<'a> SendGroup<'a> {
                     );
                 }
             });
+            true
+        } else {
+            false
         }
     }
 
@@ -316,10 +341,13 @@ impl<'a> SendGroup<'a> {
         // around still trying to send to it.
         assert!(
             self.senders.remove(id).is_some(),
-            "Removing non-existent sink from fanout: {id}"
+            "Removing nonexistent sink from fanout: {id}"
         );
 
         // Now try and detach the in-flight send, if it exists.
+        //
+        // We don't ensure that a send was or wasn't detached because this could be called either
+        // during an in-flight send _or_ after the send has completed.
         self.try_detach_send(id);
     }
 
@@ -341,12 +369,18 @@ impl<'a> SendGroup<'a> {
     fn pause(&mut self, id: &ComponentKey) {
         match self.senders.get_mut(id) {
             Some(sender) => {
-                // A sink must be known and present to be replaced, otherwise an invalid sequence of
-                // control operations has been applied.
-                assert!(
-                    sender.take().is_some(),
-                    "Pausing non-existent sink is not valid: {id}"
-                );
+                // If we don't currently own the `Sender` for the given component, that implies
+                // there is an in-flight send: a `SendGroup` cannot be created without all
+                // participating components having a send operation triggered.
+                //
+                // As such, `try_detach_send` should always succeed here, as pausing only occurs
+                // when a component is being _replaced_, and should not be called multiple times.
+                if sender.take().is_none() {
+                    assert!(
+                        self.try_detach_send(id),
+                        "Pausing already-paused sink is invalid: {id}"
+                    );
+                }
             }
             None => panic!("Pausing unknown sink from fanout: {id}"),
         }
@@ -500,16 +534,15 @@ mod tests {
         let old_receiver = mem::replace(&mut receivers[sender_id], receiver);
 
         control
-            .send(ControlMessage::Replace(
-                ComponentKey::from(sender_id.to_string()),
-                None,
-            ))
+            .send(ControlMessage::Pause(ComponentKey::from(
+                sender_id.to_string(),
+            )))
             .expect("sending control message should not fail");
 
         control
             .send(ControlMessage::Replace(
                 ComponentKey::from(sender_id.to_string()),
-                Some(sender),
+                sender,
             ))
             .expect("sending control message should not fail");
 
@@ -526,16 +559,15 @@ mod tests {
         let old_receiver = mem::replace(&mut receivers[sender_id], receiver);
 
         control
-            .send(ControlMessage::Replace(
-                ComponentKey::from(sender_id.to_string()),
-                None,
-            ))
+            .send(ControlMessage::Pause(ComponentKey::from(
+                sender_id.to_string(),
+            )))
             .expect("sending control message should not fail");
 
         (old_receiver, sender)
     }
 
-    fn finish_sender_replace(
+    fn finish_sender_resume(
         control: &UnboundedSender<ControlMessage>,
         sender_id: usize,
         sender: BufferSender<EventArray>,
@@ -543,7 +575,7 @@ mod tests {
         control
             .send(ControlMessage::Replace(
                 ComponentKey::from(sender_id.to_string()),
-                Some(sender),
+                sender,
             ))
             .expect("sending control message should not fail");
     }
@@ -836,7 +868,7 @@ mod tests {
 
         // Finish our sender replacement, which should wake up the third send and allow it to
         // actually complete:
-        finish_sender_replace(&control, 0, new_first_sender);
+        finish_sender_resume(&control, 0, new_first_sender);
         assert!(third_send.is_woken());
         assert_ready!(third_send.poll()).expect("should not fail");
 
@@ -857,7 +889,7 @@ mod tests {
     }
 
     fn _make_events(count: usize) -> impl Iterator<Item = LogEvent> {
-        (0..count).map(|i| LogEvent::from(format!("line {}", i)))
+        (0..count).map(|i| LogEvent::from(format!("line {i}")))
     }
 
     fn make_events(count: usize) -> Vec<Event> {

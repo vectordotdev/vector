@@ -14,23 +14,22 @@ thread_local! {
 pub fn contains_name_once(pattern: &str) -> Result<(), String> {
     EVENTS_RECORDED.with(|events| {
         let mut n_events = 0;
-        let mut names: String = "".to_string();
+        let mut names = String::new();
         for event in events.borrow().iter() {
             if event.ends_with(pattern) {
                 if n_events > 0 {
                     names.push_str(", ");
                 }
                 n_events += 1;
-                let _ = write!(names, "`{}`", event);
+                let _ = write!(names, "`{event}`");
             }
         }
         if n_events == 0 {
-            Err(format!("Missing event `{}`", pattern))
+            Err(format!("Missing event `{pattern}`"))
         } else if n_events > 1 {
             Err(format!(
-                "Multiple ({}) events matching `{}`: ({}). Hint! Don't use the `assert_x_` \
-                 test helpers on round-trip tests (tests that run more than a single component).",
-                n_events, pattern, names
+                "Multiple ({n_events}) events matching `{pattern}`: ({names}). Hint! Don't use the `assert_x_` \
+                 test helpers on round-trip tests (tests that run more than a single component)."
             ))
         } else {
             Ok(())
@@ -46,7 +45,7 @@ pub fn clear_recorded_events() {
 pub fn debug_print_events() {
     EVENTS_RECORDED.with(|events| {
         for event in events.borrow().iter() {
-            println!("{}", event);
+            println!("{event}");
         }
     });
 }

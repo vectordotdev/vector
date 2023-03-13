@@ -104,7 +104,7 @@ uri = "http://{address2}/"
     let pieces = topology::build_or_log_errors(&config, &diff, HashMap::new())
         .await
         .unwrap();
-    let (_topology, _shutdown) = topology::start_validated(config, diff, pieces)
+    let (_topology, _) = topology::start_validated(config, diff, pieces)
         .await
         .unwrap();
 

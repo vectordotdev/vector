@@ -10,10 +10,15 @@ use vector_config::configurable_component;
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 #[serde(default)]
 pub struct RegionOrEndpoint {
-    /// The AWS region to use.
+    /// The [AWS region][aws_region] of the target service.
+    ///
+    /// [aws_region]: https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints
+    #[configurable(metadata(docs::examples = "us-east-1"))]
     pub region: Option<String>,
 
-    /// The API endpoint of the service.
+    /// Custom endpoint for use with AWS-compatible services.
+    #[configurable(metadata(docs::examples = "http://127.0.0.0:5000/path/to/service"))]
+    #[configurable(metadata(docs::advanced))]
     pub endpoint: Option<String>,
 }
 
@@ -33,11 +38,8 @@ impl RegionOrEndpoint {
     }
 
     pub fn endpoint(&self) -> crate::Result<Option<Endpoint>> {
-        if let Some(endpoint) = &self.endpoint {
-            Ok(Some(Endpoint::immutable(Uri::from_str(endpoint)?)))
-        } else {
-            Ok(None)
-        }
+        let uri = self.endpoint.as_deref().map(Uri::from_str).transpose()?;
+        Ok(uri.map(Endpoint::immutable))
     }
 
     pub fn region(&self) -> Option<Region> {

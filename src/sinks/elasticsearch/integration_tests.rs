@@ -14,11 +14,11 @@ use vector_core::{
 
 use super::{config::DATA_STREAM_TIMESTAMP_KEY, *};
 use crate::{
-    aws::RegionOrEndpoint,
+    aws::{ImdsAuthentication, RegionOrEndpoint},
     config::{ProxyConfig, SinkConfig, SinkContext},
     http::HttpClient,
     sinks::{
-        util::{BatchConfig, Compression},
+        util::{BatchConfig, Compression, SinkBatchSettings},
         HealthcheckError,
     },
     test_util::{
@@ -110,13 +110,14 @@ async fn ensure_pipeline_in_params() {
     let pipeline = String::from("test-pipeline");
 
     let config = ElasticsearchConfig {
-        endpoints: vec!["http://localhost:9200".to_string()],
-        bulk: Some(BulkConfig {
-            index: Some(index),
-            action: None,
-        }),
+        endpoints: vec![http_server()],
+        bulk: BulkConfig {
+            index,
+            ..Default::default()
+        },
         pipeline: Some(pipeline.clone()),
-        ..config()
+        batch: batch_settings(),
+        ..Default::default()
     };
     let common = ElasticsearchCommon::parse_single(&config)
         .await
@@ -130,14 +131,15 @@ async fn structures_events_correctly() {
     let index = gen_index();
     let config = ElasticsearchConfig {
         endpoints: vec![http_server()],
-        bulk: Some(BulkConfig {
-            index: Some(index.clone()),
-            action: None,
-        }),
-        doc_type: Some("log_lines".into()),
+        bulk: BulkConfig {
+            index: index.clone(),
+            ..Default::default()
+        },
+        doc_type: "log_lines".to_string(),
         id_key: Some("my_id".into()),
         compression: Compression::None,
-        ..config()
+        batch: batch_settings(),
+        ..Default::default()
     };
     let common = ElasticsearchCommon::parse_single(&config)
         .await
@@ -164,7 +166,7 @@ async fn structures_events_correctly() {
 
     assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
-    // make sure writes all all visible
+    // make sure writes are all visible
     flush(common).await.unwrap();
 
     let response = reqwest::Client::new()
@@ -206,15 +208,97 @@ async fn structures_events_correctly() {
 }
 
 #[tokio::test]
+async fn auto_version_http() {
+    trace_init();
+
+    let config = ElasticsearchConfig {
+        endpoints: vec![http_server()],
+        doc_type: "log_lines".to_string(),
+        compression: Compression::None,
+        api_version: ElasticsearchApiVersion::Auto,
+        batch: batch_settings(),
+        ..Default::default()
+    };
+    let _ = ElasticsearchCommon::parse_single(&config)
+        .await
+        .expect("Config error");
+}
+
+#[tokio::test]
+async fn auto_version_https() {
+    trace_init();
+
+    let config = ElasticsearchConfig {
+        auth: Some(ElasticsearchAuth::Basic {
+            user: "elastic".to_string(),
+            password: "vector".to_string().into(),
+        }),
+        endpoints: vec![https_server()],
+        doc_type: "log_lines".to_string(),
+        compression: Compression::None,
+        tls: Some(TlsConfig {
+            ca_file: Some(tls::TEST_PEM_CA_PATH.into()),
+            ..Default::default()
+        }),
+        api_version: ElasticsearchApiVersion::Auto,
+        batch: batch_settings(),
+        ..Default::default()
+    };
+    let _ = ElasticsearchCommon::parse_single(&config)
+        .await
+        .expect("Config error");
+}
+
+#[tokio::test]
+async fn auto_version_aws() {
+    trace_init();
+
+    let config = ElasticsearchConfig {
+        auth: Some(ElasticsearchAuth::Aws(AwsAuthentication::Default {
+            load_timeout_secs: Some(5),
+            imds: ImdsAuthentication::default(),
+        })),
+        endpoints: vec![aws_server()],
+        aws: Some(RegionOrEndpoint::with_region(String::from("localstack"))),
+        api_version: ElasticsearchApiVersion::Auto,
+        batch: batch_settings(),
+        ..Default::default()
+    };
+
+    let _ = ElasticsearchCommon::parse_single(&config)
+        .await
+        .expect("Config error");
+}
+
+#[tokio::test]
 async fn insert_events_over_http() {
     trace_init();
 
     run_insert_tests(
         ElasticsearchConfig {
             endpoints: vec![http_server()],
-            doc_type: Some("log_lines".into()),
+            doc_type: "log_lines".into(),
             compression: Compression::None,
-            ..config()
+            batch: batch_settings(),
+            ..Default::default()
+        },
+        false,
+        BatchStatus::Delivered,
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn insert_events_over_http_with_gzip_compression() {
+    trace_init();
+
+    run_insert_tests(
+        ElasticsearchConfig {
+            endpoints: vec![http_server()],
+            doc_type: "log_lines".into(),
+            compression: Compression::gzip_default(),
+            batch: batch_settings(),
+            ..Default::default()
         },
         false,
         BatchStatus::Delivered,
@@ -233,13 +317,14 @@ async fn insert_events_over_https() {
                 password: "vector".to_string().into(),
             }),
             endpoints: vec![https_server()],
-            doc_type: Some("log_lines".into()),
+            doc_type: "log_lines".into(),
             compression: Compression::None,
             tls: Some(TlsConfig {
                 ca_file: Some(tls::TEST_PEM_CA_PATH.into()),
                 ..Default::default()
             }),
-            ..config()
+            batch: batch_settings(),
+            ..Default::default()
         },
         false,
         BatchStatus::Delivered,
@@ -255,10 +340,13 @@ async fn insert_events_on_aws() {
         ElasticsearchConfig {
             auth: Some(ElasticsearchAuth::Aws(AwsAuthentication::Default {
                 load_timeout_secs: Some(5),
+                imds: ImdsAuthentication::default(),
             })),
             endpoints: vec![aws_server()],
             aws: Some(RegionOrEndpoint::with_region(String::from("localstack"))),
-            ..config()
+            api_version: ElasticsearchApiVersion::V6,
+            batch: batch_settings(),
+            ..Default::default()
         },
         false,
         BatchStatus::Delivered,
@@ -274,11 +362,14 @@ async fn insert_events_on_aws_with_compression() {
         ElasticsearchConfig {
             auth: Some(ElasticsearchAuth::Aws(AwsAuthentication::Default {
                 load_timeout_secs: Some(5),
+                imds: ImdsAuthentication::default(),
             })),
             endpoints: vec![aws_server()],
             aws: Some(RegionOrEndpoint::with_region(String::from("localstack"))),
             compression: Compression::gzip_default(),
-            ..config()
+            api_version: ElasticsearchApiVersion::V6,
+            batch: batch_settings(),
+            ..Default::default()
         },
         false,
         BatchStatus::Delivered,
@@ -293,9 +384,28 @@ async fn insert_events_with_failure() {
     run_insert_tests(
         ElasticsearchConfig {
             endpoints: vec![http_server()],
-            doc_type: Some("log_lines".into()),
+            doc_type: "log_lines".into(),
             compression: Compression::None,
-            ..config()
+            batch: batch_settings(),
+            ..Default::default()
+        },
+        true,
+        BatchStatus::Rejected,
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn insert_events_with_failure_and_gzip_compression() {
+    trace_init();
+
+    run_insert_tests(
+        ElasticsearchConfig {
+            endpoints: vec![http_server()],
+            doc_type: "log_lines".into(),
+            compression: Compression::gzip_default(),
+            batch: batch_settings(),
+            ..Default::default()
         },
         true,
         BatchStatus::Rejected,
@@ -312,11 +422,12 @@ async fn insert_events_in_data_stream() {
     let cfg = ElasticsearchConfig {
         endpoints: vec![http_server()],
         mode: ElasticsearchMode::DataStream,
-        bulk: Some(BulkConfig {
-            index: Some(stream_index.clone()),
-            action: None,
-        }),
-        ..config()
+        bulk: BulkConfig {
+            index: Template::try_from(stream_index.clone()).expect("unable to parse template"),
+            ..Default::default()
+        },
+        batch: batch_settings(),
+        ..Default::default()
     };
     let common = ElasticsearchCommon::parse_single(&cfg)
         .await
@@ -344,18 +455,19 @@ async fn distributed_insert_events() {
             password: "vector".to_string().into(),
         }),
         endpoints: vec![https_server(), http_server()],
-        doc_type: Some("log_lines".into()),
+        doc_type: "log_lines".into(),
         compression: Compression::None,
         tls: Some(TlsConfig {
             ca_file: Some(tls::TEST_PEM_CA_PATH.into()),
             ..Default::default()
         }),
-        ..config()
+        batch: batch_settings(),
+        ..Default::default()
     };
-    config.bulk = Some(BulkConfig {
-        index: Some(gen_index()),
-        action: None,
-    });
+    config.bulk = BulkConfig {
+        index: gen_index(),
+        ..Default::default()
+    };
     run_insert_tests_with_multiple_endpoints(&config).await;
 }
 
@@ -363,18 +475,31 @@ async fn distributed_insert_events() {
 async fn distributed_insert_events_failover() {
     trace_init();
 
-    run_insert_tests(
-        ElasticsearchConfig {
-            // A valid endpoint and some random non elasticsearch endpoint
-            endpoints: vec![http_server(), "http://localhost:2347".into()],
-            doc_type: Some("log_lines".into()),
-            compression: Compression::None,
-            ..config()
-        },
-        false,
-        BatchStatus::Delivered,
-    )
-    .await;
+    let mut config = ElasticsearchConfig {
+        auth: Some(ElasticsearchAuth::Basic {
+            user: "elastic".into(),
+            password: "vector".to_string().into(),
+        }),
+        // Valid endpoints and some random non elasticsearch endpoint
+        endpoints: vec![
+            http_server(),
+            https_server(),
+            "http://localhost:2347".into(),
+        ],
+        doc_type: "log_lines".into(),
+        compression: Compression::None,
+        tls: Some(TlsConfig {
+            ca_file: Some(tls::TEST_PEM_CA_PATH.into()),
+            ..Default::default()
+        }),
+        batch: batch_settings(),
+        ..Default::default()
+    };
+    config.bulk = BulkConfig {
+        index: gen_index(),
+        ..Default::default()
+    };
+    run_insert_tests_with_multiple_endpoints(&config).await;
 }
 
 async fn run_insert_tests(
@@ -382,10 +507,10 @@ async fn run_insert_tests(
     break_events: bool,
     status: BatchStatus,
 ) {
-    config.bulk = Some(BulkConfig {
-        index: Some(gen_index()),
-        action: None,
-    });
+    config.bulk = BulkConfig {
+        index: gen_index(),
+        ..Default::default()
+    };
     run_insert_tests_with_config(&config, break_events, status).await;
 }
 
@@ -409,21 +534,16 @@ async fn run_insert_tests_with_config(
     break_events: bool,
     batch_status: BatchStatus,
 ) {
-    let common = ElasticsearchCommon::parse_many(config)
+    let common = ElasticsearchCommon::parse_single(config)
         .await
-        .expect("Config error")
-        .remove(0);
+        .expect("Config error");
     let index = match config.mode {
         // Data stream mode uses an index name generated from the event.
         ElasticsearchMode::DataStream => format!(
             "{}",
             Utc::now().format(".ds-logs-generic-default-%Y.%m.%d-000001")
         ),
-        ElasticsearchMode::Bulk => config
-            .bulk
-            .as_ref()
-            .map(|x| x.index.clone().unwrap())
-            .unwrap(),
+        ElasticsearchMode::Bulk => config.bulk.index.to_string(),
     };
     let base_url = common.base_url.clone();
 
@@ -457,7 +577,7 @@ async fn run_insert_tests_with_config(
 
     assert_eq!(receiver.try_recv(), Ok(batch_status));
 
-    // make sure writes all all visible
+    // make sure writes are all visible
     flush(common).await.expect("Flushing writes failed");
 
     let client = create_http_client();
@@ -511,7 +631,8 @@ async fn run_insert_tests_with_config(
 }
 
 async fn run_insert_tests_with_multiple_endpoints(config: &ElasticsearchConfig) {
-    let commons = ElasticsearchCommon::parse_many(config)
+    let cx = SinkContext::new_test();
+    let commons = ElasticsearchCommon::parse_many(config, cx.proxy())
         .await
         .expect("Config error");
     let index = match config.mode {
@@ -520,14 +641,9 @@ async fn run_insert_tests_with_multiple_endpoints(config: &ElasticsearchConfig) 
             "{}",
             Utc::now().format(".ds-logs-generic-default-%Y.%m.%d-000001")
         ),
-        ElasticsearchMode::Bulk => config
-            .bulk
-            .as_ref()
-            .map(|x| x.index.clone().unwrap())
-            .unwrap(),
+        ElasticsearchMode::Bulk => config.bulk.index.to_string(),
     };
 
-    let cx = SinkContext::new_test();
     let (sink, healthcheck) = config
         .build(cx.clone())
         .await
@@ -546,15 +662,15 @@ async fn run_insert_tests_with_multiple_endpoints(config: &ElasticsearchConfig) 
         .map(|common| common.base_url.clone())
         .collect::<Vec<_>>();
 
-    // make sure writes all all visible
+    // make sure writes are all visible
     for common in commons {
-        flush(common).await.expect("Flushing writes failed");
+        let _ = flush(common).await;
     }
 
     let client = create_http_client();
     let mut total = 0;
     for base_url in base_urls {
-        let response = client
+        if let Ok(response) = client
             .get(&format!("{}/{}/_search", base_url, index))
             .basic_auth("elastic", Some("vector"))
             .json(&json!({
@@ -562,29 +678,31 @@ async fn run_insert_tests_with_multiple_endpoints(config: &ElasticsearchConfig) 
             }))
             .send()
             .await
-            .unwrap()
-            .json::<Value>()
-            .await
-            .unwrap();
+        {
+            let response = response.json::<Value>().await.unwrap();
 
-        let endpoint_total = response["hits"]["total"]["value"]
-            .as_u64()
-            .or_else(|| response["hits"]["total"].as_u64())
-            .expect("Elasticsearch response does not include hits->total nor hits->total->value");
+            let endpoint_total = response["hits"]["total"]["value"]
+                .as_u64()
+                .or_else(|| response["hits"]["total"].as_u64())
+                .expect(
+                    "Elasticsearch response does not include hits->total nor hits->total->value",
+                );
 
-        assert!(
-            input.len() as u64 > endpoint_total,
-            "One of the endpoints received all of the events."
-        );
+            assert!(
+                input.len() as u64 > endpoint_total,
+                "One of the endpoints received all of the events."
+            );
 
-        total += endpoint_total;
+            total += endpoint_total;
+        }
     }
 
     assert_eq!(input.len() as u64, total);
 }
 
-fn gen_index() -> String {
-    format!("test-{}", random_string(10).to_lowercase())
+fn gen_index() -> Template {
+    Template::try_from(format!("test-{}", random_string(10).to_lowercase()))
+        .expect("can't parse template")
 }
 
 async fn create_data_stream(common: &ElasticsearchCommon, name: &str) -> crate::Result<()> {
@@ -599,12 +717,8 @@ async fn create_data_stream(common: &ElasticsearchCommon, name: &str) -> crate::
     Ok(())
 }
 
-fn config() -> ElasticsearchConfig {
+fn batch_settings<D: SinkBatchSettings + Clone + Default>() -> BatchConfig<D> {
     let mut batch = BatchConfig::default();
     batch.max_events = Some(1);
-
-    ElasticsearchConfig {
-        batch,
-        ..Default::default()
-    }
+    batch
 }

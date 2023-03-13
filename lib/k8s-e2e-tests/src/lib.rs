@@ -281,7 +281,7 @@ where
                 // We got an EOF error, this is most likely some very long line,
                 // we don't produce lines this bing is our test cases, so we'll
                 // just skip the error - as if it wasn't a JSON string.
-                error!("The JSON line we just got was incomplete, most likely it was was too long, so we're skipping it");
+                error!("The JSON line we just got was incomplete, most likely it was too long, so we're skipping it");
                 continue;
             }
             Err(err) => return Err(err.into()),

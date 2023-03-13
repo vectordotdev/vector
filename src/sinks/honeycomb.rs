@@ -2,14 +2,16 @@ use bytes::Bytes;
 use futures::{FutureExt, SinkExt};
 use http::{Request, StatusCode, Uri};
 use serde_json::json;
+use value::Kind;
 use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
 
 use crate::{
     codecs::Transformer,
-    config::{log_schema, AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
+    config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     event::{Event, Value},
     http::HttpClient,
+    schema,
     sinks::util::{
         http::{BatchedHttpSink, HttpEventEncoder, HttpSink},
         BatchConfig, BoxedRawValue, JsonArrayBuffer, SinkBatchSettings, TowerRequestConfig,
@@ -20,13 +22,17 @@ use crate::{
 #[configurable_component(sink("honeycomb"))]
 #[derive(Clone, Debug)]
 pub struct HoneycombConfig {
+    // This endpoint is not user-configurable and only exists for testing purposes
     #[serde(skip, default = "default_endpoint")]
     endpoint: String,
 
     /// The team key that will be used to authenticate against Honeycomb.
+    #[configurable(metadata(docs::examples = "${HONEYCOMB_API_KEY}"))]
+    #[configurable(metadata(docs::examples = "some-api-key"))]
     api_key: SensitiveString,
 
-    /// The dataset that Vector will send logs to.
+    /// The dataset to which logs are sent.
+    #[configurable(metadata(docs::examples = "my-honeycomb-dataset"))]
     // TODO: we probably want to make this a template
     // but this limits us in how we can do our healthcheck.
     dataset: String,
@@ -106,7 +112,10 @@ impl SinkConfig for HoneycombConfig {
     }
 
     fn input(&self) -> Input {
-        Input::log()
+        let requirement =
+            schema::Requirement::empty().optional_meaning("timestamp", Kind::timestamp());
+
+        Input::log().with_schema_requirement(requirement)
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
@@ -123,8 +132,7 @@ impl HttpEventEncoder<serde_json::Value> for HoneycombEventEncoder {
         self.transformer.transform(&mut event);
         let mut log = event.into_log();
 
-        let timestamp = if let Some(Value::Timestamp(ts)) = log.remove(log_schema().timestamp_key())
-        {
+        let timestamp = if let Some(Value::Timestamp(ts)) = log.remove_timestamp() {
             ts
         } else {
             chrono::Utc::now()
@@ -208,6 +216,7 @@ async fn healthcheck(config: HoneycombConfig, client: HttpClient) -> crate::Resu
 #[cfg(test)]
 mod test {
     use futures::{future::ready, stream};
+    use serde::Deserialize;
     use vector_core::event::{Event, LogEvent};
 
     use crate::{
@@ -230,8 +239,8 @@ mod test {
         let mock_endpoint = spawn_blackhole_http_server(always_200_response).await;
 
         let config = HoneycombConfig::generate_config().to_string();
-        let mut config =
-            toml::from_str::<HoneycombConfig>(&config).expect("config should be valid");
+        let mut config = HoneycombConfig::deserialize(toml::de::ValueDeserializer::new(&config))
+            .expect("config should be valid");
         config.endpoint = mock_endpoint.to_string();
 
         let context = SinkContext::new_test();

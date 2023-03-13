@@ -20,7 +20,7 @@
 //! that array.
 //!
 //! `Object` is a Map of `Field` -> `KindInfo`.
-//! `Field` can be a specifix field name of the object, or `Any` which represents any element found
+//! `Field` can be a specific field name of the object, or `Any` which represents any element found
 //! within that object.
 
 use std::ops::{Deref, DerefMut};
@@ -330,7 +330,7 @@ impl TypeDef {
     /// within the provided kind.
     pub fn fallible_unless(mut self, kind: impl Into<Kind>) -> Self {
         let kind = kind.into();
-        if !kind.is_superset(&self.kind) {
+        if kind.is_superset(&self.kind).is_err() {
             self.fallible = true
         }
 

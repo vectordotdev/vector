@@ -2,7 +2,9 @@ use std::{fmt, num::NonZeroUsize, sync::Arc};
 
 use async_trait::async_trait;
 use futures_util::{stream::BoxStream, StreamExt};
+use serde::Serialize;
 use tower::Service;
+use vector_buffers::EventCount;
 use vector_core::{
     event::{Event, LogEvent, Value},
     partition::Partitioner,
@@ -75,7 +77,7 @@ where
             endpoint_target: self.endpoint_target,
         };
 
-        let sink = input
+        input
             .map(move |event| process_log(event, &data))
             .batched_partitioned(
                 if self.endpoint_target == EndpointTarget::Raw {
@@ -102,9 +104,9 @@ where
                     Ok(req) => Some(req),
                 }
             })
-            .into_driver(self.service);
-
-        sink.run().await
+            .into_driver(self.service)
+            .run()
+            .await
     }
 }
 
@@ -204,7 +206,7 @@ impl Partitioner for EventPartitioner {
     }
 }
 
-#[derive(PartialEq, Default, Clone, Debug)]
+#[derive(PartialEq, Default, Clone, Debug, Serialize)]
 pub struct HecLogsProcessedEventMetadata {
     pub event_byte_size: usize,
     pub sourcetype: Option<String>,
@@ -290,5 +292,12 @@ pub fn process_log(event: Event, data: &HecLogData) -> HecProcessedEvent {
     ProcessedEvent {
         event: log,
         metadata,
+    }
+}
+
+impl EventCount for HecProcessedEvent {
+    fn event_count(&self) -> usize {
+        // A HecProcessedEvent is mapped one-to-one with an event.
+        1
     }
 }

@@ -14,6 +14,7 @@ components: sinks: websocket: {
 
 	features: {
 		acknowledgements: true
+		auto_generated:   true
 		healthcheck: enabled: true
 		send: {
 			compression: enabled: false
@@ -61,44 +62,8 @@ components: sinks: websocket: {
 		notices: []
 	}
 
-	configuration: {
-		auth: configuration._http_auth & {_args: {
-			password_example: "${HTTP_PASSWORD}"
-			username_example: "${HTTP_USERNAME}"
-		}}
-		uri: {
-			description: """
-				The WebSocket URI to connect to. This should include the protocol and host,
-				but can also include the port, path, and any other valid part of a URI.
-				"""
-			required: true
-			warnings: []
-			type: string: {
-				examples: ["ws://127.0.0.1:9000/endpoint"]
-				syntax: "literal"
-			}
-		}
-		ping_interval: {
-			common:      true
-			description: "Send WebSocket pings each this number of seconds."
-			required:    false
-			warnings: []
-			type: uint: {
-				default: null
-				unit:    "seconds"
-			}
-		}
-		ping_timeout: {
-			common:        true
-			description:   "Try to reconnect to the WebSocket server if pong not received for this number of seconds."
-			relevant_when: "ping_interval is set"
-			required:      false
-			warnings: ["This parameter is not taken into account if ping_interval is not set"]
-			type: uint: {
-				default: null
-				unit:    "seconds"
-			}
-		}
+	configuration: base.components.sinks.websocket.configuration & {
+		ping_timeout: warnings: ["This option is ignored if the `ping_interval` option is not set."]
 	}
 
 	input: {

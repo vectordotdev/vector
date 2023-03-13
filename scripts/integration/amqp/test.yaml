@@ -1,0 +1,7 @@
+features:
+- amqp-integration-tests
+
+test_filter: '::amqp::'
+
+matrix:
+  version: ['3.8']

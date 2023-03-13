@@ -11,11 +11,14 @@ use std::{
 
 use bytes::{Buf, Bytes};
 use futures::{future::BoxFuture, Sink};
-use http::StatusCode;
+use headers::HeaderName;
+use http::{header, HeaderValue, StatusCode};
 use hyper::{body, Body};
 use indexmap::IndexMap;
 use pin_project::pin_project;
-use tower::Service;
+use snafu::{ResultExt, Snafu};
+use tower::{Service, ServiceBuilder};
+use tower_http::decompression::DecompressionLayer;
 use vector_config::configurable_component;
 use vector_core::ByteSizeOf;
 
@@ -379,7 +382,7 @@ where
 
     fn call(&mut self, body: B) -> Self::Future {
         let request_builder = Arc::clone(&self.request_builder);
-        let mut http_client = self.inner.clone();
+        let http_client = self.inner.clone();
 
         Box::pin(async move {
             let request = request_builder(body).await.map_err(|error| {
@@ -390,9 +393,13 @@ where
             let request = request.map(Body::from);
             let (protocol, endpoint) = uri::protocol_endpoint(request.uri().clone());
 
-            // Any errors raised in `http_client.call` results in a `GotHttpWarning` event being emmited
+            let mut decompression_service = ServiceBuilder::new()
+                .layer(DecompressionLayer::new())
+                .service(http_client);
+
+            // Any errors raised in `http_client.call` results in a `GotHttpWarning` event being emitted
             // in `HttpClient::send`.
-            let response = http_client.call(request).await?;
+            let response = decompression_service.call(request).await?;
 
             if response.status().is_success() {
                 emit!(EndpointBytesSent {
@@ -530,7 +537,21 @@ pub struct RequestConfig {
 
     /// Additional HTTP headers to add to every HTTP request.
     #[serde(default)]
+    #[configurable(metadata(
+        docs::additional_props_description = "An HTTP request header and it's value."
+    ))]
+    #[configurable(metadata(docs::examples = "headers_examples()"))]
     pub headers: IndexMap<String, String>,
+}
+
+fn headers_examples() -> IndexMap<String, String> {
+    IndexMap::<_, _>::from_iter(
+        [
+            ("Accept".to_owned(), "text/plain".to_owned()),
+            ("X-My-Custom-Header".to_owned(), "A-Value".to_owned()),
+        ]
+        .into_iter(),
+    )
 }
 
 impl RequestConfig {
@@ -540,6 +561,36 @@ impl RequestConfig {
             self.headers.extend(headers);
         }
     }
+}
+
+#[derive(Debug, Snafu)]
+pub enum HeaderValidationError {
+    #[snafu(display("{}: {}", source, name))]
+    InvalidHeaderName {
+        name: String,
+        source: header::InvalidHeaderName,
+    },
+    #[snafu(display("{}: {}", source, value))]
+    InvalidHeaderValue {
+        value: String,
+        source: header::InvalidHeaderValue,
+    },
+}
+
+pub fn validate_headers(
+    headers: &IndexMap<String, String>,
+) -> crate::Result<IndexMap<HeaderName, HeaderValue>> {
+    let mut validated_headers = IndexMap::new();
+    for (name, value) in headers {
+        let name = HeaderName::from_bytes(name.as_bytes())
+            .with_context(|_| InvalidHeaderNameSnafu { name })?;
+        let value = HeaderValue::from_bytes(value.as_bytes())
+            .with_context(|_| InvalidHeaderValueSnafu { value })?;
+
+        validated_headers.insert(name, value);
+    }
+
+    Ok(validated_headers)
 }
 
 #[cfg(test)]

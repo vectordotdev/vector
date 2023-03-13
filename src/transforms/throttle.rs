@@ -3,8 +3,10 @@ use std::{num::NonZeroU32, pin::Pin, time::Duration};
 use async_stream::stream;
 use futures::{Stream, StreamExt};
 use governor::{clock, Quota, RateLimiter};
+use serde_with::serde_as;
 use snafu::Snafu;
 use vector_config::configurable_component;
+use vector_core::config::LogNamespace;
 
 use crate::{
     conditions::{AnyCondition, Condition},
@@ -17,9 +19,10 @@ use crate::{
 };
 
 /// Configuration for the `throttle` transform.
-#[configurable_component(transform("throttle"))]
+#[serde_as]
+#[configurable_component(transform("throttle", "Rate limit logs passing through a topology."))]
 #[derive(Clone, Debug, Default)]
-#[serde(deny_unknown_fields, default)]
+#[serde(deny_unknown_fields)]
 pub struct ThrottleConfig {
     /// The number of events allowed for a given bucket per configured `window_secs`.
     ///
@@ -27,7 +30,8 @@ pub struct ThrottleConfig {
     threshold: u32,
 
     /// The time window in which the configured `threshold` is applied, in seconds.
-    window_secs: f64,
+    #[serde_as(as = "serde_with::DurationSeconds<f64>")]
+    window_secs: Duration,
 
     /// The name of the log field whose value will be hashed to determine if the event should be
     /// rate limited.
@@ -35,7 +39,7 @@ pub struct ThrottleConfig {
     /// Each unique key will create a bucket of related events to be rate limited separately. If
     /// left unspecified, or if the event doesn’t have `key_field`, the event be will not be rate
     /// limited separately.
-    #[configurable(metadata(templatable))]
+    #[configurable(metadata(docs::examples = "{{ message }}", docs::examples = "{{ hostname }}",))]
     key_field: Option<Template>,
 
     /// A logical condition used to exclude events from sampling.
@@ -45,6 +49,7 @@ pub struct ThrottleConfig {
 impl_generate_config_from_default!(ThrottleConfig);
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "throttle")]
 impl TransformConfig for ThrottleConfig {
     async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
         Throttle::new(self, context, clock::MonotonicClock).map(Transform::event_task)
@@ -54,8 +59,9 @@ impl TransformConfig for ThrottleConfig {
         Input::log()
     }
 
-    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
-        vec![Output::default(DataType::Log)]
+    fn outputs(&self, merged_definition: &schema::Definition, _: LogNamespace) -> Vec<Output> {
+        // The event is not modified, so the definition is passed through as-is
+        vec![Output::default(DataType::Log).with_schema_definition(merged_definition.clone())]
     }
 }
 
@@ -78,7 +84,7 @@ where
         context: &TransformContext,
         clock: C,
     ) -> crate::Result<Self> {
-        let flush_keys_interval = Duration::from_secs_f64(config.window_secs);
+        let flush_keys_interval = config.window_secs;
 
         let threshold = match NonZeroU32::new(config.threshold) {
             Some(threshold) => threshold,
@@ -86,7 +92,7 @@ where
         };
 
         let quota = match Quota::with_period(Duration::from_secs_f64(
-            config.window_secs / threshold.get() as f64,
+            flush_keys_interval.as_secs_f64() / f64::from(threshold.get()),
         )) {
             Some(quota) => quota.allow_burst(threshold),
             None => return Err(Box::new(ConfigError::NonZero)),
@@ -199,7 +205,12 @@ mod tests {
     use futures::SinkExt;
 
     use super::*;
-    use crate::event::LogEvent;
+    use crate::{
+        event::LogEvent, test_util::components::assert_transform_compliance,
+        transforms::test::create_topology,
+    };
+    use tokio::sync::mpsc;
+    use tokio_stream::wrappers::ReceiverStream;
 
     #[test]
     fn generate_config() {
@@ -393,5 +404,29 @@ key_field = "{{ bucket }}"
 
         // And still nothing there
         assert_eq!(Poll::Ready(None), futures::poll!(out_stream.next()));
+    }
+
+    #[tokio::test]
+    async fn emits_internal_events() {
+        assert_transform_compliance(async move {
+            let config = ThrottleConfig {
+                threshold: 1,
+                window_secs: Duration::from_secs_f64(1.0),
+                key_field: None,
+                exclude: None,
+            };
+            let (tx, rx) = mpsc::channel(1);
+            let (topology, mut out) = create_topology(ReceiverStream::new(rx), config).await;
+
+            let log = LogEvent::from("hello world");
+            tx.send(log.into()).await.unwrap();
+
+            _ = out.recv().await;
+
+            drop(tx);
+            topology.stop().await;
+            assert_eq!(out.recv().await, None);
+        })
+        .await
     }
 }
