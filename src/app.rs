@@ -25,7 +25,7 @@ use crate::metrics;
 #[cfg(feature = "api")]
 use crate::{api, internal_events::ApiStarted};
 use crate::{
-    cli::{handle_config_errors, LogFormat, Opts, RootOpts},
+    cli::{handle_config_errors, Color, LogFormat, Opts, RootOpts},
     config::{self, Config, ConfigPath},
     heartbeat,
     signal::{self, SignalHandler, SignalTo},
@@ -58,23 +58,11 @@ pub struct Application {
 }
 
 impl ApplicationConfig {
-    pub async fn prepare_from_opts(opts: &Opts) -> Result<Self, ExitCode> {
+    pub async fn prepare(opts: &Opts) -> Result<Self, ExitCode> {
         let color = opts.root.color.use_color();
-
-        let json = match &opts.root.log_format {
-            LogFormat::Text => false,
-            LogFormat::Json => true,
-        };
 
         let config_paths = opts.root.config_paths_with_formats();
 
-        let level = get_log_levels(opts.log_level());
-        trace::init(color, json, &level, opts.root.internal_log_rate_limit);
-
-        info!(
-            message = "Internal log rate limit configured.",
-            internal_log_rate_secs = opts.root.internal_log_rate_limit
-        );
         // Signal handler for OS and provider messages.
         let (mut signal_handler, signal_rx) = SignalHandler::new();
 
@@ -83,8 +71,6 @@ impl ApplicationConfig {
                 .execute(&mut signal_handler, signal_rx, color)
                 .await);
         }
-
-        info!(message = "Log level is enabled.", level = ?level);
 
         let config = load_configs(
             &config_paths,
@@ -143,8 +129,15 @@ impl Application {
         #[cfg(not(feature = "enterprise-tests"))]
         metrics::init_global().expect("metrics initialization failed");
 
+        init_logging(
+            opts.root.color,
+            opts.root.log_format,
+            opts.log_level(),
+            opts.root.internal_log_rate_limit,
+        );
+
         let runtime = build_runtime(opts.root.threads, "vector-worker")?;
-        let config = runtime.block_on(ApplicationConfig::prepare_from_opts(&opts))?;
+        let config = runtime.block_on(ApplicationConfig::prepare(&opts))?;
 
         Ok((
             runtime,
@@ -468,4 +461,19 @@ fn build_enterprise(
         }
         Err(_) => Ok(None),
     }
+}
+
+pub fn init_logging(color: Color, format: LogFormat, log_level: &str, rate: u64) {
+    let level = get_log_levels(log_level);
+    let json = match format {
+        LogFormat::Text => false,
+        LogFormat::Json => true,
+    };
+
+    trace::init(color.use_color(), json, &level, rate);
+    debug!(
+        message = "Internal log rate limit configured.",
+        internal_log_rate_secs = rate,
+    );
+    info!(message = "Log level is enabled.", level = ?level);
 }
