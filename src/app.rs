@@ -28,8 +28,9 @@ use crate::service;
 use crate::{api, internal_events::ApiStarted};
 use crate::{
     cli::{handle_config_errors, LogFormat, Opts, RootOpts},
-    config, heartbeat,
-    signal::{self, SignalTo},
+    config::{self, Config, ConfigPath},
+    heartbeat,
+    signal::{self, SignalHandler, SignalTo},
     topology::{self, ReloadOutcome, RunningTopology, TopologyController},
     trace,
 };
@@ -67,19 +68,17 @@ impl ApplicationConfig {
             LogFormat::Json => true,
         };
 
-        let level = get_log_levels(opts.log_level());
-
         let config_paths = opts.root.config_paths_with_formats();
-        let watch_config = opts.root.watch_config;
-        let require_healthy = opts.root.require_healthy;
 
+        let level = get_log_levels(opts.log_level());
         trace::init(color, json, &level, opts.root.internal_log_rate_limit);
+
         info!(
             message = "Internal log rate limit configured.",
             internal_log_rate_secs = opts.root.internal_log_rate_limit
         );
         // Signal handler for OS and provider messages.
-        let (mut signal_handler, signal_rx) = signal::SignalHandler::new();
+        let (mut signal_handler, signal_rx) = SignalHandler::new();
         signal_handler.forever(signal::os_signals());
 
         if let Some(sub_command) = &opts.sub_command {
@@ -90,36 +89,16 @@ impl ApplicationConfig {
 
         info!(message = "Log level is enabled.", level = ?level);
 
-        let config_paths = config::process_paths(&config_paths).ok_or(exitcode::CONFIG)?;
+        let config = load_configs(
+            &config_paths,
+            opts.root.watch_config,
+            opts.root.require_healthy,
+            &mut signal_handler,
+        )
+        .await?;
 
-        if watch_config {
-            // Start listening for config changes immediately.
-            config::watcher::spawn_thread(config_paths.iter().map(Into::into), None).map_err(
-                |error| {
-                    error!(message = "Unable to start config watcher.", %error);
-                    exitcode::CONFIG
-                },
-            )?;
-        }
-
-        info!(
-            message = "Loading configs.",
-            paths = ?config_paths.iter().map(<&PathBuf>::from).collect::<Vec<_>>()
-        );
-
-        #[cfg(not(feature = "enterprise-tests"))]
-        config::init_log_schema(&config_paths, true).map_err(handle_config_errors)?;
-
-        let mut config =
-            config::load_from_paths_with_provider_and_secrets(&config_paths, &mut signal_handler)
-                .await
-                .map_err(handle_config_errors)?;
-
-        if !config.healthchecks.enabled {
-            info!("Health checks are disabled.");
-        }
-        config.healthchecks.set_require_healthy(require_healthy);
-
+        #[cfg(feature = "enterprise")]
+        let mut config = config;
         #[cfg(feature = "enterprise")]
         // Enable enterprise features, if applicable.
         let enterprise = match EnterpriseMetadata::try_from(&config) {
@@ -445,4 +424,43 @@ pub fn build_runtime(threads: Option<usize>, thread_name: &str) -> Result<Runtim
     }
 
     Ok(rt_builder.build().expect("Unable to create async runtime"))
+}
+
+pub async fn load_configs(
+    config_paths: &[ConfigPath],
+    watch_config: bool,
+    require_healthy: Option<bool>,
+    signal_handler: &mut SignalHandler,
+) -> Result<Config, ExitCode> {
+    let config_paths = config::process_paths(config_paths).ok_or(exitcode::CONFIG)?;
+
+    if watch_config {
+        // Start listening for config changes immediately.
+        config::watcher::spawn_thread(config_paths.iter().map(Into::into), None).map_err(
+            |error| {
+                error!(message = "Unable to start config watcher.", %error);
+                exitcode::CONFIG
+            },
+        )?;
+    }
+
+    info!(
+        message = "Loading configs.",
+        paths = ?config_paths.iter().map(<&PathBuf>::from).collect::<Vec<_>>()
+    );
+
+    #[cfg(not(feature = "enterprise-tests"))]
+    config::init_log_schema(&config_paths, true).map_err(handle_config_errors)?;
+
+    let mut config =
+        config::load_from_paths_with_provider_and_secrets(&config_paths, signal_handler)
+            .await
+            .map_err(handle_config_errors)?;
+
+    if !config.healthchecks.enabled {
+        info!("Health checks are disabled.");
+    }
+    config.healthchecks.set_require_healthy(require_healthy);
+
+    Ok(config)
 }
