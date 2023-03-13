@@ -1,6 +1,9 @@
 use ::value::Value;
 use rand::{thread_rng, Rng};
+use std::ops::Range;
 use vrl::prelude::*;
+
+const INVALID_RANGE_ERR: &str = "max must be greater than min";
 
 fn random_float(min: Value, max: Value) -> Resolved {
     let min = min.try_float()?;
@@ -13,6 +16,17 @@ fn random_float(min: Value, max: Value) -> Resolved {
     let f: f64 = thread_rng().gen_range(min..max);
 
     Ok(Value::Float(NotNan::new(f).expect("always a number")))
+}
+
+fn get_range(min: Value, max: Value) -> std::result::Result<Range<f64>, &'static str> {
+    let min = min.try_float().expect("min must be an float");
+    let max = max.try_float().expect("max must be an float");
+
+    if max <= min {
+        return Err(INVALID_RANGE_ERR);
+    }
+
+    Ok(min..max)
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -55,6 +69,20 @@ impl Function for RandomFloat {
         let min = arguments.required("min");
         let max = arguments.required("max");
 
+        match (min.as_value(), max.as_value()) {
+            (Some(min), Some(max)) => {
+                // check if range is valid
+                let _ = get_range(min.clone(), max.clone()).map_err(|err| {
+                    vrl::function::Error::InvalidArgument {
+                        keyword: "max",
+                        value: max,
+                        error: err,
+                    }
+                })?;
+            }
+            _ => {}
+        }
+
         Ok(RandomFloatFn { min, max }.as_expr())
     }
 }
@@ -74,11 +102,30 @@ impl FunctionExpression for RandomFloatFn {
     }
 
     fn type_def(&self, _state: &state::TypeState) -> TypeDef {
-        TypeDef::float().infallible()
+        match (self.min.as_value(), self.max.as_value()) {
+            (Some(min), Some(max)) => {
+                if get_range(min, max).is_ok() {
+                    TypeDef::float()
+                } else {
+                    TypeDef::float().fallible()
+                }
+            }
+            _ => TypeDef::float().fallible(),
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    // cannot test since non-deterministic
+    use super::*;
+
+    test_function![
+        random_float => RandomFloat;
+
+        bad_range {
+            args: func_args![min: value!(1.0), max: value!(1.0)],
+            want: Err("invalid argument"),
+            tdef: TypeDef::float().fallible(),
+        }
+    ];
 }

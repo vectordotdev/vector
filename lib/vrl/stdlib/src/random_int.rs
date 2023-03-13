@@ -1,18 +1,27 @@
 use ::value::Value;
 use rand::{thread_rng, Rng};
+use std::ops::Range;
 use vrl::prelude::*;
 
+const INVALID_RANGE_ERR: &str = "max must be greater than min";
+
 fn random_int(min: Value, max: Value) -> Resolved {
-    let min = min.try_integer()?;
-    let max = max.try_integer()?;
+    let range = get_range(min, max)?;
 
-    if max <= min {
-        return Err("max must be greater than min".into());
-    }
-
-    let i: i64 = thread_rng().gen_range(min..max);
+    let i: i64 = thread_rng().gen_range(range);
 
     Ok(Value::Integer(i))
+}
+
+fn get_range(min: Value, max: Value) -> std::result::Result<Range<i64>, &'static str> {
+    let min = min.try_integer().expect("min must be an integer");
+    let max = max.try_integer().expect("max must be an integer");
+
+    if max <= min {
+        return Err(INVALID_RANGE_ERR);
+    }
+
+    Ok(min..max)
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -55,6 +64,20 @@ impl Function for RandomInt {
         let min = arguments.required("min");
         let max = arguments.required("max");
 
+        match (min.as_value(), max.as_value()) {
+            (Some(min), Some(max)) => {
+                // check if range is valid
+                let _ = get_range(min.clone(), max.clone()).map_err(|err| {
+                    vrl::function::Error::InvalidArgument {
+                        keyword: "max",
+                        value: max,
+                        error: err,
+                    }
+                })?;
+            }
+            _ => {}
+        }
+
         Ok(RandomIntFn { min, max }.as_expr())
     }
 }
@@ -74,7 +97,16 @@ impl FunctionExpression for RandomIntFn {
     }
 
     fn type_def(&self, _state: &state::TypeState) -> TypeDef {
-        TypeDef::integer().fallible()
+        match (self.min.as_value(), self.max.as_value()) {
+            (Some(min), Some(max)) => {
+                if get_range(min, max).is_ok() {
+                    TypeDef::integer()
+                } else {
+                    TypeDef::integer().fallible()
+                }
+            }
+            _ => TypeDef::integer().fallible(),
+        }
     }
 }
 
@@ -85,9 +117,9 @@ mod tests {
     test_function![
         random_int => RandomInt;
 
-        random {
-            args: func_args![min: value!(1), max: value!(2)],
-            want: Ok(value!(1)),
+        bad_range {
+            args: func_args![min: value!(1), max: value!(1)],
+            want: Err("invalid argument"),
             tdef: TypeDef::integer().fallible(),
         }
     ];
