@@ -27,14 +27,12 @@ use crate::service;
 #[cfg(feature = "api")]
 use crate::{api, internal_events::ApiStarted};
 use crate::{
-    cli::{handle_config_errors, LogFormat, Opts, RootOpts, SubCommand},
-    config, generate, generate_schema, graph, heartbeat, list,
+    cli::{handle_config_errors, LogFormat, Opts, RootOpts},
+    config, heartbeat,
     signal::{self, SignalTo},
     topology::{self, ReloadOutcome, RunningTopology, TopologyController},
-    trace, unit_test, validate,
+    trace,
 };
-#[cfg(feature = "api-client")]
-use crate::{tap, top};
 
 pub static WORKER_THREADS: OnceNonZeroUsize = OnceNonZeroUsize::new();
 
@@ -84,28 +82,11 @@ impl ApplicationConfig {
         let (mut signal_handler, signal_rx) = signal::SignalHandler::new();
         signal_handler.forever(signal::os_signals());
 
-        if let Some(s) = &opts.sub_command {
-            let code = match s {
-                SubCommand::Generate(g) => generate::cmd(g),
-                SubCommand::GenerateSchema => generate_schema::cmd(),
-                SubCommand::Graph(g) => graph::cmd(g),
-                SubCommand::Config(c) => config::cmd(c),
-                SubCommand::List(l) => list::cmd(l),
-                SubCommand::Test(t) => unit_test::cmd(t, &mut signal_handler).await,
-                #[cfg(windows)]
-                SubCommand::Service(s) => service::cmd(s),
-                #[cfg(feature = "api-client")]
-                SubCommand::Top(t) => top::cmd(t).await,
-                #[cfg(feature = "api-client")]
-                SubCommand::Tap(t) => tap::cmd(t, signal_rx).await,
-
-                SubCommand::Validate(v) => validate::validate(v, color).await,
-                #[cfg(feature = "vrl-cli")]
-                SubCommand::Vrl(s) => vrl_cli::cmd::cmd(s),
-            };
-
-            return Err(code);
-        };
+        if let Some(sub_command) = &opts.sub_command {
+            return Err(sub_command
+                .execute(&mut signal_handler, signal_rx, color)
+                .await);
+        }
 
         info!(message = "Log level is enabled.", level = ?level);
 
