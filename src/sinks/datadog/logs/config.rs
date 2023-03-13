@@ -3,7 +3,6 @@ use std::{convert::TryFrom, sync::Arc};
 use indoc::indoc;
 use tower::ServiceBuilder;
 use value::Kind;
-use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
 use vector_core::config::proxy::ProxyConfig;
 
@@ -53,19 +52,6 @@ impl SinkBatchSettings for DatadogLogsDefaultBatchSettings {
 pub struct DatadogLogsConfig {
     #[serde(flatten)]
     pub dd_common: DatadogCommonConfig,
-
-    /// The default Datadog [API key][api_key] to use in authentication of HTTP requests.
-    ///
-    /// If an event has a Datadog [API key][api_key] set explicitly in its metadata, it will take
-    /// precedence over this setting.
-    ///
-    /// [api_key]: https://docs.datadoghq.com/api/?lang=bash#authentication
-    // TODO `api_key` is a deprecated name for this setting and should be removed in v0.29.0
-    // After which, this entire setting should be migrated to the `DatadogCommonConfig` struct.
-    #[serde(alias = "api_key")]
-    #[configurable(metadata(docs::examples = "${DATADOG_API_KEY_ENV_VAR}"))]
-    #[configurable(metadata(docs::examples = "ef8d5de700e7989468166c40fc8a0ccd"))]
-    pub default_api_key: SensitiveString,
 
     /// The Datadog region to send logs to.
     #[configurable(deprecated = "This option has been deprecated, use the `site` option instead.")]
@@ -129,7 +115,7 @@ impl DatadogLogsConfig {
     }
 
     pub fn build_processor(&self, client: HttpClient) -> crate::Result<VectorSink> {
-        let default_api_key: Arc<str> = Arc::from(self.default_api_key.inner());
+        let default_api_key: Arc<str> = Arc::from(self.dd_common.default_api_key.inner());
         let request_limits = self.request.tower.unwrap_with(&Default::default());
 
         // We forcefully cap the provided batch configuration to the size/log line limits imposed by
@@ -178,11 +164,9 @@ impl SinkConfig for DatadogLogsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let client = self.create_client(&cx.proxy)?;
 
-        let healthcheck = self.dd_common.build_healthcheck(
-            client.clone(),
-            self.default_api_key.clone().into(),
-            self.region.as_ref(),
-        )?;
+        let healthcheck = self
+            .dd_common
+            .build_healthcheck(client.clone(), self.region.as_ref())?;
 
         let sink = self.build_processor(client)?;
 

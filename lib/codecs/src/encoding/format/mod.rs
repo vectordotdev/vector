@@ -4,6 +4,7 @@
 #![deny(missing_docs)]
 
 mod avro;
+mod csv;
 mod gelf;
 mod json;
 mod logfmt;
@@ -14,6 +15,7 @@ mod text;
 
 use std::fmt::Debug;
 
+pub use self::csv::{CsvSerializer, CsvSerializerConfig};
 pub use avro::{AvroSerializer, AvroSerializerConfig, AvroSerializerOptions};
 use dyn_clone::DynClone;
 pub use gelf::{GelfSerializer, GelfSerializerConfig};

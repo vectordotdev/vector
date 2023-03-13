@@ -28,9 +28,8 @@ pub fn contains_name_once(pattern: &str) -> Result<(), String> {
             Err(format!("Missing event `{pattern}`"))
         } else if n_events > 1 {
             Err(format!(
-                "Multiple ({}) events matching `{}`: ({}). Hint! Don't use the `assert_x_` \
-                 test helpers on round-trip tests (tests that run more than a single component).",
-                n_events, pattern, names
+                "Multiple ({n_events}) events matching `{pattern}`: ({names}). Hint! Don't use the `assert_x_` \
+                 test helpers on round-trip tests (tests that run more than a single component)."
             ))
         } else {
             Ok(())

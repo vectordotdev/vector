@@ -119,10 +119,30 @@ base: components: sinks: influxdb_logs: configuration: {
 		required: true
 		type: string: examples: ["http://localhost:8086"]
 	}
+	host_key: {
+		description: """
+			Use this option to customize the key containing the hostname.
+
+			The setting of `log_schema.host_key`, usually `host`, is used here by default.
+			"""
+		required: false
+		type: string: examples: ["hostname"]
+	}
 	measurement: {
 		description: "The name of the InfluxDB measurement that will be written to."
 		required:    false
 		type: string: examples: ["vector-logs"]
+	}
+	message_key: {
+		description: """
+			Use this option to customize the key containing the message.
+
+			The setting of `log_schema.message_key`, usually `message`, is used here by default.
+			"""
+		required: false
+		type: string: examples: [
+			"text",
+		]
 	}
 	namespace: {
 		deprecated:         true
@@ -305,9 +325,25 @@ base: components: sinks: influxdb_logs: configuration: {
 		required: false
 		type: string: examples: ["autogen", "one_day_only"]
 	}
+	source_type_key: {
+		description: """
+			Use this option to customize the key containing the source_type.
+
+			The setting of `log_schema.source_type_key`, usually `source_type`, is used here by default.
+			"""
+		required: false
+		type: string: examples: [
+			"source",
+		]
+	}
 	tags: {
-		description: "The list of names of log fields that should be added as tags to each measurement."
-		required:    false
+		description: """
+			The list of names of log fields that should be added as tags to each measurement.
+
+			By default Vector adds `metric_type` as well as the configured `log_schema.host_key` and
+			`log_schema.source_type_key` options.
+			"""
+		required: false
 		type: array: {
 			default: []
 			items: type: string: examples: ["field1", "parent.child_field"]

@@ -306,7 +306,7 @@ urls: {
 	librdkafka:                                 "\(github)/edenhill/librdkafka"
 	librdkafka_config:                          "\(github)/edenhill/librdkafka/blob/master/CONFIGURATION.md"
 	linux_capability:                           "https://man7.org/linux/man-pages/man7/capabilities.7.html"
-	logdna:                                     "https://logdna.com/"
+	mezmo:                                      "https://mezmo.com/"
 	logfmt:                                     "https://brandur.org/logfmt"
 	logfmt_specs:                               "https://pkg.go.dev/github.com/kr/logfmt#section-documentation"
 	logstash:                                   "https://www.elastic.co/logstash"

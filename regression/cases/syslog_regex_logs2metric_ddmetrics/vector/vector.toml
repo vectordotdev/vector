@@ -46,5 +46,5 @@ address = "0.0.0.0:9090"
 type = "datadog_metrics"
 inputs = ["log2metric"]
 endpoint = "http://localhost:8080"
-api_key = "DEADBEEF"
+default_api_key = "DEADBEEF"
 default_namespace = "vector"

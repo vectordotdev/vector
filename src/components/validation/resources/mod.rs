@@ -182,6 +182,7 @@ fn decoder_framing_to_encoding_framer(framing: &decoding::FramingConfig) -> enco
 fn serializer_config_to_deserializer(config: &SerializerConfig) -> decoding::Deserializer {
     let deserializer_config = match config {
         SerializerConfig::Avro { .. } => todo!(),
+        SerializerConfig::Csv { .. } => todo!(),
         SerializerConfig::Gelf => DeserializerConfig::Gelf,
         SerializerConfig::Json(_) => DeserializerConfig::Json,
         SerializerConfig::Logfmt => todo!(),
