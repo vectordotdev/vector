@@ -10,6 +10,7 @@ readme = "README.md"
 publish = false
 default-run = "vector"
 autobenches = false # our benchmarks are not runnable on their own either way
+# Minimum supported rust version
 rust-version = "1.66.0"
 
 [[bin]]
@@ -192,18 +193,18 @@ azure_storage = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev =
 azure_storage_blobs = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "b4544d4920fa3064eb921340054cd9cc130b7664", default-features = false, optional = true }
 
 # OpenDAL
-opendal = {version = "0.27.2", default-features = false, features = ["native-tls"], optional = true}
+opendal = {version = "0.29.1", default-features = false, features = ["native-tls"], optional = true}
 
 # Tower
 tower = { version = "0.4.13", default-features = false, features = ["buffer", "limit", "retry", "timeout", "util", "balance", "discover"] }
 tower-http = { version = "0.4.0", default-features = false, features = ["decompression-gzip"]}
 # Serde
-serde = { version = "1.0.152", default-features = false, features = ["derive"] }
+serde = { version = "1.0.154", default-features = false, features = ["derive"] }
 serde-toml-merge = { version = "0.3.0", default-features = false }
 serde_bytes = { version = "0.11.9", default-features = false, features = ["std"], optional = true }
-serde_json = { version = "1.0.93", default-features = false, features = ["raw_value"] }
-serde_with = { version = "2.2.0", default-features = false, features = ["macros", "std"] }
-serde_yaml = { version = "0.9.17", default-features = false }
+serde_json = { version = "1.0.94", default-features = false, features = ["raw_value"] }
+serde_with = { version = "2.3.0", default-features = false, features = ["macros", "std"] }
+serde_yaml = { version = "0.9.19", default-features = false }
 
 # Messagepack
 rmp-serde = { version = "1.1.1", default-features = false, optional = true }
@@ -279,8 +280,8 @@ hyper-openssl = { version = "0.9.2", default-features = false }
 hyper-proxy = { version = "0.9.1", default-features = false, features = ["openssl-tls"] }
 indexmap = { version = "~1.9.2", default-features = false, features = ["serde"] }
 infer = { version = "0.13.0", default-features = false, optional = true}
-indoc = { version = "2.0.0", default-features = false }
-inventory = { version = "0.3.3", default-features = false }
+indoc = { version = "2.0.1", default-features = false }
+inventory = { version = "0.3.4", default-features = false }
 k8s-openapi = { version = "0.16.0", default-features = false, features = ["api", "v1_19"], optional = true }
 kube = { version = "0.75.0", default-features = false, features = ["client", "native-tls", "runtime"], optional = true }
 listenfd = { version = "1.0.0", default-features = false, optional = true }
@@ -338,7 +339,7 @@ heim = { git = "https://github.com/vectordotdev/heim.git", branch = "update-nix"
 mlua = { version = "0.8.8", default-features = false, features = ["lua54", "send", "vendored"], optional = true }
 
 [target.'cfg(windows)'.dependencies]
-windows-service = "0.5.0"
+windows-service = "0.6.0"
 
 [target.'cfg(unix)'.dependencies]
 atty = { version = "0.2.14", default-features = false }
@@ -359,7 +360,7 @@ azure_storage = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev =
 base64 = "0.21.0"
 criterion = { version = "0.4.0", features = ["html_reports", "async_tokio"] }
 itertools = { version = "0.10.5", default-features = false }
-libc = "0.2.139"
+libc = "0.2.140"
 similar-asserts = "1.4.2"
 proptest = "1.1"
 quickcheck = "1.0.3"
@@ -630,7 +631,7 @@ sinks-logs = [
   "sinks-humio",
   "sinks-influxdb",
   "sinks-kafka",
-  "sinks-logdna",
+  "sinks-mezmo",
   "sinks-loki",
   "sinks-nats",
   "sinks-new_relic_logs",
@@ -687,7 +688,7 @@ sinks-http = []
 sinks-humio = ["sinks-splunk_hec", "transforms-metric_to_log"]
 sinks-influxdb = []
 sinks-kafka = ["dep:rdkafka"]
-sinks-logdna = []
+sinks-mezmo = []
 sinks-loki = ["loki-logproto"]
 sinks-nats = ["dep:nats", "dep:nkeys"]
 sinks-new_relic_logs = ["sinks-http"]

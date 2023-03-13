@@ -75,6 +75,18 @@ pub fn list_files() -> Result<Vec<String>> {
         .collect())
 }
 
+// Get a list of files that have been modified, as a vector of strings
+pub fn get_modified_files() -> Result<Vec<String>> {
+    let args = vec![
+        "ls-files",
+        "--full-name",
+        "--modified",
+        "--others",
+        "--exclude-standard",
+    ];
+    Ok(capture_output(&args)?.lines().map(str::to_owned).collect())
+}
+
 pub fn branch_exists(branch_name: &str) -> Result<bool> {
     let output = capture_output(&["rev-parse", "--verify", branch_name])?;
     Ok(!output.is_empty())

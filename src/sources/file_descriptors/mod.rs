@@ -211,10 +211,11 @@ fn outputs(
     decoding: &DeserializerConfig,
     source_name: &'static str,
 ) -> Vec<Output> {
-    let legacy_host_key = host_key
-        .clone()
-        .and_then(|k| k.path)
-        .map(LegacyKey::InsertIfEmpty);
+    let legacy_host_key = Some(LegacyKey::InsertIfEmpty(
+        host_key.clone().and_then(|k| k.path).unwrap_or_else(|| {
+            parse_value_path(log_schema().host_key()).expect("log_schema.host_key to be valid path")
+        }),
+    ));
 
     let schema_definition = decoding
         .schema_definition(log_namespace)
@@ -223,7 +224,7 @@ fn outputs(
             legacy_host_key,
             &owned_value_path!("host"),
             Kind::bytes(),
-            None,
+            Some("host"),
         )
         .with_standard_vector_source_metadata();
 

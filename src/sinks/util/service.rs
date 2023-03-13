@@ -517,7 +517,7 @@ mod tests {
         );
         sink.ordered();
 
-        let input = (0..20).into_iter().map(|i| PartitionInnerBuffer::new(i, 0));
+        let input = (0..20).map(|i| PartitionInnerBuffer::new(i, 0));
         sink.sink_map_err(drop)
             .send_all(&mut stream::iter(input).map(|item| Ok(EncodedEvent::new(item, 0))))
             .await
@@ -526,10 +526,7 @@ mod tests {
         let output = sent_requests.lock().unwrap();
         assert_eq!(
             &*output,
-            &vec![
-                (0..10).into_iter().collect::<Vec<_>>(),
-                (10..20).into_iter().collect::<Vec<_>>(),
-            ]
+            &vec![(0..10).collect::<Vec<_>>(), (10..20).collect::<Vec<_>>(),]
         );
     }
 
