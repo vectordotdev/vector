@@ -531,7 +531,7 @@ mod test {
         encoder.encode(event, &mut frame).unwrap();
 
         let res = from_utf8(&frame).unwrap().trim();
-        let mut packets = res.split("\n");
+        let mut packets = res.split('\n');
 
         let metric2 = parse(packets.next().unwrap().trim()).unwrap();
         vector_common::assert_event_data_eq!(metric1_part2_compressed, metric2);
