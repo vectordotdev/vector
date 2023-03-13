@@ -31,6 +31,11 @@ use vector_core::config::LogNamespace;
 pub struct EnvoyAlsConfig {
     #[configurable(derived)]
     grpc: GrpcConfig,
+
+    /// The namespace to use for logs. This overrides the global setting.
+    #[configurable(metadata(docs::hidden))]
+    #[serde(default)]
+    pub log_namespace: Option<bool>,
 }
 
 /// Configuration for the `envoy_als` gRPC server.
@@ -55,6 +60,7 @@ impl GenerateConfig for EnvoyAlsConfig {
                 address: "0.0.0.0:9999".parse().unwrap(),
                 tls: Default::default(),
             },
+            log_namespace: None,
         })
         .unwrap()
     }
@@ -63,6 +69,7 @@ impl GenerateConfig for EnvoyAlsConfig {
 #[async_trait::async_trait]
 impl SourceConfig for EnvoyAlsConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<Source> {
+        let log_namespace = cx.log_namespace(self.log_namespace);
         let events_received = register!(EventsReceived);
         let bytes_received = register!(BytesReceived::from(Protocol::from("protobuf")));
 
@@ -72,6 +79,7 @@ impl SourceConfig for EnvoyAlsConfig {
             bytes_received,
             pipeline: cx.out,
             shutdown: cx.shutdown.clone(),
+            log_namespace,
         })
         .accept_compressed(tonic::codec::CompressionEncoding::Gzip);
         let grpc_source = run_grpc_server(

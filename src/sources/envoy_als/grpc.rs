@@ -11,7 +11,9 @@ use value::Value;
 use vector_common::internal_event::{
     ByteSize, BytesReceived, CountByteSize, EventsReceived, InternalEventHandle as _, Registered,
 };
-use vector_core::{event::LogEvent, EstimatedJsonEncodedSizeOf};
+use vector_core::{config::LogNamespace, event::LogEvent, EstimatedJsonEncodedSizeOf};
+
+use super::EnvoyAlsConfig;
 
 #[derive(Clone)]
 pub(super) struct Service {
@@ -19,6 +21,7 @@ pub(super) struct Service {
     pub bytes_received: Registered<BytesReceived>,
     pub pipeline: SourceSender,
     pub shutdown: ShutdownSignal,
+    pub log_namespace: LogNamespace,
 }
 
 enum StreamError {
@@ -107,6 +110,11 @@ impl Service {
                             evt.insert("identifier", Value::from(stream_id));
                         }
 
+                        self.log_namespace.insert_standard_vector_source_metadata(
+                            &mut evt,
+                            EnvoyAlsConfig::NAME,
+                            chrono::Utc::now(),
+                        );
                         events.push(evt);
                     }
                 }
