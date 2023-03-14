@@ -66,7 +66,7 @@ remap: functions: hmac: {
 				.hash_algo = "SHA-256"
 				hmac_bytes, err = hmac("Hello there", "super-secret-key", algorithm: .hash_algo)
 				if err == null {
-				.hmac = encode_base16(hmac_bytes)
+					.hmac = encode_base16(hmac_bytes)
 				}
 				"""#
 			return: "78b184f1832f8aff3934f5e0212454671b2d04d494e3b25075c5e45167029662"
