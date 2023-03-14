@@ -1,24 +1,17 @@
 use anyhow::Result;
 
 
-
 #[cfg(windows)]
 use {
-    crate::{app, util},
-    crate::app::CommandExt,
-    std::ffi::{OsStr},
+    crate::app,
     std::env,
+    std::fs::File,
+    std::io::Write,
     std::fs,
-    std::iter::once,
-    std::path::{Path, PathBuf},
+    std::path::{Path},
     std::process::Command,
 };
 
-
-// Use the `bash` interpreter included as part of the standard `git` install for our default shell
-// if nothing is specified in the environment.
-#[cfg(windows)]
-const DEFAULT_SHELL: &str = "C:\\Program Files\\Git\\bin\\bash.EXE";
 /// Create a .msi package for Windows
 #[derive(clap::Args, Debug)]
 #[command()]
@@ -32,8 +25,7 @@ impl Cli {
         }
         #[cfg(windows)]
         {
-            // TODO: wait for other PR to be merged then replace the below line with app::version()
-            let archive_version = env::var("VERSION").or_else(|_| util::read_version())?;
+            let archive_version = app::version()?;
 
             // Make sure we start with a fresh `target/msi-x64` target directory and
             // copy the `distribution/msi` directory to `target/msi-x64`
@@ -55,7 +47,7 @@ impl Cli {
                 "$progressPreference = 'silentlyContinue'; Expand-Archive {zip_file}"
             );
             app::exec("powershell", ["-Command", &powershell_command], false)?;
-            execute_powershell_script("build.sh", once(&archive_version))?;
+            build(&archive_version)?;
 
             // Change the current directory back to the original path
             env::set_current_dir(app::path())?;
@@ -70,14 +62,98 @@ impl Cli {
 }
 
 #[cfg(windows)]
-fn execute_powershell_script<T: AsRef<OsStr>>(script: &str, args: impl IntoIterator<Item = T>) -> Result<()> {
-    let path: PathBuf = [app::path(), "distribution", "msi", script].into_iter().collect();
-    // On Windows, all scripts must be run through an explicit interpreter.
-    let mut command = Command::new(&*DEFAULT_SHELL);
-    command.arg(path);
+fn build(archive_version: &str) -> Result<()> {
+    println!("Running Build with args: {archive_version}");
+    println!("Copying ZIP archive...");
 
-    for arg in args {
-        command.arg(arg);
+    println!("Preparing LICENSE.rtf..");
+    let mut license_rtf_file = File::create("LICENSE.rtf")?;
+    writeln!(
+        license_rtf_file,
+        "{{\\rtf1\\ansi\\ansicpg1252\\deff0\\nouicompat{{\\fonttbl{{\\f0\\fnil\\fcharset0 Lucida Console;}}}}\n\\viewkind4\\uc1\n\\pard\\f0\\fs14\\lang1033\\par"
+    )?;
+
+    let license_content_path = format!("vector-{archive_version}-x86_64-pc-windows-msvc/LICENSE.txt");
+    let license_content = std::fs::read_to_string(license_content_path)?;
+    for line in license_content.lines() {
+        writeln!(license_rtf_file, "{line}\\")?;
     }
-    command.check_run()
+    writeln!(license_rtf_file, "\n}}")?;
+
+    println!("Substituting version...");
+    let vector_tmpl = std::fs::read_to_string("vector.wxs.tmpl")?;
+    let vector_tmpl_updated = vector_tmpl.replace("${VERSION}", archive_version);
+    let mut vector_wxs_file = File::create("vector.wxs")?;
+    writeln!(vector_wxs_file, "{vector_tmpl_updated}")?;
+
+    println!("Building the MSI package...");
+    let vector_dir = format!("vector-{archive_version}-x86_64-pc-windows-msvc");
+    let args = &[
+        &format!("dir {vector_dir}"),
+        "-cg Vector",
+        "-dr INSTALLDIR",
+        "-gg",
+        "-sfrag",
+        "-srd",
+        "-var var.VectorDir",
+        "-out components.wxs"
+    ];
+    exec_command("heat", args)?;
+
+    // Add Win64="yes" to Component elements
+    // See https://stackoverflow.com/questions/22932942/wix-heat-exe-win64-components-win64-yes
+    let components_text = std::fs::read_to_string("components.wxs")?;
+    let components_text = components_text.replace("<Component ", r#"<Component Win64="yes" "#);
+    let mut components_file = File::create("components.wxs")?;
+    write!(components_file, "{components_text}")?;
+
+    // Call WiX toolset to build MSI package
+    let binding = &format!("-dVectorDir={vector_dir}");
+    let mut args = vec![
+        "candle",
+        "components.wxs",
+        binding
+    ];
+    exec_command("candle", &args)?;
+
+    args = vec![
+        "candle",
+        "vector.wxs",
+        "-ext",
+        "WiXUtilExtension",
+    ];
+    exec_command("candle", &args)?;
+
+    args = vec![
+        "vector.wixobj",
+        "components.wixobj",
+        "-out",
+        "vector.msi",
+        "-ext",
+        "WixUIExtension",
+        "-ext",
+        "WiXUtilExtension",
+    ];
+    exec_command("light", &args)?;
+    Ok(())
+}
+
+// TODO: Move this to app.rs, but for now use exec_command helper
+#[cfg(windows)]
+fn exec_command(cmd: &str, args: &[&str]) -> Result<()> {
+    let output = Command::new(cmd)
+        .args(args)
+        .output()?;
+
+    if output.status.success() {
+        return Ok(())
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    let status = output.status;
+    let error_message = format!(
+        "Command exited with non-zero status code: {status}\n\nSTDOUT:\n{stdout}\n\nSTDERR:\n{stderr}"
+    );
+    Err(anyhow::Error::msg(error_message))
 }
