@@ -44,16 +44,16 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
         &self,
         _events: &mut [Event],
         _request_path: &str,
-        _headers_config: HeaderMap,
-        _query_parameters: HashMap<String, String>,
+        _headers_config: &HeaderMap,
+        _query_parameters: &HashMap<String, String>,
     ) {
     }
 
     fn build_events(
         &self,
         body: Bytes,
-        header_map: HeaderMap,
-        query_parameters: HashMap<String, String>,
+        header_map: &HeaderMap,
+        query_parameters: &HashMap<String, String>,
         path: &str,
     ) -> Result<Vec<Event>, ErrorMessage>;
 
@@ -132,12 +132,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                             .is_valid(&auth_header)
                             .and_then(|()| decode(&encoding_header, body))
                             .and_then(|body| {
-                                self.build_events(
-                                    body,
-                                    headers.clone(),
-                                    query_parameters.clone(),
-                                    path.as_str(),
-                                )
+                                self.build_events(body, &headers, &query_parameters, path.as_str())
                             })
                             .map(|mut events| {
                                 emit!(HttpEventsReceived {
@@ -150,8 +145,8 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                                 self.enrich_events(
                                     &mut events,
                                     path.as_str(),
-                                    headers,
-                                    query_parameters,
+                                    &headers,
+                                    &query_parameters,
                                 );
 
                                 events

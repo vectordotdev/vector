@@ -373,8 +373,8 @@ impl HttpSource for SimpleHttpSource {
         &self,
         events: &mut [Event],
         request_path: &str,
-        headers_config: HeaderMap,
-        query_parameters: HashMap<String, String>,
+        headers_config: &HeaderMap,
+        query_parameters: &HashMap<String, String>,
     ) {
         for event in events.iter_mut() {
             let log = event.as_mut_log();
@@ -425,8 +425,8 @@ impl HttpSource for SimpleHttpSource {
     fn build_events(
         &self,
         body: Bytes,
-        _header_map: HeaderMap,
-        _query_parameters: HashMap<String, String>,
+        _header_map: &HeaderMap,
+        _query_parameters: &HashMap<String, String>,
         _request_path: &str,
     ) -> Result<Vec<Event>, ErrorMessage> {
         let mut decoder = self.decoder.clone();
