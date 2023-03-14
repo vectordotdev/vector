@@ -1,4 +1,4 @@
-use std::{collections::HashSet, env, fs::File, io::Write, path::Path};
+use std::{collections::HashSet, env, fs::File, io::Write, path::Path, process::Command};
 
 struct TrackedEnv {
     tracked: HashSet<String>,
@@ -93,9 +93,30 @@ impl BuildConstants {
     }
 }
 
+fn git_short_hash() -> String {
+    let output = Command::new("git")
+        .args(&["rev-parse", "--short", "HEAD"])
+        .output();
+
+    if output.is_err() {
+        "HEAD".to_string()
+    } else {
+        let mut hash = String::from_utf8(output.unwrap().stdout).unwrap();
+
+        hash.retain(|c| c != '\n');
+        hash.retain(|c| c != '\r');
+
+        hash
+    }
+}
+
 fn main() {
     // Always rerun if the build script itself changes.
     println!("cargo:rerun-if-changed=build.rs");
+
+    // re-run if the HEAD has changed. This is only necessary for non-release and nightly builds.
+    #[cfg(not(feature = "nightly"))]
+    println!("cargo:rerun-if-changed=.git/HEAD");
 
     #[cfg(feature = "protobuf-build")]
     {
@@ -162,6 +183,9 @@ fn main() {
         .expect("Cargo-provided environment variables should always exist!");
     let build_desc = tracker.get_env_var("VECTOR_BUILD_DESC");
 
+    // get the git short hash of the HEAD
+    let git_short_hash = git_short_hash();
+
     // Gather up the constants and write them out to our build constants file.
     let mut constants = BuildConstants::new();
     constants.add_required_constant(
@@ -205,6 +229,11 @@ fn main() {
         "VECTOR_BUILD_DESC",
         "Special build description, related to versioned releases.",
         build_desc,
+    );
+    constants.add_required_constant(
+        "GIT_SHORT_HASH",
+        "The short hash of the Git HEAD",
+        git_short_hash,
     );
     constants
         .write_to_file("built.rs")
