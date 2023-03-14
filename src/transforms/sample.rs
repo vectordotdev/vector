@@ -66,9 +66,9 @@ impl TransformConfig for SampleConfig {
         Input::new(DataType::Log | DataType::Trace)
     }
 
-    fn outputs(&self, merged_definition: &schema::Definition, _: LogNamespace) -> Vec<Output> {
+    fn outputs(&self, input_definitions: Vec<schema::Definition>, _: LogNamespace) -> Vec<Output> {
         vec![Output::default(DataType::Log | DataType::Trace)
-            .with_schema_definition(merged_definition.clone())]
+            .with_schema_definitions(input_definitions.clone())]
     }
 }
 

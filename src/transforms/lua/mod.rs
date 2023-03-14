@@ -103,10 +103,10 @@ impl TransformConfig for LuaConfig {
         }
     }
 
-    fn outputs(&self, merged_definition: &schema::Definition, _: LogNamespace) -> Vec<Output> {
+    fn outputs(&self, input_definitions: Vec<schema::Definition>, _: LogNamespace) -> Vec<Output> {
         match self {
-            LuaConfig::V1(v1) => v1.config.outputs(merged_definition),
-            LuaConfig::V2(v2) => v2.config.outputs(merged_definition),
+            LuaConfig::V1(v1) => v1.config.outputs(input_definitions),
+            LuaConfig::V2(v2) => v2.config.outputs(input_definitions),
         }
     }
 }

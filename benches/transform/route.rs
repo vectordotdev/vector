@@ -57,7 +57,7 @@ fn route(c: &mut Criterion) {
         outputs.push(Output {
             port: Some(String::from(name)),
             ty: DataType::Log,
-            log_schema_definition: None,
+            log_schema_definitions: Vec::new(),
         });
     }
     let output_buffer: TransformOutputsBuf = TransformOutputsBuf::new_with_capacity(outputs, 10);

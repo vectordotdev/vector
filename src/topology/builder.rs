@@ -215,11 +215,7 @@ pub async fn build_pieces(
                 control,
             );
 
-            let schema_definition = output
-                .log_schema_definition
-                .unwrap_or_else(schema::Definition::default_legacy_namespace);
-
-            schema_definitions.insert(output.port, schema_definition);
+            schema_definitions.insert(output.port, output.log_schema_definitions);
         }
 
         let (pump_error_tx, mut pump_error_rx) = oneshot::channel();
@@ -345,8 +341,16 @@ pub async fn build_pieces(
         debug!(component = %key, "Building new transform.");
 
         let mut schema_definitions = HashMap::new();
-        let merged_definition =
-            schema::merged_definition(&transform.inputs, config, &mut definition_cache);
+        // let merged_definition =
+        //     schema::merged_definition(&transform.inputs, config, &mut definition_cache);
+        let input_definitions =
+            schema::input_definitions(&transform.inputs, config, &mut definition_cache);
+
+        // TODO Maybe in time we won't need to use all the merged definitions below.
+        let merged_definition: Definition = input_definitions
+            .clone()
+            .try_into()
+            .expect("there should be at least one definition in the list");
 
         let span = error_span!(
             "transform",
@@ -359,12 +363,12 @@ pub async fn build_pieces(
 
         for output in transform
             .inner
-            .outputs(&merged_definition, config.schema.log_namespace())
+            .outputs(input_definitions.clone(), config.schema.log_namespace())
         {
-            let definition = output
-                .log_schema_definition
-                .unwrap_or_else(|| merged_definition.clone());
-            schema_definitions.insert(output.port, definition);
+            // TODO - we probably need more than this.
+            for definition in output.log_schema_definitions {
+                schema_definitions.insert(output.port.clone(), definition);
+            }
         }
 
         let context = TransformContext {
@@ -379,7 +383,7 @@ pub async fn build_pieces(
         let node = TransformNode::from_parts(
             key.clone(),
             transform,
-            &merged_definition,
+            input_definitions,
             config.schema.log_namespace(),
         );
 
@@ -620,7 +624,7 @@ impl TransformNode {
     pub fn from_parts(
         key: ComponentKey,
         transform: &TransformOuter<OutputId>,
-        schema_definition: &Definition,
+        schema_definition: Vec<Definition>,
         global_log_namespace: LogNamespace,
     ) -> Self {
         Self {

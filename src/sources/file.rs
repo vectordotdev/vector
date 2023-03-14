@@ -941,45 +941,49 @@ mod tests {
 
     #[test]
     fn output_schema_definition_vector_namespace() {
-        let definition = FileConfig::default().outputs(LogNamespace::Vector)[0]
+        let definitions = FileConfig::default().outputs(LogNamespace::Vector)[0]
             .clone()
-            .log_schema_definition
-            .unwrap();
+            .log_schema_definitions;
 
         assert_eq!(
-            definition,
-            Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
-                .with_meaning(OwnedTargetPath::event_root(), "message")
-                .with_metadata_field(
-                    &owned_value_path!("vector", "source_type"),
-                    Kind::bytes(),
-                    None
-                )
-                .with_metadata_field(
-                    &owned_value_path!("vector", "ingest_timestamp"),
-                    Kind::timestamp(),
-                    None
-                )
-                .with_metadata_field(
-                    &owned_value_path!("file", "host"),
-                    Kind::bytes().or_undefined(),
-                    Some("host")
-                )
-                .with_metadata_field(&owned_value_path!("file", "offset"), Kind::integer(), None)
-                .with_metadata_field(&owned_value_path!("file", "path"), Kind::bytes(), None)
+            definitions,
+            vec![
+                Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
+                    .with_meaning(OwnedTargetPath::event_root(), "message")
+                    .with_metadata_field(
+                        &owned_value_path!("vector", "source_type"),
+                        Kind::bytes(),
+                        None
+                    )
+                    .with_metadata_field(
+                        &owned_value_path!("vector", "ingest_timestamp"),
+                        Kind::timestamp(),
+                        None
+                    )
+                    .with_metadata_field(
+                        &owned_value_path!("file", "host"),
+                        Kind::bytes().or_undefined(),
+                        Some("host")
+                    )
+                    .with_metadata_field(
+                        &owned_value_path!("file", "offset"),
+                        Kind::integer(),
+                        None
+                    )
+                    .with_metadata_field(&owned_value_path!("file", "path"), Kind::bytes(), None)
+            ]
         )
     }
 
     #[test]
     fn output_schema_definition_legacy_namespace() {
-        let definition = FileConfig::default().outputs(LogNamespace::Legacy)[0]
+        let definitions = FileConfig::default().outputs(LogNamespace::Legacy)[0]
             .clone()
-            .log_schema_definition
-            .unwrap();
+            .log_schema_definitions;
 
         assert_eq!(
-            definition,
-            Definition::new_with_default_metadata(
+            definitions,
+            vec![Definition::new_with_default_metadata(
                 Kind::object(Collection::empty()),
                 [LogNamespace::Legacy]
             )
@@ -996,7 +1000,7 @@ mod tests {
                 Some("host")
             )
             .with_event_field(&owned_value_path!("offset"), Kind::undefined(), None)
-            .with_event_field(&owned_value_path!("file"), Kind::bytes(), None)
+            .with_event_field(&owned_value_path!("file"), Kind::bytes(), None)]
         )
     }
 

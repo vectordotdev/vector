@@ -788,83 +788,85 @@ mod test {
 
     #[test]
     fn test_output_schema_definition_vector_namespace() {
-        let definition = make_config("topic", "group", LogNamespace::Vector)
+        let definitions = make_config("topic", "group", LogNamespace::Vector)
             .outputs(LogNamespace::Vector)[0]
             .clone()
-            .log_schema_definition
-            .unwrap();
+            .log_schema_definitions;
 
         assert_eq!(
-            definition,
-            Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
-                .with_meaning(OwnedTargetPath::event_root(), "message")
-                .with_metadata_field(
-                    &owned_value_path!("kafka", "timestamp"),
-                    Kind::timestamp(),
-                    Some("timestamp")
-                )
-                .with_metadata_field(
-                    &owned_value_path!("kafka", "message_key"),
-                    Kind::bytes(),
-                    None
-                )
-                .with_metadata_field(&owned_value_path!("kafka", "topic"), Kind::bytes(), None)
-                .with_metadata_field(
-                    &owned_value_path!("kafka", "partition"),
-                    Kind::bytes(),
-                    None
-                )
-                .with_metadata_field(&owned_value_path!("kafka", "offset"), Kind::bytes(), None)
-                .with_metadata_field(
-                    &owned_value_path!("kafka", "headers"),
-                    Kind::object(Collection::empty().with_unknown(Kind::bytes())),
-                    None
-                )
-                .with_metadata_field(
-                    &owned_value_path!("vector", "ingest_timestamp"),
-                    Kind::timestamp(),
-                    None
-                )
-                .with_metadata_field(
-                    &owned_value_path!("vector", "source_type"),
-                    Kind::bytes(),
-                    None
-                )
+            definitions,
+            vec![
+                Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
+                    .with_meaning(OwnedTargetPath::event_root(), "message")
+                    .with_metadata_field(
+                        &owned_value_path!("kafka", "timestamp"),
+                        Kind::timestamp(),
+                        Some("timestamp")
+                    )
+                    .with_metadata_field(
+                        &owned_value_path!("kafka", "message_key"),
+                        Kind::bytes(),
+                        None
+                    )
+                    .with_metadata_field(&owned_value_path!("kafka", "topic"), Kind::bytes(), None)
+                    .with_metadata_field(
+                        &owned_value_path!("kafka", "partition"),
+                        Kind::bytes(),
+                        None
+                    )
+                    .with_metadata_field(&owned_value_path!("kafka", "offset"), Kind::bytes(), None)
+                    .with_metadata_field(
+                        &owned_value_path!("kafka", "headers"),
+                        Kind::object(Collection::empty().with_unknown(Kind::bytes())),
+                        None
+                    )
+                    .with_metadata_field(
+                        &owned_value_path!("vector", "ingest_timestamp"),
+                        Kind::timestamp(),
+                        None
+                    )
+                    .with_metadata_field(
+                        &owned_value_path!("vector", "source_type"),
+                        Kind::bytes(),
+                        None
+                    )
+            ]
         )
     }
 
     #[test]
     fn test_output_schema_definition_legacy_namespace() {
-        let definition = make_config("topic", "group", LogNamespace::Legacy)
+        let definitions = make_config("topic", "group", LogNamespace::Legacy)
             .outputs(LogNamespace::Legacy)[0]
             .clone()
-            .log_schema_definition
-            .unwrap();
+            .log_schema_definitions;
 
         assert_eq!(
-            definition,
-            Definition::new_with_default_metadata(Kind::json(), [LogNamespace::Legacy])
-                .unknown_fields(Kind::undefined())
-                .with_event_field(
-                    &owned_value_path!("message"),
-                    Kind::bytes(),
-                    Some("message")
-                )
-                .with_event_field(
-                    &owned_value_path!("timestamp"),
-                    Kind::timestamp(),
-                    Some("timestamp")
-                )
-                .with_event_field(&owned_value_path!("message_key"), Kind::bytes(), None)
-                .with_event_field(&owned_value_path!("topic"), Kind::bytes(), None)
-                .with_event_field(&owned_value_path!("partition"), Kind::bytes(), None)
-                .with_event_field(&owned_value_path!("offset"), Kind::bytes(), None)
-                .with_event_field(
-                    &owned_value_path!("headers"),
-                    Kind::object(Collection::empty().with_unknown(Kind::bytes())),
-                    None
-                )
-                .with_event_field(&owned_value_path!("source_type"), Kind::bytes(), None)
+            definitions,
+            vec![
+                Definition::new_with_default_metadata(Kind::json(), [LogNamespace::Legacy])
+                    .unknown_fields(Kind::undefined())
+                    .with_event_field(
+                        &owned_value_path!("message"),
+                        Kind::bytes(),
+                        Some("message")
+                    )
+                    .with_event_field(
+                        &owned_value_path!("timestamp"),
+                        Kind::timestamp(),
+                        Some("timestamp")
+                    )
+                    .with_event_field(&owned_value_path!("message_key"), Kind::bytes(), None)
+                    .with_event_field(&owned_value_path!("topic"), Kind::bytes(), None)
+                    .with_event_field(&owned_value_path!("partition"), Kind::bytes(), None)
+                    .with_event_field(&owned_value_path!("offset"), Kind::bytes(), None)
+                    .with_event_field(
+                        &owned_value_path!("headers"),
+                        Kind::object(Collection::empty().with_unknown(Kind::bytes())),
+                        None
+                    )
+                    .with_event_field(&owned_value_path!("source_type"), Kind::bytes(), None)
+            ]
         )
     }
 

@@ -752,10 +752,9 @@ mod tests {
             ..Default::default()
         };
 
-        let definition = config.outputs(LogNamespace::Vector)[0]
+        let definitions = config.outputs(LogNamespace::Vector)[0]
             .clone()
-            .log_schema_definition
-            .unwrap();
+            .log_schema_definitions;
 
         let expected_definition =
             Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
@@ -786,17 +785,16 @@ mod tests {
                     None,
                 );
 
-        assert_eq!(definition, expected_definition);
+        assert_eq!(definitions, vec![expected_definition]);
     }
 
     #[test]
     fn output_schema_definition_legacy_namespace() {
         let config = PubsubConfig::default();
 
-        let definition = config.outputs(LogNamespace::Legacy)[0]
+        let definitions = config.outputs(LogNamespace::Legacy)[0]
             .clone()
-            .log_schema_definition
-            .unwrap();
+            .log_schema_definitions;
 
         let expected_definition = Definition::new_with_default_metadata(
             Kind::object(Collection::empty()),
@@ -820,7 +818,7 @@ mod tests {
         )
         .with_event_field(&owned_value_path!("message_id"), Kind::bytes(), None);
 
-        assert_eq!(definition, expected_definition);
+        assert_eq!(definitions, vec![expected_definition]);
     }
 }
 

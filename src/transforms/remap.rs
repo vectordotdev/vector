@@ -221,95 +221,122 @@ impl TransformConfig for RemapConfig {
         Input::all()
     }
 
-    fn outputs(&self, input_definition: &schema::Definition, _: LogNamespace) -> Vec<Output> {
-        // We need to compile the VRL program in order to know the schema definition output of this
-        // transform. We ignore any compilation errors, as those are caught by the transform build
-        // step.
-        let default_definition = self
-            .compile_vrl_program(
-                enrichment::TableRegistry::default(),
-                input_definition.clone(),
-            )
-            .map(|(program, _, _, external_context)| {
-                // Apply any semantic meanings set in the VRL program
-                let meaning = external_context
-                    .get_custom::<MeaningList>()
-                    .cloned()
-                    .expect("context exists")
-                    .0;
+    fn outputs(&self, input_definitions: Vec<schema::Definition>, _: LogNamespace) -> Vec<Output> {
+        // It is unfortunate that merging takes ownership of the definitions so we have to clone the
+        // entire collection in order to merge them together.
+        let merged_definition: Definition = input_definitions
+            .clone()
+            .try_into()
+            .expect("we must have at least one input definition");
 
-                let state = program.final_type_state();
+        let mut dropped_definitions = Vec::new();
+        let mut default_definitions = Vec::new();
 
-                let mut new_type_def = Definition::new_with_default_metadata(
-                    state.external.target_kind().clone(),
-                    input_definition.log_namespaces().clone(),
-                );
-                for (id, path) in meaning {
-                    // currently only event paths are supported
-                    new_type_def = new_type_def.with_meaning(OwnedTargetPath::event(path), &id);
-                }
-                new_type_def
-            })
-            .unwrap_or_else(|_| {
-                Definition::new_with_default_metadata(
-                    // The program failed to compile, so it can "never" return a value
-                    Kind::never(),
-                    input_definition.log_namespaces().clone(),
+        for input_definition in input_definitions {
+            // We need to compile the VRL program in order to know the schema definition output of this
+            // transform. We ignore any compilation errors, as those are caught by the transform build
+            // step.
+            let default_definition = self
+                .compile_vrl_program(
+                    enrichment::TableRegistry::default(),
+                    merged_definition.clone(),
                 )
-            });
+                .map(|(program, _, _, external_context)| {
+                    // Apply any semantic meanings set in the VRL program
+                    let meaning = external_context
+                        .get_custom::<MeaningList>()
+                        .cloned()
+                        .expect("context exists")
+                        .0;
 
-        // When a message is dropped and re-routed, we keep the original event, but also annotate
-        // it with additional metadata.
-        let mut dropped_definition = Definition::new_with_default_metadata(
-            Kind::never(),
-            input_definition.log_namespaces().clone(),
-        );
+                    let state = program.final_type_state();
 
-        if input_definition
-            .log_namespaces()
-            .contains(&LogNamespace::Legacy)
-        {
-            dropped_definition =
-                dropped_definition.merge(input_definition.clone().with_event_field(
-                    &parse_value_path(log_schema().metadata_key()).expect("valid metadata key"),
-                    Kind::object(BTreeMap::from([
-                        ("reason".into(), Kind::bytes()),
-                        ("message".into(), Kind::bytes()),
-                        ("component_id".into(), Kind::bytes()),
-                        ("component_type".into(), Kind::bytes()),
-                        ("component_kind".into(), Kind::bytes()),
-                    ])),
-                    Some("metadata"),
-                ));
-        }
+                    let mut new_type_def = Definition::new_with_default_metadata(
+                        state.external.target_kind().clone(),
+                        input_definition.log_namespaces().clone(),
+                    );
+                    for (id, path) in meaning {
+                        // currently only event paths are supported
+                        new_type_def = new_type_def.with_meaning(OwnedTargetPath::event(path), &id);
+                    }
+                    new_type_def
+                })
+                .unwrap_or_else(|_| {
+                    Definition::new_with_default_metadata(
+                        // The program failed to compile, so it can "never" return a value
+                        Kind::never(),
+                        input_definition.log_namespaces().clone(),
+                    )
+                });
 
-        if input_definition
-            .log_namespaces()
-            .contains(&LogNamespace::Vector)
-        {
-            dropped_definition = dropped_definition.merge(
-                input_definition
-                    .clone()
-                    .with_metadata_field(&owned_value_path!("reason"), Kind::bytes(), None)
-                    .with_metadata_field(&owned_value_path!("message"), Kind::bytes(), None)
-                    .with_metadata_field(&owned_value_path!("component_id"), Kind::bytes(), None)
-                    .with_metadata_field(&owned_value_path!("component_type"), Kind::bytes(), None)
-                    .with_metadata_field(&owned_value_path!("component_kind"), Kind::bytes(), None),
+            // When a message is dropped and re-routed, we keep the original event, but also annotate
+            // it with additional metadata.
+            let mut dropped_definition = Definition::new_with_default_metadata(
+                Kind::never(),
+                input_definition.log_namespaces().clone(),
             );
+
+            if input_definition
+                .log_namespaces()
+                .contains(&LogNamespace::Legacy)
+            {
+                dropped_definition =
+                    dropped_definition.merge(input_definition.clone().with_event_field(
+                        &parse_value_path(log_schema().metadata_key()).expect("valid metadata key"),
+                        Kind::object(BTreeMap::from([
+                            ("reason".into(), Kind::bytes()),
+                            ("message".into(), Kind::bytes()),
+                            ("component_id".into(), Kind::bytes()),
+                            ("component_type".into(), Kind::bytes()),
+                            ("component_kind".into(), Kind::bytes()),
+                        ])),
+                        Some("metadata"),
+                    ));
+            }
+
+            if input_definition
+                .log_namespaces()
+                .contains(&LogNamespace::Vector)
+            {
+                dropped_definition = dropped_definition.merge(
+                    input_definition
+                        .clone()
+                        .with_metadata_field(&owned_value_path!("reason"), Kind::bytes(), None)
+                        .with_metadata_field(&owned_value_path!("message"), Kind::bytes(), None)
+                        .with_metadata_field(
+                            &owned_value_path!("component_id"),
+                            Kind::bytes(),
+                            None,
+                        )
+                        .with_metadata_field(
+                            &owned_value_path!("component_type"),
+                            Kind::bytes(),
+                            None,
+                        )
+                        .with_metadata_field(
+                            &owned_value_path!("component_kind"),
+                            Kind::bytes(),
+                            None,
+                        ),
+                );
+            }
+
+            default_definitions.push(default_definition);
+            dropped_definitions.push(dropped_definition);
         }
 
         let default_output =
-            Output::default(DataType::all()).with_schema_definition(default_definition);
+            Output::default(DataType::all()).with_schema_definitions(default_definitions);
 
         if self.reroute_dropped {
-            vec![
+            return vec![
                 default_output,
                 Output::default(DataType::all())
-                    .with_schema_definition(dropped_definition)
+                    .with_schema_definitions(dropped_definitions)
                     .with_port(DROPPED),
-            ]
+            ];
         } else {
-            vec![default_output]
+            return vec![default_output];
         }
     }
 
@@ -1383,10 +1410,10 @@ mod tests {
 
         assert_eq!(
             conf.outputs(
-                &schema::Definition::new_with_default_metadata(
+                vec![schema::Definition::new_with_default_metadata(
                     Kind::any_object(),
                     [LogNamespace::Legacy]
-                ),
+                )],
                 LogNamespace::Legacy
             ),
             vec![Output::default(DataType::all()).with_schema_definition(schema_definition)]

@@ -243,7 +243,7 @@ impl TransformConfig for Ec2Metadata {
         Input::new(DataType::Metric | DataType::Log)
     }
 
-    fn outputs(&self, merged_definition: &schema::Definition, _: LogNamespace) -> Vec<Output> {
+    fn outputs(&self, input_definitions: Vec<schema::Definition>, _: LogNamespace) -> Vec<Output> {
         let added_keys = Keys::new(self.namespace.clone());
 
         let paths = [
@@ -263,15 +263,22 @@ impl TransformConfig for Ec2Metadata {
             &added_keys.tags_key.log_path,
         ];
 
-        let mut schema_definition = merged_definition.clone();
+        let schema_definition = input_definitions
+            .iter()
+            .map(|definition| {
+                let mut schema_definition = definition.clone();
 
-        for path in paths {
-            schema_definition =
-                schema_definition.with_field(path, Kind::bytes().or_undefined(), None);
-        }
+                for path in paths {
+                    schema_definition =
+                        schema_definition.with_field(path, Kind::bytes().or_undefined(), None);
+                }
+
+                schema_definition
+            })
+            .collect();
 
         vec![Output::default(DataType::Metric | DataType::Log)
-            .with_schema_definition(schema_definition)]
+            .with_schema_definitions(schema_definition)]
     }
 }
 

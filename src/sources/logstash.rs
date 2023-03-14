@@ -789,10 +789,9 @@ mod test {
             ..Default::default()
         };
 
-        let definition = config.outputs(LogNamespace::Vector)[0]
+        let definitions = config.outputs(LogNamespace::Vector)[0]
             .clone()
-            .log_schema_definition
-            .unwrap();
+            .log_schema_definitions;
 
         let expected_definition =
             Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
@@ -823,17 +822,16 @@ mod test {
                     None,
                 );
 
-        assert_eq!(definition, expected_definition)
+        assert_eq!(definitions, vec![expected_definition])
     }
 
     #[test]
     fn output_schema_definition_legacy_namespace() {
         let config = LogstashConfig::default();
 
-        let definition = config.outputs(LogNamespace::Legacy)[0]
+        let definitions = config.outputs(LogNamespace::Legacy)[0]
             .clone()
-            .log_schema_definition
-            .unwrap();
+            .log_schema_definitions;
 
         let expected_definition = Definition::new_with_default_metadata(
             Kind::object(Collection::empty()),
@@ -848,7 +846,7 @@ mod test {
         .with_event_field(&owned_value_path!("timestamp"), Kind::timestamp(), None)
         .with_event_field(&owned_value_path!("host"), Kind::bytes(), Some("host"));
 
-        assert_eq!(definition, expected_definition)
+        assert_eq!(definitions, vec![expected_definition])
     }
 }
 

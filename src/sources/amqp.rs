@@ -518,8 +518,7 @@ pub mod test {
 
         let definition = config.outputs(LogNamespace::Vector)[0]
             .clone()
-            .log_schema_definition
-            .unwrap();
+            .log_schema_definitions;
 
         let expected_definition =
             Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
@@ -543,7 +542,7 @@ pub mod test {
                 .with_metadata_field(&owned_value_path!("amqp", "exchange"), Kind::bytes(), None)
                 .with_metadata_field(&owned_value_path!("amqp", "offset"), Kind::integer(), None);
 
-        assert_eq!(definition, expected_definition);
+        assert_eq!(definition, vec![expected_definition]);
     }
 
     #[test]
@@ -552,8 +551,7 @@ pub mod test {
 
         let definition = config.outputs(LogNamespace::Legacy)[0]
             .clone()
-            .log_schema_definition
-            .unwrap();
+            .log_schema_definitions;
 
         let expected_definition = Definition::new_with_default_metadata(
             Kind::object(Collection::empty()),
@@ -570,7 +568,7 @@ pub mod test {
         .with_event_field(&owned_value_path!("exchange"), Kind::bytes(), None)
         .with_event_field(&owned_value_path!("offset"), Kind::integer(), None);
 
-        assert_eq!(definition, expected_definition);
+        assert_eq!(definition, vec![expected_definition]);
     }
 }
 

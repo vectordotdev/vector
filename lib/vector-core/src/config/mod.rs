@@ -108,13 +108,15 @@ pub struct Output {
     // inherent blocker to support other types as well, but it'll require additional work to add
     // the relevant schemas, and store them separately in this type.
     ///
+    /// TODO These comments are now all wrong!
+    ///
     /// The `None` variant of a schema definition has two distinct meanings for a source component
     /// versus a transform component:
     ///
     /// For *sources*, a `None` schema is identical to a `Some(Definition::source_default())`.
     ///
     /// For a *transform*, a schema [`schema::Definition`] is required if `Datatype` is Log.
-    pub log_schema_definition: Option<schema::Definition>,
+    pub log_schema_definitions: Vec<schema::Definition>,
 }
 
 impl Output {
@@ -126,14 +128,22 @@ impl Output {
         Self {
             port: None,
             ty,
-            log_schema_definition: None,
+            // TODO: I don't think the default should have a definition.
+            log_schema_definitions: vec![schema::Definition::default_legacy_namespace()],
         }
     }
 
-    /// Set the schema definition for this `Output`.
+    /// Set a single schema definition for this `Output`.
     #[must_use]
     pub fn with_schema_definition(mut self, schema_definition: schema::Definition) -> Self {
-        self.log_schema_definition = Some(schema_definition);
+        self.log_schema_definitions = vec![schema_definition];
+        self
+    }
+
+    /// Set the schema definitions for this `Output`.
+    #[must_use]
+    pub fn with_schema_definitions(mut self, schema_definition: Vec<schema::Definition>) -> Self {
+        self.log_schema_definitions = schema_definition;
         self
     }
 

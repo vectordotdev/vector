@@ -177,11 +177,17 @@ impl LuaConfig {
         Input::new(DataType::Metric | DataType::Log)
     }
 
-    pub fn outputs(&self, merged_definition: &schema::Definition) -> Vec<Output> {
+    pub fn outputs(&self, input_definitions: Vec<schema::Definition>) -> Vec<Output> {
         // Lua causes the type definition to be reset
-        let definition = Definition::default_for_namespace(merged_definition.log_namespaces());
+        let namespaces = input_definitions
+            .iter()
+            .flat_map(|definition| definition.log_namespaces().clone())
+            .collect();
 
-        vec![Output::default(DataType::Metric | DataType::Log).with_schema_definition(definition)]
+        let definition = Definition::default_for_namespace(&namespaces);
+
+        vec![Output::default(DataType::Metric | DataType::Log)
+            .with_schema_definitions(vec![definition])]
     }
 }
 

@@ -2373,8 +2373,7 @@ mod tests {
 
         let definition = config.outputs(LogNamespace::Vector)[0]
             .clone()
-            .log_schema_definition
-            .unwrap();
+            .log_schema_definitions;
 
         let expected_definition = Definition::new_with_default_metadata(
             Kind::object(Collection::empty()).or_bytes(),
@@ -2416,16 +2415,15 @@ mod tests {
             None,
         );
 
-        assert_eq!(definition, expected_definition);
+        assert_eq!(definition, vec![expected_definition]);
     }
 
     #[test]
     fn output_schema_definition_legacy_namespace() {
         let config = SplunkConfig::default();
-        let definition = config.outputs(LogNamespace::Legacy)[0]
+        let definitions = config.outputs(LogNamespace::Legacy)[0]
             .clone()
-            .log_schema_definition
-            .unwrap();
+            .log_schema_definitions;
 
         let expected_definition = Definition::new_with_default_metadata(
             Kind::object(Collection::empty()),
@@ -2451,6 +2449,6 @@ mod tests {
         .with_event_field(&owned_value_path!("splunk_sourcetype"), Kind::bytes(), None)
         .with_event_field(&owned_value_path!("timestamp"), Kind::timestamp(), None);
 
-        assert_eq!(definition, expected_definition);
+        assert_eq!(definitions, vec![expected_definition]);
     }
 }

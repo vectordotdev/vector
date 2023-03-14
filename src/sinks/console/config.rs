@@ -4,7 +4,9 @@ use codecs::{
 };
 use futures::{future, FutureExt};
 use tokio::io;
+use value::Kind;
 use vector_config::configurable_component;
+use vector_core::schema::Requirement;
 
 use crate::{
     codecs::{Encoder, EncodingConfigWithFraming, SinkType},
@@ -92,7 +94,9 @@ impl SinkConfig for ConsoleSinkConfig {
     }
 
     fn input(&self) -> Input {
-        Input::new(self.encoding.config().1.input_type())
+        // WARN! This is just to test, if it appears in a PR I have really messed up.
+        let requirements = Requirement::empty().required_meaning("ponk", Kind::integer());
+        Input::new(self.encoding.config().1.input_type()).with_schema_requirement(requirements)
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {

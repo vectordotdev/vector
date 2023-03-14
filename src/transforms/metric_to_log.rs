@@ -90,7 +90,7 @@ impl TransformConfig for MetricToLogConfig {
         Input::metric()
     }
 
-    fn outputs(&self, _: &Definition, global_log_namespace: LogNamespace) -> Vec<Output> {
+    fn outputs(&self, _: Vec<Definition>, global_log_namespace: LogNamespace) -> Vec<Output> {
         let log_namespace = global_log_namespace.merge(self.log_namespace);
         let mut schema_definition =
             Definition::default_for_namespace(&BTreeSet::from([log_namespace]))
@@ -224,7 +224,7 @@ impl TransformConfig for MetricToLogConfig {
             }
         }
 
-        vec![Output::default(DataType::Log).with_schema_definition(schema_definition)]
+        vec![Output::default(DataType::Log).with_schema_definitions(vec![schema_definition])]
     }
 
     fn enable_concurrency(&self) -> bool {

@@ -174,8 +174,11 @@ async fn source(
     ))
     .unwrap();
     let schema_definitions = HashMap::from([
-        (Some(LOGS.to_owned()), test_logs_schema_definition()),
-        (Some(METRICS.to_owned()), test_metrics_schema_definition()),
+        (Some(LOGS.to_owned()), vec![test_logs_schema_definition()]),
+        (
+            Some(METRICS.to_owned()),
+            vec![test_metrics_schema_definition()],
+        ),
     ]);
     let context = SourceContext::new_test(sender, Some(schema_definitions));
     tokio::spawn(async move {
@@ -1421,7 +1424,7 @@ fn test_config_outputs() {
     struct TestCase {
         decoding: DeserializerConfig,
         multiple_outputs: bool,
-        want: HashMap<Option<&'static str>, Option<schema::Definition>>,
+        want: HashMap<Option<&'static str>, Vec<schema::Definition>>,
     }
 
     for (
@@ -1439,49 +1442,39 @@ fn test_config_outputs() {
                 multiple_outputs: false,
                 want: HashMap::from([(
                     None,
-                    Some(
-                        schema::Definition::empty_legacy_namespace()
-                            .with_event_field(
-                                &owned_value_path!("message"),
-                                Kind::bytes(),
-                                Some("message"),
-                            )
-                            .with_event_field(
-                                &owned_value_path!("status"),
-                                Kind::bytes(),
-                                Some("severity"),
-                            )
-                            .with_event_field(
-                                &owned_value_path!("timestamp"),
-                                Kind::timestamp(),
-                                Some("timestamp"),
-                            )
-                            .with_event_field(
-                                &owned_value_path!("hostname"),
-                                Kind::bytes(),
-                                Some("host"),
-                            )
-                            .with_event_field(
-                                &owned_value_path!("service"),
-                                Kind::bytes(),
-                                Some("service"),
-                            )
-                            .with_event_field(
-                                &owned_value_path!("ddsource"),
-                                Kind::bytes(),
-                                Some("source"),
-                            )
-                            .with_event_field(
-                                &owned_value_path!("ddtags"),
-                                Kind::bytes(),
-                                Some("tags"),
-                            )
-                            .with_event_field(
-                                &owned_value_path!("source_type"),
-                                Kind::bytes(),
-                                None,
-                            ),
-                    ),
+                    vec![schema::Definition::empty_legacy_namespace()
+                        .with_event_field(
+                            &owned_value_path!("message"),
+                            Kind::bytes(),
+                            Some("message"),
+                        )
+                        .with_event_field(
+                            &owned_value_path!("status"),
+                            Kind::bytes(),
+                            Some("severity"),
+                        )
+                        .with_event_field(
+                            &owned_value_path!("timestamp"),
+                            Kind::timestamp(),
+                            Some("timestamp"),
+                        )
+                        .with_event_field(
+                            &owned_value_path!("hostname"),
+                            Kind::bytes(),
+                            Some("host"),
+                        )
+                        .with_event_field(
+                            &owned_value_path!("service"),
+                            Kind::bytes(),
+                            Some("service"),
+                        )
+                        .with_event_field(
+                            &owned_value_path!("ddsource"),
+                            Kind::bytes(),
+                            Some("source"),
+                        )
+                        .with_event_field(&owned_value_path!("ddtags"), Kind::bytes(), Some("tags"))
+                        .with_event_field(&owned_value_path!("source_type"), Kind::bytes(), None)],
                 )]),
             },
         ),
@@ -1492,49 +1485,39 @@ fn test_config_outputs() {
                 multiple_outputs: false,
                 want: HashMap::from([(
                     None,
-                    Some(
-                        schema::Definition::empty_legacy_namespace()
-                            .with_event_field(
-                                &owned_value_path!("message"),
-                                Kind::bytes(),
-                                Some("message"),
-                            )
-                            .with_event_field(
-                                &owned_value_path!("status"),
-                                Kind::bytes(),
-                                Some("severity"),
-                            )
-                            .with_event_field(
-                                &owned_value_path!("timestamp"),
-                                Kind::timestamp(),
-                                Some("timestamp"),
-                            )
-                            .with_event_field(
-                                &owned_value_path!("hostname"),
-                                Kind::bytes(),
-                                Some("host"),
-                            )
-                            .with_event_field(
-                                &owned_value_path!("service"),
-                                Kind::bytes(),
-                                Some("service"),
-                            )
-                            .with_event_field(
-                                &owned_value_path!("ddsource"),
-                                Kind::bytes(),
-                                Some("source"),
-                            )
-                            .with_event_field(
-                                &owned_value_path!("ddtags"),
-                                Kind::bytes(),
-                                Some("tags"),
-                            )
-                            .with_event_field(
-                                &owned_value_path!("source_type"),
-                                Kind::bytes(),
-                                None,
-                            ),
-                    ),
+                    vec![schema::Definition::empty_legacy_namespace()
+                        .with_event_field(
+                            &owned_value_path!("message"),
+                            Kind::bytes(),
+                            Some("message"),
+                        )
+                        .with_event_field(
+                            &owned_value_path!("status"),
+                            Kind::bytes(),
+                            Some("severity"),
+                        )
+                        .with_event_field(
+                            &owned_value_path!("timestamp"),
+                            Kind::timestamp(),
+                            Some("timestamp"),
+                        )
+                        .with_event_field(
+                            &owned_value_path!("hostname"),
+                            Kind::bytes(),
+                            Some("host"),
+                        )
+                        .with_event_field(
+                            &owned_value_path!("service"),
+                            Kind::bytes(),
+                            Some("service"),
+                        )
+                        .with_event_field(
+                            &owned_value_path!("ddsource"),
+                            Kind::bytes(),
+                            Some("source"),
+                        )
+                        .with_event_field(&owned_value_path!("ddtags"), Kind::bytes(), Some("tags"))
+                        .with_event_field(&owned_value_path!("source_type"), Kind::bytes(), None)],
                 )]),
             },
         ),
@@ -1546,52 +1529,50 @@ fn test_config_outputs() {
                 want: HashMap::from([
                     (
                         Some(LOGS),
-                        Some(
-                            schema::Definition::empty_legacy_namespace()
-                                .with_event_field(
-                                    &owned_value_path!("message"),
-                                    Kind::bytes(),
-                                    Some("message"),
-                                )
-                                .with_event_field(
-                                    &owned_value_path!("status"),
-                                    Kind::bytes(),
-                                    Some("severity"),
-                                )
-                                .with_event_field(
-                                    &owned_value_path!("timestamp"),
-                                    Kind::timestamp(),
-                                    Some("timestamp"),
-                                )
-                                .with_event_field(
-                                    &owned_value_path!("hostname"),
-                                    Kind::bytes(),
-                                    Some("host"),
-                                )
-                                .with_event_field(
-                                    &owned_value_path!("service"),
-                                    Kind::bytes(),
-                                    Some("service"),
-                                )
-                                .with_event_field(
-                                    &owned_value_path!("ddsource"),
-                                    Kind::bytes(),
-                                    Some("source"),
-                                )
-                                .with_event_field(
-                                    &owned_value_path!("ddtags"),
-                                    Kind::bytes(),
-                                    Some("tags"),
-                                )
-                                .with_event_field(
-                                    &owned_value_path!("source_type"),
-                                    Kind::bytes(),
-                                    None,
-                                ),
-                        ),
+                        vec![schema::Definition::empty_legacy_namespace()
+                            .with_event_field(
+                                &owned_value_path!("message"),
+                                Kind::bytes(),
+                                Some("message"),
+                            )
+                            .with_event_field(
+                                &owned_value_path!("status"),
+                                Kind::bytes(),
+                                Some("severity"),
+                            )
+                            .with_event_field(
+                                &owned_value_path!("timestamp"),
+                                Kind::timestamp(),
+                                Some("timestamp"),
+                            )
+                            .with_event_field(
+                                &owned_value_path!("hostname"),
+                                Kind::bytes(),
+                                Some("host"),
+                            )
+                            .with_event_field(
+                                &owned_value_path!("service"),
+                                Kind::bytes(),
+                                Some("service"),
+                            )
+                            .with_event_field(
+                                &owned_value_path!("ddsource"),
+                                Kind::bytes(),
+                                Some("source"),
+                            )
+                            .with_event_field(
+                                &owned_value_path!("ddtags"),
+                                Kind::bytes(),
+                                Some("tags"),
+                            )
+                            .with_event_field(
+                                &owned_value_path!("source_type"),
+                                Kind::bytes(),
+                                None,
+                            )],
                     ),
-                    (Some(METRICS), None),
-                    (Some(TRACES), None),
+                    (Some(METRICS), vec![]),
+                    (Some(TRACES), vec![]),
                 ]),
             },
         ),
@@ -1602,21 +1583,19 @@ fn test_config_outputs() {
                 multiple_outputs: false,
                 want: HashMap::from([(
                     None,
-                    Some(
-                        schema::Definition::empty_legacy_namespace()
-                            .with_event_field(
-                                &owned_value_path!("timestamp"),
-                                Kind::json().or_timestamp(),
-                                None,
-                            )
-                            .with_event_field(&owned_value_path!("source_type"), Kind::json(), None)
-                            .with_event_field(&owned_value_path!("ddsource"), Kind::json(), None)
-                            .with_event_field(&owned_value_path!("ddtags"), Kind::json(), None)
-                            .with_event_field(&owned_value_path!("hostname"), Kind::json(), None)
-                            .with_event_field(&owned_value_path!("service"), Kind::json(), None)
-                            .with_event_field(&owned_value_path!("status"), Kind::json(), None)
-                            .unknown_fields(Kind::json()),
-                    ),
+                    vec![schema::Definition::empty_legacy_namespace()
+                        .with_event_field(
+                            &owned_value_path!("timestamp"),
+                            Kind::json().or_timestamp(),
+                            None,
+                        )
+                        .with_event_field(&owned_value_path!("source_type"), Kind::json(), None)
+                        .with_event_field(&owned_value_path!("ddsource"), Kind::json(), None)
+                        .with_event_field(&owned_value_path!("ddtags"), Kind::json(), None)
+                        .with_event_field(&owned_value_path!("hostname"), Kind::json(), None)
+                        .with_event_field(&owned_value_path!("service"), Kind::json(), None)
+                        .with_event_field(&owned_value_path!("status"), Kind::json(), None)
+                        .unknown_fields(Kind::json())],
                 )]),
             },
         ),
@@ -1628,36 +1607,22 @@ fn test_config_outputs() {
                 want: HashMap::from([
                     (
                         Some(LOGS),
-                        Some(
-                            schema::Definition::empty_legacy_namespace()
-                                .with_event_field(
-                                    &owned_value_path!("timestamp"),
-                                    Kind::json().or_timestamp(),
-                                    None,
-                                )
-                                .with_event_field(
-                                    &owned_value_path!("source_type"),
-                                    Kind::json(),
-                                    None,
-                                )
-                                .with_event_field(
-                                    &owned_value_path!("ddsource"),
-                                    Kind::json(),
-                                    None,
-                                )
-                                .with_event_field(&owned_value_path!("ddtags"), Kind::json(), None)
-                                .with_event_field(
-                                    &owned_value_path!("hostname"),
-                                    Kind::json(),
-                                    None,
-                                )
-                                .with_event_field(&owned_value_path!("service"), Kind::json(), None)
-                                .with_event_field(&owned_value_path!("status"), Kind::json(), None)
-                                .unknown_fields(Kind::json()),
-                        ),
+                        vec![schema::Definition::empty_legacy_namespace()
+                            .with_event_field(
+                                &owned_value_path!("timestamp"),
+                                Kind::json().or_timestamp(),
+                                None,
+                            )
+                            .with_event_field(&owned_value_path!("source_type"), Kind::json(), None)
+                            .with_event_field(&owned_value_path!("ddsource"), Kind::json(), None)
+                            .with_event_field(&owned_value_path!("ddtags"), Kind::json(), None)
+                            .with_event_field(&owned_value_path!("hostname"), Kind::json(), None)
+                            .with_event_field(&owned_value_path!("service"), Kind::json(), None)
+                            .with_event_field(&owned_value_path!("status"), Kind::json(), None)
+                            .unknown_fields(Kind::json())],
                     ),
-                    (Some(METRICS), None),
-                    (Some(TRACES), None),
+                    (Some(METRICS), vec![]),
+                    (Some(TRACES), vec![]),
                 ]),
             },
         ),
@@ -1669,8 +1634,77 @@ fn test_config_outputs() {
                 multiple_outputs: false,
                 want: HashMap::from([(
                     None,
-                    Some(
-                        schema::Definition::empty_legacy_namespace()
+                    vec![schema::Definition::empty_legacy_namespace()
+                        .with_event_field(
+                            &owned_value_path!("message"),
+                            Kind::bytes(),
+                            Some("message"),
+                        )
+                        .with_event_field(
+                            &owned_value_path!("timestamp"),
+                            Kind::timestamp(),
+                            Some("timestamp"),
+                        )
+                        .with_event_field(
+                            &owned_value_path!("hostname"),
+                            Kind::bytes(),
+                            Some("host"),
+                        )
+                        .optional_field(
+                            &owned_value_path!("severity"),
+                            Kind::bytes(),
+                            Some("severity"),
+                        )
+                        .optional_field(&owned_value_path!("facility"), Kind::bytes(), None)
+                        .optional_field(&owned_value_path!("version"), Kind::integer(), None)
+                        .optional_field(&owned_value_path!("appname"), Kind::bytes(), None)
+                        .optional_field(&owned_value_path!("msgid"), Kind::bytes(), None)
+                        .optional_field(
+                            &owned_value_path!("procid"),
+                            Kind::integer().or_bytes(),
+                            None,
+                        )
+                        .with_event_field(
+                            &owned_value_path!("source_type"),
+                            Kind::bytes().or_object(Collection::from_unknown(Kind::bytes())),
+                            None,
+                        )
+                        .with_event_field(
+                            &owned_value_path!("ddsource"),
+                            Kind::bytes().or_object(Collection::from_unknown(Kind::bytes())),
+                            None,
+                        )
+                        .with_event_field(
+                            &owned_value_path!("ddtags"),
+                            Kind::bytes().or_object(Collection::from_unknown(Kind::bytes())),
+                            None,
+                        )
+                        .with_event_field(
+                            &owned_value_path!("service"),
+                            Kind::bytes().or_object(Collection::from_unknown(Kind::bytes())),
+                            None,
+                        )
+                        .with_event_field(
+                            &owned_value_path!("status"),
+                            Kind::bytes().or_object(Collection::from_unknown(Kind::bytes())),
+                            None,
+                        )
+                        .unknown_fields(Kind::object(value::kind::Collection::from_unknown(
+                            Kind::bytes(),
+                        )))],
+                )]),
+            },
+        ),
+        #[cfg(feature = "sources-syslog")]
+        (
+            "syslog / multiple output",
+            TestCase {
+                decoding: DeserializerConfig::Syslog,
+                multiple_outputs: true,
+                want: HashMap::from([
+                    (
+                        Some(LOGS),
+                        vec![schema::Definition::empty_legacy_namespace()
                             .with_event_field(
                                 &owned_value_path!("message"),
                                 Kind::bytes(),
@@ -1727,92 +1761,10 @@ fn test_config_outputs() {
                             )
                             .unknown_fields(Kind::object(value::kind::Collection::from_unknown(
                                 Kind::bytes(),
-                            ))),
+                            )))],
                     ),
-                )]),
-            },
-        ),
-        #[cfg(feature = "sources-syslog")]
-        (
-            "syslog / multiple output",
-            TestCase {
-                decoding: DeserializerConfig::Syslog,
-                multiple_outputs: true,
-                want: HashMap::from([
-                    (
-                        Some(LOGS),
-                        Some(
-                            schema::Definition::empty_legacy_namespace()
-                                .with_event_field(
-                                    &owned_value_path!("message"),
-                                    Kind::bytes(),
-                                    Some("message"),
-                                )
-                                .with_event_field(
-                                    &owned_value_path!("timestamp"),
-                                    Kind::timestamp(),
-                                    Some("timestamp"),
-                                )
-                                .with_event_field(
-                                    &owned_value_path!("hostname"),
-                                    Kind::bytes(),
-                                    Some("host"),
-                                )
-                                .optional_field(
-                                    &owned_value_path!("severity"),
-                                    Kind::bytes(),
-                                    Some("severity"),
-                                )
-                                .optional_field(&owned_value_path!("facility"), Kind::bytes(), None)
-                                .optional_field(
-                                    &owned_value_path!("version"),
-                                    Kind::integer(),
-                                    None,
-                                )
-                                .optional_field(&owned_value_path!("appname"), Kind::bytes(), None)
-                                .optional_field(&owned_value_path!("msgid"), Kind::bytes(), None)
-                                .optional_field(
-                                    &owned_value_path!("procid"),
-                                    Kind::integer().or_bytes(),
-                                    None,
-                                )
-                                .with_event_field(
-                                    &owned_value_path!("source_type"),
-                                    Kind::bytes()
-                                        .or_object(Collection::from_unknown(Kind::bytes())),
-                                    None,
-                                )
-                                .with_event_field(
-                                    &owned_value_path!("ddsource"),
-                                    Kind::bytes()
-                                        .or_object(Collection::from_unknown(Kind::bytes())),
-                                    None,
-                                )
-                                .with_event_field(
-                                    &owned_value_path!("ddtags"),
-                                    Kind::bytes()
-                                        .or_object(Collection::from_unknown(Kind::bytes())),
-                                    None,
-                                )
-                                .with_event_field(
-                                    &owned_value_path!("service"),
-                                    Kind::bytes()
-                                        .or_object(Collection::from_unknown(Kind::bytes())),
-                                    None,
-                                )
-                                .with_event_field(
-                                    &owned_value_path!("status"),
-                                    Kind::bytes()
-                                        .or_object(Collection::from_unknown(Kind::bytes())),
-                                    None,
-                                )
-                                .unknown_fields(Kind::object(
-                                    value::kind::Collection::from_unknown(Kind::bytes()),
-                                )),
-                        ),
-                    ),
-                    (Some(METRICS), None),
-                    (Some(TRACES), None),
+                    (Some(METRICS), vec![]),
+                    (Some(TRACES), vec![]),
                 ]),
             },
         ),
@@ -1834,7 +1786,7 @@ fn test_config_outputs() {
         let mut outputs = config
             .outputs(LogNamespace::Legacy)
             .into_iter()
-            .map(|output| (output.port, output.log_schema_definition))
+            .map(|output| (output.port, output.log_schema_definitions))
             .collect::<HashMap<_, _>>();
 
         for (name, want) in want {
@@ -2078,52 +2030,53 @@ fn test_output_schema_definition_json_vector_namespace() {
     .unwrap()
     .outputs(LogNamespace::Vector)[0]
         .clone()
-        .log_schema_definition
-        .unwrap();
+        .log_schema_definitions;
 
     assert_eq!(
         definition,
-        Definition::new_with_default_metadata(Kind::json(), [LogNamespace::Vector])
-            .with_metadata_field(
-                &owned_value_path!("datadog_agent", "ddsource"),
-                Kind::bytes(),
-                Some("source")
-            )
-            .with_metadata_field(
-                &owned_value_path!("datadog_agent", "ddtags"),
-                Kind::bytes(),
-                Some("tags")
-            )
-            .with_metadata_field(
-                &owned_value_path!("datadog_agent", "hostname"),
-                Kind::bytes(),
-                Some("host")
-            )
-            .with_metadata_field(
-                &owned_value_path!("datadog_agent", "service"),
-                Kind::bytes(),
-                Some("service")
-            )
-            .with_metadata_field(
-                &owned_value_path!("datadog_agent", "status"),
-                Kind::bytes(),
-                Some("severity")
-            )
-            .with_metadata_field(
-                &owned_value_path!("datadog_agent", "timestamp"),
-                Kind::timestamp(),
-                Some("timestamp")
-            )
-            .with_metadata_field(
-                &owned_value_path!("vector", "ingest_timestamp"),
-                Kind::timestamp(),
-                None
-            )
-            .with_metadata_field(
-                &owned_value_path!("vector", "source_type"),
-                Kind::bytes(),
-                None
-            )
+        vec![
+            Definition::new_with_default_metadata(Kind::json(), [LogNamespace::Vector])
+                .with_metadata_field(
+                    &owned_value_path!("datadog_agent", "ddsource"),
+                    Kind::bytes(),
+                    Some("source")
+                )
+                .with_metadata_field(
+                    &owned_value_path!("datadog_agent", "ddtags"),
+                    Kind::bytes(),
+                    Some("tags")
+                )
+                .with_metadata_field(
+                    &owned_value_path!("datadog_agent", "hostname"),
+                    Kind::bytes(),
+                    Some("host")
+                )
+                .with_metadata_field(
+                    &owned_value_path!("datadog_agent", "service"),
+                    Kind::bytes(),
+                    Some("service")
+                )
+                .with_metadata_field(
+                    &owned_value_path!("datadog_agent", "status"),
+                    Kind::bytes(),
+                    Some("severity")
+                )
+                .with_metadata_field(
+                    &owned_value_path!("datadog_agent", "timestamp"),
+                    Kind::timestamp(),
+                    Some("timestamp")
+                )
+                .with_metadata_field(
+                    &owned_value_path!("vector", "ingest_timestamp"),
+                    Kind::timestamp(),
+                    None
+                )
+                .with_metadata_field(
+                    &owned_value_path!("vector", "source_type"),
+                    Kind::bytes(),
+                    None
+                )
+        ]
     )
 }
 
@@ -2136,53 +2089,54 @@ fn test_output_schema_definition_bytes_vector_namespace() {
     .unwrap()
     .outputs(LogNamespace::Vector)[0]
         .clone()
-        .log_schema_definition
-        .unwrap();
+        .log_schema_definitions;
 
     assert_eq!(
         definition,
-        Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
-            .with_metadata_field(
-                &owned_value_path!("datadog_agent", "ddsource"),
-                Kind::bytes(),
-                Some("source")
-            )
-            .with_metadata_field(
-                &owned_value_path!("datadog_agent", "ddtags"),
-                Kind::bytes(),
-                Some("tags")
-            )
-            .with_metadata_field(
-                &owned_value_path!("datadog_agent", "hostname"),
-                Kind::bytes(),
-                Some("host")
-            )
-            .with_metadata_field(
-                &owned_value_path!("datadog_agent", "service"),
-                Kind::bytes(),
-                Some("service")
-            )
-            .with_metadata_field(
-                &owned_value_path!("datadog_agent", "status"),
-                Kind::bytes(),
-                Some("severity")
-            )
-            .with_metadata_field(
-                &owned_value_path!("datadog_agent", "timestamp"),
-                Kind::timestamp(),
-                Some("timestamp")
-            )
-            .with_metadata_field(
-                &owned_value_path!("vector", "ingest_timestamp"),
-                Kind::timestamp(),
-                None
-            )
-            .with_metadata_field(
-                &owned_value_path!("vector", "source_type"),
-                Kind::bytes(),
-                None
-            )
-            .with_meaning(OwnedTargetPath::event_root(), "message")
+        vec![
+            Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
+                .with_metadata_field(
+                    &owned_value_path!("datadog_agent", "ddsource"),
+                    Kind::bytes(),
+                    Some("source")
+                )
+                .with_metadata_field(
+                    &owned_value_path!("datadog_agent", "ddtags"),
+                    Kind::bytes(),
+                    Some("tags")
+                )
+                .with_metadata_field(
+                    &owned_value_path!("datadog_agent", "hostname"),
+                    Kind::bytes(),
+                    Some("host")
+                )
+                .with_metadata_field(
+                    &owned_value_path!("datadog_agent", "service"),
+                    Kind::bytes(),
+                    Some("service")
+                )
+                .with_metadata_field(
+                    &owned_value_path!("datadog_agent", "status"),
+                    Kind::bytes(),
+                    Some("severity")
+                )
+                .with_metadata_field(
+                    &owned_value_path!("datadog_agent", "timestamp"),
+                    Kind::timestamp(),
+                    Some("timestamp")
+                )
+                .with_metadata_field(
+                    &owned_value_path!("vector", "ingest_timestamp"),
+                    Kind::timestamp(),
+                    None
+                )
+                .with_metadata_field(
+                    &owned_value_path!("vector", "source_type"),
+                    Kind::bytes(),
+                    None
+                )
+                .with_meaning(OwnedTargetPath::event_root(), "message")
+        ]
     )
 }
 
@@ -2195,23 +2149,24 @@ fn test_output_schema_definition_json_legacy_namespace() {
     .unwrap()
     .outputs(LogNamespace::Legacy)[0]
         .clone()
-        .log_schema_definition
-        .unwrap();
+        .log_schema_definitions;
 
     assert_eq!(
         definition,
-        Definition::new_with_default_metadata(Kind::json(), [LogNamespace::Legacy])
-            .with_event_field(
-                &owned_value_path!("timestamp"),
-                Kind::json().or_timestamp(),
-                None
-            )
-            .with_event_field(&owned_value_path!("ddsource"), Kind::json(), None)
-            .with_event_field(&owned_value_path!("ddtags"), Kind::json(), None)
-            .with_event_field(&owned_value_path!("hostname"), Kind::json(), None)
-            .with_event_field(&owned_value_path!("service"), Kind::json(), None)
-            .with_event_field(&owned_value_path!("source_type"), Kind::json(), None)
-            .with_event_field(&owned_value_path!("status"), Kind::json(), None)
+        vec![
+            Definition::new_with_default_metadata(Kind::json(), [LogNamespace::Legacy])
+                .with_event_field(
+                    &owned_value_path!("timestamp"),
+                    Kind::json().or_timestamp(),
+                    None
+                )
+                .with_event_field(&owned_value_path!("ddsource"), Kind::json(), None)
+                .with_event_field(&owned_value_path!("ddtags"), Kind::json(), None)
+                .with_event_field(&owned_value_path!("hostname"), Kind::json(), None)
+                .with_event_field(&owned_value_path!("service"), Kind::json(), None)
+                .with_event_field(&owned_value_path!("source_type"), Kind::json(), None)
+                .with_event_field(&owned_value_path!("status"), Kind::json(), None)
+        ]
     )
 }
 
@@ -2224,12 +2179,11 @@ fn test_output_schema_definition_bytes_legacy_namespace() {
     .unwrap()
     .outputs(LogNamespace::Legacy)[0]
         .clone()
-        .log_schema_definition
-        .unwrap();
+        .log_schema_definitions;
 
     assert_eq!(
         definition,
-        Definition::new_with_default_metadata(
+        vec![Definition::new_with_default_metadata(
             Kind::object(Collection::empty()),
             [LogNamespace::Legacy]
         )
@@ -2260,7 +2214,7 @@ fn test_output_schema_definition_bytes_legacy_namespace() {
             &owned_value_path!("timestamp"),
             Kind::timestamp(),
             Some("timestamp")
-        )
+        )]
     )
 }
 

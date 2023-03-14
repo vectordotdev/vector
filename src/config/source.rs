@@ -99,7 +99,10 @@ pub struct SourceContext {
     ///
     /// Given a source can expose multiple [`Output`] channels, the ID is tied to the identifier of
     /// that `Output`.
-    pub schema_definitions: HashMap<Option<String>, schema::Definition>,
+    ///
+    /// TODO Sources technically can only have one definition, but Output now has multiple definitions
+    /// to handle the fact that transforms can have multiple. This should be resolved.
+    pub schema_definitions: HashMap<Option<String>, Vec<schema::Definition>>,
 }
 
 impl SourceContext {
@@ -128,7 +131,7 @@ impl SourceContext {
     #[cfg(test)]
     pub fn new_test(
         out: SourceSender,
-        schema_definitions: Option<HashMap<Option<String>, schema::Definition>>,
+        schema_definitions: Option<HashMap<Option<String>, Vec<schema::Definition>>>,
     ) -> Self {
         Self {
             key: ComponentKey::from("default"),

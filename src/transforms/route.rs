@@ -101,19 +101,19 @@ impl TransformConfig for RouteConfig {
         }
     }
 
-    fn outputs(&self, merged_definition: &schema::Definition, _: LogNamespace) -> Vec<Output> {
+    fn outputs(&self, input_definitions: Vec<schema::Definition>, _: LogNamespace) -> Vec<Output> {
         let mut result: Vec<Output> = self
             .route
             .keys()
             .map(|output_name| {
                 Output::default(DataType::all())
-                    .with_schema_definition(merged_definition.clone())
+                    .with_schema_definitions(input_definitions.clone())
                     .with_port(output_name)
             })
             .collect();
         result.push(
             Output::default(DataType::all())
-                .with_schema_definition(merged_definition.clone())
+                .with_schema_definitions(input_definitions.clone())
                 .with_port(UNMATCHED_ROUTE),
         );
         result
