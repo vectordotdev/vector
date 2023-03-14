@@ -184,7 +184,7 @@ pub(crate) fn input_definitions(
     for input in inputs {
         let key = &input.component;
 
-        // If the input is a source we retrieve the defnitions from the source
+        // If the input is a source we retrieve the definitions from the source
         // (there should only be one) and add it to the return.
         if let Ok(maybe_output) = config.source_output_for_port(key, &input.port) {
             let mut source_definitions = maybe_output
