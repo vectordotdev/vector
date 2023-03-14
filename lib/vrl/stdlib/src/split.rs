@@ -4,7 +4,7 @@ use vrl::prelude::*;
 fn split(value: Value, limit: Value, pattern: Value) -> Resolved {
     let string = value.try_bytes_utf8_lossy()?;
     let limit = match limit.try_integer()? {
-        x if x < 0 => return Err(format!("limit requires a positive integer got {}", x).into()),
+        x if x < 0 => return Err(format!("limit requires a positive integer got {x}").into()),
         x => x as usize,
     };
 
