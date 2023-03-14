@@ -270,7 +270,7 @@ pub enum Sinks {
     /// WebHDFS.
     #[cfg(feature = "sinks-webhdfs")]
     #[configurable(metadata(docs::label = "WebHDFS"))]
-    WebHdfs(webhdfs::WebHdfsConfig),
+    Webhdfs(webhdfs::WebHdfsConfig),
 
     /// Deliver log events to Honeycomb.
     #[cfg(feature = "sinks-honeycomb")]
@@ -485,7 +485,7 @@ impl NamedComponent for Sinks {
             #[cfg(feature = "sinks-gcp")]
             Self::GcpPubsub(config) => config.get_component_name(),
             #[cfg(feature = "sinks-webhdfs")]
-            Self::WebHdfs(config) => config.get_component_name(),
+            Self::Webhdfs(config) => config.get_component_name(),
             #[cfg(feature = "sinks-honeycomb")]
             Self::Honeycomb(config) => config.get_component_name(),
             #[cfg(feature = "sinks-http")]
