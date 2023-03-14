@@ -40,7 +40,7 @@ remap: functions: hmac: {
 			required: false
 			default:  "SHA-256"
 			type: ["string"]
-		}
+		},
 	]
 	internal_failure_reasons: []
 	return: types: ["string"]
@@ -68,8 +68,8 @@ remap: functions: hmac: {
 			  if err == null {
 			    .hmac = encode_base16(hmac_bytes)
 			  }
-			"""#
+				"""#
 			return: "78b184f1832f8aff3934f5e0212454671b2d04d494e3b25075c5e45167029662"
-		}
+		},
 	]
 }
