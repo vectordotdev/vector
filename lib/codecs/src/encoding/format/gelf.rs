@@ -353,7 +353,7 @@ mod tests {
             };
 
             let jsn = do_serialize(true, event_fields).unwrap();
-            assert_eq!(true, jsn.get(TIMESTAMP).unwrap().is_f64());
+            assert!(jsn.get(TIMESTAMP).unwrap().is_f64());
             assert_eq!(jsn.get(TIMESTAMP).unwrap().as_f64().unwrap(), 0.1,);
         }
 
@@ -371,7 +371,7 @@ mod tests {
             };
 
             let jsn = do_serialize(true, event_fields).unwrap();
-            assert_eq!(true, jsn.get(TIMESTAMP).unwrap().is_i64());
+            assert!(jsn.get(TIMESTAMP).unwrap().is_i64());
             assert_eq!(jsn.get(TIMESTAMP).unwrap().as_i64().unwrap(), 0);
         }
     }
