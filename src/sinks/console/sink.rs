@@ -97,6 +97,7 @@ mod test {
             output: Vec::new(),
             transformer: Default::default(),
             encoder,
+            source_keys: vec![],
         };
 
         run_and_assert_sink_compliance(
