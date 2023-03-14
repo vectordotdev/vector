@@ -251,10 +251,19 @@ impl TransformConfig for RemapConfig {
 
                     let state = program.final_type_state();
 
-                    let mut new_type_def = Definition::new_with_default_metadata(
+                    let mut new_type_def = Definition::new(
                         state.external.target_kind().clone(),
+                        state.external.metadata_kind().clone(),
                         input_definition.log_namespaces().clone(),
                     );
+
+                    for (id, path) in input_definition.meanings() {
+                        // Attempt to copy over the meanings from the input definition.
+                        // The function will fail if the meaning that now points to a field that no longer exists,
+                        // this is fine since we will no longer want that meaning in the output definition.
+                        let _ = new_type_def.try_with_meaning(path.clone(), &id);
+                    }
+
                     for (id, path) in meaning {
                         // currently only event paths are supported
                         new_type_def = new_type_def.with_meaning(OwnedTargetPath::event(path), &id);

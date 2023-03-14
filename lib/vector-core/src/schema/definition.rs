@@ -406,6 +406,42 @@ impl Definition {
         self
     }
 
+    /// Register a semantic meaning for the definition.
+    ///
+    /// Returns an error if the provided path points to an unknown location in the collection.
+    pub fn try_with_meaning(
+        &mut self,
+        target_path: OwnedTargetPath,
+        meaning: &str,
+    ) -> Result<(), &'static str> {
+        // Ensure the path exists in the collection.
+        match target_path.prefix {
+            PathPrefix::Event => {
+                if !self
+                    .event_kind
+                    .at_path(&target_path.path)
+                    .contains_any_defined()
+                {
+                    return Err("meaning must point to a valid path");
+                }
+            }
+            PathPrefix::Metadata => {
+                if !self
+                    .metadata_kind
+                    .at_path(&target_path.path)
+                    .contains_any_defined()
+                {
+                    return Err("meaning must point to a valid path");
+                }
+            }
+        }
+
+        self.meaning
+            .insert(meaning.to_owned(), MeaningPointer::Valid(target_path));
+
+        Ok(())
+    }
+
     /// Set the kind for all unknown fields.
     #[must_use]
     pub fn unknown_fields(mut self, unknown: impl Into<Kind>) -> Self {

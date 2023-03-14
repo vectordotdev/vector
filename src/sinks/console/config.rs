@@ -95,7 +95,7 @@ impl SinkConfig for ConsoleSinkConfig {
 
     fn input(&self) -> Input {
         // WARN! This is just to test, if it appears in a PR I have really messed up.
-        let requirements = Requirement::empty().required_meaning("ponk", Kind::integer());
+        let requirements = Requirement::empty().required_meaning("host", Kind::integer());
         Input::new(self.encoding.config().1.input_type()).with_schema_requirement(requirements)
     }
 
