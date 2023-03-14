@@ -124,10 +124,7 @@ impl Application {
     }
 
     pub fn prepare_from_opts(opts: Opts) -> Result<(Runtime, Self), ExitCode> {
-        openssl_probe::init_ssl_cert_env_vars();
-
-        #[cfg(not(feature = "enterprise-tests"))]
-        metrics::init_global().expect("metrics initialization failed");
+        init_global();
 
         init_logging(
             opts.root.color,
@@ -349,6 +346,13 @@ async fn sources_finished(mutex: Arc<Mutex<TopologyController>>) {
             continue;
         }
     }
+}
+
+pub fn init_global() {
+    openssl_probe::init_ssl_cert_env_vars();
+
+    #[cfg(not(feature = "enterprise-tests"))]
+    metrics::init_global().expect("metrics initialization failed");
 }
 
 fn get_log_levels(default: &str) -> String {
