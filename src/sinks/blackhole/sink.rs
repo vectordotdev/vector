@@ -16,7 +16,7 @@ use tokio::{
 use vector_common::{
     config::ComponentKey,
     internal_event::{
-        ByteSize, BytesSent, CountByteSize, EventsSent, InternalEventHandle as _, Protocol
+        ByteSize, BytesSent, CountByteSize, EventsSent, InternalEventHandle as _, Protocol,
     },
 };
 use vector_core::EstimatedJsonEncodedSizeOf;
