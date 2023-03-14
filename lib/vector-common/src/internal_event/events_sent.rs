@@ -57,6 +57,7 @@ crate::registered_event!(
 );
 
 impl EventsSent {
+    #[must_use]
     pub fn sources_matrix(
         sources: Vec<ComponentKey>,
         output: Option<SharedString>,
@@ -64,17 +65,20 @@ impl EventsSent {
         sources
             .into_iter()
             .enumerate()
-            .map(|(id, key)| {
+            .map({ 
+                let output = output.clone();
+
+                move |(id, key)| {
                 let handle = register(Self::from((
                     Output(output.clone()),
                     Source(Some(key.into_id().into())),
                 )));
 
                 (Some(id), handle)
-            })
+            }})
             .chain(std::iter::once((
                 None,
-                register(Self::from((Output(None), Source(output.clone())))),
+                register(Self::from((Output(None), Source(output)))),
             )))
             .collect()
     }
