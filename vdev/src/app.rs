@@ -61,6 +61,7 @@ pub fn version() -> Result<String> {
             bail!("On latest release channel and tag {tag:?} is different from Cargo.toml {version:?}. Aborting");
         }
     } else if channel == "custom" {
+        let base_version = util::read_version()?;
         let short_hash_out = util::git_short_hash()?;
         if !short_hash_out.status.success() {
             let error = String::from_utf8_lossy(&short_hash_out.stderr);
@@ -72,7 +73,7 @@ pub fn version() -> Result<String> {
 
         // use '.' instead of '-' or '_' to avoid issues with rpm and deb package naming
         // format requirements.
-        version = format!("{version}.custom.{short_hash}");
+        version = format!("{base_version}.custom.{short_hash}");
     }
 
     Ok(version)
