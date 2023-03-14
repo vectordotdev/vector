@@ -95,18 +95,18 @@ impl BuildConstants {
 
 fn git_short_hash() -> String {
     let output = Command::new("git")
-        .args(&["rev-parse", "--short", "HEAD"])
+        .args(["rev-parse", "--short", "HEAD"])
         .output();
 
-    if output.is_err() {
-        "HEAD".to_string()
-    } else {
-        let mut hash = String::from_utf8(output.unwrap().stdout).unwrap();
+    if let Ok(output) = output {
+        let mut hash = String::from_utf8(output.stdout).unwrap();
 
         hash.retain(|c| c != '\n');
         hash.retain(|c| c != '\r');
 
         hash
+    } else {
+        "HEAD".to_string()
     }
 }
 
