@@ -504,8 +504,7 @@ impl TryFrom<::value::Value> for MetricKind {
             "incremental" => Ok(Self::Incremental),
             "absolute" => Ok(Self::Absolute),
             value => Err(format!(
-                "invalid metric kind {}, metric kind must be `absolute` or `incremental`",
-                value
+                "invalid metric kind {value}, metric kind must be `absolute` or `incremental`"
             )),
         }
     }

@@ -1291,9 +1291,7 @@ mod tests {
 
                 assert!(
                     (positive - negative).abs() <= 1.0e-6,
-                    "positive vs negative difference too great ({} vs {})",
-                    positive,
-                    negative
+                    "positive vs negative difference too great ({positive} vs {negative})",
                 );
             }
 
@@ -1499,18 +1497,14 @@ mod tests {
         let max_observed_rel_acc = check_max_relative_accuracy(config, min_value, max_value);
         assert!(
             max_observed_rel_acc <= rel_acc + FLOATING_POINT_ACCEPTABLE_ERROR,
-            "observed out of bound max relative acc: {}, target rel acc={}",
-            max_observed_rel_acc,
-            rel_acc
+            "observed out of bound max relative acc: {max_observed_rel_acc}, target rel acc={rel_acc}",
         );
     }
 
     fn compute_relative_accuracy(target: f64, actual: f64) -> f64 {
         assert!(
             !(target < 0.0 || actual < 0.0),
-            "expected/actual values must be greater than 0.0; target={}, actual={}",
-            target,
-            actual
+            "expected/actual values must be greater than 0.0; target={target}, actual={actual}",
         );
 
         if target == actual {

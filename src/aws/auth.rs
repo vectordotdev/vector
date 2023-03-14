@@ -69,6 +69,21 @@ pub enum AwsAuthentication {
         /// The AWS secret access key.
         #[configurable(metadata(docs::examples = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"))]
         secret_access_key: SensitiveString,
+
+        /// The ARN of an [IAM role][iam_role] to assume.
+        ///
+        /// [iam_role]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles.html
+        #[configurable(metadata(docs::examples = "arn:aws:iam::123456789098:role/my_role"))]
+        assume_role: Option<String>,
+
+        /// The [AWS region][aws_region] to send STS requests to.
+        ///
+        /// If not set, this will default to the configured region
+        /// for the service itself.
+        ///
+        /// [aws_region]: https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints
+        #[configurable(metadata(docs::examples = "us-west-2"))]
+        region: Option<String>,
     },
 
     /// Authenticate using credentials stored in a file.
@@ -147,11 +162,23 @@ impl AwsAuthentication {
             Self::AccessKey {
                 access_key_id,
                 secret_access_key,
-            } => Ok(SharedCredentialsProvider::new(Credentials::from_keys(
-                access_key_id.inner(),
-                secret_access_key.inner(),
-                None,
-            ))),
+                assume_role,
+                region,
+            } => {
+                let provider = SharedCredentialsProvider::new(Credentials::from_keys(
+                    access_key_id.inner(),
+                    secret_access_key.inner(),
+                    None,
+                ));
+                if let Some(assume_role) = assume_role {
+                    let auth_region = region.clone().map(Region::new).unwrap_or(service_region);
+                    let provider = AssumeRoleProviderBuilder::new(assume_role)
+                        .region(auth_region)
+                        .build(provider);
+                    return Ok(SharedCredentialsProvider::new(provider));
+                }
+                Ok(provider)
+            }
             AwsAuthentication::File {
                 credentials_file,
                 profile,
@@ -197,6 +224,8 @@ impl AwsAuthentication {
         AwsAuthentication::AccessKey {
             access_key_id: "dummy".to_string().into(),
             secret_access_key: "dummy".to_string().into(),
+            assume_role: None,
+            region: None,
         }
     }
 }
@@ -392,6 +421,35 @@ mod tests {
         .unwrap();
 
         assert!(matches!(config.auth, AwsAuthentication::AccessKey { .. }));
+    }
+
+    #[test]
+    fn parsing_static_with_assume_role() {
+        let config = toml::from_str::<ComponentConfig>(
+            r#"
+            auth.access_key_id = "key"
+            auth.secret_access_key = "other"
+            auth.assume_role = "root"
+        "#,
+        )
+        .unwrap();
+
+        match config.auth {
+            AwsAuthentication::AccessKey {
+                access_key_id,
+                secret_access_key,
+                assume_role,
+                ..
+            } => {
+                assert_eq!(&access_key_id, &SensitiveString::from("key".to_string()));
+                assert_eq!(
+                    &secret_access_key,
+                    &SensitiveString::from("other".to_string())
+                );
+                assert_eq!(&assume_role, &Some("root".to_string()));
+            }
+            _ => panic!(),
+        }
     }
 
     #[test]

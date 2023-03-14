@@ -15,7 +15,7 @@ pub(super) const AUTO_EXTRACT_TIMESTAMP_FIELD: &str = "auto_extract_timestamp";
 
 /// Splunk HEC endpoint configuration.
 #[configurable_component]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum EndpointTarget {
     /// Events are sent to the [raw endpoint][raw_endpoint_docs].
@@ -34,11 +34,6 @@ pub enum EndpointTarget {
     ///
     /// [event_endpoint_docs]: https://docs.splunk.com/Documentation/Splunk/8.0.0/RESTREF/RESTinput#services.2Fcollector.2Fevent
     /// [event_metadata_docs]: https://docs.splunk.com/Documentation/Splunk/latest/Data/FormateventsforHTTPEventCollector#Event_metadata
+    #[default]
     Event,
-}
-
-impl Default for EndpointTarget {
-    fn default() -> Self {
-        EndpointTarget::Event
-    }
 }
