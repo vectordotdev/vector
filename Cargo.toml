@@ -284,7 +284,7 @@ indoc = { version = "2.0.1", default-features = false }
 inventory = { version = "0.3.4", default-features = false }
 k8s-openapi = { version = "0.16.0", default-features = false, features = ["api", "v1_19"], optional = true }
 kube = { version = "0.75.0", default-features = false, features = ["client", "native-tls", "runtime"], optional = true }
-listenfd = { version = "1.0.0", default-features = false, optional = true }
+listenfd = { version = "1.0.1", default-features = false, optional = true }
 logfmt = { version = "0.0.2", default-features = false, optional = true }
 lru = { version = "0.10.0", default-features = false, optional = true }
 maxminddb = { version = "0.23.0", default-features = false, optional = true }
