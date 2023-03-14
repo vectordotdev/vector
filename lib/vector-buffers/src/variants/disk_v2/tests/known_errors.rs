@@ -791,11 +791,11 @@ async fn reader_throws_error_when_record_is_undecodable_via_metadata() {
             CAN_DECODE_VALUE.store(1, Ordering::Relaxed);
             let second_read_result = reader.next().await;
             assert!(matches!(second_read_result, Err(ReaderError::Incompatible { .. })));
-            let second_read_error_reason = if let ReaderError::Incompatible { reason } = second_read_result.unwrap_err() {
-                reason
-            } else {
+
+            let ReaderError::Incompatible { reason: second_read_error_reason } = second_read_result.unwrap_err() else {
                 panic!("error should be ReadError::Incompatible");
             };
+
             let expected_second_read_error_reason = format!("record metadata not supported (metadata: {:#036b})", 0_u32);
             assert_eq!(expected_second_read_error_reason, second_read_error_reason);
 
@@ -806,15 +806,13 @@ async fn reader_throws_error_when_record_is_undecodable_via_metadata() {
             // should cause an "incompatible" error:
             let third_read_result = reader.next().await;
             assert!(matches!(third_read_result, Err(ReaderError::Incompatible { .. })));
-            let third_read_error_reason = if let ReaderError::Incompatible { reason } = third_read_result.unwrap_err() {
-                reason
-            } else {
+            let ReaderError::Incompatible { reason: third_read_error_reason } = third_read_result.unwrap_err() else {
                 panic!("error should be ReadError::Incompatible");
             };
+
             let expected_third_read_error_reason_prefix = "invalid metadata for";
             assert!(third_read_error_reason.starts_with(expected_third_read_error_reason_prefix),
-                "error reason when metadata cannot be converted should start with 'metadata invalid for', got '{}' instead",
-                third_read_error_reason);
+                "error reason when metadata cannot be converted should start with 'metadata invalid for', got '{third_read_error_reason}' instead");
         }
     })
     .await;

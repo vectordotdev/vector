@@ -10,8 +10,7 @@ fn format_int(value: Value, base: Option<Value>) -> Resolved {
             let value = base.try_integer()?;
             if !(2..=36).contains(&value) {
                 return Err(format!(
-                    "invalid base {}: must be be between 2 and 36 (inclusive)",
-                    value
+                    "invalid base {value}: must be be between 2 and 36 (inclusive)"
                 )
                 .into());
             }

@@ -429,16 +429,12 @@ mod tests {
         lhs: impl TryInto<Literal> + fmt::Debug + Clone,
         rhs: impl TryInto<Literal> + fmt::Debug + Clone,
     ) -> Op {
-        use std::result::Result::Err;
-
-        let lhs = match lhs.clone().try_into() {
-            Ok(v) => v,
-            Err(_) => panic!("not a valid lhs expression: {lhs:?}"),
+        let Ok(lhs) = lhs.clone().try_into() else {
+            panic!("not a valid lhs expression: {lhs:?}")
         };
 
-        let rhs = match rhs.clone().try_into() {
-            Ok(v) => v,
-            Err(_) => panic!("not a valid rhs expression: {rhs:?}"),
+        let Ok(rhs) = rhs.clone().try_into() else {
+            panic!("not a valid rhs expression: {rhs:?}")
         };
 
         Op {

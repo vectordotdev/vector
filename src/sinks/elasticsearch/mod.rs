@@ -120,10 +120,7 @@ impl_generate_config_from_default!(ElasticsearchConfig);
 
 #[derive(Debug, Clone)]
 pub enum ElasticsearchCommonMode {
-    Bulk {
-        index: Template,
-        action: Option<Template>,
-    },
+    Bulk { index: Template, action: Template },
     DataStream(DataStreamConfig),
 }
 
@@ -147,22 +144,19 @@ impl ElasticsearchCommonMode {
     fn bulk_action<'a>(&self, event: impl Into<EventRef<'a>>) -> Option<BulkAction> {
         match self {
             ElasticsearchCommonMode::Bulk {
-                action: bulk_action,
+                action: bulk_action_template,
                 ..
-            } => match bulk_action {
-                Some(template) => template
-                    .render_string(event)
-                    .map_err(|error| {
-                        emit!(TemplateRenderingError {
-                            error,
-                            field: Some("bulk_action"),
-                            drop_event: true,
-                        });
-                    })
-                    .ok()
-                    .and_then(|value| BulkAction::try_from(value.as_str()).ok()),
-                None => Some(BulkAction::Index),
-            },
+            } => bulk_action_template
+                .render_string(event)
+                .map_err(|error| {
+                    emit!(TemplateRenderingError {
+                        error,
+                        field: Some("bulk_action"),
+                        drop_event: true,
+                    });
+                })
+                .ok()
+                .and_then(|value| BulkAction::try_from(value.as_str()).ok()),
             // avoid the interpolation
             ElasticsearchCommonMode::DataStream(_) => Some(BulkAction::Create),
         }

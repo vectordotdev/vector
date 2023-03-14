@@ -2,6 +2,7 @@ use futures_util::FutureExt;
 use http::{Request, StatusCode, Uri};
 use hyper::body::Body;
 use snafu::Snafu;
+use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
 use vector_core::{config::AcknowledgementsConfig, tls::TlsEnableableConfig};
 
@@ -29,8 +30,6 @@ pub(crate) fn default_site() -> String {
 
 /// Shared configuration for Datadog sinks.
 /// Contains the maximum set of common settings that applies to all DD sink components.
-// TODO: The `default_api_key` option should be included in this struct once the `api_key`
-// (a deprecated alias to default_api_key` is fully eradicated, which is targeted for v0.29.0.
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
@@ -55,6 +54,16 @@ pub struct DatadogCommonConfig {
     #[serde(default = "default_site")]
     pub site: String,
 
+    /// The default Datadog [API key][api_key] to use in authentication of HTTP requests.
+    ///
+    /// If an event has a Datadog [API key][api_key] set explicitly in its metadata, it will take
+    /// precedence over this setting.
+    ///
+    /// [api_key]: https://docs.datadoghq.com/api/?lang=bash#authentication
+    #[configurable(metadata(docs::examples = "${DATADOG_API_KEY_ENV_VAR}"))]
+    #[configurable(metadata(docs::examples = "ef8d5de700e7989468166c40fc8a0ccd"))]
+    pub default_api_key: SensitiveString,
+
     #[configurable(derived)]
     #[serde(default)]
     pub tls: Option<TlsEnableableConfig>,
@@ -73,6 +82,7 @@ impl Default for DatadogCommonConfig {
         Self {
             endpoint: None,
             site: default_site(),
+            default_api_key: SensitiveString::default(),
             tls: None,
             acknowledgements: AcknowledgementsConfig::default(),
         }
@@ -85,13 +95,14 @@ impl DatadogCommonConfig {
     fn build_healthcheck(
         &self,
         client: HttpClient,
-        api_key: String,
         region: Option<&Region>,
     ) -> crate::Result<Healthcheck> {
         let validate_endpoint = get_api_validate_endpoint(
             self.endpoint.as_ref(),
             get_base_domain_region(self.site.as_str(), region),
         )?;
+
+        let api_key: String = self.default_api_key.clone().into();
 
         Ok(build_healthcheck_future(client, validate_endpoint, api_key).boxed())
     }
