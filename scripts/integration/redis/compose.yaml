@@ -1,0 +1,9 @@
+version: '3'
+
+services:
+  redis:
+    image: docker.io/redis:${CONFIG_VERSION}
+
+networks:
+  default:
+    name: ${VECTOR_NETWORK}

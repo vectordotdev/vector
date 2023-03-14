@@ -43,8 +43,8 @@ export CURRENT_DIR = $(shell pwd)
 export ENVIRONMENT ?= false
 # The upstream container we publish artifacts to on a successful master build.
 export ENVIRONMENT_UPSTREAM ?= docker.io/timberio/vector-dev:sha-3eadc96742a33754a5859203b58249f6a806972a
-# Override to disable building the container, having it pull from the Github packages repo instead
-# TODO: Disable this by default. Blocked by `docker pull` from Github Packages requiring authenticated login
+# Override to disable building the container, having it pull from the GitHub packages repo instead
+# TODO: Disable this by default. Blocked by `docker pull` from GitHub Packages requiring authenticated login
 export ENVIRONMENT_AUTOBUILD ?= true
 # Override this when appropriate to disable a TTY being available in commands with `ENVIRONMENT=true`
 export ENVIRONMENT_TTY ?= true
@@ -54,7 +54,7 @@ export AWS_ACCESS_KEY_ID ?= "dummy"
 export AWS_SECRET_ACCESS_KEY ?= "dummy"
 
 # Set version
-export VERSION ?= $(shell scripts/version.sh)
+export VERSION ?= $(shell cargo vdev version)
 
 # Set if you are on the CI and actually want the things to happen. (Non-CI users should never set this.)
 export CI ?= false
@@ -305,7 +305,7 @@ test-docs: ## Run the docs test suite
 	${MAYBE_ENVIRONMENT_EXEC} cargo test --doc --workspace --no-fail-fast --no-default-features --features "${FEATURES}" ${SCOPE}
 
 .PHONY: test-all
-test-all: test test-docs test-behavior test-integration ## Runs all tests: unit, docs, behavioral, and integration.
+test-all: test test-docs test-behavior test-integration test-component-validation ## Runs all tests: unit, docs, behavioral, integration, and component validation.
 
 .PHONY: test-x86_64-unknown-linux-gnu
 test-x86_64-unknown-linux-gnu: cross-test-x86_64-unknown-linux-gnu ## Runs unit tests on the x86_64-unknown-linux-gnu triple
@@ -330,49 +330,19 @@ test-behavior: test-behavior-transforms test-behavior-formats test-behavior-conf
 
 .PHONY: test-integration
 test-integration: ## Runs all integration tests
-test-integration: test-integration-amqp test-integration-apex test-integration-aws test-integration-axiom test-integration-azure test-integration-chronicle test-integration-clickhouse
-test-integration: test-integration-docker-logs test-integration-elasticsearch
+test-integration: test-integration-amqp test-integration-aws test-integration-axiom test-integration-azure test-integration-chronicle test-integration-clickhouse
+test-integration: test-integration-databend test-integration-docker-logs test-integration-elasticsearch
 test-integration: test-integration-eventstoredb test-integration-fluent test-integration-gcp test-integration-humio test-integration-http-client test-integration-influxdb
 test-integration: test-integration-kafka test-integration-logstash test-integration-loki test-integration-mongodb test-integration-nats
 test-integration: test-integration-nginx test-integration-opentelemetry test-integration-postgres test-integration-prometheus test-integration-pulsar
 test-integration: test-integration-redis test-integration-splunk test-integration-dnstap test-integration-datadog-agent test-integration-datadog-logs
 test-integration: test-integration-datadog-traces test-integration-shutdown
 
-.PHONY: test-integration-aws-s3
-test-integration-aws-s3: ## Runs AWS S3 integration tests
-	FILTER=::aws_s3 make test-integration-aws
-
-.PHONY: test-integration-aws-sqs
-test-integration-aws-sqs: ## Runs AWS SQS integration tests
-	FILTER=::aws_sqs make test-integration-aws
-
-.PHONY: test-integration-aws-cloudwatch-logs
-test-integration-aws-cloudwatch-logs: ## Runs AWS Cloudwatch Logs integration tests
-	FILTER=::aws_cloudwatch_logs make test-integration-aws
-
-.PHONY: test-integration-aws-cloudwatch-metrics
-test-integration-aws-cloudwatch-metrics: ## Runs AWS Cloudwatch Metrics integration tests
-	FILTER=::aws_cloudwatch_metrics make test-integration-aws
-
-.PHONY: test-integration-aws-kinesis
-test-integration-aws-kinesis: ## Runs AWS Kinesis integration tests
-	FILTER=::aws_kinesis make test-integration-aws
-
-.PHONY: test-integration-datadog-agent
-test-integration-datadog-agent: ## Runs Datadog Agent integration tests
-	@test $${TEST_DATADOG_API_KEY?TEST_DATADOG_API_KEY must be set}
-	RUST_VERSION=${RUST_VERSION} ${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.datadog-agent.yml build
-	RUST_VERSION=${RUST_VERSION} ${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.datadog-agent.yml run --rm runner
-ifeq ($(AUTODESPAWN), true)
-	make test-integration-datadog-agent-cleanup
-endif
-
 test-integration-%-cleanup:
-	${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.$*.yml rm --force --stop -v
+	cargo vdev --verbose integration stop $*
 
 test-integration-%:
-	RUST_VERSION=${RUST_VERSION} ${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.$*.yml build
-	RUST_VERSION=${RUST_VERSION} ${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.$*.yml run --rm runner
+	cargo vdev --verbose integration test $*
 ifeq ($(AUTODESPAWN), true)
 	make test-integration-$*-cleanup
 endif
@@ -384,6 +354,10 @@ test-e2e-kubernetes: ## Runs Kubernetes E2E tests (Sorry, no `ENVIRONMENT=true` 
 .PHONY: test-cli
 test-cli: ## Runs cli tests
 	${MAYBE_ENVIRONMENT_EXEC} cargo nextest run --no-fail-fast --no-default-features --features cli-tests --test integration --test-threads 4
+
+.PHONY: test-component-validation
+test-component-validation: ## Runs component validation tests
+	${MAYBE_ENVIRONMENT_EXEC} cargo nextest run --no-fail-fast --no-default-features --features component-validation-tests --status-level pass --test-threads 4 components::validation::tests
 
 ##@ Benching (Supports `ENVIRONMENT=true`)
 
@@ -437,61 +411,57 @@ bench-all: bench-remap-functions
 
 .PHONY: check
 check: ## Run prerequisite code checks
-	${MAYBE_ENVIRONMENT_EXEC} cargo check --workspace --all-targets --features all-integration-tests
+	${MAYBE_ENVIRONMENT_EXEC} cargo vdev check rust
 
 .PHONY: check-all
 check-all: ## Check everything
-check-all: check-fmt check-clippy check-style check-docs
+check-all: check-fmt check-clippy check-docs
 check-all: check-version check-examples check-component-features
 check-all: check-scripts check-deny check-component-docs
 
 .PHONY: check-component-features
 check-component-features: ## Check that all component features are setup properly
-	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-component-features
+	${MAYBE_ENVIRONMENT_EXEC} cargo vdev check component-features
 
 .PHONY: check-clippy
 check-clippy: ## Check code with Clippy
-	${MAYBE_ENVIRONMENT_EXEC} cargo clippy --workspace --all-targets --features all-integration-tests -- -D warnings
+	${MAYBE_ENVIRONMENT_EXEC} cargo vdev check rust --clippy
 
 .PHONY: check-docs
 check-docs: ## Check that all /docs file are valid
-	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-docs.sh
+	${MAYBE_ENVIRONMENT_EXEC} cargo vdev check docs
 
 .PHONY: check-fmt
 check-fmt: ## Check that all files are formatted properly
-	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-fmt.sh
-
-.PHONY: check-style
-check-style: ## Check that all files are styled properly
-	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-style.sh
+	${MAYBE_ENVIRONMENT_EXEC} cargo vdev check fmt
 
 .PHONY: check-markdown
 check-markdown: ## Check that markdown is styled properly
-	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-markdown.sh
+	${MAYBE_ENVIRONMENT_EXEC} cargo vdev check markdown
 
 .PHONY: check-version
 check-version: ## Check that Vector's version is correct accounting for recent changes
-	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-version.rb
+	${MAYBE_ENVIRONMENT_EXEC} cargo vdev check version
 
 .PHONY: check-examples
 check-examples: ## Check that the config/examples files are valid
-	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-examples.sh
+	${MAYBE_ENVIRONMENT_EXEC} cargo vdev check examples
 
 .PHONY: check-scripts
-check-scripts: ## Check that scipts do not have common mistakes
-	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-scripts.sh
+check-scripts: ## Check that scripts do not have common mistakes
+	${MAYBE_ENVIRONMENT_EXEC} cargo vdev check scripts
 
 .PHONY: check-deny
 check-deny: ## Check advisories licenses and sources for crate dependencies
-	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-deny.sh
+	${MAYBE_ENVIRONMENT_EXEC} cargo vdev check deny
 
 .PHONY: check-events
 check-events: ## Check that events satisfy patterns set in https://github.com/vectordotdev/vector/blob/master/rfcs/2020-03-17-2064-event-driven-observability.md
-	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-events
+	${MAYBE_ENVIRONMENT_EXEC} cargo vdev check events
 
 .PHONY: check-component-docs
 check-component-docs: generate-component-docs ## Checks that the machine-generated component Cue docs are up-to-date.
-	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-component-docs.sh
+	${MAYBE_ENVIRONMENT_EXEC} cargo vdev check component-docs
 
 ##@ Rustdoc
 build-rustdoc: ## Build Vector's Rustdocs
@@ -512,7 +482,7 @@ target/artifacts/vector-${VERSION}-%.tar.gz: target/%/release/vector.tar.gz
 
 .PHONY: package
 package: build ## Build the Vector archive
-	${MAYBE_ENVIRONMENT_EXEC} ./scripts/package-archive.sh
+	${MAYBE_ENVIRONMENT_EXEC} cargo vdev package archive
 
 .PHONY: package-x86_64-unknown-linux-gnu-all
 package-x86_64-unknown-linux-gnu-all: package-x86_64-unknown-linux-gnu package-deb-x86_64-unknown-linux-gnu package-rpm-x86_64-unknown-linux-gnu # Build all x86_64 GNU packages
@@ -557,37 +527,37 @@ package-armv7-unknown-linux-musleabihf: target/artifacts/vector-${VERSION}-armv7
 
 .PHONY: package-deb-x86_64-unknown-linux-gnu
 package-deb-x86_64-unknown-linux-gnu: package-x86_64-unknown-linux-gnu ## Build the x86_64 GNU deb package
-	$(CONTAINER_TOOL) run -v  $(PWD):/git/vectordotdev/vector/ -e TARGET=x86_64-unknown-linux-gnu $(ENVIRONMENT_UPSTREAM) ./scripts/package-deb.sh
+	$(CONTAINER_TOOL) run -v  $(PWD):/git/vectordotdev/vector/ -e TARGET=x86_64-unknown-linux-gnu $(ENVIRONMENT_UPSTREAM) cargo vdev package deb
 
 .PHONY: package-deb-x86_64-unknown-linux-musl
 package-deb-x86_64-unknown-linux-musl: package-x86_64-unknown-linux-musl ## Build the x86_64 GNU deb package
-	$(CONTAINER_TOOL) run -v  $(PWD):/git/vectordotdev/vector/ -e TARGET=x86_64-unknown-linux-musl $(ENVIRONMENT_UPSTREAM) ./scripts/package-deb.sh
+	$(CONTAINER_TOOL) run -v  $(PWD):/git/vectordotdev/vector/ -e TARGET=x86_64-unknown-linux-musl $(ENVIRONMENT_UPSTREAM) cargo vdev package deb
 
 .PHONY: package-deb-aarch64
 package-deb-aarch64: package-aarch64-unknown-linux-gnu ## Build the aarch64 deb package
-	$(CONTAINER_TOOL) run -v  $(PWD):/git/vectordotdev/vector/ -e TARGET=aarch64-unknown-linux-gnu $(ENVIRONMENT_UPSTREAM) ./scripts/package-deb.sh
+	$(CONTAINER_TOOL) run -v  $(PWD):/git/vectordotdev/vector/ -e TARGET=aarch64-unknown-linux-gnu $(ENVIRONMENT_UPSTREAM) cargo vdev package deb
 
 .PHONY: package-deb-armv7-gnu
 package-deb-armv7-gnu: package-armv7-unknown-linux-gnueabihf ## Build the armv7-unknown-linux-gnueabihf deb package
-	$(CONTAINER_TOOL) run -v  $(PWD):/git/vectordotdev/vector/ -e TARGET=armv7-unknown-linux-gnueabihf $(ENVIRONMENT_UPSTREAM) ./scripts/package-deb.sh
+	$(CONTAINER_TOOL) run -v  $(PWD):/git/vectordotdev/vector/ -e TARGET=armv7-unknown-linux-gnueabihf $(ENVIRONMENT_UPSTREAM) cargo vdev package deb
 
 # rpms
 
 .PHONY: package-rpm-x86_64-unknown-linux-gnu
 package-rpm-x86_64-unknown-linux-gnu: package-x86_64-unknown-linux-gnu ## Build the x86_64 rpm package
-	$(CONTAINER_TOOL) run -v  $(PWD):/git/vectordotdev/vector/ -e TARGET=x86_64-unknown-linux-gnu $(ENVIRONMENT_UPSTREAM) ./scripts/package-rpm.sh
+	$(CONTAINER_TOOL) run -v  $(PWD):/git/vectordotdev/vector/ -e TARGET=x86_64-unknown-linux-gnu $(ENVIRONMENT_UPSTREAM) cargo vdev package rpm
 
 .PHONY: package-rpm-x86_64-unknown-linux-musl
 package-rpm-x86_64-unknown-linux-musl: package-x86_64-unknown-linux-musl ## Build the x86_64 musl rpm package
-	$(CONTAINER_TOOL) run -v  $(PWD):/git/vectordotdev/vector/ -e TARGET=x86_64-unknown-linux-musl $(ENVIRONMENT_UPSTREAM) ./scripts/package-rpm.sh
+	$(CONTAINER_TOOL) run -v  $(PWD):/git/vectordotdev/vector/ -e TARGET=x86_64-unknown-linux-musl $(ENVIRONMENT_UPSTREAM) cargo vdev package rpm
 
 .PHONY: package-rpm-aarch64
 package-rpm-aarch64: package-aarch64-unknown-linux-gnu ## Build the aarch64 rpm package
-	$(CONTAINER_TOOL) run -v  $(PWD):/git/vectordotdev/vector/ -e TARGET=aarch64-unknown-linux-gnu $(ENVIRONMENT_UPSTREAM) ./scripts/package-rpm.sh
+	$(CONTAINER_TOOL) run -v  $(PWD):/git/vectordotdev/vector/ -e TARGET=aarch64-unknown-linux-gnu $(ENVIRONMENT_UPSTREAM) cargo vdev package rpm
 
 .PHONY: package-rpm-armv7-gnu
 package-rpm-armv7-gnu: package-armv7-unknown-linux-gnueabihf ## Build the armv7-unknown-linux-gnueabihf rpm package
-	$(CONTAINER_TOOL) run -v  $(PWD):/git/vectordotdev/vector/ -e TARGET=armv7-unknown-linux-gnueabihf $(ENVIRONMENT_UPSTREAM) ./scripts/package-rpm.sh
+	$(CONTAINER_TOOL) run -v  $(PWD):/git/vectordotdev/vector/ -e TARGET=armv7-unknown-linux-gnueabihf $(ENVIRONMENT_UPSTREAM) cargo vdev package rpm
 
 ##@ Releasing
 
@@ -596,35 +566,31 @@ release: release-prepare generate release-commit ## Release a new Vector version
 
 .PHONY: release-commit
 release-commit: ## Commits release changes
-	@scripts/release-commit.rb
+	@cargo vdev release commit
 
 .PHONY: release-docker
 release-docker: ## Release to Docker Hub
-	@scripts/build-docker.sh
+	@cargo vdev release docker
 
 .PHONY: release-github
-release-github: ## Release to Github
-	@scripts/release-github.sh
+release-github: ## Release to GitHub
+	@cargo vdev release github
 
 .PHONY: release-homebrew
 release-homebrew: ## Release to vectordotdev Homebrew tap
-	@scripts/release-homebrew.sh
+	@cargo vdev release homebrew
 
 .PHONY: release-prepare
 release-prepare: ## Prepares the release with metadata and highlights
-	@scripts/release-prepare.rb
+	@cargo vdev release prepare
 
 .PHONY: release-push
 release-push: ## Push new Vector version
-	@scripts/release-push.sh
-
-.PHONY: release-rollback
-release-rollback: ## Rollback pending release changes
-	@scripts/release-rollback.rb
+	@cargo vdev release push
 
 .PHONY: release-s3
 release-s3: ## Release artifacts to S3
-	@scripts/release-s3.sh
+	@cargo vdev release s3
 
 .PHONY: sync-install
 sync-install: ## Sync the install.sh script for access via sh.vector.dev
@@ -642,10 +608,6 @@ compile-vrl-wasm: ## Compile VRL crates to WASM target
 
 ##@ Utility
 
-.PHONY: build-ci-docker-images
-build-ci-docker-images: ## Rebuilds all Docker images used in CI
-	@scripts/build-ci-docker-images.sh
-
 .PHONY: clean
 clean: environment-clean ## Clean everything
 	cargo clean
@@ -653,17 +615,16 @@ clean: environment-clean ## Clean everything
 .PHONY: fmt
 fmt: ## Format code
 	${MAYBE_ENVIRONMENT_EXEC} cargo fmt
-	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-style.sh --fix
 
 .PHONY: generate-kubernetes-manifests
 generate-kubernetes-manifests: ## Generate Kubernetes manifests from latest Helm chart
-	scripts/generate-manifests.sh
+	cargo vdev generate manifests
 
 .PHONY: generate-component-docs
 generate-component-docs: ## Generate per-component Cue docs from the configuration schema.
 	${MAYBE_ENVIRONMENT_EXEC} cargo build $(if $(findstring true,$(CI)),--quiet,)
 	target/debug/vector generate-schema > /tmp/vector-config-schema.json 2>/dev/null
-	${MAYBE_ENVIRONMENT_EXEC} scripts/generate-component-docs.rb /tmp/vector-config-schema.json \
+	${MAYBE_ENVIRONMENT_EXEC} cargo vdev generate component-docs /tmp/vector-config-schema.json \
 		$(if $(findstring true,$(CI)),>/dev/null,)
 
 .PHONY: signoff
@@ -685,7 +646,7 @@ endif
 
 .PHONY: version
 version: ## Get the current Vector version
-	@scripts/version.sh
+	@cargo vdev version
 
 .PHONY: git-hooks
 git-hooks: ## Add Vector-local git hooks for commit sign-off

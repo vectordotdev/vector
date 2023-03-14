@@ -140,7 +140,7 @@ fn serialize_to_json(
         // For security, we don't want environment variables to be interpolated in the final
         // output, but we *do* want defaults. To work around this, we'll serialize `ConfigBuilder`
         // to JSON, and merge in the raw config which will contain the pre-interpolated strings.
-        let mut builder = serde_json::to_value(&source_builder)
+        let mut builder = serde_json::to_value(source_builder)
             .expect("should serialize ConfigBuilder to JSON. Please report.");
 
         merge_json(&mut builder, source_json);

@@ -76,8 +76,9 @@ impl Function for ToUnixTimestamp {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
 enum Unit {
+    #[default]
     Seconds,
     Milliseconds,
     Nanoseconds,
@@ -101,12 +102,6 @@ impl Unit {
             Milliseconds => "milliseconds",
             Nanoseconds => "nanoseconds",
         }
-    }
-}
-
-impl Default for Unit {
-    fn default() -> Self {
-        Unit::Seconds
     }
 }
 

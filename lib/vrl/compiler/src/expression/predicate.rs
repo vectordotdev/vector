@@ -135,7 +135,7 @@ impl DiagnosticMessage for Error {
         match self {
             NonBoolean { kind, span } => vec![
                 Label::primary("this predicate must resolve to a boolean", span),
-                Label::context(format!("instead it resolves to {}", kind), span),
+                Label::context(format!("instead it resolves to {kind}"), span),
             ],
             Fallible { labels, .. } => labels.clone(),
         }

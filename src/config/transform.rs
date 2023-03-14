@@ -1,21 +1,49 @@
+use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 
 use async_trait::async_trait;
-use enum_dispatch::enum_dispatch;
-use indexmap::IndexMap;
+use dyn_clone::DynClone;
 use serde::Serialize;
-use vector_config::{configurable_component, Configurable, NamedComponent};
-use vector_core::config::LogNamespace;
+use vector_config::{
+    configurable_component,
+    schema::{SchemaGenerator, SchemaObject},
+    Configurable, GenerateError, Metadata, NamedComponent,
+};
+use vector_config_common::attributes::CustomAttribute;
 use vector_core::{
-    config::{GlobalOptions, Input, Output},
+    config::{GlobalOptions, Input, LogNamespace, Output},
     schema,
     transform::Transform,
 };
 
-use crate::transforms::Transforms;
-
 use super::schema::Options as SchemaOptions;
 use super::{id::Inputs, ComponentKey};
+
+pub type BoxedTransform = Box<dyn TransformConfig>;
+
+impl Configurable for BoxedTransform {
+    fn referenceable_name() -> Option<&'static str> {
+        Some("vector::transforms::Transforms")
+    }
+
+    fn metadata() -> Metadata {
+        let mut metadata = Metadata::default();
+        metadata.set_description("Configurable transforms in Vector.");
+        metadata.add_custom_attribute(CustomAttribute::kv("docs::enum_tagging", "internal"));
+        metadata.add_custom_attribute(CustomAttribute::kv("docs::enum_tag_field", "type"));
+        metadata
+    }
+
+    fn generate_schema(gen: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
+        vector_config::component::TransformDescription::generate_schemas(gen)
+    }
+}
+
+impl<T: TransformConfig + 'static> From<T> for BoxedTransform {
+    fn from(that: T) -> Self {
+        Box::new(that)
+    }
+}
 
 /// Fully resolved transform component.
 #[configurable_component]
@@ -23,14 +51,14 @@ use super::{id::Inputs, ComponentKey};
 #[derive(Clone, Debug)]
 pub struct TransformOuter<T>
 where
-    T: Configurable + Serialize,
+    T: Configurable + Serialize + 'static,
 {
     #[configurable(derived)]
     pub inputs: Inputs<T>,
 
     #[configurable(metadata(docs::hidden))]
     #[serde(flatten)]
-    pub inner: Transforms,
+    pub inner: BoxedTransform,
 }
 
 impl<T> TransformOuter<T>
@@ -40,12 +68,11 @@ where
     pub(crate) fn new<I, IT>(inputs: I, inner: IT) -> Self
     where
         I: IntoIterator<Item = T>,
-        IT: Into<Transforms>,
+        IT: Into<BoxedTransform>,
     {
-        TransformOuter {
-            inputs: Inputs::from_iter(inputs),
-            inner: inner.into(),
-        }
+        let inputs = Inputs::from_iter(inputs);
+        let inner = inner.into();
+        TransformOuter { inputs, inner }
     }
 
     pub(super) fn map_inputs<U>(self, f: impl Fn(&T) -> U) -> TransformOuter<U>
@@ -65,57 +92,6 @@ where
             inputs: Inputs::from_iter(inputs),
             inner: self.inner,
         }
-    }
-}
-
-impl TransformOuter<String> {
-    pub(crate) fn expand(
-        mut self,
-        key: ComponentKey,
-        parent_types: &HashSet<&'static str>,
-        transforms: &mut IndexMap<ComponentKey, TransformOuter<String>>,
-        expansions: &mut IndexMap<ComponentKey, Vec<ComponentKey>>,
-    ) -> Result<(), String> {
-        if !self.inner.nestable(parent_types) {
-            return Err(format!(
-                "the component {} cannot be nested in {:?}",
-                self.inner.get_component_name(),
-                parent_types
-            ));
-        }
-
-        let expansion = self
-            .inner
-            .expand(&key, &self.inputs)
-            .map_err(|err| format!("failed to expand transform '{}': {}", key, err))?;
-
-        let mut ptypes = parent_types.clone();
-        ptypes.insert(self.inner.get_component_name());
-
-        if let Some(inner_topology) = expansion {
-            let mut children = Vec::new();
-
-            expansions.insert(
-                key,
-                inner_topology
-                    .outputs()
-                    .into_iter()
-                    .map(ComponentKey::from)
-                    .collect(),
-            );
-
-            for (inner_name, inner_transform) in inner_topology.inner {
-                let child = TransformOuter {
-                    inputs: inner_transform.inputs,
-                    inner: inner_transform.inner,
-                };
-                children.push(inner_name.clone());
-                transforms.insert(inner_name, child);
-            }
-        } else {
-            transforms.insert(key, self);
-        }
-        Ok(())
     }
 }
 
@@ -193,8 +169,8 @@ impl TransformContext {
 
 /// Generalized interface for describing and building transform components.
 #[async_trait]
-#[enum_dispatch]
-pub trait TransformConfig: NamedComponent + core::fmt::Debug + Send + Sync {
+#[typetag::serde(tag = "type")]
+pub trait TransformConfig: DynClone + NamedComponent + core::fmt::Debug + Send + Sync {
     /// Builds the transform with the given context.
     ///
     /// If the transform is built successfully, `Ok(...)` is returned containing the transform.
@@ -254,51 +230,6 @@ pub trait TransformConfig: NamedComponent + core::fmt::Debug + Send + Sync {
     fn nestable(&self, _parents: &HashSet<&'static str>) -> bool {
         true
     }
-
-    /// Attempts to expand the transform into a subtopology of transforms.
-    ///
-    /// This mechanism allows a transform to act like a macro pattern, where only one transform is
-    /// configured from the user's perspective, but multiple transforms can be created, and
-    /// connected, and returned back to the topology in a seamless way.
-    ///
-    /// If the transform supports expansion, `Ok(Some(...))` is returned containing the inner
-    /// topology that represents an organized subtopology consisting of the set of expanded
-    /// transforms. Otherwise, if expansion is not supported for this transform, `Ok(None)` is returned.
-    ///
-    /// # Errors
-    ///
-    /// If there is an error during expansion, an error variant explaining the issue is returned.
-    fn expand(
-        &mut self,
-        _name: &ComponentKey,
-        _inputs: &[String],
-    ) -> crate::Result<Option<InnerTopology>> {
-        Ok(None)
-    }
 }
 
-#[derive(Debug, Serialize)]
-pub struct InnerTopologyTransform {
-    pub inputs: Inputs<String>,
-    pub inner: Transforms,
-}
-
-#[derive(Debug, Default)]
-pub struct InnerTopology {
-    pub inner: IndexMap<ComponentKey, InnerTopologyTransform>,
-    pub outputs: Vec<(ComponentKey, Vec<Output>)>,
-}
-
-impl InnerTopology {
-    pub fn outputs(&self) -> Vec<String> {
-        self.outputs
-            .iter()
-            .flat_map(|(name, outputs)| {
-                outputs.iter().map(|output| match output.port {
-                    Some(ref port) => name.port(port),
-                    None => name.id().to_string(),
-                })
-            })
-            .collect()
-    }
-}
+dyn_clone::clone_trait_object!(TransformConfig);

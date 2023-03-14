@@ -10,7 +10,7 @@ use vrl::prelude::*;
 fn parse_json(value: Value) -> Resolved {
     let bytes = value.try_bytes()?;
     let value = serde_json::from_slice::<'_, Value>(&bytes)
-        .map_err(|e| format!("unable to parse json: {}", e))?;
+        .map_err(|e| format!("unable to parse json: {e}"))?;
     Ok(value)
 }
 
@@ -21,10 +21,10 @@ fn parse_json_with_depth(value: Value, max_depth: Value) -> Resolved {
     let parsed_depth = validate_depth(max_depth)?;
 
     let raw_value = serde_json::from_slice::<'_, &RawValue>(&bytes)
-        .map_err(|e| format!("unable to read json: {}", e))?;
+        .map_err(|e| format!("unable to read json: {e}"))?;
 
     let res = parse_layer(raw_value, parsed_depth)
-        .map_err(|e| format!("unable to parse json with max depth: {}", e))?;
+        .map_err(|e| format!("unable to parse json with max depth: {e}"))?;
 
     Ok(Value::from(res))
 }
@@ -83,8 +83,7 @@ fn validate_depth(value: Value) -> std::result::Result<u8, ExpressionError> {
         Ok(res as u8)
     } else {
         Err(ExpressionError::from(format!(
-            "max_depth value should be greater than 0 and less than 128, got {}",
-            res
+            "max_depth value should be greater than 0 and less than 128, got {res}"
         )))
     }
 }

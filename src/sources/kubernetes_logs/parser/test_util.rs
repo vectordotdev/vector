@@ -4,7 +4,6 @@ use similar_asserts::assert_eq;
 use chrono::{DateTime, Utc};
 use lookup::{event_path, metadata_path};
 use value::Value;
-use vector_config::NamedComponent;
 use vector_core::{config::LogNamespace, event};
 
 use crate::{

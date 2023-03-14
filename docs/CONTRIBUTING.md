@@ -13,7 +13,7 @@ Vector team member will find this document useful.
   - [Git Branches](#git-branches)
   - [Git Commits](#git-commits)
     - [Style](#style)
-  - [Github Pull Requests](#github-pull-requests)
+  - [GitHub Pull Requests](#github-pull-requests)
     - [Title](#title)
     - [Reviews & Approvals](#reviews--approvals)
     - [Merge Style](#merge-style)
@@ -82,7 +82,7 @@ Please ensure your commits are small and focused; they should tell a story of
 your change. This helps reviewers to follow your changes, especially for more
 complex changes.
 
-### Github Pull Requests
+### GitHub Pull Requests
 
 Once your changes are ready you must submit your branch as a [pull request](https://github.com/vectordotdev/vector/pulls).
 
@@ -119,8 +119,7 @@ All pull requests should be reviewed by:
 - Two Vector team members for major changes
 - Three Vector team members for RFCs
 
-If there are any reviewers assigned, you should also wait for
-their review.
+If CODEOWNERS are assigned, a review from an individual from each of the sets of owners is required.
 
 #### Merge Style
 

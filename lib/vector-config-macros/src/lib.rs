@@ -10,7 +10,7 @@ mod configurable_component;
 
 /// Designates a type as being part of a Vector configuration.
 ///
-/// This will automatically derive the [`Configurable`][vector_config::Configurable] trait for the given struct/enum, as
+/// This will automatically derive the [`Configurable`][vector-config::Configurable] trait for the given struct/enum, as
 /// well as ensuring that serialization/deserialization (via `serde`) is derived.
 ///
 /// ## Basics

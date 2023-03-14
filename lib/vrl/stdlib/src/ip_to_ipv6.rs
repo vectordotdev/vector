@@ -7,7 +7,7 @@ fn ip_to_ipv6(value: Value) -> Resolved {
     let ip: IpAddr = value
         .try_bytes_utf8_lossy()?
         .parse()
-        .map_err(|err| format!("unable to parse IP address: {}", err))?;
+        .map_err(|err| format!("unable to parse IP address: {err}"))?;
     match ip {
         IpAddr::V4(addr) => Ok(addr.to_ipv6_mapped().to_string().into()),
         IpAddr::V6(addr) => Ok(addr.to_string().into()),

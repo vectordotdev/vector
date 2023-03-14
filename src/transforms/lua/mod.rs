@@ -32,7 +32,7 @@ enum V1 {
 pub struct LuaConfigV1 {
     /// Transform API version.
     ///
-    /// Specifying this version ensures that Vector does not break backward compatibility.
+    /// Specifying this version ensures that backward compatibility is not broken.
     version: Option<V1>,
 
     #[serde(flatten)]
@@ -54,7 +54,7 @@ enum V2 {
 pub struct LuaConfigV2 {
     /// Transform API version.
     ///
-    /// Specifying this version ensures that Vector does not break backward compatibility.
+    /// Specifying this version ensures that backward compatibility is not broken.
     version: V2,
 
     #[serde(flatten)]
@@ -62,15 +62,18 @@ pub struct LuaConfigV2 {
 }
 
 /// Configuration for the `lua` transform.
-#[configurable_component(transform("lua"))]
+#[configurable_component(transform(
+    "lua",
+    "Modify event data using the Lua programming language."
+))]
 #[derive(Clone, Debug)]
 #[serde(untagged)]
 pub enum LuaConfig {
     /// Configuration for version one.
-    V1(#[configurable(derived)] LuaConfigV1),
+    V1(LuaConfigV1),
 
     /// Configuration for version two.
-    V2(#[configurable(derived)] LuaConfigV2),
+    V2(LuaConfigV2),
 }
 
 impl GenerateConfig for LuaConfig {
@@ -84,6 +87,7 @@ impl GenerateConfig for LuaConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "lua")]
 impl TransformConfig for LuaConfig {
     async fn build(&self, _context: &TransformContext) -> crate::Result<Transform> {
         match self {

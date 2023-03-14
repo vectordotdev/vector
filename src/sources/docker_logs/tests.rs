@@ -138,7 +138,10 @@ mod integration_tests {
 
         trace!("Creating container.");
 
-        let options = Some(CreateContainerOptions { name });
+        let options = Some(CreateContainerOptions {
+            name,
+            platform: None,
+        });
         let config = ContainerConfig {
             image: Some("busybox"),
             cmd: Some(cmd),
@@ -851,7 +854,7 @@ mod integration_tests {
                     start_pattern: "^[^\\s]".to_owned(),
                     condition_pattern: "^[\\s]+at".to_owned(),
                     mode: line_agg::Mode::ContinueThrough,
-                    timeout_ms: 10,
+                    timeout_ms: Duration::from_millis(10),
                 }),
                 log_namespace: Some(true),
                 ..DockerLogsConfig::default()
@@ -923,7 +926,7 @@ mod integration_tests {
                     start_pattern: "^[^\\s]".to_owned(),
                     condition_pattern: "^[\\s]+at".to_owned(),
                     mode: line_agg::Mode::ContinueThrough,
-                    timeout_ms: 10,
+                    timeout_ms: Duration::from_millis(10),
                 }),
                 ..DockerLogsConfig::default()
             };

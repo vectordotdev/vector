@@ -1,0 +1,10 @@
+features:
+- clickhouse-integration-tests
+
+test_filter: '::clickhouse::'
+
+env:
+  CLICKHOUSE_ADDRESS: http://clickhouse:8123
+
+matrix:
+  version: ['19']

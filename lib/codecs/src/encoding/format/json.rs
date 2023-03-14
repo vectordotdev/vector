@@ -1,21 +1,33 @@
 use bytes::{BufMut, BytesMut};
-use serde::{Deserialize, Serialize};
 use tokio_util::codec::Encoder;
 use vector_core::{config::DataType, event::Event, schema};
 
+use crate::MetricTagValues;
+
 /// Config used to build a `JsonSerializer`.
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
-pub struct JsonSerializerConfig;
+#[crate::configurable_component]
+#[derive(Debug, Clone, Default)]
+pub struct JsonSerializerConfig {
+    /// Controls how metric tag values are encoded.
+    ///
+    /// When set to `single`, only the last non-bare value of tags will be displayed with the
+    /// metric.  When set to `full`, all metric tags will be exposed as separate assignments.
+    #[serde(
+        default,
+        skip_serializing_if = "vector_core::serde::skip_serializing_if_default"
+    )]
+    pub metric_tag_values: MetricTagValues,
+}
 
 impl JsonSerializerConfig {
     /// Creates a new `JsonSerializerConfig`.
-    pub const fn new() -> Self {
-        Self
+    pub const fn new(metric_tag_values: MetricTagValues) -> Self {
+        Self { metric_tag_values }
     }
 
     /// Build the `JsonSerializer` from this configuration.
     pub const fn build(&self) -> JsonSerializer {
-        JsonSerializer
+        JsonSerializer::new(self.metric_tag_values)
     }
 
     /// The data type of events that are accepted by `JsonSerializer`.
@@ -33,12 +45,14 @@ impl JsonSerializerConfig {
 
 /// Serializer that converts an `Event` to bytes using the JSON format.
 #[derive(Debug, Clone)]
-pub struct JsonSerializer;
+pub struct JsonSerializer {
+    metric_tag_values: MetricTagValues,
+}
 
 impl JsonSerializer {
     /// Creates a new `JsonSerializer`.
-    pub const fn new() -> Self {
-        Self
+    pub const fn new(metric_tag_values: MetricTagValues) -> Self {
+        Self { metric_tag_values }
     }
 
     /// Encode event and represent it as JSON value.
@@ -59,7 +73,12 @@ impl Encoder<Event> for JsonSerializer {
         let writer = buffer.writer();
         match event {
             Event::Log(log) => serde_json::to_writer(writer, &log),
-            Event::Metric(metric) => serde_json::to_writer(writer, &metric),
+            Event::Metric(mut metric) => {
+                if self.metric_tag_values == MetricTagValues::Single {
+                    metric.reduce_tags_to_single();
+                }
+                serde_json::to_writer(writer, &metric)
+            }
             Event::Trace(trace) => serde_json::to_writer(writer, &trace),
         }
         .map_err(Into::into)
@@ -68,7 +87,7 @@ impl Encoder<Event> for JsonSerializer {
 
 #[cfg(test)]
 mod tests {
-    use bytes::BytesMut;
+    use bytes::{Bytes, BytesMut};
     use chrono::{TimeZone, Utc};
     use vector_common::btreemap;
     use vector_core::event::{LogEvent, Metric, MetricKind, MetricValue, StatisticKind, Value};
@@ -83,12 +102,9 @@ mod tests {
             "z" => Value::from(25),
             "a" => Value::from("0"),
         }));
-        let mut serializer = JsonSerializer::new();
-        let mut bytes = BytesMut::new();
+        let bytes = serialize(JsonSerializerConfig::default(), event);
 
-        serializer.encode(event, &mut bytes).unwrap();
-
-        assert_eq!(bytes.freeze(), r#"{"a":"0","x":"23","z":25}"#);
+        assert_eq!(bytes, r#"{"a":"0","x":"23","z":25}"#);
     }
 
     #[test]
@@ -105,16 +121,17 @@ mod tests {
                 "key1" => "value1",
                 "Key3" => "Value3",
             )))
-            .with_timestamp(Some(Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 11))),
+            .with_timestamp(Some(
+                Utc.ymd(2018, 11, 14)
+                    .and_hms_nano_opt(8, 9, 10, 11)
+                    .expect("invalid timestamp"),
+            )),
         );
 
-        let mut serializer = JsonSerializer::new();
-        let mut bytes = BytesMut::new();
-
-        serializer.encode(event, &mut bytes).unwrap();
+        let bytes = serialize(JsonSerializerConfig::default(), event);
 
         assert_eq!(
-            bytes.freeze(),
+            bytes,
             r#"{"name":"foos","namespace":"vector","tags":{"Key3":"Value3","key1":"value1","key2":"value2"},"timestamp":"2018-11-14T08:09:10.000000011Z","kind":"incremental","counter":{"value":100.0}}"#
         );
     }
@@ -129,13 +146,10 @@ mod tests {
             },
         ));
 
-        let mut serializer = JsonSerializer::new();
-        let mut bytes = BytesMut::new();
-
-        serializer.encode(event, &mut bytes).unwrap();
+        let bytes = serialize(JsonSerializerConfig::default(), event);
 
         assert_eq!(
-            bytes.freeze(),
+            bytes,
             r#"{"name":"users","kind":"incremental","set":{"values":["bob"]}}"#
         );
     }
@@ -151,13 +165,10 @@ mod tests {
             },
         ));
 
-        let mut serializer = JsonSerializer::new();
-        let mut bytes = BytesMut::new();
-
-        serializer.encode(event, &mut bytes).unwrap();
+        let bytes = serialize(JsonSerializerConfig::default(), event);
 
         assert_eq!(
-            bytes.freeze(),
+            bytes,
             r#"{"name":"glork","kind":"incremental","distribution":{"samples":[{"value":10.0,"rate":1}],"statistic":"histogram"}}"#
         );
     }
@@ -167,7 +178,7 @@ mod tests {
         let event = Event::Log(LogEvent::from(btreemap! {
             "foo" => Value::from("bar")
         }));
-        let mut serializer = JsonSerializer::new();
+        let mut serializer = JsonSerializerConfig::default().build();
         let mut bytes = BytesMut::new();
 
         serializer.encode(event.clone(), &mut bytes).unwrap();
@@ -175,5 +186,56 @@ mod tests {
         let json = serializer.to_json_value(event).unwrap();
 
         assert_eq!(bytes.freeze(), serde_json::to_string(&json).unwrap());
+    }
+
+    #[test]
+    fn serialize_metric_tags_full() {
+        let bytes = serialize(
+            JsonSerializerConfig {
+                metric_tag_values: MetricTagValues::Full,
+            },
+            metric2(),
+        );
+
+        assert_eq!(
+            bytes,
+            r#"{"name":"counter","tags":{"a":["first",null,"second"]},"kind":"incremental","counter":{"value":1.0}}"#
+        );
+    }
+
+    #[test]
+    fn serialize_metric_tags_single() {
+        let bytes = serialize(
+            JsonSerializerConfig {
+                metric_tag_values: MetricTagValues::Single,
+            },
+            metric2(),
+        );
+
+        assert_eq!(
+            bytes,
+            r#"{"name":"counter","tags":{"a":"second"},"kind":"incremental","counter":{"value":1.0}}"#
+        );
+    }
+
+    fn metric2() -> Event {
+        Event::Metric(
+            Metric::new(
+                "counter",
+                MetricKind::Incremental,
+                MetricValue::Counter { value: 1.0 },
+            )
+            .with_tags(Some(metric_tags! (
+                "a" => "first",
+                "a" => None,
+                "a" => "second",
+            ))),
+        )
+    }
+
+    fn serialize(config: JsonSerializerConfig, input: Event) -> Bytes {
+        let mut buffer = BytesMut::new();
+        config.build().encode(input, &mut buffer).unwrap();
+        buffer.freeze()
     }
 }

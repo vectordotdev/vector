@@ -75,7 +75,7 @@ impl Query {
             match target_path.prefix {
                 PathPrefix::Event => {
                     let mut type_def = external.target().type_def.clone();
-                    let _ = type_def.remove(&target_path.path, compact);
+                    type_def.remove(&target_path.path, compact);
                     external.update_target(Details {
                         type_def,
                         value: None,
@@ -83,7 +83,7 @@ impl Query {
                 }
                 PathPrefix::Metadata => {
                     let mut kind = external.metadata_kind().clone();
-                    let _ = kind.remove(&target_path.path, compact);
+                    kind.remove(&target_path.path, compact);
                     external.update_metadata(kind);
                 }
             }
@@ -196,7 +196,7 @@ impl fmt::Debug for Target {
         use Target::{Container, External, FunctionCall, Internal};
 
         match self {
-            Internal(v) => write!(f, "Internal({:?})", v),
+            Internal(v) => write!(f, "Internal({v:?})"),
             External(prefix) => match prefix {
                 PathPrefix::Event => f.write_str("External(Event)"),
                 PathPrefix::Metadata => f.write_str("External(Metadata)"),

@@ -7,6 +7,7 @@ use ::value::Value;
 use once_cell::sync::Lazy;
 use regex::{Regex, RegexBuilder};
 use roxmltree::{Document, Node, NodeType};
+use rust_decimal::prelude::Zero;
 use vrl::prelude::*;
 
 /// Used to keep Clippy's `too_many_argument` check happy.
@@ -67,7 +68,7 @@ fn parse_xml(value: Value, options: ParseOptions) -> Resolved {
     };
     // Trim whitespace around XML elements, if applicable.
     let parse = if trim { trim_xml(&string) } else { string };
-    let doc = Document::parse(&parse).map_err(|e| format!("unable to parse xml: {}", e))?;
+    let doc = Document::parse(&parse).map_err(|e| format!("unable to parse xml: {e}"))?;
     let value = process_node(doc.root(), &config);
     Ok(value)
 }
@@ -280,7 +281,7 @@ fn inner_kind() -> Kind {
 }
 
 /// Process an XML node, and return a VRL `Value`.
-fn process_node<'a>(node: Node, config: &ParseXmlConfig<'a>) -> Value {
+fn process_node(node: Node, config: &ParseXmlConfig) -> Value {
     // Helper to recurse over a `Node`s children, and build an object.
     let recurse = |node: Node| -> BTreeMap<String, Value> {
         let mut map = BTreeMap::new();
@@ -295,11 +296,7 @@ fn process_node<'a>(node: Node, config: &ParseXmlConfig<'a>) -> Value {
             }
         }
 
-        for n in node
-            .children()
-            .into_iter()
-            .filter(|n| n.is_element() || n.is_text())
-        {
+        for n in node.children().filter(|n| n.is_element() || n.is_text()) {
             let name = match n.node_type() {
                 NodeType::Element => n.tag_name().name().to_string(),
                 NodeType::Text => config.text_key.to_string(),
@@ -338,7 +335,10 @@ fn process_node<'a>(node: Node, config: &ParseXmlConfig<'a>) -> Value {
         NodeType::Root => Value::Object(recurse(node)),
 
         NodeType::Element => {
-            match (config.always_use_text_key, node.attributes().is_empty()) {
+            match (
+                config.always_use_text_key,
+                node.attributes().len().is_zero(),
+            ) {
                 // If the node has attributes, *always* recurse to expand default keys.
                 (_, false) if config.include_attr => Value::Object(recurse(node)),
                 // If a text key should be used, always recurse.
@@ -348,11 +348,7 @@ fn process_node<'a>(node: Node, config: &ParseXmlConfig<'a>) -> Value {
                     // For a single node, 'flatten' the object if necessary.
                     1 => {
                         // Expect a single element.
-                        let node = node
-                            .children()
-                            .into_iter()
-                            .next()
-                            .expect("expected 1 XML node");
+                        let node = node.children().next().expect("expected 1 XML node");
 
                         // If the node is an element, treat it as an object.
                         if node.is_element() {

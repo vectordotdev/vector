@@ -80,9 +80,13 @@ impl RetryLogic for NewRelicApiRetry {
 #[serde(deny_unknown_fields)]
 pub struct NewRelicConfig {
     /// A valid New Relic license key.
+    #[configurable(metadata(docs::examples = "xxxx"))]
+    #[configurable(metadata(docs::examples = "${NEW_RELIC_LICENSE_KEY}"))]
     pub license_key: SensitiveString,
 
     /// The New Relic account ID.
+    #[configurable(metadata(docs::examples = "xxxx"))]
+    #[configurable(metadata(docs::examples = "${NEW_RELIC_ACCOUNT_KEY}"))]
     pub account_id: SensitiveString,
 
     #[configurable(derived)]

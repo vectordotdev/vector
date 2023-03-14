@@ -19,30 +19,35 @@ pub enum NatsConfigError {
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(rename_all = "snake_case", tag = "strategy")]
+#[configurable(metadata(
+    docs::enum_tag_description = "The strategy used to authenticate with the NATS server.
+
+More information on NATS authentication, and the various authentication strategies, can be found in the
+NATS [documentation][nats_auth_docs]. For TLS client certificate authentication specifically, see the
+`tls` settings.
+
+[nats_auth_docs]: https://docs.nats.io/running-a-nats-service/configuration/securing_nats/auth_intro"
+))]
 pub(crate) enum NatsAuthConfig {
-    /// Username and password authentication.
-    /// ([documentation](https://docs.nats.io/running-a-nats-service/configuration/securing_nats/auth_intro/username_password))
+    /// Username/password authentication.
     UserPassword {
         #[configurable(derived)]
         user_password: NatsAuthUserPassword,
     },
 
     /// Token authentication.
-    /// ([documentation](https://docs.nats.io/running-a-nats-service/configuration/securing_nats/auth_intro/tokens))
     Token {
         #[configurable(derived)]
         token: NatsAuthToken,
     },
 
-    /// Credentials file authentication.
-    /// ([documentation](https://docs.nats.io/running-a-nats-service/configuration/securing_nats/auth_intro/jwt))
+    /// Credentials file authentication. (JWT-based)
     CredentialsFile {
         #[configurable(derived)]
         credentials_file: NatsAuthCredentialsFile,
     },
 
     /// NKey authentication.
-    /// ([documentation](https://docs.nats.io/running-a-nats-service/configuration/securing_nats/auth_intro/nkey_auth))
     Nkey {
         #[configurable(derived)]
         nkey: NatsAuthNKey,
@@ -89,6 +94,7 @@ pub(crate) struct NatsAuthToken {
 #[serde(deny_unknown_fields)]
 pub(crate) struct NatsAuthCredentialsFile {
     /// Path to credentials file.
+    #[configurable(metadata(docs::examples = "/etc/nats/nats.creds"))]
     pub(crate) path: String,
 }
 

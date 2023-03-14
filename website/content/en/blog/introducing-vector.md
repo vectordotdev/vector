@@ -18,7 +18,7 @@ We decided to build Vector because we believe that **existing tools take too nar
 
 Assembling and maintaining these pipelines piecemeal can be a tough and unrewarding job. There's a dizzying array of tools that all seem to cover unique subsets of the overall capabilities you're looking to implement and there's no guarantee that any given two of them will work well together. Faced with this, teams tend towards one (or a combination!) of three rough directions: (1) vendor-first, (2) trusted open source stacks, and (3) build your own.
 
-**Vendor-first** is tempting, but usually expensive and invasive. The vendor provides their custom collectors and client libraries for you to integrate, and you simply ship them all your data. In the end, you're limited to their capabilities, locked in to their ecosystem, and paying more and more every month as your data volume grows.
+**Vendor-first** is tempting, but usually expensive and invasive. The vendor provides their custom collectors and client libraries for you to integrate, and you simply ship them all your data. In the end, you're limited to their capabilities, locked into their ecosystem, and paying more and more every month as your data volume grows.
 
 **Trusted open source stacks** give you a bit more flexibility, but with a significantly higher maintenance burden. You have to pick the right implementation of each sub-component (eight years ago there were already at least [20 implementations of statsd][statsd]), ensure they'll work together well, and then maintain and scale them for the lifetime of the infrastructure. Adding new capabilities or changing storage backends generally means adding a whole new set of components to run, often overlapping with some you're already running.
 

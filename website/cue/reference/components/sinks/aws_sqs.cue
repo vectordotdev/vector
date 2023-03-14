@@ -14,6 +14,7 @@ components: sinks: aws_sqs: components._aws & {
 
 	features: {
 		acknowledgements: true
+		auto_generated:   true
 		healthcheck: enabled: true
 		send: {
 			compression: enabled: false
@@ -65,40 +66,8 @@ components: sinks: aws_sqs: components._aws & {
 		notices: []
 	}
 
-	configuration: {
-		queue_url: {
-			description: "The URL of the Amazon SQS queue to which messages are sent."
-			required:    true
-			type: string: {
-				examples: ["https://sqs.us-east-2.amazonaws.com/123456789012/MyQueue"]
-			}
-		}
-		message_group_id: {
-			common:      false
-			description: "The tag that specifies that a message belongs to a specific message group. Can be applied only to FIFO queues."
-			required:    false
-			type: string: {
-				default: null
-				examples: ["vector", "vector-%Y-%m-%d"]
-				syntax: "template"
-			}
-		}
-		message_deduplication_id: {
-			common:      false
-			description: """
-			The message deduplication ID value to allow AWS to identify duplicate messages. This value is a template
-			which should result in a unique string for each event.
-
-			See the [AWS documentation](\(urls.aws_sqs_message_deduplication_id)) for more about how AWS does message
-			deduplication.
-			"""
-			required:    false
-			type: string: {
-				default: null
-				examples: ["{{ transaction_id }}"]
-				syntax: "template"
-			}
-		}
+	configuration: base.components.sinks.aws_sqs.configuration & {
+		_aws_include: false
 	}
 
 	input: {

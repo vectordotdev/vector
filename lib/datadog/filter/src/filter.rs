@@ -19,7 +19,7 @@ pub trait Filter<V: Debug + Send + Sync + Clone + 'static>: DynClone {
     /// Determine whether a value starts with a prefix.
     fn prefix(&self, field: Field, prefix: &str) -> Box<dyn Matcher<V>>;
 
-    /// Determine whether a value matches a wilcard.
+    /// Determine whether a value matches a wildcard.
     fn wildcard(&self, field: Field, wildcard: &str) -> Box<dyn Matcher<V>>;
 
     /// Compare a field value against `comparison_value`, using one of the `comparator` operators.

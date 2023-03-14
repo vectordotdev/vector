@@ -96,7 +96,7 @@ impl<'de> serde::de::Deserialize<'de> for FluentEventTime {
 
                 if tag != 0 {
                     return Err(serde::de::Error::custom(format!(
-                        "expected extension type 0 for fluent timestamp, got got {}",
+                        "expected extension type 0 for fluent timestamp, got {}",
                         tag
                     )));
                 }
@@ -117,7 +117,11 @@ impl<'de> serde::de::Deserialize<'de> for FluentEventTime {
                 let nanoseconds =
                     u32::from_be_bytes(bytes[4..].try_into().expect("exactly 4 bytes"));
 
-                Ok(FluentEventTime(Utc.timestamp(seconds.into(), nanoseconds)))
+                Ok(FluentEventTime(
+                    Utc.timestamp_opt(seconds.into(), nanoseconds)
+                        .single()
+                        .expect("invalid timestamp"),
+                ))
             }
         }
 
@@ -272,7 +276,7 @@ mod test {
           if input.is_nan() {
               assert_eq!(val, Value::Null);
           } else {
-              assert_relative_eq!(input as f64, val.as_float().unwrap().into_inner());
+              assert_relative_eq!(input, val.as_float().unwrap().into_inner());
           }
         }
     }

@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 use std::path::{Path, PathBuf};
 
 use rdkafka::{consumer::ConsumerContext, ClientConfig, ClientContext, Statistics};
@@ -46,6 +47,7 @@ pub struct KafkaAuthConfig {
     pub(crate) sasl: Option<KafkaSaslConfig>,
 
     #[configurable(derived)]
+    #[configurable(metadata(docs::advanced))]
     pub(crate) tls: Option<TlsEnableableConfig>,
 }
 
@@ -65,12 +67,16 @@ pub struct KafkaSaslConfig {
     pub(crate) enabled: Option<bool>,
 
     /// The SASL username.
+    #[configurable(metadata(docs::examples = "username"))]
     pub(crate) username: Option<String>,
 
     /// The SASL password.
+    #[configurable(metadata(docs::examples = "password"))]
     pub(crate) password: Option<SensitiveString>,
 
     /// The SASL mechanism to use.
+    #[configurable(metadata(docs::examples = "SCRAM-SHA-256"))]
+    #[configurable(metadata(docs::examples = "SCRAM-SHA-512"))]
     pub(crate) mechanism: Option<String>,
 }
 
@@ -145,12 +151,15 @@ fn pathbuf_to_string(path: &Path) -> crate::Result<&str> {
 }
 
 #[derive(Default)]
-pub(crate) struct KafkaStatisticsContext;
+pub(crate) struct KafkaStatisticsContext {
+    pub(crate) expose_lag_metrics: bool,
+}
 
 impl ClientContext for KafkaStatisticsContext {
     fn stats(&self, statistics: Statistics) {
         emit!(KafkaStatisticsReceived {
-            statistics: &statistics
+            statistics: &statistics,
+            expose_lag_metrics: self.expose_lag_metrics,
         });
     }
 }

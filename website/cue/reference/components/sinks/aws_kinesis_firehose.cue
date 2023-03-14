@@ -14,6 +14,7 @@ components: sinks: aws_kinesis_firehose: components._aws & {
 
 	features: {
 		acknowledgements: true
+		auto_generated:   true
 		healthcheck: enabled: true
 		send: {
 			batch: {
@@ -72,14 +73,8 @@ components: sinks: aws_kinesis_firehose: components._aws & {
 		warnings: []
 	}
 
-	configuration: {
-		stream_name: {
-			description: "The [stream name](\(urls.aws_cloudwatch_logs_stream_name)) of the target Kinesis Firehose delivery stream."
-			required:    true
-			type: string: {
-				examples: ["my-stream"]
-			}
-		}
+	configuration: base.components.sinks.aws_kinesis_firehose.configuration & {
+		_aws_include: false
 	}
 
 	input: {

@@ -1,7 +1,7 @@
 use bytes::Bytes;
 use chrono::{DateTime, Datelike, Utc};
 use lookup::lookup_v2::parse_value_path;
-use lookup::{event_path, owned_value_path, LookupBuf, OwnedValuePath};
+use lookup::{event_path, owned_value_path, OwnedTargetPath, OwnedValuePath};
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 use std::collections::BTreeMap;
@@ -112,7 +112,7 @@ impl SyslogDeserializerConfig {
             }
             (LogNamespace::Vector, Some(source)) => {
                 schema::Definition::new_with_default_metadata(Kind::bytes(), [log_namespace])
-                    .with_meaning(LookupBuf::root(), "message")
+                    .with_meaning(OwnedTargetPath::event_root(), "message")
                     .with_source_metadata(
                         source,
                         None,
@@ -178,6 +178,14 @@ impl SyslogDeserializerConfig {
                         ))),
                         None,
                     )
+                    .with_source_metadata(
+                        source,
+                        None,
+                        &owned_value_path!("tls_client_metadata"),
+                        Kind::object(Collection::empty().with_unknown(Kind::bytes()))
+                            .or_undefined(),
+                        None,
+                    )
             }
         }
     }
@@ -206,7 +214,7 @@ impl Deserializer for SyslogDeserializer {
         let log = match (self.source, log_namespace) {
             (Some(source), LogNamespace::Vector) => {
                 let mut log = LogEvent::from(Value::Bytes(Bytes::from(parsed.msg.to_string())));
-                insert_metatdata_fields_from_syslog(&mut log, source, parsed, log_namespace);
+                insert_metadata_fields_from_syslog(&mut log, source, parsed, log_namespace);
                 log
             }
             _ => {
@@ -236,7 +244,7 @@ fn resolve_year((month, _date, _hour, _min, _sec): IncompleteDate) -> i32 {
     }
 }
 
-fn insert_metatdata_fields_from_syslog(
+fn insert_metadata_fields_from_syslog(
     log: &mut LogEvent,
     source: &'static str,
     parsed: Message<&str>,

@@ -42,7 +42,6 @@ pub enum FieldMatchConfig {
             docs::examples = "field1",
             docs::examples = "parent.child_field"
         ))]
-        #[configurable(transparent)]
         Vec<String>,
     ),
 
@@ -55,7 +54,6 @@ pub enum FieldMatchConfig {
             docs::examples = "host",
             docs::examples = "hostname"
         ))]
-        #[configurable(transparent)]
         Vec<String>,
     ),
 }
@@ -70,7 +68,7 @@ pub struct CacheConfig {
 }
 
 /// Configuration for the `dedupe` transform.
-#[configurable_component(transform("dedupe"))]
+#[configurable_component(transform("dedupe", "Deduplicate logs passing through a topology."))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct DedupeConfig {
@@ -141,6 +139,7 @@ impl GenerateConfig for DedupeConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "dedupe")]
 impl TransformConfig for DedupeConfig {
     async fn build(&self, _context: &TransformContext) -> crate::Result<Transform> {
         Ok(Transform::event_task(Dedupe::new(self.clone())))
