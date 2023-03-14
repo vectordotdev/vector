@@ -44,15 +44,8 @@ pub fn git_short_hash() -> Result<Output> {
         .context("Could not execute `git`")
 }
 
-/// Calculate the release channel from `git describe`
-pub fn release_channel() -> Result<&'static str> {
-    git_head().map(|output| {
-        if output.status.success() {
-            "latest"
-        } else {
-            "nightly"
-        }
-    })
+pub fn get_mode() -> String {
+    std::env::var("MODE").unwrap_or_else(|_| "custom".to_string())
 }
 
 pub fn exists(path: impl AsRef<Path> + Debug) -> Result<bool> {

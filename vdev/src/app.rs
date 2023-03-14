@@ -47,8 +47,7 @@ pub fn set_repo_dir() -> Result<()> {
 pub fn version() -> Result<String> {
     let mut version = env::var("VERSION").or_else(|_| util::read_version())?;
 
-    let channel = env::var("CHANNEL")
-        .or_else(|_| env::var("MODE").or_else(|_| util::release_channel().map(Into::into)))?;
+    let channel = env::var("CHANNEL").unwrap_or_else(|_| util::get_mode());
 
     if channel == "latest" {
         let head = util::git_head()?;

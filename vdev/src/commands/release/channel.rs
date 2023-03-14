@@ -1,10 +1,9 @@
 use anyhow::Result;
-use std::env;
 
-use crate::util;
+use crate::util::get_mode;
 
-/// Determine the appropriate release channel (latest, nightly) based on Git HEAD.
-/// If the env var "MODE", is set, that is used instead.
+/// Provide the release channel (latest/nightly/custom) based on the MODE env variable.
+/// This command is intended for use only within GitHub build workflows.
 // This script is used across various release scripts to determine where distribute archives,
 // packages, etc.
 #[derive(clap::Args, Debug)]
@@ -13,7 +12,7 @@ pub struct Cli {}
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
-        let channel = env::var("MODE").or_else(|_| util::release_channel().map(Into::into))?;
+        let channel = get_mode();
 
         println!("{channel}");
         Ok(())
