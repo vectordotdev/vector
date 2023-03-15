@@ -6,6 +6,8 @@ on:
       git_ref:
         type: string
         required: true
+        # `mode` is used to set the "channel", which is the dir/namespace packages are organized into.
+        # Options are release/nightly/custom.
       mode:
         type: string
         required: true
@@ -21,6 +23,7 @@ env:
   # observing issues fetching boringssl via HTTPS in the OSX build, seeing if this helps
   # can be removed when we switch back to the upstream openssl-sys crate
   CARGO_NET_GIT_FETCH_WITH_CLI: true
+  MODE: ${{ inputs.mode }}
 
 jobs:
   generate-publish-metadata:
@@ -39,11 +42,7 @@ jobs:
           ref: ${{ inputs.git_ref }}
       - name: Generate publish metadata
         id: generate-publish-metadata
-        run: |
-          # If set, MODE will be used to set the "channel", which is the dir/namespace packages are organized into.
-          # the Workflow of "custom_builds" utilizes this feature.
-          export MODE="${{ inputs.mode }}"
-          make ci-generate-publish-metadata
+        run: make ci-generate-publish-metadata
 
   build-x86_64-unknown-linux-musl-packages:
     name: Build Vector for x86_64-unknown-linux-musl (.tar.gz)
@@ -90,11 +89,7 @@ jobs:
       - name: Bootstrap runner environment (generic)
         run: bash scripts/environment/prepare.sh
       - name: Build Vector
-        run: |
-          # If set, MODE will be used to set the "channel", which is the dir/namespace packages are organized into.
-          # the Workflow of "custom_builds" utilizes this feature.
-          export MODE="${{ inputs.mode }}"
-          make package-x86_64-unknown-linux-gnu-all
+        run: make package-x86_64-unknown-linux-gnu-all
       - name: Stage package artifacts for publish
         uses: actions/upload-artifact@v3
         with:
@@ -150,11 +145,7 @@ jobs:
       - name: Build Vector
         env:
           DOCKER_PRIVILEGED: "true"
-        run: |
-          # If set, MODE will be used to set the "channel", which is the dir/namespace packages are organized into.
-          # the Workflow of "custom_builds" utilizes this feature.
-          export MODE="${{ inputs.mode }}"
-          make package-aarch64-unknown-linux-gnu-all
+        run: make package-aarch64-unknown-linux-gnu-all
       - name: Stage package artifacts for publish
         uses: actions/upload-artifact@v3
         with:
@@ -182,11 +173,7 @@ jobs:
       - name: Build Vector
         env:
           DOCKER_PRIVILEGED: "true"
-        run: |
-          # If set, MODE will be used to set the "channel", which is the dir/namespace packages are organized into.
-          # the Workflow of "custom_builds" utilizes this feature.
-          export MODE="${{ inputs.mode }}"
-          make package-armv7-unknown-linux-gnueabihf-all
+        run: make package-armv7-unknown-linux-gnueabihf-all
       - name: Stage package artifacts for publish
         uses: actions/upload-artifact@v3
         with:
