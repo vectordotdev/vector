@@ -1,40 +1,85 @@
-use greptime_client::api::v1::*;
-use greptime_client::{Client, Database, Error as GreptimeError, Output};
+use std::sync::Arc;
+use std::task::Poll;
+
+use chrono::Utc;
+use futures::stream;
+use futures::SinkExt;
+use futures_util::future::BoxFuture;
+use greptimedb_client::api::v1::column::*;
+use greptimedb_client::api::v1::*;
+use greptimedb_client::{Client, Database, Error as GreptimeError, Output};
+use tower::Service;
+use vector_core::event::metric::{Bucket, MetricSketch, Quantile, Sample};
+use vector_core::event::{Event, Metric, MetricValue};
+use vector_core::metrics::AgentDDSketch;
+use vector_core::ByteSizeOf;
 
 use super::GreptimeDBConfig;
+use crate::sinks::util::buffer::metrics::MetricNormalize;
+use crate::sinks::util::buffer::metrics::MetricNormalizer;
+use crate::sinks::util::buffer::metrics::MetricSet;
+use crate::sinks::util::buffer::metrics::MetricsBuffer;
+use crate::sinks::util::retries::RetryLogic;
+use crate::sinks::util::sink::Response;
+use crate::sinks::util::statistic::DistributionStatistic;
+use crate::sinks::util::{EncodedEvent, TowerRequestConfig};
 use crate::sinks::VectorSink;
+
+#[derive(Debug)]
+pub struct GreptimeBatchOutput(Vec<Output>);
+
+impl Response for GreptimeBatchOutput {}
 
 #[derive(Clone)]
 struct GreptimeDBRetryLogic;
 
 impl RetryLogic for GreptimeDBRetryLogic {
     type Error = GreptimeError;
-    type Response = Output;
+    type Response = GreptimeBatchOutput;
 
-    fn is_retriable_error(&self, error: &Self::Error) -> bool {
+    fn is_retriable_error(&self, _error: &Self::Error) -> bool {
         // TODO(sunng87): implement this
         false
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug, Default)]
+struct GreptimeDBMetricNormalize;
+
+impl MetricNormalize for GreptimeDBMetricNormalize {
+    fn normalize(&mut self, state: &mut MetricSet, metric: Metric) -> Option<Metric> {
+        match (metric.kind(), &metric.value()) {
+            (_, MetricValue::Counter { .. }) => state.make_absolute(metric),
+            (_, MetricValue::Gauge { .. }) => state.make_absolute(metric),
+            // All others are left as-is
+            _ => Some(metric),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct GreptimeDBService {
     /// the client that connects to greptimedb
-    client: Database,
+    client: Arc<Database>,
 }
 
 impl GreptimeDBService {
     pub fn new_sink(config: &GreptimeDBConfig) -> crate::Result<VectorSink> {
-        let grpc_client = Client::with_urls(vec![config.endpoint]);
-        let client = Database::new(config.catalog, config.schema, grpc_client);
+        let grpc_client = Client::with_urls(vec![&config.grpc_endpoint]);
+        let client = Database::new(&config.catalog, &config.schema, grpc_client);
 
         let batch = config.batch.into_batch_settings()?;
         let request = config.request.unwrap_with(&TowerRequestConfig {
-            retry_attempts: Some(5),
+            retry_attempts: Some(1),
             ..Default::default()
         });
 
-        let greptime_service = GreptimeDBService { client };
+        let greptime_service = GreptimeDBService {
+            client: Arc::new(client),
+        };
+
+        let mut normalizer = MetricNormalizer::<GreptimeDBMetricNormalize>::default();
+
         let sink = request
             .batch_sink(
                 GreptimeDBRetryLogic,
@@ -43,31 +88,204 @@ impl GreptimeDBService {
                 batch.timeout,
             )
             .with_flat_map(move |event: Event| {
-                // TODO(sunng87):
                 stream::iter({
                     let byte_size = event.size_of();
-                    let metric = event.into_metric();
-                    Ok(EncodedEvent::new(metric, byte_size))
+                    normalizer
+                        .normalize(event.into_metric())
+                        .map(|metric| Ok(EncodedEvent::new(metric, byte_size)))
                 })
             })
             .sink_map_err(|e| error!(message = "Fatal greptimedb sink error.", %e));
 
-        Ok(VectorSink::From_event_sink(sink))
+        Ok(VectorSink::from_event_sink(sink))
     }
 }
 
 impl Service<Vec<Metric>> for GreptimeDBService {
-    type Response = Output;
+    type Response = GreptimeBatchOutput;
     type Error = GreptimeError;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
-    fn poll_ready(&mut self, cx: &mut std::task::Context) -> Poll<Result<(), Self::Error>> {
-        self.inner.poll_ready(cx)
+    fn poll_ready(&mut self, _cx: &mut std::task::Context) -> Poll<Result<(), Self::Error>> {
+        Poll::Ready(Ok(()))
     }
 
     // Convert vector metrics into GreptimeDB format and send them in batch
     fn call(&mut self, items: Vec<Metric>) -> Self::Future {
-        // TODO(sunng87):
-        todo!()
+        // TODO(sunng87): group metrics by name and send metrics with same name
+        // in batch
+        let requests = items.into_iter().map(metrics_to_insert_request);
+        let client = self.client.clone();
+
+        Box::pin(async move {
+            let mut outputs = Vec::with_capacity(requests.len());
+            for request in requests {
+                let result = client.insert(request).await?;
+                outputs.push(result);
+            }
+            Ok(GreptimeBatchOutput(outputs))
+        })
+    }
+}
+
+fn f64_column(name: &str, value: f64) -> Column {
+    Column {
+        column_name: name.to_owned(),
+        values: Some(column::Values {
+            f64_values: vec![value],
+            ..Default::default()
+        }),
+        semantic_type: SemanticType::Field as i32,
+        datatype: ColumnDataType::Float64 as i32,
+        ..Default::default()
+    }
+}
+
+fn ts_column(name: &str, value: i64) -> Column {
+    Column {
+        column_name: name.to_owned(),
+        values: Some(column::Values {
+            ts_millisecond_values: vec![value],
+            ..Default::default()
+        }),
+        semantic_type: SemanticType::Timestamp as i32,
+        datatype: ColumnDataType::TimestampMillisecond as i32,
+        ..Default::default()
+    }
+}
+
+fn str_column(name: &str, value: &str) -> Column {
+    Column {
+        column_name: name.to_owned(),
+        values: Some(column::Values {
+            string_values: vec![value.to_owned()],
+            ..Default::default()
+        }),
+        semantic_type: SemanticType::Tag as i32,
+        datatype: ColumnDataType::String as i32,
+        ..Default::default()
+    }
+}
+
+fn metrics_to_insert_request(metric: Metric) -> InsertRequest {
+    let metric_name = metric.name();
+
+    let mut columns = Vec::new();
+    // timetamp
+    let timestamp = metric
+        .timestamp()
+        .map(|t| t.timestamp())
+        .unwrap_or_else(|| Utc::now().timestamp());
+    columns.push(ts_column("timestamp", timestamp));
+
+    // tags
+    if let Some(tags) = metric.tags() {
+        for (key, value) in tags.iter_single() {
+            columns.push(str_column(key, value));
+        }
+    }
+
+    // fields
+    match metric.value() {
+        MetricValue::Counter { value } => columns.push(f64_column("value", *value)),
+        MetricValue::Gauge { value } => columns.push(f64_column("value", *value)),
+        MetricValue::Set { values } => columns.push(f64_column("value", values.len() as f64)),
+        MetricValue::Distribution { samples, .. } => {
+            encode_distribution(samples, &mut columns);
+        }
+
+        MetricValue::AggregatedHistogram {
+            buckets,
+            count,
+            sum,
+        } => {
+            encode_histogram(buckets.as_ref(), &mut columns);
+            columns.push(f64_column("count", *count as f64));
+            columns.push(f64_column("sum", *sum));
+        }
+        MetricValue::AggregatedSummary {
+            quantiles,
+            count,
+            sum,
+        } => {
+            encode_quantiles(quantiles.as_ref(), &mut columns);
+            columns.push(f64_column("count", *count as f64));
+            columns.push(f64_column("sum", *sum));
+        }
+        MetricValue::Sketch { sketch } => {
+            let MetricSketch::AgentDDSketch(sketch) = sketch;
+            encode_sketch(&sketch, &mut columns);
+        }
+    }
+
+    InsertRequest {
+        table_name: metric_name.to_owned(),
+        columns,
+        row_count: 1,
+        ..Default::default()
+    }
+}
+
+fn encode_distribution(samples: &[Sample], columns: &mut Vec<Column>) {
+    if let Some(stats) = DistributionStatistic::from_samples(samples, &[0.75, 0.90, 0.95, 0.99]) {
+        columns.push(f64_column("min", stats.min));
+        columns.push(f64_column("max", stats.max));
+        columns.push(f64_column("median", stats.median));
+        columns.push(f64_column("avg", stats.avg));
+        columns.push(f64_column("sum", stats.sum));
+        columns.push(f64_column("count", stats.count as f64));
+
+        for (quantile, value) in stats.quantiles {
+            columns.push(f64_column(&format!("p{:2}", quantile * 100f64), value));
+        }
+    }
+}
+
+fn encode_histogram(buckets: &[Bucket], columns: &mut Vec<Column>) {
+    for bucket in buckets {
+        let column_name = format!("b{}", bucket.upper_limit);
+        columns.push(f64_column(&column_name, bucket.count as f64));
+    }
+}
+
+fn encode_quantiles(quantiles: &[Quantile], columns: &mut Vec<Column>) {
+    for quantile in quantiles {
+        let column_name = format!("p{:2}", quantile.quantile * 100f64);
+        columns.push(f64_column(&column_name, quantile.value));
+    }
+}
+
+fn encode_sketch(sketch: &AgentDDSketch, columns: &mut Vec<Column>) {
+    columns.push(f64_column("count", sketch.count() as f64));
+    if let Some(min) = sketch.min() {
+        columns.push(f64_column("min", min));
+    }
+
+    if let Some(max) = sketch.max() {
+        columns.push(f64_column("max", max));
+    }
+
+    if let Some(sum) = sketch.sum() {
+        columns.push(f64_column("sum", sum));
+    }
+
+    if let Some(avg) = sketch.avg() {
+        columns.push(f64_column("avg", avg));
+    }
+
+    if let Some(quantile) = sketch.quantile(0.5) {
+        columns.push(f64_column("p50", quantile));
+    }
+    if let Some(quantile) = sketch.quantile(0.75) {
+        columns.push(f64_column("p75", quantile));
+    }
+    if let Some(quantile) = sketch.quantile(0.90) {
+        columns.push(f64_column("p90", quantile));
+    }
+    if let Some(quantile) = sketch.quantile(0.95) {
+        columns.push(f64_column("p95", quantile));
+    }
+    if let Some(quantile) = sketch.quantile(0.99) {
+        columns.push(f64_column("p99", quantile));
     }
 }
