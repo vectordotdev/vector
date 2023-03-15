@@ -334,15 +334,12 @@ impl TransformConfig for RemapConfig {
             dropped_definitions.push(dropped_definition);
         }
 
-        let default_output =
-            Output::default(DataType::all()).with_schema_definitions(default_definitions);
+        let default_output = Output::transform(DataType::all(), default_definitions);
 
         if self.reroute_dropped {
             return vec![
                 default_output,
-                Output::default(DataType::all())
-                    .with_schema_definitions(dropped_definitions)
-                    .with_port(DROPPED),
+                Output::transform(DataType::all(), dropped_definitions).with_port(DROPPED),
             ];
         } else {
             return vec![default_output];
@@ -1425,7 +1422,7 @@ mod tests {
                 )],
                 LogNamespace::Legacy
             ),
-            vec![Output::default(DataType::all()).with_schema_definition(schema_definition)]
+            vec![Output::transform(DataType::all(), vec![schema_definition])]
         );
 
         let context = TransformContext {
@@ -1490,8 +1487,8 @@ mod tests {
     fn collect_outputs(ft: &mut dyn SyncTransform, event: Event) -> CollectedOuput {
         let mut outputs = TransformOutputsBuf::new_with_capacity(
             vec![
-                Output::default(DataType::all()),
-                Output::default(DataType::all()).with_port(DROPPED),
+                Output::transform(DataType::all(), vec![]),
+                Output::transform(DataType::all(), vec![]).with_port(DROPPED),
             ],
             1,
         );
@@ -1517,8 +1514,8 @@ mod tests {
     ) -> std::result::Result<Event, Event> {
         let mut outputs = TransformOutputsBuf::new_with_capacity(
             vec![
-                Output::default(DataType::all()),
-                Output::default(DataType::all()).with_port(DROPPED),
+                Output::transform(DataType::all(), vec![]),
+                Output::transform(DataType::all(), vec![]).with_port(DROPPED),
             ],
             1,
         );

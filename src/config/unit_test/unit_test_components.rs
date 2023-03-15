@@ -7,6 +7,7 @@ use vector_config::configurable_component;
 use vector_core::{
     config::{DataType, Input, LogNamespace, Output},
     event::Event,
+    schema,
     sink::{StreamSink, VectorSink},
 };
 
@@ -43,7 +44,10 @@ impl SourceConfig for UnitTestSourceConfig {
     }
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
-        vec![Output::default(DataType::all())]
+        vec![Output::source_logs(
+            DataType::all(),
+            schema::Definition::default_legacy_namespace(),
+        )]
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -96,7 +100,10 @@ impl SourceConfig for UnitTestStreamSourceConfig {
     }
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
-        vec![Output::default(DataType::all())]
+        vec![Output::source_logs(
+            DataType::all(),
+            schema::Definition::default_legacy_namespace(),
+        )]
     }
 
     fn can_acknowledge(&self) -> bool {

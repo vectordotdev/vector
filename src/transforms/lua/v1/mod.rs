@@ -56,7 +56,7 @@ impl LuaConfig {
 
         let definition = Definition::default_for_namespace(&namespaces);
 
-        vec![Output::default(DataType::Log).with_schema_definitions(vec![definition])]
+        vec![Output::transform(DataType::Log, vec![definition])]
     }
 }
 

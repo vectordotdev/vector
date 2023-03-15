@@ -171,7 +171,8 @@ impl SourceConfig for LogstashConfig {
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
         // There is a global and per-source `log_namespace` config.
         // The source config overrides the global setting and is merged here.
-        vec![Output::default(DataType::Log).with_schema_definition(
+        vec![Output::source_logs(
+            DataType::Log,
             self.schema_definition(global_log_namespace.merge(self.log_namespace)),
         )]
     }

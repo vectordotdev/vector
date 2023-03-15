@@ -186,8 +186,10 @@ impl LuaConfig {
 
         let definition = Definition::default_for_namespace(&namespaces);
 
-        vec![Output::default(DataType::Metric | DataType::Log)
-            .with_schema_definitions(vec![definition])]
+        vec![Output::transform(
+            DataType::Metric | DataType::Log,
+            vec![definition],
+        )]
     }
 }
 

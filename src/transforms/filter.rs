@@ -49,7 +49,10 @@ impl TransformConfig for FilterConfig {
     }
 
     fn outputs(&self, input_definitions: Vec<schema::Definition>, _: LogNamespace) -> Vec<Output> {
-        vec![Output::default(DataType::all()).with_schema_definitions(input_definitions.clone())]
+        vec![Output::transform(
+            DataType::all(),
+            input_definitions.clone(),
+        )]
     }
 
     fn enable_concurrency(&self) -> bool {

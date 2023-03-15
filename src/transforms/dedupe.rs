@@ -150,7 +150,7 @@ impl TransformConfig for DedupeConfig {
     }
 
     fn outputs(&self, input_definitions: Vec<schema::Definition>, _: LogNamespace) -> Vec<Output> {
-        vec![Output::default(DataType::Log).with_schema_definitions(input_definitions.clone())]
+        vec![Output::transform(DataType::Log, input_definitions.clone())]
     }
 }
 

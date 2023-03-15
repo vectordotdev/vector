@@ -2,6 +2,7 @@ use async_trait::async_trait;
 use futures_util::{future::err, FutureExt};
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
+use vector_core::schema::Definition;
 use vector_core::{
     config::{DataType, Output},
     source::Source,
@@ -26,7 +27,10 @@ impl SourceConfig for ErrorSourceConfig {
     }
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
-        vec![Output::default(DataType::Log)]
+        vec![Output::source_logs(
+            DataType::Log,
+            Definition::default_legacy_namespace(),
+        )]
     }
 
     fn can_acknowledge(&self) -> bool {

@@ -387,7 +387,13 @@ mod tests {
                 "single input, source with default schema",
                 TestCase {
                     inputs: vec![("foo", None)],
-                    sources: IndexMap::from([("foo", vec![Output::default(DataType::all())])]),
+                    sources: IndexMap::from([(
+                        "foo",
+                        vec![Output::source_logs(
+                            DataType::all(),
+                            Definition::default_legacy_namespace(),
+                        )],
+                    )]),
                     transforms: IndexMap::default(),
                     want: vec![Definition::default_legacy_namespace()],
                 },
@@ -398,7 +404,8 @@ mod tests {
                     inputs: vec![("source-foo", None)],
                     sources: IndexMap::from([(
                         "source-foo",
-                        vec![Output::default(DataType::all()).with_schema_definition(
+                        vec![Output::source_logs(
+                            DataType::all(),
                             Definition::empty_legacy_namespace().with_event_field(
                                 &owned_value_path!("foo"),
                                 Kind::integer().or_bytes(),
@@ -421,7 +428,8 @@ mod tests {
                     sources: IndexMap::from([
                         (
                             "source-foo",
-                            vec![Output::default(DataType::all()).with_schema_definition(
+                            vec![Output::source_logs(
+                                DataType::all(),
                                 Definition::empty_legacy_namespace().with_event_field(
                                     &owned_value_path!("foo"),
                                     Kind::integer().or_bytes(),
@@ -431,7 +439,8 @@ mod tests {
                         ),
                         (
                             "source-bar",
-                            vec![Output::default(DataType::all()).with_schema_definition(
+                            vec![Output::source_logs(
+                                DataType::all(),
                                 Definition::empty_legacy_namespace().with_event_field(
                                     &owned_value_path!("foo"),
                                     Kind::timestamp(),
@@ -462,7 +471,8 @@ mod tests {
                     sources: IndexMap::from([
                         (
                             "source-foo",
-                            vec![Output::default(DataType::all()).with_schema_definition(
+                            vec![Output::source_logs(
+                                DataType::all(),
                                 Definition::empty_legacy_namespace().with_event_field(
                                     &owned_value_path!("foo"),
                                     Kind::boolean(),
@@ -472,7 +482,8 @@ mod tests {
                         ),
                         (
                             "source-bar",
-                            vec![Output::default(DataType::all()).with_schema_definition(
+                            vec![Output::source_logs(
+                                DataType::all(),
                                 Definition::empty_legacy_namespace().with_event_field(
                                     &owned_value_path!("bar"),
                                     Kind::integer(),
@@ -485,7 +496,8 @@ mod tests {
                         "transform-baz",
                         (
                             vec![OutputId::from("source-foo")],
-                            vec![Output::default(DataType::all()).with_schema_definition(
+                            vec![Output::source_logs(
+                                DataType::all(),
                                 Definition::empty_legacy_namespace().with_event_field(
                                     &owned_value_path!("baz"),
                                     Kind::regex(),
@@ -523,7 +535,8 @@ mod tests {
                     sources: IndexMap::from([
                         (
                             "Source 1",
-                            vec![Output::default(DataType::all()).with_schema_definition(
+                            vec![Output::source_logs(
+                                DataType::all(),
                                 Definition::empty_legacy_namespace().with_event_field(
                                     &owned_value_path!("source-1"),
                                     Kind::boolean(),
@@ -533,7 +546,8 @@ mod tests {
                         ),
                         (
                             "Source 2",
-                            vec![Output::default(DataType::all()).with_schema_definition(
+                            vec![Output::source_logs(
+                                DataType::all(),
                                 Definition::empty_legacy_namespace().with_event_field(
                                     &owned_value_path!("source-2"),
                                     Kind::integer(),
@@ -547,12 +561,13 @@ mod tests {
                             "Transform 1",
                             (
                                 vec![OutputId::from("Source 1")],
-                                vec![Output::default(DataType::all()).with_schema_definition(
-                                    Definition::empty_legacy_namespace().with_event_field(
+                                vec![Output::transform(
+                                    DataType::all(),
+                                    vec![Definition::empty_legacy_namespace().with_event_field(
                                         &owned_value_path!("transform-1"),
                                         Kind::regex(),
                                         None,
-                                    ),
+                                    )],
                                 )],
                             ),
                         ),
@@ -560,12 +575,13 @@ mod tests {
                             "Transform 2",
                             (
                                 vec![OutputId::from("Source 2")],
-                                vec![Output::default(DataType::all()).with_schema_definition(
-                                    Definition::empty_legacy_namespace().with_event_field(
+                                vec![Output::transform(
+                                    DataType::all(),
+                                    vec![Definition::empty_legacy_namespace().with_event_field(
                                         &owned_value_path!("transform-2"),
                                         Kind::float().or_null(),
                                         Some("transform-2"),
-                                    ),
+                                    )],
                                 )],
                             ),
                         ),
@@ -573,12 +589,13 @@ mod tests {
                             "Transform 3",
                             (
                                 vec![OutputId::from("Source 2")],
-                                vec![Output::default(DataType::all()).with_schema_definition(
-                                    Definition::empty_legacy_namespace().with_event_field(
+                                vec![Output::transform(
+                                    DataType::all(),
+                                    vec![Definition::empty_legacy_namespace().with_event_field(
                                         &owned_value_path!("transform-3"),
                                         Kind::integer(),
                                         Some("transform-3"),
-                                    ),
+                                    )],
                                 )],
                             ),
                         ),
@@ -586,12 +603,13 @@ mod tests {
                             "Transform 4",
                             (
                                 vec![OutputId::from("Source 2")],
-                                vec![Output::default(DataType::all()).with_schema_definition(
-                                    Definition::empty_legacy_namespace().with_event_field(
+                                vec![Output::transform(
+                                    DataType::all(),
+                                    vec![Definition::empty_legacy_namespace().with_event_field(
                                         &owned_value_path!("transform-4"),
                                         Kind::timestamp().or_bytes(),
                                         Some("transform-4"),
-                                    ),
+                                    )],
                                 )],
                             ),
                         ),
@@ -599,12 +617,13 @@ mod tests {
                             "Transform 5",
                             (
                                 vec![OutputId::from("Transform 3"), OutputId::from("Transform 4")],
-                                vec![Output::default(DataType::all()).with_schema_definition(
-                                    Definition::empty_legacy_namespace().with_event_field(
+                                vec![Output::transform(
+                                    DataType::all(),
+                                    vec![Definition::empty_legacy_namespace().with_event_field(
                                         &owned_value_path!("transform-5"),
                                         Kind::boolean(),
                                         Some("transform-5"),
-                                    ),
+                                    )],
                                 )],
                             ),
                         ),

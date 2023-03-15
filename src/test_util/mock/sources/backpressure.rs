@@ -9,6 +9,7 @@ use vector_config::configurable_component;
 use vector_core::{
     config::LogNamespace,
     event::{Event, LogEvent},
+    schema::Definition,
 };
 use vector_core::{
     config::{DataType, Output},
@@ -62,7 +63,10 @@ impl SourceConfig for BackpressureSourceConfig {
     }
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
-        vec![Output::default(DataType::all())]
+        vec![Output::source_logs(
+            DataType::all(),
+            Definition::default_legacy_namespace(),
+        )]
     }
 
     fn can_acknowledge(&self) -> bool {

@@ -254,9 +254,7 @@ impl SourceConfig for OpentelemetryConfig {
             }
         };
 
-        vec![Output::default(DataType::Log)
-            .with_port(LOGS)
-            .with_schema_definition(schema_definition)]
+        vec![Output::source_logs(DataType::Log, schema_definition).with_port(LOGS)]
     }
 
     fn resources(&self) -> Vec<Resource> {

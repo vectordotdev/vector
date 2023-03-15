@@ -277,8 +277,10 @@ impl TransformConfig for Ec2Metadata {
             })
             .collect();
 
-        vec![Output::default(DataType::Metric | DataType::Log)
-            .with_schema_definitions(schema_definition)]
+        vec![Output::source_logs(
+            DataType::Metric | DataType::Log,
+            schema_definition,
+        )]
     }
 }
 

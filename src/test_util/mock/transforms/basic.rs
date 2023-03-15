@@ -49,8 +49,8 @@ impl TransformConfig for BasicTransformConfig {
         Input::all()
     }
 
-    fn outputs(&self, _: Vec<schema::Definition>, _: LogNamespace) -> Vec<Output> {
-        vec![Output::default(DataType::all())]
+    fn outputs(&self, definitions: Vec<schema::Definition>, _: LogNamespace) -> Vec<Output> {
+        vec![Output::transform(DataType::all(), definitions)]
     }
 }
 

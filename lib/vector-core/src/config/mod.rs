@@ -124,12 +124,39 @@ impl Output {
     ///
     /// A default output is one without a port identifier (i.e. not a named output) and the default
     /// output consumers will receive if they declare the component itself as an input.
-    pub fn default(ty: DataType) -> Self {
+    #[must_use]
+    pub fn source_logs(ty: DataType, schema_definition: schema::Definition) -> Self {
         Self {
             port: None,
             ty,
-            // TODO: I don't think the default should have a definition.
-            log_schema_definitions: vec![schema::Definition::default_legacy_namespace()],
+            log_schema_definitions: vec![schema_definition],
+        }
+    }
+
+    #[must_use]
+    pub fn source_metrics(ty: DataType) -> Self {
+        Self {
+            port: None,
+            ty,
+            log_schema_definitions: vec![],
+        }
+    }
+
+    #[must_use]
+    pub fn source_traces(ty: DataType) -> Self {
+        Self {
+            port: None,
+            ty,
+            log_schema_definitions: vec![],
+        }
+    }
+
+    #[must_use]
+    pub fn transform(ty: DataType, schema_definitions: Vec<schema::Definition>) -> Self {
+        Self {
+            port: None,
+            ty,
+            log_schema_definitions: schema_definitions,
         }
     }
 

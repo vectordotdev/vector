@@ -155,7 +155,8 @@ impl TransformConfig for LogToMetricConfig {
     }
 
     fn outputs(&self, _: Vec<schema::Definition>, _: LogNamespace) -> Vec<Output> {
-        vec![Output::default(DataType::Metric)]
+        // Converting the log to a metric means we lose all incoming `Definition`s.
+        vec![Output::transform(DataType::Metric, Vec::new())]
     }
 
     fn enable_concurrency(&self) -> bool {

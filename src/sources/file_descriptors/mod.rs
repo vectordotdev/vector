@@ -228,5 +228,8 @@ fn outputs(
         )
         .with_standard_vector_source_metadata();
 
-    vec![Output::default(decoding.output_type()).with_schema_definition(schema_definition)]
+    vec![Output::source_logs(
+        decoding.output_type(),
+        schema_definition,
+    )]
 }

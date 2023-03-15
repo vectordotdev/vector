@@ -109,6 +109,6 @@ impl TransformConfig for TagCardinalityLimitConfig {
     }
 
     fn outputs(&self, _: Vec<schema::Definition>, _: LogNamespace) -> Vec<Output> {
-        vec![Output::default(DataType::Metric)]
+        vec![Output::transform(DataType::Metric, vec![])]
     }
 }

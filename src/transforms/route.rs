@@ -106,14 +106,11 @@ impl TransformConfig for RouteConfig {
             .route
             .keys()
             .map(|output_name| {
-                Output::default(DataType::all())
-                    .with_schema_definitions(input_definitions.clone())
-                    .with_port(output_name)
+                Output::transform(DataType::all(), input_definitions.clone()).with_port(output_name)
             })
             .collect();
         result.push(
-            Output::default(DataType::all())
-                .with_schema_definitions(input_definitions.clone())
+            Output::transform(DataType::all(), input_definitions.clone())
                 .with_port(UNMATCHED_ROUTE),
         );
         result
@@ -184,7 +181,7 @@ mod test {
             output_names
                 .iter()
                 .map(|output_name| {
-                    Output::default(DataType::all()).with_port(output_name.to_owned())
+                    Output::transform(DataType::all(), vec![]).with_port(output_name.to_owned())
                 })
                 .collect(),
             1,
@@ -225,7 +222,7 @@ mod test {
             output_names
                 .iter()
                 .map(|output_name| {
-                    Output::default(DataType::all()).with_port(output_name.to_owned())
+                    Output::transform(DataType::all(), vec![]).with_port(output_name.to_owned())
                 })
                 .collect(),
             1,
@@ -265,7 +262,7 @@ mod test {
             output_names
                 .iter()
                 .map(|output_name| {
-                    Output::default(DataType::all()).with_port(output_name.to_owned())
+                    Output::transform(DataType::all(), vec![]).with_port(output_name.to_owned())
                 })
                 .collect(),
             1,

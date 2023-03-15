@@ -340,13 +340,13 @@ impl SourceConfig for SimpleHttpConfig {
 
         let schema_definition = self.schema_definition(log_namespace);
 
-        vec![Output::default(
+        vec![Output::source_logs(
             self.decoding
                 .as_ref()
                 .map(|d| d.output_type())
                 .unwrap_or(DataType::Log),
-        )
-        .with_schema_definition(schema_definition)]
+            schema_definition,
+        )]
     }
 
     fn resources(&self) -> Vec<Resource> {

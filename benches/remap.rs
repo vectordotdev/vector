@@ -27,8 +27,10 @@ fn benchmark_remap(c: &mut Criterion) {
     let mut group = c.benchmark_group("remap");
 
     let add_fields_runner = |tform: &mut Box<dyn SyncTransform>, event: Event| {
-        let mut outputs =
-            TransformOutputsBuf::new_with_capacity(vec![Output::default(DataType::all())], 1);
+        let mut outputs = TransformOutputsBuf::new_with_capacity(
+            vec![Output::transform(DataType::all(), vec![])],
+            1,
+        );
         tform.transform(event, &mut outputs);
         let result = outputs.take_primary();
         let output_1 = result.first().unwrap().as_log();
@@ -77,8 +79,10 @@ fn benchmark_remap(c: &mut Criterion) {
     });
 
     let json_parser_runner = |tform: &mut Box<dyn SyncTransform>, event: Event| {
-        let mut outputs =
-            TransformOutputsBuf::new_with_capacity(vec![Output::default(DataType::all())], 1);
+        let mut outputs = TransformOutputsBuf::new_with_capacity(
+            vec![Output::transform(DataType::all(), vec![])],
+            1,
+        );
         tform.transform(event, &mut outputs);
         let result = outputs.take_primary();
         let output_1 = result.first().unwrap().as_log();
@@ -129,8 +133,10 @@ fn benchmark_remap(c: &mut Criterion) {
 
     let coerce_runner =
         |tform: &mut Box<dyn SyncTransform>, event: Event, timestamp: DateTime<Utc>| {
-            let mut outputs =
-                TransformOutputsBuf::new_with_capacity(vec![Output::default(DataType::all())], 1);
+            let mut outputs = TransformOutputsBuf::new_with_capacity(
+                vec![Output::transform(DataType::all(), vec![])],
+                1,
+            );
             tform.transform(event, &mut outputs);
             let result = outputs.take_primary();
             let output_1 = result.first().unwrap().as_log();

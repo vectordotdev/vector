@@ -39,8 +39,8 @@ impl TransformConfig for NoopTransformConfig {
         Input::all()
     }
 
-    fn outputs(&self, _: Vec<Definition>, _: LogNamespace) -> Vec<Output> {
-        vec![Output::default(DataType::all())]
+    fn outputs(&self, definitions: Vec<Definition>, _: LogNamespace) -> Vec<Output> {
+        vec![Output::transform(DataType::all(), definitions)]
     }
 
     async fn build(&self, _: &TransformContext) -> crate::Result<Transform> {

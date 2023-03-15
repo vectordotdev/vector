@@ -197,7 +197,7 @@ impl SourceConfig for VectorConfig {
             .schema_definition(log_namespace)
             .with_standard_vector_source_metadata();
 
-        vec![Output::default(DataType::all()).with_schema_definition(schema_definition)]
+        vec![Output::source_logs(DataType::all(), schema_definition)]
     }
 
     fn resources(&self) -> Vec<Resource> {
