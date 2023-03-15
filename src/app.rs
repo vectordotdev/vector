@@ -413,8 +413,13 @@ async fn sources_finished(mutex: Arc<Mutex<TopologyController>>) {
 fn get_log_levels(default: &str) -> String {
     std::env::var("VECTOR_LOG")
         .or_else(|_| {
-            warn!(message = "Use of $LOG is deprecated. Please use $VECTOR_LOG instead.");
-            std::env::var("LOG")
+            std::env::var("LOG").map(|log| {
+                warn!(
+                    message =
+                        "DEPRECATED: Use of $LOG is deprecated. Please use $VECTOR_LOG instead."
+                );
+                log
+            })
         })
         .unwrap_or_else(|_| match default {
             "off" => "off".to_owned(),
