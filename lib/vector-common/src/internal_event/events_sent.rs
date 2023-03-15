@@ -65,7 +65,7 @@ impl EventsSent {
         sources
             .into_iter()
             .enumerate()
-            .map({ 
+            .map({
                 let output = output.clone();
 
                 move |(id, key)| {
