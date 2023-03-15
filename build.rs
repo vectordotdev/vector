@@ -189,7 +189,7 @@ fn main() {
     // container during the packaging steps.
     let git_short_hash = tracker
         .get_env_var("VECTOR_GIT_SHA")
-        .unwrap_or(git_short_hash());
+        .unwrap_or_else(git_short_hash);
 
     // Gather up the constants and write them out to our build constants file.
     let mut constants = BuildConstants::new();
