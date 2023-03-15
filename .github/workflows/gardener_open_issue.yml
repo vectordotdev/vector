@@ -1,4 +1,5 @@
 # Add new issues Gardener project board for triage
+name: Add issue to Gardener board
 
 on:
   issues:
