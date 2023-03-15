@@ -1,16 +1,13 @@
-use crate::sinks::pulsar::config::PulsarSinkConfig;
-use crate::sinks::pulsar::sink::PulsarSink;
-use crate::sinks::util::TowerRequestConfig;
-use codecs::TextSerializerConfig;
+use crate::sinks::pulsar::{config::PulsarSinkConfig, sink::PulsarSink};
 use futures::StreamExt;
 use pulsar::SubType;
 use std::collections::BTreeMap;
 
 use crate::event::Value;
 use crate::sinks::VectorSink;
-use crate::test_util::components::assert_sink_compliance;
 use crate::test_util::{
-    components::SINK_TAGS, random_lines_with_stream, random_string, trace_init,
+    components::{assert_sink_compliance, SINK_TAGS},
+    random_lines_with_stream, random_string, trace_init,
 };
 use bytes::Bytes;
 
@@ -87,14 +84,7 @@ async fn pulsar_happy() {
         endpoint: pulsar_address(),
         // overriden by test
         topic: "".to_string(),
-        key_field: None,
-        properties_key: None,
-        batch_size: None,
-        compression: None,
-        encoding: TextSerializerConfig::new().into(),
-        auth: None,
-        acknowledgements: Default::default(),
-        request: TowerRequestConfig::default(),
+        ..Default::default()
     };
 
     pulsar_happy_reuse(cnf).await

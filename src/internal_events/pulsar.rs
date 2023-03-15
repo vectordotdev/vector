@@ -44,7 +44,7 @@ impl InternalEvent for PulsarPropertyExtractionError<'_> {
             message = "Failed to extract properties. Value should be a map of String -> Bytes.",
             error_code = "extracting_property",
             error_type = error_type::PARSER_FAILED,
-            stage = error_stage::RECEIVING,
+            stage = error_stage::PROCESSING,
             property_field = self.property_field,
             internal_log_rate_limit = true,
         );

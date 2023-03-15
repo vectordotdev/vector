@@ -29,7 +29,7 @@ pub struct PulsarSinkConfig {
     /// The endpoint should specify the pulsar protocol and port.
     #[serde(alias = "address")]
     #[configurable(metadata(docs::examples = "pulsar://127.0.0.1:6650"))]
-    endpoint: String,
+    pub(crate) endpoint: String,
 
     /// The Pulsar topic name to write events to.
     #[configurable(metadata(docs::examples = "topic-1234"))]
@@ -37,7 +37,7 @@ pub struct PulsarSinkConfig {
 
     /// The name of the producer. If not specified, the default name assigned by Pulsar will be used.
     #[configurable(metadata(docs::examples = "producer-name"))]
-    producer_name: Option<String>,
+    pub(crate) producer_name: Option<String>,
 
     /// The log field name or tags key to use for the topic key.
     ///
@@ -54,11 +54,11 @@ pub struct PulsarSinkConfig {
     /// Log field to use as Pulsar message key.
     #[configurable(metadata(docs::examples = "message"))]
     #[configurable(metadata(docs::examples = "my_field"))]
-    partition_key_field: Option<String>,
+    pub(crate) partition_key_field: Option<String>,
 
     #[configurable(derived)]
     #[serde(default)]
-    batch: BatchConfig,
+    pub(crate) batch: BatchConfig,
 
     #[configurable(derived)]
     #[serde(default)]
@@ -68,7 +68,7 @@ pub struct PulsarSinkConfig {
     pub encoding: EncodingConfig,
 
     #[configurable(derived)]
-    auth: Option<AuthConfig>,
+    pub(crate) auth: Option<AuthConfig>,
 
     #[configurable(derived)]
     #[serde(default)]
@@ -86,7 +86,7 @@ pub struct PulsarSinkConfig {
 /// Event batching behavior.
 #[configurable_component]
 #[derive(Clone, Copy, Debug, Default)]
-struct BatchConfig {
+pub(crate) struct BatchConfig {
     /// The maximum size of a batch before it is flushed.
     #[configurable(metadata(docs::type_unit = "events"))]
     #[configurable(metadata(docs::examples = 1000))]
@@ -96,7 +96,7 @@ struct BatchConfig {
 /// Authentication configuration.
 #[configurable_component]
 #[derive(Clone, Debug)]
-struct AuthConfig {
+pub(crate) struct AuthConfig {
     /// Basic authentication name/username.
     ///
     /// This can be used either for basic authentication (username/password) or JWT authentication.
@@ -166,6 +166,25 @@ pub enum PulsarCompression {
 
     /// Snappy.
     Snappy,
+}
+
+impl Default for PulsarSinkConfig {
+    fn default() -> Self {
+        Self {
+            endpoint: "pulsar://127.0.0.1:6650".to_string(),
+            topic: "topic-1234".to_string(),
+            producer_name: None,
+            key_field: None,
+            properties_key: None,
+            partition_key_field: None,
+            batch: Default::default(),
+            compression: None,
+            encoding: TextSerializerConfig::default().into(),
+            auth: None,
+            request: TowerRequestConfig::default(),
+            acknowledgements: Default::default(),
+        }
+    }
 }
 
 impl PulsarSinkConfig {
@@ -247,21 +266,7 @@ impl PulsarSinkConfig {
 
 impl GenerateConfig for PulsarSinkConfig {
     fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
-            endpoint: "pulsar://127.0.0.1:6650".to_string(),
-            request: TowerRequestConfig::default(),
-            topic: "topic-1234".to_string(),
-            producer_name: None,
-            key_field: None,
-            properties_key: None,
-            partition_key_field: None,
-            batch: Default::default(),
-            compression: None,
-            encoding: TextSerializerConfig::default().into(),
-            auth: None,
-            acknowledgements: Default::default(),
-        })
-        .unwrap()
+        toml::Value::try_from(Self::default()).unwrap()
     }
 }
 
