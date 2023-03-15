@@ -1,13 +1,18 @@
 use chrono::Utc;
 use codecs::decoding::{DeserializerConfig, FramingConfig, StreamDecodingError};
 use futures::{pin_mut, stream, Stream, StreamExt};
+use lookup::{lookup_v2::OptionalValuePath, owned_value_path};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::FramedRead;
+use value::Kind;
 use vector_common::internal_event::{
-    ByteSize, BytesReceived, EventsReceived, InternalEventHandle as _, Protocol,
+    ByteSize, BytesReceived, CountByteSize, EventsReceived, InternalEventHandle as _, Protocol,
 };
-use vector_config::{configurable_component, NamedComponent};
-use vector_core::{config::LogNamespace, ByteSizeOf};
+use vector_config::configurable_component;
+use vector_core::{
+    config::{LegacyKey, LogNamespace},
+    EstimatedJsonEncodedSizeOf,
+};
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
@@ -39,15 +44,27 @@ enum BuildError {
 pub struct NatsSourceConfig {
     /// The NATS URL to connect to.
     ///
-    /// The URL must take the form of `nats://server:port`.
+    /// The URL takes the form of `nats://server:port`.
+    /// If the port is not specified it defaults to 4222.
+    #[configurable(metadata(docs::examples = "nats://demo.nats.io"))]
+    #[configurable(metadata(docs::examples = "nats://127.0.0.1:4242"))]
     url: String,
 
-    /// A name assigned to the NATS connection.
+    /// A [name][nats_connection_name] assigned to the NATS connection.
+    ///
+    /// [nats_connection_name]: https://docs.nats.io/using-nats/developer/connecting/name
     #[serde(alias = "name")]
+    #[configurable(metadata(docs::examples = "vector"))]
     connection_name: String,
 
-    /// The NATS subject to publish messages to.
-    #[configurable(metadata(docs::templateable))]
+    /// The NATS [subject][nats_subject] to pull messages from.
+    ///
+    /// [nats_subject]: https://docs.nats.io/nats-concepts/subjects
+    #[configurable(metadata(docs::examples = "foo"))]
+    #[configurable(metadata(docs::examples = "time.us.east"))]
+    #[configurable(metadata(docs::examples = "time.*.east"))]
+    #[configurable(metadata(docs::examples = "time.>"))]
+    #[configurable(metadata(docs::examples = ">"))]
     subject: String,
 
     /// NATS Queue Group to join.
@@ -73,6 +90,14 @@ pub struct NatsSourceConfig {
     #[serde(default = "default_decoding")]
     #[derivative(Default(value = "default_decoding()"))]
     decoding: DeserializerConfig,
+
+    /// The `NATS` subject key.
+    #[serde(default = "default_subject_key_field")]
+    subject_key_field: OptionalValuePath,
+}
+
+fn default_subject_key_field() -> OptionalValuePath {
+    OptionalValuePath::from(owned_value_path!("subject"))
 }
 
 impl GenerateConfig for NatsSourceConfig {
@@ -96,6 +121,7 @@ impl SourceConfig for NatsSourceConfig {
             DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace).build();
 
         Ok(Box::pin(nats_source(
+            self.clone(),
             connection,
             subscription,
             decoder,
@@ -107,10 +133,22 @@ impl SourceConfig for NatsSourceConfig {
 
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
         let log_namespace = global_log_namespace.merge(self.log_namespace);
+        let legacy_subject_key_field = self
+            .subject_key_field
+            .clone()
+            .path
+            .map(LegacyKey::InsertIfEmpty);
         let schema_definition = self
             .decoding
             .schema_definition(log_namespace)
-            .with_standard_vector_source_metadata();
+            .with_standard_vector_source_metadata()
+            .with_source_metadata(
+                NatsSourceConfig::NAME,
+                legacy_subject_key_field,
+                &owned_value_path!("subject"),
+                Kind::bytes(),
+                None,
+            );
 
         vec![Output::default(self.decoding.output_type()).with_schema_definition(schema_definition)]
     }
@@ -127,7 +165,7 @@ impl NatsSourceConfig {
     }
 }
 
-impl std::convert::TryFrom<&NatsSourceConfig> for nats::asynk::Options {
+impl TryFrom<&NatsSourceConfig> for nats::asynk::Options {
     type Error = NatsConfigError;
 
     fn try_from(config: &NatsSourceConfig) -> Result<Self, Self::Error> {
@@ -144,6 +182,7 @@ fn get_subscription_stream(
 }
 
 async fn nats_source(
+    config: NatsSourceConfig,
     // Take ownership of the connection so it doesn't get dropped.
     _connection: nats::asynk::Connection,
     subscription: nats::asynk::Subscription,
@@ -152,6 +191,7 @@ async fn nats_source(
     shutdown: ShutdownSignal,
     mut out: SourceSender,
 ) -> Result<(), ()> {
+    let events_received = register!(EventsReceived);
     let stream = get_subscription_stream(subscription).take_until(shutdown);
     pin_mut!(stream);
     let bytes_received = register!(BytesReceived::from(Protocol::TCP));
@@ -162,10 +202,8 @@ async fn nats_source(
             match next {
                 Ok((events, _byte_size)) => {
                     let count = events.len();
-                    emit!(EventsReceived {
-                        count,
-                        byte_size: events.size_of()
-                    });
+                    let byte_size = events.estimated_json_encoded_size_of();
+                    events_received.emit(CountByteSize(count, byte_size));
 
                     let now = Utc::now();
 
@@ -176,6 +214,19 @@ async fn nats_source(
                                 NatsSourceConfig::NAME,
                                 now,
                             );
+
+                            let legacy_subject_key_field = config
+                                .subject_key_field
+                                .path
+                                .as_ref()
+                                .map(LegacyKey::InsertIfEmpty);
+                            log_namespace.insert_source_metadata(
+                                NatsSourceConfig::NAME,
+                                log,
+                                legacy_subject_key_field,
+                                "subject",
+                                msg.subject.as_str(),
+                            )
                         }
                         event
                     });
@@ -216,7 +267,7 @@ async fn create_subscription(
 mod tests {
     #![allow(clippy::print_stdout)] //tests
 
-    use lookup::{owned_value_path, LookupBuf};
+    use lookup::{owned_value_path, OwnedTargetPath};
     use value::{kind::Collection, Kind};
     use vector_core::schema::Definition;
 
@@ -231,6 +282,7 @@ mod tests {
     fn output_schema_definition_vector_namespace() {
         let config = NatsSourceConfig {
             log_namespace: Some(true),
+            subject_key_field: default_subject_key_field(),
             ..Default::default()
         };
 
@@ -241,20 +293,28 @@ mod tests {
 
         let expected_definition =
             Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
-                .with_meaning(LookupBuf::root(), "message")
-                .with_metadata_field(&owned_value_path!("vector", "source_type"), Kind::bytes())
+                .with_meaning(OwnedTargetPath::event_root(), "message")
+                .with_metadata_field(
+                    &owned_value_path!("vector", "source_type"),
+                    Kind::bytes(),
+                    None,
+                )
                 .with_metadata_field(
                     &owned_value_path!("vector", "ingest_timestamp"),
                     Kind::timestamp(),
-                );
+                    None,
+                )
+                .with_metadata_field(&owned_value_path!("nats", "subject"), Kind::bytes(), None);
 
         assert_eq!(definition, expected_definition);
     }
 
     #[test]
     fn output_schema_definition_legacy_namespace() {
-        let config = NatsSourceConfig::default();
-
+        let config = NatsSourceConfig {
+            subject_key_field: default_subject_key_field(),
+            ..Default::default()
+        };
         let definition = config.outputs(LogNamespace::Legacy)[0]
             .clone()
             .log_schema_definition
@@ -270,7 +330,8 @@ mod tests {
             Some("message"),
         )
         .with_event_field(&owned_value_path!("timestamp"), Kind::timestamp(), None)
-        .with_event_field(&owned_value_path!("source_type"), Kind::bytes(), None);
+        .with_event_field(&owned_value_path!("source_type"), Kind::bytes(), None)
+        .with_event_field(&owned_value_path!("subject"), Kind::bytes(), None);
 
         assert_eq!(definition, expected_definition);
     }
@@ -307,6 +368,7 @@ mod integration_tests {
             )
             .build();
             tokio::spawn(nats_source(
+                conf.clone(),
                 nc,
                 sub,
                 decoder,
@@ -341,6 +403,7 @@ mod integration_tests {
             tls: None,
             auth: None,
             log_namespace: None,
+            subject_key_field: default_subject_key_field(),
         };
 
         let r = publish_and_check(conf).await;
@@ -372,6 +435,7 @@ mod integration_tests {
                 },
             }),
             log_namespace: None,
+            subject_key_field: default_subject_key_field(),
         };
 
         let r = publish_and_check(conf).await;
@@ -403,6 +467,7 @@ mod integration_tests {
                 },
             }),
             log_namespace: None,
+            subject_key_field: default_subject_key_field(),
         };
 
         let r = publish_and_check(conf).await;
@@ -433,6 +498,7 @@ mod integration_tests {
                 },
             }),
             log_namespace: None,
+            subject_key_field: default_subject_key_field(),
         };
 
         let r = publish_and_check(conf).await;
@@ -463,6 +529,7 @@ mod integration_tests {
                 },
             }),
             log_namespace: None,
+            subject_key_field: default_subject_key_field(),
         };
 
         let r = publish_and_check(conf).await;
@@ -494,6 +561,7 @@ mod integration_tests {
                 },
             }),
             log_namespace: None,
+            subject_key_field: default_subject_key_field(),
         };
 
         let r = publish_and_check(conf).await;
@@ -525,6 +593,7 @@ mod integration_tests {
                 },
             }),
             log_namespace: None,
+            subject_key_field: default_subject_key_field(),
         };
 
         let r = publish_and_check(conf).await;
@@ -557,6 +626,7 @@ mod integration_tests {
             }),
             auth: None,
             log_namespace: None,
+            subject_key_field: default_subject_key_field(),
         };
 
         let r = publish_and_check(conf).await;
@@ -583,6 +653,7 @@ mod integration_tests {
             tls: None,
             auth: None,
             log_namespace: None,
+            subject_key_field: default_subject_key_field(),
         };
 
         let r = publish_and_check(conf).await;
@@ -617,6 +688,7 @@ mod integration_tests {
             }),
             auth: None,
             log_namespace: None,
+            subject_key_field: default_subject_key_field(),
         };
 
         let r = publish_and_check(conf).await;
@@ -649,6 +721,7 @@ mod integration_tests {
             }),
             auth: None,
             log_namespace: None,
+            subject_key_field: default_subject_key_field(),
         };
 
         let r = publish_and_check(conf).await;
@@ -685,6 +758,7 @@ mod integration_tests {
                 },
             }),
             log_namespace: None,
+            subject_key_field: default_subject_key_field(),
         };
 
         let r = publish_and_check(conf).await;
@@ -721,6 +795,7 @@ mod integration_tests {
                 },
             }),
             log_namespace: None,
+            subject_key_field: default_subject_key_field(),
         };
 
         let r = publish_and_check(conf).await;

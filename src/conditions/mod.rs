@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 use vector_config::configurable_component;
 
 use crate::event::Event;
@@ -51,7 +52,7 @@ impl Condition {
     ///
     /// The event should not be modified, it is only mutable so it can be passed into VRL, but VRL type checking prevents mutation.
     #[allow(dead_code)]
-    pub(crate) fn check(&self, e: Event) -> (bool, Event) {
+    pub fn check(&self, e: Event) -> (bool, Event) {
         match self {
             Condition::IsLog => check_is_log(e),
             Condition::IsMetric => check_is_metric(e),
@@ -96,19 +97,22 @@ impl Condition {
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ConditionConfig {
     /// Matches an event if it is a log.
+    #[configurable(metadata(docs::hidden))]
     IsLog,
 
     /// Matches an event if it is a metric.
+    #[configurable(metadata(docs::hidden))]
     IsMetric,
 
     /// Matches an event if it is a trace.
+    #[configurable(metadata(docs::hidden))]
     IsTrace,
 
     /// Matches an event with a [Vector Remap Language](https://vector.dev/docs/reference/vrl) (VRL) [boolean expression](https://vector.dev/docs/reference/vrl#boolean-expressions).
-    Vrl(#[configurable(derived)] VrlConfig),
+    Vrl(VrlConfig),
 
     /// Matches an event with a [Datadog Search](https://docs.datadoghq.com/logs/explorer/search_syntax/) query.
-    DatadogSearch(#[configurable(derived)] DatadogSearchConfig),
+    DatadogSearch(DatadogSearchConfig),
 }
 
 impl ConditionConfig {
@@ -173,10 +177,10 @@ dyn_clone::clone_trait_object!(ConditionalConfig);
 #[serde(untagged)]
 pub enum AnyCondition {
     /// A [Vector Remap Language](https://vector.dev/docs/reference/vrl) (VRL) [boolean expression](https://vector.dev/docs/reference/vrl#boolean-expressions).
-    String(#[configurable(transparent)] String),
+    String(String),
 
     /// A fully-specified condition.
-    Map(#[configurable(derived)] ConditionConfig),
+    Map(ConditionConfig),
 }
 
 impl AnyCondition {

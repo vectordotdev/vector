@@ -221,7 +221,7 @@ async fn send_agent_traces(urls: &Vec<String>, start: i64, duration: i64, span_i
 
 /// Receives the stats payloads from the Receiver channels from both of the server instances.
 /// If either of the servers does not respond with a stats payload, the test will fail.
-/// The lastest received stats payload is the only one considered. This is the same logic that the
+/// The latest received stats payload is the only one considered. This is the same logic that the
 /// Datadog UI follows.
 /// Wait for up to 35 seconds for the stats payload to arrive. The Agent can take some time to send
 /// the stats out.
@@ -319,7 +319,13 @@ fn validate_stats(agent_stats: &StatsPayload, vector_stats: &StatsPayload) {
 /// This creates a scenario where the stats payload that is output by the sink after processing the
 /// *second* batch of events (the second event) *should* contain the aggregated statistics of both
 /// of the trace events. i.e , the hit count for that bucket should be equal to "2" , not "1".
-async fn start_vector() -> (RunningTopology, tokio::sync::mpsc::UnboundedReceiver<()>) {
+async fn start_vector() -> (
+    RunningTopology,
+    (
+        tokio::sync::mpsc::UnboundedSender<()>,
+        tokio::sync::mpsc::UnboundedReceiver<()>,
+    ),
+) {
     let dd_agent_address = format!("0.0.0.0:{}", vector_receive_port());
 
     let source_config = toml::from_str::<DatadogAgentConfig>(&format!(
@@ -345,7 +351,7 @@ async fn start_vector() -> (RunningTopology, tokio::sync::mpsc::UnboundedReceive
     );
 
     let api_key = std::env::var("TEST_DATADOG_API_KEY")
-        .expect("couldn't find the Datatog api key in environment variables");
+        .expect("couldn't find the Datadog api key in environment variables");
     assert!(!api_key.is_empty(), "TEST_DATADOG_API_KEY required");
     let cfg = cfg.replace("atoken", &api_key);
 

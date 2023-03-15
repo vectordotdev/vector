@@ -89,7 +89,7 @@ async fn topology_shutdown_while_active() {
     config.add_transform("t1", &["in1"], transform1);
     config.add_sink("out1", &["t1"], sink1);
 
-    let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
+    let (topology, _) = start_topology(config.build().unwrap(), false).await;
 
     let pump_handle = tokio::spawn(async move {
         let mut stream = futures::stream::repeat(Event::Log(LogEvent::from("test")));
@@ -137,7 +137,7 @@ async fn topology_source_and_sink() {
     config.add_source("in1", source1);
     config.add_sink("out1", &["in1"], sink1);
 
-    let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
+    let (topology, _) = start_topology(config.build().unwrap(), false).await;
 
     let event = Event::Log(LogEvent::from("this"));
     in1.send_event(event.clone()).await.unwrap();
@@ -162,7 +162,7 @@ async fn topology_multiple_sources() {
     config.add_source("in2", source2);
     config.add_sink("out1", &["in1", "in2"], sink1);
 
-    let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
+    let (topology, _) = start_topology(config.build().unwrap(), false).await;
 
     let event1 = Event::Log(LogEvent::from("this"));
     let event2 = Event::Log(LogEvent::from("that"));
@@ -195,7 +195,7 @@ async fn topology_multiple_sinks() {
     config.add_sink("out1", &["in1"], sink1);
     config.add_sink("out2", &["in1"], sink2);
 
-    let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
+    let (topology, _) = start_topology(config.build().unwrap(), false).await;
 
     // Send an event into source #1:
     let event = Event::Log(LogEvent::from("this"));
@@ -230,7 +230,7 @@ async fn topology_transform_chain() {
     config.add_transform("t2", &["t1"], transform2);
     config.add_sink("out1", &["t2"], sink1);
 
-    let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
+    let (topology, _) = start_topology(config.build().unwrap(), false).await;
 
     let event = Event::Log(LogEvent::from("this"));
 
@@ -256,7 +256,7 @@ async fn topology_remove_one_source() {
     config.add_source("in2", source2);
     config.add_sink("out1", &["in1", "in2"], sink1);
 
-    let (mut topology, _crash) = start_topology(config.build().unwrap(), false).await;
+    let (mut topology, _) = start_topology(config.build().unwrap(), false).await;
 
     let (out1, sink1) = basic_sink(10);
 
@@ -300,7 +300,7 @@ async fn topology_remove_one_sink() {
     config.add_sink("out1", &["in1"], sink1);
     config.add_sink("out2", &["in1"], sink2);
 
-    let (mut topology, _crash) = start_topology(config.build().unwrap(), false).await;
+    let (mut topology, _) = start_topology(config.build().unwrap(), false).await;
 
     let mut config = Config::builder();
     config.add_source("in1", basic_source().1);
@@ -340,7 +340,7 @@ async fn topology_remove_one_transform() {
     config.add_transform("t2", &["t1"], transform2);
     config.add_sink("out1", &["t2"], sink1);
 
-    let (mut topology, _crash) = start_topology(config.build().unwrap(), false).await;
+    let (mut topology, _) = start_topology(config.build().unwrap(), false).await;
 
     // Now create an identical topology, but remove one of the transforms:
     let (mut in2, source2) = basic_source();
@@ -391,7 +391,7 @@ async fn topology_swap_source() {
     config.add_source("in1", source1);
     config.add_sink("out1", &["in1"], sink1);
 
-    let (mut topology, _crash) = start_topology(config.build().unwrap(), false).await;
+    let (mut topology, _) = start_topology(config.build().unwrap(), false).await;
 
     // Now, create sink #2 and replace `out2` with it, and add source #2 as `in2`, attached to `out1`:
     let (mut in2, source2) = basic_source();
@@ -446,7 +446,7 @@ async fn topology_swap_transform() {
     config.add_transform("t1", &["in1"], transform1);
     config.add_sink("out1", &["t1"], sink1);
 
-    let (mut topology, _crash) = start_topology(config.build().unwrap(), false).await;
+    let (mut topology, _) = start_topology(config.build().unwrap(), false).await;
 
     // Now, create source #2 and replace `in1` with it, add transform #2 as `t1`, attached to `in1`,
     // and add sink #2 as `out1`, attached to `t1`:
@@ -501,7 +501,7 @@ async fn topology_swap_sink() {
     config.add_source("in1", source1);
     config.add_sink("out1", &["in1"], sink1);
 
-    let (mut topology, _crash) = start_topology(config.build().unwrap(), false).await;
+    let (mut topology, _) = start_topology(config.build().unwrap(), false).await;
 
     // Now, create an identical topology except that the sink has changed which will force it to be rebuilt:
     let (mut in2, source2) = basic_source();
@@ -582,7 +582,7 @@ async fn topology_swap_transform_is_atomic() {
     config.add_transform("t1", &["in1"], transform1v1);
     config.add_sink("out1", &["t1"], sink1);
 
-    let (mut topology, _crash) = start_topology(config.build().unwrap(), false).await;
+    let (mut topology, _) = start_topology(config.build().unwrap(), false).await;
     sleep(Duration::from_millis(10)).await;
 
     let transform1v2 = basic_transform(" replaced", 0.0);
@@ -619,7 +619,7 @@ async fn topology_rebuild_connected() {
     config.add_source("in1", source1);
     config.add_sink("out1", &["in1"], sink1);
 
-    let (mut topology, _crash) = start_topology(config.build().unwrap(), false).await;
+    let (mut topology, _) = start_topology(config.build().unwrap(), false).await;
 
     let (mut in1, source1) = basic_source_with_data("v2");
     let (out1, sink1) = basic_sink_with_data(10, "v2");
@@ -661,7 +661,7 @@ async fn topology_rebuild_connected_transform() {
     config.add_transform("t2", &["t1"], transform2);
     config.add_sink("out1", &["t2"], sink1);
 
-    let (mut topology, _crash) = start_topology(config.build().unwrap(), false).await;
+    let (mut topology, _) = start_topology(config.build().unwrap(), false).await;
 
     let (mut in2, source2) = basic_source_with_data("v1"); // not changing
     let transform1 = basic_transform("", 0.0);
@@ -725,7 +725,7 @@ async fn topology_optional_healthcheck_does_not_fail_start() {
 #[tokio::test]
 async fn topology_optional_healthcheck_does_not_fail_reload() {
     let config = basic_config();
-    let (mut topology, _crash) = start_topology(config, false).await;
+    let (mut topology, _) = start_topology(config, false).await;
     let config = basic_config_with_sink_failing_healthcheck();
     assert!(topology.reload_config_and_respawn(config).await.unwrap());
 }
@@ -734,7 +734,7 @@ async fn topology_optional_healthcheck_does_not_fail_reload() {
 async fn topology_healthcheck_not_run_on_unchanged_reload() {
     let config = basic_config();
 
-    let (mut topology, _crash) = start_topology(config, false).await;
+    let (mut topology, _) = start_topology(config, false).await;
     let mut config = basic_config_with_sink_failing_healthcheck();
     config.healthchecks.require_healthy = true;
     assert!(topology.reload_config_and_respawn(config).await.unwrap());
@@ -750,7 +750,7 @@ async fn topology_healthcheck_run_for_changes_on_reload() {
     config.add_source("in1", src);
     config.add_sink("out1", &["in1"], basic_sink(10).1);
 
-    let (mut topology, _crash) = start_topology(config.build().unwrap(), false).await;
+    let (mut topology, _) = start_topology(config.build().unwrap(), false).await;
 
     let mut config = Config::builder();
     // We can't just drop the sender side since that will close the source.
@@ -783,13 +783,13 @@ async fn topology_disk_buffer_flushes_on_idle() {
         vec![String::from("in1"), String::from("t1")],
         sink1,
     );
-    sink1_outer.buffer = BufferConfig::Single(BufferType::DiskV1 {
-        max_size: std::num::NonZeroU64::new(1024).unwrap(),
+    sink1_outer.buffer = BufferConfig::Single(BufferType::DiskV2 {
+        max_size: std::num::NonZeroU64::new(268435488).unwrap(),
         when_full: WhenFull::DropNewest,
     });
     config.add_sink_outer("out1", sink1_outer);
 
-    let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
+    let (topology, _) = start_topology(config.build().unwrap(), false).await;
 
     in1.send_event(event).await.unwrap();
 

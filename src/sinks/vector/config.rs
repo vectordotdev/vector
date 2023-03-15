@@ -33,18 +33,27 @@ use crate::{
 #[serde(deny_unknown_fields)]
 pub struct VectorConfig {
     /// Version of the configuration.
+    // NOTE: this option is deprecated and has already been removed from the "old" docs.
+    // At some point in the future we will remove it entirely as a breaking change.
+    #[configurable(metadata(docs::hidden))]
     version: Option<super::VectorConfigVersion>,
 
-    /// The downstream Vector address to connect to.
+    /// The downstream Vector address to which to connect.
+    ///
+    /// Both IP address and hostname are accepted formats.
     ///
     /// The address _must_ include a port.
+    #[configurable(validation(format = "uri"))]
+    #[configurable(metadata(docs::examples = "92.12.333.224:6000"))]
+    #[configurable(metadata(docs::examples = "https://somehost:6000"))]
     address: String,
 
     /// Whether or not to compress requests.
     ///
     /// If set to `true`, requests will be compressed with [`gzip`][gzip_docs].
     ///
-    /// [gzip_docs]: https://en.wikipedia.org/wiki/Gzip
+    /// [gzip_docs]: https://www.gzip.org/
+    #[configurable(metadata(docs::advanced))]
     #[serde(default)]
     compression: bool,
 
@@ -67,6 +76,14 @@ pub struct VectorConfig {
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     pub(in crate::sinks::vector) acknowledgements: AcknowledgementsConfig,
+}
+
+impl VectorConfig {
+    /// Creates a `VectorConfig` with the given address.
+    pub fn from_address(addr: Uri) -> Self {
+        let addr = addr.to_string();
+        default_config(addr.as_str())
+    }
 }
 
 impl GenerateConfig for VectorConfig {
@@ -141,16 +158,16 @@ async fn healthcheck(
     }
 
     let request = service.client.health_check(proto::HealthCheckRequest {});
-
-    if let Ok(response) = request.await {
-        let status = proto::ServingStatus::from_i32(response.into_inner().status);
-
-        if let Some(proto::ServingStatus::Serving) = status {
-            return Ok(());
-        }
+    match request.await {
+        Ok(response) => match proto::ServingStatus::from_i32(response.into_inner().status) {
+            Some(proto::ServingStatus::Serving) => Ok(()),
+            Some(status) => Err(Box::new(VectorSinkError::Health {
+                status: Some(status.as_str_name()),
+            })),
+            None => Err(Box::new(VectorSinkError::Health { status: None })),
+        },
+        Err(source) => Err(Box::new(VectorSinkError::Request { source })),
     }
-
-    Err(Box::new(VectorSinkError::Health))
 }
 
 /// grpc doesn't like an address without a scheme, so we default to http or https if one isn't

@@ -2,6 +2,7 @@ use std::{
     collections::{BTreeMap, HashMap},
     io::Cursor,
     sync::Arc,
+    time::Duration,
 };
 
 use async_stream::stream;
@@ -12,19 +13,24 @@ use codecs::{
     StreamDecodingError,
 };
 use futures::{Stream, StreamExt};
+use lookup::{lookup_v2::OptionalValuePath, owned_value_path, path, OwnedValuePath};
 use once_cell::sync::OnceCell;
 use rdkafka::{
-    consumer::{Consumer, ConsumerContext, Rebalance, StreamConsumer},
+    consumer::{CommitMode, Consumer, ConsumerContext, Rebalance, StreamConsumer},
     message::{BorrowedMessage, Headers as _, Message},
     ClientConfig, ClientContext, Statistics,
 };
+use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::FramedRead;
 
+use value::{kind::Collection, Kind};
+use vector_common::finalizer::OrderedFinalizer;
 use vector_config::configurable_component;
-use vector_core::config::LogNamespace;
-
-use vector_common::{byte_size_of::ByteSizeOf, finalizer::OrderedFinalizer};
+use vector_core::{
+    config::{LegacyKey, LogNamespace},
+    EstimatedJsonEncodedSizeOf,
+};
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
@@ -50,7 +56,16 @@ enum BuildError {
     KafkaSubscribeError { source: rdkafka::error::KafkaError },
 }
 
+/// Metrics configuration.
+#[configurable_component]
+#[derive(Clone, Debug, Default)]
+struct Metrics {
+    /// Expose topic lag metrics for all topics and partitions. Metric names are `kafka_consumer_lag`.
+    pub topic_lag_metric: bool,
+}
+
 /// Configuration for the `kafka` source.
+#[serde_as]
 #[configurable_component(source("kafka"))]
 #[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
@@ -62,37 +77,56 @@ pub struct KafkaSourceConfig {
     /// allowing discovering all other hosts in the cluster.
     ///
     /// Must be in the form of `host:port`, and comma-separated.
+    #[configurable(metadata(docs::examples = "10.14.22.123:9092,10.14.23.332:9092"))]
     bootstrap_servers: String,
 
     /// The Kafka topics names to read events from.
     ///
     /// Regular expression syntax is supported if the topic begins with `^`.
+    #[configurable(metadata(
+        docs::examples = "^(prefix1|prefix2)-.+",
+        docs::examples = "topic-1",
+        docs::examples = "topic-2"
+    ))]
     topics: Vec<String>,
 
     /// The consumer group name to be used to consume events from Kafka.
+    #[configurable(metadata(docs::examples = "consumer-group-name"))]
     group_id: String,
 
     /// If offsets for consumer group do not exist, set them using this strategy.
     ///
     /// See the [librdkafka documentation](https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md) for the `auto.offset.reset` option for further clarification.
     #[serde(default = "default_auto_offset_reset")]
+    #[configurable(metadata(docs::examples = "example_auto_offset_reset_values()"))]
     auto_offset_reset: String,
 
-    /// The Kafka session timeout, in milliseconds.
+    /// The Kafka session timeout.
+    #[serde_as(as = "serde_with::DurationMilliSeconds<u64>")]
+    #[configurable(metadata(docs::examples = 5000, docs::examples = 10000))]
+    #[configurable(metadata(docs::advanced))]
     #[serde(default = "default_session_timeout_ms")]
-    session_timeout_ms: u64,
+    session_timeout_ms: Duration,
 
-    /// Timeout for network requests, in milliseconds.
+    /// Timeout for network requests.
+    #[serde_as(as = "serde_with::DurationMilliSeconds<u64>")]
+    #[configurable(metadata(docs::examples = 30000, docs::examples = 60000))]
+    #[configurable(metadata(docs::advanced))]
     #[serde(default = "default_socket_timeout_ms")]
-    socket_timeout_ms: u64,
+    socket_timeout_ms: Duration,
 
-    /// Maximum time the broker may wait to fill the response, in milliseconds.
+    /// Maximum time the broker may wait to fill the response.
+    #[serde_as(as = "serde_with::DurationMilliSeconds<u64>")]
+    #[configurable(metadata(docs::examples = 50, docs::examples = 100))]
+    #[configurable(metadata(docs::advanced))]
     #[serde(default = "default_fetch_wait_max_ms")]
-    fetch_wait_max_ms: u64,
+    fetch_wait_max_ms: Duration,
 
-    /// The frequency that the consumer offsets are committed (written) to offset storage, in milliseconds.
+    /// The frequency that the consumer offsets are committed (written) to offset storage.
+    #[serde_as(as = "serde_with::DurationMilliSeconds<u64>")]
     #[serde(default = "default_commit_interval_ms")]
-    commit_interval_ms: u64,
+    #[configurable(metadata(docs::examples = 5000, docs::examples = 10000))]
+    commit_interval_ms: Duration,
 
     /// Overrides the name of the log field used to add the message key to each event.
     ///
@@ -100,7 +134,8 @@ pub struct KafkaSourceConfig {
     ///
     /// By default, `"message_key"` is used.
     #[serde(default = "default_key_field")]
-    key_field: String,
+    #[configurable(metadata(docs::examples = "message_key"))]
+    key_field: OptionalValuePath,
 
     /// Overrides the name of the log field used to add the topic to each event.
     ///
@@ -108,7 +143,8 @@ pub struct KafkaSourceConfig {
     ///
     /// By default, `"topic"` is used.
     #[serde(default = "default_topic_key")]
-    topic_key: String,
+    #[configurable(metadata(docs::examples = "topic"))]
+    topic_key: OptionalValuePath,
 
     /// Overrides the name of the log field used to add the partition to each event.
     ///
@@ -116,7 +152,8 @@ pub struct KafkaSourceConfig {
     ///
     /// By default, `"partition"` is used.
     #[serde(default = "default_partition_key")]
-    partition_key: String,
+    #[configurable(metadata(docs::examples = "partition"))]
+    partition_key: OptionalValuePath,
 
     /// Overrides the name of the log field used to add the offset to each event.
     ///
@@ -124,7 +161,8 @@ pub struct KafkaSourceConfig {
     ///
     /// By default, `"offset"` is used.
     #[serde(default = "default_offset_key")]
-    offset_key: String,
+    #[configurable(metadata(docs::examples = "offset"))]
+    offset_key: OptionalValuePath,
 
     /// Overrides the name of the log field used to add the headers to each event.
     ///
@@ -132,17 +170,24 @@ pub struct KafkaSourceConfig {
     ///
     /// By default, `"headers"` is used.
     #[serde(default = "default_headers_key")]
-    headers_key: String,
+    #[configurable(metadata(docs::examples = "headers"))]
+    headers_key: OptionalValuePath,
 
     /// Advanced options set directly on the underlying `librdkafka` client.
     ///
     /// See the [librdkafka documentation](https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md) for details.
+    #[configurable(metadata(docs::examples = "example_librdkafka_options()"))]
+    #[configurable(metadata(docs::advanced))]
+    #[configurable(metadata(
+        docs::additional_props_description = "A librdkafka configuration option."
+    ))]
     librdkafka_options: Option<HashMap<String, String>>,
 
     #[serde(flatten)]
     auth: kafka::KafkaAuthConfig,
 
     #[configurable(derived)]
+    #[configurable(metadata(docs::advanced))]
     #[serde(default = "default_framing_message_based")]
     #[derivative(Default(value = "default_framing_message_based()"))]
     framing: FramingConfig,
@@ -155,46 +200,84 @@ pub struct KafkaSourceConfig {
     #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: SourceAcknowledgementsConfig,
+
+    /// The namespace to use for logs. This overrides the global setting.
+    #[configurable(metadata(docs::hidden))]
+    #[serde(default)]
+    log_namespace: Option<bool>,
+
+    #[configurable(derived)]
+    #[serde(default)]
+    metrics: Metrics,
 }
 
-const fn default_session_timeout_ms() -> u64 {
-    10000 // default in librdkafka
+impl KafkaSourceConfig {
+    fn keys(&self) -> Keys {
+        Keys::from(log_schema(), self)
+    }
 }
 
-const fn default_socket_timeout_ms() -> u64 {
-    60000 // default in librdkafka
+const fn default_session_timeout_ms() -> Duration {
+    Duration::from_millis(10000) // default in librdkafka
 }
 
-const fn default_fetch_wait_max_ms() -> u64 {
-    100 // default in librdkafka
+const fn default_socket_timeout_ms() -> Duration {
+    Duration::from_millis(60000) // default in librdkafka
 }
 
-const fn default_commit_interval_ms() -> u64 {
-    5000 // default in librdkafka
+const fn default_fetch_wait_max_ms() -> Duration {
+    Duration::from_millis(100) // default in librdkafka
+}
+
+const fn default_commit_interval_ms() -> Duration {
+    Duration::from_millis(5000)
 }
 
 fn default_auto_offset_reset() -> String {
     "largest".into() // default in librdkafka
 }
 
-fn default_key_field() -> String {
-    "message_key".into()
+fn default_key_field() -> OptionalValuePath {
+    OptionalValuePath::from(owned_value_path!("message_key"))
 }
 
-fn default_topic_key() -> String {
-    "topic".into()
+fn default_topic_key() -> OptionalValuePath {
+    OptionalValuePath::from(owned_value_path!("topic"))
 }
 
-fn default_partition_key() -> String {
-    "partition".into()
+fn default_partition_key() -> OptionalValuePath {
+    OptionalValuePath::from(owned_value_path!("partition"))
 }
 
-fn default_offset_key() -> String {
-    "offset".into()
+fn default_offset_key() -> OptionalValuePath {
+    OptionalValuePath::from(owned_value_path!("offset"))
 }
 
-fn default_headers_key() -> String {
-    "headers".into()
+fn default_headers_key() -> OptionalValuePath {
+    OptionalValuePath::from(owned_value_path!("headers"))
+}
+
+const fn example_auto_offset_reset_values() -> [&'static str; 7] {
+    [
+        "smallest",
+        "earliest",
+        "beginning",
+        "largest",
+        "latest",
+        "end",
+        "error",
+    ]
+}
+
+fn example_librdkafka_options() -> HashMap<String, String> {
+    HashMap::<_, _>::from_iter(
+        [
+            ("client.id".to_string(), "${ENV_VAR}".to_string()),
+            ("fetch.error.backoff.ms".to_string(), "1000".to_string()),
+            ("socket.send.buffer.bytes".to_string(), "100".to_string()),
+        ]
+        .into_iter(),
+    )
 }
 
 impl_generate_config_from_default!(KafkaSourceConfig);
@@ -202,13 +285,11 @@ impl_generate_config_from_default!(KafkaSourceConfig);
 #[async_trait::async_trait]
 impl SourceConfig for KafkaSourceConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
+        let log_namespace = cx.log_namespace(self.log_namespace);
+
         let consumer = create_consumer(self)?;
-        let decoder = DecodingConfig::new(
-            self.framing.clone(),
-            self.decoding.clone(),
-            LogNamespace::Legacy,
-        )
-        .build();
+        let decoder =
+            DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace).build();
         let acknowledgements = cx.do_acknowledgements(self.acknowledgements);
 
         Ok(Box::pin(kafka_source(
@@ -218,11 +299,62 @@ impl SourceConfig for KafkaSourceConfig {
             cx.shutdown,
             cx.out,
             acknowledgements,
+            log_namespace,
         )))
     }
 
-    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
-        vec![Output::default(self.decoding.output_type())]
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+        let log_namespace = global_log_namespace.merge(self.log_namespace);
+        let keys = self.keys();
+
+        let schema_definition = self
+            .decoding
+            .schema_definition(log_namespace)
+            .with_standard_vector_source_metadata()
+            .with_source_metadata(
+                Self::NAME,
+                Some(LegacyKey::Overwrite(owned_value_path!(keys.timestamp))),
+                &owned_value_path!("timestamp"),
+                Kind::timestamp(),
+                Some("timestamp"),
+            )
+            .with_source_metadata(
+                Self::NAME,
+                keys.topic.clone().map(LegacyKey::Overwrite),
+                &owned_value_path!("topic"),
+                Kind::bytes(),
+                None,
+            )
+            .with_source_metadata(
+                Self::NAME,
+                keys.partition.clone().map(LegacyKey::Overwrite),
+                &owned_value_path!("partition"),
+                Kind::bytes(),
+                None,
+            )
+            .with_source_metadata(
+                Self::NAME,
+                keys.offset.clone().map(LegacyKey::Overwrite),
+                &owned_value_path!("offset"),
+                Kind::bytes(),
+                None,
+            )
+            .with_source_metadata(
+                Self::NAME,
+                keys.headers.clone().map(LegacyKey::Overwrite),
+                &owned_value_path!("headers"),
+                Kind::object(Collection::empty().with_unknown(Kind::bytes())),
+                None,
+            )
+            .with_source_metadata(
+                Self::NAME,
+                keys.key_field.clone().map(LegacyKey::Overwrite),
+                &owned_value_path!("message_key"),
+                Kind::bytes(),
+                None,
+            );
+
+        vec![Output::default(self.decoding.output_type()).with_schema_definition(schema_definition)]
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -237,6 +369,7 @@ async fn kafka_source(
     mut shutdown: ShutdownSignal,
     mut out: SourceSender,
     acknowledgements: bool,
+    log_namespace: LogNamespace,
 ) -> Result<(), ()> {
     let consumer = Arc::new(consumer);
     let (finalizer, mut ack_stream) =
@@ -251,7 +384,6 @@ async fn kafka_source(
     }
 
     let mut stream = consumer.stream();
-    let keys = Keys::from(log_schema(), &config);
 
     loop {
         tokio::select! {
@@ -276,12 +408,19 @@ async fn kafka_source(
                         partition: msg.partition(),
                     });
 
-                    parse_message(msg, decoder.clone(), keys, &finalizer, &mut out, &consumer).await;
+                    parse_message(msg, decoder.clone(), config.keys(), &finalizer, &mut out, &consumer, log_namespace).await;
                 }
             },
         }
     }
 
+    // Since commits are async internally, we try one last sync commit inside the interval
+    // in case there have been acks.
+    if let Ok(current_assignment) = consumer.assignment() {
+        // not logging on error because it will error if there are no offsets stored for a partition,
+        // and this is best-effort cleanup anyway
+        let _ = consumer.commit(&current_assignment, CommitMode::Sync);
+    }
     Ok(())
 }
 
@@ -292,8 +431,9 @@ async fn parse_message(
     finalizer: &Option<Arc<OrderedFinalizer<FinalizerEntry>>>,
     out: &mut SourceSender,
     consumer: &Arc<StreamConsumer<CustomContext>>,
+    log_namespace: LogNamespace,
 ) {
-    if let Some((count, mut stream)) = parse_stream(&msg, decoder, keys) {
+    if let Some((count, mut stream)) = parse_stream(&msg, decoder, keys, log_namespace) {
         match finalizer {
             Some(finalizer) => {
                 let (batch, receiver) = BatchNotifier::new_with_receiver();
@@ -331,6 +471,7 @@ fn parse_stream<'a>(
     msg: &BorrowedMessage<'a>,
     decoder: Decoder,
     keys: Keys<'a>,
+    log_namespace: LogNamespace,
 ) -> Option<(usize, impl Stream<Item = Event> + 'a)> {
     let payload = msg.payload()?; // skip messages with empty payload
 
@@ -346,12 +487,12 @@ fn parse_stream<'a>(
                 Ok((events, _byte_size)) => {
                     emit!(KafkaEventsReceived {
                         count: events.len(),
-                        byte_size: events.size_of(),
+                        byte_size: events.estimated_json_encoded_size_of(),
                         topic: &rmsg.topic,
                         partition: rmsg.partition,
                     });
                     for mut event in events {
-                        rmsg.apply(&keys, &mut event);
+                        rmsg.apply(&keys, &mut event, log_namespace);
                         yield event;
                     }
                 },
@@ -369,33 +510,31 @@ fn parse_stream<'a>(
     Some((count, stream))
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 struct Keys<'a> {
-    source_type: &'a str,
     timestamp: &'a str,
-    key_field: &'a str,
-    topic: &'a str,
-    partition: &'a str,
-    offset: &'a str,
-    headers: &'a str,
+    key_field: &'a Option<OwnedValuePath>,
+    topic: &'a Option<OwnedValuePath>,
+    partition: &'a Option<OwnedValuePath>,
+    offset: &'a Option<OwnedValuePath>,
+    headers: &'a Option<OwnedValuePath>,
 }
 
 impl<'a> Keys<'a> {
     fn from(schema: &'a LogSchema, config: &'a KafkaSourceConfig) -> Self {
         Self {
-            source_type: schema.source_type_key(),
             timestamp: schema.timestamp_key(),
-            key_field: config.key_field.as_str(),
-            topic: config.topic_key.as_str(),
-            partition: config.partition_key.as_str(),
-            offset: config.offset_key.as_str(),
-            headers: config.headers_key.as_str(),
+            key_field: &config.key_field.path,
+            topic: &config.topic_key.path,
+            partition: &config.partition_key.path,
+            offset: &config.offset_key.path,
+            headers: &config.headers_key.path,
         }
     }
 }
 
 struct ReceivedMessage {
-    timestamp: DateTime<Utc>,
+    timestamp: Option<DateTime<Utc>>,
     key: Value,
     headers: BTreeMap<String, Value>,
     topic: String,
@@ -409,8 +548,7 @@ impl ReceivedMessage {
         let timestamp = msg
             .timestamp()
             .to_millis()
-            .and_then(|millis| Utc.timestamp_millis_opt(millis).latest())
-            .unwrap_or_else(Utc::now);
+            .and_then(|millis| Utc.timestamp_millis_opt(millis).latest());
 
         let key = msg
             .key()
@@ -439,15 +577,72 @@ impl ReceivedMessage {
         }
     }
 
-    fn apply(&self, keys: &Keys<'_>, event: &mut Event) {
+    fn apply(&self, keys: &Keys<'_>, event: &mut Event, log_namespace: LogNamespace) {
         if let Event::Log(ref mut log) = event {
-            log.insert(keys.source_type, Bytes::from("kafka"));
-            log.insert(keys.timestamp, self.timestamp);
-            log.insert(keys.key_field, self.key.clone());
-            log.insert(keys.topic, Value::from(self.topic.clone()));
-            log.insert(keys.partition, Value::from(self.partition));
-            log.insert(keys.offset, Value::from(self.offset));
-            log.insert(keys.headers, Value::from(self.headers.clone()));
+            match log_namespace {
+                LogNamespace::Vector => {
+                    // We'll only use this function in Vector namespaces because we don't want
+                    // "timestamp" to be set automatically in legacy namespaces. In legacy
+                    // namespaces, the "timestamp" field corresponds to the Kafka message, not the
+                    // timestamp when the event was processed.
+                    log_namespace.insert_standard_vector_source_metadata(
+                        log,
+                        KafkaSourceConfig::NAME,
+                        Utc::now(),
+                    );
+                }
+                LogNamespace::Legacy => {
+                    log.insert(log_schema().source_type_key(), KafkaSourceConfig::NAME);
+                }
+            }
+
+            log_namespace.insert_source_metadata(
+                KafkaSourceConfig::NAME,
+                log,
+                keys.key_field.as_ref().map(LegacyKey::Overwrite),
+                path!("message_key"),
+                self.key.clone(),
+            );
+
+            log_namespace.insert_source_metadata(
+                KafkaSourceConfig::NAME,
+                log,
+                Some(LegacyKey::Overwrite(keys.timestamp)),
+                path!("timestamp"),
+                self.timestamp,
+            );
+
+            log_namespace.insert_source_metadata(
+                KafkaSourceConfig::NAME,
+                log,
+                keys.topic.as_ref().map(LegacyKey::Overwrite),
+                path!("topic"),
+                self.topic.clone(),
+            );
+
+            log_namespace.insert_source_metadata(
+                KafkaSourceConfig::NAME,
+                log,
+                keys.partition.as_ref().map(LegacyKey::Overwrite),
+                path!("partition"),
+                self.partition,
+            );
+
+            log_namespace.insert_source_metadata(
+                KafkaSourceConfig::NAME,
+                log,
+                keys.offset.as_ref().map(LegacyKey::Overwrite),
+                path!("offset"),
+                self.offset,
+            );
+
+            log_namespace.insert_source_metadata(
+                KafkaSourceConfig::NAME,
+                log,
+                keys.headers.as_ref().map(LegacyKey::Overwrite),
+                path!("headers"),
+                self.headers.clone(),
+            );
         }
     }
 }
@@ -475,14 +670,23 @@ fn create_consumer(config: &KafkaSourceConfig) -> crate::Result<StreamConsumer<C
         .set("group.id", &config.group_id)
         .set("bootstrap.servers", &config.bootstrap_servers)
         .set("auto.offset.reset", &config.auto_offset_reset)
-        .set("session.timeout.ms", &config.session_timeout_ms.to_string())
-        .set("socket.timeout.ms", &config.socket_timeout_ms.to_string())
-        .set("fetch.wait.max.ms", &config.fetch_wait_max_ms.to_string())
+        .set(
+            "session.timeout.ms",
+            &config.session_timeout_ms.as_millis().to_string(),
+        )
+        .set(
+            "socket.timeout.ms",
+            &config.socket_timeout_ms.as_millis().to_string(),
+        )
+        .set(
+            "fetch.wait.max.ms",
+            &config.fetch_wait_max_ms.as_millis().to_string(),
+        )
         .set("enable.partition.eof", "false")
         .set("enable.auto.commit", "true")
         .set(
             "auto.commit.interval.ms",
-            &config.commit_interval_ms.to_string(),
+            &config.commit_interval_ms.as_millis().to_string(),
         )
         .set("enable.auto.offset.store", "false")
         .set("statistics.interval.ms", "1000")
@@ -497,7 +701,9 @@ fn create_consumer(config: &KafkaSourceConfig) -> crate::Result<StreamConsumer<C
     }
 
     let consumer = client_config
-        .create_with_context::<_, StreamConsumer<_>>(CustomContext::default())
+        .create_with_context::<_, StreamConsumer<_>>(CustomContext::new(
+            config.metrics.topic_lag_metric,
+        ))
         .context(KafkaCreateSnafu)?;
     let topics: Vec<&str> = config.topics.iter().map(|s| s.as_str()).collect();
     consumer.subscribe(&topics).context(KafkaSubscribeSnafu)?;
@@ -509,6 +715,15 @@ fn create_consumer(config: &KafkaSourceConfig) -> crate::Result<StreamConsumer<C
 struct CustomContext {
     stats: kafka::KafkaStatisticsContext,
     finalizer: OnceCell<Arc<OrderedFinalizer<FinalizerEntry>>>,
+}
+
+impl CustomContext {
+    fn new(expose_lag_metrics: bool) -> Self {
+        Self {
+            stats: kafka::KafkaStatisticsContext { expose_lag_metrics },
+            ..Default::default()
+        }
+    }
 }
 
 impl ClientContext for CustomContext {
@@ -529,6 +744,9 @@ impl ConsumerContext for CustomContext {
 
 #[cfg(test)]
 mod test {
+    use lookup::OwnedTargetPath;
+    use vector_core::schema::Definition;
+
     use super::*;
 
     pub fn kafka_host() -> String {
@@ -544,28 +762,115 @@ mod test {
         crate::test_util::test_generate_config::<KafkaSourceConfig>();
     }
 
-    pub(super) fn make_config(topic: &str, group: &str) -> KafkaSourceConfig {
+    pub(super) fn make_config(
+        topic: &str,
+        group: &str,
+        log_namespace: LogNamespace,
+    ) -> KafkaSourceConfig {
         KafkaSourceConfig {
             bootstrap_servers: kafka_address(9091),
             topics: vec![topic.into()],
             group_id: group.into(),
             auto_offset_reset: "beginning".into(),
-            session_timeout_ms: 6000,
-            commit_interval_ms: 1,
-            key_field: "message_key".to_string(),
-            topic_key: "topic".to_string(),
-            partition_key: "partition".to_string(),
-            offset_key: "offset".to_string(),
-            headers_key: "headers".to_string(),
-            socket_timeout_ms: 60000,
-            fetch_wait_max_ms: 100,
+            session_timeout_ms: Duration::from_millis(6000),
+            commit_interval_ms: Duration::from_millis(1),
+            key_field: default_key_field(),
+            topic_key: default_topic_key(),
+            partition_key: default_partition_key(),
+            offset_key: default_offset_key(),
+            headers_key: default_headers_key(),
+            socket_timeout_ms: Duration::from_millis(60000),
+            fetch_wait_max_ms: Duration::from_millis(100),
+            log_namespace: Some(log_namespace == LogNamespace::Vector),
             ..Default::default()
         }
     }
 
+    #[test]
+    fn test_output_schema_definition_vector_namespace() {
+        let definition = make_config("topic", "group", LogNamespace::Vector)
+            .outputs(LogNamespace::Vector)[0]
+            .clone()
+            .log_schema_definition
+            .unwrap();
+
+        assert_eq!(
+            definition,
+            Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
+                .with_meaning(OwnedTargetPath::event_root(), "message")
+                .with_metadata_field(
+                    &owned_value_path!("kafka", "timestamp"),
+                    Kind::timestamp(),
+                    Some("timestamp")
+                )
+                .with_metadata_field(
+                    &owned_value_path!("kafka", "message_key"),
+                    Kind::bytes(),
+                    None
+                )
+                .with_metadata_field(&owned_value_path!("kafka", "topic"), Kind::bytes(), None)
+                .with_metadata_field(
+                    &owned_value_path!("kafka", "partition"),
+                    Kind::bytes(),
+                    None
+                )
+                .with_metadata_field(&owned_value_path!("kafka", "offset"), Kind::bytes(), None)
+                .with_metadata_field(
+                    &owned_value_path!("kafka", "headers"),
+                    Kind::object(Collection::empty().with_unknown(Kind::bytes())),
+                    None
+                )
+                .with_metadata_field(
+                    &owned_value_path!("vector", "ingest_timestamp"),
+                    Kind::timestamp(),
+                    None
+                )
+                .with_metadata_field(
+                    &owned_value_path!("vector", "source_type"),
+                    Kind::bytes(),
+                    None
+                )
+        )
+    }
+
+    #[test]
+    fn test_output_schema_definition_legacy_namespace() {
+        let definition = make_config("topic", "group", LogNamespace::Legacy)
+            .outputs(LogNamespace::Legacy)[0]
+            .clone()
+            .log_schema_definition
+            .unwrap();
+
+        assert_eq!(
+            definition,
+            Definition::new_with_default_metadata(Kind::json(), [LogNamespace::Legacy])
+                .unknown_fields(Kind::undefined())
+                .with_event_field(
+                    &owned_value_path!("message"),
+                    Kind::bytes(),
+                    Some("message")
+                )
+                .with_event_field(
+                    &owned_value_path!("timestamp"),
+                    Kind::timestamp(),
+                    Some("timestamp")
+                )
+                .with_event_field(&owned_value_path!("message_key"), Kind::bytes(), None)
+                .with_event_field(&owned_value_path!("topic"), Kind::bytes(), None)
+                .with_event_field(&owned_value_path!("partition"), Kind::bytes(), None)
+                .with_event_field(&owned_value_path!("offset"), Kind::bytes(), None)
+                .with_event_field(
+                    &owned_value_path!("headers"),
+                    Kind::object(Collection::empty().with_unknown(Kind::bytes())),
+                    None
+                )
+                .with_event_field(&owned_value_path!("source_type"), Kind::bytes(), None)
+        )
+    }
+
     #[tokio::test]
     async fn consumer_create_ok() {
-        let config = make_config("topic", "group");
+        let config = make_config("topic", "group", LogNamespace::Legacy);
         assert!(create_consumer(&config).is_ok());
     }
 
@@ -573,7 +878,7 @@ mod test {
     async fn consumer_create_incorrect_auto_offset_reset() {
         let config = KafkaSourceConfig {
             auto_offset_reset: "incorrect-auto-offset-reset".to_string(),
-            ..make_config("topic", "group")
+            ..make_config("topic", "group", LogNamespace::Legacy)
         };
         assert!(create_consumer(&config).is_err());
     }
@@ -654,40 +959,62 @@ mod integration_test {
 
     #[tokio::test]
     async fn consumes_event_with_acknowledgements() {
-        send_receive(true, |_| false, 10).await;
+        send_receive(true, |_| false, 10, LogNamespace::Legacy).await;
+    }
+
+    #[tokio::test]
+    async fn consumes_event_with_acknowledgements_vector_namespace() {
+        send_receive(true, |_| false, 10, LogNamespace::Vector).await;
     }
 
     #[tokio::test]
     async fn consumes_event_without_acknowledgements() {
-        send_receive(false, |_| false, 10).await;
+        send_receive(false, |_| false, 10, LogNamespace::Legacy).await;
+    }
+
+    #[tokio::test]
+    async fn consumes_event_without_acknowledgements_vector_namespace() {
+        send_receive(false, |_| false, 10, LogNamespace::Vector).await;
     }
 
     #[tokio::test]
     async fn handles_one_negative_acknowledgement() {
-        send_receive(true, |n| n == 2, 10).await;
+        send_receive(true, |n| n == 2, 10, LogNamespace::Legacy).await;
+    }
+
+    #[tokio::test]
+    async fn handles_one_negative_acknowledgement_vector_namespace() {
+        send_receive(true, |n| n == 2, 10, LogNamespace::Vector).await;
     }
 
     #[tokio::test]
     async fn handles_permanent_negative_acknowledgement() {
-        send_receive(true, |n| n >= 2, 2).await;
+        send_receive(true, |n| n >= 2, 2, LogNamespace::Legacy).await;
+    }
+
+    #[tokio::test]
+    async fn handles_permanent_negative_acknowledgement_vector_namespace() {
+        send_receive(true, |n| n >= 2, 2, LogNamespace::Vector).await;
     }
 
     async fn send_receive(
         acknowledgements: bool,
         error_at: impl Fn(usize) -> bool,
         receive_count: usize,
+        log_namespace: LogNamespace,
     ) {
         const SEND_COUNT: usize = 10;
 
         let topic = format!("test-topic-{}", random_string(10));
         let group_id = format!("test-group-{}", random_string(10));
-        let config = make_config(&topic, &group_id);
+        let config = make_config(&topic, &group_id, log_namespace);
 
         let now = send_events(topic.clone(), 10).await;
 
         let events = assert_source_compliance(&["protocol", "topic", "partition"], async move {
             let (tx, rx) = SourceSender::new_test_errors(error_at);
-            let (trigger_shutdown, shutdown_done) = spawn_kafka(tx, config, acknowledgements);
+            let (trigger_shutdown, shutdown_done) =
+                spawn_kafka(tx, config, acknowledgements, log_namespace);
             let events = collect_n(rx, SEND_COUNT).await;
             // Yield to the finalization task to let it collect the
             // batch status receivers before signalling the shutdown.
@@ -704,35 +1031,75 @@ mod integration_test {
 
         assert_eq!(events.len(), SEND_COUNT);
         for (i, event) in events.into_iter().enumerate() {
-            assert_eq!(
-                event.as_log()[log_schema().message_key()],
-                format!("{} {:03}", TEXT, i).into()
-            );
-            assert_eq!(
-                event.as_log()["message_key"],
-                format!("{} {}", KEY, i).into()
-            );
-            assert_eq!(
-                event.as_log()[log_schema().source_type_key()],
-                "kafka".into()
-            );
-            assert_eq!(
-                event.as_log()[log_schema().timestamp_key()],
-                now.trunc_subsecs(3).into()
-            );
-            assert_eq!(event.as_log()["topic"], topic.clone().into());
-            assert!(event.as_log().contains("partition"));
-            assert!(event.as_log().contains("offset"));
-            let mut expected_headers = BTreeMap::new();
-            expected_headers.insert(HEADER_KEY.to_string(), Value::from(HEADER_VALUE));
-            assert_eq!(event.as_log()["headers"], Value::from(expected_headers));
+            if let LogNamespace::Legacy = log_namespace {
+                assert_eq!(
+                    event.as_log()[log_schema().message_key()],
+                    format!("{} {:03}", TEXT, i).into()
+                );
+                assert_eq!(
+                    event.as_log()["message_key"],
+                    format!("{} {}", KEY, i).into()
+                );
+                assert_eq!(
+                    event.as_log()[log_schema().source_type_key()],
+                    "kafka".into()
+                );
+                assert_eq!(
+                    event.as_log()[log_schema().timestamp_key()],
+                    now.trunc_subsecs(3).into()
+                );
+                assert_eq!(event.as_log()["topic"], topic.clone().into());
+                assert!(event.as_log().contains("partition"));
+                assert!(event.as_log().contains("offset"));
+                let mut expected_headers = BTreeMap::new();
+                expected_headers.insert(HEADER_KEY.to_string(), Value::from(HEADER_VALUE));
+                assert_eq!(event.as_log()["headers"], Value::from(expected_headers));
+            } else {
+                let meta = event.as_log().metadata().value();
+
+                assert_eq!(
+                    meta.get(path!("vector", "source_type")).unwrap(),
+                    &vrl::value!(KafkaSourceConfig::NAME)
+                );
+                assert!(meta
+                    .get(path!("vector", "ingest_timestamp"))
+                    .unwrap()
+                    .is_timestamp());
+
+                assert_eq!(
+                    event.as_log().value(),
+                    &vrl::value!(format!("{} {:03}", TEXT, i))
+                );
+                assert_eq!(
+                    meta.get(path!("kafka", "message_key")).unwrap(),
+                    &vrl::value!(format!("{} {}", KEY, i))
+                );
+
+                assert_eq!(
+                    meta.get(path!("kafka", "timestamp")).unwrap(),
+                    &vrl::value!(now.trunc_subsecs(3))
+                );
+                assert_eq!(
+                    meta.get(path!("kafka", "topic")).unwrap(),
+                    &vrl::value!(topic.clone())
+                );
+                assert!(meta.get(path!("kafka", "partition")).unwrap().is_integer(),);
+                assert!(meta.get(path!("kafka", "offset")).unwrap().is_integer(),);
+
+                let mut expected_headers = BTreeMap::new();
+                expected_headers.insert(HEADER_KEY.to_string(), Value::from(HEADER_VALUE));
+                assert_eq!(
+                    meta.get(path!("kafka", "headers")).unwrap(),
+                    &Value::from(expected_headers)
+                );
+            }
         }
     }
 
     fn make_rand_config() -> (String, String, KafkaSourceConfig) {
         let topic = format!("test-topic-{}", random_string(10));
         let group_id = format!("test-group-{}", random_string(10));
-        let config = make_config(&topic, &group_id);
+        let config = make_config(&topic, &group_id, LogNamespace::Legacy);
         (topic, group_id, config)
     }
 
@@ -762,16 +1129,26 @@ mod integration_test {
         tx: SourceSender,
         config: KafkaSourceConfig,
         acknowledgements: bool,
+        log_namespace: LogNamespace,
     ) -> (Trigger, Tripwire) {
         let (trigger_shutdown, shutdown, shutdown_done) = ShutdownSignal::new_wired();
         let consumer = create_consumer(&config).unwrap();
+
+        let decoder = DecodingConfig::new(
+            config.framing.clone(),
+            config.decoding.clone(),
+            log_namespace,
+        )
+        .build();
+
         tokio::spawn(kafka_source(
             config,
             consumer,
-            Decoder::default(),
+            decoder,
             shutdown,
             tx,
             acknowledgements,
+            log_namespace,
         ));
         (trigger_shutdown, shutdown_done)
     }
@@ -843,13 +1220,15 @@ mod integration_test {
         let _send_start = send_events(topic.clone(), NEVENTS).await;
 
         let (tx, rx1) = delay_pipeline(1, Duration::from_millis(200), EventStatus::Delivered);
-        let (trigger_shutdown1, shutdown_done1) = spawn_kafka(tx, config.clone(), true);
+        let (trigger_shutdown1, shutdown_done1) =
+            spawn_kafka(tx, config.clone(), true, LogNamespace::Legacy);
         let events1 = tokio::spawn(collect_n(rx1, NEVENTS));
 
         sleep(Duration::from_secs(1)).await;
 
         let (tx, rx2) = delay_pipeline(2, Duration::from_millis(DELAY), EventStatus::Delivered);
-        let (trigger_shutdown2, shutdown_done2) = spawn_kafka(tx, config, true);
+        let (trigger_shutdown2, shutdown_done2) =
+            spawn_kafka(tx, config, true, LogNamespace::Legacy);
         let events2 = tokio::spawn(collect_n(rx2, NEVENTS));
 
         sleep(Duration::from_secs(5)).await;

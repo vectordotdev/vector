@@ -1,7 +1,7 @@
 # RFC 14742 - Support for Duplicate and Bare Tags on Metrics
 
 Vector's current metric model supports only a single value for each tag. Several sources, however,
-however, may send metrics that contain multiple values for a given tag name, or bare tags with no
+may send metrics that contain multiple values for a given tag name, or bare tags with no
 value. Vector's tag support should be enhanced to handle this data.
 
 ## Context
@@ -78,7 +78,7 @@ strings or `null` for tags with more than one value.
 #### Scripting
 
 Both the Lua and VRL scripting languages will be given a new configuration option named
-`metric_tags_values` that controls how tag values are exposed to scripts. This may take two values,
+`metric_tag_values` that controls how tag values are exposed to scripts. This may take two values,
 `"single"` or `"full"`. When set to the former, tag values will be exposed as single strings, the
 same as they are now. Tags with multiple values will show the last assigned value, and null values
 will be ignored. When set to the latter, all tags will be exposed as arrays of either string or null
@@ -183,7 +183,7 @@ the `ToLua` trait. This trait works similar to the standard Rust `Into` and `Fro
 functions of these traits are passed a reference to the Lua interpreter object, of which we create a
 unique instance for each transform. This interpreter object can store user-defined data via a set of
 ["app data"](https://docs.rs/mlua/latest/mlua/struct.Lua.html#method.set_app_data) interfaces. We
-will use these interfaces to store the state of the `metric_tags_values` flag for the particular
+will use these interfaces to store the state of the `metric_tag_values` flag for the particular
 transform, and use the value to inform which conversion mode to use on tags.
 
 ## Rationale
@@ -266,7 +266,7 @@ which will cause problems for users:
    tag has multiple values, and set up a secondary tags structure that exposes the arrays. This will
    lead to all kinds of confusion and conflicts when the same tag is assigned through different
    variables.
-1. Add functions specficially for manipulating tag sets. This continues to make metrics management
+1. Add functions specifically for manipulating tag sets. This continues to make metrics management
    look like a second-class afterthought, and doesn't ease any compatibility problems for existing
    scripts.
 
@@ -358,7 +358,7 @@ run-time performance as well.
 The schema definitions that are already present on sinks could be enhanced to add support for what
 types of tags sources and sinks support. This would be used in any intermediate scripting transform
 (Lua or VRL) to set the tag mode exposed by that transform, instead of requiring users to manually
-set `metric_tags_values` appropriately for their topology. For VRL this would have the benefit of
+set `metric_tag_values` appropriately for their topology. For VRL this would have the benefit of
 turning the run-time problem of overwriting a multi-valued tag with a single value into a
 startup-time error, thus preventing data loss.
 

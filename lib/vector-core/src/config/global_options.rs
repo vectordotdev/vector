@@ -35,7 +35,6 @@ pub(crate) enum DataDirError {
 // function!
 #[configurable_component]
 #[derive(Clone, Debug, Default, PartialEq)]
-#[serde(default)]
 pub struct GlobalOptions {
     /// The directory used for persisting Vector state data.
     ///
@@ -50,7 +49,10 @@ pub struct GlobalOptions {
     ///
     /// This is used if a component does not have its own specific log schema. All events use a log
     /// schema, whether or not the default is used, to assign event fields on incoming events.
-    #[serde(skip_serializing_if = "crate::serde::skip_serializing_if_default")]
+    #[serde(
+        default,
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
     pub log_schema: LogSchema,
 
     /// The name of the timezone to apply to timestamp conversions that do not contain an explicit timezone.
@@ -59,11 +61,17 @@ pub struct GlobalOptions {
     /// local time.
     ///
     /// [tzdb]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
-    #[serde(skip_serializing_if = "crate::serde::skip_serializing_if_default")]
+    #[serde(
+        default,
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
     pub timezone: Option<TimeZone>,
 
     #[configurable(derived)]
-    #[serde(skip_serializing_if = "crate::serde::skip_serializing_if_default")]
+    #[serde(
+        default,
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
     pub proxy: ProxyConfig,
 
     /// Controls how acknowledgements are handled for all sinks by default.
@@ -88,7 +96,10 @@ pub struct GlobalOptions {
     /// captured, but not so long that they continue to build up indefinitely, as this will consume
     /// a small amount of memory for each metric.
     #[configurable(deprecated)]
-    #[serde(skip_serializing_if = "crate::serde::skip_serializing_if_default")]
+    #[serde(
+        default,
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
     pub expire_metrics: Option<Duration>,
 
     /// The amount of time, in seconds, that internal metrics will persist after having not been
@@ -99,7 +110,10 @@ pub struct GlobalOptions {
     /// setting this to a value that ensures that metrics live long enough to be emitted and
     /// captured, but not so long that they continue to build up indefinitely, as this will consume
     /// a small amount of memory for each metric.
-    #[serde(skip_serializing_if = "crate::serde::skip_serializing_if_default")]
+    #[serde(
+        default,
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
     pub expire_metrics_secs: Option<f64>,
 }
 
@@ -179,6 +193,13 @@ impl GlobalOptions {
             errors.push("conflicting values for 'timezone' found".to_owned());
         }
 
+        if conflicts(
+            &self.acknowledgements.enabled,
+            &with.acknowledgements.enabled,
+        ) {
+            errors.push("conflicting values for 'acknowledgements' found".to_owned());
+        }
+
         let data_dir = if self.data_dir.is_none() || self.data_dir == default_data_dir() {
             with.data_dir
         } else if with.data_dir != default_data_dir() && self.data_dir != with.data_dir {
@@ -224,21 +245,32 @@ fn conflicts<T: PartialEq>(this: &Option<T>, that: &Option<T>) -> bool {
 
 #[cfg(test)]
 mod tests {
+    use std::fmt::Debug;
+
     use chrono_tz::Tz;
 
     use super::*;
 
     #[test]
+    fn merges_data_dir() {
+        let merge = |a, b| merge("data_dir", a, b, |result| result.data_dir);
+
+        assert_eq!(merge(None, None), Ok(default_data_dir()));
+        assert_eq!(merge(Some("/test1"), None), Ok(Some("/test1".into())));
+        assert_eq!(merge(None, Some("/test2")), Ok(Some("/test2".into())));
+        assert_eq!(
+            merge(Some("/test3"), Some("/test3")),
+            Ok(Some("/test3".into()))
+        );
+        assert_eq!(
+            merge(Some("/test4"), Some("/test5")),
+            Err(vec!["conflicting values for 'data_dir' found".into()])
+        );
+    }
+
+    #[test]
     fn merges_timezones() {
-        fn merge(tz1: Option<&str>, tz2: Option<&str>) -> Result<TimeZone, Vec<String>> {
-            // Use TOML parsing to match the behavior of what a user would actually configure.
-            let tz1 = tz1.map_or(String::new(), |tz| format!(r#"timezone = "{tz}""#));
-            let tz2 = tz2.map_or(String::new(), |tz| format!(r#"timezone = "{tz}""#));
-            toml::from_str::<GlobalOptions>(&tz1)
-                .unwrap()
-                .merge(toml::from_str::<GlobalOptions>(&tz2).unwrap())
-                .map(|go| go.timezone())
-        }
+        let merge = |a, b| merge("timezone", a, b, |result| result.timezone());
 
         assert_eq!(merge(None, None), Ok(TimeZone::Local));
         assert_eq!(merge(Some("local"), None), Ok(TimeZone::Local));
@@ -257,5 +289,81 @@ mod tests {
             merge(Some("CST6CDT"), Some("GMT")),
             Err(vec!["conflicting values for 'timezone' found".into()])
         );
+    }
+
+    #[test]
+    fn merges_proxy() {
+        // We use the `.http` settings as a proxy for the other settings, as they are all compared
+        // for equality above.
+        let merge = |a, b| merge("proxy.http", a, b, |result| result.proxy.http);
+
+        assert_eq!(merge(None, None), Ok(None));
+        assert_eq!(merge(Some("test1"), None), Ok(Some("test1".into())));
+        assert_eq!(merge(None, Some("test2")), Ok(Some("test2".into())));
+        assert_eq!(
+            merge(Some("test3"), Some("test3")),
+            Ok(Some("test3".into()))
+        );
+        assert_eq!(
+            merge(Some("test4"), Some("test5")),
+            Err(vec!["conflicting values for 'proxy.http' found".into()])
+        );
+    }
+
+    #[test]
+    fn merges_acknowledgements() {
+        let merge = |a, b| merge("acknowledgements", a, b, |result| result.acknowledgements);
+
+        assert_eq!(merge(None, None), Ok(None.into()));
+        assert_eq!(merge(Some(false), None), Ok(false.into()));
+        assert_eq!(merge(Some(true), None), Ok(true.into()));
+        assert_eq!(merge(None, Some(false)), Ok(false.into()));
+        assert_eq!(merge(None, Some(true)), Ok(true.into()));
+        assert_eq!(merge(Some(false), Some(false)), Ok(false.into()));
+        assert_eq!(merge(Some(true), Some(true)), Ok(true.into()));
+        assert_eq!(
+            merge(Some(false), Some(true)),
+            Err(vec![
+                "conflicting values for 'acknowledgements' found".into()
+            ])
+        );
+        assert_eq!(
+            merge(Some(true), Some(false)),
+            Err(vec![
+                "conflicting values for 'acknowledgements' found".into()
+            ])
+        );
+    }
+
+    #[test]
+    fn merges_expire_metrics() {
+        let merge = |a, b| {
+            merge("expire_metrics_secs", a, b, |result| {
+                result.expire_metrics_secs
+            })
+        };
+
+        assert_eq!(merge(None, None), Ok(None));
+        assert_eq!(merge(Some(1.0), None), Ok(Some(1.0)));
+        assert_eq!(merge(None, Some(2.0)), Ok(Some(2.0)));
+        assert_eq!(merge(Some(3.0), Some(3.0)), Ok(Some(3.0)));
+        assert_eq!(merge(Some(4.0), Some(5.0)), Ok(Some(4.0))); // Uses minimum
+    }
+
+    fn merge<P: Debug, T>(
+        name: &str,
+        dd1: Option<P>,
+        dd2: Option<P>,
+        result: impl Fn(GlobalOptions) -> T,
+    ) -> Result<T, Vec<String>> {
+        // Use TOML parsing to match the behavior of what a user would actually configure.
+        make_config(name, dd1)
+            .merge(make_config(name, dd2))
+            .map(result)
+    }
+
+    fn make_config<P: Debug>(name: &str, value: Option<P>) -> GlobalOptions {
+        toml::from_str(&value.map_or(String::new(), |value| format!(r#"{name} = {value:?}"#)))
+            .unwrap()
     }
 }

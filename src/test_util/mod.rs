@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 use std::{
     collections::HashMap,
     convert::Infallible,
@@ -91,9 +92,10 @@ pub fn test_generate_config<T>()
 where
     for<'de> T: GenerateConfig + serde::Deserialize<'de>,
 {
-    let cfg = T::generate_config().to_string();
+    let cfg = toml::to_string(&T::generate_config()).unwrap();
+
     toml::from_str::<T>(&cfg)
-        .unwrap_or_else(|_| panic!("Invalid config generated from string:\n'{}'\n", cfg));
+        .unwrap_or_else(|e| panic!("Invalid config generated from string:\n\n{}\n'{}'", e, cfg));
 }
 
 pub fn open_fixture(path: impl AsRef<Path>) -> crate::Result<serde_json::Value> {
@@ -678,7 +680,13 @@ impl CountReceiver<Event> {
 pub async fn start_topology(
     mut config: Config,
     require_healthy: impl Into<Option<bool>>,
-) -> (RunningTopology, tokio::sync::mpsc::UnboundedReceiver<()>) {
+) -> (
+    RunningTopology,
+    (
+        tokio::sync::mpsc::UnboundedSender<()>,
+        tokio::sync::mpsc::UnboundedReceiver<()>,
+    ),
+) {
     config.healthchecks.set_require_healthy(require_healthy);
     let diff = ConfigDiff::initial(&config);
     let pieces = topology::build_or_log_errors(&config, &diff, HashMap::new())

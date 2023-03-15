@@ -54,7 +54,7 @@ that waste time and effort to debug.
 
 ### Use of a better linker
 
-As mentioned above, much time is spenting in the linker phase of building Vector, where the many
+As mentioned above, much time is spent in the linker phase of building Vector, where the many
 dependent crates that make up Vector are bundled together to produce a final executable.  For most
 users building Rust projects today, they're using their system linker, which is single-threaded.
 However, newer linkers exist that can exploit the parallelism of today's multi-core systems and
@@ -84,9 +84,9 @@ release binary with these settings enabled.  With the settings disabled, the sam
 These settings can be added back during the build process, when building versioned releases, without
 much effort.
 
-### Add system telemetry to Github Actions runners
+### Add system telemetry to GitHub Actions runners
 
-As Github Actions natively provides no telemetry of any kind about runners, or even basic metrics
+As GitHub Actions natively provides no telemetry of any kind about runners, or even basic metrics
 (how long did a job sit before running? etc), we’re often in the dark when it comes to CI and runner
 performance as a whole.
 
@@ -156,7 +156,7 @@ exist an immediately obvious alternative to improve build performance as such.
 
 ## Plan Of Attack
 
-- [ ] Update our self-hosted Github Actions runners to run the Datadog Agent, and begin collecting
+- [ ] Update our self-hosted GitHub Actions runners to run the Datadog Agent, and begin collecting
   telemetry on their overall utilization throughout a normal work day
 - [ ] Add a new CI build step which simply builds Vector in release mode, from a clean workspace,
   and reports the build time to Datadog for over-time tracking

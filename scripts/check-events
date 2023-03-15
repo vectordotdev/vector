@@ -25,6 +25,7 @@ EVENT_CLASSES = {
 METRIC_NAME_EVENTS_DROPPED = 'component_discarded_events_total'
 METRIC_NAME_ERROR = 'component_errors_total'
 
+SKIP_CHECK = [ 'DefaultName' ]
 
 def hash_array_add(hash, key, item)
   arr = hash.fetch(key, Array::new)
@@ -86,15 +87,23 @@ class Event
     end
   end
 
-  # Scan for registered counter names and tags
-  def scan_register_metrics(block)
-    # This is a _slightly_ different regex than the above, couldn't figure a way to unify them
-    block.scan(/ register_(counter|gauge|histogram)!\((?:\n\s+)?"([^"]+)"(,.+?)?\)[;,]\n/ms) \
-    do |type, name, tags|
-      tags = tags || ''
-      tags = Hash[tags.scan(/"([^"]+)" => (.+?)(?:,|$)/)]
-      add_metric(type, name, tags)
+  # Scan the registered event macro block
+  def scan_registered_event(event_fields, handle_fields, data_type, emit_block)
+    @members = event_fields.scan(/^ *([a-z0-9_]+): *(.+?),$/m) \
+                 .map { |member, type| [member, type] }
+    handle_fields.scan(/^ *([a-z0-9_]+): *(.+?) *= *(.+?),$/m) do |name, type, assignment|
+      self.scan_component_dropped_events(assignment)
+      # This is a _slightly_ different regex than the above, couldn't figure a way to unify them
+      assignment.match(/register_(counter|gauge|histogram)!\((?:\n\s+)?"([^"]+)"(,.+)?\)/ms) \
+      do
+        |type, name, tags|
+        tags = tags || ''
+        tags = Hash[tags.scan(/"([^"]+)" => (.+?)(?:,|$)/)]
+        add_metric(type, name, tags)
+        true
+      end
     end
+    self.scan_logs(emit_block)
   end
 
   def add_log(type, message, parameters)
@@ -122,7 +131,7 @@ class Event
 
   # Scan for the emission of ComponentEventsDropped.
   def scan_component_dropped_events(block)
-    if block.match(/(emit|register)!\(\s*ComponentEventsDropped\b/)
+    if block.match?(/(emit|register)!\(\s*ComponentEventsDropped\b/)
       @emits_component_events_dropped = true
     end
   end
@@ -152,8 +161,6 @@ class Event
   end
 
   def valid_with_handle?(handle)
-    @reports.clear
-
     if @uses == 0
       append('Event has no uses.')
     end
@@ -288,11 +295,11 @@ class Event
     log_level_one_of([level])
   end
 
-  private
+  def append(report)
+    @reports.append(report)
+  end
 
-    def append(report)
-      @reports.append(report)
-    end
+  private
 
     def counters_must_include_exclude_tags(name, required_tags, exclude_tags = [])
       unless @counters.include? name
@@ -378,8 +385,8 @@ Find.find('./src', './lib') do |path|
         # trailing period, respectively.
         has_message = !message_param.nil?
         message = if has_message then message_param["value"].gsub(/^"|"$/, '') else nil end
-        is_capitalized = !has_message || (message[0] == "{" || !message.match(/^[a-zA-Z]/) || message.match(/^[[:upper:]]/))
-        has_trailing_period = !has_message || (message[-1, 1] == "}" || message.match(/\.$/))
+        is_capitalized = !has_message || (message[0] == "{" || !message.match?(/^[a-zA-Z]/) || message.match?(/^[[:upper:]]/))
+        has_trailing_period = !has_message || (message[-1, 1] == "}" || message.match?(/\.$/))
 
         match_reports = []
         match_reports.append('Message must start with a capital.') unless is_capitalized
@@ -416,6 +423,7 @@ Find.find('./src', './lib') do |path|
       text.scan(/^(\s*)impl(?:<.+?>)? (InternalEvent|RegisterInternalEvent|InternalEventHandle) for ([A-Za-z0-9_]+)(?:<.+?>)? {\n(.+?)\n\1}$/m) \
       do |_space, trait, event_name, block|
         event = $all_events[event_name]
+        event.path = path
 
         event.skip_duplicate_check = block.match? /## skip check-duplicate-events ##/i
         event.skip_validity_check = block.match? /## skip check-validity-events ##/i
@@ -429,15 +437,23 @@ Find.find('./src', './lib') do |path|
             event.scan_component_dropped_events(block)
           end
         elsif trait == 'RegisterInternalEvent'
-          # Extract the handle type name to join them together
-          event.impl_register_event = block[/type Handle = ([A-Za-z0-9]+);/, 1]
-          event.scan_register_metrics(block)
-          event.scan_component_dropped_events(block)
+          # This is just a dummy name and will cause spurious errors, but it will at least surface
+          # the issue of using the macro.
+          event.impl_register_event = event_name
+          event.append("Do not implement RegisterInternalEvent manually. Use the registered_event! macro instead.")
         elsif trait == 'InternalEventHandle'
           event.impl_event_handle = true
           event.scan_logs(block)
         end
       end
+    end
+
+    # Scan for the `registered_event` macro
+    text.scan(/^(crate::|vector_common::|)registered_event! *[({]\n *([A-Za-z0-9_]+) *({(.*?)})? *=> *{(.+?)}$.*^ *fn emit\(\&self, [a-z0-9_]+: ([A-Za-z0-9_]+)\) {$(.+?)}\n(\);|\})$/m) \
+    do |_, event_name, _, event_fields, handle_fields, data_type, emit_block, _|
+      event = $all_events[event_name]
+      event.path = path
+      event.scan_registered_event(event_fields || "", handle_fields, data_type, emit_block)
     end
   end
 end
@@ -445,6 +461,10 @@ end
 $duplicates = Hash::new { |hash, key| hash[key] = [] }
 
 $all_events.each do |name, event|
+  if SKIP_CHECK.include? name
+    next
+  end
+
   # Check for duplicated signatures
   if !event.skip_duplicate_check and (event.impl_internal_event or event.impl_event_handle)
     signature = event.signature
@@ -470,7 +490,7 @@ $all_events.each do |name, event|
           error_count += 1
         end
       else
-        puts "Registered event #{event.name} references non-existent handle #{event.impl_register_event}"
+        puts "Registered event #{event.name} references nonexistent handle #{event.impl_register_event}"
         error_count += 1
         next
       end

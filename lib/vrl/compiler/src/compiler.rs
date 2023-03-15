@@ -1,11 +1,9 @@
 use core::Value;
-use diagnostic::{DiagnosticList, DiagnosticMessage, Note, Severity, Span};
+use diagnostic::{DiagnosticList, DiagnosticMessage, Severity, Span};
 use lookup::{OwnedTargetPath, OwnedValuePath, PathPrefix};
 use parser::ast::{self, Node, QueryTarget};
 
-use crate::function::ArgumentList;
 use crate::state::TypeState;
-use crate::value::VrlValueConvert;
 use crate::{
     expression::{
         assignment, function_call, literal, predicate, query, Abort, Array, Assignment, Block,
@@ -14,7 +12,7 @@ use crate::{
     },
     parser::ast::RootExpr,
     program::ProgramInfo,
-    CompileConfig, DeprecationWarning, Function, Program, TypeDef,
+    CompileConfig, Function, Program, TypeDef,
 };
 
 pub(crate) type Diagnostics = Vec<Box<dyn DiagnosticMessage>>;
@@ -49,6 +47,9 @@ pub struct Compiler<'a> {
     /// It is possible for this state to switch from `None`, to `Some(T)` and
     /// back to `None`, if the parent expression of a fallible expression
     /// nullifies the fallibility of that expression.
+    // This should probably be kept on the call stack as the "compile_*" functions are called
+    // otherwise some expressions may remove it when they shouldn't (such as the RHS of an operation removing
+    // the error from the LHS)
     fallible_expression_error: Option<Box<dyn DiagnosticMessage>>,
 
     config: CompileConfig,
@@ -385,6 +386,9 @@ impl<'a> Compiler<'a> {
             self.fallible_expression_error = None;
         }
 
+        // save the error so the RHS can't delete an error from the LHS
+        let fallible_expression_error = self.fallible_expression_error.take();
+
         let rhs_span = rhs.span();
         let rhs = Node::new(rhs_span, self.compile_expr(*rhs, state)?);
 
@@ -392,9 +396,21 @@ impl<'a> Compiler<'a> {
             .map_err(|err| self.diagnostics.push(Box::new(err)))
             .ok()?;
 
+        let type_info = op.type_info(&original_state);
+
+        // re-apply the RHS error saved from above
+        if self.fallible_expression_error.is_none() {
+            self.fallible_expression_error = fallible_expression_error;
+        }
+
+        if type_info.result.is_infallible() {
+            // There was a short-circuit operation that is preventing a fallibility error
+            self.fallible_expression_error = None;
+        }
+
         // Both "lhs" and "rhs" are compiled above, but "rhs" isn't always executed.
         // The expression can provide a more accurate type state.
-        *state = op.type_info(&original_state).state;
+        *state = type_info.state;
         Some(op)
     }
 
@@ -610,82 +626,6 @@ impl<'a> Compiler<'a> {
     }
 
     #[cfg(feature = "expr-function_call")]
-    fn check_metadata_function_deprecations(&mut self, func: &FunctionCall, args: &ArgumentList) {
-        if func.ident == "get_metadata_field" {
-            if let Ok(key) = get_metadata_key(args) {
-                match key {
-                    MetadataKey::Query(target_path) => self.diagnostics.push(Box::new(
-                        DeprecationWarning::new("the \"get_metadata_field\" function")
-                            .with_span(func.span)
-                            .with_notes(Note::solution(
-                                "using the metadata path syntax instead",
-                                vec![format!("{}", target_path)],
-                            )),
-                    )),
-                    MetadataKey::Legacy(secret_key) => self.diagnostics.push(Box::new(
-                        DeprecationWarning::new("the \"get_metadata_field\" function")
-                            .with_span(func.span)
-                            .with_notes(Note::solution(
-                                "using the \"get_secret\" function instead",
-                                vec![format!("get_secret(\"{}\")", secret_key)],
-                            )),
-                    )),
-                }
-            }
-        }
-
-        if func.ident == "set_metadata_field" {
-            if let Ok(key) = get_metadata_key(args) {
-                match key {
-                    MetadataKey::Query(target_path) => self.diagnostics.push(Box::new(
-                        DeprecationWarning::new("the \"set_metadata_field\" function")
-                            .with_span(func.span)
-                            .with_notes(Note::solution(
-                                "using the metadata path syntax instead",
-                                vec![format!("{} = {}", target_path, args.required_expr("value"))],
-                            )),
-                    )),
-                    MetadataKey::Legacy(secret_key) => self.diagnostics.push(Box::new(
-                        DeprecationWarning::new("the \"set_metadata_field\" function")
-                            .with_span(func.span)
-                            .with_notes(Note::solution(
-                                "using the \"set_secret\" function instead",
-                                vec![format!(
-                                    "set_secret(\"{}\", {})",
-                                    secret_key,
-                                    args.required_expr("value")
-                                )],
-                            )),
-                    )),
-                }
-            }
-        }
-
-        if func.ident == "remove_metadata_field" {
-            if let Ok(key) = get_metadata_key(args) {
-                match key {
-                    MetadataKey::Query(target_path) => self.diagnostics.push(Box::new(
-                        DeprecationWarning::new("the \"remove_metadata_field\" function")
-                            .with_span(func.span)
-                            .with_notes(Note::solution(
-                                "using the metadata path syntax instead",
-                                vec![format!("del({})", target_path)],
-                            )),
-                    )),
-                    MetadataKey::Legacy(secret_key) => self.diagnostics.push(Box::new(
-                        DeprecationWarning::new("the \"remove_metadata_field\" function")
-                            .with_span(func.span)
-                            .with_notes(Note::solution(
-                                "using the \"remove_secret\" function instead",
-                                vec![format!("remove_secret(\"{}\")", secret_key)],
-                            )),
-                    )),
-                }
-            }
-        }
-    }
-
-    #[cfg(feature = "expr-function_call")]
     fn compile_function_call(
         &mut self,
         node: Node<ast::FunctionCall>,
@@ -786,9 +726,7 @@ impl<'a> Compiler<'a> {
                 .map(|func| (arg_list, func))
         });
 
-        if let Some((args, function)) = &function_info {
-            self.check_metadata_function_deprecations(function, args);
-
+        if let Some((_args, function)) = &function_info {
             // Update the final state using the function expression to make sure it's accurate.
             *state = function.type_info(&original_state).state;
         }
@@ -932,41 +870,4 @@ impl<'a> Compiler<'a> {
 
         self.skip_missing_query_target.push(query);
     }
-}
-
-// Everything below is temporarily needed for deprecation warnings for the metadata functions
-
-const LEGACY_METADATA_KEYS: [&str; 2] = ["datadog_api_key", "splunk_hec_token"];
-
-pub(crate) fn legacy_keys() -> Vec<Value> {
-    LEGACY_METADATA_KEYS
-        .iter()
-        .map(|key| (*key).into())
-        .collect()
-}
-
-#[allow(clippy::large_enum_variant)]
-#[derive(Clone, Debug)]
-enum MetadataKey {
-    Legacy(String),
-    Query(OwnedTargetPath),
-}
-
-fn get_metadata_key(
-    arguments: &ArgumentList,
-) -> std::result::Result<MetadataKey, Box<dyn DiagnosticMessage>> {
-    if let Ok(Some(query)) = arguments.optional_query("key") {
-        if let Target::External(_) = query.target() {
-            // for backwards compatibility reasons, the query is forced to point at metadata
-            let target_path = OwnedTargetPath::metadata(query.path().clone());
-            return Ok(MetadataKey::Query(target_path));
-        }
-    }
-
-    let key = arguments.required_enum("key", &legacy_keys())?;
-    Ok(MetadataKey::Legacy(
-        key.try_bytes_utf8_lossy()
-            .expect("key not bytes")
-            .to_string(),
-    ))
 }

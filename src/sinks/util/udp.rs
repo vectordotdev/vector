@@ -16,7 +16,7 @@ use vector_common::internal_event::{
     ByteSize, BytesSent, InternalEventHandle, Protocol, Registered,
 };
 use vector_config::configurable_component;
-use vector_core::ByteSizeOf;
+use vector_core::EstimatedJsonEncodedSizeOf;
 
 use super::SinkBuildError;
 use crate::{
@@ -56,12 +56,18 @@ pub enum UdpError {
 pub struct UdpSinkConfig {
     /// The address to connect to.
     ///
+    /// Both IP address and hostname are accepted formats.
+    ///
     /// The address _must_ include a port.
+    #[configurable(metadata(docs::examples = "92.12.333.224:5000"))]
+    #[configurable(metadata(docs::examples = "https://somehost:5000"))]
     address: String,
 
-    /// The size, in bytes, of the socket's send buffer.
+    /// The size of the socket's send buffer.
     ///
     /// If set, the value of the setting is passed via the `SO_SNDBUF` option.
+    #[configurable(metadata(docs::type_unit = "bytes"))]
+    #[configurable(metadata(docs::examples = 65536))]
     send_buffer_bytes: Option<usize>,
 }
 
@@ -292,7 +298,7 @@ where
         while Pin::new(&mut input).peek().await.is_some() {
             let mut socket = self.connector.connect_backoff().await;
             while let Some(mut event) = input.next().await {
-                let byte_size = event.size_of();
+                let byte_size = event.estimated_json_encoded_size_of();
 
                 self.transformer.transform(&mut event);
 

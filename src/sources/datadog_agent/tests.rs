@@ -14,14 +14,17 @@ use codecs::{
 use futures::{Stream, StreamExt};
 use http::HeaderMap;
 use indoc::indoc;
-use lookup::owned_value_path;
-use lookup::LookupBuf;
+use lookup::{owned_value_path, OwnedTargetPath};
 use ordered_float::NotNan;
 use prost::Message;
 use quickcheck::{Arbitrary, Gen, QuickCheck, TestResult};
 use similar_asserts::assert_eq;
 use value::Kind;
-use vector_core::config::LogNamespace;
+use vector_core::{
+    config::LogNamespace,
+    event::{metric::TagValue, MetricTags},
+    metric_tags,
+};
 use vrl::prelude::Collection;
 
 use crate::schema::Definition;
@@ -67,7 +70,10 @@ impl Arbitrary for LogMsg {
         LogMsg {
             message: Bytes::from(String::arbitrary(g)),
             status: Bytes::from(String::arbitrary(g)),
-            timestamp: Utc.timestamp_millis(u32::arbitrary(g) as i64),
+            timestamp: Utc
+                .timestamp_millis_opt(u32::arbitrary(g) as i64)
+                .single()
+                .expect("invalid timestamp"),
             hostname: Bytes::from(String::arbitrary(g)),
             service: Bytes::from(String::arbitrary(g)),
             ddsource: Bytes::from(String::arbitrary(g)),
@@ -204,7 +210,10 @@ async fn full_payload_v1() {
                         addr,
                         &serde_json::to_string(&[LogMsg {
                             message: Bytes::from("foo"),
-                            timestamp: Utc.timestamp(123, 0),
+                            timestamp: Utc
+                                .timestamp_opt(123, 0)
+                                .single()
+                                .expect("invalid timestamp"),
                             hostname: Bytes::from("festeburg"),
                             status: Bytes::from("notice"),
                             service: Bytes::from("vector"),
@@ -227,7 +236,13 @@ async fn full_payload_v1() {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log["message"], "foo".into());
-            assert_eq!(log["timestamp"], Utc.timestamp(123, 0).into());
+            assert_eq!(
+                log["timestamp"],
+                Utc.timestamp_opt(123, 0)
+                    .single()
+                    .expect("invalid timestamp")
+                    .into()
+            );
             assert_eq!(log["hostname"], "festeburg".into());
             assert_eq!(log["status"], "notice".into());
             assert_eq!(log["service"], "vector".into());
@@ -257,7 +272,10 @@ async fn full_payload_v2() {
                         addr,
                         &serde_json::to_string(&[LogMsg {
                             message: Bytes::from("foo"),
-                            timestamp: Utc.timestamp(123, 0),
+                            timestamp: Utc
+                                .timestamp_opt(123, 0)
+                                .single()
+                                .expect("invalid timestamp"),
                             hostname: Bytes::from("festeburg"),
                             status: Bytes::from("notice"),
                             service: Bytes::from("vector"),
@@ -280,7 +298,13 @@ async fn full_payload_v2() {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log["message"], "foo".into());
-            assert_eq!(log["timestamp"], Utc.timestamp(123, 0).into());
+            assert_eq!(
+                log["timestamp"],
+                Utc.timestamp_opt(123, 0)
+                    .single()
+                    .expect("invalid timestamp")
+                    .into()
+            );
             assert_eq!(log["hostname"], "festeburg".into());
             assert_eq!(log["status"], "notice".into());
             assert_eq!(log["service"], "vector".into());
@@ -310,7 +334,10 @@ async fn no_api_key() {
                         addr,
                         &serde_json::to_string(&[LogMsg {
                             message: Bytes::from("foo"),
-                            timestamp: Utc.timestamp(123, 0),
+                            timestamp: Utc
+                                .timestamp_opt(123, 0)
+                                .single()
+                                .expect("invalid timestamp"),
                             hostname: Bytes::from("festeburg"),
                             status: Bytes::from("notice"),
                             service: Bytes::from("vector"),
@@ -333,7 +360,13 @@ async fn no_api_key() {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log["message"], "foo".into());
-            assert_eq!(log["timestamp"], Utc.timestamp(123, 0).into());
+            assert_eq!(
+                log["timestamp"],
+                Utc.timestamp_opt(123, 0)
+                    .single()
+                    .expect("invalid timestamp")
+                    .into()
+            );
             assert_eq!(log["hostname"], "festeburg".into());
             assert_eq!(log["status"], "notice".into());
             assert_eq!(log["service"], "vector".into());
@@ -363,7 +396,10 @@ async fn api_key_in_url() {
                         addr,
                         &serde_json::to_string(&[LogMsg {
                             message: Bytes::from("bar"),
-                            timestamp: Utc.timestamp(456, 0),
+                            timestamp: Utc
+                                .timestamp_opt(456, 0)
+                                .single()
+                                .expect("invalid timestamp"),
                             hostname: Bytes::from("festeburg"),
                             status: Bytes::from("notice"),
                             service: Bytes::from("vector"),
@@ -386,7 +422,13 @@ async fn api_key_in_url() {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log["message"], "bar".into());
-            assert_eq!(log["timestamp"], Utc.timestamp(456, 0).into());
+            assert_eq!(
+                log["timestamp"],
+                Utc.timestamp_opt(456, 0)
+                    .single()
+                    .expect("invalid timestamp")
+                    .into()
+            );
             assert_eq!(log["hostname"], "festeburg".into());
             assert_eq!(log["status"], "notice".into());
             assert_eq!(log["service"], "vector".into());
@@ -419,7 +461,10 @@ async fn api_key_in_query_params() {
                         addr,
                         &serde_json::to_string(&[LogMsg {
                             message: Bytes::from("bar"),
-                            timestamp: Utc.timestamp(456, 0),
+                            timestamp: Utc
+                                .timestamp_opt(456, 0)
+                                .single()
+                                .expect("invalid timestamp"),
                             hostname: Bytes::from("festeburg"),
                             status: Bytes::from("notice"),
                             service: Bytes::from("vector"),
@@ -442,7 +487,13 @@ async fn api_key_in_query_params() {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log["message"], "bar".into());
-            assert_eq!(log["timestamp"], Utc.timestamp(456, 0).into());
+            assert_eq!(
+                log["timestamp"],
+                Utc.timestamp_opt(456, 0)
+                    .single()
+                    .expect("invalid timestamp")
+                    .into()
+            );
             assert_eq!(log["hostname"], "festeburg".into());
             assert_eq!(log["status"], "notice".into());
             assert_eq!(log["service"], "vector".into());
@@ -481,7 +532,10 @@ async fn api_key_in_header() {
                         addr,
                         &serde_json::to_string(&[LogMsg {
                             message: Bytes::from("baz"),
-                            timestamp: Utc.timestamp(789, 0),
+                            timestamp: Utc
+                                .timestamp_opt(789, 0)
+                                .single()
+                                .expect("invalid timestamp"),
                             hostname: Bytes::from("festeburg"),
                             status: Bytes::from("notice"),
                             service: Bytes::from("vector"),
@@ -504,7 +558,13 @@ async fn api_key_in_header() {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log["message"], "baz".into());
-            assert_eq!(log["timestamp"], Utc.timestamp(789, 0).into());
+            assert_eq!(
+                log["timestamp"],
+                Utc.timestamp_opt(789, 0)
+                    .single()
+                    .expect("invalid timestamp")
+                    .into()
+            );
             assert_eq!(log["hostname"], "festeburg".into());
             assert_eq!(log["status"], "notice".into());
             assert_eq!(log["service"], "vector".into());
@@ -537,7 +597,10 @@ async fn delivery_failure() {
                     addr,
                     &serde_json::to_string(&[LogMsg {
                         message: Bytes::from("foo"),
-                        timestamp: Utc.timestamp(123, 0),
+                        timestamp: Utc
+                            .timestamp_opt(123, 0)
+                            .single()
+                            .expect("invalid timestamp"),
                         hostname: Bytes::from("festeburg"),
                         status: Bytes::from("notice"),
                         service: Bytes::from("vector"),
@@ -570,7 +633,10 @@ async fn ignores_disabled_acknowledgements() {
                         addr,
                         &serde_json::to_string(&[LogMsg {
                             message: Bytes::from("foo"),
-                            timestamp: Utc.timestamp(123, 0),
+                            timestamp: Utc
+                                .timestamp_opt(123, 0)
+                                .single()
+                                .expect("invalid timestamp"),
                             hostname: Bytes::from("festeburg"),
                             status: Bytes::from("notice"),
                             service: Bytes::from("vector"),
@@ -613,7 +679,10 @@ async fn ignores_api_key() {
                         addr,
                         &serde_json::to_string(&[LogMsg {
                             message: Bytes::from("baz"),
-                            timestamp: Utc.timestamp(789, 0),
+                            timestamp: Utc
+                                .timestamp_opt(789, 0)
+                                .single()
+                                .expect("invalid timestamp"),
                             hostname: Bytes::from("festeburg"),
                             status: Bytes::from("notice"),
                             service: Bytes::from("vector"),
@@ -636,7 +705,13 @@ async fn ignores_api_key() {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log["message"], "baz".into());
-            assert_eq!(log["timestamp"], Utc.timestamp(789, 0).into());
+            assert_eq!(
+                log["timestamp"],
+                Utc.timestamp_opt(789, 0)
+                    .single()
+                    .expect("invalid timestamp")
+                    .into()
+            );
             assert_eq!(log["hostname"], "festeburg".into());
             assert_eq!(log["status"], "notice".into());
             assert_eq!(log["service"], "vector".into());
@@ -749,8 +824,13 @@ async fn decode_series_endpoint_v1() {
             );
             assert_eq!(metric.kind(), MetricKind::Absolute);
             assert_eq!(*metric.value(), MetricValue::Gauge { value: 3.14 });
-            assert_tag(metric, "host", "random_host");
-            assert_tag(metric, "foo", "bar");
+            assert_tags(
+                metric,
+                metric_tags!(
+                    "host" => "random_host",
+                    "foo" => "bar",
+                ),
+            );
 
             assert_eq!(
                 &events[0].metadata().datadog_api_key().as_ref().unwrap()[..],
@@ -766,8 +846,13 @@ async fn decode_series_endpoint_v1() {
             );
             assert_eq!(metric.kind(), MetricKind::Absolute);
             assert_eq!(*metric.value(), MetricValue::Gauge { value: 3.1415 });
-            assert_tag(metric, "host", "random_host");
-            assert_tag(metric, "foo", "bar");
+            assert_tags(
+                metric,
+                metric_tags!(
+                    "host" => "random_host",
+                    "foo" => "bar",
+                ),
+            );
 
             assert_eq!(
                 &events[1].metadata().datadog_api_key().as_ref().unwrap()[..],
@@ -788,8 +873,13 @@ async fn decode_series_endpoint_v1() {
                     value: 3.14 * (10_f64)
                 }
             );
-            assert_tag(metric, "host", "another_random_host");
-            assert_tag(metric, "foo", "bar:baz");
+            assert_tags(
+                metric,
+                metric_tags!(
+                    "host" => "another_random_host",
+                    "foo" => "bar:baz",
+                ),
+            );
 
             assert_eq!(
                 &events[2].metadata().datadog_api_key().as_ref().unwrap()[..],
@@ -809,8 +899,13 @@ async fn decode_series_endpoint_v1() {
                     value: 16777216_f64
                 }
             );
-            assert_tag(metric, "host", "a_host");
-            assert_tag(metric, "foobar", "");
+            assert_tags(
+                metric,
+                metric_tags!(
+                    "host" => "a_host",
+                    "foobar" => TagValue::Bare,
+                ),
+            );
 
             metric = events[4].as_metric();
             assert_eq!(metric.name(), "disk.free");
@@ -850,7 +945,11 @@ async fn decode_sketches() {
         let mut buf = Vec::new();
         let sketch = ddmetric_proto::sketch_payload::Sketch {
             metric: "dd_sketch".to_string(),
-            tags: vec!["foo:bar".to_string(), "foobar".to_string()],
+            tags: vec![
+                "foo:bar".to_string(),
+                "foo:baz".to_string(),
+                "foobar".to_string(),
+            ],
             host: "a_host".to_string(),
             distributions: Vec::new(),
             dogsketches: vec![ddmetric_proto::sketch_payload::sketch::Dogsketch {
@@ -895,13 +994,22 @@ async fn decode_sketches() {
             assert_eq!(metric.name(), "dd_sketch");
             assert_eq!(
                 metric.timestamp(),
-                Some(Utc.ymd(2018, 11, 14).and_hms(8, 9, 10))
+                Some(
+                    Utc.ymd(2018, 11, 14)
+                        .and_hms_opt(8, 9, 10)
+                        .expect("invalid timestamp")
+                )
             );
             assert_eq!(metric.kind(), MetricKind::Incremental);
-            assert_tag(metric, "host", "a_host");
-            assert_tag(metric, "foo", "bar");
-            assert_tag(metric, "foobar", "");
-
+            assert_tags(
+                metric,
+                metric_tags!(
+                    "host" => "a_host",
+                    "foo" => "bar",
+                    "foo" => "baz",
+                    "foobar" => TagValue::Bare,
+                ),
+            );
             let s = metric.value();
             assert!(matches!(s, MetricValue::Sketch { .. }));
             if let MetricValue::Sketch {
@@ -1196,7 +1304,10 @@ async fn split_outputs() {
                         addr,
                         &serde_json::to_string(&[LogMsg {
                             message: Bytes::from("baz"),
-                            timestamp: Utc.timestamp(789, 0),
+                            timestamp: Utc
+                                .timestamp_opt(789, 0)
+                                .single()
+                                .expect("invalid timestamp"),
                             hostname: Bytes::from("festeburg"),
                             status: Bytes::from("notice"),
                             service: Bytes::from("vector"),
@@ -1263,8 +1374,13 @@ async fn split_outputs() {
             );
             assert_eq!(metric.kind(), MetricKind::Absolute);
             assert_eq!(*metric.value(), MetricValue::Gauge { value: 3.14 });
-            assert_tag(metric, "host", "random_host");
-            assert_tag(metric, "foo", "bar");
+            assert_tags(
+                metric,
+                metric_tags!(
+                    "host" => "random_host",
+                    "foo" => "bar",
+                ),
+            );
             assert_eq!(
                 &event.metadata().datadog_api_key().as_ref().unwrap()[..],
                 "abcdefgh12345678abcdefgh12345678"
@@ -1565,7 +1681,11 @@ fn test_config_outputs() {
                                 Kind::timestamp(),
                                 Some("timestamp"),
                             )
-                            .with_event_field(&owned_value_path!("hostname"), Kind::bytes(), None)
+                            .with_event_field(
+                                &owned_value_path!("hostname"),
+                                Kind::bytes(),
+                                Some("host"),
+                            )
                             .optional_field(
                                 &owned_value_path!("severity"),
                                 Kind::bytes(),
@@ -1636,7 +1756,7 @@ fn test_config_outputs() {
                                 .with_event_field(
                                     &owned_value_path!("hostname"),
                                     Kind::bytes(),
-                                    None,
+                                    Some("host"),
                                 )
                                 .optional_field(
                                     &owned_value_path!("severity"),
@@ -1767,7 +1887,7 @@ async fn decode_series_endpoint_v2() {
                     name: "another_random_host".to_string(),
                 }],
                 metric: "another_namespace.dd_rate".to_string(),
-                tags: vec!["foo:bar:baz".to_string()],
+                tags: vec!["foo:bar:baz".to_string(), "foo:bizbaz".to_string()],
                 points: vec![ddmetric_proto::metric_payload::MetricPoint {
                     value: 3.14,
                     timestamp: 1542182950,
@@ -1823,13 +1943,22 @@ async fn decode_series_endpoint_v2() {
             assert_eq!(metric.name(), "dd_gauge");
             assert_eq!(
                 metric.timestamp(),
-                Some(Utc.ymd(2018, 11, 14).and_hms(8, 9, 10))
+                Some(
+                    Utc.ymd(2018, 11, 14)
+                        .and_hms_opt(8, 9, 10)
+                        .expect("invalid timestamp")
+                )
             );
             assert_eq!(metric.kind(), MetricKind::Absolute);
             assert_eq!(*metric.value(), MetricValue::Gauge { value: 3.14 });
-            assert_tag(metric, "host", "random_host");
-            assert_tag(metric, "foo", "bar");
-            assert_tag(metric, "source_type_name", "a_random_source_type_name");
+            assert_tags(
+                metric,
+                metric_tags!(
+                    "host" => "random_host",
+                    "foo" => "bar",
+                    "source_type_name" => "a_random_source_type_name",
+                ),
+            );
             assert_eq!(metric.namespace(), Some("namespace"));
 
             assert_eq!(
@@ -1841,13 +1970,22 @@ async fn decode_series_endpoint_v2() {
             assert_eq!(metric.name(), "dd_gauge");
             assert_eq!(
                 metric.timestamp(),
-                Some(Utc.ymd(2018, 11, 14).and_hms(8, 9, 11))
+                Some(
+                    Utc.ymd(2018, 11, 14)
+                        .and_hms_opt(8, 9, 11)
+                        .expect("invalid timestamp")
+                )
             );
             assert_eq!(metric.kind(), MetricKind::Absolute);
             assert_eq!(*metric.value(), MetricValue::Gauge { value: 3.1415 });
-            assert_tag(metric, "host", "random_host");
-            assert_tag(metric, "foo", "bar");
-            assert_tag(metric, "source_type_name", "a_random_source_type_name");
+            assert_tags(
+                metric,
+                metric_tags!(
+                    "host" => "random_host",
+                    "foo" => "bar",
+                    "source_type_name" => "a_random_source_type_name",
+                ),
+            );
             assert_eq!(metric.namespace(), Some("namespace"));
 
             assert_eq!(
@@ -1859,7 +1997,11 @@ async fn decode_series_endpoint_v2() {
             assert_eq!(metric.name(), "dd_rate");
             assert_eq!(
                 metric.timestamp(),
-                Some(Utc.ymd(2018, 11, 14).and_hms(8, 9, 10))
+                Some(
+                    Utc.ymd(2018, 11, 14)
+                        .and_hms_opt(8, 9, 10)
+                        .expect("invalid timestamp")
+                )
             );
             assert_eq!(metric.kind(), MetricKind::Incremental);
             assert_eq!(
@@ -1868,12 +2010,14 @@ async fn decode_series_endpoint_v2() {
                     value: 3.14 * (10_f64)
                 }
             );
-            assert_tag(metric, "host", "another_random_host");
-            assert_tag(metric, "foo", "bar:baz");
-            assert_tag(
+            assert_tags(
                 metric,
-                "source_type_name",
-                "another_random_source_type_name",
+                metric_tags!(
+                    "host" => "another_random_host",
+                    "foo" => "bar:baz",
+                    "foo" => "bizbaz",
+                    "source_type_name" => "another_random_source_type_name",
+                ),
             );
             assert_eq!(metric.namespace(), Some("another_namespace"));
 
@@ -1886,7 +2030,11 @@ async fn decode_series_endpoint_v2() {
             assert_eq!(metric.name(), "dd_count");
             assert_eq!(
                 metric.timestamp(),
-                Some(Utc.ymd(2018, 11, 14).and_hms(8, 9, 15))
+                Some(
+                    Utc.ymd(2018, 11, 14)
+                        .and_hms_opt(8, 9, 15)
+                        .expect("invalid timestamp")
+                )
             );
             assert_eq!(metric.kind(), MetricKind::Incremental);
             assert_eq!(
@@ -1895,9 +2043,14 @@ async fn decode_series_endpoint_v2() {
                     value: 16777216_f64
                 }
             );
-            assert_tag(metric, "host", "a_host");
-            assert_tag(metric, "foobar", "");
-            assert_tag(metric, "source_type_name", "a_very_random_source_type_name");
+            assert_tags(
+                metric,
+                metric_tags!(
+                    "host" => "a_host",
+                    "foobar" => TagValue::Bare,
+                    "source_type_name" => "a_very_random_source_type_name",
+                ),
+            );
             assert_eq!(metric.namespace(), None);
 
             assert_eq!(
@@ -1933,27 +2086,44 @@ fn test_output_schema_definition_json_vector_namespace() {
         Definition::new_with_default_metadata(Kind::json(), [LogNamespace::Vector])
             .with_metadata_field(
                 &owned_value_path!("datadog_agent", "ddsource"),
-                Kind::bytes()
+                Kind::bytes(),
+                Some("source")
             )
-            .with_metadata_field(&owned_value_path!("datadog_agent", "ddtags"), Kind::bytes())
+            .with_metadata_field(
+                &owned_value_path!("datadog_agent", "ddtags"),
+                Kind::bytes(),
+                Some("tags")
+            )
             .with_metadata_field(
                 &owned_value_path!("datadog_agent", "hostname"),
-                Kind::bytes()
+                Kind::bytes(),
+                Some("host")
             )
             .with_metadata_field(
                 &owned_value_path!("datadog_agent", "service"),
-                Kind::bytes()
+                Kind::bytes(),
+                Some("service")
             )
-            .with_metadata_field(&owned_value_path!("datadog_agent", "status"), Kind::bytes())
+            .with_metadata_field(
+                &owned_value_path!("datadog_agent", "status"),
+                Kind::bytes(),
+                Some("severity")
+            )
             .with_metadata_field(
                 &owned_value_path!("datadog_agent", "timestamp"),
-                Kind::timestamp()
+                Kind::timestamp(),
+                Some("timestamp")
             )
             .with_metadata_field(
                 &owned_value_path!("vector", "ingest_timestamp"),
-                Kind::timestamp()
+                Kind::timestamp(),
+                None
             )
-            .with_metadata_field(&owned_value_path!("vector", "source_type"), Kind::bytes())
+            .with_metadata_field(
+                &owned_value_path!("vector", "source_type"),
+                Kind::bytes(),
+                None
+            )
     )
 }
 
@@ -1974,28 +2144,45 @@ fn test_output_schema_definition_bytes_vector_namespace() {
         Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
             .with_metadata_field(
                 &owned_value_path!("datadog_agent", "ddsource"),
-                Kind::bytes()
+                Kind::bytes(),
+                Some("source")
             )
-            .with_metadata_field(&owned_value_path!("datadog_agent", "ddtags"), Kind::bytes())
+            .with_metadata_field(
+                &owned_value_path!("datadog_agent", "ddtags"),
+                Kind::bytes(),
+                Some("tags")
+            )
             .with_metadata_field(
                 &owned_value_path!("datadog_agent", "hostname"),
-                Kind::bytes()
+                Kind::bytes(),
+                Some("host")
             )
             .with_metadata_field(
                 &owned_value_path!("datadog_agent", "service"),
-                Kind::bytes()
+                Kind::bytes(),
+                Some("service")
             )
-            .with_metadata_field(&owned_value_path!("datadog_agent", "status"), Kind::bytes())
+            .with_metadata_field(
+                &owned_value_path!("datadog_agent", "status"),
+                Kind::bytes(),
+                Some("severity")
+            )
             .with_metadata_field(
                 &owned_value_path!("datadog_agent", "timestamp"),
-                Kind::timestamp()
+                Kind::timestamp(),
+                Some("timestamp")
             )
             .with_metadata_field(
                 &owned_value_path!("vector", "ingest_timestamp"),
-                Kind::timestamp()
+                Kind::timestamp(),
+                None
             )
-            .with_metadata_field(&owned_value_path!("vector", "source_type"), Kind::bytes())
-            .with_meaning(LookupBuf::root(), "message")
+            .with_metadata_field(
+                &owned_value_path!("vector", "source_type"),
+                Kind::bytes(),
+                None
+            )
+            .with_meaning(OwnedTargetPath::event_root(), "message")
     )
 }
 
@@ -2077,13 +2264,6 @@ fn test_output_schema_definition_bytes_legacy_namespace() {
     )
 }
 
-fn assert_tag(metric: &Metric, tag: &str, value: &str) {
-    assert_eq!(
-        metric
-            .tags()
-            .expect("Missing tags")
-            .get(tag)
-            .map(AsRef::as_ref),
-        Some(value)
-    );
+fn assert_tags(metric: &Metric, tags: MetricTags) {
+    assert_eq!(metric.tags().expect("Missing tags"), &tags);
 }

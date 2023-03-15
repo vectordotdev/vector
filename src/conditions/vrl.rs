@@ -19,7 +19,7 @@ pub struct VrlConfig {
     /// The VRL boolean expression.
     pub(crate) source: String,
 
-    #[configurable(derived)]
+    #[configurable(derived, metadata(docs::hidden))]
     #[serde(default)]
     pub(crate) runtime: VrlRuntime,
 }
@@ -82,7 +82,7 @@ pub struct Vrl {
 
 impl Vrl {
     fn run(&self, event: Event) -> (Event, vrl::RuntimeResult) {
-        let mut target = VrlTarget::new(event, self.program.info());
+        let mut target = VrlTarget::new(event, self.program.info(), false);
         // TODO: use timezone from remap config
         let timezone = TimeZone::default();
 

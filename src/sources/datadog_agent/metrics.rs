@@ -5,7 +5,8 @@ use chrono::{TimeZone, Utc};
 use http::StatusCode;
 use prost::Message;
 use serde::{Deserialize, Serialize};
-use vector_core::{metrics::AgentDDSketch, ByteSizeOf};
+use vector_common::internal_event::{CountByteSize, InternalEventHandle as _, Registered};
+use vector_core::{metrics::AgentDDSketch, EstimatedJsonEncodedSizeOf};
 use warp::{filters::BoxedFilter, path, path::FullPath, reply::Response, Filter};
 
 use crate::{
@@ -22,7 +23,7 @@ use crate::{
             ddmetric_proto::{metric_payload, MetricPayload, SketchPayload},
             handle_request, ApiKeyQueryParams, DatadogAgentSource,
         },
-        util::ErrorMessage,
+        util::{extract_tag_key_and_value, ErrorMessage},
     },
     SourceSender,
 };
@@ -38,19 +39,11 @@ pub(crate) fn build_warp_filter(
     out: SourceSender,
     source: DatadogAgentSource,
 ) -> BoxedFilter<(Response,)> {
-    let sketches_service = sketches_service(
-        acknowledgements,
-        multiple_outputs,
-        out.clone(),
-        source.clone(),
-    );
-    let series_v1_service = series_v1_service(
-        acknowledgements,
-        multiple_outputs,
-        out.clone(),
-        source.clone(),
-    );
-    let series_v2_service = series_v2_service(acknowledgements, multiple_outputs, out, source);
+    let output = multiple_outputs.then_some(super::METRICS);
+    let sketches_service = sketches_service(acknowledgements, output, out.clone(), source.clone());
+    let series_v1_service =
+        series_v1_service(acknowledgements, output, out.clone(), source.clone());
+    let series_v2_service = series_v2_service(acknowledgements, output, out, source);
     sketches_service
         .or(series_v1_service)
         .unify()
@@ -61,7 +54,7 @@ pub(crate) fn build_warp_filter(
 
 fn sketches_service(
     acknowledgements: bool,
-    multiple_outputs: bool,
+    output: Option<&'static str>,
     out: SourceSender,
     source: DatadogAgentSource,
 ) -> BoxedFilter<(Response,)> {
@@ -89,13 +82,10 @@ fn sketches_service(
                                 query_params.dd_api_key,
                             ),
                             &source.metrics_schema_definition,
+                            &source.events_received,
                         )
                     });
-                if multiple_outputs {
-                    handle_request(events, acknowledgements, out.clone(), Some(super::METRICS))
-                } else {
-                    handle_request(events, acknowledgements, out.clone(), None)
-                }
+                handle_request(events, acknowledgements, out.clone(), output)
             },
         )
         .boxed()
@@ -103,7 +93,7 @@ fn sketches_service(
 
 fn series_v1_service(
     acknowledgements: bool,
-    multiple_outputs: bool,
+    output: Option<&'static str>,
     out: SourceSender,
     source: DatadogAgentSource,
 ) -> BoxedFilter<(Response,)> {
@@ -131,13 +121,10 @@ fn series_v1_service(
                                 query_params.dd_api_key,
                             ),
                             &source.metrics_schema_definition,
+                            &source.events_received,
                         )
                     });
-                if multiple_outputs {
-                    handle_request(events, acknowledgements, out.clone(), Some(super::METRICS))
-                } else {
-                    handle_request(events, acknowledgements, out.clone(), None)
-                }
+                handle_request(events, acknowledgements, out.clone(), output)
             },
         )
         .boxed()
@@ -145,7 +132,7 @@ fn series_v1_service(
 
 fn series_v2_service(
     acknowledgements: bool,
-    multiple_outputs: bool,
+    output: Option<&'static str>,
     out: SourceSender,
     source: DatadogAgentSource,
 ) -> BoxedFilter<(Response,)> {
@@ -173,13 +160,10 @@ fn series_v2_service(
                                 query_params.dd_api_key,
                             ),
                             &source.metrics_schema_definition,
+                            &source.events_received,
                         )
                     });
-                if multiple_outputs {
-                    handle_request(events, acknowledgements, out.clone(), Some(super::METRICS))
-                } else {
-                    handle_request(events, acknowledgements, out.clone(), None)
-                }
+                handle_request(events, acknowledgements, out.clone(), output)
             },
         )
         .boxed()
@@ -189,6 +173,7 @@ fn decode_datadog_sketches(
     body: Bytes,
     api_key: Option<Arc<str>>,
     schema_definition: &Arc<schema::Definition>,
+    events_received: &Registered<EventsReceived>,
 ) -> Result<Vec<Event>, ErrorMessage> {
     if body.is_empty() {
         // The datadog agent may send an empty payload as a keep alive
@@ -206,10 +191,10 @@ fn decode_datadog_sketches(
         )
     })?;
 
-    emit!(EventsReceived {
-        byte_size: metrics.size_of(),
-        count: metrics.len(),
-    });
+    events_received.emit(CountByteSize(
+        metrics.len(),
+        metrics.estimated_json_encoded_size_of(),
+    ));
 
     Ok(metrics)
 }
@@ -218,6 +203,7 @@ fn decode_datadog_series_v2(
     body: Bytes,
     api_key: Option<Arc<str>>,
     schema_definition: &Arc<schema::Definition>,
+    events_received: &Registered<EventsReceived>,
 ) -> Result<Vec<Event>, ErrorMessage> {
     if body.is_empty() {
         // The datadog agent may send an empty payload as a keep alive
@@ -228,17 +214,19 @@ fn decode_datadog_series_v2(
         return Ok(Vec::new());
     }
 
-    let metrics = decode_ddseries_v2(body, &api_key, schema_definition).map_err(|error| {
-        ErrorMessage::new(
-            StatusCode::UNPROCESSABLE_ENTITY,
-            format!("Error decoding Datadog sketch: {:?}", error),
-        )
-    })?;
+    let metrics = decode_ddseries_v2(body, &api_key, schema_definition, events_received).map_err(
+        |error| {
+            ErrorMessage::new(
+                StatusCode::UNPROCESSABLE_ENTITY,
+                format!("Error decoding Datadog sketch: {:?}", error),
+            )
+        },
+    )?;
 
-    emit!(EventsReceived {
-        byte_size: metrics.size_of(),
-        count: metrics.len(),
-    });
+    events_received.emit(CountByteSize(
+        metrics.len(),
+        metrics.estimated_json_encoded_size_of(),
+    ));
 
     Ok(metrics)
 }
@@ -247,6 +235,7 @@ pub(crate) fn decode_ddseries_v2(
     frame: Bytes,
     api_key: &Option<Arc<str>>,
     schema_definition: &Arc<schema::Definition>,
+    events_received: &Registered<EventsReceived>,
 ) -> crate::Result<Vec<Event>> {
     let payload = MetricPayload::decode(frame)?;
     let decoded_metrics: Vec<Event> = payload
@@ -343,10 +332,10 @@ pub(crate) fn decode_ddseries_v2(
         })
         .collect();
 
-    emit!(EventsReceived {
-        byte_size: decoded_metrics.size_of(),
-        count: decoded_metrics.len(),
-    });
+    events_received.emit(CountByteSize(
+        decoded_metrics.len(),
+        decoded_metrics.estimated_json_encoded_size_of(),
+    ));
 
     Ok(decoded_metrics)
 }
@@ -355,6 +344,7 @@ fn decode_datadog_series_v1(
     body: Bytes,
     api_key: Option<Arc<str>>,
     schema_definition: &Arc<schema::Definition>,
+    events_received: &Registered<EventsReceived>,
 ) -> Result<Vec<Event>, ErrorMessage> {
     if body.is_empty() {
         // The datadog agent may send an empty payload as a keep alive
@@ -378,21 +368,16 @@ fn decode_datadog_series_v1(
         .flat_map(|m| into_vector_metric(m, api_key.clone(), schema_definition))
         .collect();
 
-    emit!(EventsReceived {
-        byte_size: decoded_metrics.size_of(),
-        count: decoded_metrics.len(),
-    });
+    events_received.emit(CountByteSize(
+        decoded_metrics.len(),
+        decoded_metrics.estimated_json_encoded_size_of(),
+    ));
 
     Ok(decoded_metrics)
 }
 
 fn into_metric_tags(tags: Vec<String>) -> MetricTags {
-    tags.iter()
-        .map(|tag| {
-            let kv = tag.split_once(':').unwrap_or((tag, ""));
-            (kv.0.trim().to_string(), kv.1.trim().to_string())
-        })
-        .collect()
+    tags.iter().map(extract_tag_key_and_value).collect()
 }
 
 fn into_vector_metric(
@@ -457,7 +442,11 @@ fn into_vector_metric(
                         value: dd_point.1 * (i as f64),
                     },
                 )
-                .with_timestamp(Some(Utc.timestamp(dd_point.0, 0)))
+                .with_timestamp(Some(
+                    Utc.timestamp_opt(dd_point.0, 0)
+                        .single()
+                        .expect("invalid timestamp"),
+                ))
                 // dd_metric.interval is in seconds, convert to ms
                 .with_interval_ms(NonZeroU32::new(i * 1000))
                 .with_tags(Some(tags.clone()))
@@ -525,7 +514,11 @@ pub(crate) fn decode_ddsketch(
                 let (namespace, name) = namespace_name_from_dd_metric(&sketch_series.metric);
                 let mut metric = Metric::new(name.to_string(), MetricKind::Incremental, val)
                     .with_tags(Some(tags.clone()))
-                    .with_timestamp(Some(Utc.timestamp(sketch.ts, 0)))
+                    .with_timestamp(Some(
+                        Utc.timestamp_opt(sketch.ts, 0)
+                            .single()
+                            .expect("invalid timestamp"),
+                    ))
                     .with_namespace(namespace);
                 if let Some(k) = &api_key {
                     metric.metadata_mut().set_datadog_api_key(Arc::clone(k));

@@ -15,18 +15,19 @@ use codecs::{decoding::FramingError, BytesDeserializer, CharacterDelimitedDecode
 use futures::{FutureExt, Stream, StreamExt, TryFutureExt};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
 use tokio::{pin, select};
 use tokio_util::codec::FramedRead;
 use tracing::Instrument;
 use vector_common::internal_event::{
-    ByteSize, BytesReceived, InternalEventHandle as _, Protocol, Registered,
+    ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol, Registered,
 };
-use vector_config::{configurable_component, NamedComponent};
+use vector_config::configurable_component;
 
 use crate::{
     config::{SourceAcknowledgementsConfig, SourceContext},
-    event::{BatchNotifier, BatchStatus},
+    event::{BatchNotifier, BatchStatus, EstimatedJsonEncodedSizeOf},
     internal_events::{
         EventsReceived, SqsMessageDeleteBatchError, SqsMessageDeletePartialError,
         SqsMessageDeleteSucceeded, SqsMessageProcessingError, SqsMessageProcessingSucceeded,
@@ -40,10 +41,7 @@ use crate::{
     SourceSender,
 };
 use lookup::{metadata_path, path, PathPrefix};
-use vector_core::{
-    config::{log_schema, LegacyKey, LogNamespace},
-    ByteSizeOf,
-};
+use vector_core::config::{log_schema, LegacyKey, LogNamespace};
 
 static SUPPORTED_S3_EVENT_VERSION: Lazy<semver::VersionReq> =
     Lazy::new(|| semver::VersionReq::parse("~2").unwrap());
@@ -52,37 +50,46 @@ static SUPPORTED_S3_EVENT_VERSION: Lazy<semver::VersionReq> =
 //
 // TODO: It seems awfully likely that we could re-use the existing configuration type for the `aws_sqs` source in some
 // way, given the near 100% overlap in configurable values.
+#[serde_as]
 #[configurable_component]
 #[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
 #[serde(deny_unknown_fields)]
 pub(super) struct Config {
     /// The URL of the SQS queue to poll for bucket notifications.
+    #[configurable(metadata(
+        docs::examples = "https://sqs.us-east-2.amazonaws.com/123456789012/MyQueue"
+    ))]
+    #[configurable(validation(format = "uri"))]
     pub(super) queue_url: String,
 
     /// How long to wait while polling the queue for new messages, in seconds.
     ///
-    /// Generally should not be changed unless instructed to do so, as if messages are available, they will always be
-    /// consumed, regardless of the value of `poll_secs`.
-    // NOTE: We restrict this to u32 for safe conversion to i64 later.
+    /// Generally should not be changed unless instructed to do so, as if messages are available,
+    /// they will always be consumed, regardless of the value of `poll_secs`.
+    // NOTE: We restrict this to u32 for safe conversion to i32 later.
+    // NOTE: This value isn't used as a `Duration` downstream, so we don't bother using `serde_with`
     #[serde(default = "default_poll_secs")]
     #[derivative(Default(value = "default_poll_secs()"))]
+    #[configurable(metadata(docs::type_unit = "seconds"))]
     pub(super) poll_secs: u32,
 
-    /// The visibility timeout to use for messages, in secords.
+    /// The visibility timeout to use for messages, in seconds.
     ///
-    /// This controls how long a message is left unavailable after Vector receives it. If Vector receives a message, and
-    /// takes longer than `visibility_timeout_secs` to process and delete the message from the queue, it will be made reavailable for another consumer.
+    /// This controls how long a message is left unavailable after it is received. If a message is received, and
+    /// takes longer than `visibility_timeout_secs` to process and delete the message from the queue, it is made available again for another consumer.
     ///
-    /// This can happen if, for example, if Vector crashes between consuming a message and deleting it.
-    // NOTE: We restrict this to u32 for safe conversion to i64 later.
+    /// This can happen if there is an issue between consuming a message and deleting it.
+    // NOTE: We restrict this to u32 for safe conversion to i32 later.
+    // NOTE: This value isn't used as a `Duration` downstream, so we don't bother using `serde_with`
     #[serde(default = "default_visibility_timeout_secs")]
     #[derivative(Default(value = "default_visibility_timeout_secs()"))]
+    #[configurable(metadata(docs::type_unit = "seconds"))]
     pub(super) visibility_timeout_secs: u32,
 
-    /// Whether to delete the message once Vector processes it.
+    /// Whether to delete the message once it is processed.
     ///
-    /// It can be useful to set this to `false` to debug or during initial Vector setup.
+    /// It can be useful to set this to `false` for debugging or during the initial setup.
     #[serde(default = "default_true")]
     #[derivative(Default(value = "default_true()"))]
     pub(super) delete_message: bool,
@@ -91,10 +98,13 @@ pub(super) struct Config {
     ///
     /// Defaults to the number of available CPUs on the system.
     ///
-    /// Should not typically need to be changed, but it can sometimes be beneficial to raise this value when there is a
-    /// high rate of messages being pushed into the queue and the objects being fetched are small. In these cases,
-    /// Vector may not fully utilize system resources without fetching more messages per second, as the SQS message
-    /// consumption rate affects the S3 object retrieval rate.
+    /// Should not typically need to be changed, but it can sometimes be beneficial to raise this
+    /// value when there is a high rate of messages being pushed into the queue and the objects
+    /// being fetched are small. In these cases, system resources may not be fully utilized without
+    /// fetching more messages per second, as the SQS message consumption rate affects the S3 object
+    /// retrieval rate.
+    #[configurable(metadata(docs::type_unit = "tasks"))]
+    #[configurable(metadata(docs::examples = 5))]
     pub(super) client_concurrency: Option<NonZeroUsize>,
 
     #[configurable(derived)]
@@ -264,6 +274,7 @@ pub struct IngestorProcess {
     acknowledgements: bool,
     log_namespace: LogNamespace,
     bytes_received: Registered<BytesReceived>,
+    events_received: Registered<EventsReceived>,
 }
 
 impl IngestorProcess {
@@ -281,6 +292,7 @@ impl IngestorProcess {
             acknowledgements,
             log_namespace,
             bytes_received: register!(BytesReceived::from(Protocol::HTTP)),
+            events_received: register!(EventsReceived),
         }
     }
 
@@ -460,9 +472,11 @@ impl IngestorProcess {
 
         let metadata = object.metadata;
 
-        let timestamp = object
-            .last_modified
-            .map(|ts| Utc.timestamp(ts.secs(), ts.subsec_nanos()));
+        let timestamp = object.last_modified.map(|ts| {
+            Utc.timestamp_opt(ts.secs(), ts.subsec_nanos())
+                .single()
+                .expect("invalid timestamp")
+        });
 
         let (batch, receiver) = BatchNotifier::maybe_new_with_receiver(self.acknowledgements);
         let object_reader = super::s3_object_decoder(
@@ -488,6 +502,7 @@ impl IngestorProcess {
         // the case that the same vector instance processes the same message.
         let mut read_error = None;
         let bytes_received = self.bytes_received.clone();
+        let events_received = self.events_received.clone();
         let lines: Box<dyn Stream<Item = Bytes> + Send + Unpin> = Box::new(
             FramedRead::new(object_reader, CharacterDelimitedDecoder::new(b'\n'))
                 .map(|res| {
@@ -581,10 +596,7 @@ impl IngestorProcess {
                 }
             };
 
-            emit!(EventsReceived {
-                count: 1,
-                byte_size: log.size_of()
-            });
+            events_received.emit(CountByteSize(1, log.estimated_json_encoded_size_of()));
 
             log
         });
@@ -601,6 +613,10 @@ impl IngestorProcess {
         // Up above, `lines` captures `read_error`, and eventually is captured by `stream`,
         // so we explicitly drop it so that we can again utilize `read_error` below.
         drop(stream);
+
+        // The BatchNotifier is cloned for each LogEvent in the batch stream, but the last
+        // reference must be dropped before the status of the batch is sent to the channel.
+        drop(batch);
 
         if let Some(error) = read_error {
             Err(ProcessingError::ReadObject {
@@ -636,7 +652,7 @@ impl IngestorProcess {
             .receive_message()
             .queue_url(self.state.queue_url.clone())
             .max_number_of_messages(10)
-            .visibility_timeout(self.state.visibility_timeout_secs as i32)
+            .visibility_timeout(self.state.visibility_timeout_secs)
             .wait_time_seconds(self.state.poll_secs)
             .send()
             .map_ok(|res| res.messages.unwrap_or_default())

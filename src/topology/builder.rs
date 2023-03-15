@@ -16,6 +16,9 @@ use tokio::{
     time::{timeout, Duration},
 };
 use tracing::Instrument;
+use vector_common::internal_event::{
+    self, CountByteSize, EventsSent, InternalEventHandle as _, Registered,
+};
 use vector_config::NamedComponent;
 use vector_core::config::LogNamespace;
 use vector_core::{
@@ -26,7 +29,6 @@ use vector_core::{
         },
         BufferType, WhenFull,
     },
-    internal_event::EventsSent,
     schema::Definition,
     EstimatedJsonEncodedSizeOf,
 };
@@ -40,8 +42,8 @@ use super::{
 use crate::{
     config::{
         ComponentKey, DataType, EnrichmentTableConfig, Input, Inputs, Output, OutputId,
-        ProxyConfig, SinkConfig, SinkContext, SourceConfig, SourceContext, TransformConfig,
-        TransformContext, TransformOuter,
+        ProxyConfig, SinkConfig, SinkContext, SourceConfig, SourceContext, TransformContext,
+        TransformOuter,
     },
     event::{EventArray, EventContainer},
     internal_events::EventsReceived,
@@ -173,16 +175,15 @@ pub async fn build_pieces(
             // maintained for compatibility
             component_name = %key.id(),
         );
+        let _entered_span = span.enter();
+
         let task_name = format!(
             ">> {} ({}, pump) >>",
             source.inner.get_component_name(),
             key.id()
         );
 
-        let mut builder = {
-            let _span = span.enter();
-            SourceSender::builder().with_buffer(*SOURCE_SENDER_BUFFER_SIZE)
-        };
+        let mut builder = SourceSender::builder().with_buffer(*SOURCE_SENDER_BUFFER_SIZE);
         let mut pumps = Vec::new();
         let mut controls = HashMap::new();
         let mut schema_definitions = HashMap::with_capacity(source_outputs.len());
@@ -268,7 +269,8 @@ pub async fn build_pieces(
             schema_definitions,
             schema: config.schema,
         };
-        let server = match source.inner.build(context).await {
+        let source = source.inner.build(context).await;
+        let server = match source {
             Err(error) => {
                 errors.push(format!("Source \"{}\": {}", key, error));
                 continue;
@@ -346,15 +348,22 @@ pub async fn build_pieces(
         let merged_definition =
             schema::merged_definition(&transform.inputs, config, &mut definition_cache);
 
+        let span = error_span!(
+            "transform",
+            component_kind = "transform",
+            component_id = %key.id(),
+            component_type = %transform.inner.get_component_name(),
+            // maintained for compatibility
+            component_name = %key.id(),
+        );
+
         for output in transform
             .inner
             .outputs(&merged_definition, config.schema.log_namespace())
         {
-            let definition = match output.log_schema_definition {
-                Some(definition) => definition,
-                None => merged_definition.clone(),
-            };
-
+            let definition = output
+                .log_schema_definition
+                .unwrap_or_else(|| merged_definition.clone());
             schema_definitions.insert(output.port, definition);
         }
 
@@ -374,7 +383,12 @@ pub async fn build_pieces(
             config.schema.log_namespace(),
         );
 
-        let transform = match transform.inner.build(&context).await {
+        let transform = match transform
+            .inner
+            .build(&context)
+            .instrument(span.clone())
+            .await
+        {
             Err(error) => {
                 errors.push(format!("Transform \"{}\": {}", key, error));
                 continue;
@@ -387,7 +401,10 @@ pub async fn build_pieces(
 
         inputs.insert(key.clone(), (input_tx, node.inputs.clone()));
 
-        let (transform_task, transform_outputs) = build_transform(transform, node, input_rx);
+        let (transform_task, transform_outputs) = {
+            let _span = span.enter();
+            build_transform(transform, node, input_rx)
+        };
 
         outputs.extend(transform_outputs);
         tasks.insert(key.clone(), transform_task);
@@ -407,21 +424,19 @@ pub async fn build_pieces(
         let typetag = sink.inner.get_component_name();
         let input_type = sink.inner.input().data_type();
 
-        if config.schema.validation {
-            // At this point, we've validated that all transforms are valid, including any
-            // transform that mutates the schema provided by their sources. We can now validate the
-            // schema expectations of each individual sink.
-            if let Err(mut err) = schema::validate_sink_expectations(key, sink, config) {
-                errors.append(&mut err);
-            };
-        }
+        // At this point, we've validated that all transforms are valid, including any
+        // transform that mutates the schema provided by their sources. We can now validate the
+        // schema expectations of each individual sink.
+        if let Err(mut err) = schema::validate_sink_expectations(key, sink, config) {
+            errors.append(&mut err);
+        };
 
         let (tx, rx) = if let Some(buffer) = buffers.remove(key) {
             buffer
         } else {
             let buffer_type = match sink.buffer.stages().first().expect("cant ever be empty") {
                 BufferType::Memory { .. } => "memory",
-                BufferType::DiskV1 { .. } | BufferType::DiskV2 { .. } => "disk",
+                BufferType::DiskV2 { .. } => "disk",
             };
             let buffer_span = error_span!(
                 "sink",
@@ -478,14 +493,15 @@ pub async fn build_pieces(
 
             let mut rx = wrap(rx);
 
+            let events_received = register!(EventsReceived);
             sink.run(
                 rx.by_ref()
                     .filter(|events: &EventArray| ready(filter_events_type(events, input_type)))
                     .inspect(|events| {
-                        emit!(EventsReceived {
-                            count: events.len(),
-                            byte_size: events.estimated_json_encoded_size_of(),
-                        })
+                        events_received.emit(CountByteSize(
+                            events.len(),
+                            events.estimated_json_encoded_size_of(),
+                        ))
                     })
                     .take_until_if(tripwire),
             )
@@ -509,12 +525,12 @@ pub async fn build_pieces(
                 timeout(duration, healthcheck)
                     .map(|result| match result {
                         Ok(Ok(_)) => {
-                            info!("Healthcheck: Passed.");
+                            info!("Healthcheck passed.");
                             Ok(TaskOutput::Healthcheck)
                         }
                         Ok(Err(error)) => {
                             error!(
-                                msg = "Healthcheck: Failed Reason.",
+                                msg = "Healthcheck failed.",
                                 %error,
                                 component_kind = "sink",
                                 component_type = typetag,
@@ -526,7 +542,7 @@ pub async fn build_pieces(
                         }
                         Err(e) => {
                             error!(
-                                msg = "Healthcheck: timeout.",
+                                msg = "Healthcheck timed out.",
                                 component_kind = "sink",
                                 component_type = typetag,
                                 component_id = %component_key.id(),
@@ -538,7 +554,7 @@ pub async fn build_pieces(
                     })
                     .await
             } else {
-                info!("Healthcheck: Disabled.");
+                info!("Healthcheck disabled.");
                 Ok(TaskOutput::Healthcheck)
             }
         };
@@ -686,6 +702,7 @@ struct Runner {
     outputs: TransformOutputs,
     timer: crate::utilization::Timer,
     last_report: Instant,
+    events_received: Registered<EventsReceived>,
 }
 
 impl Runner {
@@ -702,6 +719,7 @@ impl Runner {
             outputs,
             timer: crate::utilization::Timer::new(),
             last_report: Instant::now(),
+            events_received: register!(EventsReceived),
         }
     }
 
@@ -712,10 +730,10 @@ impl Runner {
             self.last_report = stopped;
         }
 
-        emit!(EventsReceived {
-            count: events.len(),
-            byte_size: events.estimated_json_encoded_size_of(),
-        });
+        self.events_received.emit(CountByteSize(
+            events.len(),
+            events.estimated_json_encoded_size_of(),
+        ));
     }
 
     async fn send_outputs(&mut self, outputs_buf: &mut TransformOutputsBuf) -> crate::Result<()> {
@@ -827,22 +845,23 @@ fn build_task_transform(
 
     let input_rx = crate::utilization::wrap(input_rx.into_stream());
 
+    let events_received = register!(EventsReceived);
     let filtered = input_rx
         .filter(move |events| ready(filter_events_type(events, input_type)))
-        .inspect(|events| {
-            emit!(EventsReceived {
-                count: events.len(),
-                byte_size: events.estimated_json_encoded_size_of(),
-            })
+        .inspect(move |events| {
+            events_received.emit(CountByteSize(
+                events.len(),
+                events.estimated_json_encoded_size_of(),
+            ))
         });
+    let events_sent = register!(EventsSent::from(internal_event::Output(None)));
     let stream = t
         .transform(Box::pin(filtered))
-        .inspect(|events: &EventArray| {
-            emit!(EventsSent {
-                count: events.len(),
-                byte_size: events.estimated_json_encoded_size_of(),
-                output: None,
-            });
+        .inspect(move |events: &EventArray| {
+            events_sent.emit(CountByteSize(
+                events.len(),
+                events.estimated_json_encoded_size_of(),
+            ));
         });
     let transform = async move {
         debug!("Task transform starting.");

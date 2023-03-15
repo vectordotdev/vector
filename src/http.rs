@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 use std::{
     fmt,
     task::{Context, Poll},
@@ -235,23 +236,30 @@ impl<B> fmt::Debug for HttpClient<B> {
 #[configurable_component]
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[serde(deny_unknown_fields, rename_all = "snake_case", tag = "strategy")]
+#[configurable(metadata(docs::enum_tag_description = "The authentication strategy to use."))]
 pub enum Auth {
     /// Basic authentication.
     ///
-    /// The username and password are concatenated and encoded via base64.
+    /// The username and password are concatenated and encoded via [base64][base64].
+    ///
+    /// [base64]: https://en.wikipedia.org/wiki/Base64
     Basic {
-        /// The username to send.
+        /// The basic authentication username.
+        #[configurable(metadata(docs::examples = "${USERNAME}"))]
+        #[configurable(metadata(docs::examples = "username"))]
         user: String,
 
-        /// The password to send.
+        /// The basic authentication password.
+        #[configurable(metadata(docs::examples = "${PASSWORD}"))]
+        #[configurable(metadata(docs::examples = "password"))]
         password: SensitiveString,
     },
 
     /// Bearer authentication.
     ///
-    /// A bearer token (OAuth2, JWT, etc) is passed as-is.
+    /// The bearer token value (OAuth2, JWT, etc) is passed as-is.
     Bearer {
-        /// The bearer token to send.
+        /// The bearer authentication token.
         token: SensitiveString,
     },
 }

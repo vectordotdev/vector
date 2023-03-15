@@ -67,7 +67,7 @@ pub(super) trait MetricCollector {
                             timestamp,
                             name,
                             "_bucket",
-                            bucket_count as f64,
+                            bucket_count,
                             tags,
                             Some(("le", bucket.upper_limit.to_string())),
                         );
@@ -80,7 +80,7 @@ pub(super) trait MetricCollector {
                         tags,
                         Some(("le", "+Inf".to_string())),
                     );
-                    self.emit_value(timestamp, name, "_sum", sum as f64, tags, None);
+                    self.emit_value(timestamp, name, "_sum", sum, tags, None);
                     self.emit_value(timestamp, name, "_count", count as f64, tags, None);
                 }
                 MetricValue::Distribution {
@@ -262,7 +262,7 @@ impl MetricCollector for StringCollector {
     }
 
     fn finish(self) -> String {
-        self.processed.into_iter().map(|(_, value)| value).collect()
+        self.processed.into_values().collect()
     }
 }
 
@@ -935,6 +935,33 @@ mod tests {
                 # HELP something something
                 # TYPE something counter
                 something{code="200",path="c:\\Windows",quoted="host\"1\""} 1
+            "#}
+        );
+    }
+
+    /// According to the [spec](https://github.com/OpenObservability/OpenMetrics/blob/main/specification/OpenMetrics.md?plain=1#L115)
+    /// > Label names MUST be unique within a LabelSet.
+    /// Prometheus itself will reject the metric with an error. Largely to remain backward compatible with older versions of Vector,
+    /// we only publish the last tag in the list.
+    #[test]
+    fn encodes_duplicate_tags() {
+        let tags = metric_tags!(
+            "code" => "200",
+            "code" => "success",
+        );
+        let metric = Metric::new(
+            "something".to_owned(),
+            MetricKind::Absolute,
+            MetricValue::Counter { value: 1.0 },
+        )
+        .with_tags(Some(tags));
+        let encoded = encode_one::<StringCollector>(None, &[], &[], &metric);
+        assert_eq!(
+            encoded,
+            indoc! {r#"
+                # HELP something something
+                # TYPE something counter
+                something{code="success"} 1
             "#}
         );
     }

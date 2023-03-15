@@ -1,0 +1,10 @@
+features:
+- docker-logs-integration-tests
+
+test_filter: "::docker_logs::"
+
+runner:
+  needs_docker_socket: true
+
+matrix:
+  default: ["default"]

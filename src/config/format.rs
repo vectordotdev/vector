@@ -10,20 +10,15 @@ use serde::de;
 pub type FormatHint = Option<Format>;
 
 /// The format used to represent the configuration data.
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Debug, Default, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub enum Format {
     /// TOML format is used.
+    #[default]
     Toml,
     /// JSON format is used.
     Json,
     /// YAML format is used.
     Yaml,
-}
-
-impl Default for Format {
-    fn default() -> Self {
-        Format::Toml
-    }
 }
 
 impl Format {

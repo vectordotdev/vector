@@ -1,6 +1,7 @@
 use std::str::FromStr;
 
 use ::value::Value;
+use base64::Engine as _;
 use vrl::prelude::expression::FunctionExpression;
 use vrl::prelude::*;
 
@@ -18,9 +19,14 @@ fn encode_base64(value: Value, padding: Option<Value>, charset: Option<Value>) -
         .map(|c| Base64Charset::from_str(&String::from_utf8_lossy(&c)))
         .transpose()?
         .unwrap_or_default();
-    let config = base64::Config::new(charset.into(), padding);
 
-    Ok(base64::encode_config(value, config).into())
+    let engine = base64::engine::GeneralPurpose::new(
+        &base64::alphabet::Alphabet::from(charset),
+        base64::engine::general_purpose::GeneralPurposeConfig::default()
+            .with_encode_padding(padding),
+    );
+
+    Ok(engine.encode(value).into())
 }
 
 #[derive(Clone, Copy, Debug)]

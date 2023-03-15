@@ -1,7 +1,9 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use lookup::LookupBuf;
+use lookup::OwnedTargetPath;
 use value::Kind;
+
+use crate::config::LogNamespace;
 
 use super::Definition;
 
@@ -11,7 +13,7 @@ use super::Definition;
 /// components.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Requirement {
-    /// Semantic meanings confingured for this requirement.
+    /// Semantic meanings configured for this requirement.
     meaning: BTreeMap<&'static str, SemanticMeaning>,
 }
 
@@ -72,12 +74,24 @@ impl Requirement {
     }
 
     /// Validate the provided [`Definition`] against the current requirement.
+    /// If `validate_schema_type` is true, validation ensure the types match,
+    /// otherwise it only ensures the required fields exist.
     ///
     /// # Errors
     ///
     /// Returns a list of errors if validation fails.
-    pub fn validate(&self, definition: &Definition) -> Result<(), ValidationErrors> {
+    pub fn validate(
+        &self,
+        definition: &Definition,
+        validate_schema_type: bool,
+    ) -> Result<(), ValidationErrors> {
         let mut errors = vec![];
+
+        // We only validate definitions if there is at least one connected component
+        // that uses the Vector namespace.
+        if !definition.log_namespaces().contains(&LogNamespace::Vector) {
+            return Ok(());
+        }
 
         for (identifier, req_meaning) in &self.meaning {
             // Check if we're dealing with an invalid meaning, meaning the definition has a single
@@ -96,9 +110,9 @@ impl Requirement {
             });
 
             match maybe_meaning_path {
-                Some(path) => {
+                Some(target_path) if validate_schema_type => {
                     // Get the kind at the path for the given semantic meaning.
-                    let definition_kind = definition.event_kind().at_path(path);
+                    let definition_kind = definition.kind_at(target_path);
 
                     if req_meaning.kind.is_superset(&definition_kind).is_err() {
                         // The semantic meaning kind does not match the expected
@@ -174,7 +188,7 @@ pub enum ValidationError {
     /// A semantic meaning is pointing to multiple paths.
     MeaningDuplicate {
         identifier: &'static str,
-        paths: BTreeSet<LookupBuf>,
+        paths: BTreeSet<OwnedTargetPath>,
     },
 }
 
@@ -196,7 +210,7 @@ impl std::fmt::Display for ValidationError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::MeaningMissing { identifier } => {
-                write!(f, "missing semantic meaning: {}", identifier)
+                write!(f, "missing semantic meaning: {identifier}")
             }
             Self::MeaningKind {
                 identifier,
@@ -204,8 +218,7 @@ impl std::fmt::Display for ValidationError {
                 got,
             } => write!(
                 f,
-                "invalid semantic meaning: {} (expected {}, got {})",
-                identifier, want, got
+                "invalid semantic meaning: {identifier} (expected {want}, got {got})"
             ),
             Self::MeaningDuplicate { identifier, paths } => write!(
                 f,
@@ -225,10 +238,38 @@ impl std::error::Error for ValidationError {}
 
 #[cfg(test)]
 mod tests {
+    use lookup::lookup_v2::parse_target_path;
     use lookup::owned_value_path;
     use std::collections::HashMap;
 
     use super::*;
+
+    #[test]
+    fn test_doesnt_validate_types() {
+        let requirement = Requirement::empty().required_meaning("foo", Kind::boolean());
+        let definition = Definition::default_for_namespace(&[LogNamespace::Vector].into())
+            .with_event_field(&owned_value_path!("foo"), Kind::integer(), Some("foo"));
+
+        assert_eq!(Ok(()), requirement.validate(&definition, false));
+    }
+
+    #[test]
+    fn test_doesnt_validate_legacy_namespace() {
+        let requirement = Requirement::empty().required_meaning("foo", Kind::boolean());
+
+        // We get an error if we have a connected component with the Vector namespace.
+        let definition =
+            Definition::default_for_namespace(&[LogNamespace::Vector, LogNamespace::Legacy].into())
+                .with_event_field(&owned_value_path!("foo"), Kind::integer(), Some("foo"));
+
+        assert_ne!(Ok(()), requirement.validate(&definition, true));
+
+        // We don't get an error if we have a connected component with just the Legacy namespace.
+        let definition = Definition::default_for_namespace(&[LogNamespace::Legacy].into())
+            .with_event_field(&owned_value_path!("foo"), Kind::integer(), Some("foo"));
+
+        assert_eq!(Ok(()), requirement.validate(&definition, true));
+    }
 
     #[test]
     #[allow(clippy::too_many_lines)]
@@ -251,7 +292,7 @@ mod tests {
                 "empty",
                 TestCase {
                     requirement: Requirement::empty(),
-                    definition: Definition::empty_legacy_namespace(),
+                    definition: Definition::default_for_namespace(&[LogNamespace::Vector].into()),
                     errors: vec![],
                 },
             ),
@@ -259,7 +300,7 @@ mod tests {
                 "missing required meaning",
                 TestCase {
                     requirement: Requirement::empty().required_meaning("foo", Kind::any()),
-                    definition: Definition::empty_legacy_namespace(),
+                    definition: Definition::default_for_namespace(&[LogNamespace::Vector].into()),
                     errors: vec![ValidationError::MeaningMissing { identifier: "foo" }],
                 },
             ),
@@ -269,7 +310,7 @@ mod tests {
                     requirement: Requirement::empty()
                         .required_meaning("foo", Kind::any())
                         .required_meaning("bar", Kind::any()),
-                    definition: Definition::empty_legacy_namespace(),
+                    definition: Definition::default_for_namespace(&[LogNamespace::Vector].into()),
                     errors: vec![
                         ValidationError::MeaningMissing { identifier: "bar" },
                         ValidationError::MeaningMissing { identifier: "foo" },
@@ -280,7 +321,7 @@ mod tests {
                 "missing optional meaning",
                 TestCase {
                     requirement: Requirement::empty().optional_meaning("foo", Kind::any()),
-                    definition: Definition::empty_legacy_namespace(),
+                    definition: Definition::default_for_namespace(&[LogNamespace::Vector].into()),
                     errors: vec![],
                 },
             ),
@@ -290,7 +331,7 @@ mod tests {
                     requirement: Requirement::empty()
                         .optional_meaning("foo", Kind::any())
                         .required_meaning("bar", Kind::any()),
-                    definition: Definition::empty_legacy_namespace(),
+                    definition: Definition::default_for_namespace(&[LogNamespace::Vector].into()),
                     errors: vec![ValidationError::MeaningMissing { identifier: "bar" }],
                 },
             ),
@@ -298,11 +339,8 @@ mod tests {
                 "invalid required meaning kind",
                 TestCase {
                     requirement: Requirement::empty().required_meaning("foo", Kind::boolean()),
-                    definition: Definition::empty_legacy_namespace().with_event_field(
-                        &owned_value_path!("foo"),
-                        Kind::integer(),
-                        Some("foo"),
-                    ),
+                    definition: Definition::default_for_namespace(&[LogNamespace::Vector].into())
+                        .with_event_field(&owned_value_path!("foo"), Kind::integer(), Some("foo")),
                     errors: vec![ValidationError::MeaningKind {
                         identifier: "foo",
                         want: Kind::boolean(),
@@ -314,11 +352,8 @@ mod tests {
                 "invalid optional meaning kind",
                 TestCase {
                     requirement: Requirement::empty().optional_meaning("foo", Kind::boolean()),
-                    definition: Definition::empty_legacy_namespace().with_event_field(
-                        &owned_value_path!("foo"),
-                        Kind::integer(),
-                        Some("foo"),
-                    ),
+                    definition: Definition::default_for_namespace(&[LogNamespace::Vector].into())
+                        .with_event_field(&owned_value_path!("foo"), Kind::integer(), Some("foo")),
                     errors: vec![ValidationError::MeaningKind {
                         identifier: "foo",
                         want: Kind::boolean(),
@@ -330,28 +365,34 @@ mod tests {
                 "duplicate meaning pointers",
                 TestCase {
                     requirement: Requirement::empty().optional_meaning("foo", Kind::boolean()),
-                    definition: Definition::empty_legacy_namespace()
+                    definition: Definition::default_for_namespace(&[LogNamespace::Vector].into())
                         .with_event_field(&owned_value_path!("foo"), Kind::integer(), Some("foo"))
-                        .merge(Definition::empty_legacy_namespace().with_event_field(
-                            &owned_value_path!("bar"),
-                            Kind::boolean(),
-                            Some("foo"),
-                        )),
+                        .merge(
+                            Definition::default_for_namespace(&[LogNamespace::Vector].into())
+                                .with_event_field(
+                                    &owned_value_path!("bar"),
+                                    Kind::boolean(),
+                                    Some("foo"),
+                                ),
+                        ),
                     errors: vec![ValidationError::MeaningDuplicate {
                         identifier: "foo",
-                        paths: BTreeSet::from(["foo".into(), "bar".into()]),
+                        paths: BTreeSet::from([
+                            parse_target_path("foo").unwrap(),
+                            parse_target_path("bar").unwrap(),
+                        ]),
                     }],
                 },
             ),
         ]) {
-            let got = requirement.validate(&definition);
+            let got = requirement.validate(&definition, true);
             let want = if errors.is_empty() {
                 Ok(())
             } else {
                 Err(ValidationErrors(errors))
             };
 
-            assert_eq!(got, want, "{}", title);
+            assert_eq!(got, want, "{title}");
         }
     }
 }

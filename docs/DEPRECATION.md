@@ -25,6 +25,7 @@ Examples of possible deprecations in Vector:
 
 - Removal or rename of a configuration option
 - Removal or rename of a metric
+- Removal or rename of a component
 - Removal of a feature
 
 ## Lifecycle of a deprecation
@@ -72,6 +73,9 @@ When introducing a deprecation into Vector, the pull request introducing the dep
 - Add a deprecation note to the docs. Typically, this means adding `deprecation: "description of the deprecation"`
   to the `cue` data for the option or feature. If the `cue` schema does not support `deprecation` for whatever you
   are deprecating yet, add it to the schema and open an issue to have it rendered on the website.
+- For a component that is being renamed, the documentation page for the old name of the component is removed and a
+  new page is added for the new name. An alias is added so the old name will redirect to the new name. The title of
+  the new name will be appended with the text `(formerly OldName)`.
 - Add a log message to Vector that is logged at the `WARN` level starting with the word `DEPRECATION` if Vector detects
   the deprecated configuration or feature being used (when possible).
 

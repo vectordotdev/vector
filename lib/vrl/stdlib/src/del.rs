@@ -119,7 +119,7 @@ impl Function for Del {
         if let Some(target_path) = query.external_path() {
             if ctx.is_read_only_path(&target_path) {
                 return Err(vrl::function::Error::ReadOnlyMutation {
-                    context: format!("{} is read-only, and cannot be deleted", query),
+                    context: format!("{query} is read-only, and cannot be deleted"),
                 }
                 .into());
             }

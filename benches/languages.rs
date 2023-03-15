@@ -249,7 +249,7 @@ fn benchmark_configs(
 ) {
     vector::test_util::trace_init();
 
-    // only used for debug assertions so assigned to supress unused warning
+    // only used for debug assertions so assigned to suppress unused warning
     let _ = output;
 
     let num_lines = 10_000;
@@ -319,7 +319,7 @@ fn benchmark_configs(
                             for output_line in &output_lines {
                                 let actual: serde_json::map::Map<String, serde_json::Value> =
                                     serde_json::from_str(output_line).unwrap();
-                                // avoids asserting the actual == expected as the socket trasform
+                                // avoids asserting the actual == expected as the socket transform
                                 // adds dynamic keys like timestamp
                                 for (key, value) in output.iter() {
                                     assert_eq!(Some(value), actual.get(key), "for key {}", key,);

@@ -1,7 +1,7 @@
 use bytes::BytesMut;
 use codecs::{
     encoding::{Error, Framer, Serializer},
-    CharacterDelimitedEncoder, NewlineDelimitedEncoder, TextSerializer,
+    CharacterDelimitedEncoder, NewlineDelimitedEncoder, TextSerializerConfig,
 };
 use tokio_util::codec::Encoder as _;
 
@@ -24,7 +24,7 @@ impl Default for Encoder<Framer> {
     fn default() -> Self {
         Self {
             framer: NewlineDelimitedEncoder::new().into(),
-            serializer: TextSerializer::new().into(),
+            serializer: TextSerializerConfig::default().build().into(),
         }
     }
 }
@@ -33,7 +33,7 @@ impl Default for Encoder<()> {
     fn default() -> Self {
         Self {
             framer: (),
-            serializer: TextSerializer::new().into(),
+            serializer: TextSerializerConfig::default().build().into(),
         }
     }
 }
@@ -116,6 +116,7 @@ impl Encoder<Framer> {
             (Serializer::Native(_), _) => "application/octet-stream",
             (
                 Serializer::Avro(_)
+                | Serializer::Csv(_)
                 | Serializer::Gelf(_)
                 | Serializer::Json(_)
                 | Serializer::Logfmt(_)
@@ -183,7 +184,7 @@ impl tokio_util::codec::Encoder<Event> for Encoder<()> {
 #[cfg(test)]
 mod tests {
     use bytes::BufMut;
-    use codecs::{encoding::BoxedFramingError, TextSerializer};
+    use codecs::encoding::BoxedFramingError;
     use futures_util::{SinkExt, StreamExt};
     use tokio_util::codec::FramedWrite;
     use vector_core::event::LogEvent;
@@ -248,7 +249,7 @@ mod tests {
     async fn test_encode_events_sink_empty() {
         let encoder = Encoder::<Framer>::new(
             Framer::Boxed(Box::new(ParenEncoder::new())),
-            TextSerializer::new().into(),
+            TextSerializerConfig::default().build().into(),
         );
         let source = futures::stream::iter(vec![
             Event::Log(LogEvent::from("foo")),
@@ -267,7 +268,7 @@ mod tests {
     async fn test_encode_events_sink_non_empty() {
         let encoder = Encoder::<Framer>::new(
             Framer::Boxed(Box::new(ParenEncoder::new())),
-            TextSerializer::new().into(),
+            TextSerializerConfig::default().build().into(),
         );
         let source = futures::stream::iter(vec![
             Event::Log(LogEvent::from("bar")),
@@ -286,7 +287,7 @@ mod tests {
     async fn test_encode_events_sink_empty_handle_framing_error() {
         let encoder = Encoder::<Framer>::new(
             Framer::Boxed(Box::new(ErrorNthEncoder::new(ParenEncoder::new(), 1))),
-            TextSerializer::new().into(),
+            TextSerializerConfig::default().build().into(),
         );
         let source = futures::stream::iter(vec![
             Event::Log(LogEvent::from("foo")),
@@ -306,7 +307,7 @@ mod tests {
     async fn test_encode_events_sink_non_empty_handle_framing_error() {
         let encoder = Encoder::<Framer>::new(
             Framer::Boxed(Box::new(ErrorNthEncoder::new(ParenEncoder::new(), 1))),
-            TextSerializer::new().into(),
+            TextSerializerConfig::default().build().into(),
         );
         let source = futures::stream::iter(vec![
             Event::Log(LogEvent::from("bar")),

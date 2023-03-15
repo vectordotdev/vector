@@ -1,5 +1,3 @@
-#![cfg(test)]
-
 use aws_sdk_cloudwatch::types::DateTime;
 use chrono::{offset::TimeZone, Utc};
 use similar_asserts::assert_eq;
@@ -52,7 +50,9 @@ async fn encode_events_basic_counter() {
             MetricValue::Counter { value: 2.5 },
         )
         .with_timestamp(Some(
-            Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 123456789),
+            Utc.ymd(2018, 11, 14)
+                .and_hms_nano_opt(8, 9, 10, 123456789)
+                .expect("invalid timestamp"),
         )),
         Metric::new(
             "healthcheck",
@@ -61,7 +61,9 @@ async fn encode_events_basic_counter() {
         )
         .with_tags(Some(metric_tags!("region" => "local")))
         .with_timestamp(Some(
-            Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 123456789),
+            Utc.ymd(2018, 11, 14)
+                .and_hms_nano_opt(8, 9, 10, 123456789)
+                .expect("invalid timestamp"),
         )),
     ];
 

@@ -5,7 +5,7 @@ base: components: sinks: prometheus_exporter: configuration: {
 		description: """
 			Controls how acknowledgements are handled for this sink.
 
-			See [End-to-end Acknowledgements][e2e_acks] for more information on how Vector handles event acknowledgement.
+			See [End-to-end Acknowledgements][e2e_acks] for more information on how event acknowledgement is handled.
 
 			[e2e_acks]: https://vector.dev/docs/about/under-the-hood/architecture/end-to-end-acknowledgements/
 			"""
@@ -36,7 +36,7 @@ base: components: sinks: prometheus_exporter: configuration: {
 		required: false
 		type: string: {
 			default: "0.0.0.0:9598"
-			syntax:  "literal"
+			examples: ["192.160.0.10:9598"]
 		}
 	}
 	auth: {
@@ -49,37 +49,40 @@ base: components: sinks: prometheus_exporter: configuration: {
 		required: false
 		type: object: options: {
 			password: {
-				description:   "The password to send."
+				description:   "The basic authentication password."
 				relevant_when: "strategy = \"basic\""
 				required:      true
-				type: string: syntax: "literal"
+				type: string: examples: ["${PASSWORD}", "password"]
 			}
 			strategy: {
-				required: true
+				description: "The authentication strategy to use."
+				required:    true
 				type: string: enum: {
 					basic: """
 						Basic authentication.
 
-						The username and password are concatenated and encoded via base64.
+						The username and password are concatenated and encoded via [base64][base64].
+
+						[base64]: https://en.wikipedia.org/wiki/Base64
 						"""
 					bearer: """
 						Bearer authentication.
 
-						A bearer token (OAuth2, JWT, etc) is passed as-is.
+						The bearer token value (OAuth2, JWT, etc) is passed as-is.
 						"""
 				}
 			}
 			token: {
-				description:   "The bearer token to send."
+				description:   "The bearer authentication token."
 				relevant_when: "strategy = \"bearer\""
 				required:      true
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			user: {
-				description:   "The username to send."
+				description:   "The basic authentication username."
 				relevant_when: "strategy = \"basic\""
 				required:      true
-				type: string: syntax: "literal"
+				type: string: examples: ["${USERNAME}", "username"]
 			}
 		}
 	}
@@ -92,7 +95,7 @@ base: components: sinks: prometheus_exporter: configuration: {
 		required: false
 		type: array: {
 			default: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0]
-			items: type: number: {}
+			items: type: float: {}
 		}
 	}
 	default_namespace: {
@@ -107,14 +110,14 @@ base: components: sinks: prometheus_exporter: configuration: {
 			[prom_naming_docs]: https://prometheus.io/docs/practices/naming/#metric-names
 			"""
 		required: false
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	distributions_as_summaries: {
 		description: """
 			Whether or not to render [distributions][dist_metric_docs] as an [aggregated histogram][prom_agg_hist_docs] or  [aggregated summary][prom_agg_summ_docs].
 
-			While Vector supports distributions as a lossless way to represent a set of samples for a
-			metric, Prometheus clients (the application being scraped, which is this sink) must
+			While distributions as a lossless way to represent a set of samples for a
+			metric is supported, Prometheus clients (the application being scraped, which is this sink) must
 			aggregate locally into either an aggregated histogram or aggregated summary.
 
 			[dist_metric_docs]: https://vector.dev/docs/about/under-the-hood/architecture/data-model/metric/#distribution
@@ -148,7 +151,7 @@ base: components: sinks: prometheus_exporter: configuration: {
 		required: false
 		type: array: {
 			default: [0.5, 0.75, 0.9, 0.95, 0.99]
-			items: type: number: {}
+			items: type: float: {}
 		}
 	}
 	suppress_timestamp: {
@@ -174,16 +177,16 @@ base: components: sinks: prometheus_exporter: configuration: {
 					they are defined.
 					"""
 				required: false
-				type: array: items: type: string: syntax: "literal"
+				type: array: items: type: string: examples: ["h2"]
 			}
 			ca_file: {
 				description: """
 					Absolute path to an additional CA certificate file.
 
-					The certficate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
+					The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: examples: ["/path/to/certificate_authority.crt"]
 			}
 			crt_file: {
 				description: """
@@ -195,7 +198,7 @@ base: components: sinks: prometheus_exporter: configuration: {
 					If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: examples: ["/path/to/host_certificate.crt"]
 			}
 			enabled: {
 				description: """
@@ -214,7 +217,7 @@ base: components: sinks: prometheus_exporter: configuration: {
 					The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: examples: ["/path/to/host_certificate.key"]
 			}
 			key_pass: {
 				description: """
@@ -223,7 +226,7 @@ base: components: sinks: prometheus_exporter: configuration: {
 					This has no effect unless `key_file` is set.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: examples: ["${KEY_PASS_ENV_VAR}", "PassWord1"]
 			}
 			verify_certificate: {
 				description: """

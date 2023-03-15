@@ -13,10 +13,10 @@ use tokio::{
     sync::watch,
     time::{interval, sleep_until},
 };
-use vector_core::{
-    internal_event::{BytesSent, EventsSent},
-    ByteSizeOf,
+use vector_common::internal_event::{
+    ByteSize, BytesSent, CountByteSize, EventsSent, InternalEventHandle as _, Output, Protocol,
 };
+use vector_core::EstimatedJsonEncodedSizeOf;
 
 use crate::{
     event::{EventArray, EventContainer},
@@ -50,9 +50,11 @@ impl StreamSink<EventArray> for BlackholeSink {
         let total_events = Arc::clone(&self.total_events);
         let total_raw_bytes = Arc::clone(&self.total_raw_bytes);
         let (shutdown, mut tripwire) = watch::channel(());
+        let events_sent = register!(EventsSent::from(Output(None)));
+        let bytes_sent = register!(BytesSent::from(Protocol("blackhole".into())));
 
-        if self.config.print_interval_secs > 0 {
-            let interval_dur = Duration::from_secs(self.config.print_interval_secs);
+        if self.config.print_interval_secs.as_secs() > 0 {
+            let interval_dur = self.config.print_interval_secs;
             tokio::spawn(async move {
                 let mut print_interval = interval(interval_dur);
                 loop {
@@ -85,23 +87,15 @@ impl StreamSink<EventArray> for BlackholeSink {
                 self.last = Some(until);
             }
 
-            let message_len = events.size_of();
+            let message_len = events.estimated_json_encoded_size_of();
 
             let _ = self.total_events.fetch_add(events.len(), Ordering::AcqRel);
             let _ = self
                 .total_raw_bytes
                 .fetch_add(message_len, Ordering::AcqRel);
 
-            emit!(EventsSent {
-                count: events.len(),
-                byte_size: message_len,
-                output: None,
-            });
-
-            emit!(BytesSent {
-                byte_size: message_len,
-                protocol: "blackhole".to_string().into(),
-            });
+            events_sent.emit(CountByteSize(events.len(), message_len));
+            bytes_sent.emit(ByteSize(message_len));
         }
 
         // Notify the reporting task to shutdown.

@@ -1,13 +1,13 @@
 mod request_limiter;
 
-use std::collections::BTreeMap;
-use std::net::SocketAddr;
-use std::{io, mem::drop, time::Duration};
+use std::{collections::BTreeMap, io, mem::drop, net::SocketAddr, time::Duration};
 
 use bytes::Bytes;
 use codecs::StreamDecodingError;
 use futures::{future::BoxFuture, FutureExt, StreamExt};
+use futures_util::future::OptionFuture;
 use listenfd::ListenFd;
+use lookup::{path, OwnedValuePath};
 use smallvec::SmallVec;
 use socket2::SockRef;
 use tokio::{
@@ -18,7 +18,10 @@ use tokio::{
 use tokio_util::codec::{Decoder, FramedRead};
 use tracing::Instrument;
 use vector_common::finalization::AddBatchNotifier;
-use vector_core::{config::SourceAcknowledgementsConfig, ByteSizeOf};
+use vector_core::{
+    config::{LegacyKey, LogNamespace, SourceAcknowledgementsConfig},
+    EstimatedJsonEncodedSizeOf,
+};
 
 use self::request_limiter::RequestLimiter;
 use super::SocketListenAddr;
@@ -106,13 +109,16 @@ where
         self,
         addr: SocketListenAddr,
         keepalive: Option<TcpKeepaliveConfig>,
-        shutdown_timeout_secs: u64,
+        shutdown_timeout_secs: Duration,
         tls: MaybeTlsSettings,
-        tls_client_metadata_key: Option<String>,
+        tls_client_metadata_key: Option<OwnedValuePath>,
         receive_buffer_bytes: Option<usize>,
+        max_connection_duration_secs: Option<u64>,
         cx: SourceContext,
         acknowledgements: SourceAcknowledgementsConfig,
         max_connections: Option<u32>,
+        source_name: &'static str,
+        log_namespace: LogNamespace,
     ) -> crate::Result<crate::sources::Source> {
         let acknowledgements = cx.do_acknowledgements(acknowledgements);
 
@@ -138,7 +144,7 @@ where
             let tripwire = cx.shutdown.clone();
             let tripwire = async move {
                 let _ = tripwire.await;
-                sleep(Duration::from_secs(shutdown_timeout_secs)).await;
+                sleep(shutdown_timeout_secs).await;
             }
             .shared();
 
@@ -195,6 +201,7 @@ where
                                 socket,
                                 keepalive,
                                 receive_buffer_bytes,
+                                max_connection_duration_secs,
                                 source,
                                 tripwire,
                                 peer_addr,
@@ -202,6 +209,8 @@ where
                                 acknowledgements,
                                 request_limiter,
                                 tls_client_metadata_key.clone(),
+                                source_name,
+                                log_namespace,
                             );
 
                             tokio::spawn(
@@ -226,13 +235,16 @@ async fn handle_stream<T>(
     mut socket: MaybeTlsIncomingStream<TcpStream>,
     keepalive: Option<TcpKeepaliveConfig>,
     receive_buffer_bytes: Option<usize>,
+    max_connection_duration_secs: Option<u64>,
     source: T,
     mut tripwire: BoxFuture<'static, ()>,
     peer_addr: SocketAddr,
     mut out: SourceSender,
     acknowledgements: bool,
     request_limiter: RequestLimiter,
-    tls_client_metadata_key: Option<String>,
+    tls_client_metadata_key: Option<OwnedValuePath>,
+    source_name: &'static str,
+    log_namespace: LogNamespace,
 ) where
     <<T as TcpSource>::Decoder as tokio_util::codec::Decoder>::Item: std::marker::Send,
     T: TcpSource,
@@ -277,9 +289,22 @@ async fn handle_stream<T>(
     let reader = FramedRead::new(socket, source.decoder());
     let mut reader = ReadyFrames::new(reader);
 
+    let connection_close_timeout = OptionFuture::from(
+        max_connection_duration_secs
+            .map(|timeout_secs| tokio::time::sleep(Duration::from_secs(timeout_secs))),
+    );
+
+    tokio::pin!(connection_close_timeout);
+
     loop {
         let mut permit = tokio::select! {
             _ = &mut tripwire => break,
+            Some(_) = &mut connection_close_timeout  => {
+                if close_socket(reader.get_ref().get_ref().get_ref()) {
+                    break;
+                }
+                None
+            },
             _ = &mut shutdown_signal => {
                 if close_socket(reader.get_ref().get_ref().get_ref()) {
                     break;
@@ -314,13 +339,12 @@ async fn handle_stream<T>(
                         let acker = source.build_acker(&frames);
                         let (batch, receiver) = BatchNotifier::maybe_new_with_receiver(acknowledgements);
 
-
                         let mut events = frames.into_iter().flat_map(Into::into).collect::<Vec<Event>>();
                         let count = events.len();
 
                         emit!(SocketEventsReceived {
                             mode: SocketMode::Tcp,
-                            byte_size: events.size_of(),
+                            byte_size: events.estimated_json_encoded_size_of(),
                             count,
                         });
 
@@ -337,17 +361,22 @@ async fn handle_stream<T>(
                             }
                         }
 
-                        if let Some(tls_client_metadata_key) = &tls_client_metadata_key {
-                            if let Some(certificate_metadata) = &certificate_metadata {
-                                let mut metadata: BTreeMap<String, value::Value> = BTreeMap::new();
-                                metadata.insert("subject".to_string(), certificate_metadata.subject().into());
-                                for event in &mut events {
-                                    let log = event.as_mut_log();
-                                    log.insert(&tls_client_metadata_key[..], value::Value::from(metadata.clone()));
-                                }
+
+                        if let Some(certificate_metadata) = &certificate_metadata {
+                            let mut metadata: BTreeMap<String, value::Value> = BTreeMap::new();
+                            metadata.insert("subject".to_string(), certificate_metadata.subject().into());
+                            for event in &mut events {
+                                let log = event.as_mut_log();
+
+                                log_namespace.insert_source_metadata(
+                                    source_name,
+                                    log,
+                                    tls_client_metadata_key.as_ref().map(LegacyKey::Overwrite),
+                                    path!("tls_client_metadata"),
+                                    metadata.clone()
+                                );
                             }
                         }
-
 
                         source.handle_events(&mut events, peer_addr);
                         match out.send_batch(events).await {

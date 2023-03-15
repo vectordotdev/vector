@@ -24,12 +24,19 @@ use vector_core::config::DataType;
 #[derive(Clone, Debug)]
 pub struct PulsarSinkConfig {
     /// The endpoint to which the Pulsar client should connect to.
+    ///
+    /// The endpoint should specify the pulsar protocol and port.
     #[serde(alias = "address")]
-    pub endpoint: String,
+    #[configurable(metadata(docs::examples = "pulsar://127.0.0.1:6650"))]
+    endpoint: String,
 
     /// The Pulsar topic name to write events to.
-    #[configurable(metadata(templateable))]
-    pub topic: String,
+    #[configurable(metadata(docs::examples = "topic-1234"))]
+    topic: String,
+
+    /// The name of the producer. If not specified, the default name assigned by Pulsar will be used.
+    #[configurable(metadata(docs::examples = "producer-name"))]
+    producer_name: Option<String>,
 
     /// The log field name or tags key to use for the topic key.
     ///
@@ -43,12 +50,14 @@ pub struct PulsarSinkConfig {
     /// If omitted, no properties will be written.
     pub properties_key: Option<String>,
 
-    /// Determines the batch size.
-    ///
-    /// Defaults to 1000.
+    /// Log field to use as Pulsar message key.
+    #[configurable(metadata(docs::examples = "message"))]
+    #[configurable(metadata(docs::examples = "my_field"))]
+    partition_key_field: Option<String>,
+
     #[configurable(derived)]
     #[serde(default)]
-    pub batch_size: Option<u32>,
+    batch: BatchConfig,
 
     #[configurable(derived)]
     #[serde(default)]
@@ -73,71 +82,79 @@ pub struct PulsarSinkConfig {
     pub acknowledgements: AcknowledgementsConfig,
 }
 
-/// Identifies the compression options that are available within Pulsar.
-#[configurable_component]
-#[derive(Clone, Debug)]
-pub enum PulsarCompression {
-    /// No compression.
-    None,
-
-    /// [LZ4][lz4] compression.
-    ///
-    /// [lz4]: https://lz4.github.io/lz4/
-    Lz4,
-
-    /// [Zlib][zlib] compression.
-    ///
-    /// [zlib]: https://www.zlib.net
-    Zlib,
-
-    /// [Zstd][zstd] compression.
-    ///
-    /// [zstd]: https://zstd.net
-    Zstd,
-
-    /// [Snappy][snappy] compression.
-    ///
-    /// [snappy]: https://google.github.io/snappy/
-    Snappy,
-}
-
 /// Authentication configuration.
 #[configurable_component]
 #[derive(Clone, Debug)]
-pub struct AuthConfig {
+struct AuthConfig {
     /// Basic authentication name/username.
     ///
     /// This can be used either for basic authentication (username/password) or JWT authentication.
     /// When used for JWT, the value should be `token`.
+    #[configurable(metadata(docs::examples = "${PULSAR_NAME}"))]
+    #[configurable(metadata(docs::examples = "name123"))]
     name: Option<String>,
 
     /// Basic authentication password/token.
     ///
     /// This can be used either for basic authentication (username/password) or JWT authentication.
     /// When used for JWT, the value should be the signed JWT, in the compact representation.
-    token: Option<String>,
+    #[configurable(metadata(docs::examples = "${PULSAR_TOKEN}"))]
+    #[configurable(metadata(docs::examples = "123456789"))]
+    token: Option<SensitiveString>,
 
     #[configurable(derived)]
     oauth2: Option<OAuth2Config>,
 }
 
-/// OAuth2-specific authenticatgion configuration.
+/// OAuth2-specific authentication configuration.
 #[configurable_component]
 #[derive(Clone, Debug)]
 pub struct OAuth2Config {
     /// The issuer URL.
+    #[configurable(metadata(docs::examples = "${OAUTH2_ISSUER_URL}"))]
+    #[configurable(metadata(docs::examples = "https://oauth2.issuer"))]
     issuer_url: String,
 
     /// The credentials URL.
     ///
     /// A data URL is also supported.
+    #[configurable(metadata(docs::examples = "{OAUTH2_CREDENTIALS_URL}"))]
+    #[configurable(metadata(docs::examples = "file:///oauth2_credentials"))]
+    #[configurable(metadata(docs::examples = "data:application/json;base64,cHVsc2FyCg=="))]
     credentials_url: String,
 
     /// The OAuth2 audience.
+    #[configurable(metadata(docs::examples = "${OAUTH2_AUDIENCE}"))]
+    #[configurable(metadata(docs::examples = "pulsar"))]
     audience: Option<String>,
 
     /// The OAuth2 scope.
+    #[configurable(metadata(docs::examples = "${OAUTH2_SCOPE}"))]
+    #[configurable(metadata(docs::examples = "admin"))]
     scope: Option<String>,
+}
+
+/// Supported compression types for Pulsar.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Derivative)]
+#[derivative(Default)]
+#[serde(rename_all = "lowercase")]
+pub enum PulsarCompression {
+    /// No compression.
+    #[derivative(Default)]
+    None,
+
+    /// LZ4.
+    Lz4,
+
+    /// Zlib.
+    Zlib,
+
+    /// Zstandard.
+    Zstd,
+
+    /// Snappy.
+    Snappy,
 }
 
 impl PulsarSinkConfig {

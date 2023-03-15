@@ -7,6 +7,7 @@ components: sinks: datadog_traces: {
 
 	features: {
 		acknowledgements: true
+		auto_generated:   true
 		healthcheck: enabled: true
 		send: {
 			batch: {
@@ -64,11 +65,7 @@ components: sinks: datadog_traces: {
 		notices: []
 	}
 
-	configuration: {
-		default_api_key: sinks._datadog.configuration.default_api_key
-		endpoint:        sinks._datadog.configuration.endpoint
-		site:            sinks._datadog.configuration.site
-	}
+	configuration: base.components.sinks.datadog_traces.configuration
 
 	input: {
 		logs:    false

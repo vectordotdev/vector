@@ -4,6 +4,7 @@ components: sources: aws_s3: components._aws & {
 	title: "AWS S3"
 
 	features: {
+		auto_generated:   true
 		acknowledgements: true
 		multiline: enabled: true
 		collect: {
@@ -44,75 +45,8 @@ components: sources: aws_s3: components._aws & {
 		platform_name: null
 	}
 
-	configuration: {
-		acknowledgements: configuration._source_acknowledgements
-		strategy: {
-			common:      false
-			description: "The strategy to use to consume objects from AWS S3."
-			required:    false
-			type: string: {
-				default: "sqs"
-				enum: {
-					sqs: "Consume S3 objects by polling for bucket notifications sent to an [AWS SQS queue](\(urls.aws_sqs))."
-				}
-			}
-		}
-		compression: {
-			common:      false
-			description: "The compression format of the S3 objects.."
-			required:    false
-			type: string: {
-				default: "text"
-				enum: {
-					auto: "Vector will try to determine the compression format of the object from its: `Content-Encoding` metadata, `Content-Type` metadata, and key suffix (e.g. `.gz`). It will fallback to 'none' if it cannot determine the compression."
-					gzip: "GZIP format."
-					zstd: "ZSTD format."
-					none: "Uncompressed."
-				}
-			}
-		}
-		sqs: {
-			common:      true
-			description: "SQS strategy options. Required if strategy=`sqs`."
-			required:    false
-			type: object: {
-				examples: []
-				options: {
-					poll_secs: {
-						common:      true
-						description: "How long to wait when polling SQS for new messages."
-						required:    false
-						type: uint: {
-							default: 15
-							unit:    "seconds"
-						}
-					}
-					visibility_timeout_secs: {
-						common:      false
-						description: "The visibility timeout to use for messages in secords. This controls how long a message is left unavailable when a Vector receives it. If a `vector` does not delete the message before the timeout expires, it will be made reavailable for another consumer; this can happen if, for example, the `vector` process crashes."
-						required:    false
-						warnings: ["Should be set higher than the length of time it takes to process an individual message to avoid that message being reprocessed."]
-						type: uint: {
-							default: 300
-							unit:    "seconds"
-						}
-					}
-					delete_message: {
-						common:      true
-						description: "Whether to delete the message once Vector processes it. It can be useful to set this to `false` to debug or during initial Vector setup."
-						required:    false
-						type: bool: default: true
-					}
-					queue_url: {
-						description: "The URL of the SQS queue to receive bucket notifications from."
-						required:    true
-						type: string: {
-							examples: ["https://sqs.us-east-2.amazonaws.com/123456789012/MyQueue"]
-						}
-					}
-				}
-			}
-		}
+	configuration: base.components.sources.aws_s3.configuration & {
+		_aws_include: false
 	}
 
 	output: logs: object: {
@@ -217,12 +151,11 @@ components: sources: aws_s3: components._aws & {
 
 			policies: [
 				{
-					_action:       "ReceiveMessage"
-					required_when: "[`strategy`](#strategy) is set to `sqs`"
+					_action: "ReceiveMessage"
 				},
 				{
 					_action:       "DeleteMessage"
-					required_when: "[`strategy`](#strategy) is set to `sqs` and [`delete_message`](#sqs.delete_message) is set to `true`"
+					required_when: "[`delete_message`](#sqs.delete_message) is set to `true`"
 				},
 			]
 		},
