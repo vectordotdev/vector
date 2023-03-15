@@ -1,4 +1,4 @@
-//! This crate contains all of the logic for paths.
+//! This module contains all of the logic for paths.
 //!
 //! Paths can be thought of as similar to file paths (in an operating system) pointing
 //! to specific files inside of a directory.
@@ -44,8 +44,8 @@
 //! [OwnedValuePath] and [OwnedTargetPath] are pre-parsed paths. That means that accessing fields
 //! using an owned path is very fast. There is an upfront cost however, since owned paths are parsed
 //! when they are created, and the segments are heap allocated. Owned paths should be preferred
-//! when they can be created when performance isn't as much of a concern (e.g. startup time)
-//! and it can be stored to use multiple times.
+//! if they can be created when performance isn't as much of a concern (e.g. startup time)
+//! and they can be stored for re-use.
 //! Owned paths tend to be easier to work with since you can directly access / manipulate the
 //! segments that make up the path.
 //!
@@ -65,7 +65,7 @@
 //! be used as a path. This use is discouraged, and may be removed in the future. It mostly
 //! exists for backwards compatibility in places where String paths are used instead of owned paths.
 //! Using string paths is slightly slower than using an owned path (it's still very fast),
-//! but it's easy to introduce bugs since some type information is missing, such as whether it's a
+//! but it's easy to introduce bugs since some compile-time type information is missing, such as whether it's a
 //! target vs value path, or if the entire string is meant to be treated as a single segment vs
 //! being parsed as a path.
 //!
