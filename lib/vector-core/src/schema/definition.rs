@@ -415,32 +415,31 @@ impl Definition {
         target_path: OwnedTargetPath,
         meaning: &str,
     ) -> Result<(), &'static str> {
-        // Ensure the path exists in the collection.
         match target_path.prefix {
-            PathPrefix::Event => {
+            PathPrefix::Event
                 if !self
                     .event_kind
                     .at_path(&target_path.path)
-                    .contains_any_defined()
-                {
-                    return Err("meaning must point to a valid path");
-                }
+                    .contains_any_defined() =>
+            {
+                Err("meaning must point to a valid path")
             }
-            PathPrefix::Metadata => {
+
+            PathPrefix::Metadata
                 if !self
                     .metadata_kind
                     .at_path(&target_path.path)
-                    .contains_any_defined()
-                {
-                    return Err("meaning must point to a valid path");
-                }
+                    .contains_any_defined() =>
+            {
+                Err("meaning must point to a valid path")
+            }
+
+            _ => {
+                self.meaning
+                    .insert(meaning.to_owned(), MeaningPointer::Valid(target_path));
+                Ok(())
             }
         }
-
-        self.meaning
-            .insert(meaning.to_owned(), MeaningPointer::Valid(target_path));
-
-        Ok(())
     }
 
     /// Set the kind for all unknown fields.

@@ -108,22 +108,18 @@ pub struct Output {
     // inherent blocker to support other types as well, but it'll require additional work to add
     // the relevant schemas, and store them separately in this type.
     ///
-    /// TODO These comments are now all wrong!
+    /// *sources* if the output type is `Log` there should be a single definition. `Metric` types should
+    /// have no definition defined.
     ///
-    /// The `None` variant of a schema definition has two distinct meanings for a source component
-    /// versus a transform component:
-    ///
-    /// For *sources*, a `None` schema is identical to a `Some(Definition::source_default())`.
-    ///
-    /// For a *transform*, a schema [`schema::Definition`] is required if `Datatype` is Log.
+    /// For a *transforms* if `Datatype` is Log, at least one definition should be output. If the
+    /// transform has multiple connected sources, it is possible to have multiple output definitions -
+    /// one for each input.
     pub log_schema_definitions: Vec<schema::Definition>,
 }
 
 impl Output {
-    /// Create a default `Output` of the given data type.
-    ///
-    /// A default output is one without a port identifier (i.e. not a named output) and the default
-    /// output consumers will receive if they declare the component itself as an input.
+    /// Create an `Output` of the given data type that contains a single output `Definition`.
+    /// Designed for use in log sources.
     #[must_use]
     pub fn source_logs(ty: DataType, schema_definition: schema::Definition) -> Self {
         Self {
@@ -133,6 +129,8 @@ impl Output {
         }
     }
 
+    /// Create an `Output` of the given data type that contains no output `Definition`s.
+    /// Designed for use in metrics sources.
     #[must_use]
     pub fn source_metrics(ty: DataType) -> Self {
         Self {
@@ -142,6 +140,8 @@ impl Output {
         }
     }
 
+    /// Create an `Output` of the given data type that contains no output `Definition`s.
+    /// Designed for use in trace sources.
     #[must_use]
     pub fn source_traces(ty: DataType) -> Self {
         Self {
@@ -151,6 +151,8 @@ impl Output {
         }
     }
 
+    /// Create an `Output` of the given data type that contains multiple `Definition`s.
+    /// Designed for use in transforms.
     #[must_use]
     pub fn transform(ty: DataType, schema_definitions: Vec<schema::Definition>) -> Self {
         Self {
@@ -158,20 +160,6 @@ impl Output {
             ty,
             log_schema_definitions: schema_definitions,
         }
-    }
-
-    /// Set a single schema definition for this `Output`.
-    #[must_use]
-    pub fn with_schema_definition(mut self, schema_definition: schema::Definition) -> Self {
-        self.log_schema_definitions = vec![schema_definition];
-        self
-    }
-
-    /// Set the schema definitions for this `Output`.
-    #[must_use]
-    pub fn with_schema_definitions(mut self, schema_definition: Vec<schema::Definition>) -> Self {
-        self.log_schema_definitions = schema_definition;
-        self
     }
 
     /// Set the port name for this `Output`.
