@@ -183,8 +183,13 @@ fn main() {
         .expect("Cargo-provided environment variables should always exist!");
     let build_desc = tracker.get_env_var("VECTOR_BUILD_DESC");
 
-    // get the git short hash of the HEAD
-    let git_short_hash = git_short_hash();
+    // Get the git short hash of the HEAD.
+    // In CI build workflows this will have been exported already so that we don't run into
+    // git permission issues when trying to determine the sha while running within a docker
+    // container during the packaging steps.
+    let git_short_hash = tracker
+        .get_env_var("VECTOR_GIT_SHA")
+        .unwrap_or(git_short_hash());
 
     // Gather up the constants and write them out to our build constants file.
     let mut constants = BuildConstants::new();
