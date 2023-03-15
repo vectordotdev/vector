@@ -69,13 +69,14 @@ impl EventsSent {
                 let output = output.clone();
 
                 move |(id, key)| {
-                let handle = register(Self::from((
-                    Output(output.clone()),
-                    Source(Some(key.into_id().into())),
-                )));
+                    let handle = register(Self::from((
+                        Output(output.clone()),
+                        Source(Some(key.into_id().into())),
+                    )));
 
-                (Some(id), handle)
-            }})
+                    (Some(id), handle)
+                }
+            })
             .chain(std::iter::once((
                 None,
                 register(Self::from((Output(None), Source(output)))),
