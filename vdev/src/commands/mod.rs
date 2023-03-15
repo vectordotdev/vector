@@ -72,7 +72,6 @@ pub struct Cli {
 cli_commands! {
     mod build,
     mod check,
-    mod compile_vrl_wasm,
     mod complete,
     mod config,
     mod exec,
