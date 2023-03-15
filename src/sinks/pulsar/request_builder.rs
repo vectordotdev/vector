@@ -36,8 +36,7 @@ impl RequestBuilder<PulsarEvent> for PulsarRequestBuilder {
     type Error = io::Error;
 
     fn compression(&self) -> Compression {
-        // we don't use this compression from vector as Pulsar supports more
-        // compression formats
+        // Compression is handled by the pulsar crate through the producer settings.
         Compression::None
     }
 
