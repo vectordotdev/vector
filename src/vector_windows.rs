@@ -367,7 +367,7 @@ pub fn run() -> Result<()> {
 
 fn run_service(_arguments: Vec<OsString>) -> Result<()> {
     match Application::prepare() {
-        Ok(app) => {
+        Ok((runtime, app)) => {
             let signal_tx = app.config.signal_handler.clone_tx();
             let event_handler = move |control_event| -> ServiceControlHandlerResult {
                 match control_event {
@@ -398,7 +398,7 @@ fn run_service(_arguments: Vec<OsString>) -> Result<()> {
                 process_id: None,
             })?;
 
-            app.run();
+            runtime.block_on(app.run());
 
             // Tell the system that service has stopped.
             status_handle.set_service_status(ServiceStatus {
