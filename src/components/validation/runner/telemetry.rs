@@ -114,16 +114,15 @@ impl Telemetry {
                         let current_time = chrono::Utc::now();
 
                         loop {
-                        match &rx.recv().await {
-                            None => break 'outer,
-                            Some(telemetry_event) => {
+                            match &rx.recv().await {
+                                None => break 'outer,
+                                Some(telemetry_event) => {
                                     telemetry_events.push(telemetry_event.clone());
-
                                     if let Event::Metric(metric) = telemetry_event {
                                         if let Some(tags) = metric.tags() {
                                             if metric.name() == INTERNAL_METRICS_SHUTDOWN_EVENT &&
-                                                tags.get("component_name") == Some(INTERNAL_LOGS_KEY) &&
-                                                metric.data().timestamp().unwrap() > &current_time {
+                                            tags.get("component_name") == Some(INTERNAL_LOGS_KEY) &&
+                                            metric.data().timestamp().unwrap() > &current_time {
                                                 debug!("Telemetry: processed one component_received_events_total event.");
 
                                                 events_seen += 1;

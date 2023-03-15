@@ -18,7 +18,7 @@ use super::{
     ComponentType, TestCaseExpectation, TestEvent, ValidationConfiguration, Validator,
 };
 
-pub use self::config::*;
+pub use self::config::TopologyBuilder;
 
 /// Runner input mechanism.
 ///
