@@ -55,7 +55,11 @@ mod filter;
 mod fluent;
 #[cfg(feature = "sources-gcp_pubsub")]
 mod gcp_pubsub;
-#[cfg(any(feature = "sources-vector", feature = "sources-opentelemetry"))]
+#[cfg(any(
+    feature = "sources-vector",
+    feature = "sources-opentelemetry",
+    feature = "sources-envoy_als"
+))]
 mod grpc;
 mod heartbeat;
 #[cfg(feature = "sources-host_metrics")]
@@ -190,7 +194,11 @@ pub(crate) use self::filter::*;
 pub(crate) use self::fluent::*;
 #[cfg(feature = "sources-gcp_pubsub")]
 pub(crate) use self::gcp_pubsub::*;
-#[cfg(any(feature = "sources-vector", feature = "sources-opentelemetry"))]
+#[cfg(any(
+    feature = "sources-vector",
+    feature = "sources-opentelemetry",
+    feature = "sources-envoy_als"
+))]
 pub(crate) use self::grpc::*;
 #[cfg(feature = "sources-host_metrics")]
 pub(crate) use self::host_metrics::*;

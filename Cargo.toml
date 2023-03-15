@@ -91,6 +91,7 @@ members = [
   "lib/datadog/search-syntax",
   "lib/dnsmsg-parser",
   "lib/enrichment",
+  "lib/envoy-proto",
   "lib/fakedata",
   "lib/file-source",
   "lib/k8s-e2e-tests",
@@ -129,6 +130,7 @@ members = [
 codecs = { path = "lib/codecs", default-features = false }
 dnsmsg-parser = { path = "lib/dnsmsg-parser", optional = true }
 enrichment = { path = "lib/enrichment" }
+envoy-proto = { path = "lib/envoy-proto", optional = true }
 fakedata = { path = "lib/fakedata", optional = true }
 file-source = { path = "lib/file-source", optional = true }
 lookup = { package = "vector-lookup", path = "lib/vector-lookup" }
@@ -474,6 +476,7 @@ sources-logs = [
   "sources-datadog_agent",
   "sources-demo_logs",
   "sources-docker_logs",
+  "sources-envoy_als",
   "sources-exec",
   "sources-file",
   "sources-fluent",
@@ -521,6 +524,7 @@ sources-demo_logs = ["dep:fakedata"]
 sources-dnstap = ["dep:base64", "dep:trust-dns-proto", "dep:dnsmsg-parser", "protobuf-build"]
 sources-docker_logs = ["docker"]
 sources-eventstoredb_metrics = []
+sources-envoy_als = ["dep:envoy-proto", "dep:prost-types", "sources-vector", "dep:tonic"]
 sources-exec = []
 sources-file = ["dep:file-source"]
 sources-file-descriptor = ["tokio-util/io"]
@@ -737,6 +741,7 @@ all-integration-tests = [
   "datadog-metrics-integration-tests",
   "datadog-traces-integration-tests",
   "docker-logs-integration-tests",
+  "envoy-als-integration-tests",
   "es-integration-tests",
   "eventstoredb_metrics-integration-tests",
   "fluent-integration-tests",
@@ -797,6 +802,7 @@ datadog-logs-integration-tests = ["sinks-datadog_logs"]
 datadog-metrics-integration-tests = ["sinks-datadog_metrics"]
 datadog-traces-integration-tests = ["sources-datadog_agent", "sinks-datadog_traces", "axum/tokio"]
 docker-logs-integration-tests = ["sources-docker_logs", "unix"]
+envoy-als-integration-tests = ["sources-envoy_als"]
 es-integration-tests = ["sinks-elasticsearch"]
 eventstoredb_metrics-integration-tests = ["sources-eventstoredb_metrics"]
 fluent-integration-tests = ["docker", "sources-fluent"]

@@ -1,0 +1,47 @@
+version: "3"
+
+services:
+  envoy:
+    image: docker.io/envoyproxy/envoy:v1.24.1
+    networks:
+      - backend
+    volumes:
+      - ${PWD}/tests/data/envoy/envoy.yaml:/etc/envoy/envoy.yaml
+  runner:
+    build:
+      context: ${PWD}
+      dockerfile: scripts/integration/Dockerfile
+      args:
+        - RUST_VERSION=${RUST_VERSION}
+    working_dir: /code
+    hostname: runner
+    networks:
+      - backend
+    command:
+      - "cargo"
+      - "nextest"
+      - "run"
+      - "--no-fail-fast"
+      - "--no-default-features"
+      - "--features"
+      - "envoy-als-integration-tests"
+      - "--lib"
+      - "sources::envoy_als::integration_tests::"
+    environment:
+      - ENVOY_URL=http://envoy:9000
+      - ENVOY_HEALTH_URL=http://envoy:9001
+    depends_on:
+      - envoy
+    volumes:
+      - ${PWD}:/code
+      - target:/code/target
+      - cargogit:/usr/local/cargo/git
+      - cargoregistry:/usr/local/cargo/registry
+
+networks:
+  backend: {}
+
+volumes:
+  target: {}
+  cargogit: {}
+  cargoregistry: {}

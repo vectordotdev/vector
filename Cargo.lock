@@ -3015,6 +3015,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "envoy-proto"
+version = "0.0.0"
+dependencies = [
+ "chrono",
+ "ordered-float 3.4.0",
+ "prost",
+ "prost-build",
+ "prost-types",
+ "tonic",
+ "tonic-build",
+ "value",
+ "vector-core",
+]
+
+[[package]]
 name = "erased-serde"
 version = "0.3.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9384,6 +9399,7 @@ dependencies = [
  "encoding_rs",
  "enrichment",
  "enum_dispatch",
+ "envoy-proto",
  "exitcode",
  "fakedata",
  "file-source",
