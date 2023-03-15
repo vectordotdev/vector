@@ -16,6 +16,7 @@ use pulsar::{
     TokioExecutor,
 };
 use snafu::ResultExt;
+use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
 use vector_core::config::DataType;
 
@@ -32,7 +33,7 @@ pub struct PulsarSinkConfig {
 
     /// The Pulsar topic name to write events to.
     #[configurable(metadata(docs::examples = "topic-1234"))]
-    topic: String,
+    pub(crate) topic: String,
 
     /// The name of the producer. If not specified, the default name assigned by Pulsar will be used.
     #[configurable(metadata(docs::examples = "producer-name"))]
@@ -67,7 +68,7 @@ pub struct PulsarSinkConfig {
     pub encoding: EncodingConfig,
 
     #[configurable(derived)]
-    pub auth: Option<AuthConfig>,
+    auth: Option<AuthConfig>,
 
     #[configurable(derived)]
     #[serde(default)]
@@ -80,6 +81,16 @@ pub struct PulsarSinkConfig {
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     pub acknowledgements: AcknowledgementsConfig,
+}
+
+/// Event batching behavior.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Default)]
+struct BatchConfig {
+    /// The maximum size of a batch before it is flushed.
+    #[configurable(metadata(docs::type_unit = "events"))]
+    #[configurable(metadata(docs::examples = 1000))]
+    pub max_events: Option<u32>,
 }
 
 /// Authentication configuration.
@@ -168,7 +179,7 @@ impl PulsarSinkConfig {
             ) {
                 (Some(name), Some(token), None) => builder.with_auth(Authentication {
                     name: name.clone(),
-                    data: token.as_bytes().to_vec(),
+                    data: token.inner().as_bytes().to_vec(),
                 }),
                 (None, None, Some(oauth2)) => builder.with_auth_provider(
                     OAuth2Authentication::client_credentials(OAuth2Params {
@@ -222,7 +233,7 @@ impl PulsarSinkConfig {
                 }
             }
         }
-        opts.batch_size = self.batch_size.to_owned();
+        opts.batch_size = self.batch.max_events;
         if let SerializerConfig::Avro { avro } = self.encoding.config() {
             opts.schema = Some(proto::Schema {
                 schema_data: avro.schema.as_bytes().into(),
@@ -240,11 +251,13 @@ impl GenerateConfig for PulsarSinkConfig {
             endpoint: "pulsar://127.0.0.1:6650".to_string(),
             request: TowerRequestConfig::default(),
             topic: "topic-1234".to_string(),
+            producer_name: None,
             key_field: None,
             properties_key: None,
-            batch_size: None,
+            partition_key_field: None,
+            batch: Default::default(),
             compression: None,
-            encoding: TextSerializerConfig::new().into(),
+            encoding: TextSerializerConfig::default().into(),
             auth: None,
             acknowledgements: Default::default(),
         })

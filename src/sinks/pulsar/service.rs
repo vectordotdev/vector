@@ -37,8 +37,8 @@ impl DriverResponse for PulsarResponse {
         CountByteSize(1, self.event_byte_size)
     }
 
-    fn bytes_sent(&self) -> Option<(usize, &str)> {
-        Some((self.event_byte_size, "pulsar"))
+    fn bytes_sent(&self) -> Option<usize> {
+        Some(self.event_byte_size)
     }
 }
 

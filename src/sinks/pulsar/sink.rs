@@ -2,16 +2,6 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use std::collections::HashMap;
 
-use futures::{stream::BoxStream, StreamExt};
-use pulsar::{Error as PulsarError, Pulsar, TokioExecutor};
-use serde::Serialize;
-use snafu::{ResultExt, Snafu};
-use tower::ServiceBuilder;
-use vector_buffers::EventCount;
-use vector_common::byte_size_of::ByteSizeOf;
-use vector_core::event::LogEvent;
-use vector_core::sink::StreamSink;
-
 use crate::sinks::pulsar::config::PulsarSinkConfig;
 use crate::sinks::pulsar::encoder::PulsarEncoder;
 use crate::sinks::pulsar::request_builder::PulsarRequestBuilder;
@@ -24,6 +14,17 @@ use crate::template::{Template, TemplateParseError};
 use crate::{
     codecs::{Encoder, Transformer},
     event::Event,
+};
+use futures::{stream::BoxStream, StreamExt};
+use pulsar::{Error as PulsarError, Pulsar, TokioExecutor};
+use serde::Serialize;
+use snafu::{ResultExt, Snafu};
+use tower::ServiceBuilder;
+use vector_buffers::EventCount;
+use vector_common::byte_size_of::ByteSizeOf;
+use vector_core::{
+    event::{EstimatedJsonEncodedSizeOf, LogEvent},
+    sink::StreamSink,
 };
 
 #[derive(Debug, Snafu)]
@@ -76,6 +77,12 @@ impl ByteSizeOf for PulsarEvent {
                     .map(|(key, val)| key.capacity() + val.size_of())
                     .sum()
             })
+    }
+}
+
+impl EstimatedJsonEncodedSizeOf for PulsarEvent {
+    fn estimated_json_encoded_size_of(&self) -> usize {
+        self.event.estimated_json_encoded_size_of()
     }
 }
 
