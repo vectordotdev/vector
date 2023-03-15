@@ -25,7 +25,7 @@ use crate::metrics;
 #[cfg(feature = "api")]
 use crate::{api, internal_events::ApiStarted};
 use crate::{
-    cli::{handle_config_errors, Color, LogFormat, Opts, RootOpts},
+    cli::{handle_config_errors, Color, LogFormat, Opts},
     config::{self, Config, ConfigPath},
     heartbeat,
     signal::{self, SignalHandler, SignalTo},
@@ -53,7 +53,7 @@ pub struct ApplicationConfig {
 }
 
 pub struct Application {
-    pub opts: RootOpts,
+    pub require_healthy: Option<bool>,
     pub config: ApplicationConfig,
 }
 
@@ -139,7 +139,7 @@ impl Application {
         Ok((
             runtime,
             Self {
-                opts: opts.root,
+                require_healthy: opts.root.require_healthy,
                 config,
             },
         ))
@@ -150,21 +150,16 @@ impl Application {
         // early buffer by this point and set up a subscriber.
         crate::trace::stop_early_buffering();
 
-        let mut graceful_crash = UnboundedReceiverStream::new(self.config.graceful_crash_receiver);
-        let topology = self.config.topology;
+        let Self {
+            require_healthy,
+            config,
+        } = self;
 
-        let config_paths = self.config.config_paths;
+        let mut signal_handler = config.signal_handler;
+        let mut signal_rx = config.signal_rx;
 
-        let opts = self.opts;
-
-        #[cfg(feature = "api")]
-        let api_config = self.config.api;
-
-        #[cfg(feature = "enterprise")]
-        let enterprise_reporter = self.config.enterprise;
-
-        let mut signal_handler = self.config.signal_handler;
-        let mut signal_rx = self.config.signal_rx;
+        let topology = config.topology;
+        let config_paths = config.config_paths;
 
         emit!(VectorStarted);
         tokio::spawn(heartbeat::heartbeat());
@@ -172,7 +167,7 @@ impl Application {
         // Configure the API server, if applicable.
         #[cfg(feature = "api")]
         // Assigned to prevent the API terminating when falling out of scope.
-        let api_server = if api_config.enabled {
+        let api_server = if config.api.enabled {
             use std::sync::atomic::AtomicBool;
 
             let api_server = api::Server::start(
@@ -184,15 +179,15 @@ impl Application {
             match api_server {
                 Ok(api_server) => {
                     emit!(ApiStarted {
-                        addr: api_config.address.unwrap(),
-                        playground: api_config.playground
+                        addr: config.api.address.unwrap(),
+                        playground: config.api.playground
                     });
 
                     Some(api_server)
                 }
                 Err(e) => {
                     error!("An error occurred that Vector couldn't handle: {}.", e);
-                    let _ = self.config.graceful_crash_sender.send(());
+                    let _ = config.graceful_crash_sender.send(());
                     None
                 }
             }
@@ -203,10 +198,10 @@ impl Application {
 
         let topology_controller = TopologyController {
             topology,
-            config_paths,
-            require_healthy: opts.require_healthy,
+            config_paths: config_paths.clone(),
+            require_healthy,
             #[cfg(feature = "enterprise")]
-            enterprise_reporter,
+            enterprise_reporter: config.enterprise,
             #[cfg(feature = "api")]
             api_server,
         };
@@ -233,6 +228,8 @@ impl Application {
             None
         };
 
+        let mut graceful_crash = UnboundedReceiverStream::new(config.graceful_crash_receiver);
+
         let signal = loop {
             tokio::select! {
                 signal = signal_rx.recv() => {
@@ -248,7 +245,7 @@ impl Application {
                             let mut topology_controller = topology_controller.lock().await;
 
                             // Reload paths
-                            if let Some(paths) = config::process_paths(&opts.config_paths_with_formats()) {
+                            if let Some(paths) = config::process_paths(&config_paths) {
                                 topology_controller.config_paths = paths;
                             }
 
