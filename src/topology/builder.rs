@@ -671,7 +671,7 @@ fn build_sync_transform(
     input_rx: BufferReceiver<EventArray>,
     source_keys: Vec<ComponentKey>,
 ) -> (Task, HashMap<OutputId, fanout::ControlChannel>) {
-    let (outputs, controls) = TransformOutputs::new(node.outputs, source_keys);
+    let (outputs, controls) = TransformOutputs::new(node.outputs, &source_keys);
 
     let runner = Runner::new(t, input_rx, node.input_details.data_type(), outputs);
     let transform = if node.enable_concurrency {

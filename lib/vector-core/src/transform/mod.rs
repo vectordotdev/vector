@@ -231,7 +231,8 @@ pub struct TransformOutputs {
 impl TransformOutputs {
     pub fn new(
         outputs_in: Vec<config::Output>,
-        source_keys: Vec<ComponentKey>,
+        #[allow(clippy::needless_pass_by_value)]
+        source_keys: &[ComponentKey],
     ) -> (Self, HashMap<Option<String>, fanout::ControlChannel>) {
         let outputs_spec = outputs_in.clone();
         let mut primary_output = None;
@@ -245,7 +246,7 @@ impl TransformOutputs {
                     primary_output = Some(TransformOutput {
                         fanout,
                         events_sent: EventsSent::sources_matrix(
-                            source_keys.clone(),
+                            source_keys.to_owned(),
                             Some(DEFAULT_OUTPUT.into()),
                         ),
                     });
@@ -257,7 +258,7 @@ impl TransformOutputs {
                         TransformOutput {
                             fanout,
                             events_sent: EventsSent::sources_matrix(
-                                source_keys.clone(),
+                                source_keys.to_owned(),
                                 Some(name.clone().into()),
                             ),
                         },
@@ -329,7 +330,7 @@ impl TransformOutputs {
 
             buf.send(&mut output.fanout).await?;
 
-            for (id, count) in metrics.into_iter() {
+            for (id, count) in metrics {
                 if let Some(handle) = output.events_sent.get(&id) {
                     handle.emit(count);
                 };
