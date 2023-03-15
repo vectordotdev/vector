@@ -28,32 +28,36 @@ impl SourceMetrics {
             SourceMetrics::SentEventBytesTotal => "component_sent_event_bytes_total",
         }
     }
+}
 
-    pub const fn validation(
-        &self,
-    ) -> fn(
-        &ValidationConfiguration,
-        &[TestEvent],
-        &[Event],
-        &[Event],
-    ) -> Result<Vec<String>, Vec<String>> {
-        match self {
-            SourceMetrics::EventsReceived => validate_component_received_events_total,
-            SourceMetrics::EventsReceivedBytes => validate_component_received_event_bytes_total,
-            SourceMetrics::ReceivedBytesTotal => validate_component_received_bytes_total,
-            SourceMetrics::SentEventsTotal => validate_component_sent_events_total,
-            SourceMetrics::SentEventBytesTotal => validate_component_sent_event_bytes_total,
+pub fn validate_sources(
+    configuration: &ValidationConfiguration,
+    inputs: &[TestEvent],
+    outputs: &[Event],
+    telemetry_events: &[Event],
+) -> Result<Vec<String>, Vec<String>> {
+    let mut out: Vec<String> = Vec::new();
+    let mut errs: Vec<String> = Vec::new();
+
+    let validations = [
+        validate_component_received_events_total,
+        validate_component_received_event_bytes_total,
+        validate_component_received_bytes_total,
+        validate_component_sent_events_total,
+        validate_component_sent_event_bytes_total,
+    ];
+
+    for v in validations.iter() {
+        match v(configuration, inputs, outputs, telemetry_events) {
+            Err(e) => errs.extend(e),
+            Ok(m) => out.extend(m),
         }
     }
 
-    pub const fn all() -> [SourceMetrics; 5] {
-        [
-            SourceMetrics::EventsReceived,
-            SourceMetrics::EventsReceivedBytes,
-            SourceMetrics::ReceivedBytesTotal,
-            SourceMetrics::SentEventsTotal,
-            SourceMetrics::SentEventBytesTotal,
-        ]
+    if errs.is_empty() {
+        Ok(out)
+    } else {
+        Err(errs)
     }
 }
 

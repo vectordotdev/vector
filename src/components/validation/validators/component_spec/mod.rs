@@ -8,7 +8,7 @@ use crate::components::validation::{
 
 use super::Validator;
 
-use self::sources::SourceMetrics;
+use self::sources::{validate_sources, SourceMetrics};
 
 /// Validates that the component meets the requirements of the [Component Specification][component_spec].
 ///
@@ -109,12 +109,10 @@ fn validate_telemetry(
 
     match component_type {
         ComponentType::Source => {
-            for metric in SourceMetrics::all().iter() {
-                let validation = metric.validation();
-                match validation(&configuration, inputs, outputs, telemetry_events) {
-                    Err(e) => errs.extend(e),
-                    Ok(m) => out.extend(m),
-                }
+            let result = validate_sources(&configuration, inputs, outputs, telemetry_events);
+            match result {
+                Ok(o) => out.extend(o),
+                Err(e) => errs.extend(e),
             }
         }
         ComponentType::Sink => {}
