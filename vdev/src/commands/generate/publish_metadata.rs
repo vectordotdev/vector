@@ -29,25 +29,21 @@ impl Cli {
             _ => "vector"
         };
 
-        // Set the output variables
-        let version_output = format!("vector_version={version}");
-        let build_desc_output = format!("vector_build_desc={build_desc}");
-        let channel_output = format!("vector_release_channel={channel}");
-        let cloudsmith_repo_output = format!("vector_cloudsmith_repo={cloudsmith_repo}");
-
         let mut output_file: Box<dyn Write> = match env::var("GITHUB_OUTPUT") {
             Ok(file_name) if !file_name.is_empty() => {
-                let mut options = OpenOptions::new();
-                options.write(true).append(true).create(true);
-                let file = options.open(file_name)?;
+                let file = OpenOptions::new()
+                    .write(true)
+                    .append(true)
+                    .create(true)
+                    .open(file_name)?;
                 Box::new(file)
             },
             _ => Box::new(io::stdout()),
         };
-        writeln!(output_file, "{version_output}")?;
-        writeln!(output_file, "{build_desc_output}")?;
-        writeln!(output_file, "{channel_output}")?;
-        writeln!(output_file, "{cloudsmith_repo_output}")?;
+        writeln!(output_file, "vector_version={version}")?;
+        writeln!(output_file, "vector_build_desc={build_desc}")?;
+        writeln!(output_file, "vector_release_channel={channel}")?;
+        writeln!(output_file, "vector_cloudsmith_repo={cloudsmith_repo}")?;
         Ok(())
     }
 }

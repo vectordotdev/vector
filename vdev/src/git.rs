@@ -52,8 +52,7 @@ pub fn list_files() -> Result<Vec<String>> {
 }
 
 pub fn get_git_sha() -> Result<String> {
-    let output = capture_output(&["rev-parse", "--short", "HEAD"])?;
-    Ok(output.trim_end().to_string())
+    capture_output(&["rev-parse", "--short", "HEAD"]).map(|output| output.trim_end().to_string())
 }
 
 // Get a list of files that have been modified, as a vector of strings
