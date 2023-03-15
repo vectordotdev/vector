@@ -67,9 +67,9 @@ impl TransformConfig for SampleConfig {
     }
 
     fn outputs(&self, input_definitions: Vec<schema::Definition>, _: LogNamespace) -> Vec<Output> {
-        vec![Output::source_logs(
+        vec![Output::transform(
             DataType::Log | DataType::Trace,
-            input_definitions.clone(),
+            input_definitions,
         )]
     }
 }

@@ -198,7 +198,7 @@ pub(crate) fn input_definitions(
         // If the input is a transform we recurse to the upstream components to retrieve
         // their definitions and pass it through the transform to get the new definitions.
         if let Some(inputs) = config.transform_inputs(key) {
-            let transform_definitions = input_definitions(&inputs, config, cache);
+            let transform_definitions = input_definitions(inputs, config, cache);
             let mut transform_definitions = config
                 .transform_output_for_port(key, &input.port, transform_definitions)
                 .expect("transform must exist")

@@ -74,7 +74,7 @@ impl TryFrom<Vec<Definition>> for Definition {
     fn try_from(value: Vec<Definition>) -> Result<Self, Self::Error> {
         value
             .into_iter()
-            .reduce(|merged, definition| merged.merge(definition))
+            .reduce(Definition::merge)
             .ok_or("cannot merge an empty definition list")
     }
 }
@@ -408,6 +408,7 @@ impl Definition {
 
     /// Register a semantic meaning for the definition.
     ///
+    /// # Errors
     /// Returns an error if the provided path points to an unknown location in the collection.
     pub fn try_with_meaning(
         &mut self,

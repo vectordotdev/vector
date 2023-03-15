@@ -261,7 +261,7 @@ impl TransformConfig for RemapConfig {
                         // Attempt to copy over the meanings from the input definition.
                         // The function will fail if the meaning that now points to a field that no longer exists,
                         // this is fine since we will no longer want that meaning in the output definition.
-                        let _ = new_type_def.try_with_meaning(path.clone(), &id);
+                        let _ = new_type_def.try_with_meaning(path.clone(), id);
                     }
 
                     for (id, path) in meaning {
@@ -337,12 +337,12 @@ impl TransformConfig for RemapConfig {
         let default_output = Output::transform(DataType::all(), default_definitions);
 
         if self.reroute_dropped {
-            return vec![
+            vec![
                 default_output,
                 Output::transform(DataType::all(), dropped_definitions).with_port(DROPPED),
-            ];
+            ]
         } else {
-            return vec![default_output];
+            vec![default_output]
         }
     }
 

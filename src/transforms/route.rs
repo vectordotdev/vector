@@ -109,10 +109,8 @@ impl TransformConfig for RouteConfig {
                 Output::transform(DataType::all(), input_definitions.clone()).with_port(output_name)
             })
             .collect();
-        result.push(
-            Output::transform(DataType::all(), input_definitions.clone())
-                .with_port(UNMATCHED_ROUTE),
-        );
+        result
+            .push(Output::transform(DataType::all(), input_definitions).with_port(UNMATCHED_ROUTE));
         result
     }
 
