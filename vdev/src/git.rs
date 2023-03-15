@@ -1,6 +1,6 @@
 use std::{collections::HashSet, process::Command, process::Output};
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Result, Context};
 
 use crate::app::CommandExt as _;
 
@@ -51,7 +51,7 @@ pub fn list_files() -> Result<Vec<String>> {
         .collect())
 }
 
-// Get a list of files that have been modified, as a vector of strings
+/// Get a list of files that have been modified, as a vector of strings
 pub fn get_modified_files() -> Result<Vec<String>> {
     let args = vec![
         "ls-files",
@@ -63,10 +63,8 @@ pub fn get_modified_files() -> Result<Vec<String>> {
     Ok(capture_output(&args)?.lines().map(str::to_owned).collect())
 }
 
-pub fn set_config_values(config_values: Vec<(&str, &str)>) -> Result<String> {
-    let mut args = Vec::new();
-    args.push("config");
-    // args.push("--global");
+pub fn set_config_values(config_values: &[(&str, &str)]) -> Result<String> {
+    let mut args = vec!["config"];
 
     for (key, value) in config_values {
         args.push(key);
@@ -76,30 +74,22 @@ pub fn set_config_values(config_values: Vec<(&str, &str)>) -> Result<String> {
     capture_output(&args)
 }
 
-// Checks if the current directory's repo is clean
+/// Checks if the current directory's repo is clean
 pub fn check_git_repository_clean() -> Result<bool> {
-    let output = Command::new("git")
-        .arg("diff-index")
-        .arg("--quiet")
-        .arg("HEAD")
-        .output()
-        .map_err(|e| anyhow!("{}", e))?;
-
-    Ok(output.status.success())
+    Ok(Command::new("git")
+        .args(["diff-index", "--quiet", "HEAD"])
+        .stdout(std::process::Stdio::null())
+        .status()
+        .map(|status| status.success())?)
 }
 
-// Commits changes from the current repo
+/// Commits changes from the current repo
 pub fn commit(commit_message: &str) -> Result<Output> {
-    let output = Command::new("git")
-        .arg("-am")
-        .arg(commit_message)
-        .output()
-        .map_err(|e| anyhow!("{}", e))?;
-
+    let output = run_command_check_status(&["-am", commit_message])?;
     Ok(output)
 }
 
-// Pushes changes from the current repo
+/// Pushes changes from the current repo
 pub fn push() -> Result<Output> {
     let output = Command::new("git")
         .arg("push")
@@ -122,6 +112,21 @@ pub fn clone(repo_url: &str) -> Result<Output> {
 fn capture_output(args: &[&str]) -> Result<String> {
     Command::new("git").in_repo().args(args).capture_output()
 }
+
+// TODO: Potentially modify capture_output function with this implementation if it satisfies the use case
+fn run_command_check_status(args: &[&str]) -> Result<Output> {
+    let mut command = Command::new("git");
+    command.args(args);
+
+    let output = command.output().context(format!("Failed to run command: git {:?}", args))?;
+    let status = output.status;
+    if !status.success() {
+        return Err(anyhow!("Command failed with exit code: {status}"));
+    }
+
+    Ok(output)
+}
+
 
 fn is_warning_line(line: &str) -> bool {
     line.starts_with("warning: ") || line.contains("original line endings")
