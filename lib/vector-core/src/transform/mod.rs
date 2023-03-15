@@ -231,7 +231,6 @@ pub struct TransformOutputs {
 impl TransformOutputs {
     pub fn new(
         outputs_in: Vec<config::Output>,
-        #[allow(clippy::needless_pass_by_value)]
         source_keys: &[ComponentKey],
     ) -> (Self, HashMap<Option<String>, fanout::ControlChannel>) {
         let outputs_spec = outputs_in.clone();
