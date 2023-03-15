@@ -10,7 +10,6 @@ set -euo pipefail
 CHANNEL="${CHANNEL:-"$(cargo vdev release channel)"}"
 VERSION="${VECTOR_VERSION:-"$(cargo vdev version)"}"
 DATE="${DATE:-"$(date -u +%Y-%m-%d)"}"
-DATE_VER="${DATE}-${VERSION}"
 VERIFY_TIMEOUT="${VERIFY_TIMEOUT:-"30"}" # seconds
 VERIFY_RETRIES="${VERIFY_RETRIES:-"2"}"
 
@@ -20,19 +19,8 @@ export AWS_REGION=us-east-1
 # Setup
 #
 
-
 td="$(mktemp -d)"
 cp -av "target/artifacts/." "$td"
-
-# include the date in the artifact filenames for custom builds.
-if [[ "$CHANNEL" == "custom" ]]; then
-    for f in "$td"/*; do
-        a="$(echo "$f" | sed -r -e "s/${VERSION}/${DATE_VER}/")"
-        mv "$f" "$a"
-    done
-fi
-
-ls "$td"
 
 td_nightly="$(mktemp -d)"
 cp -av "target/artifacts/." "$td_nightly"
@@ -145,15 +133,15 @@ elif [[ "$CHANNEL" == "custom" ]]; then
 
   # Add custom files
   echo "Uploading all artifacts to s3://packages.timber.io/vector/custom"
-  aws s3 cp "$td" "s3://packages.timber.io/vector/custom/$DATE_VER" --recursive --sse --acl public-read
+  aws s3 cp "$td" "s3://packages.timber.io/vector/custom/$VERSION" --recursive --sse --acl public-read
   echo "Uploaded archives"
 
   # Verify that the files exist and can be downloaded
   echo "Waiting for $VERIFY_TIMEOUT seconds before running the verifications"
   sleep "$VERIFY_TIMEOUT"
   verify_artifact \
-    "https://packages.timber.io/vector/custom/$DATE_VER/vector-$DATE_VER-x86_64-unknown-linux-gnu.tar.gz" \
-    "$td/vector-$DATE_VER-x86_64-unknown-linux-gnu.tar.gz"
+    "https://packages.timber.io/vector/custom/$VERSION/vector-$VERSION-x86_64-unknown-linux-gnu.tar.gz" \
+    "$td/vector-$VERSION-x86_64-unknown-linux-gnu.tar.gz"
 
 fi
 
