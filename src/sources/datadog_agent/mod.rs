@@ -143,8 +143,6 @@ impl SourceConfig for DatadogAgentConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
         let log_namespace = cx.log_namespace(self.log_namespace);
 
-        // Since this is for a source, we can expect there to be only one schema definition,
-        // so here we retrieve the first in the list.
         let logs_schema_definition = cx
             .schema_definitions
             .get(&Some(LOGS.to_owned()))
@@ -152,8 +150,6 @@ impl SourceConfig for DatadogAgentConfig {
             .expect("registered log schema required")
             .clone();
 
-        // Since this is for a source, we can expect there to be only one schema definition,
-        // so here we retrieve the first in the list.
         let metrics_schema_definition = cx
             .schema_definitions
             .get(&Some(METRICS.to_owned()))
