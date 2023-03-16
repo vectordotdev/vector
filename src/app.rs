@@ -48,35 +48,39 @@ pub struct ApplicationConfig {
     pub api: config::api::Options,
     #[cfg(feature = "enterprise")]
     pub enterprise: Option<EnterpriseReporter<BoxFuture<'static, ()>>>,
-    pub signals: SignalPair,
 }
 
 pub struct Application {
     pub require_healthy: Option<bool>,
     pub config: ApplicationConfig,
+    pub signals: SignalPair,
 }
 
 impl ApplicationConfig {
-    pub async fn prepare(opts: &Opts) -> Result<Self, ExitCode> {
-        let color = opts.root.color.use_color();
-
+    pub async fn from_opts(
+        opts: &Opts,
+        signal_handler: &mut SignalHandler,
+    ) -> Result<Self, ExitCode> {
         let config_paths = opts.root.config_paths_with_formats();
-
-        // Signal handler for OS and provider messages.
-        let mut signals = SignalPair::default();
-
-        if let Some(sub_command) = &opts.sub_command {
-            return Err(sub_command.execute(signals, color).await);
-        }
 
         let config = load_configs(
             &config_paths,
             opts.root.watch_config,
             opts.root.require_healthy,
-            &mut signals.handler,
+            signal_handler,
         )
         .await?;
 
+        Self::from_config(config_paths, config).await
+    }
+
+    pub async fn from_config(
+        config_paths: Vec<ConfigPath>,
+        config: Config,
+    ) -> Result<Self, ExitCode> {
+        // This is ugly, but needed to allow `config` to be mutable for building the enterprise
+        // features, but also avoid a "does not need to be mutable" warning when the enterprise
+        // feature is not enabled.
         #[cfg(feature = "enterprise")]
         let mut config = config;
         #[cfg(feature = "enterprise")]
@@ -103,7 +107,6 @@ impl ApplicationConfig {
             api,
             #[cfg(feature = "enterprise")]
             enterprise,
-            signals,
         })
     }
 }
@@ -130,13 +133,24 @@ impl Application {
         );
 
         let runtime = build_runtime(opts.root.threads, "vector-worker")?;
-        let config = runtime.block_on(ApplicationConfig::prepare(&opts))?;
+
+        let color = opts.root.color.use_color();
+
+        // Signal handler for OS and provider messages.
+        let mut signals = SignalPair::default();
+
+        if let Some(sub_command) = &opts.sub_command {
+            return Err(runtime.block_on(sub_command.execute(signals, color)));
+        }
+
+        let config = runtime.block_on(ApplicationConfig::from_opts(&opts, &mut signals.handler))?;
 
         Ok((
             runtime,
             Self {
                 require_healthy: opts.root.require_healthy,
                 config,
+                signals,
             },
         ))
     }
@@ -149,10 +163,11 @@ impl Application {
         let Self {
             require_healthy,
             config,
+            signals,
         } = self;
 
-        let mut signal_handler = config.signals.handler;
-        let mut signal_rx = config.signals.receiver;
+        let mut signal_handler = signals.handler;
+        let mut signal_rx = signals.receiver;
 
         let topology = config.topology;
         let config_paths = config.config_paths;
