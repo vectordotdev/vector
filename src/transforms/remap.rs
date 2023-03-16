@@ -229,28 +229,30 @@ impl TransformConfig for RemapConfig {
             .try_into()
             .expect("we must have at least one input definition");
 
+        // We need to compile the VRL program in order to know the schema definition output of this
+        // transform. We ignore any compilation errors, as those are caught by the transform build
+        // step.
+        let compiled = self
+            .compile_vrl_program(enrichment::TableRegistry::default(), merged_definition)
+            .map(|(program, _, _, external_context)| {
+                (
+                    program.final_type_state(),
+                    external_context
+                        .get_custom::<MeaningList>()
+                        .cloned()
+                        .expect("context exists")
+                        .0,
+                )
+            })
+            .map_err(|_| ());
+
         let mut dropped_definitions = Vec::new();
         let mut default_definitions = Vec::new();
 
         for input_definition in input_definitions {
-            // We need to compile the VRL program in order to know the schema definition output of this
-            // transform. We ignore any compilation errors, as those are caught by the transform build
-            // step.
-            let default_definition = self
-                .compile_vrl_program(
-                    enrichment::TableRegistry::default(),
-                    merged_definition.clone(),
-                )
-                .map(|(program, _, _, external_context)| {
-                    // Apply any semantic meanings set in the VRL program
-                    let meaning = external_context
-                        .get_custom::<MeaningList>()
-                        .cloned()
-                        .expect("context exists")
-                        .0;
-
-                    let state = program.final_type_state();
-
+            let default_definition = compiled
+                .clone()
+                .map(|(state, meaning)| {
                     let mut new_type_def = Definition::new(
                         state.external.target_kind().clone(),
                         state.external.metadata_kind().clone(),
@@ -264,6 +266,7 @@ impl TransformConfig for RemapConfig {
                         let _ = new_type_def.try_with_meaning(path.clone(), id);
                     }
 
+                    // Apply any semantic meanings set in the VRL program
                     for (id, path) in meaning {
                         // currently only event paths are supported
                         new_type_def = new_type_def.with_meaning(OwnedTargetPath::event(path), &id);
