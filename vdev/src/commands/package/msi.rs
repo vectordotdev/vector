@@ -1,9 +1,10 @@
 use anyhow::Result;
 
-
 #[cfg(windows)]
 use {
     crate::app,
+    crate::app::CommandExt as _,
+    crate::util,
     std::env,
     std::fs::File,
     std::io::Write,
@@ -27,6 +28,15 @@ impl Cli {
         {
             let archive_version = app::version()?;
 
+            let package_version = {
+                let channel = util::release_channel()?;
+                if channel == "custom" {
+                    // Extract the version before ".custom"
+                    archive_version.split(".custom").next().unwrap().to_string()
+                } else {
+                    archive_version.clone()
+                }
+            };
             // Make sure we start with a fresh `target/msi-x64` target directory and
             // copy the `distribution/msi` directory to `target/msi-x64`
             let msi_x64_dir = Path::new("target").join("msi-x64");
@@ -47,7 +57,7 @@ impl Cli {
                 "$progressPreference = 'silentlyContinue'; Expand-Archive {zip_file}"
             );
             app::exec("powershell", ["-Command", &powershell_command], false)?;
-            build(&archive_version)?;
+            build(&archive_version, &package_version)?;
 
             // Change the current directory back to the original path
             env::set_current_dir(app::path())?;
@@ -62,7 +72,7 @@ impl Cli {
 }
 
 #[cfg(windows)]
-fn build(archive_version: &str) -> Result<()> {
+fn build(archive_version: &str, package_version: &str) -> Result<()> {
     println!("Running Build with args: {archive_version}");
     println!("Copying ZIP archive...");
 
@@ -82,7 +92,7 @@ fn build(archive_version: &str) -> Result<()> {
 
     println!("Substituting version...");
     let vector_tmpl = std::fs::read_to_string("vector.wxs.tmpl")?;
-    let vector_tmpl_updated = vector_tmpl.replace("${VERSION}", archive_version);
+    let vector_tmpl_updated = vector_tmpl.replace("${VERSION}", package_version);
     let mut vector_wxs_file = File::create("vector.wxs")?;
     writeln!(vector_wxs_file, "{vector_tmpl_updated}")?;
 
@@ -98,7 +108,7 @@ fn build(archive_version: &str) -> Result<()> {
         "-var var.VectorDir",
         "-out components.wxs"
     ];
-    exec_command("heat", args)?;
+    Command::new("heat").args(args).capture_output()?;
 
     // Add Win64="yes" to Component elements
     // See https://stackoverflow.com/questions/22932942/wix-heat-exe-win64-components-win64-yes
@@ -114,7 +124,7 @@ fn build(archive_version: &str) -> Result<()> {
         "components.wxs",
         binding
     ];
-    exec_command("candle", &args)?;
+    Command::new("candle").args(&args).capture_output()?;
 
     args = vec![
         "candle",
@@ -122,7 +132,7 @@ fn build(archive_version: &str) -> Result<()> {
         "-ext",
         "WiXUtilExtension",
     ];
-    exec_command("candle", &args)?;
+    Command::new("candle").args(&args).capture_output()?;
 
     args = vec![
         "vector.wixobj",
@@ -134,26 +144,6 @@ fn build(archive_version: &str) -> Result<()> {
         "-ext",
         "WiXUtilExtension",
     ];
-    exec_command("light", &args)?;
+    Command::new("light").args(&args).capture_output()?;
     Ok(())
-}
-
-// TODO: Move this to app.rs, but for now use exec_command helper
-#[cfg(windows)]
-fn exec_command(cmd: &str, args: &[&str]) -> Result<()> {
-    let output = Command::new(cmd)
-        .args(args)
-        .output()?;
-
-    if output.status.success() {
-        return Ok(())
-    }
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    let status = output.status;
-    let error_message = format!(
-        "Command exited with non-zero status code: {status}\n\nSTDOUT:\n{stdout}\n\nSTDERR:\n{stderr}"
-    );
-    Err(anyhow::Error::msg(error_message))
 }
