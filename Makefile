@@ -604,7 +604,7 @@ test-vrl: ## Run the VRL test suite
 
 .PHONY: compile-vrl-wasm
 compile-vrl-wasm: ## Compile VRL crates to WASM target
-	@scripts/compile-vrl-wasm.sh
+	cargo vdev generate vrl-wasm
 
 ##@ Utility
 
