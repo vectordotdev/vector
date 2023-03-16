@@ -2,6 +2,7 @@ crate::cli_subcommands! {
     "Generate or Regenerate derived files..."
     component_docs,
     manifests,
+    mod publish_metadata,
     release_cue,
     mod vrl_wasm,
 }
