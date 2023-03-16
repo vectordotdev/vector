@@ -77,7 +77,6 @@ impl ApplicationConfig {
         );
         // Signal handler for OS and provider messages.
         let (mut signal_handler, signal_rx) = SignalHandler::new();
-        signal_handler.forever(signal::os_signals());
 
         if let Some(sub_command) = &opts.sub_command {
             return Err(sub_command

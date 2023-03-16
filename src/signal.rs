@@ -39,6 +39,7 @@ impl SignalHandler {
             shutdown_txs: vec![],
         };
 
+        handler.forever(os_signals());
         (handler, rx)
     }
 
@@ -54,7 +55,7 @@ impl SignalHandler {
 
     /// Takes a stream who's elements are convertible to `SignalTo`, and spawns a permanent
     /// task for transmitting to the receiver.
-    pub fn forever<T, S>(&mut self, stream: S)
+    fn forever<T, S>(&self, stream: S)
     where
         T: Into<SignalTo> + Send + Sync,
         S: Stream<Item = T> + 'static + Send,
@@ -120,7 +121,7 @@ impl SignalHandler {
 
 /// Signals from OS/user.
 #[cfg(unix)]
-pub fn os_signals() -> impl Stream<Item = SignalTo> {
+fn os_signals() -> impl Stream<Item = SignalTo> {
     use tokio::signal::unix::{signal, SignalKind};
 
     let mut sigint = signal(SignalKind::interrupt()).expect("Signal handlers should not panic.");
@@ -143,7 +144,7 @@ pub fn os_signals() -> impl Stream<Item = SignalTo> {
 
 /// Signals from OS/user.
 #[cfg(windows)]
-pub(crate) fn os_signals() -> impl Stream<Item = SignalTo> {
+fn os_signals() -> impl Stream<Item = SignalTo> {
     use futures::future::FutureExt;
 
     async_stream::stream! {
