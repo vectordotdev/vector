@@ -345,16 +345,14 @@ pub async fn build_pieces(
         debug!(component = %key, "Building new transform.");
 
         let mut schema_definitions = HashMap::new();
-        // let merged_definition =
-        //     schema::merged_definition(&transform.inputs, config, &mut definition_cache);
         let input_definitions =
             schema::input_definitions(&transform.inputs, config, &mut definition_cache);
 
-        // TODO Maybe in time we won't need to use all the merged definitions below.
         let merged_definition: Definition = input_definitions
             .clone()
             .try_into()
-            .expect("there should be at least one definition in the list");
+            // We may not have any definitions if all the inputs are from metrics sources.
+            .unwrap_or_else(|_| Definition::any());
 
         let span = error_span!(
             "transform",

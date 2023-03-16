@@ -227,7 +227,7 @@ impl TransformConfig for RemapConfig {
         let merged_definition: Definition = input_definitions
             .clone()
             .try_into()
-            .expect("we must have at least one input definition");
+            .unwrap_or_else(|_| Definition::any());
 
         // We need to compile the VRL program in order to know the schema definition output of this
         // transform. We ignore any compilation errors, as those are caught by the transform build
