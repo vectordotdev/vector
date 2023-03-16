@@ -52,6 +52,9 @@ impl<const N: usize> GroupStack<N> {
             panic!("tried to pop current allocation group from the stack but the stack is empty");
         }
 
+        // Clear the current slot.
+        self.slots[self.idx].take();
+
         self.idx -= 1;
         self.slots[self.idx]
     }

@@ -10,41 +10,48 @@ thread_local! {
 }
 
 const DEFAULT_SHARD_FACTOR: usize = 8;
+const SHARD_FACTOR_MASK: usize = DEFAULT_SHARD_FACTOR - 1;
 
 #[derive(Debug)]
-pub struct ShardedAtomicU64<const N: usize = DEFAULT_SHARD_FACTOR> {
-    slots: [AtomicU64; N],
+pub struct ShardedAtomicU64 {
+    slots: [AtomicU64; DEFAULT_SHARD_FACTOR],
 }
 
-impl<const N: usize> ShardedAtomicU64<N> {
+impl ShardedAtomicU64 {
     pub const fn new() -> Self {
-        assert!(N == N.next_power_of_two(), "shard factor must be a power of two");
+        assert!(
+            DEFAULT_SHARD_FACTOR == DEFAULT_SHARD_FACTOR.next_power_of_two(),
+            "shard factor must be a power of two"
+        );
+        assert!(
+            SHARD_FACTOR_MASK == DEFAULT_SHARD_FACTOR - 1,
+            "shard factor mask must be N-1 (i.e. factor = 8 (0x1000), mask = 7 (0x111)"
+        );
 
         const DEFAULT_ATOMIC: AtomicU64 = AtomicU64::new(0);
-        let slots = [DEFAULT_ATOMIC; N];
+        let slots = [DEFAULT_ATOMIC; DEFAULT_SHARD_FACTOR];
 
         Self { slots }
     }
 
-    #[inline]
     fn get(&self) -> &AtomicU64 {
         let id = THREAD_ID.try_with(|id| *id).unwrap_or_default();
-        let idx = id.rotate_right(N.trailing_zeros());
+        let idx = id & SHARD_FACTOR_MASK;
         &self.slots[idx]
     }
 
-    fn get_all(&self) -> &[AtomicU64] {
+    pub fn get_all(&self) -> &[AtomicU64] {
         &self.slots
     }
 }
 
-impl<const N: usize> Default for ShardedAtomicU64<N> {
+impl Default for ShardedAtomicU64 {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<const N: usize> Deref for ShardedAtomicU64<N> {
+impl Deref for ShardedAtomicU64 {
     type Target = AtomicU64;
 
     fn deref(&self) -> &Self::Target {

@@ -99,7 +99,12 @@ impl AllocationGroup {
 
     pub fn consume_and_reset_statistics(&self) -> (u64, u64) {
         let allocated_bytes = self.allocated_bytes.swap(0, Ordering::Relaxed);
-        let deallocated_bytes = self.deallocated_bytes.swap(0, Ordering::Relaxed);
+        let deallocated_bytes = self
+            .deallocated_bytes
+            .get_all()
+            .iter()
+            .map(|inner| inner.swap(0, Ordering::Relaxed))
+            .sum();
 
         (allocated_bytes, deallocated_bytes)
     }

@@ -1,5 +1,6 @@
 use std::{
     alloc::{GlobalAlloc, Layout},
+    cmp, ptr,
     sync::atomic::Ordering,
 };
 
@@ -23,7 +24,6 @@ impl<A> GroupedTracingAllocator<A> {
 }
 
 unsafe impl<A: GlobalAlloc> GlobalAlloc for GroupedTracingAllocator<A> {
-    #[inline]
     unsafe fn alloc(&self, object_layout: Layout) -> *mut u8 {
         // Don't trace allocations unless enabled.
         if !TRACE_ALLOCATIONS.load(Ordering::Relaxed) {
@@ -52,7 +52,6 @@ unsafe impl<A: GlobalAlloc> GlobalAlloc for GroupedTracingAllocator<A> {
         actual_ptr
     }
 
-    #[inline]
     unsafe fn dealloc(&self, object_ptr: *mut u8, object_layout: Layout) {
         // Don't trace deallocations unless enabled.
         if !TRACE_ALLOCATIONS.load(Ordering::Relaxed) {
@@ -77,9 +76,74 @@ unsafe impl<A: GlobalAlloc> GlobalAlloc for GroupedTracingAllocator<A> {
 
         allocation_group_ref.track_deallocation(wrapped_layout.size() as u64);
     }
+
+    unsafe fn realloc(
+        &self,
+        old_object_ptr: *mut u8,
+        old_object_layout: Layout,
+        new_object_size: usize,
+    ) -> *mut u8 {
+        // Don't perform tracing-specific reallocation unless enabled.
+        if !TRACE_ALLOCATIONS.load(Ordering::Relaxed) {
+            return self
+                .allocator
+                .realloc(old_object_ptr, old_object_layout, new_object_size);
+        }
+
+        // Regenerate the wrapped layout so we know where we have to look, as the pointer we've
+        // given relates to the requested layout, not the wrapped layout that was actually
+        // allocated.
+        //
+        // Once we have that, we can reconstitute the reference to the allocation group that the
+        // allocation belongs to.
+        let (_, offset_to_group_ref) = get_wrapped_layout(old_object_layout);
+        let allocation_group_ref = old_object_ptr
+            .add(offset_to_group_ref)
+            .cast::<&'static AllocationGroup>()
+            .read();
+
+        // Calculate the new layout for the underlying object, and then wrap it like we normally
+        // would for a pure allocation.
+        //
+        // SAFETY: the caller must ensure that the `object_new_size` does not overflow.
+        // `object_layout.align()` comes from a `Layout` and is thus guaranteed to be valid.
+        let new_object_layout = unsafe {
+            Layout::from_size_align_unchecked(new_object_size, old_object_layout.align())
+        };
+        let (new_actual_layout, offset_to_group_ref) = get_wrapped_layout(new_object_layout);
+        let new_object_ptr = self.allocator.alloc(new_actual_layout);
+        if new_object_ptr.is_null() {
+            return new_object_ptr;
+        }
+
+        // Write the reference to the active allocation group at the end of the allocation so we can
+        // access it when this allocation is, eventually, deallocated... and actually track this new
+        // allocation.
+        let group_ref_ptr = new_object_ptr
+            .add(offset_to_group_ref)
+            .cast::<&'static AllocationGroup>();
+        group_ref_ptr.write(allocation_group_ref);
+
+        Accumulator::track_allocation_local(new_actual_layout.size() as u64);
+
+        // Since we've successfully gotten the replacement allocation, and moved the allocation group
+        // reference, copy the memory from the old allocation and then deallocate it.
+        //
+        // SAFETY: the previously allocated block cannot overlap the newly allocated block.
+        // The safety contract for `dealloc` must be upheld by the caller.
+        unsafe {
+            ptr::copy_nonoverlapping(
+                old_object_ptr,
+                new_object_ptr,
+                cmp::min(old_object_layout.size(), new_object_size),
+            );
+            self.dealloc(old_object_ptr, old_object_layout);
+        }
+
+        new_object_ptr
+    }
 }
 
-#[inline(always)]
 fn get_wrapped_layout(object_layout: Layout) -> (Layout, usize) {
     static TRAILER_LAYOUT: Layout = Layout::new::<&'static AllocationGroup>();
 
