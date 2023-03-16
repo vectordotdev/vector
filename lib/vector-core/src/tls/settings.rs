@@ -7,7 +7,7 @@ use std::{
 
 use lookup::lookup_v2::OptionalValuePath;
 use openssl::{
-    pkcs12::{ParsedPkcs12, Pkcs12},
+    pkcs12::{ParsedPkcs12_2, Pkcs12},
     pkey::{PKey, Private},
     ssl::{ConnectConfiguration, SslContextBuilder, SslVerifyMode},
     stack::Stack,
@@ -202,7 +202,7 @@ impl TlsSettings {
         })
     }
 
-    fn identity(&self) -> Option<ParsedPkcs12> {
+    fn identity(&self) -> Option<ParsedPkcs12_2> {
         // This data was test-built previously, so we can just use it
         // here and expect the results will not fail. This can all be
         // reworked when `openssl::pkcs12::ParsedPkcs12` gains the Clone
@@ -210,15 +210,19 @@ impl TlsSettings {
         self.identity.as_ref().map(|identity| {
             Pkcs12::from_der(&identity.0)
                 .expect("Could not build PKCS#12 archive from parsed data")
-                .parse(&identity.1)
+                .parse2(&identity.1)
                 .expect("Could not parse stored PKCS#12 archive")
         })
     }
 
     pub fn identity_pem(&self) -> Option<(Vec<u8>, Vec<u8>)> {
         self.identity().map(|identity| {
-            let mut cert = identity.cert.to_pem().expect("Invalid stored identity");
-            if let Some(chain) = identity.chain {
+            let mut cert = identity
+                .cert
+                .expect("Identity required")
+                .to_pem()
+                .expect("Invalid stored identity");
+            if let Some(chain) = identity.ca {
                 for authority in chain {
                     cert.extend(
                         authority
@@ -229,6 +233,7 @@ impl TlsSettings {
             }
             let key = identity
                 .pkey
+                .expect("Private key required")
                 .private_key_to_pem_pkcs8()
                 .expect("Invalid stored private key");
             (cert, key)
@@ -250,13 +255,14 @@ impl TlsSettings {
             SslVerifyMode::NONE
         });
         if let Some(identity) = self.identity() {
-            context
-                .set_certificate(&identity.cert)
-                .context(SetCertificateSnafu)?;
-            context
-                .set_private_key(&identity.pkey)
-                .context(SetPrivateKeySnafu)?;
-            if let Some(chain) = identity.chain {
+            if let Some(cert) = &identity.cert {
+                context.set_certificate(cert).context(SetCertificateSnafu)?;
+            }
+            if let Some(pkey) = &identity.pkey {
+                context.set_private_key(pkey).context(SetPrivateKeySnafu)?;
+            }
+
+            if let Some(chain) = identity.ca {
                 for cert in chain {
                     context
                         .add_extra_chain_cert(cert)
@@ -368,15 +374,19 @@ impl TlsConfig {
                     ca_stack.push(intermediate).context(CaStackPushSnafu)?;
                 }
 
-                let mut builder = Pkcs12::builder();
-                builder.ca(ca_stack);
-                let pkcs12 = builder.build("", &name, &key, &crt).context(Pkcs12Snafu)?;
+                let pkcs12 = Pkcs12::builder()
+                    .ca(ca_stack)
+                    .name(&name)
+                    .pkey(&key)
+                    .cert(&crt)
+                    .build2("")
+                    .context(Pkcs12Snafu)?;
                 let identity = pkcs12.to_der().context(DerExportSnafu)?;
 
                 // Build the resulting parsed PKCS#12 archive,
                 // but don't store it, as it cannot be cloned.
                 // This is just for error checking.
-                pkcs12.parse("").context(TlsIdentitySnafu)?;
+                pkcs12.parse2("").context(TlsIdentitySnafu)?;
 
                 Ok(Some(IdentityStore(identity, String::new())))
             }
@@ -388,7 +398,7 @@ impl TlsConfig {
         let pkcs12 = Pkcs12::from_der(&der).context(ParsePkcs12Snafu)?;
         // Verify password
         let key_pass = self.key_pass.as_deref().unwrap_or("");
-        pkcs12.parse(key_pass).context(ParsePkcs12Snafu)?;
+        pkcs12.parse2(key_pass).context(ParsePkcs12Snafu)?;
         Ok(Some(IdentityStore(der, key_pass.to_string())))
     }
 }

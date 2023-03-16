@@ -65,7 +65,9 @@ components: sources: journald: {
 						examples: ["journald"]
 					}
 				}
-				timestamp: fields._current_timestamp
+				timestamp: fields._current_timestamp & {
+					description: "The time at which the event appeared in the journal."
+				}
 				"*": {
 					common:      false
 					description: "Any Journald field"

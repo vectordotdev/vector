@@ -157,7 +157,7 @@ impl WebHdfsConfig {
         builder.root(&self.root);
         builder.endpoint(&self.endpoint);
 
-        let op = Operator::create(builder)?
+        let op = Operator::new(builder)?
             .layer(LoggingLayer::default())
             .finish();
         Ok(op)

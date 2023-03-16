@@ -112,26 +112,22 @@ impl SourceConfig for SocketConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         match self.mode.clone() {
             Mode::Tcp(config) => {
-                let (framing, decoding) = match (config.framing(), config.max_length()) {
-                    (Some(_), Some(_)) => {
-                        return Err("Using `max_length` is deprecated and does not have any effect when framing is provided. Configure `max_length` on the framing config instead.".into());
+                let decoding = config.decoding().clone();
+                // TODO: in v0.30.0 , remove the `max_length` setting from
+                // the UnixConfig, and all of the below mess and replace
+                // it with the configured framing /
+                // decoding.default_stream_framing().
+                let framing = match (config.framing().clone(), config.max_length()) {
+                    (Some(framing), Some(_)) => {
+                        warn!(message = "DEPRECATION: The `max_length` setting is deprecated and will be removed in an upcoming release. Since a `framing` setting was provided, the `max_length` setting has no effect.");
+                        framing
                     }
-                    (Some(framing), None) => {
-                        let decoding = config.decoding().clone();
-                        let framing = framing.clone();
-                        (framing, decoding)
-                    }
+                    (Some(framing), None) => framing,
                     (None, Some(max_length)) => {
-                        let decoding = config.decoding().clone();
-                        let framing =
-                            NewlineDelimitedDecoderConfig::new_with_max_length(max_length).into();
-                        (framing, decoding)
+                        warn!(message = "DEPRECATION: The `max_length` setting is deprecated and will be removed in an upcoming release. Please configure the `max_length` from the `framing` setting instead.");
+                        NewlineDelimitedDecoderConfig::new_with_max_length(max_length).into()
                     }
-                    (None, None) => {
-                        let decoding = config.decoding().clone();
-                        let framing = decoding.default_stream_framing();
-                        (framing, decoding)
-                    }
+                    (None, None) => decoding.default_stream_framing(),
                 };
 
                 let log_namespace = cx.log_namespace(config.log_namespace);
@@ -193,25 +189,23 @@ impl SourceConfig for SocketConfig {
             }
             #[cfg(unix)]
             Mode::UnixStream(config) => {
-                let (framing, decoding) = match (config.framing.clone(), config.max_length) {
-                    (Some(_), Some(_)) => {
-                        return Err("Using `max_length` is deprecated and does not have any effect when framing is provided. Configure `max_length` on the framing config instead.".into());
+                let decoding = config.decoding.clone();
+
+                // TODO: in v0.30.0 , remove the `max_length` setting from
+                // the UnixConfig, and all of the below mess and replace
+                // it with the configured framing /
+                // decoding.default_stream_framing().
+                let framing = match (config.framing.clone(), config.max_length) {
+                    (Some(framing), Some(_)) => {
+                        warn!(message = "DEPRECATION: The `max_length` setting is deprecated and will be removed in an upcoming release. Since a `framing` setting was provided, the `max_length` setting has no effect.");
+                        framing
                     }
-                    (Some(framing), None) => {
-                        let decoding = config.decoding.clone();
-                        (framing, decoding)
-                    }
+                    (Some(framing), None) => framing,
                     (None, Some(max_length)) => {
-                        let decoding = config.decoding.clone();
-                        let framing =
-                            NewlineDelimitedDecoderConfig::new_with_max_length(max_length).into();
-                        (framing, decoding)
+                        warn!(message = "DEPRECATION: The `max_length` setting is deprecated and will be removed in an upcoming release. Please configure the `max_length` from the `framing` setting instead.");
+                        NewlineDelimitedDecoderConfig::new_with_max_length(max_length).into()
                     }
-                    (None, None) => {
-                        let decoding = config.decoding.clone();
-                        let framing = decoding.default_stream_framing();
-                        (framing, decoding)
-                    }
+                    (None, None) => decoding.default_stream_framing(),
                 };
 
                 let log_namespace = cx.log_namespace(config.log_namespace);

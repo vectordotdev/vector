@@ -9,6 +9,30 @@ pub fn current_branch() -> Result<String> {
     Ok(output.trim_end().to_string())
 }
 
+pub fn checkout_or_create_branch(branch_name: &str) -> Result<()> {
+    if branch_exists(branch_name)? {
+        checkout_branch(branch_name)?;
+    } else {
+        create_branch(branch_name)?;
+    }
+    Ok(())
+}
+
+pub fn merge_branch(branch_name: &str) -> Result<()> {
+    let _output = capture_output(&["merge", "--ff", branch_name])?;
+    Ok(())
+}
+
+pub fn tag_version(version: &str) -> Result<()> {
+    let _output = capture_output(&["tag", "--annotate", version, "--message", version])?;
+    Ok(())
+}
+
+pub fn push_branch(branch_name: &str) -> Result<()> {
+    let _output = capture_output(&["push", "origin", branch_name])?;
+    Ok(())
+}
+
 pub fn changed_files() -> Result<Vec<String>> {
     let mut files = HashSet::new();
 
@@ -61,6 +85,21 @@ pub fn get_modified_files() -> Result<Vec<String>> {
         "--exclude-standard",
     ];
     Ok(capture_output(&args)?.lines().map(str::to_owned).collect())
+}
+
+pub fn branch_exists(branch_name: &str) -> Result<bool> {
+    let output = capture_output(&["rev-parse", "--verify", branch_name])?;
+    Ok(!output.is_empty())
+}
+
+pub fn checkout_branch(branch_name: &str) -> Result<()> {
+    let _output = capture_output(&["checkout", branch_name])?;
+    Ok(())
+}
+
+pub fn create_branch(branch_name: &str) -> Result<()> {
+    let _output = capture_output(&["checkout", "-b", branch_name])?;
+    Ok(())
 }
 
 fn capture_output(args: &[&str]) -> Result<String> {

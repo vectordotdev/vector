@@ -17,7 +17,7 @@ dyn-clone = { version = "1.0.11", default-features = false }
 enrichment = { path = "../enrichment", optional = true }
 enumflags2 = { version = "0.7.5", default-features = false }
 float_eq = { version = "1.0", default-features = false }
-futures = { version = "0.3.26", default-features = false, features = ["std"] }
+futures = { version = "0.3.27", default-features = false, features = ["std"] }
 futures-util = { version = "0.3.27", default-features = false, features = ["std"] }
 headers = { version = "0.3.8", default-features = false }
 http = { version = "0.2.9", default-features = false }
@@ -30,7 +30,7 @@ metrics-util = { version = "0.14.0", default-features = false, features = ["regi
 mlua = { version = "0.8.8", default-features = false, features = ["lua54", "send", "vendored"], optional = true }
 no-proxy = { version  = "0.3.2", default-features = false, features = ["serialize"] }
 once_cell = { version = "1.17", default-features = false }
-openssl = { version = "0.10.45", default-features = false, features = ["vendored"] }
+openssl = { version = "0.10.46", default-features = false, features = ["vendored"] }
 ordered-float = { version = "3.4.0", default-features = false }
 parking_lot = { version = "0.12.1", default-features = false }
 pin-project = { version = "1.0.12", default-features = false }
@@ -40,9 +40,9 @@ prost = { version = "0.11.8", default-features = false, features = ["std"] }
 quanta = { version = "0.10.1", default-features = false }
 regex = { version = "1.7.1", default-features = false, features = ["std", "perf"] }
 ryu = { version = "1", default-features = false }
-serde = { version = "1.0.154", default-features = false, features = ["derive", "rc"] }
+serde = { version = "1.0.156", default-features = false, features = ["derive", "rc"] }
 serde_json = { version = "1.0.94", default-features = false }
-serde_with = { version = "2.3.0", default-features = false, features = ["std", "macros"] }
+serde_with = { version = "2.3.1", default-features = false, features = ["std", "macros"] }
 smallvec = { version = "1", default-features = false, features = ["serde", "const_generics"] }
 snafu = { version = "0.7.4", default-features = false }
 socket2 = { version = "0.4.7", default-features = false }
@@ -50,7 +50,7 @@ tokio = { version = "1.26.0", default-features = false, features = ["net"] }
 tokio-openssl = { version = "0.6.3", default-features = false }
 tokio-stream = { version = "0.1", default-features = false, features = ["time"], optional = true }
 tokio-util = { version = "0.7.0", default-features = false, features = ["time"] }
-toml = { version = "0.7.2", default-features = false }
+toml = { version = "0.7.3", default-features = false }
 tonic = { version = "0.8", default-features = false, features = ["transport"] }
 tower = { version = "0.4", default-features = false, features = ["util"] }
 tracing = { version = "0.1.34", default-features = false }
@@ -89,7 +89,7 @@ quickcheck_macros = "1"
 proptest = "1.1"
 similar-asserts = "1.4.2"
 tokio-test = "0.4.2"
-toml = { version = "0.7.2", default-features = false, features = ["parse"] }
+toml = { version = "0.7.3", default-features = false, features = ["parse"] }
 ndarray = "0.15.6"
 ndarray-stats = "0.5.1"
 noisy_float = "0.2.0"
