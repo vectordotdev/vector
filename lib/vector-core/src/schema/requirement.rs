@@ -218,8 +218,7 @@ impl std::fmt::Display for ValidationError {
                 got,
             } => write!(
                 f,
-                "invalid semantic meaning: {} (expected {}, got {})",
-                identifier, want, got
+                "invalid semantic meaning: {identifier} (expected {want}, got {got})"
             ),
             Self::MeaningDuplicate { identifier, paths } => write!(
                 f,

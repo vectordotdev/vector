@@ -83,8 +83,7 @@ fn validate_depth(value: Value) -> std::result::Result<u8, ExpressionError> {
         Ok(res as u8)
     } else {
         Err(ExpressionError::from(format!(
-            "max_depth value should be greater than 0 and less than 128, got {}",
-            res
+            "max_depth value should be greater than 0 and less than 128, got {res}"
         )))
     }
 }

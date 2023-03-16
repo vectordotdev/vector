@@ -59,7 +59,7 @@ impl SourceConfig for TripwireSourceConfig {
                     .then(crate::shutdown::tripwire_handler)
                     .boxed(),
             )
-            .map(|_| std::mem::drop(out))
+            .map(|_| drop(out))
             .unit_error(),
         ))
     }

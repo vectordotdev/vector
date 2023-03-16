@@ -614,6 +614,10 @@ impl IngestorProcess {
         // so we explicitly drop it so that we can again utilize `read_error` below.
         drop(stream);
 
+        // The BatchNotifier is cloned for each LogEvent in the batch stream, but the last
+        // reference must be dropped before the status of the batch is sent to the channel.
+        drop(batch);
+
         if let Some(error) = read_error {
             Err(ProcessingError::ReadObject {
                 source: error,

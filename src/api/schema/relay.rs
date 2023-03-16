@@ -158,7 +158,6 @@ pub async fn query<T: async_graphql::OutputType, I: ExactSizeIterator<Item = T>>
             );
             connection.edges.extend(
                 (start..end)
-                    .into_iter()
                     .zip(iter.skip(start))
                     .map(|(cursor, node)| Edge::new(Base64Cursor::new(cursor), node)),
             );

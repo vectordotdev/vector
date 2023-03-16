@@ -307,9 +307,7 @@ where
         &mut self,
         is_finalized: bool,
     ) -> Result<Option<ReadToken>, ReaderError<T>> {
-        let record_len = if let Some(len) = self.read_length_delimiter(is_finalized).await? {
-            len
-        } else {
+        let Some(record_len) = self.read_length_delimiter(is_finalized).await? else {
             return Ok(None);
         };
 
@@ -852,12 +850,12 @@ where
                 } => {
                     let record = try_as_record_archive(data_file_mmap.as_ref())
                         .expect("record was already validated");
-                    let item = match decode_record_payload::<T>(record) {
-                        Ok(item) => item,
+
+                    let Ok(item) = decode_record_payload::<T>(record) else {
                         // If there's an error decoding the item, just fall back to the slow path,
                         // because this file might actually be where we left off, so we don't want
                         // to incorrectly skip ahead or anything.
-                        Err(_) => break,
+                        break
                     };
 
                     // We have to remove 1 from the event count here because otherwise the ID would

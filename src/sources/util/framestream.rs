@@ -866,7 +866,7 @@ mod test {
             "world".into(),
         );
 
-        std::mem::drop(sock_stream); //explicitly drop the stream so we don't get warnings about not using it
+        drop(sock_stream); //explicitly drop the stream so we don't get warnings about not using it
 
         // Ensure source actually shut down successfully.
         signal_shutdown(source_name, &mut shutdown).await;
@@ -914,7 +914,7 @@ mod test {
             .iter()
             .any(|e| e.as_log()[&log_schema().message_key()] == "world".into()));
 
-        std::mem::drop(sock_stream); //explicitly drop the stream so we don't get warnings about not using it
+        drop(sock_stream); //explicitly drop the stream so we don't get warnings about not using it
 
         // Ensure source actually shut down successfully.
         signal_shutdown(source_name, &mut shutdown).await;
@@ -944,7 +944,7 @@ mod test {
         assert_eq!(frame_vec[0].as_ref().unwrap().len(), 0);
         assert_accept_frame(frame_vec[1].as_mut().unwrap(), content_type);
 
-        std::mem::drop(sock_stream); //explicitly drop the stream so we don't get warnings about not using it
+        drop(sock_stream); //explicitly drop the stream so we don't get warnings about not using it
 
         // Ensure source actually shut down successfully.
         signal_shutdown(source_name, &mut shutdown).await;
@@ -979,7 +979,7 @@ mod test {
         assert_eq!(frame_vec[0].as_ref().unwrap().len(), 0);
         assert_accept_frame(frame_vec[1].as_mut().unwrap(), content_type);
 
-        std::mem::drop(sock_stream); //explicitly drop the stream so we don't get warnings about not using it
+        drop(sock_stream); //explicitly drop the stream so we don't get warnings about not using it
 
         // Ensure source actually shut down successfully.
         signal_shutdown(source_name, &mut shutdown).await;
@@ -1037,7 +1037,7 @@ mod test {
             "world".into(),
         );
 
-        std::mem::drop(sock_stream); //explicitly drop the stream so we don't get warnings about not using it
+        drop(sock_stream); //explicitly drop the stream so we don't get warnings about not using it
 
         // Ensure source actually shut down successfully.
         signal_shutdown(source_name, &mut shutdown).await;
@@ -1076,8 +1076,6 @@ mod test {
             events[1].as_log()[&log_schema().message_key()],
             "world".into(),
         );
-
-        // std::mem::drop(sock_stream); //explicitly drop the stream so we don't get warnings about not using it
 
         // Ensure source actually shut down successfully.
         signal_shutdown(source_name, &mut shutdown).await;
