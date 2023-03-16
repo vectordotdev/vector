@@ -367,14 +367,14 @@ struct SimpleHttpSource {
     log_namespace: LogNamespace,
 }
 
-impl SimpleHttpSource {
+impl HttpSource for SimpleHttpSource {
     /// Enriches the passed in events with metadata for the `request_path` and for each of the headers.
     fn enrich_events(
         &self,
         events: &mut [Event],
         request_path: &str,
-        headers_config: HeaderMap,
-        query_parameters: HashMap<String, String>,
+        headers_config: &HeaderMap,
+        query_parameters: &HashMap<String, String>,
     ) {
         for event in events.iter_mut() {
             let log = event.as_mut_log();
@@ -421,15 +421,13 @@ impl SimpleHttpSource {
             );
         }
     }
-}
 
-impl HttpSource for SimpleHttpSource {
     fn build_events(
         &self,
         body: Bytes,
-        header_map: HeaderMap,
-        query_parameters: HashMap<String, String>,
-        request_path: &str,
+        _header_map: &HeaderMap,
+        _query_parameters: &HashMap<String, String>,
+        _request_path: &str,
     ) -> Result<Vec<Event>, ErrorMessage> {
         let mut decoder = self.decoder.clone();
         let mut events = Vec::new();
@@ -452,8 +450,6 @@ impl HttpSource for SimpleHttpSource {
                 }
             }
         }
-
-        self.enrich_events(&mut events, request_path, header_map, query_parameters);
 
         Ok(events)
     }

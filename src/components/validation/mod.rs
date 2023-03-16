@@ -37,7 +37,7 @@ impl ComponentType {
 
 /// Component type-specific configuration.
 #[allow(clippy::large_enum_variant)]
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum ComponentConfiguration {
     /// A source component.
     Source(Sources),
