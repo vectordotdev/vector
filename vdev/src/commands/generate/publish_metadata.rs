@@ -37,7 +37,6 @@ impl Cli {
         let mut output_file: Box<dyn Write> = match env::var("GITHUB_OUTPUT") {
             Ok(file_name) if !file_name.is_empty() => {
                 let file = OpenOptions::new()
-                    .write(true)
                     .append(true)
                     .create(true)
                     .open(file_name)?;
