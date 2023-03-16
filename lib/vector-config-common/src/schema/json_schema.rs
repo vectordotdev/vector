@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::ops::Deref;
+use std::{iter, ops::Deref};
 
 use super::{Map, Set};
 
@@ -537,6 +537,30 @@ pub enum InstanceType {
 pub enum SingleOrVec<T> {
     Single(Box<T>),
     Vec(Vec<T>),
+}
+
+impl<T: Clone> Extend<T> for SingleOrVec<T> {
+    fn extend<I: IntoIterator<Item = T>>(&mut self, iter: I) {
+        match self {
+            Self::Single(item) => {
+                *self = Self::Vec(iter::once(*item.clone()).chain(iter.into_iter()).collect());
+            }
+            Self::Vec(items) => items.extend(iter),
+        }
+    }
+}
+
+impl<'a, T> IntoIterator for &'a SingleOrVec<T> {
+    type Item = &'a T;
+
+    type IntoIter = std::slice::Iter<'a, T>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        match self {
+            SingleOrVec::Single(item) => std::slice::from_ref(item.as_ref()).into_iter(),
+            SingleOrVec::Vec(items) => items.as_slice().into_iter(),
+        }
+    }
 }
 
 impl<T> From<T> for SingleOrVec<T> {

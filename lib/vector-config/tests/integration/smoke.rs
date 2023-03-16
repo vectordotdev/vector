@@ -514,7 +514,7 @@ pub enum SinkConfig {
     Advanced(AdvancedSinkConfig),
 }
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 #[configurable_component]
 #[configurable(description = "Global options for configuring Vector.")]
 pub struct GlobalOptions {
@@ -530,6 +530,7 @@ pub struct GlobalOptions {
 #[configurable_component]
 pub struct VectorConfig {
     #[configurable(derived)]
+    #[serde(default)]
     global: GlobalOptions,
 
     /// Any configured sources.

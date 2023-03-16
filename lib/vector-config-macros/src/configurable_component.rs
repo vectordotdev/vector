@@ -1,5 +1,5 @@
 use darling::{Error, FromMeta};
-use itertools::Itertools as _;
+use itertools::Itertools;
 use proc_macro::TokenStream;
 use proc_macro2::{Ident, Span};
 use quote::{quote, quote_spanned};

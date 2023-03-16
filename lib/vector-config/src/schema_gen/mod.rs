@@ -8,6 +8,10 @@ use crate::{
     num::ConfigurableNumber, Configurable, ConfigurableRef, GenerateError, Metadata, ToValue,
 };
 
+use self::flatten::FlattenReferencesAndSubschemasVisitor;
+
+mod flatten;
+
 /// Applies metadata to the given schema.
 ///
 /// Metadata can include semantic information (title, description, etc), validation (min/max, allowable
@@ -139,10 +143,11 @@ fn apply_metadata(config: &ConfigurableRef, schema: &mut SchemaObject, metadata:
 }
 
 pub fn convert_to_flattened_schema(primary: &mut SchemaObject, mut subschemas: Vec<SchemaObject>) {
-    // First, we replace the primary schema with an empty schema, because we need to push it the actual primary schema
-    // into the list of `allOf` schemas. This is due to the fact that it's not valid to "extend" a schema using `allOf`,
-    // so everything has to be in there.
+    // First, we replace the primary schema with an empty schema, because we need to push it the
+    // actual primary schema into the list of `allOf` schemas. This is due to the fact that it's not
+    // valid to "extend" a schema using `allOf`, so everything has to be in there.
     let primary_subschema = mem::take(primary);
+
     subschemas.insert(0, primary_subschema);
 
     let all_of_schemas = subschemas.into_iter().map(Schema::Object).collect();
@@ -268,7 +273,6 @@ pub(crate) fn generate_map_schema(
 pub fn generate_struct_schema(
     properties: IndexMap<String, SchemaObject>,
     required: BTreeSet<String>,
-    additional_properties: Option<Box<Schema>>,
 ) -> SchemaObject {
     let properties = properties
         .into_iter()
@@ -279,7 +283,7 @@ pub fn generate_struct_schema(
         object: Some(Box::new(ObjectValidation {
             properties,
             required,
-            additional_properties,
+            additional_properties: Some(Box::new(Schema::Bool(false))),
             ..Default::default()
         })),
         ..Default::default()
@@ -455,7 +459,7 @@ pub fn generate_internal_tagged_variant_schema(
     let mut required = BTreeSet::new();
     required.insert(tag);
 
-    generate_struct_schema(properties, required, None)
+    generate_struct_schema(properties, required)
 }
 
 pub fn generate_root_schema<T>() -> Result<RootSchema, GenerateError>
@@ -465,7 +469,11 @@ where
     // Set env variable to enable generating all schemas, including platform-specific ones.
     std::env::set_var("VECTOR_GENERATE_SCHEMA", "true");
 
-    let schema_gen = RefCell::new(SchemaSettings::new().into_generator());
+    let generator = SchemaSettings::new()
+        .with_visitor(FlattenReferencesAndSubschemasVisitor::from_settings)
+        .into_generator();
+
+    let schema_gen = RefCell::new(generator);
 
     let schema =
         get_or_generate_schema(&T::as_configurable_ref(), &schema_gen, Some(T::metadata()))?;
