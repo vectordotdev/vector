@@ -7,7 +7,7 @@ use std::fs::OpenOptions;
 use std::io::{self, Write};
 
 /// Setting necessary metadata for our publish workflow in CI.
-/// 
+///
 /// Responsible for setting necessary metadata for our publish workflow in CI.
 /// Computes the Vector version (from Cargo.toml), the release channel (nightly vs latest), which Cloudsmith
 /// repository to publish to, and more. All of this information is emitted in a way that sets native outputs on the
