@@ -1,6 +1,7 @@
 #![allow(missing_docs)]
 use std::{collections::HashMap, num::NonZeroUsize, path::PathBuf, sync::Arc};
 
+use exitcode::ExitCode;
 use futures::StreamExt;
 #[cfg(feature = "enterprise")]
 use futures_util::future::BoxFuture;
@@ -26,7 +27,7 @@ use crate::service;
 #[cfg(feature = "api")]
 use crate::{api, internal_events::ApiStarted};
 use crate::{
-    cli::{handle_config_errors, Color, LogFormat, Opts, RootOpts, SubCommand},
+    cli::{handle_config_errors, LogFormat, Opts, RootOpts, SubCommand},
     config, generate, generate_schema, graph, heartbeat, list,
     signal::{self, SignalTo},
     topology::{self, ReloadOutcome, RunningTopology, TopologyController},
@@ -60,7 +61,7 @@ pub struct Application {
 }
 
 impl Application {
-    pub fn prepare() -> Result<(Runtime, Self), exitcode::ExitCode> {
+    pub fn prepare() -> Result<(Runtime, Self), ExitCode> {
         let opts = Opts::get_matches().map_err(|error| {
             // Printing to stdout/err can itself fail; ignore it.
             let _ = error.print();
@@ -70,43 +71,14 @@ impl Application {
         Self::prepare_from_opts(opts)
     }
 
-    pub fn prepare_from_opts(opts: Opts) -> Result<(Runtime, Self), exitcode::ExitCode> {
+    pub fn prepare_from_opts(opts: Opts) -> Result<(Runtime, Self), ExitCode> {
         openssl_probe::init_ssl_cert_env_vars();
 
-        let level = std::env::var("VECTOR_LOG")
-            .or_else(|_| {
-                warn!(message = "Use of $LOG is deprecated. Please use $VECTOR_LOG instead.");
-                std::env::var("LOG")
-            })
-            .unwrap_or_else(|_| match opts.log_level() {
-                "off" => "off".to_owned(),
-                level => [
-                    format!("vector={}", level),
-                    format!("codec={}", level),
-                    format!("vrl={}", level),
-                    format!("file_source={}", level),
-                    "tower_limit=trace".to_owned(),
-                    format!("rdkafka={}", level),
-                    format!("buffers={}", level),
-                    format!("lapin={}", level),
-                    format!("kube={}", level),
-                ]
-                .join(","),
-            });
+        let level = get_log_levels(opts.log_level());
 
-        let root_opts = opts.root;
-        let sub_command = opts.sub_command;
+        let color = opts.root.color.use_color();
 
-        let color = match root_opts.color {
-            #[cfg(unix)]
-            Color::Auto => atty::is(atty::Stream::Stdout),
-            #[cfg(windows)]
-            Color::Auto => false, // ANSI colors are not supported by cmd.exe
-            Color::Always => true,
-            Color::Never => false,
-        };
-
-        let json = match &root_opts.log_format {
+        let json = match &opts.root.log_format {
             LogFormat::Text => false,
             LogFormat::Json => true,
         };
@@ -114,42 +86,24 @@ impl Application {
         #[cfg(not(feature = "enterprise-tests"))]
         metrics::init_global().expect("metrics initialization failed");
 
-        let mut rt_builder = runtime::Builder::new_multi_thread();
-        rt_builder.enable_all().thread_name("vector-worker");
-
-        if let Some(threads) = root_opts.threads {
-            if threads < 1 {
-                #[allow(clippy::print_stderr)]
-                {
-                    eprintln!("The `threads` argument must be greater or equal to 1.");
-                }
-                return Err(exitcode::CONFIG);
-            } else {
-                WORKER_THREADS
-                    .set(NonZeroUsize::new(threads).expect("already checked"))
-                    .expect("double thread initialization");
-                rt_builder.worker_threads(threads);
-            }
-        }
-
-        let runtime = rt_builder.build().expect("Unable to create async runtime");
+        let runtime = build_runtime(opts.root.threads, "vector-worker")?;
 
         let config = {
-            let config_paths = root_opts.config_paths_with_formats();
-            let watch_config = root_opts.watch_config;
-            let require_healthy = root_opts.require_healthy;
+            let config_paths = opts.root.config_paths_with_formats();
+            let watch_config = opts.root.watch_config;
+            let require_healthy = opts.root.require_healthy;
 
             runtime.block_on(async move {
-                trace::init(color, json, &level, root_opts.internal_log_rate_limit);
+                trace::init(color, json, &level, opts.root.internal_log_rate_limit);
                 info!(
                     message = "Internal log rate limit configured.",
-                    internal_log_rate_secs = root_opts.internal_log_rate_limit
+                    internal_log_rate_secs = opts.root.internal_log_rate_limit
                 );
                 // Signal handler for OS and provider messages.
                 let (mut signal_handler, signal_rx) = signal::SignalHandler::new();
                 signal_handler.forever(signal::os_signals());
 
-                if let Some(s) = sub_command {
+                if let Some(s) = opts.sub_command {
                     let code = match s {
                         SubCommand::Generate(g) => generate::cmd(&g),
                         SubCommand::GenerateSchema => generate_schema::cmd(),
@@ -253,7 +207,7 @@ impl Application {
         Ok((
             runtime,
             Self {
-                opts: root_opts,
+                opts: opts.root,
                 config,
             },
         ))
@@ -460,4 +414,54 @@ async fn sources_finished(mutex: Arc<Mutex<TopologyController>>) {
             continue;
         }
     }
+}
+
+fn get_log_levels(default: &str) -> String {
+    std::env::var("VECTOR_LOG")
+        .or_else(|_| {
+            std::env::var("LOG").map(|log| {
+                warn!(
+                    message =
+                        "DEPRECATED: Use of $LOG is deprecated. Please use $VECTOR_LOG instead."
+                );
+                log
+            })
+        })
+        .unwrap_or_else(|_| match default {
+            "off" => "off".to_owned(),
+            level => [
+                format!("vector={}", level),
+                format!("codec={}", level),
+                format!("vrl={}", level),
+                format!("file_source={}", level),
+                "tower_limit=trace".to_owned(),
+                format!("rdkafka={}", level),
+                format!("buffers={}", level),
+                format!("lapin={}", level),
+                format!("kube={}", level),
+            ]
+            .join(","),
+        })
+}
+
+pub fn build_runtime(threads: Option<usize>, thread_name: &str) -> Result<Runtime, ExitCode> {
+    let mut rt_builder = runtime::Builder::new_multi_thread();
+    rt_builder.enable_all().thread_name(thread_name);
+
+    if let Some(threads) = threads {
+        if threads < 1 {
+            #[allow(clippy::print_stderr)]
+            {
+                eprintln!("The `threads` argument must be greater or equal to 1.");
+            }
+            return Err(exitcode::CONFIG);
+        } else {
+            WORKER_THREADS
+                .set(NonZeroUsize::new(threads).expect("already checked"))
+                .expect("double thread initialization");
+            rt_builder.worker_threads(threads);
+        }
+    }
+
+    Ok(rt_builder.build().expect("Unable to create async runtime"))
 }
