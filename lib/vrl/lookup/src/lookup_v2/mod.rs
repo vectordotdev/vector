@@ -64,10 +64,10 @@
 //! [ValuePath] and [TargetPath] are implemented for [&str]. That means a raw / unparsed string can
 //! be used as a path. This use is discouraged, and may be removed in the future. It mostly
 //! exists for backwards compatibility in places where String paths are used instead of owned paths.
-//! Using string paths is slightly slower than using an owned path (it's still very fast),
-//! but it's easy to introduce bugs since some compile-time type information is missing, such as whether it's a
-//! target vs value path, or if the entire string is meant to be treated as a single segment vs
-//! being parsed as a path.
+//! Using string paths is slightly slower than using an owned path. It's still very fast
+//! but it is easy to introduce bugs since some compile-time type information is missing -
+//! such as whether it is a target vs value path, or if the entire string is meant
+//!  to be treated as a single segment vs being parsed as a path.
 //!
 //! # Macros
 //! Several macros exist to make creating paths easier. These are used if the structure of the
