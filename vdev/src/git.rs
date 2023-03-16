@@ -1,6 +1,6 @@
-use std::{collections::HashSet, process::Command, process::Output};
+use std::{collections::HashSet, process::Command};
 
-use anyhow::{anyhow, Result, Context};
+use anyhow::Result;
 
 use crate::app::CommandExt as _;
 
@@ -84,49 +84,26 @@ pub fn check_git_repository_clean() -> Result<bool> {
 }
 
 /// Commits changes from the current repo
-pub fn commit(commit_message: &str) -> Result<Output> {
-    let output = run_command_check_status(&["-am", commit_message])?;
-    Ok(output)
+pub fn commit(commit_message: &str) -> Result<String> {
+    Command::new("git")
+        .args(["-am", commit_message])
+        .capture_output()
 }
 
 /// Pushes changes from the current repo
-pub fn push() -> Result<Output> {
-    let output = Command::new("git")
-        .arg("push")
-        .output()
-        .map_err(|e| anyhow!("{}", e))?;
-
-    Ok(output)
+pub fn push() -> Result<String> {
+    Command::new("git").arg("push").capture_output()
 }
 
-pub fn clone(repo_url: &str) -> Result<Output> {
-    let output = Command::new("git")
-        .arg("clone")
-        .arg(repo_url)
-        .output()
-        .map_err(|e| anyhow!("{}", e))?;
-
-    Ok(output)
+pub fn clone(repo_url: &str) -> Result<String> {
+    Command::new("git")
+        .args(["clone", repo_url])
+        .capture_output()
 }
 
 fn capture_output(args: &[&str]) -> Result<String> {
     Command::new("git").in_repo().args(args).capture_output()
 }
-
-// TODO: Potentially modify capture_output function with this implementation if it satisfies the use case
-fn run_command_check_status(args: &[&str]) -> Result<Output> {
-    let mut command = Command::new("git");
-    command.args(args);
-
-    let output = command.output().context(format!("Failed to run command: git {:?}", args))?;
-    let status = output.status;
-    if !status.success() {
-        return Err(anyhow!("Command failed with exit code: {status}"));
-    }
-
-    Ok(output)
-}
-
 
 fn is_warning_line(line: &str) -> bool {
     line.starts_with("warning: ") || line.contains("original line endings")
