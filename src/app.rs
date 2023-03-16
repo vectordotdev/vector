@@ -55,13 +55,12 @@ pub struct ApplicationConfig {
 }
 
 pub struct Application {
-    opts: RootOpts,
+    pub opts: RootOpts,
     pub config: ApplicationConfig,
-    pub runtime: Runtime,
 }
 
 impl Application {
-    pub fn prepare() -> Result<Self, exitcode::ExitCode> {
+    pub fn prepare() -> Result<(Runtime, Self), exitcode::ExitCode> {
         let opts = Opts::get_matches().map_err(|error| {
             // Printing to stdout/err can itself fail; ignore it.
             let _ = error.print();
@@ -71,7 +70,7 @@ impl Application {
         Self::prepare_from_opts(opts)
     }
 
-    pub fn prepare_from_opts(opts: Opts) -> Result<Self, exitcode::ExitCode> {
+    pub fn prepare_from_opts(opts: Opts) -> Result<(Runtime, Self), exitcode::ExitCode> {
         openssl_probe::init_ssl_cert_env_vars();
 
         let level = std::env::var("VECTOR_LOG")
@@ -133,14 +132,14 @@ impl Application {
             }
         }
 
-        let rt = rt_builder.build().expect("Unable to create async runtime");
+        let runtime = rt_builder.build().expect("Unable to create async runtime");
 
         let config = {
             let config_paths = root_opts.config_paths_with_formats();
             let watch_config = root_opts.watch_config;
             let require_healthy = root_opts.require_healthy;
 
-            rt.block_on(async move {
+            runtime.block_on(async move {
                 trace::init(color, json, &level, root_opts.internal_log_rate_limit);
                 info!(
                     message = "Internal log rate limit configured.",
@@ -251,15 +250,19 @@ impl Application {
             })
         }?;
 
-        Ok(Application {
-            opts: root_opts,
-            config,
-            runtime: rt,
-        })
+        Ok((
+            runtime,
+            Self {
+                opts: root_opts,
+                config,
+            },
+        ))
     }
 
-    pub fn run(self) {
-        let rt = self.runtime;
+    pub async fn run(self) {
+        // Any internal_logs sources will have grabbed a copy of the
+        // early buffer by this point and set up a subscriber.
+        crate::trace::stop_early_buffering();
 
         let mut graceful_crash = UnboundedReceiverStream::new(self.config.graceful_crash_receiver);
         let topology = self.config.topology;
@@ -277,148 +280,151 @@ impl Application {
         let mut signal_handler = self.config.signal_handler;
         let mut signal_rx = self.config.signal_rx;
 
-        // Any internal_logs sources will have grabbed a copy of the
-        // early buffer by this point and set up a subscriber.
-        crate::trace::stop_early_buffering();
+        emit!(VectorStarted);
+        tokio::spawn(heartbeat::heartbeat());
 
-        rt.block_on(async move {
-            emit!(VectorStarted);
-            tokio::spawn(heartbeat::heartbeat());
+        // Configure the API server, if applicable.
+        #[cfg(feature = "api")]
+        // Assigned to prevent the API terminating when falling out of scope.
+        let api_server = if api_config.enabled {
+            use std::sync::atomic::AtomicBool;
 
-            // Configure the API server, if applicable.
+            let api_server = api::Server::start(
+                topology.config(),
+                topology.watch(),
+                Arc::<AtomicBool>::clone(&topology.running),
+            );
+
+            match api_server {
+                Ok(api_server) => {
+                    emit!(ApiStarted {
+                        addr: api_config.address.unwrap(),
+                        playground: api_config.playground
+                    });
+
+                    Some(api_server)
+                }
+                Err(e) => {
+                    error!("An error occurred that Vector couldn't handle: {}.", e);
+                    let _ = self.config.graceful_crash_sender.send(());
+                    None
+                }
+            }
+        } else {
+            info!(message="API is disabled, enable by setting `api.enabled` to `true` and use commands like `vector top`.");
+            None
+        };
+
+        let topology_controller = TopologyController {
+            topology,
+            config_paths,
+            require_healthy: opts.require_healthy,
+            #[cfg(feature = "enterprise")]
+            enterprise_reporter,
             #[cfg(feature = "api")]
-            // Assigned to prevent the API terminating when falling out of scope.
-            let api_server = if api_config.enabled {
-                use std::sync::atomic::AtomicBool;
+            api_server,
+        };
+        let topology_controller = Arc::new(Mutex::new(topology_controller));
 
-                let api_server = api::Server::start(topology.config(), topology.watch(), Arc::<AtomicBool>::clone(&topology.running));
-
-                match api_server {
-                    Ok(api_server) => {
-                        emit!(ApiStarted {
-                            addr: api_config.address.unwrap(),
-                            playground: api_config.playground
-                        });
-
-                        Some(api_server)
-                    }
-                    Err(e) => {
-                        error!("An error occurred that Vector couldn't handle: {}.", e);
-                        let _ = self.config.graceful_crash_sender.send(());
-                        None
-                    }
+        // If the relevant ENV var is set, start up the control server
+        #[cfg(not(windows))]
+        let control_server_pieces = if let Ok(path) = std::env::var("VECTOR_CONTROL_SOCKET_PATH") {
+            let (shutdown_trigger, tripwire) = stream_cancel::Tripwire::new();
+            match ControlServer::bind(path, Arc::clone(&topology_controller), tripwire) {
+                Ok(control_server) => {
+                    let server_handle = tokio::spawn(control_server.run());
+                    Some((shutdown_trigger, server_handle))
                 }
-            } else {
-                info!(message="API is disabled, enable by setting `api.enabled` to `true` and use commands like `vector top`.");
-                None
-            };
-
-            let topology_controller = TopologyController {
-                topology,
-                config_paths,
-                require_healthy: opts.require_healthy,
-                #[cfg(feature = "enterprise")]
-                enterprise_reporter,
-                #[cfg(feature = "api")]
-                api_server,
-            };
-            let topology_controller = Arc::new(Mutex::new(topology_controller));
-
-            // If the relevant ENV var is set, start up the control server
-            #[cfg(not(windows))]
-            let control_server_pieces = if let Ok(path) = std::env::var("VECTOR_CONTROL_SOCKET_PATH") {
-                let (shutdown_trigger, tripwire) = stream_cancel::Tripwire::new();
-                match ControlServer::bind(path, Arc::clone(&topology_controller), tripwire) {
-                    Ok(control_server) => {
-                        let server_handle = tokio::spawn(control_server.run());
-                        Some((shutdown_trigger, server_handle))
-                    }
-                    Err(error) => {
-                        error!(message = "Error binding control server.", %error);
-                        // TODO: We should exit non-zero here, but `Application::run` isn't set up
-                        // that way, and we'd need to push everything up to the API server start
-                        // into `Application::prepare`.
-                        return
-                    }
+                Err(error) => {
+                    error!(message = "Error binding control server.", %error);
+                    // TODO: We should exit non-zero here, but `Application::run` isn't set up
+                    // that way, and we'd need to push everything up to the API server start
+                    // into `Application::prepare`.
+                    return;
                 }
-            } else {
-                None
-            };
+            }
+        } else {
+            None
+        };
 
-            let signal = loop {
-                tokio::select! {
-                    signal = signal_rx.recv() => {
-                        match signal {
-                            Ok(SignalTo::ReloadFromConfigBuilder(config_builder)) => {
-                                let mut topology_controller = topology_controller.lock().await;
-                                let new_config = config_builder.build().map_err(handle_config_errors).ok();
-                                if let ReloadOutcome::FatalError = topology_controller.reload(new_config).await {
-                                    break SignalTo::Shutdown;
-                                }
+        let signal = loop {
+            tokio::select! {
+                signal = signal_rx.recv() => {
+                    match signal {
+                        Ok(SignalTo::ReloadFromConfigBuilder(config_builder)) => {
+                            let mut topology_controller = topology_controller.lock().await;
+                            let new_config = config_builder.build().map_err(handle_config_errors).ok();
+                            if let ReloadOutcome::FatalError = topology_controller.reload(new_config).await {
+                                break SignalTo::Shutdown;
                             }
-                            Ok(SignalTo::ReloadFromDisk) => {
-                                let mut topology_controller = topology_controller.lock().await;
-
-                                // Reload paths
-                                if let Some(paths) = config::process_paths(&opts.config_paths_with_formats()) {
-                                    topology_controller.config_paths = paths;
-                                }
-
-                                // Reload config
-                                let new_config = config::load_from_paths_with_provider_and_secrets(&topology_controller.config_paths, &mut signal_handler)
-                                    .await
-                                    .map_err(handle_config_errors).ok();
-
-                                if let ReloadOutcome::FatalError = topology_controller.reload(new_config).await {
-                                    break SignalTo::Shutdown;
-                                }
-                            },
-                            Err(RecvError::Lagged(amt)) => warn!("Overflow, dropped {} signals.", amt),
-                            Err(RecvError::Closed) => break SignalTo::Shutdown,
-                            Ok(signal) => break signal,
                         }
-                    }
-                    // Trigger graceful shutdown if a component crashed, or all sources have ended.
-                    _ = graceful_crash.next() => break SignalTo::Shutdown,
-                    _ = sources_finished(Arc::clone(&topology_controller)) => {
-                        info!("All sources have finished.");
-                        break SignalTo::Shutdown
-                    } ,
-                    else => unreachable!("Signal streams never end"),
-                }
-            };
+                        Ok(SignalTo::ReloadFromDisk) => {
+                            let mut topology_controller = topology_controller.lock().await;
 
-            // Shut down the control server, if running
-            #[cfg(not(windows))]
-            if let Some((shutdown_trigger, server_handle)) = control_server_pieces {
-                drop(shutdown_trigger);
-                server_handle.await.expect("control server task panicked").expect("control server error");
-            }
+                            // Reload paths
+                            if let Some(paths) = config::process_paths(&opts.config_paths_with_formats()) {
+                                topology_controller.config_paths = paths;
+                            }
 
-            // Once any control server has stopped, we'll have the only reference to the topology
-            // controller and can safely remove it from the Arc/Mutex to shut down the topology.
-            let topology_controller = Arc::try_unwrap(topology_controller).expect("fail to unwrap topology controller").into_inner();
+                            // Reload config
+                            let new_config = config::load_from_paths_with_provider_and_secrets(&topology_controller.config_paths, &mut signal_handler)
+                                .await
+                                .map_err(handle_config_errors).ok();
 
-            match signal {
-                SignalTo::Shutdown => {
-                    emit!(VectorStopped);
-                    tokio::select! {
-                        _ = topology_controller.stop() => (), // Graceful shutdown finished
-                        _ = signal_rx.recv() => {
-                            // It is highly unlikely that this event will exit from topology.
-                            emit!(VectorQuit);
-                            // Dropping the shutdown future will immediately shut the server down
-                        }
+                            if let ReloadOutcome::FatalError = topology_controller.reload(new_config).await {
+                                break SignalTo::Shutdown;
+                            }
+                        },
+                        Err(RecvError::Lagged(amt)) => warn!("Overflow, dropped {} signals.", amt),
+                        Err(RecvError::Closed) => break SignalTo::Shutdown,
+                        Ok(signal) => break signal,
                     }
                 }
-                SignalTo::Quit => {
-                    // It is highly unlikely that this event will exit from topology.
-                    emit!(VectorQuit);
-                    drop(topology_controller);
-                }
-                _ => unreachable!(),
+                // Trigger graceful shutdown if a component crashed, or all sources have ended.
+                _ = graceful_crash.next() => break SignalTo::Shutdown,
+                _ = sources_finished(Arc::clone(&topology_controller)) => {
+                    info!("All sources have finished.");
+                    break SignalTo::Shutdown
+                } ,
+                else => unreachable!("Signal streams never end"),
             }
-        });
+        };
+
+        // Shut down the control server, if running
+        #[cfg(not(windows))]
+        if let Some((shutdown_trigger, server_handle)) = control_server_pieces {
+            drop(shutdown_trigger);
+            server_handle
+                .await
+                .expect("control server task panicked")
+                .expect("control server error");
+        }
+
+        // Once any control server has stopped, we'll have the only reference to the topology
+        // controller and can safely remove it from the Arc/Mutex to shut down the topology.
+        let topology_controller = Arc::try_unwrap(topology_controller)
+            .expect("fail to unwrap topology controller")
+            .into_inner();
+
+        match signal {
+            SignalTo::Shutdown => {
+                emit!(VectorStopped);
+                tokio::select! {
+                    _ = topology_controller.stop() => (), // Graceful shutdown finished
+                    _ = signal_rx.recv() => {
+                        // It is highly unlikely that this event will exit from topology.
+                        emit!(VectorQuit);
+                        // Dropping the shutdown future will immediately shut the server down
+                    }
+                }
+            }
+            SignalTo::Quit => {
+                // It is highly unlikely that this event will exit from topology.
+                emit!(VectorQuit);
+                drop(topology_controller);
+            }
+            _ => unreachable!(),
+        }
     }
 }
 
