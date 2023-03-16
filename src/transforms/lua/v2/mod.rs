@@ -1,5 +1,6 @@
 use std::{path::PathBuf, time::Duration};
 
+use codecs::MetricTagValues;
 use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
 use vector_config::configurable_component;
@@ -8,7 +9,6 @@ use vector_core::transform::runtime_transform::{RuntimeTransform, Timer};
 
 use crate::event::lua::event::LuaEvent;
 use crate::schema::Definition;
-use crate::transforms::MetricTagsValues;
 use crate::{
     config::{self, DataType, Input, Output, CONFIG_PATHS},
     event::Event,
@@ -64,7 +64,7 @@ pub struct LuaConfig {
 
     /// A list of directories to search when loading a Lua file via the `require` function.
     ///
-    /// If not specified, the modules are looked up in the directories of Vector’s configs.
+    /// If not specified, the modules are looked up in the configuration directories.
     #[serde(default = "default_config_paths")]
     #[configurable(metadata(docs::examples = "/etc/vector/lua"))]
     search_dirs: Vec<PathBuf>,
@@ -83,7 +83,7 @@ pub struct LuaConfig {
     /// When set to `full`, all metric tags will be exposed as arrays of either string or null
     /// values.
     #[serde(default)]
-    metric_tag_values: MetricTagsValues,
+    metric_tag_values: MetricTagValues,
 }
 
 fn default_config_paths() -> Vec<PathBuf> {
@@ -110,7 +110,7 @@ fn default_config_paths() -> Vec<PathBuf> {
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 struct HooksConfig {
-    /// A function which is called when the first event comes, before calling `hooks.process`.
+    /// The function called when the first event comes in, before `hooks.process` is called.
     ///
     /// It can produce new events using the `emit` function.
     ///
@@ -122,7 +122,7 @@ struct HooksConfig {
     ))]
     init: Option<String>,
 
-    /// A function which is called for each incoming event.
+    /// The function called for each incoming event.
     ///
     /// It can produce new events using the `emit` function.
     ///
@@ -135,7 +135,7 @@ struct HooksConfig {
     ))]
     process: String,
 
-    /// A function which is called when Vector is stopped.
+    /// The function called when the transform is stopped.
     ///
     /// It can produce new events using the `emit` function.
     ///
@@ -269,7 +269,7 @@ impl Lua {
             timers.push((timer, handler_key));
         }
 
-        let multi_value_tags = config.metric_tag_values == MetricTagsValues::Full;
+        let multi_value_tags = config.metric_tag_values == MetricTagValues::Full;
 
         Ok(Self {
             lua,

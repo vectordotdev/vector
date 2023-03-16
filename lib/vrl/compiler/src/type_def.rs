@@ -20,7 +20,7 @@
 //! that array.
 //!
 //! `Object` is a Map of `Field` -> `KindInfo`.
-//! `Field` can be a specifix field name of the object, or `Any` which represents any element found
+//! `Field` can be a specific field name of the object, or `Any` which represents any element found
 //! within that object.
 
 use std::ops::{Deref, DerefMut};

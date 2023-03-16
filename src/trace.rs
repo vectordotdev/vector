@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 use std::{
     collections::HashMap,
     marker::PhantomData,
@@ -280,7 +281,7 @@ impl TraceSubscription {
     /// Converts this subscription into a raw stream of log events.
     pub fn into_stream(self) -> impl Stream<Item = LogEvent> + Unpin {
         // We ignore errors because the only error we get is when the broadcast receiver lags, and there's nothing we
-        // can actully do about that so there's no reason to force callers to even deal with it.
+        // can actually do about that so there's no reason to force callers to even deal with it.
         BroadcastStream::new(self.trace_rx).filter_map(|event| ready(event.ok()))
     }
 }

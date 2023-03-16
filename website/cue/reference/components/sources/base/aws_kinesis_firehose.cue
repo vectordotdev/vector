@@ -2,6 +2,8 @@ package metadata
 
 base: components: sources: aws_kinesis_firehose: configuration: {
 	access_key: {
+		deprecated:         true
+		deprecated_message: "This option has been deprecated, use `access_keys` instead."
 		description: """
 			An optional access key to authenticate requests against.
 
@@ -9,15 +11,28 @@ base: components: sources: aws_kinesis_firehose: configuration: {
 			configured, `access_key` should be set to the same value. Otherwise, all requests will be allowed.
 			"""
 		required: false
-		type: string: syntax: "literal"
+		type: string: examples: ["A94A8FE5CCB19BA61C4C08"]
+	}
+	access_keys: {
+		description: """
+			An optional list of access keys to authenticate requests against.
+
+			AWS Kinesis Firehose can be configured to pass along a user-configurable access key with each request. If
+			configured, `access_keys` should be set to the same value. Otherwise, all requests will be allowed.
+			"""
+		required: false
+		type: array: items: type: string: examples: ["A94A8FE5CCB19BA61C4C08", "B94B8FE5CCB19BA61C4C12"]
 	}
 	acknowledgements: {
+		deprecated: true
 		description: """
 			Controls how acknowledgements are handled by this source.
 
-			This setting is **deprecated** in favor of enabling `acknowledgements` at the [global][global_acks] or sink level. Enabling or disabling acknowledgements at the source level has **no effect** on acknowledgement behavior.
+			This setting is **deprecated** in favor of enabling `acknowledgements` at the [global][global_acks] or sink level.
 
-			See [End-to-end Acknowledgements][e2e_acks] for more information on how Vector handles event acknowledgement.
+			Enabling or disabling acknowledgements at the source level has **no effect** on acknowledgement behavior.
+
+			See [End-to-end Acknowledgements][e2e_acks] for more information on how event acknowledgement is handled.
 
 			[global_acks]: https://vector.dev/docs/reference/configuration/global-options/#acknowledgements
 			[e2e_acks]: https://vector.dev/docs/about/under-the-hood/architecture/end-to-end-acknowledgements/
@@ -30,15 +45,16 @@ base: components: sources: aws_kinesis_firehose: configuration: {
 		}
 	}
 	address: {
-		description: "The address to listen for connections on."
+		description: "The socket address to listen for connections on."
 		required:    true
-		type: string: syntax: "literal"
+		type: string: examples: ["0.0.0.0:443", "localhost:443"]
 	}
 	decoding: {
 		description: "Configures how events are decoded from raw bytes."
 		required:    false
 		type: object: options: codec: {
-			required: false
+			description: "The codec to use for decoding events."
+			required:    false
 			type: string: {
 				default: "bytes"
 				enum: {
@@ -54,13 +70,17 @@ base: components: sources: aws_kinesis_firehose: configuration: {
 						[json]: https://www.json.org/
 						"""
 					native: """
-						Decodes the raw bytes as Vector’s [native Protocol Buffers format][vector_native_protobuf] ([EXPERIMENTAL][experimental]).
+						Decodes the raw bytes as Vector’s [native Protocol Buffers format][vector_native_protobuf].
+
+						This codec is **[experimental][experimental]**.
 
 						[vector_native_protobuf]: https://github.com/vectordotdev/vector/blob/master/lib/vector-core/proto/event.proto
 						[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
 						"""
 					native_json: """
-						Decodes the raw bytes as Vector’s [native JSON format][vector_native_json] ([EXPERIMENTAL][experimental]).
+						Decodes the raw bytes as Vector’s [native JSON format][vector_native_json].
+
+						This codec is **[experimental][experimental]**.
 
 						[vector_native_json]: https://github.com/vectordotdev/vector/blob/master/lib/codecs/tests/data/native_encoding/schema.cue
 						[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
@@ -103,6 +123,14 @@ base: components: sources: aws_kinesis_firehose: configuration: {
 																The maximum length of the byte buffer.
 
 																This length does *not* include the trailing delimiter.
+
+																By default, there is no maximum length enforced. If events are malformed, this can lead to
+																additional resource usage as events continue to be buffered in memory, and can potentially
+																lead to memory exhaustion in extreme cases.
+
+																If there is a risk of processing malformed data, such as logs with user-controlled input,
+																consider setting the maximum length to a reasonably large value as a safety net. This will
+																ensure that processing is not truly unbounded.
 																"""
 						required: false
 						type: uint: {}
@@ -110,7 +138,8 @@ base: components: sources: aws_kinesis_firehose: configuration: {
 				}
 			}
 			method: {
-				required: false
+				description: "The framing method."
+				required:    false
 				type: string: {
 					default: "bytes"
 					enum: {
@@ -135,6 +164,14 @@ base: components: sources: aws_kinesis_firehose: configuration: {
 						The maximum length of the byte buffer.
 
 						This length does *not* include the trailing delimiter.
+
+						By default, there is no maximum length enforced. If events are malformed, this can lead to
+						additional resource usage as events continue to be buffered in memory, and can potentially
+						lead to memory exhaustion in extreme cases.
+
+						If there is a risk of processing malformed data, such as logs with user-controlled input,
+						consider setting the maximum length to a reasonably large value as a safety net. This will
+						ensure that processing is not truly unbounded.
 						"""
 					required: false
 					type: uint: {}
@@ -156,29 +193,46 @@ base: components: sources: aws_kinesis_firehose: configuration: {
 		description: """
 			The compression scheme to use for decompressing records within the Firehose message.
 
-			Some services, like AWS CloudWatch Logs, will [compress the events with
-			gzip](\\(urls.aws_cloudwatch_logs_firehose)), before sending them AWS Kinesis Firehose. This option can be used
-			to automatically decompress them before forwarding them to the next component.
+			Some services, like AWS CloudWatch Logs, will [compress the events with gzip][events_with_gzip],
+			before sending them AWS Kinesis Firehose. This option can be used to automatically decompress
+			them before forwarding them to the next component.
 
-			Note that this is different from [Content encoding option](\\(urls.aws_kinesis_firehose_http_protocol)) of the
+			Note that this is different from [Content encoding option][encoding_option] of the
 			Firehose HTTP endpoint destination. That option controls the content encoding of the entire HTTP request.
+
+			[events_with_gzip]: https://docs.aws.amazon.com/firehose/latest/dev/writing-with-cloudwatch-logs.html
+			[encoding_option]: https://docs.aws.amazon.com/firehose/latest/dev/create-destination.html#create-destination-http
 			"""
 		required: false
-		type: string: enum: {
-			auto: """
-				Automatically attempt to determine the compression scheme.
+		type: string: {
+			default: "auto"
+			enum: {
+				auto: """
+					Automatically attempt to determine the compression scheme.
 
-				Vector will try to determine the compression scheme of the object by looking at its file signature, also known
-				as [magic bytes](\\(urls.magic_bytes)).
+					The compression scheme of the object is determined by looking at its file signature, also known
+					as [magic bytes][magic_bytes].
 
-				Given that determining the encoding using magic bytes is not a perfect check, if the record fails to decompress
-				with the discovered format, the record will be forwarded as-is. Thus, if you know the records will always be
-				gzip encoded (for example if they are coming from AWS CloudWatch Logs) then you should prefer to set `gzip` here
-				to have Vector reject any records that are not-gziped.
-				"""
-			gzip: "GZIP."
-			none: "Uncompressed."
+					If the record fails to decompress with the discovered format, the record is forwarded as is.
+					Thus, if you know the records are always gzip encoded (for example, if they are coming from AWS CloudWatch Logs),
+					set `gzip` in this field so that any records that are not-gzipped are rejected.
+
+					[magic_bytes]: https://en.wikipedia.org/wiki/List_of_file_signatures
+					"""
+				gzip: "GZIP."
+				none: "Uncompressed."
+			}
 		}
+	}
+	store_access_key: {
+		description: """
+			Whether or not to store the AWS Firehose Access Key in event secrets.
+
+			If set to `true`, when incoming requests contains an Access Key sent by AWS Firehose, it will be kept in the
+			event secrets as "aws_kinesis_firehose_access_key".
+			"""
+		required: true
+		type: bool: {}
 	}
 	tls: {
 		description: "Configures the TLS options for incoming/outgoing connections."
@@ -192,7 +246,7 @@ base: components: sources: aws_kinesis_firehose: configuration: {
 					they are defined.
 					"""
 				required: false
-				type: array: items: type: string: syntax: "literal"
+				type: array: items: type: string: examples: ["h2"]
 			}
 			ca_file: {
 				description: """
@@ -201,7 +255,7 @@ base: components: sources: aws_kinesis_firehose: configuration: {
 					The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: examples: ["/path/to/certificate_authority.crt"]
 			}
 			crt_file: {
 				description: """
@@ -213,7 +267,7 @@ base: components: sources: aws_kinesis_firehose: configuration: {
 					If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: examples: ["/path/to/host_certificate.crt"]
 			}
 			enabled: {
 				description: """
@@ -232,7 +286,7 @@ base: components: sources: aws_kinesis_firehose: configuration: {
 					The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: examples: ["/path/to/host_certificate.key"]
 			}
 			key_pass: {
 				description: """
@@ -241,7 +295,7 @@ base: components: sources: aws_kinesis_firehose: configuration: {
 					This has no effect unless `key_file` is set.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: examples: ["${KEY_PASS_ENV_VAR}", "PassWord1"]
 			}
 			verify_certificate: {
 				description: """

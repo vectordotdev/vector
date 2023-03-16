@@ -5,6 +5,10 @@ components: sources: splunk_hec: {
 
 	title: "Splunk HTTP Event Collector (HEC)"
 
+	description: """
+		This source exposes three HTTP endpoints at a configurable address that jointly implement the [Splunk HEC API](https://docs.splunk.com/Documentation/Splunk/9.0.3/Data/UsetheHTTPEventCollector): `/services/collector/event`, `/services/collector/raw`, and `/services/collector/health`.
+		"""
+
 	classes: {
 		commonly_used: false
 		delivery:      "at_least_once"
@@ -15,6 +19,7 @@ components: sources: splunk_hec: {
 	}
 
 	features: {
+		auto_generated:   true
 		acknowledgements: true
 		multiline: enabled: false
 		receive: {
@@ -51,94 +56,7 @@ components: sources: splunk_hec: {
 		platform_name: null
 	}
 
-	configuration: {
-		acknowledgements: configuration._source_acknowledgements & {
-			type: object: {
-				options: {
-					max_number_of_ack_channels: {
-						common:      false
-						description: "The maximum number of Splunk HEC channels clients can use with this source. Minimum of `1`."
-						required:    false
-						type: uint: {
-							default: 1000000
-							unit:    null
-						}
-					}
-					max_pending_acks: {
-						common:      false
-						description: "The maximum number of ack statuses pending query across all channels. Equivalent to the `max_number_of_acked_requests_pending_query` Splunk HEC setting. Minimum of `1`."
-						required:    false
-						type: uint: {
-							default: 10000000
-							unit:    null
-						}
-					}
-					max_pending_acks_per_channel: {
-						common:      false
-						description: "The maximum number of ack statuses pending query for a single channel. Equivalent to the `max_number_of_acked_requests_pending_query_per_ack_channel` Splunk HEC setting. Minimum of `1`."
-						required:    false
-						type: uint: {
-							default: 1000000
-							unit:    null
-						}
-					}
-					ack_idle_cleanup: {
-						common:      false
-						description: "Whether or not to remove channels after idling for `max_idle_time` seconds. A channel is idling if it is not used for sending data or querying ack statuses."
-						required:    false
-						type: bool: {
-							default: false
-						}
-					}
-					max_idle_time: {
-						common:      false
-						description: "The amount of time a channel is allowed to idle before removal. Channels can potentially idle for longer than this setting but clients should not rely on such behavior. Minimum of `1`."
-						required:    false
-						type: uint: {
-							default: 300
-							unit:    "seconds"
-						}
-					}
-				}
-			}
-		}
-		address: {
-			common:      true
-			description: "The address to accept connections on."
-			required:    false
-			type: string: {
-				default: "0.0.0.0:\(_port)"
-			}
-		}
-		token: {
-			common:      true
-			description: "If supplied, incoming requests must supply this token in the `Authorization` header, just as a client would if it was communicating with the Splunk HEC endpoint directly. If _not_ supplied, the `Authorization` header will be ignored and requests will not be authenticated."
-			required:    false
-			warnings: ["This option has been deprecated, the `valid_tokens` option should be used."]
-			type: string: {
-				default: null
-				examples: ["A94A8FE5CCB19BA61C4C08"]
-			}
-		}
-		valid_tokens: {
-			common:      true
-			description: "If supplied, incoming requests must supply one of these tokens in the `Authorization` header, just as a client would if it was communicating with the Splunk HEC endpoint directly. If _not_ supplied, the `Authorization` header will be ignored and requests will not be authenticated."
-			required:    false
-			type: array: {
-				default: null
-
-				items: type: string: {
-					examples: ["A94A8FE5CCB19BA61C4C08"]
-				}
-			}
-		}
-		store_hec_token: {
-			common:      false
-			description: "When incoming requests contain a Splunk HEC token, if this setting is set to `true`, the token will kept in the event metadata and will be used if the event is sent to a Splunk HEC sink."
-			required:    false
-			type: bool: default: false
-		}
-	}
+	configuration: base.components.sources.splunk_hec.configuration
 
 	output: logs: event: {
 		description: "A single event"

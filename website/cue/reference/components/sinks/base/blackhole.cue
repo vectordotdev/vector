@@ -5,7 +5,7 @@ base: components: sinks: blackhole: configuration: {
 		description: """
 			Controls how acknowledgements are handled for this sink.
 
-			See [End-to-end Acknowledgements][e2e_acks] for more information on how Vector handles event acknowledgement.
+			See [End-to-end Acknowledgements][e2e_acks] for more information on how event acknowledgement is handled.
 
 			[e2e_acks]: https://vector.dev/docs/about/under-the-hood/architecture/end-to-end-acknowledgements/
 			"""
@@ -29,12 +29,18 @@ base: components: sinks: blackhole: configuration: {
 	}
 	print_interval_secs: {
 		description: """
-			The number of seconds between reporting a summary of activity.
+			The interval between reporting a summary of activity.
 
 			Set to `0` to disable reporting.
 			"""
 		required: false
-		type: uint: default: 1
+		type: uint: {
+			default: 1
+			examples: [
+				10,
+			]
+			unit: "seconds"
+		}
 	}
 	rate: {
 		description: """
@@ -43,6 +49,8 @@ base: components: sinks: blackhole: configuration: {
 			By default, there is no limit.
 			"""
 		required: false
-		type: uint: {}
+		type: uint: examples: [
+			1000,
+		]
 	}
 }

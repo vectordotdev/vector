@@ -192,7 +192,7 @@ impl Bin {
 /// Datadog made some slight tweaks to configuration values and in-memory layout to optimize it for
 /// insertion performance within the agent.
 ///
-/// We've mimiced the agent version of `DDSketch` here in order to support a future where we can
+/// We've mimicked the agent version of `DDSketch` here in order to support a future where we can
 /// take sketches shipped by the agent, handle them internally, merge them, and so on, without any
 /// loss of accuracy, eventually forwarding them to Datadog ourselves.
 ///
@@ -1291,9 +1291,7 @@ mod tests {
 
                 assert!(
                     (positive - negative).abs() <= 1.0e-6,
-                    "positive vs negative difference too great ({} vs {})",
-                    positive,
-                    negative
+                    "positive vs negative difference too great ({positive} vs {negative})",
                 );
             }
 
@@ -1399,7 +1397,7 @@ mod tests {
         // granularity.
         //
         // This test uses a far larger range of values, and takes 60-70 seconds, hence why we've
-        // guared it here behind a cfg flag.
+        // guarded it here behind a cfg flag.
         let config = Config::default();
         let min_value = 1.0e-6;
         let max_value = i64::MAX as f32;
@@ -1499,18 +1497,14 @@ mod tests {
         let max_observed_rel_acc = check_max_relative_accuracy(config, min_value, max_value);
         assert!(
             max_observed_rel_acc <= rel_acc + FLOATING_POINT_ACCEPTABLE_ERROR,
-            "observed out of bound max relative acc: {}, target rel acc={}",
-            max_observed_rel_acc,
-            rel_acc
+            "observed out of bound max relative acc: {max_observed_rel_acc}, target rel acc={rel_acc}",
         );
     }
 
     fn compute_relative_accuracy(target: f64, actual: f64) -> f64 {
         assert!(
             !(target < 0.0 || actual < 0.0),
-            "expected/actual values must be greater than 0.0; target={}, actual={}",
-            target,
-            actual
+            "expected/actual values must be greater than 0.0; target={target}, actual={actual}",
         );
 
         if target == actual {

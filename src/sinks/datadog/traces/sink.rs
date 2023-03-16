@@ -23,7 +23,7 @@ use crate::{
 #[derive(Default)]
 struct EventPartitioner;
 
-// Use all fields from the top level protobuf contruct associated with the API key
+// Use all fields from the top level protobuf construct associated with the API key
 #[derive(Hash, Eq, PartialEq, Clone, Debug)]
 pub(crate) struct PartitionKey {
     pub(crate) api_key: Option<Arc<str>>,

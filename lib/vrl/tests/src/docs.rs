@@ -20,9 +20,6 @@ const SKIP_FUNCTION_EXAMPLES: &[&str] = &[
     "get_hostname",
     "now",
     "get_env_var",
-    "get_metadata_field",
-    "set_metadata_field",
-    "remove_metadata_field",
 ];
 
 #[derive(Debug, Deserialize)]
@@ -83,7 +80,7 @@ pub fn tests(ignore_cue: bool) -> Vec<Test> {
 
     let output = Command::new("bash")
         .current_dir(dir)
-        .args(&["cue.sh", "export", "-e", "remap"])
+        .args(["cue.sh", "export", "-e", "remap"])
         .output()
         .expect("failed to execute process");
 

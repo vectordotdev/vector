@@ -30,10 +30,10 @@ impl fmt::Debug for ControlMessage {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "ControlMessage::")?;
         match self {
-            Self::Add(id, _) => write!(f, "Add({:?})", id),
-            Self::Remove(id) => write!(f, "Remove({:?})", id),
-            Self::Pause(id) => write!(f, "Pause({:?})", id),
-            Self::Replace(id, _) => write!(f, "Replace({:?})", id),
+            Self::Add(id, _) => write!(f, "Add({id:?})"),
+            Self::Remove(id) => write!(f, "Remove({id:?})"),
+            Self::Pause(id) => write!(f, "Pause({id:?})"),
+            Self::Replace(id, _) => write!(f, "Replace({id:?})"),
         }
     }
 }
@@ -75,7 +75,7 @@ impl Fanout {
     fn remove(&mut self, id: &ComponentKey) {
         assert!(
             self.senders.remove(id).is_some(),
-            "Removing non-existent sink from fanout: {id}"
+            "Removing nonexistent sink from fanout: {id}"
         );
     }
 
@@ -101,7 +101,7 @@ impl Fanout {
                 // control operations has been applied.
                 assert!(
                     sender.take().is_some(),
-                    "Pausing non-existent sink is not valid: {id}"
+                    "Pausing nonexistent sink is not valid: {id}"
                 );
             }
             None => panic!("Pausing unknown sink from fanout: {id}"),
@@ -160,7 +160,7 @@ impl Fanout {
     /// # Panics
     ///
     /// This method can panic if the fanout receives a control message that violates some invariant
-    /// about its current state (e.g. remove a non-existent sink, etc.). This would imply a bug in
+    /// about its current state (e.g. remove a nonexistent sink, etc.). This would imply a bug in
     /// Vector's config reloading logic.
     ///
     /// # Errors
@@ -186,7 +186,7 @@ impl Fanout {
     /// # Panics
     ///
     /// This method can panic if the fanout receives a control message that violates some invariant
-    /// about its current state (e.g. remove a non-existent sink, etc). This would imply a bug in
+    /// about its current state (e.g. remove a nonexistent sink, etc). This would imply a bug in
     /// Vector's config reloading logic.
     ///
     /// # Errors
@@ -341,7 +341,7 @@ impl<'a> SendGroup<'a> {
         // around still trying to send to it.
         assert!(
             self.senders.remove(id).is_some(),
-            "Removing non-existent sink from fanout: {id}"
+            "Removing nonexistent sink from fanout: {id}"
         );
 
         // Now try and detach the in-flight send, if it exists.
@@ -889,7 +889,7 @@ mod tests {
     }
 
     fn _make_events(count: usize) -> impl Iterator<Item = LogEvent> {
-        (0..count).map(|i| LogEvent::from(format!("line {}", i)))
+        (0..count).map(|i| LogEvent::from(format!("line {i}")))
     }
 
     fn make_events(count: usize) -> Vec<Event> {

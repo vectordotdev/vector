@@ -35,7 +35,7 @@ $ mkcert -client -cert-file nats-client.pem -key-file nats-client.key localhost 
 After that, you can read more about [TLS configuration in
 NATS](https://docs.nats.io/running-a-nats-service/configuration/securing_nats/tls) to learn what to add to the
 configuration file itself. It also covers generating certificates using `mkcert`, but the above commands are specific to
-our existging test configurations, so you can skip read the link,. and simply follow the commands, if all you're doing
+our existing test configurations, so you can skip read the link,. and simply follow the commands, if all you're doing
 is regenerating the certificates due to expiration, etc.
 
 ## Generating the JWT-based configuration credentials

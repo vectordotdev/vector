@@ -41,8 +41,8 @@ jobs:
           export REPLICAS="10"
           export TOTAL_SAMPLES="600"
           export P_VALUE="0.1"
-          export SMP_CRATE_VERSION="0.6.5"
-          export LADING_VERSION="0.11.3"
+          export SMP_CRATE_VERSION="0.7.2"
+          export LADING_VERSION="0.12.0"
 
           echo "warmup seconds: ${WARMUP_SECONDS}"
           echo "replicas: ${REPLICAS}"
@@ -83,7 +83,7 @@ jobs:
         # https://octokit.github.io/rest.js/v19#custom-requests
         # `github-script` aliases `octokit` to the `github` namespace.
       - name: 'Download metadata'
-        uses: actions/github-script@v6.3.3
+        uses: actions/github-script@v6.4.0
         with:
           script: |
             var artifacts = await github.rest.actions.listWorkflowRunArtifacts({
@@ -122,7 +122,7 @@ jobs:
       - compute-metadata
     steps:
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v1.7.0
+        uses: aws-actions/configure-aws-credentials@v2.0.0
         with:
           aws-access-key-id: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_SECRET_ACCESS_KEY }}
@@ -153,7 +153,7 @@ jobs:
         # https://octokit.github.io/rest.js/v19#custom-requests
         # `github-script` aliases `octokit` to the `github` namespace.
       - name: 'Download baseline image'
-        uses: actions/github-script@v6.3.3
+        uses: actions/github-script@v6.4.0
         with:
           script: |
             var artifacts = await github.rest.actions.listWorkflowRunArtifacts({
@@ -184,7 +184,7 @@ jobs:
           docker load --input baseline-image.tar
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v1.7.0
+        uses: aws-actions/configure-aws-credentials@v2.0.0
         with:
           aws-access-key-id: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_SECRET_ACCESS_KEY }}
@@ -221,7 +221,7 @@ jobs:
         # https://octokit.github.io/rest.js/v19#custom-requests
         # `github-script` aliases `octokit` to the `github` namespace.
       - name: 'Download comparison image'
-        uses: actions/github-script@v6.3.3
+        uses: actions/github-script@v6.4.0
         with:
           script: |
             var artifacts = await github.rest.actions.listWorkflowRunArtifacts({
@@ -252,7 +252,7 @@ jobs:
           docker load --input comparison-image.tar
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v1.7.0
+        uses: aws-actions/configure-aws-credentials@v2.0.0
         with:
           aws-access-key-id: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_SECRET_ACCESS_KEY }}
@@ -298,7 +298,7 @@ jobs:
           ref: ${{ needs.compute-metadata.outputs.checkout-sha }}
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v1.7.0
+        uses: aws-actions/configure-aws-credentials@v2.0.0
         with:
           aws-access-key-id: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_SECRET_ACCESS_KEY }}
@@ -314,7 +314,7 @@ jobs:
 
       - name: Submit job
         env:
-          RUST_LOG: debug
+          RUST_LOG: info
         run: |
           chmod +x ${{ runner.temp }}/bin/smp
 
@@ -417,7 +417,7 @@ jobs:
       - uses: actions/checkout@v3
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v1-node16
+        uses: aws-actions/configure-aws-credentials@v2.0.0
         with:
           aws-access-key-id: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_SECRET_ACCESS_KEY }}
@@ -453,7 +453,7 @@ jobs:
             /repos/${{ github.repository }}/statuses/${{ needs.compute-metadata.outputs.head-sha }} \
             -f state='failure' \
             -f description='Analyze experimental results from Regression Detector cancelled.' \
-            -f context='Regression Detector / analyze-experiment' \
+            -f context='Regression Detector / detect-regression' \
             -f target_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
       - name: Check status, success
@@ -466,7 +466,7 @@ jobs:
             /repos/${{ github.repository }}/statuses/${{ needs.compute-metadata.outputs.head-sha }} \
             -f state='success' \
             -f description='Analyze experimental results from Regression Detector succeeded.' \
-            -f context='Regression Detector / analyze-experiment' \
+            -f context='Regression Detector / detect-regression' \
             -f target_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
       - name: Check status, failure
@@ -480,10 +480,10 @@ jobs:
             /repos/${{ github.repository }}/statuses/${{ needs.compute-metadata.outputs.head-sha }} \
             -f state='success' \
             -f description='Analyze experimental results from Regression Detector failed.' \
-            -f context='Regression Detector / analyze-experiment' \
+            -f context='Regression Detector / detect-regression' \
             -f target_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
-  download-analysis:
+  analyze-experiment:
     name: Download regression analysis & upload report
     runs-on: ubuntu-22.04
     needs:
@@ -508,7 +508,7 @@ jobs:
           ref: ${{ needs.compute-metadata.outputs.checkout-sha }}
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v1.7.0
+        uses: aws-actions/configure-aws-credentials@v2.0.0
         with:
           aws-access-key-id: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_SECRET_ACCESS_KEY }}

@@ -42,9 +42,9 @@ macro_rules! metric_tags {
     ($($key:expr => $value:expr,)+) => { $crate::metric_tags!($($key => $value),+) };
 
     ($($key:expr => $value:expr),*) => {
-        $crate::event::MetricTags::from([
-            $( ($key.into(), $value.into()), )*
-        ])
+        [
+            $( ($key.into(), $crate::event::metric::TagValue::from($value)), )*
+        ].into_iter().collect::<$crate::event::MetricTags>()
     };
 }
 
@@ -229,7 +229,7 @@ impl Metric {
         self.data.time.timestamp
     }
 
-    /// Gets a reference to the interval (in milliseconds) coverred by this metric, if it exists.
+    /// Gets a reference to the interval (in milliseconds) covered by this metric, if it exists.
     #[inline]
     pub fn interval_ms(&self) -> Option<NonZeroU32> {
         self.data.time.interval_ms
@@ -383,6 +383,17 @@ impl Metric {
     pub fn subtract(&mut self, other: impl AsRef<MetricData>) -> bool {
         self.data.subtract(other.as_ref())
     }
+
+    /// Reduces all the tag values to their single value, discarding any for which that value would
+    /// be null. If the result is empty, the tag set is dropped.
+    pub fn reduce_tags_to_single(&mut self) {
+        if let Some(tags) = &mut self.series.tags {
+            tags.reduce_to_single();
+            if tags.is_empty() {
+                self.series.tags = None;
+            }
+        }
+    }
 }
 
 impl AsRef<MetricData> for Metric {
@@ -421,14 +432,14 @@ impl Display for Metric {
     /// ```
     fn fmt(&self, fmt: &mut Formatter<'_>) -> Result<(), fmt::Error> {
         if let Some(timestamp) = &self.data.time.timestamp {
-            write!(fmt, "{:?} ", timestamp)?;
+            write!(fmt, "{timestamp:?} ")?;
         }
         let kind = match self.data.kind {
             MetricKind::Absolute => '=',
             MetricKind::Incremental => '+',
         };
         self.series.fmt(fmt)?;
-        write!(fmt, " {} ", kind)?;
+        write!(fmt, " {kind} ")?;
         self.data.value.fmt(fmt)
     }
 }
@@ -466,7 +477,7 @@ impl Finalizable for Metric {
 /// Metric kind.
 ///
 /// Metrics can be either absolute of incremental. Absolute metrics represent a sort of "last write wins" scenario,
-/// where the latest absolute value seen is meant to be the actual metric value.  In constrast, and perhaps intuitively,
+/// where the latest absolute value seen is meant to be the actual metric value.  In contrast, and perhaps intuitively,
 /// incremental metrics are meant to be additive, such that we don't know what total value of the metric is, but we know
 /// that we'll be adding or subtracting the given value from it.
 ///
@@ -493,8 +504,7 @@ impl TryFrom<::value::Value> for MetricKind {
             "incremental" => Ok(Self::Incremental),
             "absolute" => Ok(Self::Absolute),
             value => Err(format!(
-                "invalid metric kind {}, metric kind must be `absolute` or `incremental`",
-                value
+                "invalid metric kind {value}, metric kind must be `absolute` or `incremental`"
             )),
         }
     }
@@ -579,7 +589,7 @@ where
 {
     let mut this_sep = "";
     for item in items {
-        write!(fmt, "{}", this_sep)?;
+        write!(fmt, "{this_sep}")?;
         writer(fmt, item)?;
         this_sep = sep;
     }
@@ -588,9 +598,9 @@ where
 
 fn write_word(fmt: &mut Formatter<'_>, word: &str) -> Result<(), fmt::Error> {
     if word.contains(|c: char| !c.is_ascii_alphanumeric() && c != '_') {
-        write!(fmt, "{:?}", word)
+        write!(fmt, "{word:?}")
     } else {
-        write!(fmt, "{}", word)
+        write!(fmt, "{word}")
     }
 }
 
@@ -635,7 +645,9 @@ mod test {
     use super::*;
 
     fn ts() -> DateTime<Utc> {
-        Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 11)
+        Utc.ymd(2018, 11, 14)
+            .and_hms_nano_opt(8, 9, 10, 11)
+            .expect("invalid timestamp")
     }
 
     fn tags() -> MetricTags {

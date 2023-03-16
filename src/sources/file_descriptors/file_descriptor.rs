@@ -4,7 +4,7 @@ use super::{outputs, FileDescriptorConfig};
 use codecs::decoding::{DeserializerConfig, FramingConfig};
 use indoc::indoc;
 use lookup::lookup_v2::OptionalValuePath;
-use vector_config::{configurable_component, NamedComponent};
+use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
 
 use crate::{
@@ -20,11 +20,11 @@ pub struct FileDescriptorSourceConfig {
     ///
     /// Messages larger than this are truncated.
     #[serde(default = "crate::serde::default_max_length")]
+    #[configurable(metadata(docs::type_unit = "bytes"))]
     pub max_length: usize,
 
     /// Overrides the name of the log field used to add the current hostname to each event.
     ///
-    /// The value will be the current hostname for wherever Vector is running.
     ///
     /// By default, the [global `host_key` option](https://vector.dev/docs/reference/configuration//global-options#log_schema.host_key) is used.
     pub host_key: Option<OptionalValuePath>,
@@ -37,6 +37,7 @@ pub struct FileDescriptorSourceConfig {
     pub decoding: DeserializerConfig,
 
     /// The file descriptor number to read from.
+    #[configurable(metadata(docs::examples = 10))]
     pub fd: u32,
 
     /// The namespace to use for logs. This overrides the global setting.

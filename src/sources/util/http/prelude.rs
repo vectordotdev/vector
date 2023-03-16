@@ -152,13 +152,20 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
 
             info!(message = "Building HTTP server.", address = %address);
 
-            let listener = tls.bind(&address).await.unwrap();
-            warp::serve(routes)
-                .serve_incoming_with_graceful_shutdown(
-                    listener.accept_stream(),
-                    cx.shutdown.map(|_| ()),
-                )
-                .await;
+            match tls.bind(&address).await {
+                Ok(listener) => {
+                    warp::serve(routes)
+                        .serve_incoming_with_graceful_shutdown(
+                            listener.accept_stream(),
+                            cx.shutdown.map(|_| ()),
+                        )
+                        .await;
+                }
+                Err(error) => {
+                    error!("An error occurred: {:?}.", error);
+                    return Err(());
+                }
+            }
             Ok(())
         }))
     }

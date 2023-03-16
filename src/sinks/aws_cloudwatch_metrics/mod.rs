@@ -1,4 +1,6 @@
+#[cfg(all(test, feature = "aws-cloudwatch-metrics-integration-tests"))]
 mod integration_tests;
+#[cfg(test)]
 mod tests;
 
 use aws_sdk_cloudwatch::{
@@ -48,11 +50,14 @@ impl SinkBatchSettings for CloudWatchMetricsDefaultBatchSettings {
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct CloudWatchMetricsSinkConfig {
-    /// The default namespace to use for metrics that do not have one.
+    /// The default [namespace][namespace] to use for metrics that do not have one.
     ///
     /// Metrics with the same name can only be differentiated by their namespace, and not all
     /// metrics have their own namespace.
+    ///
+    /// [namespace]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/cloudwatch_concepts.html#Namespace
     #[serde(alias = "namespace")]
+    #[configurable(metadata(docs::examples = "service"))]
     pub default_namespace: String,
 
     /// The [AWS region][aws_region] of the target service.
@@ -80,6 +85,7 @@ pub struct CloudWatchMetricsSinkConfig {
     ///
     /// [iam_role]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles.html
     #[configurable(deprecated)]
+    #[configurable(metadata(docs::hidden))]
     assume_role: Option<String>,
 
     #[configurable(derived)]
@@ -215,11 +221,11 @@ impl CloudWatchMetricsSvc {
     ) -> crate::Result<VectorSink> {
         let default_namespace = config.default_namespace.clone();
         let batch = config.batch.into_batch_settings()?;
-        let request_settings = config.request.unwrap_with(&TowerRequestConfig {
-            timeout_secs: Some(30),
-            rate_limit_num: Some(150),
-            ..Default::default()
-        });
+        let request_settings = config.request.unwrap_with(
+            &TowerRequestConfig::default()
+                .timeout_secs(30)
+                .rate_limit_num(150),
+        );
 
         let service = CloudWatchMetricsSvc { client };
         let buffer = PartitionBuffer::new(MetricsBuffer::new(batch.size));

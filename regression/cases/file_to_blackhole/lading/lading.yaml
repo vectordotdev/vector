@@ -8,3 +8,7 @@ generator:
       bytes_per_second: "100Mb"
       maximum_bytes_per_file: "100Mb"
       maximum_prebuild_cache_size_bytes: "400Mb"
+
+blackhole:
+  - tcp:
+      binding_addr: "127.0.0.1:15400"

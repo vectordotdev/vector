@@ -3,19 +3,12 @@ package metadata
 base: components: sinks: configuration: {
 	buffer: {
 		description: """
-			Buffer configuration.
+			Configures the buffering behavior for this sink.
 
-			Buffers are compromised of stages(*) that form a buffer _topology_, with input items being
-			subject to configurable behavior when each stage reaches configured limits.  Buffers are
-			configured for sinks, where backpressure from the sink can be handled by the buffer.  This
-			allows absorbing temporary load, or potentially adding write-ahead-log behavior to a sink to
-			increase the durability of a given Vector pipeline.
+			More information about the individual buffer types, and buffer behavior, can be found in the
+			[Buffering Model][buffering_model] section.
 
-			While we use the term "buffer topology" here, a buffer topology is referred to by the more
-			common "buffer" or "buffers" shorthand.  This is related to buffers originally being a single
-			component, where you could only choose which buffer type to use.  As we expand buffer
-			functionality to allow chaining buffers together, you'll see "buffer topology" used in internal
-			documentation to correctly reflect the internal structure.
+			[buffering_model]: /docs/about/under-the-hood/architecture/buffering-model/
 			"""
 		required: false
 		type: object: options: {
@@ -31,28 +24,23 @@ base: components: sinks: configuration: {
 
 					Must be at least ~256 megabytes (268435488 bytes).
 					"""
-				relevant_when: "type = \"disk_v1\" or type = \"disk\""
+				relevant_when: "type = \"disk\""
 				required:      true
-				type: uint: {}
+				type: uint: unit: "bytes"
 			}
 			type: {
-				required: false
+				description: "The type of buffer to use."
+				required:    false
 				type: string: {
 					default: "memory"
 					enum: {
 						disk: """
-														Events are buffered on disk. (version 2)
+														Events are buffered on disk.
 
 														This is less performant, but more durable. Data that has been synchronized to disk will not
 														be lost if Vector is restarted forcefully or crashes.
 
 														Data is synchronized to disk every 500ms.
-														"""
-						disk_v1: """
-														Events are buffered on disk. (version 1)
-
-														This is less performant, but more durable. Data that has been synchronized to disk will not
-														be lost if Vector is restarted forcefully or crashes.
 														"""
 						memory: """
 														Events are buffered in memory.
@@ -83,16 +71,6 @@ base: components: sinks: configuration: {
 														highest priority, and it is preferable to temporarily lose events rather than cause a
 														slowdown in the acceptance/consumption of events.
 														"""
-						overflow: """
-														Overflows to the next stage in the buffer topology.
-
-														If the current buffer stage is full, attempt to send this event to the next buffer stage.
-														That stage may also be configured overflow, and so on, but ultimately the last stage in a
-														buffer topology must use one of the other handling behaviors. This means that next stage may
-														potentially be able to buffer the event, but it may also block or drop the event.
-
-														This mode can only be used when two or more buffer stages are configured.
-														"""
 					}
 				}
 			}
@@ -115,7 +93,7 @@ base: components: sinks: configuration: {
 					components -- port, path, etc -- are allowed as well.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 		}
 	}
@@ -132,18 +110,17 @@ base: components: sinks: configuration: {
 			[configuration]: https://vector.dev/docs/reference/configuration/
 			"""
 		required: true
-		type: array: items: type: string: {
-			examples: ["my-source-or-transform-id", "prefix-*"]
-			syntax: "literal"
-		}
+		type: array: items: type: string: examples: ["my-source-or-transform-id", "prefix-*"]
 	}
 	proxy: {
 		description: """
 			Proxy configuration.
 
-			Vector can be configured to proxy traffic through an HTTP(S) proxy when making external requests. Similar to common
-			proxy configuration convention, users can set different proxies to use based on the type of traffic being proxied,
-			as well as set specific hosts that should not be proxied.
+			Configure to proxy traffic through an HTTP(S) proxy when making external requests.
+
+			Similar to common proxy configuration convention, users can set different proxies
+			to use based on the type of traffic being proxied, as well as set specific hosts that
+			should not be proxied.
 			"""
 		required: false
 		type: object: options: {
@@ -159,10 +136,7 @@ base: components: sinks: configuration: {
 					Must be a valid URI string.
 					"""
 				required: false
-				type: string: {
-					examples: ["http://foo.bar:3128"]
-					syntax: "literal"
-				}
+				type: string: examples: ["http://foo.bar:3128"]
 			}
 			https: {
 				description: """
@@ -171,10 +145,7 @@ base: components: sinks: configuration: {
 					Must be a valid URI string.
 					"""
 				required: false
-				type: string: {
-					examples: ["http://foo.bar:3128"]
-					syntax: "literal"
-				}
+				type: string: examples: ["http://foo.bar:3128"]
 			}
 			no_proxy: {
 				description: """
@@ -195,7 +166,7 @@ base: components: sinks: configuration: {
 				required: false
 				type: array: {
 					default: []
-					items: type: string: syntax: "literal"
+					items: type: string: examples: ["localhost", ".foo.bar", "*"]
 				}
 			}
 		}

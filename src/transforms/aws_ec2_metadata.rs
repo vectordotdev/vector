@@ -76,7 +76,10 @@ static TOKEN_HEADER: Lazy<Bytes> = Lazy::new(|| Bytes::from("X-aws-ec2-metadata-
 
 /// Configuration for the `aws_ec2_metadata` transform.
 #[serde_as]
-#[configurable_component(transform("aws_ec2_metadata"))]
+#[configurable_component(transform(
+    "aws_ec2_metadata",
+    "Parse metadata emitted by AWS EC2 instances."
+))]
 #[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
 pub struct Ec2Metadata {
@@ -124,7 +127,7 @@ pub struct Ec2Metadata {
     )]
     proxy: ProxyConfig,
 
-    /// Requires the transform to be able to successfully query the EC2 metadata before Vector can start.
+    /// Requires the transform to be able to successfully query the EC2 metadata before starting to process the data.
     #[serde(default = "default_required")]
     #[derivative(Default(value = "default_required()"))]
     required: bool,
@@ -189,6 +192,7 @@ struct Keys {
 impl_generate_config_from_default!(Ec2Metadata);
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "aws_ec2_metadata")]
 impl TransformConfig for Ec2Metadata {
     async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
         let state = Arc::new(ArcSwap::new(Arc::new(vec![])));

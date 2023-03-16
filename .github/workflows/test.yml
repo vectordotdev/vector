@@ -2,6 +2,8 @@ name: Test Suite
 
 on:
   pull_request:
+  merge_group:
+    types: [checks_requested]
   push:
     branches:
       - master
@@ -62,8 +64,10 @@ jobs:
               - "Cargo.toml"
               - "Makefile"
               - "rust-toolchain.toml"
+              - "vdev/**"
             deny:
               - 'deny.toml'
+              - "vdev/**"
             dependencies:
               - ".cargo/**"
               - 'Cargo.toml'
@@ -72,16 +76,22 @@ jobs:
               - '.github/workflows/pr.yml'
               - 'Makefile'
               - 'scripts/cross/**'
+              - "vdev/**"
             cue:
               - 'website/cue/**'
+              - "vdev"
             component_docs:
               - 'scripts/generate-component-docs.rb'
+              - "vdev/**"
             markdown:
               - '**/**.md'
+              - "vdev/**"
             internal_events:
               - 'src/internal_events/**'
+              - "vdev/**"
             docker:
               - 'distribution/docker/**'
+              - "vdev/**"
 
   # Remove this once https://github.com/vectordotdev/vector/issues/3771 is closed.
   # Then, modify the `cross-linux` job to run `test` instead of `build`.
@@ -203,6 +213,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-
       - run: echo "::add-matcher::.github/matchers/rust.json"
+      - run: 'cargo install cross --version 0.2.4 --force --locked'
       # Why is this build, not check? Because we need to make sure the linking phase works.
       # aarch64 and musl in particular are notoriously hard to link.
       # While it may be tempting to slot a `check` in here for quickness, please don't.
@@ -271,7 +282,7 @@ jobs:
       - uses: actions/checkout@v3
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
-      - run: make test-vrl
+      - run: cargo vdev test-vrl
 
   test-vrl-wasm:
     name: VRL WASM - Linux
@@ -335,10 +346,7 @@ jobs:
             ${{ runner.os }}-cargo-
       - name: Enable Rust matcher
         run: echo "::add-matcher::.github/matchers/rust.json"
-      - name: Check style
-        run: make check-style
-      - name: Check code format || needs.changes.outputs.source == 'true'
-        if: needs.changes.outputs.source == 'true'
+      - name: Check code format
         run: make check-fmt
       - name: Check clippy
         if: needs.changes.outputs.source == 'true'
@@ -362,6 +370,11 @@ jobs:
       - name: Check Component Docs
         if: needs.changes.outputs.source == 'true' || needs.changes.outputs.component_docs == 'true'
         run: make check-component-docs
+      - uses: actions/upload-artifact@v3
+        with:
+          name: "config-schema.json"
+          path: "/tmp/vector-config-schema.json"
+        if: success() || failure()
   master-failure:
     name: master-failure
     if: failure() && github.ref == 'refs/heads/master'

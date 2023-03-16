@@ -23,7 +23,7 @@ use crate::{
             ddmetric_proto::{metric_payload, MetricPayload, SketchPayload},
             handle_request, ApiKeyQueryParams, DatadogAgentSource,
         },
-        util::ErrorMessage,
+        util::{extract_tag_key_and_value, ErrorMessage},
     },
     SourceSender,
 };
@@ -377,12 +377,7 @@ fn decode_datadog_series_v1(
 }
 
 fn into_metric_tags(tags: Vec<String>) -> MetricTags {
-    tags.iter()
-        .map(|tag| {
-            let kv = tag.split_once(':').unwrap_or((tag, ""));
-            (kv.0.trim().to_string(), kv.1.trim().to_string())
-        })
-        .collect()
+    tags.iter().map(extract_tag_key_and_value).collect()
 }
 
 fn into_vector_metric(
@@ -447,7 +442,11 @@ fn into_vector_metric(
                         value: dd_point.1 * (i as f64),
                     },
                 )
-                .with_timestamp(Some(Utc.timestamp(dd_point.0, 0)))
+                .with_timestamp(Some(
+                    Utc.timestamp_opt(dd_point.0, 0)
+                        .single()
+                        .expect("invalid timestamp"),
+                ))
                 // dd_metric.interval is in seconds, convert to ms
                 .with_interval_ms(NonZeroU32::new(i * 1000))
                 .with_tags(Some(tags.clone()))
@@ -515,7 +514,11 @@ pub(crate) fn decode_ddsketch(
                 let (namespace, name) = namespace_name_from_dd_metric(&sketch_series.metric);
                 let mut metric = Metric::new(name.to_string(), MetricKind::Incremental, val)
                     .with_tags(Some(tags.clone()))
-                    .with_timestamp(Some(Utc.timestamp(sketch.ts, 0)))
+                    .with_timestamp(Some(
+                        Utc.timestamp_opt(sketch.ts, 0)
+                            .single()
+                            .expect("invalid timestamp"),
+                    ))
                     .with_namespace(namespace);
                 if let Some(k) = &api_key {
                     metric.metadata_mut().set_datadog_api_key(Arc::clone(k));

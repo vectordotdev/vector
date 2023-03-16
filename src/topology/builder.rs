@@ -42,8 +42,8 @@ use super::{
 use crate::{
     config::{
         ComponentKey, DataType, EnrichmentTableConfig, Input, Inputs, Output, OutputId,
-        ProxyConfig, SinkConfig, SinkContext, SourceConfig, SourceContext, TransformConfig,
-        TransformContext, TransformOuter,
+        ProxyConfig, SinkConfig, SinkContext, SourceConfig, SourceContext, TransformContext,
+        TransformOuter,
     },
     event::{EventArray, EventContainer},
     internal_events::EventsReceived,
@@ -175,16 +175,15 @@ pub async fn build_pieces(
             // maintained for compatibility
             component_name = %key.id(),
         );
+        let _entered_span = span.enter();
+
         let task_name = format!(
             ">> {} ({}, pump) >>",
             source.inner.get_component_name(),
             key.id()
         );
 
-        let mut builder = {
-            let _span = span.enter();
-            SourceSender::builder().with_buffer(*SOURCE_SENDER_BUFFER_SIZE)
-        };
+        let mut builder = SourceSender::builder().with_buffer(*SOURCE_SENDER_BUFFER_SIZE);
         let mut pumps = Vec::new();
         let mut controls = HashMap::new();
         let mut schema_definitions = HashMap::with_capacity(source_outputs.len());
@@ -270,7 +269,8 @@ pub async fn build_pieces(
             schema_definitions,
             schema: config.schema,
         };
-        let server = match source.inner.build(context).await {
+        let source = source.inner.build(context).await;
+        let server = match source {
             Err(error) => {
                 errors.push(format!("Source \"{}\": {}", key, error));
                 continue;
@@ -424,21 +424,19 @@ pub async fn build_pieces(
         let typetag = sink.inner.get_component_name();
         let input_type = sink.inner.input().data_type();
 
-        if config.schema.validation {
-            // At this point, we've validated that all transforms are valid, including any
-            // transform that mutates the schema provided by their sources. We can now validate the
-            // schema expectations of each individual sink.
-            if let Err(mut err) = schema::validate_sink_expectations(key, sink, config) {
-                errors.append(&mut err);
-            };
-        }
+        // At this point, we've validated that all transforms are valid, including any
+        // transform that mutates the schema provided by their sources. We can now validate the
+        // schema expectations of each individual sink.
+        if let Err(mut err) = schema::validate_sink_expectations(key, sink, config) {
+            errors.append(&mut err);
+        };
 
         let (tx, rx) = if let Some(buffer) = buffers.remove(key) {
             buffer
         } else {
             let buffer_type = match sink.buffer.stages().first().expect("cant ever be empty") {
                 BufferType::Memory { .. } => "memory",
-                BufferType::DiskV1 { .. } | BufferType::DiskV2 { .. } => "disk",
+                BufferType::DiskV2 { .. } => "disk",
             };
             let buffer_span = error_span!(
                 "sink",

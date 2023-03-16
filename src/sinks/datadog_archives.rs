@@ -14,9 +14,10 @@ use std::{
 };
 
 use azure_storage_blobs::prelude::ContainerClient;
+use base64::prelude::{Engine as _, BASE64_STANDARD};
 use bytes::{BufMut, Bytes, BytesMut};
 use chrono::{SecondsFormat, Utc};
-use codecs::{encoding::Framer, JsonSerializer, NewlineDelimitedEncoder};
+use codecs::{encoding::Framer, JsonSerializerConfig, NewlineDelimitedEncoder};
 use goauth::scopes::Scope;
 use http::header::{HeaderName, HeaderValue};
 use http::Uri;
@@ -25,12 +26,13 @@ use rand::{thread_rng, Rng};
 use snafu::Snafu;
 use tower::ServiceBuilder;
 use uuid::Uuid;
+use value::Kind;
 use vector_common::request_metadata::RequestMetadata;
 use vector_config::{configurable_component, NamedComponent};
 use vector_core::{
-    config::{log_schema, AcknowledgementsConfig, LogSchema},
+    config::AcknowledgementsConfig,
     event::{Event, EventFinalizers, Finalizable},
-    ByteSizeOf,
+    schema, ByteSizeOf,
 };
 
 use crate::{
@@ -103,7 +105,7 @@ pub struct DatadogArchivesSinkConfig {
     ///
     /// Prefixes are useful for partitioning objects, such as by creating an object key that
     /// stores objects under a particular "directory". If using a prefix for this purpose, it must end
-    /// in `/` in order to act as a directory path: Vector will **not** add a trailing `/` automatically.
+    /// in `/` to act as a directory path. A trailing `/` is **not** automatically added.
     pub key_prefix: Option<String>,
 
     #[configurable(derived)]
@@ -214,9 +216,10 @@ pub struct S3Options {
     /// For more information, see [Using Amazon S3 storage classes][storage_classes].
     ///
     /// [storage_classes]: https://docs.aws.amazon.com/AmazonS3/latest/dev/storage-class-intro.html
-    pub storage_class: Option<S3StorageClass>,
+    pub storage_class: S3StorageClass,
 
     /// The tag-set for the object.
+    #[configurable(metadata(docs::additional_props_description = "A single tag."))]
     pub tags: Option<BTreeMap<String, String>>,
 }
 
@@ -247,6 +250,7 @@ pub struct GcsConfig {
     /// For more information, see [Custom metadata][custom_metadata].
     ///
     /// [custom_metadata]: https://cloud.google.com/storage/docs/metadata#custom-metadata
+    #[configurable(metadata(docs::additional_props_description = "A key/value pair."))]
     metadata: Option<HashMap<String, String>>,
 
     #[serde(flatten)]
@@ -282,10 +286,7 @@ enum ConfigError {
 const KEY_TEMPLATE: &str = "/dt=%Y%m%d/hour=%H/";
 
 impl DatadogArchivesSinkConfig {
-    async fn build_sink(
-        &self,
-        cx: SinkContext,
-    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
+    async fn build_sink(&self, cx: SinkContext) -> crate::Result<(VectorSink, super::Healthcheck)> {
         match &self.service[..] {
             "aws_s3" => {
                 let s3_config = self.aws_s3.as_ref().expect("s3 config wasn't provided");
@@ -310,6 +311,7 @@ impl DatadogArchivesSinkConfig {
                     Some(azure_config.connection_string.clone()),
                     None,
                     self.bucket.clone(),
+                    None,
                 )?;
                 let svc = self
                     .build_azure_sink(Arc::<ContainerClient>::clone(&client))
@@ -349,16 +351,16 @@ impl DatadogArchivesSinkConfig {
         &self,
         s3_options: &S3Options,
         service: S3Service,
-    ) -> std::result::Result<VectorSink, ConfigError> {
+    ) -> Result<VectorSink, ConfigError> {
         // we use lower default limits, because we send 100mb batches,
-        // thus no need of the higher number of outcoming requests
+        // thus no need of the higher number of outgoing requests
         let request_limits = self.request.unwrap_with(&Default::default());
         let service = ServiceBuilder::new()
             .settings(request_limits, S3RetryLogic)
             .service(service);
 
         match s3_options.storage_class {
-            Some(class @ S3StorageClass::DeepArchive) | Some(class @ S3StorageClass::Glacier) => {
+            class @ S3StorageClass::DeepArchive | class @ S3StorageClass::Glacier => {
                 return Err(ConfigError::UnsupportedStorageClass {
                     storage_class: format!("{:?}", class),
                 });
@@ -490,7 +492,6 @@ struct DatadogArchivesEncoding {
     reserved_attributes: HashSet<&'static str>,
     id_rnd_bytes: [u8; 8],
     id_seq_number: AtomicU32,
-    log_schema: &'static LogSchema,
 }
 
 impl DatadogArchivesEncoding {
@@ -514,7 +515,7 @@ impl DatadogArchivesEncoding {
         let id_seq_number = self.id_seq_number.fetch_add(1, Ordering::Relaxed);
         id.put_u32(id_seq_number);
 
-        base64::encode(id.freeze())
+        BASE64_STANDARD.encode(id.freeze())
     }
 }
 
@@ -525,24 +526,24 @@ impl DatadogArchivesEncoding {
                 transformer,
                 Encoder::<Framer>::new(
                     NewlineDelimitedEncoder::new().into(),
-                    JsonSerializer::new().into(),
+                    JsonSerializerConfig::default().build().into(),
                 ),
             ),
             reserved_attributes: RESERVED_ATTRIBUTES.iter().copied().collect(),
             id_rnd_bytes: thread_rng().gen::<[u8; 8]>(),
             id_seq_number: AtomicU32::new(0),
-            log_schema: log_schema(),
         }
     }
 }
 
 impl crate::sinks::util::encoding::Encoder<Vec<Event>> for DatadogArchivesEncoding {
     /// Applies the following transformations to align event's schema with DD:
-    /// - `_id` is generated in the sink(format described below);
-    /// - `date` is set from the Global Log Schema's `timestamp` mapping, or to the current time if missing;
-    /// - `message`,`host` are set from the corresponding Global Log Schema mappings;
+    /// - (required) `_id` is generated in the sink(format described below);
+    /// - (required) `date` is set from the `timestamp` meaning or Global Log Schema mapping, or to the current time if missing;
+    /// - `message`,`host` are set from the corresponding meanings or Global Log Schema mappings;
     /// - `source`, `service`, `status`, `tags` and other reserved attributes are left as is;
     /// - the rest of the fields is moved to `attributes`.
+    // TODO: All reserved attributes could have specific meanings, rather than specific paths
     fn encode_input(&self, mut input: Vec<Event>, writer: &mut dyn Write) -> io::Result<usize> {
         for event in input.iter_mut() {
             let log_event = event.as_mut_log();
@@ -550,18 +551,24 @@ impl crate::sinks::util::encoding::Encoder<Vec<Event>> for DatadogArchivesEncodi
             log_event.insert("_id", self.generate_log_id());
 
             let timestamp = log_event
-                .remove(self.log_schema.timestamp_key())
-                .unwrap_or_else(|| chrono::Utc::now().timestamp_millis().into());
+                .remove_timestamp()
+                .unwrap_or_else(|| Utc::now().timestamp_millis().into());
             log_event.insert(
                 "date",
                 timestamp
                     .as_timestamp()
                     .cloned()
-                    .unwrap_or_else(chrono::Utc::now)
+                    .unwrap_or_else(Utc::now)
                     .to_rfc3339_opts(SecondsFormat::Millis, true),
             );
-            log_event.rename_key(self.log_schema.message_key(), event_path!("message"));
-            log_event.rename_key(self.log_schema.host_key(), event_path!("host"));
+
+            if let Some(message_path) = log_event.message_path() {
+                log_event.rename_key(message_path.as_str(), event_path!("message"));
+            }
+
+            if let Some(host_path) = log_event.host_path() {
+                log_event.rename_key(host_path.as_str(), event_path!("host"));
+            }
 
             let mut attributes = BTreeMap::new();
 
@@ -852,21 +859,31 @@ impl RequestBuilder<(String, Vec<Event>)> for DatadogAzureRequestBuilder {
 //
 // TODO: When the sink is fully supported and we expose it for use/within the docs, remove this.
 impl NamedComponent for DatadogArchivesSinkConfig {
-    const NAME: &'static str = "datadog_archives";
+    fn get_component_name(&self) -> &'static str {
+        "datadog_archives"
+    }
 }
 
 #[async_trait::async_trait]
 impl SinkConfig for DatadogArchivesSinkConfig {
-    async fn build(
-        &self,
-        cx: SinkContext,
-    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
+    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, super::Healthcheck)> {
         let sink_and_healthcheck = self.build_sink(cx).await?;
         Ok(sink_and_healthcheck)
     }
 
     fn input(&self) -> Input {
-        Input::log()
+        let requirements = schema::Requirement::empty()
+            .optional_meaning("host", Kind::bytes())
+            .optional_meaning("message", Kind::bytes())
+            .optional_meaning("source", Kind::bytes())
+            .optional_meaning("service", Kind::bytes())
+            .optional_meaning("severity", Kind::bytes())
+            // TODO: A `timestamp` is required for rehydration, however today we generate a `Utc::now()`
+            // timestamp if it's not found in the event. We could require this meaning instead.
+            .optional_meaning("timestamp", Kind::timestamp())
+            .optional_meaning("trace_id", Kind::bytes());
+
+        Input::log().with_schema_requirement(requirements)
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
@@ -1053,7 +1070,9 @@ mod tests {
     /// - base64-encoded,
     /// - first 6 bytes - a "now" timestamp in millis
     fn validate_event_id(id: &str) {
-        let bytes = base64::decode(id).expect("_id is not base64-encoded");
+        let bytes = BASE64_STANDARD
+            .decode(id)
+            .expect("_id is not base64-encoded");
         assert_eq!(bytes.len(), 18);
         let mut timestamp: [u8; 8] = [0; 8];
         for (i, b) in bytes[..6].iter().enumerate() {
@@ -1135,7 +1154,7 @@ mod tests {
                 request: TowerRequestConfig::default(),
                 aws_s3: Some(S3Config {
                     options: S3Options {
-                        storage_class: Some(class),
+                        storage_class: class,
                         ..Default::default()
                     },
                     region: RegionOrEndpoint::with_region("us-east-1".to_owned()),

@@ -97,7 +97,7 @@ The following additional source configuration will be added:
   type = "postgresql_metrics" # required
   endpoint = "postgres://postgres@localhost" # required - address of the PG server.
   included_databases = ["production", "testing"] # optional, list of databases to query. Defaults to all if not specified.
-  excluded_databases = [ "development" ] # optional, excludes specific databases. If a DB is exclude explictity but included in `included_databases` then it is excluded.
+  excluded_databases = [ "development" ] # optional, excludes specific databases. If a DB is excluded explicitly but included in `included_databases` then it is excluded.
   scrape_interval_secs = 15 # optional, default, seconds
   namespace = "postgresql" # optional, default is "postgresql", namespace to attach to metrics.
 ```
@@ -127,7 +127,7 @@ Additionally, as part of Vector's vision to be the "one tool" for ingesting and 
 
 ### Having users run telegraf or Prom node exporter and using Vector's prometheus source to scrape it
 
-We could not add the source directly to Vector and instead instruct users to run Telegraf's `postgresl` input or Prometheus' `postgresql_exporter` and point Vector at the resulting data. This would leverage the already supported inputs from those projects.
+We could not add the source directly to Vector and instead instruct users to run Telegraf's `postgresql` input or Prometheus' `postgresql_exporter` and point Vector at the resulting data. This would leverage the already supported inputs from those projects.
 
 I decided against this as it would be in contrast with one of the listed
 principles of Vector:

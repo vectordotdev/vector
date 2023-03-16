@@ -29,7 +29,7 @@ use vector_common::{
     finalizer::UnorderedFinalizer,
     internal_event::{CountByteSize, EventsReceived, InternalEventHandle as _},
 };
-use vector_config::{configurable_component, NamedComponent};
+use vector_config::configurable_component;
 use vector_core::{
     config::{log_schema, LegacyKey, LogNamespace, SourceAcknowledgementsConfig},
     event::Event,
@@ -60,9 +60,10 @@ pub struct AmqpSourceConfig {
 
     /// The identifier for the consumer.
     #[serde(default = "default_consumer")]
+    #[configurable(metadata(docs::examples = "consumer-group-name"))]
     pub(crate) consumer: String,
 
-    /// Connection options for `AMQP` source.
+    #[serde(flatten)]
     pub(crate) connection: AmqpConfig,
 
     /// The `AMQP` routing key.
@@ -484,7 +485,7 @@ async fn handle_ack(status: BatchStatus, entry: FinalizerEntry) {
 
 #[cfg(test)]
 pub mod test {
-    use lookup::LookupBuf;
+    use lookup::OwnedTargetPath;
     use value::kind::Collection;
     use vector_core::schema::Definition;
 
@@ -522,16 +523,25 @@ pub mod test {
 
         let expected_definition =
             Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
-                .with_meaning(LookupBuf::root(), "message")
-                .with_metadata_field(&owned_value_path!("vector", "source_type"), Kind::bytes())
+                .with_meaning(OwnedTargetPath::event_root(), "message")
+                .with_metadata_field(
+                    &owned_value_path!("vector", "source_type"),
+                    Kind::bytes(),
+                    None,
+                )
                 .with_metadata_field(
                     &owned_value_path!("vector", "ingest_timestamp"),
                     Kind::timestamp(),
+                    None,
                 )
-                .with_metadata_field(&owned_value_path!("amqp", "timestamp"), Kind::timestamp())
-                .with_metadata_field(&owned_value_path!("amqp", "routing"), Kind::bytes())
-                .with_metadata_field(&owned_value_path!("amqp", "exchange"), Kind::bytes())
-                .with_metadata_field(&owned_value_path!("amqp", "offset"), Kind::integer());
+                .with_metadata_field(
+                    &owned_value_path!("amqp", "timestamp"),
+                    Kind::timestamp(),
+                    Some("timestamp"),
+                )
+                .with_metadata_field(&owned_value_path!("amqp", "routing"), Kind::bytes(), None)
+                .with_metadata_field(&owned_value_path!("amqp", "exchange"), Kind::bytes(), None)
+                .with_metadata_field(&owned_value_path!("amqp", "offset"), Kind::integer(), None);
 
         assert_eq!(definition, expected_definition);
     }

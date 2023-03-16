@@ -52,7 +52,9 @@ fn timestamp_param_conversion() {
 }
 
 fn dateref() -> DateTime<Utc> {
-    Utc.from_utc_datetime(&NaiveDateTime::from_timestamp(981_173_106, 0))
+    Utc.from_utc_datetime(
+        &NaiveDateTime::from_timestamp_opt(981_173_106, 0).expect("invalid timestamp"),
+    )
 }
 
 #[allow(clippy::trait_duplication_in_bounds)] // appears to be a false positive
@@ -62,7 +64,7 @@ where
 {
     std::env::set_var("TZ", TIMEZONE_NAME);
     Conversion::parse(fmt, TimeZone::Local)
-        .unwrap_or_else(|_| panic!("Invalid conversion {:?}", fmt))
+        .unwrap_or_else(|_| panic!("Invalid conversion {fmt:?}"))
         .convert(value.into())
 }
 

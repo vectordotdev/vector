@@ -69,7 +69,7 @@ otherwise undermine security.
 #### Open Source
 
 Vector and its dependencies are open-source. All code and changes are publicly
-available at [our Github repo][urls.vector_repo]. While the transparent nature
+available at [our GitHub repo][urls.vector_repo]. While the transparent nature
 open source helps to improve security, so does the large collaborative
 community behind Vector.
 
@@ -92,7 +92,7 @@ changes are audited and traceable.
 #### Signed Commits
 
 Because of Vector's [merge style](CONTRIBUTING.md#merge-style), commits to
-release branches are signed by Github itself during the squash and merge
+release branches are signed by GitHub itself during the squash and merge
 process. Commits to development branches are encouraged to be signed but not
 required since changes must go through a [review process](#reviews--approvals).
 
@@ -122,7 +122,7 @@ team members.
 ### Two-factor Authentication
 
 All Vector team members are required to enable two-factor authentication
-for their Github accounts.
+for their GitHub accounts.
 
 ### Privilege Model
 
@@ -166,7 +166,7 @@ the [Reviewing guide](REVIEWING.md#dependencies).
 
 ### Change Control
 
-As noted above Vector uses the Git version control system on Github.
+As noted above Vector uses the Git version control system on GitHub.
 
 #### Pull Requests
 
@@ -199,7 +199,7 @@ When possible, we'll create automated checks to enforce security policies.
 - Vector implements [Dependabot][urls.dependabot] which performs automated
   upgrades on dependencies and [alerts][urls.dependabot_alerts] about any
   dependency-related security vulnerabilities.
-- We verify the security of our Docker images using [Synk's][urls.snyk] vulnerability
+- We verify the security of our Docker images using [Snyk's][urls.snyk] vulnerability
   scanning.
 
 #### Vulnerability Remediation
