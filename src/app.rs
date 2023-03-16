@@ -28,7 +28,7 @@ use crate::{
     cli::{handle_config_errors, Color, LogFormat, Opts},
     config::{self, Config, ConfigPath},
     heartbeat,
-    signal::{self, SignalHandler, SignalTo},
+    signal::{SignalHandler, SignalPair, SignalTo},
     topology::{self, ReloadOutcome, RunningTopology, TopologyController},
     trace,
 };
@@ -48,8 +48,7 @@ pub struct ApplicationConfig {
     pub api: config::api::Options,
     #[cfg(feature = "enterprise")]
     pub enterprise: Option<EnterpriseReporter<BoxFuture<'static, ()>>>,
-    pub signal_handler: signal::SignalHandler,
-    pub signal_rx: signal::SignalRx,
+    pub signals: SignalPair,
 }
 
 pub struct Application {
@@ -64,19 +63,17 @@ impl ApplicationConfig {
         let config_paths = opts.root.config_paths_with_formats();
 
         // Signal handler for OS and provider messages.
-        let (mut signal_handler, signal_rx) = SignalHandler::new();
+        let mut signals = SignalPair::default();
 
         if let Some(sub_command) = &opts.sub_command {
-            return Err(sub_command
-                .execute(&mut signal_handler, signal_rx, color)
-                .await);
+            return Err(sub_command.execute(signals, color).await);
         }
 
         let config = load_configs(
             &config_paths,
             opts.root.watch_config,
             opts.root.require_healthy,
-            &mut signal_handler,
+            &mut signals.handler,
         )
         .await?;
 
@@ -106,8 +103,7 @@ impl ApplicationConfig {
             api,
             #[cfg(feature = "enterprise")]
             enterprise,
-            signal_handler,
-            signal_rx,
+            signals,
         })
     }
 }
@@ -155,8 +151,8 @@ impl Application {
             config,
         } = self;
 
-        let mut signal_handler = config.signal_handler;
-        let mut signal_rx = config.signal_rx;
+        let mut signal_handler = config.signals.handler;
+        let mut signal_rx = config.signals.receiver;
 
         let topology = config.topology;
         let config_paths = config.config_paths;

@@ -1,4 +1,5 @@
 #![allow(missing_docs)]
+
 use tokio::sync::broadcast;
 use tokio_stream::{Stream, StreamExt};
 
@@ -22,6 +23,21 @@ pub enum SignalTo {
     Quit,
 }
 
+/// Convenience struct for app setup handling.
+pub struct SignalPair {
+    pub handler: SignalHandler,
+    pub receiver: SignalRx,
+}
+
+impl Default for SignalPair {
+    /// Create a new signal handler pair, and set them up to receive OS signals.
+    fn default() -> Self {
+        let (handler, receiver) = SignalHandler::new();
+        handler.forever(os_signals());
+        Self { handler, receiver }
+    }
+}
+
 /// SignalHandler is a general `ControlTo` message receiver and transmitter. It's used by
 /// OS signals and providers to surface control events to the root of the application.
 pub struct SignalHandler {
@@ -32,14 +48,13 @@ pub struct SignalHandler {
 impl SignalHandler {
     /// Create a new signal handler with space for 128 control messages at a time, to
     /// ensure the channel doesn't overflow and drop signals.
-    pub fn new() -> (Self, SignalRx) {
+    fn new() -> (Self, SignalRx) {
         let (tx, rx) = broadcast::channel(128);
         let handler = Self {
             tx,
             shutdown_txs: vec![],
         };
 
-        handler.forever(os_signals());
         (handler, rx)
     }
 

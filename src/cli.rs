@@ -247,8 +247,7 @@ pub enum SubCommand {
 impl SubCommand {
     pub async fn execute(
         &self,
-        signal_handler: &mut signal::SignalHandler,
-        #[allow(unused_variables)] signal_rx: signal::SignalRx,
+        mut signals: signal::SignalPair,
         color: bool,
     ) -> exitcode::ExitCode {
         match self {
@@ -260,8 +259,8 @@ impl SubCommand {
             #[cfg(windows)]
             Self::Service(s) => service::cmd(s),
             #[cfg(feature = "api-client")]
-            Self::Tap(t) => tap::cmd(t, signal_rx).await,
-            Self::Test(t) => unit_test::cmd(t, signal_handler).await,
+            Self::Tap(t) => tap::cmd(t, signals.receiver).await,
+            Self::Test(t) => unit_test::cmd(t, &mut signals.handler).await,
             #[cfg(feature = "api-client")]
             Self::Top(t) => top::cmd(t).await,
             Self::Validate(v) => validate::validate(v, color).await,
