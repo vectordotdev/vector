@@ -150,13 +150,6 @@ impl SourceConfig for DatadogAgentConfig {
             .expect("registered log schema required")
             .clone();
 
-        let metrics_schema_definition = cx
-            .schema_definitions
-            .get(&Some(METRICS.to_owned()))
-            .or_else(|| cx.schema_definitions.get(&None))
-            .expect("registered metrics schema required")
-            .clone();
-
         let decoder =
             DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace).build();
 
@@ -166,7 +159,6 @@ impl SourceConfig for DatadogAgentConfig {
             decoder,
             tls.http_protocol_name(),
             logs_schema_definition,
-            metrics_schema_definition,
             log_namespace,
         );
         let listener = tls.bind(&self.address).await?;
@@ -293,7 +285,6 @@ pub(crate) struct DatadogAgentSource {
     pub(crate) decoder: Decoder,
     protocol: &'static str,
     logs_schema_definition: Arc<schema::Definition>,
-    metrics_schema_definition: Arc<schema::Definition>,
     events_received: Registered<EventsReceived>,
 }
 
@@ -330,7 +321,6 @@ impl DatadogAgentSource {
         decoder: Decoder,
         protocol: &'static str,
         logs_schema_definition: schema::Definition,
-        metrics_schema_definition: schema::Definition,
         log_namespace: LogNamespace,
     ) -> Self {
         Self {
@@ -344,7 +334,6 @@ impl DatadogAgentSource {
             decoder,
             protocol,
             logs_schema_definition: Arc::new(logs_schema_definition),
-            metrics_schema_definition: Arc::new(metrics_schema_definition),
             log_namespace,
             events_received: register!(EventsReceived),
         }

@@ -57,14 +57,6 @@ fn test_logs_schema_definition() -> schema::Definition {
     )
 }
 
-fn test_metrics_schema_definition() -> schema::Definition {
-    schema::Definition::empty_legacy_namespace().with_event_field(
-        &owned_value_path!("a schema tag"),
-        Kind::boolean().or_null(),
-        Some("tag"),
-    )
-}
-
 impl Arbitrary for LogMsg {
     fn arbitrary(g: &mut Gen) -> Self {
         LogMsg {
@@ -101,7 +93,6 @@ fn test_decode_log_body() {
             decoder,
             "http",
             test_logs_schema_definition(),
-            test_metrics_schema_definition(),
             LogNamespace::Legacy,
         );
 
@@ -173,10 +164,8 @@ async fn source(
         address, store_api_key, acknowledgements, multiple_outputs
     ))
     .unwrap();
-    let schema_definitions = HashMap::from([
-        (Some(LOGS.to_owned()), test_logs_schema_definition()),
-        (Some(METRICS.to_owned()), test_metrics_schema_definition()),
-    ]);
+    let schema_definitions =
+        HashMap::from([(Some(LOGS.to_owned()), test_logs_schema_definition())]);
     let context = SourceContext::new_test(sender, Some(schema_definitions));
     tokio::spawn(async move {
         config.build(context).await.unwrap().await.unwrap();
@@ -919,13 +908,6 @@ async fn decode_series_endpoint_v1() {
                 &events[3].metadata().datadog_api_key().as_ref().unwrap()[..],
                 "12345678abcdefgh12345678abcdefgh"
             );
-
-            for event in events {
-                assert_eq!(
-                    event.metadata().schema_definition(),
-                    &test_metrics_schema_definition()
-                );
-            }
         }
     })
     .await;
@@ -1028,13 +1010,6 @@ async fn decode_sketches() {
                 &events[0].metadata().datadog_api_key().as_ref().unwrap()[..],
                 "12345678abcdefgh12345678abcdefgh"
             );
-
-            for event in events {
-                assert_eq!(
-                    event.metadata().schema_definition(),
-                    &test_metrics_schema_definition()
-                );
-            }
         }
     })
     .await;
@@ -1384,10 +1359,6 @@ async fn split_outputs() {
             assert_eq!(
                 &event.metadata().datadog_api_key().as_ref().unwrap()[..],
                 "abcdefgh12345678abcdefgh12345678"
-            );
-            assert_eq!(
-                event.metadata().schema_definition(),
-                &test_metrics_schema_definition()
             );
         }
 
@@ -2006,13 +1977,6 @@ async fn decode_series_endpoint_v2() {
                 &events[3].metadata().datadog_api_key().as_ref().unwrap()[..],
                 "12345678abcdefgh12345678abcdefgh"
             );
-
-            for event in events {
-                assert_eq!(
-                    event.metadata().schema_definition(),
-                    &test_metrics_schema_definition()
-                );
-            }
         }
     })
     .await;
