@@ -49,7 +49,7 @@ impl Cli {
             let zip_file = format!("vector-{archive_version}-x86_64-pc-windows-msvc.zip");
             fs::copy(artifacts_dir.join(&zip_file), msi_x64_dir.join(&zip_file))?;
 
-            // Ensure in the `msi-x64` directory
+            // Ensure we are in the `msi-x64` directory
             env::set_current_dir(&msi_x64_dir)?;
 
             // Extract the zip file with PowerShell and build the MSI package
