@@ -2,7 +2,6 @@
 use std::path::PathBuf;
 
 use clap::{ArgAction, CommandFactory, FromArgMatches, Parser};
-use once_cell::sync::Lazy;
 
 #[cfg(windows)]
 use crate::service;
@@ -12,8 +11,6 @@ use crate::tap;
 use crate::top;
 use crate::{config, generate, get_version, graph, list, unit_test, validate};
 use crate::{generate_schema, signal};
-
-static ISATTY: Lazy<bool> = Lazy::new(|| atty::is(atty::Stream::Stdout));
 
 #[derive(Parser, Debug)]
 #[command(rename_all = "kebab-case")]
@@ -281,7 +278,7 @@ impl Color {
     pub fn use_color(&self) -> bool {
         match self {
             #[cfg(unix)]
-            Color::Auto => *ISATTY,
+            Color::Auto => atty::is(atty::Stream::Stdout),
             #[cfg(windows)]
             Color::Auto => false, // ANSI colors are not supported by cmd.exe
             Color::Always => true,

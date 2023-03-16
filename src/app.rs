@@ -25,7 +25,7 @@ use crate::metrics;
 #[cfg(feature = "api")]
 use crate::{api, internal_events::ApiStarted};
 use crate::{
-    cli::{handle_config_errors, Color, LogFormat, Opts},
+    cli::{handle_config_errors, LogFormat, Opts},
     config::{self, Config, ConfigPath},
     heartbeat,
     signal::{SignalHandler, SignalPair, SignalTo},
@@ -125,16 +125,16 @@ impl Application {
     pub fn prepare_from_opts(opts: Opts) -> Result<(Runtime, Self), ExitCode> {
         init_global();
 
+        let color = opts.root.color.use_color();
+
         init_logging(
-            opts.root.color,
+            color,
             opts.root.log_format,
             opts.log_level(),
             opts.root.internal_log_rate_limit,
         );
 
         let runtime = build_runtime(opts.root.threads, "vector-worker")?;
-
-        let color = opts.root.color.use_color();
 
         // Signal handler for OS and provider messages.
         let mut signals = SignalPair::default();
@@ -475,14 +475,14 @@ fn build_enterprise(
     }
 }
 
-pub fn init_logging(color: Color, format: LogFormat, log_level: &str, rate: u64) {
+pub fn init_logging(color: bool, format: LogFormat, log_level: &str, rate: u64) {
     let level = get_log_levels(log_level);
     let json = match format {
         LogFormat::Text => false,
         LogFormat::Json => true,
     };
 
-    trace::init(color.use_color(), json, &level, rate);
+    trace::init(color, json, &level, rate);
     debug!(
         message = "Internal log rate limit configured.",
         internal_log_rate_secs = rate,
