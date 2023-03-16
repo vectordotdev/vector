@@ -22,8 +22,6 @@ use crate::config::enterprise::{
 use crate::control_server::ControlServer;
 #[cfg(not(feature = "enterprise-tests"))]
 use crate::metrics;
-#[cfg(windows)]
-use crate::service;
 #[cfg(feature = "api")]
 use crate::{api, internal_events::ApiStarted};
 use crate::{
