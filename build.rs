@@ -93,21 +93,19 @@ impl BuildConstants {
     }
 }
 
-fn git_short_hash() -> String {
-    let output = Command::new("git")
+fn git_short_hash() -> std::io::Result<String> {
+    let output_result = Command::new("git")
         .args(["rev-parse", "--short", "HEAD"])
         .output();
 
-    if let Ok(output) = output {
+    output_result.map(|output| {
         let mut hash = String::from_utf8(output.stdout).unwrap();
 
         hash.retain(|c| c != '\n');
         hash.retain(|c| c != '\r');
 
         hash
-    } else {
-        "HEAD".to_string()
-    }
+    })
 }
 
 fn main() {
@@ -187,9 +185,17 @@ fn main() {
     // In CI build workflows this will have been exported already so that we don't run into
     // git permission issues when trying to determine the sha while running within a docker
     // container during the packaging steps.
-    let git_short_hash = tracker
-        .get_env_var("VECTOR_GIT_SHA")
-        .unwrap_or_else(git_short_hash);
+    let git_short_hash = tracker.get_env_var("VECTOR_GIT_SHA").unwrap_or_else(|| {
+        git_short_hash()
+            .map_err(|e| -> String {
+                format!(
+                    "Unable to determine git short hash from rev-parse command: {}",
+                    e.to_string()
+                )
+                .into()
+            })
+            .unwrap()
+    });
 
     // Gather up the constants and write them out to our build constants file.
     let mut constants = BuildConstants::new();
