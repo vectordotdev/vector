@@ -27,15 +27,59 @@ base: components: sinks: webhdfs: configuration: {
 			type: bool: {}
 		}
 	}
-	compression: {
-		description: "Compression algorithm."
+	batch: {
+		description: "Event batching behavior."
 		required:    false
+		type: object: options: {
+			max_bytes: {
+				description: """
+					The maximum size of a batch that will be processed by a sink.
+
+					This is based on the uncompressed size of the batched events, before they are
+					serialized / compressed.
+					"""
+				required: false
+				type: uint: {
+					default: 10000000
+					unit:    "bytes"
+				}
+			}
+			max_events: {
+				description: "The maximum size of a batch before it is flushed."
+				required:    false
+				type: uint: unit: "events"
+			}
+			timeout_secs: {
+				description: "The maximum age of a batch before it is flushed."
+				required:    false
+				type: float: {
+					default: 300.0
+					unit:    "seconds"
+				}
+			}
+		}
+	}
+	compression: {
+		description: """
+			Compression configuration.
+
+			All compression algorithms use the default compression level unless otherwise specified.
+			"""
+		required: false
 		type: string: {
-			default: "none"
+			default: "gzip"
 			enum: {
-				gzip: "Gzip compression."
+				gzip: """
+					[Gzip][gzip] compression.
+
+					[gzip]: https://www.gzip.org/
+					"""
 				none: "No compression."
-				zstd: "Zstandard compression."
+				zlib: """
+					[Zlib][zlib] compression.
+
+					[zlib]: https://zlib.net/
+					"""
 			}
 		}
 	}
@@ -61,6 +105,11 @@ base: components: sinks: webhdfs: configuration: {
 						Encodes an event as an [Apache Avro][apache_avro] message.
 
 						[apache_avro]: https://avro.apache.org/
+						"""
+					csv: """
+						Encodes an event as a CSV message.
+
+						This codec must be configured with fields to encode.
 						"""
 					gelf: """
 						Encodes an event as a [GELF][gelf] message.
@@ -114,6 +163,24 @@ base: components: sinks: webhdfs: configuration: {
 						"""
 				}
 			}
+			csv: {
+				description:   "The CSV Serializer Options."
+				relevant_when: "codec = \"csv\""
+				required:      true
+				type: object: options: fields: {
+					description: """
+						Configures the fields that will be encoded, as well as the order in which they
+						appear in the output.
+
+						If a field is not present in the event, the output will be an empty string.
+
+						Values of type `Array`, `Object`, and `Regex` are not supported and the
+						output will be an empty string.
+						"""
+					required: true
+					type: array: items: type: string: {}
+				}
+			}
 			except_fields: {
 				description: "List of fields that will be excluded from the encoded event."
 				required:    false
@@ -155,6 +222,22 @@ base: components: sinks: webhdfs: configuration: {
 			}
 		}
 	}
+	endpoint: {
+		description: """
+			An HDFS cluster consists of a single NameNode, a master server that manages the file system namespace and regulates access to files by clients.
+
+			The endpoint is the HDFS's web restful HTTP API endpoint.
+
+			For more information, see the [HDFS Architecture][hdfs_arch] documentation.
+
+			[hdfs_arch]: https://hadoop.apache.org/docs/r3.3.4/hadoop-project-dist/hadoop-hdfs/WebHdfsDesign.html#NameNode_and_DataNodes
+			"""
+		required: false
+		type: string: {
+			default: ""
+			examples: ["http://127.0.0.1:9870"]
+		}
+	}
 	framing: {
 		description: "Framing configuration."
 		required:    false
@@ -185,31 +268,31 @@ base: components: sinks: webhdfs: configuration: {
 			}
 		}
 	}
-	root: {
-		description: "Root path of webhdfs services."
-		required:    true
-		type: string: {}
-	}
 	prefix: {
 		description: """
-				A prefix to apply to all keys.
+			A prefix to apply to all keys.
 
-				Prefixes are useful for partitioning objects, such as by creating an blob key that stores blobs under a particular "directory". If using a prefix for this purpose, it must end in `/` to act as a directory path. A trailing `/` is **not**
+			Prefixes are useful for partitioning objects, such as by creating an blob key that
+			stores blobs under a particular "directory". If using a prefix for this purpose, it must end
+			in `/` to act as a directory path. A trailing `/` is **not** automatically added.
+
+			The final file path with be like `{root}/{prefix}{suffix}`.
 			"""
-		required: true
-		type: string: syntax: "template"
+		required: false
+		type: string: {
+			default: ""
+			syntax:  "template"
+		}
 	}
-	endpoint: {
+	root: {
 		description: """
-				An hdfs cluster consists of a single NameNode, a master server that manages the file system namespace and regulates access to files by clients.
+			The root path for WebHDFS.
 
-				For example:
+			Must be a valid directory.
 
-				- `http://172.16.80.2:8090` visiting name node's webhdfs port at `172.16.80.2:8090`
-
-				For more information: [HDFS Architecture](https://hadoop.apache.org/docs/r3.3.4/hadoop-project-dist/hadoop-hdfs/HdfsDesign.html)
+			The final file path with be like `{root}/{prefix}{suffix}`.
 			"""
-		required: true
-		type: string: {}
+		required: false
+		type: string: default: ""
 	}
 }

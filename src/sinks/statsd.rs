@@ -9,10 +9,10 @@ use futures::{future, stream, SinkExt, TryFutureExt};
 use futures_util::FutureExt;
 use tokio_util::codec::Encoder;
 use tower::{Service, ServiceBuilder};
+
 use vector_config::configurable_component;
 use vector_core::ByteSizeOf;
 
-use super::util::SinkBatchSettings;
 #[cfg(unix)]
 use crate::sinks::util::unix::UnixSinkConfig;
 use crate::{
@@ -30,6 +30,8 @@ use crate::{
         BatchConfig, BatchSink, Buffer, Compression, EncodedEvent,
     },
 };
+
+use super::util::SinkBatchSettings;
 
 pub struct StatsdSvc {
     inner: UdpService,
@@ -244,14 +246,22 @@ impl Encoder<Event> for StatsdEncoder {
                 // This would also imply rewriting this sink in the new style to take advantage of it.
                 let mut samples = samples.clone();
                 let compressed_samples = compress_distribution(&mut samples);
+                let mut temp_buf = Vec::new();
                 for sample in compressed_samples {
                     push_event(
-                        &mut buf,
+                        &mut temp_buf,
                         metric,
                         sample.value,
                         metric_type,
                         Some(sample.rate),
                     );
+                    let msg = encode_namespace(
+                        metric.namespace().or(self.default_namespace.as_deref()),
+                        '.',
+                        temp_buf.join("|"),
+                    );
+                    buf.push(msg);
+                    temp_buf.clear()
                 }
             }
             MetricValue::Set { values } => {
@@ -269,13 +279,20 @@ impl Encoder<Event> for StatsdEncoder {
             }
         };
 
-        let message = encode_namespace(
-            metric.namespace().or(self.default_namespace.as_deref()),
-            '.',
-            buf.join("|"),
-        );
+        // TODO: this properly encodes aggregate histograms, but it does not handle sketches. There
+        // are complications with applying this to sketches, as it is required to extract the
+        // buckets and unpack the sketch in order to get the real values for distribution samples.
+        // Tracked in #11661.
+        let msg: String = match metric.value() {
+            MetricValue::Distribution { .. } => buf.join("\n"),
+            _ => encode_namespace(
+                metric.namespace().or(self.default_namespace.as_deref()),
+                '.',
+                buf.join("|"),
+            ),
+        };
 
-        bytes.put_slice(&message.into_bytes());
+        bytes.put_slice(&msg.into_bytes());
         bytes.put_u8(b'\n');
 
         Ok(())
@@ -477,6 +494,54 @@ mod test {
 
     #[cfg(feature = "sources-statsd")]
     #[test]
+    fn test_encode_distribution_aggregated() {
+        let metric1 = Metric::new(
+            "distribution",
+            MetricKind::Incremental,
+            MetricValue::Distribution {
+                samples: vector_core::samples![2.5 => 1, 1.5 => 1, 1.5 => 1],
+                statistic: StatisticKind::Histogram,
+            },
+        )
+        .with_tags(Some(tags()));
+
+        let metric1_part1_compressed = Metric::new(
+            "distribution",
+            MetricKind::Incremental,
+            MetricValue::Distribution {
+                samples: vector_core::samples![2.5 => 1],
+                statistic: StatisticKind::Histogram,
+            },
+        )
+        .with_tags(Some(tags()));
+        let metric1_part2_compressed = Metric::new(
+            "distribution",
+            MetricKind::Incremental,
+            MetricValue::Distribution {
+                samples: vector_core::samples![1.5 => 2],
+                statistic: StatisticKind::Histogram,
+            },
+        )
+        .with_tags(Some(tags()));
+        let event = Event::Metric(metric1);
+        let mut encoder = StatsdEncoder {
+            default_namespace: None,
+        };
+        let mut frame = BytesMut::new();
+        encoder.encode(event, &mut frame).unwrap();
+
+        let res = from_utf8(&frame).unwrap().trim();
+        let mut packets = res.split('\n');
+
+        let metric2 = parse(packets.next().unwrap().trim()).unwrap();
+        vector_common::assert_event_data_eq!(metric1_part2_compressed, metric2);
+
+        let metric3 = parse(packets.next().unwrap().trim()).unwrap();
+        vector_common::assert_event_data_eq!(metric1_part1_compressed, metric3);
+    }
+
+    #[cfg(feature = "sources-statsd")]
+    #[test]
     fn test_encode_set() {
         let metric1 = Metric::new(
             "set",
@@ -493,6 +558,7 @@ mod test {
         let mut frame = BytesMut::new();
         encoder.encode(event, &mut frame).unwrap();
         let metric2 = parse(from_utf8(&frame).unwrap().trim()).unwrap();
+
         vector_common::assert_event_data_eq!(metric1, metric2);
     }
 

@@ -4,6 +4,7 @@ crate::cli_subcommands! {
     manifests,
     mod publish_metadata,
     release_cue,
+    mod vrl_wasm,
 }
 
 crate::script_wrapper! {

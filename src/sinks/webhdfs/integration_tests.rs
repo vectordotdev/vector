@@ -5,7 +5,7 @@ use std::{
 
 use codecs::{encoding::FramingConfig, TextSerializerConfig};
 use futures::{stream, StreamExt};
-use opendal::{Object, ObjectMetakey};
+use opendal::{Entry, Metakey};
 use similar_asserts::assert_eq;
 use vector_core::event::{Event, LogEvent};
 
@@ -75,9 +75,8 @@ async fn hdfs_rotate_files_after_the_buffer_size_is_reached() {
     tokio::time::sleep(Duration::from_secs(1)).await;
 
     // blocking_scan isn't supported
-    let objects: Vec<Object> = op
-        .object("/")
-        .scan()
+    let objects: Vec<Entry> = op
+        .scan("/")
         .await
         .unwrap()
         .map(|x| x.unwrap())
@@ -86,8 +85,9 @@ async fn hdfs_rotate_files_after_the_buffer_size_is_reached() {
 
     let mut objects = objects
         .into_iter()
-        .filter(|o| {
-            o.blocking_metadata(ObjectMetakey::Mode)
+        .filter(|entry| {
+            op.blocking()
+                .metadata(entry, Metakey::Mode)
                 .unwrap()
                 .mode()
                 .is_file()
@@ -100,7 +100,7 @@ async fn hdfs_rotate_files_after_the_buffer_size_is_reached() {
 
     let mut response_lines: Vec<Vec<String>> = Vec::new();
     for o in objects {
-        let bs = o.read().await.unwrap();
+        let bs = op.read(o.path()).await.unwrap();
         let buf_read = BufReader::new(Cursor::new(bs));
 
         response_lines.push(buf_read.lines().map(|l| l.unwrap()).collect());

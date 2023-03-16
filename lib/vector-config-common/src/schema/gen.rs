@@ -40,8 +40,14 @@ impl SchemaSettings {
         &self.definitions_path
     }
 
-    /// Appends the given visitor to the list of [visitors](SchemaSettings::visitors) for these `SchemaSettings`.
-    pub fn with_visitor(mut self, visitor: impl Visitor + 'static) -> Self {
+    /// Creates a `Visitor` from the given closure and appends it to the list of
+    /// [visitors](SchemaSettings::visitors) for these `SchemaSettings`.
+    pub fn with_visitor<F, V>(mut self, visitor_fn: F) -> Self
+    where
+        F: FnOnce(&Self) -> V,
+        V: Visitor + 'static,
+    {
+        let visitor = visitor_fn(&self);
         self.visitors.push(Box::new(visitor));
         self
     }
@@ -130,11 +136,17 @@ impl SchemaGenerator {
     /// definitions referenced by `root_schema` refer to this generator.
     ///
     /// All other relevant settings (i.e. meta-schema) are carried over.
-    pub fn into_root_schema(self, root_schema: SchemaObject) -> RootSchema {
-        RootSchema {
+    pub fn into_root_schema(mut self, root_schema: SchemaObject) -> RootSchema {
+        let mut root_schema = RootSchema {
             meta_schema: Some(self.settings.meta_schema),
             schema: root_schema,
             definitions: self.definitions,
+        };
+
+        for visitor in self.settings.visitors.iter_mut() {
+            visitor.visit_root_schema(&mut root_schema);
         }
+
+        root_schema
     }
 }
