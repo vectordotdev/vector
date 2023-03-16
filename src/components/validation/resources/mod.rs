@@ -13,8 +13,8 @@ use vector_core::{config::DataType, event::Event};
 
 use crate::codecs::{Decoder, DecodingConfig, Encoder, EncodingConfig, EncodingConfigWithFraming};
 
-pub use self::event::TestEvent;
-pub use self::http::HttpResourceConfig;
+pub use self::event::{EventData, TestEvent};
+pub use self::http::{encode_test_event, HttpResourceConfig};
 
 use super::sync::{Configuring, TaskCoordinator};
 
@@ -277,7 +277,7 @@ impl From<HttpResourceConfig> for ResourceDefinition {
 pub struct ExternalResource {
     direction: ResourceDirection,
     definition: ResourceDefinition,
-    codec: ResourceCodec,
+    pub codec: ResourceCodec,
 }
 
 impl ExternalResource {
