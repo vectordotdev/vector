@@ -10,6 +10,7 @@ use crate::tap;
 #[cfg(feature = "api-client")]
 use crate::top;
 use crate::{config, generate, get_version, graph, list, unit_test, validate};
+use crate::{generate_schema, signal};
 
 #[derive(Parser, Debug)]
 #[command(rename_all = "kebab-case")]
@@ -238,6 +239,33 @@ pub enum SubCommand {
     /// Vector Remap Language CLI
     #[cfg(feature = "vrl-cli")]
     Vrl(vrl_cli::Opts),
+}
+
+impl SubCommand {
+    pub async fn execute(
+        &self,
+        signal_handler: &mut signal::SignalHandler,
+        #[allow(unused_variables)] signal_rx: signal::SignalRx,
+        color: bool,
+    ) -> exitcode::ExitCode {
+        match self {
+            Self::Config(c) => config::cmd(c),
+            Self::Generate(g) => generate::cmd(g),
+            Self::GenerateSchema => generate_schema::cmd(),
+            Self::Graph(g) => graph::cmd(g),
+            Self::List(l) => list::cmd(l),
+            #[cfg(windows)]
+            Self::Service(s) => service::cmd(s),
+            #[cfg(feature = "api-client")]
+            Self::Tap(t) => tap::cmd(t, signal_rx).await,
+            Self::Test(t) => unit_test::cmd(t, signal_handler).await,
+            #[cfg(feature = "api-client")]
+            Self::Top(t) => top::cmd(t).await,
+            Self::Validate(v) => validate::validate(v, color).await,
+            #[cfg(feature = "vrl-cli")]
+            Self::Vrl(s) => vrl_cli::cmd::cmd(s),
+        }
+    }
 }
 
 #[derive(clap::ValueEnum, Debug, Clone, PartialEq, Eq)]
