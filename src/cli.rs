@@ -249,19 +249,18 @@ impl SubCommand {
         color: bool,
     ) -> exitcode::ExitCode {
         match self {
+            Self::Config(c) => config::cmd(c),
             Self::Generate(g) => generate::cmd(g),
             Self::GenerateSchema => generate_schema::cmd(),
             Self::Graph(g) => graph::cmd(g),
-            Self::Config(c) => config::cmd(c),
             Self::List(l) => list::cmd(l),
-            Self::Test(t) => unit_test::cmd(t, signal_handler).await,
             #[cfg(windows)]
             Self::Service(s) => service::cmd(s),
             #[cfg(feature = "api-client")]
-            Self::Top(t) => top::cmd(t).await,
-            #[cfg(feature = "api-client")]
             Self::Tap(t) => tap::cmd(t, signal_rx).await,
-
+            Self::Test(t) => unit_test::cmd(t, signal_handler).await,
+            #[cfg(feature = "api-client")]
+            Self::Top(t) => top::cmd(t).await,
             Self::Validate(v) => validate::validate(v, color).await,
             #[cfg(feature = "vrl-cli")]
             Self::Vrl(s) => vrl_cli::cmd::cmd(s),
