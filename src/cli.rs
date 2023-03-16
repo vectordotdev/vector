@@ -247,6 +247,19 @@ pub enum Color {
     Never,
 }
 
+impl Color {
+    pub fn use_color(&self) -> bool {
+        match self {
+            #[cfg(unix)]
+            Color::Auto => atty::is(atty::Stream::Stdout),
+            #[cfg(windows)]
+            Color::Auto => false, // ANSI colors are not supported by cmd.exe
+            Color::Always => true,
+            Color::Never => false,
+        }
+    }
+}
+
 #[derive(clap::ValueEnum, Debug, Clone, PartialEq, Eq)]
 pub enum LogFormat {
     Text,
