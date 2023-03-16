@@ -3,6 +3,7 @@ crate::cli_subcommands! {
     component_docs,
     manifests,
     release_cue,
+    mod vrl_wasm,
 }
 
 crate::script_wrapper! {
