@@ -174,11 +174,8 @@ async fn source(
     ))
     .unwrap();
     let schema_definitions = HashMap::from([
-        (Some(LOGS.to_owned()), vec![test_logs_schema_definition()]),
-        (
-            Some(METRICS.to_owned()),
-            vec![test_metrics_schema_definition()],
-        ),
+        (Some(LOGS.to_owned()), test_logs_schema_definition()),
+        (Some(METRICS.to_owned()), test_metrics_schema_definition()),
     ]);
     let context = SourceContext::new_test(sender, Some(schema_definitions));
     tokio::spawn(async move {

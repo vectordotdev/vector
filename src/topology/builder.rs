@@ -188,7 +188,7 @@ pub async fn build_pieces(
         let mut controls = HashMap::new();
         let mut schema_definitions = HashMap::with_capacity(source_outputs.len());
 
-        for output in source_outputs {
+        for mut output in source_outputs {
             let mut rx = builder.add_output(output.clone());
 
             let (mut fanout, control) = Fanout::new();
@@ -215,7 +215,11 @@ pub async fn build_pieces(
                 control,
             );
 
-            schema_definitions.insert(output.port, output.log_schema_definitions);
+            if !output.log_schema_definitions.is_empty() {
+                // No source should produce more than one schema definition.
+                assert!(output.log_schema_definitions.len() == 1);
+                schema_definitions.insert(output.port, output.log_schema_definitions.remove(0));
+            }
         }
 
         let (pump_error_tx, mut pump_error_rx) = oneshot::channel();

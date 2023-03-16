@@ -150,8 +150,6 @@ impl SourceConfig for DatadogAgentConfig {
             .get(&Some(LOGS.to_owned()))
             .or_else(|| cx.schema_definitions.get(&None))
             .expect("registered log schema required")
-            .first()
-            .expect("registered log schema required")
             .clone();
 
         // Since this is for a source, we can expect there to be only one schema definition,
@@ -160,8 +158,6 @@ impl SourceConfig for DatadogAgentConfig {
             .schema_definitions
             .get(&Some(METRICS.to_owned()))
             .or_else(|| cx.schema_definitions.get(&None))
-            .expect("registered metrics schema required")
-            .first()
             .expect("registered metrics schema required")
             .clone();
 
