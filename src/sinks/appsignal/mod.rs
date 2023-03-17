@@ -21,6 +21,7 @@ use crate::{
         },
         BuildError,
     },
+    tls::TlsSettings,
 };
 
 /// Configuration for the `appsignal` sink.
@@ -84,7 +85,8 @@ impl SinkConfig for AppsignalSinkConfig {
 
         let buffer = JsonArrayBuffer::new(batch_settings.size);
 
-        let client = HttpClient::new(None, cx.proxy())?;
+        let tls_settings = TlsSettings::from_options(&None)?;
+        let client = HttpClient::new(tls_settings, cx.proxy())?;
 
         let sink = BatchedHttpSink::new(
             self.clone(),
