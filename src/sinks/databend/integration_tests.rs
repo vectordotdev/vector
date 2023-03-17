@@ -46,8 +46,7 @@ fn make_event() -> (Event, BatchStatusReceiver) {
     (event.into(), receiver)
 }
 
-#[tokio::test]
-async fn insert_events() {
+async fn insert_event_with_encoding(codec: &str) {
     trace_init();
 
     let table = gen_table();
@@ -57,7 +56,7 @@ async fn insert_events() {
         password: SensitiveString::from(databend_password()),
     });
 
-    let cfg = format!(
+    let mut cfg = format!(
         r#"
             endpoint = "{}"
             table = "{}"
@@ -71,12 +70,29 @@ async fn insert_events() {
         databend_user(),
         databend_password(),
     );
+    match codec {
+        "json" => {
+            cfg.push_str(
+                r#"
+                    encoding.codec = "json"
+                "#,
+            );
+        }
+        "csv" => {
+            cfg.push_str(
+                r#"
+                    encoding.codec = "csv"
+                    encoding.csv.fields = ["host", "timestamp", "message"]
+                "#,
+            );
+        }
+        _ => panic!("unsupported codec"),
+    }
 
     let (config, _) = load_sink::<DatabendConfig>(&cfg).unwrap();
 
     let proxy = ProxyConfig::default();
     let http_client = HttpClient::new(None, &proxy).unwrap();
-
     let client = DatabendAPIClient::new(http_client, endpoint, auth);
 
     let create_table_sql = format!(
@@ -115,6 +131,16 @@ async fn insert_events() {
     }
 
     assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+}
+
+#[tokio::test]
+async fn insert_event_json() {
+    insert_event_with_encoding("json").await;
+}
+
+#[tokio::test]
+async fn insert_event_csv() {
+    insert_event_with_encoding("csv").await;
 }
 
 fn response_to_map(resp: &DatabendHttpResponse) -> Vec<BTreeMap<String, String>> {

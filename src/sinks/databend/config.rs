@@ -1,16 +1,13 @@
 use std::collections::BTreeMap;
 
-use codecs::{
-    encoding::{Framer, FramingConfig, SerializerConfig},
-    JsonSerializerConfig,
-};
+use codecs::encoding::{Framer, FramingConfig, SerializerConfig};
 use futures::future::FutureExt;
 use tower::ServiceBuilder;
 use vector_config::{component::GenerateConfig, configurable_component};
 use vector_core::tls::TlsSettings;
 
 use crate::{
-    codecs::{Encoder, EncodingConfigWithFraming, SinkType, Transformer},
+    codecs::{Encoder, EncodingConfig},
     config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext},
     http::{Auth, HttpClient, MaybeAuth},
     sinks::{
@@ -48,11 +45,7 @@ pub struct DatabendConfig {
     pub database: String,
 
     #[configurable(derived)]
-    #[serde(
-        default,
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
-    )]
-    pub encoding: Transformer,
+    pub encoding: EncodingConfig,
 
     #[configurable(derived)]
     #[serde(default)]
@@ -83,6 +76,7 @@ impl GenerateConfig for DatabendConfig {
             r#"endpoint = "http://localhost:8000"
             table = "default"
             database = "default"
+            encoding.codec = "json"
         "#,
         )
         .unwrap()
@@ -121,15 +115,28 @@ impl SinkConfig for DatabendConfig {
         let table = config.table;
         let client = DatabendAPIClient::new(self.build_client(&cx)?, endpoint, auth);
 
-        let encoding_config = EncodingConfigWithFraming::new(
-            Some(FramingConfig::NewlineDelimited),
-            SerializerConfig::Json(JsonSerializerConfig::default()),
-            self.encoding.clone(),
-        );
-        let (framer, serializer) = encoding_config.build(SinkType::StreamBased)?;
         let mut file_format_options = BTreeMap::new();
-        file_format_options.insert("type".to_string(), "NDJSON".to_string());
         file_format_options.insert("compression".to_string(), "gzip".to_string());
+        let serializer = match self.encoding.config() {
+            SerializerConfig::Json(_) => {
+                file_format_options.insert("type".to_string(), "NDJSON".to_string());
+                self.encoding.build()?
+            }
+            SerializerConfig::Csv(_) => {
+                file_format_options.insert("type".to_string(), "CSV".to_string());
+                file_format_options.insert("field_delimiter".to_string(), ",".to_string());
+                file_format_options.insert("record_delimiter".to_string(), "\n".to_string());
+                file_format_options.insert("skip_header".to_string(), "0".to_string());
+                self.encoding.build()?
+            }
+            _ => {
+                return Err(
+                    format!("Unsupported encoding {:?} for databend sink", self.encoding).into(),
+                );
+            }
+        };
+        let framer = FramingConfig::NewlineDelimited.build();
+        let transformer = self.encoding.transformer();
 
         let mut copy_options = BTreeMap::new();
         copy_options.insert("purge".to_string(), "true".to_string());
@@ -140,7 +147,6 @@ impl SinkConfig for DatabendConfig {
             .settings(request_settings, DatabendRetryLogic)
             .service(service);
 
-        let transformer = self.encoding.clone();
         let encoder = Encoder::<Framer>::new(framer, serializer);
         let request_builder = DatabendRequestBuilder::new(
             Compression::Gzip(CompressionLevel::default()),
@@ -177,12 +183,13 @@ mod tests {
     }
 
     #[test]
-    fn parse_database() {
+    fn parse_config() {
         let cfg = toml::from_str::<DatabendConfig>(
             r#"
             endpoint = "http://localhost:8000"
             table = "mytable"
             database = "mydatabase"
+            encoding.codec = "json"
         "#,
         )
         .unwrap();
