@@ -182,6 +182,7 @@ default = [
     "parse_regex",
     "parse_regex_all",
     "parse_ruby_hash",
+    "parse_spring_boot",
     "parse_syslog",
     "parse_timestamp",
     "parse_tokens",
@@ -337,6 +338,7 @@ parse_query_string = ["dep:url"]
 parse_regex = ["dep:regex"]
 parse_regex_all = ["dep:regex"]
 parse_ruby_hash = ["dep:nom"]
+parse_spring_boot = ["dep:grok"]
 parse_syslog = ["dep:syslog_loose", "dep:chrono", "vector-common/conversion"]
 parse_timestamp = ["vector-common/conversion", "dep:chrono"]
 parse_tokens = ["vector-common/tokenize"]

@@ -246,6 +246,8 @@ mod parse_regex;
 mod parse_regex_all;
 #[cfg(feature = "parse_ruby_hash")]
 mod parse_ruby_hash;
+#[cfg(feature = "parse_spring_boot")]
+mod parse_spring_boot;
 #[cfg(feature = "parse_syslog")]
 mod parse_syslog;
 #[cfg(feature = "parse_timestamp")]
@@ -547,6 +549,8 @@ pub use parse_regex::ParseRegex;
 pub use parse_regex_all::ParseRegexAll;
 #[cfg(feature = "parse_ruby_hash")]
 pub use parse_ruby_hash::ParseRubyHash;
+#[cfg(feature = "parse_spring_boot")]
+pub use parse_spring_boot::ParseSpringBoot;
 #[cfg(feature = "parse_syslog")]
 pub use parse_syslog::ParseSyslog;
 #[cfg(feature = "parse_timestamp")]
@@ -864,6 +868,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(ParseRegexAll),
         #[cfg(feature = "parse_ruby_hash")]
         Box::new(ParseRubyHash),
+        #[cfg(feature = "parse_spring_boot")]
+        Box::new(ParseSpringBoot),
         #[cfg(feature = "parse_syslog")]
         Box::new(ParseSyslog),
         #[cfg(feature = "parse_timestamp")]
