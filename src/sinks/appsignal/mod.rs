@@ -31,7 +31,8 @@ pub struct AppsignalSinkConfig {
     /// The AppSignal API endpoint to report to. This is configured by default and doesn't need to be changed.
     #[configurable(validation(format = "uri"))]
     #[configurable(metadata(docs::examples = "https://appsignal-endpoint.net"))]
-    endpoint: Option<String>,
+    #[serde(default = "default_endpoint")]
+    endpoint: String,
 
     /// A valid app-level AppSignal Push API key.
     #[configurable(metadata(docs::examples = "00000000-0000-0000-0000-000000000000"))]
@@ -60,6 +61,10 @@ pub struct AppsignalSinkConfig {
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     acknowledgements: AcknowledgementsConfig,
+}
+
+fn default_endpoint() -> String {
+    "https://appsignal-endpoint.net".to_string()
 }
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -98,7 +103,7 @@ impl SinkConfig for AppsignalSinkConfig {
         .sink_map_err(|error| error!(message = "Fatal AppSignal sink error.", %error));
 
         let healthcheck = healthcheck(
-            endpoint_uri(self.endpoint.as_ref(), "vector/healthcheck")?,
+            endpoint_uri(self.endpoint.clone(), "vector/healthcheck")?,
             push_api_key,
             client,
         )
@@ -145,7 +150,7 @@ impl HttpSink for AppsignalSinkConfig {
     }
 
     async fn build_request(&self, events: Self::Output) -> crate::Result<Request<Bytes>> {
-        let uri = endpoint_uri(self.endpoint.as_ref(), "vector/events")?;
+        let uri = endpoint_uri(self.endpoint.clone(), "vector/events")?;
         let request = Request::post(uri)
             .header(
                 AUTHORIZATION,
@@ -182,12 +187,8 @@ pub(crate) async fn healthcheck(
     }
 }
 
-fn endpoint_uri(endpoint: Option<&String>, path: &str) -> crate::Result<Uri> {
-    let mut uri = if let Some(endpoint) = endpoint {
-        endpoint.to_string()
-    } else {
-        "https://appsignal-endpoint.net".to_string()
-    };
+fn endpoint_uri(endpoint: String, path: &str) -> crate::Result<Uri> {
+    let mut uri = endpoint.clone();
     if !uri.ends_with('/') {
         uri.push('/');
     }
@@ -226,7 +227,7 @@ mod test {
         let mut config =
             AppsignalSinkConfig::deserialize(toml::de::ValueDeserializer::new(&config))
                 .expect("config should be valid");
-        config.endpoint = Some(mock_endpoint.to_string());
+        config.endpoint = mock_endpoint.to_string();
 
         let context = SinkContext::new_test();
         let (sink, _healthcheck) = config.build(context).await.unwrap();
@@ -236,18 +237,9 @@ mod test {
     }
 
     #[test]
-    fn endpoint_uri_with_default_endpoint() {
-        let uri = endpoint_uri(None, "vector/events");
-        assert_eq!(
-            uri.expect("Not a valid URI").to_string(),
-            "https://appsignal-endpoint.net/vector/events"
-        );
-    }
-
-    #[test]
-    fn endpoint_uri_with_endpoint_override() {
+    fn endpoint_uri_with_path() {
         let uri = endpoint_uri(
-            Some(&"https://appsignal-endpoint.net".to_string()),
+            "https://appsignal-endpoint.net".to_string(),
             "vector/events",
         );
         assert_eq!(
@@ -257,9 +249,9 @@ mod test {
     }
 
     #[test]
-    fn endpoint_uri_with_endpoint_override_and_trailing_slash() {
+    fn endpoint_uri_with_trailing_slash() {
         let uri = endpoint_uri(
-            Some(&"https://appsignal-endpoint.net/".to_string()),
+            "https://appsignal-endpoint.net/".to_string(),
             "vector/events",
         );
         assert_eq!(
