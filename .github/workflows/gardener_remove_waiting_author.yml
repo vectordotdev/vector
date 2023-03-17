@@ -11,4 +11,4 @@ jobs:
       - uses: actions/checkout@v2
       - uses: actions-ecosystem/action-remove-labels@v1
         with:
-          labels: "meta: awaiting-author"
+          labels: "meta: awaiting author"
