@@ -344,7 +344,6 @@ pub async fn build_pieces(
     {
         debug!(component = %key, "Building new transform.");
 
-        let mut schema_definitions = HashMap::new();
         let input_definitions =
             schema::input_definitions(&transform.inputs, config, &mut definition_cache);
 
@@ -363,15 +362,13 @@ pub async fn build_pieces(
             component_name = %key.id(),
         );
 
-        for output in transform
+        // Create a map of the outputs to the list of possible definitions from those outputs.
+        let schema_definitions = transform
             .inner
             .outputs(input_definitions.clone(), config.schema.log_namespace())
-        {
-            // TODO - we probably need more than this.
-            for definition in output.log_schema_definitions {
-                schema_definitions.insert(output.port.clone(), definition);
-            }
-        }
+            .into_iter()
+            .map(|output| (output.port, output.log_schema_definitions))
+            .collect::<HashMap<_, _>>();
 
         let context = TransformContext {
             key: Some(key.clone()),
