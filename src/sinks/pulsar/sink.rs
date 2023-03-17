@@ -148,7 +148,9 @@ impl PulsarSink {
                     Ok(req) => Some(req),
                 }
             })
-            .into_driver(service);
+            .into_driver(service)
+            .protocol("tcp");
+
         sink.run().await
     }
 }
