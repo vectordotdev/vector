@@ -174,7 +174,7 @@ impl<Exe: Executor> Service<PulsarRequest> for PulsarService<Exe> {
             let body = request.body.clone();
             let mut msg_builder = lp.create_message().with_content(body.as_ref());
             if let Some(key) = request.metadata.key {
-                msg_builder = msg_builder.with_key(String::from_utf8_lossy(&*key));
+                msg_builder = msg_builder.with_key(String::from_utf8_lossy(&key));
             }
             if let Some(timestamp) = ts {
                 msg_builder = msg_builder.event_time(timestamp as u64);
@@ -182,7 +182,7 @@ impl<Exe: Executor> Service<PulsarRequest> for PulsarService<Exe> {
             if let Some(properties) = request.metadata.properties {
                 for (key, value) in properties {
                     msg_builder =
-                        msg_builder.with_property(key, String::from_utf8_lossy(&*value.clone()));
+                        msg_builder.with_property(key, String::from_utf8_lossy(&value.clone()));
                 }
             }
 
