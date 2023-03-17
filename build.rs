@@ -182,20 +182,20 @@ fn main() {
     let build_desc = tracker.get_env_var("VECTOR_BUILD_DESC");
 
     // Get the git short hash of the HEAD.
-    // In CI build workflows this will have been exported already so that we don't run into
-    // git permission issues when trying to determine the sha while running within a docker
-    // container during the packaging steps.
-    let git_short_hash = tracker.get_env_var("VECTOR_GIT_SHA").unwrap_or_else(|| {
-        git_short_hash()
-            .map_err(|e| -> String {
-                format!(
-                    "Unable to determine git short hash from rev-parse command: {}",
-                    e.to_string()
-                )
-                .into()
-            })
-            .unwrap()
-    });
+    // Note that if Vector is compiled within a container, proper git permissions must be set for
+    // the repo directory.
+    // In CI build workflows this will have been pre-configured by running the command
+    // "git config --global --add safe.directory /git/vectordotdev/vector", from the vdev package
+    // subcommands.
+    let git_short_hash = git_short_hash()
+        .map_err(|e| -> String {
+            format!(
+                "Unable to determine git short hash from rev-parse command: {}",
+                e.to_string()
+            )
+            .into()
+        })
+        .unwrap();
 
     // Gather up the constants and write them out to our build constants file.
     let mut constants = BuildConstants::new();
