@@ -130,9 +130,7 @@ macro_rules! package_script_wrapper {
 
                 impl Cli {
                     pub(super) fn exec(self) -> anyhow::Result<()> {
-
                         $crate::util::mark_safe_git_repo();
-
                         $crate::app::exec(concat!("scripts/", $script), self.args, true)
                     }
                 }
