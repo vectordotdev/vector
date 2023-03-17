@@ -17,7 +17,7 @@ pub(super) fn make_pulsar_event(
     event: Event,
 ) -> Option<PulsarEvent> {
     let topic = topic.render_string(&event).ok()?;
-    let key = get_key(&event, &config.key_field);
+    let key = get_key(&event, &config.partition_key_field);
     let timestamp_millis = get_timestamp_millis(&event, log_schema());
     let properties = get_properties(&event, &config.properties_key);
     Some(PulsarEvent {
@@ -29,17 +29,19 @@ pub(super) fn make_pulsar_event(
     })
 }
 
-fn get_key(event: &Event, key_field: &Option<String>) -> Option<Bytes> {
-    key_field.as_ref().and_then(|key_field| match event {
-        Event::Log(log) => log
-            .get(key_field.as_str())
-            .map(|value| value.coerce_to_bytes()),
-        Event::Metric(metric) => metric
-            .tags()
-            .and_then(|tags| tags.get(key_field))
-            .map(|value| value.to_owned().into()),
-        _ => None,
-    })
+fn get_key(event: &Event, partition_key_field: &Option<String>) -> Option<Bytes> {
+    partition_key_field
+        .as_ref()
+        .and_then(|partition_key_field| match event {
+            Event::Log(log) => log
+                .get(partition_key_field.as_str())
+                .map(|value| value.coerce_to_bytes()),
+            Event::Metric(metric) => metric
+                .tags()
+                .and_then(|tags| tags.get(partition_key_field))
+                .map(|value| value.to_owned().into()),
+            _ => None,
+        })
 }
 
 fn get_timestamp_millis(event: &Event, log_schema: &'static LogSchema) -> Option<i64> {

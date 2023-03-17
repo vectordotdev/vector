@@ -1,7 +1,7 @@
 features:
 - pulsar-integration-tests
 
-test_filter: '::pulsar::'
+test_filter: '::pulsar::integration_tests::'
 
 env:
   PULSAR_ADDRESS: pulsar://pulsar:6650

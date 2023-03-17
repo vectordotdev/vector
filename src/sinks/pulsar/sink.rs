@@ -107,7 +107,7 @@ impl PulsarSink {
         let serializer = config.encoding.build()?;
         let request_settings = config.request.unwrap_with(&TowerRequestConfig::default());
         let encoder = Encoder::<()>::new(serializer);
-        let service = PulsarService::new(client, producer_opts, None);
+        let service = PulsarService::new(client, producer_opts, None, config.producer_name.clone());
         let topic = config.topic.clone();
 
         Ok(PulsarSink {

@@ -75,6 +75,7 @@ pub struct PulsarService<Exe: Executor> {
     pulsar_client: Pulsar<Exe>,
     producer_cache: SafeLru<Exe>,
     producer_options: ProducerOptions,
+    producer_name: Option<String>,
 }
 
 impl<Exe: Executor> PulsarService<Exe> {
@@ -82,6 +83,7 @@ impl<Exe: Executor> PulsarService<Exe> {
         pulsar_client: Pulsar<Exe>,
         producer_options: ProducerOptions,
         producer_cache_size: Option<NonZeroUsize>,
+        producer_name: Option<String>,
     ) -> PulsarService<Exe> {
         // Use a LRUCache to store a limited set of producers
         // Producers in Pulsar use a send buffer, so we want to limit the number of these
@@ -92,6 +94,7 @@ impl<Exe: Executor> PulsarService<Exe> {
             pulsar_client,
             producer_cache,
             producer_options,
+            producer_name,
         }
     }
 
@@ -103,12 +106,18 @@ impl<Exe: Executor> PulsarService<Exe> {
         client: Pulsar<Exe>,
         producer_options: ProducerOptions,
         topic: &String,
+        name: Option<String>,
     ) -> Result<Arc<Mutex<Producer<Exe>>>, PulsarError> {
-        let prod = client
+        let mut builder = client
             .producer()
             .with_topic(topic)
             .with_options(producer_options);
-        match prod.build().await {
+
+        if let Some(name) = name {
+            builder = builder.with_name(name);
+        }
+
+        match builder.build().await {
             Ok(p) => Ok(Arc::new(Mutex::new(p))),
             Err(e) => Err(e),
         }
@@ -121,13 +130,14 @@ impl<Exe: Executor> PulsarService<Exe> {
         client: Pulsar<Exe>,
         producer_options: ProducerOptions,
         topic: String,
+        name: Option<String>,
     ) -> Arc<Mutex<Producer<Exe>>> {
         let mut pc = producer_cache.lock().await;
         match pc.contains(&topic) {
             false => {
                 pc.put(
                     topic.clone(),
-                    PulsarService::build_producer(client, producer_options, &topic).await,
+                    PulsarService::build_producer(client, producer_options, &topic, name).await,
                 );
                 let f = pc.get(&topic).unwrap().as_ref().unwrap();
                 Arc::clone(f)
@@ -155,6 +165,7 @@ impl<Exe: Executor> Service<PulsarRequest> for PulsarService<Exe> {
             self.pulsar_client.clone(),
             self.producer_options.clone(),
             request.metadata.topic.clone(),
+            self.producer_name.clone(),
         );
         let ts = request.metadata.timestamp_millis.to_owned();
         Box::pin(async move {

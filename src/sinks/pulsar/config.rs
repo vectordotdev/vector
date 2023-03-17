@@ -44,17 +44,14 @@ pub struct PulsarSinkConfig {
     /// If the field does not exist in the log or in tags, a blank value will be used. If unspecified, the key is not sent.
     ///
     /// Pulsar uses a hash of the key to choose the topic-partition or uses round-robin if the record has no key.
-    pub key_field: Option<String>,
+    #[configurable(metadata(docs::examples = "message"))]
+    #[configurable(metadata(docs::examples = "my_field"))]
+    pub(crate) partition_key_field: Option<String>,
 
     /// The log field name to use for the Pulsar properties.
     ///
     /// If omitted, no properties will be written.
     pub properties_key: Option<String>,
-
-    /// Log field to use as Pulsar message key.
-    #[configurable(metadata(docs::examples = "message"))]
-    #[configurable(metadata(docs::examples = "my_field"))]
-    pub(crate) partition_key_field: Option<String>,
 
     #[configurable(derived)]
     #[serde(default)]
@@ -62,7 +59,7 @@ pub struct PulsarSinkConfig {
 
     #[configurable(derived)]
     #[serde(default)]
-    pub compression: Option<PulsarCompression>,
+    pub compression: PulsarCompression,
 
     #[configurable(derived)]
     pub encoding: EncodingConfig,
@@ -174,11 +171,10 @@ impl Default for PulsarSinkConfig {
             endpoint: "pulsar://127.0.0.1:6650".to_string(),
             topic: "topic-1234".to_string(),
             producer_name: None,
-            key_field: None,
             properties_key: None,
             partition_key_field: None,
             batch: Default::default(),
-            compression: None,
+            compression: Default::default(),
             encoding: TextSerializerConfig::default().into(),
             auth: None,
             request: TowerRequestConfig::default(),
@@ -227,32 +223,33 @@ impl PulsarSinkConfig {
             batch_size: None,
             compression: None,
         };
-        if let Some(config_compression) = &self.compression {
-            match config_compression {
-                PulsarCompression::None => opts.compression = Some(compression::Compression::None),
-                PulsarCompression::Lz4 => {
-                    opts.compression = Some(compression::Compression::Lz4(
-                        compression::CompressionLz4::default(),
-                    ))
-                }
-                PulsarCompression::Zlib => {
-                    opts.compression = Some(compression::Compression::Zlib(
-                        compression::CompressionZlib::default(),
-                    ))
-                }
-                PulsarCompression::Zstd => {
-                    opts.compression = Some(compression::Compression::Zstd(
-                        compression::CompressionZstd::default(),
-                    ))
-                }
-                PulsarCompression::Snappy => {
-                    opts.compression = Some(compression::Compression::Snappy(
-                        compression::CompressionSnappy::default(),
-                    ))
-                }
+
+        match &self.compression {
+            PulsarCompression::None => opts.compression = Some(compression::Compression::None),
+            PulsarCompression::Lz4 => {
+                opts.compression = Some(compression::Compression::Lz4(
+                    compression::CompressionLz4::default(),
+                ))
+            }
+            PulsarCompression::Zlib => {
+                opts.compression = Some(compression::Compression::Zlib(
+                    compression::CompressionZlib::default(),
+                ))
+            }
+            PulsarCompression::Zstd => {
+                opts.compression = Some(compression::Compression::Zstd(
+                    compression::CompressionZstd::default(),
+                ))
+            }
+            PulsarCompression::Snappy => {
+                opts.compression = Some(compression::Compression::Snappy(
+                    compression::CompressionSnappy::default(),
+                ))
             }
         }
+
         opts.batch_size = self.batch.max_events;
+
         if let SerializerConfig::Avro { avro } = self.encoding.config() {
             opts.schema = Some(proto::Schema {
                 schema_data: avro.schema.as_bytes().into(),
