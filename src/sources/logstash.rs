@@ -209,7 +209,7 @@ impl TcpSource for LogstashSource {
 
             self.log_namespace.insert_vector_metadata(
                 log,
-                log_schema().source_type_key(),
+                Some(log_schema().source_type_key()),
                 path!("source_type"),
                 Bytes::from_static(LogstashConfig::NAME.as_bytes()),
             );
@@ -232,10 +232,12 @@ impl TcpSource for LogstashSource {
                     log.insert(metadata_path!("vector", "ingest_timestamp"), now);
                 }
                 LogNamespace::Legacy => {
-                    log.insert(
-                        (PathPrefix::Event, log_schema().timestamp_key()),
-                        log_timestamp.unwrap_or_else(|| Value::from(now)),
-                    );
+                    if let Some(timestamp_key) = log_schema().timestamp_key() {
+                        log.insert(
+                            (PathPrefix::Event, timestamp_key),
+                            log_timestamp.unwrap_or_else(|| Value::from(now)),
+                        );
+                    }
                 }
             }
 

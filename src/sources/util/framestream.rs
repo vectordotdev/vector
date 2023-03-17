@@ -356,7 +356,7 @@ pub trait FrameHandler {
     fn socket_receive_buffer_size(&self) -> Option<usize>;
     fn socket_send_buffer_size(&self) -> Option<usize>;
     fn host_key(&self) -> &Option<OwnedValuePath>;
-    fn timestamp_key(&self) -> &str;
+    fn timestamp_key(&self) -> Option<&OwnedValuePath>;
     fn source_type_key(&self) -> &str;
 }
 

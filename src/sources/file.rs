@@ -747,7 +747,7 @@ fn create_event(
 
     log_namespace.insert_vector_metadata(
         &mut event,
-        log_schema().source_type_key(),
+        Some(log_schema().source_type_key()),
         path!("source_type"),
         Bytes::from_static(FileConfig::NAME.as_bytes()),
     );

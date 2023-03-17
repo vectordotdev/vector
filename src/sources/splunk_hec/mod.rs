@@ -660,7 +660,7 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
         // Add source type
         self.log_namespace.insert_vector_metadata(
             &mut log,
-            lookup::path!(log_schema().source_type_key()),
+            Some(log_schema().source_type_key()),
             lookup::path!("source_type"),
             SplunkConfig::NAME,
         );
@@ -737,7 +737,7 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
         self.log_namespace.insert_source_metadata(
             SplunkConfig::NAME,
             &mut log,
-            Some(LegacyKey::Overwrite(log_schema().timestamp_key())),
+            log_schema().timestamp_key().map(LegacyKey::Overwrite),
             "timestamp",
             timestamp,
         );

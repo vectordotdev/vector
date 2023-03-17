@@ -108,10 +108,12 @@ pub(super) async fn firehose(
                                     );
                                 }
                                 LogNamespace::Legacy => {
-                                    log.try_insert(
-                                        (PathPrefix::Event, log_schema().timestamp_key()),
-                                        request.timestamp,
-                                    );
+                                    if let Some(timestamp_key) = log_schema().timestamp_key() {
+                                        log.try_insert(
+                                            (PathPrefix::Event, timestamp_key),
+                                            request.timestamp,
+                                        );
+                                    }
                                 }
                             };
 
