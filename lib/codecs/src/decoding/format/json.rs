@@ -2,7 +2,7 @@ use std::convert::TryInto;
 
 use bytes::Bytes;
 use chrono::Utc;
-use lookup::lookup_v2::parse_value_path;
+use lookup::PathPrefix;
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 use value::Kind;
@@ -32,15 +32,21 @@ impl JsonDeserializerConfig {
     /// The schema produced by the deserializer.
     pub fn schema_definition(&self, log_namespace: LogNamespace) -> schema::Definition {
         match log_namespace {
-            LogNamespace::Legacy => schema::Definition::empty_legacy_namespace()
-                .unknown_fields(Kind::json())
-                .try_with_field(
-                    &parse_value_path(log_schema().timestamp_key()).expect("valid timestamp key"),
-                    // The JSON decoder will try to insert a new `timestamp`-type value into the
-                    // "timestamp_key" field, but only if that field doesn't already exist.
-                    Kind::json().or_timestamp(),
-                    Some("timestamp"),
-                ),
+            LogNamespace::Legacy => {
+                let mut definition =
+                    schema::Definition::empty_legacy_namespace().unknown_fields(Kind::json());
+
+                if let Some(timestamp_key) = log_schema().timestamp_key() {
+                    definition = definition.try_with_field(
+                        timestamp_key,
+                        // The JSON decoder will try to insert a new `timestamp`-type value into the
+                        // "timestamp_key" field, but only if that field doesn't already exist.
+                        Kind::json().or_timestamp(),
+                        Some("timestamp"),
+                    );
+                }
+                definition
+            }
             LogNamespace::Vector => {
                 schema::Definition::new_with_default_metadata(Kind::json(), [log_namespace])
             }
@@ -95,14 +101,15 @@ impl Deserializer for JsonDeserializer {
             LogNamespace::Legacy => {
                 let timestamp = Utc::now();
 
-                for event in &mut events {
-                    let log = event.as_mut_log();
-                    let timestamp_key = log_schema().timestamp_key();
-
-                    if !log.contains(timestamp_key) {
-                        log.insert(timestamp_key, timestamp);
+                if let Some(timestamp_key) = log_schema().timestamp_key() {
+                    for event in &mut events {
+                        let log = event.as_mut_log();
+                        if !log.contains((PathPrefix::Event, timestamp_key)) {
+                            log.insert((PathPrefix::Event, timestamp_key), timestamp);
+                        }
                     }
                 }
+
                 events
             }
         };

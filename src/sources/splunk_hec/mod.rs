@@ -773,7 +773,7 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
                 // The timestamp is extracted from the message for the Legacy namespace.
                 self.log_namespace.insert_vector_metadata(
                     &mut log,
-                    lookup::path!(log_schema().timestamp_key()),
+                    log_schema().timestamp_key(),
                     lookup::path!("ingest_timestamp"),
                     chrono::Utc::now(),
                 );

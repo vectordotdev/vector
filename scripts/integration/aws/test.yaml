@@ -1,7 +1,7 @@
 features:
 - aws-integration-tests
 
-test_filter: ::aws_
+test_filter: ::aws_kinesis::streams
 
 env:
   AWS_ACCESS_KEY_ID: dummy

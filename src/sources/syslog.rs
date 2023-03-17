@@ -423,7 +423,9 @@ fn enrich_syslog_event(
             .get("timestamp")
             .and_then(|timestamp| timestamp.as_timestamp().cloned())
             .unwrap_or_else(Utc::now);
-        log.insert((PathPrefix::Event, log_schema().timestamp_key()), timestamp);
+        if let Some(timestamp_key) = log_schema().timestamp_key() {
+            log.insert((PathPrefix::Event, timestamp_key), timestamp);
+        }
     }
 
     trace!(
