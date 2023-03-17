@@ -132,19 +132,19 @@ pub fn os_signals() -> impl Stream<Item = SignalTo> {
         loop {
             let signal = tokio::select! {
                 _ = sigint.recv() => {
-                    info!(message = "SIGINT signal received.");
+                    info!(message = "Signal received.", signal = "SIGINT");
                     SignalTo::Shutdown
                 },
                 _ = sigterm.recv() => {
-                    info!(message = "SIGTERM signal received.");
+                    info!(message = "Signal received.", signal = "SIGTERM");
                     SignalTo::Shutdown
                 } ,
                 _ = sigquit.recv() => {
-                    info!(message = "SIGQUIT signal received.");
+                    info!(message = "Signal received.", signal = "SIGQUIT");
                     SignalTo::Quit
                 },
                 _ = sighup.recv() => {
-                    info!(message = "SIGHUP signal received.");
+                    info!(message = "Signal received.", signal = "SIGHUP");
                     SignalTo::ReloadFromDisk
                 },
             };
