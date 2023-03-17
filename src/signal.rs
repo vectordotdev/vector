@@ -29,11 +29,11 @@ pub struct SignalPair {
     pub receiver: SignalRx,
 }
 
-impl Default for SignalPair {
+impl SignalPair {
     /// Create a new signal handler pair, and set them up to receive OS signals.
-    fn default() -> Self {
+    pub async fn new() -> Self {
         let (handler, receiver) = SignalHandler::new();
-        handler.forever(os_signals());
+        handler.forever(os_signals()).await;
         Self { handler, receiver }
     }
 }
@@ -70,7 +70,10 @@ impl SignalHandler {
 
     /// Takes a stream who's elements are convertible to `SignalTo`, and spawns a permanent
     /// task for transmitting to the receiver.
-    fn forever<T, S>(&self, stream: S)
+    // This is not actually an async function, but it does call `tokio::spawn` which MUST be run in
+    // the context of an async reactor. Marking this as `async` enforces that requirement even
+    // though it never actually uses `await`.
+    async fn forever<T, S>(&self, stream: S)
     where
         T: Into<SignalTo> + Send + Sync,
         S: Stream<Item = T> + 'static + Send,
