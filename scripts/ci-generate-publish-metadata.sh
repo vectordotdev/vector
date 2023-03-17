@@ -21,8 +21,6 @@ GIT_SHA=$(git rev-parse --short HEAD)
 CURRENT_DATE=$(date +%Y-%m-%d)
 echo "vector_build_desc=${GIT_SHA} ${CURRENT_DATE}" >> "${GITHUB_OUTPUT}"
 
-echo "vector_git_sha=${GIT_SHA}" >> "${GITHUB_OUTPUT}"
-
 # Figure out what our release channel is.
 CHANNEL="${CHANNEL:-"$(cargo vdev release channel)"}"
 echo "vector_release_channel=${CHANNEL}" >> "${GITHUB_OUTPUT}"

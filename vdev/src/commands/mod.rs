@@ -112,3 +112,49 @@ macro_rules! script_wrapper {
         }
     };
 }
+
+/// This macro creates a wrapper for an existing package script. If the command is run from within
+/// the CI environment (by checking the CI env var), the repo directory is marked as safe, to
+/// satisfy git permissions requirements.
+#[macro_export]
+macro_rules! package_script_wrapper {
+    ( $mod:ident = $doc:literal => $script:literal ) => {
+        paste::paste! {
+            mod $mod {
+                use anyhow::Context as _;
+
+                #[doc = $doc]
+                #[derive(clap::Args, Debug)]
+                #[command()]
+                pub(super) struct Cli {
+                    args: Vec<String>,
+                }
+
+                impl Cli {
+                    pub(super) fn exec(self) -> anyhow::Result<()> {
+
+                        // If CI triggered this command, it is necessary to adjust the permissions
+                        // on the git repository.
+                        if let Ok(is_ci) = std::env::var("CI") {
+                            if is_ci == "true" {
+                                std::process::Command::new("git")
+                                    .args([
+                                        "config",
+                                        "--global",
+                                        "--add",
+                                        "safe.directory",
+                                        "/git/vectordotdev/vector",
+                                    ])
+                                    .output()
+                                    .context("Could not execute `git config --add safe.directory`")
+                                    .unwrap();
+                            }
+                        }
+
+                        $crate::app::exec(concat!("scripts/", $script), self.args, true)
+                    }
+                }
+            }
+        }
+    };
+}
