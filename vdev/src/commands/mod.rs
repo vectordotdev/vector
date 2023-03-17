@@ -121,8 +121,6 @@ macro_rules! package_script_wrapper {
     ( $mod:ident = $doc:literal => $script:literal ) => {
         paste::paste! {
             mod $mod {
-                use anyhow::Context as _;
-
                 #[doc = $doc]
                 #[derive(clap::Args, Debug)]
                 #[command()]
@@ -133,23 +131,7 @@ macro_rules! package_script_wrapper {
                 impl Cli {
                     pub(super) fn exec(self) -> anyhow::Result<()> {
 
-                        // If CI triggered this command, it is necessary to adjust the permissions
-                        // on the git repository.
-                        if let Ok(is_ci) = std::env::var("CI") {
-                            if is_ci == "true" {
-                                std::process::Command::new("git")
-                                    .args([
-                                        "config",
-                                        "--global",
-                                        "--add",
-                                        "safe.directory",
-                                        "/git/vectordotdev/vector",
-                                    ])
-                                    .output()
-                                    .context("Could not execute `git config --add safe.directory`")
-                                    .unwrap();
-                            }
-                        }
+                        $crate::util::mark_safe_git_repo();
 
                         $crate::app::exec(concat!("scripts/", $script), self.args, true)
                     }

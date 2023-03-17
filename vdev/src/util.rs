@@ -44,6 +44,26 @@ pub fn git_short_hash() -> Result<Output> {
         .context("Could not execute `git`")
 }
 
+// If in CI, it is necessary to adjust the permissions on the git repository
+// as a precursor to running some git commands.
+pub fn mark_safe_git_repo() {
+    if let Ok(is_ci) = std::env::var("CI") {
+        if is_ci == "true" {
+            std::process::Command::new("git")
+                .args([
+                    "config",
+                    "--global",
+                    "--add",
+                    "safe.directory",
+                    "/git/vectordotdev/vector",
+                ])
+                .output()
+                .context("Could not execute `git config --add safe.directory`")
+                .unwrap();
+        }
+    }
+}
+
 pub fn get_mode() -> String {
     std::env::var("MODE").unwrap_or_else(|_| "custom".to_string())
 }

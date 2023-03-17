@@ -62,20 +62,16 @@ pub fn version() -> Result<String> {
     } else if channel == "custom" {
         let base_version = util::read_version()?;
 
-        // use pre computed SHA if available, such as when called within build workflows,
-        // where permissions issues prevent us from being able to determine it.
-        let short_hash = if let Ok(sha) = env::var("VECTOR_GIT_SHA") {
-            sha
-        } else {
-            let short_hash_out = util::git_short_hash()?;
-            if !short_hash_out.status.success() {
-                let error = String::from_utf8_lossy(&short_hash_out.stderr);
-                bail!("Error getting short hash running `git rev-parse`:\n{error}");
-            }
-            String::from_utf8_lossy(&short_hash_out.stdout)
-                .trim()
-                .to_string()
-        };
+        util::mark_safe_git_repo();
+
+        let short_hash_out = util::git_short_hash()?;
+        if !short_hash_out.status.success() {
+            let error = String::from_utf8_lossy(&short_hash_out.stderr);
+            bail!("Error getting short hash running `git rev-parse`:\n{error}");
+        }
+        let short_hash = String::from_utf8_lossy(&short_hash_out.stdout)
+            .trim()
+            .to_string();
 
         // use '.' instead of '-' or '_' to avoid issues with rpm and deb package naming
         // format requirements.
