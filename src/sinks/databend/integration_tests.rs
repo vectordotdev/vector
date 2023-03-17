@@ -46,7 +46,7 @@ fn make_event() -> (Event, BatchStatusReceiver) {
     (event.into(), receiver)
 }
 
-async fn insert_event_with_encoding(codec: &str) {
+fn prepare_config(codec: &str, compression: &str) -> (String, String, DatabendAPIClient) {
     trace_init();
 
     let table = gen_table();
@@ -65,8 +65,8 @@ async fn insert_event_with_encoding(codec: &str) {
             auth.password = "{}"
             batch.max_events = 1
         "#,
-        endpoint.clone(),
-        table.clone(),
+        endpoint,
+        table,
         databend_user(),
         databend_password(),
     );
@@ -88,13 +88,32 @@ async fn insert_event_with_encoding(codec: &str) {
         }
         _ => panic!("unsupported codec"),
     }
-
-    let (config, _) = load_sink::<DatabendConfig>(&cfg).unwrap();
+    match compression {
+        "gzip" => {
+            cfg.push_str(
+                r#"
+                    compression = "gzip"
+                "#,
+            );
+        }
+        "none" => {
+            cfg.push_str(
+                r#"
+                    compression = "none"
+                "#,
+            );
+        }
+        _ => panic!("unsupported codec"),
+    }
 
     let proxy = ProxyConfig::default();
     let http_client = HttpClient::new(None, &proxy).unwrap();
     let client = DatabendAPIClient::new(http_client, endpoint, auth);
 
+    (cfg, table, client)
+}
+
+async fn insert_event_with_cfg(cfg: String, table: String, client: DatabendAPIClient) {
     let create_table_sql = format!(
         "create table `{}` (host String, timestamp String, message String)",
         table
@@ -104,6 +123,7 @@ async fn insert_event_with_encoding(codec: &str) {
         .await
         .unwrap();
 
+    let (config, _) = load_sink::<DatabendConfig>(&cfg).unwrap();
     let (sink, _hc) = config.build(SinkContext::new_test()).await.unwrap();
 
     let (input_event, mut receiver) = make_event();
@@ -135,12 +155,26 @@ async fn insert_event_with_encoding(codec: &str) {
 
 #[tokio::test]
 async fn insert_event_json() {
-    insert_event_with_encoding("json").await;
+    let (cfg, table, client) = prepare_config("json", "none");
+    insert_event_with_cfg(cfg, table, client).await;
+}
+
+#[tokio::test]
+async fn insert_event_json_gzip() {
+    let (cfg, table, client) = prepare_config("json", "gzip");
+    insert_event_with_cfg(cfg, table, client).await;
 }
 
 #[tokio::test]
 async fn insert_event_csv() {
-    insert_event_with_encoding("csv").await;
+    let (cfg, table, client) = prepare_config("csv", "none");
+    insert_event_with_cfg(cfg, table, client).await;
+}
+
+#[tokio::test]
+async fn insert_event_csv_gzip() {
+    let (cfg, table, client) = prepare_config("csv", "gzip");
+    insert_event_with_cfg(cfg, table, client).await;
 }
 
 fn response_to_map(resp: &DatabendHttpResponse) -> Vec<BTreeMap<String, String>> {

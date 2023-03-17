@@ -31,7 +31,10 @@ components: sinks: databend: {
 			}
 			encoding: {
 				enabled: true
-				codec: enabled: false
+				codec: {
+					enabled: true
+					enum: ["json", "csv"]
+				}
 			}
 			proxy: enabled: true
 			request: {

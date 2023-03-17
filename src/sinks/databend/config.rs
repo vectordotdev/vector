@@ -12,8 +12,8 @@ use crate::{
     http::{Auth, HttpClient, MaybeAuth},
     sinks::{
         util::{
-            buffer::compression::CompressionLevel, BatchConfig, Compression,
-            RealtimeSizeBasedDefaultBatchSettings, ServiceBuilderExt, TowerRequestConfig, UriSerde,
+            BatchConfig, Compression, RealtimeSizeBasedDefaultBatchSettings, ServiceBuilderExt,
+            TowerRequestConfig, UriSerde,
         },
         Healthcheck, VectorSink,
     },
@@ -46,6 +46,10 @@ pub struct DatabendConfig {
 
     #[configurable(derived)]
     pub encoding: EncodingConfig,
+
+    #[configurable(derived)]
+    #[serde(default = "Compression::gzip_default")]
+    pub compression: Compression,
 
     #[configurable(derived)]
     #[serde(default)]
@@ -116,7 +120,23 @@ impl SinkConfig for DatabendConfig {
         let client = DatabendAPIClient::new(self.build_client(&cx)?, endpoint, auth);
 
         let mut file_format_options = BTreeMap::new();
-        file_format_options.insert("compression".to_string(), "gzip".to_string());
+        let compression = match self.compression {
+            Compression::Gzip(level) => {
+                file_format_options.insert("compression".to_string(), "GZIP".to_string());
+                Compression::Gzip(level)
+            }
+            Compression::None => {
+                file_format_options.insert("compression".to_string(), "NONE".to_string());
+                Compression::None
+            }
+            _ => {
+                return Err(format!(
+                    "Unsupported compression {:?} for databend sink",
+                    self.compression
+                )
+                .into());
+            }
+        };
         let serializer = match self.encoding.config() {
             SerializerConfig::Json(_) => {
                 file_format_options.insert("type".to_string(), "NDJSON".to_string());
@@ -148,10 +168,7 @@ impl SinkConfig for DatabendConfig {
             .service(service);
 
         let encoder = Encoder::<Framer>::new(framer, serializer);
-        let request_builder = DatabendRequestBuilder::new(
-            Compression::Gzip(CompressionLevel::default()),
-            (transformer, encoder),
-        );
+        let request_builder = DatabendRequestBuilder::new(compression, (transformer, encoder));
 
         let sink = DatabendSink::new(batch_settings, request_builder, service);
 
@@ -196,5 +213,7 @@ mod tests {
         assert_eq!(cfg.endpoint.uri, "http://localhost:8000");
         assert_eq!(cfg.table, "mytable");
         assert_eq!(cfg.database, "mydatabase");
+        assert!(matches!(cfg.encoding.config(), SerializerConfig::Json(_)));
+        assert!(matches!(cfg.compression, Compression::Gzip(_)));
     }
 }
