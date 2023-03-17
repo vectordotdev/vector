@@ -604,7 +604,7 @@ test-vrl: ## Run the VRL test suite
 
 .PHONY: compile-vrl-wasm
 compile-vrl-wasm: ## Compile VRL crates to WASM target
-	@scripts/compile-vrl-wasm.sh
+	cargo vdev generate vrl-wasm
 
 ##@ Utility
 
@@ -659,4 +659,4 @@ cargo-install-%:
 
 .PHONY: ci-generate-publish-metadata
 ci-generate-publish-metadata: ## Generates the necessary metadata required for building/publishing Vector.
-	@scripts/ci-generate-publish-metadata.sh
+	cargo vdev generate publish-metadata

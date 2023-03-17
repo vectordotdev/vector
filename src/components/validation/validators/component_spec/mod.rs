@@ -1,8 +1,14 @@
-use vector_core::event::Event;
+mod sources;
 
-use crate::components::validation::{ComponentType, TestCaseExpectation, TestEvent};
+use vector_core::event::{Event, Metric};
+
+use crate::components::validation::{
+    ComponentType, TestCaseExpectation, TestEvent, ValidationConfiguration,
+};
 
 use super::Validator;
+
+use self::sources::{validate_sources, SourceMetrics};
 
 /// Validates that the component meets the requirements of the [Component Specification][component_spec].
 ///
@@ -22,7 +28,8 @@ impl Validator for ComponentSpecValidator {
 
     fn check_validation(
         &self,
-        _component_type: ComponentType,
+        configuration: ValidationConfiguration,
+        component_type: ComponentType,
         expectation: TestCaseExpectation,
         inputs: &[TestEvent],
         outputs: &[Event],
@@ -68,15 +75,89 @@ impl Validator for ComponentSpecValidator {
             }
         }
 
-        // TODO: Check for the relevant telemetry events for the given component type.
-
-        Ok(vec![
+        let mut run_out = vec![
             format!(
                 "sent {} inputs and received {} outputs",
                 inputs.len(),
                 outputs.len()
             ),
             format!("received {} telemetry events", telemetry_events.len()),
-        ])
+        ];
+
+        let out = validate_telemetry(
+            configuration,
+            component_type,
+            inputs,
+            outputs,
+            telemetry_events,
+        )?;
+        run_out.extend(out);
+
+        Ok(run_out)
     }
+}
+
+fn validate_telemetry(
+    configuration: ValidationConfiguration,
+    component_type: ComponentType,
+    inputs: &[TestEvent],
+    outputs: &[Event],
+    telemetry_events: &[Event],
+) -> Result<Vec<String>, Vec<String>> {
+    let mut out: Vec<String> = Vec::new();
+    let mut errs: Vec<String> = Vec::new();
+
+    match component_type {
+        ComponentType::Source => {
+            let result = validate_sources(&configuration, inputs, outputs, telemetry_events);
+            match result {
+                Ok(o) => out.extend(o),
+                Err(e) => errs.extend(e),
+            }
+        }
+        ComponentType::Sink => {}
+        ComponentType::Transform => {}
+    }
+
+    if errs.is_empty() {
+        Ok(out)
+    } else {
+        Err(errs)
+    }
+}
+
+fn filter_events_by_metric_and_component<'a>(
+    telemetry_events: &'a [Event],
+    metric: SourceMetrics,
+    component_name: &'a str,
+) -> Result<Vec<&'a Metric>, Vec<String>> {
+    let metrics: Vec<&Metric> = telemetry_events
+        .iter()
+        .flat_map(|e| {
+            if let vector_core::event::Event::Metric(m) = e {
+                Some(m)
+            } else {
+                None
+            }
+        })
+        .filter(|&m| {
+            if m.name() == metric.to_string() {
+                if let Some(tags) = m.tags() {
+                    if tags.get("component_name").unwrap_or("") == component_name {
+                        return true;
+                    }
+                }
+            }
+
+            false
+        })
+        .collect();
+
+    debug!("{}: {} metrics found.", metric.to_string(), metrics.len(),);
+
+    if metrics.is_empty() {
+        return Err(vec![format!("{}: no metrics were emitted.", metric)]);
+    }
+
+    Ok(metrics)
 }

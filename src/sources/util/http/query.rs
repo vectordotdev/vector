@@ -9,7 +9,7 @@ use vector_core::{
 pub fn add_query_parameters(
     events: &mut [Event],
     query_parameters_config: &[String],
-    query_parameters: HashMap<String, String>,
+    query_parameters: &HashMap<String, String>,
     log_namespace: LogNamespace,
     source_name: &'static str,
 ) {

@@ -35,11 +35,11 @@ fn main() {
         }
     }
 
-    let app = Application::prepare().unwrap_or_else(|code| {
+    let (runtime, app) = Application::prepare().unwrap_or_else(|code| {
         std::process::exit(code);
     });
 
-    app.run();
+    runtime.block_on(app.run());
 }
 
 #[cfg(windows)]
@@ -49,10 +49,10 @@ pub fn main() {
     // interactive mode and then fallback to console mode.  See
     // https://docs.microsoft.com/en-us/dotnet/api/system.environment.userinteractive?redirectedfrom=MSDN&view=netcore-3.1#System_Environment_UserInteractive
     vector::vector_windows::run().unwrap_or_else(|_| {
-        let app = Application::prepare().unwrap_or_else(|code| {
+        let (runtime, app) = Application::prepare().unwrap_or_else(|code| {
             std::process::exit(code);
         });
 
-        app.run();
+        runtime.block_on(app.run());
     });
 }

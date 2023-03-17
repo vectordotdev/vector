@@ -229,51 +229,52 @@ struct PrometheusScrapeContext {
 }
 
 impl HttpClientContext for PrometheusScrapeContext {
+    fn enrich_events(&mut self, events: &mut Vec<Event>) {
+        for event in events.iter_mut() {
+            let metric = event.as_mut_metric();
+            if let Some(InstanceInfo {
+                tag,
+                instance,
+                honor_label,
+            }) = &self.instance_info
+            {
+                match (honor_label, metric.tag_value(tag)) {
+                    (false, Some(old_instance)) => {
+                        metric.replace_tag(format!("exported_{}", tag), old_instance);
+                        metric.replace_tag(tag.clone(), instance.clone());
+                    }
+                    (true, Some(_)) => {}
+                    (_, None) => {
+                        metric.replace_tag(tag.clone(), instance.clone());
+                    }
+                }
+            }
+            if let Some(EndpointInfo {
+                tag,
+                endpoint,
+                honor_label,
+            }) = &self.endpoint_info
+            {
+                match (honor_label, metric.tag_value(tag)) {
+                    (false, Some(old_endpoint)) => {
+                        metric.replace_tag(format!("exported_{}", tag), old_endpoint);
+                        metric.replace_tag(tag.clone(), endpoint.clone());
+                    }
+                    (true, Some(_)) => {}
+                    (_, None) => {
+                        metric.replace_tag(tag.clone(), endpoint.clone());
+                    }
+                }
+            }
+        }
+    }
+
     /// Parses the Prometheus HTTP response into metric events
     fn on_response(&mut self, url: &Uri, _header: &Parts, body: &Bytes) -> Option<Vec<Event>> {
         let body = String::from_utf8_lossy(body);
 
         match parser::parse_text(&body) {
-            Ok(mut events) => {
-                for event in events.iter_mut() {
-                    let metric = event.as_mut_metric();
-                    if let Some(InstanceInfo {
-                        tag,
-                        instance,
-                        honor_label,
-                    }) = &self.instance_info
-                    {
-                        match (honor_label, metric.tag_value(tag)) {
-                            (false, Some(old_instance)) => {
-                                metric.replace_tag(format!("exported_{}", tag), old_instance);
-                                metric.replace_tag(tag.clone(), instance.clone());
-                            }
-                            (true, Some(_)) => {}
-                            (_, None) => {
-                                metric.replace_tag(tag.clone(), instance.clone());
-                            }
-                        }
-                    }
-                    if let Some(EndpointInfo {
-                        tag,
-                        endpoint,
-                        honor_label,
-                    }) = &self.endpoint_info
-                    {
-                        match (honor_label, metric.tag_value(tag)) {
-                            (false, Some(old_endpoint)) => {
-                                metric.replace_tag(format!("exported_{}", tag), old_endpoint);
-                                metric.replace_tag(tag.clone(), endpoint.clone());
-                            }
-                            (true, Some(_)) => {}
-                            (_, None) => {
-                                metric.replace_tag(tag.clone(), endpoint.clone());
-                            }
-                        }
-                    }
-                }
-                Some(events)
-            }
+            Ok(events) => Some(events),
             Err(error) => {
                 if url.path() == "/" {
                     // https://github.com/vectordotdev/vector/pull/3801#issuecomment-700723178
