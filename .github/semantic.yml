@@ -216,8 +216,8 @@ scopes:
   - influxdb_logs sink # Anything `influxdb_logs` sink related
   - influxdb_metrics sink # Anything `influxdb_metrics` sink related
   - kafka sink # Anything `kafka` sink related
-  - mezmo sink # Anything `mezmo` sink related
   - loki sink # Anything `loki` sink related
+  - mezmo sink # Anything `mezmo` sink related
   - nats sink # Anything `nats` sink related
   - new sink # A request for a new sink
   - new_relic sink # Anything `new_relic` sink related
@@ -237,10 +237,17 @@ scopes:
   - websocket sink # Anything `websocket` sink related
 
   # website
+  - analytics website # Anything related to website analytics
   - blog website # Anything related to the Vector blog
+  - copy website # Anything related to website copy
   - css website # Anything related to vector.dev's CSS and aesthetics
   - guides website # Anything related to Vector's guides
   - highlights website # Anything related to vector.dev highlights
   - javascript website # Anything related to the JavaScript functionality on vector.dev
+  - navigation website # Anything related to navigating the site
+  - operations website # Anything related to site operations: deploying, etc
+  - releases website # Anything related to the press page
   - search website # Anything related to the website's Algolia search indexing/config
+  - seo website # Anything related to search engine optimization (SEO)
+  - sitemap website # Anything related to the press page
   - template website # Anything related to website HTML and other templates
