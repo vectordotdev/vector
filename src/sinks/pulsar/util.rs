@@ -5,8 +5,6 @@ use crate::template::Template;
 use bytes::Bytes;
 use std::collections::HashMap;
 use value::Value;
-use vector_core::config::log_schema;
-use vector_core::config::LogSchema;
 use vector_core::event::Event;
 
 /// Transforms an event into a Pulsar event by rendering the required template fields.
@@ -18,7 +16,7 @@ pub(super) fn make_pulsar_event(
 ) -> Option<PulsarEvent> {
     let topic = topic.render_string(&event).ok()?;
     let key = get_key(&event, &config.partition_key_field);
-    let timestamp_millis = get_timestamp_millis(&event, log_schema());
+    let timestamp_millis = get_timestamp_millis(&event);
     let properties = get_properties(&event, &config.properties_key);
     Some(PulsarEvent {
         event,
@@ -44,12 +42,9 @@ fn get_key(event: &Event, partition_key_field: &Option<String>) -> Option<Bytes>
         })
 }
 
-fn get_timestamp_millis(event: &Event, log_schema: &'static LogSchema) -> Option<i64> {
+fn get_timestamp_millis(event: &Event) -> Option<i64> {
     match &event {
-        Event::Log(log) => log
-            .get(log_schema.timestamp_key())
-            .and_then(|v| v.as_timestamp())
-            .copied(),
+        Event::Log(log) => log.get_timestamp().and_then(|v| v.as_timestamp()).copied(),
         Event::Metric(metric) => metric.timestamp(),
         _ => None,
     }

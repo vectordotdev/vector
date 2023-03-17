@@ -2,6 +2,7 @@ use crate::sinks::util::TowerRequestConfig;
 use crate::{
     codecs::EncodingConfig,
     config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
+    schema,
     sinks::{
         pulsar::sink::{healthcheck, PulsarSink},
         Healthcheck, VectorSink,
@@ -16,6 +17,7 @@ use pulsar::{
     TokioExecutor,
 };
 use snafu::ResultExt;
+use value::Kind;
 use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
 use vector_core::config::DataType;
@@ -283,7 +285,11 @@ impl SinkConfig for PulsarSinkConfig {
     }
 
     fn input(&self) -> Input {
+        let requirement =
+            schema::Requirement::empty().optional_meaning("timestamp", Kind::timestamp());
+
         Input::new(self.encoding.config().input_type() & (DataType::Log | DataType::Metric))
+            .with_schema_requirement(requirement)
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
