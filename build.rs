@@ -191,9 +191,8 @@ fn main() {
         .map_err(|e| -> String {
             format!(
                 "Unable to determine git short hash from rev-parse command: {}",
-                e.to_string()
+                e
             )
-            .into()
         })
         .unwrap();
 
