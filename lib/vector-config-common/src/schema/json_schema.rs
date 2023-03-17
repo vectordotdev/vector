@@ -223,7 +223,7 @@ impl SchemaObject {
         self.reference.is_some()
     }
 
-    /// Returns `true` if `self` accepts values of the given type, according to the [`instance_type`] field.
+    /// Returns `true` if `self` accepts values of the given type, according to the [`Self::instance_type`] field.
     ///
     /// This is a basic check that always returns `true` if no `instance_type` is specified on the schema,
     /// and does not check any subschemas. Because of this, both `{}` and  `{"not": {}}` accept any type according
