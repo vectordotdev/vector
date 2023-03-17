@@ -26,12 +26,12 @@ impl Cli {
         let build_desc = format!("{git_sha} {current_date}");
 
         // Figure out what our release channel is.
-        let channel = util::release_channel()?;
+        let channel = util::get_mode();
 
         // Depending on the channel, this influences which Cloudsmith repository we publish to.
-        let cloudsmith_repo = match channel {
+        let cloudsmith_repo = match channel.as_str() {
             "nightly" => "vector-nightly",
-            _ => "vector"
+            _ => "vector",
         };
 
         let mut output_file: Box<dyn Write> = match env::var("GITHUB_OUTPUT") {
@@ -41,7 +41,7 @@ impl Cli {
                     .create(true)
                     .open(file_name)?;
                 Box::new(file)
-            },
+            }
             _ => Box::new(io::stdout()),
         };
         writeln!(output_file, "vector_version={version}")?;
