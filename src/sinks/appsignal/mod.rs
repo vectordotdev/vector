@@ -188,7 +188,7 @@ pub(crate) async fn healthcheck(
 }
 
 fn endpoint_uri(endpoint: String, path: &str) -> crate::Result<Uri> {
-    let mut uri = endpoint.clone();
+    let mut uri = endpoint;
     if !uri.ends_with('/') {
         uri.push('/');
     }
