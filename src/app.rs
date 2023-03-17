@@ -145,6 +145,16 @@ impl ApplicationConfig {
 }
 
 impl Application {
+    pub fn run() {
+        let (runtime, app) = Self::prepare_start().unwrap_or_else(|code| std::process::exit(code));
+
+        runtime.block_on(app.run());
+    }
+
+    pub fn prepare_start() -> Result<(Runtime, StartedApplication), ExitCode> {
+        Self::prepare().and_then(|(runtime, app)| app.start(&runtime).map(|app| (runtime, app)))
+    }
+
     pub fn prepare() -> Result<(Runtime, Self), ExitCode> {
         let opts = Opts::get_matches().map_err(|error| {
             // Printing to stdout/err can itself fail; ignore it.
@@ -191,22 +201,19 @@ impl Application {
         ))
     }
 
-    pub async fn run(self) {
+    pub fn start(self, runtime: &Runtime) -> Result<StartedApplication, ExitCode> {
         // Any internal_logs sources will have grabbed a copy of the
         // early buffer by this point and set up a subscriber.
         crate::trace::stop_early_buffering();
 
         emit!(VectorStarted);
-        tokio::spawn(heartbeat::heartbeat());
+        runtime.spawn(heartbeat::heartbeat());
 
         let Self {
             require_healthy,
             config,
             signals,
         } = self;
-
-        let mut signal_handler = signals.handler;
-        let mut signal_rx = signals.receiver;
 
         let topology_controller = TopologyController {
             #[cfg(feature = "api")]
@@ -230,17 +237,51 @@ impl Application {
                 }
                 Err(error) => {
                     error!(message = "Error binding control server.", %error);
-                    // TODO: We should exit non-zero here, but `Application::run` isn't set up
-                    // that way, and we'd need to push everything up to the API server start
-                    // into `Application::prepare`.
-                    return;
+                    return Err(exitcode::CONFIG);
                 }
             }
         } else {
             None
         };
 
-        let mut graceful_crash = UnboundedReceiverStream::new(config.graceful_crash_receiver);
+        Ok(StartedApplication {
+            config_paths: config.config_paths,
+            #[cfg(not(windows))]
+            control_server_pieces,
+            graceful_crash_receiver: config.graceful_crash_receiver,
+            signals,
+            topology_controller,
+        })
+    }
+}
+
+pub struct StartedApplication {
+    config_paths: Vec<ConfigPath>,
+    #[cfg(not(windows))]
+    control_server_pieces: Option<(
+        stream_cancel::Trigger,
+        tokio::task::JoinHandle<Result<(), Box<dyn serde::ser::StdError + Send + Sync>>>,
+    )>,
+    graceful_crash_receiver: mpsc::UnboundedReceiver<()>,
+    signals: SignalPair,
+    topology_controller: Arc<Mutex<TopologyController>>,
+}
+
+impl StartedApplication {
+    pub async fn run(self) {
+        let Self {
+            config_paths,
+            #[cfg(not(windows))]
+            control_server_pieces,
+            graceful_crash_receiver,
+            signals,
+            topology_controller,
+        } = self;
+
+        let mut graceful_crash = UnboundedReceiverStream::new(graceful_crash_receiver);
+
+        let mut signal_handler = signals.handler;
+        let mut signal_rx = signals.receiver;
 
         let signal = loop {
             tokio::select! {
@@ -257,7 +298,7 @@ impl Application {
                             let mut topology_controller = topology_controller.lock().await;
 
                             // Reload paths
-                            if let Some(paths) = config::process_paths(&config.config_paths) {
+                            if let Some(paths) = config::process_paths(&config_paths) {
                                 topology_controller.config_paths = paths;
                             }
 

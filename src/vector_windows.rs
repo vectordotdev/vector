@@ -366,7 +366,7 @@ pub fn run() -> Result<()> {
 }
 
 fn run_service(_arguments: Vec<OsString>) -> Result<()> {
-    match Application::prepare() {
+    match Application::prepare_start() {
         Ok((runtime, app)) => {
             let signal_tx = app.signals.handler.clone_tx();
             let event_handler = move |control_event| -> ServiceControlHandlerResult {
