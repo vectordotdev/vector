@@ -114,8 +114,10 @@ fn spawn_input_http_server(
 
                     buffer.into_response()
                 } else {
-                    // No outstanding events to send, so just provide an empty response.
-                    StatusCode::NO_CONTENT.into_response()
+                    // We'll send an empty 200 in the response since some
+                    // sources throw errors for anything other than a valid
+                    // response.
+                    StatusCode::OK.into_response()
                 }
             }
         });

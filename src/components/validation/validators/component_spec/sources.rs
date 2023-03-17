@@ -4,9 +4,10 @@ use bytes::BytesMut;
 use vector_core::event::{Event, MetricKind};
 use vector_core::EstimatedJsonEncodedSizeOf;
 
+use crate::components::validation::validators::component_spec::filter_events_by_metric_and_component;
 use crate::components::validation::{encode_test_event, TestEvent, ValidationConfiguration};
 
-use super::filter_events_by_metric_and_component;
+use super::filter_events_by_metric_and_component_with_errors;
 
 const TEST_SOURCE_NAME: &str = "test_source";
 
@@ -16,6 +17,7 @@ pub enum SourceMetrics {
     ReceivedBytesTotal,
     SentEventsTotal,
     SentEventBytesTotal,
+    ErrorsTotal,
 }
 
 impl SourceMetrics {
@@ -26,6 +28,7 @@ impl SourceMetrics {
             SourceMetrics::ReceivedBytesTotal => "component_received_bytes_total",
             SourceMetrics::SentEventsTotal => "component_sent_events_total",
             SourceMetrics::SentEventBytesTotal => "component_sent_event_bytes_total",
+            SourceMetrics::ErrorsTotal => "component_errors_total",
         }
     }
 }
@@ -45,6 +48,7 @@ pub fn validate_sources(
         validate_component_received_bytes_total,
         validate_component_sent_events_total,
         validate_component_sent_event_bytes_total,
+        validate_component_errors_total,
     ];
 
     for v in validations.iter() {
@@ -75,9 +79,9 @@ fn validate_component_received_events_total(
 ) -> Result<Vec<String>, Vec<String>> {
     let mut errs: Vec<String> = Vec::new();
 
-    let metrics = filter_events_by_metric_and_component(
+    let metrics = filter_events_by_metric_and_component_with_errors(
         telemetry_events,
-        SourceMetrics::EventsReceived,
+        &SourceMetrics::EventsReceived,
         TEST_SOURCE_NAME,
     )?;
 
@@ -140,9 +144,9 @@ fn validate_component_received_event_bytes_total(
 ) -> Result<Vec<String>, Vec<String>> {
     let mut errs: Vec<String> = Vec::new();
 
-    let metrics = filter_events_by_metric_and_component(
+    let metrics = filter_events_by_metric_and_component_with_errors(
         telemetry_events,
-        SourceMetrics::EventsReceivedBytes,
+        &SourceMetrics::EventsReceivedBytes,
         TEST_SOURCE_NAME,
     )?;
 
@@ -207,9 +211,9 @@ fn validate_component_received_bytes_total(
 ) -> Result<Vec<String>, Vec<String>> {
     let mut errs: Vec<String> = Vec::new();
 
-    let metrics = filter_events_by_metric_and_component(
+    let metrics = filter_events_by_metric_and_component_with_errors(
         telemetry_events,
-        SourceMetrics::ReceivedBytesTotal,
+        &SourceMetrics::ReceivedBytesTotal,
         TEST_SOURCE_NAME,
     )?;
 
@@ -279,9 +283,9 @@ fn validate_component_sent_events_total(
 ) -> Result<Vec<String>, Vec<String>> {
     let mut errs: Vec<String> = Vec::new();
 
-    let metrics = filter_events_by_metric_and_component(
+    let metrics = filter_events_by_metric_and_component_with_errors(
         telemetry_events,
-        SourceMetrics::SentEventsTotal,
+        &SourceMetrics::SentEventsTotal,
         TEST_SOURCE_NAME,
     )?;
 
@@ -344,9 +348,9 @@ fn validate_component_sent_event_bytes_total(
 ) -> Result<Vec<String>, Vec<String>> {
     let mut errs: Vec<String> = Vec::new();
 
-    let metrics = filter_events_by_metric_and_component(
+    let metrics = filter_events_by_metric_and_component_with_errors(
         telemetry_events,
-        SourceMetrics::SentEventBytesTotal,
+        &SourceMetrics::SentEventBytesTotal,
         TEST_SOURCE_NAME,
     )?;
 
@@ -397,4 +401,72 @@ fn validate_component_sent_event_bytes_total(
         SourceMetrics::SentEventBytesTotal,
         metric_bytes,
     )])
+}
+fn validate_component_errors_total(
+    _configuration: &ValidationConfiguration,
+    inputs: &[TestEvent],
+    _outputs: &[Event],
+    telemetry_events: &[Event],
+) -> Result<Vec<String>, Vec<String>> {
+    let mut errs: Vec<String> = Vec::new();
+
+    let metrics = filter_events_by_metric_and_component(
+        telemetry_events,
+        &SourceMetrics::ErrorsTotal,
+        TEST_SOURCE_NAME,
+    );
+
+    let mut errors: u32 = 0;
+    for m in metrics {
+        match m.value() {
+            vector_core::event::MetricValue::Counter { value } => {
+                if let MetricKind::Absolute = m.data().kind {
+                    errors = *value as u32
+                } else {
+                    errors += *value as u32
+                }
+            }
+            _ => errs.push(format!(
+                "{}: metric value is not a counter",
+                SourceMetrics::ErrorsTotal,
+            )),
+        }
+    }
+
+    let expected_errors: u32 = inputs.iter().fold(0, |acc, i| {
+        if let TestEvent::Modified {
+            expected_errors, ..
+        } = i
+        {
+            return acc + expected_errors;
+        }
+        acc
+    });
+
+    debug!(
+        "{}: {} errors, expected at least {}.",
+        SourceMetrics::ErrorsTotal,
+        errors,
+        expected_errors,
+    );
+
+    // Due to limitations in the test harness, we can only check for a lower
+    // bound on the expected number of errors. This is because we can't
+    // synchronize with the source's internal logic. For example, the http
+    // client source might try to pull metrics from our test server right after
+    // we've shut it down, registering an error.
+    if errors < expected_errors {
+        errs.push(format!(
+            "{}: expected at least {} errors, but received {}",
+            SourceMetrics::ErrorsTotal,
+            expected_errors,
+            errors
+        ));
+    }
+
+    if !errs.is_empty() {
+        return Err(errs);
+    }
+
+    Ok(vec![format!("{}: {}", SourceMetrics::ErrorsTotal, errors,)])
 }

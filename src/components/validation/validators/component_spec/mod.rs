@@ -126,11 +126,24 @@ fn validate_telemetry(
     }
 }
 
-fn filter_events_by_metric_and_component<'a>(
+fn filter_events_by_metric_and_component_with_errors<'a>(
     telemetry_events: &'a [Event],
-    metric: SourceMetrics,
+    metric: &SourceMetrics,
     component_name: &'a str,
 ) -> Result<Vec<&'a Metric>, Vec<String>> {
+    let metrics = filter_events_by_metric_and_component(telemetry_events, metric, component_name);
+    if metrics.is_empty() {
+        return Err(vec![format!("{}: no metrics were emitted.", metric)]);
+    }
+
+    Ok(metrics)
+}
+
+fn filter_events_by_metric_and_component<'a>(
+    telemetry_events: &'a [Event],
+    metric: &SourceMetrics,
+    component_name: &'a str,
+) -> Vec<&'a Metric> {
     let metrics: Vec<&Metric> = telemetry_events
         .iter()
         .flat_map(|e| {
@@ -155,9 +168,5 @@ fn filter_events_by_metric_and_component<'a>(
 
     debug!("{}: {} metrics found.", metric.to_string(), metrics.len(),);
 
-    if metrics.is_empty() {
-        return Err(vec![format!("{}: no metrics were emitted.", metric)]);
-    }
-
-    Ok(metrics)
+    metrics
 }
