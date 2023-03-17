@@ -1,5 +1,6 @@
 use crate::encoding::BuildError;
 use bytes::{BufMut, BytesMut};
+use chrono::SecondsFormat;
 use lookup::lookup_v2::ConfigOwnedTargetPath;
 use tokio_util::codec::Encoder;
 use vector_core::{
@@ -85,7 +86,9 @@ impl Encoder<Event> for CsvSerializer {
                 Some(Value::Integer(int)) => wtr.write_field(int.to_string())?,
                 Some(Value::Float(float)) => wtr.write_field(float.to_string())?,
                 Some(Value::Boolean(bool)) => wtr.write_field(bool.to_string())?,
-                Some(Value::Timestamp(timestamp)) => wtr.write_field(timestamp.to_rfc3339())?,
+                Some(Value::Timestamp(timestamp)) => {
+                    wtr.write_field(timestamp.to_rfc3339_opts(SecondsFormat::AutoSi, true))?
+                }
                 Some(Value::Null) => wtr.write_field("")?,
                 // Other value types: Array, Regex, Object are not supported by the CSV format.
                 Some(_) => wtr.write_field("")?,
@@ -148,7 +151,7 @@ mod tests {
 
         assert_eq!(
             bytes.freeze(),
-            b"bar,123,\"abc,bcd\",3.1415925,,sp ace,2023-02-27T07:04:49.363+00:00,\"the \"\"quote\"\" should be escaped\",true".as_slice()
+            b"bar,123,\"abc,bcd\",3.1415925,,sp ace,2023-02-27T07:04:49.363Z,\"the \"\"quote\"\" should be escaped\",true".as_slice()
         );
     }
 
