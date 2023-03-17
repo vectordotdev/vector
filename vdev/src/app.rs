@@ -8,7 +8,7 @@ use log::LevelFilter;
 use once_cell::sync::{Lazy, OnceCell};
 
 use crate::config::Config;
-use crate::util;
+use crate::{git, util};
 
 // Use the `bash` interpreter included as part of the standard `git` install for our default shell
 // if nothing is specified in the environment.
@@ -64,18 +64,11 @@ pub fn version() -> Result<String> {
 
         util::mark_safe_git_repo();
 
-        let short_hash_out = util::git_short_hash()?;
-        if !short_hash_out.status.success() {
-            let error = String::from_utf8_lossy(&short_hash_out.stderr);
-            bail!("Error getting short hash running `git rev-parse`:\n{error}");
-        }
-        let short_hash = String::from_utf8_lossy(&short_hash_out.stdout)
-            .trim()
-            .to_string();
+        let sha = git::get_git_sha()?;
 
         // use '.' instead of '-' or '_' to avoid issues with rpm and deb package naming
         // format requirements.
-        version = format!("{base_version}.custom.{short_hash}");
+        version = format!("{base_version}.custom.{sha}");
     }
 
     Ok(version)

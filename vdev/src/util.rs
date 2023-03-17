@@ -37,13 +37,6 @@ pub fn git_head() -> Result<Output> {
         .context("Could not execute `git`")
 }
 
-pub fn git_short_hash() -> Result<Output> {
-    Command::new("git")
-        .args(["rev-parse", "--short", "HEAD"])
-        .output()
-        .context("Could not execute `git`")
-}
-
 // If in CI, it is necessary to adjust the permissions on the git repository
 // as a precursor to running some git commands.
 pub fn mark_safe_git_repo() {

@@ -19,14 +19,14 @@ pub struct Cli {}
 impl Cli {
     pub fn exec(self) -> Result<()> {
         // Generate the Vector version and build description.
-        let version = util::read_version()?;
+        let version = env::var("VERSION").or_else(|_| util::read_version())?;
 
         let git_sha = git::get_git_sha()?;
         let current_date = Local::today().naive_local().to_string();
         let build_desc = format!("{git_sha} {current_date}");
 
         // Figure out what our release channel is.
-        let channel = util::get_mode();
+        let channel = env::var("CHANNEL").unwrap_or_else(|_| util::get_mode());
 
         // Depending on the channel, this influences which Cloudsmith repository we publish to.
         let cloudsmith_repo = match channel.as_str() {
