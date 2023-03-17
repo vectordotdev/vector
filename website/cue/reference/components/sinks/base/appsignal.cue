@@ -89,7 +89,10 @@ base: components: sinks: appsignal: configuration: {
 	endpoint: {
 		description: "The AppSignal API endpoint to report to. This is configured by default and doesn't need to be changed."
 		required:    false
-		type: string: examples: ["https://appsignal-endpoint.net"]
+		type: string: {
+			default: "https://appsignal-endpoint.net"
+			examples: ["https://appsignal-endpoint.net"]
+		}
 	}
 	push_api_key: {
 		description: "A valid app-level AppSignal Push API key."
