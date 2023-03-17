@@ -7,9 +7,12 @@ use futures::StreamExt;
 use futures_util::future::BoxFuture;
 use futures_util::FutureExt;
 use once_cell::race::OnceNonZeroUsize;
+use serde::ser::StdError;
+use stream_cancel::Trigger;
 use tokio::{
     runtime::{self, Runtime},
     sync::{mpsc, Mutex},
+    task::JoinHandle,
 };
 use tokio_stream::wrappers::UnboundedReceiverStream;
 
@@ -28,7 +31,7 @@ use crate::{
     cli::{handle_config_errors, LogFormat, Opts, RootOpts},
     config::{self, Config, ConfigPath},
     heartbeat,
-    signal::{SignalHandler, SignalPair, SignalTo},
+    signal::{SignalHandler, SignalPair, SignalRx, SignalTo},
     topology::{self, ReloadOutcome, RunningTopology, TopologyController},
     trace,
 };
@@ -270,6 +273,10 @@ pub struct StartedApplication {
 
 impl StartedApplication {
     pub async fn run(self) {
+        self.main().await.shutdown().await
+    }
+
+    pub async fn main(self) -> FinishedApplication {
         let Self {
             config_paths,
             #[cfg(not(windows))]
@@ -326,6 +333,37 @@ impl StartedApplication {
                 else => unreachable!("Signal streams never end"),
             }
         };
+
+        FinishedApplication {
+            #[cfg(not(windows))]
+            control_server_pieces,
+            signal,
+            signal_rx,
+            topology_controller,
+        }
+    }
+}
+
+pub struct FinishedApplication {
+    #[cfg(not(windows))]
+    control_server_pieces: Option<(
+        Trigger,
+        JoinHandle<Result<(), Box<dyn StdError + Send + Sync>>>,
+    )>,
+    signal: SignalTo,
+    signal_rx: SignalRx,
+    topology_controller: Arc<Mutex<TopologyController>>,
+}
+
+impl FinishedApplication {
+    pub async fn shutdown(self) {
+        let FinishedApplication {
+            #[cfg(not(windows))]
+            control_server_pieces,
+            signal,
+            mut signal_rx,
+            topology_controller,
+        } = self;
 
         // Shut down the control server, if running
         #[cfg(not(windows))]
