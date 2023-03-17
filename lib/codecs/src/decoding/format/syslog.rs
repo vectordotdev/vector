@@ -60,6 +60,7 @@ impl SyslogDeserializerConfig {
                         Some("timestamp"),
                     )
                     .optional_field(&owned_value_path!("hostname"), Kind::bytes(), Some("host"))
+                    .optional_field(&owned_value_path!("source_ip"), Kind::bytes(), None)
                     .optional_field(
                         &owned_value_path!("severity"),
                         Kind::bytes(),
@@ -126,6 +127,13 @@ impl SyslogDeserializerConfig {
                         &owned_value_path!("hostname"),
                         Kind::bytes().or_undefined(),
                         Some("host"),
+                    )
+                    .with_source_metadata(
+                        source,
+                        None,
+                        &owned_value_path!("source_ip"),
+                        Kind::bytes().or_undefined(),
+                        None,
                     )
                     .with_source_metadata(
                         source,
