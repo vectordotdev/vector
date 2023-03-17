@@ -50,7 +50,7 @@ impl InternalEvent for PulsarPropertyExtractionError<'_> {
         );
         counter!(
             "component_errors_total", 1,
-            "error_code" => "extracing_property",
+            "error_code" => "extracting_property",
             "error_type" => error_type::PARSER_FAILED,
             "stage" => error_stage::PROCESSING,
         );
