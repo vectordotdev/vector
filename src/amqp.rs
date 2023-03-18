@@ -1,4 +1,4 @@
-//! Functionality supporting both the [sources::amqp] source and `[sinks::amqp]` sink.
+//! Functionality supporting both the `[crate::sources::amqp]` source and `[crate::sinks::amqp]` sink.
 use lapin::tcp::{OwnedIdentity, OwnedTLSConfig};
 use vector_config::configurable_component;
 

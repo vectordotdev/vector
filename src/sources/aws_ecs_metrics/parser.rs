@@ -159,7 +159,7 @@ fn blkio_tags(item: &BlockIoStat, tags: &MetricTags) -> MetricTags {
     tags
 }
 
-/// reference https://www.kernel.org/doc/Documentation/cgroup-v1/blkio-controller.txt
+/// reference <https://www.kernel.org/doc/Documentation/cgroup-v1/blkio-controller.txt>
 fn blkio_metrics(
     blkio: &BlockIoStats,
     timestamp: DateTime<Utc>,

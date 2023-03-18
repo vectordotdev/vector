@@ -89,7 +89,7 @@ impl DistributionStatistic {
 /// it might be preferable to use a more common function, such as R-7.
 ///
 /// List of quantile functions:
-/// https://en.wikipedia.org/wiki/Quantile#Estimating_quantiles_from_a_sample
+/// <https://en.wikipedia.org/wiki/Quantile#Estimating_quantiles_from_a_sample>
 fn find_quantile(bins: &[Sample], p: f64) -> f64 {
     let count = bins.last().expect("bins is empty").rate;
     find_sample(bins, (p * count as f64).round() as u32)
