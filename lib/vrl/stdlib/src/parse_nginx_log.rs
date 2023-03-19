@@ -25,7 +25,11 @@ fn parse_nginx_log(
 }
 
 fn variants() -> Vec<Value> {
-    vec![value!("combined"), value!("error")]
+    vec![
+        value!("combined"),
+        value!("error"),
+        value!("ingress_upstreaminfo"),
+    ]
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -101,6 +105,7 @@ impl Function for ParseNginxLog {
 fn regex_for_format(format: &[u8]) -> &Regex {
     match format {
         b"combined" => &log_util::REGEX_NGINX_COMBINED_LOG,
+        b"ingress_upstreaminfo" => &log_util::REGEX_INGRESS_NGINX_UPSTREAMINFO_LOG,
         b"error" => &log_util::REGEX_NGINX_ERROR_LOG,
         _ => unreachable!(),
     }
@@ -109,6 +114,7 @@ fn regex_for_format(format: &[u8]) -> &Regex {
 fn time_format_for_format(format: &[u8]) -> String {
     match format {
         b"combined" => "%d/%b/%Y:%T %z".to_owned(),
+        b"ingress_upstreaminfo" => "%d/%b/%Y:%T %z".to_owned(),
         b"error" => "%Y/%m/%d %H:%M:%S".to_owned(),
         _ => unreachable!(),
     }
@@ -146,6 +152,7 @@ impl FunctionExpression for ParseNginxLogFn {
     fn type_def(&self, _: &state::TypeState) -> TypeDef {
         TypeDef::object(match self.format.as_ref() {
             b"combined" => kind_combined(),
+            b"ingress_upstreaminfo" => kind_ingress_upstreaminfo(),
             b"error" => kind_error(),
             _ => unreachable!(),
         })
@@ -167,6 +174,34 @@ fn kind_combined() -> BTreeMap<Field, Kind> {
         ("referer".into(), Kind::bytes().or_null()),
         ("agent".into(), Kind::bytes().or_null()),
         ("compression".into(), Kind::bytes().or_null()),
+    ])
+}
+
+fn kind_ingress_upstreaminfo() -> BTreeMap<Field, Kind> {
+    BTreeMap::from([
+        ("remote_addr".into(), Kind::bytes()),
+        ("remote_user".into(), Kind::bytes().or_null()),
+        ("timestamp".into(), Kind::timestamp()),
+        ("request".into(), Kind::bytes()),
+        ("method".into(), Kind::bytes()),
+        ("path".into(), Kind::bytes()),
+        ("protocol".into(), Kind::bytes()),
+        ("status".into(), Kind::integer()),
+        ("body_bytes_size".into(), Kind::integer()),
+        ("http_referer".into(), Kind::bytes()),
+        ("http_user_agent".into(), Kind::bytes()),
+        ("request_length".into(), Kind::integer()),
+        ("request_time".into(), Kind::float()),
+        ("proxy_upstream_name".into(), Kind::bytes()),
+        (
+            "proxy_alternative_upstream_name".into(),
+            Kind::bytes().or_null(),
+        ),
+        ("upstream_addr".into(), Kind::bytes()),
+        ("upstream_response_length".into(), Kind::integer()),
+        ("upstream_response_time".into(), Kind::float()),
+        ("upstream_status".into(), Kind::integer()),
+        ("req_id".into(), Kind::bytes()),
     ])
 }
 
@@ -258,6 +293,64 @@ mod tests {
                 "compression" => "2.75",
             }),
             tdef: TypeDef::object(kind_combined()).fallible(),
+        }
+
+        ingress_nginx_upstreaminfo_valid_without_optional_fields {
+            args: func_args![
+                value: r#"0.0.0.0 - - [18/Mar/2023:15:00:00 +0000] "GET /some/path HTTP/2.0" 200 12312 "https://10.0.0.1/some/referer" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/111.0.0.0 Safari/537.36" 462 0.050 [some-upstream-service-9000] [] 10.0.50.80:9000 19437 0.049 200 752178adb17130b291aefd8c386279e7"#,
+                format: "ingress_upstreaminfo"
+            ],
+            want: Ok(btreemap! {
+                "remote_addr" => "0.0.0.0",
+                "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2023-03-18T15:00:00Z").unwrap().into()),
+                "request" => "GET /some/path HTTP/2.0",
+                "method" => "GET",
+                "path" => "/some/path",
+                "protocol" => "HTTP/2.0",
+                "status" => 200,
+                "body_bytes_size" => 12312,
+                "http_referer" => "https://10.0.0.1/some/referer",
+                "http_user_agent" => "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/111.0.0.0 Safari/537.36",
+                "request_length" => 462,
+                "request_time" => 0.050,
+                "proxy_upstream_name" => "some-upstream-service-9000",
+                "upstream_addr" => "10.0.50.80:9000",
+                "upstream_response_length" => 19437,
+                "upstream_response_time" => 0.049,
+                "upstream_status" => 200,
+                "req_id" => "752178adb17130b291aefd8c386279e7",
+            }),
+            tdef: TypeDef::object(kind_ingress_upstreaminfo()).fallible(),
+        }
+
+        ingress_nginx_upstreaminfo_valid_all_fields {
+            args: func_args![
+                value: r#"0.0.0.0 - bob [18/Mar/2023:15:00:00 +0000] "GET /some/path HTTP/2.0" 200 12312 "https://10.0.0.1/some/referer" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/111.0.0.0 Safari/537.36" 462 0.050 [some-upstream-service-9000] [some-other-upstream-5000] 10.0.50.80:9000 19437 0.049 200 752178adb17130b291aefd8c386279e7"#,
+                format: "ingress_upstreaminfo"
+            ],
+            want: Ok(btreemap! {
+                "remote_addr" => "0.0.0.0",
+                "remote_user" => "bob",
+                "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2023-03-18T15:00:00Z").unwrap().into()),
+                "request" => "GET /some/path HTTP/2.0",
+                "method" => "GET",
+                "path" => "/some/path",
+                "protocol" => "HTTP/2.0",
+                "status" => 200,
+                "body_bytes_size" => 12312,
+                "http_referer" => "https://10.0.0.1/some/referer",
+                "http_user_agent" => "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/111.0.0.0 Safari/537.36",
+                "request_length" => 462,
+                "request_time" => 0.050,
+                "proxy_upstream_name" => "some-upstream-service-9000",
+                "proxy_alternative_upstream_name" => "some-other-upstream-5000",
+                "upstream_addr" => "10.0.50.80:9000",
+                "upstream_response_length" => 19437,
+                "upstream_response_time" => 0.049,
+                "upstream_status" => 200,
+                "req_id" => "752178adb17130b291aefd8c386279e7",
+            }),
+            tdef: TypeDef::object(kind_ingress_upstreaminfo()).fallible(),
         }
 
         error_line_valid {

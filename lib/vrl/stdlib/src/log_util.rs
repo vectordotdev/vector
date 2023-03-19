@@ -131,6 +131,39 @@ pub(crate) static REGEX_NGINX_COMBINED_LOG: Lazy<Regex> = Lazy::new(|| {
     .expect("failed compiling regex for Nginx combined log")
 });
 
+// - Ingress Nginx docs: https://kubernetes.github.io/ingress-nginx/user-guide/nginx-configuration/log-format/
+#[cfg(feature = "parse_nginx_log")]
+pub(crate) static REGEX_INGRESS_NGINX_UPSTREAMINFO_LOG: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(
+        r#"(?x)                                             # Ignore whitespace and comments in the regex expression.
+        ^\s*                                                # Start with any number of whitespaces
+        (-|(?P<remote_addr>\S+))\s+                         # Match `-` or any non space character
+        \-\s+                                               # Always a dash
+        (-|(?P<remote_user>\S+))\s+                         # Match `-` or any non space character
+        \[(?P<timestamp>[^\]]+)\]\s+                        # Match date between brackets
+        "(?P<request>
+        (?P<method>\w+)\s+                                  # Match at least a word
+        (?P<path>\S+)\s+                                    # Match any non space character
+        (?P<protocol>[^"]+)
+        )"\s+                                               # Match any non double-quote character
+        (?P<status>\d+)\s+                                  # Match numbers
+        (?P<body_bytes_size>\d+)\s+                         # Match numbers
+        "(-|(?P<http_referer>[^"]+))"\s+                    # Match `-` or any non double-quote character
+        "(-|(?P<http_user_agent>[^"]+))"\s+                 # Match `-` or any non double-quote character
+        (?P<request_length>\d+)\s+                          # Match numbers
+        (?P<request_time>\d+\.\d+)\s+                       # Match numbers with dot
+        \[(?P<proxy_upstream_name>[^\]]+)\]\s+              # Match all characters within square brackets
+        \[(?P<proxy_alternative_upstream_name>[^\]]+)?\]\s+ # Match all characters within square brackets, optional
+        (?P<upstream_addr>\S+)\s+                           # Match any non space character
+        (?P<upstream_response_length>\d+)\s+                # Match numbers
+        (?P<upstream_response_time>\d+\.\d+)\s+             # Match numbers with dot
+        (?P<upstream_status>\d+)\s+                         # Match numbers
+        (?P<req_id>\S+)                                     # Match any non space character
+        \s*$                                                # Match any number of whitespaces (to be discarded).
+    "#)
+    .expect("failed compiling regex for Ingress Nginx upstreaminfo log")
+});
+
 #[cfg(feature = "parse_nginx_log")]
 pub(crate) static REGEX_NGINX_ERROR_LOG: Lazy<Regex> = Lazy::new(|| {
     Regex::new(
@@ -177,12 +210,22 @@ fn capture_value(
 ) -> std::result::Result<Value, String> {
     Ok(match name {
         "timestamp" => Value::Timestamp(parse_time(value, timestamp_format, timezone)?),
-        "status" | "size" | "pid" | "tid" | "cid" | "port" => Value::Integer(
+
+        "status"
+        | "size"
+        | "pid"
+        | "tid"
+        | "cid"
+        | "port"
+        | "body_bytes_size"
+        | "request_length"
+        | "upstream_response_length"
+        | "upstream_status" => Value::Integer(
             value
                 .parse()
                 .map_err(|_| format!("failed parsing {name}"))?,
         ),
-        "excess" => Value::Float(
+        "excess" | "request_time" | "upstream_response_time" => Value::Float(
             value
                 .parse()
                 .map_err(|_| format!("failed parsing {name}"))?,

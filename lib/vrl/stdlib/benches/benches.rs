@@ -1727,6 +1727,33 @@ bench_function! {
         })),
     }
 
+    ingress_upstreaminfo {
+        args: func_args![
+            value: r#"0.0.0.0 - - [18/Mar/2023:15:00:00 +0000] "GET /some/path HTTP/2.0" 200 12312 "https://10.0.0.1/some/referer" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/111.0.0.0 Safari/537.36" 462 0.050 [some-upstream-service-9000] [] 10.0.50.80:9000 19437 0.049 200 752178adb17130b291aefd8c386279e7"#,
+            format: "ingress_upstreaminfo",
+        ],
+        want: Ok(value!({
+            "remote_addr" => "0.0.0.0",
+            "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2023-03-18T15:00:00Z").unwrap().info()),
+            "request" => "GET /some/path HTTP/2.0",
+            "method" => "GET",
+            "path" => "/some/path",
+            "protocol" => "HTTP/2.0",
+            "status" => 200,
+            "body_bytes_size" => 12312,
+            "http_referer" => "https://10.0.0.1/some/referer",
+            "http_user_agent" => "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/111.0.0.0 Safari/537.36",
+            "request_length" => 462,
+            "request_time" => 0.050,
+            "proxy_upstream_name" => "some-upstream-service-9000",
+            "upstream_addr" => "10.0.50.80:9000",
+            "upstream_response_length" => 19437,
+            "upstream_response_time" => 0.049,
+            "upstream_status" => 200,
+            "req_id" => "752178adb17130b291aefd8c386279e7",
+        })),
+    }
+
     error {
         args: func_args![value: r#"2021/04/01 13:02:31 [error] 31#31: *1 open() "/usr/share/nginx/html/not-found" failed (2: No such file or directory), client: 172.17.0.1, server: localhost, request: "POST /not-found HTTP/1.1", host: "localhost:8081""#,
                          format: "error"

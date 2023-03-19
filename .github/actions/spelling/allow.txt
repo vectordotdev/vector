@@ -385,6 +385,7 @@ Treq
 tzdata
 ubuntu
 Umeox
+upstreaminfo
 useragents
 usergroups
 userguide
