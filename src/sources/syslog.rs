@@ -524,6 +524,11 @@ mod test {
                     Some("host"),
                 )
                 .with_metadata_field(
+                    &owned_value_path!("syslog", "source_ip"),
+                    Kind::bytes().or_undefined(),
+                    None,
+                )
+                .with_metadata_field(
                     &owned_value_path!("syslog", "severity"),
                     Kind::bytes().or_undefined(),
                     Some("severity"),
@@ -596,6 +601,11 @@ mod test {
             &owned_value_path!("hostname"),
             Kind::bytes().or_undefined(),
             Some("host"),
+        )
+        .with_event_field(
+            &owned_value_path!("source_ip"),
+            Kind::bytes().or_undefined(),
+            None,
         )
         .with_event_field(
             &owned_value_path!("severity"),

@@ -62,7 +62,7 @@ impl SyslogDeserializerConfig {
                     )
                 }
 
-                definition
+                definition = definition
                     .optional_field(&owned_value_path!("hostname"), Kind::bytes(), Some("host"))
                     .optional_field(
                         &owned_value_path!("severity"),
@@ -79,7 +79,15 @@ impl SyslogDeserializerConfig {
                         None,
                     )
                     // "structured data" is placed at the root. It will always be a map of strings
-                    .unknown_fields(Kind::object(Collection::from_unknown(Kind::bytes())))
+                    .unknown_fields(Kind::object(Collection::from_unknown(Kind::bytes())));
+
+                if self.source.is_some() {
+                    // This field is added by the syslog source. It will not be present if the data
+                    // is coming from the codec.
+                    definition.optional_field(&owned_value_path!("source_ip"), Kind::bytes(), None)
+                } else {
+                    definition
+                }
             }
             (LogNamespace::Vector, None) => {
                 schema::Definition::new_with_default_metadata(
@@ -130,6 +138,13 @@ impl SyslogDeserializerConfig {
                         &owned_value_path!("hostname"),
                         Kind::bytes().or_undefined(),
                         Some("host"),
+                    )
+                    .with_source_metadata(
+                        source,
+                        None,
+                        &owned_value_path!("source_ip"),
+                        Kind::bytes().or_undefined(),
+                        None,
                     )
                     .with_source_metadata(
                         source,
