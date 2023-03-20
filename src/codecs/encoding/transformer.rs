@@ -318,7 +318,10 @@ mod tests {
         let mut event = Event::Log(LogEvent::from("Demo"));
         let timestamp = event
             .as_mut_log()
-            .get(log_schema().timestamp_key())
+            .get((
+                lookup::PathPrefix::Event,
+                log_schema().timestamp_key().unwrap(),
+            ))
             .unwrap()
             .clone();
         let timestamp = timestamp.as_timestamp().unwrap();
@@ -330,7 +333,10 @@ mod tests {
 
         match event
             .as_mut_log()
-            .get(log_schema().timestamp_key())
+            .get((
+                lookup::PathPrefix::Event,
+                log_schema().timestamp_key().unwrap(),
+            ))
             .unwrap()
         {
             Value::Integer(_) => {}

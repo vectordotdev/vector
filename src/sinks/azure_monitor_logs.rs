@@ -482,11 +482,11 @@ mod tests {
     fn insert_timestamp_kv(log: &mut LogEvent) -> (String, String) {
         let now = chrono::Utc::now();
 
-        let timestamp_key = log_schema().timestamp_key().to_string();
+        let timestamp_key = log_schema().timestamp_key().unwrap();
         let timestamp_value = now.to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
-        log.insert(timestamp_key.as_str(), now);
+        log.insert((PathPrefix::Event, timestamp_key), now);
 
-        (timestamp_key, timestamp_value)
+        (timestamp_key.to_string(), timestamp_value)
     }
 
     #[test]
@@ -583,7 +583,10 @@ mod tests {
 
         let time_generated_field = headers.get("time-generated-field").unwrap();
         let timestamp_key = log_schema().timestamp_key();
-        assert_eq!(time_generated_field.to_str().unwrap(), timestamp_key);
+        assert_eq!(
+            time_generated_field.to_str().unwrap(),
+            timestamp_key.unwrap().to_string().as_str()
+        );
 
         let azure_resource_id = headers.get("x-ms-azureresourceid").unwrap();
         assert_eq!(

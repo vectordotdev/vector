@@ -455,7 +455,9 @@ mod tests {
         let events = deserializer.parse(input, LogNamespace::Legacy).unwrap();
         assert_eq!(events.len(), 1);
         assert_eq!(events[0].as_log()[log_schema().message_key()], "MSG".into());
-        assert!(events[0].as_log()[log_schema().timestamp_key()].is_timestamp());
+        assert!(
+            events[0].as_log()[log_schema().timestamp_key().unwrap().to_string()].is_timestamp()
+        );
     }
 
     #[test]

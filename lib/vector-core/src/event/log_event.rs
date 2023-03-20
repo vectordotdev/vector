@@ -422,7 +422,7 @@ impl LogEvent {
     pub fn timestamp_path(&self) -> Option<String> {
         match self.namespace() {
             LogNamespace::Vector => self.find_key_by_meaning("timestamp"),
-            LogNamespace::Legacy => log_schema().timestamp_key().map(|path| path.to_string()),
+            LogNamespace::Legacy => log_schema().timestamp_key().map(ToString::to_string),
         }
     }
 
@@ -521,8 +521,9 @@ mod test_utils {
             let mut log = LogEvent::default();
 
             log.insert(log_schema().message_key(), message);
-            log.insert(log_schema().timestamp_key(), Utc::now());
-
+            if let Some(timestamp_key) = log_schema().timestamp_key() {
+                log.insert((PathPrefix::Event, timestamp_key), Utc::now());
+            }
             log
         }
     }

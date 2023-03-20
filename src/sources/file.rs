@@ -1019,7 +1019,7 @@ mod tests {
         assert_eq!(log["offset"], 0.into());
         assert_eq!(log[log_schema().message_key()], "hello world".into());
         assert_eq!(log[log_schema().source_type_key()], "file".into());
-        assert!(log[log_schema().timestamp_key()].is_timestamp());
+        assert!(log[log_schema().timestamp_key().unwrap().to_string()].is_timestamp());
     }
 
     #[test]
@@ -1041,7 +1041,7 @@ mod tests {
         assert_eq!(log["off"], 0.into());
         assert_eq!(log[log_schema().message_key()], "hello world".into());
         assert_eq!(log[log_schema().source_type_key()], "file".into());
-        assert!(log[log_schema().timestamp_key()].is_timestamp());
+        assert!(log[log_schema().timestamp_key().unwrap().to_string()].is_timestamp());
     }
 
     #[test]
@@ -1446,7 +1446,7 @@ mod tests {
                         .to_string(),
                     log_schema().host_key().to_string(),
                     log_schema().message_key().to_string(),
-                    log_schema().timestamp_key().to_string(),
+                    log_schema().timestamp_key().unwrap().to_string(),
                     log_schema().source_type_key().to_string()
                 ]
                 .into_iter()

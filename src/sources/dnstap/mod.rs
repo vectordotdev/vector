@@ -406,7 +406,7 @@ mod tests {
         let mut event = Event::from(LogEvent::from(value::Value::from(json)));
         event.as_mut_log().insert("timestamp", chrono::Utc::now());
 
-        let definition = DnstapConfig::event_schema("timestamp");
+        let definition = DnstapConfig::event_schema(Some(&owned_value_path!("timestamp")));
         let schema = vector_core::schema::Definition::empty_legacy_namespace()
             .with_standard_vector_source_metadata();
 

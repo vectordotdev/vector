@@ -520,7 +520,7 @@ mod tests {
                 r#"at=info method=GET path="/cart_link" host=lumberjack-store.timber.io request_id=05726858-c44e-4f94-9a20-37df73be9006 fwd="73.75.38.87" dyno=web.1 connect=1ms service=22ms status=304 bytes=656 protocol=http"#.into()
             );
             assert_eq!(
-                log[log_schema().timestamp_key()],
+                log[log_schema().timestamp_key().unwrap().to_string()],
                 "2020-01-08T22:33:57.353034+00:00"
                     .parse::<DateTime<Utc>>()
                     .unwrap()
@@ -603,7 +603,7 @@ mod tests {
 
         assert_eq!(log[log_schema().message_key()], "foo bar baz".into());
         assert_eq!(
-            log[log_schema().timestamp_key()],
+            log[log_schema().timestamp_key().unwrap().to_string()],
             "2020-01-08T22:33:57.353034+00:00"
                 .parse::<DateTime<Utc>>()
                 .unwrap()
@@ -624,7 +624,12 @@ mod tests {
             log[log_schema().message_key()],
             "what am i doing here".into()
         );
-        assert!(log.get(log_schema().timestamp_key()).is_some());
+        assert!(log
+            .get((
+                lookup::PathPrefix::Event,
+                log_schema().timestamp_key().unwrap()
+            ))
+            .is_some());
         assert_eq!(log[log_schema().source_type_key()], "heroku_logs".into());
     }
 
@@ -637,7 +642,7 @@ mod tests {
 
         assert_eq!(log[log_schema().message_key()], "i'm not that long".into());
         assert_eq!(
-            log[log_schema().timestamp_key()],
+            log[log_schema().timestamp_key().unwrap().to_string()],
             "2020-01-08T22:33:57.353034+00:00"
                 .parse::<DateTime<Utc>>()
                 .unwrap()

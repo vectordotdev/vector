@@ -1045,7 +1045,7 @@ mod integration_test {
                     "kafka".into()
                 );
                 assert_eq!(
-                    event.as_log()[log_schema().timestamp_key()],
+                    event.as_log()[log_schema().timestamp_key().unwrap().to_string()],
                     now.trunc_subsecs(3).into()
                 );
                 assert_eq!(event.as_log()["topic"], topic.clone().into());

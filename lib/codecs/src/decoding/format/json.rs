@@ -144,7 +144,11 @@ mod tests {
                 let log = event.as_log();
                 assert_eq!(log["foo"], 123.into());
                 assert_eq!(
-                    log.get(log_schema().timestamp_key()).is_some(),
+                    log.get((
+                        lookup::PathPrefix::Event,
+                        log_schema().timestamp_key().unwrap()
+                    ))
+                    .is_some(),
                     namespace == LogNamespace::Legacy
                 );
             }
@@ -166,7 +170,11 @@ mod tests {
                 let log = event.as_log();
                 assert_eq!(log["foo"], 123.into());
                 assert_eq!(
-                    log.get(log_schema().timestamp_key()).is_some(),
+                    log.get((
+                        lookup::PathPrefix::Event,
+                        log_schema().timestamp_key().unwrap()
+                    ))
+                    .is_some(),
                     namespace == LogNamespace::Legacy
                 );
             }
@@ -176,7 +184,8 @@ mod tests {
                 let log = event.as_log();
                 assert_eq!(log["bar"], 456.into());
                 assert_eq!(
-                    log.get(log_schema().timestamp_key()).is_some(),
+                    log.get((PathPrefix::Event, log_schema().timestamp_key().unwrap()))
+                        .is_some(),
                     namespace == LogNamespace::Legacy
                 );
             }

@@ -1441,7 +1441,7 @@ mod tests {
     }
 
     fn timestamp(event: &Event) -> Value {
-        event.as_log()[log_schema().timestamp_key()].clone()
+        event.as_log()[log_schema().timestamp_key().unwrap().to_string()].clone()
     }
 
     fn value_ts(secs: i64, usecs: u32) -> Value {
