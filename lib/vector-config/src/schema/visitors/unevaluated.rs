@@ -28,7 +28,7 @@ impl DisallowedUnevaluatedPropertiesVisitor {
 
     fn get_cleaned_schema_ref(&self, schema_ref: &str) -> String {
         if schema_ref.starts_with(&self.definition_path) {
-            (&schema_ref[self.definition_path.len()..]).to_string()
+            schema_ref[self.definition_path.len()..].to_string()
         } else {
             schema_ref.to_string()
         }
@@ -40,10 +40,12 @@ impl DisallowedUnevaluatedPropertiesVisitor {
         schema_ref: &'a str,
     ) -> (String, Schema) {
         let cleaned = self.get_cleaned_schema_ref(schema_ref);
-        let resolved = definitions.get(&cleaned).cloned().expect(&format!(
-            "Unknown schema definition '{}' referenced in schema.",
-            cleaned
-        ));
+        let resolved = definitions.get(&cleaned).cloned().unwrap_or_else(|| {
+            panic!(
+                "Unknown schema definition '{}' referenced in schema.",
+                cleaned
+            )
+        });
 
         (cleaned, resolved)
     }
@@ -58,7 +60,7 @@ impl DisallowedUnevaluatedPropertiesVisitor {
     {
         if let Some(schema_ref) = schema.reference.as_ref() {
             if let (clean_schema_ref, Schema::Object(mut referenced_schema)) =
-                self.resolve_schema_reference(definitions, &schema_ref)
+                self.resolve_schema_reference(definitions, schema_ref)
             {
                 f(definitions, &mut referenced_schema);
 
@@ -99,7 +101,7 @@ impl Visitor for DisallowedUnevaluatedPropertiesVisitor {
         // use the now-updated schema.
         if let Some(schema_ref) = schema.reference.as_ref() {
             if let (clean_schema_ref, Schema::Object(mut referenced_schema)) =
-                self.resolve_schema_reference(definitions, &schema_ref)
+                self.resolve_schema_reference(definitions, schema_ref)
             {
                 self.visit_schema_object(definitions, &mut referenced_schema);
 
