@@ -1,4 +1,5 @@
 #![allow(missing_docs)]
+
 use tokio::sync::broadcast;
 use tokio_stream::{Stream, StreamExt};
 
@@ -22,6 +23,21 @@ pub enum SignalTo {
     Quit,
 }
 
+/// Convenience struct for app setup handling.
+pub struct SignalPair {
+    pub handler: SignalHandler,
+    pub receiver: SignalRx,
+}
+
+impl SignalPair {
+    /// Create a new signal handler pair, and set them up to receive OS signals.
+    pub async fn new() -> Self {
+        let (handler, receiver) = SignalHandler::new();
+        handler.forever(os_signals()).await;
+        Self { handler, receiver }
+    }
+}
+
 /// SignalHandler is a general `ControlTo` message receiver and transmitter. It's used by
 /// OS signals and providers to surface control events to the root of the application.
 pub struct SignalHandler {
@@ -32,7 +48,7 @@ pub struct SignalHandler {
 impl SignalHandler {
     /// Create a new signal handler with space for 128 control messages at a time, to
     /// ensure the channel doesn't overflow and drop signals.
-    pub fn new() -> (Self, SignalRx) {
+    fn new() -> (Self, SignalRx) {
         let (tx, rx) = broadcast::channel(128);
         let handler = Self {
             tx,
@@ -54,7 +70,10 @@ impl SignalHandler {
 
     /// Takes a stream who's elements are convertible to `SignalTo`, and spawns a permanent
     /// task for transmitting to the receiver.
-    pub fn forever<T, S>(&mut self, stream: S)
+    // This is not actually an async function, but it does call `tokio::spawn` which MUST be run in
+    // the context of an async reactor. Marking this as `async` enforces that requirement even
+    // though it never actually uses `await`.
+    async fn forever<T, S>(&self, stream: S)
     where
         T: Into<SignalTo> + Send + Sync,
         S: Stream<Item = T> + 'static + Send,
@@ -120,7 +139,7 @@ impl SignalHandler {
 
 /// Signals from OS/user.
 #[cfg(unix)]
-pub fn os_signals() -> impl Stream<Item = SignalTo> {
+fn os_signals() -> impl Stream<Item = SignalTo> {
     use tokio::signal::unix::{signal, SignalKind};
 
     let mut sigint = signal(SignalKind::interrupt()).expect("Signal handlers should not panic.");
@@ -143,7 +162,7 @@ pub fn os_signals() -> impl Stream<Item = SignalTo> {
 
 /// Signals from OS/user.
 #[cfg(windows)]
-pub(crate) fn os_signals() -> impl Stream<Item = SignalTo> {
+fn os_signals() -> impl Stream<Item = SignalTo> {
     use futures::future::FutureExt;
 
     async_stream::stream! {
