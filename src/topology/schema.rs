@@ -170,9 +170,8 @@ pub(crate) fn input_definitions(
     config: &Config,
     cache: &mut Cache,
 ) -> Vec<Definition> {
-    // TODO Shouldn't we make sure this is never empty?
     if inputs.is_empty() {
-        return vec![Definition::default_legacy_namespace()];
+        return vec![Definition::any()];
     }
 
     if let Some(definitions) = cache.get(&(config.schema_enabled(), inputs.to_vec())) {
