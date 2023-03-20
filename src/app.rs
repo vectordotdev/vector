@@ -25,10 +25,10 @@ use crate::metrics;
 #[cfg(feature = "api")]
 use crate::{api, internal_events::ApiStarted};
 use crate::{
-    cli::{handle_config_errors, LogFormat, Opts, RootOpts},
+    cli::{handle_config_errors, LogFormat, Opts},
     config::{self, Config, ConfigPath},
     heartbeat,
-    signal::{self, SignalHandler, SignalTo},
+    signal::{SignalHandler, SignalPair, SignalTo},
     topology::{self, ReloadOutcome, RunningTopology, TopologyController},
     trace,
 };
@@ -48,53 +48,39 @@ pub struct ApplicationConfig {
     pub api: config::api::Options,
     #[cfg(feature = "enterprise")]
     pub enterprise: Option<EnterpriseReporter<BoxFuture<'static, ()>>>,
-    pub signal_handler: signal::SignalHandler,
-    pub signal_rx: signal::SignalRx,
 }
 
 pub struct Application {
-    pub opts: RootOpts,
+    pub require_healthy: Option<bool>,
     pub config: ApplicationConfig,
+    pub signals: SignalPair,
 }
 
 impl ApplicationConfig {
-    pub async fn prepare_from_opts(opts: &Opts) -> Result<Self, ExitCode> {
-        let color = opts.root.color.use_color();
-
-        let json = match &opts.root.log_format {
-            LogFormat::Text => false,
-            LogFormat::Json => true,
-        };
-
+    pub async fn from_opts(
+        opts: &Opts,
+        signal_handler: &mut SignalHandler,
+    ) -> Result<Self, ExitCode> {
         let config_paths = opts.root.config_paths_with_formats();
-
-        let level = get_log_levels(opts.log_level());
-        trace::init(color, json, &level, opts.root.internal_log_rate_limit);
-
-        info!(
-            message = "Internal log rate limit configured.",
-            internal_log_rate_secs = opts.root.internal_log_rate_limit
-        );
-        // Signal handler for OS and provider messages.
-        let (mut signal_handler, signal_rx) = SignalHandler::new();
-        signal_handler.forever(signal::os_signals());
-
-        if let Some(sub_command) = &opts.sub_command {
-            return Err(sub_command
-                .execute(&mut signal_handler, signal_rx, color)
-                .await);
-        }
-
-        info!(message = "Log level is enabled.", level = ?level);
 
         let config = load_configs(
             &config_paths,
             opts.root.watch_config,
             opts.root.require_healthy,
-            &mut signal_handler,
+            signal_handler,
         )
         .await?;
 
+        Self::from_config(config_paths, config).await
+    }
+
+    pub async fn from_config(
+        config_paths: Vec<ConfigPath>,
+        config: Config,
+    ) -> Result<Self, ExitCode> {
+        // This is ugly, but needed to allow `config` to be mutable for building the enterprise
+        // features, but also avoid a "does not need to be mutable" warning when the enterprise
+        // feature is not enabled.
         #[cfg(feature = "enterprise")]
         let mut config = config;
         #[cfg(feature = "enterprise")]
@@ -121,8 +107,6 @@ impl ApplicationConfig {
             api,
             #[cfg(feature = "enterprise")]
             enterprise,
-            signal_handler,
-            signal_rx,
         })
     }
 }
@@ -139,19 +123,34 @@ impl Application {
     }
 
     pub fn prepare_from_opts(opts: Opts) -> Result<(Runtime, Self), ExitCode> {
-        openssl_probe::init_ssl_cert_env_vars();
+        init_global();
 
-        #[cfg(not(feature = "enterprise-tests"))]
-        metrics::init_global().expect("metrics initialization failed");
+        let color = opts.root.color.use_color();
+
+        init_logging(
+            color,
+            opts.root.log_format,
+            opts.log_level(),
+            opts.root.internal_log_rate_limit,
+        );
 
         let runtime = build_runtime(opts.root.threads, "vector-worker")?;
-        let config = runtime.block_on(ApplicationConfig::prepare_from_opts(&opts))?;
+
+        // Signal handler for OS and provider messages.
+        let mut signals = runtime.block_on(SignalPair::new());
+
+        if let Some(sub_command) = &opts.sub_command {
+            return Err(runtime.block_on(sub_command.execute(signals, color)));
+        }
+
+        let config = runtime.block_on(ApplicationConfig::from_opts(&opts, &mut signals.handler))?;
 
         Ok((
             runtime,
             Self {
-                opts: opts.root,
+                require_healthy: opts.root.require_healthy,
                 config,
+                signals,
             },
         ))
     }
@@ -161,21 +160,17 @@ impl Application {
         // early buffer by this point and set up a subscriber.
         crate::trace::stop_early_buffering();
 
-        let mut graceful_crash = UnboundedReceiverStream::new(self.config.graceful_crash_receiver);
-        let topology = self.config.topology;
+        let Self {
+            require_healthy,
+            config,
+            signals,
+        } = self;
 
-        let config_paths = self.config.config_paths;
+        let mut signal_handler = signals.handler;
+        let mut signal_rx = signals.receiver;
 
-        let opts = self.opts;
-
-        #[cfg(feature = "api")]
-        let api_config = self.config.api;
-
-        #[cfg(feature = "enterprise")]
-        let enterprise_reporter = self.config.enterprise;
-
-        let mut signal_handler = self.config.signal_handler;
-        let mut signal_rx = self.config.signal_rx;
+        let topology = config.topology;
+        let config_paths = config.config_paths;
 
         emit!(VectorStarted);
         tokio::spawn(heartbeat::heartbeat());
@@ -183,7 +178,7 @@ impl Application {
         // Configure the API server, if applicable.
         #[cfg(feature = "api")]
         // Assigned to prevent the API terminating when falling out of scope.
-        let api_server = if api_config.enabled {
+        let api_server = if config.api.enabled {
             use std::sync::atomic::AtomicBool;
 
             let api_server = api::Server::start(
@@ -195,15 +190,15 @@ impl Application {
             match api_server {
                 Ok(api_server) => {
                     emit!(ApiStarted {
-                        addr: api_config.address.unwrap(),
-                        playground: api_config.playground
+                        addr: config.api.address.unwrap(),
+                        playground: config.api.playground
                     });
 
                     Some(api_server)
                 }
                 Err(e) => {
                     error!("An error occurred that Vector couldn't handle: {}.", e);
-                    let _ = self.config.graceful_crash_sender.send(());
+                    let _ = config.graceful_crash_sender.send(());
                     None
                 }
             }
@@ -214,10 +209,10 @@ impl Application {
 
         let topology_controller = TopologyController {
             topology,
-            config_paths,
-            require_healthy: opts.require_healthy,
+            config_paths: config_paths.clone(),
+            require_healthy,
             #[cfg(feature = "enterprise")]
-            enterprise_reporter,
+            enterprise_reporter: config.enterprise,
             #[cfg(feature = "api")]
             api_server,
         };
@@ -244,6 +239,8 @@ impl Application {
             None
         };
 
+        let mut graceful_crash = UnboundedReceiverStream::new(config.graceful_crash_receiver);
+
         let signal = loop {
             tokio::select! {
                 signal = signal_rx.recv() => {
@@ -259,7 +256,7 @@ impl Application {
                             let mut topology_controller = topology_controller.lock().await;
 
                             // Reload paths
-                            if let Some(paths) = config::process_paths(&opts.config_paths_with_formats()) {
+                            if let Some(paths) = config::process_paths(&config_paths) {
                                 topology_controller.config_paths = paths;
                             }
 
@@ -357,6 +354,13 @@ async fn sources_finished(mutex: Arc<Mutex<TopologyController>>) {
             continue;
         }
     }
+}
+
+pub fn init_global() {
+    openssl_probe::init_ssl_cert_env_vars();
+
+    #[cfg(not(feature = "enterprise-tests"))]
+    metrics::init_global().expect("metrics initialization failed");
 }
 
 fn get_log_levels(default: &str) -> String {
@@ -469,4 +473,19 @@ fn build_enterprise(
         }
         Err(_) => Ok(None),
     }
+}
+
+pub fn init_logging(color: bool, format: LogFormat, log_level: &str, rate: u64) {
+    let level = get_log_levels(log_level);
+    let json = match format {
+        LogFormat::Text => false,
+        LogFormat::Json => true,
+    };
+
+    trace::init(color, json, &level, rate);
+    debug!(
+        message = "Internal log rate limit configured.",
+        internal_log_rate_secs = rate,
+    );
+    info!(message = "Log level is enabled.", level = ?level);
 }
