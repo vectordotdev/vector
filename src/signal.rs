@@ -33,7 +33,8 @@ impl SignalPair {
     /// Create a new signal handler pair, and set them up to receive OS signals.
     pub fn new(runtime: &Runtime) -> Self {
         let (handler, receiver) = SignalHandler::new();
-        handler.forever(runtime, os_signals());
+        let signals = os_signals(runtime);
+        handler.forever(runtime, signals);
         Self { handler, receiver }
     }
 }
@@ -136,30 +137,37 @@ impl SignalHandler {
 
 /// Signals from OS/user.
 #[cfg(unix)]
-fn os_signals() -> impl Stream<Item = SignalTo> {
+fn os_signals(runtime: &Runtime) -> impl Stream<Item = SignalTo> {
     use tokio::signal::unix::{signal, SignalKind};
 
-    let mut sigint = signal(SignalKind::interrupt()).expect("Signal handlers should not panic.");
-    let mut sigterm = signal(SignalKind::terminate()).expect("Signal handlers should not panic.");
-    let mut sigquit = signal(SignalKind::quit()).expect("Signal handlers should not panic.");
-    let mut sighup = signal(SignalKind::hangup()).expect("Signal handlers should not panic.");
+    // The `signal` function must be run within the context of a Tokio runtime.
+    runtime.block_on(async {
+        let mut sigint =
+            signal(SignalKind::interrupt()).expect("Signal handlers should not panic.");
+        let mut sigterm =
+            signal(SignalKind::terminate()).expect("Signal handlers should not panic.");
+        let mut sigquit = signal(SignalKind::quit()).expect("Signal handlers should not panic.");
+        let mut sighup = signal(SignalKind::hangup()).expect("Signal handlers should not panic.");
 
-    async_stream::stream! {
-        loop {
-            let signal = tokio::select! {
-                _ = sigint.recv() => SignalTo::Shutdown,
-                _ = sigterm.recv() => SignalTo::Shutdown,
-                _ = sigquit.recv() => SignalTo::Quit,
-                _ = sighup.recv() => SignalTo::ReloadFromDisk,
-            };
-            yield signal;
+        // Strictly speaking, setting up this stream does not need to be created within the async
+        // block, but keeping it in the same block makes variable naming simpler.
+        async_stream::stream! {
+            loop {
+                let signal = tokio::select! {
+                    _ = sigint.recv() => SignalTo::Shutdown,
+                    _ = sigterm.recv() => SignalTo::Shutdown,
+                    _ = sigquit.recv() => SignalTo::Quit,
+                    _ = sighup.recv() => SignalTo::ReloadFromDisk,
+                };
+                yield signal;
+            }
         }
-    }
+    })
 }
 
 /// Signals from OS/user.
 #[cfg(windows)]
-fn os_signals() -> impl Stream<Item = SignalTo> {
+async fn os_signals(_: &Runtime) -> impl Stream<Item = SignalTo> {
     use futures::future::FutureExt;
 
     async_stream::stream! {
