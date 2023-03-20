@@ -1,10 +1,14 @@
 use indexmap::IndexMap;
 use vector_config_common::schema::{
     visit::{visit_schema_object, Visitor},
-    InstanceType, Map, RootSchema, Schema, SchemaObject, SchemaSettings, SingleOrVec,
+    InstanceType, Map, Schema, SchemaObject, SchemaSettings, SingleOrVec,
 };
 
 /// A visitor that marks schemas as disallowing unknown properties via `unevaluatedProperties`.
+///
+/// This is the equivalernt of `serde`'s `deny_unknown_fields` attribute: instead of only validating
+/// the properties specified in the schema, and ignoring any properties present in the JSON
+/// instance, any unevaluated properties are considered an error.
 ///
 /// This visitor selectively marks schemas with `unevaluatedProperties: false` in order to ensure
 /// that unknown properties are not allowed, but also in a way that doesn't interact incorrectly
