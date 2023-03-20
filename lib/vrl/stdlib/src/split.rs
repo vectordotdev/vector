@@ -4,7 +4,7 @@ use vrl::prelude::*;
 fn split(value: Value, limit: Value, pattern: Value) -> Resolved {
     let string = value.try_bytes_utf8_lossy()?;
     let limit = match limit.try_integer()? {
-        x if x < 0 => return Err(format!("limit requires a positive integer got {x}").into()),
+        x if x < 0 => 0,
         x => x as usize,
     };
 
@@ -192,12 +192,21 @@ mod test {
             tdef: TypeDef::array(Collection::from_unknown(Kind::bytes())),
         }
 
+        zero_limit {
+            args: func_args![value: "This is a long string.",
+                             pattern: " ",
+                             limit: 0
+            ],
+            want: Ok(Vec::<u8>::new()),
+            tdef: TypeDef::array(Collection::from_unknown(Kind::bytes())),
+        }
+
         negative_limit {
             args: func_args![value: "This is a long string.",
                              pattern: " ",
                              limit: -1
             ],
-            want: Err("limit requires a positive integer got -1"),
+            want: Ok(Vec::<u8>::new()),
             tdef: TypeDef::array(Collection::from_unknown(Kind::bytes())),
         }
 
