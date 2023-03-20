@@ -25,7 +25,7 @@ use crate::metrics;
 #[cfg(feature = "api")]
 use crate::{api, internal_events::ApiStarted};
 use crate::{
-    cli::{handle_config_errors, LogFormat, Opts},
+    cli::{handle_config_errors, LogFormat, Opts, RootOpts},
     config::{self, Config, ConfigPath},
     heartbeat,
     signal::{SignalHandler, SignalPair, SignalTo},
@@ -58,15 +58,15 @@ pub struct Application {
 
 impl ApplicationConfig {
     pub async fn from_opts(
-        opts: &Opts,
+        opts: &RootOpts,
         signal_handler: &mut SignalHandler,
     ) -> Result<Self, ExitCode> {
-        let config_paths = opts.root.config_paths_with_formats();
+        let config_paths = opts.config_paths_with_formats();
 
         let config = load_configs(
             &config_paths,
-            opts.root.watch_config,
-            opts.root.require_healthy,
+            opts.watch_config,
+            opts.require_healthy,
             signal_handler,
         )
         .await?;
@@ -143,7 +143,10 @@ impl Application {
             return Err(runtime.block_on(sub_command.execute(signals, color)));
         }
 
-        let config = runtime.block_on(ApplicationConfig::from_opts(&opts, &mut signals.handler))?;
+        let config = runtime.block_on(ApplicationConfig::from_opts(
+            &opts.root,
+            &mut signals.handler,
+        ))?;
 
         Ok((
             runtime,
