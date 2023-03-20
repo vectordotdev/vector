@@ -45,9 +45,9 @@ pub(crate) struct PulsarSink {
     topic_template: Template,
 }
 
-/// Stores the event together with the extracted keys, topics, etc
+/// Stores the event together with the extracted keys, topics, etc.
 /// This is passed into the `RequestBuilder` which then splits it out into the event
-/// and metadata containing the keys, and metadata
+/// and metadata containing the keys, and metadata.
 /// This event needs to be created prior to building the request so we can filter out
 /// any events that error whilst rendering the templates.
 #[derive(Serialize)]
@@ -70,7 +70,7 @@ impl ByteSizeOf for PulsarEvent {
     fn allocated_bytes(&self) -> usize {
         self.event.size_of()
             + self.topic.size_of()
-            + self.key.as_ref().map_or(0, |bytes| bytes.clone().size_of())
+            + self.key.as_ref().map_or(0, |bytes| bytes.size_of())
             + self.properties.as_ref().map_or(0, |props| {
                 props
                     .iter()
@@ -87,13 +87,11 @@ impl EstimatedJsonEncodedSizeOf for PulsarEvent {
 }
 
 pub(crate) async fn healthcheck(config: PulsarSinkConfig) -> crate::Result<()> {
-    trace!("Healthcheck started.");
     let client = config.create_pulsar_client().await?;
     let topic = Template::try_from(config.topic)
         .context(TopicTemplateSnafu)?
         .render_string(&LogEvent::from_str_legacy(""))?;
     client.lookup_topic(topic).await?;
-    trace!("Healthcheck completed.");
     Ok(())
 }
 
@@ -140,13 +138,9 @@ impl PulsarSink {
             })
             .request_builder(None, request_builder)
             .filter_map(|request| async move {
-                match request {
-                    Err(e) => {
-                        error!("Failed to build Pulsar request: {:?}.", e);
-                        None
-                    }
-                    Ok(req) => Some(req),
-                }
+                request
+                    .map_err(|e| error!("Failed to build Pulsar request: {:?}.", e))
+                    .ok()
             })
             .into_driver(service)
             .protocol("tcp");
