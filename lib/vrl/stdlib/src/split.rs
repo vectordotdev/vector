@@ -3,7 +3,11 @@ use vrl::prelude::*;
 
 fn split(value: Value, limit: Value, pattern: Value) -> Resolved {
     let string = value.try_bytes_utf8_lossy()?;
-    let limit = limit.try_integer()? as usize;
+    let limit = match limit.try_integer()? {
+        x if x < 0 => 0,
+        x => x as usize,
+    };
+
     match pattern {
         Value::Regex(pattern) => Ok(pattern
             .splitn(string.as_ref(), limit)
@@ -168,7 +172,43 @@ mod test {
              ],
              want: Ok(value!(["˙ƃuᴉɹʇs", "ƃuol", "ɐ", "sᴉ", "sᴉɥ┴"])),
              tdef: TypeDef::array(Collection::from_unknown(Kind::bytes())),
-         }
+        }
+
+        limit {
+            args: func_args![value: "This is a long string.",
+                             pattern: " ",
+                             limit: 2
+            ],
+            want: Ok(value!(["This", "is a long string."])),
+            tdef: TypeDef::array(Collection::from_unknown(Kind::bytes())),
+        }
+
+        over_length_limit {
+            args: func_args![value: "This is a long string.",
+                             pattern: " ",
+                             limit: 2000
+            ],
+            want: Ok(value!(["This", "is", "a", "long", "string."])),
+            tdef: TypeDef::array(Collection::from_unknown(Kind::bytes())),
+        }
+
+        zero_limit {
+            args: func_args![value: "This is a long string.",
+                             pattern: " ",
+                             limit: 0
+            ],
+            want: Ok(Vec::<u8>::new()),
+            tdef: TypeDef::array(Collection::from_unknown(Kind::bytes())),
+        }
+
+        negative_limit {
+            args: func_args![value: "This is a long string.",
+                             pattern: " ",
+                             limit: -1
+            ],
+            want: Ok(Vec::<u8>::new()),
+            tdef: TypeDef::array(Collection::from_unknown(Kind::bytes())),
+        }
 
     ];
 }
