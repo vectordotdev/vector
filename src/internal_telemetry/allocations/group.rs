@@ -125,7 +125,7 @@ impl AllocationGroupToken {
         // accessing it here.
         unsafe {
             let _ = ALLOCATION_GROUP_STACK.try_with(|stack| {
-                (&mut *stack.get()).push(self.0);
+                (*stack.get()).push(self.0);
                 Accumulator::enter(self.0);
             });
         }
@@ -136,7 +136,7 @@ impl AllocationGroupToken {
         // accessing it here.
         unsafe {
             let _ = ALLOCATION_GROUP_STACK.try_with(|stack| {
-                if let Some(new_group) = (&mut *stack.get()).pop() {
+                if let Some(new_group) = (*stack.get()).pop() {
                     Accumulator::enter(new_group);
                 } else {
                     Accumulator::exit();
@@ -163,7 +163,7 @@ impl AllocationGroupToken {
 
 impl PartialEq for AllocationGroupToken {
     fn eq(&self, other: &Self) -> bool {
-        self.0 as *const _ == other.0 as *const _
+        std::ptr::eq(self.0, other.0)
     }
 }
 
@@ -187,8 +187,8 @@ pub(super) fn get_current_allocation_group() -> &'static AllocationGroup {
     // accessing it here.
     unsafe {
         ALLOCATION_GROUP_STACK
-            .try_with(|stack| (&*stack.get()).current())
-            .unwrap_or_else(|_| Some(&ROOT_ALLOCATION_GROUP))
-            .unwrap_or_else(|| &ROOT_ALLOCATION_GROUP)
+            .try_with(|stack| (*stack.get()).current())
+            .unwrap_or(Some(&ROOT_ALLOCATION_GROUP))
+            .unwrap_or(&ROOT_ALLOCATION_GROUP)
     }
 }

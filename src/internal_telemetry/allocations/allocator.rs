@@ -21,7 +21,7 @@ struct MetadataTrailer {
 
 impl MetadataTrailer {
     /// Creates a `MetadataTrailer` from the given allocation group.
-    fn from_group_ref(group_ref: &'static AllocationGroup) -> Self {
+    const fn from_group_ref(group_ref: &'static AllocationGroup) -> Self {
         Self {
             canary: TRAILER_CANARY,
             group_ref,
@@ -29,7 +29,7 @@ impl MetadataTrailer {
     }
 
     /// Whether or not this metadata is valid based on the canary.
-    fn is_valid(&self) -> bool {
+    const fn is_valid(&self) -> bool {
         self.canary == TRAILER_CANARY
     }
 
@@ -37,7 +37,7 @@ impl MetadataTrailer {
     ///
     /// If the canary is not valid, `None` is returned. Otherwise, `Some(...)` is returned
     /// containing a reference to the allocation group.
-    fn try_group(&self) -> Option<&'static AllocationGroup> {
+    const fn try_group(&self) -> Option<&'static AllocationGroup> {
         // The canary value is meant to be sufficiently unique that if we can read the canary value
         // from the field, we can be sure that this `MetadataTrailer` was read from a real
         // allocation that was traced, and that the resulting group reference is also valid.
