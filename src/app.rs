@@ -155,8 +155,7 @@ impl Application {
     }
 
     pub fn prepare_start() -> Result<(Runtime, StartedApplication), ExitCode> {
-        Self::prepare()
-            .and_then(|(runtime, app)| runtime.block_on(app.start()).map(|app| (runtime, app)))
+        Self::prepare().and_then(|(runtime, app)| app.start(&runtime).map(|app| (runtime, app)))
     }
 
     pub fn prepare() -> Result<(Runtime, Self), ExitCode> {
@@ -184,7 +183,7 @@ impl Application {
         let runtime = build_runtime(opts.root.threads, "vector-worker")?;
 
         // Signal handler for OS and provider messages.
-        let mut signals = runtime.block_on(SignalPair::new());
+        let mut signals = SignalPair::new(&runtime);
 
         if let Some(sub_command) = &opts.sub_command {
             return Err(runtime.block_on(sub_command.execute(signals, color)));
@@ -202,16 +201,13 @@ impl Application {
         ))
     }
 
-    // This is not actually an async function, but it does call `tokio::spawn` which MUST be run in
-    // the context of an async reactor. Marking this as `async` enforces that requirement even
-    // though it never actually uses `await`.
-    pub async fn start(self) -> Result<StartedApplication, ExitCode> {
+    pub fn start(self, runtime: &Runtime) -> Result<StartedApplication, ExitCode> {
         // Any internal_logs sources will have grabbed a copy of the
         // early buffer by this point and set up a subscriber.
         crate::trace::stop_early_buffering();
 
         emit!(VectorStarted);
-        tokio::spawn(heartbeat::heartbeat());
+        runtime.spawn(heartbeat::heartbeat());
 
         let Self {
             require_healthy,
