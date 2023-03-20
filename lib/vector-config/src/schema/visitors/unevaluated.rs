@@ -85,7 +85,7 @@ impl Visitor for DisallowedUnevaluatedPropertiesVisitor {
         // fundamentally incompatible in this way: since a subschema is validated against the
         // entirety of the JSON instance passed in at the level of `allOf`, `oneOf`, and so on, each
         // subschema will implicitly be forced to observe other, potentially unrelated properties,
-        // and so would naturally fail validation if `unevaluatedProperties` was present in thei
+        // and so would naturally fail validation if `unevaluatedProperties` was present in the
         // subschema and set to `false`.
 
         // First, if this schema itself has a schema reference (`$ref`), we resolve it and visit
