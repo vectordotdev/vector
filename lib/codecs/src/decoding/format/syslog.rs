@@ -44,7 +44,7 @@ impl SyslogDeserializerConfig {
     pub fn schema_definition(&self, log_namespace: LogNamespace) -> schema::Definition {
         match (log_namespace, self.source) {
             (LogNamespace::Legacy, _) => {
-                schema::Definition::empty_legacy_namespace()
+                let definition = schema::Definition::empty_legacy_namespace()
                     // The `message` field is always defined. If parsing fails, the entire body becomes the
                     // message.
                     .with_event_field(
@@ -75,7 +75,15 @@ impl SyslogDeserializerConfig {
                         None,
                     )
                     // "structured data" is placed at the root. It will always be a map of strings
-                    .unknown_fields(Kind::object(Collection::from_unknown(Kind::bytes())))
+                    .unknown_fields(Kind::object(Collection::from_unknown(Kind::bytes())));
+
+                if self.source.is_some() {
+                    // This field is added by the syslog source. It will not be present if the data
+                    // is coming from the codec.
+                    definition.optional_field(&owned_value_path!("source_ip"), Kind::bytes(), None)
+                } else {
+                    definition
+                }
             }
             (LogNamespace::Vector, None) => {
                 schema::Definition::new_with_default_metadata(
@@ -126,6 +134,13 @@ impl SyslogDeserializerConfig {
                         &owned_value_path!("hostname"),
                         Kind::bytes().or_undefined(),
                         Some("host"),
+                    )
+                    .with_source_metadata(
+                        source,
+                        None,
+                        &owned_value_path!("source_ip"),
+                        Kind::bytes().or_undefined(),
+                        None,
                     )
                     .with_source_metadata(
                         source,
