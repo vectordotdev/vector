@@ -155,7 +155,8 @@ impl Application {
     }
 
     pub fn prepare_start() -> Result<(Runtime, StartedApplication), ExitCode> {
-        Self::prepare().and_then(|(runtime, app)| app.start().map(|app| (runtime, app)))
+        Self::prepare()
+            .and_then(|(runtime, app)| runtime.block_on(app.start()).map(|app| (runtime, app)))
     }
 
     pub fn prepare() -> Result<(Runtime, Self), ExitCode> {
@@ -201,7 +202,10 @@ impl Application {
         ))
     }
 
-    pub fn start(self) -> Result<StartedApplication, ExitCode> {
+    // This is not actually an async function, but it does call `tokio::spawn` which MUST be run in
+    // the context of an async reactor. Marking this as `async` enforces that requirement even
+    // though it never actually uses `await`.
+    pub async fn start(self) -> Result<StartedApplication, ExitCode> {
         // Any internal_logs sources will have grabbed a copy of the
         // early buffer by this point and set up a subscriber.
         crate::trace::stop_early_buffering();
