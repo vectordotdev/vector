@@ -4,14 +4,12 @@ use vector_config_common::schema::{
     InstanceType, Map, RootSchema, Schema, SchemaObject, SchemaSettings, SingleOrVec,
 };
 
-// TODO: We need to thread through the definitions in the root schema to all of the trait methods,
-// and helper methods. Specifically, we're currently applying `unevaluatedProperties: false` to
-// `GlobalOptions` because it's only ever brought in through `$ref`, and we don't clear
-// `unevaluatedProperties` from `$ref`-based subschemas.
-//
-// Practically, this means that validation for that schema fails as soon as we try and set, say,
-// `sources`, at the top-level.
-
+/// A visitor that marks schemas as disallowing unknown properties via `unevaluatedProperties`.
+///
+/// This visitor selectively marks schemas with `unevaluatedProperties: false` in order to ensure
+/// that unknown properties are not allowed, but also in a way that doesn't interact incorrectly
+/// with advanced subschema validation, such as `oneOf` or `allOf`, as `unevaulatedProperties`
+/// cannot simply be applied to any and all schemas indiscriminately.
 #[derive(Debug)]
 pub struct DisallowedUnevaluatedPropertiesVisitor {
     definition_path: String,
@@ -172,6 +170,11 @@ fn is_object_schema(instance_type: Option<&SingleOrVec<InstanceType>>) -> bool {
 fn get_subschema_validators(schema: &mut SchemaObject) -> Option<Vec<&mut SchemaObject>> {
     let mut validators = vec![];
 
+    // Grab any subschemas for `allOf` and `oneOf`, if present.
+    //
+    // There are other subschema validators -- `anyOf` -- as well as other advanced validation
+    // mechanisms such as `if`/`then`/`else, but we explicitly don't handle them here as we don't
+    // currently use them in Vector's configuration schema.
     if let Some(subschemas) = schema.subschemas.as_mut() {
         if let Some(all_of) = subschemas.all_of.as_mut() {
             validators.extend(all_of.iter_mut().filter_map(|validator| match validator {
@@ -186,10 +189,6 @@ fn get_subschema_validators(schema: &mut SchemaObject) -> Option<Vec<&mut Schema
                 _ => None,
             }));
         }
-
-        // TODO: There are other subschema validation pathways -- `anyOf`, `if`/`then`/`else`, etc
-        // -- that we may eventually need to support, but Vector does not currently generate any
-        // schemas using those keywords.
     }
 
     if validators.is_empty() {
