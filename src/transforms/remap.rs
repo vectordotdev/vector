@@ -437,14 +437,21 @@ where
             .schema_definitions
             .get(&None)
             .expect("default schema required")
-            .clone();
+            // TODO we can now have multiple possible definitions.
+            // This is going to need to be updated to store these possible definitions and then
+            // choose the correct one based on the input the event has come from.
+            .get(0)
+            .cloned()
+            .unwrap_or_else(|| Definition::any());
 
         let dropped_schema_definition = context
             .schema_definitions
             .get(&Some(DROPPED.to_owned()))
             .or_else(|| context.schema_definitions.get(&None))
             .expect("dropped schema required")
-            .clone();
+            .get(0)
+            .cloned()
+            .unwrap_or_else(|| Definition::any());
 
         Ok(Remap {
             component_key: context.key.clone(),
@@ -690,8 +697,11 @@ mod tests {
 
     fn remap(config: RemapConfig) -> Result<Remap<AstRunner>> {
         let schema_definitions = HashMap::from([
-            (None, test_default_schema_definition()),
-            (Some(DROPPED.to_owned()), test_dropped_schema_definition()),
+            (None, vec![test_default_schema_definition()]),
+            (
+                Some(DROPPED.to_owned()),
+                vec![test_dropped_schema_definition()],
+            ),
         ]);
 
         Remap::new_ast(config, &TransformContext::new_test(schema_definitions))
@@ -1161,8 +1171,11 @@ mod tests {
             ..Default::default()
         };
         let schema_definitions = HashMap::from([
-            (None, test_default_schema_definition()),
-            (Some(DROPPED.to_owned()), test_dropped_schema_definition()),
+            (None, vec![test_default_schema_definition()]),
+            (
+                Some(DROPPED.to_owned()),
+                vec![test_dropped_schema_definition()],
+            ),
         ]);
         let context = TransformContext {
             key: Some(ComponentKey::from("remapper")),
