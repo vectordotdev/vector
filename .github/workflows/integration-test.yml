@@ -57,6 +57,7 @@ jobs:
       matrix:
         include:
           - test: 'amqp'
+          - test: 'appsignal'
           - test: 'aws'
           - test: 'axiom'
           - test: 'azure'

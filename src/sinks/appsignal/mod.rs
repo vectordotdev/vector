@@ -1,3 +1,6 @@
+#[cfg(all(test, feature = "appsignal-integration-tests"))]
+mod integration_tests;
+
 use std::io::Write;
 
 use bytes::{BufMut, Bytes, BytesMut};

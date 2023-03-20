@@ -729,6 +729,7 @@ nightly = []
 # Testing-related features
 all-integration-tests = [
   "amqp-integration-tests",
+  "appsignal-integration-tests",
   "aws-integration-tests",
   "axiom-integration-tests",
   "azure-integration-tests",
@@ -766,6 +767,7 @@ all-integration-tests = [
 ]
 
 amqp-integration-tests = ["sources-amqp", "sinks-amqp"]
+appsignal-integration-tests = ["sinks-appsignal"]
 
 aws-integration-tests = [
   "aws-cloudwatch-logs-integration-tests",
