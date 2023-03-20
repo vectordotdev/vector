@@ -184,7 +184,7 @@ unsafe impl<A: GlobalAlloc> GlobalAlloc for GroupedTracingAllocator<A> {
             return new_object_ptr;
         }
 
-        // Since we've successfully acquired the newly-sized allocation, ragardless of whether or
+        // Since we've successfully acquired the newly-sized allocation, regardless of whether or
         // not the metadata was present, we can go ahead and copy the old object value and then
         // deallocate the original allocation.
         //
