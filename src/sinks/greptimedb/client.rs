@@ -8,7 +8,9 @@ use futures_util::future::BoxFuture;
 use greptimedb_client::api::v1::auth_header::AuthScheme;
 use greptimedb_client::api::v1::column::*;
 use greptimedb_client::api::v1::*;
-use greptimedb_client::{Client, Database, Error as GreptimeError};
+use greptimedb_client::{
+    Client, Database, Error as GreptimeError, DEFAULT_CATALOG_NAME, DEFAULT_SCHEMA_NAME,
+};
 use tower::Service;
 use vector_core::event::metric::{Bucket, MetricSketch, Quantile, Sample};
 use vector_core::event::{Event, Metric, MetricValue};
@@ -67,7 +69,11 @@ pub struct GreptimeDBService {
 impl GreptimeDBService {
     pub fn new_sink(config: &GreptimeDBConfig) -> crate::Result<VectorSink> {
         let grpc_client = Client::with_urls(vec![&config.grpc_endpoint]);
-        let mut client = Database::new(&config.catalog, &config.schema, grpc_client);
+        let mut client = Database::new(
+            config.catalog.as_deref().unwrap_or(DEFAULT_CATALOG_NAME),
+            config.schema.as_deref().unwrap_or(DEFAULT_SCHEMA_NAME),
+            grpc_client,
+        );
 
         if let (Some(username), Some(password)) = (&config.username, &config.password) {
             client.set_auth(AuthScheme::Basic(Basic {
@@ -78,7 +84,7 @@ impl GreptimeDBService {
 
         let batch = config.batch.into_batch_settings()?;
         let request = config.request.unwrap_with(&TowerRequestConfig {
-            retry_attempts: Some(1),
+            retry_attempts: None,
             ..Default::default()
         });
 
@@ -136,7 +142,7 @@ impl Service<Vec<Metric>> for GreptimeDBService {
     }
 }
 
-fn f64_column(name: &str, value: f64) -> Column {
+fn f64_field(name: &str, value: f64) -> Column {
     Column {
         column_name: name.to_owned(),
         values: Some(column::Values {
@@ -162,7 +168,7 @@ fn ts_column(name: &str, value: i64) -> Column {
     }
 }
 
-fn str_column(name: &str, value: &str) -> Column {
+fn tag_column(name: &str, value: &str) -> Column {
     Column {
         column_name: name.to_owned(),
         values: Some(column::Values {
@@ -189,15 +195,15 @@ fn metrics_to_insert_request(metric: Metric) -> InsertRequest {
     // tags
     if let Some(tags) = metric.tags() {
         for (key, value) in tags.iter_single() {
-            columns.push(str_column(key, value));
+            columns.push(tag_column(key, value));
         }
     }
 
     // fields
     match metric.value() {
-        MetricValue::Counter { value } => columns.push(f64_column("value", *value)),
-        MetricValue::Gauge { value } => columns.push(f64_column("value", *value)),
-        MetricValue::Set { values } => columns.push(f64_column("value", values.len() as f64)),
+        MetricValue::Counter { value } => columns.push(f64_field("value", *value)),
+        MetricValue::Gauge { value } => columns.push(f64_field("value", *value)),
+        MetricValue::Set { values } => columns.push(f64_field("value", values.len() as f64)),
         MetricValue::Distribution { samples, .. } => {
             encode_distribution(samples, &mut columns);
         }
@@ -208,8 +214,8 @@ fn metrics_to_insert_request(metric: Metric) -> InsertRequest {
             sum,
         } => {
             encode_histogram(buckets.as_ref(), &mut columns);
-            columns.push(f64_column("count", *count as f64));
-            columns.push(f64_column("sum", *sum));
+            columns.push(f64_field("count", *count as f64));
+            columns.push(f64_field("sum", *sum));
         }
         MetricValue::AggregatedSummary {
             quantiles,
@@ -217,8 +223,8 @@ fn metrics_to_insert_request(metric: Metric) -> InsertRequest {
             sum,
         } => {
             encode_quantiles(quantiles.as_ref(), &mut columns);
-            columns.push(f64_column("count", *count as f64));
-            columns.push(f64_column("sum", *sum));
+            columns.push(f64_field("count", *count as f64));
+            columns.push(f64_field("sum", *sum));
         }
         MetricValue::Sketch { sketch } => {
             let MetricSketch::AgentDDSketch(sketch) = sketch;
@@ -236,15 +242,15 @@ fn metrics_to_insert_request(metric: Metric) -> InsertRequest {
 
 fn encode_distribution(samples: &[Sample], columns: &mut Vec<Column>) {
     if let Some(stats) = DistributionStatistic::from_samples(samples, &[0.75, 0.90, 0.95, 0.99]) {
-        columns.push(f64_column("min", stats.min));
-        columns.push(f64_column("max", stats.max));
-        columns.push(f64_column("median", stats.median));
-        columns.push(f64_column("avg", stats.avg));
-        columns.push(f64_column("sum", stats.sum));
-        columns.push(f64_column("count", stats.count as f64));
+        columns.push(f64_field("min", stats.min));
+        columns.push(f64_field("max", stats.max));
+        columns.push(f64_field("median", stats.median));
+        columns.push(f64_field("avg", stats.avg));
+        columns.push(f64_field("sum", stats.sum));
+        columns.push(f64_field("count", stats.count as f64));
 
         for (quantile, value) in stats.quantiles {
-            columns.push(f64_column(&format!("p{:2}", quantile * 100f64), value));
+            columns.push(f64_field(&format!("p{:2}", quantile * 100f64), value));
         }
     }
 }
@@ -252,48 +258,144 @@ fn encode_distribution(samples: &[Sample], columns: &mut Vec<Column>) {
 fn encode_histogram(buckets: &[Bucket], columns: &mut Vec<Column>) {
     for bucket in buckets {
         let column_name = format!("b{}", bucket.upper_limit);
-        columns.push(f64_column(&column_name, bucket.count as f64));
+        columns.push(f64_field(&column_name, bucket.count as f64));
     }
 }
 
 fn encode_quantiles(quantiles: &[Quantile], columns: &mut Vec<Column>) {
     for quantile in quantiles {
         let column_name = format!("p{:2}", quantile.quantile * 100f64);
-        columns.push(f64_column(&column_name, quantile.value));
+        columns.push(f64_field(&column_name, quantile.value));
     }
 }
 
 fn encode_sketch(sketch: &AgentDDSketch, columns: &mut Vec<Column>) {
-    columns.push(f64_column("count", sketch.count() as f64));
+    columns.push(f64_field("count", sketch.count() as f64));
     if let Some(min) = sketch.min() {
-        columns.push(f64_column("min", min));
+        columns.push(f64_field("min", min));
     }
 
     if let Some(max) = sketch.max() {
-        columns.push(f64_column("max", max));
+        columns.push(f64_field("max", max));
     }
 
     if let Some(sum) = sketch.sum() {
-        columns.push(f64_column("sum", sum));
+        columns.push(f64_field("sum", sum));
     }
 
     if let Some(avg) = sketch.avg() {
-        columns.push(f64_column("avg", avg));
+        columns.push(f64_field("avg", avg));
     }
 
     if let Some(quantile) = sketch.quantile(0.5) {
-        columns.push(f64_column("p50", quantile));
+        columns.push(f64_field("p50", quantile));
     }
     if let Some(quantile) = sketch.quantile(0.75) {
-        columns.push(f64_column("p75", quantile));
+        columns.push(f64_field("p75", quantile));
     }
     if let Some(quantile) = sketch.quantile(0.90) {
-        columns.push(f64_column("p90", quantile));
+        columns.push(f64_field("p90", quantile));
     }
     if let Some(quantile) = sketch.quantile(0.95) {
-        columns.push(f64_column("p95", quantile));
+        columns.push(f64_field("p95", quantile));
     }
     if let Some(quantile) = sketch.quantile(0.99) {
-        columns.push(f64_column("p99", quantile));
+        columns.push(f64_field("p99", quantile));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    use similar_asserts::assert_eq;
+
+    use super::*;
+    use crate::event::metric::{MetricKind, StatisticKind};
+
+    fn get_column(columns: &[Column], name: &str) -> f64 {
+        let col = columns.iter().find(|c| c.column_name == name).unwrap();
+        *col.values.unwrap().f64_values.get(0).unwrap()
+    }
+
+    #[test]
+    fn test_metric_data_to_insert_request() {
+        let metric = Metric::new(
+            "load1",
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 1.1 },
+        )
+        .with_namespace(Some("ns"))
+        .with_tags(Some([("host".to_owned(), "thinkneo".to_owned())].into()))
+        .with_timestamp(Some(Utc::now()));
+
+        let insert = metrics_to_insert_request(metric);
+
+        assert_eq!(insert.table_name, "load1");
+        assert_eq!(insert.row_count, 1);
+        assert_eq!(insert.columns.len(), 3);
+
+        let column_names = insert
+            .columns
+            .iter()
+            .map(|c| c.column_name.as_ref())
+            .collect::<Vec<&str>>();
+        assert!(column_names.contains(&"timestamp"));
+        assert!(column_names.contains(&"host"));
+        assert!(column_names.contains(&"value"));
+
+        assert_eq!(get_column(&insert.columns, "value"), 1.1);
+    }
+
+    #[test]
+    fn test_counter() {
+        let metric = Metric::new(
+            "cpu_seconds_total",
+            MetricKind::Incremental,
+            MetricValue::Counter { value: 1.1 },
+        );
+        let insert = metrics_to_insert_request(metric);
+        assert_eq!(insert.columns.len(), 2);
+
+        assert_eq!(get_column(&insert.columns, "value"), 1.1);
+    }
+
+    #[test]
+    fn test_set() {
+        let metric = Metric::new(
+            "cpu_seconds_total",
+            MetricKind::Absolute,
+            MetricValue::Set {
+                values: ["foo".to_owned(), "bar".to_owned()].iter().collect(),
+            },
+        );
+        let insert = metrics_to_insert_request(metric);
+        assert_eq!(insert.columns.len(), 2);
+
+        assert_eq!(get_column(&insert.columns, "value"), 2.0);
+    }
+
+    #[test]
+    fn test_distribution() {
+        let metric = Metric::new(
+            "cpu_seconds_total",
+            MetricKind::Incremental,
+            MetricValue::Distribution {
+                samples: vector_core::samples![1.0 => 2, 2.0 => 4, 3.0 => 2],
+                statistic: StatisticKind::Histogram,
+            },
+        );
+        let insert = metrics_to_insert_request(metric);
+        assert_eq!(insert.columns.len(), 11);
+
+        assert_eq!(get_column(&insert.columns, "max"), 3.0);
+        assert_eq!(get_column(&insert.columns, "min"), 1.0);
+        assert_eq!(get_column(&insert.columns, "median"), 2.0);
+        assert_eq!(get_column(&insert.columns, "avg"), 2.0);
+        assert_eq!(get_column(&insert.columns, "sum"), 16.0);
+        assert_eq!(get_column(&insert.columns, "count"), 8.0);
+        assert_eq!(get_column(&insert.columns, "p75"), 2.0);
+        assert_eq!(get_column(&insert.columns, "p90"), 3.0);
+        assert_eq!(get_column(&insert.columns, "p95"), 3.0);
+        assert_eq!(get_column(&insert.columns, "p99"), 3.0);
     }
 }

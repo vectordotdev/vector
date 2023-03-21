@@ -30,10 +30,12 @@ impl SinkBatchSettings for GreptimeDBDefaultBatchSettings {
 pub struct GreptimeDBConfig {
     /// The catalog name to connect
     #[configurable(metadata(docs::examples = "greptime"))]
-    pub catalog: String,
+    #[serde(default)]
+    pub catalog: Option<String>,
     /// The schema name to connect
     #[configurable(metadata(docs::examples = "public"))]
-    pub schema: String,
+    #[serde(default)]
+    pub schema: Option<String>,
     /// The host and port of greptimedb grpc service
     #[configurable(metadata(docs::examples = "localhost:4001"))]
     pub grpc_endpoint: String,
@@ -107,4 +109,28 @@ fn healthcheck(endpoint: &str, mut client: HttpClient) -> crate::Result<super::H
             })
     }
     .boxed())
+}
+
+#[cfg(test)]
+mod tests {
+    use indoc::indoc;
+
+    use super::*;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<GreptimeDBConfig>();
+    }
+
+    #[test]
+    fn test_config_with_username() {
+        let config = indoc! {r#"
+            grpc_endpoint = "foo-bar.ap-southeast-1.aws.greptime.cloud:4001"
+            http_endpoint = "http://alpha-bravo.ap-southeast-1.aws.greptime.cloud/health"
+            catalog = "foo"
+            schema = "bar"
+        "#};
+
+        toml::from_str::<GreptimeDBConfig>(config).unwrap();
+    }
 }
