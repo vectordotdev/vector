@@ -109,17 +109,16 @@ pub fn check_git_repository_clean() -> Result<bool> {
 
 /// Commits changes from the current repo
 pub fn commit(commit_message: &str) -> Result<String> {
-    Command::new("git")
-        .args(["-am", commit_message])
-        .capture_output()
+    capture_output(&["commit", "--all", "--message", commit_message])
 }
 
 /// Pushes changes from the current repo
 pub fn push() -> Result<String> {
-    Command::new("git").arg("push").capture_output()
+    capture_output(&["push"])
 }
 
 pub fn clone(repo_url: &str) -> Result<String> {
+    // We cannot use capture_output since this will need to run in the CWD
     Command::new("git")
         .args(["clone", repo_url])
         .capture_output()
