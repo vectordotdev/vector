@@ -7,12 +7,9 @@ use futures::StreamExt;
 use futures_util::future::BoxFuture;
 use futures_util::FutureExt;
 use once_cell::race::OnceNonZeroUsize;
-use serde::ser::StdError;
-use stream_cancel::Trigger;
 use tokio::{
     runtime::{self, Runtime},
     sync::{mpsc, Mutex},
-    task::JoinHandle,
 };
 use tokio_stream::wrappers::UnboundedReceiverStream;
 
@@ -22,7 +19,7 @@ use crate::config::enterprise::{
     EnterpriseReporter,
 };
 #[cfg(not(windows))]
-use crate::control_server::ControlServer;
+use crate::control_server::{self, ControlServer};
 #[cfg(not(feature = "enterprise-tests"))]
 use crate::metrics;
 #[cfg(feature = "api")]
@@ -228,24 +225,11 @@ impl Application {
 
         // If the relevant ENV var is set, start up the control server
         #[cfg(not(windows))]
-        let control_server_pieces = if let Ok(path) = std::env::var("VECTOR_CONTROL_SOCKET_PATH") {
-            let (shutdown_trigger, tripwire) = stream_cancel::Tripwire::new();
-            match ControlServer::bind(path, Arc::clone(&topology_controller), tripwire) {
-                Ok(control_server) => {
-                    let server_handle = tokio::spawn(control_server.run());
-                    Some((shutdown_trigger, server_handle))
-                }
-                Err(error) => {
-                    error!(message = "Error binding control server.", %error);
-                    return Err(exitcode::CONFIG);
-                }
-            }
-        } else {
-            None
-        };
+        let control_server_pieces = setup_control_server(&topology_controller, runtime)?;
 
         Ok(StartedApplication {
             config_paths: config.config_paths,
+            #[cfg(not(windows))]
             control_server_pieces,
             graceful_crash_receiver: config.graceful_crash_receiver,
             signals,
@@ -256,12 +240,10 @@ impl Application {
 
 pub struct StartedApplication {
     config_paths: Vec<ConfigPath>,
-    control_server_pieces: Option<(
-        stream_cancel::Trigger,
-        tokio::task::JoinHandle<Result<(), Box<dyn serde::ser::StdError + Send + Sync>>>,
-    )>,
+    #[cfg(not(windows))]
+    control_server_pieces: Option<control_server::Pieces>,
     graceful_crash_receiver: mpsc::UnboundedReceiver<()>,
-    signals: SignalPair,
+    pub signals: SignalPair,
     topology_controller: Arc<Mutex<TopologyController>>,
 }
 
@@ -273,6 +255,7 @@ impl StartedApplication {
     pub async fn main(self) -> FinishedApplication {
         let Self {
             config_paths,
+            #[cfg(not(windows))]
             control_server_pieces,
             graceful_crash_receiver,
             signals,
@@ -339,10 +322,7 @@ impl StartedApplication {
 
 pub struct FinishedApplication {
     #[cfg(not(windows))]
-    control_server_pieces: Option<(
-        Trigger,
-        JoinHandle<Result<(), Box<dyn StdError + Send + Sync>>>,
-    )>,
+    control_server_pieces: Option<control_server::Pieces>,
     signal: SignalTo,
     signal_rx: SignalRx,
     topology_controller: Arc<Mutex<TopologyController>>,
@@ -562,4 +542,20 @@ pub fn init_logging(color: bool, format: LogFormat, log_level: &str, rate: u64) 
         internal_log_rate_secs = rate,
     );
     info!(message = "Log level is enabled.", level = ?level);
+}
+
+#[cfg(not(windows))]
+pub fn setup_control_server(
+    topology_controller: &Arc<Mutex<TopologyController>>,
+    runtime: &Runtime,
+) -> Result<Option<control_server::Pieces>, ExitCode> {
+    std::env::var("VECTOR_CONTROL_SOCKET_PATH")
+        .ok()
+        .map(|path| {
+            ControlServer::start(path, topology_controller, runtime).map_err(|error| {
+                error!(message = "Failed to bind control server.", %error);
+                exitcode::CONFIG
+            })
+        })
+        .transpose()
 }
