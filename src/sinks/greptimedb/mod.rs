@@ -24,7 +24,7 @@ impl SinkBatchSettings for GreptimeDBDefaultBatchSettings {
 }
 
 /// Configuration items for GreptimeDB
-#[configurable_component(sink("greptimedb_metrics"))]
+#[configurable_component(sink("greptimedb"))]
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct GreptimeDBConfig {

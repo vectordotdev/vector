@@ -7,7 +7,7 @@ use futures::SinkExt;
 use futures_util::future::BoxFuture;
 use greptimedb_client::api::v1::column::*;
 use greptimedb_client::api::v1::*;
-use greptimedb_client::{Client, Database, Error as GreptimeError, Output};
+use greptimedb_client::{Client, Database, Error as GreptimeError};
 use tower::Service;
 use vector_core::event::metric::{Bucket, MetricSketch, Quantile, Sample};
 use vector_core::event::{Event, Metric, MetricValue};
@@ -26,7 +26,7 @@ use crate::sinks::util::{EncodedEvent, TowerRequestConfig};
 use crate::sinks::VectorSink;
 
 #[derive(Debug)]
-pub struct GreptimeBatchOutput(Vec<Output>);
+pub struct GreptimeBatchOutput(Vec<u32>);
 
 impl Response for GreptimeBatchOutput {}
 
@@ -174,8 +174,8 @@ fn metrics_to_insert_request(metric: Metric) -> InsertRequest {
     // timetamp
     let timestamp = metric
         .timestamp()
-        .map(|t| t.timestamp())
-        .unwrap_or_else(|| Utc::now().timestamp());
+        .map(|t| t.timestamp_millis())
+        .unwrap_or_else(|| Utc::now().timestamp_millis());
     columns.push(ts_column("timestamp", timestamp));
 
     // tags
