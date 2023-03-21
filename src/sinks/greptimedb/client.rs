@@ -5,6 +5,7 @@ use chrono::Utc;
 use futures::stream;
 use futures::SinkExt;
 use futures_util::future::BoxFuture;
+use greptimedb_client::api::v1::auth_header::AuthScheme;
 use greptimedb_client::api::v1::column::*;
 use greptimedb_client::api::v1::*;
 use greptimedb_client::{Client, Database, Error as GreptimeError};
@@ -66,7 +67,14 @@ pub struct GreptimeDBService {
 impl GreptimeDBService {
     pub fn new_sink(config: &GreptimeDBConfig) -> crate::Result<VectorSink> {
         let grpc_client = Client::with_urls(vec![&config.grpc_endpoint]);
-        let client = Database::new(&config.catalog, &config.schema, grpc_client);
+        let mut client = Database::new(&config.catalog, &config.schema, grpc_client);
+
+        if let (Some(username), Some(password)) = (&config.username, &config.password) {
+            client.set_auth(AuthScheme::Basic(Basic {
+                username: username.to_owned(),
+                password: password.to_owned(),
+            }))
+        }
 
         let batch = config.batch.into_batch_settings()?;
         let request = config.request.unwrap_with(&TowerRequestConfig {

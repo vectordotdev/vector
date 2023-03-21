@@ -40,6 +40,14 @@ pub struct GreptimeDBConfig {
     /// The host and port of greptimedb http service
     #[configurable(metadata(docs::examples = "http://localhost:4000"))]
     pub http_endpoint: String,
+    /// The username of greptimedb
+    #[configurable(metadata(docs::examples = "username"))]
+    #[serde(default)]
+    pub username: Option<String>,
+    /// The password of greptimedb
+    #[configurable(metadata(docs::examples = "password"))]
+    #[serde(default)]
+    pub password: Option<String>,
 
     #[configurable(derived)]
     #[serde(default)]
