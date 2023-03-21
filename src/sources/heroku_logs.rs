@@ -208,15 +208,15 @@ impl LogplexSource {
     fn decode_message(
         &self,
         body: Bytes,
-        header_map: HeaderMap,
+        header_map: &HeaderMap,
     ) -> Result<Vec<Event>, ErrorMessage> {
         // Deal with headers
-        let msg_count = match usize::from_str(get_header(&header_map, "Logplex-Msg-Count")?) {
+        let msg_count = match usize::from_str(get_header(header_map, "Logplex-Msg-Count")?) {
             Ok(v) => v,
             Err(e) => return Err(header_error_message("Logplex-Msg-Count", &e.to_string())),
         };
-        let frame_id = get_header(&header_map, "Logplex-Frame-Id")?;
-        let drain_token = get_header(&header_map, "Logplex-Drain-Token")?;
+        let frame_id = get_header(header_map, "Logplex-Frame-Id")?;
+        let drain_token = get_header(header_map, "Logplex-Drain-Token")?;
 
         emit!(HerokuLogplexRequestReceived {
             msg_count,
@@ -260,21 +260,27 @@ impl HttpSource for LogplexSource {
     fn build_events(
         &self,
         body: Bytes,
-        header_map: HeaderMap,
-        query_parameters: HashMap<String, String>,
+        header_map: &HeaderMap,
+        _query_parameters: &HashMap<String, String>,
         _full_path: &str,
     ) -> Result<Vec<Event>, ErrorMessage> {
-        let mut events = self.decode_message(body, header_map)?;
+        self.decode_message(body, header_map)
+    }
 
+    fn enrich_events(
+        &self,
+        events: &mut [Event],
+        _request_path: &str,
+        _headers_config: &HeaderMap,
+        query_parameters: &HashMap<String, String>,
+    ) {
         add_query_parameters(
-            &mut events,
+            events,
             &self.query_parameters,
             query_parameters,
             self.log_namespace,
             LogplexConfig::NAME,
         );
-
-        Ok(events)
     }
 }
 

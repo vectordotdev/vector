@@ -14,7 +14,7 @@ pub fn convert_time_format(format: &str) -> std::result::Result<String, String> 
     let mut time_format = String::new();
     let mut chars = format.chars().peekable();
     while let Some(&c) = chars.peek() {
-        if ('A'..='Z').contains(&c) || ('a'..='z').contains(&c) {
+        if c.is_ascii_uppercase() || c.is_ascii_lowercase() {
             let token: String = chars.by_ref().peeking_take_while(|&cn| cn == c).collect();
             match token.chars().next().unwrap() {
                 // hour of day (number, 1..12)
@@ -141,7 +141,7 @@ pub fn time_format_to_regex(
     let mut tz_captured = false;
     let mut with_tz = false;
     while let Some(&c) = chars.peek() {
-        if ('A'..='Z').contains(&c) || ('a'..='z').contains(&c) {
+        if c.is_ascii_uppercase() || c.is_ascii_lowercase() {
             let token: String = chars.by_ref().peeking_take_while(|&cn| cn == c).collect();
             match token.chars().next().unwrap() {
                 'h' | 'H' | 'm' | 's' | 'S' | 'Y' | 'x' | 'c' | 'C' | 'e' | 'D' | 'w' => {

@@ -8,6 +8,8 @@ use crate::{
     num::ConfigurableNumber, Configurable, ConfigurableRef, GenerateError, Metadata, ToValue,
 };
 
+use super::visitors::DisallowedUnevaluatedPropertiesVisitor;
+
 /// Applies metadata to the given schema.
 ///
 /// Metadata can include semantic information (title, description, etc), validation (min/max, allowable
@@ -465,7 +467,9 @@ where
     // Set env variable to enable generating all schemas, including platform-specific ones.
     std::env::set_var("VECTOR_GENERATE_SCHEMA", "true");
 
-    let schema_gen = RefCell::new(SchemaSettings::new().into_generator());
+    let schema_settings =
+        SchemaSettings::new().with_visitor(DisallowedUnevaluatedPropertiesVisitor::from_settings);
+    let schema_gen = RefCell::new(schema_settings.into_generator());
 
     let schema =
         get_or_generate_schema(&T::as_configurable_ref(), &schema_gen, Some(T::metadata()))?;

@@ -1195,10 +1195,7 @@ mod test {
             )]))
         );
 
-        let metric = match target {
-            VrlTarget::Metric { metric, .. } => metric,
-            _ => unreachable!(),
-        };
+        let VrlTarget::Metric { metric, .. } = target else {unreachable!()};
 
         // get single value (should be the last one)
         assert_eq!(metric.tag_value("foo"), Some("b".into()));

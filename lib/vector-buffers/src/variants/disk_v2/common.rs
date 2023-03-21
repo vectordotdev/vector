@@ -315,27 +315,18 @@ where
         if max_data_file_size > data_file_size_mechanical_limit {
             return Err(BuildError::InvalidParameter {
                 param_name: "max_data_file_size",
-                reason: format!(
-                    "cannot be greater than {} bytes",
-                    data_file_size_mechanical_limit
-                ),
+                reason: format!("cannot be greater than {data_file_size_mechanical_limit} bytes"),
             });
         }
 
-        let minimum_buffer_size = match get_minimum_buffer_size(max_data_file_size) {
-            Some(value) => value,
-            None => {
-                unreachable!("maximum data file size should be correctly limited at this point")
-            }
+        let Some(minimum_buffer_size) = get_minimum_buffer_size(max_data_file_size) else {
+            unreachable!("maximum data file size should be correctly limited at this point")
         };
 
         if max_buffer_size < minimum_buffer_size {
             return Err(BuildError::InvalidParameter {
                 param_name: "max_buffer_size",
-                reason: format!(
-                    "must be greater than or equal to {} bytes",
-                    minimum_buffer_size
-                ),
+                reason: format!("must be greater than or equal to {minimum_buffer_size} bytes"),
             });
         }
 
@@ -349,21 +340,15 @@ where
         if max_record_size <= MINIMUM_MAX_RECORD_SIZE {
             return Err(BuildError::InvalidParameter {
                 param_name: "max_record_size",
-                reason: format!(
-                    "must be greater than or equal to {} bytes",
-                    MINIMUM_MAX_RECORD_SIZE,
-                ),
+                reason: format!("must be greater than or equal to {MINIMUM_MAX_RECORD_SIZE} bytes",),
             });
         }
 
-        let max_record_size_converted = match u64::try_from(max_record_size) {
-            Ok(value) => value,
-            Err(_) => {
-                return Err(BuildError::InvalidParameter {
-                    param_name: "max_record_size",
-                    reason: "must be less than 2^64 bytes".to_string(),
-                })
-            }
+        let Ok(max_record_size_converted) = u64::try_from(max_record_size) else {
+            return Err(BuildError::InvalidParameter {
+                param_name: "max_record_size",
+                reason: "must be less than 2^64 bytes".to_string(),
+            })
         };
 
         if max_record_size_converted > max_data_file_size {

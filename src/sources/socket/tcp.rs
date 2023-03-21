@@ -33,9 +33,7 @@ pub struct TcpConfig {
     /// The maximum buffer size of incoming messages.
     ///
     /// Messages larger than this are truncated.
-    // TODO: this option is noted as deprecated in the source build function in mod.rs , but
-    // behaviorally there are inconsistencies when adapting the from_address() function to use framing
-    // instead of max_length. Merits further investigation.
+    // TODO: communicated as deprecated in v0.29.0, can be removed in v0.30.0
     #[configurable(
         deprecated = "This option has been deprecated. Configure `max_length` on the framing config instead."
     )]

@@ -368,9 +368,8 @@ fn open_url(url: &str) {
         #[allow(clippy::print_stdout)]
         {
             println!(
-                "couldn't open default web browser: {}\n\
-            you can access the desired documentation at {}",
-                err, url
+                "couldn't open default web browser: {err}\n\
+            you can access the desired documentation at {url}"
             );
         }
     }

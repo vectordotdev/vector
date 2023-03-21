@@ -6,7 +6,7 @@ use clap::Args;
 use crate::app::CommandExt as _;
 use crate::platform;
 
-/// Build Vector
+/// Build the `vector` executable.
 #[derive(Args, Debug)]
 #[command()]
 pub struct Cli {

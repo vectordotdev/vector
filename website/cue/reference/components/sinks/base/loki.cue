@@ -157,6 +157,11 @@ base: components: sinks: loki: configuration: {
 
 						[apache_avro]: https://avro.apache.org/
 						"""
+					csv: """
+						Encodes an event as a CSV message.
+
+						This codec must be configured with fields to encode.
+						"""
 					gelf: """
 						Encodes an event as a [GELF][gelf] message.
 
@@ -207,6 +212,24 @@ base: components: sinks: loki: configuration: {
 						transform, etc) and removing the message field while doing additional parsing on it, as this
 						could lead to the encoding emitting empty strings for the given event.
 						"""
+				}
+			}
+			csv: {
+				description:   "The CSV Serializer Options."
+				relevant_when: "codec = \"csv\""
+				required:      true
+				type: object: options: fields: {
+					description: """
+						Configures the fields that will be encoded, as well as the order in which they
+						appear in the output.
+
+						If a field is not present in the event, the output will be an empty string.
+
+						Values of type `Array`, `Object`, and `Regex` are not supported and the
+						output will be an empty string.
+						"""
+					required: true
+					type: array: items: type: string: {}
 				}
 			}
 			except_fields: {
@@ -265,8 +288,8 @@ base: components: sinks: loki: configuration: {
 
 			Both keys and values are templateable, which enables you to attach dynamic labels to events.
 
-			Labels can be suffixed with a `*` to allow the expansion of objects into multiple labels,
-			see [Label expansion][label_expansion] for more information.
+			Valid label keys include `*`, and prefixes ending with `*`, to allow for the expansion of
+			objects into multiple labels. See [Label expansion][label_expansion] for more information.
 
 			Note: If the set of labels has high cardinality, this can cause drastic performance issues
 			with Loki. To prevent this from happening, reduce the number of unique label keys and
@@ -277,7 +300,8 @@ base: components: sinks: loki: configuration: {
 		required: false
 		type: object: {
 			examples: [{
-				"pod_labels_*":      "{{ kubernetes.pod_labels }}"
+				"\"*\"":             "{{ metadata }}"
+				"\"pod_labels_*\"":  "{{ kubernetes.pod_labels }}"
 				source:              "vector"
 				"{{ event_field }}": "{{ some_other_event_field }}"
 			}]

@@ -394,8 +394,8 @@ fn enrich_syslog_event(
         log_namespace.insert_source_metadata(
             SyslogConfig::NAME,
             log,
-            Some(LegacyKey::Overwrite("source_id")),
-            path!("source_id"),
+            Some(LegacyKey::Overwrite("source_ip")),
+            path!("source_ip"),
             default_host.clone(),
         );
     }
@@ -522,6 +522,11 @@ mod test {
                     Some("host"),
                 )
                 .with_metadata_field(
+                    &owned_value_path!("syslog", "source_ip"),
+                    Kind::bytes().or_undefined(),
+                    None,
+                )
+                .with_metadata_field(
                     &owned_value_path!("syslog", "severity"),
                     Kind::bytes().or_undefined(),
                     Some("severity"),
@@ -594,6 +599,11 @@ mod test {
             &owned_value_path!("hostname"),
             Kind::bytes().or_undefined(),
             Some("host"),
+        )
+        .with_event_field(
+            &owned_value_path!("source_ip"),
+            Kind::bytes().or_undefined(),
+            None,
         )
         .with_event_field(
             &owned_value_path!("severity"),
@@ -1320,7 +1330,7 @@ mod test {
         fn from(e: Event) -> Self {
             let (value, _) = e.into_log().into_parts();
             let mut fields = value.into_object().unwrap();
-            fields.remove("source_id");
+            fields.remove("source_ip");
 
             Self {
                 msgid: fields.remove("msgid").map(value_to_string).unwrap(),

@@ -1,3 +1,4 @@
+docs/ @vectordotdev/ux-team
 lib/file-source/ @spencergilbert @vectordotdev/integrations-team
 lib/k8s-e2e-tests/ @spencergilbert @vectordotdev/integrations-team
 lib/k8s-test-framework/ @spencergilbert @vectordotdev/integrations-team

@@ -484,9 +484,9 @@ fn setup_logs_reporting(
         dd_common: DatadogCommonConfig {
             endpoint: datadog.endpoint.clone(),
             site: datadog.site.clone(),
+            default_api_key: api_key.into(),
             ..Default::default()
         },
-        default_api_key: api_key.into(),
         region: datadog.region,
         request: RequestConfig {
             headers: IndexMap::from([(
@@ -592,9 +592,9 @@ fn setup_metrics_reporting(
         dd_common: DatadogCommonConfig {
             endpoint: datadog.endpoint.clone(),
             site: datadog.site.clone(),
+            default_api_key: api_key.into(),
             ..Default::default()
         },
-        default_api_key: api_key.into(),
         region: datadog.region,
         ..Default::default()
     };

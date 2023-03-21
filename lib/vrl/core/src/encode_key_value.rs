@@ -92,7 +92,7 @@ fn flatten<'a>(
     Ok(map)
 }
 
-fn encode_field<'a>(output: &mut String, key: &str, value: &str, key_value_delimiter: &'a str) {
+fn encode_field(output: &mut String, key: &str, value: &str, key_value_delimiter: &str) {
     encode_string(output, key);
     output.push_str(key_value_delimiter);
     encode_string(output, value);
