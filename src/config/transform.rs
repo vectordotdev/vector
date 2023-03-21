@@ -191,7 +191,7 @@ pub trait TransformConfig: DynClone + NamedComponent + core::fmt::Debug + Send +
     /// of events flowing through the transform.
     fn outputs(
         &self,
-        input_definitions: Vec<(OutputId, schema::Definition)>,
+        input_definitions: &[(OutputId, schema::Definition)],
         global_log_namespace: LogNamespace,
     ) -> Vec<Output>;
 

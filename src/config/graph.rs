@@ -77,7 +77,7 @@ impl Graph {
                 Node::Transform {
                     in_ty: transform.inner.input().data_type(),
                     outputs: transform.inner.outputs(
-                        vec![(id.into(), schema::Definition::any())],
+                        &[(id.into(), schema::Definition::any())],
                         schema.log_namespace(),
                     ),
                 },

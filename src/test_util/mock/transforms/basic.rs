@@ -51,14 +51,14 @@ impl TransformConfig for BasicTransformConfig {
 
     fn outputs(
         &self,
-        definitions: Vec<(OutputId, schema::Definition)>,
+        definitions: &[(OutputId, schema::Definition)],
         _: LogNamespace,
     ) -> Vec<Output> {
         vec![Output::transform(
             DataType::all(),
             definitions
-                .into_iter()
-                .map(|(_output, definition)| definition)
+                .iter()
+                .map(|(_output, definition)| definition.clone())
                 .collect(),
         )]
     }

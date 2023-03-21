@@ -156,7 +156,7 @@ impl TransformConfig for LogToMetricConfig {
         Input::log()
     }
 
-    fn outputs(&self, _: Vec<(OutputId, schema::Definition)>, _: LogNamespace) -> Vec<Output> {
+    fn outputs(&self, _: &[(OutputId, schema::Definition)], _: LogNamespace) -> Vec<Output> {
         // Converting the log to a metric means we lose all incoming `Definition`s.
         vec![Output::transform(DataType::Metric, Vec::new())]
     }

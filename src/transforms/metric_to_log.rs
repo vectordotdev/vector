@@ -93,7 +93,7 @@ impl TransformConfig for MetricToLogConfig {
 
     fn outputs(
         &self,
-        _: Vec<(OutputId, Definition)>,
+        _: &[(OutputId, Definition)],
         global_log_namespace: LogNamespace,
     ) -> Vec<Output> {
         let log_namespace = global_log_namespace.merge(self.log_namespace);

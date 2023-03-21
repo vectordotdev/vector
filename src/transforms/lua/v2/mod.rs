@@ -178,7 +178,7 @@ impl LuaConfig {
         Input::new(DataType::Metric | DataType::Log)
     }
 
-    pub fn outputs(&self, input_definitions: Vec<(OutputId, schema::Definition)>) -> Vec<Output> {
+    pub fn outputs(&self, input_definitions: &[(OutputId, schema::Definition)]) -> Vec<Output> {
         // Lua causes the type definition to be reset
         let namespaces = input_definitions
             .iter()

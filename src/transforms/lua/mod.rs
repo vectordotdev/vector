@@ -105,7 +105,7 @@ impl TransformConfig for LuaConfig {
 
     fn outputs(
         &self,
-        input_definitions: Vec<(OutputId, schema::Definition)>,
+        input_definitions: &[(OutputId, schema::Definition)],
         _: LogNamespace,
     ) -> Vec<Output> {
         match self {

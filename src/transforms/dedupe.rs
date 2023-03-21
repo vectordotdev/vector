@@ -152,14 +152,14 @@ impl TransformConfig for DedupeConfig {
 
     fn outputs(
         &self,
-        input_definitions: Vec<(OutputId, schema::Definition)>,
+        input_definitions: &[(OutputId, schema::Definition)],
         _: LogNamespace,
     ) -> Vec<Output> {
         vec![Output::transform(
             DataType::Log,
             input_definitions
-                .into_iter()
-                .map(|(_output, definition)| definition)
+                .iter()
+                .map(|(_output, definition)| definition.clone())
                 .collect(),
         )]
     }

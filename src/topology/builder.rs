@@ -366,7 +366,7 @@ pub async fn build_pieces(
         // Create a map of the outputs to the list of possible definitions from those outputs.
         let schema_definitions = transform
             .inner
-            .outputs(input_definitions.clone(), config.schema.log_namespace())
+            .outputs(&input_definitions, config.schema.log_namespace())
             .into_iter()
             .map(|output| (output.port, output.log_schema_definitions))
             .collect::<HashMap<_, _>>();
@@ -383,7 +383,7 @@ pub async fn build_pieces(
         let node = TransformNode::from_parts(
             key.clone(),
             transform,
-            input_definitions,
+            &input_definitions,
             config.schema.log_namespace(),
         );
 
@@ -622,7 +622,7 @@ impl TransformNode {
     pub fn from_parts(
         key: ComponentKey,
         transform: &TransformOuter<OutputId>,
-        schema_definition: Vec<(OutputId, Definition)>,
+        schema_definition: &[(OutputId, Definition)],
         global_log_namespace: LogNamespace,
     ) -> Self {
         Self {

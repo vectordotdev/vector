@@ -39,12 +39,12 @@ impl TransformConfig for NoopTransformConfig {
         Input::all()
     }
 
-    fn outputs(&self, definitions: Vec<(OutputId, Definition)>, _: LogNamespace) -> Vec<Output> {
+    fn outputs(&self, definitions: &[(OutputId, Definition)], _: LogNamespace) -> Vec<Output> {
         vec![Output::transform(
             DataType::all(),
             definitions
-                .into_iter()
-                .map(|(_output, definition)| definition)
+                .iter()
+                .map(|(_output, definition)| definition.clone())
                 .collect(),
         )]
     }

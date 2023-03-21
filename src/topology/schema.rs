@@ -52,7 +52,7 @@ pub fn possible_definitions(
 
             let mut transform_definition = input.with_definitions(
                 config
-                    .transform_output_for_port(key, &input.port, input_definitions)
+                    .transform_output_for_port(key, &input.port, &input_definitions)
                     .expect("transform must exist - already found inputs")
                     .unwrap_or_else(|| {
                         unreachable!(
@@ -131,7 +131,7 @@ pub(super) fn expanded_definitions(
             let input_definitions = possible_definitions(inputs, config, &mut merged_cache);
 
             let mut transform_definition = config
-                .transform_outputs(key, input_definitions)
+                .transform_outputs(key, &input_definitions)
                 .expect("already found inputs")
                 .iter()
                 .find_map(|output| {
@@ -196,7 +196,7 @@ pub(crate) fn input_definitions(
             let transform_definitions = input_definitions(inputs, config, cache);
             let mut transform_definitions = input.with_definitions(
                 config
-                    .transform_output_for_port(key, &input.port, transform_definitions)
+                    .transform_output_for_port(key, &input.port, &transform_definitions)
                     .expect("transform must exist")
                     .unwrap_or_else(|| unreachable!())
                     .log_schema_definitions,
@@ -256,7 +256,7 @@ pub trait ComponentContainer {
     fn transform_outputs(
         &self,
         key: &ComponentKey,
-        input_definitions: Vec<(OutputId, Definition)>,
+        input_definitions: &[(OutputId, Definition)],
     ) -> Option<Vec<Output>>;
 
     /// Gets the transform output for the given port.
@@ -268,7 +268,7 @@ pub trait ComponentContainer {
         &self,
         key: &ComponentKey,
         port: &Option<String>,
-        input_definitions: Vec<(OutputId, Definition)>,
+        input_definitions: &[(OutputId, Definition)],
     ) -> Result<Option<Output>, ()> {
         if let Some(outputs) = self.transform_outputs(key, input_definitions) {
             Ok(get_output_for_port(outputs, port))
@@ -316,7 +316,7 @@ impl ComponentContainer for Config {
     fn transform_outputs(
         &self,
         key: &ComponentKey,
-        input_definitions: Vec<(OutputId, Definition)>,
+        input_definitions: &[(OutputId, Definition)],
     ) -> Option<Vec<Output>> {
         self.transform(key).map(|source| {
             source
@@ -363,7 +363,7 @@ mod tests {
             fn transform_outputs(
                 &self,
                 key: &ComponentKey,
-                _input_definitions: Vec<(OutputId, Definition)>,
+                _input_definitions: &[(OutputId, Definition)],
             ) -> Option<Vec<Output>> {
                 self.transforms.get(key.id()).cloned().map(|v| v.1)
             }

@@ -172,7 +172,7 @@ pub fn check_outputs(config: &ConfigBuilder) -> Result<(), Vec<String>> {
         if transform
             .inner
             .outputs(
-                vec![(OutputId::dummy(), definition)],
+                &[(OutputId::dummy(), definition)],
                 config.schema.log_namespace(),
             )
             .iter()
@@ -345,7 +345,7 @@ pub fn warnings(config: &Config) -> Vec<String> {
         transform
             .inner
             .outputs(
-                possible_definitions(&transform.inputs, config, &mut cache),
+                &possible_definitions(&transform.inputs, config, &mut cache),
                 config.schema.log_namespace(),
             )
             .iter()

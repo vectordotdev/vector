@@ -224,7 +224,7 @@ impl TransformConfig for RemapConfig {
 
     fn outputs(
         &self,
-        input_definitions: Vec<(OutputId, schema::Definition)>,
+        input_definitions: &[(OutputId, schema::Definition)],
         _: LogNamespace,
     ) -> Vec<Output> {
         // It is unfortunate that merging takes ownership of the definitions so we have to clone the
@@ -1438,7 +1438,7 @@ mod tests {
 
         assert_eq!(
             conf.outputs(
-                vec![(
+                &[(
                     "test".into(),
                     schema::Definition::new_with_default_metadata(
                         Kind::any_object(),

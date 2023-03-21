@@ -128,7 +128,7 @@ impl TransformConfig for ReduceConfig {
 
     fn outputs(
         &self,
-        input_definitions: Vec<(OutputId, schema::Definition)>,
+        input_definitions: &[(OutputId, schema::Definition)],
         _: LogNamespace,
     ) -> Vec<Output> {
         let mut output_definitions = Vec::new();
@@ -520,10 +520,7 @@ group_by = [ "request_id" ]
                     None,
                 );
             let schema_definitions = reduce_config
-                .outputs(
-                    vec![("test".into(), input_definition)],
-                    LogNamespace::Legacy,
-                )
+                .outputs(&[("test".into(), input_definition)], LogNamespace::Legacy)
                 .first()
                 .unwrap()
                 .log_schema_definitions

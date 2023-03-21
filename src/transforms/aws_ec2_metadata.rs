@@ -246,7 +246,7 @@ impl TransformConfig for Ec2Metadata {
 
     fn outputs(
         &self,
-        input_definitions: Vec<(OutputId, schema::Definition)>,
+        input_definitions: &[(OutputId, schema::Definition)],
         _: LogNamespace,
     ) -> Vec<Output> {
         let added_keys = Keys::new(self.namespace.clone());
