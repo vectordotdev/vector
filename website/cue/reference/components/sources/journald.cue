@@ -38,7 +38,7 @@ components: sources: journald: {
 		requirements: [
 			"""
 				This source requires permissions to run `journalctl`. When installed from a package manager this should be
-				handled for you, otherwise ensure the running user is part of the `systemd-journal` group.
+				handled automatically, otherwise ensure the running user is part of the `systemd-journal` group.
 				""",
 		]
 		warnings: []
