@@ -176,11 +176,10 @@ fn is_object_schema(instance_type: Option<&SingleOrVec<InstanceType>>) -> bool {
 fn get_subschema_validators(schema: &mut SchemaObject) -> Option<Vec<&mut SchemaObject>> {
     let mut validators = vec![];
 
-    // Grab any subschemas for `allOf` and `oneOf`, if present.
+    // Grab any subschemas for `allOf`/`oneOf`/`anyOf`, if present.
     //
-    // There are other subschema validators -- `anyOf` -- as well as other advanced validation
-    // mechanisms such as `if`/`then`/`else, but we explicitly don't handle them here as we don't
-    // currently use them in Vector's configuration schema.
+    // There are other advanced validation mechanisms such as `if`/`then`/`else, but we explicitly
+    // don't handle them here as we don't currently use them in Vector's configuration schema.
     if let Some(subschemas) = schema.subschemas.as_mut() {
         if let Some(all_of) = subschemas.all_of.as_mut() {
             validators.extend(all_of.iter_mut().filter_map(|validator| match validator {
@@ -191,6 +190,13 @@ fn get_subschema_validators(schema: &mut SchemaObject) -> Option<Vec<&mut Schema
 
         if let Some(one_of) = subschemas.one_of.as_mut() {
             validators.extend(one_of.iter_mut().filter_map(|validator| match validator {
+                Schema::Object(inner) => Some(inner),
+                _ => None,
+            }));
+        }
+
+        if let Some(any_of) = subschemas.any_of.as_mut() {
+            validators.extend(any_of.iter_mut().filter_map(|validator| match validator {
                 Schema::Object(inner) => Some(inner),
                 _ => None,
             }));
