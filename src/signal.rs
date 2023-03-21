@@ -150,10 +150,22 @@ fn os_signals() -> impl Stream<Item = SignalTo> {
     async_stream::stream! {
         loop {
             let signal = tokio::select! {
-                _ = sigint.recv() => SignalTo::Shutdown,
-                _ = sigterm.recv() => SignalTo::Shutdown,
-                _ = sigquit.recv() => SignalTo::Quit,
-                _ = sighup.recv() => SignalTo::ReloadFromDisk,
+                _ = sigint.recv() => {
+                    info!(message = "Signal received.", signal = "SIGINT");
+                    SignalTo::Shutdown
+                },
+                _ = sigterm.recv() => {
+                    info!(message = "Signal received.", signal = "SIGTERM");
+                    SignalTo::Shutdown
+                } ,
+                _ = sigquit.recv() => {
+                    info!(message = "Signal received.", signal = "SIGQUIT");
+                    SignalTo::Quit
+                },
+                _ = sighup.recv() => {
+                    info!(message = "Signal received.", signal = "SIGHUP");
+                    SignalTo::ReloadFromDisk
+                },
             };
             yield signal;
         }
