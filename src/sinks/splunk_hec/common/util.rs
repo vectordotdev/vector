@@ -136,10 +136,6 @@ pub fn host_key() -> String {
     crate::config::log_schema().host_key().to_string()
 }
 
-// pub fn timestamp_key() -> Option<OwnedValuePath> {
-//     crate::config::log_schema().timestamp_key().cloned()
-// }
-
 pub fn config_timestamp_key() -> OptionalValuePath {
     OptionalValuePath {
         path: crate::config::log_schema().timestamp_key().cloned(),
