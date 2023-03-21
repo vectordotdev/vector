@@ -167,7 +167,7 @@ fn os_signals(runtime: &Runtime) -> impl Stream<Item = SignalTo> {
 
 /// Signals from OS/user.
 #[cfg(windows)]
-async fn os_signals(_: &Runtime) -> impl Stream<Item = SignalTo> {
+fn os_signals(_: &Runtime) -> impl Stream<Item = SignalTo> {
     use futures::future::FutureExt;
 
     async_stream::stream! {
