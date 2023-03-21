@@ -142,12 +142,11 @@ fn os_signals(runtime: &Runtime) -> impl Stream<Item = SignalTo> {
 
     // The `signal` function must be run within the context of a Tokio runtime.
     runtime.block_on(async {
-        let mut sigint =
-            signal(SignalKind::interrupt()).expect("Signal handlers should not panic.");
+        let mut sigint = signal(SignalKind::interrupt()).expect("Failed to set up SIGINT handler.");
         let mut sigterm =
-            signal(SignalKind::terminate()).expect("Signal handlers should not panic.");
-        let mut sigquit = signal(SignalKind::quit()).expect("Signal handlers should not panic.");
-        let mut sighup = signal(SignalKind::hangup()).expect("Signal handlers should not panic.");
+            signal(SignalKind::terminate()).expect("Failed to set up SIGTERM handler.");
+        let mut sigquit = signal(SignalKind::quit()).expect("Failed to set up SIGQUIT handler.");
+        let mut sighup = signal(SignalKind::hangup()).expect("Failed to set up SIGHUP handler.");
 
         // Strictly speaking, setting up this stream does not need to be created within the async
         // block, but keeping it in the same block makes variable naming simpler.
