@@ -15,6 +15,7 @@ use lookup::PathPrefix;
 use serde_with::serde_as;
 use vector_config::configurable_component;
 
+use crate::config::OutputId;
 use crate::{
     conditions::{AnyCondition, Condition},
     config::{DataType, Input, Output, TransformConfig, TransformContext},
@@ -125,10 +126,14 @@ impl TransformConfig for ReduceConfig {
         Input::log()
     }
 
-    fn outputs(&self, input_definitions: Vec<schema::Definition>, _: LogNamespace) -> Vec<Output> {
+    fn outputs(
+        &self,
+        input_definitions: Vec<(OutputId, schema::Definition)>,
+        _: LogNamespace,
+    ) -> Vec<Output> {
         let mut output_definitions = Vec::new();
 
-        for input in input_definitions {
+        for (_output, input) in input_definitions {
             let mut schema_definition = input.clone();
 
             for (key, merge_strategy) in self.merge_strategies.iter() {
@@ -515,7 +520,10 @@ group_by = [ "request_id" ]
                     None,
                 );
             let schema_definitions = reduce_config
-                .outputs(vec![input_definition], LogNamespace::Legacy)
+                .outputs(
+                    vec![("test".into(), input_definition)],
+                    LogNamespace::Legacy,
+                )
                 .first()
                 .unwrap()
                 .log_schema_definitions

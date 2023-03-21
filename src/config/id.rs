@@ -3,6 +3,8 @@ use std::{fmt, ops::Deref};
 use vector_config::configurable_component;
 pub use vector_core::config::ComponentKey;
 
+use super::schema;
+
 /// A list of upstream [source][sources] or [transform][transforms] IDs.
 ///
 /// Wildcards (`*`) are supported.
@@ -104,6 +106,30 @@ pub struct OutputId {
 
     /// The output port name, if not the default.
     pub port: Option<String>,
+}
+
+impl OutputId {
+    /// Some situations when building the topology requires running the
+    /// transforms::output function to retrieve the outputs, but we don't have an
+    /// `OutputId` form a source. This gives us an `OutputId` that we can use.
+    pub fn dummy() -> Self {
+        Self {
+            component: "dummy".into(),
+            port: None,
+        }
+    }
+
+    /// Given a list of [`schema::Definition`]s, returns a [`Vec`] of tuples of
+    /// this `OutputId` with each `Definition`.
+    pub fn with_definitions(
+        &self,
+        definitions: impl IntoIterator<Item = schema::Definition>,
+    ) -> Vec<(OutputId, schema::Definition)> {
+        definitions
+            .into_iter()
+            .map(|definition| (self.clone(), definition))
+            .collect()
+    }
 }
 
 impl fmt::Display for OutputId {

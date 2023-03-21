@@ -18,6 +18,7 @@ use value::Kind;
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
 
+use crate::config::OutputId;
 use crate::{
     config::{DataType, Input, Output, ProxyConfig, TransformConfig, TransformContext},
     event::Event,
@@ -243,7 +244,11 @@ impl TransformConfig for Ec2Metadata {
         Input::new(DataType::Metric | DataType::Log)
     }
 
-    fn outputs(&self, input_definitions: Vec<schema::Definition>, _: LogNamespace) -> Vec<Output> {
+    fn outputs(
+        &self,
+        input_definitions: Vec<(OutputId, schema::Definition)>,
+        _: LogNamespace,
+    ) -> Vec<Output> {
         let added_keys = Keys::new(self.namespace.clone());
 
         let paths = [
@@ -265,7 +270,7 @@ impl TransformConfig for Ec2Metadata {
 
         let schema_definition = input_definitions
             .iter()
-            .map(|definition| {
+            .map(|(_output, definition)| {
                 let mut schema_definition = definition.clone();
 
                 for path in paths {

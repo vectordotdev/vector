@@ -14,7 +14,7 @@ use vector_core::{
     transform::{FunctionTransform, OutputBuffer, Transform},
 };
 
-use crate::config::{TransformConfig, TransformContext};
+use crate::config::{OutputId, TransformConfig, TransformContext};
 
 /// Configuration for the `test_basic` transform.
 #[configurable_component(transform("test_basic", "Test (basic)"))]
@@ -49,8 +49,18 @@ impl TransformConfig for BasicTransformConfig {
         Input::all()
     }
 
-    fn outputs(&self, definitions: Vec<schema::Definition>, _: LogNamespace) -> Vec<Output> {
-        vec![Output::transform(DataType::all(), definitions)]
+    fn outputs(
+        &self,
+        definitions: Vec<(OutputId, schema::Definition)>,
+        _: LogNamespace,
+    ) -> Vec<Output> {
+        vec![Output::transform(
+            DataType::all(),
+            definitions
+                .into_iter()
+                .map(|(_output, definition)| definition)
+                .collect(),
+        )]
     }
 }
 

@@ -11,7 +11,7 @@ use vector_core::{
     transform::{FunctionTransform, OutputBuffer, TaskTransform, Transform},
 };
 
-use crate::config::{GenerateConfig, TransformConfig, TransformContext};
+use crate::config::{GenerateConfig, OutputId, TransformConfig, TransformContext};
 
 use super::TransformType;
 
@@ -39,8 +39,14 @@ impl TransformConfig for NoopTransformConfig {
         Input::all()
     }
 
-    fn outputs(&self, definitions: Vec<Definition>, _: LogNamespace) -> Vec<Output> {
-        vec![Output::transform(DataType::all(), definitions)]
+    fn outputs(&self, definitions: Vec<(OutputId, Definition)>, _: LogNamespace) -> Vec<Output> {
+        vec![Output::transform(
+            DataType::all(),
+            definitions
+                .into_iter()
+                .map(|(_output, definition)| definition)
+                .collect(),
+        )]
     }
 
     async fn build(&self, _: &TransformContext) -> crate::Result<Transform> {

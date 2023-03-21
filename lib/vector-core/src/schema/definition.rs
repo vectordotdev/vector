@@ -67,18 +67,6 @@ impl MeaningPointer {
     }
 }
 
-/// Create a single definition by merging all the definitions together.
-impl TryFrom<Vec<Definition>> for Definition {
-    type Error = &'static str;
-
-    fn try_from(value: Vec<Definition>) -> Result<Self, Self::Error> {
-        value
-            .into_iter()
-            .reduce(Definition::merge)
-            .ok_or("cannot merge an empty definition list")
-    }
-}
-
 impl Definition {
     /// The most general possible definition. The `Kind` is `any`, and all `log_namespaces` are enabled.
     pub fn any() -> Self {

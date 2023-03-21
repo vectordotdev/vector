@@ -8,7 +8,8 @@ use vector_core::config::LogNamespace;
 
 use crate::{
     config::{
-        log_schema, DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext,
+        log_schema, DataType, GenerateConfig, Input, Output, OutputId, TransformConfig,
+        TransformContext,
     },
     event::{Event, Value},
     internal_events::DedupeEventsDropped,
@@ -149,8 +150,18 @@ impl TransformConfig for DedupeConfig {
         Input::log()
     }
 
-    fn outputs(&self, input_definitions: Vec<schema::Definition>, _: LogNamespace) -> Vec<Output> {
-        vec![Output::transform(DataType::Log, input_definitions)]
+    fn outputs(
+        &self,
+        input_definitions: Vec<(OutputId, schema::Definition)>,
+        _: LogNamespace,
+    ) -> Vec<Output> {
+        vec![Output::transform(
+            DataType::Log,
+            input_definitions
+                .into_iter()
+                .map(|(_output, definition)| definition)
+                .collect(),
+        )]
     }
 }
 

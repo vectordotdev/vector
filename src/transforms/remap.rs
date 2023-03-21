@@ -24,6 +24,7 @@ use vrl::{
     CompileConfig, Program, Runtime, Terminate, VrlRuntime,
 };
 
+use crate::config::OutputId;
 use crate::{
     config::{
         log_schema, ComponentKey, DataType, Input, Output, TransformConfig, TransformContext,
@@ -221,13 +222,18 @@ impl TransformConfig for RemapConfig {
         Input::all()
     }
 
-    fn outputs(&self, input_definitions: Vec<schema::Definition>, _: LogNamespace) -> Vec<Output> {
+    fn outputs(
+        &self,
+        input_definitions: Vec<(OutputId, schema::Definition)>,
+        _: LogNamespace,
+    ) -> Vec<Output> {
         // It is unfortunate that merging takes ownership of the definitions so we have to clone the
         // entire collection in order to merge them together.
         let merged_definition: Definition = input_definitions
-            .clone()
-            .try_into()
-            .unwrap_or_else(|_| Definition::any());
+            .iter()
+            .map(|(_output, definition)| definition.clone())
+            .reduce(Definition::merge)
+            .unwrap_or_else(Definition::any);
 
         // We need to compile the VRL program in order to know the schema definition output of this
         // transform. We ignore any compilation errors, as those are caught by the transform build
@@ -249,7 +255,7 @@ impl TransformConfig for RemapConfig {
         let mut dropped_definitions = Vec::new();
         let mut default_definitions = Vec::new();
 
-        for input_definition in input_definitions {
+        for (_output_id, input_definition) in input_definitions {
             let default_definition = compiled
                 .clone()
                 .map(|(state, meaning)| {
@@ -442,7 +448,7 @@ where
             // choose the correct one based on the input the event has come from.
             .get(0)
             .cloned()
-            .unwrap_or_else(|| Definition::any());
+            .unwrap_or_else(Definition::any);
 
         let dropped_schema_definition = context
             .schema_definitions
@@ -451,7 +457,7 @@ where
             .expect("dropped schema required")
             .get(0)
             .cloned()
-            .unwrap_or_else(|| Definition::any());
+            .unwrap_or_else(Definition::any);
 
         Ok(Remap {
             component_key: context.key.clone(),
@@ -1432,9 +1438,12 @@ mod tests {
 
         assert_eq!(
             conf.outputs(
-                vec![schema::Definition::new_with_default_metadata(
-                    Kind::any_object(),
-                    [LogNamespace::Legacy]
+                vec![(
+                    "test".into(),
+                    schema::Definition::new_with_default_metadata(
+                        Kind::any_object(),
+                        [LogNamespace::Legacy]
+                    )
                 )],
                 LogNamespace::Legacy
             ),

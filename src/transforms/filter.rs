@@ -4,7 +4,9 @@ use vector_core::config::LogNamespace;
 
 use crate::{
     conditions::{AnyCondition, Condition},
-    config::{DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext},
+    config::{
+        DataType, GenerateConfig, Input, Output, OutputId, TransformConfig, TransformContext,
+    },
     event::Event,
     internal_events::FilterEventsDropped,
     schema,
@@ -48,8 +50,18 @@ impl TransformConfig for FilterConfig {
         Input::all()
     }
 
-    fn outputs(&self, input_definitions: Vec<schema::Definition>, _: LogNamespace) -> Vec<Output> {
-        vec![Output::transform(DataType::all(), input_definitions)]
+    fn outputs(
+        &self,
+        input_definitions: Vec<(OutputId, schema::Definition)>,
+        _: LogNamespace,
+    ) -> Vec<Output> {
+        vec![Output::transform(
+            DataType::all(),
+            input_definitions
+                .into_iter()
+                .map(|(_output, definition)| definition)
+                .collect(),
+        )]
     }
 
     fn enable_concurrency(&self) -> bool {

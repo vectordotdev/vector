@@ -11,6 +11,7 @@ use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
 use vrl::prelude::BTreeMap;
 
+use crate::config::OutputId;
 use crate::{
     config::{
         log_schema, DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext,
@@ -90,7 +91,11 @@ impl TransformConfig for MetricToLogConfig {
         Input::metric()
     }
 
-    fn outputs(&self, _: Vec<Definition>, global_log_namespace: LogNamespace) -> Vec<Output> {
+    fn outputs(
+        &self,
+        _: Vec<(OutputId, Definition)>,
+        global_log_namespace: LogNamespace,
+    ) -> Vec<Output> {
         let log_namespace = global_log_namespace.merge(self.log_namespace);
         let mut schema_definition =
             Definition::default_for_namespace(&BTreeSet::from([log_namespace]))

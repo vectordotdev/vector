@@ -5,7 +5,7 @@ use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
 
 use crate::{
-    config::{GenerateConfig, Input, Output, TransformConfig, TransformContext},
+    config::{GenerateConfig, Input, Output, OutputId, TransformConfig, TransformContext},
     schema,
     transforms::Transform,
 };
@@ -103,7 +103,11 @@ impl TransformConfig for LuaConfig {
         }
     }
 
-    fn outputs(&self, input_definitions: Vec<schema::Definition>, _: LogNamespace) -> Vec<Output> {
+    fn outputs(
+        &self,
+        input_definitions: Vec<(OutputId, schema::Definition)>,
+        _: LogNamespace,
+    ) -> Vec<Output> {
         match self {
             LuaConfig::V1(v1) => v1.config.outputs(input_definitions),
             LuaConfig::V2(v2) => v2.config.outputs(input_definitions),

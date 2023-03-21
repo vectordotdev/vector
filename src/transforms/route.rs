@@ -5,7 +5,9 @@ use vector_core::transform::SyncTransform;
 
 use crate::{
     conditions::{AnyCondition, Condition},
-    config::{DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext},
+    config::{
+        DataType, GenerateConfig, Input, Output, OutputId, TransformConfig, TransformContext,
+    },
     event::Event,
     schema,
     transforms::Transform,
@@ -101,16 +103,35 @@ impl TransformConfig for RouteConfig {
         }
     }
 
-    fn outputs(&self, input_definitions: Vec<schema::Definition>, _: LogNamespace) -> Vec<Output> {
+    fn outputs(
+        &self,
+        input_definitions: Vec<(OutputId, schema::Definition)>,
+        _: LogNamespace,
+    ) -> Vec<Output> {
         let mut result: Vec<Output> = self
             .route
             .keys()
             .map(|output_name| {
-                Output::transform(DataType::all(), input_definitions.clone()).with_port(output_name)
+                Output::transform(
+                    DataType::all(),
+                    input_definitions
+                        .iter()
+                        .map(|(_output, definition)| definition.clone())
+                        .collect(),
+                )
+                .with_port(output_name)
             })
             .collect();
-        result
-            .push(Output::transform(DataType::all(), input_definitions).with_port(UNMATCHED_ROUTE));
+        result.push(
+            Output::transform(
+                DataType::all(),
+                input_definitions
+                    .into_iter()
+                    .map(|(_output, definition)| definition)
+                    .collect(),
+            )
+            .with_port(UNMATCHED_ROUTE),
+        );
         result
     }
 

@@ -5,6 +5,7 @@ use ordered_float::NotNan;
 use snafu::{ResultExt, Snafu};
 use vector_config::configurable_component;
 
+use crate::config::OutputId;
 use crate::schema::Definition;
 use crate::{
     config::{DataType, Input, Output},
@@ -47,11 +48,11 @@ impl LuaConfig {
         Input::log()
     }
 
-    pub fn outputs(&self, input_definitions: Vec<schema::Definition>) -> Vec<Output> {
+    pub fn outputs(&self, input_definitions: Vec<(OutputId, schema::Definition)>) -> Vec<Output> {
         // Lua causes the type definition to be reset
         let namespaces = input_definitions
             .iter()
-            .flat_map(|definition| definition.log_namespaces().clone())
+            .flat_map(|(_output, definition)| definition.log_namespaces().clone())
             .collect();
 
         let definition = Definition::default_for_namespace(&namespaces);

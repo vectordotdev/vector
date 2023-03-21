@@ -6,7 +6,9 @@ use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
 
 use crate::{
-    config::{DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext},
+    config::{
+        DataType, GenerateConfig, Input, Output, OutputId, TransformConfig, TransformContext,
+    },
     event::{
         metric::{Metric, MetricKind, MetricTags, MetricValue, StatisticKind, TagValue},
         Event, Value,
@@ -154,7 +156,7 @@ impl TransformConfig for LogToMetricConfig {
         Input::log()
     }
 
-    fn outputs(&self, _: Vec<schema::Definition>, _: LogNamespace) -> Vec<Output> {
+    fn outputs(&self, _: Vec<(OutputId, schema::Definition)>, _: LogNamespace) -> Vec<Output> {
         // Converting the log to a metric means we lose all incoming `Definition`s.
         vec![Output::transform(DataType::Metric, Vec::new())]
     }

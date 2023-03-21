@@ -348,10 +348,11 @@ pub async fn build_pieces(
             schema::input_definitions(&transform.inputs, config, &mut definition_cache);
 
         let merged_definition: Definition = input_definitions
-            .clone()
-            .try_into()
+            .iter()
+            .map(|(_output_id, definition)| definition.clone())
+            .reduce(Definition::merge)
             // We may not have any definitions if all the inputs are from metrics sources.
-            .unwrap_or_else(|_| Definition::any());
+            .unwrap_or_else(Definition::any);
 
         let span = error_span!(
             "transform",
@@ -621,7 +622,7 @@ impl TransformNode {
     pub fn from_parts(
         key: ComponentKey,
         transform: &TransformOuter<OutputId>,
-        schema_definition: Vec<Definition>,
+        schema_definition: Vec<(OutputId, Definition)>,
         global_log_namespace: LogNamespace,
     ) -> Self {
         Self {

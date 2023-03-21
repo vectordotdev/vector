@@ -17,6 +17,7 @@ use vector_core::{
 };
 
 use super::schema::Options as SchemaOptions;
+use super::OutputId;
 use super::{id::Inputs, ComponentKey};
 
 pub type BoxedTransform = Box<dyn TransformConfig>;
@@ -190,7 +191,7 @@ pub trait TransformConfig: DynClone + NamedComponent + core::fmt::Debug + Send +
     /// of events flowing through the transform.
     fn outputs(
         &self,
-        input_definitions: Vec<schema::Definition>,
+        input_definitions: Vec<(OutputId, schema::Definition)>,
         global_log_namespace: LogNamespace,
     ) -> Vec<Output>;
 

@@ -9,15 +9,15 @@ use crate::{
 
 /// The cache is used whilst building up the topology.
 /// TODO: Describe more, especially why we have a bool in the key.
-type Cache = HashMap<(bool, Vec<OutputId>), Vec<Definition>>;
+type Cache = HashMap<(bool, Vec<OutputId>), Vec<(OutputId, Definition)>>;
 
 pub fn possible_definitions(
     inputs: &[OutputId],
     config: &dyn ComponentContainer,
     cache: &mut Cache,
-) -> Vec<Definition> {
+) -> Vec<(OutputId, Definition)> {
     if inputs.is_empty() {
-        return vec![Definition::default_legacy_namespace()];
+        return vec![];
     }
 
     // Try to get the definition from the cache.
@@ -25,48 +25,43 @@ pub fn possible_definitions(
         return definition.clone();
     }
 
-    // let mut definition = Definition::new(Kind::never(), Kind::never(), []);
     let mut definitions = Vec::new();
 
     for input in inputs {
         let key = &input.component;
 
         // If the input is a source, the output is merged into the top-level schema.
-        // Not all sources contain a schema yet, in which case they use a default.
-        // TODO ^ They should do now?
         if let Ok(maybe_output) = config.source_output_for_port(key, &input.port) {
-            let mut source_definition = maybe_output
-                .unwrap_or_else(|| {
-                    unreachable!(
-                        "source output mis-configured - output for port {:?} missing",
-                        &input.port
-                    )
-                })
-                .log_schema_definitions;
-
-            // Schemas must be implemented for components that support the "Vector" namespace, so since
-            // one doesn't exist here, we can assume it's using the default "legacy" namespace schema definition
-            // .unwrap_or_else(Definition::default_legacy_namespace);
+            let mut source_definition = input.with_definitions(
+                maybe_output
+                    .unwrap_or_else(|| {
+                        unreachable!(
+                            "source output mis-configured - output for port {:?} missing",
+                            &input.port
+                        )
+                    })
+                    .log_schema_definitions,
+            );
 
             definitions.append(&mut source_definition);
         }
 
         // If the input is a transform, the output is merged into the top-level schema
-        // Not all transforms contain a schema yet. If that's the case, it's assumed
-        // that the transform doesn't modify the event schema, so it is passed through as-is (recursively)
         if let Some(inputs) = config.transform_inputs(key) {
             let input_definitions = possible_definitions(inputs, config, cache);
 
-            let mut transform_definition = config
-                .transform_output_for_port(key, &input.port, input_definitions)
-                .expect("transform must exist - already found inputs")
-                .unwrap_or_else(|| {
-                    unreachable!(
-                        "transform output mis-configured - output for port {:?} missing",
-                        &input.port
-                    )
-                })
-                .log_schema_definitions;
+            let mut transform_definition = input.with_definitions(
+                config
+                    .transform_output_for_port(key, &input.port, input_definitions)
+                    .expect("transform must exist - already found inputs")
+                    .unwrap_or_else(|| {
+                        unreachable!(
+                            "transform output mis-configured - output for port {:?} missing",
+                            &input.port
+                        )
+                    })
+                    .log_schema_definitions,
+            );
 
             definitions.append(&mut transform_definition);
         }
@@ -92,13 +87,13 @@ pub(super) fn expanded_definitions(
     inputs: &[OutputId],
     config: &dyn ComponentContainer,
     cache: &mut Cache,
-) -> Vec<Definition> {
+) -> Vec<(OutputId, Definition)> {
     // Try to get the definition from the cache.
     if let Some(definitions) = cache.get(&(config.schema_enabled(), inputs.to_vec())) {
         return definitions.clone();
     }
 
-    let mut definitions: Vec<Definition> = vec![];
+    let mut definitions: Vec<(OutputId, Definition)> = vec![];
     let mut merged_cache = HashMap::default();
 
     for input in inputs {
@@ -117,7 +112,7 @@ pub(super) fn expanded_definitions(
                 .iter()
                 .find_map(|output| {
                     if output.port == input.port {
-                        Some(output.log_schema_definitions.clone())
+                        Some(input.with_definitions(output.log_schema_definitions.clone()))
                     } else {
                         None
                     }
@@ -141,7 +136,7 @@ pub(super) fn expanded_definitions(
                 .iter()
                 .find_map(|output| {
                     if output.port == input.port {
-                        Some(output.log_schema_definitions.clone())
+                        Some(input.with_definitions(output.log_schema_definitions.clone()))
                     } else {
                         None
                     }
@@ -169,9 +164,9 @@ pub(crate) fn input_definitions(
     inputs: &[OutputId],
     config: &Config,
     cache: &mut Cache,
-) -> Vec<Definition> {
+) -> Vec<(OutputId, Definition)> {
     if inputs.is_empty() {
-        return vec![Definition::any()];
+        return vec![];
     }
 
     if let Some(definitions) = cache.get(&(config.schema_enabled(), inputs.to_vec())) {
@@ -186,10 +181,11 @@ pub(crate) fn input_definitions(
         // If the input is a source we retrieve the definitions from the source
         // (there should only be one) and add it to the return.
         if let Ok(maybe_output) = config.source_output_for_port(key, &input.port) {
-            let mut source_definitions = maybe_output
-                .unwrap_or_else(|| unreachable!())
-                .log_schema_definitions
-                .clone();
+            let mut source_definitions = input.with_definitions(
+                maybe_output
+                    .unwrap_or_else(|| unreachable!())
+                    .log_schema_definitions,
+            );
 
             definitions.append(&mut source_definitions);
         }
@@ -198,12 +194,13 @@ pub(crate) fn input_definitions(
         // their definitions and pass it through the transform to get the new definitions.
         if let Some(inputs) = config.transform_inputs(key) {
             let transform_definitions = input_definitions(inputs, config, cache);
-            let mut transform_definitions = config
-                .transform_output_for_port(key, &input.port, transform_definitions)
-                .expect("transform must exist")
-                .unwrap_or_else(|| unreachable!())
-                .log_schema_definitions
-                .clone();
+            let mut transform_definitions = input.with_definitions(
+                config
+                    .transform_output_for_port(key, &input.port, transform_definitions)
+                    .expect("transform must exist")
+                    .unwrap_or_else(|| unreachable!())
+                    .log_schema_definitions,
+            );
 
             definitions.append(&mut transform_definitions);
         }
@@ -229,7 +226,7 @@ pub(super) fn validate_sink_expectations(
     let definitions = expanded_definitions(&sink.inputs, config, &mut cache);
 
     // Validate each individual definition against the sink requirement.
-    for definition in definitions {
+    for (_output, definition) in definitions {
         if let Err(err) = requirement.validate(&definition, config.schema.validation) {
             errors.append(
                 &mut err
@@ -259,7 +256,7 @@ pub trait ComponentContainer {
     fn transform_outputs(
         &self,
         key: &ComponentKey,
-        input_definitions: Vec<Definition>,
+        input_definitions: Vec<(OutputId, Definition)>,
     ) -> Option<Vec<Output>>;
 
     /// Gets the transform output for the given port.
@@ -271,7 +268,7 @@ pub trait ComponentContainer {
         &self,
         key: &ComponentKey,
         port: &Option<String>,
-        input_definitions: Vec<Definition>,
+        input_definitions: Vec<(OutputId, Definition)>,
     ) -> Result<Option<Output>, ()> {
         if let Some(outputs) = self.transform_outputs(key, input_definitions) {
             Ok(get_output_for_port(outputs, port))
@@ -319,7 +316,7 @@ impl ComponentContainer for Config {
     fn transform_outputs(
         &self,
         key: &ComponentKey,
-        input_definitions: Vec<Definition>,
+        input_definitions: Vec<(OutputId, Definition)>,
     ) -> Option<Vec<Output>> {
         self.transform(key).map(|source| {
             source
@@ -347,7 +344,7 @@ mod tests {
             inputs: Vec<(&'static str, Option<String>)>,
             sources: IndexMap<&'static str, Vec<Output>>,
             transforms: IndexMap<&'static str, (Vec<OutputId>, Vec<Output>)>,
-            want: Vec<Definition>,
+            want: Vec<(OutputId, Definition)>,
         }
 
         impl ComponentContainer for TestCase {
@@ -366,7 +363,7 @@ mod tests {
             fn transform_outputs(
                 &self,
                 key: &ComponentKey,
-                _input_definitions: Vec<Definition>,
+                _input_definitions: Vec<(OutputId, Definition)>,
             ) -> Option<Vec<Output>> {
                 self.transforms.get(key.id()).cloned().map(|v| v.1)
             }
@@ -394,7 +391,7 @@ mod tests {
                         )],
                     )]),
                     transforms: IndexMap::default(),
-                    want: vec![Definition::default_legacy_namespace()],
+                    want: vec![("foo".into(), Definition::default_legacy_namespace())],
                 },
             ),
             (
@@ -413,10 +410,13 @@ mod tests {
                         )],
                     )]),
                     transforms: IndexMap::default(),
-                    want: vec![Definition::empty_legacy_namespace().with_event_field(
-                        &owned_value_path!("foo"),
-                        Kind::integer().or_bytes(),
-                        Some("foo bar"),
+                    want: vec![(
+                        "source-foo".into(),
+                        Definition::empty_legacy_namespace().with_event_field(
+                            &owned_value_path!("foo"),
+                            Kind::integer().or_bytes(),
+                            Some("foo bar"),
+                        ),
                     )],
                 },
             ),
@@ -450,15 +450,21 @@ mod tests {
                     ]),
                     transforms: IndexMap::default(),
                     want: vec![
-                        Definition::empty_legacy_namespace().with_event_field(
-                            &owned_value_path!("foo"),
-                            Kind::integer().or_bytes(),
-                            Some("foo bar"),
+                        (
+                            "source-foo".into(),
+                            Definition::empty_legacy_namespace().with_event_field(
+                                &owned_value_path!("foo"),
+                                Kind::integer().or_bytes(),
+                                Some("foo bar"),
+                            ),
                         ),
-                        Definition::empty_legacy_namespace().with_event_field(
-                            &owned_value_path!("foo"),
-                            Kind::timestamp(),
-                            Some("baz qux"),
+                        (
+                            "source-bar".into(),
+                            Definition::empty_legacy_namespace().with_event_field(
+                                &owned_value_path!("foo"),
+                                Kind::timestamp(),
+                                Some("baz qux"),
+                            ),
                         ),
                     ],
                 },
@@ -506,15 +512,21 @@ mod tests {
                         ),
                     )]),
                     want: vec![
-                        Definition::empty_legacy_namespace().with_event_field(
-                            &owned_value_path!("bar"),
-                            Kind::integer(),
-                            Some("bar"),
+                        (
+                            "source-bar".into(),
+                            Definition::empty_legacy_namespace().with_event_field(
+                                &owned_value_path!("bar"),
+                                Kind::integer(),
+                                Some("bar"),
+                            ),
                         ),
-                        Definition::empty_legacy_namespace().with_event_field(
-                            &owned_value_path!("baz"),
-                            Kind::regex(),
-                            Some("baz"),
+                        (
+                            "transform-baz".into(),
+                            Definition::empty_legacy_namespace().with_event_field(
+                                &owned_value_path!("baz"),
+                                Kind::regex(),
+                                Some("baz"),
+                            ),
                         ),
                     ],
                 },
@@ -629,22 +641,31 @@ mod tests {
                     ]),
                     want: vec![
                         // Pipeline 1
-                        Definition::empty_legacy_namespace().with_event_field(
-                            &owned_value_path!("transform-1"),
-                            Kind::regex(),
-                            None,
+                        (
+                            "Transform 1".into(),
+                            Definition::empty_legacy_namespace().with_event_field(
+                                &owned_value_path!("transform-1"),
+                                Kind::regex(),
+                                None,
+                            ),
                         ),
                         // Pipeline 2
-                        Definition::empty_legacy_namespace().with_event_field(
-                            &owned_value_path!("transform-2"),
-                            Kind::float().or_null(),
-                            Some("transform-2"),
+                        (
+                            "Transform 2".into(),
+                            Definition::empty_legacy_namespace().with_event_field(
+                                &owned_value_path!("transform-2"),
+                                Kind::float().or_null(),
+                                Some("transform-2"),
+                            ),
                         ),
                         // Pipeline 3
-                        Definition::empty_legacy_namespace().with_event_field(
-                            &owned_value_path!("transform-5"),
-                            Kind::boolean(),
-                            Some("transform-5"),
+                        (
+                            "Transform 5".into(),
+                            Definition::empty_legacy_namespace().with_event_field(
+                                &owned_value_path!("transform-5"),
+                                Kind::boolean(),
+                                Some("transform-5"),
+                            ),
                         ),
                     ],
                 },

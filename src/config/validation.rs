@@ -171,7 +171,10 @@ pub fn check_outputs(config: &ConfigBuilder) -> Result<(), Vec<String>> {
 
         if transform
             .inner
-            .outputs(vec![definition], config.schema.log_namespace())
+            .outputs(
+                vec![(OutputId::dummy(), definition)],
+                config.schema.log_namespace(),
+            )
             .iter()
             .map(|output| output.port.as_deref().unwrap_or(""))
             .any(|name| name == DEFAULT_OUTPUT)
