@@ -37,7 +37,7 @@ pub struct PulsarSinkConfig {
     #[configurable(metadata(docs::examples = "topic-1234"))]
     pub(crate) topic: String,
 
-    /// The name of the producer. If not specified, the default name assigned by Pulsar will be used.
+    /// The name of the producer. If not specified, Pulsar will generate a unique name.
     #[configurable(metadata(docs::examples = "producer-name"))]
     pub(crate) producer_name: Option<String>,
 
@@ -57,7 +57,7 @@ pub struct PulsarSinkConfig {
 
     #[configurable(derived)]
     #[serde(default)]
-    pub(crate) batch: BatchConfig,
+    pub(crate) batch: PulsarBatchConfig,
 
     #[configurable(derived)]
     #[serde(default)]
@@ -67,11 +67,7 @@ pub struct PulsarSinkConfig {
     pub encoding: EncodingConfig,
 
     #[configurable(derived)]
-    pub(crate) auth: Option<AuthConfig>,
-
-    #[configurable(derived)]
-    #[serde(default)]
-    pub request: TowerRequestConfig,
+    pub(crate) auth: Option<PulsarAuthConfig>,
 
     #[configurable(derived)]
     #[serde(
@@ -85,7 +81,7 @@ pub struct PulsarSinkConfig {
 /// Event batching behavior.
 #[configurable_component]
 #[derive(Clone, Copy, Debug, Default)]
-pub(crate) struct BatchConfig {
+pub(crate) struct PulsarBatchConfig {
     /// The maximum size of a batch before it is flushed.
     #[configurable(metadata(docs::type_unit = "events"))]
     #[configurable(metadata(docs::examples = 1000))]
@@ -95,7 +91,7 @@ pub(crate) struct BatchConfig {
 /// Authentication configuration.
 #[configurable_component]
 #[derive(Clone, Debug)]
-pub(crate) struct AuthConfig {
+pub(crate) struct PulsarAuthConfig {
     /// Basic authentication name/username.
     ///
     /// This can be used either for basic authentication (username/password) or JWT authentication.
@@ -179,7 +175,6 @@ impl Default for PulsarSinkConfig {
             compression: Default::default(),
             encoding: TextSerializerConfig::default().into(),
             auth: None,
-            request: TowerRequestConfig::default(),
             acknowledgements: Default::default(),
         }
     }
