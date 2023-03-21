@@ -120,7 +120,7 @@ impl CloudwatchRequestBuilder {
 /// ByteSizeOf is being abused to represent the encoded size of a request for the Partitioned Batcher
 ///
 /// The maximum batch size is 1,048,576 bytes. This size is calculated as the sum of all event messages in UTF-8, plus 26 bytes for each log event.
-/// source: https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_PutLogEvents.html
+/// source: <https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_PutLogEvents.html>
 impl ByteSizeOf for CloudwatchRequest {
     fn size_of(&self) -> usize {
         self.message.len() + 26
