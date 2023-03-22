@@ -13,7 +13,6 @@ use axum::{
 use futures::FutureExt;
 use http::StatusCode;
 use hyper::server::{self, conn::Http};
-use serde::ser::StdError;
 use serde_json::json;
 use stream_cancel::Tripwire;
 use tokio::{net::UnixListener, sync::Mutex};
@@ -30,9 +29,6 @@ pub struct ControlServer {
     shutdown_signal: Tripwire,
     socket_path: PathBuf,
 }
-
-pub type Handle = tokio::task::JoinHandle<Result<(), Box<dyn StdError + Send + Sync>>>;
-pub type Pieces = (stream_cancel::Trigger, Handle);
 
 impl ControlServer {
     pub fn bind(
@@ -51,18 +47,6 @@ impl ControlServer {
             topology_controller,
             shutdown_signal,
             socket_path: socket_path.as_ref().to_path_buf(),
-        })
-    }
-
-    pub fn start(
-        socket_path: impl AsRef<Path>,
-        topology_controller: &Arc<Mutex<TopologyController>>,
-        runtime: &tokio::runtime::Runtime,
-    ) -> Result<Pieces, Box<dyn StdError + Send + Sync>> {
-        let (shutdown_trigger, tripwire) = stream_cancel::Tripwire::new();
-        Self::bind(socket_path, Arc::clone(topology_controller), tripwire).map(|control_server| {
-            let server_handle = runtime.spawn(control_server.run());
-            (shutdown_trigger, server_handle)
         })
     }
 
