@@ -434,11 +434,8 @@ fn validate_component_errors_total(
     }
 
     let expected_errors: u32 = inputs.iter().fold(0, |acc, i| {
-        if let TestEvent::Modified {
-            expected_errors, ..
-        } = i
-        {
-            return acc + expected_errors;
+        if let TestEvent::Modified { .. } = i {
+            return acc + 1;
         }
         acc
     });

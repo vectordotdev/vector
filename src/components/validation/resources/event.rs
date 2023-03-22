@@ -17,11 +17,7 @@ pub enum TestEvent {
     ///
     /// For transforms and sinks, generally, the only way to cause an error is if the event itself
     /// is malformed in some way, which can be achieved without this test event variant.
-    Modified {
-        modified: bool,
-        event: EventData,
-        expected_errors: u32,
-    },
+    Modified { modified: bool, event: EventData },
 }
 
 impl TestEvent {
