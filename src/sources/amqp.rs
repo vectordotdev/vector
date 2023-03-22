@@ -271,7 +271,7 @@ fn populate_event(
 
     log_namespace.insert_vector_metadata(
         log,
-        path!(log_schema().source_type_key()),
+        Some(log_schema().source_type_key()),
         path!("source_type"),
         Bytes::from_static(AmqpSourceConfig::NAME.as_bytes()),
     );
@@ -291,10 +291,12 @@ fn populate_event(
             log.insert(metadata_path!("vector", "ingest_timestamp"), Utc::now());
         }
         LogNamespace::Legacy => {
-            log.try_insert(
-                (PathPrefix::Event, log_schema().timestamp_key()),
-                timestamp.unwrap_or_else(Utc::now),
-            );
+            if let Some(timestamp_key) = log_schema().timestamp_key() {
+                log.try_insert(
+                    (PathPrefix::Event, timestamp_key),
+                    timestamp.unwrap_or_else(Utc::now),
+                );
+            }
         }
     };
 }
@@ -705,7 +707,9 @@ mod integration_test {
         assert_eq!(log[log_schema().message_key()], "my message".into());
         assert_eq!(log["routing"], routing_key.into());
         assert_eq!(log[log_schema().source_type_key()], "amqp".into());
-        let log_ts = log[log_schema().timestamp_key()].as_timestamp().unwrap();
+        let log_ts = log[log_schema().timestamp_key().unwrap().to_string()]
+            .as_timestamp()
+            .unwrap();
         assert!(log_ts.signed_duration_since(now) < chrono::Duration::seconds(1));
         assert_eq!(log["exchange"], exchange.into());
     }

@@ -394,6 +394,7 @@ impl FunctionTransform for LogToMetric {
 #[cfg(test)]
 mod tests {
     use chrono::{offset::TimeZone, DateTime, Utc};
+    use lookup::PathPrefix;
     use std::time::Duration;
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
@@ -432,7 +433,10 @@ mod tests {
     fn create_event(key: &str, value: impl Into<Value> + std::fmt::Debug) -> Event {
         let mut log = Event::Log(LogEvent::from("i am a log"));
         log.as_mut_log().insert(key, value);
-        log.as_mut_log().insert(log_schema().timestamp_key(), ts());
+        log.as_mut_log().insert(
+            (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
+            ts(),
+        );
         log
     }
 
@@ -786,9 +790,10 @@ mod tests {
         );
 
         let mut event = Event::Log(LogEvent::from("i am a log"));
-        event
-            .as_mut_log()
-            .insert(log_schema().timestamp_key(), ts());
+        event.as_mut_log().insert(
+            (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
+            ts(),
+        );
         event.as_mut_log().insert("status", "42");
         event.as_mut_log().insert("backtrace", "message");
         let metadata = event.metadata().clone();
@@ -835,9 +840,10 @@ mod tests {
         );
 
         let mut event = Event::Log(LogEvent::from("i am a log"));
-        event
-            .as_mut_log()
-            .insert(log_schema().timestamp_key(), ts());
+        event.as_mut_log().insert(
+            (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
+            ts(),
+        );
         event.as_mut_log().insert("status", "42");
         event.as_mut_log().insert("backtrace", "message");
         event.as_mut_log().insert("host", "local");

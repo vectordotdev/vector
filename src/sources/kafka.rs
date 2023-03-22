@@ -313,7 +313,7 @@ impl SourceConfig for KafkaSourceConfig {
             .with_standard_vector_source_metadata()
             .with_source_metadata(
                 Self::NAME,
-                Some(LegacyKey::Overwrite(owned_value_path!(keys.timestamp))),
+                keys.timestamp.map(LegacyKey::Overwrite),
                 &owned_value_path!("timestamp"),
                 Kind::timestamp(),
                 Some("timestamp"),
@@ -510,9 +510,9 @@ fn parse_stream<'a>(
     Some((count, stream))
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 struct Keys<'a> {
-    timestamp: &'a str,
+    timestamp: Option<OwnedValuePath>,
     key_field: &'a Option<OwnedValuePath>,
     topic: &'a Option<OwnedValuePath>,
     partition: &'a Option<OwnedValuePath>,
@@ -523,7 +523,7 @@ struct Keys<'a> {
 impl<'a> Keys<'a> {
     fn from(schema: &'a LogSchema, config: &'a KafkaSourceConfig) -> Self {
         Self {
-            timestamp: schema.timestamp_key(),
+            timestamp: schema.timestamp_key().cloned(),
             key_field: &config.key_field.path,
             topic: &config.topic_key.path,
             partition: &config.partition_key.path,
@@ -607,7 +607,7 @@ impl ReceivedMessage {
             log_namespace.insert_source_metadata(
                 KafkaSourceConfig::NAME,
                 log,
-                Some(LegacyKey::Overwrite(keys.timestamp)),
+                keys.timestamp.as_ref().map(LegacyKey::Overwrite),
                 path!("timestamp"),
                 self.timestamp,
             );
@@ -1045,7 +1045,7 @@ mod integration_test {
                     "kafka".into()
                 );
                 assert_eq!(
-                    event.as_log()[log_schema().timestamp_key()],
+                    event.as_log()[log_schema().timestamp_key().unwrap().to_string()],
                     now.trunc_subsecs(3).into()
                 );
                 assert_eq!(event.as_log()["topic"], topic.clone().into());

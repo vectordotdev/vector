@@ -724,7 +724,9 @@ fn enrich_log_event(log: &mut LogEvent, log_namespace: LogNamespace) {
         }
         LogNamespace::Legacy => {
             if let Some(ts) = timestamp {
-                log.insert((PathPrefix::Event, log_schema().timestamp_key()), ts);
+                if let Some(timestamp_key) = log_schema().timestamp_key() {
+                    log.insert((PathPrefix::Event, timestamp_key), ts);
+                }
             }
         }
     }
@@ -732,7 +734,7 @@ fn enrich_log_event(log: &mut LogEvent, log_namespace: LogNamespace) {
     // Add source type.
     log_namespace.insert_vector_metadata(
         log,
-        log_schema().source_type_key(),
+        Some(log_schema().source_type_key()),
         path!("source_type"),
         JournaldConfig::NAME,
     );
@@ -1439,7 +1441,7 @@ mod tests {
     }
 
     fn timestamp(event: &Event) -> Value {
-        event.as_log()[log_schema().timestamp_key()].clone()
+        event.as_log()[log_schema().timestamp_key().unwrap().to_string()].clone()
     }
 
     fn value_ts(secs: i64, usecs: u32) -> Value {

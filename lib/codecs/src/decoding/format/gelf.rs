@@ -1,6 +1,6 @@
 use bytes::Bytes;
 use chrono::{DateTime, NaiveDateTime, Utc};
-use lookup::{event_path, owned_value_path};
+use lookup::{event_path, owned_value_path, PathPrefix};
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 use std::collections::HashMap;
@@ -98,19 +98,21 @@ impl GelfDeserializer {
             log.insert(FULL_MESSAGE, full_message.to_string());
         }
 
-        if let Some(timestamp) = parsed.timestamp {
-            let naive = NaiveDateTime::from_timestamp_opt(
-                f64::trunc(timestamp) as i64,
-                f64::fract(timestamp) as u32,
-            )
-            .expect("invalid timestamp");
-            log.insert(
-                log_schema().timestamp_key(),
-                DateTime::<Utc>::from_utc(naive, Utc),
-            );
-        // per GELF spec- add timestamp if not provided
-        } else {
-            log.insert(log_schema().timestamp_key(), Utc::now());
+        if let Some(timestamp_key) = log_schema().timestamp_key() {
+            if let Some(timestamp) = parsed.timestamp {
+                let naive = NaiveDateTime::from_timestamp_opt(
+                    f64::trunc(timestamp) as i64,
+                    f64::fract(timestamp) as u32,
+                )
+                .expect("invalid timestamp");
+                log.insert(
+                    (PathPrefix::Event, timestamp_key),
+                    DateTime::<Utc>::from_utc(naive, Utc),
+                );
+                // per GELF spec- add timestamp if not provided
+            } else {
+                log.insert((PathPrefix::Event, timestamp_key), Utc::now());
+            }
         }
 
         if let Some(level) = parsed.level {

@@ -572,7 +572,7 @@ impl IngestorProcess {
 
             log_namespace.insert_vector_metadata(
                 &mut log,
-                path!(log_schema().source_type_key()),
+                Some(log_schema().source_type_key()),
                 path!("source_type"),
                 Bytes::from_static(AwsS3Config::NAME.as_bytes()),
             );
@@ -589,10 +589,12 @@ impl IngestorProcess {
                     log.insert(metadata_path!("vector", "ingest_timestamp"), Utc::now());
                 }
                 LogNamespace::Legacy => {
-                    log.try_insert(
-                        (PathPrefix::Event, log_schema().timestamp_key()),
-                        timestamp.unwrap_or_else(Utc::now),
-                    );
+                    if let Some(timestamp_key) = log_schema().timestamp_key() {
+                        log.try_insert(
+                            (PathPrefix::Event, timestamp_key),
+                            timestamp.unwrap_or_else(Utc::now),
+                        );
+                    }
                 }
             };
 

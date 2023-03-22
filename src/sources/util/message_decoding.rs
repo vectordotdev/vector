@@ -3,7 +3,7 @@ use std::iter;
 use bytes::{Bytes, BytesMut};
 use chrono::{DateTime, Utc};
 use codecs::StreamDecodingError;
-use lookup::{metadata_path, path};
+use lookup::{metadata_path, path, PathPrefix};
 use tokio_util::codec::Decoder as _;
 use vector_common::internal_event::{
     CountByteSize, EventsReceived, InternalEventHandle as _, Registered,
@@ -33,7 +33,7 @@ pub fn decode_message<'a>(
                 if let Event::Log(ref mut log) = event {
                     log_namespace.insert_vector_metadata(
                         log,
-                        path!(schema.source_type_key()),
+                        Some(schema.source_type_key()),
                         path!("source_type"),
                         Bytes::from(source_type),
                     );
@@ -47,7 +47,9 @@ pub fn decode_message<'a>(
                         }
                         LogNamespace::Legacy => {
                             if let Some(timestamp) = timestamp {
-                                log.try_insert(schema.timestamp_key(), timestamp);
+                                if let Some(timestamp_key) = schema.timestamp_key() {
+                                    log.try_insert((PathPrefix::Event, timestamp_key), timestamp);
+                                }
                             }
                         }
                     }

@@ -69,7 +69,6 @@ impl Transformer {
         timestamp_format: Option<TimestampFormat>,
     ) -> Result<Self, crate::Error> {
         Self::validate_fields(only_fields.as_ref(), except_fields.as_ref())?;
-
         Ok(Self {
             only_fields,
             except_fields,
@@ -308,7 +307,10 @@ mod tests {
         let mut event = Event::Log(LogEvent::from("Demo"));
         let timestamp = event
             .as_mut_log()
-            .get(log_schema().timestamp_key())
+            .get((
+                lookup::PathPrefix::Event,
+                log_schema().timestamp_key().unwrap(),
+            ))
             .unwrap()
             .clone();
         let timestamp = timestamp.as_timestamp().unwrap();
@@ -320,7 +322,10 @@ mod tests {
 
         match event
             .as_mut_log()
-            .get(log_schema().timestamp_key())
+            .get((
+                lookup::PathPrefix::Event,
+                log_schema().timestamp_key().unwrap(),
+            ))
             .unwrap()
         {
             Value::Integer(_) => {}

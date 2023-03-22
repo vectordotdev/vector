@@ -1,15 +1,17 @@
 use codecs::JsonSerializerConfig;
+use lookup::lookup_v2::OptionalValuePath;
 use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
 
 use super::host_key;
+use crate::sinks::splunk_hec::common::config_timestamp_key;
 use crate::{
     codecs::EncodingConfig,
     config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext},
     sinks::{
         splunk_hec::{
             common::{
-                acknowledgements::HecClientAcknowledgementsConfig, timestamp_key, EndpointTarget,
+                acknowledgements::HecClientAcknowledgementsConfig, EndpointTarget,
                 SplunkHecDefaultBatchSettings,
             },
             logs::config::HecLogsSinkConfig,
@@ -130,8 +132,8 @@ pub struct HumioLogsConfig {
     /// By default, the [global `log_schema.timestamp_key` option][global_timestamp_key] is used.
     ///
     /// [global_timestamp_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.timestamp_key
-    #[serde(default = "timestamp_key")]
-    pub(super) timestamp_key: String,
+    #[serde(default = "config_timestamp_key")]
+    pub(super) timestamp_key: OptionalValuePath,
 }
 
 fn default_endpoint() -> String {
@@ -159,7 +161,7 @@ impl GenerateConfig for HumioLogsConfig {
             tls: None,
             timestamp_nanos_key: None,
             acknowledgements: Default::default(),
-            timestamp_key: timestamp_key(),
+            timestamp_key: config_timestamp_key(),
         })
         .unwrap()
     }
@@ -200,7 +202,7 @@ impl HumioLogsConfig {
                 indexer_acknowledgements_enabled: false,
                 ..Default::default()
             },
-            timestamp_key: timestamp_key(),
+            timestamp_key: config_timestamp_key(),
             endpoint_target: EndpointTarget::Event,
             auto_extract_timestamp: None,
         }
@@ -262,7 +264,13 @@ mod integration_tests {
         event.insert(log_schema().host_key(), host.clone());
 
         let ts = Utc.timestamp_nanos(Utc::now().timestamp_millis() * 1_000_000 + 132_456);
-        event.insert(log_schema().timestamp_key(), ts);
+        event.insert(
+            (
+                lookup::PathPrefix::Event,
+                log_schema().timestamp_key().unwrap(),
+            ),
+            ts,
+        );
 
         run_and_assert_sink_compliance(sink, stream::once(ready(event)), &HTTP_SINK_TAGS).await;
 

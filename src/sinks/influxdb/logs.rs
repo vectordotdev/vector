@@ -4,6 +4,7 @@ use bytes::{Bytes, BytesMut};
 use futures::SinkExt;
 use http::{Request, Uri};
 use indoc::indoc;
+use lookup::PathPrefix;
 use vector_config::configurable_component;
 
 use crate::{
@@ -202,10 +203,15 @@ impl HttpEventEncoder<BytesMut> for InfluxDbLogsEncoder {
         };
 
         // Timestamp
-        let timestamp = encode_timestamp(match log.remove(log_schema().timestamp_key()) {
-            Some(Value::Timestamp(ts)) => Some(ts),
-            _ => None,
-        });
+        let timestamp =
+            encode_timestamp(if let Some(timestamp_key) = log_schema().timestamp_key() {
+                match log.remove((PathPrefix::Event, timestamp_key)) {
+                    Some(Value::Timestamp(ts)) => Some(ts),
+                    _ => None,
+                }
+            } else {
+                None
+            });
 
         // Tags + Fields
         let mut tags = MetricTags::default();

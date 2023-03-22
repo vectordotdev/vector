@@ -21,7 +21,7 @@ use codecs::{encoding::Framer, JsonSerializerConfig, NewlineDelimitedEncoder};
 use goauth::scopes::Scope;
 use http::header::{HeaderName, HeaderValue};
 use http::Uri;
-use lookup::event_path;
+use lookup::{event_path, PathPrefix};
 use rand::{thread_rng, Rng};
 use snafu::Snafu;
 use tower::ServiceBuilder;
@@ -553,9 +553,14 @@ impl crate::sinks::util::encoding::Encoder<Vec<Event>> for DatadogArchivesEncodi
 
             log_event.insert("_id", self.generate_log_id());
 
-            let timestamp = log_event
-                .remove(self.log_schema.timestamp_key())
-                .unwrap_or_else(|| chrono::Utc::now().timestamp_millis().into());
+            let timestamp = if let Some(timestamp_key) = self.log_schema.timestamp_key() {
+                log_event
+                    .remove((PathPrefix::Event, timestamp_key))
+                    .unwrap_or_else(|| chrono::Utc::now().timestamp_millis().into())
+            } else {
+                chrono::Utc::now().timestamp_millis().into()
+            };
+
             log_event.insert(
                 "date",
                 timestamp
@@ -564,6 +569,7 @@ impl crate::sinks::util::encoding::Encoder<Vec<Event>> for DatadogArchivesEncodi
                     .unwrap_or_else(chrono::Utc::now)
                     .to_rfc3339_opts(SecondsFormat::Millis, true),
             );
+
             log_event.rename_key(self.log_schema.message_key(), event_path!("message"));
             log_event.rename_key(self.log_schema.host_key(), event_path!("host"));
 

@@ -321,7 +321,10 @@ mod tests {
             events[0]
                 .clone()
                 .as_log()
-                .get(log_schema().timestamp_key())
+                .get((
+                    lookup::PathPrefix::Event,
+                    log_schema().timestamp_key().unwrap()
+                ))
                 .unwrap()
                 .to_string_lossy(),
             now.to_rfc3339_opts(SecondsFormat::AutoSi, true)

@@ -105,12 +105,11 @@ impl DnstapConfig {
         "protobuf:dnstap.Dnstap".to_string() //content-type for framestream
     }
 
-    fn event_schema(timestamp_key: &'static str) -> DnstapEventSchema {
+    fn event_schema(timestamp_key: Option<&OwnedValuePath>) -> DnstapEventSchema {
         let mut schema = DnstapEventSchema::new();
         schema
             .dnstap_root_data_schema_mut()
-            .set_timestamp(timestamp_key);
-
+            .set_timestamp(timestamp_key.cloned());
         schema
     }
 
@@ -208,7 +207,7 @@ pub struct DnstapFrameHandler {
     socket_receive_buffer_size: Option<usize>,
     socket_send_buffer_size: Option<usize>,
     host_key: Option<OwnedValuePath>,
-    timestamp_key: String,
+    timestamp_key: Option<OwnedValuePath>,
     source_type_key: String,
     bytes_received: Registered<BytesReceived>,
     log_namespace: LogNamespace,
@@ -238,7 +237,7 @@ impl DnstapFrameHandler {
             socket_receive_buffer_size: config.socket_receive_buffer_size,
             socket_send_buffer_size: config.socket_send_buffer_size,
             host_key,
-            timestamp_key: timestamp_key.to_string(),
+            timestamp_key: timestamp_key.cloned(),
             source_type_key: source_type_key.to_string(),
             bytes_received: register!(BytesReceived::from(Protocol::from("protobuf"))),
             log_namespace,
@@ -270,7 +269,7 @@ impl FrameHandler for DnstapFrameHandler {
             // The timestamp is inserted by the parser which caters for the Legacy namespace.
             self.log_namespace.insert_vector_metadata(
                 &mut log_event,
-                path!(self.timestamp_key()),
+                self.timestamp_key(),
                 path!("ingest_timestamp"),
                 chrono::Utc::now(),
             );
@@ -278,7 +277,7 @@ impl FrameHandler for DnstapFrameHandler {
 
         self.log_namespace.insert_vector_metadata(
             &mut log_event,
-            path!(self.source_type_key()),
+            Some(self.source_type_key()),
             path!("source_type"),
             DnstapConfig::NAME,
         );
@@ -348,8 +347,8 @@ impl FrameHandler for DnstapFrameHandler {
         self.source_type_key.as_str()
     }
 
-    fn timestamp_key(&self) -> &str {
-        self.timestamp_key.as_str()
+    fn timestamp_key(&self) -> Option<&OwnedValuePath> {
+        self.timestamp_key.as_ref()
     }
 }
 
@@ -407,7 +406,7 @@ mod tests {
         let mut event = Event::from(LogEvent::from(value::Value::from(json)));
         event.as_mut_log().insert("timestamp", chrono::Utc::now());
 
-        let definition = DnstapConfig::event_schema("timestamp");
+        let definition = DnstapConfig::event_schema(Some(&owned_value_path!("timestamp")));
         let schema = vector_core::schema::Definition::empty_legacy_namespace()
             .with_standard_vector_source_metadata();
 

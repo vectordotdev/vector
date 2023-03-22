@@ -1,7 +1,7 @@
 use bytes::Bytes;
 use chrono::{DateTime, Datelike, Utc};
 use lookup::lookup_v2::parse_value_path;
-use lookup::{event_path, owned_value_path, OwnedTargetPath, OwnedValuePath};
+use lookup::{event_path, owned_value_path, OwnedTargetPath, OwnedValuePath, PathPrefix};
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 use std::collections::BTreeMap;
@@ -44,21 +44,25 @@ impl SyslogDeserializerConfig {
     pub fn schema_definition(&self, log_namespace: LogNamespace) -> schema::Definition {
         match (log_namespace, self.source) {
             (LogNamespace::Legacy, _) => {
-                let definition = schema::Definition::empty_legacy_namespace()
+                let mut definition = schema::Definition::empty_legacy_namespace()
                     // The `message` field is always defined. If parsing fails, the entire body becomes the
                     // message.
                     .with_event_field(
                         &parse_value_path(log_schema().message_key()).expect("valid message key"),
                         Kind::bytes(),
                         Some("message"),
-                    )
+                    );
+
+                if let Some(timestamp_key) = log_schema().timestamp_key() {
                     // All other fields are optional.
-                    .optional_field(
-                        &parse_value_path(log_schema().timestamp_key())
-                            .expect("valid timestamp key"),
+                    definition = definition.optional_field(
+                        timestamp_key,
                         Kind::timestamp(),
                         Some("timestamp"),
                     )
+                }
+
+                definition = definition
                     .optional_field(&owned_value_path!("hostname"), Kind::bytes(), Some("host"))
                     .optional_field(
                         &owned_value_path!("severity"),
@@ -381,7 +385,9 @@ fn insert_fields_from_syslog(
         let timestamp = DateTime::<Utc>::from(timestamp);
         match log_namespace {
             LogNamespace::Legacy => {
-                log.insert(event_path!(log_schema().timestamp_key()), timestamp);
+                if let Some(timestamp_key) = log_schema().timestamp_key() {
+                    log.insert((PathPrefix::Event, timestamp_key), timestamp);
+                }
             }
             LogNamespace::Vector => {
                 log.insert(event_path!("timestamp"), timestamp);
@@ -449,7 +455,9 @@ mod tests {
         let events = deserializer.parse(input, LogNamespace::Legacy).unwrap();
         assert_eq!(events.len(), 1);
         assert_eq!(events[0].as_log()[log_schema().message_key()], "MSG".into());
-        assert!(events[0].as_log()[log_schema().timestamp_key()].is_timestamp());
+        assert!(
+            events[0].as_log()[log_schema().timestamp_key().unwrap().to_string()].is_timestamp()
+        );
     }
 
     #[test]

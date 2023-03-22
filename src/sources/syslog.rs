@@ -422,7 +422,9 @@ fn enrich_syslog_event(
             .get("timestamp")
             .and_then(|timestamp| timestamp.as_timestamp().cloned())
             .unwrap_or_else(Utc::now);
-        log.insert((PathPrefix::Event, log_schema().timestamp_key()), timestamp);
+        if let Some(timestamp_key) = log_schema().timestamp_key() {
+            log.insert((PathPrefix::Event, timestamp_key), timestamp);
+        }
     }
 
     trace!(
@@ -800,7 +802,10 @@ mod test {
         {
             let expected = expected.as_mut_log();
             expected.insert(
-                log_schema().timestamp_key(),
+                (
+                    lookup::PathPrefix::Event,
+                    log_schema().timestamp_key().unwrap(),
+                ),
                 Utc.ymd(2019, 2, 13)
                     .and_hms_opt(19, 48, 34)
                     .expect("invalid timestamp"),
@@ -840,7 +845,10 @@ mod test {
         {
             let expected = expected.as_mut_log();
             expected.insert(
-                log_schema().timestamp_key(),
+                (
+                    lookup::PathPrefix::Event,
+                    log_schema().timestamp_key().unwrap(),
+                ),
                 Utc.ymd(2019, 2, 13)
                     .and_hms_opt(19, 48, 34)
                     .expect("invalid timestamp"),
@@ -959,7 +967,13 @@ mod test {
                 .and_hms_opt(20, 7, 26)
                 .expect("invalid timestamp")
                 .into();
-            expected.insert(log_schema().timestamp_key(), expected_date);
+            expected.insert(
+                (
+                    lookup::PathPrefix::Event,
+                    log_schema().timestamp_key().unwrap(),
+                ),
+                expected_date,
+            );
             expected.insert(log_schema().host_key(), "74794bfb6795");
             expected.insert(log_schema().source_type_key(), "syslog");
             expected.insert("hostname", "74794bfb6795");
@@ -992,7 +1006,13 @@ mod test {
                 .and_hms_opt(21, 31, 56)
                 .expect("invalid timestamp")
                 .into();
-            expected.insert(log_schema().timestamp_key(), expected_date);
+            expected.insert(
+                (
+                    lookup::PathPrefix::Event,
+                    log_schema().timestamp_key().unwrap(),
+                ),
+                expected_date,
+            );
             expected.insert(log_schema().source_type_key(), "syslog");
             expected.insert("host", "74794bfb6795");
             expected.insert("hostname", "74794bfb6795");
@@ -1020,7 +1040,10 @@ mod test {
         {
             let expected = expected.as_mut_log();
             expected.insert(
-                log_schema().timestamp_key(),
+                (
+                    lookup::PathPrefix::Event,
+                    log_schema().timestamp_key().unwrap(),
+                ),
                 Utc.ymd(2019, 2, 13).and_hms_micro(21, 53, 30, 605_850),
             );
             expected.insert(log_schema().source_type_key(), "syslog");

@@ -6,6 +6,7 @@ use http::{
     Request, StatusCode, Uri,
 };
 use hyper::Body;
+use lookup::PathPrefix;
 use once_cell::sync::Lazy;
 use openssl::{base64, hash, pkey, sign};
 use regex::Regex;
@@ -17,7 +18,7 @@ use vector_config::configurable_component;
 use crate::{
     codecs::Transformer,
     config::{log_schema, AcknowledgementsConfig, Input, SinkConfig, SinkContext},
-    event::{Event, Value},
+    event::Event,
     http::HttpClient,
     sinks::{
         util::{
@@ -203,20 +204,18 @@ impl HttpEventEncoder<serde_json::Value> for AzureMonitorLogsEventEncoder {
         let mut log = event.into_log();
         let timestamp_key = log_schema().timestamp_key();
 
-        let timestamp = if let Some(Value::Timestamp(ts)) = log.remove(timestamp_key) {
-            ts
-        } else {
-            chrono::Utc::now()
-        };
+        if let Some(timestamp_key) = timestamp_key {
+            let timestamp = log
+                .remove((PathPrefix::Event, timestamp_key))
+                .and_then(|timestamp_value| timestamp_value.as_timestamp().cloned())
+                .unwrap_or_else(chrono::Utc::now);
 
-        let mut entry = serde_json::json!(&log);
-        let object_entry = entry.as_object_mut().unwrap();
-        object_entry.insert(
-            timestamp_key.to_string(),
-            JsonValue::String(timestamp.to_rfc3339_opts(chrono::SecondsFormat::Millis, true)),
-        );
-
-        Some(entry)
+            log.insert(
+                (PathPrefix::Event, timestamp_key),
+                JsonValue::String(timestamp.to_rfc3339_opts(chrono::SecondsFormat::Millis, true)),
+            );
+        }
+        Some(serde_json::json!(&log))
     }
 }
 
@@ -263,11 +262,12 @@ impl AzureMonitorLogsSink {
         let log_type = HeaderValue::from_str(&config.log_type)?;
         default_headers.insert(LOG_TYPE_HEADER.clone(), log_type);
 
-        let timestamp_key = log_schema().timestamp_key();
-        default_headers.insert(
-            TIME_GENERATED_FIELD_HEADER.clone(),
-            HeaderValue::from_str(timestamp_key)?,
-        );
+        if let Some(timestamp_key) = log_schema().timestamp_key() {
+            default_headers.insert(
+                TIME_GENERATED_FIELD_HEADER.clone(),
+                HeaderValue::from_str(&timestamp_key.to_string())?,
+            );
+        }
 
         if let Some(azure_resource_id) = &config.azure_resource_id {
             if azure_resource_id.is_empty() {
@@ -361,10 +361,10 @@ async fn healthcheck(sink: AzureMonitorLogsSink, client: HttpClient) -> crate::R
 
 #[cfg(test)]
 mod tests {
-    use std::time::Duration;
-
     use futures::{future::ready, stream};
+    use lookup::PathPrefix;
     use serde_json::value::RawValue;
+    use std::time::Duration;
 
     use super::*;
     use crate::{
@@ -429,11 +429,11 @@ mod tests {
     fn insert_timestamp_kv(log: &mut LogEvent) -> (String, String) {
         let now = chrono::Utc::now();
 
-        let timestamp_key = log_schema().timestamp_key().to_string();
+        let timestamp_key = log_schema().timestamp_key().unwrap();
         let timestamp_value = now.to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
-        log.insert(timestamp_key.as_str(), now);
+        log.insert((PathPrefix::Event, timestamp_key), now);
 
-        (timestamp_key, timestamp_value)
+        (timestamp_key.to_string(), timestamp_value)
     }
 
     #[test]
@@ -530,7 +530,10 @@ mod tests {
 
         let time_generated_field = headers.get("time-generated-field").unwrap();
         let timestamp_key = log_schema().timestamp_key();
-        assert_eq!(time_generated_field.to_str().unwrap(), timestamp_key);
+        assert_eq!(
+            time_generated_field.to_str().unwrap(),
+            timestamp_key.unwrap().to_string().as_str()
+        );
 
         let azure_resource_id = headers.get("x-ms-azureresourceid").unwrap();
         assert_eq!(
