@@ -372,7 +372,7 @@ impl<'a> Builder<'a> {
                                     let mut kind = Kind::never();
 
                                     if type_def.is_array() {
-                                        kind.add_array(value::kind::Collection::any());
+                                        kind.add_array(value::kind::Collection::from_unknown(Kind::bytes().or_integer()));
                                     } 
              
                                     (kind.into(), None)
