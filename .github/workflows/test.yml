@@ -379,6 +379,42 @@ jobs:
           path: "/tmp/vector-config-schema.json"
         if: success() || failure()
 
+  coverage:
+    name: Run test coverage
+    runs-on: [linux, test-runner]
+    needs: changes
+    if: ${{ needs.changes.outputs.source == 'true' }}
+    steps:
+      - uses: actions/checkout@v3
+      - name: Toolchain setup
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          override: true
+
+      - name: Install grcov
+        run: cargo install cargo-tarpaulin
+
+      - uses: actions/cache@v3
+        name: Cache Cargo registry + index
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Generate coverage
+        run: cargo +nightly tarpaulin --verbose --all-features --workspace --out Xml
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        if: ${{ env.GITHUB_REPOSITORY }} == 'vectordotdev/vector'
+        with:
+          name: coverage
+
   master-failure:
     name: master-failure
     if: failure() && github.ref == 'refs/heads/master'
