@@ -1,6 +1,6 @@
 ---
 title: HTTP Server
-description: Receives observability data from an [HTTP client request](https://en.wikipedia.org/wiki/Hypertext_Transfer_Protocol#Client_request)
+description: Receive observability data from an [HTTP client request](https://en.wikipedia.org/wiki/Hypertext_Transfer_Protocol#Client_request)
 kind: source
 layout: component
 tags: ["http", "server", "component", "source", "logs", "metrics", "traces"]
