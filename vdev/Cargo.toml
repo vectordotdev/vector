@@ -16,7 +16,7 @@ clap = { version = "4.1.11", features = ["derive"] }
 clap-verbosity-flag = "2.0.0"
 clap_complete = "4.1.5"
 confy = "0.5.1"
-directories = "4.0.1"
+directories = "5.0.0"
 # remove this when stabilized https://doc.rust-lang.org/stable/std/path/fn.absolute.html
 dunce = "1.0.3"
 hashlink = { version = "0.8.1", features = ["serde_impl"] }
