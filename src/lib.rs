@@ -126,7 +126,7 @@ pub use vector_common::{shutdown, Error, Result};
 pub use vector_core::{event, metrics, schema, tcp, tls};
 
 /// The current version of Vector in simplified format.
-/// <version-number>-nightly.
+/// `<version-number>-nightly`.
 pub fn vector_version() -> impl std::fmt::Display {
     #[cfg(feature = "nightly")]
     let pkg_version = format!("{}-nightly", built_info::PKG_VERSION);

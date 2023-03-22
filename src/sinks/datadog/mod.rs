@@ -91,7 +91,7 @@ impl Default for DatadogCommonConfig {
 
 impl DatadogCommonConfig {
     /// Returns a `Healthcheck` which is a future that will be used to ensure the
-    /// <site>/api/v1/validate endpoint is reachable.
+    /// `<site>/api/v1/validate` endpoint is reachable.
     fn build_healthcheck(
         &self,
         client: HttpClient,
@@ -108,7 +108,7 @@ impl DatadogCommonConfig {
     }
 }
 
-/// Makes a GET HTTP request to <site>/api/v1/validate using the provided client and API key.
+/// Makes a GET HTTP request to `<site>/api/v1/validate` using the provided client and API key.
 async fn build_healthcheck_future(
     client: HttpClient,
     validate_endpoint: Uri,
