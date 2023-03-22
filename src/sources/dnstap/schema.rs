@@ -1,11 +1,10 @@
-use std::collections::BTreeMap;
-
 use lookup::{owned_value_path, OwnedValuePath};
+use std::collections::BTreeMap;
+use value::btreemap;
 use value::{
     kind::{Collection, Field},
     Kind,
 };
-use vector_common::btreemap;
 
 #[derive(Debug, Default, Clone)]
 pub struct DnstapEventSchema {

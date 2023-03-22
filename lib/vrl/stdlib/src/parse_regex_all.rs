@@ -119,7 +119,7 @@ impl FunctionExpression for ParseRegexAllFn {
 #[cfg(test)]
 #[allow(clippy::trivial_regex)]
 mod tests {
-    use vector_common::btreemap;
+    use ::value::btreemap;
 
     use super::*;
 

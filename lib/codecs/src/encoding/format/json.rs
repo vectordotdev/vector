@@ -89,7 +89,7 @@ impl Encoder<Event> for JsonSerializer {
 mod tests {
     use bytes::{Bytes, BytesMut};
     use chrono::{TimeZone, Utc};
-    use vector_common::btreemap;
+    use value::btreemap;
     use vector_core::event::{LogEvent, Metric, MetricKind, MetricValue, StatisticKind, Value};
     use vector_core::metric_tags;
 

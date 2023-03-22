@@ -9678,6 +9678,7 @@ dependencies = [
  "vector-config",
  "vector-config-common",
  "vector-config-macros",
+ "vrl-core",
 ]
 
 [[package]]
@@ -9699,6 +9700,7 @@ dependencies = [
  "url",
  "vector-config-common",
  "vector-config-macros",
+ "vrl-core",
 ]
 
 [[package]]
@@ -9854,7 +9856,6 @@ dependencies = [
  "ordered-float 3.6.0",
  "serde_json",
  "value",
- "vector-common",
  "vrl-compiler",
  "vrl-core",
  "vrl-diagnostic",
@@ -9876,7 +9877,6 @@ dependencies = [
  "serde_json",
  "thiserror",
  "value",
- "vector-common",
  "vector-lookup",
  "vector-vrl-functions",
  "vrl",
@@ -9917,7 +9917,17 @@ dependencies = [
 name = "vrl-core"
 version = "0.1.0"
 dependencies = [
+ "bytes 1.4.0",
+ "chrono",
+ "chrono-tz",
+ "derivative",
  "lookup",
+ "nom",
+ "ordered-float 3.6.0",
+ "serde",
+ "serde_json",
+ "snafu",
+ "tracing 0.1.37",
  "value",
  "vrl-diagnostic",
 ]
@@ -9999,7 +10009,6 @@ dependencies = [
  "utf8-width",
  "uuid",
  "value",
- "vector-common",
  "vrl",
  "vrl-core",
  "woothee",
@@ -10024,7 +10033,6 @@ dependencies = [
  "tikv-jemallocator",
  "tracing-subscriber",
  "value",
- "vector-common",
  "vector-vrl-functions",
  "vrl",
  "vrl-stdlib",

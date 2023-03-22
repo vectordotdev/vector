@@ -2,6 +2,7 @@ use core::TargetValue;
 use std::borrow::Cow::{self, Borrowed, Owned};
 
 use ::value::Value;
+use core::TimeZone;
 use indoc::indoc;
 use lookup::{owned_value_path, OwnedTargetPath};
 use once_cell::sync::Lazy;
@@ -17,7 +18,6 @@ use rustyline::{
     Context, Editor, Helper,
 };
 use value::Secrets;
-use vector_common::TimeZone;
 use vector_vrl_functions::vrl_functions;
 use vrl::state::TypeState;
 use vrl::{

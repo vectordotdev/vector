@@ -95,7 +95,7 @@ impl FunctionExpression for AppendFn {
 
 #[cfg(test)]
 mod tests {
-    use vector_common::btreemap;
+    use ::value::btreemap;
 
     use super::*;
 

@@ -208,7 +208,8 @@ impl fmt::Display for DelFn {
 
 #[cfg(test)]
 mod tests {
-    use vector_common::{btreemap, TimeZone};
+    use ::value::btreemap;
+    use vrl_core::TimeZone;
 
     use super::*;
 
