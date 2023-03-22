@@ -1,9 +1,9 @@
 ---
 title: HTTP
-description: Deliver observability event data to an HTTP server
+description: Deliver observability data to an [HTTP](https://en.wikipedia.org/wiki/Hypertext_Transfer_Protocol) server
 kind: sink
 layout: component
-tags: ["http", "component", "sink"]
+tags: ["http", "client", "component", "sink", "logs", "metrics", "traces"]
 ---
 
 {{/*
