@@ -71,6 +71,33 @@ impl Display for SourceMetrics {
     }
 }
 
+fn sum_counters(
+    metric_name: SourceMetrics,
+    metrics: &[&vector_core::event::Metric],
+) -> Result<f64, Vec<String>> {
+    let mut events: f64 = 0.0;
+    let mut errs = Vec::new();
+
+    for m in metrics {
+        match m.value() {
+            vector_core::event::MetricValue::Counter { value } => {
+                if let MetricKind::Absolute = m.data().kind {
+                    events = *value;
+                } else {
+                    events += *value;
+                }
+            }
+            _ => errs.push(format!("{}: metric value is not a counter", metric_name,)),
+        }
+    }
+
+    if errs.is_empty() {
+        Ok(events)
+    } else {
+        Err(errs)
+    }
+}
+
 fn validate_component_received_events_total(
     _configuration: &ValidationConfiguration,
     inputs: &[TestEvent],
@@ -85,22 +112,7 @@ fn validate_component_received_events_total(
         TEST_SOURCE_NAME,
     )?;
 
-    let mut events = 0;
-    for m in metrics {
-        match m.value() {
-            vector_core::event::MetricValue::Counter { value } => {
-                if let MetricKind::Absolute = m.data().kind {
-                    events = *value as i32
-                } else {
-                    events += *value as i32
-                }
-            }
-            _ => errs.push(format!(
-                "{}: metric value is not a counter",
-                SourceMetrics::EventsReceived,
-            )),
-        }
-    }
+    let events: i32 = sum_counters(SourceMetrics::EventsReceived, &metrics)? as i32;
 
     let expected_events = inputs.iter().fold(0, |acc, i| {
         if let TestEvent::Passthrough(_) = i {
@@ -150,22 +162,7 @@ fn validate_component_received_event_bytes_total(
         TEST_SOURCE_NAME,
     )?;
 
-    let mut metric_bytes: f64 = 0.0;
-    for m in metrics {
-        match m.value() {
-            vector_core::event::MetricValue::Counter { value } => {
-                if let MetricKind::Absolute = m.data().kind {
-                    metric_bytes = *value
-                } else {
-                    metric_bytes += value
-                }
-            }
-            _ => errs.push(format!(
-                "{}: metric value is not a counter",
-                SourceMetrics::EventsReceivedBytes,
-            )),
-        }
-    }
+    let metric_bytes: f64 = sum_counters(SourceMetrics::EventsReceivedBytes, &metrics)?;
 
     let expected_bytes = inputs.iter().fold(0, |acc, i| {
         if let TestEvent::Passthrough(_) = i {
@@ -217,22 +214,7 @@ fn validate_component_received_bytes_total(
         TEST_SOURCE_NAME,
     )?;
 
-    let mut metric_bytes: f64 = 0.0;
-    for m in metrics {
-        match m.value() {
-            vector_core::event::MetricValue::Counter { value } => {
-                if let MetricKind::Absolute = m.data().kind {
-                    metric_bytes = *value
-                } else {
-                    metric_bytes += value
-                }
-            }
-            _ => errs.push(format!(
-                "{}: metric value is not a counter",
-                SourceMetrics::ReceivedBytesTotal,
-            )),
-        }
-    }
+    let metric_bytes: f64 = sum_counters(SourceMetrics::ReceivedBytesTotal, &metrics)?;
 
     let mut expected_bytes = 0;
     if let Some(c) = &configuration.external_resource {
@@ -289,22 +271,7 @@ fn validate_component_sent_events_total(
         TEST_SOURCE_NAME,
     )?;
 
-    let mut events = 0;
-    for m in metrics {
-        match m.value() {
-            vector_core::event::MetricValue::Counter { value } => {
-                if let MetricKind::Absolute = m.data().kind {
-                    events = *value as i32
-                } else {
-                    events += *value as i32
-                }
-            }
-            _ => errs.push(format!(
-                "{}: metric value is not a counter",
-                SourceMetrics::SentEventsTotal,
-            )),
-        }
-    }
+    let events = sum_counters(SourceMetrics::SentEventsTotal, &metrics)? as i32;
 
     let expected_events = inputs.iter().fold(0, |acc, i| {
         if let TestEvent::Passthrough(_) = i {
@@ -354,22 +321,7 @@ fn validate_component_sent_event_bytes_total(
         TEST_SOURCE_NAME,
     )?;
 
-    let mut metric_bytes: f64 = 0.0;
-    for m in metrics {
-        match m.value() {
-            vector_core::event::MetricValue::Counter { value } => {
-                if let MetricKind::Absolute = m.data().kind {
-                    metric_bytes = *value
-                } else {
-                    metric_bytes += value
-                }
-            }
-            _ => errs.push(format!(
-                "{}: metric value is not a counter",
-                SourceMetrics::SentEventBytesTotal,
-            )),
-        }
-    }
+    let metric_bytes = sum_counters(SourceMetrics::SentEventBytesTotal, &metrics)?;
 
     let mut expected_bytes = 0;
     for e in outputs {
@@ -416,24 +368,9 @@ fn validate_component_errors_total(
         TEST_SOURCE_NAME,
     );
 
-    let mut errors: u32 = 0;
-    for m in metrics {
-        match m.value() {
-            vector_core::event::MetricValue::Counter { value } => {
-                if let MetricKind::Absolute = m.data().kind {
-                    errors = *value as u32
-                } else {
-                    errors += *value as u32
-                }
-            }
-            _ => errs.push(format!(
-                "{}: metric value is not a counter",
-                SourceMetrics::ErrorsTotal,
-            )),
-        }
-    }
+    let errors: i32 = sum_counters(SourceMetrics::ErrorsTotal, &metrics)? as i32;
 
-    let expected_errors: u32 = inputs.iter().fold(0, |acc, i| {
+    let expected_errors: i32 = inputs.iter().fold(0, |acc, i| {
         if let TestEvent::Modified { .. } = i {
             return acc + 1;
         }
