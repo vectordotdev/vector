@@ -6,10 +6,10 @@ remap: functions: for_each: {
 		Iterate over a collection.
 
 		This function currently *does not* support recursive iteration.
-		If you have a need for recursive iteration using `for_each`,
-		which can't be solved using the `map_keys` or `map_values`
-		enumeration functions (which *do* support recursion), then
-		[please let us know](\(urls.new_feature_request))!
+		If you have a need for recursive iteration, see the
+		`for_each_recursive` function or alternatively the `map_keys`
+		or `map_values` enumeration functions (which *do* support
+		recursion).
 
 		The function uses the "function closure syntax" to allow reading
 		the key/value or index/value combination for each item in the

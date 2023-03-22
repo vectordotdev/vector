@@ -3,7 +3,7 @@ package metadata
 remap: functions: for_each_recursive: {
 	category: "Enumerate"
 	description: """
-		Iterate recursively through an object.
+		Iterate recursively over a collection.
 
         This function exposes the parent keys and value for
         every key iterated through in objects. For arrays the parent
