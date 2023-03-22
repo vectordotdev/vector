@@ -399,16 +399,11 @@ jobs:
             ${{ runner.os }}-cargo-
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
-      - name: Nightly toolchain setup
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: nightly
-          override: true
       - name: Install grcov
         run: cargo install cargo-tarpaulin
 
       - name: Generate coverage
-        run: cargo +nightly tarpaulin --verbose --all-features --workspace --out Xml
+        run: cargo tarpaulin --all-features --workspace --out Xml
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
         if: ${{ env.GITHUB_REPOSITORY }} == 'vectordotdev/vector'
