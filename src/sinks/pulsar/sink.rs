@@ -5,11 +5,9 @@ use std::collections::HashMap;
 use crate::sinks::pulsar::config::PulsarSinkConfig;
 use crate::sinks::pulsar::encoder::PulsarEncoder;
 use crate::sinks::pulsar::request_builder::PulsarRequestBuilder;
-use crate::sinks::pulsar::service::{PulsarRetryLogic, PulsarService};
+use crate::sinks::pulsar::service::PulsarService;
 use crate::sinks::pulsar::util;
-use crate::sinks::util::{
-    ServiceBuilderExt, SinkBuilderExt, TowerRequestConfig, TowerRequestSettings,
-};
+use crate::sinks::util::SinkBuilderExt;
 use crate::template::{Template, TemplateParseError};
 use crate::{
     codecs::{Encoder, Transformer},
@@ -40,7 +38,6 @@ pub(crate) struct PulsarSink {
     transformer: Transformer,
     encoder: Encoder<()>,
     service: PulsarService<TokioExecutor>,
-    request_settings: TowerRequestSettings,
     config: PulsarSinkConfig,
     topic_template: Template,
 }
@@ -103,15 +100,13 @@ impl PulsarSink {
         let producer_opts = config.build_producer_options();
         let transformer = config.encoding.transformer();
         let serializer = config.encoding.build()?;
-        let request_settings = config.request.unwrap_with(&TowerRequestConfig::default());
         let encoder = Encoder::<()>::new(serializer);
-        let service = PulsarService::new(client, producer_opts, None, config.producer_name.clone());
+        let service = PulsarService::new(client, producer_opts, config.producer_name.clone());
         let topic = config.topic.clone();
 
         Ok(PulsarSink {
             config,
             transformer,
-            request_settings,
             encoder,
             service,
             topic_template: Template::try_from(topic).context(TopicTemplateSnafu)?,
@@ -119,9 +114,7 @@ impl PulsarSink {
     }
 
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
-        let service = ServiceBuilder::new()
-            .settings(self.request_settings, PulsarRetryLogic)
-            .service(self.service);
+        let service = ServiceBuilder::new().service(self.service);
         let request_builder = PulsarRequestBuilder {
             encoder: PulsarEncoder {
                 transformer: self.transformer.clone(),

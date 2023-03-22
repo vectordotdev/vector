@@ -1,4 +1,3 @@
-use crate::sinks::util::TowerRequestConfig;
 use crate::{
     codecs::EncodingConfig,
     config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
