@@ -1,6 +1,5 @@
+use lookup::{owned_value_path, OwnedValuePath};
 use std::collections::BTreeMap;
-
-use lookup::owned_value_path;
 use value::btreemap;
 use value::{
     kind::{Collection, Field},
@@ -333,31 +332,19 @@ impl DnstapEventSchema {
     }
 
     pub fn new() -> Self {
-        Self {
-            dnstap_root_data_schema: DnstapRootDataSchema::default(),
-            dnstap_message_schema: DnstapMessageSchema::default(),
-            dns_query_message_schema: DnsQueryMessageSchema::default(),
-            dns_query_header_schema: DnsQueryHeaderSchema::default(),
-            dns_update_message_schema: DnsUpdateMessageSchema::default(),
-            dns_update_header_schema: DnsUpdateHeaderSchema::default(),
-            dns_message_opt_pseudo_section_schema: DnsMessageOptPseudoSectionSchema::default(),
-            dns_message_option_schema: DnsMessageOptionSchema::default(),
-            dns_record_schema: DnsRecordSchema::default(),
-            dns_query_question_schema: DnsQueryQuestionSchema::default(),
-            dns_update_zone_info_schema: DnsUpdateZoneInfoSchema::default(),
-        }
+        Self::default()
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct DnstapRootDataSchema {
-    timestamp: &'static str,
+    timestamp: Option<OwnedValuePath>,
 }
 
 impl Default for DnstapRootDataSchema {
     fn default() -> Self {
         Self {
-            timestamp: "timestamp",
+            timestamp: Some(owned_value_path!("timestamp")),
         }
     }
 }
@@ -383,8 +370,8 @@ impl DnstapRootDataSchema {
         "dataTypeId"
     }
 
-    pub const fn timestamp(&self) -> &'static str {
-        self.timestamp
+    pub const fn timestamp(&self) -> Option<&OwnedValuePath> {
+        self.timestamp.as_ref()
     }
 
     pub const fn time(&self) -> &'static str {
@@ -403,7 +390,7 @@ impl DnstapRootDataSchema {
         "rawData"
     }
 
-    pub fn set_timestamp(&mut self, val: &'static str) -> &mut Self {
+    pub fn set_timestamp(&mut self, val: Option<OwnedValuePath>) -> &mut Self {
         self.timestamp = val;
         self
     }

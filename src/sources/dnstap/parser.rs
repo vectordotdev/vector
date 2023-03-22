@@ -31,7 +31,7 @@ use dnstap_proto::{
     message::Type as DnstapMessageType, Dnstap, Message as DnstapMessage, SocketFamily,
     SocketProtocol,
 };
-use lookup::lookup_v2::OwnedValuePath;
+use lookup::lookup_v2::{OwnedValuePath, ValuePath};
 use lookup::PathPrefix;
 
 use super::{
@@ -101,14 +101,14 @@ impl<'a> DnstapParser<'a> {
         }
     }
 
-    fn insert<V>(&mut self, key: &'static str, value: V) -> Option<Value>
+    fn insert<'b, 'c: 'b, V>(&'c mut self, key: impl ValuePath<'b>, value: V) -> Option<Value>
     where
         V: Into<Value> + Debug,
     {
-        let mut node_path = self.parent_key_path.clone();
-        node_path.push_field(key);
-        self.log_event
-            .insert((PathPrefix::Event, &node_path), value)
+        self.log_event.insert(
+            (PathPrefix::Event, (&self.parent_key_path).concat(key)),
+            value,
+        )
     }
 
     pub fn parse_dnstap_data(&mut self, frame: Bytes) -> Result<()> {
@@ -356,10 +356,9 @@ impl<'a> DnstapParser<'a> {
                 .timestamp_opt(time_sec.try_into().unwrap(), query_time_nsec)
                 .single()
                 .expect("invalid timestamp");
-            self.insert(
-                self.event_schema.dnstap_root_data_schema().timestamp(),
-                timestamp,
-            );
+            if let Some(timestamp_key) = self.event_schema.dnstap_root_data_schema().timestamp() {
+                self.insert(timestamp_key, timestamp);
+            }
         }
 
         if message.is_none() {

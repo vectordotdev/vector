@@ -155,7 +155,12 @@ async fn structures_events_correctly() {
     input_event.insert("foo", "bar");
     drop(batch);
 
-    let timestamp = input_event[crate::config::log_schema().timestamp_key()].clone();
+    let timestamp = input_event[crate::config::log_schema()
+        .timestamp_key()
+        .unwrap()
+        .to_string()
+        .as_str()]
+    .clone();
 
     run_and_assert_sink_compliance(
         sink,
@@ -623,7 +628,7 @@ async fn run_insert_tests_with_config(
                 obj.remove("data_stream");
                 // Un-rewrite the timestamp field
                 let timestamp = obj.remove(DATA_STREAM_TIMESTAMP_KEY).unwrap();
-                obj.insert(log_schema().timestamp_key().into(), timestamp);
+                obj.insert(log_schema().timestamp_key().unwrap().to_string(), timestamp);
             }
             assert!(input.contains(hit));
         }
