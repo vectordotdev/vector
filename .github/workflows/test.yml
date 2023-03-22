@@ -400,10 +400,10 @@ jobs:
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - name: Install grcov
-        run: cargo install cargo-tarpaulin
+        run: cargo install cargo-tarpaulin --locked
 
       - name: Generate coverage
-        run: cargo tarpaulin --all-features --workspace --out Xml
+        run: cargo tarpaulin --workspace --out Xml
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
         if: ${{ env.GITHUB_REPOSITORY }} == 'vectordotdev/vector'
