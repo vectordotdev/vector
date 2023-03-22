@@ -1,19 +1,4 @@
-use futures_util::FutureExt;
-use snafu::ResultExt;
-use value::Kind;
-
-use pulsar::authentication::oauth2::{OAuth2Authentication, OAuth2Params};
-use pulsar::error::AuthenticationError;
-use pulsar::{
-    compression, message::proto, Authentication, Error as PulsarError, ProducerOptions, Pulsar,
-    TokioExecutor,
-};
-
-use codecs::{encoding::SerializerConfig, TextSerializerConfig};
-use vector_common::sensitive_string::SensitiveString;
-use vector_config::configurable_component;
-use vector_core::config::DataType;
-
+use crate::sinks::util::TowerRequestConfig;
 use crate::{
     codecs::EncodingConfig,
     config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
@@ -23,6 +8,19 @@ use crate::{
         Healthcheck, VectorSink,
     },
 };
+use codecs::{encoding::SerializerConfig, TextSerializerConfig};
+use futures_util::FutureExt;
+use pulsar::authentication::oauth2::{OAuth2Authentication, OAuth2Params};
+use pulsar::error::AuthenticationError;
+use pulsar::{
+    compression, message::proto, Authentication, Error as PulsarError, ProducerOptions, Pulsar,
+    TokioExecutor,
+};
+use snafu::ResultExt;
+use value::Kind;
+use vector_common::sensitive_string::SensitiveString;
+use vector_config::configurable_component;
+use vector_core::config::DataType;
 
 /// Configuration for the `pulsar` sink.
 #[configurable_component(sink("pulsar"))]
@@ -274,7 +272,7 @@ impl SinkConfig for PulsarSinkConfig {
             .await
             .context(super::sink::CreatePulsarSinkSnafu)?;
 
-        let sink = PulsarSink::new(client, self.clone()).await?;
+        let sink = PulsarSink::new(client, self.clone())?;
 
         let hc = healthcheck(self.clone()).boxed();
 

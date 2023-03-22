@@ -1,26 +1,25 @@
 use async_trait::async_trait;
 use bytes::Bytes;
-use futures::{stream::BoxStream, StreamExt};
-use pulsar::{Error as PulsarError, Pulsar, TokioExecutor};
-use serde::Serialize;
-use snafu::{ResultExt, Snafu};
 use std::collections::HashMap;
-use tower::ServiceBuilder;
 
-use super::{
-    config::PulsarSinkConfig,
-    encoder::PulsarEncoder,
-    request_builder::PulsarRequestBuilder,
-    service::{PulsarRetryLogic, PulsarService},
-    util,
+use crate::sinks::pulsar::config::PulsarSinkConfig;
+use crate::sinks::pulsar::encoder::PulsarEncoder;
+use crate::sinks::pulsar::request_builder::PulsarRequestBuilder;
+use crate::sinks::pulsar::service::{PulsarRetryLogic, PulsarService};
+use crate::sinks::pulsar::util;
+use crate::sinks::util::{
+    ServiceBuilderExt, SinkBuilderExt, TowerRequestConfig, TowerRequestSettings,
 };
-
 use crate::template::{Template, TemplateParseError};
 use crate::{
     codecs::{Encoder, Transformer},
     event::Event,
-    sinks::util::{ServiceBuilderExt, SinkBuilderExt, TowerRequestConfig},
 };
+use futures::{stream::BoxStream, StreamExt};
+use pulsar::{Error as PulsarError, Pulsar, TokioExecutor};
+use serde::Serialize;
+use snafu::{ResultExt, Snafu};
+use tower::ServiceBuilder;
 use vector_buffers::EventCount;
 use vector_common::byte_size_of::ByteSizeOf;
 use vector_core::{
@@ -41,6 +40,7 @@ pub(crate) struct PulsarSink {
     transformer: Transformer,
     encoder: Encoder<()>,
     service: PulsarService<TokioExecutor>,
+    request_settings: TowerRequestSettings,
     config: PulsarSinkConfig,
     topic_template: Template,
 }
@@ -96,26 +96,22 @@ pub(crate) async fn healthcheck(config: PulsarSinkConfig) -> crate::Result<()> {
 }
 
 impl PulsarSink {
-    pub(crate) async fn new(
+    pub(crate) fn new(
         client: Pulsar<TokioExecutor>,
         config: PulsarSinkConfig,
     ) -> crate::Result<Self> {
         let producer_opts = config.build_producer_options();
         let transformer = config.encoding.transformer();
         let serializer = config.encoding.build()?;
+        let request_settings = config.request.unwrap_with(&TowerRequestConfig::default());
         let encoder = Encoder::<()>::new(serializer);
-        let service = PulsarService::new(
-            client,
-            producer_opts,
-            config.producer_name.clone(),
-            &config.topic,
-        )
-        .await?;
+        let service = PulsarService::new(client, producer_opts, None, config.producer_name.clone());
         let topic = config.topic.clone();
 
         Ok(PulsarSink {
             config,
             transformer,
+            request_settings,
             encoder,
             service,
             topic_template: Template::try_from(topic).context(TopicTemplateSnafu)?,
@@ -123,10 +119,8 @@ impl PulsarSink {
     }
 
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
-        let request_config = TowerRequestConfig::default();
-        let request_settings = request_config.unwrap_with(&request_config);
         let service = ServiceBuilder::new()
-            .settings(request_settings, PulsarRetryLogic)
+            .settings(self.request_settings, PulsarRetryLogic)
             .service(self.service);
         let request_builder = PulsarRequestBuilder {
             encoder: PulsarEncoder {

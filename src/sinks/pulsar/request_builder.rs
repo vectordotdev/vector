@@ -20,6 +20,7 @@ pub(super) struct PulsarMetadata {
     pub key: Option<Bytes>,
     pub properties: Option<HashMap<String, Bytes>>,
     pub timestamp_millis: Option<i64>,
+    pub topic: String,
 }
 
 pub(super) struct PulsarRequestBuilder {
@@ -53,6 +54,7 @@ impl RequestBuilder<PulsarEvent> for PulsarRequestBuilder {
             key: input.key,
             timestamp_millis: input.timestamp_millis,
             properties: input.properties,
+            topic: input.topic,
         };
         (metadata, builder, input.event)
     }
