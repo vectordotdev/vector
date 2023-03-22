@@ -127,7 +127,7 @@ mod tests {
                 pid: "72972",
                 thread: "main",
                 logger: "o.s.i.monitor.IntegrationMBeanExporter",
-                message: "java.lang.NullPointerException: null\n\tat io.javabrains.EmployerController.getAllEmployers(EmployerController.java:20) ~[classes/:na]"
+                message: "java.lang.NullPointerException: null\n\tat io.test.EmployerController.getAllEmployers(EmployerController.java:20) ~[classes/:na]"
             })),
             tdef: TypeDef::object(inner_kind()),
         }
