@@ -3,19 +3,23 @@ crate::cli_subcommands! {
         archive, deb, msi, rpm,
 }
 
-crate::package_script_wrapper! {
+crate::script_wrapper! {
     archive = "Create a .tar.gz package for the specified $TARGET"
         => "package-archive.sh"
+        => crate::util::mark_safe_git_repo()
 }
-crate::package_script_wrapper! {
+crate::script_wrapper! {
     deb = "Create a .deb package to be distributed in the APT package manager"
         => "package-deb.sh"
+        => crate::util::mark_safe_git_repo()
 }
-crate::package_script_wrapper! {
+crate::script_wrapper! {
     msi = "Create a .msi package for Windows"
         => "package-msi.sh"
+        => crate::util::mark_safe_git_repo()
 }
-crate::package_script_wrapper! {
+crate::script_wrapper! {
     rpm = "Create a .rpm package to be distributed in the YUM package manager"
         => "package-rpm.sh"
+        => crate::util::mark_safe_git_repo()
 }

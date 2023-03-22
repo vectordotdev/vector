@@ -90,10 +90,11 @@ cli_commands! {
     mod version,
 }
 
-/// This macro creates a wrapper for an existing script
+/// This macro creates a wrapper for an existing script.
+/// `pre` provides the option to execute an expression before running the script.
 #[macro_export]
 macro_rules! script_wrapper {
-    ( $mod:ident = $doc:literal => $script:literal ) => {
+    ( $mod:ident = $doc:literal => $script:literal => $pre:expr ) => {
         paste::paste! {
             mod $mod {
                 #[doc = $doc]
@@ -105,32 +106,7 @@ macro_rules! script_wrapper {
 
                 impl Cli {
                     pub(super) fn exec(self) -> anyhow::Result<()> {
-                        $crate::app::exec(concat!("scripts/", $script), self.args, true)
-                    }
-                }
-            }
-        }
-    };
-}
-
-/// This macro creates a wrapper for an existing package script. If the command is run from within
-/// the CI environment (by checking the CI env var), the repo directory is marked as safe, to
-/// satisfy git permissions requirements.
-#[macro_export]
-macro_rules! package_script_wrapper {
-    ( $mod:ident = $doc:literal => $script:literal ) => {
-        paste::paste! {
-            mod $mod {
-                #[doc = $doc]
-                #[derive(clap::Args, Debug)]
-                #[command()]
-                pub(super) struct Cli {
-                    args: Vec<String>,
-                }
-
-                impl Cli {
-                    pub(super) fn exec(self) -> anyhow::Result<()> {
-                        $crate::util::mark_safe_git_repo();
+                        $pre;
                         $crate::app::exec(concat!("scripts/", $script), self.args, true)
                     }
                 }
