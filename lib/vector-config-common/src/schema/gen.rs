@@ -42,6 +42,7 @@ impl SchemaSettings {
 
     /// Creates a `Visitor` from the given closure and appends it to the list of
     /// [visitors](SchemaSettings::visitors) for these `SchemaSettings`.
+    #[allow(rustdoc::private_intra_doc_links)]
     pub fn with_visitor<F, V>(mut self, visitor_fn: F) -> Self
     where
         F: FnOnce(&Self) -> V,
@@ -93,6 +94,7 @@ impl SchemaGenerator {
     ///
     /// The keys of the returned `Map` are the [schema names](JsonSchema::schema_name), and the
     /// values are the schemas themselves.
+    #[allow(rustdoc::broken_intra_doc_links)]
     pub fn definitions(&self) -> &Map<String, Schema> {
         &self.definitions
     }
@@ -102,6 +104,7 @@ impl SchemaGenerator {
     ///
     /// The keys of the returned `Map` are the [schema names](JsonSchema::schema_name), and the
     /// values are the schemas themselves.
+    #[allow(rustdoc::broken_intra_doc_links)]
     pub fn definitions_mut(&mut self) -> &mut Map<String, Schema> {
         &mut self.definitions
     }

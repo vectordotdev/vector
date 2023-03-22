@@ -90,7 +90,7 @@ pub enum AwsAuthentication {
     ///
     /// Additionally, the specific credential profile to use can be set.
     /// The file format must match the credentials file format outlined in
-    /// https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html.
+    /// <https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html>.
     File {
         /// Path to the credentials file.
         #[configurable(metadata(docs::examples = "/my/aws/credentials"))]

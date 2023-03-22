@@ -103,8 +103,8 @@ fn apply_grok_rule(source: &str, grok_rule: &GrokRule) -> Result<Value, Error> {
 mod tests {
     use ordered_float::NotNan;
     use tracing_test::traced_test;
+    use value::btreemap;
     use value::Value;
-    use vector_common::btreemap;
 
     use super::*;
     use crate::parse_grok_rules::parse_grok_rules;

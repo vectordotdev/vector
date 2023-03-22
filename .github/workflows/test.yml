@@ -370,11 +370,15 @@ jobs:
       - name: Check Component Docs
         if: needs.changes.outputs.source == 'true' || needs.changes.outputs.component_docs == 'true'
         run: make check-component-docs
+      - name: Check Rust Docs
+        if: needs.changes.outputs.source == 'true'
+        run: cd rust-doc && make docs
       - uses: actions/upload-artifact@v3
         with:
           name: "config-schema.json"
           path: "/tmp/vector-config-schema.json"
         if: success() || failure()
+
   master-failure:
     name: master-failure
     if: failure() && github.ref == 'refs/heads/master'
