@@ -211,8 +211,8 @@ rmp-serde = { version = "1.1.1", default-features = false, optional = true }
 rmpv = { version = "1.0.0", default-features = false, features = ["with-serde"], optional = true }
 
 # Prost
-prost = { version = "0.11.8", default-features = false, features = ["std"] }
-prost-types = { version = "0.11.8", default-features = false, optional = true }
+prost = { version = "0.11", default-features = false, features = ["std"] }
+prost-types = { version = "0.11", default-features = false, optional = true }
 
 # GCP
 goauth = { version = "0.13.1", optional = true }
@@ -346,7 +346,7 @@ atty = { version = "0.2.14", default-features = false }
 nix = { version = "0.26.2", default-features = false, features = ["socket", "signal"] }
 
 [build-dependencies]
-prost-build = { version = "0.11.8", default-features = false, optional = true }
+prost-build = { version = "0.11", default-features = false, optional = true }
 tonic-build = { version = "0.8", default-features = false, features = ["transport", "prost"], optional = true }
 openssl-src = { version = "111", default-features = false, features = ["force-engine"] }
 
