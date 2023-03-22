@@ -386,7 +386,6 @@ jobs:
     if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
       - uses: actions/checkout@v3
-      - name: Toolchain setup
       - uses: actions/cache@v3
         name: Cache Cargo registry + index
         with:
@@ -400,6 +399,7 @@ jobs:
             ${{ runner.os }}-cargo-
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
+      - name: Nightly toolchain setup
         uses: actions-rs/toolchain@v1
         with:
           toolchain: nightly
