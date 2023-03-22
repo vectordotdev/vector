@@ -150,7 +150,7 @@ loki-logproto = { path = "lib/loki-logproto", optional = true }
 
 # Tokio / Futures
 async-stream = { version = "0.3.4", default-features = false }
-async-trait = { version = "0.1.66", default-features = false }
+async-trait = { version = "0.1.67", default-features = false }
 futures = { version = "0.3.27", default-features = false, features = ["compat", "io-compat"], package = "futures" }
 tokio = { version = "1.26.0", default-features = false, features = ["full"] }
 tokio-openssl = { version = "0.6.3", default-features = false }
@@ -211,8 +211,8 @@ rmp-serde = { version = "1.1.1", default-features = false, optional = true }
 rmpv = { version = "1.0.0", default-features = false, features = ["with-serde"], optional = true }
 
 # Prost
-prost = { version = "0.11.8", default-features = false, features = ["std"] }
-prost-types = { version = "0.11.8", default-features = false, optional = true }
+prost = { version = "0.11", default-features = false, features = ["std"] }
+prost-types = { version = "0.11", default-features = false, optional = true }
 
 # GCP
 goauth = { version = "0.13.1", optional = true }
@@ -307,7 +307,7 @@ rand = { version = "0.8.5", default-features = false, features = ["small_rng"] }
 rand_distr = { version = "0.4.3", default-features = false }
 rdkafka = { version = "0.29.0", default-features = false, features = ["tokio", "libz", "ssl", "zstd"], optional = true }
 redis = { version = "0.22.3", default-features = false, features = ["connection-manager", "tokio-comp", "tokio-native-tls-comp"], optional = true }
-regex = { version = "1.7.1", default-features = false, features = ["std", "perf"] }
+regex = { version = "1.7.2", default-features = false, features = ["std", "perf"] }
 roaring = { version = "0.10.1", default-features = false, optional = true }
 seahash = { version = "4.1.0", default-features = false }
 semver = { version = "1.0.17", default-features = false, features = ["serde", "std"], optional = true }
@@ -346,7 +346,7 @@ atty = { version = "0.2.14", default-features = false }
 nix = { version = "0.26.2", default-features = false, features = ["socket", "signal"] }
 
 [build-dependencies]
-prost-build = { version = "0.11.8", default-features = false, optional = true }
+prost-build = { version = "0.11", default-features = false, optional = true }
 tonic-build = { version = "0.8", default-features = false, features = ["transport", "prost"], optional = true }
 openssl-src = { version = "111", default-features = false, features = ["force-engine"] }
 

@@ -40,6 +40,8 @@ pub mod kind;
 pub mod secrets;
 pub mod value;
 
+mod btreemap;
+
 pub use kind::Kind;
 
 pub use self::secrets::Secrets;

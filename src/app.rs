@@ -19,7 +19,7 @@ use crate::config::enterprise::{
     EnterpriseReporter,
 };
 #[cfg(not(windows))]
-use crate::control_server::{self, ControlServer};
+use crate::control_server::ControlServer;
 #[cfg(not(feature = "enterprise-tests"))]
 use crate::metrics;
 #[cfg(feature = "api")]
@@ -28,7 +28,7 @@ use crate::{
     cli::{handle_config_errors, LogFormat, Opts, RootOpts},
     config::{self, Config, ConfigPath},
     heartbeat,
-    signal::{SignalHandler, SignalPair, SignalRx, SignalTo},
+    signal::{SignalHandler, SignalPair, SignalTo},
     topology::{self, ReloadOutcome, RunningTopology, TopologyController},
     trace,
 };
@@ -109,52 +109,9 @@ impl ApplicationConfig {
             enterprise,
         })
     }
-
-    /// Configure the API server, if applicable
-    #[cfg(feature = "api")]
-    pub fn setup_api(&self) -> Option<api::Server> {
-        if self.api.enabled {
-            use std::sync::atomic::AtomicBool;
-
-            let api_server = api::Server::start(
-                self.topology.config(),
-                self.topology.watch(),
-                Arc::<AtomicBool>::clone(&self.topology.running),
-            );
-
-            match api_server {
-                Ok(api_server) => {
-                    emit!(ApiStarted {
-                        addr: self.api.address.unwrap(),
-                        playground: self.api.playground
-                    });
-
-                    Some(api_server)
-                }
-                Err(e) => {
-                    error!("An error occurred that Vector couldn't handle: {}.", e);
-                    let _ = self.graceful_crash_sender.send(());
-                    None
-                }
-            }
-        } else {
-            info!(message="API is disabled, enable by setting `api.enabled` to `true` and use commands like `vector top`.");
-            None
-        }
-    }
 }
 
 impl Application {
-    pub fn run() {
-        let (runtime, app) = Self::prepare_start().unwrap_or_else(|code| std::process::exit(code));
-
-        runtime.block_on(app.run());
-    }
-
-    pub fn prepare_start() -> Result<(Runtime, StartedApplication), ExitCode> {
-        Self::prepare().and_then(|(runtime, app)| app.start(&runtime).map(|app| (runtime, app)))
-    }
-
     pub fn prepare() -> Result<(Runtime, Self), ExitCode> {
         let opts = Opts::get_matches().map_err(|error| {
             // Printing to stdout/err can itself fail; ignore it.
@@ -180,7 +137,7 @@ impl Application {
         let runtime = build_runtime(opts.root.threads, "vector-worker")?;
 
         // Signal handler for OS and provider messages.
-        let mut signals = SignalPair::new(&runtime);
+        let mut signals = runtime.block_on(SignalPair::new());
 
         if let Some(sub_command) = &opts.sub_command {
             return Err(runtime.block_on(sub_command.execute(signals, color)));
@@ -201,13 +158,10 @@ impl Application {
         ))
     }
 
-    pub fn start(self, runtime: &Runtime) -> Result<StartedApplication, ExitCode> {
+    pub async fn run(self) {
         // Any internal_logs sources will have grabbed a copy of the
         // early buffer by this point and set up a subscriber.
         crate::trace::stop_early_buffering();
-
-        emit!(VectorStarted);
-        runtime.spawn(heartbeat::heartbeat());
 
         let Self {
             require_healthy,
@@ -215,60 +169,80 @@ impl Application {
             signals,
         } = self;
 
+        let mut signal_handler = signals.handler;
+        let mut signal_rx = signals.receiver;
+
+        let topology = config.topology;
+        let config_paths = config.config_paths;
+
+        emit!(VectorStarted);
+        tokio::spawn(heartbeat::heartbeat());
+
+        // Configure the API server, if applicable.
+        #[cfg(feature = "api")]
+        // Assigned to prevent the API terminating when falling out of scope.
+        let api_server = if config.api.enabled {
+            use std::sync::atomic::AtomicBool;
+
+            let api_server = api::Server::start(
+                topology.config(),
+                topology.watch(),
+                Arc::<AtomicBool>::clone(&topology.running),
+            );
+
+            match api_server {
+                Ok(api_server) => {
+                    emit!(ApiStarted {
+                        addr: config.api.address.unwrap(),
+                        playground: config.api.playground
+                    });
+
+                    Some(api_server)
+                }
+                Err(e) => {
+                    error!("An error occurred that Vector couldn't handle: {}.", e);
+                    let _ = config.graceful_crash_sender.send(());
+                    None
+                }
+            }
+        } else {
+            info!(message="API is disabled, enable by setting `api.enabled` to `true` and use commands like `vector top`.");
+            None
+        };
+
         let topology_controller = TopologyController {
-            #[cfg(feature = "api")]
-            api_server: config.setup_api(),
-            topology: config.topology,
-            config_paths: config.config_paths.clone(),
+            topology,
+            config_paths: config_paths.clone(),
             require_healthy,
             #[cfg(feature = "enterprise")]
             enterprise_reporter: config.enterprise,
+            #[cfg(feature = "api")]
+            api_server,
         };
         let topology_controller = Arc::new(Mutex::new(topology_controller));
 
         // If the relevant ENV var is set, start up the control server
         #[cfg(not(windows))]
-        let control_server_pieces = setup_control_server(&topology_controller, runtime)?;
+        let control_server_pieces = if let Ok(path) = std::env::var("VECTOR_CONTROL_SOCKET_PATH") {
+            let (shutdown_trigger, tripwire) = stream_cancel::Tripwire::new();
+            match ControlServer::bind(path, Arc::clone(&topology_controller), tripwire) {
+                Ok(control_server) => {
+                    let server_handle = tokio::spawn(control_server.run());
+                    Some((shutdown_trigger, server_handle))
+                }
+                Err(error) => {
+                    error!(message = "Error binding control server.", %error);
+                    // TODO: We should exit non-zero here, but `Application::run` isn't set up
+                    // that way, and we'd need to push everything up to the API server start
+                    // into `Application::prepare`.
+                    return;
+                }
+            }
+        } else {
+            None
+        };
 
-        Ok(StartedApplication {
-            config_paths: config.config_paths,
-            #[cfg(not(windows))]
-            control_server_pieces,
-            graceful_crash_receiver: config.graceful_crash_receiver,
-            signals,
-            topology_controller,
-        })
-    }
-}
-
-pub struct StartedApplication {
-    config_paths: Vec<ConfigPath>,
-    #[cfg(not(windows))]
-    control_server_pieces: Option<control_server::Pieces>,
-    graceful_crash_receiver: mpsc::UnboundedReceiver<()>,
-    pub signals: SignalPair,
-    topology_controller: Arc<Mutex<TopologyController>>,
-}
-
-impl StartedApplication {
-    pub async fn run(self) {
-        self.main().await.shutdown().await
-    }
-
-    pub async fn main(self) -> FinishedApplication {
-        let Self {
-            config_paths,
-            #[cfg(not(windows))]
-            control_server_pieces,
-            graceful_crash_receiver,
-            signals,
-            topology_controller,
-        } = self;
-
-        let mut graceful_crash = UnboundedReceiverStream::new(graceful_crash_receiver);
-
-        let mut signal_handler = signals.handler;
-        let mut signal_rx = signals.receiver;
+        let mut graceful_crash = UnboundedReceiverStream::new(config.graceful_crash_receiver);
 
         let signal = loop {
             tokio::select! {
@@ -312,34 +286,6 @@ impl StartedApplication {
                 else => unreachable!("Signal streams never end"),
             }
         };
-
-        FinishedApplication {
-            #[cfg(not(windows))]
-            control_server_pieces,
-            signal,
-            signal_rx,
-            topology_controller,
-        }
-    }
-}
-
-pub struct FinishedApplication {
-    #[cfg(not(windows))]
-    control_server_pieces: Option<control_server::Pieces>,
-    signal: SignalTo,
-    signal_rx: SignalRx,
-    topology_controller: Arc<Mutex<TopologyController>>,
-}
-
-impl FinishedApplication {
-    pub async fn shutdown(self) {
-        let FinishedApplication {
-            #[cfg(not(windows))]
-            control_server_pieces,
-            signal,
-            mut signal_rx,
-            topology_controller,
-        } = self;
 
         // Shut down the control server, if running
         #[cfg(not(windows))]
@@ -545,20 +491,4 @@ pub fn init_logging(color: bool, format: LogFormat, log_level: &str, rate: u64) 
         internal_log_rate_secs = rate,
     );
     info!(message = "Log level is enabled.", level = ?level);
-}
-
-#[cfg(not(windows))]
-pub fn setup_control_server(
-    topology_controller: &Arc<Mutex<TopologyController>>,
-    runtime: &Runtime,
-) -> Result<Option<control_server::Pieces>, ExitCode> {
-    std::env::var("VECTOR_CONTROL_SOCKET_PATH")
-        .ok()
-        .map(|path| {
-            ControlServer::start(path, topology_controller, runtime).map_err(|error| {
-                error!(message = "Failed to bind control server.", %error);
-                exitcode::CONFIG
-            })
-        })
-        .transpose()
 }

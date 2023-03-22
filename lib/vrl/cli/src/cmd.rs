@@ -9,9 +9,9 @@ use std::{
 
 use ::value::Value;
 use clap::Parser;
+use core::TimeZone;
 use lookup::{owned_value_path, OwnedTargetPath};
 use value::Secrets;
-use vector_common::TimeZone;
 use vrl::state::TypeState;
 use vrl::{diagnostic::Formatter, state, Program, Runtime, Target, VrlRuntime};
 use vrl::{CompilationResult, CompileConfig};

@@ -1,4 +1,4 @@
-use vector_common::TimeZone;
+use core::TimeZone;
 
 use crate::{state::Runtime, Target};
 
