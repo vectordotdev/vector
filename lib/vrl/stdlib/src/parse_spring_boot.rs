@@ -120,7 +120,7 @@ mod tests {
         }
 
         error_trace {
-            args: func_args![value: value!("2023-01-30 22:37:33.495 INFO 72972 --- [ main] o.s.i.monitor.IntegrationMBeanExporter : java.lang.NullPointerException: null\n\tat io.javabrains.EmployerController.getAllEmployers(EmployerController.java:20) ~[classes/:na]")],
+            args: func_args![value: value!("2023-01-30 22:37:33.495 INFO 72972 --- [ main] o.s.i.monitor.IntegrationMBeanExporter : java.lang.NullPointerException: null\n\tat io.test.EmployerController.getAllEmployers(EmployerController.java:20) ~[classes/:na]")],
             want: Ok(value!({
                 timestamp: "2023-01-30 22:37:33.495",
                 level: "INFO",
