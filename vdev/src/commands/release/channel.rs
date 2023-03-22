@@ -1,6 +1,6 @@
 use anyhow::Result;
 
-use crate::util::get_mode;
+use crate::util::get_channel;
 
 /// Provide the release channel (latest/nightly/custom) based on the MODE env variable.
 /// This command is intended for use only within GitHub build workflows.
@@ -12,7 +12,7 @@ pub struct Cli {}
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
-        let channel = get_mode();
+        let channel = get_channel();
 
         println!("{channel}");
         Ok(())

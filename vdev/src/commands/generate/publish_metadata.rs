@@ -26,7 +26,7 @@ impl Cli {
         let build_desc = format!("{git_sha} {current_date}");
 
         // Figure out what our release channel is.
-        let channel = env::var("CHANNEL").unwrap_or_else(|_| util::get_mode());
+        let channel = util::get_channel();
 
         // Depending on the channel, this influences which Cloudsmith repository we publish to.
         let cloudsmith_repo = match channel.as_str() {

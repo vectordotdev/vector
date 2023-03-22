@@ -133,7 +133,7 @@ pub fn vector_version() -> impl std::fmt::Display {
 
     #[cfg(not(feature = "nightly"))]
     let pkg_version = match built_info::DEBUG {
-        // if any debug info is included considered it a non-release build.
+        // If any debug info is included, consider it a non-release build.
         "1" | "2" | "true" => {
             format!(
                 "{}-custom-{}",

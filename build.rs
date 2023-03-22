@@ -99,10 +99,8 @@ fn git_short_hash() -> std::io::Result<String> {
         .output();
 
     output_result.map(|output| {
-        let mut hash = String::from_utf8(output.stdout).unwrap();
-
-        hash.retain(|c| c != '\n');
-        hash.retain(|c| c != '\r');
+        let mut hash = String::from_utf8(output.stdout).expect("valid UTF-8");
+        hash.retain(|c| !c.is_ascii_whitespace());
 
         hash
     })
@@ -194,7 +192,7 @@ fn main() {
                 e
             )
         })
-        .unwrap();
+        .expect("git hash detection failed");
 
     // Gather up the constants and write them out to our build constants file.
     let mut constants = BuildConstants::new();

@@ -47,7 +47,7 @@ pub fn set_repo_dir() -> Result<()> {
 pub fn version() -> Result<String> {
     let mut version = env::var("VERSION").or_else(|_| util::read_version())?;
 
-    let channel = env::var("CHANNEL").unwrap_or_else(|_| util::get_mode());
+    let channel = util::get_channel();
 
     if channel == "latest" {
         let head = util::git_head()?;
@@ -60,15 +60,13 @@ pub fn version() -> Result<String> {
             bail!("On latest release channel and tag {tag:?} is different from Cargo.toml {version:?}. Aborting");
         }
     } else if channel == "custom" {
-        let base_version = util::read_version()?;
-
         util::mark_safe_git_repo();
 
         let sha = git::get_git_sha()?;
 
         // use '.' instead of '-' or '_' to avoid issues with rpm and deb package naming
         // format requirements.
-        version = format!("{base_version}.custom.{sha}");
+        version = format!("{version}.custom.{sha}");
     }
 
     Ok(version)
