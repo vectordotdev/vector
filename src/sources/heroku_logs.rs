@@ -26,8 +26,8 @@ use vector_core::{
 use crate::{
     codecs::{Decoder, DecodingConfig},
     config::{
-        log_schema, GenerateConfig, Output, Resource, SourceAcknowledgementsConfig, SourceConfig,
-        SourceContext,
+        log_schema, GenerateConfig, Resource, SourceAcknowledgementsConfig, SourceConfig,
+        SourceContext, SourceOutput,
     },
     event::{Event, LogEvent},
     internal_events::{HerokuLogplexRequestReadError, HerokuLogplexRequestReceived},
@@ -181,11 +181,14 @@ impl SourceConfig for LogplexConfig {
         )
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         // There is a global and per-source `log_namespace` config.
         // The source config overrides the global setting and is merged here.
         let schema_def = self.schema_definition(global_log_namespace.merge(self.log_namespace));
-        vec![Output::source_logs(self.decoding.output_type(), schema_def)]
+        vec![SourceOutput::source_logs(
+            self.decoding.output_type(),
+            schema_def,
+        )]
     }
 
     fn resources(&self) -> Vec<Resource> {
@@ -691,7 +694,7 @@ mod tests {
                     None,
                 );
 
-        assert_eq!(definitions, vec![expected_definition])
+        assert_eq!(definitions, Some(expected_definition))
     }
 
     #[test]
@@ -718,6 +721,6 @@ mod tests {
         .with_event_field(&owned_value_path!("proc_id"), Kind::bytes(), None)
         .unknown_fields(Kind::bytes());
 
-        assert_eq!(definitions, vec![expected_definition])
+        assert_eq!(definitions, Some(expected_definition))
     }
 }

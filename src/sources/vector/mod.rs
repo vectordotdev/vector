@@ -15,8 +15,8 @@ use vector_core::{
 
 use crate::{
     config::{
-        DataType, GenerateConfig, Output, Resource, SourceAcknowledgementsConfig, SourceConfig,
-        SourceContext,
+        DataType, GenerateConfig, Resource, SourceAcknowledgementsConfig, SourceConfig,
+        SourceContext, SourceOutput,
     },
     internal_events::{EventsReceived, StreamClosedError},
     proto::vector as proto,
@@ -190,14 +190,17 @@ impl SourceConfig for VectorConfig {
         Ok(Box::pin(source))
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         let log_namespace = global_log_namespace.merge(self.log_namespace);
 
         let schema_definition = NativeDeserializerConfig
             .schema_definition(log_namespace)
             .with_standard_vector_source_metadata();
 
-        vec![Output::source_logs(DataType::all(), schema_definition)]
+        vec![SourceOutput::source_logs(
+            DataType::all(),
+            schema_definition,
+        )]
     }
 
     fn resources(&self) -> Vec<Resource> {
@@ -245,7 +248,7 @@ mod test {
                     None,
                 );
 
-        assert_eq!(definitions, vec![expected_definition])
+        assert_eq!(definitions, Some(expected_definition))
     }
 
     #[test]
@@ -263,7 +266,7 @@ mod test {
         .with_event_field(&owned_value_path!("source_type"), Kind::bytes(), None)
         .with_event_field(&owned_value_path!("timestamp"), Kind::timestamp(), None);
 
-        assert_eq!(definitions, vec![expected_definition])
+        assert_eq!(definitions, Some(expected_definition))
     }
 }
 

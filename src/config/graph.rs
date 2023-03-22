@@ -3,13 +3,13 @@ use std::collections::{HashMap, HashSet, VecDeque};
 
 use super::{
     schema, ComponentKey, DataType, Output, OutputId, SinkConfig, SinkOuter, SourceConfig,
-    SourceOuter, TransformOuter,
+    SourceOuter, SourceOutput, TransformOuter,
 };
 
 #[derive(Debug, Clone)]
 pub enum Node {
     Source {
-        outputs: Vec<Output>,
+        outputs: Vec<SourceOutput>,
     },
     Transform {
         in_ty: DataType,
@@ -167,7 +167,12 @@ impl Graph {
     /// have inputs.
     fn get_output_type(&self, id: &OutputId) -> DataType {
         match &self.nodes[&id.component] {
-            Node::Source { outputs } | Node::Transform { outputs, .. } => outputs
+            Node::Source { outputs } => outputs
+                .iter()
+                .find(|output| output.port == id.port)
+                .map(|output| output.ty)
+                .expect("output didn't exist"),
+            Node::Transform { outputs, .. } => outputs
                 .iter()
                 .find(|output| output.port == id.port)
                 .map(|output| output.ty)
@@ -258,7 +263,14 @@ impl Graph {
             .iter()
             .flat_map(|(key, node)| match node {
                 Node::Sink { .. } => vec![],
-                Node::Source { outputs } | Node::Transform { outputs, .. } => outputs
+                Node::Source { outputs } => outputs
+                    .iter()
+                    .map(|output| OutputId {
+                        component: key.clone(),
+                        port: output.port.clone(),
+                    })
+                    .collect(),
+                Node::Transform { outputs, .. } => outputs
                     .iter()
                     .map(|output| OutputId {
                         component: key.clone(),
@@ -363,7 +375,7 @@ mod test {
             self.nodes.insert(
                 id.into(),
                 Node::Source {
-                    outputs: vec![Output::source_metrics(ty)],
+                    outputs: vec![SourceOutput::source_metrics(ty)],
                 },
             );
         }
@@ -619,13 +631,13 @@ mod test {
         graph.nodes.insert(
             ComponentKey::from("foo.bar"),
             Node::Source {
-                outputs: vec![Output::source_metrics(DataType::all())],
+                outputs: vec![SourceOutput::source_metrics(DataType::all())],
             },
         );
         graph.nodes.insert(
             ComponentKey::from("foo.bar"),
             Node::Source {
-                outputs: vec![Output::source_metrics(DataType::all())],
+                outputs: vec![SourceOutput::source_metrics(DataType::all())],
             },
         );
         graph.nodes.insert(
@@ -650,7 +662,7 @@ mod test {
         graph.nodes.insert(
             ComponentKey::from("baz.errors"),
             Node::Source {
-                outputs: vec![Output::source_metrics(DataType::all())],
+                outputs: vec![SourceOutput::source_metrics(DataType::all())],
             },
         );
         graph.nodes.insert(

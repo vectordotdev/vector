@@ -16,7 +16,7 @@ use vector_core::{
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
-    config::{GenerateConfig, Output, SourceConfig, SourceContext},
+    config::{GenerateConfig, SourceConfig, SourceContext, SourceOutput},
     event::Event,
     internal_events::StreamClosedError,
     nats::{from_tls_auth_config, NatsAuthConfig, NatsConfigError},
@@ -131,7 +131,7 @@ impl SourceConfig for NatsSourceConfig {
         )))
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         let log_namespace = global_log_namespace.merge(self.log_namespace);
         let legacy_subject_key_field = self
             .subject_key_field
@@ -150,7 +150,7 @@ impl SourceConfig for NatsSourceConfig {
                 None,
             );
 
-        vec![Output::source_logs(
+        vec![SourceOutput::source_logs(
             self.decoding.output_type(),
             schema_definition,
         )]
@@ -308,7 +308,7 @@ mod tests {
                 )
                 .with_metadata_field(&owned_value_path!("nats", "subject"), Kind::bytes(), None);
 
-        assert_eq!(definitions, vec![expected_definition]);
+        assert_eq!(definitions, Some(expected_definition));
     }
 
     #[test]
@@ -334,7 +334,7 @@ mod tests {
         .with_event_field(&owned_value_path!("source_type"), Kind::bytes(), None)
         .with_event_field(&owned_value_path!("subject"), Kind::bytes(), None);
 
-        assert_eq!(definitions, vec![expected_definition]);
+        assert_eq!(definitions, Some(expected_definition));
     }
 }
 

@@ -3,7 +3,7 @@
 use crate::{
     amqp::AmqpConfig,
     codecs::{Decoder, DecodingConfig},
-    config::{Output, SourceConfig, SourceContext},
+    config::{SourceConfig, SourceContext, SourceOutput},
     event::{BatchNotifier, BatchStatus},
     internal_events::{
         source::{AmqpAckError, AmqpBytesReceived, AmqpEventError, AmqpRejectError},
@@ -138,7 +138,7 @@ impl SourceConfig for AmqpSourceConfig {
         amqp_source(self, cx.shutdown, cx.out, log_namespace, acknowledgements).await
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         let log_namespace = global_log_namespace.merge(self.log_namespace);
         let schema_definition = self
             .decoding
@@ -176,7 +176,7 @@ impl SourceConfig for AmqpSourceConfig {
                 None,
             );
 
-        vec![Output::source_logs(
+        vec![SourceOutput::source_logs(
             self.decoding.output_type(),
             schema_definition,
         )]
@@ -545,7 +545,7 @@ pub mod test {
                 .with_metadata_field(&owned_value_path!("amqp", "exchange"), Kind::bytes(), None)
                 .with_metadata_field(&owned_value_path!("amqp", "offset"), Kind::integer(), None);
 
-        assert_eq!(definition, vec![expected_definition]);
+        assert_eq!(definition, Some(expected_definition));
     }
 
     #[test]
@@ -571,7 +571,7 @@ pub mod test {
         .with_event_field(&owned_value_path!("exchange"), Kind::bytes(), None)
         .with_event_field(&owned_value_path!("offset"), Kind::integer(), None);
 
-        assert_eq!(definition, vec![expected_definition]);
+        assert_eq!(definition, Some(expected_definition));
     }
 }
 

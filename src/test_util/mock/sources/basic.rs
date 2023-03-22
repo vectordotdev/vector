@@ -8,7 +8,7 @@ use vector_buffers::topology::channel::{limited, LimitedReceiver};
 use vector_config::configurable_component;
 use vector_core::{config::LogNamespace, schema::Definition};
 use vector_core::{
-    config::{DataType, Output},
+    config::{DataType, SourceOutput},
     event::{EventArray, EventContainer},
     source::Source,
 };
@@ -131,8 +131,8 @@ impl SourceConfig for BasicSourceConfig {
         }))
     }
 
-    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
-        vec![Output::source_logs(
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
+        vec![SourceOutput::source_logs(
             self.data_type.unwrap(),
             Definition::default_legacy_namespace(),
         )]

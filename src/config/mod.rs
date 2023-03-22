@@ -12,7 +12,7 @@ pub use vector_config::component::{GenerateConfig, SinkDescription, TransformDes
 use vector_config::configurable_component;
 pub use vector_core::config::{
     AcknowledgementsConfig, DataType, GlobalOptions, Input, LogNamespace, Output,
-    SourceAcknowledgementsConfig,
+    SourceAcknowledgementsConfig, SourceOutput,
 };
 
 use crate::{conditions, event::Metric, secrets::SecretBackends, serde::OneOrMany};

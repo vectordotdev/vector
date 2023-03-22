@@ -34,7 +34,7 @@ use self::{
     splunk_response::{HecResponse, HecResponseMetadata, HecStatusCode},
 };
 use crate::{
-    config::{log_schema, DataType, Output, Resource, SourceConfig, SourceContext},
+    config::{log_schema, DataType, Resource, SourceConfig, SourceContext, SourceOutput},
     event::{Event, LogEvent, Value},
     internal_events::{
         EventsReceived, HttpBytesReceived, SplunkHecRequestBodyInvalidError, SplunkHecRequestError,
@@ -174,7 +174,7 @@ impl SourceConfig for SplunkConfig {
         }))
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         let log_namespace = global_log_namespace.merge(self.log_namespace);
 
         let schema_definition = match log_namespace {
@@ -236,7 +236,7 @@ impl SourceConfig for SplunkConfig {
             None,
         );
 
-        vec![Output::source_logs(DataType::Log, schema_definition)]
+        vec![SourceOutput::source_logs(DataType::Log, schema_definition)]
     }
 
     fn resources(&self) -> Vec<Resource> {
@@ -2415,7 +2415,7 @@ mod tests {
             None,
         );
 
-        assert_eq!(definition, vec![expected_definition]);
+        assert_eq!(definition, Some(expected_definition));
     }
 
     #[test]
@@ -2449,6 +2449,6 @@ mod tests {
         .with_event_field(&owned_value_path!("splunk_sourcetype"), Kind::bytes(), None)
         .with_event_field(&owned_value_path!("timestamp"), Kind::timestamp(), None);
 
-        assert_eq!(definitions, vec![expected_definition]);
+        assert_eq!(definitions, Some(expected_definition));
     }
 }

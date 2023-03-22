@@ -25,8 +25,8 @@ use vector_core::{
 use super::util::net::{SocketListenAddr, TcpSource, TcpSourceAck, TcpSourceAcker};
 use crate::{
     config::{
-        log_schema, DataType, GenerateConfig, Output, Resource, SourceAcknowledgementsConfig,
-        SourceConfig, SourceContext,
+        log_schema, DataType, GenerateConfig, Resource, SourceAcknowledgementsConfig, SourceConfig,
+        SourceContext, SourceOutput,
     },
     event::{Event, LogEvent, Value},
     serde::bool_or_struct,
@@ -168,10 +168,10 @@ impl SourceConfig for LogstashConfig {
         )
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         // There is a global and per-source `log_namespace` config.
         // The source config overrides the global setting and is merged here.
-        vec![Output::source_logs(
+        vec![SourceOutput::source_logs(
             DataType::Log,
             self.schema_definition(global_log_namespace.merge(self.log_namespace)),
         )]
@@ -823,7 +823,7 @@ mod test {
                     None,
                 );
 
-        assert_eq!(definitions, vec![expected_definition])
+        assert_eq!(definitions, Some(expected_definition))
     }
 
     #[test]
@@ -847,7 +847,7 @@ mod test {
         .with_event_field(&owned_value_path!("timestamp"), Kind::timestamp(), None)
         .with_event_field(&owned_value_path!("host"), Kind::bytes(), Some("host"));
 
-        assert_eq!(definitions, vec![expected_definition])
+        assert_eq!(definitions, Some(expected_definition))
     }
 }
 

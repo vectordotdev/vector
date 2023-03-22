@@ -313,8 +313,8 @@ mod integration_tests {
             container_remove(&id, &docker).await;
 
             schema_definitions
-                .iter()
-                .for_each(|definition| definition.assert_valid_for_event(&events[0]));
+                .unwrap()
+                .assert_valid_for_event(&events[0]);
             assert_eq!(events[0].as_log().get(".").unwrap(), &vrl::value!(message));
         })
         .await;
@@ -343,8 +343,8 @@ mod integration_tests {
             container_remove(&id, &docker).await;
 
             schema_definitions
-                .iter()
-                .for_each(|definition| definition.assert_valid_for_event(&events[0]));
+                .unwrap()
+                .assert_valid_for_event(&events[0]);
             assert_eq!(
                 events[0].as_log()[log_schema().message_key()],
                 message.into()
@@ -377,8 +377,8 @@ mod integration_tests {
             container_remove(&id, &docker).await;
 
             schema_definitions
-                .iter()
-                .for_each(|definition| definition.assert_valid_for_event(&events[0]));
+                .unwrap()
+                .assert_valid_for_event(&events[0]);
 
             let log = events[0].as_log();
             let meta = log.metadata().value();
@@ -437,8 +437,8 @@ mod integration_tests {
             container_remove(&id, &docker).await;
 
             schema_definitions
-                .iter()
-                .for_each(|definition| definition.assert_valid_for_event(&events[0]));
+                .unwrap()
+                .assert_valid_for_event(&events[0]);
             let log = events[0].as_log();
             assert_eq!(log[log_schema().message_key()], message.into());
             assert_eq!(log[CONTAINER], id.into());
@@ -476,16 +476,14 @@ mod integration_tests {
             let events = collect_n(out, 2).await;
             container_remove(&id, &docker).await;
 
-            schema_definitions
-                .iter()
-                .for_each(|definition| definition.assert_valid_for_event(&events[0]));
+            let definition = schema_definitions.unwrap();
+
+            definition.assert_valid_for_event(&events[0]);
             assert_eq!(
                 events[0].as_log()[log_schema().message_key()],
                 message.into()
             );
-            schema_definitions
-                .iter()
-                .for_each(|definition| definition.assert_valid_for_event(&events[1]));
+            definition.assert_valid_for_event(&events[1]);
             assert_eq!(
                 events[1].as_log()[log_schema().message_key()],
                 message.into()
@@ -520,8 +518,8 @@ mod integration_tests {
             container_remove(&id1, &docker).await;
 
             schema_definitions
-                .iter()
-                .for_each(|definition| definition.assert_valid_for_event(&events[0]));
+                .unwrap()
+                .assert_valid_for_event(&events[0]);
             assert_eq!(
                 events[0].as_log()[log_schema().message_key()],
                 message.into()
@@ -568,17 +566,15 @@ mod integration_tests {
 
             assert_eq!(events.len(), 2);
 
-            schema_definitions
-                .iter()
-                .for_each(|definition| definition.assert_valid_for_event(&events[0]));
+            let definition = schema_definitions.unwrap();
+
+            definition.assert_valid_for_event(&events[0]);
             assert_eq!(
                 events[0].as_log()[log_schema().message_key()],
                 will_be_read.into()
             );
 
-            schema_definitions
-                .iter()
-                .for_each(|definition| definition.assert_valid_for_event(&events[1]));
+            definition.assert_valid_for_event(&events[1]);
             assert_eq!(
                 events[1].as_log()[log_schema().message_key()],
                 will_be_read.into()
@@ -614,8 +610,8 @@ mod integration_tests {
             container_remove(&id1, &docker).await;
 
             schema_definitions
-                .iter()
-                .for_each(|definition| definition.assert_valid_for_event(&events[0]));
+                .unwrap()
+                .assert_valid_for_event(&events[0]);
             assert_eq!(
                 events[0].as_log()[log_schema().message_key()],
                 message.into()
@@ -648,8 +644,8 @@ mod integration_tests {
             container_remove(&id, &docker).await;
 
             schema_definitions
-                .iter()
-                .for_each(|definition| definition.assert_valid_for_event(&events[0]));
+                .unwrap()
+                .assert_valid_for_event(&events[0]);
             let log = events[0].as_log();
             assert_eq!(log[log_schema().message_key()], message.into());
             assert_eq!(log[CONTAINER], id.into());
@@ -693,8 +689,8 @@ mod integration_tests {
             container_remove(&id, &docker).await;
 
             schema_definitions
-                .iter()
-                .for_each(|definition| definition.assert_valid_for_event(&events[0]));
+                .unwrap()
+                .assert_valid_for_event(&events[0]);
             assert_eq!(
                 events[0].as_log()[log_schema().message_key()],
                 message.into()
@@ -783,8 +779,8 @@ mod integration_tests {
             container_remove(&id, &docker).await;
 
             schema_definitions
-                .iter()
-                .for_each(|definition| definition.assert_valid_for_event(&events[0]));
+                .unwrap()
+                .assert_valid_for_event(&events[0]);
             let log = events[0].as_log();
             assert_eq!(log[log_schema().message_key()], message.into());
             assert_eq!(log[CONTAINER], id.into());
@@ -832,8 +828,8 @@ mod integration_tests {
             container_remove(&id, &docker).await;
 
             schema_definitions
-                .iter()
-                .for_each(|definition| definition.assert_valid_for_event(&events[0]));
+                .unwrap()
+                .assert_valid_for_event(&events[0]);
             let log = events[0].as_log();
             assert_eq!(log[log_schema().message_key()], message.into());
         })
@@ -849,7 +845,8 @@ mod integration_tests {
                 .first()
                 .unwrap()
                 .log_schema_definitions
-                .clone();
+                .clone()
+                .unwrap();
 
             let emitted_messages = vec![
                 "java.lang.Exception",
@@ -896,9 +893,7 @@ mod integration_tests {
             let actual_messages = events
                 .into_iter()
                 .map(|event| {
-                    schema_definitions
-                        .iter()
-                        .for_each(|definition| definition.assert_valid_for_event(&event));
+                    schema_definitions.assert_valid_for_event(&event);
 
                     event
                         .into_log()
@@ -922,7 +917,8 @@ mod integration_tests {
                 .first()
                 .unwrap()
                 .log_schema_definitions
-                .clone();
+                .clone()
+                .unwrap();
 
             let emitted_messages = vec![
                 "java.lang.Exception",
@@ -968,9 +964,7 @@ mod integration_tests {
             let actual_messages = events
                 .into_iter()
                 .map(|event| {
-                    schema_definitions
-                        .iter()
-                        .for_each(|definition| definition.assert_valid_for_event(&event));
+                    schema_definitions.assert_valid_for_event(&event);
 
                     event
                         .into_log()

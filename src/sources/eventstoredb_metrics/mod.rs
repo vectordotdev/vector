@@ -14,7 +14,7 @@ use vector_core::EstimatedJsonEncodedSizeOf;
 
 use self::types::Stats;
 use crate::{
-    config::{self, Output, SourceConfig, SourceContext},
+    config::{self, SourceConfig, SourceContext, SourceOutput},
     http::HttpClient,
     internal_events::{
         EventStoreDbMetricsHttpError, EventStoreDbStatsParsingError, EventsReceived,
@@ -68,8 +68,8 @@ impl SourceConfig for EventStoreDbConfig {
         )
     }
 
-    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
-        vec![Output::source_metrics(config::DataType::Metric)]
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
+        vec![SourceOutput::source_metrics(config::DataType::Metric)]
     }
 
     fn can_acknowledge(&self) -> bool {

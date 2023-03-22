@@ -23,7 +23,9 @@ use vector_core::config::{LegacyKey, LogNamespace};
 use crate::sources::util::build_unix_stream_source;
 use crate::{
     codecs::Decoder,
-    config::{log_schema, DataType, GenerateConfig, Output, Resource, SourceConfig, SourceContext},
+    config::{
+        log_schema, DataType, GenerateConfig, Resource, SourceConfig, SourceContext, SourceOutput,
+    },
     event::Event,
     internal_events::StreamClosedError,
     internal_events::{SocketBindError, SocketMode, SocketReceiveError},
@@ -237,13 +239,13 @@ impl SourceConfig for SyslogConfig {
         }
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         let log_namespace = global_log_namespace.merge(self.log_namespace);
         let schema_definition = SyslogDeserializerConfig::from_source(SyslogConfig::NAME)
             .schema_definition(log_namespace)
             .with_standard_vector_source_metadata();
 
-        vec![Output::source_logs(DataType::Log, schema_definition)]
+        vec![SourceOutput::source_logs(DataType::Log, schema_definition)]
     }
 
     fn resources(&self) -> Vec<Resource> {
@@ -563,7 +565,7 @@ mod test {
                     None,
                 );
 
-        assert_eq!(definitions, vec![expected_definition]);
+        assert_eq!(definitions, Some(expected_definition));
     }
 
     #[test]
@@ -626,7 +628,7 @@ mod test {
         .unknown_fields(Kind::object(Collection::from_unknown(Kind::bytes())))
         .with_standard_vector_source_metadata();
 
-        assert_eq!(definitions, vec![expected_definition]);
+        assert_eq!(definitions, Some(expected_definition));
     }
 
     #[test]

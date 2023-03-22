@@ -22,8 +22,8 @@ use vector_core::schema::Definition;
 use super::util::net::{SocketListenAddr, TcpSource, TcpSourceAck, TcpSourceAcker};
 use crate::{
     config::{
-        log_schema, DataType, GenerateConfig, Output, Resource, SourceAcknowledgementsConfig,
-        SourceConfig, SourceContext,
+        log_schema, DataType, GenerateConfig, Resource, SourceAcknowledgementsConfig, SourceConfig,
+        SourceContext, SourceOutput,
     },
     event::{Event, LogEvent},
     internal_events::{FluentMessageDecodeError, FluentMessageReceived},
@@ -113,11 +113,11 @@ impl SourceConfig for FluentConfig {
         )
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         let log_namespace = global_log_namespace.merge(self.log_namespace);
         let schema_definition = self.schema_definition(log_namespace);
 
-        vec![Output::source_logs(DataType::Log, schema_definition)]
+        vec![SourceOutput::source_logs(DataType::Log, schema_definition)]
     }
 
     fn resources(&self) -> Vec<Resource> {
@@ -996,7 +996,7 @@ mod tests {
                     None,
                 );
 
-        assert_eq!(definitions, vec![expected_definition])
+        assert_eq!(definitions, Some(expected_definition))
     }
 
     #[test]
@@ -1030,7 +1030,7 @@ mod tests {
         .with_event_field(&owned_value_path!("host"), Kind::bytes(), Some("host"))
         .unknown_fields(Kind::bytes());
 
-        assert_eq!(definitions, vec![expected_definition])
+        assert_eq!(definitions, Some(expected_definition))
     }
 }
 

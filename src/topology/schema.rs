@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+use vector_core::config::SourceOutput;
+
 pub(super) use crate::schema::Definition;
 
 use crate::{
@@ -249,7 +251,7 @@ pub(super) fn validate_sink_expectations(
 pub trait ComponentContainer {
     fn schema_enabled(&self) -> bool;
 
-    fn source_outputs(&self, key: &ComponentKey) -> Option<Vec<Output>>;
+    fn source_outputs(&self, key: &ComponentKey) -> Option<Vec<SourceOutput>>;
 
     fn transform_inputs(&self, key: &ComponentKey) -> Option<&[OutputId]>;
 
@@ -286,9 +288,9 @@ pub trait ComponentContainer {
         &self,
         key: &ComponentKey,
         port: &Option<String>,
-    ) -> Result<Option<Output>, ()> {
+    ) -> Result<Option<SourceOutput>, ()> {
         if let Some(outputs) = self.source_outputs(key) {
-            Ok(get_output_for_port(outputs, port))
+            Ok(get_source_output_for_port(outputs, port))
         } else {
             Err(())
         }
@@ -299,12 +301,19 @@ fn get_output_for_port(outputs: Vec<Output>, port: &Option<String>) -> Option<Ou
     outputs.into_iter().find(|output| &output.port == port)
 }
 
+fn get_source_output_for_port(
+    outputs: Vec<SourceOutput>,
+    port: &Option<String>,
+) -> Option<SourceOutput> {
+    outputs.into_iter().find(|output| &output.port == port)
+}
+
 impl ComponentContainer for Config {
     fn schema_enabled(&self) -> bool {
         self.schema.enabled
     }
 
-    fn source_outputs(&self, key: &ComponentKey) -> Option<Vec<Output>> {
+    fn source_outputs(&self, key: &ComponentKey) -> Option<Vec<SourceOutput>> {
         self.source(key)
             .map(|source| source.inner.outputs(self.schema.log_namespace()))
     }
@@ -334,7 +343,7 @@ mod tests {
     use lookup::owned_value_path;
     use similar_asserts::assert_eq;
     use value::Kind;
-    use vector_core::config::{DataType, Output};
+    use vector_core::config::{DataType, Output, SourceOutput};
 
     use super::*;
 
@@ -342,7 +351,7 @@ mod tests {
     fn test_expanded_definition() {
         struct TestCase {
             inputs: Vec<(&'static str, Option<String>)>,
-            sources: IndexMap<&'static str, Vec<Output>>,
+            sources: IndexMap<&'static str, Vec<SourceOutput>>,
             transforms: IndexMap<&'static str, (Vec<OutputId>, Vec<Output>)>,
             want: Vec<(OutputId, Definition)>,
         }
@@ -352,7 +361,7 @@ mod tests {
                 true
             }
 
-            fn source_outputs(&self, key: &ComponentKey) -> Option<Vec<Output>> {
+            fn source_outputs(&self, key: &ComponentKey) -> Option<Vec<SourceOutput>> {
                 self.sources.get(key.id()).cloned()
             }
 
@@ -385,7 +394,7 @@ mod tests {
                     inputs: vec![("foo", None)],
                     sources: IndexMap::from([(
                         "foo",
-                        vec![Output::source_logs(
+                        vec![SourceOutput::source_logs(
                             DataType::all(),
                             Definition::default_legacy_namespace(),
                         )],
@@ -400,7 +409,7 @@ mod tests {
                     inputs: vec![("source-foo", None)],
                     sources: IndexMap::from([(
                         "source-foo",
-                        vec![Output::source_logs(
+                        vec![SourceOutput::source_logs(
                             DataType::all(),
                             Definition::empty_legacy_namespace().with_event_field(
                                 &owned_value_path!("foo"),
@@ -427,7 +436,7 @@ mod tests {
                     sources: IndexMap::from([
                         (
                             "source-foo",
-                            vec![Output::source_logs(
+                            vec![SourceOutput::source_logs(
                                 DataType::all(),
                                 Definition::empty_legacy_namespace().with_event_field(
                                     &owned_value_path!("foo"),
@@ -438,7 +447,7 @@ mod tests {
                         ),
                         (
                             "source-bar",
-                            vec![Output::source_logs(
+                            vec![SourceOutput::source_logs(
                                 DataType::all(),
                                 Definition::empty_legacy_namespace().with_event_field(
                                     &owned_value_path!("foo"),
@@ -476,7 +485,7 @@ mod tests {
                     sources: IndexMap::from([
                         (
                             "source-foo",
-                            vec![Output::source_logs(
+                            vec![SourceOutput::source_logs(
                                 DataType::all(),
                                 Definition::empty_legacy_namespace().with_event_field(
                                     &owned_value_path!("foo"),
@@ -487,7 +496,7 @@ mod tests {
                         ),
                         (
                             "source-bar",
-                            vec![Output::source_logs(
+                            vec![SourceOutput::source_logs(
                                 DataType::all(),
                                 Definition::empty_legacy_namespace().with_event_field(
                                     &owned_value_path!("bar"),
@@ -501,13 +510,13 @@ mod tests {
                         "transform-baz",
                         (
                             vec![OutputId::from("source-foo")],
-                            vec![Output::source_logs(
+                            vec![Output::transform(
                                 DataType::all(),
-                                Definition::empty_legacy_namespace().with_event_field(
+                                vec![Definition::empty_legacy_namespace().with_event_field(
                                     &owned_value_path!("baz"),
                                     Kind::regex(),
                                     Some("baz"),
-                                ),
+                                )],
                             )],
                         ),
                     )]),
@@ -546,7 +555,7 @@ mod tests {
                     sources: IndexMap::from([
                         (
                             "Source 1",
-                            vec![Output::source_logs(
+                            vec![SourceOutput::source_logs(
                                 DataType::all(),
                                 Definition::empty_legacy_namespace().with_event_field(
                                     &owned_value_path!("source-1"),
@@ -557,7 +566,7 @@ mod tests {
                         ),
                         (
                             "Source 2",
-                            vec![Output::source_logs(
+                            vec![SourceOutput::source_logs(
                                 DataType::all(),
                                 Definition::empty_legacy_namespace().with_event_field(
                                     &owned_value_path!("source-2"),

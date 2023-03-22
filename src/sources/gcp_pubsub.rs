@@ -30,7 +30,7 @@ use vector_core::config::{LegacyKey, LogNamespace};
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
-    config::{DataType, Output, SourceAcknowledgementsConfig, SourceConfig, SourceContext},
+    config::{DataType, SourceAcknowledgementsConfig, SourceConfig, SourceContext, SourceOutput},
     event::{BatchNotifier, BatchStatus, Event, MaybeAsLogMut, Value},
     gcp::{GcpAuthConfig, GcpAuthenticator, Scope, PUBSUB_URL},
     internal_events::{
@@ -322,7 +322,7 @@ impl SourceConfig for PubsubConfig {
         Ok(Box::pin(source))
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         let log_namespace = global_log_namespace.merge(self.log_namespace);
         let schema_definition = self
             .decoding
@@ -350,7 +350,7 @@ impl SourceConfig for PubsubConfig {
                 None,
             );
 
-        vec![Output::source_logs(DataType::Log, schema_definition)]
+        vec![SourceOutput::source_logs(DataType::Log, schema_definition)]
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -785,7 +785,7 @@ mod tests {
                     None,
                 );
 
-        assert_eq!(definitions, vec![expected_definition]);
+        assert_eq!(definitions, Some(expected_definition));
     }
 
     #[test]
@@ -818,7 +818,7 @@ mod tests {
         )
         .with_event_field(&owned_value_path!("message_id"), Kind::bytes(), None);
 
-        assert_eq!(definitions, vec![expected_definition]);
+        assert_eq!(definitions, Some(expected_definition));
     }
 }
 

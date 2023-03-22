@@ -12,7 +12,7 @@ use vector_core::{
 };
 
 use crate::{
-    config::{DataType, Output, SourceConfig, SourceContext},
+    config::{DataType, SourceConfig, SourceContext, SourceOutput},
     event::{EstimatedJsonEncodedSizeOf, Event},
     internal_events::{InternalLogsBytesReceived, InternalLogsEventsReceived, StreamClosedError},
     shutdown::ShutdownSignal,
@@ -117,11 +117,11 @@ impl SourceConfig for InternalLogsConfig {
         )))
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         let schema_definition =
             self.schema_definition(global_log_namespace.merge(self.log_namespace));
 
-        vec![Output::source_logs(DataType::Log, schema_definition)]
+        vec![SourceOutput::source_logs(DataType::Log, schema_definition)]
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -363,7 +363,7 @@ mod tests {
                     Some("host"),
                 );
 
-        assert_eq!(definitions, vec![expected_definition])
+        assert_eq!(definitions, Some(expected_definition))
     }
 
     #[test]
@@ -396,6 +396,6 @@ mod tests {
             Some("host"),
         );
 
-        assert_eq!(definitions, vec![expected_definition])
+        assert_eq!(definitions, Some(expected_definition))
     }
 }

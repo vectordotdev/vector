@@ -35,7 +35,8 @@ use vector_core::{
 use crate::{
     codecs::{Decoder, DecodingConfig},
     config::{
-        log_schema, LogSchema, Output, SourceAcknowledgementsConfig, SourceConfig, SourceContext,
+        log_schema, LogSchema, SourceAcknowledgementsConfig, SourceConfig, SourceContext,
+        SourceOutput,
     },
     event::{BatchNotifier, BatchStatus, Event, Value},
     internal_events::{
@@ -303,7 +304,7 @@ impl SourceConfig for KafkaSourceConfig {
         )))
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         let log_namespace = global_log_namespace.merge(self.log_namespace);
         let keys = self.keys();
 
@@ -354,7 +355,7 @@ impl SourceConfig for KafkaSourceConfig {
                 None,
             );
 
-        vec![Output::source_logs(
+        vec![SourceOutput::source_logs(
             self.decoding.output_type(),
             schema_definition,
         )]
@@ -798,7 +799,7 @@ mod test {
 
         assert_eq!(
             definitions,
-            vec![
+            Some(
                 Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
                     .with_meaning(OwnedTargetPath::event_root(), "message")
                     .with_metadata_field(
@@ -833,7 +834,7 @@ mod test {
                         Kind::bytes(),
                         None
                     )
-            ]
+            )
         )
     }
 
@@ -846,7 +847,7 @@ mod test {
 
         assert_eq!(
             definitions,
-            vec![
+            Some(
                 Definition::new_with_default_metadata(Kind::json(), [LogNamespace::Legacy])
                     .unknown_fields(Kind::undefined())
                     .with_event_field(
@@ -869,7 +870,7 @@ mod test {
                         None
                     )
                     .with_event_field(&owned_value_path!("source_type"), Kind::bytes(), None)
-            ]
+            )
         )
     }
 

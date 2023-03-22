@@ -23,7 +23,8 @@ use crate::{
     codecs::{Decoder, DecodingConfig},
     components::validation::*,
     config::{
-        GenerateConfig, Output, Resource, SourceAcknowledgementsConfig, SourceConfig, SourceContext,
+        GenerateConfig, Resource, SourceAcknowledgementsConfig, SourceConfig, SourceContext,
+        SourceOutput,
     },
     event::{Event, Value},
     register_validatable_component,
@@ -53,7 +54,7 @@ impl SourceConfig for HttpConfig {
         self.0.build(cx).await
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         self.0.outputs(global_log_namespace)
     }
 
@@ -333,14 +334,14 @@ impl SourceConfig for SimpleHttpConfig {
         )
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         // There is a global and per-source `log_namespace` config.
         // The source config overrides the global setting and is merged here.
         let log_namespace = global_log_namespace.merge(self.log_namespace);
 
         let schema_definition = self.schema_definition(log_namespace);
 
-        vec![Output::source_logs(
+        vec![SourceOutput::source_logs(
             self.decoding
                 .as_ref()
                 .map(|d| d.output_type())
@@ -1319,7 +1320,7 @@ mod tests {
                     None,
                 );
 
-        assert_eq!(definitions, vec![expected_definition])
+        assert_eq!(definitions, Some(expected_definition))
     }
 
     #[test]
@@ -1344,7 +1345,7 @@ mod tests {
         .with_event_field(&owned_value_path!("path"), Kind::bytes(), None)
         .unknown_fields(Kind::bytes());
 
-        assert_eq!(definitions, vec![expected_definition])
+        assert_eq!(definitions, Some(expected_definition))
     }
 
     #[test]

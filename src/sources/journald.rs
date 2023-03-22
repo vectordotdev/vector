@@ -44,7 +44,8 @@ use vector_core::{
 
 use crate::{
     config::{
-        log_schema, DataType, Output, SourceAcknowledgementsConfig, SourceConfig, SourceContext,
+        log_schema, DataType, SourceAcknowledgementsConfig, SourceConfig, SourceContext,
+        SourceOutput,
     },
     event::{BatchNotifier, BatchStatus, BatchStatusReceiver, LogEvent},
     internal_events::{
@@ -362,11 +363,11 @@ impl SourceConfig for JournaldConfig {
         ))
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         let schema_definition =
             self.schema_definition(global_log_namespace.merge(self.log_namespace));
 
-        vec![Output::source_logs(DataType::Log, schema_definition)]
+        vec![SourceOutput::source_logs(DataType::Log, schema_definition)]
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -1494,7 +1495,7 @@ mod tests {
                     Some("host"),
                 );
 
-        assert_eq!(definitions, vec![expected_definition])
+        assert_eq!(definitions, Some(expected_definition))
     }
 
     #[test]
@@ -1518,7 +1519,7 @@ mod tests {
         )
         .unknown_fields(Kind::bytes());
 
-        assert_eq!(definitions, vec![expected_definition])
+        assert_eq!(definitions, Some(expected_definition))
     }
 
     fn matches_schema(config: &JournaldConfig, namespace: LogNamespace) {
@@ -1555,9 +1556,7 @@ mod tests {
 
         let definitions = config.outputs(namespace)[0].clone().log_schema_definitions;
 
-        definitions
-            .iter()
-            .for_each(|definition| definition.assert_valid_for_event(&event));
+        definitions.unwrap().assert_valid_for_event(&event);
     }
 
     #[test]

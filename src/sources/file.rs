@@ -24,7 +24,8 @@ use vector_core::config::{LegacyKey, LogNamespace};
 use super::util::{EncodingConfig, MultilineConfig};
 use crate::{
     config::{
-        log_schema, DataType, Output, SourceAcknowledgementsConfig, SourceConfig, SourceContext,
+        log_schema, DataType, SourceAcknowledgementsConfig, SourceConfig, SourceContext,
+        SourceOutput,
     },
     encoding_transcode::{Decoder, Encoder},
     event::{BatchNotifier, BatchStatus, LogEvent},
@@ -430,7 +431,7 @@ impl SourceConfig for FileConfig {
         ))
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         let file_key = self.file_key.clone().path.map(LegacyKey::Overwrite);
         let host_key = self.host_key.clone().path.map(LegacyKey::Overwrite);
 
@@ -465,7 +466,7 @@ impl SourceConfig for FileConfig {
                 None,
             );
 
-        vec![Output::source_logs(DataType::Log, schema_definition)]
+        vec![SourceOutput::source_logs(DataType::Log, schema_definition)]
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -947,7 +948,7 @@ mod tests {
 
         assert_eq!(
             definitions,
-            vec![
+            Some(
                 Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
                     .with_meaning(OwnedTargetPath::event_root(), "message")
                     .with_metadata_field(
@@ -971,7 +972,7 @@ mod tests {
                         None
                     )
                     .with_metadata_field(&owned_value_path!("file", "path"), Kind::bytes(), None)
-            ]
+            )
         )
     }
 
@@ -983,24 +984,26 @@ mod tests {
 
         assert_eq!(
             definitions,
-            vec![Definition::new_with_default_metadata(
-                Kind::object(Collection::empty()),
-                [LogNamespace::Legacy]
+            Some(
+                Definition::new_with_default_metadata(
+                    Kind::object(Collection::empty()),
+                    [LogNamespace::Legacy]
+                )
+                .with_event_field(
+                    &owned_value_path!("message"),
+                    Kind::bytes(),
+                    Some("message")
+                )
+                .with_event_field(&owned_value_path!("source_type"), Kind::bytes(), None)
+                .with_event_field(&owned_value_path!("timestamp"), Kind::timestamp(), None)
+                .with_event_field(
+                    &owned_value_path!("host"),
+                    Kind::bytes().or_undefined(),
+                    Some("host")
+                )
+                .with_event_field(&owned_value_path!("offset"), Kind::undefined(), None)
+                .with_event_field(&owned_value_path!("file"), Kind::bytes(), None)
             )
-            .with_event_field(
-                &owned_value_path!("message"),
-                Kind::bytes(),
-                Some("message")
-            )
-            .with_event_field(&owned_value_path!("source_type"), Kind::bytes(), None)
-            .with_event_field(&owned_value_path!("timestamp"), Kind::timestamp(), None)
-            .with_event_field(
-                &owned_value_path!("host"),
-                Kind::bytes().or_undefined(),
-                Some("host")
-            )
-            .with_event_field(&owned_value_path!("offset"), Kind::undefined(), None)
-            .with_event_field(&owned_value_path!("file"), Kind::bytes(), None)]
         )
     }
 

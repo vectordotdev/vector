@@ -12,7 +12,7 @@ use vector_core::{
     schema::Definition,
 };
 use vector_core::{
-    config::{DataType, Output},
+    config::{DataType, SourceOutput},
     source::Source,
 };
 
@@ -62,8 +62,8 @@ impl SourceConfig for BackpressureSourceConfig {
         .boxed())
     }
 
-    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
-        vec![Output::source_logs(
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
+        vec![SourceOutput::source_logs(
             DataType::all(),
             Definition::default_legacy_namespace(),
         )]

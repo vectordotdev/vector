@@ -100,6 +100,68 @@ impl Input {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub struct SourceOutput {
+    pub port: Option<String>,
+    pub ty: DataType,
+
+    // NOTE: schema definitions are only implemented/supported for log-type events. There is no
+    // inherent blocker to support other types as well, but it'll require additional work to add
+    // the relevant schemas, and store them separately in this type.
+    ///
+    /// *sources* if the output type is `Log` there should be a single definition. `Metric` types should
+    /// have no definition defined.
+    ///
+    /// For a *transforms* if `Datatype` is Log, at least one definition should be output. If the
+    /// transform has multiple connected sources, it is possible to have multiple output definitions -
+    /// one for each input.
+    pub log_schema_definitions: Option<schema::Definition>,
+}
+
+impl SourceOutput {
+    /// Create an `Output` of the given data type that contains a single output `Definition`.
+    /// Designed for use in log sources.
+    #[must_use]
+    pub fn source_logs(ty: DataType, schema_definition: schema::Definition) -> Self {
+        Self {
+            port: None,
+            ty,
+            log_schema_definitions: Some(schema_definition),
+        }
+    }
+
+    /// Create an `Output` of the given data type that contains no output `Definition`s.
+    /// Designed for use in metrics sources.
+    #[must_use]
+    pub fn source_metrics(ty: DataType) -> Self {
+        Self {
+            port: None,
+            ty,
+            log_schema_definitions: None,
+        }
+    }
+
+    /// Create an `Output` of the given data type that contains no output `Definition`s.
+    /// Designed for use in trace sources.
+    #[must_use]
+    pub fn source_traces(ty: DataType) -> Self {
+        Self {
+            port: None,
+            ty,
+            log_schema_definitions: None,
+        }
+    }
+}
+
+impl SourceOutput {
+    /// Set the port name for this `Output`.
+    #[must_use]
+    pub fn with_port(mut self, name: impl Into<String>) -> Self {
+        self.port = Some(name.into());
+        self
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct Output {
     pub port: Option<String>,
     pub ty: DataType,
@@ -118,39 +180,6 @@ pub struct Output {
 }
 
 impl Output {
-    /// Create an `Output` of the given data type that contains a single output `Definition`.
-    /// Designed for use in log sources.
-    #[must_use]
-    pub fn source_logs(ty: DataType, schema_definition: schema::Definition) -> Self {
-        Self {
-            port: None,
-            ty,
-            log_schema_definitions: vec![schema_definition],
-        }
-    }
-
-    /// Create an `Output` of the given data type that contains no output `Definition`s.
-    /// Designed for use in metrics sources.
-    #[must_use]
-    pub fn source_metrics(ty: DataType) -> Self {
-        Self {
-            port: None,
-            ty,
-            log_schema_definitions: vec![],
-        }
-    }
-
-    /// Create an `Output` of the given data type that contains no output `Definition`s.
-    /// Designed for use in trace sources.
-    #[must_use]
-    pub fn source_traces(ty: DataType) -> Self {
-        Self {
-            port: None,
-            ty,
-            log_schema_definitions: vec![],
-        }
-    }
-
     /// Create an `Output` of the given data type that contains multiple `Definition`s.
     /// Designed for use in transforms.
     #[must_use]

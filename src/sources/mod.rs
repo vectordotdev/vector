@@ -85,12 +85,12 @@ pub mod vector;
 pub mod util;
 
 use vector_config::{configurable_component, NamedComponent};
-use vector_core::config::{LogNamespace, Output};
+use vector_core::config::LogNamespace;
 pub use vector_core::source::Source;
 
 use crate::config::{
     unit_test::{UnitTestSourceConfig, UnitTestStreamSourceConfig},
-    Resource, SourceConfig, SourceContext,
+    Resource, SourceConfig, SourceContext, SourceOutput,
 };
 
 /// Common build errors

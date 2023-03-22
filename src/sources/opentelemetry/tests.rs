@@ -110,9 +110,7 @@ async fn receive_grpc_logs_vector_namespace() {
         // we just send one, so only one output
         assert_eq!(output.len(), 1);
         let event = output.pop().unwrap();
-        schema_definitions
-            .iter()
-            .for_each(|definition| definition.assert_valid_for_event(&event));
+        schema_definitions.unwrap().assert_valid_for_event(&event);
 
         assert_eq!(event.as_log().get(".").unwrap(), &vrl::value!("log body"));
 
@@ -252,8 +250,8 @@ async fn receive_grpc_logs_legacy_namespace() {
         assert_eq!(output.len(), 1);
         let actual_event = output.pop().unwrap();
         schema_definitions
-            .iter()
-            .for_each(|definition| definition.assert_valid_for_event(&actual_event));
+            .unwrap()
+            .assert_valid_for_event(&actual_event);
         let expect_vec = vec_into_btmap(vec![
             (
                 "attributes",

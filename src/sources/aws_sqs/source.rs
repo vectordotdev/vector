@@ -275,9 +275,7 @@ mod tests {
                 .to_string_lossy(),
             now.to_rfc3339_opts(SecondsFormat::AutoSi, true)
         );
-        definitions
-            .iter()
-            .for_each(|definition| definition.assert_valid_for_event(&events[0]));
+        definitions.unwrap().assert_valid_for_event(&events[0]);
     }
 
     #[tokio::test]
@@ -326,9 +324,7 @@ mod tests {
                 .to_string_lossy(),
             now.to_rfc3339_opts(SecondsFormat::AutoSi, true)
         );
-        definitions
-            .iter()
-            .for_each(|definition| definition.assert_valid_for_event(&events[0]));
+        definitions.unwrap().assert_valid_for_event(&events[0]);
     }
 
     #[test]

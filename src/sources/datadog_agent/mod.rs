@@ -40,8 +40,8 @@ use warp::{filters::BoxedFilter, reject::Rejection, reply::Response, Filter, Rep
 use crate::{
     codecs::{Decoder, DecodingConfig},
     config::{
-        log_schema, DataType, GenerateConfig, Output, Resource, SourceAcknowledgementsConfig,
-        SourceConfig, SourceContext,
+        log_schema, DataType, GenerateConfig, Resource, SourceAcknowledgementsConfig, SourceConfig,
+        SourceContext, SourceOutput,
     },
     event::Event,
     internal_events::{HttpBytesReceived, HttpDecompressError, StreamClosedError},
@@ -193,7 +193,7 @@ impl SourceConfig for DatadogAgentConfig {
         }))
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         let definition = self
             .decoding
             .schema_definition(global_log_namespace.merge(self.log_namespace))
@@ -243,12 +243,12 @@ impl SourceConfig for DatadogAgentConfig {
 
         if self.multiple_outputs {
             vec![
-                Output::source_metrics(DataType::Metric).with_port(METRICS),
-                Output::source_logs(DataType::Log, definition).with_port(LOGS),
-                Output::source_traces(DataType::Trace).with_port(TRACES),
+                SourceOutput::source_metrics(DataType::Metric).with_port(METRICS),
+                SourceOutput::source_logs(DataType::Log, definition).with_port(LOGS),
+                SourceOutput::source_traces(DataType::Trace).with_port(TRACES),
             ]
         } else {
-            vec![Output::source_logs(DataType::all(), definition)]
+            vec![SourceOutput::source_logs(DataType::all(), definition)]
         }
     }
 
