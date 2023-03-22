@@ -1,5 +1,6 @@
 use core::TargetValue;
 use std::borrow::Cow::{self, Borrowed, Owned};
+use std::rc::Rc;
 
 use ::value::Value;
 use core::TimeZone;
@@ -18,10 +19,10 @@ use rustyline::{
     Context, Editor, Helper,
 };
 use value::Secrets;
-use vector_vrl_functions::vrl_functions;
 use vrl::state::TypeState;
 use vrl::{
-    diagnostic::Formatter, prelude::BTreeMap, state, CompileConfig, Runtime, Target, VrlRuntime,
+    diagnostic::Formatter, prelude::BTreeMap, state, CompileConfig, Function, Runtime, Target,
+    VrlRuntime,
 };
 
 // Create a list of all possible error values for potential docs lookup
@@ -54,7 +55,9 @@ pub(crate) fn run(
     mut objects: Vec<TargetValue>,
     timezone: TimeZone,
     vrl_runtime: VrlRuntime,
+    stdlib_functions: Vec<Box<dyn Function>>,
 ) -> Result<(), rustyline::error::ReadlineError> {
+    let stdlib_functions = Rc::new(stdlib_functions);
     let mut index = 0;
     let func_docs_regex = Regex::new(r"^help\sdocs\s(\w{1,})$").unwrap();
     let error_docs_regex = Regex::new(r"^help\serror\s(\w{1,})$").unwrap();
@@ -63,7 +66,7 @@ pub(crate) fn run(
 
     let mut rt = Runtime::new(state::Runtime::default());
     let mut rl = Editor::<Repl, MemHistory>::new()?;
-    rl.set_helper(Some(Repl::new()));
+    rl.set_helper(Some(Repl::new(stdlib_functions.clone())));
 
     #[allow(clippy::print_stdout)]
     {
@@ -127,6 +130,7 @@ pub(crate) fn run(
                     &mut state,
                     timezone,
                     vrl_runtime,
+                    &stdlib_functions,
                 );
 
                 let string = match result {
@@ -159,15 +163,13 @@ fn resolve(
     state: &mut TypeState,
     timezone: TimeZone,
     vrl_runtime: VrlRuntime,
+    stdlib_functions: &[Box<dyn Function>],
 ) -> Result<Value, String> {
-    let mut functions = stdlib::all();
-    functions.extend(vector_vrl_functions::vrl_functions());
-
     let mut config = CompileConfig::default();
     // The CLI should be moved out of the "vrl" module, and then it can use the `vector-core::compile_vrl` function which includes this automatically
     config.set_read_only_path(OwnedTargetPath::metadata(owned_value_path!("vector")), true);
 
-    let program = match vrl::compile_with_state(program, &functions, state, config) {
+    let program = match vrl::compile_with_state(program, stdlib_functions, state, config) {
         Ok(result) => result.program,
         Err(diagnostics) => {
             return Err(Formatter::new(program, diagnostics).colored().to_string());
@@ -197,23 +199,24 @@ struct Repl {
     history_hinter: HistoryHinter,
     colored_prompt: String,
     hints: Vec<&'static str>,
+    stdlib_functions: Rc<Vec<Box<dyn Function>>>,
 }
 
 impl Repl {
-    fn new() -> Self {
+    fn new(stdlib_functions: Rc<Vec<Box<dyn Function>>>) -> Self {
         Self {
             highlighter: MatchingBracketHighlighter::new(),
             history_hinter: HistoryHinter {},
             colored_prompt: "$ ".to_owned(),
-            hints: initial_hints(),
+            hints: initial_hints(&stdlib_functions),
+            stdlib_functions,
         }
     }
 }
 
-fn initial_hints() -> Vec<&'static str> {
-    stdlib::all()
-        .into_iter()
-        .chain(vrl_functions())
+fn initial_hints(funcs: &[Box<dyn Function>]) -> Vec<&'static str> {
+    funcs
+        .iter()
         .map(|f| f.identifier())
         .chain(RESERVED_TERMS.iter().copied())
         .collect()
@@ -305,6 +308,7 @@ impl Validator for Repl {
             &mut state,
             timezone,
             VrlRuntime::Ast,
+            &self.stdlib_functions,
         );
 
         let result = match result {

@@ -20,7 +20,6 @@ regex = { version = "1", default-features = false, optional = true, features = [
 rustyline = { version = "11", default-features = false, optional = true }
 serde_json = "1"
 thiserror = "1"
-vector-vrl-functions = { path = "../../vector-vrl-functions" }
 vrl = { path = "../vrl", default-features = false }
 core = { package = "vrl-core", path = "../core", default-features = false }
 value = { path = "../value", default-features = false, features = [] }
