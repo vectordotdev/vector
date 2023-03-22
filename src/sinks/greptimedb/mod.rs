@@ -1,6 +1,7 @@
 use futures_util::FutureExt;
 use http::StatusCode;
 use tower::Service;
+use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
 use vector_core::config::{AcknowledgementsConfig, Input};
 use vector_core::tls::{TlsConfig, TlsSettings};
@@ -49,7 +50,7 @@ pub struct GreptimeDBConfig {
     /// The password of greptimedb
     #[configurable(metadata(docs::examples = "password"))]
     #[serde(default)]
-    pub password: Option<String>,
+    pub password: Option<SensitiveString>,
 
     #[configurable(derived)]
     #[serde(default)]
