@@ -2,7 +2,7 @@ use anyhow::Result;
 
 use crate::util::get_channel;
 
-/// Provide the release channel (latest/nightly/custom) based on the MODE env variable.
+/// Provide the release channel (latest/nightly/custom).
 /// This command is intended for use only within GitHub build workflows.
 // This script is used across various release scripts to determine where distribute archives,
 // packages, etc.
