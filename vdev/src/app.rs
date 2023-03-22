@@ -59,7 +59,9 @@ pub fn version() -> Result<String> {
         if tag != format!("v{version}") {
             bail!("On latest release channel and tag {tag:?} is different from Cargo.toml {version:?}. Aborting");
         }
-    } else if channel == "custom" {
+
+    // extend version for custom builds if not already
+    } else if channel == "custom" && !version.contains("custom") {
         util::mark_safe_git_repo();
 
         let sha = git::get_git_sha()?;
