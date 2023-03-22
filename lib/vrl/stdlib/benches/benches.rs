@@ -102,6 +102,7 @@ criterion_group!(
               parse_regex,
               parse_regex_all,
               parse_ruby_hash,
+              parse_spring_boot,
               parse_syslog,
               parse_timestamp,
               parse_tokens,
@@ -1841,6 +1842,22 @@ bench_function! {
             testObj: {
                 testBool: true,
             }
+        }))
+    }
+}
+
+bench_function! {
+    parse_spring_boot => vrl_stdlib::ParseSpringBoot;
+
+    literal {
+        args: func_args![value: value!("2023-01-30 22:37:33.495 INFO 72972 --- [ main] o.s.i.monitor.IntegrationMBeanExporter : Registering MessageChannel cacheConsumer-in-0")],
+        want: Ok(value!({
+            timestamp: "2023-01-30 22:37:33.495",
+            level: "INFO",
+            pid: "72972",
+            thread: "main",
+            logger: "o.s.i.monitor.IntegrationMBeanExporter",
+            message: "Registering MessageChannel cacheConsumer-in-0"
         }))
     }
 }
