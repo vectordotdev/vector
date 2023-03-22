@@ -6,7 +6,7 @@ edition = "2021"
 publish = false
 
 [dependencies]
-async-recursion = "1.0.2"
+async-recursion = "1.0.4"
 async-stream = "0.3.4"
 async-trait = { version = "0.1", default-features = false }
 bytecheck = { version = "0.6.9", default-features = false, features = ["std"] }
@@ -32,7 +32,7 @@ vector-config-macros = { path = "../vector-config-macros", default-features = fa
 vector-common = { path = "../vector-common", default-features = false, features = ["byte_size_of", "serde"] }
 
 [dev-dependencies]
-clap = "4.1.8"
+clap = "4.1.11"
 criterion = { version = "0.4", features = ["html_reports", "async_tokio"] }
 crossbeam-queue = "0.3.8"
 hdrhistogram = "7.5.2"
