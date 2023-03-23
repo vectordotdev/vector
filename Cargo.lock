@@ -9991,6 +9991,7 @@ dependencies = [
  "flate2",
  "grok",
  "hex",
+ "hmac",
  "hostname",
  "indexmap",
  "lookup",
