@@ -112,7 +112,7 @@ impl ApplicationConfig {
 
     /// Configure the API server, if applicable
     #[cfg(feature = "api")]
-    pub fn setup_api(&self) -> Option<api::Server> {
+    pub fn setup_api(&self, runtime: &Runtime) -> Option<api::Server> {
         if self.api.enabled {
             use std::sync::atomic::AtomicBool;
 
@@ -120,6 +120,7 @@ impl ApplicationConfig {
                 self.topology.config(),
                 self.topology.watch(),
                 Arc::<AtomicBool>::clone(&self.topology.running),
+                runtime,
             );
 
             match api_server {
@@ -217,7 +218,7 @@ impl Application {
 
         let topology_controller = TopologyController {
             #[cfg(feature = "api")]
-            api_server: config.setup_api(),
+            api_server: config.setup_api(runtime),
             topology: config.topology,
             config_paths: config.config_paths.clone(),
             require_healthy,
@@ -232,7 +233,7 @@ impl Application {
             let (shutdown_trigger, tripwire) = stream_cancel::Tripwire::new();
             match ControlServer::bind(path, Arc::clone(&topology_controller), tripwire) {
                 Ok(control_server) => {
-                    let server_handle = tokio::spawn(control_server.run());
+                    let server_handle = runtime.spawn(control_server.run());
                     Some((shutdown_trigger, server_handle))
                 }
                 Err(error) => {
