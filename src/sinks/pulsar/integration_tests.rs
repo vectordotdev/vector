@@ -5,6 +5,7 @@ use std::collections::BTreeMap;
 
 use crate::event::Value;
 use crate::sinks::VectorSink;
+use crate::template::Template;
 use crate::test_util::{
     components::{assert_sink_compliance, SINK_TAGS},
     random_lines_with_stream, random_string, trace_init,
@@ -22,33 +23,35 @@ async fn pulsar_happy_reuse(mut cnf: PulsarSinkConfig) {
     let prop_1_value = "prop-1-value";
     let num_events = 1_000;
     let (input, events) = random_lines_with_stream(100, num_events, None);
+
     let prop_key_opt = cnf.properties_key.clone();
     let input_events = events.map(move |mut events| {
         // if a property_key is defined, add some properties!
-        if let Some(prop_key) = &prop_key_opt {
-            let properties_key = prop_key;
-            let mut property_values = BTreeMap::new();
-            property_values.insert(
-                prop_1_key.to_owned(),
-                Value::Bytes(Bytes::from(prop_1_value)),
-            );
-            events.iter_logs_mut().for_each(move |log| {
-                log.insert(properties_key.as_str(), property_values.clone());
-            });
-            events
-        } else {
-            events
+        if let Some(properties_key) = &prop_key_opt {
+            if let Some(properties_key) = &properties_key.path {
+                let mut property_values = BTreeMap::new();
+                property_values.insert(
+                    prop_1_key.to_owned(),
+                    Value::Bytes(Bytes::from(prop_1_value)),
+                );
+                events.iter_logs_mut().for_each(move |log| {
+                    log.insert(properties_key, property_values.clone());
+                });
+                return events;
+            }
         }
+        events
     });
 
-    let topic = format!("test-{}", random_string(10));
+    let topic_str = format!("test-{}", random_string(10));
+    let topic = Template::try_from(topic_str.clone()).expect("Unable to parse template");
 
     cnf.topic = topic.clone();
 
     let pulsar = cnf.create_pulsar_client().await.unwrap();
     let mut consumer = pulsar
         .consumer()
-        .with_topic(&topic)
+        .with_topic(&topic_str)
         .with_consumer_name("VectorTestConsumer")
         .with_subscription_type(SubType::Shared)
         .with_subscription("VectorTestSub")
@@ -83,7 +86,6 @@ async fn pulsar_happy() {
     let cnf = PulsarSinkConfig {
         endpoint: pulsar_address(),
         // overriden by test
-        topic: "".to_string(),
         ..Default::default()
     };
 
