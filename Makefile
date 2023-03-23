@@ -604,7 +604,7 @@ test-vrl: ## Run the VRL test suite
 
 .PHONY: compile-vrl-wasm
 compile-vrl-wasm: ## Compile VRL crates to WASM target
-	cargo vdev generate vrl-wasm
+	cargo vdev build vrl-wasm
 
 ##@ Utility
 
@@ -618,13 +618,13 @@ fmt: ## Format code
 
 .PHONY: generate-kubernetes-manifests
 generate-kubernetes-manifests: ## Generate Kubernetes manifests from latest Helm chart
-	cargo vdev generate manifests
+	cargo vdev build manifests
 
 .PHONY: generate-component-docs
 generate-component-docs: ## Generate per-component Cue docs from the configuration schema.
 	${MAYBE_ENVIRONMENT_EXEC} cargo build $(if $(findstring true,$(CI)),--quiet,)
 	target/debug/vector generate-schema > /tmp/vector-config-schema.json 2>/dev/null
-	${MAYBE_ENVIRONMENT_EXEC} cargo vdev generate component-docs /tmp/vector-config-schema.json \
+	${MAYBE_ENVIRONMENT_EXEC} cargo vdev build component-docs /tmp/vector-config-schema.json \
 		$(if $(findstring true,$(CI)),>/dev/null,)
 
 .PHONY: signoff
@@ -659,4 +659,4 @@ cargo-install-%:
 
 .PHONY: ci-generate-publish-metadata
 ci-generate-publish-metadata: ## Generates the necessary metadata required for building/publishing Vector.
-	cargo vdev generate publish-metadata
+	cargo vdev build publish-metadata
