@@ -11,7 +11,7 @@ The week before the release:
   - `git fetch && git checkout origin/master && git checkout -b v0.<new version number> && git push -u`
 - [ ] Create a new release preparation branch from `master`
   - `git checkout -b prepare-v0.<new version number> && git push -u`
-- [ ] Run `cargo vdev generate release-cue` to generate a new cue file for the release
+- [ ] Run `cargo vdev build release-cue` to generate a new cue file for the release
 - [ ] Add `changelog` key to generated cue file
   - [ ] `git log --no-merges --cherry-pick --right-only <last release tag>...`
   - [ ] Should be hand-written list of changes
@@ -45,7 +45,7 @@ On the day of release:
   - Discoverable via [https://github.com/timberio/vector/actions/workflows/release.yml](https://github.com/timberio/vector/actions/workflows/release.yml)
 - [ ] Release updated Helm chart. See [releasing Helm chart](https://github.com/vectordotdev/helm-charts#releasing).
 - [ ] Once Helm chart is released, updated Vector manifests
-    - Run `cargo vdev generate manifests` and open a PR with changes
+    - Run `cargo vdev build manifests` and open a PR with changes
 - [ ] Add docker images to [https://github.com/DataDog/images](https://github.com/DataDog/images/tree/master/vector) to have them available internally.
 - [ ] Cherry-pick any release commits from the release branch that are not on `master`, to `master`
 - [ ] Bump the release number in the `Cargo.toml` on master to the next major release
