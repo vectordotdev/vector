@@ -111,6 +111,7 @@ members = [
   "lib/vector-lookup",
   "lib/vector-vrl/cli",
   "lib/vector-vrl/functions",
+  "lib/vector-vrl/tests",
   "lib/vrl/cli",
   "lib/vrl/compiler",
   "lib/vrl/core",
