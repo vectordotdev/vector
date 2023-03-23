@@ -28,6 +28,7 @@ dns-lookup = { version = "1.0.8", optional = true }
 flate2 = { version = "1.0.25", default-features = false, features = ["default"], optional = true }
 grok = { version = "2", optional = true }
 hex = { version = "0.4", optional = true }
+hmac = { version = "0.12.1", optional = true }
 hostname = { version = "0.3", optional = true }
 indexmap = { version = "~1.9.2", default-features = false, optional = true}
 md-5 = { version = "0.10", optional = true }
@@ -120,6 +121,7 @@ default = [
     "get",
     "get_env_var",
     "get_hostname",
+    "hmac",
     "includes",
     "integer",
     "ip_aton",
@@ -275,6 +277,7 @@ format_timestamp = ["dep:chrono"]
 get = ["dep:lookup_lib"]
 get_env_var = []
 get_hostname = ["dep:hostname"]
+hmac = ["dep:hmac", "dep:sha-1", "dep:sha-2", "dep:hex", "dep:base64"]
 includes = []
 integer = []
 ip_aton = []

@@ -170,7 +170,7 @@ impl Application {
         let runtime = build_runtime(opts.root.threads, "vector-worker")?;
 
         // Signal handler for OS and provider messages.
-        let mut signals = runtime.block_on(SignalPair::new());
+        let mut signals = SignalPair::new(&runtime);
 
         if let Some(sub_command) = &opts.sub_command {
             return Err(runtime.block_on(sub_command.execute(signals, color)));
