@@ -83,6 +83,9 @@ pub struct PulsarSinkConfig {
 #[derive(Clone, Copy, Debug, Default)]
 pub(crate) struct PulsarBatchConfig {
     /// The maximum size of a batch before it is flushed.
+    ///
+    /// Note this is an unsigned 32 bit integer which is a smaller capacity than
+    /// many of the other sink batch settings.
     #[configurable(metadata(docs::type_unit = "events"))]
     #[configurable(metadata(docs::examples = 1000))]
     pub max_events: Option<u32>,

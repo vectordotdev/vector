@@ -87,8 +87,13 @@ base: components: sinks: pulsar: configuration: {
 		description: "Event batching behavior."
 		required:    false
 		type: object: options: max_events: {
-			description: "The maximum size of a batch before it is flushed."
-			required:    false
+			description: """
+				The maximum size of a batch before it is flushed.
+
+				Note this is an unsigned 32 bit integer which is a smaller capacity than
+				many of the other sink batch settings.
+				"""
+			required: false
 			type: uint: {
 				examples: [1000]
 				unit: "events"
@@ -285,6 +290,9 @@ base: components: sinks: pulsar: configuration: {
 	topic: {
 		description: "The Pulsar topic name to write events to."
 		required:    true
-		type: string: examples: ["topic-1234"]
+		type: string: {
+			examples: ["topic-1234"]
+			syntax: "template"
+		}
 	}
 }
