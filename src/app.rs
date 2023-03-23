@@ -263,7 +263,7 @@ pub struct StartedApplication {
         tokio::task::JoinHandle<Result<(), Box<dyn serde::ser::StdError + Send + Sync>>>,
     )>,
     graceful_crash_receiver: mpsc::UnboundedReceiver<()>,
-    signals: SignalPair,
+    pub signals: SignalPair,
     topology_controller: Arc<Mutex<TopologyController>>,
 }
 
