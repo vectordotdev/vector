@@ -119,7 +119,7 @@ impl<Exe: Executor> Service<PulsarRequest> for PulsarService<Exe> {
                 properties,
                 partition_key,
                 event_time,
-                ....Default::default()
+                ..Default::default()
             };
 
             match producer.send(topic, message).await {
