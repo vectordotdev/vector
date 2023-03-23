@@ -95,9 +95,6 @@ cli_commands! {
 #[macro_export]
 macro_rules! script_wrapper {
     ( $mod:ident = $doc:literal => $script:literal ) => {
-        $crate::script_wrapper! { $mod = $doc => $script => {} }
-    };
-    ( $mod:ident = $doc:literal => $script:literal => $pre:expr ) => {
         paste::paste! {
             mod $mod {
                 #[doc = $doc]
@@ -109,7 +106,6 @@ macro_rules! script_wrapper {
 
                 impl Cli {
                     pub(super) fn exec(self) -> anyhow::Result<()> {
-                        $pre;
                         $crate::app::exec(concat!("scripts/", $script), self.args, true)
                     }
                 }

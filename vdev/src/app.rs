@@ -44,7 +44,9 @@ pub fn set_repo_dir() -> Result<()> {
 }
 
 pub fn version() -> Result<String> {
-    let mut version = env::var("VERSION").or_else(|_| util::read_version())?;
+    let mut version = env::var("VERSION")
+        .or_else(|_| env::var("VECTOR_VERSION"))
+        .or_else(|_| util::read_version())?;
 
     let channel = util::get_channel();
 
@@ -61,8 +63,6 @@ pub fn version() -> Result<String> {
 
     // extend version for custom builds if not already
     } else if channel == "custom" && !version.contains("custom") {
-        util::mark_safe_git_repo();
-
         let sha = git::get_git_sha()?;
 
         // use '.' instead of '-' or '_' to avoid issues with rpm and deb package naming
