@@ -1,9 +1,15 @@
 use ::value::Value;
+use regex::Regex;
 use vrl::prelude::*;
 
 fn match_(value: Value, pattern: Value) -> Resolved {
     let string = value.try_bytes_utf8_lossy()?;
     let pattern = pattern.try_regex()?;
+    Ok(pattern.is_match(&string).into())
+}
+
+fn match_static(value: Value, pattern: &Regex) -> Resolved {
+    let string = value.try_bytes_utf8_lossy()?;
     Ok(pattern.is_match(&string).into())
 }
 
@@ -54,7 +60,20 @@ impl Function for Match {
         let value = arguments.required("value");
         let pattern = arguments.required("pattern");
 
-        Ok(MatchFn { value, pattern }.as_expr())
+        match pattern.as_value() {
+            Some(pattern) => {
+                let pattern = pattern
+                    .try_regex()
+                    .map_err(|e| Box::new(e) as Box<dyn DiagnosticMessage>)?;
+
+                let pattern = Regex::new(pattern.as_str()).map_err(|e| {
+                    Box::new(ExpressionError::from(e.to_string())) as Box<dyn DiagnosticMessage>
+                })?;
+
+                Ok(MatchStaticFn { value, pattern }.as_expr())
+            }
+            None => Ok(MatchFn { value, pattern }.as_expr()),
+        }
     }
 }
 
@@ -70,6 +89,24 @@ impl FunctionExpression for MatchFn {
         let pattern = self.pattern.resolve(ctx)?;
 
         match_(value, pattern)
+    }
+
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
+        TypeDef::boolean().infallible()
+    }
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct MatchStaticFn {
+    value: Box<dyn Expression>,
+    pattern: Regex,
+}
+
+impl FunctionExpression for MatchStaticFn {
+    fn resolve(&self, ctx: &mut Context) -> Resolved {
+        let value = self.value.resolve(ctx)?;
+
+        match_static(value, &self.pattern)
     }
 
     fn type_def(&self, _: &state::TypeState) -> TypeDef {
