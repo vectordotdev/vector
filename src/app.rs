@@ -109,6 +109,39 @@ impl ApplicationConfig {
             enterprise,
         })
     }
+
+    /// Configure the API server, if applicable
+    #[cfg(feature = "api")]
+    pub fn setup_api(&self) -> Option<api::Server> {
+        if self.api.enabled {
+            use std::sync::atomic::AtomicBool;
+
+            let api_server = api::Server::start(
+                self.topology.config(),
+                self.topology.watch(),
+                Arc::<AtomicBool>::clone(&self.topology.running),
+            );
+
+            match api_server {
+                Ok(api_server) => {
+                    emit!(ApiStarted {
+                        addr: self.api.address.unwrap(),
+                        playground: self.api.playground
+                    });
+
+                    Some(api_server)
+                }
+                Err(e) => {
+                    error!("An error occurred that Vector couldn't handle: {}.", e);
+                    let _ = self.graceful_crash_sender.send(());
+                    None
+                }
+            }
+        } else {
+            info!(message="API is disabled, enable by setting `api.enabled` to `true` and use commands like `vector top`.");
+            None
+        }
+    }
 }
 
 impl Application {
@@ -163,6 +196,9 @@ impl Application {
         // early buffer by this point and set up a subscriber.
         crate::trace::stop_early_buffering();
 
+        emit!(VectorStarted);
+        tokio::spawn(heartbeat::heartbeat());
+
         let Self {
             require_healthy,
             config,
@@ -172,52 +208,14 @@ impl Application {
         let mut signal_handler = signals.handler;
         let mut signal_rx = signals.receiver;
 
-        let topology = config.topology;
-        let config_paths = config.config_paths;
-
-        emit!(VectorStarted);
-        tokio::spawn(heartbeat::heartbeat());
-
-        // Configure the API server, if applicable.
-        #[cfg(feature = "api")]
-        // Assigned to prevent the API terminating when falling out of scope.
-        let api_server = if config.api.enabled {
-            use std::sync::atomic::AtomicBool;
-
-            let api_server = api::Server::start(
-                topology.config(),
-                topology.watch(),
-                Arc::<AtomicBool>::clone(&topology.running),
-            );
-
-            match api_server {
-                Ok(api_server) => {
-                    emit!(ApiStarted {
-                        addr: config.api.address.unwrap(),
-                        playground: config.api.playground
-                    });
-
-                    Some(api_server)
-                }
-                Err(e) => {
-                    error!("An error occurred that Vector couldn't handle: {}.", e);
-                    let _ = config.graceful_crash_sender.send(());
-                    None
-                }
-            }
-        } else {
-            info!(message="API is disabled, enable by setting `api.enabled` to `true` and use commands like `vector top`.");
-            None
-        };
-
         let topology_controller = TopologyController {
-            topology,
-            config_paths: config_paths.clone(),
+            #[cfg(feature = "api")]
+            api_server: config.setup_api(),
+            topology: config.topology,
+            config_paths: config.config_paths.clone(),
             require_healthy,
             #[cfg(feature = "enterprise")]
             enterprise_reporter: config.enterprise,
-            #[cfg(feature = "api")]
-            api_server,
         };
         let topology_controller = Arc::new(Mutex::new(topology_controller));
 
@@ -259,7 +257,7 @@ impl Application {
                             let mut topology_controller = topology_controller.lock().await;
 
                             // Reload paths
-                            if let Some(paths) = config::process_paths(&config_paths) {
+                            if let Some(paths) = config::process_paths(&config.config_paths) {
                                 topology_controller.config_paths = paths;
                             }
 
