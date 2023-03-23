@@ -145,7 +145,7 @@ impl FunctionExpression for ParseGrokFn {
 
 #[cfg(test)]
 mod test {
-    use vector_common::btreemap;
+    use ::value::btreemap;
 
     use super::*;
 

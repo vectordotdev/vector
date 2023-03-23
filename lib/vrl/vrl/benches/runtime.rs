@@ -4,8 +4,8 @@ use ::value::Value;
 use compiler::state;
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use indoc::indoc;
-use vector_common::TimeZone;
 use vrl::{CompilationResult, Runtime};
+use vrl_core::TimeZone;
 
 struct Source {
     name: &'static str,

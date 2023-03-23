@@ -3,8 +3,11 @@ use std::process::{Command, Output};
 use std::{collections::BTreeMap, fmt::Debug, fs, io::ErrorKind, path::Path};
 
 use anyhow::{Context as _, Result};
+use once_cell::sync::Lazy;
 use serde::Deserialize;
 use serde_json::Value;
+
+pub static IS_A_TTY: Lazy<bool> = Lazy::new(|| atty::is(atty::Stream::Stdout));
 
 #[derive(Deserialize)]
 pub struct CargoTomlPackage {

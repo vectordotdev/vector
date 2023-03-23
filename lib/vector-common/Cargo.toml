@@ -8,17 +8,11 @@ license = "MPL-2.0"
 
 [features]
 default = [
-  "aws_cloudwatch_logs_subscription",
   "btreemap",
   "conversion",
   "tokenize",
   "encoding",
   "sensitive_string"
-]
-
-aws_cloudwatch_logs_subscription = [
-  "chrono?/serde",
-  "serde/derive",
 ]
 
 btreemap = []
@@ -69,6 +63,7 @@ stream-cancel = { version = "0.8.1", default-features = false }
 tokio = { version = "1.26.0", default-features = false, features = ["macros", "time"] }
 tracing = { version = "0.1.34", default-features = false }
 value = { path = "../vrl/value", features = ["json", "arbitrary"] }
+vrl-core = { path = "../vrl/core", default-features = false }
 vector-config = { path = "../vector-config" }
 vector-config-common = { path = "../vector-config-common" }
 vector-config-macros = { path = "../vector-config-macros" }
