@@ -1,6 +1,3 @@
-#![allow(clippy::print_stdout)] // tests
-#![allow(clippy::print_stderr)] // tests
-
 use vrl_tests::{get_tests_from_functions, run_tests, Test, TestConfig};
 
 use chrono_tz::Tz;

@@ -17,7 +17,7 @@ impl Cli {
 }
 
 fn run_tests(path: &[&str]) -> Result<()> {
-    let path: PathBuf = path.into_iter().collect();
+    let path: PathBuf = path.iter().collect();
     env::set_current_dir(path).context("Could not change directory")?;
     app::exec("cargo", ["run"].into_iter(), false)
 }
