@@ -1,4 +1,4 @@
-use std::{cell::RefCell, collections::BTreeSet, mem};
+use std::{cell::RefCell, collections::BTreeSet, env, mem};
 
 use indexmap::IndexMap;
 use serde_json::{Map, Value};
@@ -464,15 +464,17 @@ pub fn generate_root_schema<T>() -> Result<RootSchema, GenerateError>
 where
     T: Configurable + 'static,
 {
-    // Set env variable to enable generating all schemas, including platform-specific ones.
-    std::env::set_var("VECTOR_GENERATE_SCHEMA", "true");
-
     let schema_settings =
         SchemaSettings::new().with_visitor(DisallowedUnevaluatedPropertiesVisitor::from_settings);
     let schema_gen = RefCell::new(schema_settings.into_generator());
 
+    // Set env variable to enable generating all schemas, including platform-specific ones.
+    env::set_var("VECTOR_GENERATE_SCHEMA", "true");
+
     let schema =
         get_or_generate_schema(&T::as_configurable_ref(), &schema_gen, Some(T::metadata()))?;
+
+    env::remove_var("VECTOR_GENERATE_SCHEMA");
 
     Ok(schema_gen.into_inner().into_root_schema(schema))
 }
