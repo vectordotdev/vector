@@ -218,7 +218,7 @@ impl PulsarSinkConfig {
             access_mode: Some(0),
             metadata: Default::default(),
             schema: None,
-            batch_size: None,
+            batch_size: self.batch.max_events,
             compression: None,
         };
 
@@ -245,8 +245,6 @@ impl PulsarSinkConfig {
                 ))
             }
         }
-
-        opts.batch_size = self.batch.max_events;
 
         if let SerializerConfig::Avro { avro } = self.encoding.config() {
             opts.schema = Some(proto::Schema {
