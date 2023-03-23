@@ -12,12 +12,11 @@ use chrono_tz::Tz;
 use clap::Parser;
 use glob::glob;
 use value::Secrets;
-use vector_common::TimeZone;
 use vrl::{
     diagnostic::Formatter,
     prelude::{BTreeMap, VrlValueConvert},
     state, CompilationResult, CompileConfig, Runtime, SecretTarget, TargetValueRef, Terminate,
-    VrlRuntime,
+    TimeZone, VrlRuntime,
 };
 use vrl_tests::{docs, Test};
 

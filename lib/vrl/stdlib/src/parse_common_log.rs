@@ -123,8 +123,8 @@ fn inner_kind() -> BTreeMap<Field, Kind> {
 
 #[cfg(test)]
 mod tests {
+    use ::value::btreemap;
     use chrono::prelude::*;
-    use vector_common::btreemap;
 
     use super::*;
 

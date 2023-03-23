@@ -1,3 +1,4 @@
+/// A macro to easily create a map containing `Value`
 #[macro_export]
 macro_rules! btreemap {
     () => (::std::collections::BTreeMap::new());

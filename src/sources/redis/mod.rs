@@ -252,13 +252,13 @@ impl InputHandler {
                         if let Event::Log(ref mut log) = event {
                             self.log_namespace.insert_vector_metadata(
                                 log,
-                                path!(log_schema().source_type_key()),
+                                Some(log_schema().source_type_key()),
                                 path!("source_type"),
                                 Bytes::from(RedisSourceConfig::NAME),
                             );
                             self.log_namespace.insert_vector_metadata(
                                 log,
-                                path!(log_schema().timestamp_key()),
+                                log_schema().timestamp_key(),
                                 path!("ingest_timestamp"),
                                 now,
                             );

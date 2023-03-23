@@ -9,10 +9,10 @@ use serde::{Deserialize, Serialize};
 pub enum NodeType {
     Mongod,  // MongoDB daemon
     Mongos,  // Mongo sharding server
-    Replset, // https://docs.mongodb.com/manual/reference/glossary/#term-replica-set
+    Replset, // <https://docs.mongodb.com/manual/reference/glossary/#term-replica-set>
 }
 
-/// https://docs.mongodb.com/manual/reference/command/isMaster/
+/// <https://docs.mongodb.com/manual/reference/command/isMaster/>
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CommandIsMaster {
@@ -21,7 +21,7 @@ pub struct CommandIsMaster {
     pub hosts: Option<Vec<String>>,
 }
 
-/// https://docs.mongodb.com/manual/reference/command/buildInfo/
+/// <https://docs.mongodb.com/manual/reference/command/buildInfo/>
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CommandBuildInfo {
@@ -32,7 +32,7 @@ pub struct CommandBuildInfo {
     pub max_bson_object_size: i64,
 }
 
-/// https://docs.mongodb.com/manual/reference/command/serverStatus/
+/// <https://docs.mongodb.com/manual/reference/command/serverStatus/>
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CommandServerStatus {
@@ -269,7 +269,7 @@ pub struct CommandServerStatusMetricsReplTtl {
     pub passes: i64,
 }
 
-/// https://docs.mongodb.com/manual/reference/operator/aggregation/collStats/#latency-stats-document
+/// <https://docs.mongodb.com/manual/reference/operator/aggregation/collStats/#latency-stats-document>
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CommandServerStatusOpLatenciesStat {

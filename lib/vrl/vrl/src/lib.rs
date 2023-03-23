@@ -16,7 +16,7 @@ pub use compiler::{
 };
 pub use diagnostic;
 pub use runtime::{Runtime, RuntimeResult, Terminate};
-pub use vector_common::TimeZone;
+pub use vrl_core::TimeZone;
 
 use crate::state::TypeState;
 pub use compiler::expression::query;

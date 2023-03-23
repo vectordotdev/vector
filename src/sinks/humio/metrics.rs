@@ -3,6 +3,7 @@ use codecs::JsonSerializerConfig;
 use futures::StreamExt;
 use futures_util::stream::BoxStream;
 use indoc::indoc;
+use lookup::lookup_v2::OptionalValuePath;
 use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
 use vector_core::{sink::StreamSink, transform::Transform};
@@ -172,7 +173,9 @@ impl SinkConfig for HumioMetricsConfig {
             timestamp_nanos_key: None,
             acknowledgements: Default::default(),
             // hard coded as humio expects this format so no sense in making it configurable
-            timestamp_key: "timestamp".to_string(),
+            timestamp_key: OptionalValuePath {
+                path: Some(lookup::owned_value_path!("timestamp")),
+            },
         };
 
         let (sink, healthcheck) = sink.clone().build(cx).await?;

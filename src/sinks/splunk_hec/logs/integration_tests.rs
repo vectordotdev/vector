@@ -3,6 +3,7 @@ use std::{convert::TryFrom, iter, num::NonZeroU8};
 use chrono::{TimeZone, Utc};
 use codecs::{JsonSerializerConfig, TextSerializerConfig};
 use futures::{future::ready, stream};
+use lookup::lookup_v2::OptionalValuePath;
 use serde_json::Value as JsonValue;
 use tokio::time::{sleep, Duration};
 use vector_core::event::{BatchNotifier, BatchStatus, Event, LogEvent};
@@ -417,7 +418,9 @@ async fn splunk_auto_extracted_timestamp() {
 
         let config = HecLogsSinkConfig {
             auto_extract_timestamp: Some(true),
-            timestamp_key: "timestamp".to_string(),
+            timestamp_key: OptionalValuePath {
+                path: Some(lookup::owned_value_path!("timestamp")),
+            },
             ..config(JsonSerializerConfig::default().into(), vec![]).await
         };
 
@@ -464,7 +467,9 @@ async fn splunk_non_auto_extracted_timestamp() {
 
         let config = HecLogsSinkConfig {
             auto_extract_timestamp: Some(false),
-            timestamp_key: "timestamp".to_string(),
+            timestamp_key: OptionalValuePath {
+                path: Some(lookup::owned_value_path!("timestamp")),
+            },
             ..config(JsonSerializerConfig::default().into(), vec![]).await
         };
 

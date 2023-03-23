@@ -1,6 +1,7 @@
 use crate::encoding::BuildError;
 use bytes::{BufMut, BytesMut};
-use lookup::lookup_v2::ConfigOwnedTargetPath;
+use chrono::SecondsFormat;
+use lookup::lookup_v2::ConfigTargetPath;
 use tokio_util::codec::Encoder;
 use vector_core::{
     config::DataType,
@@ -55,18 +56,18 @@ pub struct CsvSerializerOptions {
     ///
     /// Values of type `Array`, `Object`, and `Regex` are not supported and the
     /// output will be an empty string.
-    pub fields: Vec<ConfigOwnedTargetPath>,
+    pub fields: Vec<ConfigTargetPath>,
 }
 
 /// Serializer that converts an `Event` to bytes using the CSV format.
 #[derive(Debug, Clone)]
 pub struct CsvSerializer {
-    fields: Vec<ConfigOwnedTargetPath>,
+    fields: Vec<ConfigTargetPath>,
 }
 
 impl CsvSerializer {
     /// Creates a new `CsvSerializer`.
-    pub const fn new(fields: Vec<ConfigOwnedTargetPath>) -> Self {
+    pub const fn new(fields: Vec<ConfigTargetPath>) -> Self {
         Self { fields }
     }
 }
@@ -85,7 +86,9 @@ impl Encoder<Event> for CsvSerializer {
                 Some(Value::Integer(int)) => wtr.write_field(int.to_string())?,
                 Some(Value::Float(float)) => wtr.write_field(float.to_string())?,
                 Some(Value::Boolean(bool)) => wtr.write_field(bool.to_string())?,
-                Some(Value::Timestamp(timestamp)) => wtr.write_field(timestamp.to_rfc3339())?,
+                Some(Value::Timestamp(timestamp)) => {
+                    wtr.write_field(timestamp.to_rfc3339_opts(SecondsFormat::AutoSi, true))?
+                }
                 Some(Value::Null) => wtr.write_field("")?,
                 // Other value types: Array, Regex, Object are not supported by the CSV format.
                 Some(_) => wtr.write_field("")?,
@@ -130,15 +133,15 @@ mod tests {
         }));
 
         let fields = vec![
-            ConfigOwnedTargetPath::try_from("foo".to_string()).unwrap(),
-            ConfigOwnedTargetPath::try_from("int".to_string()).unwrap(),
-            ConfigOwnedTargetPath::try_from("comma".to_string()).unwrap(),
-            ConfigOwnedTargetPath::try_from("float".to_string()).unwrap(),
-            ConfigOwnedTargetPath::try_from("missing".to_string()).unwrap(),
-            ConfigOwnedTargetPath::try_from("space".to_string()).unwrap(),
-            ConfigOwnedTargetPath::try_from("time".to_string()).unwrap(),
-            ConfigOwnedTargetPath::try_from("quote".to_string()).unwrap(),
-            ConfigOwnedTargetPath::try_from("bool".to_string()).unwrap(),
+            ConfigTargetPath::try_from("foo".to_string()).unwrap(),
+            ConfigTargetPath::try_from("int".to_string()).unwrap(),
+            ConfigTargetPath::try_from("comma".to_string()).unwrap(),
+            ConfigTargetPath::try_from("float".to_string()).unwrap(),
+            ConfigTargetPath::try_from("missing".to_string()).unwrap(),
+            ConfigTargetPath::try_from("space".to_string()).unwrap(),
+            ConfigTargetPath::try_from("time".to_string()).unwrap(),
+            ConfigTargetPath::try_from("quote".to_string()).unwrap(),
+            ConfigTargetPath::try_from("bool".to_string()).unwrap(),
         ];
         let config = CsvSerializerConfig::new(CsvSerializerOptions { fields });
         let mut serializer = config.build().unwrap();
@@ -148,7 +151,7 @@ mod tests {
 
         assert_eq!(
             bytes.freeze(),
-            b"bar,123,\"abc,bcd\",3.1415925,,sp ace,2023-02-27T07:04:49.363+00:00,\"the \"\"quote\"\" should be escaped\",true".as_slice()
+            b"bar,123,\"abc,bcd\",3.1415925,,sp ace,2023-02-27T07:04:49.363Z,\"the \"\"quote\"\" should be escaped\",true".as_slice()
         );
     }
 
@@ -162,11 +165,11 @@ mod tests {
             "field5" => Value::from("value5"),
         }));
         let fields = vec![
-            ConfigOwnedTargetPath::try_from("field1".to_string()).unwrap(),
-            ConfigOwnedTargetPath::try_from("field5".to_string()).unwrap(),
-            ConfigOwnedTargetPath::try_from("field5".to_string()).unwrap(),
-            ConfigOwnedTargetPath::try_from("field3".to_string()).unwrap(),
-            ConfigOwnedTargetPath::try_from("field2".to_string()).unwrap(),
+            ConfigTargetPath::try_from("field1".to_string()).unwrap(),
+            ConfigTargetPath::try_from("field5".to_string()).unwrap(),
+            ConfigTargetPath::try_from("field5".to_string()).unwrap(),
+            ConfigTargetPath::try_from("field3".to_string()).unwrap(),
+            ConfigTargetPath::try_from("field2".to_string()).unwrap(),
         ];
         let config = CsvSerializerConfig::new(CsvSerializerOptions { fields });
         let mut serializer = config.build().unwrap();

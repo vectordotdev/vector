@@ -13,7 +13,7 @@ use vector_core::event::Value;
 ///
 /// Not yet handled are the handshake messages.
 ///
-/// https://github.com/fluent/fluentd/wiki/Forward-Protocol-Specification-v1#event-modes
+/// <https://github.com/fluent/fluentd/wiki/Forward-Protocol-Specification-v1#event-modes>
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(untagged)]
 pub(super) enum FluentMessage {
@@ -38,7 +38,7 @@ pub(super) enum FluentMessage {
 
 /// Server options sent by client.
 ///
-/// https://github.com/fluent/fluentd/wiki/Forward-Protocol-Specification-v1#option
+/// <https://github.com/fluent/fluentd/wiki/Forward-Protocol-Specification-v1#option>
 #[derive(Default, Debug, Deserialize, Serialize)]
 #[serde(default)]
 pub(super) struct FluentMessageOptions {
@@ -49,7 +49,7 @@ pub(super) struct FluentMessageOptions {
 
 /// Fluent entry consisting of timestamp and record.
 ///
-/// https://github.com/fluent/fluentd/wiki/Forward-Protocol-Specification-v1#forward-mode
+/// <https://github.com/fluent/fluentd/wiki/Forward-Protocol-Specification-v1#forward-mode>
 #[derive(Debug, Deserialize, Serialize)]
 pub(super) struct FluentEntry(pub(super) FluentTimestamp, pub(super) FluentRecord);
 
@@ -61,7 +61,7 @@ pub(super) type FluentTag = String;
 
 /// Custom decoder for Fluent's EventTime msgpack extension.
 ///
-/// https://github.com/fluent/fluentd/wiki/Forward-Protocol-Specification-v1#eventtime-ext-format
+/// <https://github.com/fluent/fluentd/wiki/Forward-Protocol-Specification-v1#eventtime-ext-format>
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub(super) struct FluentEventTime(DateTime<Utc>);
 
@@ -172,10 +172,10 @@ impl From<FluentValue> for Value {
             ),
             rmpv::Value::Map(values) => {
                 // Per
-                // https://github.com/fluent/fluentd/wiki/Forward-Protocol-Specification-v1#message-modes
+                // <https://github.com/fluent/fluentd/wiki/Forward-Protocol-Specification-v1#message-modes>
                 // we should expect that keys are always stringy. Ultimately a
                 // lot hinges on what
-                // https://github.com/fluent/fluentd/wiki/Forward-Protocol-Specification-v1#grammar
+                // <https://github.com/fluent/fluentd/wiki/Forward-Protocol-Specification-v1#grammar>
                 // defines 'object' as.
                 //
                 // The current implementation will SILENTLY DROP non-stringy keys.

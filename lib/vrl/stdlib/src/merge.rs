@@ -117,7 +117,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use vector_common::btreemap;
+    use ::value::btreemap;
     use vrl::value::Kind;
 
     use super::*;
