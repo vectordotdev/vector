@@ -9372,6 +9372,7 @@ dependencies = [
  "os_info",
  "owo-colors",
  "paste",
+ "regex",
  "serde",
  "serde_json",
  "serde_yaml 0.9.19",

@@ -74,6 +74,7 @@ cli_commands! {
     mod check,
     mod complete,
     mod config,
+    mod crate_versions,
     mod exec,
     mod features,
     mod fmt,
