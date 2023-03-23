@@ -8,7 +8,7 @@ on:
 
 jobs:
   Release:
-    uses: .github/workflows/publish.yml
+    uses: ./.github/workflows/publish.yml
     with:
       git_ref: ${{ github.ref }}
       channel: release

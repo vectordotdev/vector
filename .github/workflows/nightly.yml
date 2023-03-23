@@ -7,7 +7,7 @@ on:
 
 jobs:
   Nightly:
-    uses: .github/workflows/publish.yml
+    uses: ./.github/workflows/publish.yml
     with:
       git_ref: ${{ github.ref }}
       channel: nightly
