@@ -551,7 +551,7 @@ pub fn file_source(
         // The shutdown sent in to the finalizer is the global
         // shutdown handle used to tell it to stop accepting new batch
         // statuses and just wait for the remaining acks to come in.
-        let (finalizer, mut ack_stream) = OrderedFinalizer::<FinalizerEntry>::new(shutdown.clone());
+        let (finalizer, mut ack_stream) = OrderedFinalizer::<FinalizerEntry>::new(None);
         // We set up a separate shutdown signal to tie together the
         // finalizer and the checkpoint writer task in the file
         // server, to make it continue to write out updated

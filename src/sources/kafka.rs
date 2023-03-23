@@ -373,7 +373,7 @@ async fn kafka_source(
 ) -> Result<(), ()> {
     let consumer = Arc::new(consumer);
     let (finalizer, mut ack_stream) =
-        OrderedFinalizer::<FinalizerEntry>::maybe_new(acknowledgements, shutdown.clone());
+        OrderedFinalizer::<FinalizerEntry>::maybe_new(acknowledgements, Some(shutdown.clone()));
     let finalizer = finalizer.map(Arc::new);
     if let Some(finalizer) = &finalizer {
         consumer

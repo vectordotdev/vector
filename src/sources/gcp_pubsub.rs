@@ -497,7 +497,7 @@ impl PubsubSource {
         let mut stream = stream.into_inner();
 
         let (finalizer, mut ack_stream) =
-            Finalizer::maybe_new(self.acknowledgements, self.shutdown.clone());
+            Finalizer::maybe_new(self.acknowledgements, Some(self.shutdown.clone()));
         let mut pending_acks = 0;
 
         loop {
