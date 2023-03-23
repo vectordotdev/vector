@@ -94,6 +94,9 @@ cli_commands! {
 /// `pre` provides the option to execute an expression before running the script.
 #[macro_export]
 macro_rules! script_wrapper {
+    ( $mod:ident = $doc:literal => $script:literal ) => {
+        $crate::script_wrapper! { $mod = $doc => $script => {} }
+    };
     ( $mod:ident = $doc:literal => $script:literal => $pre:expr ) => {
         paste::paste! {
             mod $mod {
