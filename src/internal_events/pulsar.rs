@@ -34,18 +34,18 @@ impl InternalEvent for PulsarSendingError {
     }
 }
 
-pub struct PulsarPropertyExtractionError<'a> {
-    pub property_field: &'a str,
+pub struct PulsarPropertyExtractionError<F: std::fmt::Display> {
+    pub property_field: F,
 }
 
-impl InternalEvent for PulsarPropertyExtractionError<'_> {
+impl<F: std::fmt::Display> InternalEvent for PulsarPropertyExtractionError<F> {
     fn emit(self) {
         error!(
             message = "Failed to extract properties. Value should be a map of String -> Bytes.",
             error_code = "extracting_property",
             error_type = error_type::PARSER_FAILED,
             stage = error_stage::PROCESSING,
-            property_field = self.property_field,
+            property_field = %self.property_field,
             internal_log_rate_limit = true,
         );
         counter!(

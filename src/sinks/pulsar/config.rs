@@ -10,6 +10,7 @@ use crate::{
 };
 use codecs::{encoding::SerializerConfig, TextSerializerConfig};
 use futures_util::FutureExt;
+use lookup::lookup_v2::OptionalTargetPath;
 use pulsar::{
     authentication::oauth2::{OAuth2Authentication, OAuth2Params},
     compression,
@@ -43,19 +44,21 @@ pub struct PulsarSinkConfig {
     #[configurable(metadata(docs::examples = "producer-name"))]
     pub(crate) producer_name: Option<String>,
 
-    /// The log field name or tags key to use for the topic key.
+    /// The log field name or tags key to use for the partition key.
     ///
-    /// If the field does not exist in the log or in tags, a blank value will be used. If unspecified, the key is not sent.
+    /// If the field does not exist in the log event or metric tags, a blank value will be used.
+    ///
+    /// If omitted, the key is not sent.
     ///
     /// Pulsar uses a hash of the key to choose the topic-partition or uses round-robin if the record has no key.
     #[configurable(metadata(docs::examples = "message"))]
     #[configurable(metadata(docs::examples = "my_field"))]
-    pub(crate) partition_key_field: Option<String>,
+    pub(crate) partition_key_field: Option<OptionalTargetPath>,
 
-    /// The log field name to use for the Pulsar properties.
+    /// The log field name to use for the Pulsar properties key.
     ///
     /// If omitted, no properties will be written.
-    pub properties_key: Option<String>,
+    pub properties_key: Option<OptionalTargetPath>,
 
     #[configurable(derived)]
     #[serde(default)]
