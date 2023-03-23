@@ -51,13 +51,13 @@ pub struct LogstashConfig {
 
     /// The size of the receive buffer used for each connection.
     ///
-    /// This generally should not need to be changed.
+    /// Generally, this should not need to be changed.
     #[configurable(metadata(docs::type_unit = "bytes"))]
     #[configurable(metadata(docs::examples = 65536))]
     #[configurable(metadata(docs::advanced))]
     receive_buffer_bytes: Option<usize>,
 
-    /// The maximum number of TCP connections that will be allowed at any given time.
+    /// The maximum number of TCP connections that are allowed at any given time.
     #[configurable(metadata(docs::type_unit = "connections"))]
     #[configurable(metadata(docs::advanced))]
     connection_limit: Option<u32>,

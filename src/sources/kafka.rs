@@ -73,7 +73,7 @@ struct Metrics {
 pub struct KafkaSourceConfig {
     /// A comma-separated list of Kafka bootstrap servers.
     ///
-    /// These are the servers in a Kafka cluster that a client should use to "bootstrap" its connection to the cluster,
+    /// These are the servers in a Kafka cluster that a client should use to bootstrap its connection to the cluster,
     /// allowing discovering all other hosts in the cluster.
     ///
     /// Must be in the form of `host:port`, and comma-separated.
@@ -130,7 +130,7 @@ pub struct KafkaSourceConfig {
 
     /// Overrides the name of the log field used to add the message key to each event.
     ///
-    /// The value will be the message key of the Kafka message itself.
+    /// The value is the message key of the Kafka message itself.
     ///
     /// By default, `"message_key"` is used.
     #[serde(default = "default_key_field")]
@@ -139,7 +139,7 @@ pub struct KafkaSourceConfig {
 
     /// Overrides the name of the log field used to add the topic to each event.
     ///
-    /// The value will be the topic from which the Kafka message was consumed from.
+    /// The value is the topic from which the Kafka message was consumed from.
     ///
     /// By default, `"topic"` is used.
     #[serde(default = "default_topic_key")]
@@ -148,7 +148,7 @@ pub struct KafkaSourceConfig {
 
     /// Overrides the name of the log field used to add the partition to each event.
     ///
-    /// The value will be the partition from which the Kafka message was consumed from.
+    /// The value is the partition from which the Kafka message was consumed from.
     ///
     /// By default, `"partition"` is used.
     #[serde(default = "default_partition_key")]
@@ -157,7 +157,7 @@ pub struct KafkaSourceConfig {
 
     /// Overrides the name of the log field used to add the offset to each event.
     ///
-    /// The value will be the offset of the Kafka message itself.
+    /// The value is the offset of the Kafka message itself.
     ///
     /// By default, `"offset"` is used.
     #[serde(default = "default_offset_key")]
@@ -166,7 +166,7 @@ pub struct KafkaSourceConfig {
 
     /// Overrides the name of the log field used to add the headers to each event.
     ///
-    /// The value will be the headers of the Kafka message itself.
+    /// The value is the headers of the Kafka message itself.
     ///
     /// By default, `"headers"` is used.
     #[serde(default = "default_headers_key")]

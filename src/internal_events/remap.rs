@@ -9,7 +9,7 @@ use vector_common::internal_event::{
 #[derive(Debug)]
 pub struct RemapMappingError {
     /// If set to true, the remap transform has dropped the event after a failed
-    /// mapping. This internal event will reflect that in its messaging.
+    /// mapping. This internal event reflects that in its messaging.
     pub event_dropped: bool,
     pub error: String,
 }
@@ -42,7 +42,7 @@ impl InternalEvent for RemapMappingError {
 #[derive(Debug)]
 pub struct RemapMappingAbort {
     /// If set to true, the remap transform has dropped the event after an abort
-    /// during mapping. This internal event will reflect that in its messaging.
+    /// during mapping. This internal event reflects that in its messaging.
     pub event_dropped: bool,
 }
 

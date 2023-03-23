@@ -29,7 +29,7 @@ NATS [documentation][nats_auth_docs]. For TLS client certificate authentication 
 [nats_auth_docs]: https://docs.nats.io/running-a-nats-service/configuration/securing_nats/auth_intro"
 ))]
 pub(crate) enum NatsAuthConfig {
-    /// Username/password authentication.
+    /// Username and password authentication.
     UserPassword {
         #[configurable(derived)]
         user_password: NatsAuthUserPassword,

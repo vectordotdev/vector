@@ -34,7 +34,7 @@ use crate::{
 pub struct DemoLogsConfig {
     /// The amount of time, in seconds, to pause between each batch of output lines.
     ///
-    /// The default is one batch per second. In order to remove the delay and output batches as quickly as possible, set
+    /// The default is one batch per second. To remove the delay and output batches as quickly as possible, set
     /// `interval` to `0.0`.
     #[serde(alias = "batch_interval")]
     #[derivative(Default(value = "default_interval()"))]

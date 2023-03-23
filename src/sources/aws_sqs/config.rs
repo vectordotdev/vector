@@ -38,8 +38,8 @@ pub struct AwsSqsConfig {
 
     /// How long to wait while polling the queue for new messages, in seconds.
     ///
-    /// Generally should not be changed unless instructed to do so, as if messages are available,
-    /// they will always be consumed, regardless of the value of `poll_secs`.
+    /// Generally, this should not be changed unless instructed to do so, as if messages are available,
+    /// they are always consumed, regardless of the value of `poll_secs`.
     // NOTE: We restrict this to u32 for safe conversion to i32 later.
     // NOTE: This value isn't used as a `Duration` downstream, so we don't bother using `serde_with`
     #[serde(default = "default_poll_secs")]

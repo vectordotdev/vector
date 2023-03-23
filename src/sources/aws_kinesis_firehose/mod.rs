@@ -36,7 +36,7 @@ pub struct AwsKinesisFirehoseConfig {
     /// An optional access key to authenticate requests against.
     ///
     /// AWS Kinesis Firehose can be configured to pass along a user-configurable access key with each request. If
-    /// configured, `access_key` should be set to the same value. Otherwise, all requests will be allowed.
+    /// configured, `access_key` should be set to the same value. Otherwise, all requests are allowed.
     #[configurable(deprecated = "This option has been deprecated, use `access_keys` instead.")]
     #[configurable(metadata(docs::examples = "A94A8FE5CCB19BA61C4C08"))]
     access_key: Option<SensitiveString>,
@@ -44,20 +44,20 @@ pub struct AwsKinesisFirehoseConfig {
     /// An optional list of access keys to authenticate requests against.
     ///
     /// AWS Kinesis Firehose can be configured to pass along a user-configurable access key with each request. If
-    /// configured, `access_keys` should be set to the same value. Otherwise, all requests will be allowed.
+    /// configured, `access_keys` should be set to the same value. Otherwise, all requests are allowed.
     #[configurable(metadata(docs::examples = "access_keys_example()"))]
     access_keys: Option<Vec<SensitiveString>>,
 
     /// Whether or not to store the AWS Firehose Access Key in event secrets.
     ///
-    /// If set to `true`, when incoming requests contains an Access Key sent by AWS Firehose, it will be kept in the
+    /// If set to `true`, when incoming requests contains an access key sent by AWS Firehose, it is kept in the
     /// event secrets as "aws_kinesis_firehose_access_key".
     #[configurable(derived)]
     store_access_key: bool,
 
     /// The compression scheme to use for decompressing records within the Firehose message.
     ///
-    /// Some services, like AWS CloudWatch Logs, will [compress the events with gzip][events_with_gzip],
+    /// Some services, like AWS CloudWatch Logs, [compresses the events with gzip][events_with_gzip],
     /// before sending them AWS Kinesis Firehose. This option can be used to automatically decompress
     /// them before forwarding them to the next component.
     ///

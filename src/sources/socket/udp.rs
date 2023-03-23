@@ -71,7 +71,7 @@ pub struct UdpConfig {
 
     /// The size of the receive buffer used for the listening socket.
     ///
-    /// Generally this should not need to be configured.
+    /// Generally, this should not need to be configured.
     #[configurable(metadata(docs::type_unit = "bytes"))]
     receive_buffer_bytes: Option<usize>,
 
