@@ -18,6 +18,7 @@ pub enum SourceMetrics {
     SentEventsTotal,
     SentEventBytesTotal,
     ErrorsTotal,
+    EventsDropped,
 }
 
 impl SourceMetrics {
@@ -29,6 +30,7 @@ impl SourceMetrics {
             SourceMetrics::SentEventsTotal => "component_sent_events_total",
             SourceMetrics::SentEventBytesTotal => "component_sent_event_bytes_total",
             SourceMetrics::ErrorsTotal => "component_errors_total",
+            SourceMetrics::EventsDropped => "component_discarded_events_total",
         }
     }
 }
@@ -49,6 +51,7 @@ pub fn validate_sources(
         validate_component_sent_events_total,
         validate_component_sent_event_bytes_total,
         validate_component_errors_total,
+        validate_component_errors_dropped_total,
     ];
 
     for v in validations.iter() {
@@ -403,4 +406,54 @@ fn validate_component_errors_total(
     }
 
     Ok(vec![format!("{}: {}", SourceMetrics::ErrorsTotal, errors,)])
+}
+
+fn validate_component_errors_dropped_total(
+    _configuration: &ValidationConfiguration,
+    inputs: &[TestEvent],
+    _outputs: &[Event],
+    telemetry_events: &[Event],
+) -> Result<Vec<String>, Vec<String>> {
+    let mut errs: Vec<String> = Vec::new();
+
+    let metrics = filter_events_by_metric_and_component(
+        telemetry_events,
+        &SourceMetrics::EventsDropped,
+        TEST_SOURCE_NAME,
+    );
+
+    let errors: i32 = sum_counters(SourceMetrics::EventsDropped, &metrics)? as i32;
+
+    let expected_errors: i32 = inputs.iter().fold(0, |acc, i| {
+        if let TestEvent::Interrupted { .. } = i {
+            return acc + 1;
+        }
+        acc
+    });
+
+    debug!(
+        "{}: {} errors, expected at least {}",
+        SourceMetrics::EventsDropped,
+        errors,
+        expected_errors,
+    );
+
+    if errors > 0 {
+        errs.push(format!(
+            "{}: expected at least {} errors, but received {}",
+            SourceMetrics::EventsDropped,
+            expected_errors,
+            errors
+        ));
+    }
+
+    if !errs.is_empty() {
+        return Err(errs);
+    }
+
+    Ok(vec![format!(
+        "{}: {}",
+        SourceMetrics::EventsDropped,
+        errors,
+    )])
 }

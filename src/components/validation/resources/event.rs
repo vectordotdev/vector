@@ -18,6 +18,11 @@ pub enum TestEvent {
     /// For transforms and sinks, generally, the only way to cause an error is if the event itself
     /// is malformed in some way, which can be achieved without this test event variant.
     Modified { modified: bool, event: EventData },
+
+    /// The event is interrupted by the external resource. This is used to test
+    /// the failure path where a connection is interrupted while the event is
+    /// being processed.
+    Interrupted { interrupted: bool, event: EventData },
 }
 
 impl TestEvent {
@@ -25,6 +30,7 @@ impl TestEvent {
         match self {
             Self::Passthrough(event) => event.into_event(),
             Self::Modified { event, .. } => event.into_event(),
+            Self::Interrupted { event, .. } => event.into_event(),
         }
     }
 }

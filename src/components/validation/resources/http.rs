@@ -415,6 +415,14 @@ pub fn encode_test_event(
                 .encode(event.into_event(), buf)
                 .expect("should not fail to encode input event");
         }
+        TestEvent::Interrupted {
+            interrupted: _,
+            event,
+        } => {
+            encoder
+                .encode(event.into_event(), buf)
+                .expect("should not fail to encode input event");
+        }
         TestEvent::Modified { event, .. } => {
             // This is a little fragile, but we check what serializer this encoder uses, and based
             // on `Serializer::supports_json`, we choose an opposing codec. For example, if the
