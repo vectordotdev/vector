@@ -13,7 +13,7 @@ use core::TimeZone;
 use lookup::{owned_value_path, OwnedTargetPath};
 use value::Secrets;
 use vrl::state::TypeState;
-use vrl::{diagnostic::Formatter, state, Program, Runtime, Target, VrlRuntime};
+use vrl::{diagnostic::Formatter, state, Function, Program, Runtime, Target, VrlRuntime};
 use vrl::{CompilationResult, CompileConfig};
 
 #[cfg(feature = "repl")]
@@ -95,8 +95,8 @@ impl Opts {
 }
 
 #[must_use]
-pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
-    match run(opts) {
+pub fn cmd(opts: &Opts, stdlib_functions: Vec<Box<dyn Function>>) -> exitcode::ExitCode {
+    match run(opts, stdlib_functions) {
         Ok(_) => exitcode::OK,
         Err(err) => {
             #[allow(clippy::print_stderr)]
@@ -108,7 +108,7 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
     }
 }
 
-fn run(opts: &Opts) -> Result<(), Error> {
+fn run(opts: &Opts, stdlib_functions: Vec<Box<dyn Function>>) -> Result<(), Error> {
     let tz = opts.timezone()?;
     // Run the REPL if no program or program file is specified
     if opts.should_open_repl() {
@@ -120,7 +120,7 @@ fn run(opts: &Opts) -> Result<(), Error> {
             default_objects()
         };
 
-        repl(repl_objects, tz, opts.runtime)
+        repl(repl_objects, tz, opts.runtime, stdlib_functions)
     } else {
         let objects = opts.read_into_objects()?;
         let source = opts.read_program()?;
@@ -179,7 +179,12 @@ fn run(opts: &Opts) -> Result<(), Error> {
 
 #[cfg(feature = "repl")]
 #[allow(clippy::unnecessary_wraps)]
-fn repl(objects: Vec<Value>, timezone: TimeZone, vrl_runtime: VrlRuntime) -> Result<(), Error> {
+fn repl(
+    objects: Vec<Value>,
+    timezone: TimeZone,
+    vrl_runtime: VrlRuntime,
+    stdlib_functions: Vec<Box<dyn Function>>,
+) -> Result<(), Error> {
     use core::TargetValue;
 
     let objects = objects
@@ -191,12 +196,17 @@ fn repl(objects: Vec<Value>, timezone: TimeZone, vrl_runtime: VrlRuntime) -> Res
         })
         .collect();
 
-    repl::run(objects, timezone, vrl_runtime).map_err(Into::into)
+    repl::run(objects, timezone, vrl_runtime, stdlib_functions).map_err(Into::into)
 }
 
 #[cfg(not(feature = "repl"))]
 #[allow(clippy::needless_pass_by_value)]
-fn repl(_objects: Vec<Value>, _timezone: TimeZone, _vrl_runtime: VrlRuntime) -> Result<(), Error> {
+fn repl(
+    _objects: Vec<Value>,
+    _timezone: TimeZone,
+    _vrl_runtime: VrlRuntime,
+    _stdlib_functions: Vec<Box<dyn Function>>,
+) -> Result<(), Error> {
     Err(Error::ReplFeature)
 }
 

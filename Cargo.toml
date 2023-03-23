@@ -109,7 +109,8 @@ members = [
   "lib/vector-config-macros",
   "lib/vector-core",
   "lib/vector-lookup",
-  "lib/vector-vrl-functions",
+  "lib/vector-vrl/cli",
+  "lib/vector-vrl/functions",
   "lib/vrl/cli",
   "lib/vrl/compiler",
   "lib/vrl/core",
@@ -144,7 +145,7 @@ vector-config = { path = "lib/vector-config" }
 vector-config-common = { path = "lib/vector-config-common" }
 vector-config-macros = { path = "lib/vector-config-macros" }
 vector-core = { path = "lib/vector-core", default-features = false, features = ["vrl"] }
-vector-vrl-functions = { path = "lib/vector-vrl-functions" }
+vector-vrl-functions = { path = "lib/vector-vrl/functions" }
 vrl-cli = { path = "lib/vrl/cli", optional = true }
 loki-logproto = { path = "lib/loki-logproto", optional = true }
 

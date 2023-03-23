@@ -9826,6 +9826,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "vector-vrl-cli"
+version = "0.1.0"
+dependencies = [
+ "clap 4.1.11",
+ "vector-vrl-functions",
+ "vrl-cli",
+ "vrl-stdlib",
+]
+
+[[package]]
 name = "vector-vrl-functions"
 version = "0.1.0"
 dependencies = [
@@ -9879,7 +9889,6 @@ dependencies = [
  "thiserror",
  "value",
  "vector-lookup",
- "vector-vrl-functions",
  "vrl",
  "vrl-core",
  "vrl-stdlib",
