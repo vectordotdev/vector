@@ -37,7 +37,7 @@ pub const TEST_PEM_CLIENT_CRT_PATH: &str =
 pub const TEST_PEM_CLIENT_KEY_PATH: &str =
     "tests/data/ca/intermediate_client/private/localhost.key.pem";
 
-/// Configures the TLS options for incoming and outgoing connections.
+/// Configures the TLS options for incoming/outgoing connections.
 #[configurable_component]
 #[configurable(metadata(docs::advanced))]
 #[derive(Clone, Debug, Default)]
@@ -87,10 +87,10 @@ pub struct TlsSourceConfig {
 pub struct TlsConfig {
     /// Enables certificate verification.
     ///
-    /// If enabled, certificates must not be expired and be issued by a trusted
+    /// If enabled, certificates must not be expired and must be issued by a trusted
     /// issuer. This verification operates in a hierarchical manner, checking that the leaf certificate (the
-    /// certificate presented by the client or server) is not only valid, but that the issuer of that certificate is also valid, and
-    /// so on, until the verification process reaches a root certificate.
+    /// certificate presented by the client/server) is not only valid, but that the issuer of that certificate is also valid, and
+    /// so on until the verification process reaches a root certificate.
     ///
     /// Relevant for both incoming and outgoing connections.
     ///

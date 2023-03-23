@@ -135,7 +135,7 @@ pub struct JournaldConfig {
     pub include_matches: Matches,
 
     /// A list of sets of field/value pairs that, if any are present in a journal entry,
-    /// the entry is excluded from this source.
+    /// excludes the entry from this source.
     ///
     /// If `exclude_units` is specified, it is merged into this list.
     #[serde(default)]
