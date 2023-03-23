@@ -75,16 +75,16 @@ fn sum_counters(
     metric_name: SourceMetrics,
     metrics: &[&vector_core::event::Metric],
 ) -> Result<f64, Vec<String>> {
-    let mut events: f64 = 0.0;
+    let mut sum: f64 = 0.0;
     let mut errs = Vec::new();
 
     for m in metrics {
         match m.value() {
             vector_core::event::MetricValue::Counter { value } => {
                 if let MetricKind::Absolute = m.data().kind {
-                    events = *value;
+                    sum = *value;
                 } else {
-                    events += *value;
+                    sum += *value;
                 }
             }
             _ => errs.push(format!("{}: metric value is not a counter", metric_name,)),
@@ -92,7 +92,7 @@ fn sum_counters(
     }
 
     if errs.is_empty() {
-        Ok(events)
+        Ok(sum)
     } else {
         Err(errs)
     }
