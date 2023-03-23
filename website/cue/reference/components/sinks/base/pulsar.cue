@@ -264,9 +264,11 @@ base: components: sinks: pulsar: configuration: {
 	}
 	partition_key_field: {
 		description: """
-			The log field name or tags key to use for the topic key.
+			The log field name or tags key to use for the partition key.
 
-			If the field does not exist in the log or in tags, a blank value will be used. If unspecified, the key is not sent.
+			If the field does not exist in the log event or metric tags, a blank value will be used.
+
+			If omitted, the key is not sent.
 
 			Pulsar uses a hash of the key to choose the topic-partition or uses round-robin if the record has no key.
 			"""
@@ -280,7 +282,7 @@ base: components: sinks: pulsar: configuration: {
 	}
 	properties_key: {
 		description: """
-			The log field name to use for the Pulsar properties.
+			The log field name to use for the Pulsar properties key.
 
 			If omitted, no properties will be written.
 			"""
