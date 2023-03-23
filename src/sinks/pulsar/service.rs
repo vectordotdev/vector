@@ -64,8 +64,6 @@ impl<Exe: Executor> PulsarService<Exe> {
         producer_options: ProducerOptions,
         producer_name: Option<String>,
     ) -> PulsarService<Exe> {
-        // TODO put retry logic into building the pulsar client (with_connection_retry_options() /
-        // with_operation_retry_options)
         let mut builder = pulsar_client.producer().with_options(producer_options);
 
         if let Some(name) = producer_name {

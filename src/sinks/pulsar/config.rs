@@ -10,12 +10,14 @@ use crate::{
 };
 use codecs::{encoding::SerializerConfig, TextSerializerConfig};
 use futures_util::FutureExt;
-use pulsar::authentication::oauth2::{OAuth2Authentication, OAuth2Params};
-use pulsar::error::AuthenticationError;
 use pulsar::{
-    compression, message::proto, Authentication, Error as PulsarError, ProducerOptions, Pulsar,
+    authentication::oauth2::{OAuth2Authentication, OAuth2Params},
+    compression,
+    message::proto,
+    Authentication, ConnectionRetryOptions, Error as PulsarError, ProducerOptions, Pulsar,
     TokioExecutor,
 };
+use pulsar::{error::AuthenticationError, OperationRetryOptions};
 use snafu::ResultExt;
 use value::Kind;
 use vector_common::sensitive_string::SensitiveString;
@@ -211,6 +213,14 @@ impl PulsarSinkConfig {
                 ))),
             };
         }
+
+        // Apply configuration for reconnection exponential backoff.
+        let retry_opts = ConnectionRetryOptions::default();
+        builder = builder.with_connection_retry_options(retry_opts);
+
+        // Apply configuration for retrying Pulsar operations.
+        let operation_retry_opts = OperationRetryOptions::default();
+        builder = builder.with_operation_retry_options(operation_retry_opts);
 
         builder.build().await
     }
