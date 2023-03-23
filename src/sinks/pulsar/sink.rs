@@ -1,23 +1,18 @@
 use async_trait::async_trait;
 use bytes::Bytes;
-use std::collections::HashMap;
-
-use crate::sinks::pulsar::config::PulsarSinkConfig;
-use crate::sinks::pulsar::encoder::PulsarEncoder;
-use crate::sinks::pulsar::request_builder::PulsarRequestBuilder;
-use crate::sinks::pulsar::service::PulsarService;
-use crate::sinks::pulsar::util;
-use crate::sinks::util::SinkBuilderExt;
-use crate::template::{Template, TemplateParseError};
-use crate::{
-    codecs::{Encoder, Transformer},
-    event::Event,
-};
 use futures::{stream::BoxStream, StreamExt};
 use pulsar::{Error as PulsarError, Pulsar, TokioExecutor};
 use serde::Serialize;
-use snafu::{ResultExt, Snafu};
+use snafu::Snafu;
+use std::collections::HashMap;
 use tower::ServiceBuilder;
+
+use crate::{
+    codecs::{Encoder, Transformer},
+    event::Event,
+    sinks::util::SinkBuilderExt,
+    template::Template,
+};
 use vector_buffers::EventCount;
 use vector_common::byte_size_of::ByteSizeOf;
 use vector_core::{
@@ -25,13 +20,16 @@ use vector_core::{
     sink::StreamSink,
 };
 
+use super::{
+    config::PulsarSinkConfig, encoder::PulsarEncoder, request_builder::PulsarRequestBuilder,
+    service::PulsarService, util,
+};
+
 #[derive(Debug, Snafu)]
 #[snafu(visibility(pub(crate)))]
 pub(crate) enum BuildError {
     #[snafu(display("creating pulsar producer failed: {}", source))]
     CreatePulsarSink { source: PulsarError },
-    #[snafu(display("invalid topic template: {}", source))]
-    TopicTemplate { source: TemplateParseError },
 }
 
 pub(crate) struct PulsarSink {
@@ -85,9 +83,7 @@ impl EstimatedJsonEncodedSizeOf for PulsarEvent {
 
 pub(crate) async fn healthcheck(config: PulsarSinkConfig) -> crate::Result<()> {
     let client = config.create_pulsar_client().await?;
-    let topic = Template::try_from(config.topic)
-        .context(TopicTemplateSnafu)?
-        .render_string(&LogEvent::from_str_legacy(""))?;
+    let topic = config.topic.render_string(&LogEvent::from_str_legacy(""))?;
     client.lookup_topic(topic).await?;
     Ok(())
 }
@@ -102,14 +98,14 @@ impl PulsarSink {
         let serializer = config.encoding.build()?;
         let encoder = Encoder::<()>::new(serializer);
         let service = PulsarService::new(client, producer_opts, config.producer_name.clone());
-        let topic = config.topic.clone();
+        let topic_template = config.topic.clone();
 
         Ok(PulsarSink {
             config,
             transformer,
             encoder,
             service,
-            topic_template: Template::try_from(topic).context(TopicTemplateSnafu)?,
+            topic_template,
         })
     }
 

@@ -6,6 +6,7 @@ use crate::{
         pulsar::sink::{healthcheck, PulsarSink},
         Healthcheck, VectorSink,
     },
+    template::Template,
 };
 use codecs::{encoding::SerializerConfig, TextSerializerConfig};
 use futures_util::FutureExt;
@@ -34,7 +35,7 @@ pub struct PulsarSinkConfig {
 
     /// The Pulsar topic name to write events to.
     #[configurable(metadata(docs::examples = "topic-1234"))]
-    pub(crate) topic: String,
+    pub(crate) topic: Template,
 
     /// The name of the producer. If not specified, Pulsar will generate a unique name.
     #[configurable(metadata(docs::examples = "producer-name"))]
@@ -166,7 +167,8 @@ impl Default for PulsarSinkConfig {
     fn default() -> Self {
         Self {
             endpoint: "pulsar://127.0.0.1:6650".to_string(),
-            topic: "topic-1234".to_string(),
+            topic: Template::try_from("topic-1234")
+                .expect("Unable to parse default template topic"),
             producer_name: None,
             properties_key: None,
             partition_key_field: None,
