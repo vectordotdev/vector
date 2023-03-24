@@ -3128,11 +3128,11 @@ dependencies = [
 
 [[package]]
 name = "fakedata_generator"
-version = "0.2.4"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6815202b22ccd0dd16957e52e254c52392c84edafb4d3cc0161b9f30a85dbb88"
+checksum = "ca26fc6577e6accebf666a06a4139eb10411670d2f211edea7462e67a80ab1a4"
 dependencies = [
- "rand 0.7.3",
+ "rand 0.8.5",
  "serde",
  "serde_json",
 ]
