@@ -297,7 +297,7 @@ mod integration_tests {
             .outputs(LogNamespace::Vector)
             .first()
             .unwrap()
-            .log_schema_definitions
+            .schema_definition
             .clone();
 
         assert_source_compliance(&SOURCE_TAGS, async {
@@ -327,7 +327,7 @@ mod integration_tests {
             .outputs(LogNamespace::Legacy)
             .first()
             .unwrap()
-            .log_schema_definitions
+            .schema_definition
             .clone();
 
         assert_source_compliance(&SOURCE_TAGS, async {
@@ -360,7 +360,7 @@ mod integration_tests {
             .outputs(LogNamespace::Vector)
             .first()
             .unwrap()
-            .log_schema_definitions
+            .schema_definition
             .clone();
 
         assert_source_compliance(&SOURCE_TAGS, async {
@@ -420,7 +420,7 @@ mod integration_tests {
             .outputs(LogNamespace::Legacy)
             .first()
             .unwrap()
-            .log_schema_definitions
+            .schema_definition
             .clone();
 
         assert_source_compliance(&SOURCE_TAGS, async {
@@ -461,7 +461,7 @@ mod integration_tests {
             .outputs(LogNamespace::Legacy)
             .first()
             .unwrap()
-            .log_schema_definitions
+            .schema_definition
             .clone();
 
         assert_source_compliance(&SOURCE_TAGS, async {
@@ -499,7 +499,7 @@ mod integration_tests {
             .outputs(LogNamespace::Legacy)
             .first()
             .unwrap()
-            .log_schema_definitions
+            .schema_definition
             .clone();
 
         assert_source_compliance(&SOURCE_TAGS, async {
@@ -535,7 +535,7 @@ mod integration_tests {
             .outputs(LogNamespace::Legacy)
             .first()
             .unwrap()
-            .log_schema_definitions
+            .schema_definition
             .clone();
 
         assert_source_compliance(&SOURCE_TAGS, async {
@@ -590,7 +590,7 @@ mod integration_tests {
             .outputs(LogNamespace::Legacy)
             .first()
             .unwrap()
-            .log_schema_definitions
+            .schema_definition
             .clone();
 
         assert_source_compliance(&SOURCE_TAGS, async {
@@ -627,7 +627,7 @@ mod integration_tests {
             .outputs(LogNamespace::Legacy)
             .first()
             .unwrap()
-            .log_schema_definitions
+            .schema_definition
             .clone();
 
         assert_source_compliance(&SOURCE_TAGS, async {
@@ -668,7 +668,7 @@ mod integration_tests {
             .outputs(LogNamespace::Legacy)
             .first()
             .unwrap()
-            .log_schema_definitions
+            .schema_definition
             .clone();
 
         assert_source_compliance(&SOURCE_TAGS, async {
@@ -762,7 +762,7 @@ mod integration_tests {
             .outputs(LogNamespace::Legacy)
             .first()
             .unwrap()
-            .log_schema_definitions
+            .schema_definition
             .clone();
 
         assert_source_compliance(&SOURCE_TAGS, async {
@@ -809,7 +809,7 @@ mod integration_tests {
             .outputs(LogNamespace::Legacy)
             .first()
             .unwrap()
-            .log_schema_definitions
+            .schema_definition
             .clone();
 
         assert_source_compliance(&SOURCE_TAGS, async {
@@ -844,7 +844,7 @@ mod integration_tests {
                 .outputs(LogNamespace::Vector)
                 .first()
                 .unwrap()
-                .log_schema_definitions
+                .schema_definition
                 .clone()
                 .unwrap();
 
@@ -916,7 +916,7 @@ mod integration_tests {
                 .outputs(LogNamespace::Legacy)
                 .first()
                 .unwrap()
-                .log_schema_definitions
+                .schema_definition
                 .clone()
                 .unwrap();
 

@@ -578,9 +578,10 @@ mod test_utils {
         /// # Panics
         /// If the definition is valid for the event.
         pub fn assert_invalid_for_event(&self, event: &Event) {
-            if let Ok(_) = self.is_valid_for_event(event) {
-                panic!("Schema definition assertion passed incorrectly");
-            }
+            assert!(
+                self.is_valid_for_event(event).is_err(),
+                "Schema definition assertion passed incorrectly"
+            );
         }
     }
 }
