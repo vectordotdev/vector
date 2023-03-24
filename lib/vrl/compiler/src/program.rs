@@ -34,7 +34,7 @@ impl Program {
         &self.info
     }
 
-    /// Resolve the program to its final [`Value`].
+    /// Resolve the program to its final [`value::Value`].
     ///
     /// # Errors
     ///
@@ -58,10 +58,10 @@ pub struct ProgramInfo {
     /// statement in the source.
     pub abortable: bool,
 
-    /// A list of possible queries made to the external [`Target`] at runtime.
+    /// A list of possible queries made to the external [`core::Target`] at runtime.
     pub target_queries: Vec<OwnedTargetPath>,
 
-    /// A list of possible assignments made to the external [`Target`] at
+    /// A list of possible assignments made to the external [`core::Target`] at
     /// runtime.
     pub target_assignments: Vec<OwnedTargetPath>,
 }
