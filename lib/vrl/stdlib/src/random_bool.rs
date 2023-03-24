@@ -23,7 +23,7 @@ impl Function for RandomBool {
     fn examples(&self) -> &'static [Example] {
         &[Example {
             title: "generate random boolean",
-            source: r#"random_bool()"#,
+            source: r#"is_boolean(random_bool())"#,
             result: Ok("true"),
         }]
     }
@@ -53,5 +53,5 @@ impl FunctionExpression for RandomBoolFn {
 
 #[cfg(test)]
 mod tests {
-    // cannot test since non-deterministic
+    // tests are handled by examples
 }

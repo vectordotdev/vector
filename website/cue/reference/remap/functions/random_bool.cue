@@ -14,7 +14,7 @@ remap: functions: random_bool: {
 		{
 			title: "Random boolean"
 			source: """
-				random_bool()
+				is_boolean(random_bool())
 				"""
 			return: true
 		},

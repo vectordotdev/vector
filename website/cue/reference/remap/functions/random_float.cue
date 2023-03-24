@@ -29,9 +29,10 @@ remap: functions: random_float: {
 		{
 			title: "Random float from 0 to 10, not including 10"
 			source: """
-				random_float!(0, 10)
+				f = random_float(0.0, 10.0)
+				f >= 0 && f < 10
 				"""
-			return: 1.123
+			return: true
 		},
 	]
 }

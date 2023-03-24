@@ -55,8 +55,11 @@ impl Function for RandomFloat {
     fn examples(&self) -> &'static [Example] {
         &[Example {
             title: "generate random float from 0 to 10",
-            source: r#"random_float(0, 10)"#,
-            result: Ok("2"),
+            source: r#"
+				f = random_float(0.0, 10.0)
+				f >= 0 && f < 10
+                "#,
+            result: Ok("true"),
         }]
     }
 
@@ -105,7 +108,7 @@ impl FunctionExpression for RandomFloatFn {
         match (self.min.as_value(), self.max.as_value()) {
             (Some(min), Some(max)) => {
                 if get_range(min, max).is_ok() {
-                    TypeDef::float()
+                    TypeDef::float().infallible()
                 } else {
                     TypeDef::float().fallible()
                 }
@@ -118,6 +121,8 @@ impl FunctionExpression for RandomFloatFn {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // positive tests are handled by examples
 
     test_function![
         random_float => RandomFloat;

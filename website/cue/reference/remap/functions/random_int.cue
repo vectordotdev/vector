@@ -29,9 +29,10 @@ remap: functions: random_int: {
 		{
 			title: "Random integer from 0 to 10, not including 10"
 			source: """
-				random_int!(0, 10)
+				i = random_int(0, 10)
+				i >= 0 && i < 10
 				"""
-			return: 1
+			return: true
 		},
 	]
 }

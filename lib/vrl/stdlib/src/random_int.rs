@@ -49,9 +49,12 @@ impl Function for RandomInt {
 
     fn examples(&self) -> &'static [Example] {
         &[Example {
-            title: "generate random integer from 0 to 10",
-            source: r#"random_int(0, 10)"#,
-            result: Ok("2"),
+            title: "generate random float from 0 to 10",
+            source: r#"
+				i = random_int(0, 10)
+				i >= 0 && i < 10
+                "#,
+            result: Ok("true"),
         }]
     }
 
@@ -113,6 +116,8 @@ impl FunctionExpression for RandomIntFn {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // positive tests are handled by examples
 
     test_function![
         random_int => RandomInt;
