@@ -1,0 +1,66 @@
+on:
+  issue_comment:
+    types:
+      - created
+
+jobs:
+  move-to-backlog:
+    name: Move done issues back to Gardener project board backlog
+    runs-on: ubuntu-latest
+    steps:
+      - name: Move issue back to backlog if status is Done
+        run: |
+          # ids fetched from https://docs.github.com/en/graphql/overview/explorer
+          project_id="PVT_kwDOAQFeYs4AAsTr" # Gardener
+          issue_id=${{ github.event.issue.node_id }}
+          status_field_id="PVTSSF_lADOAQFeYs4AAsTrzgAXRuU" # Status
+          backlog_option_id="f75ad846" # Backlog
+
+          # ensures that the issue is already on board but also seems to be the only way to fetch
+          # the item id
+          item_id="$(gh api graphql -f query='
+            mutation($project_id: ID!, $content_id: ID!) {
+                addProjectV2ItemById(input: {projectId: $project_id, contentId: $content_id}) {
+                  item {
+                    id
+                  }
+                }
+            }' -f project_id="$project_id" -f content_id="$issue_id" -q '.data.addProjectV2ItemById.item.id'
+          ")
+
+          current_status="$(gh api graphql -f query='
+            query($node_id: ID!) {
+              node(id: $item_id) {
+                ... on ProjectV2Item {
+                  fieldValueByName(name: "Status") {
+                    ... on ProjectV2ItemFieldSingleSelectValue {
+                      name
+                    }
+                  }
+                }
+              }
+            }'
+          ") -f item_id="$item_id" -q '.data.node.fieldValueByName.name'
+
+          if [[ "$current_status" = "Done" ]] ; then
+            echo "Moving issue from Done to Backlog"
+            gh api graphql -f query='
+              mutation($project_id: ID!, $item_id: ID!, $field_id: ID!, $option_id: String) {
+                updateProjectV2ItemFieldValue(
+                  input: {
+                    projectId: $project_id
+                    itemId: $item_id
+                    fieldId: $field_id
+                    value: {
+                      singleSelectOptionId: $option_id
+                    }
+                  }
+                ) {
+                  projectV2Item {
+                    id
+                  }
+                }
+              }' -f project_id="$project_id" -f item_id="$item_id" -f field_id="$status_field_id" -f option_id="$backlog_option_id"
+          else
+            echo "Issue already in $current_status"
+          fi
