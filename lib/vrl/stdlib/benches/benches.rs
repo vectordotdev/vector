@@ -108,6 +108,11 @@ criterion_group!(
               parse_user_agent,
               parse_xml,
               push,
+              // TODO: value is non-deterministic and so cannot assert equality
+              // random_bool,
+              // TODO: value is non-deterministic and so cannot assert equality
+              //random_float,
+              random_int,
               redact,
               remove,
               replace,
@@ -2131,6 +2136,15 @@ bench_function! {
     literal {
         args: func_args![value: value!([11, false, 42.5]), item: "foo"],
         want: Ok(value!([11, false, 42.5, "foo"])),
+    }
+}
+
+bench_function! {
+    random_int => vrl_stdlib::RandomInt;
+
+    literal {
+        args: func_args![min: 1, max: 2],
+        want: Ok(1),
     }
 }
 

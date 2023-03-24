@@ -190,7 +190,10 @@ default = [
     "parse_user_agent",
     "parse_xml",
     "push",
+    "random_bool",
     "random_bytes",
+    "random_float",
+    "random_int",
     "redact",
     "remove",
     "replace",
@@ -346,7 +349,10 @@ parse_url = ["dep:url"]
 parse_user_agent = ["dep:woothee","dep:uaparser","dep:once_cell"]
 parse_xml = ["dep:roxmltree", "dep:once_cell", "dep:regex"]
 push = []
+random_bool = ["dep:rand"]
 random_bytes = ["dep:rand"]
+random_float = ["dep:rand"]
+random_int = ["dep:rand"]
 redact = ["dep:once_cell", "dep:regex"]
 remove = ["dep:lookup_lib"]
 replace = ["dep:regex"]

@@ -262,8 +262,14 @@ mod parse_user_agent;
 mod parse_xml;
 #[cfg(feature = "push")]
 mod push;
+#[cfg(feature = "random_bool")]
+mod random_bool;
 #[cfg(feature = "random_bytes")]
 mod random_bytes;
+#[cfg(feature = "random_float")]
+mod random_float;
+#[cfg(feature = "random_int")]
+mod random_int;
 #[cfg(feature = "redact")]
 mod redact;
 #[cfg(feature = "remove")]
@@ -567,8 +573,14 @@ pub use parse_xml::ParseXml;
 pub use push::Push;
 #[cfg(feature = "match")]
 pub use r#match::Match;
+#[cfg(feature = "random_bool")]
+pub use random_bool::RandomBool;
 #[cfg(feature = "random_bytes")]
 pub use random_bytes::RandomBytes;
+#[cfg(feature = "random_float")]
+pub use random_float::RandomFloat;
+#[cfg(feature = "random_int")]
+pub use random_int::RandomInt;
 #[cfg(feature = "redact")]
 pub use redact::Redact;
 #[cfg(feature = "remove")]
@@ -884,8 +896,14 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(ParseXml),
         #[cfg(feature = "push")]
         Box::new(Push),
+        #[cfg(feature = "random_bool")]
+        Box::new(RandomBool),
         #[cfg(feature = "random_bytes")]
         Box::new(RandomBytes),
+        #[cfg(feature = "random_float")]
+        Box::new(RandomFloat),
+        #[cfg(feature = "random_int")]
+        Box::new(RandomInt),
         #[cfg(feature = "redact")]
         Box::new(Redact),
         #[cfg(feature = "remove")]
