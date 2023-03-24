@@ -32,10 +32,6 @@ core = { package = "vrl-core", path = "../core", default-features = false }
 diagnostic = { package = "vrl-diagnostic", path = "../diagnostic" }
 parser = { package = "vrl-parser", path = "../parser" }
 lookup = { path = "../lookup" }
-
-vector-config = { path = "../../vector-config" }
-vector-config-common = { path = "../../vector-config-common" }
-vector-config-macros = { path = "../../vector-config-macros" }
 value = { path = "../value" }
 getrandom = { version = "0.2", features = ["js"] }
 
@@ -53,7 +49,6 @@ anymap = { version = "1.0.0-beta.2" }
 [dev-dependencies]
 criterion = "0.4"
 indoc = "2"
-vector-common = { path = "../../vector-common", default-features = false, features = ["btreemap"] }
 
 [[bench]]
 name = "kind"

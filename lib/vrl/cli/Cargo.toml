@@ -24,7 +24,7 @@ vrl = { path = "../vrl", default-features = false }
 core = { package = "vrl-core", path = "../core", default-features = false }
 value = { path = "../value", default-features = false, features = [] }
 webbrowser = { version = "0.8", default-features = false, optional = true }
-lookup = { package = "vector-lookup", path = "../../vector-lookup" }
+lookup = { package = "lookup", path = "../lookup" }
 
 [dependencies.stdlib]
 package = "vrl-stdlib"
