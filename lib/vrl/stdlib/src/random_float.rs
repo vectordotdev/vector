@@ -19,8 +19,8 @@ fn random_float(min: Value, max: Value) -> Resolved {
 }
 
 fn get_range(min: Value, max: Value) -> std::result::Result<Range<f64>, &'static str> {
-    let min = min.try_float().expect("min must be an float");
-    let max = max.try_float().expect("max must be an float");
+    let min = min.try_float().expect("min must be a float");
+    let max = max.try_float().expect("max must be a float");
 
     if max <= min {
         return Err(INVALID_RANGE_ERR);
@@ -54,7 +54,7 @@ impl Function for RandomFloat {
 
     fn examples(&self) -> &'static [Example] {
         &[Example {
-            title: "generate random float from 0 to 10",
+            title: "generate a random float from 0.0 to 10.0",
             source: r#"
 				f = random_float(0.0, 10.0)
 				f >= 0 && f < 10

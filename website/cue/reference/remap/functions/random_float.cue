@@ -3,7 +3,7 @@ package metadata
 remap: functions: random_float: {
 	category: "Random"
 	description: """
-		Returns random float between [min, max).
+		Returns a random float between [min, max).
 		"""
 
 	arguments: [

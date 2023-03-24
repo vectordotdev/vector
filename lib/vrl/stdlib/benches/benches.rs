@@ -109,9 +109,9 @@ criterion_group!(
               parse_user_agent,
               parse_xml,
               push,
-              //TODO: value is non-deterministic and so cannot assert equality
+              // TODO: value is non-deterministic and so cannot assert equality
               // random_bool,
-              //TODO: value is non-deterministic and so cannot assert equality
+              // TODO: value is non-deterministic and so cannot assert equality
               //random_float,
               random_int,
               redact,

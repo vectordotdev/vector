@@ -49,7 +49,7 @@ impl Function for RandomInt {
 
     fn examples(&self) -> &'static [Example] {
         &[Example {
-            title: "generate random float from 0 to 10",
+            title: "generate a random int from 0 to 10",
             source: r#"
 				i = random_int(0, 10)
 				i >= 0 && i < 10

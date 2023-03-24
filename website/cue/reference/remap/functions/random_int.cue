@@ -3,7 +3,7 @@ package metadata
 remap: functions: random_int: {
 	category: "Random"
 	description: """
-		Returns random integer between [min, max).
+		Returns a random integer between [min, max).
 		"""
 
 	arguments: [
