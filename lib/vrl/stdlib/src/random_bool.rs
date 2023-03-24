@@ -2,6 +2,7 @@ use ::value::Value;
 use rand::{thread_rng, Rng};
 use vrl::prelude::*;
 
+#[allow(clippy::unnecessary_wraps)] // match other VRL function implementations
 fn random_bool() -> Resolved {
     let b: bool = thread_rng().gen();
 

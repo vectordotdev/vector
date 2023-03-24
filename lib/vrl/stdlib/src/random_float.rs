@@ -72,18 +72,15 @@ impl Function for RandomFloat {
         let min = arguments.required("min");
         let max = arguments.required("max");
 
-        match (min.as_value(), max.as_value()) {
-            (Some(min), Some(max)) => {
-                // check if range is valid
-                let _ = get_range(min.clone(), max.clone()).map_err(|err| {
-                    vrl::function::Error::InvalidArgument {
-                        keyword: "max",
-                        value: max,
-                        error: err,
-                    }
-                })?;
-            }
-            _ => {}
+        if let (Some(min), Some(max)) = (min.as_value(), max.as_value()) {
+            // check if range is valid
+            let _ = get_range(min, max.clone()).map_err(|err| {
+                vrl::function::Error::InvalidArgument {
+                    keyword: "max",
+                    value: max,
+                    error: err,
+                }
+            })?;
         }
 
         Ok(RandomFloatFn { min, max }.as_expr())
