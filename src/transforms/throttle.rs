@@ -10,7 +10,7 @@ use vector_core::config::LogNamespace;
 
 use crate::{
     conditions::{AnyCondition, Condition},
-    config::{DataType, Input, Output, OutputId, TransformConfig, TransformContext},
+    config::{DataType, Input, OutputId, TransformConfig, TransformContext, TransformOutput},
     event::Event,
     internal_events::{TemplateRenderingError, ThrottleEventDiscarded},
     schema,
@@ -63,9 +63,9 @@ impl TransformConfig for ThrottleConfig {
         &self,
         input_definitions: &[(OutputId, schema::Definition)],
         _: LogNamespace,
-    ) -> Vec<Output> {
+    ) -> Vec<TransformOutput> {
         // The event is not modified, so the definition is passed through as-is
-        vec![Output::transform(
+        vec![TransformOutput::transform(
             DataType::Log,
             input_definitions
                 .iter()

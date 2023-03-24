@@ -1161,9 +1161,9 @@ mod tests {
     fn test_output_schema_definition_vector_namespace() {
         let definitions = toml::from_str::<Config>("")
             .unwrap()
-            .outputs(LogNamespace::Vector)[0]
-            .clone()
-            .log_schema_definitions;
+            .outputs(LogNamespace::Vector)
+            .remove(0)
+            .into_schema_definition(true);
 
         assert_eq!(
             definitions,
@@ -1277,9 +1277,9 @@ mod tests {
     fn test_output_schema_definition_legacy_namespace() {
         let definitions = toml::from_str::<Config>("")
             .unwrap()
-            .outputs(LogNamespace::Legacy)[0]
-            .clone()
-            .log_schema_definitions;
+            .outputs(LogNamespace::Legacy)
+            .remove(0)
+            .into_schema_definition(true);
 
         assert_eq!(
             definitions,

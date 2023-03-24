@@ -41,9 +41,9 @@ use super::{
 };
 use crate::{
     config::{
-        ComponentKey, DataType, EnrichmentTableConfig, Input, Inputs, Output, OutputId,
-        ProxyConfig, SinkConfig, SinkContext, SourceConfig, SourceContext, TransformContext,
-        TransformOuter,
+        ComponentKey, DataType, EnrichmentTableConfig, Input, Inputs, OutputId, ProxyConfig,
+        SinkConfig, SinkContext, SourceConfig, SourceContext, TransformContext, TransformOuter,
+        TransformOutput,
     },
     event::{EventArray, EventContainer},
     internal_events::EventsReceived,
@@ -188,7 +188,7 @@ pub async fn build_pieces(
         let mut controls = HashMap::new();
         let mut schema_definitions = HashMap::with_capacity(source_outputs.len());
 
-        for mut output in source_outputs {
+        for output in source_outputs.into_iter() {
             let mut rx = builder.add_source_output(output.clone());
 
             let (mut fanout, control) = Fanout::new();
@@ -215,8 +215,9 @@ pub async fn build_pieces(
                 control,
             );
 
-            if let Some(definition) = output.log_schema_definitions.take() {
-                schema_definitions.insert(output.port, definition);
+            let port = output.port.clone();
+            if let Some(definition) = output.into_schema_definition(config.schema.enabled) {
+                schema_definitions.insert(port, definition);
             }
         }
 
@@ -612,7 +613,7 @@ struct TransformNode {
     typetag: &'static str,
     inputs: Inputs<OutputId>,
     input_details: Input,
-    outputs: Vec<Output>,
+    outputs: Vec<TransformOutput>,
     enable_concurrency: bool,
 }
 

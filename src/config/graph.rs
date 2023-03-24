@@ -2,8 +2,8 @@ use indexmap::{set::IndexSet, IndexMap};
 use std::collections::{HashMap, HashSet, VecDeque};
 
 use super::{
-    schema, ComponentKey, DataType, Output, OutputId, SinkConfig, SinkOuter, SourceConfig,
-    SourceOuter, SourceOutput, TransformOuter,
+    schema, ComponentKey, DataType, OutputId, SinkConfig, SinkOuter, SourceConfig, SourceOuter,
+    SourceOutput, TransformOuter, TransformOutput,
 };
 
 #[derive(Debug, Clone)]
@@ -13,7 +13,7 @@ pub enum Node {
     },
     Transform {
         in_ty: DataType,
-        outputs: Vec<Output>,
+        outputs: Vec<TransformOutput>,
     },
     Sink {
         ty: DataType,
@@ -393,7 +393,7 @@ mod test {
                 id.clone(),
                 Node::Transform {
                     in_ty,
-                    outputs: vec![Output::transform(
+                    outputs: vec![TransformOutput::transform(
                         out_ty,
                         vec![Definition::default_legacy_namespace()],
                     )],
@@ -411,7 +411,7 @@ mod test {
             let id = id.into();
             match self.nodes.get_mut(&id) {
                 Some(Node::Transform { outputs, .. }) => outputs.push(
-                    Output::transform(ty, vec![Definition::default_legacy_namespace()])
+                    TransformOutput::transform(ty, vec![Definition::default_legacy_namespace()])
                         .with_port(name),
                 ),
                 _ => panic!("invalid transform"),
@@ -645,11 +645,11 @@ mod test {
             Node::Transform {
                 in_ty: DataType::all(),
                 outputs: vec![
-                    Output::transform(
+                    TransformOutput::transform(
                         DataType::all(),
                         vec![Definition::default_legacy_namespace()],
                     ),
-                    Output::transform(
+                    TransformOutput::transform(
                         DataType::all(),
                         vec![Definition::default_legacy_namespace()],
                     )
@@ -670,11 +670,11 @@ mod test {
             Node::Transform {
                 in_ty: DataType::all(),
                 outputs: vec![
-                    Output::transform(
+                    TransformOutput::transform(
                         DataType::all(),
                         vec![Definition::default_legacy_namespace()],
                     ),
-                    Output::transform(
+                    TransformOutput::transform(
                         DataType::all(),
                         vec![Definition::default_legacy_namespace()],
                     )

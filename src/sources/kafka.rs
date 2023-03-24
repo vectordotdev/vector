@@ -793,9 +793,9 @@ mod test {
     #[test]
     fn test_output_schema_definition_vector_namespace() {
         let definitions = make_config("topic", "group", LogNamespace::Vector)
-            .outputs(LogNamespace::Vector)[0]
-            .clone()
-            .log_schema_definitions;
+            .outputs(LogNamespace::Vector)
+            .remove(0)
+            .into_schema_definition(true);
 
         assert_eq!(
             definitions,
@@ -841,9 +841,9 @@ mod test {
     #[test]
     fn test_output_schema_definition_legacy_namespace() {
         let definitions = make_config("topic", "group", LogNamespace::Legacy)
-            .outputs(LogNamespace::Legacy)[0]
-            .clone()
-            .log_schema_definitions;
+            .outputs(LogNamespace::Legacy)
+            .remove(0)
+            .into_schema_definition(true);
 
         assert_eq!(
             definitions,

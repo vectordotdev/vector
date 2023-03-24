@@ -20,7 +20,7 @@ use vector_core::config::LogNamespace;
 
 use crate::config::OutputId;
 use crate::{
-    config::{DataType, Input, Output, ProxyConfig, TransformConfig, TransformContext},
+    config::{DataType, Input, ProxyConfig, TransformConfig, TransformContext, TransformOutput},
     event::Event,
     http::HttpClient,
     internal_events::{AwsEc2MetadataRefreshError, AwsEc2MetadataRefreshSuccessful},
@@ -248,7 +248,7 @@ impl TransformConfig for Ec2Metadata {
         &self,
         input_definitions: &[(OutputId, schema::Definition)],
         _: LogNamespace,
-    ) -> Vec<Output> {
+    ) -> Vec<TransformOutput> {
         let added_keys = Keys::new(self.namespace.clone());
 
         let paths = [
@@ -282,7 +282,7 @@ impl TransformConfig for Ec2Metadata {
             })
             .collect();
 
-        vec![Output::transform(
+        vec![TransformOutput::transform(
             DataType::Metric | DataType::Log,
             schema_definition,
         )]

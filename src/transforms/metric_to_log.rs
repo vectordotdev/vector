@@ -14,7 +14,8 @@ use vrl::prelude::BTreeMap;
 use crate::config::OutputId;
 use crate::{
     config::{
-        log_schema, DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext,
+        log_schema, DataType, GenerateConfig, Input, TransformConfig, TransformContext,
+        TransformOutput,
     },
     event::{self, Event, LogEvent, Metric},
     internal_events::MetricToLogSerializeError,
@@ -95,7 +96,7 @@ impl TransformConfig for MetricToLogConfig {
         &self,
         _: &[(OutputId, Definition)],
         global_log_namespace: LogNamespace,
-    ) -> Vec<Output> {
+    ) -> Vec<TransformOutput> {
         let log_namespace = global_log_namespace.merge(self.log_namespace);
         let mut schema_definition =
             Definition::default_for_namespace(&BTreeSet::from([log_namespace]))
@@ -229,7 +230,10 @@ impl TransformConfig for MetricToLogConfig {
             }
         }
 
-        vec![Output::transform(DataType::Log, vec![schema_definition])]
+        vec![TransformOutput::transform(
+            DataType::Log,
+            vec![schema_definition],
+        )]
     }
 
     fn enable_concurrency(&self) -> bool {

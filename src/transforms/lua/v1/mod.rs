@@ -8,7 +8,7 @@ use vector_config::configurable_component;
 use crate::config::OutputId;
 use crate::schema::Definition;
 use crate::{
-    config::{DataType, Input, Output},
+    config::{DataType, Input, TransformOutput},
     event::{Event, Value},
     internal_events::{LuaGcTriggered, LuaScriptError},
     schema,
@@ -48,7 +48,10 @@ impl LuaConfig {
         Input::log()
     }
 
-    pub fn outputs(&self, input_definitions: &[(OutputId, schema::Definition)]) -> Vec<Output> {
+    pub fn outputs(
+        &self,
+        input_definitions: &[(OutputId, schema::Definition)],
+    ) -> Vec<TransformOutput> {
         // Lua causes the type definition to be reset
         let namespaces = input_definitions
             .iter()
@@ -57,7 +60,7 @@ impl LuaConfig {
 
         let definition = Definition::default_for_namespace(&namespaces);
 
-        vec![Output::transform(DataType::Log, vec![definition])]
+        vec![TransformOutput::transform(DataType::Log, vec![definition])]
     }
 }
 

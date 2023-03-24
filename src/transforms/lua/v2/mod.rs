@@ -11,7 +11,7 @@ use crate::config::OutputId;
 use crate::event::lua::event::LuaEvent;
 use crate::schema::Definition;
 use crate::{
-    config::{self, DataType, Input, Output, CONFIG_PATHS},
+    config::{self, DataType, Input, TransformOutput, CONFIG_PATHS},
     event::Event,
     internal_events::{LuaBuildError, LuaGcTriggered},
     schema,
@@ -178,7 +178,10 @@ impl LuaConfig {
         Input::new(DataType::Metric | DataType::Log)
     }
 
-    pub fn outputs(&self, input_definitions: &[(OutputId, schema::Definition)]) -> Vec<Output> {
+    pub fn outputs(
+        &self,
+        input_definitions: &[(OutputId, schema::Definition)],
+    ) -> Vec<TransformOutput> {
         // Lua causes the type definition to be reset
         let namespaces = input_definitions
             .iter()
@@ -187,7 +190,7 @@ impl LuaConfig {
 
         let definition = Definition::default_for_namespace(&namespaces);
 
-        vec![Output::transform(
+        vec![TransformOutput::transform(
             DataType::Metric | DataType::Log,
             vec![definition],
         )]

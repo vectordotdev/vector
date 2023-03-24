@@ -5,7 +5,9 @@ use vector_core::config::SourceOutput;
 pub(super) use crate::schema::Definition;
 
 use crate::{
-    config::{ComponentKey, Config, Output, OutputId, SinkConfig, SinkOuter, SourceConfig},
+    config::{
+        ComponentKey, Config, OutputId, SinkConfig, SinkOuter, SourceConfig, TransformOutput,
+    },
     topology,
 };
 
@@ -42,7 +44,7 @@ pub fn possible_definitions(
                             &input.port
                         )
                     })
-                    .log_schema_definitions,
+                    .into_schema_definition(config.schema_enabled()),
             );
 
             definitions.append(&mut source_definition);
@@ -111,10 +113,12 @@ pub(super) fn expanded_definitions(
             // actual output of the source feeding into this input, and then get the definition
             // belonging to that output.
             let mut source_definitions = outputs
-                .iter()
+                .into_iter()
                 .find_map(|output| {
                     if output.port == input.port {
-                        Some(input.with_definitions(output.log_schema_definitions.clone()))
+                        Some(input.with_definitions(
+                            output.into_schema_definition(config.schema_enabled()),
+                        ))
                     } else {
                         None
                     }
@@ -186,7 +190,7 @@ pub(crate) fn input_definitions(
             let mut source_definitions = input.with_definitions(
                 maybe_output
                     .unwrap_or_else(|| unreachable!())
-                    .log_schema_definitions,
+                    .schema_definition(config.schema_enabled()),
             );
 
             definitions.append(&mut source_definitions);
@@ -259,7 +263,7 @@ pub trait ComponentContainer {
         &self,
         key: &ComponentKey,
         input_definitions: &[(OutputId, Definition)],
-    ) -> Option<Vec<Output>>;
+    ) -> Option<Vec<TransformOutput>>;
 
     /// Gets the transform output for the given port.
     ///
@@ -271,7 +275,7 @@ pub trait ComponentContainer {
         key: &ComponentKey,
         port: &Option<String>,
         input_definitions: &[(OutputId, Definition)],
-    ) -> Result<Option<Output>, ()> {
+    ) -> Result<Option<TransformOutput>, ()> {
         if let Some(outputs) = self.transform_outputs(key, input_definitions) {
             Ok(get_output_for_port(outputs, port))
         } else {
@@ -297,7 +301,10 @@ pub trait ComponentContainer {
     }
 }
 
-fn get_output_for_port(outputs: Vec<Output>, port: &Option<String>) -> Option<Output> {
+fn get_output_for_port(
+    outputs: Vec<TransformOutput>,
+    port: &Option<String>,
+) -> Option<TransformOutput> {
     outputs.into_iter().find(|output| &output.port == port)
 }
 
@@ -326,7 +333,7 @@ impl ComponentContainer for Config {
         &self,
         key: &ComponentKey,
         input_definitions: &[(OutputId, Definition)],
-    ) -> Option<Vec<Output>> {
+    ) -> Option<Vec<TransformOutput>> {
         self.transform(key).map(|source| {
             source
                 .inner
@@ -343,7 +350,7 @@ mod tests {
     use lookup::owned_value_path;
     use similar_asserts::assert_eq;
     use value::Kind;
-    use vector_core::config::{DataType, Output, SourceOutput};
+    use vector_core::config::{DataType, SourceOutput, TransformOutput};
 
     use super::*;
 
@@ -352,7 +359,7 @@ mod tests {
         struct TestCase {
             inputs: Vec<(&'static str, Option<String>)>,
             sources: IndexMap<&'static str, Vec<SourceOutput>>,
-            transforms: IndexMap<&'static str, (Vec<OutputId>, Vec<Output>)>,
+            transforms: IndexMap<&'static str, (Vec<OutputId>, Vec<TransformOutput>)>,
             want: Vec<(OutputId, Definition)>,
         }
 
@@ -373,7 +380,7 @@ mod tests {
                 &self,
                 key: &ComponentKey,
                 _input_definitions: &[(OutputId, Definition)],
-            ) -> Option<Vec<Output>> {
+            ) -> Option<Vec<TransformOutput>> {
                 self.transforms.get(key.id()).cloned().map(|v| v.1)
             }
         }
@@ -510,7 +517,7 @@ mod tests {
                         "transform-baz",
                         (
                             vec![OutputId::from("source-foo")],
-                            vec![Output::transform(
+                            vec![TransformOutput::transform(
                                 DataType::all(),
                                 vec![Definition::empty_legacy_namespace().with_event_field(
                                     &owned_value_path!("baz"),
@@ -581,7 +588,7 @@ mod tests {
                             "Transform 1",
                             (
                                 vec![OutputId::from("Source 1")],
-                                vec![Output::transform(
+                                vec![TransformOutput::transform(
                                     DataType::all(),
                                     vec![Definition::empty_legacy_namespace().with_event_field(
                                         &owned_value_path!("transform-1"),
@@ -595,7 +602,7 @@ mod tests {
                             "Transform 2",
                             (
                                 vec![OutputId::from("Source 2")],
-                                vec![Output::transform(
+                                vec![TransformOutput::transform(
                                     DataType::all(),
                                     vec![Definition::empty_legacy_namespace().with_event_field(
                                         &owned_value_path!("transform-2"),
@@ -609,7 +616,7 @@ mod tests {
                             "Transform 3",
                             (
                                 vec![OutputId::from("Source 2")],
-                                vec![Output::transform(
+                                vec![TransformOutput::transform(
                                     DataType::all(),
                                     vec![Definition::empty_legacy_namespace().with_event_field(
                                         &owned_value_path!("transform-3"),
@@ -623,7 +630,7 @@ mod tests {
                             "Transform 4",
                             (
                                 vec![OutputId::from("Source 2")],
-                                vec![Output::transform(
+                                vec![TransformOutput::transform(
                                     DataType::all(),
                                     vec![Definition::empty_legacy_namespace().with_event_field(
                                         &owned_value_path!("transform-4"),
@@ -637,7 +644,7 @@ mod tests {
                             "Transform 5",
                             (
                                 vec![OutputId::from("Transform 3"), OutputId::from("Transform 4")],
-                                vec![Output::transform(
+                                vec![TransformOutput::transform(
                                     DataType::all(),
                                     vec![Definition::empty_legacy_namespace().with_event_field(
                                         &owned_value_path!("transform-5"),

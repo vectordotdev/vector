@@ -5,7 +5,7 @@ use futures_util::Stream;
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
 use vector_core::{
-    config::{DataType, Input, Output},
+    config::{DataType, Input, TransformOutput},
     event::{Event, EventContainer},
     schema::Definition,
     transform::{FunctionTransform, OutputBuffer, TaskTransform, Transform},
@@ -39,8 +39,12 @@ impl TransformConfig for NoopTransformConfig {
         Input::all()
     }
 
-    fn outputs(&self, definitions: &[(OutputId, Definition)], _: LogNamespace) -> Vec<Output> {
-        vec![Output::transform(
+    fn outputs(
+        &self,
+        definitions: &[(OutputId, Definition)],
+        _: LogNamespace,
+    ) -> Vec<TransformOutput> {
+        vec![TransformOutput::transform(
             DataType::all(),
             definitions
                 .iter()

@@ -942,9 +942,10 @@ mod tests {
 
     #[test]
     fn output_schema_definition_vector_namespace() {
-        let definitions = FileConfig::default().outputs(LogNamespace::Vector)[0]
-            .clone()
-            .log_schema_definitions;
+        let definitions = FileConfig::default()
+            .outputs(LogNamespace::Vector)
+            .remove(0)
+            .into_schema_definition(true);
 
         assert_eq!(
             definitions,
@@ -978,9 +979,10 @@ mod tests {
 
     #[test]
     fn output_schema_definition_legacy_namespace() {
-        let definitions = FileConfig::default().outputs(LogNamespace::Legacy)[0]
-            .clone()
-            .log_schema_definitions;
+        let definitions = FileConfig::default()
+            .outputs(LogNamespace::Legacy)
+            .remove(0)
+            .into_schema_definition(true);
 
         assert_eq!(
             definitions,

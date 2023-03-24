@@ -10,7 +10,7 @@ use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
 
 use crate::{
-    config::{DataType, Input, Output, OutputId, TransformConfig, TransformContext},
+    config::{DataType, Input, OutputId, TransformConfig, TransformContext, TransformOutput},
     event::{metric, Event, EventMetadata},
     internal_events::{AggregateEventRecorded, AggregateFlushed, AggregateUpdateFailed},
     schema,
@@ -46,8 +46,12 @@ impl TransformConfig for AggregateConfig {
         Input::metric()
     }
 
-    fn outputs(&self, _: &[(OutputId, schema::Definition)], _: LogNamespace) -> Vec<Output> {
-        vec![Output::transform(DataType::Metric, vec![])]
+    fn outputs(
+        &self,
+        _: &[(OutputId, schema::Definition)],
+        _: LogNamespace,
+    ) -> Vec<TransformOutput> {
+        vec![TransformOutput::transform(DataType::Metric, vec![])]
     }
 }
 

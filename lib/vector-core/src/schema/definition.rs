@@ -373,6 +373,16 @@ impl Definition {
     /// This method panics if the provided path points to an unknown location in the collection.
     #[must_use]
     pub fn with_meaning(mut self, target_path: OwnedTargetPath, meaning: &str) -> Self {
+        self.add_meaning(target_path, meaning);
+        self
+    }
+
+    /// Adds the meaning pointing to the given path to our list of meanings.
+    ///
+    /// # Panics
+    ///
+    /// This method panics if the provided path points to an unknown location in the collection.
+    fn add_meaning(&mut self, target_path: OwnedTargetPath, meaning: &str) {
         // Ensure the path exists in the collection.
         match target_path.prefix {
             PathPrefix::Event => assert!(
@@ -391,7 +401,6 @@ impl Definition {
 
         self.meaning
             .insert(meaning.to_owned(), MeaningPointer::Valid(target_path));
-        self
     }
 
     /// Register a semantic meaning for the definition.
@@ -487,6 +496,21 @@ impl Definition {
             })
     }
 
+    /// Adds the meanings provided by an iterator over the given meanings.
+    ///
+    /// # Panics
+    ///
+    /// This method panics if the provided path from any of the incoming meanings point to
+    /// an unknown location in the collection.
+    pub fn add_meanings<'a>(
+        &'a mut self,
+        meanings: impl Iterator<Item = (&'a String, &'a OwnedTargetPath)>,
+    ) {
+        for (meaning, path) in meanings {
+            self.add_meaning(path.clone(), meaning);
+        }
+    }
+
     pub fn event_kind(&self) -> &Kind {
         &self.event_kind
     }
@@ -563,6 +587,15 @@ mod test_utils {
         pub fn assert_valid_for_event(&self, event: &Event) {
             if let Err(err) = self.is_valid_for_event(event) {
                 panic!("Schema definition assertion failed: {err}");
+            }
+        }
+
+        /// Asserts that the schema definition is _invalid_ for the given event.
+        /// # Panics
+        /// If the definition is valid for the event.
+        pub fn assert_invalid_for_event(&self, event: &Event) {
+            if let Ok(_) = self.is_valid_for_event(event) {
+                panic!("Schema definition assertion passed incorrectly");
             }
         }
     }

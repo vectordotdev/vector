@@ -233,9 +233,10 @@ mod tests {
             log_namespace: Some(true),
             ..Default::default()
         };
-        let definitions = config.outputs(LogNamespace::Vector)[0]
-            .clone()
-            .log_schema_definitions;
+        let definitions = config
+            .outputs(LogNamespace::Vector)
+            .remove(0)
+            .into_schema_definition(true);
 
         let message = "test";
         let now = Utc::now();
@@ -284,9 +285,10 @@ mod tests {
             log_namespace: None,
             ..Default::default()
         };
-        let definitions = config.outputs(LogNamespace::Legacy)[0]
-            .clone()
-            .log_schema_definitions;
+        let definitions = config
+            .outputs(LogNamespace::Legacy)
+            .remove(0)
+            .into_schema_definition(true);
 
         let message = "test";
         let now = Utc::now();

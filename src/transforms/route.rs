@@ -6,7 +6,8 @@ use vector_core::transform::SyncTransform;
 use crate::{
     conditions::{AnyCondition, Condition},
     config::{
-        DataType, GenerateConfig, Input, Output, OutputId, TransformConfig, TransformContext,
+        DataType, GenerateConfig, Input, OutputId, TransformConfig, TransformContext,
+        TransformOutput,
     },
     event::Event,
     schema,
@@ -107,12 +108,12 @@ impl TransformConfig for RouteConfig {
         &self,
         input_definitions: &[(OutputId, schema::Definition)],
         _: LogNamespace,
-    ) -> Vec<Output> {
-        let mut result: Vec<Output> = self
+    ) -> Vec<TransformOutput> {
+        let mut result: Vec<TransformOutput> = self
             .route
             .keys()
             .map(|output_name| {
-                Output::transform(
+                TransformOutput::transform(
                     DataType::all(),
                     input_definitions
                         .iter()
@@ -123,7 +124,7 @@ impl TransformConfig for RouteConfig {
             })
             .collect();
         result.push(
-            Output::transform(
+            TransformOutput::transform(
                 DataType::all(),
                 input_definitions
                     .iter()
@@ -200,7 +201,8 @@ mod test {
             output_names
                 .iter()
                 .map(|output_name| {
-                    Output::transform(DataType::all(), vec![]).with_port(output_name.to_owned())
+                    TransformOutput::transform(DataType::all(), vec![])
+                        .with_port(output_name.to_owned())
                 })
                 .collect(),
             1,
@@ -241,7 +243,8 @@ mod test {
             output_names
                 .iter()
                 .map(|output_name| {
-                    Output::transform(DataType::all(), vec![]).with_port(output_name.to_owned())
+                    TransformOutput::transform(DataType::all(), vec![])
+                        .with_port(output_name.to_owned())
                 })
                 .collect(),
             1,
@@ -281,7 +284,8 @@ mod test {
             output_names
                 .iter()
                 .map(|output_name| {
-                    Output::transform(DataType::all(), vec![]).with_port(output_name.to_owned())
+                    TransformOutput::transform(DataType::all(), vec![])
+                        .with_port(output_name.to_owned())
                 })
                 .collect(),
             1,

@@ -18,7 +18,7 @@ use vector_config::configurable_component;
 use crate::config::OutputId;
 use crate::{
     conditions::{AnyCondition, Condition},
-    config::{DataType, Input, Output, TransformConfig, TransformContext},
+    config::{DataType, Input, TransformConfig, TransformContext, TransformOutput},
     event::{discriminant::Discriminant, Event, EventMetadata, LogEvent},
     internal_events::ReduceStaleEventFlushed,
     schema,
@@ -130,7 +130,7 @@ impl TransformConfig for ReduceConfig {
         &self,
         input_definitions: &[(OutputId, schema::Definition)],
         _: LogNamespace,
-    ) -> Vec<Output> {
+    ) -> Vec<TransformOutput> {
         let mut output_definitions = Vec::new();
 
         for (_output, input) in input_definitions {
@@ -221,7 +221,10 @@ impl TransformConfig for ReduceConfig {
             output_definitions.push(schema_definition);
         }
 
-        vec![Output::transform(DataType::Log, output_definitions)]
+        vec![TransformOutput::transform(
+            DataType::Log,
+            output_definitions,
+        )]
     }
 }
 

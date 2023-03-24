@@ -335,9 +335,10 @@ mod tests {
     fn output_schema_definition_vector_namespace() {
         let config = InternalLogsConfig::default();
 
-        let definitions = config.outputs(LogNamespace::Vector)[0]
-            .clone()
-            .log_schema_definitions;
+        let definitions = config
+            .outputs(LogNamespace::Vector)
+            .remove(0)
+            .into_schema_definition(true);
 
         let expected_definition =
             Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
@@ -374,9 +375,10 @@ mod tests {
 
         config.pid_key = OptionalValuePath::from(owned_value_path!(pid_key));
 
-        let definitions = config.outputs(LogNamespace::Legacy)[0]
-            .clone()
-            .log_schema_definitions;
+        let definitions = config
+            .outputs(LogNamespace::Legacy)
+            .remove(0)
+            .into_schema_definition(true);
 
         let expected_definition = Definition::new_with_default_metadata(
             Kind::object(Collection::empty()),

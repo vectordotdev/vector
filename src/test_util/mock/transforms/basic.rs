@@ -5,7 +5,7 @@ use value::Value;
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
 use vector_core::{
-    config::{DataType, Input, Output},
+    config::{DataType, Input, TransformOutput},
     event::{
         metric::{MetricData, Sample},
         Event, MetricValue,
@@ -53,8 +53,8 @@ impl TransformConfig for BasicTransformConfig {
         &self,
         definitions: &[(OutputId, schema::Definition)],
         _: LogNamespace,
-    ) -> Vec<Output> {
-        vec![Output::transform(
+    ) -> Vec<TransformOutput> {
+        vec![TransformOutput::transform(
             DataType::all(),
             definitions
                 .iter()

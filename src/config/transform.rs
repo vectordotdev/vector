@@ -11,7 +11,7 @@ use vector_config::{
 };
 use vector_config_common::attributes::CustomAttribute;
 use vector_core::{
-    config::{GlobalOptions, Input, LogNamespace, Output},
+    config::{GlobalOptions, Input, LogNamespace, TransformOutput},
     schema,
     transform::Transform,
 };
@@ -193,7 +193,7 @@ pub trait TransformConfig: DynClone + NamedComponent + core::fmt::Debug + Send +
         &self,
         input_definitions: &[(OutputId, schema::Definition)],
         global_log_namespace: LogNamespace,
-    ) -> Vec<Output>;
+    ) -> Vec<TransformOutput>;
 
     /// Validates that the configuration of the transform is valid.
     ///

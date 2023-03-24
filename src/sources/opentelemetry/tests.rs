@@ -50,10 +50,8 @@ async fn receive_grpc_logs_vector_namespace() {
         };
         let schema_definitions = source
             .outputs(LogNamespace::Vector)
-            .first()
-            .unwrap()
-            .log_schema_definitions
-            .clone();
+            .remove(0)
+            .into_schema_definition(true);
 
         let (sender, logs_output, _) = new_source(EventStatus::Delivered);
         let server = source
@@ -189,10 +187,8 @@ async fn receive_grpc_logs_legacy_namespace() {
         };
         let schema_definitions = source
             .outputs(LogNamespace::Legacy)
-            .first()
-            .unwrap()
-            .log_schema_definitions
-            .clone();
+            .remove(0)
+            .into_schema_definition(true);
 
         let (sender, logs_output, _) = new_source(EventStatus::Delivered);
         let server = source

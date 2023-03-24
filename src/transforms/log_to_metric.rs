@@ -7,7 +7,8 @@ use vector_core::config::LogNamespace;
 
 use crate::{
     config::{
-        DataType, GenerateConfig, Input, Output, OutputId, TransformConfig, TransformContext,
+        DataType, GenerateConfig, Input, OutputId, TransformConfig, TransformContext,
+        TransformOutput,
     },
     event::{
         metric::{Metric, MetricKind, MetricTags, MetricValue, StatisticKind, TagValue},
@@ -156,9 +157,13 @@ impl TransformConfig for LogToMetricConfig {
         Input::log()
     }
 
-    fn outputs(&self, _: &[(OutputId, schema::Definition)], _: LogNamespace) -> Vec<Output> {
+    fn outputs(
+        &self,
+        _: &[(OutputId, schema::Definition)],
+        _: LogNamespace,
+    ) -> Vec<TransformOutput> {
         // Converting the log to a metric means we lose all incoming `Definition`s.
-        vec![Output::transform(DataType::Metric, Vec::new())]
+        vec![TransformOutput::transform(DataType::Metric, Vec::new())]
     }
 
     fn enable_concurrency(&self) -> bool {

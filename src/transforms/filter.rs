@@ -5,7 +5,8 @@ use vector_core::config::LogNamespace;
 use crate::{
     conditions::{AnyCondition, Condition},
     config::{
-        DataType, GenerateConfig, Input, Output, OutputId, TransformConfig, TransformContext,
+        DataType, GenerateConfig, Input, OutputId, TransformConfig, TransformContext,
+        TransformOutput,
     },
     event::Event,
     internal_events::FilterEventsDropped,
@@ -54,8 +55,8 @@ impl TransformConfig for FilterConfig {
         &self,
         input_definitions: &[(OutputId, schema::Definition)],
         _: LogNamespace,
-    ) -> Vec<Output> {
-        vec![Output::transform(
+    ) -> Vec<TransformOutput> {
+        vec![TransformOutput::transform(
             DataType::all(),
             input_definitions
                 .iter()
