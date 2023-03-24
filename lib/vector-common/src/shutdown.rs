@@ -279,7 +279,7 @@ impl SourceShutdownCoordinator {
         )
     }
 
-    /// Returned future will finish once all *current* sources have finished.
+    /// Returned future will finish once all sources have finished.
     #[must_use]
     pub fn shutdown_tripwire(&self) -> future::BoxFuture<'static, ()> {
         let futures = self
@@ -288,7 +288,9 @@ impl SourceShutdownCoordinator {
             .cloned()
             .map(|tripwire| tripwire.then(tripwire_handler).boxed());
 
-        future::join_all(futures).map(|_| ()).boxed()
+        future::join_all(futures)
+            .map(|_| info!("All sources have finished."))
+            .boxed()
     }
 
     fn shutdown_source_complete(
