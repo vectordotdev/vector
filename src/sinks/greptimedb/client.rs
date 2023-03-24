@@ -455,3 +455,7 @@ mod tests {
         assert_eq!(get_column(&insert.columns, "sum"), 12.0);
     }
 }
+
+#[cfg(feature = "greptimedb-integration-tests")]
+#[cfg(test)]
+mod integration_tests {}
