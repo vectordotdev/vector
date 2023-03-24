@@ -27,7 +27,7 @@ remap: functions: random_float: {
 
 	examples: [
 		{
-			title: "Random float from 0 to 10, not including 10"
+			title: "Random float from 0.0 to 10.0, not including 10.0"
 			source: """
 				f = random_float(0.0, 10.0)
 				f >= 0 && f < 10
