@@ -23,7 +23,7 @@ use crate::{
 };
 
 /// Configuration for the `metric_to_log` transform.
-#[configurable_component(transform("metric_to_log"))]
+#[configurable_component(transform("metric_to_log", "Convert metric events to log events."))]
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct MetricToLogConfig {
@@ -75,6 +75,7 @@ impl GenerateConfig for MetricToLogConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "metric_to_log")]
 impl TransformConfig for MetricToLogConfig {
     async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
         Ok(Transform::function(MetricToLog::new(
@@ -209,11 +210,10 @@ impl TransformConfig for MetricToLogConfig {
                 );
             }
             LogNamespace::Legacy => {
-                schema_definition = schema_definition.with_event_field(
-                    &parse_value_path(log_schema().timestamp_key()).expect("valid timestamp key"),
-                    Kind::timestamp(),
-                    None,
-                );
+                if let Some(timestamp_key) = log_schema().timestamp_key() {
+                    schema_definition =
+                        schema_definition.with_event_field(timestamp_key, Kind::timestamp(), None);
+                }
 
                 schema_definition = schema_definition.with_event_field(
                     &parse_value_path(log_schema().host_key()).expect("valid host key"),
@@ -286,7 +286,10 @@ impl MetricToLog {
                             })
                             .unwrap_or_else(|| event::Value::Timestamp(Utc::now()));
 
-                        log.insert(log_schema().timestamp_key(), timestamp);
+                        if let Some(timestamp_key) = log_schema().timestamp_key() {
+                            log.insert((PathPrefix::Event, timestamp_key), timestamp);
+                        }
+
                         if let Some(host) = log.remove_prune(self.host_tag.as_str(), true) {
                             log.insert(log_schema().host_key(), host);
                         }

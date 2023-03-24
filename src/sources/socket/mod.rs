@@ -6,7 +6,7 @@ mod unix;
 use codecs::{decoding::DeserializerConfig, NewlineDelimitedDecoderConfig};
 use lookup::{lookup_v2::OptionalValuePath, owned_value_path};
 use value::{kind::Collection, Kind};
-use vector_config::{configurable_component, NamedComponent};
+use vector_config::configurable_component;
 use vector_core::config::{log_schema, LegacyKey, LogNamespace};
 
 #[cfg(unix)]
@@ -112,26 +112,22 @@ impl SourceConfig for SocketConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         match self.mode.clone() {
             Mode::Tcp(config) => {
-                let (framing, decoding) = match (config.framing(), config.max_length()) {
-                    (Some(_), Some(_)) => {
-                        return Err("Using `max_length` is deprecated and does not have any effect when framing is provided. Configure `max_length` on the framing config instead.".into());
+                let decoding = config.decoding().clone();
+                // TODO: in v0.30.0 , remove the `max_length` setting from
+                // the UnixConfig, and all of the below mess and replace
+                // it with the configured framing /
+                // decoding.default_stream_framing().
+                let framing = match (config.framing().clone(), config.max_length()) {
+                    (Some(framing), Some(_)) => {
+                        warn!(message = "DEPRECATION: The `max_length` setting is deprecated and will be removed in an upcoming release. Since a `framing` setting was provided, the `max_length` setting has no effect.");
+                        framing
                     }
-                    (Some(framing), None) => {
-                        let decoding = config.decoding().clone();
-                        let framing = framing.clone();
-                        (framing, decoding)
-                    }
+                    (Some(framing), None) => framing,
                     (None, Some(max_length)) => {
-                        let decoding = config.decoding().clone();
-                        let framing =
-                            NewlineDelimitedDecoderConfig::new_with_max_length(max_length).into();
-                        (framing, decoding)
+                        warn!(message = "DEPRECATION: The `max_length` setting is deprecated and will be removed in an upcoming release. Please configure the `max_length` from the `framing` setting instead.");
+                        NewlineDelimitedDecoderConfig::new_with_max_length(max_length).into()
                     }
-                    (None, None) => {
-                        let decoding = config.decoding().clone();
-                        let framing = decoding.default_stream_framing();
-                        (framing, decoding)
-                    }
+                    (None, None) => decoding.default_stream_framing(),
                 };
 
                 let log_namespace = cx.log_namespace(config.log_namespace);
@@ -152,6 +148,7 @@ impl SourceConfig for SocketConfig {
                     tls,
                     tls_client_metadata_key,
                     config.receive_buffer_bytes(),
+                    config.max_connection_duration_secs(),
                     cx,
                     false.into(),
                     config.connection_limit,
@@ -192,25 +189,23 @@ impl SourceConfig for SocketConfig {
             }
             #[cfg(unix)]
             Mode::UnixStream(config) => {
-                let (framing, decoding) = match (config.framing.clone(), config.max_length) {
-                    (Some(_), Some(_)) => {
-                        return Err("Using `max_length` is deprecated and does not have any effect when framing is provided. Configure `max_length` on the framing config instead.".into());
+                let decoding = config.decoding.clone();
+
+                // TODO: in v0.30.0 , remove the `max_length` setting from
+                // the UnixConfig, and all of the below mess and replace
+                // it with the configured framing /
+                // decoding.default_stream_framing().
+                let framing = match (config.framing.clone(), config.max_length) {
+                    (Some(framing), Some(_)) => {
+                        warn!(message = "DEPRECATION: The `max_length` setting is deprecated and will be removed in an upcoming release. Since a `framing` setting was provided, the `max_length` setting has no effect.");
+                        framing
                     }
-                    (Some(framing), None) => {
-                        let decoding = config.decoding.clone();
-                        (framing, decoding)
-                    }
+                    (Some(framing), None) => framing,
                     (None, Some(max_length)) => {
-                        let decoding = config.decoding.clone();
-                        let framing =
-                            NewlineDelimitedDecoderConfig::new_with_max_length(max_length).into();
-                        (framing, decoding)
+                        warn!(message = "DEPRECATION: The `max_length` setting is deprecated and will be removed in an upcoming release. Please configure the `max_length` from the `framing` setting instead.");
+                        NewlineDelimitedDecoderConfig::new_with_max_length(max_length).into()
                     }
-                    (None, None) => {
-                        let decoding = config.decoding.clone();
-                        let framing = decoding.default_stream_framing();
-                        (framing, decoding)
-                    }
+                    (None, None) => decoding.default_stream_framing(),
                 };
 
                 let log_namespace = cx.log_namespace(config.log_namespace);
@@ -343,6 +338,7 @@ fn default_max_length() -> Option<usize> {
 
 #[cfg(test)]
 mod test {
+    use approx::assert_relative_eq;
     use std::{
         collections::{BTreeMap, HashMap},
         net::{SocketAddr, UdpSocket},
@@ -359,12 +355,13 @@ mod test {
     use codecs::{decoding::CharacterDelimitedDecoderOptions, CharacterDelimitedDecoderConfig};
     use futures::{stream, StreamExt};
     use lookup::{lookup_v2::OptionalValuePath, owned_value_path, path};
+    use tokio::io::AsyncReadExt;
+    use tokio::net::TcpStream;
     use tokio::{
         task::JoinHandle,
         time::{timeout, Duration, Instant},
     };
-    use vector_common::btreemap;
-    use vector_config::NamedComponent;
+    use value::btreemap;
     use vector_core::event::EventContainer;
     #[cfg(unix)]
     use {
@@ -817,6 +814,45 @@ mod test {
 
         let source_result = source_handle.await.expect("source task should not panic");
         assert_eq!(source_result, Ok(()));
+    }
+
+    #[tokio::test]
+    async fn tcp_connection_close_after_max_duration() {
+        let (tx, _) = SourceSender::new_test();
+        let addr = next_addr();
+
+        let mut source_config = TcpConfig::from_address(addr.into());
+        source_config.set_max_connection_duration_secs(Some(1));
+        let source_task = SocketConfig::from(source_config)
+            .build(SourceContext::new_test(tx, None))
+            .await
+            .unwrap();
+
+        // Spawn the source task and wait until we're sure it's listening:
+        drop(tokio::spawn(source_task));
+        wait_for_tcp(addr).await;
+
+        let mut stream: TcpStream = TcpStream::connect(addr)
+            .await
+            .expect("stream should be able to connect");
+        let start = Instant::now();
+
+        let timeout = tokio::time::sleep(Duration::from_millis(1200));
+        let mut buffer = [0u8; 10];
+
+        tokio::select! {
+             _ = timeout => {
+                 panic!("timed out waiting for stream to close")
+             },
+             read_result = stream.read(&mut buffer) => {
+                 match read_result {
+                    // read resulting with 0 bytes -> the connection was closed
+                    Ok(0) => assert_relative_eq!(start.elapsed().as_secs_f64(), 1.0, epsilon = 0.3),
+                    Ok(_) => panic!("unexpectedly read data from stream"),
+                    Err(e) => panic!("{:}", e)
+                 }
+             }
+        }
     }
 
     //////// UDP TESTS ////////

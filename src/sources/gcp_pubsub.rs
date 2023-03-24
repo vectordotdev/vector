@@ -25,7 +25,7 @@ use vector_common::internal_event::{
     ByteSize, BytesReceived, EventsReceived, InternalEventHandle as _, Protocol, Registered,
 };
 use vector_common::{byte_size_of::ByteSizeOf, finalizer::UnorderedFinalizer};
-use vector_config::{configurable_component, NamedComponent};
+use vector_config::configurable_component;
 use vector_core::config::{LegacyKey, LogNamespace};
 
 use crate::{
@@ -835,7 +835,7 @@ mod integration_tests {
     use once_cell::sync::Lazy;
     use serde_json::{json, Value};
     use tokio::time::{Duration, Instant};
-    use vector_common::btreemap;
+    use value::btreemap;
 
     use super::*;
     use crate::config::{ComponentKey, ProxyConfig};

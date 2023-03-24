@@ -590,7 +590,7 @@ mod test {
     use chrono::{offset::TimeZone, Utc};
     use lookup::owned_value_path;
     use similar_asserts::assert_eq;
-    use vector_common::btreemap;
+    use value::btreemap;
     use vrl_lib::Target;
 
     use super::super::MetricValue;
@@ -599,7 +599,7 @@ mod test {
 
     #[test]
     fn log_get() {
-        use vector_common::btreemap;
+        use value::btreemap;
 
         let cases = vec![
             (
@@ -655,7 +655,7 @@ mod test {
     #[allow(clippy::too_many_lines)]
     #[test]
     fn log_insert() {
-        use vector_common::btreemap;
+        use value::btreemap;
 
         let cases = vec![
             (
@@ -867,7 +867,7 @@ mod test {
 
     #[test]
     fn log_into_events() {
-        use vector_common::btreemap;
+        use value::btreemap;
 
         let cases = vec![
             (
@@ -1195,10 +1195,7 @@ mod test {
             )]))
         );
 
-        let metric = match target {
-            VrlTarget::Metric { metric, .. } => metric,
-            _ => unreachable!(),
-        };
+        let VrlTarget::Metric { metric, .. } = target else {unreachable!()};
 
         // get single value (should be the last one)
         assert_eq!(metric.tag_value("foo"), Some("b".into()));

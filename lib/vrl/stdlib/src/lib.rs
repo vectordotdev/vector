@@ -60,6 +60,8 @@ mod decode_mime_q;
 mod decode_percent;
 #[cfg(feature = "decode_zlib")]
 mod decode_zlib;
+#[cfg(feature = "decode_zstd")]
+mod decode_zstd;
 #[cfg(feature = "decrypt")]
 mod decrypt;
 #[cfg(feature = "del")]
@@ -82,6 +84,8 @@ mod encode_logfmt;
 mod encode_percent;
 #[cfg(feature = "encode_zlib")]
 mod encode_zlib;
+#[cfg(feature = "encode_zstd")]
+mod encode_zstd;
 #[cfg(feature = "encrypt")]
 mod encrypt;
 #[cfg(feature = "ends_with")]
@@ -112,6 +116,8 @@ mod get;
 mod get_env_var;
 #[cfg(feature = "get_hostname")]
 mod get_hostname;
+#[cfg(feature = "hmac")]
+mod hmac;
 #[cfg(feature = "includes")]
 mod includes;
 #[cfg(feature = "integer")]
@@ -337,6 +343,8 @@ mod values;
 
 // -----------------------------------------------------------------------------
 
+#[cfg(feature = "hmac")]
+pub use crate::hmac::Hmac;
 #[cfg(feature = "abs")]
 pub use abs::Abs;
 #[cfg(feature = "append")]
@@ -367,6 +375,8 @@ pub use decode_mime_q::DecodeMimeQ;
 pub use decode_percent::DecodePercent;
 #[cfg(feature = "decode_zlib")]
 pub use decode_zlib::DecodeZlib;
+#[cfg(feature = "decode_zstd")]
+pub use decode_zstd::DecodeZstd;
 #[cfg(feature = "decrypt")]
 pub use decrypt::Decrypt;
 #[cfg(feature = "del")]
@@ -389,6 +399,8 @@ pub use encode_logfmt::EncodeLogfmt;
 pub use encode_percent::EncodePercent;
 #[cfg(feature = "encode_zlib")]
 pub use encode_zlib::EncodeZlib;
+#[cfg(feature = "encode_zstd")]
+pub use encode_zstd::EncodeZstd;
 #[cfg(feature = "encrypt")]
 pub use encrypt::Encrypt;
 #[cfg(feature = "ends_with")]
@@ -674,6 +686,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(DecodeMimeQ),
         #[cfg(feature = "decode_zlib")]
         Box::new(DecodeZlib),
+        #[cfg(feature = "decode_zstd")]
+        Box::new(DecodeZstd),
         #[cfg(feature = "decrypt")]
         Box::new(Decrypt),
         #[cfg(feature = "del")]
@@ -696,6 +710,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(EncodePercent),
         #[cfg(feature = "encode_zlib")]
         Box::new(EncodeZlib),
+        #[cfg(feature = "encode_zstd")]
+        Box::new(EncodeZstd),
         #[cfg(feature = "encrypt")]
         Box::new(Encrypt),
         #[cfg(feature = "ends_with")]
@@ -726,6 +742,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(GetEnvVar),
         #[cfg(feature = "get_hostname")]
         Box::new(GetHostname),
+        #[cfg(feature = "hmac")]
+        Box::new(Hmac),
         #[cfg(feature = "includes")]
         Box::new(Includes),
         #[cfg(feature = "integer")]

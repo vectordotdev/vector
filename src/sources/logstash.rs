@@ -16,7 +16,7 @@ use snafu::{ResultExt, Snafu};
 use tokio_util::codec::Decoder;
 use value::kind::Collection;
 use value::Kind;
-use vector_config::{configurable_component, NamedComponent};
+use vector_config::configurable_component;
 use vector_core::{
     config::{LegacyKey, LogNamespace},
     schema::Definition,
@@ -159,6 +159,7 @@ impl SourceConfig for LogstashConfig {
             tls,
             tls_client_metadata_key,
             self.receive_buffer_bytes,
+            None,
             cx,
             self.acknowledgements,
             self.connection_limit,
@@ -208,7 +209,7 @@ impl TcpSource for LogstashSource {
 
             self.log_namespace.insert_vector_metadata(
                 log,
-                log_schema().source_type_key(),
+                Some(log_schema().source_type_key()),
                 path!("source_type"),
                 Bytes::from_static(LogstashConfig::NAME.as_bytes()),
             );
@@ -231,10 +232,12 @@ impl TcpSource for LogstashSource {
                     log.insert(metadata_path!("vector", "ingest_timestamp"), now);
                 }
                 LogNamespace::Legacy => {
-                    log.insert(
-                        (PathPrefix::Event, log_schema().timestamp_key()),
-                        log_timestamp.unwrap_or_else(|| Value::from(now)),
-                    );
+                    if let Some(timestamp_key) = log_schema().timestamp_key() {
+                        log.insert(
+                            (PathPrefix::Event, timestamp_key),
+                            log_timestamp.unwrap_or_else(|| Value::from(now)),
+                        );
+                    }
                 }
             }
 

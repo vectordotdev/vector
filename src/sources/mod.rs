@@ -340,10 +340,8 @@ pub enum Sources {
     Vector(vector::VectorConfig),
 }
 
-// We can't use `enum_dispatch` here because it doesn't support associated constants.
+// TODO: Use `enum_dispatch` here
 impl NamedComponent for Sources {
-    const NAME: &'static str = "_invalid_usage";
-
     fn get_component_name(&self) -> &'static str {
         match self {
             #[cfg(feature = "sources-amqp")]

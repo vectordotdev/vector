@@ -14,7 +14,7 @@ use serde_with::serde_as;
 use smallvec::{smallvec, SmallVec};
 use tokio_util::udp::UdpFramed;
 use vector_common::internal_event::{CountByteSize, InternalEventHandle as _, Registered};
-use vector_config::{configurable_component, NamedComponent};
+use vector_config::configurable_component;
 use vector_core::EstimatedJsonEncodedSizeOf;
 
 use self::parser::ParseError;
@@ -165,6 +165,7 @@ impl SourceConfig for StatsdConfig {
                     tls,
                     tls_client_metadata_key,
                     config.receive_buffer_bytes,
+                    None,
                     cx,
                     false.into(),
                     config.connection_limit,

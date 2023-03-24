@@ -97,7 +97,7 @@ async fn start_test_detail(
     // Swap out the endpoint so we can force send it
     // to our local server
     let endpoint = format!("http://{}", addr);
-    config.endpoint = Some(endpoint.clone());
+    config.dd_common.endpoint = Some(endpoint.clone());
 
     let (sink, _) = config.build(cx).await.unwrap();
 
@@ -132,12 +132,12 @@ async fn start_test_error(
     start_test_detail(api_status, batch_status, true).await
 }
 
-#[tokio::test]
 /// Assert the basic functionality of the sink in good conditions
 ///
 /// This test rigs the sink to return OKv1 to responses, checks that all batches
 /// were delivered and then asserts that every message is able to be
 /// deserialized.
+#[tokio::test]
 async fn smoke() {
     let (expected, rx) = start_test_success(ApiStatus::OKv1, BatchStatus::Delivered).await;
 
@@ -236,7 +236,7 @@ async fn api_key_in_metadata_inner(api_status: ApiStatus) {
     let addr = next_addr();
     // Swap out the endpoint so we can force send it to our local server
     let endpoint = format!("http://{}", addr);
-    config.endpoint = Some(endpoint.clone());
+    config.dd_common.endpoint = Some(endpoint.clone());
 
     let (sink, _) = config.build(cx).await.unwrap();
 
@@ -316,7 +316,7 @@ async fn multiple_api_keys_inner(api_status: ApiStatus) {
     // Swap out the endpoint so we can force send it
     // to our local server
     let endpoint = format!("http://{}", addr);
-    config.endpoint = Some(endpoint.clone());
+    config.dd_common.endpoint = Some(endpoint.clone());
 
     let (sink, _) = config.build(cx).await.unwrap();
 
@@ -378,7 +378,7 @@ async fn enterprise_headers_inner(api_status: ApiStatus) {
     let addr = next_addr();
     // Swap out the endpoint so we can force send it to our local server
     let endpoint = format!("http://{}", addr);
-    config.endpoint = Some(endpoint.clone());
+    config.dd_common.endpoint = Some(endpoint.clone());
 
     let (sink, _) = config.build(cx).await.unwrap();
 
@@ -441,7 +441,7 @@ async fn no_enterprise_headers_inner(api_status: ApiStatus) {
     let addr = next_addr();
     // Swap out the endpoint so we can force send it to our local server
     let endpoint = format!("http://{}", addr);
-    config.endpoint = Some(endpoint.clone());
+    config.dd_common.endpoint = Some(endpoint.clone());
 
     let (sink, _) = config.build(cx).await.unwrap();
 

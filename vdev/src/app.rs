@@ -7,7 +7,7 @@ use indicatif::{ProgressBar, ProgressStyle};
 use log::LevelFilter;
 use once_cell::sync::{Lazy, OnceCell};
 
-use crate::config::Config;
+use crate::{config::Config, platform, util};
 
 // Use the `bash` interpreter included as part of the standard `git` install for our default shell
 // if nothing is specified in the environment.
@@ -43,6 +43,25 @@ pub fn set_repo_dir() -> Result<()> {
     env::set_current_dir(path()).context("Could not change directory")
 }
 
+pub fn version() -> Result<String> {
+    let version = env::var("VERSION").or_else(|_| util::read_version())?;
+    let channel = env::var("CHANNEL").or_else(|_| util::release_channel().map(Into::into))?;
+
+    if channel == "latest" {
+        let head = util::git_head()?;
+        if !head.status.success() {
+            let error = String::from_utf8_lossy(&head.stderr);
+            bail!("Error running `git describe`:\n{error}");
+        }
+        let tag = String::from_utf8_lossy(&head.stdout).trim().to_string();
+        if tag != format!("v{version}") {
+            bail!("On latest release channel and tag {tag:?} is different from Cargo.toml {version:?}. Aborting");
+        }
+    }
+
+    Ok(version)
+}
+
 /// Overlay some extra helper functions onto `std::process::Command`
 pub trait CommandExt {
     fn script(script: &str) -> Self;
@@ -52,6 +71,7 @@ pub trait CommandExt {
     fn run(&mut self) -> Result<ExitStatus>;
     fn wait(&mut self, message: impl Into<Cow<'static, str>>) -> Result<()>;
     fn pre_exec(&self);
+    fn features(&mut self, features: &[String]) -> &mut Self;
 }
 
 impl CommandExt for Command {
@@ -106,10 +126,8 @@ impl CommandExt for Command {
 
         let result = self.output();
         progress_bar.finish_and_clear();
-        let output = match result {
-            Ok(output) => output,
-            Err(_) => bail!("could not run command"),
-        };
+
+        let Ok(output) = result else {bail!("could not run command")};
 
         if output.status.success() {
             Ok(())
@@ -136,6 +154,17 @@ impl CommandExt for Command {
                 debug!("  unset ${key}");
             }
         }
+    }
+
+    fn features(&mut self, features: &[String]) -> &mut Self {
+        self.arg("--no-default-features");
+        self.arg("--features");
+        if features.is_empty() {
+            self.arg(platform::default_features());
+        } else {
+            self.arg(features.join(","));
+        }
+        self
     }
 }
 

@@ -23,7 +23,7 @@ use tracing::Instrument;
 use vector_common::internal_event::{
     ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol, Registered,
 };
-use vector_config::{configurable_component, NamedComponent};
+use vector_config::configurable_component;
 
 use crate::{
     config::{SourceAcknowledgementsConfig, SourceContext},
@@ -572,7 +572,7 @@ impl IngestorProcess {
 
             log_namespace.insert_vector_metadata(
                 &mut log,
-                path!(log_schema().source_type_key()),
+                Some(log_schema().source_type_key()),
                 path!("source_type"),
                 Bytes::from_static(AwsS3Config::NAME.as_bytes()),
             );
@@ -589,10 +589,12 @@ impl IngestorProcess {
                     log.insert(metadata_path!("vector", "ingest_timestamp"), Utc::now());
                 }
                 LogNamespace::Legacy => {
-                    log.try_insert(
-                        (PathPrefix::Event, log_schema().timestamp_key()),
-                        timestamp.unwrap_or_else(Utc::now),
-                    );
+                    if let Some(timestamp_key) = log_schema().timestamp_key() {
+                        log.try_insert(
+                            (PathPrefix::Event, timestamp_key),
+                            timestamp.unwrap_or_else(Utc::now),
+                        );
+                    }
                 }
             };
 
@@ -613,6 +615,10 @@ impl IngestorProcess {
         // Up above, `lines` captures `read_error`, and eventually is captured by `stream`,
         // so we explicitly drop it so that we can again utilize `read_error` below.
         drop(stream);
+
+        // The BatchNotifier is cloned for each LogEvent in the batch stream, but the last
+        // reference must be dropped before the status of the batch is sent to the channel.
+        drop(batch);
 
         if let Some(error) = read_error {
             Err(ProcessingError::ReadObject {

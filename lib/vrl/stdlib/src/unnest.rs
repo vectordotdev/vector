@@ -159,9 +159,7 @@ impl FunctionExpression for UnnestFn {
 pub(crate) fn invert_array_at_path(typedef: &TypeDef, path: &OwnedValuePath) -> TypeDef {
     let kind = typedef.kind().at_path(path);
 
-    let mut array = if let Some(array) = kind.into_array() {
-        array
-    } else {
+    let Some(mut array) = kind.into_array() else {
         // Guaranteed fallible.
         // This can't actually be set to "fallible", or it will cause problems due to
         // https://github.com/vectordotdev/vector/issues/13527
@@ -187,11 +185,11 @@ pub(crate) fn invert_array_at_path(typedef: &TypeDef, path: &OwnedValuePath) -> 
 
 #[cfg(test)]
 mod tests {
-    use lookup_lib::lookup_v2::parse_value_path;
-    use vector_common::{btreemap, TimeZone};
-    use vrl::state::TypeState;
-
     use super::*;
+    use ::value::btreemap;
+    use lookup_lib::lookup_v2::parse_value_path;
+    use vrl::state::TypeState;
+    use vrl_core::TimeZone;
 
     #[test]
     fn type_def() {

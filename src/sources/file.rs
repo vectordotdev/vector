@@ -18,7 +18,7 @@ use tokio::{sync::oneshot, task::spawn_blocking};
 use tracing::{Instrument, Span};
 use value::Kind;
 use vector_common::finalizer::OrderedFinalizer;
-use vector_config::{configurable_component, NamedComponent};
+use vector_config::configurable_component;
 use vector_core::config::{LegacyKey, LogNamespace};
 
 use super::util::{EncodingConfig, MultilineConfig};
@@ -747,7 +747,7 @@ fn create_event(
 
     log_namespace.insert_vector_metadata(
         &mut event,
-        log_schema().source_type_key(),
+        Some(log_schema().source_type_key()),
         path!("source_type"),
         Bytes::from_static(FileConfig::NAME.as_bytes()),
     );
@@ -1019,7 +1019,7 @@ mod tests {
         assert_eq!(log["offset"], 0.into());
         assert_eq!(log[log_schema().message_key()], "hello world".into());
         assert_eq!(log[log_schema().source_type_key()], "file".into());
-        assert!(log[log_schema().timestamp_key()].is_timestamp());
+        assert!(log[log_schema().timestamp_key().unwrap().to_string()].is_timestamp());
     }
 
     #[test]
@@ -1041,7 +1041,7 @@ mod tests {
         assert_eq!(log["off"], 0.into());
         assert_eq!(log[log_schema().message_key()], "hello world".into());
         assert_eq!(log[log_schema().source_type_key()], "file".into());
-        assert!(log[log_schema().timestamp_key()].is_timestamp());
+        assert!(log[log_schema().timestamp_key().unwrap().to_string()].is_timestamp());
     }
 
     #[test]
@@ -1446,7 +1446,7 @@ mod tests {
                         .to_string(),
                     log_schema().host_key().to_string(),
                     log_schema().message_key().to_string(),
-                    log_schema().timestamp_key().to_string(),
+                    log_schema().timestamp_key().unwrap().to_string(),
                     log_schema().source_type_key().to_string()
                 ]
                 .into_iter()
@@ -2162,7 +2162,7 @@ mod tests {
             for i in 0..n {
                 writeln!(&mut file, "{}", i).unwrap();
             }
-            std::mem::drop(file);
+            drop(file);
 
             for _ in 0..10 {
                 // Wait for remove grace period to end.

@@ -26,7 +26,7 @@ use tokio_util::codec::FramedRead;
 
 use value::{kind::Collection, Kind};
 use vector_common::finalizer::OrderedFinalizer;
-use vector_config::{configurable_component, NamedComponent};
+use vector_config::configurable_component;
 use vector_core::{
     config::{LegacyKey, LogNamespace},
     EstimatedJsonEncodedSizeOf,
@@ -54,6 +54,14 @@ enum BuildError {
     KafkaCreateError { source: rdkafka::error::KafkaError },
     #[snafu(display("Could not subscribe to Kafka topics: {}", source))]
     KafkaSubscribeError { source: rdkafka::error::KafkaError },
+}
+
+/// Metrics configuration.
+#[configurable_component]
+#[derive(Clone, Debug, Default)]
+struct Metrics {
+    /// Expose topic lag metrics for all topics and partitions. Metric names are `kafka_consumer_lag`.
+    pub topic_lag_metric: bool,
 }
 
 /// Configuration for the `kafka` source.
@@ -85,10 +93,6 @@ pub struct KafkaSourceConfig {
     /// The consumer group name to be used to consume events from Kafka.
     #[configurable(metadata(docs::examples = "consumer-group-name"))]
     group_id: String,
-
-    /// Override dynamic membership and broker assignment behavior with static membership, using a group instance (member) id.
-    #[configurable(metadata(docs::examples = "kafka-streams-instance-1"))]
-    group_instance_id: Option<String>,
 
     /// If offsets for consumer group do not exist, set them using this strategy.
     ///
@@ -201,6 +205,10 @@ pub struct KafkaSourceConfig {
     #[configurable(metadata(docs::hidden))]
     #[serde(default)]
     log_namespace: Option<bool>,
+
+    #[configurable(derived)]
+    #[serde(default)]
+    metrics: Metrics,
 }
 
 impl KafkaSourceConfig {
@@ -305,7 +313,7 @@ impl SourceConfig for KafkaSourceConfig {
             .with_standard_vector_source_metadata()
             .with_source_metadata(
                 Self::NAME,
-                Some(LegacyKey::Overwrite(owned_value_path!(keys.timestamp))),
+                keys.timestamp.map(LegacyKey::Overwrite),
                 &owned_value_path!("timestamp"),
                 Kind::timestamp(),
                 Some("timestamp"),
@@ -502,9 +510,9 @@ fn parse_stream<'a>(
     Some((count, stream))
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 struct Keys<'a> {
-    timestamp: &'a str,
+    timestamp: Option<OwnedValuePath>,
     key_field: &'a Option<OwnedValuePath>,
     topic: &'a Option<OwnedValuePath>,
     partition: &'a Option<OwnedValuePath>,
@@ -515,7 +523,7 @@ struct Keys<'a> {
 impl<'a> Keys<'a> {
     fn from(schema: &'a LogSchema, config: &'a KafkaSourceConfig) -> Self {
         Self {
-            timestamp: schema.timestamp_key(),
+            timestamp: schema.timestamp_key().cloned(),
             key_field: &config.key_field.path,
             topic: &config.topic_key.path,
             partition: &config.partition_key.path,
@@ -599,7 +607,7 @@ impl ReceivedMessage {
             log_namespace.insert_source_metadata(
                 KafkaSourceConfig::NAME,
                 log,
-                Some(LegacyKey::Overwrite(keys.timestamp)),
+                keys.timestamp.as_ref().map(LegacyKey::Overwrite),
                 path!("timestamp"),
                 self.timestamp,
             );
@@ -692,12 +700,10 @@ fn create_consumer(config: &KafkaSourceConfig) -> crate::Result<StreamConsumer<C
         }
     }
 
-    if let Some(group_instance_id) = &config.group_instance_id {
-        client_config.set("group.instance.id", group_instance_id);
-    }
-
     let consumer = client_config
-        .create_with_context::<_, StreamConsumer<_>>(CustomContext::default())
+        .create_with_context::<_, StreamConsumer<_>>(CustomContext::new(
+            config.metrics.topic_lag_metric,
+        ))
         .context(KafkaCreateSnafu)?;
     let topics: Vec<&str> = config.topics.iter().map(|s| s.as_str()).collect();
     consumer.subscribe(&topics).context(KafkaSubscribeSnafu)?;
@@ -709,6 +715,15 @@ fn create_consumer(config: &KafkaSourceConfig) -> crate::Result<StreamConsumer<C
 struct CustomContext {
     stats: kafka::KafkaStatisticsContext,
     finalizer: OnceCell<Arc<OrderedFinalizer<FinalizerEntry>>>,
+}
+
+impl CustomContext {
+    fn new(expose_lag_metrics: bool) -> Self {
+        Self {
+            stats: kafka::KafkaStatisticsContext { expose_lag_metrics },
+            ..Default::default()
+        }
+    }
 }
 
 impl ClientContext for CustomContext {
@@ -1030,7 +1045,7 @@ mod integration_test {
                     "kafka".into()
                 );
                 assert_eq!(
-                    event.as_log()[log_schema().timestamp_key()],
+                    event.as_log()[log_schema().timestamp_key().unwrap().to_string()],
                     now.trunc_subsecs(3).into()
                 );
                 assert_eq!(event.as_log()["topic"], topic.clone().into());

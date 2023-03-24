@@ -120,8 +120,8 @@ impl HttpSource for RemoteWriteSource {
     fn build_events(
         &self,
         mut body: Bytes,
-        header_map: HeaderMap,
-        _query_parameters: HashMap<String, String>,
+        header_map: &HeaderMap,
+        _query_parameters: &HashMap<String, String>,
         _full_path: &str,
     ) -> Result<Vec<Event>, ErrorMessage> {
         // If `Content-Encoding` header isn't `snappy` HttpSource won't decode it for us

@@ -25,7 +25,7 @@ use value::{kind::Collection, Kind};
 use vector_common::internal_event::{
     ByteSize, BytesReceived, InternalEventHandle as _, Protocol, Registered,
 };
-use vector_config::{configurable_component, NamedComponent};
+use vector_config::configurable_component;
 use vector_core::config::{LegacyKey, LogNamespace};
 
 use super::util::MultilineConfig;
@@ -327,8 +327,9 @@ impl SourceConfig for DockerLogsConfig {
             )
             .with_source_metadata(
                 Self::NAME,
-                parse_value_path(log_schema().timestamp_key())
-                    .ok()
+                log_schema()
+                    .timestamp_key()
+                    .cloned()
                     .map(LegacyKey::Overwrite),
                 &owned_value_path!("timestamp"),
                 Kind::timestamp(),
@@ -966,7 +967,7 @@ impl ContainerLogInfo {
     fn log_since(&self) -> i64 {
         self.last_log
             .as_ref()
-            .map(|&(ref d, _)| d.timestamp())
+            .map(|(d, _)| d.timestamp())
             .unwrap_or_else(|| self.created.timestamp())
             - 1
     }
@@ -1119,7 +1120,7 @@ impl ContainerLogInfo {
 
         log_namespace.insert_vector_metadata(
             &mut log,
-            path!(log_schema().source_type_key()),
+            Some(log_schema().source_type_key()),
             path!("source_type"),
             Bytes::from_static(DockerLogsConfig::NAME.as_bytes()),
         );
@@ -1139,7 +1140,9 @@ impl ContainerLogInfo {
             }
             LogNamespace::Legacy => {
                 if let Some(timestamp) = timestamp {
-                    log.try_insert((PathPrefix::Event, log_schema().timestamp_key()), timestamp);
+                    if let Some(timestamp_key) = log_schema().timestamp_key() {
+                        log.try_insert((PathPrefix::Event, timestamp_key), timestamp);
+                    }
                 }
             }
         };

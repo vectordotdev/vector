@@ -22,7 +22,7 @@ use tokio_stream::wrappers::IntervalStream;
 use tokio_util::codec::FramedRead;
 use value::Kind;
 use vector_common::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
-use vector_config::{configurable_component, NamedComponent};
+use vector_config::configurable_component;
 use vector_core::{config::LegacyKey, EstimatedJsonEncodedSizeOf};
 
 use crate::{
@@ -685,7 +685,7 @@ fn spawn_reader_thread<R: 'static + AsyncRead + Unpin + std::marker::Send>(
     sender: Sender<((SmallVec<[Event; 1]>, usize), &'static str)>,
 ) {
     // Start the green background thread for collecting
-    let _ = Box::pin(tokio::spawn(async move {
+    drop(tokio::spawn(async move {
         debug!("Start capturing {} command output.", origin);
 
         let mut stream = FramedRead::new(reader, decoder);
@@ -756,7 +756,12 @@ mod tests {
         assert_eq!(log[COMMAND_KEY], config.command.into());
         assert_eq!(log[log_schema().message_key()], "hello world".into());
         assert_eq!(log[log_schema().source_type_key()], "exec".into());
-        assert!(log.get(log_schema().timestamp_key()).is_some());
+        assert!(log
+            .get((
+                lookup::PathPrefix::Event,
+                log_schema().timestamp_key().unwrap()
+            ))
+            .is_some());
     }
 
     #[test]
@@ -832,7 +837,12 @@ mod tests {
         assert_eq!(log[COMMAND_KEY], config.command.into());
         assert_eq!(log[log_schema().message_key()], "hello world".into());
         assert_eq!(log[log_schema().source_type_key()], "exec".into());
-        assert!(log.get(log_schema().timestamp_key()).is_some());
+        assert!(log
+            .get((
+                lookup::PathPrefix::Event,
+                log_schema().timestamp_key().unwrap()
+            ))
+            .is_some());
     }
 
     #[test]
@@ -1029,7 +1039,12 @@ mod tests {
             assert_eq!(log[log_schema().message_key()], "Hello World!".into());
             assert_eq!(log[log_schema().host_key()], "Some.Machine".into());
             assert!(log.get(PID_KEY).is_some());
-            assert!(log.get(log_schema().timestamp_key()).is_some());
+            assert!(log
+                .get((
+                    lookup::PathPrefix::Event,
+                    log_schema().timestamp_key().unwrap()
+                ))
+                .is_some());
 
             assert_eq!(8, log.all_fields().unwrap().count());
         } else {

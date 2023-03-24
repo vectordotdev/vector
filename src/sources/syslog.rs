@@ -16,7 +16,7 @@ use lookup::{
 };
 use smallvec::SmallVec;
 use tokio_util::udp::UdpFramed;
-use vector_config::{configurable_component, NamedComponent};
+use vector_config::configurable_component;
 use vector_core::config::{LegacyKey, LogNamespace};
 
 #[cfg(unix)]
@@ -191,6 +191,7 @@ impl SourceConfig for SyslogConfig {
                     tls,
                     tls_client_metadata_key,
                     receive_buffer_bytes,
+                    None,
                     cx,
                     false.into(),
                     connection_limit,
@@ -393,8 +394,8 @@ fn enrich_syslog_event(
         log_namespace.insert_source_metadata(
             SyslogConfig::NAME,
             log,
-            Some(LegacyKey::Overwrite("source_id")),
-            path!("source_id"),
+            Some(LegacyKey::Overwrite("source_ip")),
+            path!("source_ip"),
             default_host.clone(),
         );
     }
@@ -422,7 +423,9 @@ fn enrich_syslog_event(
             .get("timestamp")
             .and_then(|timestamp| timestamp.as_timestamp().cloned())
             .unwrap_or_else(Utc::now);
-        log.insert((PathPrefix::Event, log_schema().timestamp_key()), timestamp);
+        if let Some(timestamp_key) = log_schema().timestamp_key() {
+            log.insert((PathPrefix::Event, timestamp_key), timestamp);
+        }
     }
 
     trace!(
@@ -521,6 +524,11 @@ mod test {
                     Some("host"),
                 )
                 .with_metadata_field(
+                    &owned_value_path!("syslog", "source_ip"),
+                    Kind::bytes().or_undefined(),
+                    None,
+                )
+                .with_metadata_field(
                     &owned_value_path!("syslog", "severity"),
                     Kind::bytes().or_undefined(),
                     Some("severity"),
@@ -593,6 +601,11 @@ mod test {
             &owned_value_path!("hostname"),
             Kind::bytes().or_undefined(),
             Some("host"),
+        )
+        .with_event_field(
+            &owned_value_path!("source_ip"),
+            Kind::bytes().or_undefined(),
+            None,
         )
         .with_event_field(
             &owned_value_path!("severity"),
@@ -790,7 +803,10 @@ mod test {
         {
             let expected = expected.as_mut_log();
             expected.insert(
-                log_schema().timestamp_key(),
+                (
+                    lookup::PathPrefix::Event,
+                    log_schema().timestamp_key().unwrap(),
+                ),
                 Utc.ymd(2019, 2, 13)
                     .and_hms_opt(19, 48, 34)
                     .expect("invalid timestamp"),
@@ -830,7 +846,10 @@ mod test {
         {
             let expected = expected.as_mut_log();
             expected.insert(
-                log_schema().timestamp_key(),
+                (
+                    lookup::PathPrefix::Event,
+                    log_schema().timestamp_key().unwrap(),
+                ),
                 Utc.ymd(2019, 2, 13)
                     .and_hms_opt(19, 48, 34)
                     .expect("invalid timestamp"),
@@ -949,7 +968,13 @@ mod test {
                 .and_hms_opt(20, 7, 26)
                 .expect("invalid timestamp")
                 .into();
-            expected.insert(log_schema().timestamp_key(), expected_date);
+            expected.insert(
+                (
+                    lookup::PathPrefix::Event,
+                    log_schema().timestamp_key().unwrap(),
+                ),
+                expected_date,
+            );
             expected.insert(log_schema().host_key(), "74794bfb6795");
             expected.insert(log_schema().source_type_key(), "syslog");
             expected.insert("hostname", "74794bfb6795");
@@ -982,7 +1007,13 @@ mod test {
                 .and_hms_opt(21, 31, 56)
                 .expect("invalid timestamp")
                 .into();
-            expected.insert(log_schema().timestamp_key(), expected_date);
+            expected.insert(
+                (
+                    lookup::PathPrefix::Event,
+                    log_schema().timestamp_key().unwrap(),
+                ),
+                expected_date,
+            );
             expected.insert(log_schema().source_type_key(), "syslog");
             expected.insert("host", "74794bfb6795");
             expected.insert("hostname", "74794bfb6795");
@@ -1010,7 +1041,10 @@ mod test {
         {
             let expected = expected.as_mut_log();
             expected.insert(
-                log_schema().timestamp_key(),
+                (
+                    lookup::PathPrefix::Event,
+                    log_schema().timestamp_key().unwrap(),
+                ),
                 Utc.ymd(2019, 2, 13).and_hms_micro(21, 53, 30, 605_850),
             );
             expected.insert(log_schema().source_type_key(), "syslog");
@@ -1319,7 +1353,7 @@ mod test {
         fn from(e: Event) -> Self {
             let (value, _) = e.into_log().into_parts();
             let mut fields = value.into_object().unwrap();
-            fields.remove("source_id");
+            fields.remove("source_ip");
 
             Self {
                 msgid: fields.remove("msgid").map(value_to_string).unwrap(),

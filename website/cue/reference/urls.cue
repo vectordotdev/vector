@@ -1,7 +1,6 @@
 package metadata
 
 urls: {
-	apex:                                       "https://apex.sh/logs/"
 	azure_blob_storage:                         "https://azure.microsoft.com/en-us/services/storage/blobs/"
 	azure_event_hubs:                           "https://learn.microsoft.com/en-us/azure/event-hubs/"
 	azure_event_hubs_kafka:                     "https://learn.microsoft.com/en-us/azure/event-hubs/event-hubs-for-kafka-ecosystem-overview"
@@ -120,6 +119,9 @@ urls: {
 	cue:                                        "https://cuelang.org/"
 	csv:                                        "\(wikipedia)/wiki/Comma-separated_values"
 	dag:                                        "\(wikipedia)/wiki/Directed_acyclic_graph"
+	databend:                                   "https://databend.rs"
+	databend_rest:                              "https://databend.rs/doc/integrations/api/rest"
+	databend_cloud:                             "https://www.databend.com"
 	datadog:                                    "https://www.datadoghq.com"
 	datadog_agent:                              "https://docs.datadoghq.com/agent/"
 	datadog_agent_doc:                          "\(datadog_docs)/agent/vector_aggregation/"
@@ -241,6 +243,7 @@ urls: {
 	heroku:                                     "https://www.heroku.com"
 	heroku_http_log_drain:                      "https://devcenter.heroku.com/articles/log-drains#https-drains"
 	heroku_start:                               "https://devcenter.heroku.com/start"
+	hmac:                                       "\(wikipedia)/wiki/HMAC"
 	homebrew:                                   "https://brew.sh/"
 	homebrew_services:                          "\(github)/Homebrew/homebrew-services"
 	honeycomb:                                  "https://honeycomb.io"
@@ -304,7 +307,7 @@ urls: {
 	librdkafka:                                 "\(github)/edenhill/librdkafka"
 	librdkafka_config:                          "\(github)/edenhill/librdkafka/blob/master/CONFIGURATION.md"
 	linux_capability:                           "https://man7.org/linux/man-pages/man7/capabilities.7.html"
-	logdna:                                     "https://logdna.com/"
+	mezmo:                                      "https://mezmo.com/"
 	logfmt:                                     "https://brandur.org/logfmt"
 	logfmt_specs:                               "https://pkg.go.dev/github.com/kr/logfmt#section-documentation"
 	logstash:                                   "https://www.elastic.co/logstash"
@@ -647,5 +650,5 @@ urls: {
 	ytt:                                        "https://carvel.dev/ytt/"
 	yum:                                        "\(wikipedia)/wiki/Yum_(software)"
 	zlib:                                       "https://www.zlib.net"
-	zstd:                                       "https://zstd.net"
+	zstd:                                       "https://facebook.github.io/zstd"
 }

@@ -5,7 +5,7 @@ use chrono::Utc;
 use codecs::decoding::{DeserializerConfig, FramingConfig};
 use lookup::{lookup_v2::OptionalValuePath, path};
 use vector_common::shutdown::ShutdownSignal;
-use vector_config::{configurable_component, NamedComponent};
+use vector_config::configurable_component;
 use vector_core::config::{LegacyKey, LogNamespace};
 
 use crate::{
@@ -44,13 +44,10 @@ pub struct UnixConfig {
     /// The maximum buffer size of incoming messages.
     ///
     /// Messages larger than this are truncated.
-    // TODO: this option is noted as deprecated in the source build function in mod.rs , but
-    // behaviorally there are inconsistencies when adapting the new() function to use framing
-    // instead of max_length. Merits further investigation.
+    // TODO: communicated as deprecated in v0.29.0, can be removed in v0.30.0
     #[configurable(
         deprecated = "This option has been deprecated. Configure `max_length` on the framing config instead."
     )]
-    #[serde(default = "default_max_length")]
     #[configurable(metadata(docs::type_unit = "bytes"))]
     pub max_length: Option<usize>,
 

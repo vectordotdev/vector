@@ -1,8 +1,7 @@
-args:
-- --features
+features:
 - postgresql_metrics-integration-tests
-- --lib
-- ::postgres
+
+test_filter: ::postgres
 
 env:
   PG_HOST: postgres

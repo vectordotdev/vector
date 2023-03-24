@@ -22,7 +22,7 @@ pub(in crate::sinks) enum Field {
     Float(f64),
     /// unsigned integer
     /// Influx can support 64 bit integers if compiled with a flag, see:
-    /// https://github.com/influxdata/influxdb/issues/7801#issuecomment-466801839
+    /// <https://github.com/influxdata/influxdb/issues/7801#issuecomment-466801839>
     UnsignedInt(u64),
     /// integer
     Int(i64),
@@ -227,7 +227,7 @@ fn healthcheck(
     .boxed())
 }
 
-// https://v2.docs.influxdata.com/v2.0/reference/syntax/line-protocol/
+// https://docs.influxdata.com/influxdb/latest/reference/syntax/line-protocol/
 pub(in crate::sinks) fn influx_line_protocol(
     protocol_version: ProtocolVersion,
     measurement: &str,

@@ -12,7 +12,7 @@ use http::{StatusCode, Uri};
 use lookup::{lookup_v2::OptionalValuePath, owned_value_path, path};
 use tokio_util::codec::Decoder as _;
 use value::{kind::Collection, Kind};
-use vector_config::{configurable_component, NamedComponent};
+use vector_config::configurable_component;
 use vector_core::{
     config::{DataType, LegacyKey, LogNamespace},
     schema::Definition,
@@ -367,14 +367,14 @@ struct SimpleHttpSource {
     log_namespace: LogNamespace,
 }
 
-impl SimpleHttpSource {
+impl HttpSource for SimpleHttpSource {
     /// Enriches the passed in events with metadata for the `request_path` and for each of the headers.
     fn enrich_events(
         &self,
         events: &mut [Event],
         request_path: &str,
-        headers_config: HeaderMap,
-        query_parameters: HashMap<String, String>,
+        headers_config: &HeaderMap,
+        query_parameters: &HashMap<String, String>,
     ) {
         for event in events.iter_mut() {
             let log = event.as_mut_log();
@@ -421,15 +421,13 @@ impl SimpleHttpSource {
             );
         }
     }
-}
 
-impl HttpSource for SimpleHttpSource {
     fn build_events(
         &self,
         body: Bytes,
-        header_map: HeaderMap,
-        query_parameters: HashMap<String, String>,
-        request_path: &str,
+        _header_map: &HeaderMap,
+        _query_parameters: &HashMap<String, String>,
+        _request_path: &str,
     ) -> Result<Vec<Event>, ErrorMessage> {
         let mut decoder = self.decoder.clone();
         let mut events = Vec::new();
@@ -453,8 +451,6 @@ impl HttpSource for SimpleHttpSource {
             }
         }
 
-        self.enrich_events(&mut events, request_path, header_map, query_parameters);
-
         Ok(events)
     }
 }
@@ -466,7 +462,6 @@ mod tests {
     use std::{collections::BTreeMap, io::Write, net::SocketAddr};
     use value::kind::Collection;
     use value::Kind;
-    use vector_config::NamedComponent;
     use vector_core::config::LogNamespace;
     use vector_core::event::LogEvent;
     use vector_core::schema::Definition;
@@ -657,7 +652,12 @@ mod tests {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log[log_schema().message_key()], "test body".into());
-            assert!(log.get(log_schema().timestamp_key()).is_some());
+            assert!(log
+                .get((
+                    lookup::PathPrefix::Event,
+                    log_schema().timestamp_key().unwrap()
+                ))
+                .is_some());
             assert_eq!(
                 log[log_schema().source_type_key()],
                 SimpleHttpConfig::NAME.into()
@@ -779,12 +779,18 @@ mod tests {
         assert!(events
             .remove(1)
             .as_log()
-            .get(log_schema().timestamp_key())
+            .get((
+                lookup::PathPrefix::Event,
+                log_schema().timestamp_key().unwrap()
+            ))
             .is_some());
         assert!(events
             .remove(0)
             .as_log()
-            .get(log_schema().timestamp_key())
+            .get((
+                lookup::PathPrefix::Event,
+                log_schema().timestamp_key().unwrap()
+            ))
             .is_some());
     }
 
@@ -943,7 +949,12 @@ mod tests {
     }
 
     async fn assert_event_metadata(log: &LogEvent) {
-        assert!(log.get(log_schema().timestamp_key()).is_some());
+        assert!(log
+            .get((
+                lookup::PathPrefix::Event,
+                log_schema().timestamp_key().unwrap()
+            ))
+            .is_some());
         assert_eq!(
             log[log_schema().source_type_key()],
             SimpleHttpConfig::NAME.into()
@@ -1110,7 +1121,12 @@ mod tests {
             let log = event.as_log();
             assert_eq!(log["key1"], "value1".into());
             assert_eq!(log["vector_http_path"], "/event/path".into());
-            assert!(log.get(log_schema().timestamp_key()).is_some());
+            assert!(log
+                .get((
+                    lookup::PathPrefix::Event,
+                    log_schema().timestamp_key().unwrap()
+                ))
+                .is_some());
             assert_eq!(
                 log[log_schema().source_type_key()],
                 SimpleHttpConfig::NAME.into()
@@ -1158,7 +1174,12 @@ mod tests {
             let log = event.as_log();
             assert_eq!(log["key1"], "value1".into());
             assert_eq!(log["vector_http_path"], "/event/path1".into());
-            assert!(log.get(log_schema().timestamp_key()).is_some());
+            assert!(log
+                .get((
+                    lookup::PathPrefix::Event,
+                    log_schema().timestamp_key().unwrap()
+                ))
+                .is_some());
             assert_eq!(
                 log[log_schema().source_type_key()],
                 SimpleHttpConfig::NAME.into()
@@ -1169,7 +1190,12 @@ mod tests {
             let log = event.as_log();
             assert_eq!(log["key2"], "value2".into());
             assert_eq!(log["vector_http_path"], "/event/path2".into());
-            assert!(log.get(log_schema().timestamp_key()).is_some());
+            assert!(log
+                .get((
+                    lookup::PathPrefix::Event,
+                    log_schema().timestamp_key().unwrap()
+                ))
+                .is_some());
             assert_eq!(
                 log[log_schema().source_type_key()],
                 SimpleHttpConfig::NAME.into()

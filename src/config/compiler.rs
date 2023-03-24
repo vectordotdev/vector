@@ -2,7 +2,7 @@ use indexmap::IndexSet;
 
 use super::{
     builder::ConfigBuilder, graph::Graph, id::Inputs, schema, validation, Config, OutputId,
-    SourceConfig, TransformConfig,
+    SourceConfig,
 };
 
 pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<String>> {

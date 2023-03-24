@@ -8,7 +8,7 @@ use lookup::owned_value_path;
 use snafu::Snafu;
 use tokio_util::io::StreamReader;
 use value::{kind::Collection, Kind};
-use vector_config::{configurable_component, NamedComponent};
+use vector_config::configurable_component;
 use vector_core::config::{DataType, LegacyKey, LogNamespace};
 
 use super::util::MultilineConfig;
@@ -203,7 +203,10 @@ impl AwsS3Config {
             .region()
             .ok_or(CreateSqsIngestorError::RegionMissing)?;
 
-        let endpoint = self.region.endpoint();
+        let endpoint = self
+            .region
+            .endpoint()
+            .map_err(|_| CreateSqsIngestorError::InvalidEndpoint)?;
 
         let s3_client = create_client::<S3ClientBuilder>(
             &self.auth,
@@ -419,7 +422,6 @@ mod integration_tests {
     use lookup::path;
     use similar_asserts::assert_eq;
     use value::Value;
-    use vector_config::NamedComponent;
 
     use super::{sqs, AwsS3Config, Compression, Strategy};
     use crate::{
@@ -891,7 +893,7 @@ mod integration_tests {
         create_client::<S3ClientBuilder>(
             &auth,
             region_endpoint.region(),
-            region_endpoint.endpoint(),
+            region_endpoint.endpoint().unwrap(),
             &proxy_config,
             &None,
             false,
@@ -910,7 +912,7 @@ mod integration_tests {
         create_client::<SqsClientBuilder>(
             &auth,
             region_endpoint.region(),
-            region_endpoint.endpoint(),
+            region_endpoint.endpoint().unwrap(),
             &proxy_config,
             &None,
             false,

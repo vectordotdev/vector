@@ -6,7 +6,10 @@ use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
 
 /// Configuration for the `tag_cardinality_limit` transform.
-#[configurable_component(transform("tag_cardinality_limit"))]
+#[configurable_component(transform(
+    "tag_cardinality_limit",
+    "Limit the cardinality of tags on metrics events as a safeguard against cardinality explosion."
+))]
 #[derive(Clone, Debug)]
 pub struct TagCardinalityLimitConfig {
     /// How many distinct values to accept for any given key.
@@ -93,6 +96,7 @@ impl GenerateConfig for TagCardinalityLimitConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "tag_cardinality_limit")]
 impl TransformConfig for TagCardinalityLimitConfig {
     async fn build(&self, _context: &TransformContext) -> crate::Result<Transform> {
         Ok(Transform::event_task(TagCardinalityLimit::new(

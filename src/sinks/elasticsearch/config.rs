@@ -9,7 +9,7 @@ use vector_config::configurable_component;
 use crate::{
     aws::RegionOrEndpoint,
     codecs::Transformer,
-    config::{log_schema, AcknowledgementsConfig, DataType, Input, SinkConfig, SinkContext},
+    config::{AcknowledgementsConfig, DataType, Input, SinkConfig, SinkContext},
     event::{EventRef, LogEvent, Value},
     http::HttpClient,
     internal_events::TemplateRenderingError,
@@ -33,6 +33,8 @@ use crate::{
     transforms::metric_to_log::MetricToLogConfig,
 };
 use lookup::event_path;
+use value::Kind;
+use vector_core::schema::Requirement;
 
 /// The field name for the timestamp required by data stream mode
 pub const DATA_STREAM_TIMESTAMP_KEY: &str = "@timestamp";
@@ -161,9 +163,13 @@ pub struct ElasticsearchConfig {
     #[serde(rename = "distribution")]
     pub endpoint_health: Option<HealthConfig>,
 
+    // TODO: `bulk` and `data_stream` are each only relevant if the `mode` is set to their
+    // corresponding mode. An improvement to look into would be to extract the `BulkConfig` and
+    // `DataStreamConfig` into the `mode` enum variants. Doing so would remove them from the root
+    // of the config here and thus any post serde config parsing manual error prone logic.
     #[serde(alias = "normal", default)]
     #[configurable(derived)]
-    pub bulk: Option<BulkConfig>,
+    pub bulk: BulkConfig,
 
     #[serde(default)]
     #[configurable(derived)]
@@ -211,7 +217,7 @@ impl Default for ElasticsearchConfig {
             aws: None,
             tls: None,
             endpoint_health: None,
-            bulk: Some(BulkConfig::default()), // the default mode is Bulk
+            bulk: BulkConfig::default(), // the default mode is Bulk
             data_stream: None,
             metrics: None,
             acknowledgements: Default::default(),
@@ -220,23 +226,11 @@ impl Default for ElasticsearchConfig {
 }
 
 impl ElasticsearchConfig {
-    pub fn bulk_action(&self) -> Option<Template> {
-        self.bulk
-            .as_ref()
-            .map(|bulk_config| bulk_config.action.clone())
-    }
-
-    pub fn index(&self) -> Option<Template> {
-        self.bulk
-            .as_ref()
-            .map(|bulk_config| bulk_config.index.clone())
-    }
-
     pub fn common_mode(&self) -> crate::Result<ElasticsearchCommonMode> {
         match self.mode {
             ElasticsearchMode::Bulk => Ok(ElasticsearchCommonMode::Bulk {
-                index: self.index().expect("index should not be undefined"),
-                action: self.bulk_action(),
+                index: self.bulk.index.clone(),
+                action: self.bulk.action.clone(),
             }),
             ElasticsearchMode::DataStream => Ok(ElasticsearchCommonMode::DataStream(
                 self.data_stream.clone().unwrap_or_default(),
@@ -247,7 +241,7 @@ impl ElasticsearchConfig {
 
 /// Elasticsearch bulk mode configuration.
 #[configurable_component]
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub struct BulkConfig {
     /// Action to use when making requests to the [Elasticsearch Bulk API][es_bulk].
@@ -359,15 +353,17 @@ impl DataStreamConfig {
         true
     }
 
+    /// If there is a `timestamp` field, rename it to the expected `@timestamp` for Elastic Common Schema.
     pub fn remap_timestamp(&self, log: &mut LogEvent) {
-        // we keep it if the timestamp field is @timestamp
-        let timestamp_key = log_schema().timestamp_key();
-        if timestamp_key == DATA_STREAM_TIMESTAMP_KEY {
-            return;
-        }
+        if let Some(timestamp_key) = log.timestamp_path() {
+            if timestamp_key == DATA_STREAM_TIMESTAMP_KEY {
+                return;
+            }
 
-        if let Some(value) = log.remove(timestamp_key) {
-            log.insert(event_path!(DATA_STREAM_TIMESTAMP_KEY), value);
+            log.rename_key(
+                timestamp_key.as_str(),
+                event_path!(DATA_STREAM_TIMESTAMP_KEY),
+            )
         }
     }
 
@@ -521,7 +517,9 @@ impl SinkConfig for ElasticsearchConfig {
     }
 
     fn input(&self) -> Input {
-        Input::new(DataType::Metric | DataType::Log)
+        let requirements = Requirement::empty().optional_meaning("timestamp", Kind::timestamp());
+
+        Input::new(DataType::Metric | DataType::Log).with_schema_requirement(requirements)
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
@@ -605,5 +603,17 @@ mod tests {
         )
         .unwrap();
         assert_eq!(config.api_version, ElasticsearchApiVersion::Auto);
+    }
+
+    #[test]
+    fn parse_default_bulk() {
+        let config = toml::from_str::<ElasticsearchConfig>(
+            r#"
+            endpoints = [""]
+        "#,
+        )
+        .unwrap();
+        assert_eq!(config.mode, ElasticsearchMode::Bulk);
+        assert_eq!(config.bulk, BulkConfig::default());
     }
 }

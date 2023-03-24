@@ -35,7 +35,7 @@ use vector_common::{
     internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol},
     TimeZone,
 };
-use vector_config::{configurable_component, NamedComponent};
+use vector_config::configurable_component;
 use vector_core::{
     config::LegacyKey, config::LogNamespace, transform::TaskTransform, EstimatedJsonEncodedSizeOf,
 };
@@ -480,9 +480,10 @@ impl SourceConfig for Config {
             )
             .with_source_metadata(
                 Self::NAME,
-                Some(LegacyKey::Overwrite(owned_value_path!(
-                    log_schema().timestamp_key()
-                ))),
+                log_schema()
+                    .timestamp_key()
+                    .cloned()
+                    .map(LegacyKey::Overwrite),
                 &owned_value_path!("timestamp"),
                 Kind::timestamp(),
                 Some("timestamp"),
@@ -889,7 +890,7 @@ fn create_event(
 
     log_namespace.insert_vector_metadata(
         &mut log,
-        path!(log_schema().source_type_key()),
+        Some(log_schema().source_type_key()),
         path!("source_type"),
         Bytes::from(Config::NAME),
     );

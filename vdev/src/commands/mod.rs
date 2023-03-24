@@ -74,10 +74,10 @@ cli_commands! {
     mod check,
     mod complete,
     mod config,
+    mod crate_versions,
     mod exec,
     mod features,
     mod fmt,
-    mod generate,
     mod info,
     mod integration,
     mod meta,
@@ -86,6 +86,7 @@ cli_commands! {
     mod run,
     mod status,
     mod test,
+    mod test_vrl,
     mod version,
 }
 

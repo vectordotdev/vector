@@ -110,7 +110,7 @@ impl SqsSource {
             .visibility_timeout(self.visibility_timeout_secs as i32)
             // I think this should be a known attribute
             // https://github.com/awslabs/aws-sdk-rust/issues/411
-            .attribute_names(QueueAttributeName::from("SentTimestamp"))
+            .attribute_names(QueueAttributeName::Unknown(String::from("SentTimestamp")))
             .send()
             .await;
 
@@ -222,7 +222,6 @@ mod tests {
     use crate::codecs::DecodingConfig;
     use chrono::SecondsFormat;
     use lookup::path;
-    use vector_config::NamedComponent;
 
     use super::*;
     use crate::config::{log_schema, SourceConfig};
@@ -322,7 +321,10 @@ mod tests {
             events[0]
                 .clone()
                 .as_log()
-                .get(log_schema().timestamp_key())
+                .get((
+                    lookup::PathPrefix::Event,
+                    log_schema().timestamp_key().unwrap()
+                ))
                 .unwrap()
                 .to_string_lossy(),
             now.to_rfc3339_opts(SecondsFormat::AutoSi, true)

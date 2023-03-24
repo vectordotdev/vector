@@ -1,9 +1,10 @@
+use std::cell::RefCell;
+
 use vector_config_common::attributes::CustomAttribute;
 
 use crate::{
     num::NumberClass,
-    schema::generate_number_schema,
-    schemars::{gen::SchemaGenerator, schema::SchemaObject},
+    schema::{generate_number_schema, SchemaGenerator, SchemaObject},
     Configurable, GenerateError, Metadata,
 };
 
@@ -36,7 +37,7 @@ where
         T::validate_metadata(&converted)
     }
 
-    fn generate_schema(gen: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
+    fn generate_schema(gen: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
         // Forward to the underlying `T`.
         //
         // We have to convert from `Metadata` to `Metadata` which erases the default value,
@@ -65,7 +66,7 @@ impl Configurable for serde_with::DurationSeconds<u64, serde_with::formats::Stri
         metadata
     }
 
-    fn generate_schema(_: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
+    fn generate_schema(_: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
         // This boils down to a number schema, but we just need to shuttle around the metadata so
         // that we can call the relevant schema generation function.
         Ok(generate_number_schema::<u64>())
@@ -91,7 +92,7 @@ impl Configurable for serde_with::DurationSeconds<f64, serde_with::formats::Stri
         metadata
     }
 
-    fn generate_schema(_: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
+    fn generate_schema(_: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
         // This boils down to a number schema, but we just need to shuttle around the metadata so
         // that we can call the relevant schema generation function.
         Ok(generate_number_schema::<f64>())
@@ -116,7 +117,7 @@ impl Configurable for serde_with::DurationMilliSeconds<u64, serde_with::formats:
         metadata
     }
 
-    fn generate_schema(_: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
+    fn generate_schema(_: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
         // This boils down to a number schema, but we just need to shuttle around the metadata so
         // that we can call the relevant schema generation function.
         Ok(generate_number_schema::<u64>())
