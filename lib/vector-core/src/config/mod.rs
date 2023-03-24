@@ -113,8 +113,12 @@ pub struct SourceOutput {
 impl SourceOutput {
     /// Create a `SourceOutput` of the given data type that contains a single output `Definition`.
     /// Designed for use in log sources.
+    ///
+    /// There is nothing intrinsically that forces this function to be used just for logs. `ty` could
+    /// be `DataType::Metrics` and this function will not complain. The only thing is this function
+    /// forces a `schema_definition` to be specified, which is required for logs.
     #[must_use]
-    pub fn source_logs(ty: DataType, schema_definition: schema::Definition) -> Self {
+    pub fn new_logs(ty: DataType, schema_definition: schema::Definition) -> Self {
         Self {
             port: None,
             ty,
@@ -124,8 +128,12 @@ impl SourceOutput {
 
     /// Create a `SourceOutput` of the given data type that contains no output `Definition`s.
     /// Designed for use in metrics sources.
+    ///
+    /// There is nothing intrinsically that forces this function to be used just for metrics. `ty` could
+    /// be `DataType::Logs` and this function will not complain. The only thing is this function
+    /// forces a `schema_definition` to *not* be specified, as it is not required for metrics.
     #[must_use]
-    pub fn source_metrics(ty: DataType) -> Self {
+    pub fn new_metrics(ty: DataType) -> Self {
         Self {
             port: None,
             ty,
@@ -135,8 +143,12 @@ impl SourceOutput {
 
     /// Create a `SourceOutput` of the given data type that contains no output `Definition`s.
     /// Designed for use in trace sources.
+    ///
+    /// There is nothing intrinsically that forces this function to be used just for traces. `ty` could
+    /// be `DataType::Logs` and this function will not complain. The only thing is this function
+    /// forces a `schema_definition` to *not* be specified, as it is not required for traces.
     #[must_use]
-    pub fn source_traces(ty: DataType) -> Self {
+    pub fn new_traces(ty: DataType) -> Self {
         Self {
             port: None,
             ty,
@@ -207,7 +219,7 @@ impl TransformOutput {
     /// Create an `Output` of the given data type that contains multiple `Definition`s.
     /// Designed for use in transforms.
     #[must_use]
-    pub fn transform(ty: DataType, schema_definitions: Vec<schema::Definition>) -> Self {
+    pub fn new(ty: DataType, schema_definitions: Vec<schema::Definition>) -> Self {
         Self {
             port: None,
             ty,
@@ -536,10 +548,10 @@ mod test {
         let definition = schema::Definition::empty_legacy_namespace()
             .with_event_field(&owned_value_path!("zork"), Kind::bytes(), Some("zork"))
             .with_event_field(&owned_value_path!("nork"), Kind::integer(), None);
-        let output = SourceOutput::source_logs(DataType::Log, definition);
+        let output = SourceOutput::new_logs(DataType::Log, definition);
 
         let valid_event = LogEvent::from(Value::from(btreemap! {
-            "zork" => "gork",
+            "zork" => "norknoog",
             "nork" => 32
         }))
         .into();
@@ -586,7 +598,7 @@ mod test {
             )
             .with_event_field(&owned_value_path!("nork"), Kind::integer(), None);
 
-        let output = SourceOutput::source_logs(DataType::Log, definition);
+        let output = SourceOutput::new_logs(DataType::Log, definition);
 
         let mut valid_event = LogEvent::from(Value::from(btreemap! {
             "nork" => 32

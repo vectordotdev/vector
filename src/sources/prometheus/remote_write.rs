@@ -86,7 +86,7 @@ impl SourceConfig for PrometheusRemoteWriteConfig {
     }
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
-        vec![SourceOutput::source_metrics(config::DataType::Metric)]
+        vec![SourceOutput::new_metrics(config::DataType::Metric)]
     }
 
     fn can_acknowledge(&self) -> bool {

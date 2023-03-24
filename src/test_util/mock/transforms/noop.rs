@@ -44,7 +44,7 @@ impl TransformConfig for NoopTransformConfig {
         definitions: &[(OutputId, Definition)],
         _: LogNamespace,
     ) -> Vec<TransformOutput> {
-        vec![TransformOutput::transform(
+        vec![TransformOutput::new(
             DataType::all(),
             definitions
                 .iter()

@@ -489,7 +489,7 @@ impl SourceConfig for Config {
             )
             .with_standard_vector_source_metadata();
 
-        vec![SourceOutput::source_logs(DataType::Log, schema_definition)]
+        vec![SourceOutput::new_logs(DataType::Log, schema_definition)]
     }
 
     fn can_acknowledge(&self) -> bool {

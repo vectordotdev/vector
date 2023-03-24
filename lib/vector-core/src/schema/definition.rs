@@ -383,24 +383,8 @@ impl Definition {
     ///
     /// This method panics if the provided path points to an unknown location in the collection.
     fn add_meaning(&mut self, target_path: OwnedTargetPath, meaning: &str) {
-        // Ensure the path exists in the collection.
-        match target_path.prefix {
-            PathPrefix::Event => assert!(
-                self.event_kind
-                    .at_path(&target_path.path)
-                    .contains_any_defined(),
-                "meaning must point to a valid path"
-            ),
-            PathPrefix::Metadata => assert!(
-                self.metadata_kind
-                    .at_path(&target_path.path)
-                    .contains_any_defined(),
-                "meaning must point to a valid path"
-            ),
-        };
-
-        self.meaning
-            .insert(meaning.to_owned(), MeaningPointer::Valid(target_path));
+        self.try_with_meaning(target_path, meaning)
+            .unwrap_or_else(|err| panic!("{}", err));
     }
 
     /// Register a semantic meaning for the definition.

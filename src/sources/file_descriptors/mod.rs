@@ -228,7 +228,7 @@ fn outputs(
         )
         .with_standard_vector_source_metadata();
 
-    vec![SourceOutput::source_logs(
+    vec![SourceOutput::new_logs(
         decoding.output_type(),
         schema_definition,
     )]

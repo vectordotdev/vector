@@ -243,12 +243,12 @@ impl SourceConfig for DatadogAgentConfig {
 
         if self.multiple_outputs {
             vec![
-                SourceOutput::source_metrics(DataType::Metric).with_port(METRICS),
-                SourceOutput::source_logs(DataType::Log, definition).with_port(LOGS),
-                SourceOutput::source_traces(DataType::Trace).with_port(TRACES),
+                SourceOutput::new_metrics(DataType::Metric).with_port(METRICS),
+                SourceOutput::new_logs(DataType::Log, definition).with_port(LOGS),
+                SourceOutput::new_traces(DataType::Trace).with_port(TRACES),
             ]
         } else {
-            vec![SourceOutput::source_logs(DataType::all(), definition)]
+            vec![SourceOutput::new_logs(DataType::all(), definition)]
         }
     }
 

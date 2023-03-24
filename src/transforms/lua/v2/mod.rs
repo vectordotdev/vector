@@ -190,7 +190,7 @@ impl LuaConfig {
 
         let definition = Definition::default_for_namespace(&namespaces);
 
-        vec![TransformOutput::transform(
+        vec![TransformOutput::new(
             DataType::Metric | DataType::Log,
             vec![definition],
         )]

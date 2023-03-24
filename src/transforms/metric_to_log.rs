@@ -230,10 +230,7 @@ impl TransformConfig for MetricToLogConfig {
             }
         }
 
-        vec![TransformOutput::transform(
-            DataType::Log,
-            vec![schema_definition],
-        )]
+        vec![TransformOutput::new(DataType::Log, vec![schema_definition])]
     }
 
     fn enable_concurrency(&self) -> bool {

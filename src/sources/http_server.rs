@@ -341,7 +341,7 @@ impl SourceConfig for SimpleHttpConfig {
 
         let schema_definition = self.schema_definition(log_namespace);
 
-        vec![SourceOutput::source_logs(
+        vec![SourceOutput::new_logs(
             self.decoding
                 .as_ref()
                 .map(|d| d.output_type())

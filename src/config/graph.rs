@@ -375,7 +375,7 @@ mod test {
             self.nodes.insert(
                 id.into(),
                 Node::Source {
-                    outputs: vec![SourceOutput::source_metrics(ty)],
+                    outputs: vec![SourceOutput::new_metrics(ty)],
                 },
             );
         }
@@ -393,7 +393,7 @@ mod test {
                 id.clone(),
                 Node::Transform {
                     in_ty,
-                    outputs: vec![TransformOutput::transform(
+                    outputs: vec![TransformOutput::new(
                         out_ty,
                         vec![Definition::default_legacy_namespace()],
                     )],
@@ -411,7 +411,7 @@ mod test {
             let id = id.into();
             match self.nodes.get_mut(&id) {
                 Some(Node::Transform { outputs, .. }) => outputs.push(
-                    TransformOutput::transform(ty, vec![Definition::default_legacy_namespace()])
+                    TransformOutput::new(ty, vec![Definition::default_legacy_namespace()])
                         .with_port(name),
                 ),
                 _ => panic!("invalid transform"),
@@ -631,13 +631,13 @@ mod test {
         graph.nodes.insert(
             ComponentKey::from("foo.bar"),
             Node::Source {
-                outputs: vec![SourceOutput::source_metrics(DataType::all())],
+                outputs: vec![SourceOutput::new_metrics(DataType::all())],
             },
         );
         graph.nodes.insert(
             ComponentKey::from("foo.bar"),
             Node::Source {
-                outputs: vec![SourceOutput::source_metrics(DataType::all())],
+                outputs: vec![SourceOutput::new_metrics(DataType::all())],
             },
         );
         graph.nodes.insert(
@@ -645,11 +645,11 @@ mod test {
             Node::Transform {
                 in_ty: DataType::all(),
                 outputs: vec![
-                    TransformOutput::transform(
+                    TransformOutput::new(
                         DataType::all(),
                         vec![Definition::default_legacy_namespace()],
                     ),
-                    TransformOutput::transform(
+                    TransformOutput::new(
                         DataType::all(),
                         vec![Definition::default_legacy_namespace()],
                     )
@@ -662,7 +662,7 @@ mod test {
         graph.nodes.insert(
             ComponentKey::from("baz.errors"),
             Node::Source {
-                outputs: vec![SourceOutput::source_metrics(DataType::all())],
+                outputs: vec![SourceOutput::new_metrics(DataType::all())],
             },
         );
         graph.nodes.insert(
@@ -670,11 +670,11 @@ mod test {
             Node::Transform {
                 in_ty: DataType::all(),
                 outputs: vec![
-                    TransformOutput::transform(
+                    TransformOutput::new(
                         DataType::all(),
                         vec![Definition::default_legacy_namespace()],
                     ),
-                    TransformOutput::transform(
+                    TransformOutput::new(
                         DataType::all(),
                         vec![Definition::default_legacy_namespace()],
                     )

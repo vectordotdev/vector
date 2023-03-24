@@ -236,7 +236,7 @@ impl SourceConfig for SplunkConfig {
             None,
         );
 
-        vec![SourceOutput::source_logs(DataType::Log, schema_definition)]
+        vec![SourceOutput::new_logs(DataType::Log, schema_definition)]
     }
 
     fn resources(&self) -> Vec<Resource> {

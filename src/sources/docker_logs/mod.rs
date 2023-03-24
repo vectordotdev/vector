@@ -349,7 +349,7 @@ impl SourceConfig for DockerLogsConfig {
                 None,
             );
 
-        vec![SourceOutput::source_logs(DataType::Log, schema_definition)]
+        vec![SourceOutput::new_logs(DataType::Log, schema_definition)]
     }
 
     fn can_acknowledge(&self) -> bool {

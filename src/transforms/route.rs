@@ -113,7 +113,7 @@ impl TransformConfig for RouteConfig {
             .route
             .keys()
             .map(|output_name| {
-                TransformOutput::transform(
+                TransformOutput::new(
                     DataType::all(),
                     input_definitions
                         .iter()
@@ -124,7 +124,7 @@ impl TransformConfig for RouteConfig {
             })
             .collect();
         result.push(
-            TransformOutput::transform(
+            TransformOutput::new(
                 DataType::all(),
                 input_definitions
                     .iter()
@@ -201,8 +201,7 @@ mod test {
             output_names
                 .iter()
                 .map(|output_name| {
-                    TransformOutput::transform(DataType::all(), vec![])
-                        .with_port(output_name.to_owned())
+                    TransformOutput::new(DataType::all(), vec![]).with_port(output_name.to_owned())
                 })
                 .collect(),
             1,
@@ -243,8 +242,7 @@ mod test {
             output_names
                 .iter()
                 .map(|output_name| {
-                    TransformOutput::transform(DataType::all(), vec![])
-                        .with_port(output_name.to_owned())
+                    TransformOutput::new(DataType::all(), vec![]).with_port(output_name.to_owned())
                 })
                 .collect(),
             1,
@@ -284,8 +282,7 @@ mod test {
             output_names
                 .iter()
                 .map(|output_name| {
-                    TransformOutput::transform(DataType::all(), vec![])
-                        .with_port(output_name.to_owned())
+                    TransformOutput::new(DataType::all(), vec![]).with_port(output_name.to_owned())
                 })
                 .collect(),
             1,

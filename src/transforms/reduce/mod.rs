@@ -221,10 +221,7 @@ impl TransformConfig for ReduceConfig {
             output_definitions.push(schema_definition);
         }
 
-        vec![TransformOutput::transform(
-            DataType::Log,
-            output_definitions,
-        )]
+        vec![TransformOutput::new(DataType::Log, output_definitions)]
     }
 }
 

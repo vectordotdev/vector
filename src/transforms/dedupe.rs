@@ -155,7 +155,7 @@ impl TransformConfig for DedupeConfig {
         input_definitions: &[(OutputId, schema::Definition)],
         _: LogNamespace,
     ) -> Vec<TransformOutput> {
-        vec![TransformOutput::transform(
+        vec![TransformOutput::new(
             DataType::Log,
             input_definitions
                 .iter()

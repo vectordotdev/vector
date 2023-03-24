@@ -267,7 +267,7 @@ impl SourceConfig for HostMetricsConfig {
     }
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
-        vec![SourceOutput::source_metrics(DataType::Metric)]
+        vec![SourceOutput::new_metrics(DataType::Metric)]
     }
 
     fn can_acknowledge(&self) -> bool {

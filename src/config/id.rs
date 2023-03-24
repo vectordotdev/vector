@@ -111,7 +111,7 @@ pub struct OutputId {
 impl OutputId {
     /// Some situations when building the topology requires running the
     /// transforms::output function to retrieve the outputs, but we don't have an
-    /// `OutputId` form a source. This gives us an `OutputId` that we can use.
+    /// `OutputId` from a source. This gives us an `OutputId` that we can use.
     pub fn dummy() -> Self {
         Self {
             component: "dummy".into(),

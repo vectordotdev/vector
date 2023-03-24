@@ -65,7 +65,7 @@ impl TransformConfig for ThrottleConfig {
         _: LogNamespace,
     ) -> Vec<TransformOutput> {
         // The event is not modified, so the definition is passed through as-is
-        vec![TransformOutput::transform(
+        vec![TransformOutput::new(
             DataType::Log,
             input_definitions
                 .iter()

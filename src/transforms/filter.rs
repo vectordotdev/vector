@@ -56,7 +56,7 @@ impl TransformConfig for FilterConfig {
         input_definitions: &[(OutputId, schema::Definition)],
         _: LogNamespace,
     ) -> Vec<TransformOutput> {
-        vec![TransformOutput::transform(
+        vec![TransformOutput::new(
             DataType::all(),
             input_definitions
                 .iter()

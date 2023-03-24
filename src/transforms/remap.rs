@@ -228,8 +228,6 @@ impl TransformConfig for RemapConfig {
         input_definitions: &[(OutputId, schema::Definition)],
         _: LogNamespace,
     ) -> Vec<TransformOutput> {
-        // It is unfortunate that merging takes ownership of the definitions so we have to clone the
-        // entire collection in order to merge them together.
         let merged_definition: Definition = input_definitions
             .iter()
             .map(|(_output, definition)| definition.clone())
@@ -344,12 +342,12 @@ impl TransformConfig for RemapConfig {
             dropped_definitions.push(dropped_definition);
         }
 
-        let default_output = TransformOutput::transform(DataType::all(), default_definitions);
+        let default_output = TransformOutput::new(DataType::all(), default_definitions);
 
         if self.reroute_dropped {
             vec![
                 default_output,
-                TransformOutput::transform(DataType::all(), dropped_definitions).with_port(DROPPED),
+                TransformOutput::new(DataType::all(), dropped_definitions).with_port(DROPPED),
             ]
         } else {
             vec![default_output]
@@ -1448,7 +1446,7 @@ mod tests {
                 )],
                 LogNamespace::Legacy
             ),
-            vec![TransformOutput::transform(
+            vec![TransformOutput::new(
                 DataType::all(),
                 vec![schema_definition]
             )]
@@ -1516,8 +1514,8 @@ mod tests {
     fn collect_outputs(ft: &mut dyn SyncTransform, event: Event) -> CollectedOuput {
         let mut outputs = TransformOutputsBuf::new_with_capacity(
             vec![
-                TransformOutput::transform(DataType::all(), vec![]),
-                TransformOutput::transform(DataType::all(), vec![]).with_port(DROPPED),
+                TransformOutput::new(DataType::all(), vec![]),
+                TransformOutput::new(DataType::all(), vec![]).with_port(DROPPED),
             ],
             1,
         );
@@ -1543,8 +1541,8 @@ mod tests {
     ) -> std::result::Result<Event, Event> {
         let mut outputs = TransformOutputsBuf::new_with_capacity(
             vec![
-                TransformOutput::transform(DataType::all(), vec![]),
-                TransformOutput::transform(DataType::all(), vec![]).with_port(DROPPED),
+                TransformOutput::new(DataType::all(), vec![]),
+                TransformOutput::new(DataType::all(), vec![]).with_port(DROPPED),
             ],
             1,
         );

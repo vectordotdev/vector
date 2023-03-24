@@ -54,7 +54,7 @@ impl TransformConfig for BasicTransformConfig {
         definitions: &[(OutputId, schema::Definition)],
         _: LogNamespace,
     ) -> Vec<TransformOutput> {
-        vec![TransformOutput::transform(
+        vec![TransformOutput::new(
             DataType::all(),
             definitions
                 .iter()

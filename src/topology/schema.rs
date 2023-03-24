@@ -401,7 +401,7 @@ mod tests {
                     inputs: vec![("foo", None)],
                     sources: IndexMap::from([(
                         "foo",
-                        vec![SourceOutput::source_logs(
+                        vec![SourceOutput::new_logs(
                             DataType::all(),
                             Definition::default_legacy_namespace(),
                         )],
@@ -416,7 +416,7 @@ mod tests {
                     inputs: vec![("source-foo", None)],
                     sources: IndexMap::from([(
                         "source-foo",
-                        vec![SourceOutput::source_logs(
+                        vec![SourceOutput::new_logs(
                             DataType::all(),
                             Definition::empty_legacy_namespace().with_event_field(
                                 &owned_value_path!("foo"),
@@ -443,7 +443,7 @@ mod tests {
                     sources: IndexMap::from([
                         (
                             "source-foo",
-                            vec![SourceOutput::source_logs(
+                            vec![SourceOutput::new_logs(
                                 DataType::all(),
                                 Definition::empty_legacy_namespace().with_event_field(
                                     &owned_value_path!("foo"),
@@ -454,7 +454,7 @@ mod tests {
                         ),
                         (
                             "source-bar",
-                            vec![SourceOutput::source_logs(
+                            vec![SourceOutput::new_logs(
                                 DataType::all(),
                                 Definition::empty_legacy_namespace().with_event_field(
                                     &owned_value_path!("foo"),
@@ -492,7 +492,7 @@ mod tests {
                     sources: IndexMap::from([
                         (
                             "source-foo",
-                            vec![SourceOutput::source_logs(
+                            vec![SourceOutput::new_logs(
                                 DataType::all(),
                                 Definition::empty_legacy_namespace().with_event_field(
                                     &owned_value_path!("foo"),
@@ -503,7 +503,7 @@ mod tests {
                         ),
                         (
                             "source-bar",
-                            vec![SourceOutput::source_logs(
+                            vec![SourceOutput::new_logs(
                                 DataType::all(),
                                 Definition::empty_legacy_namespace().with_event_field(
                                     &owned_value_path!("bar"),
@@ -517,7 +517,7 @@ mod tests {
                         "transform-baz",
                         (
                             vec![OutputId::from("source-foo")],
-                            vec![TransformOutput::transform(
+                            vec![TransformOutput::new(
                                 DataType::all(),
                                 vec![Definition::empty_legacy_namespace().with_event_field(
                                     &owned_value_path!("baz"),
@@ -562,7 +562,7 @@ mod tests {
                     sources: IndexMap::from([
                         (
                             "Source 1",
-                            vec![SourceOutput::source_logs(
+                            vec![SourceOutput::new_logs(
                                 DataType::all(),
                                 Definition::empty_legacy_namespace().with_event_field(
                                     &owned_value_path!("source-1"),
@@ -573,7 +573,7 @@ mod tests {
                         ),
                         (
                             "Source 2",
-                            vec![SourceOutput::source_logs(
+                            vec![SourceOutput::new_logs(
                                 DataType::all(),
                                 Definition::empty_legacy_namespace().with_event_field(
                                     &owned_value_path!("source-2"),
@@ -588,7 +588,7 @@ mod tests {
                             "Transform 1",
                             (
                                 vec![OutputId::from("Source 1")],
-                                vec![TransformOutput::transform(
+                                vec![TransformOutput::new(
                                     DataType::all(),
                                     vec![Definition::empty_legacy_namespace().with_event_field(
                                         &owned_value_path!("transform-1"),
@@ -602,7 +602,7 @@ mod tests {
                             "Transform 2",
                             (
                                 vec![OutputId::from("Source 2")],
-                                vec![TransformOutput::transform(
+                                vec![TransformOutput::new(
                                     DataType::all(),
                                     vec![Definition::empty_legacy_namespace().with_event_field(
                                         &owned_value_path!("transform-2"),
@@ -616,7 +616,7 @@ mod tests {
                             "Transform 3",
                             (
                                 vec![OutputId::from("Source 2")],
-                                vec![TransformOutput::transform(
+                                vec![TransformOutput::new(
                                     DataType::all(),
                                     vec![Definition::empty_legacy_namespace().with_event_field(
                                         &owned_value_path!("transform-3"),
@@ -630,7 +630,7 @@ mod tests {
                             "Transform 4",
                             (
                                 vec![OutputId::from("Source 2")],
-                                vec![TransformOutput::transform(
+                                vec![TransformOutput::new(
                                     DataType::all(),
                                     vec![Definition::empty_legacy_namespace().with_event_field(
                                         &owned_value_path!("transform-4"),
@@ -644,7 +644,7 @@ mod tests {
                             "Transform 5",
                             (
                                 vec![OutputId::from("Transform 3"), OutputId::from("Transform 4")],
-                                vec![TransformOutput::transform(
+                                vec![TransformOutput::new(
                                     DataType::all(),
                                     vec![Definition::empty_legacy_namespace().with_event_field(
                                         &owned_value_path!("transform-5"),

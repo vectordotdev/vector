@@ -74,7 +74,7 @@ impl TransformConfig for SampleConfig {
         input_definitions: &[(OutputId, schema::Definition)],
         _: LogNamespace,
     ) -> Vec<TransformOutput> {
-        vec![TransformOutput::transform(
+        vec![TransformOutput::new(
             DataType::Log | DataType::Trace,
             input_definitions
                 .iter()
