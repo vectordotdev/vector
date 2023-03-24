@@ -9845,6 +9845,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "vector-vrl-tests"
+version = "0.1.0"
+dependencies = [
+ "ansi_term",
+ "chrono",
+ "chrono-tz",
+ "clap 4.1.11",
+ "enrichment",
+ "glob",
+ "lookup",
+ "prettydiff",
+ "regex",
+ "serde",
+ "serde_json",
+ "tikv-jemallocator",
+ "tracing-subscriber",
+ "value",
+ "vector-vrl-functions",
+ "vrl",
+ "vrl-stdlib",
+ "vrl-tests",
+]
+
+[[package]]
 name = "version_check"
 version = "0.9.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -10044,7 +10068,6 @@ dependencies = [
  "tikv-jemallocator",
  "tracing-subscriber",
  "value",
- "vector-vrl-functions",
  "vrl",
  "vrl-stdlib",
 ]

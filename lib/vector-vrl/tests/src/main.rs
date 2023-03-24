@@ -1,3 +1,9 @@
+#![allow(clippy::print_stdout)] // tests
+#![allow(clippy::print_stderr)] // tests
+
+mod docs;
+mod test_enrichment;
+
 use vrl_tests::{get_tests_from_functions, run_tests, Test, TestConfig};
 
 use chrono_tz::Tz;
@@ -39,6 +45,10 @@ pub struct Cmd {
     /// Should we use the VM to evaluate the VRL
     #[clap(short, long = "runtime", default_value_t)]
     runtime: VrlRuntime,
+
+    /// Ignore the Cue tests (to speed up run)
+    #[clap(long)]
+    ignore_cue: bool,
 }
 
 impl Cmd {
@@ -51,12 +61,17 @@ impl Cmd {
     }
 }
 
-fn should_run(name: &str, pat: &Option<String>) -> bool {
+fn should_run(name: &str, pat: &Option<String>, _runtime: VrlRuntime) -> bool {
+    if name == "tests/example.vrl" {
+        return false;
+    }
+
     if let Some(pat) = pat {
         if !name.contains(pat) {
             return false;
         }
     }
+
     true
 }
 
@@ -78,12 +93,21 @@ fn main() {
         timezone: cmd.timezone(),
     };
 
+    let mut functions = stdlib::all();
+    functions.extend(vector_vrl_functions::vrl_functions());
+    functions.extend(enrichment::vrl_functions());
+
     run_tests(
         tests,
         &cfg,
-        &stdlib::all(),
-        || (CompileConfig::default(), ()),
-        |_| {},
+        &functions,
+        || {
+            let mut config = CompileConfig::default();
+            let enrichment_table = test_enrichment::test_enrichment_table();
+            config.set_custom(enrichment_table.clone());
+            (config, enrichment_table)
+        },
+        |registry| registry.finish_load(),
     );
 }
 
@@ -94,7 +118,19 @@ fn get_tests(cmd: &Cmd) -> Vec<Test> {
             let path = entry.ok()?;
             Some(Test::from_path(&path))
         })
-        .chain(get_tests_from_functions(stdlib::all()))
-        .filter(|test| should_run(&format!("{}/{}", test.category, test.name), &cmd.pattern))
+        .chain(docs::tests(cmd.ignore_cue).into_iter())
+        .chain(get_tests_from_functions(
+            vector_vrl_functions::vrl_functions()
+                .into_iter()
+                .chain(enrichment::vrl_functions())
+                .collect(),
+        ))
+        .filter(|test| {
+            should_run(
+                &format!("{}/{}", test.category, test.name),
+                &cmd.pattern,
+                cmd.runtime,
+            )
+        })
         .collect::<Vec<_>>()
 }
