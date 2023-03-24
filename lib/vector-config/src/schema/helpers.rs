@@ -479,12 +479,23 @@ pub fn generate_internal_tagged_variant_schema(
     generate_struct_schema(properties, required, None)
 }
 
+pub fn default_schema_settings() -> SchemaSettings {
+    SchemaSettings::new().with_visitor(DisallowedUnevaluatedPropertiesVisitor::from_settings)
+}
+
 pub fn generate_root_schema<T>() -> Result<RootSchema, GenerateError>
 where
     T: Configurable + 'static,
 {
-    let schema_settings =
-        SchemaSettings::new().with_visitor(DisallowedUnevaluatedPropertiesVisitor::from_settings);
+    generate_root_schema_with_settings::<T>(default_schema_settings())
+}
+
+pub fn generate_root_schema_with_settings<T>(
+    schema_settings: SchemaSettings,
+) -> Result<RootSchema, GenerateError>
+where
+    T: Configurable + 'static,
+{
     let schema_gen = RefCell::new(schema_settings.into_generator());
 
     // Set env variable to enable generating all schemas, including platform-specific ones.
