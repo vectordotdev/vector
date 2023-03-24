@@ -69,7 +69,7 @@
 ^\.github/actions/spelling/
 ^\Q.cargo/config.toml\E$
 ^\Q.github/workflows/spelling.yml\E$
-^\Q.github/workflows/gardner_issue_comment.yml\E$
+^\Q.github/workflows/gardener_issue_comment.yml\E$
 ^\Qbenches/codecs/moby_dick.txt\E$
 ^\Qbenches/dnstap/mod.rs\E$
 ^\Qbenches/transform/route.rs\E$
