@@ -114,7 +114,7 @@ pub enum AwsAuthentication {
 
         /// Timeout for assuming the role, in seconds.
         ///
-        /// Relevant when the default credentials chain or  `assume_role` is used.
+        /// Relevant when the default credentials chain or `assume_role` is used.
         #[configurable(metadata(docs::type_unit = "seconds"))]
         #[configurable(metadata(docs::examples = 30))]
         load_timeout_secs: Option<u64>,

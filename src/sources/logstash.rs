@@ -50,8 +50,6 @@ pub struct LogstashConfig {
     tls: Option<TlsSourceConfig>,
 
     /// The size of the receive buffer used for each connection.
-    ///
-    /// Generally, this should not need to be changed.
     #[configurable(metadata(docs::type_unit = "bytes"))]
     #[configurable(metadata(docs::examples = 65536))]
     #[configurable(metadata(docs::advanced))]
