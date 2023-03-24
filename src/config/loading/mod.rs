@@ -288,7 +288,7 @@ pub fn prepare_input<R: std::io::Read>(mut input: R) -> Result<(String, Vec<Stri
 
     let mut vars = std::env::vars().collect::<HashMap<_, _>>();
     if !vars.contains_key("HOSTNAME") {
-        if let Ok(hostname) = crate::get_hostname() {
+        if let Ok(hostname) = vector_common::get_hostname() {
             vars.insert("HOSTNAME".into(), hostname);
         }
     }

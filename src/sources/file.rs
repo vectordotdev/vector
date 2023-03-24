@@ -536,7 +536,7 @@ pub fn file_source(
 
     let event_metadata = EventMetadata {
         host_key: config.host_key.clone().path,
-        hostname: crate::get_hostname().ok(),
+        hostname: vector_common::get_hostname().ok(),
         file_key: config.file_key.clone().path,
         offset_key: config.offset_key.clone().and_then(|k| k.path),
     };

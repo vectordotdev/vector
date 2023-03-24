@@ -63,3 +63,19 @@ pub type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
 /// Vector's basic result type, defined in terms of [`Error`] and generic over
 /// `T`.
 pub type Result<T> = std::result::Result<T, Error>;
+
+/// Retrieve the current hostname.
+///
+/// # Errors
+///
+/// Errors are unlikely, but will be the error related to the underlying syscall
+pub fn get_hostname() -> std::io::Result<String> {
+    if let Some(given) = std::env::var("VECTOR_HOSTNAME")
+        .ok()
+        .filter(|s| !s.is_empty())
+    {
+        Ok(given)
+    } else {
+        Ok(hostname::get()?.to_string_lossy().into())
+    }
+}

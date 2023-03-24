@@ -447,7 +447,7 @@ impl MetricsBuffer {
         Self {
             metrics: Vec::new(),
             name: "",
-            host: crate::get_hostname().ok(),
+            host: vector_common::get_hostname().ok(),
             timestamp: Utc::now(),
             namespace,
         }
@@ -732,7 +732,7 @@ pub(self) mod tests {
         let metrics = HostMetrics::new(HostMetricsConfig::default())
             .capture_metrics()
             .await;
-        let hostname = crate::get_hostname().expect("Broken hostname");
+        let hostname = vector_common::get_hostname().expect("Broken hostname");
         assert!(!metrics.into_iter().any(|event| event
             .tags()
             .expect("Missing tags")

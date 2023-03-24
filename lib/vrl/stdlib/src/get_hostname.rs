@@ -1,12 +1,5 @@
 use vrl::prelude::*;
 
-fn get_hostname() -> Resolved {
-    Ok(hostname::get()
-        .map_err(|error| format!("failed to get hostname: {error}"))?
-        .to_string_lossy()
-        .into())
-}
-
 #[derive(Clone, Copy, Debug)]
 pub struct GetHostname;
 
@@ -38,7 +31,9 @@ struct GetHostnameFn;
 
 impl FunctionExpression for GetHostnameFn {
     fn resolve(&self, _: &mut Context) -> Resolved {
-        get_hostname()
+        Ok(vector_common::get_hostname()
+            .map_err(|error| format!("failed to get hostname: {}", error))?
+            .into())
     }
 
     fn type_def(&self, _: &state::TypeState) -> TypeDef {

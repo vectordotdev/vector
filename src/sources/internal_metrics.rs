@@ -157,7 +157,7 @@ impl<'a> InternalMetrics<'a> {
         let mut interval =
             IntervalStream::new(time::interval(self.interval)).take_until(self.shutdown);
         while interval.next().await.is_some() {
-            let hostname = crate::get_hostname();
+            let hostname = vector_common::get_hostname();
             let pid = std::process::id().to_string();
 
             let metrics = self.controller.capture_metrics();

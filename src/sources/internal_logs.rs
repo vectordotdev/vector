@@ -137,7 +137,7 @@ async fn run(
     shutdown: ShutdownSignal,
     log_namespace: LogNamespace,
 ) -> Result<(), ()> {
-    let hostname = crate::get_hostname();
+    let hostname = vector_common::get_hostname();
     let pid = std::process::id();
 
     // Chain any log events that were captured during early buffering to the front,

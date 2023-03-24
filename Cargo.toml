@@ -273,7 +273,6 @@ h2 = { version = "0.3.16", default-features = false, optional = true }
 hash_hasher = { version = "2.0.0", default-features = false }
 hashbrown = { version = "0.13.2", default-features = false, optional = true, features = ["ahash"] }
 headers = { version = "0.3.8", default-features = false }
-hostname = { version = "0.3.1", default-features = false }
 http = { version = "0.2.9", default-features = false }
 http-body = { version = "0.4.5", default-features = false }
 hyper = { version = "0.14.25", default-features = false, features = ["client", "runtime", "http1", "http2", "server", "stream"] }

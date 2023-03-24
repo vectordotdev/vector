@@ -12,7 +12,7 @@ impl Meta {
 
     /// Hostname
     async fn hostname(&self) -> Option<String> {
-        crate::get_hostname().ok()
+        vector_common::get_hostname().ok()
     }
 }
 

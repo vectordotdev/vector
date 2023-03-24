@@ -467,7 +467,7 @@ impl DockerLogsSource {
         let backoff_secs = config.retry_backoff_secs;
 
         let host_key = config.host_key.clone();
-        let hostname = crate::get_hostname().ok();
+        let hostname = vector_common::get_hostname().ok();
 
         // Only logs created at, or after this moment are logged.
         let core = DockerLogsSourceCore::new(config)?;
