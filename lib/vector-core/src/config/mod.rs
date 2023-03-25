@@ -436,15 +436,9 @@ mod test {
     fn test_insert_standard_vector_source_metadata() {
         let nested_path = "a.b.c.d";
 
-        init_log_schema(
-            || {
-                let mut schema = LogSchema::default();
-                schema.set_source_type_key(nested_path.to_owned());
-                Ok(schema)
-            },
-            false,
-        )
-        .unwrap();
+        let mut schema = LogSchema::default();
+        schema.set_source_type_key(nested_path.to_owned());
+        init_log_schema(schema, false);
 
         let namespace = LogNamespace::Legacy;
         let mut event = LogEvent::from("log");
