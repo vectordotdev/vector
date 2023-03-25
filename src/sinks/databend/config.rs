@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use codecs::encoding::{Framer, FramingConfig, SerializerConfig};
+use codecs::encoding::{Framer, FramingConfig};
 use futures::future::FutureExt;
 use tower::ServiceBuilder;
 use vector_config::{component::GenerateConfig, configurable_component};
@@ -22,8 +22,11 @@ use crate::{
 
 use super::{
     api::{DatabendAPIClient, DatabendHttpRequest},
+    compression::DatabendCompression,
+    encoding::{DatabendEncodingConfig, DatabendSerializerConfig},
+    request_builder::DatabendRequestBuilder,
     service::{DatabendRetryLogic, DatabendService},
-    sink::{DatabendRequestBuilder, DatabendSink},
+    sink::DatabendSink,
 };
 
 /// Configuration for the `databend` sink.
@@ -45,11 +48,12 @@ pub struct DatabendConfig {
     pub database: String,
 
     #[configurable(derived)]
-    pub encoding: EncodingConfig,
+    #[serde(default)]
+    pub encoding: DatabendEncodingConfig,
 
     #[configurable(derived)]
-    #[serde(default = "Compression::gzip_default")]
-    pub compression: Compression,
+    #[serde(default)]
+    pub compression: DatabendCompression,
 
     #[configurable(derived)]
     #[serde(default)]
@@ -80,7 +84,6 @@ impl GenerateConfig for DatabendConfig {
             r#"endpoint = "http://localhost:8000"
             table = "default"
             database = "default"
-            encoding.codec = "json"
         "#,
         )
         .unwrap()
@@ -121,42 +124,31 @@ impl SinkConfig for DatabendConfig {
 
         let mut file_format_options = BTreeMap::new();
         let compression = match self.compression {
-            Compression::Gzip(level) => {
+            DatabendCompression::Gzip => {
                 file_format_options.insert("compression".to_string(), "GZIP".to_string());
-                Compression::Gzip(level)
+                Compression::gzip_default()
             }
-            Compression::None => {
+            DatabendCompression::None => {
                 file_format_options.insert("compression".to_string(), "NONE".to_string());
                 Compression::None
             }
-            _ => {
-                return Err(format!(
-                    "Unsupported compression {:?} for databend sink",
-                    self.compression
-                )
-                .into());
-            }
         };
+        let encoding: EncodingConfig = self.encoding.clone().into();
         let serializer = match self.encoding.config() {
-            SerializerConfig::Json(_) => {
+            DatabendSerializerConfig::Json(_) => {
                 file_format_options.insert("type".to_string(), "NDJSON".to_string());
-                self.encoding.build()?
+                encoding.build()?
             }
-            SerializerConfig::Csv(_) => {
+            DatabendSerializerConfig::Csv(_) => {
                 file_format_options.insert("type".to_string(), "CSV".to_string());
                 file_format_options.insert("field_delimiter".to_string(), ",".to_string());
                 file_format_options.insert("record_delimiter".to_string(), "\n".to_string());
                 file_format_options.insert("skip_header".to_string(), "0".to_string());
-                self.encoding.build()?
-            }
-            _ => {
-                return Err(
-                    format!("Unsupported encoding {:?} for databend sink", self.encoding).into(),
-                );
+                encoding.build()?
             }
         };
         let framer = FramingConfig::NewlineDelimited.build();
-        let transformer = self.encoding.transformer();
+        let transformer = encoding.transformer();
 
         let mut copy_options = BTreeMap::new();
         copy_options.insert("purge".to_string(), "true".to_string());
@@ -206,14 +198,39 @@ mod tests {
             endpoint = "http://localhost:8000"
             table = "mytable"
             database = "mydatabase"
-            encoding.codec = "json"
         "#,
         )
         .unwrap();
         assert_eq!(cfg.endpoint.uri, "http://localhost:8000");
         assert_eq!(cfg.table, "mytable");
         assert_eq!(cfg.database, "mydatabase");
-        assert!(matches!(cfg.encoding.config(), SerializerConfig::Json(_)));
-        assert!(matches!(cfg.compression, Compression::Gzip(_)));
+        assert!(matches!(
+            cfg.encoding.config(),
+            DatabendSerializerConfig::Json(_)
+        ));
+        assert!(matches!(cfg.compression, DatabendCompression::Gzip));
+    }
+
+    #[test]
+    fn parse_config_with_encoding_compression() {
+        let cfg = toml::from_str::<DatabendConfig>(
+            r#"
+            endpoint = "http://localhost:8000"
+            table = "mytable"
+            database = "mydatabase"
+            encoding.codec = "csv"
+            encoding.csv.fields = ["host", "timestamp", "message"]
+            compression = "none"
+        "#,
+        )
+        .unwrap();
+        assert_eq!(cfg.endpoint.uri, "http://localhost:8000");
+        assert_eq!(cfg.table, "mytable");
+        assert_eq!(cfg.database, "mydatabase");
+        assert!(matches!(
+            cfg.encoding.config(),
+            DatabendSerializerConfig::Csv(_)
+        ));
+        assert!(matches!(cfg.compression, DatabendCompression::None));
     }
 }
