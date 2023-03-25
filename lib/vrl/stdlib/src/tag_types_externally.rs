@@ -123,9 +123,9 @@ fn tag_type_externally(value: Value) -> Value {
 
 #[cfg(test)]
 mod tests {
+    use ::value::btreemap;
     use chrono::{TimeZone, Utc};
     use regex::Regex;
-    use vector_common::btreemap;
 
     use super::*;
 

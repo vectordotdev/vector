@@ -12,9 +12,9 @@ weight: 2
 curl \
   --proto '=https' \
   --tlsv1.2 -O \
-  https://packages.timber.io/vector/{{< version >}}/vector-{{< version >}}-amd64.deb
+  https://packages.timber.io/vector/{{< version >}}/vector_{{< version >}}-1_amd64.deb
 
-sudo dpkg -i vector-{{< version >}}-amd64.deb
+sudo dpkg -i vector_{{< version >}}-1_amd64.deb
 ```
 
 ## Other actions

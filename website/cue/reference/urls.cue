@@ -243,6 +243,7 @@ urls: {
 	heroku:                                     "https://www.heroku.com"
 	heroku_http_log_drain:                      "https://devcenter.heroku.com/articles/log-drains#https-drains"
 	heroku_start:                               "https://devcenter.heroku.com/start"
+	hmac:                                       "\(wikipedia)/wiki/HMAC"
 	homebrew:                                   "https://brew.sh/"
 	homebrew_services:                          "\(github)/Homebrew/homebrew-services"
 	honeycomb:                                  "https://honeycomb.io"

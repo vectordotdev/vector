@@ -173,8 +173,8 @@ impl FunctionExpression for ParseGroksFn {
 
 #[cfg(test)]
 mod test {
+    use ::value::btreemap;
     use ::value::Value;
-    use vector_common::btreemap;
 
     use super::*;
 

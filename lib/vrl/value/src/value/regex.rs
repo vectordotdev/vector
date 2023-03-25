@@ -38,6 +38,8 @@ impl ValueRegex {
     }
 }
 
+impl Eq for ValueRegex {}
+
 impl PartialEq for ValueRegex {
     fn eq(&self, other: &Self) -> bool {
         self.0.as_str() == other.0.as_str()

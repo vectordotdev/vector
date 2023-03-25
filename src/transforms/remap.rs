@@ -615,7 +615,7 @@ mod tests {
     use std::collections::HashMap;
 
     use indoc::{formatdoc, indoc};
-    use vector_common::btreemap;
+    use value::btreemap;
     use vector_core::{config::GlobalOptions, event::EventMetadata, metric_tags};
 
     use super::*;

@@ -1,6 +1,6 @@
 use ::value::Value;
-use vector_common::conversion::Conversion;
 use vrl::prelude::*;
+use vrl_core::conversion::Conversion;
 
 fn to_int(value: Value) -> Resolved {
     use Value::{Boolean, Bytes, Float, Integer, Null, Timestamp};

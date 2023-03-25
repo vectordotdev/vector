@@ -244,8 +244,7 @@ pub enum SubCommand {
 impl SubCommand {
     pub async fn execute(
         &self,
-        signal_handler: &mut signal::SignalHandler,
-        #[allow(unused_variables)] signal_rx: signal::SignalRx,
+        mut signals: signal::SignalPair,
         color: bool,
     ) -> exitcode::ExitCode {
         match self {
@@ -257,18 +256,22 @@ impl SubCommand {
             #[cfg(windows)]
             Self::Service(s) => service::cmd(s),
             #[cfg(feature = "api-client")]
-            Self::Tap(t) => tap::cmd(t, signal_rx).await,
-            Self::Test(t) => unit_test::cmd(t, signal_handler).await,
+            Self::Tap(t) => tap::cmd(t, signals.receiver).await,
+            Self::Test(t) => unit_test::cmd(t, &mut signals.handler).await,
             #[cfg(feature = "api-client")]
             Self::Top(t) => top::cmd(t).await,
             Self::Validate(v) => validate::validate(v, color).await,
             #[cfg(feature = "vrl-cli")]
-            Self::Vrl(s) => vrl_cli::cmd::cmd(s),
+            Self::Vrl(s) => {
+                let mut functions = vrl_stdlib::all();
+                functions.extend(vector_vrl_functions::vrl_functions());
+                vrl_cli::cmd::cmd(s, functions)
+            }
         }
     }
 }
 
-#[derive(clap::ValueEnum, Debug, Clone, PartialEq, Eq)]
+#[derive(clap::ValueEnum, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Color {
     Auto,
     Always,
@@ -288,7 +291,7 @@ impl Color {
     }
 }
 
-#[derive(clap::ValueEnum, Debug, Clone, PartialEq, Eq)]
+#[derive(clap::ValueEnum, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LogFormat {
     Text,
     Json,

@@ -2,8 +2,8 @@ use std::str::FromStr;
 
 use ::value::Value;
 use chrono::{TimeZone as _, Utc};
-use vector_common::{conversion::Conversion, TimeZone};
 use vrl::prelude::*;
+use vrl_core::{conversion::Conversion, TimeZone};
 
 fn to_timestamp(value: Value, unit: Unit) -> Resolved {
     use Value::{Bytes, Float, Integer, Timestamp};
@@ -271,8 +271,8 @@ impl FunctionExpression for ToTimestampFn {
 mod tests {
     use std::collections::BTreeMap;
 
-    use vector_common::TimeZone;
     use vrl::prelude::expression::Literal;
+    use vrl_core::TimeZone;
 
     use super::*;
 
