@@ -2622,7 +2622,6 @@ dependencies = [
  "tracing 0.1.37",
  "tracing-test",
  "value",
- "vector-common",
  "vrl-compiler",
 ]
 
@@ -9699,6 +9698,7 @@ dependencies = [
  "url",
  "vector-config-common",
  "vector-config-macros",
+ "vrl-compiler",
  "vrl-core",
 ]
 
@@ -9903,6 +9903,7 @@ dependencies = [
  "clap 4.1.11",
  "exitcode",
  "indoc",
+ "lookup",
  "once_cell",
  "prettytable-rs",
  "regex",
@@ -9910,7 +9911,6 @@ dependencies = [
  "serde_json",
  "thiserror",
  "value",
- "vector-lookup",
  "vrl",
  "vrl-core",
  "vrl-stdlib",
@@ -9936,10 +9936,6 @@ dependencies = [
  "serde",
  "thiserror",
  "value",
- "vector-common",
- "vector-config",
- "vector-config-common",
- "vector-config-macros",
  "vrl-core",
  "vrl-diagnostic",
  "vrl-parser",
@@ -10056,7 +10052,6 @@ dependencies = [
  "chrono",
  "chrono-tz",
  "clap 4.1.11",
- "enrichment",
  "glob",
  "lookup",
  "prettydiff",

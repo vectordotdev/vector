@@ -48,6 +48,7 @@ pub use core::{
     value, ExpressionError, Resolved, SecretTarget, Target, TargetValue, TargetValueRef,
 };
 
+use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 use std::{fmt::Display, str::FromStr};
 
@@ -60,13 +61,11 @@ pub use paste::paste;
 pub use program::{Program, ProgramInfo};
 pub use state::{TypeInfo, TypeState};
 pub use type_def::TypeDef;
-use vector_config::configurable_component;
 
 pub type Result<T = CompilationResult> = std::result::Result<T, DiagnosticList>;
 
 /// Available VRL runtimes.
-#[configurable_component]
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum VrlRuntime {
     /// Tree-walking runtime.

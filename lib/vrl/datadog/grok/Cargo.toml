@@ -22,13 +22,12 @@ thiserror = { version = "1", default-features = false }
 tracing = { version = "0.1.34", default-features = false }
 
 # Internal
-lookup = { path = "../../vrl/lookup" }
-value = {path = "../../vrl/value", features = ["json", "test"]}
-vector-common = { path = "../../vector-common" }
-vrl-compiler = { path = "../../vrl/compiler" }
+lookup = { path = "../../lookup" }
+value = {path = "../../value", features = ["json", "test"]}
+vrl-compiler = { path = "../../compiler" }
 
 [dev-dependencies]
-vrl-compiler = { path = "../../vrl/compiler" }
+vrl-compiler = { path = "../../compiler" }
 criterion = { version = "0.4.0" }
 tracing-test = { version = "0.2", default-features = false }
 

@@ -10,9 +10,9 @@ license = "MPL-2.0"
 vrl = { path = "../vrl" }
 value = { path = "../value", default-features = false }
 
-datadog-filter = { path = "../../datadog/filter", optional = true }
-datadog-grok = { path = "../../datadog/grok", optional = true }
-datadog-search-syntax = { path = "../../datadog/search-syntax", optional = true }
+datadog-filter = { path = "../datadog/filter", optional = true }
+datadog-grok = { path = "../datadog/grok", optional = true }
+datadog-search-syntax = { path = "../datadog/search-syntax", optional = true }
 lookup_lib = {package = "lookup", path = "../lookup", optional = true }
 vrl-core = { path = "../core" }
 

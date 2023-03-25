@@ -6,7 +6,6 @@ edition = "2021"
 publish = false
 
 [dependencies]
-enrichment = { path = "../../enrichment" }
 lookup = { path = "../lookup" }
 stdlib = { package = "vrl-stdlib", path = "../stdlib" }
 vrl = { path = "../vrl" }
