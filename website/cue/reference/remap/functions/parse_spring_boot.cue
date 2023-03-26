@@ -7,7 +7,7 @@ remap: functions: parse_spring_boot: {
 		"""#
 	notices: [
 		"""
-            All values are returned as strings. It pasres spring boot log and returns timestamp, level(log level), pid, thread, logger, message.
+            All values are returned as strings. It parses spring boot log and returns timestamp, level(log level), pid, thread, logger, message.
 			""",
 	]
 
