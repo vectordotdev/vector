@@ -26,7 +26,7 @@ remap: functions: parse_spring_boot: {
 		{
 			title: "Parse spring boot log"
 			source: #"""
-				pasrse_spring_boot("2023-01-30 22:37:33.495 INFO 72972 --- [ main] o.s.i.monitor.IntegrationMBeanExporter : Registering MessageChannel cacheConsumer-in-0")
+				parse_spring_boot("2023-01-30 22:37:33.495 INFO 72972 --- [ main] o.s.i.monitor.IntegrationMBeanExporter : Registering MessageChannel cacheConsumer-in-0")
 				"""#
 			return: {
 				timestamp: "2023-01-30 22:37:33.495"
@@ -40,7 +40,7 @@ remap: functions: parse_spring_boot: {
 		{
 			title: "Parse spring boot error trace log"
 			source: #"""
-				pasrse_spring_boot("2023-01-30 22:37:33.495 ERROR 72972 --- [ main] o.s.i.monitor.IntegrationMBeanExporter : java.lang.NullPointerException: null\n\tat io.test.EmployerController.getAllEmployers(EmployerController.java:20) ~[classes/:na]")
+				parse_spring_boot("2023-01-30 22:37:33.495 ERROR 72972 --- [ main] o.s.i.monitor.IntegrationMBeanExporter : java.lang.NullPointerException: null\n\tat io.test.EmployerController.getAllEmployers(EmployerController.java:20) ~[classes/:na]")
 				"""#
 			return: {
 				timestamp: "2023-01-30 22:37:33.495"
