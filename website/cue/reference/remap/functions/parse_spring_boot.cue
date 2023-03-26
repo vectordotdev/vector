@@ -7,7 +7,13 @@ remap: functions: parse_spring_boot: {
 		"""#
 	notices: [
 		"""
-            All values are returned as strings. It parses spring boot log and returns timestamp, level(log level), pid, thread, logger, message.
+			All values are returned as strings. It parses spring boot log and returns timestamp, level(log level), pid, thread, logger, message.
+			""",
+	]
+	notices: [
+		"""
+			We recommend using community-maintained Grok patterns when possible, as they're more likely to be properly
+			vetted and improved over time than bespoke patterns.
 			""",
 	]
 
