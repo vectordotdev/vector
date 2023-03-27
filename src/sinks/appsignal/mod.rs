@@ -7,6 +7,7 @@ use futures::{FutureExt, SinkExt};
 use http::{header::AUTHORIZATION, Request, Uri};
 use hyper::Body;
 use serde_json::json;
+use snafu::{ResultExt, Snafu};
 use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
 
@@ -25,6 +26,26 @@ use crate::{
     },
     tls::TlsSettings,
 };
+
+#[derive(Debug, Snafu)]
+pub enum FinishError {
+    #[snafu(display(
+        "Failure occurred during writing to or finalizing the compressor: {}",
+        source
+    ))]
+    CompressionFailed { source: std::io::Error },
+}
+
+impl FinishError {
+    /// Gets the telemetry-friendly string version of this error.
+    ///
+    /// The value will be a short string with only lowercase letters and underscores.
+    pub const fn as_error_type(&self) -> &'static str {
+        match self {
+            Self::CompressionFailed { .. } => "compression_failed",
+        }
+    }
+}
 
 /// Configuration for the `appsignal` sink.
 #[configurable_component(sink("appsignal"))]
@@ -167,7 +188,7 @@ impl HttpSink for AppsignalSinkConfig {
         write_all(&mut writer, 0, &body)?;
         body = writer
             .finish()
-            .expect("Writing to Vec can't fail")
+            .context(CompressionFailedSnafu)?
             .into_inner()
             .into();
 
