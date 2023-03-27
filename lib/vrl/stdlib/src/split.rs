@@ -197,7 +197,7 @@ mod test {
                              pattern: " ",
                              limit: 0
             ],
-            want: Ok(Vec::<u8>::new()),
+            want: Ok(value!([])),
             tdef: TypeDef::array(Collection::from_unknown(Kind::bytes())),
         }
 
@@ -206,7 +206,7 @@ mod test {
                              pattern: " ",
                              limit: -1
             ],
-            want: Ok(Vec::<u8>::new()),
+            want: Ok(value!([])),
             tdef: TypeDef::array(Collection::from_unknown(Kind::bytes())),
         }
 
