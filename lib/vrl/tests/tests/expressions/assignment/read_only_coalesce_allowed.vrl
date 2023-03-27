@@ -1,5 +1,0 @@
-# read_only: .(read_only_1 | read_only_2)
-# result: { "read_only_4": 5 }
-
-.(read_only_3 | read_only_4) = 5
-.

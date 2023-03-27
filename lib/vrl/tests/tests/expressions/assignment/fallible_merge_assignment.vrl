@@ -1,5 +1,0 @@
-# result: { "foo" : 2, "bar": "3" }
-
-.res = { "foo": 2 }
-.res, _ |= parse_key_value(s'bar=3')
-.res

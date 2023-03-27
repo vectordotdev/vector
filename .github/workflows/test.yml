@@ -284,19 +284,6 @@ jobs:
       - run: bash scripts/environment/prepare.sh
       - run: cargo vdev test-vrl
 
-  test-vrl-wasm:
-    name: VRL WASM - Linux
-    continue-on-error: true
-    runs-on: [linux, test-runner]
-    needs: changes
-    if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.cue == 'true' }}
-    steps:
-      - uses: actions/checkout@v3
-      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - run: bash scripts/environment/prepare.sh
-      - run: bash scripts/ensure-wasm-target-installed.sh
-      - run: make compile-vrl-wasm
-
   check-component-features:
     name: Component Features - Linux
     runs-on: [linux, test-runner]

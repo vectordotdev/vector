@@ -198,15 +198,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "arbitrary"
-version = "1.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e2d098ff73c1ca148721f37baad5ea6a465a13f9573aba8641fbbbae8164a54e"
-dependencies = [
- "derive_arbitrary",
-]
-
-[[package]]
 name = "arc-swap"
 version = "1.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2594,6 +2585,7 @@ checksum = "8d7439c3735f405729d52c3fbbe4de140eaf938a1fe47d227c27f8254d4302a5"
 [[package]]
 name = "datadog-filter"
 version = "0.1.0"
+source = "git+https://github.com/vectordotdev/vrl?rev=v0.1.0#c515186e30058ddb5b8506d2763eaa98c1b13d93"
 dependencies = [
  "datadog-search-syntax",
  "dyn-clone",
@@ -2603,11 +2595,11 @@ dependencies = [
 [[package]]
 name = "datadog-grok"
 version = "0.1.0"
+source = "git+https://github.com/vectordotdev/vrl?rev=v0.1.0#c515186e30058ddb5b8506d2763eaa98c1b13d93"
 dependencies = [
  "bytes 1.4.0",
  "chrono",
  "chrono-tz",
- "criterion",
  "lalrpop",
  "lalrpop-util",
  "lookup",
@@ -2620,7 +2612,6 @@ dependencies = [
  "serde_json",
  "thiserror",
  "tracing 0.1.37",
- "tracing-test",
  "value",
  "vrl-compiler",
 ]
@@ -2628,6 +2619,7 @@ dependencies = [
 [[package]]
 name = "datadog-search-syntax"
 version = "0.1.0"
+source = "git+https://github.com/vectordotdev/vrl?rev=v0.1.0#c515186e30058ddb5b8506d2763eaa98c1b13d93"
 dependencies = [
  "itertools",
  "once_cell",
@@ -2692,17 +2684,6 @@ name = "derivative"
 version = "2.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fcc3dd5e9e9c0b295d6e1e4d811fb6f157d5ffd784b8d202fc62eac8035a770b"
-dependencies = [
- "proc-macro2 1.0.54",
- "quote 1.0.26",
- "syn 1.0.109",
-]
-
-[[package]]
-name = "derive_arbitrary"
-version = "1.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f3cdeb9ec472d588e539a818b2dee436825730da08ad0017c4b1a17676bdc8b7"
 dependencies = [
  "proc-macro2 1.0.54",
  "quote 1.0.26",
@@ -3482,19 +3463,6 @@ name = "glob"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d2fabcfbdc87f4758337ca535fb41a6d701b65693ce38287d856d1674551ec9b"
-
-[[package]]
-name = "gloo-utils"
-version = "0.1.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a8e8fc851e9c7b9852508bc6e3f690f452f474417e8545ec9857b7f7377036b5"
-dependencies = [
- "js-sys",
- "serde",
- "serde_json",
- "wasm-bindgen",
- "web-sys",
-]
 
 [[package]]
 name = "goauth"
@@ -4766,8 +4734,8 @@ dependencies = [
 [[package]]
 name = "lookup"
 version = "0.1.0"
+source = "git+https://github.com/vectordotdev/vrl?rev=v0.1.0#c515186e30058ddb5b8506d2763eaa98c1b13d93"
 dependencies = [
- "criterion",
  "inherent",
  "lalrpop",
  "lalrpop-util",
@@ -4775,9 +4743,7 @@ dependencies = [
  "quickcheck",
  "regex",
  "serde",
- "serde_json",
  "snafu",
- "tracing 0.1.37",
 ]
 
 [[package]]
@@ -6384,18 +6350,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "proptests"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "lookup",
- "ordered-float 3.6.0",
- "proptest",
- "vrl-diagnostic",
- "vrl-parser",
-]
-
-[[package]]
 name = "prost"
 version = "0.11.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7478,17 +7432,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "serde-wasm-bindgen"
-version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f3b143e2833c57ab9ad3ea280d21fd34e285a42837aeb0ee301f4f41890fa00e"
-dependencies = [
- "js-sys",
- "serde",
- "wasm-bindgen",
-]
-
-[[package]]
 name = "serde-xml-rs"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8280,41 +8223,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "95059e91184749cb66be6dc994f67f182b6d897cb3df74a5bf66b5e709295fd8"
 
 [[package]]
-name = "test-case"
-version = "3.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "679b019fb241da62cc449b33b224d19ebe1c6767b495569765115dd7f7f9fba4"
-dependencies = [
- "test-case-macros",
-]
-
-[[package]]
-name = "test-case-core"
-version = "3.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "72dc21b5887f4032c4656502d085dc28f2afbb686f25f216472bb0526f4b1b88"
-dependencies = [
- "cfg-if",
- "proc-macro-error",
- "proc-macro2 1.0.54",
- "quote 1.0.26",
- "syn 1.0.109",
-]
-
-[[package]]
-name = "test-case-macros"
-version = "3.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f3786898e0be151a96f730fd529b0e8a10f5990fa2a7ea14e37ca27613c05190"
-dependencies = [
- "proc-macro-error",
- "proc-macro2 1.0.54",
- "quote 1.0.26",
- "syn 1.0.109",
- "test-case-core",
-]
-
-[[package]]
 name = "test-generator"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8939,35 +8847,11 @@ dependencies = [
  "serde",
  "serde_json",
  "sharded-slab",
- "smallvec",
  "thread_local",
  "tracing 0.1.37",
  "tracing-core 0.1.30",
  "tracing-log",
  "tracing-serde",
-]
-
-[[package]]
-name = "tracing-test"
-version = "0.2.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3a2c0ff408fe918a94c428a3f2ad04e4afd5c95bbc08fcf868eff750c15728a4"
-dependencies = [
- "lazy_static",
- "tracing-core 0.1.30",
- "tracing-subscriber",
- "tracing-test-macro",
-]
-
-[[package]]
-name = "tracing-test-macro"
-version = "0.2.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "258bc1c4f8e2e73a977812ab339d503e6feeb92700f6d07a6de4d321522d5c08"
-dependencies = [
- "lazy_static",
- "quote 1.0.26",
- "syn 1.0.109",
 ]
 
 [[package]]
@@ -9349,11 +9233,11 @@ checksum = "830b7e5d4d90034032940e4ace0d9a9a057e7a45cd94e6c007832e39edb82f6d"
 [[package]]
 name = "value"
 version = "0.1.0"
+source = "git+https://github.com/vectordotdev/vrl?rev=v0.1.0#c515186e30058ddb5b8506d2763eaa98c1b13d93"
 dependencies = [
  "async-graphql",
  "bytes 1.4.0",
  "chrono",
- "indoc",
  "lookup",
  "mlua",
  "ordered-float 3.6.0",
@@ -9862,8 +9746,8 @@ dependencies = [
 name = "vector-vrl-functions"
 version = "0.1.0"
 dependencies = [
+ "lookup",
  "value",
- "vector-lookup",
  "vrl",
 ]
 
@@ -9906,24 +9790,23 @@ checksum = "6a02e4885ed3bc0f2de90ea6dd45ebcbb66dacffe03547fadbb0eeae2770887d"
 [[package]]
 name = "vrl"
 version = "0.1.0"
+source = "git+https://github.com/vectordotdev/vrl?rev=v0.1.0#c515186e30058ddb5b8506d2763eaa98c1b13d93"
 dependencies = [
  "bytes 1.4.0",
- "criterion",
  "indoc",
  "lookup",
  "ordered-float 3.6.0",
- "serde_json",
  "value",
  "vrl-compiler",
  "vrl-core",
  "vrl-diagnostic",
  "vrl-parser",
- "vrl-stdlib",
 ]
 
 [[package]]
 name = "vrl-cli"
 version = "0.1.0"
+source = "git+https://github.com/vectordotdev/vrl?rev=v0.1.0#c515186e30058ddb5b8506d2763eaa98c1b13d93"
 dependencies = [
  "clap 4.1.11",
  "exitcode",
@@ -9945,14 +9828,13 @@ dependencies = [
 [[package]]
 name = "vrl-compiler"
 version = "0.1.0"
+source = "git+https://github.com/vectordotdev/vrl?rev=v0.1.0#c515186e30058ddb5b8506d2763eaa98c1b13d93"
 dependencies = [
  "anymap",
  "bytes 1.4.0",
  "chrono",
- "criterion",
  "dyn-clone",
  "getrandom 0.2.8",
- "indoc",
  "lalrpop-util",
  "lookup",
  "ordered-float 3.6.0",
@@ -9969,6 +9851,7 @@ dependencies = [
 [[package]]
 name = "vrl-core"
 version = "0.1.0"
+source = "git+https://github.com/vectordotdev/vrl?rev=v0.1.0#c515186e30058ddb5b8506d2763eaa98c1b13d93"
 dependencies = [
  "bytes 1.4.0",
  "chrono",
@@ -9988,6 +9871,7 @@ dependencies = [
 [[package]]
 name = "vrl-diagnostic"
 version = "0.1.0"
+source = "git+https://github.com/vectordotdev/vrl?rev=v0.1.0#c515186e30058ddb5b8506d2763eaa98c1b13d93"
 dependencies = [
  "codespan-reporting",
  "termcolor",
@@ -9996,14 +9880,13 @@ dependencies = [
 [[package]]
 name = "vrl-parser"
 version = "0.1.0"
+source = "git+https://github.com/vectordotdev/vrl?rev=v0.1.0#c515186e30058ddb5b8506d2763eaa98c1b13d93"
 dependencies = [
- "arbitrary",
  "lalrpop",
  "lalrpop-util",
  "lookup",
  "ordered-float 3.6.0",
  "paste",
- "test-case",
  "thiserror",
  "vrl-diagnostic",
 ]
@@ -10011,9 +9894,9 @@ dependencies = [
 [[package]]
 name = "vrl-stdlib"
 version = "0.1.0"
+source = "git+https://github.com/vectordotdev/vrl?rev=v0.1.0#c515186e30058ddb5b8506d2763eaa98c1b13d93"
 dependencies = [
  "aes",
- "anyhow",
  "base16",
  "base64 0.21.0",
  "bytes 1.4.0",
@@ -10021,9 +9904,7 @@ dependencies = [
  "cfb-mode",
  "charset",
  "chrono",
- "chrono-tz",
  "cidr-utils",
- "criterion",
  "csv",
  "ctr",
  "data-encoding",
@@ -10057,7 +9938,6 @@ dependencies = [
  "strip-ansi-escapes",
  "syslog_loose",
  "tracing 0.1.37",
- "tracing-test",
  "uaparser",
  "url",
  "utf8-width",
@@ -10072,6 +9952,7 @@ dependencies = [
 [[package]]
 name = "vrl-tests"
 version = "0.1.0"
+source = "git+https://github.com/vectordotdev/vrl?rev=v0.1.0#c515186e30058ddb5b8506d2763eaa98c1b13d93"
 dependencies = [
  "ansi_term",
  "chrono",
@@ -10088,20 +9969,6 @@ dependencies = [
  "value",
  "vrl",
  "vrl-stdlib",
-]
-
-[[package]]
-name = "vrl-web-playground"
-version = "0.1.0"
-dependencies = [
- "getrandom 0.2.8",
- "gloo-utils",
- "serde",
- "serde-wasm-bindgen",
- "value",
- "vrl",
- "vrl-stdlib",
- "wasm-bindgen",
 ]
 
 [[package]]

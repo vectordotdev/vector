@@ -1,5 +1,0 @@
-# object: { "message": "{\"name\": \"Chase\"}\n{\"name\": \"Sky\"}\ninvalid JSON" }
-# result: [{ "name": "Chase" }, { "name": "Sky" }]
-
-strings = split!(.message, "\n")
-compact(map_values(strings) -> |value| { parse_json(value) ?? null })

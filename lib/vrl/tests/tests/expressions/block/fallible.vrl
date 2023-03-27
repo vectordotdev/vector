@@ -1,6 +1,0 @@
-# result: 1
-
-{
-  parse_json("invalid")
-  2
-} ?? 1

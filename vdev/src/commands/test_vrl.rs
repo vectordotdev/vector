@@ -11,7 +11,6 @@ pub struct Cli {}
 impl Cli {
     pub fn exec(self) -> Result<()> {
         run_tests(&[app::path(), "lib", "vector-vrl", "tests"])?;
-        run_tests(&[app::path(), "lib", "vrl", "tests"])?;
         Ok(())
     }
 }
