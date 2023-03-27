@@ -1,8 +1,6 @@
 #[cfg(all(test, feature = "appsignal-integration-tests"))]
 mod integration_tests;
 
-use std::io::Write;
-
 use bytes::{BufMut, Bytes, BytesMut};
 use flate2::write::GzEncoder;
 use futures::{FutureExt, SinkExt};
@@ -19,6 +17,7 @@ use crate::{
     http::HttpClient,
     sinks::{
         util::{
+            encoding::write_all,
             http::{BatchedHttpSink, HttpEventEncoder, HttpSink},
             BatchConfig, BoxedRawValue, JsonArrayBuffer, SinkBatchSettings, TowerRequestConfig,
         },
@@ -165,7 +164,7 @@ impl HttpSink for AppsignalSinkConfig {
 
         let buffer = BytesMut::new();
         let mut writer = GzEncoder::new(buffer.writer(), flate2::Compression::new(6));
-        writer.write_all(&body).expect("Writing to Vec can't fail");
+        write_all(&mut writer, 0, &body)?;
         body = writer
             .finish()
             .expect("Writing to Vec can't fail")
