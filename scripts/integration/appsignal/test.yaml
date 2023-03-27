@@ -1,7 +1,7 @@
 features:
 - appsignal-integration-tests
 
-test_filter: '::appsignal::'
+test_filter: '::appsignal::integration_tests::'
 
 runner:
   env:
