@@ -6,6 +6,8 @@ mod gen;
 mod json_schema;
 pub mod visit;
 
+pub(crate) const DEFINITIONS_PREFIX: &str = "#/definitions/";
+
 pub type Map<K, V> = indexmap::IndexMap<K, V>;
 pub type Set<V> = std::collections::BTreeSet<V>;
 
