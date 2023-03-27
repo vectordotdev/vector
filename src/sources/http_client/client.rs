@@ -244,7 +244,7 @@ impl ValidatableComponent for HttpClientConfig {
 register_validatable_component!(HttpClientConfig);
 
 impl HttpClientConfig {
-    fn get_decoding_config(&self, log_namespace: Option<LogNamespace>) -> DecodingConfig {
+    pub fn get_decoding_config(&self, log_namespace: Option<LogNamespace>) -> DecodingConfig {
         let decoding = self.decoding.clone();
         let framing = self.framing.clone();
         let log_namespace =
@@ -256,9 +256,9 @@ impl HttpClientConfig {
 
 /// Captures the configuration options required to decode the incoming requests into events.
 #[derive(Clone)]
-struct HttpClientContext {
-    decoder: Decoder,
-    log_namespace: LogNamespace,
+pub struct HttpClientContext {
+    pub decoder: Decoder,
+    pub log_namespace: LogNamespace,
 }
 
 impl HttpClientContext {
@@ -283,9 +283,32 @@ impl HttpClientContext {
         }
         events
     }
+}
+
+impl HttpClientBuilder for HttpClientContext {
+    type Context = HttpClientContext;
+
+    /// No additional context from request data is needed from this particular client.
+    fn build(&self, _uri: &Uri) -> Self::Context {
+        self.clone()
+    }
+}
+
+impl http_client::HttpClientContext for HttpClientContext {
+    /// Decodes the HTTP response body into events per the decoder configured.
+    fn on_response(&mut self, _url: &Uri, _header: &Parts, body: &Bytes) -> Option<Vec<Event>> {
+        // get the body into a byte array
+        let mut buf = BytesMut::new();
+        let body = String::from_utf8_lossy(body);
+        buf.extend_from_slice(body.as_bytes());
+
+        let events = self.decode_events(&mut buf);
+
+        Some(events)
+    }
 
     /// Enriches events with source_type, timestamp
-    fn enrich_events(&self, events: &mut Vec<Event>) {
+    fn enrich_events(&mut self, events: &mut Vec<Event>) {
         let now = Utc::now();
 
         for event in events {
@@ -311,30 +334,5 @@ impl HttpClientContext {
                 }
             }
         }
-    }
-}
-
-impl HttpClientBuilder for HttpClientContext {
-    type Context = HttpClientContext;
-
-    /// No additional context from request data is needed from this particular client.
-    fn build(&self, _uri: &Uri) -> Self::Context {
-        self.clone()
-    }
-}
-
-impl http_client::HttpClientContext for HttpClientContext {
-    /// Decodes the HTTP response body into events per the decoder configured.
-    fn on_response(&mut self, _url: &Uri, _header: &Parts, body: &Bytes) -> Option<Vec<Event>> {
-        // get the body into a byte array
-        let mut buf = BytesMut::new();
-        let body = String::from_utf8_lossy(body);
-        buf.extend_from_slice(body.as_bytes());
-
-        // decode and enrich
-        let mut events = self.decode_events(&mut buf);
-        self.enrich_events(&mut events);
-
-        Some(events)
     }
 }

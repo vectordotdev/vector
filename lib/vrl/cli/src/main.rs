@@ -4,5 +4,5 @@ use clap::Parser;
 use vrl_cli::{cmd::cmd, Opts};
 
 fn main() {
-    std::process::exit(cmd(&Opts::parse()));
+    std::process::exit(cmd(&Opts::parse(), stdlib::all()));
 }

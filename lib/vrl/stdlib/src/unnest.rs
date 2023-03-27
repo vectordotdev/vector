@@ -185,11 +185,11 @@ pub(crate) fn invert_array_at_path(typedef: &TypeDef, path: &OwnedValuePath) -> 
 
 #[cfg(test)]
 mod tests {
-    use lookup_lib::lookup_v2::parse_value_path;
-    use vector_common::{btreemap, TimeZone};
-    use vrl::state::TypeState;
-
     use super::*;
+    use ::value::btreemap;
+    use lookup_lib::lookup_v2::parse_value_path;
+    use vrl::state::TypeState;
+    use vrl_core::TimeZone;
 
     #[test]
     fn type_def() {

@@ -47,7 +47,9 @@ impl DiagnosticMessage for ExpressionError {
     }
 
     fn message(&self) -> String {
-        use ExpressionError::{Abort, Error};
+        #[cfg(feature = "expr-abort")]
+        use ExpressionError::Abort;
+        use ExpressionError::Error;
 
         match self {
             #[cfg(feature = "expr-abort")]
@@ -57,7 +59,9 @@ impl DiagnosticMessage for ExpressionError {
     }
 
     fn labels(&self) -> Vec<Label> {
-        use ExpressionError::{Abort, Error};
+        #[cfg(feature = "expr-abort")]
+        use ExpressionError::Abort;
+        use ExpressionError::Error;
 
         match self {
             #[cfg(feature = "expr-abort")]
@@ -69,7 +73,9 @@ impl DiagnosticMessage for ExpressionError {
     }
 
     fn notes(&self) -> Vec<Note> {
-        use ExpressionError::{Abort, Error};
+        #[cfg(feature = "expr-abort")]
+        use ExpressionError::Abort;
+        use ExpressionError::Error;
 
         match self {
             #[cfg(feature = "expr-abort")]

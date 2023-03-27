@@ -20,11 +20,7 @@ mod serde;
 #[cfg(any(test, feature = "toml"))]
 mod toml;
 
-use std::{
-    collections::BTreeMap,
-    fmt::Debug,
-    hash::{Hash, Hasher},
-};
+use std::collections::BTreeMap;
 
 pub use crate::value::regex::ValueRegex;
 use bytes::{Bytes, BytesMut};
@@ -37,7 +33,7 @@ use ordered_float::NotNan;
 pub type StdError = Box<dyn std::error::Error + Send + Sync + 'static>;
 
 /// The main value type used in Vector events, and VRL.
-#[derive(Debug, Clone)]
+#[derive(Eq, PartialEq, Hash, Debug, Clone)]
 pub enum Value {
     /// Bytes - usually representing a UTF8 String.
     Bytes(Bytes),
@@ -67,86 +63,6 @@ pub enum Value {
 
     /// Null.
     Null,
-}
-
-impl Eq for Value {}
-
-impl PartialEq<Self> for Value {
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (Self::Array(a), Self::Array(b)) => a.eq(b),
-            (Self::Boolean(a), Self::Boolean(b)) => a.eq(b),
-            (Self::Bytes(a), Self::Bytes(b)) => a.eq(b),
-            (Self::Regex(a), Self::Regex(b)) => a.eq(b),
-            (Self::Float(a), Self::Float(b)) => {
-                // This compares floats with the following rules:
-                // * NaNs compare as equal
-                // * Positive and negative infinity are not equal
-                // * -0 and +0 are not equal
-                // * Floats will compare using truncated portion
-                if a.is_sign_negative() == b.is_sign_negative() {
-                    if a.is_finite() && b.is_finite() {
-                        a.trunc().eq(&b.trunc())
-                    } else {
-                        a.is_finite() == b.is_finite()
-                    }
-                } else {
-                    false
-                }
-            }
-            (Self::Integer(a), Self::Integer(b)) => a.eq(b),
-            (Self::Object(a), Self::Object(b)) => a.eq(b),
-            (Self::Null, Self::Null) => true,
-            (Self::Timestamp(a), Self::Timestamp(b)) => a.eq(b),
-            _ => false,
-        }
-    }
-}
-
-impl Hash for Value {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        core::mem::discriminant(self).hash(state);
-        match self {
-            Self::Array(v) => {
-                v.hash(state);
-            }
-            Self::Boolean(v) => {
-                v.hash(state);
-            }
-            Self::Bytes(v) => {
-                v.hash(state);
-            }
-            Self::Regex(regex) => {
-                regex.as_bytes_slice().hash(state);
-            }
-            Self::Float(v) => {
-                // This hashes floats with the following rules:
-                // * NaNs hash as equal (covered by above discriminant hash)
-                // * Positive and negative infinity has to different values
-                // * -0 and +0 hash to different values
-                // * otherwise transmute to u64 and hash
-                if v.is_finite() {
-                    v.is_sign_negative().hash(state);
-                    let trunc: u64 = v.trunc().to_bits();
-                    trunc.hash(state);
-                } else if !v.is_nan() {
-                    v.is_sign_negative().hash(state);
-                } //else covered by discriminant hash
-            }
-            Self::Integer(v) => {
-                v.hash(state);
-            }
-            Self::Object(v) => {
-                v.hash(state);
-            }
-            Self::Null => {
-                //covered by discriminant hash
-            }
-            Self::Timestamp(v) => {
-                v.hash(state);
-            }
-        }
-    }
 }
 
 impl Value {
@@ -271,58 +187,6 @@ mod test {
     use quickcheck::{QuickCheck, TestResult};
 
     use super::*;
-
-    mod value_compare {
-        use super::*;
-
-        #[test]
-        fn compare_correctly() {
-            assert!(Value::Integer(0).eq(&Value::Integer(0)));
-            assert!(!Value::Integer(0).eq(&Value::Integer(1)));
-            assert!(!Value::Boolean(true).eq(&Value::Integer(2)));
-            assert!(Value::from(1.2).eq(&Value::from(1.4)));
-            assert!(!Value::from(1.2).eq(&Value::from(-1.2)));
-            assert!(!Value::from(-0.0).eq(&Value::from(0.0)));
-            assert!(!Value::from(f64::NEG_INFINITY).eq(&Value::from(f64::INFINITY)));
-            assert!(Value::Array(vec![Value::Integer(0), Value::Boolean(true)])
-                .eq(&Value::Array(vec![Value::Integer(0), Value::Boolean(true)])));
-            assert!(!Value::Array(vec![Value::Integer(0), Value::Boolean(true)])
-                .eq(&Value::Array(vec![Value::Integer(1), Value::Boolean(true)])));
-        }
-    }
-
-    mod value_hash {
-        use super::*;
-
-        fn hash(a: &Value) -> u64 {
-            let mut h = std::collections::hash_map::DefaultHasher::new();
-
-            a.hash(&mut h);
-            h.finish()
-        }
-
-        #[test]
-        fn hash_correctly() {
-            assert_eq!(hash(&Value::Integer(0)), hash(&Value::Integer(0)));
-            assert_ne!(hash(&Value::Integer(0)), hash(&Value::Integer(1)));
-            assert_ne!(hash(&Value::Boolean(true)), hash(&Value::Integer(2)));
-            assert_eq!(hash(&Value::from(1.2)), hash(&Value::from(1.4)));
-            assert_ne!(hash(&Value::from(1.2)), hash(&Value::from(-1.2)));
-            assert_ne!(hash(&Value::from(-0.0)), hash(&Value::from(0.0)));
-            assert_ne!(
-                hash(&Value::from(f64::NEG_INFINITY)),
-                hash(&Value::from(f64::INFINITY))
-            );
-            assert_eq!(
-                hash(&Value::Array(vec![Value::Integer(0), Value::Boolean(true)])),
-                hash(&Value::Array(vec![Value::Integer(0), Value::Boolean(true)]))
-            );
-            assert_ne!(
-                hash(&Value::Array(vec![Value::Integer(0), Value::Boolean(true)])),
-                hash(&Value::Array(vec![Value::Integer(1), Value::Boolean(true)]))
-            );
-        }
-    }
 
     mod corner_cases {
         use super::*;

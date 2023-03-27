@@ -8,27 +8,29 @@ pub use lookup::lookup_v2::{
     OwnedValuePath, PathConcat, PathParseError, PathPrefix, TargetPath, ValuePath,
 };
 
-/// A wrapper around `OwnedValuePath` that allows it to be used in Vector config
+/// A wrapper around `OwnedValuePath` that allows it to be used in Vector config.
+/// This requires a valid path to be used. If you want to allow optional paths,
+/// use [optional_path::OptionalValuePath].
 #[configurable_component]
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[serde(try_from = "String", into = "String")]
-pub struct ConfigOwnedValuePath(pub OwnedValuePath);
+pub struct ConfigValuePath(pub OwnedValuePath);
 
-impl TryFrom<String> for ConfigOwnedValuePath {
+impl TryFrom<String> for ConfigValuePath {
     type Error = PathParseError;
 
     fn try_from(src: String) -> Result<Self, Self::Error> {
-        OwnedValuePath::try_from(src).map(ConfigOwnedValuePath)
+        OwnedValuePath::try_from(src).map(ConfigValuePath)
     }
 }
 
-impl From<ConfigOwnedValuePath> for String {
-    fn from(owned: ConfigOwnedValuePath) -> Self {
+impl From<ConfigValuePath> for String {
+    fn from(owned: ConfigValuePath) -> Self {
         String::from(owned.0)
     }
 }
 
-impl<'a> ValuePath<'a> for &'a ConfigOwnedValuePath {
+impl<'a> ValuePath<'a> for &'a ConfigValuePath {
     type Iter = <&'a OwnedValuePath as ValuePath<'a>>::Iter;
 
     fn segment_iter(&self) -> Self::Iter {
@@ -41,23 +43,23 @@ impl<'a> ValuePath<'a> for &'a ConfigOwnedValuePath {
 #[configurable_component]
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[serde(try_from = "String", into = "String")]
-pub struct ConfigOwnedTargetPath(pub OwnedTargetPath);
+pub struct ConfigTargetPath(pub OwnedTargetPath);
 
-impl TryFrom<String> for ConfigOwnedTargetPath {
+impl TryFrom<String> for ConfigTargetPath {
     type Error = PathParseError;
 
     fn try_from(src: String) -> Result<Self, Self::Error> {
-        OwnedTargetPath::try_from(src).map(ConfigOwnedTargetPath)
+        OwnedTargetPath::try_from(src).map(ConfigTargetPath)
     }
 }
 
-impl From<ConfigOwnedTargetPath> for String {
-    fn from(owned: ConfigOwnedTargetPath) -> Self {
+impl From<ConfigTargetPath> for String {
+    fn from(owned: ConfigTargetPath) -> Self {
         String::from(owned.0)
     }
 }
 
-impl<'a> TargetPath<'a> for &'a ConfigOwnedTargetPath {
+impl<'a> TargetPath<'a> for &'a ConfigTargetPath {
     type ValuePath = &'a OwnedValuePath;
 
     fn prefix(&self) -> PathPrefix {

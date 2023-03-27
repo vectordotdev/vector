@@ -1,4 +1,5 @@
 use std::{collections::HashMap, convert::TryFrom, fmt, net::SocketAddr};
+use vector_core::EstimatedJsonEncodedSizeOf;
 
 use async_trait::async_trait;
 use bytes::Bytes;
@@ -7,7 +8,6 @@ use tracing::Span;
 use vector_core::{
     config::SourceAcknowledgementsConfig,
     event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event},
-    EstimatedJsonEncodedSizeOf,
 };
 use warp::{
     filters::{
@@ -37,11 +37,23 @@ use super::{
 
 #[async_trait]
 pub trait HttpSource: Clone + Send + Sync + 'static {
+    // This function can be defined to enrich events with additional HTTP
+    // metadata. This function should be used rather than internal enrichment so
+    // that accurate byte count metrics can be emitted.
+    fn enrich_events(
+        &self,
+        _events: &mut [Event],
+        _request_path: &str,
+        _headers_config: &HeaderMap,
+        _query_parameters: &HashMap<String, String>,
+    ) {
+    }
+
     fn build_events(
         &self,
         body: Bytes,
-        header_map: HeaderMap,
-        query_parameters: HashMap<String, String>,
+        header_map: &HeaderMap,
+        query_parameters: &HashMap<String, String>,
         path: &str,
     ) -> Result<Vec<Event>, ErrorMessage>;
 
@@ -109,6 +121,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                           query_parameters: HashMap<String, String>| {
                         debug!(message = "Handling HTTP request.", headers = ?headers);
                         let http_path = path.as_str();
+
                         emit!(HttpBytesReceived {
                             byte_size: body.len(),
                             http_path,
@@ -119,15 +132,23 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                             .is_valid(&auth_header)
                             .and_then(|()| decode(&encoding_header, body))
                             .and_then(|body| {
-                                self.build_events(body, headers, query_parameters, path.as_str())
+                                self.build_events(body, &headers, &query_parameters, path.as_str())
                             })
-                            .map(|events| {
+                            .map(|mut events| {
                                 emit!(HttpEventsReceived {
                                     count: events.len(),
                                     byte_size: events.estimated_json_encoded_size_of(),
                                     http_path,
                                     protocol,
                                 });
+
+                                self.enrich_events(
+                                    &mut events,
+                                    path.as_str(),
+                                    &headers,
+                                    &query_parameters,
+                                );
+
                                 events
                             });
 

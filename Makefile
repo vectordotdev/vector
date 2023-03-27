@@ -317,12 +317,12 @@ test-aarch64-unknown-linux-gnu: cross-test-aarch64-unknown-linux-gnu ## Runs uni
 
 .PHONY: test-behavior-config
 test-behavior-config: ## Runs configuration related behavioral tests
-	${MAYBE_ENVIRONMENT_EXEC} cargo build --bin secret-backend-example
-	${MAYBE_ENVIRONMENT_EXEC} cargo run -- test tests/behavior/config/*
+	${MAYBE_ENVIRONMENT_EXEC} cargo build --no-default-features --features transforms --bin secret-backend-example
+	${MAYBE_ENVIRONMENT_EXEC} cargo run --no-default-features --features transforms -- test tests/behavior/config/*
 
 .PHONY: test-behavior-%
 test-behavior-%: ## Runs behavioral test for a given category
-	${MAYBE_ENVIRONMENT_EXEC} cargo run -- test tests/behavior/$*/*
+	${MAYBE_ENVIRONMENT_EXEC} cargo run --no-default-features --features transforms -- test tests/behavior/$*/*
 
 .PHONY: test-behavior
 test-behavior: ## Runs all behavioral tests
@@ -600,11 +600,11 @@ sync-install: ## Sync the install.sh script for access via sh.vector.dev
 
 .PHONY: test-vrl
 test-vrl: ## Run the VRL test suite
-	@scripts/test-vrl.sh
+	@cargo vdev test-vrl
 
 .PHONY: compile-vrl-wasm
 compile-vrl-wasm: ## Compile VRL crates to WASM target
-	cargo vdev generate vrl-wasm
+	cargo vdev build vrl-wasm
 
 ##@ Utility
 
@@ -618,13 +618,13 @@ fmt: ## Format code
 
 .PHONY: generate-kubernetes-manifests
 generate-kubernetes-manifests: ## Generate Kubernetes manifests from latest Helm chart
-	cargo vdev generate manifests
+	cargo vdev build manifests
 
 .PHONY: generate-component-docs
 generate-component-docs: ## Generate per-component Cue docs from the configuration schema.
 	${MAYBE_ENVIRONMENT_EXEC} cargo build $(if $(findstring true,$(CI)),--quiet,)
 	target/debug/vector generate-schema > /tmp/vector-config-schema.json 2>/dev/null
-	${MAYBE_ENVIRONMENT_EXEC} cargo vdev generate component-docs /tmp/vector-config-schema.json \
+	${MAYBE_ENVIRONMENT_EXEC} cargo vdev build component-docs /tmp/vector-config-schema.json \
 		$(if $(findstring true,$(CI)),>/dev/null,)
 
 .PHONY: signoff
@@ -659,4 +659,4 @@ cargo-install-%:
 
 .PHONY: ci-generate-publish-metadata
 ci-generate-publish-metadata: ## Generates the necessary metadata required for building/publishing Vector.
-	@scripts/ci-generate-publish-metadata.sh
+	cargo vdev build publish-metadata

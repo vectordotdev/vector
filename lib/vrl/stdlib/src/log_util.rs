@@ -4,7 +4,7 @@ use ::value::Value;
 use chrono::prelude::{DateTime, Utc};
 use once_cell::sync::Lazy;
 use regex::{Captures, Regex};
-use vector_common::TimeZone;
+use vrl_core::TimeZone;
 
 // Information about the common log format taken from the
 // - W3C specification: https://www.w3.org/Daemon/User/Config/Logging.html#common-logfile-format

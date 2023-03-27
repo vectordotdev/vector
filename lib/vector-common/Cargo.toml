@@ -8,17 +8,11 @@ license = "MPL-2.0"
 
 [features]
 default = [
-  "aws_cloudwatch_logs_subscription",
   "btreemap",
   "conversion",
   "tokenize",
   "encoding",
   "sensitive_string"
-]
-
-aws_cloudwatch_logs_subscription = [
-  "chrono?/serde",
-  "serde/derive",
 ]
 
 btreemap = []
@@ -57,18 +51,19 @@ futures = { version = "0.3.27", default-features = false, features = ["std"] }
 indexmap = { version = "~1.9.2", default-features = false }
 metrics = "0.20.1"
 nom = { version = "7", optional = true }
-ordered-float = { version = "3.4.0", default-features = false }
+ordered-float = { version = "3.6.0", default-features = false }
 paste = "1.0.12"
 pin-project = { version = "1.0.12", default-features = false }
 ryu = { version = "1", default-features = false }
 serde_json = { version = "1.0.94", default-features = false, features = ["std", "raw_value"] }
-serde = { version = "1.0.156", optional = true, features = ["derive"] }
+serde = { version = "1.0.158", optional = true, features = ["derive"] }
 smallvec = { version = "1", default-features = false }
 snafu = { version = "0.7", optional = true }
 stream-cancel = { version = "0.8.1", default-features = false }
 tokio = { version = "1.26.0", default-features = false, features = ["macros", "time"] }
 tracing = { version = "0.1.34", default-features = false }
 value = { path = "../vrl/value", features = ["json", "arbitrary"] }
+vrl-core = { path = "../vrl/core", default-features = false }
 vector-config = { path = "../vector-config" }
 vector-config-common = { path = "../vector-config-common" }
 vector-config-macros = { path = "../vector-config-macros" }
