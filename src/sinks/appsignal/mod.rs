@@ -106,7 +106,7 @@ impl SinkConfig for AppsignalSinkConfig {
         .sink_map_err(|error| error!(message = "Fatal AppSignal sink error.", %error));
 
         let healthcheck = healthcheck(
-            endpoint_uri(self.endpoint.clone(), "vector/healthcheck")?,
+            endpoint_uri(&self.endpoint, "vector/healthcheck")?,
             push_api_key,
             client,
         )
@@ -153,7 +153,7 @@ impl HttpSink for AppsignalSinkConfig {
     }
 
     async fn build_request(&self, events: Self::Output) -> crate::Result<Request<Bytes>> {
-        let uri = endpoint_uri(self.endpoint.clone(), "vector/events")?;
+        let uri = endpoint_uri(&self.endpoint, "vector/events")?;
         let request = Request::post(uri)
             .header(
                 AUTHORIZATION,
@@ -190,17 +190,18 @@ pub(crate) async fn healthcheck(
     }
 }
 
-fn endpoint_uri(endpoint: String, path: &str) -> crate::Result<Uri> {
-    let mut uri = endpoint;
-    if !uri.ends_with('/') {
-        uri.push('/');
-    }
-    uri.push_str(path);
+fn endpoint_uri(endpoint: &str, path: &str) -> crate::Result<Uri> {
+    let uri = if endpoint.ends_with('/') {
+        format!("{endpoint}{path}")
+    } else {
+        format!("{endpoint}/{path}")
+    };
     match uri.parse::<Uri>() {
         Ok(u) => Ok(u),
         Err(e) => Err(Box::new(BuildError::UriParseError { source: e })),
     }
 }
+
 #[cfg(test)]
 mod test {
     use futures::{future::ready, stream};
@@ -241,10 +242,7 @@ mod test {
 
     #[test]
     fn endpoint_uri_with_path() {
-        let uri = endpoint_uri(
-            "https://appsignal-endpoint.net".to_string(),
-            "vector/events",
-        );
+        let uri = endpoint_uri("https://appsignal-endpoint.net", "vector/events");
         assert_eq!(
             uri.expect("Not a valid URI").to_string(),
             "https://appsignal-endpoint.net/vector/events"
@@ -253,10 +251,7 @@ mod test {
 
     #[test]
     fn endpoint_uri_with_trailing_slash() {
-        let uri = endpoint_uri(
-            "https://appsignal-endpoint.net/".to_string(),
-            "vector/events",
-        );
+        let uri = endpoint_uri("https://appsignal-endpoint.net/", "vector/events");
         assert_eq!(
             uri.expect("Not a valid URI").to_string(),
             "https://appsignal-endpoint.net/vector/events"
