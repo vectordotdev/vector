@@ -111,86 +111,84 @@ fn examples_to_tests(
     Box::new(examples.into_iter().flat_map(move |(k, v)| {
         v.examples
             .into_iter()
-            .map(|example| Test::from_cue_example(category, k.clone(), example))
+            .map(|example| test_from_cue_example(category, k.clone(), example))
             .collect::<Vec<_>>()
     }))
 }
 
-impl Test {
-    fn from_cue_example(category: &'static str, name: String, example: Example) -> Self {
-        use ::value::Value;
+fn test_from_cue_example(category: &'static str, name: String, example: Example) -> Test {
+    use ::value::Value;
 
-        let Example {
-            title,
-            input,
-            mut source,
-            returns,
-            output,
-            raises,
-            skip_test,
-        } = example;
+    let Example {
+        title,
+        input,
+        mut source,
+        returns,
+        output,
+        raises,
+        skip_test,
+    } = example;
 
-        let mut skip = skip_test.unwrap_or_else(|| SKIP_FUNCTION_EXAMPLES.contains(&name.as_str()));
+    let mut skip = skip_test.unwrap_or_else(|| SKIP_FUNCTION_EXAMPLES.contains(&name.as_str()));
 
-        let object = match input {
-            Some(event) => {
-                serde_json::from_value::<Value>(serde_json::Value::Object(event.log)).unwrap()
-            }
-            None => Value::Object(BTreeMap::default()),
+    let object = match input {
+        Some(event) => {
+            serde_json::from_value::<Value>(serde_json::Value::Object(event.log)).unwrap()
+        }
+        None => Value::Object(BTreeMap::default()),
+    };
+
+    if returns.is_some() && output.is_some() {
+        panic!(
+            "example must either specify return or output, not both: {}/{}",
+            category, &name
+        );
+    }
+
+    if let Some(output) = &output {
+        let contains_metric_event = match &output {
+            ExampleOutput::Events(events) => events.iter().any(|event| event.metric.is_some()),
+            ExampleOutput::Event(event) => event.metric.is_some(),
         };
 
-        if returns.is_some() && output.is_some() {
-            panic!(
-                "example must either specify return or output, not both: {}/{}",
-                category, &name
-            );
+        if contains_metric_event {
+            skip = true;
         }
 
-        if let Some(output) = &output {
-            let contains_metric_event = match &output {
-                ExampleOutput::Events(events) => events.iter().any(|event| event.metric.is_some()),
-                ExampleOutput::Event(event) => event.metric.is_some(),
-            };
+        // when checking the output, we need to add `.` at the end of the
+        // program to make sure we correctly evaluate the external object.
+        source += "; .";
+    }
 
-            if contains_metric_event {
-                skip = true;
-            }
-
-            // when checking the output, we need to add `.` at the end of the
-            // program to make sure we correctly evaluate the external object.
-            source += "; .";
-        }
-
-        let result = match raises {
-            Some(Error::Runtime(error) | Error::Compiletime(error)) => error,
-            None => serde_json::to_string(
-                &returns
-                    .or_else(|| {
-                        output.map(|output| match output {
-                            ExampleOutput::Events(events) => serde_json::Value::Array(
-                                events
-                                    .into_iter()
-                                    .map(|event| serde_json::Value::Object(event.log))
-                                    .collect(),
-                            ),
-                            ExampleOutput::Event(event) => serde_json::Value::Object(event.log),
-                        })
+    let result = match raises {
+        Some(Error::Runtime(error) | Error::Compiletime(error)) => error,
+        None => serde_json::to_string(
+            &returns
+                .or_else(|| {
+                    output.map(|output| match output {
+                        ExampleOutput::Events(events) => serde_json::Value::Array(
+                            events
+                                .into_iter()
+                                .map(|event| serde_json::Value::Object(event.log))
+                                .collect(),
+                        ),
+                        ExampleOutput::Event(event) => serde_json::Value::Object(event.log),
                     })
-                    .unwrap_or_default(),
-            )
-            .unwrap(),
-        };
+                })
+                .unwrap_or_default(),
+        )
+        .unwrap(),
+    };
 
-        Self {
-            name: title,
-            category: format!("docs/{}/{}", category, name),
-            error: None,
-            source,
-            object,
-            result,
-            result_approx: false,
-            skip,
-            read_only_paths: vec![],
-        }
+    Test {
+        name: title,
+        category: format!("docs/{}/{}", category, name),
+        error: None,
+        source,
+        object,
+        result,
+        result_approx: false,
+        skip,
+        read_only_paths: vec![],
     }
 }

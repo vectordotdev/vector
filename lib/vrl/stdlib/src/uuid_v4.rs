@@ -53,7 +53,7 @@ mod tests {
     use std::collections::BTreeMap;
 
     use ::value::Value;
-    use vector_common::TimeZone;
+    use vrl_core::TimeZone;
 
     use super::*;
 

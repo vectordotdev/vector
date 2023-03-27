@@ -38,7 +38,10 @@ async fn sets_create_action_when_configured() {
 
     let mut log = LogEvent::from("hello there");
     log.insert(
-        log_schema().timestamp_key(),
+        (
+            lookup::PathPrefix::Event,
+            log_schema().timestamp_key().unwrap(),
+        ),
         Utc.ymd(2020, 12, 1)
             .and_hms_opt(1, 2, 3)
             .expect("invalid timestamp"),
@@ -89,7 +92,10 @@ async fn encode_datastream_mode() {
 
     let mut log = LogEvent::from("hello there");
     log.insert(
-        log_schema().timestamp_key(),
+        (
+            lookup::PathPrefix::Event,
+            log_schema().timestamp_key().unwrap(),
+        ),
         Utc.ymd(2020, 12, 1)
             .and_hms_opt(1, 2, 3)
             .expect("invalid timestamp"),
@@ -139,7 +145,10 @@ async fn encode_datastream_mode_no_routing() {
     let mut log = LogEvent::from("hello there");
     log.insert("data_stream", data_stream_body());
     log.insert(
-        log_schema().timestamp_key(),
+        (
+            lookup::PathPrefix::Event,
+            log_schema().timestamp_key().unwrap(),
+        ),
         Utc.ymd(2020, 12, 1)
             .and_hms_opt(1, 2, 3)
             .expect("invalid timestamp"),
@@ -280,7 +289,10 @@ async fn encode_datastream_mode_no_sync() {
     let mut log = LogEvent::from("hello there");
     log.insert("data_stream", data_stream_body());
     log.insert(
-        log_schema().timestamp_key(),
+        (
+            lookup::PathPrefix::Event,
+            log_schema().timestamp_key().unwrap(),
+        ),
         Utc.ymd(2020, 12, 1)
             .and_hms_opt(1, 2, 3)
             .expect("invalid timestamp"),

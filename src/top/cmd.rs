@@ -111,10 +111,10 @@ pub async fn cmd(opts: &super::Opts) -> exitcode::ExitCode {
             connection.abort();
             exitcode::OK
         }
-        _ => {
+        Err(err) => {
             #[allow(clippy::print_stderr)]
             {
-                eprintln!("Your terminal doesn't support building a dashboard. Exiting.");
+                eprintln!("Encountered error: {}", err);
             }
             connection.abort();
             exitcode::IOERR

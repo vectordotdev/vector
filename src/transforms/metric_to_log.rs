@@ -210,11 +210,10 @@ impl TransformConfig for MetricToLogConfig {
                 );
             }
             LogNamespace::Legacy => {
-                schema_definition = schema_definition.with_event_field(
-                    &parse_value_path(log_schema().timestamp_key()).expect("valid timestamp key"),
-                    Kind::timestamp(),
-                    None,
-                );
+                if let Some(timestamp_key) = log_schema().timestamp_key() {
+                    schema_definition =
+                        schema_definition.with_event_field(timestamp_key, Kind::timestamp(), None);
+                }
 
                 schema_definition = schema_definition.with_event_field(
                     &parse_value_path(log_schema().host_key()).expect("valid host key"),
@@ -287,7 +286,10 @@ impl MetricToLog {
                             })
                             .unwrap_or_else(|| event::Value::Timestamp(Utc::now()));
 
-                        log.insert(log_schema().timestamp_key(), timestamp);
+                        if let Some(timestamp_key) = log_schema().timestamp_key() {
+                            log.insert((PathPrefix::Event, timestamp_key), timestamp);
+                        }
+
                         if let Some(host) = log.remove_prune(self.host_tag.as_str(), true) {
                             log.insert(log_schema().host_key(), host);
                         }

@@ -70,7 +70,7 @@ fn serialization() {
         "message": "raw log line",
         "foo": "bar",
         "bar": "baz",
-        "timestamp": event.get(log_schema().timestamp_key()),
+        "timestamp": event.get(log_schema().timestamp_key().unwrap().to_string().as_str()),
     });
 
     let actual_all = serde_json::to_value(event.all_fields().unwrap()).unwrap();

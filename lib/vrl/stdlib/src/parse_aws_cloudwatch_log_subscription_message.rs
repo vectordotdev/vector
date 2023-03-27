@@ -1,8 +1,47 @@
 use std::collections::BTreeMap;
 
 use ::value::Value;
-use vector_common::aws_cloudwatch_logs_subscription::AwsCloudWatchLogsSubscriptionMessage;
 use vrl::prelude::*;
+
+use chrono::{serde::ts_milliseconds, DateTime, Utc};
+use serde::Deserialize;
+
+#[derive(Debug, Deserialize, Clone, Copy)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE", deny_unknown_fields)]
+enum AwsCloudWatchLogsSubscriptionMessageType {
+    ControlMessage,
+    DataMessage,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct AwsCloudWatchLogEvent {
+    id: String,
+    #[serde(with = "ts_milliseconds")]
+    timestamp: DateTime<Utc>,
+    message: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct AwsCloudWatchLogsSubscriptionMessage {
+    owner: String,
+    message_type: AwsCloudWatchLogsSubscriptionMessageType,
+    log_group: String,
+    log_stream: String,
+    subscription_filters: Vec<String>,
+    log_events: Vec<AwsCloudWatchLogEvent>,
+}
+
+impl AwsCloudWatchLogsSubscriptionMessageType {
+    #[must_use]
+    fn as_str(self) -> &'static str {
+        match self {
+            AwsCloudWatchLogsSubscriptionMessageType::ControlMessage => "CONTROL_MESSAGE",
+            AwsCloudWatchLogsSubscriptionMessageType::DataMessage => "DATA_MESSAGE",
+        }
+    }
+}
 
 fn parse_aws_cloudwatch_log_subscription_message(bytes: Value) -> Resolved {
     let bytes = bytes.try_bytes()?;
