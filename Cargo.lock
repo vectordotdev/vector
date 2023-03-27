@@ -4849,6 +4849,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "mach2"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6d0d1830bcd151a6fc4aea1369af235b36c1528fe976b8ff678683c9995eade8"
+dependencies = [
+ "libc",
+]
+
+[[package]]
 name = "malloc_buf"
 version = "0.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5007,7 +5016,7 @@ dependencies = [
  "ordered-float 2.10.0",
  "parking_lot",
  "portable-atomic",
- "quanta",
+ "quanta 0.10.1",
  "radix_trie",
  "sketches-ddsketch",
 ]
@@ -6517,6 +6526,22 @@ dependencies = [
  "once_cell",
  "raw-cpuid",
  "wasi 0.10.2+wasi-snapshot-preview1",
+ "web-sys",
+ "winapi",
+]
+
+[[package]]
+name = "quanta"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8cc73c42f9314c4bdce450c77e6f09ecbddefbeddb1b5979ded332a3913ded33"
+dependencies = [
+ "crossbeam-utils",
+ "libc",
+ "mach2",
+ "once_cell",
+ "raw-cpuid",
+ "wasi 0.11.0+wasi-snapshot-preview1",
  "web-sys",
  "winapi",
 ]
@@ -9772,7 +9797,7 @@ dependencies = [
  "prost",
  "prost-build",
  "prost-types",
- "quanta",
+ "quanta 0.11.0",
  "quickcheck",
  "quickcheck_macros",
  "rand 0.8.5",
