@@ -15,9 +15,7 @@ VERSION="${VECTOR_VERSION:-"$(cargo vdev version)"}"
 DATE="${DATE:-"$(date -u +%Y-%m-%d)"}"
 PLATFORM="${PLATFORM:-}"
 PUSH="${PUSH:-"true"}"
-# TODO revert this when ready to merge
-#REPO="${REPO:-"timberio/vector"}"
-REPO="${REPO:-"timberio/test-custom-builds"}"
+REPO="${REPO:-"timberio/vector"}"
 
 #
 # Functions
