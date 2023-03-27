@@ -338,7 +338,7 @@ def find_nested_object_property_schema(schema, property_name)
   # recursively visit each of those subschemas, looking for object schemas along the way that we can
   # check for the given property within.
   matching_property_schemas = []
-  unvisited_subschemas = schema['oneOf'].dup || schema['allOf'].dup || []
+  unvisited_subschemas = schema['oneOf'].dup || schema['anyOf'].dup|| schema['allOf'].dup || []
   while !unvisited_subschemas.empty? do
     unvisited_subschema = unvisited_subschemas.pop
 
@@ -352,7 +352,7 @@ def find_nested_object_property_schema(schema, property_name)
 
     # If the subschema had no object properties, see if it's an `oneOf`/`allOf` subschema, and if
     # so, collect any of _those_ subschemas and add them to our list of subschemas to visit.
-    maybe_unvisited_subschemas = unvisited_subschema['oneOf'].dup || unvisited_subschema['allOf'].dup || []
+    maybe_unvisited_subschemas = unvisited_subschema['oneOf'].dup || unvisited_subschema['anyOf'].dup || unvisited_subschema['allOf'].dup || []
     unvisited_subschemas.concat(maybe_unvisited_subschemas) unless maybe_unvisited_subschemas.nil?
   end
 
