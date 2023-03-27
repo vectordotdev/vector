@@ -51,7 +51,7 @@ impl FinishError {
 #[configurable_component(sink("appsignal"))]
 #[derive(Clone, Debug, Default)]
 pub struct AppsignalSinkConfig {
-    /// The AppSignal API endpoint to report to. This is configured by default and doesn't need to be changed.
+    /// The URI for the AppSignal API to send data to.
     #[configurable(validation(format = "uri"))]
     #[configurable(metadata(docs::examples = "https://appsignal-endpoint.net"))]
     #[serde(default = "default_endpoint")]
@@ -155,7 +155,7 @@ impl HttpEventEncoder<serde_json::Value> for AppsignalEventEncoder {
         match event {
             Event::Log(log) => Some(json!({ "log": log })),
             Event::Metric(metric) => Some(json!({ "metric": metric })),
-            _ => panic!("The AppSignal sink does not support this event: {event:?}"),
+            _ => panic!("The AppSignal sink does not support this type of event: {event:?}"),
         }
     }
 }
@@ -181,7 +181,7 @@ impl HttpSink for AppsignalSinkConfig {
             )
             .header("Content-Encoding", "gzip");
 
-        let mut body = crate::serde::json::to_bytes(&events).unwrap().freeze();
+        let mut body = crate::serde::json::to_bytes(&events)?.freeze();
 
         let buffer = BytesMut::new();
         let mut writer = GzEncoder::new(buffer.writer(), flate2::Compression::new(6));
