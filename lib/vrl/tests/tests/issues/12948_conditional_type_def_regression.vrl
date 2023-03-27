@@ -1,7 +1,0 @@
-# result: null
-
-if .platform == "Apache2" || .platform == "Nginx" {
-  apache2 = del(.apache2)
-  if is_null(apache2) { apache2 = {} }
-  .http = merge(object!(apache2), {})
-}

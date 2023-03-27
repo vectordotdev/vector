@@ -1,6 +1,0 @@
-# issue: https://github.com/vectordotdev/vector/issues/6361
-# result: "1"
-
-foo = [{ "foo": to_string(1) }]
-bar = foo[0].foo
-upcase(bar)

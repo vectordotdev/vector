@@ -1,4 +1,0 @@
-# result: 1.0
-
-foo = 1
-ok, err = 1 / foo
