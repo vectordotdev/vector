@@ -428,7 +428,7 @@ async fn splunk_auto_extracted_timestamp() {
 
         // With auto_extract_timestamp switched the timestamp comes from the message.
         // Note that as per <https://docs.splunk.com/Documentation/Splunk/latest/Data/Configuretimestamprecognition>
-        // the max age of timestamps is 2,000 days old. So we will test with a timestamp that
+        // by default, the max age of timestamps is 2,000 days old. So we will test with a timestamp that
         // is within that limit.
         let date = Utc::now().with_nanosecond(0).unwrap() - chrono::Duration::days(1999);
         let message = format!("this message is on {}", date.format("%Y-%m-%d %H:%M:%S"));
@@ -446,8 +446,6 @@ async fn splunk_auto_extracted_timestamp() {
         run_and_assert_sink_compliance(sink, stream::once(ready(event)), &HTTP_SINK_TAGS).await;
 
         let entry = find_entry(&message).await;
-
-        // `"2017-10-05T14:33:42.000+00:00
 
         assert_eq!(
             format!("{{\"message\":\"{}\"}}", message),
