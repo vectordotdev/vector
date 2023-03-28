@@ -104,7 +104,7 @@ pub trait ContainerTestRunner: TestRunner {
         let mut command = dockercmd(["ps", "-a", "--format", "{{.Names}} {{.State}}"]);
         let container_name = self.container_name();
 
-        for line in command.capture_output()?.lines() {
+        for line in command.check_output()?.lines() {
             if let Some((name, state)) = line.split_once(' ') {
                 if name == container_name {
                     return Ok(if state == "created" {
@@ -157,7 +157,7 @@ pub trait ContainerTestRunner: TestRunner {
         volumes.insert(VOLUME_TARGET);
         volumes.insert(VOLUME_CARGO_GIT);
         volumes.insert(VOLUME_CARGO_REGISTRY);
-        for volume in command.capture_output()?.lines() {
+        for volume in command.check_output()?.lines() {
             volumes.take(volume);
         }
 
@@ -324,7 +324,7 @@ impl IntegrationTestRunner {
             let mut command = dockercmd(["network", "ls", "--format", "{{.Name}}"]);
 
             if command
-                .capture_output()?
+                .check_output()?
                 .lines()
                 .any(|network| network == network_name)
             {
