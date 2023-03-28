@@ -186,11 +186,14 @@ fn main() {
     // "git config --global --add safe.directory /git/vectordotdev/vector", from the vdev package
     // subcommands.
     let git_short_hash = git_short_hash()
-        .map_err(|e| -> String {
-            eprintln!(
-                "Unable to determine git short hash from rev-parse command: {}",
-                e
-            )
+        .map_err(|e| {
+            #[allow(clippy::print_stderr)]
+            {
+                eprintln!(
+                    "Unable to determine git short hash from rev-parse command: {}",
+                    e
+                );
+            }
         })
         .expect("git hash detection failed");
 
