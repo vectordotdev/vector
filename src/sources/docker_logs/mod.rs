@@ -94,10 +94,10 @@ pub struct DockerLogsConfig {
     /// Matching is prefix first, so specifying a value of `foo` would match any container named `foo` as well as any
     /// container whose name started with `foo`. This applies equally whether matching container IDs or names.
     ///
-    /// By default, the source will collect logs for all containers. If `exclude_containers` is configured, any
-    /// container that matches a configured exclusion will be excluded even if it is also included via
-    /// `include_containers`, so care should be taken when utilizing prefix matches as they cannot be overridden by a
-    /// corresponding entry in `include_containers` e.g. excluding `foo` by attempting to include `foo-specific-id`.
+    /// By default, the source collects logs for all containers. If `exclude_containers` is configured, any
+    /// container that matches a configured exclusion is excluded even if it is also included with
+    /// `include_containers`, so care should be taken when using prefix matches as they cannot be overridden by a
+    /// corresponding entry in `include_containers`, for example, excluding `foo` by attempting to include `foo-specific-id`.
     ///
     /// This can be used in conjunction with `include_containers`.
     #[configurable(metadata(
@@ -134,14 +134,14 @@ pub struct DockerLogsConfig {
 
     /// A list of image names to match against.
     ///
-    /// If not provided, all images will be included.
+    /// If not provided, all images are included.
     #[configurable(metadata(docs::examples = "httpd", docs::examples = "redis",))]
     include_images: Option<Vec<String>>,
 
     /// Overrides the name of the log field used to mark an event as partial.
     ///
-    /// If `auto_partial_merge` is disabled, partial events will be emitted with a log field, controlled by this
-    /// configuration value, is set, indicating that the event is not complete.
+    /// If `auto_partial_merge` is disabled, partial events are emitted with a log field, set by this
+    /// configuration value, indicating that the event is not complete.
     #[serde(default = "default_partial_event_marker_field")]
     partial_event_marker_field: Option<String>,
 

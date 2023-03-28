@@ -81,7 +81,7 @@ base: components: sinks: aws_cloudwatch_metrics: configuration: {
 				description: """
 					Timeout for successfully loading any credentials, in seconds.
 
-					Relevant when the default credentials chain is used or `assume_role`.
+					Relevant when the default credentials chain or `assume_role` is used.
 					"""
 				required: false
 				type: uint: {
@@ -105,7 +105,7 @@ base: components: sinks: aws_cloudwatch_metrics: configuration: {
 				description: """
 					The [AWS region][aws_region] to send STS requests to.
 
-					If not set, this will default to the configured region
+					If not set, this defaults to the configured region
 					for the service itself.
 
 					[aws_region]: https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints
@@ -353,8 +353,8 @@ base: components: sinks: aws_cloudwatch_metrics: configuration: {
 				description: """
 					Sets the list of supported ALPN protocols.
 
-					Declare the supported ALPN protocols, which are used during negotiation with peer. Prioritized in the order
-					they are defined.
+					Declare the supported ALPN protocols, which are used during negotiation with peer. They are prioritized in the order
+					that they are defined.
 					"""
 				required: false
 				type: array: items: type: string: examples: ["h2"]
@@ -402,10 +402,10 @@ base: components: sinks: aws_cloudwatch_metrics: configuration: {
 				description: """
 					Enables certificate verification.
 
-					If enabled, certificates must be valid in terms of not being expired, as well as being issued by a trusted
-					issuer. This verification operates in a hierarchical manner, checking that not only the leaf certificate (the
-					certificate presented by the client/server) is valid, but also that the issuer of that certificate is valid, and
-					so on until reaching a root certificate.
+					If enabled, certificates must not be expired and must be issued by a trusted
+					issuer. This verification operates in a hierarchical manner, checking that the leaf certificate (the
+					certificate presented by the client/server) is not only valid, but that the issuer of that certificate is also valid, and
+					so on until the verification process reaches a root certificate.
 
 					Relevant for both incoming and outgoing connections.
 
