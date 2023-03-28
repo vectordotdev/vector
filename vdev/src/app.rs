@@ -44,9 +44,7 @@ pub fn set_repo_dir() -> Result<()> {
 }
 
 pub fn version() -> Result<String> {
-    let mut version = env::var("VERSION")
-        .or_else(|_| env::var("VECTOR_VERSION"))
-        .or_else(|_| util::read_version())?;
+    let mut version = util::get_version()?;
 
     let channel = util::get_channel();
 

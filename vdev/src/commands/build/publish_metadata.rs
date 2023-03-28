@@ -19,7 +19,7 @@ pub struct Cli {}
 impl Cli {
     pub fn exec(self) -> Result<()> {
         // Generate the Vector version and build description.
-        let version = env::var("VERSION").or_else(|_| util::read_version())?;
+        let version = util::get_version()?;
 
         let git_sha = git::get_git_sha()?;
         let current_date = Local::today().naive_local().to_string();

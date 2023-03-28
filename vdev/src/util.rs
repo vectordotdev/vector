@@ -33,6 +33,13 @@ pub fn read_version() -> Result<String> {
     CargoToml::load().map(|cargo| cargo.package.version)
 }
 
+/// Use the version provided by env vars or default to reading from `Cargo.toml`.
+pub fn get_version() -> Result<String> {
+    std::env::var("VERSION")
+        .or_else(|_| std::env::var("VECTOR_VERSION"))
+        .or_else(|_| read_version())
+}
+
 pub fn git_head() -> Result<Output> {
     Command::new("git")
         .args(["describe", "--exact-match", "--tags", "HEAD"])
