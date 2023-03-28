@@ -42,7 +42,7 @@ pub struct FluentConfig {
     #[configurable(derived)]
     address: SocketListenAddr,
 
-    /// The maximum number of TCP connections that will be allowed at any given time.
+    /// The maximum number of TCP connections that are allowed at any given time.
     #[configurable(metadata(docs::type_unit = "connections"))]
     connection_limit: Option<u32>,
 

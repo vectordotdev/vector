@@ -64,13 +64,9 @@ pub use vector_core::config::{log_schema, proxy::ProxyConfig, LogSchema};
 /// configured log schema defaults.
 /// If deny is set, will panic if schema has already been set.
 pub fn init_log_schema(config_paths: &[ConfigPath], deny_if_set: bool) -> Result<(), Vec<String>> {
-    vector_core::config::init_log_schema(
-        || {
-            let (builder, _) = load_builder_from_paths(config_paths)?;
-            Ok(builder.global.log_schema)
-        },
-        deny_if_set,
-    )
+    let (builder, _) = load_builder_from_paths(config_paths)?;
+    vector_core::config::init_log_schema(builder.global.log_schema, deny_if_set);
+    Ok(())
 }
 
 #[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq)]

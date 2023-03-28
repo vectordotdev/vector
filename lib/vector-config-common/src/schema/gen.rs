@@ -1,16 +1,12 @@
-use super::{visit::Visitor, Map, RootSchema, Schema, SchemaObject};
+use super::{visit::Visitor, Map, RootSchema, Schema, SchemaObject, DEFINITIONS_PREFIX};
 
 /// Settings to customize how schemas are generated.
 #[derive(Debug)]
 pub struct SchemaSettings {
     /// A JSON pointer to the expected location of referenceable subschemas within the resulting root schema.
-    ///
-    /// Defaults to `"#/definitions/"`.
     definitions_path: String,
 
     /// The URI of the meta-schema describing the structure of the generated schemas.
-    ///
-    /// Defaults to `"http://json-schema.org/draft-07/schema#"`.
     meta_schema: String,
 
     /// A list of visitors that get applied to all generated root schemas.
@@ -29,7 +25,7 @@ impl SchemaSettings {
     /// [json_schema_2019_09]: https://json-schema.org/specification-links.html#2019-09-formerly-known-as-draft-8
     pub fn new() -> SchemaSettings {
         SchemaSettings {
-            definitions_path: "#/definitions/".to_owned(),
+            definitions_path: DEFINITIONS_PREFIX.to_owned(),
             meta_schema: "https://json-schema.org/draft/2019-09/schema".to_string(),
             visitors: Vec::default(),
         }

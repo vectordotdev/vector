@@ -49,7 +49,7 @@ base: components: sources: gcp_pubsub: configuration: {
 		description: """
 			An [API key][gcp_api_key].
 
-			Either an API key, or a path to a service account credentials JSON file can be specified.
+			Either an API key or a path to a service account credentials JSON file can be specified.
 
 			If both are unset, the `GOOGLE_APPLICATION_CREDENTIALS` environment variable is checked for a filename. If no
 			filename is named, an attempt is made to fetch an instance service account for the compute instance the program is
@@ -63,9 +63,9 @@ base: components: sources: gcp_pubsub: configuration: {
 	}
 	credentials_path: {
 		description: """
-			Path to a [service account] credentials JSON file.
+			Path to a [service account][gcp_service_account_credentials] credentials JSON file.
 
-			Either an API key, or a path to a service account credentials JSON file can be specified.
+			Either an API key or a path to a service account credentials JSON file can be specified.
 
 			If both are unset, the `GOOGLE_APPLICATION_CREDENTIALS` environment variable is checked for a filename. If no
 			filename is named, an attempt is made to fetch an instance service account for the compute instance the program is
@@ -116,7 +116,7 @@ base: components: sources: gcp_pubsub: configuration: {
 					syslog: """
 						Decodes the raw bytes as a Syslog message.
 
-						Will decode either as the [RFC 3164][rfc3164]-style format ("old" style) or the more modern
+						Decodes either as the [RFC 3164][rfc3164]-style format ("old" style) or the
 						[RFC 5424][rfc5424]-style format ("new" style, includes structured data).
 
 						[rfc3164]: https://www.ietf.org/rfc/rfc3164.txt
@@ -165,8 +165,8 @@ base: components: sources: gcp_pubsub: configuration: {
 																lead to memory exhaustion in extreme cases.
 
 																If there is a risk of processing malformed data, such as logs with user-controlled input,
-																consider setting the maximum length to a reasonably large value as a safety net. This will
-																ensure that processing is not truly unbounded.
+																consider setting the maximum length to a reasonably large value as a safety net. This
+																ensures that processing is not actually unbounded.
 																"""
 						required: false
 						type: uint: {}
@@ -179,7 +179,7 @@ base: components: sources: gcp_pubsub: configuration: {
 				type: string: {
 					default: "bytes"
 					enum: {
-						bytes:               "Byte frames are passed through as-is according to the underlying I/O boundaries (e.g. split between messages or stream segments)."
+						bytes:               "Byte frames are passed through as-is according to the underlying I/O boundaries (for example, split between messages or stream segments)."
 						character_delimited: "Byte frames which are delimited by a chosen character."
 						length_delimited:    "Byte frames which are prefixed by an unsigned big-endian 32-bit integer indicating the length."
 						newline_delimited:   "Byte frames which are delimited by a newline character."
@@ -206,8 +206,8 @@ base: components: sources: gcp_pubsub: configuration: {
 						lead to memory exhaustion in extreme cases.
 
 						If there is a risk of processing malformed data, such as logs with user-controlled input,
-						consider setting the maximum length to a reasonably large value as a safety net. This will
-						ensure that processing is not truly unbounded.
+						consider setting the maximum length to a reasonably large value as a safety net. This
+						ensures that processing is not actually unbounded.
 						"""
 					required: false
 					type: uint: {}
@@ -298,8 +298,8 @@ base: components: sources: gcp_pubsub: configuration: {
 				description: """
 					Sets the list of supported ALPN protocols.
 
-					Declare the supported ALPN protocols, which are used during negotiation with peer. Prioritized in the order
-					they are defined.
+					Declare the supported ALPN protocols, which are used during negotiation with peer. They are prioritized in the order
+					that they are defined.
 					"""
 				required: false
 				type: array: items: type: string: examples: ["h2"]
@@ -347,10 +347,10 @@ base: components: sources: gcp_pubsub: configuration: {
 				description: """
 					Enables certificate verification.
 
-					If enabled, certificates must be valid in terms of not being expired, as well as being issued by a trusted
-					issuer. This verification operates in a hierarchical manner, checking that not only the leaf certificate (the
-					certificate presented by the client/server) is valid, but also that the issuer of that certificate is valid, and
-					so on until reaching a root certificate.
+					If enabled, certificates must not be expired and must be issued by a trusted
+					issuer. This verification operates in a hierarchical manner, checking that the leaf certificate (the
+					certificate presented by the client/server) is not only valid, but that the issuer of that certificate is also valid, and
+					so on until the verification process reaches a root certificate.
 
 					Relevant for both incoming and outgoing connections.
 

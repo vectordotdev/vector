@@ -114,7 +114,7 @@ pub enum AwsAuthentication {
 
         /// Timeout for assuming the role, in seconds.
         ///
-        /// Relevant when the default credentials chain is used or `assume_role`.
+        /// Relevant when the default credentials chain or `assume_role` is used.
         #[configurable(metadata(docs::type_unit = "seconds"))]
         #[configurable(metadata(docs::examples = 30))]
         load_timeout_secs: Option<u64>,
@@ -125,7 +125,7 @@ pub enum AwsAuthentication {
 
         /// The [AWS region][aws_region] to send STS requests to.
         ///
-        /// If not set, this will default to the configured region
+        /// If not set, this defaults to the configured region
         /// for the service itself.
         ///
         /// [aws_region]: https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints
@@ -133,12 +133,12 @@ pub enum AwsAuthentication {
         region: Option<String>,
     },
 
-    /// Default authentication strategy which tries a variety of substrategies in a one-after-the-other fashion.
+    /// Default authentication strategy which tries a variety of substrategies in sequential order.
     #[derivative(Default)]
     Default {
         /// Timeout for successfully loading any credentials, in seconds.
         ///
-        /// Relevant when the default credentials chain is used or `assume_role`.
+        /// Relevant when the default credentials chain or `assume_role` is used.
         #[configurable(metadata(docs::type_unit = "seconds"))]
         #[configurable(metadata(docs::examples = 30))]
         load_timeout_secs: Option<u64>,

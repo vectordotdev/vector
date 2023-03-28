@@ -1,6 +1,6 @@
 use std::{convert::TryFrom, iter, num::NonZeroU8};
 
-use chrono::{TimeZone, Utc};
+use chrono::{TimeZone, Timelike, Utc};
 use codecs::{JsonSerializerConfig, TextSerializerConfig};
 use futures::{future::ready, stream};
 use lookup::lookup_v2::OptionalValuePath;
@@ -427,8 +427,12 @@ async fn splunk_auto_extracted_timestamp() {
         let (sink, _) = config.build(cx).await.unwrap();
 
         // With auto_extract_timestamp switched the timestamp comes from the message.
-        let message = "this message is on 2017-10-01 03:00:00";
-        let mut event = LogEvent::from(message);
+        // Note that as per <https://docs.splunk.com/Documentation/Splunk/latest/Data/Configuretimestamprecognition>
+        // by default, the max age of timestamps is 2,000 days old. So we will test with a timestamp that
+        // is within that limit.
+        let date = Utc::now().with_nanosecond(0).unwrap() - chrono::Duration::days(1999);
+        let message = format!("this message is on {}", date.format("%Y-%m-%d %H:%M:%S"));
+        let mut event = LogEvent::from(message.as_str());
 
         event.insert(
             "timestamp",
@@ -441,14 +445,14 @@ async fn splunk_auto_extracted_timestamp() {
 
         run_and_assert_sink_compliance(sink, stream::once(ready(event)), &HTTP_SINK_TAGS).await;
 
-        let entry = find_entry(message).await;
+        let entry = find_entry(&message).await;
 
         assert_eq!(
             format!("{{\"message\":\"{}\"}}", message),
             entry["_raw"].as_str().unwrap()
         );
         assert_eq!(
-            "2017-10-01T03:00:00.000+00:00",
+            &format!("{}", date.format("%Y-%m-%dT%H:%M:%S%.3f%:z")),
             entry["_time"].as_str().unwrap()
         );
     }
@@ -474,8 +478,9 @@ async fn splunk_non_auto_extracted_timestamp() {
         };
 
         let (sink, _) = config.build(cx).await.unwrap();
-        let message = "this message is on 2019-10-01 00:00:00";
-        let mut event = LogEvent::from(message);
+        let date = Utc::now().with_nanosecond(0).unwrap() - chrono::Duration::days(1999);
+        let message = format!("this message is on {}", date.format("%Y-%m-%d %H:%M:%S"));
+        let mut event = LogEvent::from(message.as_str());
 
         // With auto_extract_timestamp switched off the timestamp comes from the event timestamp.
         event.insert(
@@ -489,7 +494,7 @@ async fn splunk_non_auto_extracted_timestamp() {
 
         run_and_assert_sink_compliance(sink, stream::once(ready(event)), &HTTP_SINK_TAGS).await;
 
-        let entry = find_entry(message).await;
+        let entry = find_entry(&message).await;
 
         assert_eq!(
             format!("{{\"message\":\"{}\"}}", message),

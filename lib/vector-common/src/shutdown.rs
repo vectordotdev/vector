@@ -288,7 +288,9 @@ impl SourceShutdownCoordinator {
             .cloned()
             .map(|tripwire| tripwire.then(tripwire_handler).boxed());
 
-        future::join_all(futures).map(|_| ()).boxed()
+        future::join_all(futures)
+            .map(|_| info!("All sources have finished."))
+            .boxed()
     }
 
     fn shutdown_source_complete(

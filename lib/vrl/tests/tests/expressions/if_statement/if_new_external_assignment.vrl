@@ -1,7 +1,0 @@
-# result: {"any": true}
-
-assert!(type_def(.a) == {"any": true})
-if false {
-  .a = "string"
-}
-type_def(.a)

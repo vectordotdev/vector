@@ -13,7 +13,7 @@ base: components: sources: socket: configuration: {
 		type: string: examples: ["0.0.0.0:9000", "systemd", "systemd#3"]
 	}
 	connection_limit: {
-		description:   "The maximum number of TCP connections that will be allowed at any given time."
+		description:   "The maximum number of TCP connections that are allowed at any given time."
 		relevant_when: "mode = \"tcp\""
 		required:      false
 		type: uint: unit: "connections"
@@ -57,7 +57,7 @@ base: components: sources: socket: configuration: {
 					syslog: """
 						Decodes the raw bytes as a Syslog message.
 
-						Will decode either as the [RFC 3164][rfc3164]-style format ("old" style) or the more modern
+						Decodes either as the [RFC 3164][rfc3164]-style format ("old" style) or the
 						[RFC 5424][rfc5424]-style format ("new" style, includes structured data).
 
 						[rfc3164]: https://www.ietf.org/rfc/rfc3164.txt
@@ -98,8 +98,8 @@ base: components: sources: socket: configuration: {
 																lead to memory exhaustion in extreme cases.
 
 																If there is a risk of processing malformed data, such as logs with user-controlled input,
-																consider setting the maximum length to a reasonably large value as a safety net. This will
-																ensure that processing is not truly unbounded.
+																consider setting the maximum length to a reasonably large value as a safety net. This
+																ensures that processing is not actually unbounded.
 																"""
 						required: false
 						type: uint: {}
@@ -110,7 +110,7 @@ base: components: sources: socket: configuration: {
 				description: "The framing method."
 				required:    true
 				type: string: enum: {
-					bytes:               "Byte frames are passed through as-is according to the underlying I/O boundaries (e.g. split between messages or stream segments)."
+					bytes:               "Byte frames are passed through as-is according to the underlying I/O boundaries (for example, split between messages or stream segments)."
 					character_delimited: "Byte frames which are delimited by a chosen character."
 					length_delimited:    "Byte frames which are prefixed by an unsigned big-endian 32-bit integer indicating the length."
 					newline_delimited:   "Byte frames which are delimited by a newline character."
@@ -136,8 +136,8 @@ base: components: sources: socket: configuration: {
 						lead to memory exhaustion in extreme cases.
 
 						If there is a risk of processing malformed data, such as logs with user-controlled input,
-						consider setting the maximum length to a reasonably large value as a safety net. This will
-						ensure that processing is not truly unbounded.
+						consider setting the maximum length to a reasonably large value as a safety net. This
+						ensures that processing is not actually unbounded.
 						"""
 					required: false
 					type: uint: {}
@@ -236,11 +236,7 @@ base: components: sources: socket: configuration: {
 		type: string: default: "port"
 	}
 	receive_buffer_bytes: {
-		description: """
-			The size of the receive buffer used for each connection.
-
-			Generally this should not need to be configured.
-			"""
+		description:   "The size of the receive buffer used for each connection."
 		relevant_when: "mode = \"tcp\" or mode = \"udp\""
 		required:      false
 		type: uint: unit: "bytes"
@@ -258,7 +254,7 @@ base: components: sources: socket: configuration: {
 		description: """
 			Unix file mode bits to be applied to the unix socket file as its designated file permissions.
 
-			Note that the file mode value can be specified in any numeric format supported by your configuration
+			Note: The file mode value can be specified in any numeric format supported by your configuration
 			language, but it is most intuitive to use an octal number.
 			"""
 		relevant_when: "mode = \"unix_datagram\" or mode = \"unix_stream\""
@@ -266,7 +262,7 @@ base: components: sources: socket: configuration: {
 		type: uint: examples: [511, 384, 508]
 	}
 	tls: {
-		description:   "TlsEnableableConfig for `sources`, adding metadata from the client certificate"
+		description:   "TlsEnableableConfig for `sources`, adding metadata from the client certificate."
 		relevant_when: "mode = \"tcp\""
 		required:      false
 		type: object: options: {
@@ -274,8 +270,8 @@ base: components: sources: socket: configuration: {
 				description: """
 					Sets the list of supported ALPN protocols.
 
-					Declare the supported ALPN protocols, which are used during negotiation with peer. Prioritized in the order
-					they are defined.
+					Declare the supported ALPN protocols, which are used during negotiation with peer. They are prioritized in the order
+					that they are defined.
 					"""
 				required: false
 				type: array: items: type: string: examples: ["h2"]
@@ -308,7 +304,7 @@ base: components: sources: socket: configuration: {
 			}
 			enabled: {
 				description: """
-					Whether or not to require TLS for incoming/outgoing connections.
+					Whether or not to require TLS for incoming or outgoing connections.
 
 					When enabled and used for incoming connections, an identity certificate is also required. See `tls.crt_file` for
 					more information.
@@ -338,10 +334,10 @@ base: components: sources: socket: configuration: {
 				description: """
 					Enables certificate verification.
 
-					If enabled, certificates must be valid in terms of not being expired, as well as being issued by a trusted
-					issuer. This verification operates in a hierarchical manner, checking that not only the leaf certificate (the
-					certificate presented by the client/server) is valid, but also that the issuer of that certificate is valid, and
-					so on until reaching a root certificate.
+					If enabled, certificates must not be expired and must be issued by a trusted
+					issuer. This verification operates in a hierarchical manner, checking that the leaf certificate (the
+					certificate presented by the client/server) is not only valid, but that the issuer of that certificate is also valid, and
+					so on until the verification process reaches a root certificate.
 
 					Relevant for both incoming and outgoing connections.
 

@@ -31,8 +31,8 @@ pub struct NewlineDelimitedDecoderOptions {
     /// lead to memory exhaustion in extreme cases.
     ///
     /// If there is a risk of processing malformed data, such as logs with user-controlled input,
-    /// consider setting the maximum length to a reasonably large value as a safety net. This will
-    /// ensure that processing is not truly unbounded.
+    /// consider setting the maximum length to a reasonably large value as a safety net. This
+    /// ensures that processing is not actually unbounded.
     #[serde(skip_serializing_if = "vector_core::serde::skip_serializing_if_default")]
     max_length: Option<usize>,
 }

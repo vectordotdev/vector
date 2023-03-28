@@ -1,4 +1,0 @@
-# object: { "__foo": true, "_bar": "bar", "baz": "", "_qux_": { "__quux": "", "_derp_": "derp" }, "_quux": [{ "_darp": "" }] }
-# result: {   "foo": true,  "bar": "bar", "baz": "",  "qux_": {   "quux": "",  "derp_": "derp" },  "quux": [{  "darp": "" }] }
-
-map_keys(., recursive: true) -> |key| { replace(key, r'\A_*', "") }

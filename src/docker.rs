@@ -24,7 +24,7 @@ pub enum Error {
 
 /// Configuration of TLS when connecting to the Docker daemon.
 ///
-/// Only relevant when connecting to Docker via an HTTPS URL.
+/// Only relevant when connecting to Docker with an HTTPS URL.
 ///
 /// If not configured, the environment variable `DOCKER_CERT_PATH` is used. If `DOCKER_CERT_PATH` is absent, then` DOCKER_CONFIG` is used. If both environment variables are absent, the certificates in `~/.docker/` are read.
 #[configurable_component]

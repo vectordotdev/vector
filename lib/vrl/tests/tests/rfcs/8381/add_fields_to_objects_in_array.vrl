@@ -1,5 +1,0 @@
-# object: { "foo": "bar", "items": [{}, {}] }
-# result: { "foo": "bar", "items": [{ "foo": "bar" }, { "foo": "bar" }] }
-
-.items = map_values(array!(.items)) -> |value| { value.foo = .foo; value }
-.

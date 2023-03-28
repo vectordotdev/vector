@@ -1,5 +1,0 @@
-# result:
-# { "integer": true, "undefined": true }
-
-x = slice!([0], 0)
-type_def(x[1])
