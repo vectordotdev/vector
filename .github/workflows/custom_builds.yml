@@ -1,15 +1,12 @@
-name: Release Suite
+name: Custom Builds
 
 on:
-  push:
-    tags:
-      - v0.*
-      - v1.*
+  workflow_dispatch: {}
 
 jobs:
-  Release:
+  Custom:
     uses: ./.github/workflows/publish.yml
     with:
       git_ref: ${{ github.ref }}
-      channel: release
+      channel: custom
     secrets: inherit
