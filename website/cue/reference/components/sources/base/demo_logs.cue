@@ -49,7 +49,7 @@ base: components: sources: demo_logs: configuration: {
 					syslog: """
 						Decodes the raw bytes as a Syslog message.
 
-						Will decode either as the [RFC 3164][rfc3164]-style format ("old" style) or the more modern
+						Decodes either as the [RFC 3164][rfc3164]-style format ("old" style) or the
 						[RFC 5424][rfc5424]-style format ("new" style, includes structured data).
 
 						[rfc3164]: https://www.ietf.org/rfc/rfc3164.txt
@@ -122,8 +122,8 @@ base: components: sources: demo_logs: configuration: {
 																lead to memory exhaustion in extreme cases.
 
 																If there is a risk of processing malformed data, such as logs with user-controlled input,
-																consider setting the maximum length to a reasonably large value as a safety net. This will
-																ensure that processing is not truly unbounded.
+																consider setting the maximum length to a reasonably large value as a safety net. This
+																ensures that processing is not actually unbounded.
 																"""
 						required: false
 						type: uint: {}
@@ -136,7 +136,7 @@ base: components: sources: demo_logs: configuration: {
 				type: string: {
 					default: "bytes"
 					enum: {
-						bytes:               "Byte frames are passed through as-is according to the underlying I/O boundaries (e.g. split between messages or stream segments)."
+						bytes:               "Byte frames are passed through as-is according to the underlying I/O boundaries (for example, split between messages or stream segments)."
 						character_delimited: "Byte frames which are delimited by a chosen character."
 						length_delimited:    "Byte frames which are prefixed by an unsigned big-endian 32-bit integer indicating the length."
 						newline_delimited:   "Byte frames which are delimited by a newline character."
@@ -163,8 +163,8 @@ base: components: sources: demo_logs: configuration: {
 						lead to memory exhaustion in extreme cases.
 
 						If there is a risk of processing malformed data, such as logs with user-controlled input,
-						consider setting the maximum length to a reasonably large value as a safety net. This will
-						ensure that processing is not truly unbounded.
+						consider setting the maximum length to a reasonably large value as a safety net. This
+						ensures that processing is not actually unbounded.
 						"""
 					required: false
 					type: uint: {}
@@ -186,7 +186,7 @@ base: components: sources: demo_logs: configuration: {
 		description: """
 			The amount of time, in seconds, to pause between each batch of output lines.
 
-			The default is one batch per second. In order to remove the delay and output batches as quickly as possible, set
+			The default is one batch per second. To remove the delay and output batches as quickly as possible, set
 			`interval` to `0.0`.
 			"""
 		required: false

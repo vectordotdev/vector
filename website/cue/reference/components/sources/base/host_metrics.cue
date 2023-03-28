@@ -3,7 +3,7 @@ package metadata
 base: components: sources: host_metrics: configuration: {
 	cgroups: {
 		description: """
-			Options for the “cgroups” (controller groups) metrics collector.
+			Options for the cgroups (controller groups) metrics collector.
 
 			This collector is only available on Linux systems, and only supports either version 2 or hybrid cgroups.
 			"""
@@ -93,7 +93,7 @@ base: components: sources: host_metrics: configuration: {
 		}
 	}
 	disk: {
-		description: "Options for the “disk” metrics collector."
+		description: "Options for the disk metrics collector."
 		required:    false
 		type: object: options: devices: {
 			description: """
@@ -133,7 +133,7 @@ base: components: sources: host_metrics: configuration: {
 		}
 	}
 	filesystem: {
-		description: "Options for the “filesystem” metrics collector."
+		description: "Options for the filesystem metrics collector."
 		required:    false
 		type: object: options: {
 			devices: {
@@ -252,7 +252,7 @@ base: components: sources: host_metrics: configuration: {
 		type: string: default: "host"
 	}
 	network: {
-		description: "Options for the “network” metrics collector."
+		description: "Options for the network metrics collector."
 		required:    false
 		type: object: options: devices: {
 			description: """

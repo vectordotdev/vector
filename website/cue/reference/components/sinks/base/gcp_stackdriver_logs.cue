@@ -31,7 +31,7 @@ base: components: sinks: gcp_stackdriver_logs: configuration: {
 		description: """
 			An [API key][gcp_api_key].
 
-			Either an API key, or a path to a service account credentials JSON file can be specified.
+			Either an API key or a path to a service account credentials JSON file can be specified.
 
 			If both are unset, the `GOOGLE_APPLICATION_CREDENTIALS` environment variable is checked for a filename. If no
 			filename is named, an attempt is made to fetch an instance service account for the compute instance the program is
@@ -86,9 +86,9 @@ base: components: sinks: gcp_stackdriver_logs: configuration: {
 	}
 	credentials_path: {
 		description: """
-			Path to a [service account] credentials JSON file.
+			Path to a [service account][gcp_service_account_credentials] credentials JSON file.
 
-			Either an API key, or a path to a service account credentials JSON file can be specified.
+			Either an API key or a path to a service account credentials JSON file can be specified.
 
 			If both are unset, the `GOOGLE_APPLICATION_CREDENTIALS` environment variable is checked for a filename. If no
 			filename is named, an attempt is made to fetch an instance service account for the compute instance the program is
@@ -370,8 +370,8 @@ base: components: sinks: gcp_stackdriver_logs: configuration: {
 				description: """
 					Sets the list of supported ALPN protocols.
 
-					Declare the supported ALPN protocols, which are used during negotiation with peer. Prioritized in the order
-					they are defined.
+					Declare the supported ALPN protocols, which are used during negotiation with peer. They are prioritized in the order
+					that they are defined.
 					"""
 				required: false
 				type: array: items: type: string: examples: ["h2"]
@@ -419,10 +419,10 @@ base: components: sinks: gcp_stackdriver_logs: configuration: {
 				description: """
 					Enables certificate verification.
 
-					If enabled, certificates must be valid in terms of not being expired, as well as being issued by a trusted
-					issuer. This verification operates in a hierarchical manner, checking that not only the leaf certificate (the
-					certificate presented by the client/server) is valid, but also that the issuer of that certificate is valid, and
-					so on until reaching a root certificate.
+					If enabled, certificates must not be expired and must be issued by a trusted
+					issuer. This verification operates in a hierarchical manner, checking that the leaf certificate (the
+					certificate presented by the client/server) is not only valid, but that the issuer of that certificate is also valid, and
+					so on until the verification process reaches a root certificate.
 
 					Relevant for both incoming and outgoing connections.
 

@@ -13,7 +13,7 @@ base: components: sources: syslog: configuration: {
 		type: string: examples: ["0.0.0.0:9000", "systemd", "systemd#3"]
 	}
 	connection_limit: {
-		description:   "The maximum number of TCP connections that will be allowed at any given time."
+		description:   "The maximum number of TCP connections that are allowed at any given time."
 		relevant_when: "mode = \"tcp\""
 		required:      false
 		type: uint: {}
@@ -22,8 +22,8 @@ base: components: sources: syslog: configuration: {
 		description: """
 			Overrides the name of the log field used to add the peer host to each event.
 
-			If using TCP or UDP, the value will be the peer host's address, including the port i.e. `1.2.3.4:9000`. If using
-			UDS, the value will be the socket path itself.
+			If using TCP or UDP, the value is the peer host's address, including the port. For example, `1.2.3.4:9000`. If using
+			UDS, the value is the socket path itself.
 
 			By default, the [global `log_schema.host_key` option][global_host_key] is used.
 
@@ -87,7 +87,7 @@ base: components: sources: syslog: configuration: {
 		description: """
 			Unix file mode bits to be applied to the unix socket file as its designated file permissions.
 
-			Note that the file mode value can be specified in any numeric format supported by your configuration
+			Note: The file mode value can be specified in any numeric format supported by your configuration
 			language, but it is most intuitive to use an octal number.
 			"""
 		relevant_when: "mode = \"unix\""
@@ -95,7 +95,7 @@ base: components: sources: syslog: configuration: {
 		type: uint: {}
 	}
 	tls: {
-		description:   "TlsEnableableConfig for `sources`, adding metadata from the client certificate"
+		description:   "TlsEnableableConfig for `sources`, adding metadata from the client certificate."
 		relevant_when: "mode = \"tcp\""
 		required:      false
 		type: object: options: {
@@ -103,8 +103,8 @@ base: components: sources: syslog: configuration: {
 				description: """
 					Sets the list of supported ALPN protocols.
 
-					Declare the supported ALPN protocols, which are used during negotiation with peer. Prioritized in the order
-					they are defined.
+					Declare the supported ALPN protocols, which are used during negotiation with peer. They are prioritized in the order
+					that they are defined.
 					"""
 				required: false
 				type: array: items: type: string: examples: ["h2"]
@@ -137,7 +137,7 @@ base: components: sources: syslog: configuration: {
 			}
 			enabled: {
 				description: """
-					Whether or not to require TLS for incoming/outgoing connections.
+					Whether or not to require TLS for incoming or outgoing connections.
 
 					When enabled and used for incoming connections, an identity certificate is also required. See `tls.crt_file` for
 					more information.
@@ -167,10 +167,10 @@ base: components: sources: syslog: configuration: {
 				description: """
 					Enables certificate verification.
 
-					If enabled, certificates must be valid in terms of not being expired, as well as being issued by a trusted
-					issuer. This verification operates in a hierarchical manner, checking that not only the leaf certificate (the
-					certificate presented by the client/server) is valid, but also that the issuer of that certificate is valid, and
-					so on until reaching a root certificate.
+					If enabled, certificates must not be expired and must be issued by a trusted
+					issuer. This verification operates in a hierarchical manner, checking that the leaf certificate (the
+					certificate presented by the client/server) is not only valid, but that the issuer of that certificate is also valid, and
+					so on until the verification process reaches a root certificate.
 
 					Relevant for both incoming and outgoing connections.
 
