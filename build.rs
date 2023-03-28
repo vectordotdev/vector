@@ -187,7 +187,7 @@ fn main() {
     // subcommands.
     let git_short_hash = git_short_hash()
         .map_err(|e| -> String {
-            format!(
+            eprintln!(
                 "Unable to determine git short hash from rev-parse command: {}",
                 e
             )
