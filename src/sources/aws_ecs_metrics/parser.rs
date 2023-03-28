@@ -258,7 +258,7 @@ fn cpu_metrics(
     timestamp: DateTime<Utc>,
     namespace: &Option<String>,
     tags: &MetricTags,
-    stattype: &str,
+    usage: &str,
 ) -> Vec<Metric> {
     // Eight expected metrics not including online_cpus
     let size = 8 + cpu.online_cpus.unwrap_or(0);
@@ -266,7 +266,7 @@ fn cpu_metrics(
 
     if let Some(online_cpus) = cpu.online_cpus {
         metrics.push(gauge(
-            stattype,
+            usage,
             "online_cpus",
             namespace.clone(),
             timestamp,
@@ -277,7 +277,7 @@ fn cpu_metrics(
 
     if let Some(system_cpu_usage) = cpu.system_cpu_usage {
         metrics.push(counter(
-            stattype,
+            usage,
             "usage_system_jiffies_total",
             namespace.clone(),
             timestamp,
@@ -300,7 +300,7 @@ fn cpu_metrics(
             .filter_map(|(name, value)| {
                 value.map(|value| {
                     counter(
-                        stattype,
+                        usage,
                         name,
                         namespace.clone(),
                         timestamp,
@@ -328,7 +328,7 @@ fn cpu_metrics(
             .filter_map(|(name, value)| {
                 value.map(|value| {
                     counter(
-                        stattype,
+                        usage,
                         name,
                         namespace.clone(),
                         timestamp,
@@ -349,7 +349,7 @@ fn cpu_metrics(
                     tags.replace("cpu".into(), index.to_string());
 
                     counter(
-                        stattype,
+                        usage,
                         "usage_percpu_jiffies_total",
                         namespace.clone(),
                         timestamp,
