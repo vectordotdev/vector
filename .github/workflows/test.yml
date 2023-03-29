@@ -127,7 +127,7 @@ jobs:
 
   test-cli:
     name: CLI - Linux
-    runs-on: [linux, test-runner]
+    runs-on: [linux, ubuntu-20]
     needs: changes
     env:
       CARGO_INCREMENTAL: 0
@@ -182,7 +182,7 @@ jobs:
 
   cross-linux:
     name: Cross - ${{ matrix.target }}
-    runs-on: [linux, test-runner]
+    runs-on: [linux, optimize-8-core]
     needs: changes
     env:
       CARGO_INCREMENTAL: 0
@@ -198,7 +198,8 @@ jobs:
 
     # We run cross checks when dependencies change to ensure they still build.
     # This helps us avoid adopting dependencies that aren't compatible with other architectures.
-    if: ${{ needs.changes.outputs.dependencies == 'true' }}
+    # TODO: re enable conditional
+    #if: ${{ needs.changes.outputs.dependencies == 'true' }}
     steps:
       - uses: actions/checkout@v3
       - uses: actions/cache@v3
@@ -224,7 +225,8 @@ jobs:
           path: "./target/${{ matrix.target }}/debug/vector"
 
   cross-linux-check:
-    if: ${{ needs.changes.outputs.dependencies == 'true' }}
+    # TODO: re enable conditional
+    #if: ${{ needs.changes.outputs.dependencies == 'true' }}
     runs-on: ubuntu-20.04
     name: Cross - Linux
     needs: cross-linux
@@ -275,7 +277,7 @@ jobs:
   test-vrl:
     name: VRL - Linux
     continue-on-error: true
-    runs-on: [linux, test-runner]
+    runs-on: [linux, ubuntu-20]
     needs: changes
     if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.cue == 'true' }}
     steps:
@@ -298,7 +300,7 @@ jobs:
 
   check-msrv:
     name: Check minimum supported Rust version
-    runs-on: [linux, test-runner]
+    runs-on: [linux, ubuntu-20]
     needs: changes
     if: ${{ needs.changes.outputs.source == 'true' }}
     steps:

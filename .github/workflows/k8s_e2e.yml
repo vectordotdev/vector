@@ -82,7 +82,7 @@ jobs:
   # See https://github.community/t/feature-request-and-use-case-example-to-allow-matrix-in-if-s/126067
   compute-k8s-test-plan:
     name: Compute K8s test plan
-    runs-on: [linux, test-runner]
+    runs-on: [linux, ubuntu-latest]
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     if: |
