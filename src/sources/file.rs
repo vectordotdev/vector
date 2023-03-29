@@ -1597,11 +1597,6 @@ mod tests {
         // ...but not all the lines; if the first run processed the entire file, we may not hit the
         // bug we're testing for, which happens if the finalizer stream exits on shutdown with pending acks
         assert!(lines.len() < line_count);
-        println!(
-            "Read {} lines (last: '{}').",
-            lines.len(),
-            lines[lines.len() - 1]
-        );
 
         // Restart the server, and it should read the rest without duplicating any
         let received = run_file_source(
@@ -1613,7 +1608,6 @@ mod tests {
         )
         .await;
         let lines2 = extract_messages_string(received);
-        println!("Read {} lines (first: '{}').", lines2.len(), lines2[0]);
 
         // Between both runs, we should have the expected number of lines
         assert_eq!(lines.len() + lines2.len(), line_count);
