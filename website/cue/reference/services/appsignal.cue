@@ -2,7 +2,7 @@ package metadata
 
 services: appsignal: {
 	name:     "AppSignal"
-	thing:    "a \(name) account"
+	thing:    "an \(name) app"
 	url:      urls.appsignal
 	versions: null
 

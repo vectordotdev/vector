@@ -4,7 +4,7 @@
 //! metric types. These events are sent to the `appsignal-endpoint.net` domain, which is part of
 //! the `appsignal.com` infrastructure.
 //!
-//! Logs and metrics are stored on an per app basis are require an app-level Push API key.
+//! Logs and metrics are stored on an per app basis and require an app-level Push API key.
 
 #[cfg(all(test, feature = "appsignal-integration-tests"))]
 mod integration_tests;
