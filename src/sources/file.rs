@@ -1566,6 +1566,60 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn file_duplicate_processing_after_restart() {
+        let dir = tempdir().unwrap();
+        let config = file::FileConfig {
+            include: vec![dir.path().join("*")],
+            ..test_default_file_config(&dir)
+        };
+
+        let path = dir.path().join("file");
+        let mut file = File::create(&path).unwrap();
+
+        let line_count = 4000;
+        for i in 0..line_count {
+            writeln!(&mut file, "Here's a line for you: {}", i).unwrap();
+        }
+        sleep_500_millis().await;
+
+        // First time server runs it should pick up a bunch of lines
+        let received = run_file_source(
+            &config,
+            true,
+            Acks,
+            LogNamespace::Legacy,
+            // shutdown signal is sent after this duration
+            sleep_500_millis(),
+        )
+        .await;
+        let lines = extract_messages_string(received);
+
+        // ...but not all the lines; if the first run processed the entire file, we may not hit the
+        // bug we're testing for, which happens if the finalizer stream exits on shutdown with pending acks
+        assert!(lines.len() < line_count);
+        println!(
+            "Read {} lines (last: '{}').",
+            lines.len(),
+            lines[lines.len() - 1]
+        );
+
+        // Restart the server, and it should read the rest without duplicating any
+        let received = run_file_source(
+            &config,
+            true,
+            Acks,
+            LogNamespace::Legacy,
+            sleep(Duration::from_secs(5)),
+        )
+        .await;
+        let lines2 = extract_messages_string(received);
+        println!("Read {} lines (first: '{}').", lines2.len(), lines2[0]);
+
+        // Between both runs, we should have the expected number of lines
+        assert_eq!(lines.len() + lines2.len(), line_count);
+    }
+
+    #[tokio::test]
     async fn file_start_position_server_restart_with_file_rotation_acknowledged() {
         file_start_position_server_restart_with_file_rotation(Acks).await
     }
