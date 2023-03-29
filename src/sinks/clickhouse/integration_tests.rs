@@ -183,11 +183,17 @@ async fn insert_events_unix_timestamps() {
 
     let exp_event = input_event.as_mut_log();
     exp_event.insert(
-        log_schema().timestamp_key(),
+        (
+            lookup::PathPrefix::Event,
+            log_schema().timestamp_key().unwrap(),
+        ),
         format!(
             "{}",
             exp_event
-                .get(log_schema().timestamp_key())
+                .get((
+                    lookup::PathPrefix::Event,
+                    log_schema().timestamp_key().unwrap()
+                ))
                 .unwrap()
                 .as_timestamp()
                 .unwrap()
@@ -245,11 +251,17 @@ timestamp_format = "unix""#,
 
     let exp_event = input_event.as_mut_log();
     exp_event.insert(
-        log_schema().timestamp_key(),
+        (
+            lookup::PathPrefix::Event,
+            log_schema().timestamp_key().unwrap(),
+        ),
         format!(
             "{}",
             exp_event
-                .get(log_schema().timestamp_key())
+                .get((
+                    lookup::PathPrefix::Event,
+                    log_schema().timestamp_key().unwrap()
+                ))
                 .unwrap()
                 .as_timestamp()
                 .unwrap()

@@ -1,5 +1,0 @@
-# issue: https://github.com/vectordotdev/vector/issues/6266
-# object: { "foo": null }
-# result: {}
-
-. = compact(.)

@@ -1,5 +1,0 @@
-# result: [{ "ok": 1.0 }, null]
-
-foo = 1
-.ok, err = 1 / foo
-[., err]

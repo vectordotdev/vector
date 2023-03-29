@@ -50,14 +50,12 @@ pub struct LogstashConfig {
     tls: Option<TlsSourceConfig>,
 
     /// The size of the receive buffer used for each connection.
-    ///
-    /// This generally should not need to be changed.
     #[configurable(metadata(docs::type_unit = "bytes"))]
     #[configurable(metadata(docs::examples = 65536))]
     #[configurable(metadata(docs::advanced))]
     receive_buffer_bytes: Option<usize>,
 
-    /// The maximum number of TCP connections that will be allowed at any given time.
+    /// The maximum number of TCP connections that are allowed at any given time.
     #[configurable(metadata(docs::type_unit = "connections"))]
     #[configurable(metadata(docs::advanced))]
     connection_limit: Option<u32>,
@@ -210,7 +208,7 @@ impl TcpSource for LogstashSource {
 
             self.log_namespace.insert_vector_metadata(
                 log,
-                log_schema().source_type_key(),
+                Some(log_schema().source_type_key()),
                 path!("source_type"),
                 Bytes::from_static(LogstashConfig::NAME.as_bytes()),
             );
@@ -233,10 +231,12 @@ impl TcpSource for LogstashSource {
                     log.insert(metadata_path!("vector", "ingest_timestamp"), now);
                 }
                 LogNamespace::Legacy => {
-                    log.insert(
-                        (PathPrefix::Event, log_schema().timestamp_key()),
-                        log_timestamp.unwrap_or_else(|| Value::from(now)),
-                    );
+                    if let Some(timestamp_key) = log_schema().timestamp_key() {
+                        log.insert(
+                            (PathPrefix::Event, timestamp_key),
+                            log_timestamp.unwrap_or_else(|| Value::from(now)),
+                        );
+                    }
                 }
             }
 

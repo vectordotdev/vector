@@ -110,14 +110,14 @@ pub struct JournaldConfig {
     ///
     /// If empty or not present, all units are accepted.
     ///
-    /// Unit names lacking a `.` will have `.service` appended to make them a valid service unit name.
+    /// Unit names lacking a `.` have `.service` appended to make them a valid service unit name.
     #[serde(default)]
     #[configurable(metadata(docs::examples = "ntpd", docs::examples = "sysinit.target"))]
     pub include_units: Vec<String>,
 
     /// A list of unit names to exclude from monitoring.
     ///
-    /// Unit names lacking a `.` will have `.service` appended to make them a valid service unit
+    /// Unit names lacking a `.` have `.service` appended to make them a valid service unit
     /// name.
     #[serde(default)]
     #[configurable(metadata(docs::examples = "badservice", docs::examples = "sysinit.target"))]
@@ -127,7 +127,7 @@ pub struct JournaldConfig {
     ///
     /// If empty or not present, all journal fields are accepted.
     ///
-    /// If `include_units` is specified, it will be merged into this list.
+    /// If `include_units` is specified, it is merged into this list.
     #[serde(default)]
     #[configurable(metadata(
         docs::additional_props_description = "The set of field values to match in journal entries that are to be included."
@@ -135,10 +135,10 @@ pub struct JournaldConfig {
     #[configurable(metadata(docs::examples = "matches_examples()"))]
     pub include_matches: Matches,
 
-    /// A list of sets of field/value pairs that, if any are present in a journal entry, will cause
-    /// the entry to be excluded from this source.
+    /// A list of sets of field/value pairs that, if any are present in a journal entry,
+    /// excludes the entry from this source.
     ///
-    /// If `exclude_units` is specified, it will be merged into this list.
+    /// If `exclude_units` is specified, it is merged into this list.
     #[serde(default)]
     #[configurable(metadata(
         docs::additional_props_description = "The set of field values to match in journal entries that are to be excluded."
@@ -169,7 +169,7 @@ pub struct JournaldConfig {
 
     /// The full path of the journal directory.
     ///
-    /// If not set, `journalctl` will use the default system journal path.
+    /// If not set, `journalctl` uses the default system journal path.
     #[serde(default)]
     pub journal_directory: Option<PathBuf>,
 
@@ -725,7 +725,9 @@ fn enrich_log_event(log: &mut LogEvent, log_namespace: LogNamespace) {
         }
         LogNamespace::Legacy => {
             if let Some(ts) = timestamp {
-                log.insert((PathPrefix::Event, log_schema().timestamp_key()), ts);
+                if let Some(timestamp_key) = log_schema().timestamp_key() {
+                    log.insert((PathPrefix::Event, timestamp_key), ts);
+                }
             }
         }
     }
@@ -733,7 +735,7 @@ fn enrich_log_event(log: &mut LogEvent, log_namespace: LogNamespace) {
     // Add source type.
     log_namespace.insert_vector_metadata(
         log,
-        log_schema().source_type_key(),
+        Some(log_schema().source_type_key()),
         path!("source_type"),
         JournaldConfig::NAME,
     );
@@ -1440,7 +1442,7 @@ mod tests {
     }
 
     fn timestamp(event: &Event) -> Value {
-        event.as_log()[log_schema().timestamp_key()].clone()
+        event.as_log()[log_schema().timestamp_key().unwrap().to_string()].clone()
     }
 
     fn value_ts(secs: i64, usecs: u32) -> Value {

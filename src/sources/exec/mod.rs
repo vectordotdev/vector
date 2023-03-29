@@ -67,7 +67,7 @@ pub struct ExecConfig {
     #[serde(default = "default_include_stderr")]
     pub include_stderr: bool,
 
-    /// The maximum buffer size allowed before a log event will be generated.
+    /// The maximum buffer size allowed before a log event is generated.
     #[serde(default = "default_maximum_buffer_size")]
     pub maximum_buffer_size_bytes: usize,
 
@@ -103,7 +103,7 @@ pub enum Mode {
 pub struct ScheduledConfig {
     /// The interval, in seconds, between scheduled command runs.
     ///
-    /// If the command takes longer than `exec_interval_secs` to run, it will be killed.
+    /// If the command takes longer than `exec_interval_secs` to run, it is killed.
     #[serde(default = "default_exec_interval_secs")]
     exec_interval_secs: u64,
 }
@@ -117,7 +117,7 @@ pub struct StreamingConfig {
     #[serde(default = "default_respawn_on_exit")]
     respawn_on_exit: bool,
 
-    /// The amount of time, in seconds, that Vector will wait before rerunning a streaming command that exited.
+    /// The amount of time, in seconds, before rerunning a streaming command that exited.
     #[serde(default = "default_respawn_interval_secs")]
     respawn_interval_secs: u64,
 }
@@ -759,7 +759,12 @@ mod tests {
         assert_eq!(log[COMMAND_KEY], config.command.into());
         assert_eq!(log[log_schema().message_key()], "hello world".into());
         assert_eq!(log[log_schema().source_type_key()], "exec".into());
-        assert!(log.get(log_schema().timestamp_key()).is_some());
+        assert!(log
+            .get((
+                lookup::PathPrefix::Event,
+                log_schema().timestamp_key().unwrap()
+            ))
+            .is_some());
     }
 
     #[test]
@@ -835,7 +840,12 @@ mod tests {
         assert_eq!(log[COMMAND_KEY], config.command.into());
         assert_eq!(log[log_schema().message_key()], "hello world".into());
         assert_eq!(log[log_schema().source_type_key()], "exec".into());
-        assert!(log.get(log_schema().timestamp_key()).is_some());
+        assert!(log
+            .get((
+                lookup::PathPrefix::Event,
+                log_schema().timestamp_key().unwrap()
+            ))
+            .is_some());
     }
 
     #[test]
@@ -1032,7 +1042,12 @@ mod tests {
             assert_eq!(log[log_schema().message_key()], "Hello World!".into());
             assert_eq!(log[log_schema().host_key()], "Some.Machine".into());
             assert!(log.get(PID_KEY).is_some());
-            assert!(log.get(log_schema().timestamp_key()).is_some());
+            assert!(log
+                .get((
+                    lookup::PathPrefix::Event,
+                    log_schema().timestamp_key().unwrap()
+                ))
+                .is_some());
 
             assert_eq!(8, log.all_fields().unwrap().count());
         } else {

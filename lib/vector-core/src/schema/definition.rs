@@ -152,7 +152,7 @@ impl Definition {
             None,
         )
         .with_vector_metadata(
-            parse_value_path(log_schema().timestamp_key()).ok().as_ref(),
+            log_schema().timestamp_key(),
             &owned_value_path!("ingest_timestamp"),
             Kind::timestamp(),
             None,

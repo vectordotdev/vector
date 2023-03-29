@@ -65,8 +65,8 @@ pub(super) struct Config {
 
     /// How long to wait while polling the queue for new messages, in seconds.
     ///
-    /// Generally should not be changed unless instructed to do so, as if messages are available,
-    /// they will always be consumed, regardless of the value of `poll_secs`.
+    /// Generally, this should not be changed unless instructed to do so, as if messages are available,
+    /// they are always consumed, regardless of the value of `poll_secs`.
     // NOTE: We restrict this to u32 for safe conversion to i32 later.
     // NOTE: This value isn't used as a `Duration` downstream, so we don't bother using `serde_with`
     #[serde(default = "default_poll_secs")]
@@ -572,7 +572,7 @@ impl IngestorProcess {
 
             log_namespace.insert_vector_metadata(
                 &mut log,
-                path!(log_schema().source_type_key()),
+                Some(log_schema().source_type_key()),
                 path!("source_type"),
                 Bytes::from_static(AwsS3Config::NAME.as_bytes()),
             );
@@ -589,10 +589,12 @@ impl IngestorProcess {
                     log.insert(metadata_path!("vector", "ingest_timestamp"), Utc::now());
                 }
                 LogNamespace::Legacy => {
-                    log.try_insert(
-                        (PathPrefix::Event, log_schema().timestamp_key()),
-                        timestamp.unwrap_or_else(Utc::now),
-                    );
+                    if let Some(timestamp_key) = log_schema().timestamp_key() {
+                        log.try_insert(
+                            (PathPrefix::Event, timestamp_key),
+                            timestamp.unwrap_or_else(Utc::now),
+                        );
+                    }
                 }
             };
 

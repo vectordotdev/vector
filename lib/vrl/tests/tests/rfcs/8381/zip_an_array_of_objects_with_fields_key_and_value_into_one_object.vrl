@@ -1,8 +1,0 @@
-# result: { "name": "value", "key": "otherValue" }
-
-data = [{ "key": "name", "value": "value" }, { "key": "key", "value": "otherValue" }]
-for_each(data) -> |_index, value| {
-  . = set!(., [value.key], value.value)
-}
-
-.

@@ -1,5 +1,5 @@
-use lookup::lookup_v2::parse_target_path;
-use lookup::OwnedTargetPath;
+use lookup::lookup_v2::{parse_target_path, OptionalValuePath};
+use lookup::{owned_value_path, OwnedTargetPath, OwnedValuePath};
 use once_cell::sync::{Lazy, OnceCell};
 use vector_config::configurable_component;
 
@@ -17,17 +17,11 @@ static LOG_SCHEMA_DEFAULT: Lazy<LogSchema> = Lazy::new(LogSchema::default);
 /// # Panics
 ///
 /// If deny is set, will panic if schema has already been set.
-pub fn init_log_schema<F>(builder: F, deny_if_set: bool) -> Result<(), Vec<String>>
-where
-    F: FnOnce() -> Result<LogSchema, Vec<String>>,
-{
-    let log_schema = builder()?;
+pub fn init_log_schema(log_schema: LogSchema, deny_if_set: bool) {
     assert!(
         !(LOG_SCHEMA.set(log_schema).is_err() && deny_if_set),
         "Couldn't set schema"
     );
-
-    Ok(())
 }
 
 /// Components should use global `LogSchema` returned by this function.  The
@@ -53,7 +47,7 @@ pub struct LogSchema {
 
     /// The name of the event field to treat as the event timestamp.
     #[serde(default = "LogSchema::default_timestamp_key")]
-    timestamp_key: String,
+    timestamp_key: OptionalValuePath,
 
     /// The name of the event field to treat as the host which sent the message.
     ///
@@ -93,8 +87,10 @@ impl LogSchema {
         String::from("message")
     }
 
-    fn default_timestamp_key() -> String {
-        String::from("timestamp")
+    fn default_timestamp_key() -> OptionalValuePath {
+        OptionalValuePath {
+            path: Some(owned_value_path!("timestamp")),
+        }
     }
 
     fn default_host_key() -> String {
@@ -122,8 +118,8 @@ impl LogSchema {
         parse_target_path(self.message_key()).expect("valid message key")
     }
 
-    pub fn timestamp_key(&self) -> &str {
-        &self.timestamp_key
+    pub fn timestamp_key(&self) -> Option<&OwnedValuePath> {
+        self.timestamp_key.path.as_ref()
     }
 
     pub fn host_key(&self) -> &str {
@@ -142,8 +138,8 @@ impl LogSchema {
         self.message_key = v;
     }
 
-    pub fn set_timestamp_key(&mut self, v: String) {
-        self.timestamp_key = v;
+    pub fn set_timestamp_key(&mut self, v: Option<OwnedValuePath>) {
+        self.timestamp_key = OptionalValuePath { path: v };
     }
 
     pub fn set_host_key(&mut self, v: String) {
@@ -188,7 +184,7 @@ impl LogSchema {
             {
                 errors.push("conflicting values for 'log_schema.timestamp_key' found".to_owned());
             } else {
-                self.set_timestamp_key(other.timestamp_key().to_string());
+                self.set_timestamp_key(other.timestamp_key().cloned());
             }
             if self.source_type_key() != LOG_SCHEMA_DEFAULT.source_type_key()
                 && self.source_type_key() != other.source_type_key()

@@ -80,13 +80,13 @@ pub struct SimpleHttpConfig {
 
     /// The expected encoding of received data.
     ///
-    /// Note that for `json` and `ndjson` encodings, the fields of the JSON objects are output as separate fields.
+    /// Note: For `json` and `ndjson` encodings, the fields of the JSON objects are output as separate fields.
     #[serde(default)]
     encoding: Option<Encoding>,
 
     /// A list of HTTP headers to include in the log event.
     ///
-    /// These will override any values included in the JSON payload with conflicting names.
+    /// These override any values included in the JSON payload with conflicting names.
     #[serde(default)]
     #[configurable(metadata(docs::examples = "User-Agent"))]
     #[configurable(metadata(docs::examples = "X-My-Custom-Header"))]
@@ -94,7 +94,7 @@ pub struct SimpleHttpConfig {
 
     /// A list of URL query parameters to include in the log event.
     ///
-    /// These will override any values included in the body with conflicting names.
+    /// These override any values included in the body with conflicting names.
     #[serde(default)]
     #[configurable(metadata(docs::examples = "application"))]
     #[configurable(metadata(docs::examples = "source"))]
@@ -105,21 +105,21 @@ pub struct SimpleHttpConfig {
 
     /// Whether or not to treat the configured `path` as an absolute path.
     ///
-    /// If set to `true`, only requests using the exact URL path specified in `path` will be accepted. Otherwise,
-    /// requests sent to a URL path that starts with the value of `path` will be accepted.
+    /// If set to `true`, only requests using the exact URL path specified in `path` are accepted. Otherwise,
+    /// requests sent to a URL path that starts with the value of `path` are accepted.
     ///
-    /// With `strict_path` set to `false` and `path` set to `""`, the configured HTTP source will accept requests from
+    /// With `strict_path` set to `false` and `path` set to `""`, the configured HTTP source accepts requests from
     /// any URL path.
     #[serde(default = "crate::serde::default_true")]
     strict_path: bool,
 
-    /// The URL path on which log event POST requests shall be sent.
+    /// The URL path on which log event POST requests are sent.
     #[serde(default = "default_path")]
     #[configurable(metadata(docs::examples = "/event/path"))]
     #[configurable(metadata(docs::examples = "/logs"))]
     path: String,
 
-    /// The event key in which the requested URL path used to send the request will be stored.
+    /// The event key in which the requested URL path used to send the request is stored.
     #[serde(default = "default_path_key")]
     #[configurable(metadata(docs::examples = "vector_http_path"))]
     path_key: OptionalValuePath,
@@ -368,14 +368,14 @@ struct SimpleHttpSource {
     log_namespace: LogNamespace,
 }
 
-impl SimpleHttpSource {
+impl HttpSource for SimpleHttpSource {
     /// Enriches the passed in events with metadata for the `request_path` and for each of the headers.
     fn enrich_events(
         &self,
         events: &mut [Event],
         request_path: &str,
-        headers_config: HeaderMap,
-        query_parameters: HashMap<String, String>,
+        headers_config: &HeaderMap,
+        query_parameters: &HashMap<String, String>,
     ) {
         for event in events.iter_mut() {
             let log = event.as_mut_log();
@@ -422,15 +422,13 @@ impl SimpleHttpSource {
             );
         }
     }
-}
 
-impl HttpSource for SimpleHttpSource {
     fn build_events(
         &self,
         body: Bytes,
-        header_map: HeaderMap,
-        query_parameters: HashMap<String, String>,
-        request_path: &str,
+        _header_map: &HeaderMap,
+        _query_parameters: &HashMap<String, String>,
+        _request_path: &str,
     ) -> Result<Vec<Event>, ErrorMessage> {
         let mut decoder = self.decoder.clone();
         let mut events = Vec::new();
@@ -453,8 +451,6 @@ impl HttpSource for SimpleHttpSource {
                 }
             }
         }
-
-        self.enrich_events(&mut events, request_path, header_map, query_parameters);
 
         Ok(events)
     }
@@ -657,7 +653,12 @@ mod tests {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log[log_schema().message_key()], "test body".into());
-            assert!(log.get(log_schema().timestamp_key()).is_some());
+            assert!(log
+                .get((
+                    lookup::PathPrefix::Event,
+                    log_schema().timestamp_key().unwrap()
+                ))
+                .is_some());
             assert_eq!(
                 log[log_schema().source_type_key()],
                 SimpleHttpConfig::NAME.into()
@@ -779,12 +780,18 @@ mod tests {
         assert!(events
             .remove(1)
             .as_log()
-            .get(log_schema().timestamp_key())
+            .get((
+                lookup::PathPrefix::Event,
+                log_schema().timestamp_key().unwrap()
+            ))
             .is_some());
         assert!(events
             .remove(0)
             .as_log()
-            .get(log_schema().timestamp_key())
+            .get((
+                lookup::PathPrefix::Event,
+                log_schema().timestamp_key().unwrap()
+            ))
             .is_some());
     }
 
@@ -943,7 +950,12 @@ mod tests {
     }
 
     async fn assert_event_metadata(log: &LogEvent) {
-        assert!(log.get(log_schema().timestamp_key()).is_some());
+        assert!(log
+            .get((
+                lookup::PathPrefix::Event,
+                log_schema().timestamp_key().unwrap()
+            ))
+            .is_some());
         assert_eq!(
             log[log_schema().source_type_key()],
             SimpleHttpConfig::NAME.into()
@@ -1110,7 +1122,12 @@ mod tests {
             let log = event.as_log();
             assert_eq!(log["key1"], "value1".into());
             assert_eq!(log["vector_http_path"], "/event/path".into());
-            assert!(log.get(log_schema().timestamp_key()).is_some());
+            assert!(log
+                .get((
+                    lookup::PathPrefix::Event,
+                    log_schema().timestamp_key().unwrap()
+                ))
+                .is_some());
             assert_eq!(
                 log[log_schema().source_type_key()],
                 SimpleHttpConfig::NAME.into()
@@ -1158,7 +1175,12 @@ mod tests {
             let log = event.as_log();
             assert_eq!(log["key1"], "value1".into());
             assert_eq!(log["vector_http_path"], "/event/path1".into());
-            assert!(log.get(log_schema().timestamp_key()).is_some());
+            assert!(log
+                .get((
+                    lookup::PathPrefix::Event,
+                    log_schema().timestamp_key().unwrap()
+                ))
+                .is_some());
             assert_eq!(
                 log[log_schema().source_type_key()],
                 SimpleHttpConfig::NAME.into()
@@ -1169,7 +1191,12 @@ mod tests {
             let log = event.as_log();
             assert_eq!(log["key2"], "value2".into());
             assert_eq!(log["vector_http_path"], "/event/path2".into());
-            assert!(log.get(log_schema().timestamp_key()).is_some());
+            assert!(log
+                .get((
+                    lookup::PathPrefix::Event,
+                    log_schema().timestamp_key().unwrap()
+                ))
+                .is_some());
             assert_eq!(
                 log[log_schema().source_type_key()],
                 SimpleHttpConfig::NAME.into()

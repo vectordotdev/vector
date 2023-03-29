@@ -272,8 +272,7 @@ impl Service<OpenDalRequest> for OpenDalService {
 
         Box::pin(async move {
             let result = op
-                .object(&request.metadata.partition_key)
-                .write(request.payload)
+                .write(&request.metadata.partition_key, request.payload)
                 .in_current_span()
                 .await;
             result.map(|_| OpenDalResponse {

@@ -444,7 +444,7 @@ impl LogNamespace {
     ) {
         self.insert_vector_metadata(
             log,
-            log_schema().source_type_key(),
+            Some(log_schema().source_type_key()),
             path!("source_type"),
             Bytes::from_static(source_name.as_bytes()),
         );
@@ -463,7 +463,7 @@ impl LogNamespace {
     pub fn insert_vector_metadata<'a>(
         &self,
         log: &mut LogEvent,
-        legacy_key: impl ValuePath<'a>,
+        legacy_key: Option<impl ValuePath<'a>>,
         metadata_key: impl ValuePath<'a>,
         value: impl Into<Value>,
     ) {
@@ -474,7 +474,9 @@ impl LogNamespace {
                     .insert(path!("vector").concat(metadata_key), value);
             }
             LogNamespace::Legacy => {
-                log.try_insert((PathPrefix::Event, legacy_key), value);
+                if let Some(legacy_key) = legacy_key {
+                    log.try_insert((PathPrefix::Event, legacy_key), value);
+                }
             }
         }
     }
@@ -523,15 +525,9 @@ mod test {
     fn test_insert_standard_vector_source_metadata() {
         let nested_path = "a.b.c.d";
 
-        init_log_schema(
-            || {
-                let mut schema = LogSchema::default();
-                schema.set_source_type_key(nested_path.to_owned());
-                Ok(schema)
-            },
-            false,
-        )
-        .unwrap();
+        let mut schema = LogSchema::default();
+        schema.set_source_type_key(nested_path.to_owned());
+        init_log_schema(schema, false);
 
         let namespace = LogNamespace::Legacy;
         let mut event = LogEvent::from("log");

@@ -134,7 +134,7 @@ pub struct Config {
 
     /// Whether or not to automatically merge partial events.
     ///
-    /// Partial here is in respect to messages that were split by the Kubernetes Container Runtime
+    /// Partial events are messages that were split by the Kubernetes Container Runtime
     /// log driver.
     auto_partial_merge: bool,
 
@@ -193,7 +193,7 @@ pub struct Config {
 
     /// The interval at which the file system is polled to identify new files to read from.
     ///
-    /// This is quite efficient, yet might still create some load of the
+    /// This is quite efficient, yet might still create some load on the
     /// file system; in addition, it is currently coupled with checksum dumping
     /// in the underlying file server, so setting it too low may introduce
     /// a significant overhead.
@@ -222,9 +222,9 @@ pub struct Config {
     /// How long to delay removing metadata entries from the cache when a pod deletion event
     /// event is received from the watch stream.
     ///
-    /// A longer delay will allow for continued enrichment of logs after the originating Pod is
-    /// removed. If relevant metadata has been removed, the log will be forwarded un-enriched and a
-    /// warning will be emitted.
+    /// A longer delay allows for continued enrichment of logs after the originating Pod is
+    /// removed. If relevant metadata has been removed, the log is forwarded un-enriched and a
+    /// warning is emitted.
     #[serde_as(as = "serde_with::DurationMilliSeconds<u64>")]
     delay_deletion_ms: Duration,
 
@@ -480,9 +480,10 @@ impl SourceConfig for Config {
             )
             .with_source_metadata(
                 Self::NAME,
-                Some(LegacyKey::Overwrite(owned_value_path!(
-                    log_schema().timestamp_key()
-                ))),
+                log_schema()
+                    .timestamp_key()
+                    .cloned()
+                    .map(LegacyKey::Overwrite),
                 &owned_value_path!("timestamp"),
                 Kind::timestamp(),
                 Some("timestamp"),
@@ -889,7 +890,7 @@ fn create_event(
 
     log_namespace.insert_vector_metadata(
         &mut log,
-        path!(log_schema().source_type_key()),
+        Some(log_schema().source_type_key()),
         path!("source_type"),
         Bytes::from(Config::NAME),
     );

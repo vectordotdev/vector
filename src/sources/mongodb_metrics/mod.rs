@@ -166,7 +166,7 @@ impl SourceConfig for MongoDbMetricsConfig {
 
 impl MongoDbMetrics {
     /// Works only with Standalone connection-string. Collect metrics only from specified instance.
-    /// https://docs.mongodb.com/manual/reference/connection-string/#standard-connection-string-format
+    /// <https://docs.mongodb.com/manual/reference/connection-string/#standard-connection-string-format>
     async fn new(endpoint: &str, namespace: Option<String>) -> Result<MongoDbMetrics, BuildError> {
         let mut client_options = ClientOptions::parse(endpoint)
             .await
@@ -201,8 +201,8 @@ impl MongoDbMetrics {
             NodeType::Replset
         } else if msg.msg.map(|msg| msg == "isdbgrid").unwrap_or(false) {
             // Contains the value isdbgrid when isMaster returns from a mongos instance.
-            // https://docs.mongodb.com/manual/reference/command/isMaster/#isMaster.msg
-            // https://docs.mongodb.com/manual/core/sharded-cluster-query-router/#confirm-connection-to-mongos-instances
+            // <https://docs.mongodb.com/manual/reference/command/isMaster/#isMaster.msg>
+            // <https://docs.mongodb.com/manual/core/sharded-cluster-query-router/#confirm-connection-to-mongos-instances>
             NodeType::Mongos
         } else {
             NodeType::Mongod
@@ -270,7 +270,7 @@ impl MongoDbMetrics {
     }
 
     /// Collect metrics from `serverStatus` command.
-    /// https://docs.mongodb.com/manual/reference/command/serverStatus/
+    /// <https://docs.mongodb.com/manual/reference/command/serverStatus/>
     async fn collect_server_status(&self) -> Result<Vec<Metric>, CollectError> {
         self.print_version().await?;
 
@@ -1003,12 +1003,12 @@ fn document_size(doc: &Document) -> usize {
 }
 
 /// Remove credentials from endpoint.
-/// URI components: https://docs.mongodb.com/manual/reference/connection-string/#components
+/// URI components: <https://docs.mongodb.com/manual/reference/connection-string/#components>
 /// It's not possible to use [url::Url](https://docs.rs/url/2.1.1/url/struct.Url.html) because connection string can have multiple hosts.
-/// Would be nice to serialize [ClientOptions][https://docs.rs/mongodb/1.1.1/mongodb/options/struct.ClientOptions.html] to String, but it's not supported.
+/// Would be nice to serialize [ClientOptions](https://docs.rs/mongodb/1.1.1/mongodb/options/struct.ClientOptions.html) to String, but it's not supported.
 /// `endpoint` argument would not be required, but field `original_uri` in `ClientOptions` is private.
 /// `.unwrap()` in function is safe because endpoint was already verified by `ClientOptions`.
-/// Based on ClientOptions::parse_uri -- https://github.com/mongodb/mongo-rust-driver/blob/09e1193f93dcd850ebebb7fb82f6ab786fd85de1/src/client/options/mod.rs#L708
+/// Based on ClientOptions::parse_uri -- <https://github.com/mongodb/mongo-rust-driver/blob/09e1193f93dcd850ebebb7fb82f6ab786fd85de1/src/client/options/mod.rs#L708>
 fn sanitize_endpoint(endpoint: &str, options: &ClientOptions) -> String {
     let mut endpoint = endpoint.to_owned();
     if options.credential.is_some() {

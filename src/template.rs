@@ -7,6 +7,7 @@ use chrono::{
     Utc,
 };
 use lookup::lookup_v2::parse_target_path;
+use lookup::PathPrefix;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use snafu::Snafu;
@@ -171,7 +172,9 @@ impl Template {
                             EventRef::Metric(metric) => {
                                 render_metric_field(key, metric).map(Cow::Borrowed)
                             }
-                            EventRef::Trace(trace) => trace.get(key).map(Value::to_string_lossy),
+                            EventRef::Trace(trace) => {
+                                trace.get(key.as_str()).map(Value::to_string_lossy)
+                            }
                         }
                         .unwrap_or_else(|| {
                             missing_keys.push(key.to_owned());
@@ -340,15 +343,18 @@ fn render_metric_field<'a>(key: &str, metric: &'a Metric) -> Option<&'a str> {
 
 fn render_timestamp(items: &ParsedStrftime, event: EventRef<'_>) -> String {
     match event {
-        EventRef::Log(log) => log
-            .get(log_schema().timestamp_key())
-            .and_then(Value::as_timestamp)
-            .copied(),
+        EventRef::Log(log) => log_schema().timestamp_key().and_then(|timestamp_key| {
+            log.get((PathPrefix::Event, timestamp_key))
+                .and_then(Value::as_timestamp)
+                .copied()
+        }),
         EventRef::Metric(metric) => metric.timestamp(),
-        EventRef::Trace(trace) => trace
-            .get(log_schema().timestamp_key())
-            .and_then(Value::as_timestamp)
-            .copied(),
+        EventRef::Trace(trace) => log_schema().timestamp_key().and_then(|timestamp_key| {
+            trace
+                .get((PathPrefix::Event, timestamp_key))
+                .and_then(Value::as_timestamp)
+                .copied()
+        }),
     }
     .unwrap_or_else(Utc::now)
     .format_with_items(items.as_items())
@@ -488,7 +494,13 @@ mod tests {
             .expect("invalid timestamp");
 
         let mut event = Event::Log(LogEvent::from("hello world"));
-        event.as_mut_log().insert(log_schema().timestamp_key(), ts);
+        event.as_mut_log().insert(
+            (
+                lookup::PathPrefix::Event,
+                log_schema().timestamp_key().unwrap(),
+            ),
+            ts,
+        );
 
         let template = Template::try_from("abcd-%F").unwrap();
 
@@ -503,7 +515,13 @@ mod tests {
             .expect("invalid timestamp");
 
         let mut event = Event::Log(LogEvent::from("hello world"));
-        event.as_mut_log().insert(log_schema().timestamp_key(), ts);
+        event.as_mut_log().insert(
+            (
+                lookup::PathPrefix::Event,
+                log_schema().timestamp_key().unwrap(),
+            ),
+            ts,
+        );
 
         let template = Template::try_from("abcd-%F_%T").unwrap();
 
@@ -522,7 +540,13 @@ mod tests {
 
         let mut event = Event::Log(LogEvent::from("hello world"));
         event.as_mut_log().insert("foo", "butts");
-        event.as_mut_log().insert(log_schema().timestamp_key(), ts);
+        event.as_mut_log().insert(
+            (
+                lookup::PathPrefix::Event,
+                log_schema().timestamp_key().unwrap(),
+            ),
+            ts,
+        );
 
         let template = Template::try_from("{{ foo }}-%F_%T").unwrap();
 
@@ -541,7 +565,13 @@ mod tests {
 
         let mut event = Event::Log(LogEvent::from("hello world"));
         event.as_mut_log().insert("format", "%F");
-        event.as_mut_log().insert(log_schema().timestamp_key(), ts);
+        event.as_mut_log().insert(
+            (
+                lookup::PathPrefix::Event,
+                log_schema().timestamp_key().unwrap(),
+            ),
+            ts,
+        );
 
         let template = Template::try_from("nested {{ format }} %T").unwrap();
 
@@ -560,7 +590,13 @@ mod tests {
 
         let mut event = Event::Log(LogEvent::from("hello world"));
         event.as_mut_log().insert("\"%F\"", "foo");
-        event.as_mut_log().insert(log_schema().timestamp_key(), ts);
+        event.as_mut_log().insert(
+            (
+                lookup::PathPrefix::Event,
+                log_schema().timestamp_key().unwrap(),
+            ),
+            ts,
+        );
 
         let template = Template::try_from("nested {{ \"%F\" }} %T").unwrap();
 

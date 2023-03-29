@@ -50,7 +50,7 @@ pub struct VectorConfig {
 
     /// Whether or not to compress requests.
     ///
-    /// If set to `true`, requests will be compressed with [`gzip`][gzip_docs].
+    /// If set to `true`, requests are compressed with [`gzip`][gzip_docs].
     ///
     /// [gzip_docs]: https://www.gzip.org/
     #[configurable(metadata(docs::advanced))]

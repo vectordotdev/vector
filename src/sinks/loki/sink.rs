@@ -491,9 +491,16 @@ mod tests {
         };
         let mut event = Event::Log(LogEvent::from("hello world"));
         let log = event.as_mut_log();
-        log.insert(log_schema().timestamp_key(), chrono::Utc::now());
+        log.insert(
+            (
+                lookup::PathPrefix::Event,
+                log_schema().timestamp_key().unwrap(),
+            ),
+            chrono::Utc::now(),
+        );
         let record = encoder.encode_event(event).unwrap();
-        assert!(String::from_utf8_lossy(&record.event.event).contains(log_schema().timestamp_key()));
+        assert!(String::from_utf8_lossy(&record.event.event)
+            .contains(log_schema().timestamp_key().unwrap().to_string().as_str()));
         assert_eq!(record.labels.len(), 1);
         assert_eq!(
             record.labels[0],
@@ -530,7 +537,13 @@ mod tests {
         };
         let mut event = Event::Log(LogEvent::from("hello world"));
         let log = event.as_mut_log();
-        log.insert(log_schema().timestamp_key(), chrono::Utc::now());
+        log.insert(
+            (
+                lookup::PathPrefix::Event,
+                log_schema().timestamp_key().unwrap(),
+            ),
+            chrono::Utc::now(),
+        );
         log.insert("name", "foo");
         log.insert("value", "bar");
 
@@ -540,7 +553,8 @@ mod tests {
         log.insert("dict", Value::from(test_dict));
 
         let record = encoder.encode_event(event).unwrap();
-        assert!(String::from_utf8_lossy(&record.event.event).contains(log_schema().timestamp_key()));
+        assert!(String::from_utf8_lossy(&record.event.event)
+            .contains(log_schema().timestamp_key().unwrap().to_string().as_str()));
         assert_eq!(record.labels.len(), 4);
 
         let labels: HashMap<String, String> = record.labels.into_iter().collect();
@@ -616,11 +630,16 @@ mod tests {
         };
         let mut event = Event::Log(LogEvent::from("hello world"));
         let log = event.as_mut_log();
-        log.insert(log_schema().timestamp_key(), chrono::Utc::now());
-        let record = encoder.encode_event(event).unwrap();
-        assert!(
-            !String::from_utf8_lossy(&record.event.event).contains(log_schema().timestamp_key())
+        log.insert(
+            (
+                lookup::PathPrefix::Event,
+                log_schema().timestamp_key().unwrap(),
+            ),
+            chrono::Utc::now(),
         );
+        let record = encoder.encode_event(event).unwrap();
+        assert!(!String::from_utf8_lossy(&record.event.event)
+            .contains(log_schema().timestamp_key().unwrap().to_string().as_str()));
     }
 
     #[test]
@@ -644,7 +663,13 @@ mod tests {
         };
         let mut event = Event::Log(LogEvent::from("hello world"));
         let log = event.as_mut_log();
-        log.insert(log_schema().timestamp_key(), chrono::Utc::now());
+        log.insert(
+            (
+                lookup::PathPrefix::Event,
+                log_schema().timestamp_key().unwrap(),
+            ),
+            chrono::Utc::now(),
+        );
         log.insert("name", "foo");
         log.insert("value", "bar");
         let record = encoder.encode_event(event).unwrap();
@@ -673,7 +698,13 @@ mod tests {
                 } else {
                     base + chrono::Duration::seconds(i as i64)
                 };
-                log.insert(log_schema().timestamp_key(), ts);
+                log.insert(
+                    (
+                        lookup::PathPrefix::Event,
+                        log_schema().timestamp_key().unwrap(),
+                    ),
+                    ts,
+                );
                 event
             })
             .collect::<Vec<_>>();

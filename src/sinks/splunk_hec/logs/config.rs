@@ -2,12 +2,14 @@ use std::sync::Arc;
 
 use codecs::TextSerializerConfig;
 use futures_util::FutureExt;
+use lookup::lookup_v2::OptionalValuePath;
 use tower::ServiceBuilder;
 use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
 use vector_core::sink::VectorSink;
 
 use super::{encoder::HecLogsEncoder, request_builder::HecLogsRequestBuilder, sink::HecLogsSink};
+use crate::sinks::splunk_hec::common::config_timestamp_key;
 use crate::{
     codecs::{Encoder, EncodingConfig},
     config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext},
@@ -17,7 +19,7 @@ use crate::{
             acknowledgements::HecClientAcknowledgementsConfig,
             build_healthcheck, build_http_batch_service, create_client, host_key,
             service::{HecService, HttpRequestBuilder},
-            timestamp_key, EndpointTarget, SplunkHecDefaultBatchSettings,
+            EndpointTarget, SplunkHecDefaultBatchSettings,
         },
         util::{
             http::HttpRetryLogic, BatchConfig, Compression, ServiceBuilderExt, TowerRequestConfig,
@@ -130,9 +132,9 @@ pub struct HecLogsSinkConfig {
     ///
     /// [global_timestamp_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.timestamp_key
     #[configurable(metadata(docs::advanced))]
-    #[serde(default = "crate::sinks::splunk_hec::common::timestamp_key")]
+    #[serde(default = "crate::sinks::splunk_hec::common::config_timestamp_key")]
     #[configurable(metadata(docs::examples = "timestamp", docs::examples = ""))]
-    pub timestamp_key: String,
+    pub timestamp_key: OptionalValuePath,
 
     /// Passes the `auto_extract_timestamp` option to Splunk.
     ///
@@ -172,7 +174,7 @@ impl GenerateConfig for HecLogsSinkConfig {
             tls: None,
             acknowledgements: Default::default(),
             timestamp_nanos_key: None,
-            timestamp_key: timestamp_key(),
+            timestamp_key: config_timestamp_key(),
             auto_extract_timestamp: None,
             endpoint_target: EndpointTarget::Event,
         })
@@ -269,7 +271,7 @@ impl HecLogsSinkConfig {
             indexed_fields: self.indexed_fields.clone(),
             host: self.host_key.clone(),
             timestamp_nanos_key: self.timestamp_nanos_key.clone(),
-            timestamp_key: self.timestamp_key.clone(),
+            timestamp_key: self.timestamp_key.path.clone(),
             endpoint_target: self.endpoint_target,
         };
 

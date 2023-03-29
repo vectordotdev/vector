@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use tokio::{select, sync::mpsc, task::JoinHandle};
 use vector_core::event::Event;
 
@@ -21,6 +23,9 @@ const INTERNAL_LOGS_KEY: &str = "_telemetry_logs";
 const INTERNAL_METRICS_KEY: &str = "_telemetry_metrics";
 const VECTOR_SINK_KEY: &str = "_telemetry_out";
 
+// The metrics event to monitor for before shutting down a telemetry collector.
+const INTERNAL_METRICS_SHUTDOWN_EVENT: &str = "component_received_events_total";
+
 /// Telemetry collector for a component under validation.
 pub struct Telemetry {
     listen_addr: GrpcAddress,
@@ -37,8 +42,18 @@ impl Telemetry {
         // Attach an internal logs and internal metrics source, and send them on to a dedicated Vector
         // sink that we'll spawn a listener for to collect everything.
         let internal_logs = InternalLogsConfig::default();
-        let internal_metrics = InternalMetricsConfig::default();
-        let vector_sink = VectorSinkConfig::from_address(listen_addr.as_uri());
+        let internal_metrics = InternalMetricsConfig {
+            scrape_interval_secs: Duration::from_millis(100),
+            ..Default::default()
+        };
+        let mut vector_sink = VectorSinkConfig::from_address(listen_addr.as_uri());
+
+        // We want to ensure that the output sink is flushed as soon as
+        // possible, so we set the batch timeout to a very low value. We also
+        // disable retries, as we don't want to waste time performing retries,
+        // especially when the test harness is shutting down.
+        vector_sink.batch.timeout_secs = Some(0.1);
+        vector_sink.request.retry_attempts = Some(0);
 
         config_builder.add_source(INTERNAL_LOGS_KEY, internal_logs);
         config_builder.add_source(INTERNAL_METRICS_KEY, internal_metrics);
@@ -57,30 +72,79 @@ impl Telemetry {
         }
     }
 
-    pub fn into_collector(
+    pub async fn into_collector(
         self,
-        task_coordinator: &TaskCoordinator<Configuring>,
+        telemetry_task_coordinator: &TaskCoordinator<Configuring>,
     ) -> TelemetryCollector {
-        let telemetry_started = task_coordinator.track_started();
-        let telemetry_completed = task_coordinator.track_completed();
-        let mut telemetry_shutdown_handle = task_coordinator.register_for_shutdown();
+        let telemetry_started = telemetry_task_coordinator.track_started();
+        let telemetry_completed = telemetry_task_coordinator.track_completed();
+        let mut telemetry_shutdown_handle = telemetry_task_coordinator.register_for_shutdown();
 
-        spawn_grpc_server(self.listen_addr, self.service, task_coordinator);
+        // We need a task coordinator for the gRPC server because it strictly
+        // needs to be shut down after the telemetry collector. This is because
+        // the server needs to be alive to process every last incoming event
+        // from the Vector sink that we're using to collect telemetry.
+        let grpc_task_coordinator = TaskCoordinator::new();
+        spawn_grpc_server(self.listen_addr, self.service, &grpc_task_coordinator);
+        let grpc_task_coordinator = grpc_task_coordinator.started().await;
+        debug!("All gRPC task(s) started.");
 
         let mut rx = self.rx;
         let driver_handle = tokio::spawn(async move {
             telemetry_started.mark_as_done();
 
             let mut telemetry_events = Vec::new();
-            loop {
+            'outer: loop {
                 select! {
-                    _ = telemetry_shutdown_handle.wait() => break,
+                    _ = telemetry_shutdown_handle.wait() => {
+                        // After we receive the shutdown signal, we need to wait
+                        // for two event emissions from the internal_metrics
+                        // source. This is to ensure that we've received all the
+                        // events from the components that we're testing.
+                        //
+                        // We need exactly two because the internal_metrics
+                        // source does not emit component events until after the
+                        // component_received_events_total metric has been
+                        // emitted. Thus, two events ensure that all component
+                        // events have been emitted.
+
+                        debug!("Telemetry: waiting for final internal_metrics events before shutting down.");
+
+                        let mut events_seen = 0;
+                        let current_time = chrono::Utc::now();
+
+                        loop {
+                            match &rx.recv().await {
+                                None => break 'outer,
+                                Some(telemetry_event) => {
+                                    telemetry_events.push(telemetry_event.clone());
+                                    if let Event::Metric(metric) = telemetry_event {
+                                        if let Some(tags) = metric.tags() {
+                                            if metric.name() == INTERNAL_METRICS_SHUTDOWN_EVENT &&
+                                            tags.get("component_name") == Some(INTERNAL_LOGS_KEY) &&
+                                            metric.data().timestamp().unwrap() > &current_time {
+                                                debug!("Telemetry: processed one component_received_events_total event.");
+
+                                                events_seen += 1;
+                                                if events_seen == 2 {
+                                                    break 'outer;
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
                     maybe_telemetry_event = rx.recv() => match maybe_telemetry_event {
                         None => break,
                         Some(telemetry_event) => telemetry_events.push(telemetry_event),
                     },
                 }
             }
+
+            grpc_task_coordinator.shutdown().await;
+            debug!("GRPC task(s) have been shutdown.");
 
             telemetry_completed.mark_as_done();
 

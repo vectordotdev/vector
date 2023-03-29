@@ -1,5 +1,0 @@
-# object: { "foo": { "field": "value" } }
-# result: { "foo": { "field": "value", "morefield": "morevalue" } }
-
-.foo = merge(object!(.foo), { "morefield": "morevalue" })
-.

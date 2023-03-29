@@ -1,4 +1,5 @@
 # Add new pull requests to Gardener project board for triage
+name: Add PR to Gardener board
 
 on:
   pull_request_target:

@@ -1,5 +1,0 @@
-# result:
-#
-# function call error for "parse_json" at (1:27): unable to parse json: key must be a string at line 1 column 3
-
-parse_json!("{ INVALID }")

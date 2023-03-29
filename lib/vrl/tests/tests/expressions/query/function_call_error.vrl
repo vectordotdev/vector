@@ -1,4 +1,0 @@
-# result: "function call error for \"upcase\" at (10:24): expected string, got null"
-
-_, err = upcase(.thing).thing
-err

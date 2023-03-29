@@ -22,7 +22,7 @@ base: components: sources: internal_metrics: configuration: {
 				description: """
 					Overrides the name of the tag used to add the peer host to each metric.
 
-					The value will be the peer host's address, including the port i.e. `1.2.3.4:9000`.
+					The value is the peer host's address, including the port. For example, `1.2.3.4:9000`.
 
 					By default, the [global `log_schema.host_key` option][global_host_key] is used.
 
@@ -37,7 +37,7 @@ base: components: sources: internal_metrics: configuration: {
 				description: """
 					Sets the name of the tag to use to add the current process ID to each metric.
 
-					By default, this is not set and the tag will not be automatically added.
+					By default, this is not set and the tag is not automatically added.
 					"""
 				required: false
 				type: string: examples: ["pid"]
