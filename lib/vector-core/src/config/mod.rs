@@ -153,10 +153,10 @@ impl SourceOutput {
         }
     }
 
-    /// Return the schema `Definition` from this output.
+    /// Return the schema [`schema::Definition`] from this output.
     ///
     /// Takes a `schema_enabled` flag to determine if the full definition including the fields
-    /// and associated types should be returned, or if a simple definition should be return.
+    /// and associated types should be returned, or if a simple definition should be returned.
     /// Schema enabled is set in the users configuration.
     #[must_use]
     pub fn schema_definition(&self, schema_enabled: bool) -> Option<schema::Definition> {
@@ -172,11 +172,11 @@ impl SourceOutput {
         })
     }
 
-    /// Consumes the object and returns the schema `Definition` from this output.
+    /// Consumes the object and returns the schema [`schema::Definition`] from this output.
     ///
     /// Takes a `schema_enabled` flag to determine if the full definition including the fields
-    /// and associated types should be returned, or if a simple definition should be return.
-    /// Schema enabled is set in the users configuration.
+    /// and associated types should be returned, or if a simple definition should be returned.
+    /// Schema enabled is set in the user's configuration.
     #[must_use]
     pub fn into_schema_definition(self, schema_enabled: bool) -> Option<schema::Definition> {
         self.schema_definition.map(|definition| {
@@ -193,7 +193,7 @@ impl SourceOutput {
 }
 
 impl SourceOutput {
-    /// Set the port name for this `Output`.
+    /// Set the port name for this `SourceOutput`.
     #[must_use]
     pub fn with_port(mut self, name: impl Into<String>) -> Self {
         self.port = Some(name.into());
@@ -206,14 +206,14 @@ pub struct TransformOutput {
     pub port: Option<String>,
     pub ty: DataType,
 
-    /// For a *transforms* if `Datatype` is Log, at least one definition should be output. If the
+    /// For *transforms* if `Datatype` is [`DataType::Log`], at least one definition should be output. If the
     /// transform has multiple connected sources, it is possible to have multiple output definitions -
     /// one for each input.
     pub log_schema_definitions: Vec<schema::Definition>,
 }
 
 impl TransformOutput {
-    /// Create an `Output` of the given data type that contains multiple `Definition`s.
+    /// Create a `TransformOutput` of the given data type that contains multiple [`schema::Definition`]s.
     /// Designed for use in transforms.
     #[must_use]
     pub fn new(ty: DataType, schema_definitions: Vec<schema::Definition>) -> Self {
