@@ -97,7 +97,7 @@ jobs:
   # Then, modify the `cross-linux` job to run `test` instead of `build`.
   test-linux:
     name: Unit - x86_64-unknown-linux-gnu
-    runs-on: [linux, optimize-4-core]
+    runs-on: [linux, optimize-8-core]
     needs: changes
     env:
       CARGO_INCREMENTAL: 0
