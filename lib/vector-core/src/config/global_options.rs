@@ -55,9 +55,9 @@ pub struct GlobalOptions {
     )]
     pub log_schema: LogSchema,
 
-    /// The name of the timezone to apply to timestamp conversions that do not contain an explicit timezone.
+    /// The name of the time zone to apply to timestamp conversions that do not contain an explicit time zone.
     ///
-    /// The timezone name may be any name in the [TZ database][tzdb], or `local` to indicate system
+    /// The time zone name may be any name in the [TZ database][tzdb] or `local` to indicate system
     /// local time.
     ///
     /// [tzdb]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones

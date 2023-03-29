@@ -88,7 +88,7 @@ pub struct FileConfig {
 
     /// Overrides the name of the log field used to add the file path to each event.
     ///
-    /// The value will be the full path to the file where the event was read message.
+    /// The value is the full path to the file where the event was read message.
     ///
     /// Set to `""` to suppress this key.
     #[serde(default = "default_file_key")]
@@ -119,7 +119,7 @@ pub struct FileConfig {
     #[configurable(metadata(docs::examples = 600))]
     pub ignore_older_secs: Option<u64>,
 
-    /// The maximum size of a line before it will be discarded.
+    /// The maximum size of a line before it is discarded.
     ///
     /// This protects against malformed lines or tailing incorrect files.
     #[serde(default = "default_max_line_bytes")]
@@ -149,7 +149,7 @@ pub struct FileConfig {
 
     /// Enables adding the file offset to each event and sets the name of the log field used.
     ///
-    /// The value will be the byte offset of the start of the line within the file.
+    /// The value is the byte offset of the start of the line within the file.
     ///
     /// Off by default, the offset is only added to the event if this is set.
     #[serde(default)]
@@ -207,9 +207,9 @@ pub struct FileConfig {
     #[serde(default)]
     pub oldest_first: bool,
 
-    /// Timeout from reaching `EOF` after which file will be removed from filesystem, unless new data is written in the meantime.
+    /// Timeout from reaching `EOF` after which the file is removed from the filesystem, unless new data is written in the meantime.
     ///
-    /// If not specified, files will not be removed.
+    /// If not specified, files are not removed.
     #[serde(alias = "remove_after", default)]
     #[configurable(metadata(docs::type_unit = "seconds"))]
     #[configurable(metadata(docs::examples = 0))]

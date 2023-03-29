@@ -70,7 +70,7 @@ pub struct SplunkConfig {
     /// If supplied, incoming requests must supply this token in the `Authorization` header, just as a client would if
     /// it was communicating with the Splunk HEC endpoint directly.
     ///
-    /// If _not_ supplied, the `Authorization` header will be ignored and requests will not be authenticated.
+    /// If _not_ supplied, the `Authorization` header is ignored and requests are not authenticated.
     #[configurable(deprecated = "This option has been deprecated, use `valid_tokens` instead.")]
     token: Option<SensitiveString>,
 
@@ -79,14 +79,14 @@ pub struct SplunkConfig {
     /// If supplied, incoming requests must supply one of these tokens in the `Authorization` header, just as a client
     /// would if it was communicating with the Splunk HEC endpoint directly.
     ///
-    /// If _not_ supplied, the `Authorization` header will be ignored and requests will not be authenticated.
+    /// If _not_ supplied, the `Authorization` header is ignored and requests are not authenticated.
     #[configurable(metadata(docs::examples = "A94A8FE5CCB19BA61C4C08"))]
     valid_tokens: Option<Vec<SensitiveString>>,
 
     /// Whether or not to forward the Splunk HEC authentication token with events.
     ///
-    /// If set to `true`, when incoming requests contain a Splunk HEC token, the token used will kept in the
-    /// event metadata and be preferentially used if the event is sent to a Splunk HEC sink.
+    /// If set to `true`, when incoming requests contain a Splunk HEC token, the token used is kept in the
+    /// event metadata and preferentially used if the event is sent to a Splunk HEC sink.
     store_hec_token: bool,
 
     #[configurable(derived)]

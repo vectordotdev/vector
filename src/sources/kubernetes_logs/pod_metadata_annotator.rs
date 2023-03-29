@@ -41,7 +41,7 @@ pub struct FieldsSpec {
     #[configurable(metadata(docs::examples = ""))]
     pub pod_namespace: OptionalTargetPath,
 
-    /// Event field for the Pod's uid.
+    /// Event field for the Pod's UID.
     ///
     /// Set to `""` to suppress this key.
     #[configurable(metadata(docs::examples = ".k8s.pod_uid"))]

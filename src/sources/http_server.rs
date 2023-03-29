@@ -79,13 +79,13 @@ pub struct SimpleHttpConfig {
 
     /// The expected encoding of received data.
     ///
-    /// Note that for `json` and `ndjson` encodings, the fields of the JSON objects are output as separate fields.
+    /// Note: For `json` and `ndjson` encodings, the fields of the JSON objects are output as separate fields.
     #[serde(default)]
     encoding: Option<Encoding>,
 
     /// A list of HTTP headers to include in the log event.
     ///
-    /// These will override any values included in the JSON payload with conflicting names.
+    /// These override any values included in the JSON payload with conflicting names.
     #[serde(default)]
     #[configurable(metadata(docs::examples = "User-Agent"))]
     #[configurable(metadata(docs::examples = "X-My-Custom-Header"))]
@@ -93,7 +93,7 @@ pub struct SimpleHttpConfig {
 
     /// A list of URL query parameters to include in the log event.
     ///
-    /// These will override any values included in the body with conflicting names.
+    /// These override any values included in the body with conflicting names.
     #[serde(default)]
     #[configurable(metadata(docs::examples = "application"))]
     #[configurable(metadata(docs::examples = "source"))]
@@ -104,21 +104,21 @@ pub struct SimpleHttpConfig {
 
     /// Whether or not to treat the configured `path` as an absolute path.
     ///
-    /// If set to `true`, only requests using the exact URL path specified in `path` will be accepted. Otherwise,
-    /// requests sent to a URL path that starts with the value of `path` will be accepted.
+    /// If set to `true`, only requests using the exact URL path specified in `path` are accepted. Otherwise,
+    /// requests sent to a URL path that starts with the value of `path` are accepted.
     ///
-    /// With `strict_path` set to `false` and `path` set to `""`, the configured HTTP source will accept requests from
+    /// With `strict_path` set to `false` and `path` set to `""`, the configured HTTP source accepts requests from
     /// any URL path.
     #[serde(default = "crate::serde::default_true")]
     strict_path: bool,
 
-    /// The URL path on which log event POST requests shall be sent.
+    /// The URL path on which log event POST requests are sent.
     #[serde(default = "default_path")]
     #[configurable(metadata(docs::examples = "/event/path"))]
     #[configurable(metadata(docs::examples = "/logs"))]
     path: String,
 
-    /// The event key in which the requested URL path used to send the request will be stored.
+    /// The event key in which the requested URL path used to send the request is stored.
     #[serde(default = "default_path_key")]
     #[configurable(metadata(docs::examples = "vector_http_path"))]
     path_key: OptionalValuePath,

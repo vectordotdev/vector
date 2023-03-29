@@ -1,4 +1,8 @@
-use std::{cell::RefCell, collections::BTreeSet, env, mem};
+use std::{
+    cell::RefCell,
+    collections::{BTreeSet, HashMap},
+    env, mem,
+};
 
 use indexmap::IndexMap;
 use serde_json::{Map, Value};
@@ -414,6 +418,21 @@ pub fn generate_one_of_schema(subschemas: &[SchemaObject]) -> SchemaObject {
     }
 }
 
+pub fn generate_any_of_schema(subschemas: &[SchemaObject]) -> SchemaObject {
+    let subschemas = subschemas
+        .iter()
+        .map(|s| Schema::Object(s.clone()))
+        .collect::<Vec<_>>();
+
+    SchemaObject {
+        subschemas: Some(Box::new(SubschemaValidation {
+            any_of: Some(subschemas),
+            ..Default::default()
+        })),
+        ..Default::default()
+    }
+}
+
 pub fn generate_tuple_schema(subschemas: &[SchemaObject]) -> SchemaObject {
     let subschemas = subschemas
         .iter()
@@ -632,4 +651,34 @@ pub(crate) fn assert_string_schema_for_map(
     } else {
         Ok(())
     }
+}
+
+/// Determines whether or not an enum schema is ambiguous based on discriminants of its variants.
+///
+/// A discriminant is the set of the named fields which are required, which may be an empty set.
+pub fn has_ambiguous_discriminants(
+    discriminants: &HashMap<&'static str, BTreeSet<String>>,
+) -> bool {
+    // Firstly, if there's less than two discriminants, then there can't be any ambiguity.
+    if discriminants.len() < 2 {
+        return false;
+    }
+
+    // Any empty discriminant is considered ambiguous.
+    if discriminants
+        .values()
+        .any(|discriminant| discriminant.is_empty())
+    {
+        return true;
+    }
+
+    // Now collapse the list of discriminants into another set, which will eliminate any duplicate
+    // sets. If there are any duplicate sets, this would also imply ambiguity, since there's not
+    // enough discrimination via required fields.
+    let deduplicated = discriminants.values().cloned().collect::<BTreeSet<_>>();
+    if deduplicated.len() != discriminants.len() {
+        return true;
+    }
+
+    false
 }
