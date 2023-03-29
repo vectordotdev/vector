@@ -17,5 +17,5 @@ syn = { version = "1.0", default-features = false, features = ["full", "extra-tr
 vector-config-common = { path = "../vector-config-common" }
 
 [dev-dependencies]
-serde = { version = "1.0.158", default-features = false }
+serde = { version = "1.0.159", default-features = false }
 vector-config = { path = "../vector-config" }
