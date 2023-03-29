@@ -155,6 +155,10 @@ mod integration_tests {
 
     #[tokio::test]
     async fn axiom_logs_put_data() {
+        let api_key = std::env::var("AXIOM_TOKEN")
+            .expect("couldn't find the Axiom token in environment variables");
+        assert!(!api_key.is_empty(), "$AXIOM_TOKEN required");
+
         let client = reqwest::Client::new();
         let url = env::var("AXIOM_URL").unwrap();
         let token = env::var("AXIOM_TOKEN").expect("AXIOM_TOKEN environment variable to be set");
