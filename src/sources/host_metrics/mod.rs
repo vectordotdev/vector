@@ -20,7 +20,7 @@ use vector_core::config::LogNamespace;
 use vector_core::EstimatedJsonEncodedSizeOf;
 
 use crate::{
-    config::{DataType, SourceConfig, SourceContext, SourceOutput},
+    config::{SourceConfig, SourceContext, SourceOutput},
     event::metric::{Metric, MetricKind, MetricTags, MetricValue},
     internal_events::{EventsReceived, HostMetricsScrapeDetailError, StreamClosedError},
     shutdown::ShutdownSignal,

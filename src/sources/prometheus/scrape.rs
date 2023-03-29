@@ -12,7 +12,7 @@ use vector_core::{config::LogNamespace, event::Event};
 use super::parser;
 use crate::sources::util::http::HttpMethod;
 use crate::{
-    config::{self, GenerateConfig, SourceConfig, SourceContext, SourceOutput},
+    config::{GenerateConfig, SourceConfig, SourceContext, SourceOutput},
     http::Auth,
     internal_events::PrometheusParseError,
     sources::{

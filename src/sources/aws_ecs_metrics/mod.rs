@@ -10,7 +10,7 @@ use vector_config::configurable_component;
 use vector_core::{config::LogNamespace, EstimatedJsonEncodedSizeOf};
 
 use crate::{
-    config::{self, GenerateConfig, SourceConfig, SourceContext, SourceOutput},
+    config::{GenerateConfig, SourceConfig, SourceContext, SourceOutput},
     internal_events::{
         AwsEcsMetricsEventsReceived, AwsEcsMetricsHttpError, AwsEcsMetricsParseError,
         AwsEcsMetricsResponseError, RequestCompleted, StreamClosedError,

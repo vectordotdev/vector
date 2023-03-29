@@ -98,8 +98,8 @@ pub struct SourceContext {
 
     /// Tracks the schema IDs assigned to schemas exposed by the source.
     ///
-    /// Given a source can expose multiple [`Output`] channels, the ID is tied to the identifier of
-    /// that `Output`.
+    /// Given a source can expose multiple [`SourceOutput`] channels, the ID is tied to the identifier of
+    /// that `SourceOutput`.
     pub schema_definitions: HashMap<Option<String>, schema::Definition>,
 }
 

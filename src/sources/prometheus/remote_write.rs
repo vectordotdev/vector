@@ -10,8 +10,7 @@ use warp::http::{HeaderMap, StatusCode};
 use super::parser;
 use crate::{
     config::{
-        self, GenerateConfig, SourceAcknowledgementsConfig, SourceConfig, SourceContext,
-        SourceOutput,
+        GenerateConfig, SourceAcknowledgementsConfig, SourceConfig, SourceContext, SourceOutput,
     },
     event::Event,
     internal_events::PrometheusRemoteWriteParseError,

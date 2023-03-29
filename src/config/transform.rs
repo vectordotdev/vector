@@ -109,8 +109,8 @@ pub struct TransformContext {
 
     /// Tracks the schema IDs assigned to schemas exposed by the transform.
     ///
-    /// Given a transform can expose multiple [`Output`] channels, the ID is tied to the identifier of
-    /// that `Output`.
+    /// Given a transform can expose multiple [`TransformOutput`] channels, the ID is tied to the identifier of
+    /// that `TransformOutput`.
     pub schema_definitions: HashMap<Option<String>, Vec<schema::Definition>>,
 
     /// The schema definition created by merging all inputs of the transform.

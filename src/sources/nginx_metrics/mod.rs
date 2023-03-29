@@ -16,7 +16,7 @@ use vector_config::configurable_component;
 use vector_core::{metric_tags, EstimatedJsonEncodedSizeOf};
 
 use crate::{
-    config::{DataType, SourceConfig, SourceContext, SourceOutput},
+    config::{SourceConfig, SourceContext, SourceOutput},
     event::metric::{Metric, MetricKind, MetricTags, MetricValue},
     http::{Auth, HttpClient},
     internal_events::{

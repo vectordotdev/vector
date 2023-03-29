@@ -14,7 +14,7 @@ use vector_core::EstimatedJsonEncodedSizeOf;
 
 use self::types::Stats;
 use crate::{
-    config::{self, SourceConfig, SourceContext, SourceOutput},
+    config::{SourceConfig, SourceContext, SourceOutput},
     http::HttpClient,
     internal_events::{
         EventStoreDbMetricsHttpError, EventStoreDbStatsParsingError, EventsReceived,
