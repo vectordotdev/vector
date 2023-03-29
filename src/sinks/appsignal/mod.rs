@@ -10,7 +10,7 @@
 mod integration_tests;
 
 use bytes::{BufMut, Bytes, BytesMut};
-use flate2::write::GzEncoder;
+use flate2::write::{GzEncoder, ZlibEncoder};
 use futures::{FutureExt, SinkExt};
 use http::{header::AUTHORIZATION, Request, Uri};
 use hyper::Body;
@@ -55,6 +55,24 @@ impl FinishError {
     }
 }
 
+/// Supported compression types for the AppSignal sink.
+#[configurable_component]
+#[derive(Copy, Clone, Debug, Derivative, Eq, PartialEq)]
+#[serde(rename_all = "lowercase")]
+#[derivative(Default)]
+enum AppsignalCompression {
+    /// [Gzip][gzip] compression.
+    ///
+    /// [gzip]: https://www.gzip.org/
+    #[derivative(Default)]
+    Gzip,
+
+    /// [Zlib][zlib] compression.
+    ///
+    /// [zlib]: https://zlib.net/
+    Zlib,
+}
+
 /// Configuration for the `appsignal` sink.
 #[configurable_component(sink("appsignal"))]
 #[derive(Clone, Debug, Default)]
@@ -69,6 +87,10 @@ pub struct AppsignalSinkConfig {
     #[configurable(metadata(docs::examples = "00000000-0000-0000-0000-000000000000"))]
     #[configurable(metadata(docs::examples = "${APPSIGNAL_PUSH_API_KEY}"))]
     push_api_key: SensitiveString,
+
+    #[configurable(derived)]
+    #[serde(default)]
+    compression: AppsignalCompression,
 
     #[configurable(derived)]
     #[serde(default)]
@@ -182,24 +204,39 @@ impl HttpSink for AppsignalSinkConfig {
 
     async fn build_request(&self, events: Self::Output) -> crate::Result<Request<Bytes>> {
         let uri = endpoint_uri(&self.endpoint, "vector/events")?;
-        let request = Request::post(uri)
-            .header(
-                AUTHORIZATION,
-                format!("Bearer {}", self.push_api_key.inner()),
-            )
-            .header("Content-Encoding", "gzip");
+        let mut request = Request::post(uri).header(
+            AUTHORIZATION,
+            format!("Bearer {}", self.push_api_key.inner()),
+        );
 
         let mut body = crate::serde::json::to_bytes(&events)?.freeze();
 
-        let buffer = BytesMut::new();
-        let mut writer = GzEncoder::new(buffer.writer(), flate2::Compression::new(6));
-        write_all(&mut writer, 0, &body)?;
-        body = writer
-            .finish()
-            .context(CompressionFailedSnafu)?
-            .into_inner()
-            .into();
+        match self.compression {
+            AppsignalCompression::Gzip => {
+                request = request.header("Content-Encoding", "gzip");
 
+                let buffer = BytesMut::new();
+                let mut writer = GzEncoder::new(buffer.writer(), flate2::Compression::new(6));
+                write_all(&mut writer, 0, &body)?;
+                body = writer
+                    .finish()
+                    .context(CompressionFailedSnafu)?
+                    .into_inner()
+                    .into();
+            }
+            AppsignalCompression::Zlib => {
+                request = request.header("Content-Encoding", "deflate");
+
+                let buffer = BytesMut::new();
+                let mut writer = ZlibEncoder::new(buffer.writer(), flate2::Compression::new(6));
+                write_all(&mut writer, 0, &body)?;
+                body = writer
+                    .finish()
+                    .context(CompressionFailedSnafu)?
+                    .into_inner()
+                    .into();
+            }
+        }
         request.body(body).map_err(Into::into)
     }
 }
