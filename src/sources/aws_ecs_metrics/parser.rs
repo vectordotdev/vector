@@ -530,7 +530,13 @@ pub(super) fn parse(
         }
 
         if let Some(precpu) = container.precpu_stats {
-            metrics.extend(cpu_metrics(&precpu, container.ts, &namespace, &tags, "precpu"));
+            metrics.extend(cpu_metrics(
+                &precpu,
+                container.ts,
+                &namespace,
+                &tags,
+                "precpu",
+            ));
         }
 
         if let Some(memory) = container.memory_stats {
