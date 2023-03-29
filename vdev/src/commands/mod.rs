@@ -90,8 +90,7 @@ cli_commands! {
     mod version,
 }
 
-/// This macro creates a wrapper for an existing script.
-/// `pre` provides the option to execute an expression before running the script.
+/// This macro creates a wrapper for an existing script
 #[macro_export]
 macro_rules! script_wrapper {
     ( $mod:ident = $doc:literal => $script:literal ) => {
