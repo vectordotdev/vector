@@ -114,11 +114,11 @@ impl SourceOutput {
     /// Create a `SourceOutput` of the given data type that contains a single output `Definition`.
     /// Designed for use in log sources.
     ///
-    /// There is nothing intrinsically that forces this function to be used just for logs. `ty` could
-    /// be `DataType::Metrics` and this function will not complain. The only thing is this function
-    /// forces a `schema_definition` to be specified, which is required for logs.
+    /// Asserts that `ty` contains [`DataType::Log`].
     #[must_use]
     pub fn new_logs(ty: DataType, schema_definition: schema::Definition) -> Self {
+        assert!(ty.contains(DataType::Log));
+
         Self {
             port: None,
             ty,
@@ -129,14 +129,12 @@ impl SourceOutput {
     /// Create a `SourceOutput` of the given data type that contains no output `Definition`s.
     /// Designed for use in metrics sources.
     ///
-    /// There is nothing intrinsically that forces this function to be used just for metrics. `ty` could
-    /// be `DataType::Logs` and this function will not complain. The only thing is this function
-    /// forces a `schema_definition` to *not* be specified, as it is not required for metrics.
+    /// Sets the datatype to be [`DataType::Metric`].
     #[must_use]
-    pub fn new_metrics(ty: DataType) -> Self {
+    pub fn new_metrics() -> Self {
         Self {
             port: None,
-            ty,
+            ty: DataType::Metric,
             schema_definition: None,
         }
     }
@@ -144,14 +142,13 @@ impl SourceOutput {
     /// Create a `SourceOutput` of the given data type that contains no output `Definition`s.
     /// Designed for use in trace sources.
     ///
-    /// There is nothing intrinsically that forces this function to be used just for traces. `ty` could
-    /// be `DataType::Logs` and this function will not complain. The only thing is this function
-    /// forces a `schema_definition` to *not* be specified, as it is not required for traces.
+    ///
+    /// Sets the datatype to be [`DataType::Trace`].
     #[must_use]
-    pub fn new_traces(ty: DataType) -> Self {
+    pub fn new_traces() -> Self {
         Self {
             port: None,
-            ty,
+            ty: DataType::Trace,
             schema_definition: None,
         }
     }

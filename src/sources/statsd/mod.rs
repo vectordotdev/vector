@@ -179,7 +179,7 @@ impl SourceConfig for StatsdConfig {
     }
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
-        vec![SourceOutput::new_metrics(config::DataType::Metric)]
+        vec![SourceOutput::new_metrics()]
     }
 
     fn resources(&self) -> Vec<Resource> {
