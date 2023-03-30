@@ -142,7 +142,6 @@ impl SourceOutput {
     /// Create a `SourceOutput` of the given data type that contains no output `Definition`s.
     /// Designed for use in trace sources.
     ///
-    ///
     /// Sets the datatype to be [`DataType::Trace`].
     #[must_use]
     pub fn new_traces() -> Self {
@@ -160,14 +159,16 @@ impl SourceOutput {
     /// Schema enabled is set in the users configuration.
     #[must_use]
     pub fn schema_definition(&self, schema_enabled: bool) -> Option<schema::Definition> {
-        self.schema_definition.as_ref().map(|definition| {
-            if schema_enabled || definition.log_namespaces().contains(&LogNamespace::Vector) {
-                definition.clone()
-            } else {
+        self.schema_definition.as_ref().and_then(|definition| {
+            if schema_enabled {
+                Some(definition.clone())
+            } else if definition.log_namespaces().contains(&LogNamespace::Vector) {
                 let mut new_definition =
                     schema::Definition::default_for_namespace(definition.log_namespaces());
                 new_definition.add_meanings(definition.meanings());
-                new_definition
+                Some(new_definition)
+            } else {
+                None
             }
         })
     }
@@ -179,14 +180,16 @@ impl SourceOutput {
     /// Schema enabled is set in the user's configuration.
     #[must_use]
     pub fn into_schema_definition(self, schema_enabled: bool) -> Option<schema::Definition> {
-        self.schema_definition.map(|definition| {
-            if schema_enabled || definition.log_namespaces().contains(&LogNamespace::Vector) {
-                definition
-            } else {
+        self.schema_definition.and_then(|definition| {
+            if schema_enabled {
+                Some(definition)
+            } else if definition.log_namespaces().contains(&LogNamespace::Vector) {
                 let mut new_definition =
                     schema::Definition::default_for_namespace(definition.log_namespaces());
                 new_definition.add_meanings(definition.meanings());
-                new_definition
+                Some(new_definition)
+            } else {
+                None
             }
         })
     }
@@ -206,9 +209,10 @@ pub struct TransformOutput {
     pub port: Option<String>,
     pub ty: DataType,
 
-    /// For *transforms* if `Datatype` is [`DataType::Log`], at least one definition should be output. If the
-    /// transform has multiple connected sources, it is possible to have multiple output definitions -
-    /// one for each input.
+    /// For *transforms* if `Datatype` is [`DataType::Log`], if schema is
+    /// enabled, at least one definition  should be output. If the transform
+    /// has multiple connected sources, it is possible to have multiple output
+    /// definitions - one for each input.
     pub log_schema_definitions: Vec<schema::Definition>,
 }
 

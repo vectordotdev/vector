@@ -390,6 +390,7 @@ impl Definition {
     /// Register a semantic meaning for the definition.
     ///
     /// # Errors
+    ///
     /// Returns an error if the provided path points to an unknown location in the collection.
     pub fn try_with_meaning(
         &mut self,
@@ -525,6 +526,7 @@ mod test_utils {
         /// Checks that the schema definition is _valid_ for the given event.
         ///
         /// # Errors
+        ///
         /// If the definition is not valid, debug info will be returned.
         pub fn is_valid_for_event(&self, event: &Event) -> Result<(), String> {
             if let Some(log) = event.maybe_as_log() {
@@ -566,7 +568,9 @@ mod test_utils {
         }
 
         /// Asserts that the schema definition is _valid_ for the given event.
+        ///
         /// # Panics
+        ///
         /// If the definition is not valid for the event.
         pub fn assert_valid_for_event(&self, event: &Event) {
             if let Err(err) = self.is_valid_for_event(event) {
@@ -575,12 +579,14 @@ mod test_utils {
         }
 
         /// Asserts that the schema definition is _invalid_ for the given event.
+        ///
         /// # Panics
+        ///
         /// If the definition is valid for the event.
         pub fn assert_invalid_for_event(&self, event: &Event) {
             assert!(
                 self.is_valid_for_event(event).is_err(),
-                "Schema definition assertion passed incorrectly"
+                "Schema definition assertion should not be valid"
             );
         }
     }
