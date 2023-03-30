@@ -1,4 +1,0 @@
-# result: 2
-
-foo = { "bar": 2 }
-foo.bar

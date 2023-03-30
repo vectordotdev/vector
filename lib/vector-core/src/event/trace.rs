@@ -1,5 +1,6 @@
 use std::{collections::BTreeMap, fmt::Debug};
 
+use lookup::lookup_v2::TargetPath;
 use serde::{Deserialize, Serialize};
 use vector_buffers::EventCount;
 use vector_common::EventDataEq;
@@ -67,8 +68,9 @@ impl TraceEvent {
         self.0.as_map().expect("inner value must be a map")
     }
 
-    pub fn get(&self, key: impl AsRef<str>) -> Option<&Value> {
-        self.0.get(key.as_ref())
+    #[allow(clippy::needless_pass_by_value)] // TargetPath is always a reference
+    pub fn get<'a>(&self, key: impl TargetPath<'a>) -> Option<&Value> {
+        self.0.get(key)
     }
 
     pub fn get_mut(&mut self, key: impl AsRef<str>) -> Option<&mut Value> {

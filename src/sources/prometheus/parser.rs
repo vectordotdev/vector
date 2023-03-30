@@ -112,7 +112,7 @@ fn reparse_groups(groups: Vec<MetricGroup>) -> Vec<Event> {
                                         value: q.value,
                                     })
                                     .collect(),
-                                count: u64::from(metric.count),
+                                count: metric.count,
                                 sum: metric.sum,
                             },
                         )

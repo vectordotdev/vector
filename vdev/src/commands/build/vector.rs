@@ -3,8 +3,7 @@ use std::process::Command;
 use anyhow::Result;
 use clap::Args;
 
-use crate::app::CommandExt as _;
-use crate::platform;
+use crate::{app::CommandExt as _, platform};
 
 /// Build the `vector` executable.
 #[derive(Args, Debug)]
@@ -26,18 +25,13 @@ impl Cli {
     pub fn exec(self) -> Result<()> {
         let mut command = Command::new("cargo");
         command.in_repo();
-        command.args(["build", "--no-default-features"]);
+        command.arg("build");
 
         if self.release {
             command.arg("--release");
         }
 
-        command.arg("--features");
-        if self.feature.is_empty() {
-            command.arg(platform::default_features());
-        } else {
-            command.arg(self.feature.join(","));
-        }
+        command.features(&self.feature);
 
         let target = self.target.unwrap_or_else(platform::default_target);
         command.args(["--target", &target]);

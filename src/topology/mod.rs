@@ -11,7 +11,6 @@ pub(super) use vector_core::fanout;
 pub mod schema;
 
 pub mod builder;
-mod controller;
 mod ready_arrays;
 mod running;
 mod task;
@@ -25,7 +24,6 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-pub use controller::{ReloadOutcome, TopologyController};
 use futures::{Future, FutureExt};
 pub(super) use running::RunningTopology;
 use tokio::sync::{mpsc, watch};

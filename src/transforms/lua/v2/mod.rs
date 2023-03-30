@@ -76,11 +76,11 @@ pub struct LuaConfig {
     #[serde(default)]
     timers: Vec<TimerConfig>,
 
-    /// When set to `single`, metric tag values will be exposed as single strings, the
-    /// same as they were before this config option. Tags with multiple values will show the last assigned value, and null values
-    /// will be ignored.
+    /// When set to `single`, metric tag values are exposed as single strings, the
+    /// same as they were before this config option. Tags with multiple values show the last assigned value, and null values
+    /// are ignored.
     ///
-    /// When set to `full`, all metric tags will be exposed as arrays of either string or null
+    /// When set to `full`, all metric tags are exposed as arrays of either string or null
     /// values.
     #[serde(default)]
     metric_tag_values: MetricTagValues,

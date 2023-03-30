@@ -497,7 +497,7 @@ impl PubsubSource {
         let mut stream = stream.into_inner();
 
         let (finalizer, mut ack_stream) =
-            Finalizer::maybe_new(self.acknowledgements, self.shutdown.clone());
+            Finalizer::maybe_new(self.acknowledgements, Some(self.shutdown.clone()));
         let mut pending_acks = 0;
 
         loop {
@@ -835,7 +835,7 @@ mod integration_tests {
     use once_cell::sync::Lazy;
     use serde_json::{json, Value};
     use tokio::time::{Duration, Instant};
-    use vector_common::btreemap;
+    use value::btreemap;
 
     use super::*;
     use crate::config::{ComponentKey, ProxyConfig};

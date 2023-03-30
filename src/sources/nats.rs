@@ -67,7 +67,7 @@ pub struct NatsSourceConfig {
     #[configurable(metadata(docs::examples = ">"))]
     subject: String,
 
-    /// NATS Queue Group to join.
+    /// The NATS queue group to join.
     queue: Option<String>,
 
     /// The namespace to use for logs. This overrides the global setting.

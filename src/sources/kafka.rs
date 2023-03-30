@@ -73,7 +73,7 @@ struct Metrics {
 pub struct KafkaSourceConfig {
     /// A comma-separated list of Kafka bootstrap servers.
     ///
-    /// These are the servers in a Kafka cluster that a client should use to "bootstrap" its connection to the cluster,
+    /// These are the servers in a Kafka cluster that a client should use to bootstrap its connection to the cluster,
     /// allowing discovering all other hosts in the cluster.
     ///
     /// Must be in the form of `host:port`, and comma-separated.
@@ -130,7 +130,7 @@ pub struct KafkaSourceConfig {
 
     /// Overrides the name of the log field used to add the message key to each event.
     ///
-    /// The value will be the message key of the Kafka message itself.
+    /// The value is the message key of the Kafka message itself.
     ///
     /// By default, `"message_key"` is used.
     #[serde(default = "default_key_field")]
@@ -139,7 +139,7 @@ pub struct KafkaSourceConfig {
 
     /// Overrides the name of the log field used to add the topic to each event.
     ///
-    /// The value will be the topic from which the Kafka message was consumed from.
+    /// The value is the topic from which the Kafka message was consumed from.
     ///
     /// By default, `"topic"` is used.
     #[serde(default = "default_topic_key")]
@@ -148,7 +148,7 @@ pub struct KafkaSourceConfig {
 
     /// Overrides the name of the log field used to add the partition to each event.
     ///
-    /// The value will be the partition from which the Kafka message was consumed from.
+    /// The value is the partition from which the Kafka message was consumed from.
     ///
     /// By default, `"partition"` is used.
     #[serde(default = "default_partition_key")]
@@ -157,7 +157,7 @@ pub struct KafkaSourceConfig {
 
     /// Overrides the name of the log field used to add the offset to each event.
     ///
-    /// The value will be the offset of the Kafka message itself.
+    /// The value is the offset of the Kafka message itself.
     ///
     /// By default, `"offset"` is used.
     #[serde(default = "default_offset_key")]
@@ -166,7 +166,7 @@ pub struct KafkaSourceConfig {
 
     /// Overrides the name of the log field used to add the headers to each event.
     ///
-    /// The value will be the headers of the Kafka message itself.
+    /// The value is the headers of the Kafka message itself.
     ///
     /// By default, `"headers"` is used.
     #[serde(default = "default_headers_key")]
@@ -313,7 +313,7 @@ impl SourceConfig for KafkaSourceConfig {
             .with_standard_vector_source_metadata()
             .with_source_metadata(
                 Self::NAME,
-                Some(LegacyKey::Overwrite(owned_value_path!(keys.timestamp))),
+                keys.timestamp.map(LegacyKey::Overwrite),
                 &owned_value_path!("timestamp"),
                 Kind::timestamp(),
                 Some("timestamp"),
@@ -373,7 +373,7 @@ async fn kafka_source(
 ) -> Result<(), ()> {
     let consumer = Arc::new(consumer);
     let (finalizer, mut ack_stream) =
-        OrderedFinalizer::<FinalizerEntry>::maybe_new(acknowledgements, shutdown.clone());
+        OrderedFinalizer::<FinalizerEntry>::maybe_new(acknowledgements, Some(shutdown.clone()));
     let finalizer = finalizer.map(Arc::new);
     if let Some(finalizer) = &finalizer {
         consumer
@@ -510,9 +510,9 @@ fn parse_stream<'a>(
     Some((count, stream))
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 struct Keys<'a> {
-    timestamp: &'a str,
+    timestamp: Option<OwnedValuePath>,
     key_field: &'a Option<OwnedValuePath>,
     topic: &'a Option<OwnedValuePath>,
     partition: &'a Option<OwnedValuePath>,
@@ -523,7 +523,7 @@ struct Keys<'a> {
 impl<'a> Keys<'a> {
     fn from(schema: &'a LogSchema, config: &'a KafkaSourceConfig) -> Self {
         Self {
-            timestamp: schema.timestamp_key(),
+            timestamp: schema.timestamp_key().cloned(),
             key_field: &config.key_field.path,
             topic: &config.topic_key.path,
             partition: &config.partition_key.path,
@@ -607,7 +607,7 @@ impl ReceivedMessage {
             log_namespace.insert_source_metadata(
                 KafkaSourceConfig::NAME,
                 log,
-                Some(LegacyKey::Overwrite(keys.timestamp)),
+                keys.timestamp.as_ref().map(LegacyKey::Overwrite),
                 path!("timestamp"),
                 self.timestamp,
             );
@@ -1045,7 +1045,7 @@ mod integration_test {
                     "kafka".into()
                 );
                 assert_eq!(
-                    event.as_log()[log_schema().timestamp_key()],
+                    event.as_log()[log_schema().timestamp_key().unwrap().to_string()],
                     now.trunc_subsecs(3).into()
                 );
                 assert_eq!(event.as_log()["topic"], topic.clone().into());

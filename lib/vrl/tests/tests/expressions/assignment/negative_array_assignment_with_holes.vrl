@@ -1,4 +1,0 @@
-# result: { "object": { "x": { "array": { "0": { "bytes": true }, "1": { "null": true }, "2": { "null": true }, "3": { "null": true }, "4": { "null": true } } } } }
-. = {"x": []}
-.x[-5] = "foo"
-type_def(.)

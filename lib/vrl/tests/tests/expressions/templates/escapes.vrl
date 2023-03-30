@@ -1,3 +1,0 @@
-# result: This {{ is not a }} templated { string }
-
-"This \{{ is not a \}} templated { string }"

@@ -1,6 +1,6 @@
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
-use lookup::path;
+use lookup::{path, OwnedTargetPath};
 use serde_json::Value as JsonValue;
 use snafu::{OptionExt, ResultExt, Snafu};
 use vector_core::config::{LegacyKey, LogNamespace};
@@ -80,7 +80,7 @@ fn parse_json(log: &mut LogEvent, log_namespace: LogNamespace) -> Result<(), Par
                     TIMESTAMP_KEY => log_namespace.insert_source_metadata(
                         Config::NAME,
                         log,
-                        Some(LegacyKey::Overwrite(path!(log_schema().timestamp_key()))),
+                        log_schema().timestamp_key().map(LegacyKey::Overwrite),
                         path!("timestamp"),
                         value,
                     ),
@@ -105,24 +105,32 @@ fn normalize_event(
 ) -> Result<(), NormalizationError> {
     // Parse timestamp.
     let timestamp_key = match log_namespace {
-        LogNamespace::Vector => "%kubernetes_logs.timestamp",
-        LogNamespace::Legacy => log_schema().timestamp_key(),
+        LogNamespace::Vector => Some(OwnedTargetPath::metadata(lookup::owned_value_path!(
+            "kubernetes_logs",
+            "timestamp"
+        ))),
+        LogNamespace::Legacy => log_schema()
+            .timestamp_key()
+            .map(|path| OwnedTargetPath::event(path.clone())),
     };
-    let time = log.remove(timestamp_key).context(TimeFieldMissingSnafu)?;
 
-    let time = match time {
-        Value::Bytes(val) => val,
-        _ => return Err(NormalizationError::TimeValueUnexpectedType),
-    };
-    let time = DateTime::parse_from_rfc3339(String::from_utf8_lossy(time.as_ref()).as_ref())
-        .context(TimeParsingSnafu)?;
-    log_namespace.insert_source_metadata(
-        Config::NAME,
-        log,
-        Some(LegacyKey::Overwrite(path!(log_schema().timestamp_key()))),
-        path!("timestamp"),
-        time.with_timezone(&Utc),
-    );
+    if let Some(timestamp_key) = timestamp_key {
+        let time = log.remove(&timestamp_key).context(TimeFieldMissingSnafu)?;
+
+        let time = match time {
+            Value::Bytes(val) => val,
+            _ => return Err(NormalizationError::TimeValueUnexpectedType),
+        };
+        let time = DateTime::parse_from_rfc3339(String::from_utf8_lossy(time.as_ref()).as_ref())
+            .context(TimeParsingSnafu)?;
+        log_namespace.insert_source_metadata(
+            Config::NAME,
+            log,
+            log_schema().timestamp_key().map(LegacyKey::Overwrite),
+            path!("timestamp"),
+            time.with_timezone(&Utc),
+        );
+    }
 
     // Parse message, remove trailing newline and detect if it's partial.
     let message_key = match log_namespace {

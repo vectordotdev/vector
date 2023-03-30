@@ -7,8 +7,7 @@ use indicatif::{ProgressBar, ProgressStyle};
 use log::LevelFilter;
 use once_cell::sync::{Lazy, OnceCell};
 
-use crate::config::Config;
-use crate::util;
+use crate::{config::Config, platform, util};
 
 // Use the `bash` interpreter included as part of the standard `git` install for our default shell
 // if nothing is specified in the environment.
@@ -72,6 +71,7 @@ pub trait CommandExt {
     fn run(&mut self) -> Result<ExitStatus>;
     fn wait(&mut self, message: impl Into<Cow<'static, str>>) -> Result<()>;
     fn pre_exec(&self);
+    fn features(&mut self, features: &[String]) -> &mut Self;
 }
 
 impl CommandExt for Command {
@@ -154,6 +154,17 @@ impl CommandExt for Command {
                 debug!("  unset ${key}");
             }
         }
+    }
+
+    fn features(&mut self, features: &[String]) -> &mut Self {
+        self.arg("--no-default-features");
+        self.arg("--features");
+        if features.is_empty() {
+            self.arg(platform::default_features());
+        } else {
+            self.arg(features.join(","));
+        }
+        self
     }
 }
 

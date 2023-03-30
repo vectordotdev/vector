@@ -50,8 +50,8 @@ pub struct SyslogConfig {
 
     /// Overrides the name of the log field used to add the peer host to each event.
     ///
-    /// If using TCP or UDP, the value will be the peer host's address, including the port i.e. `1.2.3.4:9000`. If using
-    /// UDS, the value will be the socket path itself.
+    /// If using TCP or UDP, the value is the peer host's address, including the port. For example, `1.2.3.4:9000`. If using
+    /// UDS, the value is the socket path itself.
     ///
     /// By default, the [global `log_schema.host_key` option][global_host_key] is used.
     ///
@@ -87,7 +87,7 @@ pub enum Mode {
         #[configurable(metadata(docs::type_unit = "bytes"))]
         receive_buffer_bytes: Option<usize>,
 
-        /// The maximum number of TCP connections that will be allowed at any given time.
+        /// The maximum number of TCP connections that are allowed at any given time.
         connection_limit: Option<u32>,
     },
 
@@ -114,7 +114,7 @@ pub enum Mode {
 
         /// Unix file mode bits to be applied to the unix socket file as its designated file permissions.
         ///
-        /// Note that the file mode value can be specified in any numeric format supported by your configuration
+        /// Note: The file mode value can be specified in any numeric format supported by your configuration
         /// language, but it is most intuitive to use an octal number.
         socket_file_mode: Option<u32>,
     },
@@ -423,7 +423,9 @@ fn enrich_syslog_event(
             .get("timestamp")
             .and_then(|timestamp| timestamp.as_timestamp().cloned())
             .unwrap_or_else(Utc::now);
-        log.insert((PathPrefix::Event, log_schema().timestamp_key()), timestamp);
+        if let Some(timestamp_key) = log_schema().timestamp_key() {
+            log.insert((PathPrefix::Event, timestamp_key), timestamp);
+        }
     }
 
     trace!(
@@ -801,7 +803,10 @@ mod test {
         {
             let expected = expected.as_mut_log();
             expected.insert(
-                log_schema().timestamp_key(),
+                (
+                    lookup::PathPrefix::Event,
+                    log_schema().timestamp_key().unwrap(),
+                ),
                 Utc.ymd(2019, 2, 13)
                     .and_hms_opt(19, 48, 34)
                     .expect("invalid timestamp"),
@@ -841,7 +846,10 @@ mod test {
         {
             let expected = expected.as_mut_log();
             expected.insert(
-                log_schema().timestamp_key(),
+                (
+                    lookup::PathPrefix::Event,
+                    log_schema().timestamp_key().unwrap(),
+                ),
                 Utc.ymd(2019, 2, 13)
                     .and_hms_opt(19, 48, 34)
                     .expect("invalid timestamp"),
@@ -960,7 +968,13 @@ mod test {
                 .and_hms_opt(20, 7, 26)
                 .expect("invalid timestamp")
                 .into();
-            expected.insert(log_schema().timestamp_key(), expected_date);
+            expected.insert(
+                (
+                    lookup::PathPrefix::Event,
+                    log_schema().timestamp_key().unwrap(),
+                ),
+                expected_date,
+            );
             expected.insert(log_schema().host_key(), "74794bfb6795");
             expected.insert(log_schema().source_type_key(), "syslog");
             expected.insert("hostname", "74794bfb6795");
@@ -993,7 +1007,13 @@ mod test {
                 .and_hms_opt(21, 31, 56)
                 .expect("invalid timestamp")
                 .into();
-            expected.insert(log_schema().timestamp_key(), expected_date);
+            expected.insert(
+                (
+                    lookup::PathPrefix::Event,
+                    log_schema().timestamp_key().unwrap(),
+                ),
+                expected_date,
+            );
             expected.insert(log_schema().source_type_key(), "syslog");
             expected.insert("host", "74794bfb6795");
             expected.insert("hostname", "74794bfb6795");
@@ -1021,7 +1041,10 @@ mod test {
         {
             let expected = expected.as_mut_log();
             expected.insert(
-                log_schema().timestamp_key(),
+                (
+                    lookup::PathPrefix::Event,
+                    log_schema().timestamp_key().unwrap(),
+                ),
                 Utc.ymd(2019, 2, 13).and_hms_micro(21, 53, 30, 605_850),
             );
             expected.insert(log_schema().source_type_key(), "syslog");

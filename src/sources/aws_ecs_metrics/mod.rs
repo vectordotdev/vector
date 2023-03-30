@@ -59,7 +59,7 @@ pub enum Version {
 pub struct AwsEcsMetricsSourceConfig {
     /// Base URI of the task metadata endpoint.
     ///
-    /// If empty, the URI will be automatically discovered based on the latest version detected.
+    /// If empty, the URI is automatically discovered based on the latest version detected.
     ///
     /// By default:
     /// - The version 4 endpoint base URI is stored in the environment variable `ECS_CONTAINER_METADATA_URI_V4`.

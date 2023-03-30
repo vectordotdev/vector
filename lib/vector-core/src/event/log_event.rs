@@ -146,7 +146,10 @@ impl LogEvent {
     pub fn from_str_legacy(msg: impl Into<String>) -> Self {
         let mut log = LogEvent::default();
         log.insert(log_schema().message_key(), msg.into());
-        log.insert(log_schema().timestamp_key(), Utc::now());
+        if let Some(timestamp_key) = log_schema().timestamp_key() {
+            log.insert((PathPrefix::Event, timestamp_key), Utc::now());
+        }
+
         log
     }
 
@@ -419,7 +422,7 @@ impl LogEvent {
     pub fn timestamp_path(&self) -> Option<String> {
         match self.namespace() {
             LogNamespace::Vector => self.find_key_by_meaning("timestamp"),
-            LogNamespace::Legacy => Some(log_schema().timestamp_key().to_owned()),
+            LogNamespace::Legacy => log_schema().timestamp_key().map(ToString::to_string),
         }
     }
 
@@ -459,19 +462,17 @@ impl LogEvent {
     pub fn get_timestamp(&self) -> Option<&Value> {
         match self.namespace() {
             LogNamespace::Vector => self.get_by_meaning("timestamp"),
-            LogNamespace::Legacy => self.get((PathPrefix::Event, log_schema().timestamp_key())),
+            LogNamespace::Legacy => log_schema()
+                .timestamp_key()
+                .and_then(|key| self.get((PathPrefix::Event, key))),
         }
     }
 
     /// Removes the `timestamp` from the event. This is either from the "timestamp" semantic meaning (Vector namespace)
     /// or from the timestamp key set on the "Global Log Schema" (Legacy namespace).
     pub fn remove_timestamp(&mut self) -> Option<Value> {
-        match self.namespace() {
-            LogNamespace::Vector => self
-                .find_key_by_meaning("timestamp")
-                .and_then(|key| self.remove(key.as_str())),
-            LogNamespace::Legacy => self.remove((PathPrefix::Event, log_schema().timestamp_key())),
-        }
+        self.timestamp_path()
+            .and_then(|key| self.remove(key.as_str()))
     }
 
     /// Fetches the `host` of the event. This is either from the "host" semantic meaning (Vector namespace)
@@ -520,8 +521,9 @@ mod test_utils {
             let mut log = LogEvent::default();
 
             log.insert(log_schema().message_key(), message);
-            log.insert(log_schema().timestamp_key(), Utc::now());
-
+            if let Some(timestamp_key) = log_schema().timestamp_key() {
+                log.insert((PathPrefix::Event, timestamp_key), Utc::now());
+            }
             log
         }
     }

@@ -88,7 +88,7 @@ pub struct FileConfig {
 
     /// Overrides the name of the log field used to add the file path to each event.
     ///
-    /// The value will be the full path to the file where the event was read message.
+    /// The value is the full path to the file where the event was read message.
     ///
     /// Set to `""` to suppress this key.
     #[serde(default = "default_file_key")]
@@ -119,7 +119,7 @@ pub struct FileConfig {
     #[configurable(metadata(docs::examples = 600))]
     pub ignore_older_secs: Option<u64>,
 
-    /// The maximum size of a line before it will be discarded.
+    /// The maximum size of a line before it is discarded.
     ///
     /// This protects against malformed lines or tailing incorrect files.
     #[serde(default = "default_max_line_bytes")]
@@ -149,7 +149,7 @@ pub struct FileConfig {
 
     /// Enables adding the file offset to each event and sets the name of the log field used.
     ///
-    /// The value will be the byte offset of the start of the line within the file.
+    /// The value is the byte offset of the start of the line within the file.
     ///
     /// Off by default, the offset is only added to the event if this is set.
     #[serde(default)]
@@ -207,9 +207,9 @@ pub struct FileConfig {
     #[serde(default)]
     pub oldest_first: bool,
 
-    /// Timeout from reaching `EOF` after which file will be removed from filesystem, unless new data is written in the meantime.
+    /// Timeout from reaching `EOF` after which the file is removed from the filesystem, unless new data is written in the meantime.
     ///
-    /// If not specified, files will not be removed.
+    /// If not specified, files are not removed.
     #[serde(alias = "remove_after", default)]
     #[configurable(metadata(docs::type_unit = "seconds"))]
     #[configurable(metadata(docs::examples = 0))]
@@ -551,7 +551,8 @@ pub fn file_source(
         // The shutdown sent in to the finalizer is the global
         // shutdown handle used to tell it to stop accepting new batch
         // statuses and just wait for the remaining acks to come in.
-        let (finalizer, mut ack_stream) = OrderedFinalizer::<FinalizerEntry>::new(shutdown.clone());
+        let (finalizer, mut ack_stream) = OrderedFinalizer::<FinalizerEntry>::new(None);
+
         // We set up a separate shutdown signal to tie together the
         // finalizer and the checkpoint writer task in the file
         // server, to make it continue to write out updated
@@ -747,7 +748,7 @@ fn create_event(
 
     log_namespace.insert_vector_metadata(
         &mut event,
-        log_schema().source_type_key(),
+        Some(log_schema().source_type_key()),
         path!("source_type"),
         Bytes::from_static(FileConfig::NAME.as_bytes()),
     );
@@ -1019,7 +1020,7 @@ mod tests {
         assert_eq!(log["offset"], 0.into());
         assert_eq!(log[log_schema().message_key()], "hello world".into());
         assert_eq!(log[log_schema().source_type_key()], "file".into());
-        assert!(log[log_schema().timestamp_key()].is_timestamp());
+        assert!(log[log_schema().timestamp_key().unwrap().to_string()].is_timestamp());
     }
 
     #[test]
@@ -1041,7 +1042,7 @@ mod tests {
         assert_eq!(log["off"], 0.into());
         assert_eq!(log[log_schema().message_key()], "hello world".into());
         assert_eq!(log[log_schema().source_type_key()], "file".into());
-        assert!(log[log_schema().timestamp_key()].is_timestamp());
+        assert!(log[log_schema().timestamp_key().unwrap().to_string()].is_timestamp());
     }
 
     #[test]
@@ -1446,7 +1447,7 @@ mod tests {
                         .to_string(),
                     log_schema().host_key().to_string(),
                     log_schema().message_key().to_string(),
-                    log_schema().timestamp_key().to_string(),
+                    log_schema().timestamp_key().unwrap().to_string(),
                     log_schema().source_type_key().to_string()
                 ]
                 .into_iter()
@@ -1563,6 +1564,54 @@ mod tests {
         .await;
         let lines = extract_messages_string(received);
         assert_eq!(lines, vec!["the line"]);
+    }
+
+    #[tokio::test]
+    async fn file_duplicate_processing_after_restart() {
+        let dir = tempdir().unwrap();
+        let config = file::FileConfig {
+            include: vec![dir.path().join("*")],
+            ..test_default_file_config(&dir)
+        };
+
+        let path = dir.path().join("file");
+        let mut file = File::create(&path).unwrap();
+
+        let line_count = 4000;
+        for i in 0..line_count {
+            writeln!(&mut file, "Here's a line for you: {}", i).unwrap();
+        }
+        sleep_500_millis().await;
+
+        // First time server runs it should pick up a bunch of lines
+        let received = run_file_source(
+            &config,
+            true,
+            Acks,
+            LogNamespace::Legacy,
+            // shutdown signal is sent after this duration
+            sleep_500_millis(),
+        )
+        .await;
+        let lines = extract_messages_string(received);
+
+        // ...but not all the lines; if the first run processed the entire file, we may not hit the
+        // bug we're testing for, which happens if the finalizer stream exits on shutdown with pending acks
+        assert!(lines.len() < line_count);
+
+        // Restart the server, and it should read the rest without duplicating any
+        let received = run_file_source(
+            &config,
+            true,
+            Acks,
+            LogNamespace::Legacy,
+            sleep(Duration::from_secs(5)),
+        )
+        .await;
+        let lines2 = extract_messages_string(received);
+
+        // Between both runs, we should have the expected number of lines
+        assert_eq!(lines.len() + lines2.len(), line_count);
     }
 
     #[tokio::test]

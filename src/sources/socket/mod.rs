@@ -361,7 +361,7 @@ mod test {
         task::JoinHandle,
         time::{timeout, Duration, Instant},
     };
-    use vector_common::btreemap;
+    use value::btreemap;
     use vector_core::event::EventContainer;
     #[cfg(unix)]
     use {
