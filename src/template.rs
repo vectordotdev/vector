@@ -4,7 +4,7 @@ use std::{borrow::Cow, convert::TryFrom, fmt, hash::Hash, path::PathBuf};
 use bytes::Bytes;
 use chrono::{
     format::{strftime::StrftimeItems, Item},
-    Utc,
+    Utc, FixedOffset,
 };
 use lookup::lookup_v2::parse_target_path;
 use lookup::PathPrefix;
@@ -64,6 +64,9 @@ pub struct Template {
 
     #[serde(skip)]
     reserve_size: usize,
+
+    #[serde(skip)]
+    tz_offset: Option<FixedOffset>,
 }
 
 impl TryFrom<&str> for Template {
@@ -112,11 +115,14 @@ impl TryFrom<Cow<'_, str>> for Template {
                 })
                 .sum();
 
+            let tz_offset = FixedOffset::east_opt(0);
+
             Template {
                 parts,
                 src: src.into_owned(),
                 is_static,
                 reserve_size,
+                tz_offset,
             }
         })
     }
@@ -138,6 +144,11 @@ impl fmt::Display for Template {
 impl ConfigurableString for Template {}
 
 impl Template {
+    /// set tz offset
+    pub fn with_tz_offset(mut self, tz_offset: FixedOffset) -> Self {
+        self.tz_offset = Some(tz_offset);
+        self
+    }
     /// Renders the given template with data from the event.
     pub fn render<'a>(
         &self,
@@ -164,7 +175,7 @@ impl Template {
         for part in &self.parts {
             match part {
                 Part::Literal(lit) => out.push_str(lit),
-                Part::Strftime(items) => out.push_str(&render_timestamp(items, event)),
+                Part::Strftime(items) => out.push_str(&render_timestamp(items, event, self.tz_offset.unwrap())),
                 Part::Reference(key) => {
                     out.push_str(
                         &match event {
@@ -341,22 +352,33 @@ fn render_metric_field<'a>(key: &str, metric: &'a Metric) -> Option<&'a str> {
     }
 }
 
-fn render_timestamp(items: &ParsedStrftime, event: EventRef<'_>) -> String {
+fn render_timestamp(items: &ParsedStrftime, event: EventRef<'_>, tz_offset: FixedOffset) -> String {
     match event {
-        EventRef::Log(log) => log_schema().timestamp_key().and_then(|timestamp_key| {
-            log.get((PathPrefix::Event, timestamp_key))
-                .and_then(Value::as_timestamp)
-                .copied()
-        }),
-        EventRef::Metric(metric) => metric.timestamp(),
-        EventRef::Trace(trace) => log_schema().timestamp_key().and_then(|timestamp_key| {
-            trace
-                .get((PathPrefix::Event, timestamp_key))
-                .and_then(Value::as_timestamp)
-                .copied()
-        }),
+        EventRef::Log(log) => {
+            log_schema().timestamp_key().and_then(|timestamp_key| {
+                log.get((PathPrefix::Event, timestamp_key))
+                    .and_then(Value::as_timestamp)
+                    .copied()
+            })
+            .unwrap_or_else(Utc::now)
+            .with_timezone(&tz_offset)
+        },
+        EventRef::Metric(metric) => {
+            metric.timestamp()
+                .unwrap_or_else(Utc::now)
+                .with_timezone(&tz_offset)
+        },
+        EventRef::Trace(trace) => {
+            log_schema().timestamp_key().and_then(|timestamp_key| {
+                trace
+                    .get((PathPrefix::Event, timestamp_key))
+                    .and_then(Value::as_timestamp)
+                    .copied()
+            })
+            .unwrap_or_else(Utc::now)
+            .with_timezone(&tz_offset)
+        },
     }
-    .unwrap_or_else(Utc::now)
     .format_with_items(items.as_items())
     .to_string()
 }

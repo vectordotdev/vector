@@ -13,6 +13,7 @@ use futures::{
     stream::{BoxStream, StreamExt},
     FutureExt,
 };
+
 use serde_with::serde_as;
 use tokio::{
     fs::{self, File},
@@ -35,8 +36,10 @@ use crate::{
     template::Template,
 };
 mod bytes_path;
+mod tz_offset;
 
 use bytes_path::BytesPath;
+use tz_offset::TzOffset;
 
 /// Configuration for the `file` sink.
 #[serde_as]
@@ -80,6 +83,13 @@ pub struct FileSinkConfig {
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     pub acknowledgements: AcknowledgementsConfig,
+
+    #[configurable(derived)]
+    #[serde(
+        default,
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    pub tz_offset: TzOffset,
 }
 
 impl GenerateConfig for FileSinkConfig {
@@ -90,6 +100,7 @@ impl GenerateConfig for FileSinkConfig {
             encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
             compression: Default::default(),
             acknowledgements: Default::default(),
+            tz_offset: TzOffset::default(),
         })
         .unwrap()
     }
@@ -207,7 +218,7 @@ impl FileSink {
         let encoder = Encoder::<Framer>::new(framer, serializer);
 
         Ok(Self {
-            path: config.path.clone(),
+            path: config.path.clone().with_tz_offset(config.tz_offset.offset()),
             transformer,
             encoder,
             idle_timeout: config.idle_timeout,
@@ -452,6 +463,7 @@ mod tests {
             encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
             compression: Compression::None,
             acknowledgements: Default::default(),
+            tz_offset: TzOffset::default(),
         };
 
         let (input, _events) = random_lines_with_stream(100, 64, None);
@@ -474,6 +486,7 @@ mod tests {
             encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
             compression: Compression::Gzip,
             acknowledgements: Default::default(),
+            tz_offset: TzOffset::default(),
         };
 
         let (input, _) = random_lines_with_stream(100, 64, None);
@@ -496,6 +509,7 @@ mod tests {
             encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
             compression: Compression::Zstd,
             acknowledgements: Default::default(),
+            tz_offset: TzOffset::default(),
         };
 
         let (input, _) = random_lines_with_stream(100, 64, None);
@@ -523,6 +537,7 @@ mod tests {
             encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
             compression: Compression::None,
             acknowledgements: Default::default(),
+            tz_offset: TzOffset::default(),
         };
 
         let (mut input, _events) = random_events_with_stream(32, 8, None);
@@ -600,6 +615,7 @@ mod tests {
             encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
             compression: Compression::None,
             acknowledgements: Default::default(),
+            tz_offset: TzOffset::default(),
         };
 
         let (mut input, _events) = random_lines_with_stream(10, 64, None);
