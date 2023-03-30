@@ -65,12 +65,12 @@ impl Visitor for DisallowedUnevaluatedPropertiesVisitor {
                 // Like the top-level schema reference logic, this ensures the schema definition is
                 // updated for subsequent resolution.
                 if let Some(object) = subschema.object.as_mut() {
-                    object.unevaluated_properties = None;
+                    object.unevaluated_properties = Some(Box::new(Schema::Bool(true)));
                 } else {
                     with_resolved_schema_reference(definitions, subschema, |_, resolved| {
                         if let Schema::Object(schema) = resolved {
                             if let Some(object) = schema.object.as_mut() {
-                                object.unevaluated_properties = None;
+                                object.unevaluated_properties = Some(Box::new(Schema::Bool(true)));
                             }
                         }
                     });
@@ -89,11 +89,26 @@ impl Visitor for DisallowedUnevaluatedPropertiesVisitor {
 fn mark_schema_closed(schema: &mut SchemaObject) {
     // We only mark the schema as closed if it also does not have `additionalProperties` set to a
     // non-boolean schema. It is a logical inconsistency otherwise.
+
+    // Make sure this schema doesn't also have `additionalProperties` set to a non-boolean schema,
+    // as it would be a logical consistency to then also set `unevaluatedProperties` to `false`.
     if let Some(Schema::Object(_)) = schema
         .object()
         .additional_properties
         .as_ref()
         .map(|v| v.as_ref())
+    {
+        return;
+    }
+
+    // As well, if `unevaluatedProperties` is already set, then we don't do anything. By
+    // default, the field on the Rust side will be unset, so if it's been set explicitly,
+    // that means another usage of this schema requires that it not be set to `false`.
+    if schema
+        .object
+        .as_ref()
+        .and_then(|object| object.unevaluated_properties.as_ref())
+        .is_some()
     {
         return;
     }
