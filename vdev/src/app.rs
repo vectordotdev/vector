@@ -96,6 +96,7 @@ impl CommandExt for Command {
         self.current_dir(path())
     }
 
+    
     /// Run the command and capture its output.
     fn check_output(&mut self) -> Result<String> {
         // Set up the command's stdout to be piped, so we can capture it
