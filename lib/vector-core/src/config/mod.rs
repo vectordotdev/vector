@@ -571,18 +571,8 @@ mod test {
         new_definition.assert_valid_for_event(&valid_event);
         new_definition.assert_invalid_for_event(&invalid_event);
 
-        // Get a definition without schema enabled.
-        let new_definition = output.schema_definition(false).unwrap();
-
-        // Meanings should still exist.
-        assert_eq!(
-            Some(&OwnedTargetPath::event(owned_value_path!("zork"))),
-            new_definition.meaning_path("zork")
-        );
-
-        // Events should not have the schema validated.
-        new_definition.assert_valid_for_event(&valid_event);
-        new_definition.assert_valid_for_event(&invalid_event);
+        // There should be no definition without schemas enabled.
+        assert_eq!(None, output.schema_definition(false));
     }
 
     #[test]
@@ -645,8 +635,8 @@ mod test {
             new_definition.meaning_path("zork")
         );
 
-        // Events should still have the schema validated.
+        // Events should not have the schema validated.
         new_definition.assert_valid_for_event(&valid_event);
-        new_definition.assert_invalid_for_event(&invalid_event);
+        new_definition.assert_valid_for_event(&invalid_event);
     }
 }
