@@ -14,7 +14,7 @@ use vector_config_common::schema::{
 /// that unknown properties are not allowed, but also in a way that doesn't interact incorrectly
 /// with advanced subschema validation, such as `oneOf` or `allOf`, as `unevaluatedProperties`
 /// cannot simply be applied to any and all schemas indiscriminately.
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct DisallowedUnevaluatedPropertiesVisitor;
 
 impl DisallowedUnevaluatedPropertiesVisitor {
@@ -33,25 +33,14 @@ impl Visitor for DisallowedUnevaluatedPropertiesVisitor {
         // fashion, applying the unevaluated properties change from the bottom up.
         visit_schema_object(self, definitions, schema);
 
-        // If this schema is an object schema (`type` of `object`) or has any subschema validation
-        // (`allOf`/`oneOf`/`anyOf`, `if`/`then`/`else`, `$ref`, etc) then we'll set
-        // `unevaluatedProperties` to `false`.
+        // Next, see if this schema has any subschema validation: `allOf`, `oneOf`, or `anyOf`.
         //
-        // Crucially, if this schema has any subschema validation and those subschemas have
-        // `unevaluatedProperties` set, we will _remove_ it, as subschema validation is
-        // fundamentally incompatible in this way: since a subschema is validated against the
-        // entirety of the JSON instance passed in at the level of `allOf`, `oneOf`, and so on, each
-        // subschema will implicitly be forced to observe other, potentially unrelated properties,
-        // and so would naturally fail validation if `unevaluatedProperties` was present in the
-        // subschema and set to `false`.
-
-        // Next, see if this schema has any subschema validation, specifically `allOf` and `oneOf`.
         // If so, we ensure that none of them have `unevaluatedProperties` set at all. We do this
-        // because subschema validation involves seeing the entire JSON instance, or seeing a value
-        // that's unrelated: we know that some schemas in a `oneOf` won't match, and that's fine,
-        // but if they're marked with `unevaluatedProperties: false`, they'll fail... which is why
-        // we remove that from the subschemas  themselves but essentially hoist it up to the level
-        // of the `allOf`/`oneOf`, where it can ensure the correct behavior.
+        // because subschema validation involves each subschema seeing the entire JSON instance, or
+        // seeing a value that's unrelated: we know that some schemas in a `oneOf` won't match, and
+        // that's fine, but if they're marked with `unevaluatedProperties: false`, they'll fail...
+        // which is why we remove that from the subschemas themselves but essentially hoist it up
+        // to the level of the `allOf`/`oneOf`/`anyOf`, where it can apply the correct behavior.
         let mut had_relevant_subschemas = false;
         if let Some(subschemas) = get_subschema_validators(schema) {
             had_relevant_subschemas = true;
@@ -65,12 +54,12 @@ impl Visitor for DisallowedUnevaluatedPropertiesVisitor {
                 // Like the top-level schema reference logic, this ensures the schema definition is
                 // updated for subsequent resolution.
                 if let Some(object) = subschema.object.as_mut() {
-                    object.unevaluated_properties = None;
+                    object.unevaluated_properties = Some(Box::new(Schema::Bool(true)));
                 } else {
                     with_resolved_schema_reference(definitions, subschema, |_, resolved| {
                         if let Schema::Object(schema) = resolved {
                             if let Some(object) = schema.object.as_mut() {
-                                object.unevaluated_properties = None;
+                                object.unevaluated_properties = Some(Box::new(Schema::Bool(true)));
                             }
                         }
                     });
@@ -87,13 +76,33 @@ impl Visitor for DisallowedUnevaluatedPropertiesVisitor {
 }
 
 fn mark_schema_closed(schema: &mut SchemaObject) {
-    // We only mark the schema as closed if it also does not have `additionalProperties` set to a
-    // non-boolean schema. It is a logical inconsistency otherwise.
+    // Make sure this schema doesn't also have `additionalProperties` set to a non-boolean schema,
+    // as it would be a logical inconsistency to then also set `unevaluatedProperties` to `false`.
+    //
+    // TODO: We may want to consider dropping `additionalProperties` entirely here if it's a boolean
+    // schema, as `unevaluatedProperties` would provide the equivalent behavior, and it avoids us
+    // running into weird validation issues where `additionalProperties` gets used in situations it
+    // can't handle, the same ones we switched to using `unevaluatedProperties` for in the first
+    // place... but realistically, we don't ourselves generated boolean schemas for
+    // `additionalProperties` through normal means, so it's not currently an issue that should even
+    // occur.
     if let Some(Schema::Object(_)) = schema
         .object()
         .additional_properties
         .as_ref()
         .map(|v| v.as_ref())
+    {
+        return;
+    }
+
+    // As well, if `unevaluatedProperties` is already set, then we don't do anything. By default,
+    // the field on the Rust side will be unset, so if it's been set explicitly, that means another
+    // usage of this schema requires that it not be set to `false`.
+    if schema
+        .object
+        .as_ref()
+        .and_then(|object| object.unevaluated_properties.as_ref())
+        .is_some()
     {
         return;
     }
@@ -145,5 +154,315 @@ fn get_subschema_validators(schema: &mut SchemaObject) -> Option<Vec<&mut Schema
         None
     } else {
         Some(validators)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use pretty_assertions::assert_eq;
+    use serde_json::{json, Value};
+    use vector_config_common::schema::{visit::Visitor, RootSchema};
+
+    use super::DisallowedUnevaluatedPropertiesVisitor;
+
+    fn as_schema(value: Value) -> RootSchema {
+        serde_json::from_value(value).expect("should not fail to deserialize schema")
+    }
+
+    fn assert_schemas_eq(expected: RootSchema, actual: RootSchema) {
+        let expected_json = serde_json::to_string_pretty(&expected).expect("should not fail");
+        let actual_json = serde_json::to_string_pretty(&actual).expect("should not fail");
+
+        assert_eq!(expected_json, actual_json);
+    }
+
+    #[test]
+    fn basic_object_schema() {
+        let mut actual_schema = as_schema(json!({
+            "type": "object",
+            "properties": {
+                "a": { "type": "string" }
+            }
+        }));
+
+        let mut visitor = DisallowedUnevaluatedPropertiesVisitor::default();
+        visitor.visit_root_schema(&mut actual_schema);
+
+        let expected_schema = as_schema(json!({
+            "type": "object",
+            "properties": {
+                "a": { "type": "string" }
+            },
+            "unevaluatedProperties": false
+        }));
+
+        assert_schemas_eq(expected_schema, actual_schema);
+    }
+
+    #[test]
+    fn basic_object_schema_through_ref() {
+        let mut actual_schema = as_schema(json!({
+            "$ref": "#/definitions/simple",
+            "definitions": {
+                "simple": {
+                    "type": "object",
+                    "properties": {
+                        "a": { "type": "string" }
+                    }
+                }
+            }
+        }));
+
+        let mut visitor = DisallowedUnevaluatedPropertiesVisitor::default();
+        visitor.visit_root_schema(&mut actual_schema);
+
+        let expected_schema = as_schema(json!({
+            "$ref": "#/definitions/simple",
+            "definitions": {
+                "simple": {
+                    "type": "object",
+                    "properties": {
+                        "a": { "type": "string" }
+                    },
+                    "unevaluatedProperties": false
+                }
+            }
+        }));
+
+        assert_schemas_eq(expected_schema, actual_schema);
+    }
+
+    #[test]
+    fn all_of_with_basic_object_schemas() {
+        let mut actual_schema = as_schema(json!({
+            "type": "object",
+            "allOf": [{
+                "type": "object",
+                "properties": {
+                    "a": { "type": "string" }
+                }
+            },
+            {
+                "type": "object",
+                "properties": {
+                    "b": { "type": "string" }
+                }
+            }]
+        }));
+
+        let mut visitor = DisallowedUnevaluatedPropertiesVisitor::default();
+        visitor.visit_root_schema(&mut actual_schema);
+
+        let expected_schema = as_schema(json!({
+            "type": "object",
+            "allOf": [{
+                "type": "object",
+                "properties": {
+                    "a": { "type": "string" }
+                }
+            },
+            {
+                "type": "object",
+                "properties": {
+                    "b": { "type": "string" }
+                }
+            }],
+            "unevaluatedProperties": false
+        }));
+
+        assert_schemas_eq(expected_schema, actual_schema);
+    }
+
+    #[test]
+    fn one_of_with_basic_object_schemas() {
+        let mut actual_schema = as_schema(json!({
+            "type": "object",
+            "oneOf": [{
+                "type": "object",
+                "properties": {
+                    "a": { "type": "string" }
+                }
+            },
+            {
+                "type": "object",
+                "properties": {
+                    "b": { "type": "string" }
+                }
+            }]
+        }));
+
+        let mut visitor = DisallowedUnevaluatedPropertiesVisitor::default();
+        visitor.visit_root_schema(&mut actual_schema);
+
+        let expected_schema = as_schema(json!({
+            "type": "object",
+            "oneOf": [{
+                "type": "object",
+                "properties": {
+                    "a": { "type": "string" }
+                }
+            },
+            {
+                "type": "object",
+                "properties": {
+                    "b": { "type": "string" }
+                }
+            }],
+            "unevaluatedProperties": false
+        }));
+
+        assert_schemas_eq(expected_schema, actual_schema);
+    }
+
+    #[test]
+    fn any_of_with_basic_object_schemas() {
+        let mut actual_schema = as_schema(json!({
+            "type": "object",
+            "anyOf": [{
+                "type": "object",
+                "properties": {
+                    "a": { "type": "string" }
+                }
+            },
+            {
+                "type": "object",
+                "properties": {
+                    "b": { "type": "string" }
+                }
+            }]
+        }));
+
+        let mut visitor = DisallowedUnevaluatedPropertiesVisitor::default();
+        visitor.visit_root_schema(&mut actual_schema);
+
+        let expected_schema = as_schema(json!({
+            "type": "object",
+            "anyOf": [{
+                "type": "object",
+                "properties": {
+                    "a": { "type": "string" }
+                }
+            },
+            {
+                "type": "object",
+                "properties": {
+                    "b": { "type": "string" }
+                }
+            }],
+            "unevaluatedProperties": false
+        }));
+
+        assert_schemas_eq(expected_schema, actual_schema);
+    }
+
+    #[test]
+    fn ignores_object_schema_with_non_boolean_additional_properties() {
+        let mut actual_schema = as_schema(json!({
+            "type": "object",
+            "properties": {
+                "a": { "type": "string" }
+            },
+            "additionalProperties": { "type": "number" }
+        }));
+        let expected_schema = actual_schema.clone();
+
+        let mut visitor = DisallowedUnevaluatedPropertiesVisitor::default();
+        visitor.visit_root_schema(&mut actual_schema);
+
+        assert_schemas_eq(expected_schema, actual_schema);
+    }
+
+    #[test]
+    fn object_schema_with_boolean_additional_properties() {
+        let mut actual_schema = as_schema(json!({
+            "type": "object",
+            "properties": {
+                "a": { "type": "string" }
+            },
+            "additionalProperties": false
+        }));
+
+        let mut visitor = DisallowedUnevaluatedPropertiesVisitor::default();
+        visitor.visit_root_schema(&mut actual_schema);
+
+        let expected_schema = as_schema(json!({
+            "type": "object",
+            "properties": {
+                "a": { "type": "string" }
+            },
+            "additionalProperties": false,
+            "unevaluatedProperties": false
+        }));
+
+        assert_schemas_eq(expected_schema, actual_schema);
+    }
+
+    #[test]
+    fn all_of_with_object_props_using_schema_refs() {
+        let mut actual_schema = as_schema(json!({
+            "type": "object",
+            "allOf": [{
+                "type": "object",
+                "properties": {
+                    "a": { "$ref": "#/definitions/subschema" }
+                }
+            },
+            {
+                "type": "object",
+                "properties": {
+                    "aa": {
+                        "type": "object",
+                        "properties": {
+                            "a": { "$ref": "#/definitions/subschema" }
+                        }
+                    }
+                }
+            }],
+            "definitions": {
+                "subschema": {
+                    "type": "object",
+                    "properties": {
+                        "f": { "type": "string" }
+                    }
+                }
+            }
+        }));
+
+        let mut visitor = DisallowedUnevaluatedPropertiesVisitor::default();
+        visitor.visit_root_schema(&mut actual_schema);
+
+        let expected_schema = as_schema(json!({
+            "type": "object",
+            "allOf": [{
+                "type": "object",
+                "properties": {
+                    "a": { "$ref": "#/definitions/subschema" }
+                }
+            },
+            {
+                "type": "object",
+                "properties": {
+                    "aa": {
+                        "type": "object",
+                        "properties": {
+                            "a": { "$ref": "#/definitions/subschema" }
+                        },
+                        "unevaluatedProperties": false
+                    }
+                }
+            }],
+            "definitions": {
+                "subschema": {
+                    "type": "object",
+                    "properties": {
+                        "f": { "type": "string" }
+                    },
+                    "unevaluatedProperties": false
+                }
+            },
+            "unevaluatedProperties": false
+        }));
+
+        assert_schemas_eq(expected_schema, actual_schema);
     }
 }

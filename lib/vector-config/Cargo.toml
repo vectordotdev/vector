@@ -30,4 +30,5 @@ vector-config-common = { path = "../vector-config-common" }
 vector-config-macros = { path = "../vector-config-macros" }
 
 [dev-dependencies]
+pretty_assertions = { version = "1.3.0", default-features = false, features = ["std"] }
 serde_with = { version = "2.3.1", default-features = false, features = ["std", "macros"] }
