@@ -6,9 +6,7 @@ on:
       git_ref:
         type: string
         required: true
-        # channel is the dir/namespace packages are organized into.
-        # Options are release/nightly/custom.
-      channel:
+      mode:
         type: string
         required: true
 
@@ -23,7 +21,6 @@ env:
   # observing issues fetching boringssl via HTTPS in the OSX build, seeing if this helps
   # can be removed when we switch back to the upstream openssl-sys crate
   CARGO_NET_GIT_FETCH_WITH_CLI: true
-  CHANNEL: ${{ inputs.channel }}
 
 jobs:
   generate-publish-metadata:
@@ -548,7 +545,7 @@ jobs:
   publish-github:
     name: Publish to GitHub
     # We only publish to GitHub for versioned releases, not nightlies.
-    if: ${{ inputs.channel == 'release' }}
+    if: ${{ inputs.mode == 'Release' }}
     runs-on: ubuntu-20.04
     needs:
       - generate-publish-metadata
@@ -618,7 +615,7 @@ jobs:
   publish-homebrew:
     name: Publish to Homebrew
     # We only publish to Homebrew for versioned releases, not nightlies.
-    if: ${{ inputs.channel == 'release' }}
+    if: ${{ inputs.mode == 'Release' }}
     runs-on: ubuntu-20.04
     needs:
       - generate-publish-metadata
@@ -638,7 +635,7 @@ jobs:
   publish-cloudsmith:
     name: Publish to Cloudsmith
     # We only publish to CloudSmith for versioned releases, not nightlies.
-    if: ${{ inputs.channel == 'release' }}
+    if: ${{ inputs.mode == 'Release' }}
     runs-on: ubuntu-20.04
     needs:
       - generate-publish-metadata
@@ -751,7 +748,7 @@ jobs:
 
   publish-failure:
     name: Send Publish Failure Notification
-    if: ${{ inputs.channel != 'custom' }} && failure()
+    if: failure()
     runs-on: ubuntu-20.04
     needs:
       - generate-publish-metadata
@@ -776,4 +773,4 @@ jobs:
         DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
       uses: Ilshidur/action-discord@0.3.2
       with:
-        args: "${{ inputs.channel }} failed: <https://github.com/${{github.repository}}/actions/runs/${{github.run_id}}>"
+        args: "${{ inputs.mode }} failed: <https://github.com/${{github.repository}}/actions/runs/${{github.run_id}}>"
