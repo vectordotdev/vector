@@ -354,31 +354,21 @@ fn render_metric_field<'a>(key: &str, metric: &'a Metric) -> Option<&'a str> {
 
 fn render_timestamp(items: &ParsedStrftime, event: EventRef<'_>, tz_offset: FixedOffset) -> String {
     match event {
-        EventRef::Log(log) => {
-            log_schema().timestamp_key().and_then(|timestamp_key| {
-                log.get((PathPrefix::Event, timestamp_key))
-                    .and_then(Value::as_timestamp)
-                    .copied()
-            })
-            .unwrap_or_else(Utc::now)
-            .with_timezone(&tz_offset)
-        },
-        EventRef::Metric(metric) => {
-            metric.timestamp()
-                .unwrap_or_else(Utc::now)
-                .with_timezone(&tz_offset)
-        },
-        EventRef::Trace(trace) => {
-            log_schema().timestamp_key().and_then(|timestamp_key| {
-                trace
-                    .get((PathPrefix::Event, timestamp_key))
-                    .and_then(Value::as_timestamp)
-                    .copied()
-            })
-            .unwrap_or_else(Utc::now)
-            .with_timezone(&tz_offset)
-        },
+        EventRef::Log(log) => log_schema().timestamp_key().and_then(|timestamp_key| {
+            log.get((PathPrefix::Event, timestamp_key))
+                .and_then(Value::as_timestamp)
+                .copied()
+        }),
+        EventRef::Metric(metric) => metric.timestamp(),
+        EventRef::Trace(trace) => log_schema().timestamp_key().and_then(|timestamp_key| {
+            trace
+                .get((PathPrefix::Event, timestamp_key))
+                .and_then(Value::as_timestamp)
+                .copied()
+        }),
     }
+    .unwrap_or_else(Utc::now)
+    .with_timezone(&tz_offset)
     .format_with_items(items.as_items())
     .to_string()
 }
