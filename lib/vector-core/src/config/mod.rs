@@ -114,7 +114,10 @@ impl SourceOutput {
     /// Create a `SourceOutput` of the given data type that contains a single output `Definition`.
     /// Designed for use in log sources.
     ///
-    /// Asserts that `ty` contains [`DataType::Log`].
+    ///
+    /// # Panics
+    ///
+    /// Panics if `ty` does not contain [`DataType::Log`].
     #[must_use]
     pub fn new_logs(ty: DataType, schema_definition: schema::Definition) -> Self {
         assert!(ty.contains(DataType::Log));
