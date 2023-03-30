@@ -97,7 +97,7 @@ jobs:
   # Then, modify the `cross-linux` job to run `test` instead of `build`.
   test-linux:
     name: Unit - x86_64-unknown-linux-gnu
-    runs-on: [linux, test-runner]
+    runs-on: [linux, optimize-8-core]
     needs: changes
     env:
       CARGO_INCREMENTAL: 0
@@ -155,7 +155,7 @@ jobs:
 
   test-misc:
     name: Miscellaneous - Linux
-    runs-on: [linux, test-runner]
+    runs-on: [linux, optimize-4-core]
     needs: changes
     env:
       CARGO_INCREMENTAL: 0
@@ -182,7 +182,7 @@ jobs:
 
   cross-linux:
     name: Cross - ${{ matrix.target }}
-    runs-on: [linux, optimize-8-core]
+    runs-on: [linux, optimize-4-core]
     needs: changes
     env:
       CARGO_INCREMENTAL: 0
@@ -266,7 +266,7 @@ jobs:
 
   test-windows:
     name: Unit - Windows
-    runs-on: [windows, test-runner]
+    runs-on: [windows, optimize-win-8-core]
     needs: changes
     if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
@@ -288,7 +288,7 @@ jobs:
 
   check-component-features:
     name: Component Features - Linux
-    runs-on: [linux, test-runner]
+    runs-on: [linux, optimize-4-core]
     needs: changes
     if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
@@ -311,7 +311,7 @@ jobs:
 
   checks:
     name: Checks
-    runs-on: [linux, test-runner]
+    runs-on: [linux, optimize-4-core]
     needs: changes
     env:
       CARGO_INCREMENTAL: 0

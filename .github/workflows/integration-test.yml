@@ -48,7 +48,7 @@ env:
 jobs:
   test-integration:
     name: Integration - Linux, ${{ matrix.test }}
-    runs-on: [linux, test-runner]
+    runs-on: [linux, optimize-4-core]
     if: |
       !github.event.pull_request
         || contains(github.event.pull_request.labels.*.name, 'ci-condition: integration tests enable')
@@ -89,7 +89,7 @@ jobs:
           - test: 'shutdown'
           - test: 'splunk'
           - test: 'webhdfs'
-    timeout-minutes: 20
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v3
       - run: make ci-sweep
