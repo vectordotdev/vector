@@ -198,7 +198,8 @@ jobs:
 
     # We run cross checks when dependencies change to ensure they still build.
     # This helps us avoid adopting dependencies that aren't compatible with other architectures.
-    if: ${{ needs.changes.outputs.dependencies == 'true' }}
+    # TODO temp remove conditional
+    # if: ${{ needs.changes.outputs.dependencies == 'true' }}
     steps:
       - uses: actions/checkout@v3
       - uses: actions/cache@v3
@@ -224,7 +225,8 @@ jobs:
           path: "./target/${{ matrix.target }}/debug/vector"
 
   cross-linux-check:
-    if: ${{ needs.changes.outputs.dependencies == 'true' }}
+    # TODO temp remove conditional
+    #if: ${{ needs.changes.outputs.dependencies == 'true' }}
     runs-on: ubuntu-20.04
     name: Cross - Linux
     needs: cross-linux
@@ -264,7 +266,7 @@ jobs:
 
   test-windows:
     name: Unit - Windows
-    runs-on: [windows, optimize-4-core]
+    runs-on: [windows, optimize-win-8-core]
     needs: changes
     if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
