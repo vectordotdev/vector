@@ -9,8 +9,7 @@
 #[cfg(all(test, feature = "appsignal-integration-tests"))]
 mod integration_tests;
 
-use bytes::{BufMut, Bytes, BytesMut};
-use flate2::write::{GzEncoder, ZlibEncoder};
+use bytes::Bytes;
 use futures::{FutureExt, SinkExt};
 use http::{header::AUTHORIZATION, Request, Uri};
 use hyper::Body;
@@ -28,7 +27,8 @@ use crate::{
         util::{
             encoding::write_all,
             http::{BatchedHttpSink, HttpEventEncoder, HttpSink},
-            BatchConfig, BoxedRawValue, JsonArrayBuffer, SinkBatchSettings, TowerRequestConfig,
+            BatchConfig, BoxedRawValue, Compression, Compressor, JsonArrayBuffer,
+            SinkBatchSettings, TowerRequestConfig,
         },
         BuildError,
     },
@@ -211,32 +211,19 @@ impl HttpSink for AppsignalSinkConfig {
 
         let mut body = crate::serde::json::to_bytes(&events)?.freeze();
 
-        match self.compression {
+        let compression = match self.compression {
             AppsignalCompression::Gzip => {
                 request = request.header("Content-Encoding", "gzip");
-
-                let buffer = BytesMut::new();
-                let mut writer = GzEncoder::new(buffer.writer(), flate2::Compression::new(6));
-                write_all(&mut writer, 0, &body)?;
-                body = writer
-                    .finish()
-                    .context(CompressionFailedSnafu)?
-                    .into_inner()
-                    .into();
+                Compression::gzip_default()
             }
             AppsignalCompression::Zlib => {
                 request = request.header("Content-Encoding", "deflate");
-
-                let buffer = BytesMut::new();
-                let mut writer = ZlibEncoder::new(buffer.writer(), flate2::Compression::new(6));
-                write_all(&mut writer, 0, &body)?;
-                body = writer
-                    .finish()
-                    .context(CompressionFailedSnafu)?
-                    .into_inner()
-                    .into();
+                Compression::zlib_default()
             }
-        }
+        };
+        let mut compressor = Compressor::from(compression);
+        write_all(&mut compressor, 0, &body)?;
+        body = compressor.finish().context(CompressionFailedSnafu)?.into();
         request.body(body).map_err(Into::into)
     }
 }
