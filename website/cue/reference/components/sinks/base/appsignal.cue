@@ -62,6 +62,25 @@ base: components: sinks: appsignal: configuration: {
 			}
 		}
 	}
+	compression: {
+		description: "Supported compression types for the AppSignal sink."
+		required:    false
+		type: string: {
+			default: "gzip"
+			enum: {
+				gzip: """
+					[Gzip][gzip] compression.
+
+					[gzip]: https://www.gzip.org/
+					"""
+				zlib: """
+					[Zlib][zlib] compression.
+
+					[zlib]: https://zlib.net/
+					"""
+			}
+		}
+	}
 	encoding: {
 		description: "Transformations to prepare an event for serialization."
 		required:    false
@@ -87,7 +106,7 @@ base: components: sinks: appsignal: configuration: {
 		}
 	}
 	endpoint: {
-		description: "The AppSignal API endpoint to report to. This is configured by default and doesn't need to be changed."
+		description: "The URI for the AppSignal API to send data to."
 		required:    false
 		type: string: {
 			default: "https://appsignal-endpoint.net"
