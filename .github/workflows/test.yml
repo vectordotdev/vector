@@ -264,7 +264,7 @@ jobs:
 
   test-windows:
     name: Unit - Windows
-    runs-on: [windows, optimize-8-core]
+    runs-on: [windows, optimize-win-8-core]
     needs: changes
     if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
