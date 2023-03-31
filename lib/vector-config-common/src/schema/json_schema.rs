@@ -498,13 +498,13 @@ pub struct ObjectValidation {
     /// The `additionalProperties` keyword.
     ///
     /// See [JSON Schema 9.3.2.3. "additionalProperties"](https://tools.ietf.org/html/draft-handrews-json-schema-02#section-9.3.2.3).
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "is_none_or_default_true")]
     pub additional_properties: Option<Box<Schema>>,
 
     /// The `unevaluatedProperties` keyword.
     ///
     /// See [JSON Schema 9.3.2.4. "unevaluatedProperties"](https://tools.ietf.org/html/draft-handrews-json-schema-02#section-9.3.2.4).
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "is_none_or_default_true")]
     pub unevaluated_properties: Option<Box<Schema>>,
 
     /// The `propertyNames` keyword.
@@ -558,5 +558,12 @@ impl<T: PartialEq> SingleOrVec<T> {
             SingleOrVec::Single(s) => s.deref() == x,
             SingleOrVec::Vec(v) => v.contains(x),
         }
+    }
+}
+
+fn is_none_or_default_true(field: &Option<Box<Schema>>) -> bool {
+    match field {
+        None => true,
+        Some(value) => matches!(value.as_ref(), Schema::Bool(true)),
     }
 }
