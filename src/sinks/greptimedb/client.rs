@@ -8,9 +8,7 @@ use futures_util::future::BoxFuture;
 use greptimedb_client::api::v1::auth_header::AuthScheme;
 use greptimedb_client::api::v1::column::*;
 use greptimedb_client::api::v1::*;
-use greptimedb_client::{
-    Client, Database, Error as GreptimeError, DEFAULT_CATALOG_NAME, DEFAULT_SCHEMA_NAME,
-};
+use greptimedb_client::{Client, Database, Error as GreptimeError, DEFAULT_SCHEMA_NAME};
 use tower::Service;
 use vector_core::event::metric::{Bucket, MetricSketch, Quantile, Sample};
 use vector_core::event::{Event, Metric, MetricValue};
@@ -67,10 +65,9 @@ pub struct GreptimeDBService {
 
 impl GreptimeDBService {
     pub fn new_sink(config: &GreptimeDBConfig) -> crate::Result<VectorSink> {
-        let grpc_client = Client::with_urls(vec![&config.grpc_endpoint]);
-        let mut client = Database::new(
-            config.catalog.as_deref().unwrap_or(DEFAULT_CATALOG_NAME),
-            config.schema.as_deref().unwrap_or(DEFAULT_SCHEMA_NAME),
+        let grpc_client = Client::with_urls(vec![&config.endpoint]);
+        let mut client = Database::new_with_dbname(
+            config.dbname.as_deref().unwrap_or(DEFAULT_SCHEMA_NAME),
             grpc_client,
         );
 

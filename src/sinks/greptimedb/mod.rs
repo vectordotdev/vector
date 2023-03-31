@@ -1,13 +1,11 @@
 use futures_util::FutureExt;
-use http::StatusCode;
-use tower::Service;
+use greptimedb_client::Client;
 use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
 use vector_core::config::{AcknowledgementsConfig, Input};
-use vector_core::tls::{TlsConfig, TlsSettings};
+use vector_core::tls::TlsConfig;
 
 use crate::config::{SinkConfig, SinkContext};
-use crate::http::HttpClient;
 use crate::sinks::util::{BatchConfig, SinkBatchSettings};
 use crate::sinks::{Healthcheck, VectorSink};
 
@@ -29,20 +27,13 @@ impl SinkBatchSettings for GreptimeDBDefaultBatchSettings {
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct GreptimeDBConfig {
-    /// The catalog name to connect
-    #[configurable(metadata(docs::examples = "greptime"))]
-    #[serde(default)]
-    pub catalog: Option<String>,
-    /// The schema name to connect
+    /// The database name to connect
     #[configurable(metadata(docs::examples = "public"))]
     #[serde(default)]
-    pub schema: Option<String>,
+    pub dbname: Option<String>,
     /// The host and port of greptimedb grpc service
-    #[configurable(metadata(docs::examples = "localhost:4001"))]
-    pub grpc_endpoint: String,
-    /// The host and port of greptimedb http service
-    #[configurable(metadata(docs::examples = "http://localhost:4000"))]
-    pub http_endpoint: String,
+    #[configurable(metadata(docs::examples = "example.com:4001"))]
+    pub endpoint: String,
     /// The username of greptimedb
     #[configurable(metadata(docs::examples = "username"))]
     #[serde(default)]
@@ -76,11 +67,9 @@ impl_generate_config_from_default!(GreptimeDBConfig);
 
 #[async_trait::async_trait]
 impl SinkConfig for GreptimeDBConfig {
-    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+    async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let sink = client::GreptimeDBService::new_sink(&self)?;
-        let tls_settings = TlsSettings::from_options(&self.tls)?;
-        let http_client = HttpClient::new(tls_settings, cx.proxy())?;
-        let healthcheck = healthcheck(&self.http_endpoint, http_client)?;
+        let healthcheck = healthcheck(&self)?;
         Ok((sink, healthcheck))
     }
 
@@ -93,23 +82,10 @@ impl SinkConfig for GreptimeDBConfig {
     }
 }
 
-fn healthcheck(endpoint: &str, mut client: HttpClient) -> crate::Result<super::Healthcheck> {
-    let uri = format!("{endpoint}/health");
+fn healthcheck(config: &GreptimeDBConfig) -> crate::Result<super::Healthcheck> {
+    let client = Client::with_urls(vec![&config.endpoint]);
 
-    let request = hyper::Request::get(uri).body(hyper::Body::empty()).unwrap();
-
-    Ok(async move {
-        client
-            .call(request)
-            .await
-            .map_err(|error| error.into())
-            .and_then(|response| match response.status() {
-                StatusCode::OK => Ok(()),
-                StatusCode::NO_CONTENT => Ok(()),
-                other => Err(super::HealthcheckError::UnexpectedStatus { status: other }.into()),
-            })
-    }
-    .boxed())
+    Ok(async move { client.health_check().await.map_err(|error| error.into()) }.boxed())
 }
 
 #[cfg(test)]
@@ -126,10 +102,8 @@ mod tests {
     #[test]
     fn test_config_with_username() {
         let config = indoc! {r#"
-            grpc_endpoint = "foo-bar.ap-southeast-1.aws.greptime.cloud:4001"
-            http_endpoint = "http://alpha-bravo.ap-southeast-1.aws.greptime.cloud/health"
-            catalog = "foo"
-            schema = "bar"
+            endpoint = "foo-bar.ap-southeast-1.aws.greptime.cloud:4001"
+            dbname = "foo-bar"
         "#};
 
         toml::from_str::<GreptimeDBConfig>(config).unwrap();
