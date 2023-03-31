@@ -23,7 +23,7 @@ use kube::{
     config::{self, KubeConfigOptions},
     runtime::{
         reflector::{self},
-        watcher,
+        watcher, WatchStreamExt,
     },
     Client, Config as ClientConfig,
 };
@@ -639,7 +639,8 @@ impl Source {
                 label_selector: Some(label_selector),
                 ..Default::default()
             },
-        );
+        )
+        .backoff(watcher::default_backoff());
         let pod_store_w = reflector::store::Writer::default();
         let pod_state = pod_store_w.as_reader();
         let pod_cacher = MetaCache::new();
@@ -660,7 +661,8 @@ impl Source {
                 label_selector: Some(namespace_label_selector),
                 ..Default::default()
             },
-        );
+        )
+        .backoff(watcher::default_backoff());
         let ns_store_w = reflector::store::Writer::default();
         let ns_state = ns_store_w.as_reader();
         let ns_cacher = MetaCache::new();
@@ -681,7 +683,8 @@ impl Source {
                 field_selector: Some(node_selector),
                 ..Default::default()
             },
-        );
+        )
+        .backoff(watcher::default_backoff());
         let node_store_w = reflector::store::Writer::default();
         let node_state = node_store_w.as_reader();
         let node_cacher = MetaCache::new();
