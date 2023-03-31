@@ -662,7 +662,7 @@ mod tests {
     };
 
     use bytes::{BufMut, Bytes, BytesMut};
-    use chrono::{DateTime, TimeZone, Utc};
+    use chrono::{DateTime, Duration, TimeZone, Utc};
     use flate2::read::ZlibDecoder;
     use proptest::{
         arbitrary::any, collection::btree_map, num::f64::POSITIVE as ARB_POSITIVE_F64, prop_assert,
@@ -722,9 +722,7 @@ mod tests {
     }
 
     fn ts() -> DateTime<Utc> {
-        Utc.ymd(2018, 11, 14)
-            .and_hms_nano_opt(8, 9, 10, 11)
-            .expect("invalid timestamp")
+        Utc.with_ymd_and_hms(2018, 11, 14, 8, 9, 10).unwrap() + Duration::nanoseconds(11)
     }
 
     fn tags() -> MetricTags {

@@ -320,7 +320,7 @@ impl FunctionTransform for MetricToLog {
 
 #[cfg(test)]
 mod tests {
-    use chrono::{offset::TimeZone, DateTime, Utc};
+    use chrono::{offset::TimeZone, DateTime, Duration as ChronoDuration, Utc};
     use futures::executor::block_on;
     use proptest::prelude::*;
     use similar_asserts::assert_eq;
@@ -367,9 +367,7 @@ mod tests {
     }
 
     fn ts() -> DateTime<Utc> {
-        Utc.ymd(2018, 11, 14)
-            .and_hms_nano_opt(8, 9, 10, 11)
-            .expect("invalid timestamp")
+        Utc.with_ymd_and_hms(2018, 11, 14, 8, 9, 10).unwrap() + ChronoDuration::nanoseconds(11)
     }
 
     fn tags() -> MetricTags {

@@ -437,7 +437,7 @@ const fn prometheus_metric_type(metric_value: &MetricValue) -> proto::MetricType
 mod tests {
     use std::collections::BTreeSet;
 
-    use chrono::{DateTime, TimeZone};
+    use chrono::{DateTime, Duration, TimeZone};
     use indoc::indoc;
     use similar_asserts::assert_eq;
     use vector_core::metric_tags;
@@ -912,7 +912,7 @@ mod tests {
     }
 
     fn timestamp() -> DateTime<Utc> {
-        Utc.ymd(2021, 2, 3).and_hms_milli(4, 5, 6, 789)
+        Utc.with_ymd_and_hms(2021, 2, 3, 4, 5, 6).unwrap() + Duration::milliseconds(789)
     }
 
     #[test]

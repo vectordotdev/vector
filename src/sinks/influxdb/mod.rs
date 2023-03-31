@@ -377,7 +377,7 @@ pub(in crate::sinks) fn encode_uri(
 pub mod test_util {
     use std::{fs::File, io::Read};
 
-    use chrono::{offset::TimeZone, DateTime, SecondsFormat, Utc};
+    use chrono::{offset::TimeZone, DateTime, Duration, SecondsFormat, Utc};
     use vector_core::metric_tags;
 
     use super::*;
@@ -392,7 +392,7 @@ pub mod test_util {
     }
 
     pub(crate) fn ts() -> DateTime<Utc> {
-        Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 11)
+        Utc.with_ymd_and_hms(2018, 11, 14, 8, 9, 10).unwrap() + Duration::nanoseconds(11)
     }
 
     pub(crate) fn tags() -> MetricTags {

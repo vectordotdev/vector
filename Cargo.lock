@@ -1768,8 +1768,8 @@ dependencies = [
 
 [[package]]
 name = "chrono"
-version = "0.4.22"
-source = "git+https://github.com/vectordotdev/chrono.git?branch=no-default-time-v0.4.22-1#920ff24cabedcec0f8459b8d9681cbac186dfb58"
+version = "0.4.24"
+source = "git+https://github.com/vectordotdev/chrono.git?tag=v0.4.24-no-default-time-1#7ec1ad93833787da5df64898fb3e6206221c6833"
 dependencies = [
  "iana-time-zone",
  "js-sys",

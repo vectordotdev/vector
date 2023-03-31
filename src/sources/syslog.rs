@@ -444,6 +444,7 @@ mod test {
     };
 
     use chrono::prelude::*;
+    use chrono::Duration as ChronoDuration;
     use codecs::decoding::format::Deserializer;
     use rand::{thread_rng, Rng};
     use serde::Deserialize;
@@ -807,9 +808,7 @@ mod test {
                     lookup::PathPrefix::Event,
                     log_schema().timestamp_key().unwrap(),
                 ),
-                Utc.ymd(2019, 2, 13)
-                    .and_hms_opt(19, 48, 34)
-                    .expect("invalid timestamp"),
+                Utc.with_ymd_and_hms(2019, 2, 13, 19, 48, 34).unwrap(),
             );
             expected.insert(log_schema().source_type_key(), "syslog");
             expected.insert("host", "74794bfb6795");
@@ -850,9 +849,7 @@ mod test {
                     lookup::PathPrefix::Event,
                     log_schema().timestamp_key().unwrap(),
                 ),
-                Utc.ymd(2019, 2, 13)
-                    .and_hms_opt(19, 48, 34)
-                    .expect("invalid timestamp"),
+                Utc.with_ymd_and_hms(2019, 2, 13, 19, 48, 34).unwrap(),
             );
             expected.insert(log_schema().host_key(), "74794bfb6795");
             expected.insert("hostname", "74794bfb6795");
@@ -963,11 +960,9 @@ mod test {
             let year = value.as_timestamp().unwrap().naive_local().year();
 
             let expected = expected.as_mut_log();
-            let expected_date: DateTime<Utc> = Local
-                .ymd(year, 2, 13)
-                .and_hms_opt(20, 7, 26)
-                .expect("invalid timestamp")
-                .into();
+            let expected_date: DateTime<Utc> =
+                Utc.with_ymd_and_hms(year, 2, 13, 20, 7, 26).unwrap();
+
             expected.insert(
                 (
                     lookup::PathPrefix::Event,
@@ -1002,11 +997,8 @@ mod test {
             let year = value.as_timestamp().unwrap().naive_local().year();
 
             let expected = expected.as_mut_log();
-            let expected_date: DateTime<Utc> = Local
-                .ymd(year, 2, 13)
-                .and_hms_opt(21, 31, 56)
-                .expect("invalid timestamp")
-                .into();
+            let expected_date: DateTime<Utc> =
+                Utc.with_ymd_and_hms(year, 2, 13, 21, 31, 56).unwrap();
             expected.insert(
                 (
                     lookup::PathPrefix::Event,
@@ -1045,7 +1037,8 @@ mod test {
                     lookup::PathPrefix::Event,
                     log_schema().timestamp_key().unwrap(),
                 ),
-                Utc.ymd(2019, 2, 13).and_hms_micro(21, 53, 30, 605_850),
+                Utc.with_ymd_and_hms(2019, 2, 13, 21, 53, 30).unwrap()
+                    + ChronoDuration::microseconds(605_850),
             );
             expected.insert(log_schema().source_type_key(), "syslog");
             expected.insert("host", "74794bfb6795");
