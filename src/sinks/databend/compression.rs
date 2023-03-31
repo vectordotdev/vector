@@ -19,6 +19,6 @@ pub enum DatabendCompression {
 
 impl Default for DatabendCompression {
     fn default() -> Self {
-        Self::Gzip
+        Self::None
     }
 }

@@ -208,7 +208,7 @@ mod tests {
             cfg.encoding.config(),
             DatabendSerializerConfig::Json(_)
         ));
-        assert!(matches!(cfg.compression, DatabendCompression::Gzip));
+        assert!(matches!(cfg.compression, DatabendCompression::None));
     }
 
     #[test]
@@ -220,7 +220,7 @@ mod tests {
             database = "mydatabase"
             encoding.codec = "csv"
             encoding.csv.fields = ["host", "timestamp", "message"]
-            compression = "none"
+            compression = "gzip"
         "#,
         )
         .unwrap();
@@ -231,6 +231,6 @@ mod tests {
             cfg.encoding.config(),
             DatabendSerializerConfig::Csv(_)
         ));
-        assert!(matches!(cfg.compression, DatabendCompression::None));
+        assert!(matches!(cfg.compression, DatabendCompression::Gzip));
     }
 }
