@@ -28,7 +28,7 @@ impl Cli {
         for line in Command::new("cargo")
             .arg("tree")
             .features(&self.feature)
-            .capture_output()?
+            .check_output()?
             .lines()
         {
             if let Some(captures) = re_crate.captures(line) {

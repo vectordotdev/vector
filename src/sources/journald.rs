@@ -887,7 +887,7 @@ impl Finalizer {
         shutdown: ShutdownSignal,
     ) -> Self {
         if acknowledgements {
-            let (finalizer, mut ack_stream) = OrderedFinalizer::new(shutdown);
+            let (finalizer, mut ack_stream) = OrderedFinalizer::new(Some(shutdown));
             tokio::spawn(async move {
                 while let Some((status, cursor)) = ack_stream.next().await {
                     if status == BatchStatus::Delivered {
