@@ -166,7 +166,7 @@ aws-sdk-elasticsearch = {version = "0.21.0", default-features = false, features 
 aws-sdk-firehose = { version = "0.21.0", default-features = false, features = ["native-tls"], optional = true }
 aws-sdk-kinesis = { version = "0.21.0", default-features = false, features = ["native-tls"], optional = true }
 aws-types = { version = "0.51.0", default-features = false, features = ["hardcoded-credentials"], optional = true }
-aws-sigv4 = { version = "0.53.0", default-features = false, features = ["sign-http"], optional = true }
+aws-sigv4 = { version = "0.55.0", default-features = false, features = ["sign-http"], optional = true }
 aws-config = { version = "0.51.0", default-features = false, features = ["native-tls"], optional = true }
 aws-smithy-async = { version = "0.51.0", default-features = false, optional = true }
 aws-smithy-client = { version = "0.51.0", default-features = false, features = ["client-hyper"], optional = true}
