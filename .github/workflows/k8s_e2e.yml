@@ -57,6 +57,8 @@ jobs:
       CARGO_PROFILE_RELEASE_CODEGEN_UNITS: 256
       CARGO_INCREMENTAL: 0
     steps:
+      - name: Fix Git safe directories issue when in containers (actions/checkout#760)
+        run: git config --global --add safe.directory /__w/vector/vector
       - uses: actions/checkout@v3
       - run: make ci-sweep
       - uses: actions/cache@v3
