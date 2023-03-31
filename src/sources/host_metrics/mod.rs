@@ -126,7 +126,7 @@ pub struct HostMetricsConfig {
     pub network: network::NetworkConfig,
 }
 
-/// Options for the “cgroups” (controller groups) metrics collector.
+/// Options for the cgroups (controller groups) metrics collector.
 ///
 /// This collector is only available on Linux systems, and only supports either version 2 or hybrid cgroups.
 #[configurable_component]

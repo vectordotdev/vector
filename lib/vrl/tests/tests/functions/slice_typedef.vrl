@@ -1,8 +1,0 @@
-# result: { "array": {  }, "array_unknown_infinite": { "object": { "foo": { "object": { "a": { "bytes": true, "integer": true } } } }, "undefined": true } }
-
-
-a = []
-a[0] = {"foo": {"a": 1}}
-a[1] = {"foo": {"a": "bytes"}}
-{ "foo": { "a": "bytes" } }
-type_def(slice!(a, 0))

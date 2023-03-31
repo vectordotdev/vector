@@ -7,17 +7,17 @@ publish = false
 
 [dependencies]
 enrichment = { path = "../../enrichment" }
-lookup = { path = "../../vrl/lookup" }
-stdlib = { package = "vrl-stdlib", path = "../../vrl/stdlib" }
-vrl = { path = "../../vrl/vrl" }
-value = { path = "../../vrl/value" }
-vrl-tests = { path = "../../vrl/tests" }
+lookup = { package = "lookup", git = "https://github.com/vectordotdev/vrl", rev = "v0.1.0" }
+stdlib = { package = "vrl-stdlib", git = "https://github.com/vectordotdev/vrl", rev = "v0.1.0" }
+vrl = { package = "vrl", git = "https://github.com/vectordotdev/vrl", rev = "v0.1.0" }
+value = { package = "value", git = "https://github.com/vectordotdev/vrl", rev = "v0.1.0" }
+vrl-tests = { package = "vrl-tests", git = "https://github.com/vectordotdev/vrl", rev = "v0.1.0" }
 vector-vrl-functions = { path = "../../vector-vrl/functions" }
 
 ansi_term = "0.12"
 chrono = "0.4"
 chrono-tz = "0.8"
-clap = { version = "4.1.11", features = ["derive"] }
+clap = { version = "4.1.14", features = ["derive"] }
 glob = "0.3"
 prettydiff = "0.6"
 regex = "1"

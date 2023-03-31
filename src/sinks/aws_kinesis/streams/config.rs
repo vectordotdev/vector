@@ -182,6 +182,12 @@ impl RetryLogic for KinesisRetryLogic {
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
         if let SdkError::ServiceError { err, raw: _ } = error {
+            // Note that if the request partially fails (records sent to one
+            // partition fail but the others do not, for example), Vector
+            // does not retry. This line only covers a failure for the entire
+            // request.
+            //
+            // https://github.com/vectordotdev/vector/issues/359
             if let PutRecordsErrorKind::ProvisionedThroughputExceededException(_) = err.kind {
                 return true;
             }

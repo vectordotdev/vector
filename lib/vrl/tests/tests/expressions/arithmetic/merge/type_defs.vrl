@@ -1,9 +1,0 @@
-# result: true
-
-x = { "ook": "nork" }
-y = { "nook": "nork" }
-
-z = x | y
-
-contains(z.ook, "nork") &&
-contains(z.nook, "nork")

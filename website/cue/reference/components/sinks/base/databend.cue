@@ -56,7 +56,7 @@ base: components: sinks: databend: configuration: {
 					bearer: """
 						Bearer authentication.
 
-						The bearer token value (OAuth2, JWT, etc) is passed as-is.
+						The bearer token value (OAuth2, JWT, etc.) is passed as-is.
 						"""
 				}
 			}
@@ -106,6 +106,21 @@ base: components: sinks: databend: configuration: {
 			}
 		}
 	}
+	compression: {
+		description: "Compression configuration."
+		required:    false
+		type: string: {
+			default: "none"
+			enum: {
+				gzip: """
+					[Gzip][gzip] compression.
+
+					[gzip]: https://www.gzip.org/
+					"""
+				none: "No compression."
+			}
+		}
+	}
 	database: {
 		description: "The database that contains the table that data will be inserted into."
 		required:    false
@@ -115,13 +130,71 @@ base: components: sinks: databend: configuration: {
 		}
 	}
 	encoding: {
-		description: "Transformations to prepare an event for serialization."
+		description: "Configures how events are encoded into raw bytes."
 		required:    false
 		type: object: options: {
+			codec: {
+				description: "The codec to use for encoding events."
+				required:    false
+				type: string: {
+					default: "json"
+					enum: {
+						csv: """
+															Encodes an event as a CSV message.
+
+															This codec must be configured with fields to encode.
+															"""
+						json: """
+															Encodes an event as [JSON][json].
+
+															[json]: https://www.json.org/
+															"""
+					}
+				}
+			}
+			csv: {
+				description:   "The CSV Serializer Options."
+				relevant_when: "codec = \"csv\""
+				required:      true
+				type: object: options: fields: {
+					description: """
+						Configures the fields that will be encoded, as well as the order in which they
+						appear in the output.
+
+						If a field is not present in the event, the output will be an empty string.
+
+						Values of type `Array`, `Object`, and `Regex` are not supported and the
+						output will be an empty string.
+						"""
+					required: true
+					type: array: items: type: string: {}
+				}
+			}
 			except_fields: {
 				description: "List of fields that will be excluded from the encoded event."
 				required:    false
 				type: array: items: type: string: {}
+			}
+			metric_tag_values: {
+				description: """
+					Controls how metric tag values are encoded.
+
+					When set to `single`, only the last non-bare value of tags are displayed with the
+					metric.  When set to `full`, all metric tags are exposed as separate assignments.
+					"""
+				relevant_when: "codec = \"json\""
+				required:      false
+				type: string: {
+					default: "single"
+					enum: {
+						full: "All tags are exposed as arrays of either string or null values."
+						single: """
+															Tag values are exposed as single strings, the same as they were before this config
+															option. Tags with multiple values show the last assigned value, and null values
+															are ignored.
+															"""
+					}
+				}
 			}
 			only_fields: {
 				description: "List of fields that will be included in the encoded event."
@@ -299,8 +372,8 @@ base: components: sinks: databend: configuration: {
 				description: """
 					Sets the list of supported ALPN protocols.
 
-					Declare the supported ALPN protocols, which are used during negotiation with peer. Prioritized in the order
-					they are defined.
+					Declare the supported ALPN protocols, which are used during negotiation with peer. They are prioritized in the order
+					that they are defined.
 					"""
 				required: false
 				type: array: items: type: string: examples: ["h2"]
@@ -348,10 +421,10 @@ base: components: sinks: databend: configuration: {
 				description: """
 					Enables certificate verification.
 
-					If enabled, certificates must be valid in terms of not being expired, as well as being issued by a trusted
-					issuer. This verification operates in a hierarchical manner, checking that not only the leaf certificate (the
-					certificate presented by the client/server) is valid, but also that the issuer of that certificate is valid, and
-					so on until reaching a root certificate.
+					If enabled, certificates must not be expired and must be issued by a trusted
+					issuer. This verification operates in a hierarchical manner, checking that the leaf certificate (the
+					certificate presented by the client/server) is not only valid, but that the issuer of that certificate is also valid, and
+					so on until the verification process reaches a root certificate.
 
 					Relevant for both incoming and outgoing connections.
 

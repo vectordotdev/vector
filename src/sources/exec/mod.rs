@@ -67,7 +67,7 @@ pub struct ExecConfig {
     #[serde(default = "default_include_stderr")]
     pub include_stderr: bool,
 
-    /// The maximum buffer size allowed before a log event will be generated.
+    /// The maximum buffer size allowed before a log event is generated.
     #[serde(default = "default_maximum_buffer_size")]
     pub maximum_buffer_size_bytes: usize,
 
@@ -103,7 +103,7 @@ pub enum Mode {
 pub struct ScheduledConfig {
     /// The interval, in seconds, between scheduled command runs.
     ///
-    /// If the command takes longer than `exec_interval_secs` to run, it will be killed.
+    /// If the command takes longer than `exec_interval_secs` to run, it is killed.
     #[serde(default = "default_exec_interval_secs")]
     exec_interval_secs: u64,
 }
@@ -117,7 +117,7 @@ pub struct StreamingConfig {
     #[serde(default = "default_respawn_on_exit")]
     respawn_on_exit: bool,
 
-    /// The amount of time, in seconds, that Vector will wait before rerunning a streaming command that exited.
+    /// The amount of time, in seconds, before rerunning a streaming command that exited.
     #[serde(default = "default_respawn_interval_secs")]
     respawn_interval_secs: u64,
 }

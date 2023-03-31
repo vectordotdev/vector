@@ -15,7 +15,7 @@ base: components: transforms: dedupe: configuration: {
 			Options to control what fields to match against.
 
 			When no field matching configuration is specified, events are matched using the `timestamp`,
-			`host`, and `message` fields from an event. The specific field names used will be those set in
+			`host`, and `message` fields from an event. The specific field names used are those set in
 			the global [`log schema`][global_log_schema] configuration.
 
 			[global_log_schema]: https://vector.dev/docs/reference/configuration/global-options/#log_schema

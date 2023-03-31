@@ -107,7 +107,7 @@ pub struct RedisSourceConfig {
 
     /// The Redis URL to connect to.
     ///
-    /// The URL must take the form of `protocol://server:port/db` where the `protocol` can either be `redis` or `rediss` for connections secured via TLS.
+    /// The URL must take the form of `protocol://server:port/db` where the `protocol` can either be `redis` or `rediss` for connections secured using TLS.
     #[configurable(metadata(docs::examples = "redis://127.0.0.1:6379/0"))]
     url: String,
 
@@ -117,9 +117,9 @@ pub struct RedisSourceConfig {
 
     /// Sets the name of the log field to use to add the key to each event.
     ///
-    /// The value will be the Redis key that the event was read from.
+    /// The value is the Redis key that the event was read from.
     ///
-    /// By default, this is not set and the field will not be automatically added.
+    /// By default, this is not set and the field is not automatically added.
     #[configurable(metadata(docs::examples = "redis_key"))]
     redis_key: Option<OptionalValuePath>,
 

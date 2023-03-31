@@ -15,8 +15,8 @@ use crate::MetricTagValues;
 pub struct TextSerializerConfig {
     /// Controls how metric tag values are encoded.
     ///
-    /// When set to `single`, only the last non-bare value of tags will be displayed with the
-    /// metric.  When set to `full`, all metric tags will be exposed as separate assignments.
+    /// When set to `single`, only the last non-bare value of tags are displayed with the
+    /// metric.  When set to `full`, all metric tags are exposed as separate assignments.
     #[serde(
         default,
         skip_serializing_if = "vector_core::serde::skip_serializing_if_default"

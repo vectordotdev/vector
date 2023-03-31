@@ -108,7 +108,7 @@ base: components: sinks: elasticsearch: configuration: {
 				description: """
 					Timeout for successfully loading any credentials, in seconds.
 
-					Relevant when the default credentials chain is used or `assume_role`.
+					Relevant when the default credentials chain or `assume_role` is used.
 					"""
 				relevant_when: "strategy = \"aws\""
 				required:      false
@@ -140,7 +140,7 @@ base: components: sinks: elasticsearch: configuration: {
 				description: """
 					The [AWS region][aws_region] to send STS requests to.
 
-					If not set, this will default to the configured region
+					If not set, this defaults to the configured region
 					for the service itself.
 
 					[aws_region]: https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints
@@ -438,7 +438,7 @@ base: components: sinks: elasticsearch: configuration: {
 					Name of the tag in the metric to use for the source host.
 
 					If present, the value of the tag is set on the generated log event in the "host" field,
-					where the field key will use the [global `host_key` option][global_log_schema_host_key].
+					where the field key uses the [global `host_key` option][global_log_schema_host_key].
 
 					[global_log_schema_host_key]: https://vector.dev/docs/reference/configuration//global-options#log_schema.host_key
 					"""
@@ -449,8 +449,8 @@ base: components: sinks: elasticsearch: configuration: {
 				description: """
 					Controls how metric tag values are encoded.
 
-					When set to `single`, only the last non-bare value of tags will be displayed with the
-					metric.  When set to `full`, all metric tags will be exposed as separate assignments as
+					When set to `single`, only the last non-bare value of tags are displayed with the
+					metric.  When set to `full`, all metric tags are exposed as separate assignments as
 					described by [the `native_json` codec][vector_native_json].
 
 					[vector_native_json]: https://github.com/vectordotdev/vector/blob/master/lib/codecs/tests/data/native_encoding/schema.cue
@@ -459,22 +459,22 @@ base: components: sinks: elasticsearch: configuration: {
 				type: string: {
 					default: "single"
 					enum: {
-						full: "All tags will be exposed as arrays of either string or null values."
+						full: "All tags are exposed as arrays of either string or null values."
 						single: """
-															Tag values will be exposed as single strings, the same as they were before this config
-															option. Tags with multiple values will show the last assigned value, and null values will be
-															ignored.
+															Tag values are exposed as single strings, the same as they were before this config
+															option. Tags with multiple values show the last assigned value, and null values
+															are ignored.
 															"""
 					}
 				}
 			}
 			timezone: {
 				description: """
-					The name of the timezone to apply to timestamp conversions that do not contain an explicit
+					The name of the time zone to apply to timestamp conversions that do not contain an explicit
 					time zone.
 
 					This overrides the [global `timezone`][global_timezone] option. The time zone name may be
-					any name in the [TZ database][tz_database], or `local` to indicate system local time.
+					any name in the [TZ database][tz_database] or `local` to indicate system local time.
 
 					[global_timezone]: https://vector.dev/docs/reference/configuration//global-options#timezone
 					[tz_database]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
@@ -702,8 +702,8 @@ base: components: sinks: elasticsearch: configuration: {
 				description: """
 					Sets the list of supported ALPN protocols.
 
-					Declare the supported ALPN protocols, which are used during negotiation with peer. Prioritized in the order
-					they are defined.
+					Declare the supported ALPN protocols, which are used during negotiation with peer. They are prioritized in the order
+					that they are defined.
 					"""
 				required: false
 				type: array: items: type: string: examples: ["h2"]
@@ -751,10 +751,10 @@ base: components: sinks: elasticsearch: configuration: {
 				description: """
 					Enables certificate verification.
 
-					If enabled, certificates must be valid in terms of not being expired, as well as being issued by a trusted
-					issuer. This verification operates in a hierarchical manner, checking that not only the leaf certificate (the
-					certificate presented by the client/server) is valid, but also that the issuer of that certificate is valid, and
-					so on until reaching a root certificate.
+					If enabled, certificates must not be expired and must be issued by a trusted
+					issuer. This verification operates in a hierarchical manner, checking that the leaf certificate (the
+					certificate presented by the client/server) is not only valid, but that the issuer of that certificate is also valid, and
+					so on until the verification process reaches a root certificate.
 
 					Relevant for both incoming and outgoing connections.
 

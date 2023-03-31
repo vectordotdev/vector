@@ -50,7 +50,7 @@ pub struct LogplexConfig {
 
     /// A list of URL query parameters to include in the log event.
     ///
-    /// These will override any values included in the body with conflicting names.
+    /// These override any values included in the body with conflicting names.
     #[serde(default)]
     #[configurable(metadata(docs::examples = "application", docs::examples = "source"))]
     query_parameters: Vec<String>,

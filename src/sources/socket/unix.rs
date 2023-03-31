@@ -34,7 +34,7 @@ pub struct UnixConfig {
 
     /// Unix file mode bits to be applied to the unix socket file as its designated file permissions.
     ///
-    /// Note that the file mode value can be specified in any numeric format supported by your configuration
+    /// Note: The file mode value can be specified in any numeric format supported by your configuration
     /// language, but it is most intuitive to use an octal number.
     #[configurable(metadata(docs::examples = 0o777))]
     #[configurable(metadata(docs::examples = 0o600))]
