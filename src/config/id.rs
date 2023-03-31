@@ -109,9 +109,12 @@ pub struct OutputId {
 }
 
 impl OutputId {
-    /// Some situations when building the topology requires running the
+    /// Some situations, for example when validating a config file requires running the
     /// transforms::output function to retrieve the outputs, but we don't have an
     /// `OutputId` from a source. This gives us an `OutputId` that we can use.
+    ///
+    /// TODO: This is not a pleasant solution, but would require some significant refactoring
+    /// to the topology code to avoid.
     pub fn dummy() -> Self {
         Self {
             component: "dummy".into(),
