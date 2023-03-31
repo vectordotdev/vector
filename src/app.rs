@@ -1,5 +1,5 @@
 #![allow(missing_docs)]
-use std::{collections::HashMap, num::NonZeroUsize, path::PathBuf, sync::Arc};
+use std::{collections::HashMap, num::NonZeroUsize, path::PathBuf};
 
 use exitcode::ExitCode;
 use futures::StreamExt;
@@ -8,7 +8,7 @@ use futures_util::future::BoxFuture;
 use once_cell::race::OnceNonZeroUsize;
 use tokio::{
     runtime::{self, Runtime},
-    sync::{mpsc, Mutex},
+    sync::mpsc,
 };
 use tokio_stream::wrappers::UnboundedReceiverStream;
 
@@ -26,7 +26,9 @@ use crate::{
     config::{self, Config, ConfigPath},
     heartbeat,
     signal::{SignalHandler, SignalPair, SignalRx, SignalTo},
-    topology::{self, ReloadOutcome, RunningTopology, TopologyController},
+    topology::{
+        self, ReloadOutcome, RunningTopology, SharedTopologyController, TopologyController,
+    },
     trace,
 };
 
@@ -209,7 +211,7 @@ impl Application {
             signals,
         } = self;
 
-        let topology_controller = Arc::new(Mutex::new(TopologyController {
+        let topology_controller = SharedTopologyController::new(TopologyController {
             #[cfg(feature = "api")]
             api_server: config.setup_api(runtime),
             topology: config.topology,
@@ -217,7 +219,7 @@ impl Application {
             require_healthy,
             #[cfg(feature = "enterprise")]
             enterprise_reporter: config.enterprise,
-        }));
+        });
 
         Ok(StartedApplication {
             config_paths: config.config_paths,
@@ -229,10 +231,10 @@ impl Application {
 }
 
 pub struct StartedApplication {
-    config_paths: Vec<ConfigPath>,
-    graceful_crash_receiver: mpsc::UnboundedReceiver<()>,
+    pub config_paths: Vec<ConfigPath>,
+    pub graceful_crash_receiver: mpsc::UnboundedReceiver<()>,
     pub signals: SignalPair,
-    topology_controller: Arc<Mutex<TopologyController>>,
+    pub topology_controller: SharedTopologyController,
 }
 
 impl StartedApplication {
@@ -288,7 +290,7 @@ impl StartedApplication {
                 }
                 // Trigger graceful shutdown if a component crashed, or all sources have ended.
                 _ = graceful_crash.next() => break SignalTo::Shutdown,
-                _ = TopologyController::sources_finished(Arc::clone(&topology_controller)) => {
+                _ = TopologyController::sources_finished(topology_controller.clone()) => {
                     info!("All sources have finished.");
                     break SignalTo::Shutdown
                 } ,
@@ -305,9 +307,9 @@ impl StartedApplication {
 }
 
 pub struct FinishedApplication {
-    signal: SignalTo,
-    signal_rx: SignalRx,
-    topology_controller: Arc<Mutex<TopologyController>>,
+    pub signal: SignalTo,
+    pub signal_rx: SignalRx,
+    pub topology_controller: SharedTopologyController,
 }
 
 impl FinishedApplication {
@@ -320,7 +322,8 @@ impl FinishedApplication {
 
         // At this point, we'll have the only reference to the topology controller and can safely
         // remove it from the Arc/Mutex to shut down the topology.
-        let topology_controller = Arc::try_unwrap(topology_controller)
+        let topology_controller = topology_controller
+            .try_into_inner()
             .expect("fail to unwrap topology controller")
             .into_inner();
 

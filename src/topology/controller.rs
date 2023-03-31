@@ -1,6 +1,9 @@
+use std::sync::Arc;
+
 #[cfg(feature = "enterprise")]
 use futures_util::future::BoxFuture;
 use futures_util::FutureExt as _;
+use tokio::sync::{Mutex, MutexGuard};
 
 #[cfg(feature = "api")]
 use crate::api;
@@ -12,6 +15,23 @@ use crate::internal_events::{
     VectorConfigLoadError, VectorRecoveryError, VectorReloadError, VectorReloaded,
 };
 use crate::{config, topology::RunningTopology};
+
+#[derive(Clone, Debug)]
+pub struct SharedTopologyController(Arc<Mutex<TopologyController>>);
+
+impl SharedTopologyController {
+    pub fn new(inner: TopologyController) -> Self {
+        Self(Arc::new(Mutex::new(inner)))
+    }
+
+    pub async fn lock(&self) -> MutexGuard<TopologyController> {
+        self.0.lock().await
+    }
+
+    pub fn try_into_inner(self) -> Result<Mutex<TopologyController>, Self> {
+        Arc::try_unwrap(self.0).map_err(Self)
+    }
+}
 
 pub struct TopologyController {
     pub topology: RunningTopology,
@@ -116,7 +136,7 @@ impl TopologyController {
     // check, preventing anyone else from adding new sources. If it does not resolve, that indicates
     // that new sources have been added since our original call and we should start the process over to
     // continue waiting.
-    pub async fn sources_finished(mutex: std::sync::Arc<tokio::sync::Mutex<Self>>) {
+    pub async fn sources_finished(mutex: SharedTopologyController) {
         loop {
             // Do an initial async wait while the topology is running, making sure not the hold the
             // mutex lock while we wait on sources to finish.
