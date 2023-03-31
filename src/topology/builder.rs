@@ -216,7 +216,7 @@ pub async fn build_pieces(
             );
 
             let port = output.port.clone();
-            if let Some(definition) = output.into_schema_definition(config.schema.enabled) {
+            if let Some(definition) = output.schema_definition(config.schema.enabled) {
                 schema_definitions.insert(port, definition);
             }
         }

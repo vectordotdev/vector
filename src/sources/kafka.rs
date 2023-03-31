@@ -795,7 +795,7 @@ mod test {
         let definitions = make_config("topic", "group", LogNamespace::Vector)
             .outputs(LogNamespace::Vector)
             .remove(0)
-            .into_schema_definition(true);
+            .schema_definition(true);
 
         assert_eq!(
             definitions,
@@ -843,7 +843,7 @@ mod test {
         let definitions = make_config("topic", "group", LogNamespace::Legacy)
             .outputs(LogNamespace::Legacy)
             .remove(0)
-            .into_schema_definition(true);
+            .schema_definition(true);
 
         assert_eq!(
             definitions,

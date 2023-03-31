@@ -946,7 +946,7 @@ mod tests {
         let definitions = FileConfig::default()
             .outputs(LogNamespace::Vector)
             .remove(0)
-            .into_schema_definition(true);
+            .schema_definition(true);
 
         assert_eq!(
             definitions,
@@ -983,7 +983,7 @@ mod tests {
         let definitions = FileConfig::default()
             .outputs(LogNamespace::Legacy)
             .remove(0)
-            .into_schema_definition(true);
+            .schema_definition(true);
 
         assert_eq!(
             definitions,

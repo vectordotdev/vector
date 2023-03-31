@@ -1805,7 +1805,7 @@ fn test_config_outputs() {
         let mut outputs = config
             .outputs(LogNamespace::Legacy)
             .into_iter()
-            .map(|output| (output.port.clone(), output.into_schema_definition(true)))
+            .map(|output| (output.port.clone(), output.schema_definition(true)))
             .collect::<HashMap<_, _>>();
 
         for (name, want) in want {
@@ -2042,7 +2042,7 @@ fn test_output_schema_definition_json_vector_namespace() {
     .unwrap()
     .outputs(LogNamespace::Vector)
     .remove(0)
-    .into_schema_definition(true);
+    .schema_definition(true);
 
     assert_eq!(
         definition,
@@ -2101,7 +2101,7 @@ fn test_output_schema_definition_bytes_vector_namespace() {
     .unwrap()
     .outputs(LogNamespace::Vector)
     .remove(0)
-    .into_schema_definition(true);
+    .schema_definition(true);
 
     assert_eq!(
         definition,
@@ -2161,7 +2161,7 @@ fn test_output_schema_definition_json_legacy_namespace() {
     .unwrap()
     .outputs(LogNamespace::Legacy)
     .remove(0)
-    .into_schema_definition(true);
+    .schema_definition(true);
 
     assert_eq!(
         definition,
@@ -2191,7 +2191,7 @@ fn test_output_schema_definition_bytes_legacy_namespace() {
     .unwrap()
     .outputs(LogNamespace::Legacy)
     .remove(0)
-    .into_schema_definition(true);
+    .schema_definition(true);
 
     assert_eq!(
         definition,

@@ -159,40 +159,23 @@ impl SourceOutput {
     ///
     /// Takes a `schema_enabled` flag to determine if the full definition including the fields
     /// and associated types should be returned, or if a simple definition should be returned.
+    /// A simple definition is just the default for the namespace. For the Vector namespace the
+    /// meanings are included.
     /// Schema enabled is set in the users configuration.
     #[must_use]
     pub fn schema_definition(&self, schema_enabled: bool) -> Option<schema::Definition> {
-        self.schema_definition.as_ref().and_then(|definition| {
+        self.schema_definition.as_ref().map(|definition| {
             if schema_enabled {
-                Some(definition.clone())
-            } else if definition.log_namespaces().contains(&LogNamespace::Vector) {
+                definition.clone()
+            } else {
                 let mut new_definition =
                     schema::Definition::default_for_namespace(definition.log_namespaces());
-                new_definition.add_meanings(definition.meanings());
-                Some(new_definition)
-            } else {
-                None
-            }
-        })
-    }
 
-    /// Consumes the object and returns the schema [`schema::Definition`] from this output.
-    ///
-    /// Takes a `schema_enabled` flag to determine if the full definition including the fields
-    /// and associated types should be returned, or if a simple definition should be returned.
-    /// Schema enabled is set in the user's configuration.
-    #[must_use]
-    pub fn into_schema_definition(self, schema_enabled: bool) -> Option<schema::Definition> {
-        self.schema_definition.and_then(|definition| {
-            if schema_enabled {
-                Some(definition)
-            } else if definition.log_namespaces().contains(&LogNamespace::Vector) {
-                let mut new_definition =
-                    schema::Definition::default_for_namespace(definition.log_namespaces());
-                new_definition.add_meanings(definition.meanings());
-                Some(new_definition)
-            } else {
-                None
+                if definition.log_namespaces().contains(&LogNamespace::Vector) {
+                    new_definition.add_meanings(definition.meanings());
+                }
+
+                new_definition
             }
         })
     }

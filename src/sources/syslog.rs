@@ -500,7 +500,7 @@ mod test {
         let definitions = config
             .outputs(LogNamespace::Vector)
             .remove(0)
-            .into_schema_definition(true);
+            .schema_definition(true);
 
         let expected_definition =
             Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
@@ -583,7 +583,7 @@ mod test {
         let definitions = config
             .outputs(LogNamespace::Legacy)
             .remove(0)
-            .into_schema_definition(true);
+            .schema_definition(true);
 
         let expected_definition = Definition::new_with_default_metadata(
             Kind::object(Collection::empty()),

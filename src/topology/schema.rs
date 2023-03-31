@@ -44,7 +44,7 @@ pub fn possible_definitions(
                             &input.port
                         )
                     })
-                    .into_schema_definition(config.schema_enabled()),
+                    .schema_definition(config.schema_enabled()),
             );
 
             definitions.append(&mut source_definition);
@@ -112,22 +112,23 @@ pub(super) fn expanded_definitions(
             // After getting the source matching to the given input, we need to further narrow the
             // actual output of the source feeding into this input, and then get the definition
             // belonging to that output.
-            let mut source_definitions = outputs
-                .into_iter()
-                .find_map(|output| {
-                    if output.port == input.port {
-                        Some(input.with_definitions(
-                            output.into_schema_definition(config.schema_enabled()),
-                        ))
-                    } else {
-                        None
-                    }
-                })
-                .unwrap_or_else(|| {
-                    // If we find no match, it means the topology is misconfigured. This is a fatal
-                    // error, but other parts of the topology builder deal with this state.
-                    unreachable!("source output mis-configured")
-                });
+            let mut source_definitions =
+                outputs
+                    .into_iter()
+                    .find_map(|output| {
+                        if output.port == input.port {
+                            Some(input.with_definitions(
+                                output.schema_definition(config.schema_enabled()),
+                            ))
+                        } else {
+                            None
+                        }
+                    })
+                    .unwrap_or_else(|| {
+                        // If we find no match, it means the topology is misconfigured. This is a fatal
+                        // error, but other parts of the topology builder deal with this state.
+                        unreachable!("source output mis-configured")
+                    });
 
             definitions.append(&mut source_definitions);
 

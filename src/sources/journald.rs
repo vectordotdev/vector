@@ -1468,7 +1468,7 @@ mod tests {
         let definitions = config
             .outputs(LogNamespace::Vector)
             .remove(0)
-            .into_schema_definition(true);
+            .schema_definition(true);
 
         let expected_definition =
             Definition::new_with_default_metadata(Kind::bytes().or_null(), [LogNamespace::Vector])
@@ -1508,7 +1508,7 @@ mod tests {
         let definitions = config
             .outputs(LogNamespace::Legacy)
             .remove(0)
-            .into_schema_definition(true);
+            .schema_definition(true);
 
         let expected_definition = Definition::new_with_default_metadata(
             Kind::object(Collection::empty()),
@@ -1558,10 +1558,7 @@ mod tests {
 
         event.as_mut_log().insert("timestamp", chrono::Utc::now());
 
-        let definitions = config
-            .outputs(namespace)
-            .remove(0)
-            .into_schema_definition(true);
+        let definitions = config.outputs(namespace).remove(0).schema_definition(true);
 
         definitions.unwrap().assert_valid_for_event(&event);
     }
