@@ -5,7 +5,6 @@ use exitcode::ExitCode;
 use futures::StreamExt;
 #[cfg(feature = "enterprise")]
 use futures_util::future::BoxFuture;
-use futures_util::FutureExt;
 use once_cell::race::OnceNonZeroUsize;
 use tokio::{
     runtime::{self, Runtime},
@@ -210,7 +209,7 @@ impl Application {
             signals,
         } = self;
 
-        let topology_controller = TopologyController {
+        let topology_controller = Arc::new(Mutex::new(TopologyController {
             #[cfg(feature = "api")]
             api_server: config.setup_api(runtime),
             topology: config.topology,
@@ -218,8 +217,7 @@ impl Application {
             require_healthy,
             #[cfg(feature = "enterprise")]
             enterprise_reporter: config.enterprise,
-        };
-        let topology_controller = Arc::new(Mutex::new(topology_controller));
+        }));
 
         Ok(StartedApplication {
             config_paths: config.config_paths,
@@ -290,7 +288,7 @@ impl StartedApplication {
                 }
                 // Trigger graceful shutdown if a component crashed, or all sources have ended.
                 _ = graceful_crash.next() => break SignalTo::Shutdown,
-                _ = sources_finished(Arc::clone(&topology_controller)) => {
+                _ = TopologyController::sources_finished(Arc::clone(&topology_controller)) => {
                     info!("All sources have finished.");
                     break SignalTo::Shutdown
                 } ,
@@ -344,40 +342,6 @@ impl FinishedApplication {
                 drop(topology_controller);
             }
             _ => unreachable!(),
-        }
-    }
-}
-
-// The `sources_finished` method on `RunningTopology` only considers sources that are currently
-// running at the time the method is called. This presents a problem when the set of running
-// sources can change while we are waiting on the resulting future to resolve.
-//
-// This function resolves that issue by waiting in two stages. The first is the usual asynchronous
-// wait for the future to complete. When it does, we know that all of the sources that existed when
-// the future was built have finished, but we don't know if that's because they were replaced as
-// part of a reload (in which case we don't want to return yet). To differentiate, we acquire the
-// lock on the topology, create a new future, and check whether it resolves immediately or not. If
-// it does resolve, we know all sources are truly finished because we held the lock during the
-// check, preventing anyone else from adding new sources. If it does not resolve, that indicates
-// that new sources have been added since our original call and we should start the process over to
-// continue waiting.
-async fn sources_finished(mutex: Arc<Mutex<TopologyController>>) {
-    loop {
-        // Do an initial async wait while the topology is running, making sure not the hold the
-        // mutex lock while we wait on sources to finish.
-        let initial = {
-            let tc = mutex.lock().await;
-            tc.topology.sources_finished()
-        };
-        initial.await;
-
-        // Once the initial signal is tripped, hold lock on the topology while checking again. This
-        // ensures that no other task is adding new sources.
-        let top = mutex.lock().await;
-        if top.topology.sources_finished().now_or_never().is_some() {
-            return;
-        } else {
-            continue;
         }
     }
 }
