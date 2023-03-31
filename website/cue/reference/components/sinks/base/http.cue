@@ -310,8 +310,12 @@ base: components: sinks: http: configuration: {
 		}
 	}
 	method: {
-		description: "The HTTP method to use when making the request."
-		required:    false
+		description: """
+			HTTP method.
+
+			The HTTP method to use when making the request.
+			"""
+		required: false
 		type: string: {
 			default: "post"
 			enum: {

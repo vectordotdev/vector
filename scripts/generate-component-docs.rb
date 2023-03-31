@@ -603,6 +603,17 @@ def expand_schema_references(root_schema, unexpanded_schema)
       }
     end
 
+    if !schema['anyOf'].nil?
+      schema['anyOf'] = schema['anyOf'].map { |subschema|
+        new_subschema = expand_schema_references(root_schema, subschema)
+        if new_subschema != subschema
+          expanded = true
+        end
+
+        new_subschema
+      }
+    end
+
     if !expanded
       break
     end
@@ -914,10 +925,10 @@ def resolve_bare_schema(root_schema, schema)
           @logger.error "Relevant schema: #{JSON.pretty_generate(schema)}"
           exit 1
         end
-        additional_properties['description'] = singular_description
 
         resolved_additional_properties = resolve_schema(root_schema, additional_properties)
         resolved_additional_properties['required'] = true
+        resolved_additional_properties['description'] = singular_description
         options.push(['*', resolved_additional_properties])
       end
 

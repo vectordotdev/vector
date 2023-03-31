@@ -1,10 +1,26 @@
-//use indexmap::IndexMap;
-use vector_config_common::schema::{
-    visit::{visit_schema_object, with_resolved_schema_reference, Visitor},
-    InstanceType, Map, Schema, SchemaObject, SchemaSettings, SingleOrVec,
+#![allow(warnings)]
+
+use std::{
+    collections::{HashMap, HashSet},
+    convert::identity,
+    mem::discriminant,
 };
 
-/// A visitor that marks schemas as disallowing unknown properties via `unevaluatedProperties`.
+use serde_json::Value;
+use tracing::{debug, error};
+use vector_config_common::schema::{
+    visit::{visit_schema_object, with_resolved_schema_reference, Visitor},
+    *,
+};
+
+use crate::schema::visitors::merge::Mergeable;
+
+use super::scoped_visit::{
+    visit_schema_object_scoped, SchemaReference, SchemaScopeStack, ScopedVisitor,
+};
+
+/// A visitor that marks schemas as closed by disallowing unknown properties via
+/// `unevaluatedProperties`.
 ///
 /// This is the equivalent of `serde`'s `deny_unknown_fields` attribute: instead of only validating
 /// the properties specified in the schema, and ignoring any properties present in the JSON
@@ -15,23 +31,128 @@ use vector_config_common::schema::{
 /// with advanced subschema validation, such as `oneOf` or `allOf`, as `unevaluatedProperties`
 /// cannot simply be applied to any and all schemas indiscriminately.
 #[derive(Debug, Default)]
-pub struct DisallowedUnevaluatedPropertiesVisitor;
+pub struct DisallowedUnevaluatedPropertiesVisitor {
+    scope_stack: SchemaScopeStack,
+    eligible_to_flatten: HashMap<String, HashSet<SchemaReference>>,
+}
 
 impl DisallowedUnevaluatedPropertiesVisitor {
     pub fn from_settings(_: &SchemaSettings) -> Self {
-        Self
+        Self {
+            scope_stack: SchemaScopeStack::default(),
+            eligible_to_flatten: HashMap::new(),
+        }
     }
 }
 
 impl Visitor for DisallowedUnevaluatedPropertiesVisitor {
+    fn visit_root_schema(&mut self, root: &mut RootSchema) {
+        // Glossary:
+        //
+        //   mark(ed): setting or having `unevaluatedProperties` set to `Some(Schema::Bool(false))`
+        //   unmark(ed): unsetting or having `unevaluatedProperties` set to `None`
+
+        // For all definitions, visit _just_ the defined schema (no recursing) and build a map of
+        // child definitions -> (mark eligibility, [(parent definition, would_unmark)]), such that we know exactly
+        // which schemas refer to any given schema definition and if they would lead to the child
+        // schema being marked as `unevaluatedProperties: false`.
+        //
+        // We would filter out any child definitions that aren't eligible to be marked. For the
+        // remaining child schemas, we group the parent definitions by `would_unmark`, which
+        // indicates whether or not the given parent definition would cause the child definition to
+        // be unmarked.
+        //
+        // As an example, we would expect a parent schema referring to a child schema via `allOf` to
+        // unmark the child schema, while a parent schema referring to a child schema within a
+        // specific property to not unmark the child schema.
+        //
+        // With the grouped parent definitions, take the smaller of the two groups. This represents
+        // the set of parent schemas that we will indicate as needing to use a flattened version of
+        // the child schema when we execute our primary visit logic.
+
+        let mut eligible_to_flatten = HashMap::new();
+        let flattening_eligibility_map = build_closed_schema_flatten_eligibility_mappings(root);
+        for (child_schema_ref, metadata) in flattening_eligibility_map {
+            let would_unmark = metadata
+                .referrers
+                .iter()
+                .filter(|r| r.would_unmark)
+                .map(|r| r.referent.clone())
+                .collect::<HashSet<_>>();
+            let would_not_unmark = metadata
+                .referrers
+                .iter()
+                .filter(|r| !r.would_unmark)
+                .map(|r| r.referent.clone())
+                .collect::<HashSet<_>>();
+
+            if would_not_unmark.len() > would_unmark.len() {
+                eligible_to_flatten.insert(child_schema_ref.to_string(), would_unmark);
+            } else {
+                eligible_to_flatten.insert(child_schema_ref.to_string(), would_not_unmark);
+            }
+        }
+
+        debug!(
+            "Found {} referents eligible for flattening: {:?}",
+            eligible_to_flatten.len(),
+            eligible_to_flatten,
+        );
+
+        self.eligible_to_flatten = eligible_to_flatten;
+
+        visit::visit_root_schema(self, root);
+    }
+
     fn visit_schema_object(
         &mut self,
         definitions: &mut Map<String, Schema>,
         schema: &mut SchemaObject,
     ) {
+        // If this schema has a schema reference, check our flattening eligibility map to figure out
+        // if we need to merge it in.
+        //
+        // When a given schema reference (the actual target of `$ref`) is eligible for flattening in
+        // a given schema (what we're currently visiting) then it means that this schema would,
+        // based on its composition, lead to the schema reference either being marked or unmarked.
+        //
+        // We flatten the schema reference into this schema to avoid that from occurring, and we do
+        // so based on whichever group of referrers -- the schemas which reference the particular
+        // target schema -- is smaller, such that we do the minimum number of flattenings per target
+        // schema, to keep the schema as small as we reasonably can.
+        if let Some(reference) = schema.reference.as_ref() {
+            let current_parent_schema_ref = self.get_current_schema_scope();
+
+            if let Some(referrers) = self.eligible_to_flatten.get(reference) {
+                if referrers.contains(&current_parent_schema_ref) {
+                    let current_schema_ref = get_cleaned_schema_reference(reference);
+                    let referenced_schema = definitions
+                        .get(current_schema_ref)
+                        .expect("schema definition must exist");
+
+                    debug!(
+                        referent = current_schema_ref,
+                        referrer = current_parent_schema_ref.as_ref(),
+                        "Found eligible referent/referrer mapping."
+                    );
+
+                    if let Schema::Object(referenced_schema) = referenced_schema {
+                        debug!(
+                            referent = current_schema_ref,
+                            referrer = current_parent_schema_ref.as_ref(),
+                            "Flattening referent into referrer."
+                        );
+
+                        schema.reference = None;
+                        schema.merge(&referenced_schema);
+                    }
+                }
+            }
+        }
+
         // Visit the schema object first so that we recurse the overall schema in a depth-first
-        // fashion, applying the unevaluated properties change from the bottom up.
-        visit_schema_object(self, definitions, schema);
+        // fashion, marking eligible object schemas as closed.
+        visit_schema_object_scoped(self, definitions, schema);
 
         // Next, see if this schema has any subschema validation: `allOf`, `oneOf`, or `anyOf`.
         //
@@ -42,37 +163,376 @@ impl Visitor for DisallowedUnevaluatedPropertiesVisitor {
         // which is why we remove that from the subschemas themselves but essentially hoist it up
         // to the level of the `allOf`/`oneOf`/`anyOf`, where it can apply the correct behavior.
         let mut had_relevant_subschemas = false;
-        if let Some(subschemas) = get_subschema_validators(schema) {
-            had_relevant_subschemas = true;
-
+        if let Some(subschema) = schema.subschemas.as_mut() {
+            let mut subschemas = get_object_subschemas_from_parent_mut(subschema.as_mut());
             for subschema in subschemas {
-                // If the schema is an object schema, we'll unset `unevaluatedProperties` directly.
-                // If it isn't an object schema, we'll see if the subschema is actually a schema
-                // reference, and if so, we'll make sure to unset `unevaluatedProperties` on the
-                // resolved schema reference itself.
-                //
-                // Like the top-level schema reference logic, this ensures the schema definition is
-                // updated for subsequent resolution.
-                if let Some(object) = subschema.object.as_mut() {
-                    object.unevaluated_properties = Some(Box::new(Schema::Bool(true)));
-                } else {
-                    with_resolved_schema_reference(definitions, subschema, |_, resolved| {
-                        if let Schema::Object(schema) = resolved {
-                            if let Some(object) = schema.object.as_mut() {
-                                object.unevaluated_properties = Some(Box::new(Schema::Bool(true)));
-                            }
-                        }
-                    });
-                }
+                had_relevant_subschemas = true;
+
+                unmark_or_flatten_schema(definitions, subschema);
             }
         }
 
         // If we encountered any subschema validation, or if this schema itself is an object schema,
         // mark the schema as closed by setting `unevaluatedProperties` to `false`.
-        if had_relevant_subschemas || is_object_schema(schema.instance_type.as_ref()) {
+        if had_relevant_subschemas || is_object_schema(schema) {
             mark_schema_closed(schema);
         }
     }
+}
+
+impl ScopedVisitor for DisallowedUnevaluatedPropertiesVisitor {
+    fn push_schema_scope<S: Into<SchemaReference>>(&mut self, scope: S) {
+        self.scope_stack.push(scope.into());
+    }
+
+    fn pop_schema_scope(&mut self) {
+        self.scope_stack.pop().expect("stack was empty during pop");
+    }
+
+    fn get_current_schema_scope(&self) -> &SchemaReference {
+        self.scope_stack
+            .current()
+            .unwrap_or_else(|| &SchemaReference::Root)
+    }
+}
+
+fn is_non_object_optional_schema(
+    definitions: &mut Map<String, Schema>,
+    schema: &mut SchemaObject,
+) -> bool {
+    // Only match schemas that have subschema validation in the form of `oneOf`, and nothing else.
+    let subschemas = match schema.subschemas.as_ref() {
+        None => return false,
+        Some(subschema) => {
+            let has_non_one_of = subschema.all_of.is_some() || subschema.any_of.is_some();
+            match subschema.one_of.as_ref() {
+                Some(one_of) if !has_non_one_of => one_of,
+                _ => return false,
+            }
+        }
+    };
+
+    // There can only be two subschemas, one of which is simply a `null` schema.
+    if subschemas.len() != 2 {
+        return false;
+    }
+
+    let maybe_non_null_schema_idx = subschemas[0]
+        .as_object()
+        .map(is_null_schema)
+        .and_then(|x| x.then(|| 1))
+        .or_else(|| {
+            subschemas[1]
+                .as_object()
+                .map(is_null_schema)
+                .and_then(|x| x.then(|| 0))
+        });
+
+    let non_null_schema = match maybe_non_null_schema_idx {
+        Some(idx) => &subschemas[idx],
+        None => return false,
+    };
+
+    // Check if the non-null schema is an object schema or not.
+    non_null_schema
+        .as_object()
+        .map(|schema| !is_object_schema(schema))
+        .unwrap_or(true)
+}
+
+fn unmark_or_flatten_schema(definitions: &mut Map<String, Schema>, schema: &mut SchemaObject) {
+    // If the schema is an object schema, we'll unset `unevaluatedProperties` directly.
+    // If it isn't an object schema, we'll see if the subschema is actually a schema
+    // reference, and if so, we'll make sure to unset `unevaluatedProperties` on the
+    // resolved schema reference itself.
+    //
+    // Like the top-level schema reference logic, this ensures the schema definition is
+    // updated for subsequent resolution.
+    if let Some(object) = schema.object.as_mut() {
+        debug!("Unmarked object subschema directly.");
+
+        object.unevaluated_properties = Some(Box::new(Schema::Bool(true)));
+    } else {
+        with_resolved_schema_reference(definitions, schema, |_, schema_ref, resolved| {
+            if let Schema::Object(resolved) = resolved {
+                if let Some(object) = resolved.object.as_mut() {
+                    debug!(
+                        referent = schema_ref,
+                        "Unmarked subschema by traversing schema reference."
+                    );
+
+                    object.unevaluated_properties = Some(Box::new(Schema::Bool(true)));
+                }
+            }
+        });
+    }
+}
+
+/// A referent schema that carries the chance of being unmarking by its referrer.
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+struct MarkableReferent {
+    // Whether or not the referent would be unmarked by the referrer.
+    would_unmark: bool,
+
+    /// The referent schema.
+    referent: SchemaReference,
+}
+
+impl MarkableReferent {
+    fn would_unmark<R: Into<SchemaReference>>(referent: R) -> Self {
+        Self {
+            would_unmark: true,
+            referent: referent.into(),
+        }
+    }
+
+    fn would_not_unmark<R: Into<SchemaReference>>(referent: R) -> Self {
+        Self {
+            would_unmark: false,
+            referent: referent.into(),
+        }
+    }
+
+    fn with_new_referent<R: Into<SchemaReference>>(&self, new_referent: R) -> Self {
+        Self {
+            would_unmark: self.would_unmark,
+            referent: new_referent.into(),
+        }
+    }
+}
+
+#[derive(Debug)]
+struct ChildMetadata {
+    /// Whether or not this schema, in isolation, should be marked.
+    should_mark: bool,
+
+    /// The set of referring schemas.
+    referrers: HashSet<MarkableReferent>,
+}
+
+impl ChildMetadata {
+    fn from_schema(schema: &SchemaObject) -> Self {
+        Self {
+            should_mark: is_markable_schema(schema),
+            referrers: HashSet::new(),
+        }
+    }
+}
+
+fn build_closed_schema_flatten_eligibility_mappings(
+    root_schema: &RootSchema,
+) -> HashMap<String, ChildMetadata> {
+    // Iterate over all definitions, and once more for the root schema, and generate a map of parent
+    // schema -> (would_unmark, child schema).
+    let mut parent_to_child = HashMap::new();
+    for (definition_name, definition) in &root_schema.definitions {
+        // We only care about full-fledged schemas, not boolean schemas.
+        let parent_schema = match definition {
+            Schema::Bool(_) => continue,
+            Schema::Object(schema) => schema,
+        };
+
+        // If a schema itself would not be considered markable, then we don't need to consider the
+        // eligibility between parent/child since there's nothing to drive the "now unmark the child
+        // schemas" logic.
+        if !is_markable_schema(parent_schema) {
+            continue;
+        }
+
+        // Collect all referents for this definition, which includes both property-based referents
+        // and subschema-based referents. Property-based referents are not required to be unmarked,
+        // while subschema-based referents must be unmarked.
+        let mut referents = HashSet::new();
+        get_referents(parent_schema, &mut referents);
+
+        // Store the parent/child mapping.
+        parent_to_child.insert(SchemaReference::from(definition_name), referents);
+    }
+
+    // Collect the referents from the root schema.
+    let mut root_referents = HashSet::new();
+    get_referents(&root_schema.schema, &mut root_referents);
+    parent_to_child.insert(SchemaReference::Root, root_referents);
+
+    // Now we build a reverse map, going from child -> parent. We'll iterate over every child
+    // referent, for every parent/child entry, calcuating the set of referrers, and if they would
+    // require unmarking the child.
+    let mut child_to_parent = HashMap::new();
+    for (parent_schema_ref, child_referents) in parent_to_child {
+        for child_referent in child_referents {
+            let entry = child_to_parent
+                .entry(child_referent.referent.as_ref().to_string())
+                .or_insert_with(|| {
+                    let child_schema =
+                        get_schema_from_reference(root_schema, &child_referent.referent);
+                    ChildMetadata::from_schema(child_schema)
+                });
+
+            // Transform the child referent into a parent referent, which preserves the "would
+            // unmark" value but now points to the parent instead, and add it to the list of
+            // _referrers_ for the child.
+            entry
+                .referrers
+                .insert(child_referent.with_new_referent(parent_schema_ref.clone()));
+        }
+    }
+
+    /*
+    // Now filter out entries that are not be eligible for flattening.
+    child_to_parent
+        .into_iter()
+        // Filter out all mappings that don't involve markable schemas.
+        .filter(|(_, metadata)| metadata.should_mark)
+        // Filter out all mappings where all referrers have the same marking behavior for the
+        // referrent, as there's nothing to differentiate between for flattening vs not flattening,
+        // so long
+        .filter(|(_, metadata)| {
+            !(metadata.referrers.iter().all(|r| r.would_unmark)
+                || metadata.referrers.iter().all(|r| !r.would_unmark))
+        })
+        .collect()*/
+
+    child_to_parent
+}
+
+fn get_schema_from_reference<'a>(
+    root_schema: &'a RootSchema,
+    schema_ref: &SchemaReference,
+) -> &'a SchemaObject {
+    match schema_ref {
+        SchemaReference::Root => &root_schema.schema,
+        SchemaReference::Definition(name) => {
+            let definition_name = get_cleaned_schema_reference(name.as_str());
+            match root_schema.definitions.get(definition_name) {
+                None => panic!("Schema definition '{}' does not exist!", definition_name),
+                Some(schema) => schema
+                    .as_object()
+                    .expect("referenced schemas should never be boolean schemas"),
+            }
+        }
+    }
+}
+
+/// Determines whether a schema is eligible to be marked.
+fn is_markable_schema(schema: &SchemaObject) -> bool {
+    // If the schema is an object schema, and does not have`additionalProperties` set, it can be
+    // marked, as marking a schema with both `unevaluatedProperties`/`additionalProperties` would
+    // otherwise be a logical inconsistency.
+    let has_additional_properties = schema
+        .object
+        .as_ref()
+        .and_then(|object| object.additional_properties.as_ref())
+        .map(|schema| matches!(schema.as_ref(), Schema::Object(_)))
+        .unwrap_or(false);
+
+    if is_object_schema(schema) && !has_additional_properties {
+        return true;
+    }
+
+    // If the schema uses subschema validation -- specifically: `allOf`, `oneOf`, or `anyOf` -- then
+    // it should be marked, so long as one of the subschemas is actually an object schema.
+    //
+    // If we're dealing with something like a `oneOf` for `Option<T>`, we'll have two
+    // subschemas: { "type": "null" } and { "$ref": "#/definitions/T" }. If the schema for `T` is,
+    // say, just a scalar schema, instead of an object schema... then it wouldn't be marked, and in
+    // turn, we wouldn't need to mark the schema for `Option<T>`: there's no properties at all.
+    if let Some(subschema) = schema.subschemas.as_ref() {
+        let mut subschemas = get_object_subschemas_from_parent(subschema);
+
+        let has_object_subschema = subschemas.any(is_object_schema);
+        if has_object_subschema {
+            return true;
+        }
+    }
+
+    false
+}
+
+/// Collects all referents from the given parent schema, and inserts them to `referents`.
+///
+/// Property schemas from `properties`, `patternProperties`, and `additionalProperties` are checked.
+/// Any such referents in a property schema are do not need to be unmarked as the "chain" between
+/// parent/child is broken implicitly by the property-level scoping of the value they would be given
+/// to validate.
+///
+/// Subschemas from `allOf`, `oneOf`, and `anyOf` are also checked. As subschema validation implies
+/// that each subschema will be given the same value to validate, even if the subschema only
+/// represents a slice of the parent schema, there is a link between parent/child that requires the
+/// child to be unmarked so that the parent can be marked to enforce `unevaluatedProperties` at the
+/// correct scope.
+///
+/// This function will recurse a schema object entirely, in terms of property schemas and
+/// subschemas, but will not recurse through schema references.
+fn get_referents(parent_schema: &SchemaObject, referents: &mut HashSet<MarkableReferent>) {
+    if let Some(parent_object) = parent_schema.object.as_ref() {
+        // For both `properties` and `patternProperties`, collect the schema reference, if any, from
+        // all property schemas.
+        for (_, property_schema) in parent_object
+            .properties
+            .iter()
+            .chain(parent_object.pattern_properties.iter())
+        {
+            if let Some(child_schema) = property_schema.as_object() {
+                if let Some(child_schema_ref) = child_schema.reference.as_ref() {
+                    referents.insert(MarkableReferent::would_not_unmark(child_schema_ref));
+                } else {
+                    get_referents(child_schema, referents);
+                }
+            }
+        }
+
+        // For `additionalProperties`, if present and defined as a schema object, collect the schema
+        // reference if one is set.
+        if let Some(additional_properties) = parent_object.additional_properties.as_ref() {
+            if let Some(child_schema) = additional_properties.as_ref().as_object() {
+                if let Some(child_schema_ref) = child_schema.reference.as_ref() {
+                    referents.insert(MarkableReferent::would_not_unmark(child_schema_ref));
+                } else {
+                    get_referents(child_schema, referents);
+                }
+            }
+        }
+    }
+
+    if let Some(subschema) = parent_schema.subschemas.as_ref() {
+        // For `allOf`, `oneOf`, and `anyOf`, collect the schema reference, if any, from their
+        // respective subschemas.
+        for subschema in get_object_subschemas_from_parent(subschema) {
+            if let Some(child_schema_ref) = subschema.reference.as_ref() {
+                referents.insert(MarkableReferent::would_unmark(child_schema_ref));
+            } else {
+                get_referents(subschema, referents);
+            }
+        }
+    }
+}
+
+fn get_object_subschemas_from_parent(
+    subschema: &SubschemaValidation,
+) -> impl Iterator<Item = &SchemaObject> {
+    [
+        subschema.all_of.as_ref(),
+        subschema.one_of.as_ref(),
+        subschema.any_of.as_ref(),
+    ]
+    .into_iter()
+    .filter_map(identity)
+    .flat_map(identity)
+    .filter_map(Schema::as_object)
+}
+
+fn get_object_subschemas_from_parent_mut(
+    subschema: &mut SubschemaValidation,
+) -> impl Iterator<Item = &mut SchemaObject> {
+    [
+        subschema.all_of.as_mut(),
+        subschema.one_of.as_mut(),
+        subschema.any_of.as_mut(),
+    ]
+    .into_iter()
+    .filter_map(identity)
+    .flat_map(identity)
+    .filter_map(Schema::as_object_mut)
 }
 
 fn mark_schema_closed(schema: &mut SchemaObject) {
@@ -110,14 +570,26 @@ fn mark_schema_closed(schema: &mut SchemaObject) {
     schema.object().unevaluated_properties = Some(Box::new(Schema::Bool(false)));
 }
 
-fn is_object_schema(instance_type: Option<&SingleOrVec<InstanceType>>) -> bool {
-    match instance_type {
+fn schema_type_matches(
+    schema: &SchemaObject,
+    instance_type: InstanceType,
+    allow_multiple: bool,
+) -> bool {
+    match schema.instance_type.as_ref() {
         Some(sov) => match sov {
-            SingleOrVec::Single(inner) => inner.as_ref() == &InstanceType::Object,
-            SingleOrVec::Vec(inner) => inner.contains(&InstanceType::Object),
+            SingleOrVec::Single(inner) => inner.as_ref() == &instance_type,
+            SingleOrVec::Vec(inner) => inner.contains(&instance_type) && allow_multiple,
         },
         None => false,
     }
+}
+
+fn is_object_schema(schema: &SchemaObject) -> bool {
+    schema_type_matches(schema, InstanceType::Object, true)
+}
+
+fn is_null_schema(schema: &SchemaObject) -> bool {
+    schema_type_matches(schema, InstanceType::Null, false)
 }
 
 fn get_subschema_validators(schema: &mut SchemaObject) -> Option<Vec<&mut SchemaObject>> {
@@ -159,22 +631,12 @@ fn get_subschema_validators(schema: &mut SchemaObject) -> Option<Vec<&mut Schema
 
 #[cfg(test)]
 mod tests {
-    use pretty_assertions::assert_eq;
-    use serde_json::{json, Value};
-    use vector_config_common::schema::{visit::Visitor, RootSchema};
+    use serde_json::json;
+    use vector_config_common::schema::visit::Visitor;
+
+    use crate::schema::visitors::test::{as_schema, assert_schemas_eq};
 
     use super::DisallowedUnevaluatedPropertiesVisitor;
-
-    fn as_schema(value: Value) -> RootSchema {
-        serde_json::from_value(value).expect("should not fail to deserialize schema")
-    }
-
-    fn assert_schemas_eq(expected: RootSchema, actual: RootSchema) {
-        let expected_json = serde_json::to_string_pretty(&expected).expect("should not fail");
-        let actual_json = serde_json::to_string_pretty(&actual).expect("should not fail");
-
-        assert_eq!(expected_json, actual_json);
-    }
 
     #[test]
     fn basic_object_schema() {
@@ -457,6 +919,52 @@ mod tests {
                     "properties": {
                         "f": { "type": "string" }
                     },
+                    "unevaluatedProperties": false
+                }
+            },
+            "unevaluatedProperties": false
+        }));
+
+        assert_schemas_eq(expected_schema, actual_schema);
+    }
+
+    #[test]
+    fn conflicting_schema_usages_get_duplicated_and_flattened() {
+        let mut actual_schema = as_schema(json!({
+            "type": "object",
+            "properties": {
+                "acks": { "$ref": "#/definitions/acks" },
+                "custom_acks": { "$ref": "#/definitions/custom_acks" }
+            },
+            "definitions": {
+                "custom_acks": {
+                    "allOf": [{ "type": "object", "properties": { "ack_count": { "type": "number" } } },
+                              { "$ref": "#/definitions/acks" }]
+                },
+                "acks": { "type": "object", "properties": { "enabled": { "type": "boolean" } } }
+            }
+        }));
+
+        let mut visitor = DisallowedUnevaluatedPropertiesVisitor::default();
+        visitor.visit_root_schema(&mut actual_schema);
+
+        let expected_schema = as_schema(json!({
+            "type": "object",
+            "properties": {
+                "acks": { "$ref": "#/definitions/acks" },
+                "custom_acks": { "$ref": "#/definitions/custom_acks" }
+            },
+            "definitions": {
+                "custom_acks": {
+                    "allOf": [
+                        { "type": "object", "properties": { "ack_count": { "type": "number" } } },
+                        { "type": "object", "properties": { "enabled": { "type": "boolean" } } }
+                    ],
+                    "unevaluatedProperties": false
+                },
+                "acks": {
+                    "type": "object",
+                    "properties": { "enabled": { "type": "boolean" } },
                     "unevaluatedProperties": false
                 }
             },

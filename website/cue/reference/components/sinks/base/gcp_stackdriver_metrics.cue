@@ -256,8 +256,12 @@ base: components: sinks: gcp_stackdriver_metrics: configuration: {
 		}
 	}
 	resource: {
-		description: "The monitored resource to associate the metrics with."
-		required:    true
+		description: """
+			A monitored resource.
+
+			The monitored resource to associate the metrics with.
+			"""
+		required: true
 		type: object: {
 			examples: [{
 				instanceId: "Twilight"
