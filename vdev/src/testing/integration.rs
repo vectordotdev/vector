@@ -146,6 +146,7 @@ impl IntegrationTest {
             self.runner.remove()?;
             compose.stop()?;
             self.envs_dir.remove()?;
+            std::fs::remove_file(&compose.path)?;
         }
 
         Ok(())
@@ -197,7 +198,6 @@ impl Compose {
 
     fn stop(&self) -> Result<()> {
         // The config settings are not needed when stopping a compose setup.
-        std::fs::remove_file(&self.path)?;
         self.run("Stopping", &["down", "--timeout", "0", "--volumes"], None)
     }
 
