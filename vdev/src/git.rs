@@ -99,7 +99,7 @@ pub fn set_config_values(config_values: &[(&str, &str)]) -> Result<String> {
         args.push(value);
     }
 
-    capture_output(&args)
+    check_output(&args)
 }
 
 /// Checks if the current directory's repo is clean
@@ -113,19 +113,19 @@ pub fn check_git_repository_clean() -> Result<bool> {
 
 /// Commits changes from the current repo
 pub fn commit(commit_message: &str) -> Result<String> {
-    capture_output(&["commit", "--all", "--message", commit_message])
+    check_output(&["commit", "--all", "--message", commit_message])
 }
 
 /// Pushes changes from the current repo
 pub fn push() -> Result<String> {
-    capture_output(&["push"])
+    check_output(&["push"])
 }
 
 pub fn clone(repo_url: &str) -> Result<String> {
     // We cannot use capture_output since this will need to run in the CWD
     Command::new("git")
         .args(["clone", repo_url])
-        .capture_output()
+        .check_output()
 }
 
 pub fn branch_exists(branch_name: &str) -> Result<bool> {
