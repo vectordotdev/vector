@@ -42,7 +42,6 @@ env:
   DISABLE_MOLD: true
   CI: true
   PROFILE: debug
-  VECTOR_VERSION: "custom-k8s-e2e-test"
 
 jobs:
   build-x86_64-unknown-linux-gnu:
@@ -69,6 +68,7 @@ jobs:
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: echo "::add-matcher::.github/matchers/rust.json"
+      - run: export VECTOR_VERSION="$(cargo vdev version)"
       - run: make package-deb-x86_64-unknown-linux-gnu
       - uses: actions/upload-artifact@v3
         with:
