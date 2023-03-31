@@ -527,7 +527,7 @@ mod test {
     }
 
     #[test]
-    fn test_source_definitons_legacy() {
+    fn test_source_definitions_legacy() {
         let definition = schema::Definition::empty_legacy_namespace()
             .with_event_field(&owned_value_path!("zork"), Kind::bytes(), Some("zork"))
             .with_event_field(&owned_value_path!("nork"), Kind::integer(), None);
@@ -557,8 +557,11 @@ mod test {
         new_definition.assert_valid_for_event(&valid_event);
         new_definition.assert_invalid_for_event(&invalid_event);
 
-        // There should be no definition without schemas enabled.
-        assert_eq!(None, output.schema_definition(false));
+        // There should be the default legacy definition without schemas enabled.
+        assert_eq!(
+            Some(schema::Definition::default_legacy_namespace()),
+            output.schema_definition(false)
+        );
     }
 
     #[test]
