@@ -1,22 +1,19 @@
 use std::collections::BTreeMap;
 
-use codecs::{
-    encoding::{Framer, FramingConfig, SerializerConfig},
-    JsonSerializerConfig,
-};
+use codecs::encoding::{Framer, FramingConfig};
 use futures::future::FutureExt;
 use tower::ServiceBuilder;
 use vector_config::{component::GenerateConfig, configurable_component};
 use vector_core::tls::TlsSettings;
 
 use crate::{
-    codecs::{Encoder, EncodingConfigWithFraming, SinkType, Transformer},
+    codecs::{Encoder, EncodingConfig},
     config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext},
     http::{Auth, HttpClient, MaybeAuth},
     sinks::{
         util::{
-            buffer::compression::CompressionLevel, BatchConfig, Compression,
-            RealtimeSizeBasedDefaultBatchSettings, ServiceBuilderExt, TowerRequestConfig, UriSerde,
+            BatchConfig, Compression, RealtimeSizeBasedDefaultBatchSettings, ServiceBuilderExt,
+            TowerRequestConfig, UriSerde,
         },
         Healthcheck, VectorSink,
     },
@@ -25,8 +22,11 @@ use crate::{
 
 use super::{
     api::{DatabendAPIClient, DatabendHttpRequest},
+    compression::DatabendCompression,
+    encoding::{DatabendEncodingConfig, DatabendSerializerConfig},
+    request_builder::DatabendRequestBuilder,
     service::{DatabendRetryLogic, DatabendService},
-    sink::{DatabendRequestBuilder, DatabendSink},
+    sink::DatabendSink,
 };
 
 /// Configuration for the `databend` sink.
@@ -48,11 +48,12 @@ pub struct DatabendConfig {
     pub database: String,
 
     #[configurable(derived)]
-    #[serde(
-        default,
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
-    )]
-    pub encoding: Transformer,
+    #[serde(default)]
+    pub encoding: DatabendEncodingConfig,
+
+    #[configurable(derived)]
+    #[serde(default)]
+    pub compression: DatabendCompression,
 
     #[configurable(derived)]
     #[serde(default)]
@@ -121,15 +122,33 @@ impl SinkConfig for DatabendConfig {
         let table = config.table;
         let client = DatabendAPIClient::new(self.build_client(&cx)?, endpoint, auth);
 
-        let encoding_config = EncodingConfigWithFraming::new(
-            Some(FramingConfig::NewlineDelimited),
-            SerializerConfig::Json(JsonSerializerConfig::default()),
-            self.encoding.clone(),
-        );
-        let (framer, serializer) = encoding_config.build(SinkType::StreamBased)?;
         let mut file_format_options = BTreeMap::new();
-        file_format_options.insert("type".to_string(), "NDJSON".to_string());
-        file_format_options.insert("compression".to_string(), "gzip".to_string());
+        let compression = match self.compression {
+            DatabendCompression::Gzip => {
+                file_format_options.insert("compression".to_string(), "GZIP".to_string());
+                Compression::gzip_default()
+            }
+            DatabendCompression::None => {
+                file_format_options.insert("compression".to_string(), "NONE".to_string());
+                Compression::None
+            }
+        };
+        let encoding: EncodingConfig = self.encoding.clone().into();
+        let serializer = match self.encoding.config() {
+            DatabendSerializerConfig::Json(_) => {
+                file_format_options.insert("type".to_string(), "NDJSON".to_string());
+                encoding.build()?
+            }
+            DatabendSerializerConfig::Csv(_) => {
+                file_format_options.insert("type".to_string(), "CSV".to_string());
+                file_format_options.insert("field_delimiter".to_string(), ",".to_string());
+                file_format_options.insert("record_delimiter".to_string(), "\n".to_string());
+                file_format_options.insert("skip_header".to_string(), "0".to_string());
+                encoding.build()?
+            }
+        };
+        let framer = FramingConfig::NewlineDelimited.build();
+        let transformer = encoding.transformer();
 
         let mut copy_options = BTreeMap::new();
         copy_options.insert("purge".to_string(), "true".to_string());
@@ -140,12 +159,8 @@ impl SinkConfig for DatabendConfig {
             .settings(request_settings, DatabendRetryLogic)
             .service(service);
 
-        let transformer = self.encoding.clone();
         let encoder = Encoder::<Framer>::new(framer, serializer);
-        let request_builder = DatabendRequestBuilder::new(
-            Compression::Gzip(CompressionLevel::default()),
-            (transformer, encoder),
-        );
+        let request_builder = DatabendRequestBuilder::new(compression, (transformer, encoder));
 
         let sink = DatabendSink::new(batch_settings, request_builder, service);
 
@@ -177,7 +192,7 @@ mod tests {
     }
 
     #[test]
-    fn parse_database() {
+    fn parse_config() {
         let cfg = toml::from_str::<DatabendConfig>(
             r#"
             endpoint = "http://localhost:8000"
@@ -189,5 +204,33 @@ mod tests {
         assert_eq!(cfg.endpoint.uri, "http://localhost:8000");
         assert_eq!(cfg.table, "mytable");
         assert_eq!(cfg.database, "mydatabase");
+        assert!(matches!(
+            cfg.encoding.config(),
+            DatabendSerializerConfig::Json(_)
+        ));
+        assert!(matches!(cfg.compression, DatabendCompression::None));
+    }
+
+    #[test]
+    fn parse_config_with_encoding_compression() {
+        let cfg = toml::from_str::<DatabendConfig>(
+            r#"
+            endpoint = "http://localhost:8000"
+            table = "mytable"
+            database = "mydatabase"
+            encoding.codec = "csv"
+            encoding.csv.fields = ["host", "timestamp", "message"]
+            compression = "gzip"
+        "#,
+        )
+        .unwrap();
+        assert_eq!(cfg.endpoint.uri, "http://localhost:8000");
+        assert_eq!(cfg.table, "mytable");
+        assert_eq!(cfg.database, "mydatabase");
+        assert!(matches!(
+            cfg.encoding.config(),
+            DatabendSerializerConfig::Csv(_)
+        ));
+        assert!(matches!(cfg.compression, DatabendCompression::Gzip));
     }
 }
