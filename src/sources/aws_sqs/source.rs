@@ -45,7 +45,7 @@ impl SqsSource {
     pub async fn run(self, out: SourceSender, shutdown: ShutdownSignal) -> Result<(), ()> {
         let mut task_handles = vec![];
         let finalizer = self.acknowledgements.then(|| {
-            let (finalizer, mut ack_stream) = Finalizer::new(shutdown.clone());
+            let (finalizer, mut ack_stream) = Finalizer::new(Some(shutdown.clone()));
             let client = self.client.clone();
             let queue_url = self.queue_url.clone();
             tokio::spawn(

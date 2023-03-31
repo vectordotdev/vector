@@ -187,10 +187,10 @@ opendal = {version = "0.30", default-features = false, features = ["native-tls"]
 tower = { version = "0.4.13", default-features = false, features = ["buffer", "limit", "retry", "timeout", "util", "balance", "discover"] }
 tower-http = { version = "0.4.0", default-features = false, features = ["decompression-gzip"]}
 # Serde
-serde = { version = "1.0.158", default-features = false, features = ["derive"] }
+serde = { version = "1.0.159", default-features = false, features = ["derive"] }
 serde-toml-merge = { version = "0.3.0", default-features = false }
 serde_bytes = { version = "0.11.9", default-features = false, features = ["std"], optional = true }
-serde_json = { version = "1.0.94", default-features = false, features = ["raw_value"] }
+serde_json = { version = "1.0.95", default-features = false, features = ["raw_value"] }
 serde_with = { version = "2.3.1", default-features = false, features = ["macros", "std"] }
 serde_yaml = { version = "0.9.19", default-features = false }
 
@@ -242,7 +242,7 @@ bytes = { version = "1.4.0", default-features = false, features = ["serde"] }
 bytesize = { version = "1.2.0", default-features = false }
 chrono = { version = "0.4.22", default-features = false, features = ["serde"] }
 cidr-utils = { version = "0.5.10", default-features = false }
-clap = { version = "4.1.11", default-features = false, features = ["derive", "error-context", "env", "help", "std", "string", "usage", "wrap_help"] }
+clap = { version = "4.1.14", default-features = false, features = ["derive", "error-context", "env", "help", "std", "string", "usage", "wrap_help"] }
 colored = { version = "2.0.0", default-features = false }
 csv = { version = "1.2", default-features = false }
 derivative = { version = "2.2.0", default-features = false }
@@ -266,10 +266,10 @@ http-body = { version = "0.4.5", default-features = false }
 hyper = { version = "0.14.25", default-features = false, features = ["client", "runtime", "http1", "http2", "server", "stream"] }
 hyper-openssl = { version = "0.9.2", default-features = false }
 hyper-proxy = { version = "0.9.1", default-features = false, features = ["openssl-tls"] }
-indexmap = { version = "~1.9.2", default-features = false, features = ["serde"] }
+indexmap = { version = "~1.9.3", default-features = false, features = ["serde"] }
 infer = { version = "0.13.0", default-features = false, optional = true}
 indoc = { version = "2.0.1", default-features = false }
-inventory = { version = "0.3.4", default-features = false }
+inventory = { version = "0.3.5", default-features = false }
 k8s-openapi = { version = "0.16.0", default-features = false, features = ["api", "v1_19"], optional = true }
 kube = { version = "0.75.0", default-features = false, features = ["client", "native-tls", "runtime"], optional = true }
 listenfd = { version = "1.0.1", default-features = false, optional = true }
@@ -353,7 +353,7 @@ similar-asserts = "1.4.2"
 proptest = "1.1"
 quickcheck = "1.0.3"
 reqwest = { version = "0.11", features = ["json"] }
-tempfile = "3.4.0"
+tempfile = "3.5.0"
 test-generator = "0.3.1"
 tokio-test = "0.4.2"
 tokio = { version = "1.26.0", features = ["test-util"] }

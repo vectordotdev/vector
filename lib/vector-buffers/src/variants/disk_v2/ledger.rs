@@ -14,7 +14,7 @@ use futures::StreamExt;
 use rkyv::{with::Atomic, Archive, Serialize};
 use snafu::{ResultExt, Snafu};
 use tokio::{fs, io::AsyncWriteExt, sync::Notify};
-use vector_common::{finalizer::OrderedFinalizer, shutdown::ShutdownSignal};
+use vector_common::finalizer::OrderedFinalizer;
 
 use super::{
     backed_archive::BackedArchive,
@@ -705,7 +705,7 @@ where
 
     #[must_use]
     pub(super) fn spawn_finalizer(self: Arc<Self>) -> OrderedFinalizer<u64> {
-        let (finalizer, mut stream) = OrderedFinalizer::new(ShutdownSignal::noop());
+        let (finalizer, mut stream) = OrderedFinalizer::new(None);
         tokio::spawn(async move {
             while let Some((_status, amount)) = stream.next().await {
                 self.increment_pending_acks(amount);

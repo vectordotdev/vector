@@ -215,6 +215,3 @@ k8s
 
 # ignore long runs of a single character:
 \b([A-Za-z])\g{-1}{3,}\b
-
-# ignore comment in package-msi.sh
-[#].*custom\.a28ecdc.*
