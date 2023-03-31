@@ -71,8 +71,6 @@ pub struct TcpConfig {
     tls: Option<TlsSourceConfig>,
 
     /// The size of the receive buffer used for each connection.
-    ///
-    /// Generally this should not need to be configured.
     #[configurable(metadata(docs::type_unit = "bytes"))]
     receive_buffer_bytes: Option<usize>,
 
@@ -82,7 +80,7 @@ pub struct TcpConfig {
     #[configurable(metadata(docs::type_unit = "seconds"))]
     max_connection_duration_secs: Option<u64>,
 
-    /// The maximum number of TCP connections that will be allowed at any given time.
+    /// The maximum number of TCP connections that are allowed at any given time.
     #[configurable(metadata(docs::type_unit = "connections"))]
     pub connection_limit: Option<u32>,
 

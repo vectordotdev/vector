@@ -1,3 +1,0 @@
-#result: { "foo": 1, "bar": 2, "zub": 3, "zoob": 4 }
-
-{ "foo": 1, "bar": 99 } | { "bar": 2 } | { "zub": 3, "zoob": 99 } | { "zoob": 4 }

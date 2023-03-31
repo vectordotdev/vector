@@ -1,8 +1,0 @@
-# result: [1, "yes", false, "yes"]
-
-[
-    5 / 0 ?? 1,
-    parse_json(s'"yes"') ?? false,
-    parse_json("nope") ?? false,
-    parse_json("nope") ?? parse_json("no") ?? parse_json(s'"yes"') ?? []
-]

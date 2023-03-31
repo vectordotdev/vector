@@ -56,15 +56,15 @@ pub struct PrometheusScrapeConfig {
     #[serde(rename = "scrape_interval_secs")]
     interval: Duration,
 
-    /// The tag name added to each event representing the scraped instance's host:port.
+    /// The tag name added to each event representing the scraped instance's `host:port`.
     ///
-    /// The tag value will be the host/port of the scraped instance.
+    /// The tag value is the host and port of the scraped instance.
     #[configurable(metadata(docs::advanced))]
     instance_tag: Option<String>,
 
     /// The tag name added to each event representing the scraped instance's endpoint.
     ///
-    /// The tag value will be the endpoint of the scraped instance.
+    /// The tag value is the endpoint of the scraped instance.
     #[configurable(metadata(docs::advanced))]
     endpoint_tag: Option<String>,
 

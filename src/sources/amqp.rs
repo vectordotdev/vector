@@ -417,7 +417,7 @@ async fn run_amqp_source(
     acknowledgements: bool,
 ) -> Result<(), ()> {
     let (finalizer, mut ack_stream) =
-        UnorderedFinalizer::<FinalizerEntry>::maybe_new(acknowledgements, shutdown.clone());
+        UnorderedFinalizer::<FinalizerEntry>::maybe_new(acknowledgements, Some(shutdown.clone()));
 
     debug!("Starting amqp source, listening to queue {}.", config.queue);
     let mut consumer = channel

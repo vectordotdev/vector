@@ -1,4 +1,4 @@
-use super::{Map, RootSchema, Schema, SchemaObject, SingleOrVec};
+use super::{Map, RootSchema, Schema, SchemaObject, SingleOrVec, DEFINITIONS_PREFIX};
 
 /// Trait used to recursively modify a constructed schema and its subschemas.
 pub trait Visitor: std::fmt::Debug {
@@ -50,6 +50,12 @@ pub fn visit_schema_object<V: Visitor + ?Sized>(
     definitions: &mut Map<String, Schema>,
     schema: &mut SchemaObject,
 ) {
+    if schema.reference.is_some() {
+        with_resolved_schema_reference(definitions, schema, |defs, referenced_schema| {
+            v.visit_schema(defs, referenced_schema);
+        })
+    }
+
     if let Some(sub) = &mut schema.subschemas {
         visit_vec(v, definitions, &mut sub.all_of);
         visit_vec(v, definitions, &mut sub.any_of);
@@ -119,5 +125,25 @@ fn visit_single_or_vec<V: Visitor + ?Sized>(
                 v.visit_schema(definitions, s);
             }
         }
+    }
+}
+
+pub fn with_resolved_schema_reference<F>(
+    definitions: &mut Map<String, Schema>,
+    schema: &mut SchemaObject,
+    f: F,
+) where
+    F: FnOnce(&mut Map<String, Schema>, &mut Schema),
+{
+    if let Some(reference) = schema.reference.as_ref() {
+        let schema_def_key = reference.replace(DEFINITIONS_PREFIX, "");
+        let mut referenced_schema = definitions
+            .get(&schema_def_key)
+            .cloned()
+            .expect("schema reference should exist");
+
+        f(definitions, &mut referenced_schema);
+
+        definitions.insert(schema_def_key, referenced_schema);
     }
 }

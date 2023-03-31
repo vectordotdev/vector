@@ -51,10 +51,10 @@ base: components: sources: journald: configuration: {
 	}
 	exclude_matches: {
 		description: """
-			A list of sets of field/value pairs that, if any are present in a journal entry, will cause
-			the entry to be excluded from this source.
+			A list of sets of field/value pairs that, if any are present in a journal entry,
+			excludes the entry from this source.
 
-			If `exclude_units` is specified, it will be merged into this list.
+			If `exclude_units` is specified, it is merged into this list.
 			"""
 		required: false
 		type: object: {
@@ -73,7 +73,7 @@ base: components: sources: journald: configuration: {
 		description: """
 			A list of unit names to exclude from monitoring.
 
-			Unit names lacking a `.` will have `.service` appended to make them a valid service unit
+			Unit names lacking a `.` have `.service` appended to make them a valid service unit
 			name.
 			"""
 		required: false
@@ -88,7 +88,7 @@ base: components: sources: journald: configuration: {
 
 			If empty or not present, all journal fields are accepted.
 
-			If `include_units` is specified, it will be merged into this list.
+			If `include_units` is specified, it is merged into this list.
 			"""
 		required: false
 		type: object: {
@@ -109,7 +109,7 @@ base: components: sources: journald: configuration: {
 
 			If empty or not present, all units are accepted.
 
-			Unit names lacking a `.` will have `.service` appended to make them a valid service unit name.
+			Unit names lacking a `.` have `.service` appended to make them a valid service unit name.
 			"""
 		required: false
 		type: array: {
@@ -121,7 +121,7 @@ base: components: sources: journald: configuration: {
 		description: """
 			The full path of the journal directory.
 
-			If not set, `journalctl` will use the default system journal path.
+			If not set, `journalctl` uses the default system journal path.
 			"""
 		required: false
 		type: string: {}

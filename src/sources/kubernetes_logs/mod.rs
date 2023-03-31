@@ -23,7 +23,7 @@ use kube::{
     config::{self, KubeConfigOptions},
     runtime::{
         reflector::{self},
-        watcher,
+        watcher, WatchStreamExt,
     },
     Client, Config as ClientConfig,
 };
@@ -134,7 +134,7 @@ pub struct Config {
 
     /// Whether or not to automatically merge partial events.
     ///
-    /// Partial here is in respect to messages that were split by the Kubernetes Container Runtime
+    /// Partial events are messages that were split by the Kubernetes Container Runtime
     /// log driver.
     auto_partial_merge: bool,
 
@@ -193,7 +193,7 @@ pub struct Config {
 
     /// The interval at which the file system is polled to identify new files to read from.
     ///
-    /// This is quite efficient, yet might still create some load of the
+    /// This is quite efficient, yet might still create some load on the
     /// file system; in addition, it is currently coupled with checksum dumping
     /// in the underlying file server, so setting it too low may introduce
     /// a significant overhead.
@@ -222,9 +222,9 @@ pub struct Config {
     /// How long to delay removing metadata entries from the cache when a pod deletion event
     /// event is received from the watch stream.
     ///
-    /// A longer delay will allow for continued enrichment of logs after the originating Pod is
-    /// removed. If relevant metadata has been removed, the log will be forwarded un-enriched and a
-    /// warning will be emitted.
+    /// A longer delay allows for continued enrichment of logs after the originating Pod is
+    /// removed. If relevant metadata has been removed, the log is forwarded un-enriched and a
+    /// warning is emitted.
     #[serde_as(as = "serde_with::DurationMilliSeconds<u64>")]
     delay_deletion_ms: Duration,
 
@@ -639,7 +639,8 @@ impl Source {
                 label_selector: Some(label_selector),
                 ..Default::default()
             },
-        );
+        )
+        .backoff(watcher::default_backoff());
         let pod_store_w = reflector::store::Writer::default();
         let pod_state = pod_store_w.as_reader();
         let pod_cacher = MetaCache::new();
@@ -660,7 +661,8 @@ impl Source {
                 label_selector: Some(namespace_label_selector),
                 ..Default::default()
             },
-        );
+        )
+        .backoff(watcher::default_backoff());
         let ns_store_w = reflector::store::Writer::default();
         let ns_state = ns_store_w.as_reader();
         let ns_cacher = MetaCache::new();
@@ -681,7 +683,8 @@ impl Source {
                 field_selector: Some(node_selector),
                 ..Default::default()
             },
-        );
+        )
+        .backoff(watcher::default_backoff());
         let node_store_w = reflector::store::Writer::default();
         let node_state = node_store_w.as_reader();
         let node_cacher = MetaCache::new();

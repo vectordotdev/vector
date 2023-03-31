@@ -1,3 +1,0 @@
-# Testing to make sure this compiles.
-# result: {}
-. = map_keys(., recursive: false) -> |key| { key }

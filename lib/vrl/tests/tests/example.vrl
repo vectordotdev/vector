@@ -1,7 +1,0 @@
-# object: { "bar": "bar", "baz": true }
-# result: { "bar": "foo", "baz": 5, "foo": "test" }
-
-.foo = "test"
-.bar = "foo"
-.baz = (to_int(.baz) ?? 0) + 4
-.

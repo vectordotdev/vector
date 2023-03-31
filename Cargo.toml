@@ -86,9 +86,6 @@ depends = ""
 members = [
   ".",
   "lib/codecs",
-  "lib/datadog/filter",
-  "lib/datadog/grok",
-  "lib/datadog/search-syntax",
   "lib/dnsmsg-parser",
   "lib/enrichment",
   "lib/fakedata",
@@ -112,17 +109,6 @@ members = [
   "lib/vector-vrl/cli",
   "lib/vector-vrl/functions",
   "lib/vector-vrl/tests",
-  "lib/vrl/cli",
-  "lib/vrl/compiler",
-  "lib/vrl/core",
-  "lib/vrl/diagnostic",
-  "lib/vrl/parser",
-  "lib/vrl/stdlib",
-  "lib/vrl/tests",
-  "lib/vrl/proptests",
-  "lib/vrl/value",
-  "lib/vrl/vrl",
-  "lib/vrl/web-playground",
   "vdev",
 ]
 
@@ -138,7 +124,7 @@ portpicker = { path = "lib/portpicker" }
 prometheus-parser = { path = "lib/prometheus-parser", optional = true }
 opentelemetry-proto = { path = "lib/opentelemetry-proto", optional = true }
 tracing-limit = { path = "lib/tracing-limit" }
-value = { path = "lib/vrl/value" }
+value = { package = "value", git = "https://github.com/vectordotdev/vrl", rev = "v0.1.0" }
 vector-api-client = { path = "lib/vector-api-client", optional = true }
 vector-buffers = { path = "lib/vector-buffers", default-features = false }
 vector-common = { path = "lib/vector-common" }
@@ -147,12 +133,12 @@ vector-config-common = { path = "lib/vector-config-common" }
 vector-config-macros = { path = "lib/vector-config-macros" }
 vector-core = { path = "lib/vector-core", default-features = false, features = ["vrl"] }
 vector-vrl-functions = { path = "lib/vector-vrl/functions" }
-vrl-cli = { path = "lib/vrl/cli", optional = true }
+vrl-cli = { package = "vrl-cli", git = "https://github.com/vectordotdev/vrl", rev = "v0.1.0", optional = true }
 loki-logproto = { path = "lib/loki-logproto", optional = true }
 
 # Tokio / Futures
 async-stream = { version = "0.3.4", default-features = false }
-async-trait = { version = "0.1.67", default-features = false }
+async-trait = { version = "0.1.68", default-features = false }
 futures = { version = "0.3.27", default-features = false, features = ["compat", "io-compat"], package = "futures" }
 tokio = { version = "1.26.0", default-features = false, features = ["full"] }
 tokio-openssl = { version = "0.6.3", default-features = false }
@@ -180,7 +166,7 @@ aws-sdk-elasticsearch = {version = "0.21.0", default-features = false, features 
 aws-sdk-firehose = { version = "0.21.0", default-features = false, features = ["native-tls"], optional = true }
 aws-sdk-kinesis = { version = "0.21.0", default-features = false, features = ["native-tls"], optional = true }
 aws-types = { version = "0.51.0", default-features = false, features = ["hardcoded-credentials"], optional = true }
-aws-sigv4 = { version = "0.53.0", default-features = false, features = ["sign-http"], optional = true }
+aws-sigv4 = { version = "0.55.0", default-features = false, features = ["sign-http"], optional = true }
 aws-config = { version = "0.51.0", default-features = false, features = ["native-tls"], optional = true }
 aws-smithy-async = { version = "0.51.0", default-features = false, optional = true }
 aws-smithy-client = { version = "0.51.0", default-features = false, features = ["client-hyper"], optional = true}
@@ -201,10 +187,10 @@ opendal = {version = "0.30", default-features = false, features = ["native-tls"]
 tower = { version = "0.4.13", default-features = false, features = ["buffer", "limit", "retry", "timeout", "util", "balance", "discover"] }
 tower-http = { version = "0.4.0", default-features = false, features = ["decompression-gzip"]}
 # Serde
-serde = { version = "1.0.158", default-features = false, features = ["derive"] }
+serde = { version = "1.0.159", default-features = false, features = ["derive"] }
 serde-toml-merge = { version = "0.3.0", default-features = false }
 serde_bytes = { version = "0.11.9", default-features = false, features = ["std"], optional = true }
-serde_json = { version = "1.0.94", default-features = false, features = ["raw_value"] }
+serde_json = { version = "1.0.95", default-features = false, features = ["raw_value"] }
 serde_with = { version = "2.3.1", default-features = false, features = ["macros", "std"] }
 serde_yaml = { version = "0.9.19", default-features = false }
 
@@ -224,8 +210,8 @@ smpl_jwt = { version = "0.7.1", default-features = false, optional = true }
 lapin = { version = "2.1.1", default-features = false, features = ["native-tls"], optional = true }
 
 # API
-async-graphql = { version = "5.0.6", default-features = false, optional = true, features = ["chrono"] }
-async-graphql-warp = { version = "5.0.6", default-features = false, optional = true }
+async-graphql = { version = "5.0.7", default-features = false, optional = true, features = ["chrono"] }
+async-graphql-warp = { version = "5.0.7", default-features = false, optional = true }
 itertools = { version = "0.10.5", default-features = false, optional = true }
 
 # API client
@@ -235,14 +221,14 @@ number_prefix = { version = "0.4.0", default-features = false, features = ["std"
 tui = { version = "0.19.0", optional = true, default-features = false, features = ["crossterm"] }
 
 # Datadog Pipelines
-datadog-filter = { path = "lib/datadog/filter" }
-datadog-search-syntax = { path = "lib/datadog/search-syntax" }
+datadog-filter = { package = "datadog-filter", git = "https://github.com/vectordotdev/vrl", rev = "v0.1.0" }
+datadog-search-syntax = { package = "datadog-search-syntax", git = "https://github.com/vectordotdev/vrl", rev = "v0.1.0" }
 hex = { version = "0.4.3", default-features = false, optional = true }
 sha2 = { version = "0.10.6", default-features = false, optional = true }
 
 # VRL Lang
-vrl = { path = "lib/vrl/vrl" }
-vrl-stdlib = { path = "lib/vrl/stdlib" }
+vrl = { package = "vrl", git = "https://github.com/vectordotdev/vrl", rev = "v0.1.0" }
+vrl-stdlib = { package = "vrl-stdlib", git = "https://github.com/vectordotdev/vrl", rev = "v0.1.0" }
 
 # External libs
 arc-swap = { version = "1.6", default-features = false, optional = true }
@@ -256,7 +242,7 @@ bytes = { version = "1.4.0", default-features = false, features = ["serde"] }
 bytesize = { version = "1.2.0", default-features = false }
 chrono = { version = "0.4.22", default-features = false, features = ["serde"] }
 cidr-utils = { version = "0.5.10", default-features = false }
-clap = { version = "4.1.11", default-features = false, features = ["derive", "error-context", "env", "help", "std", "string", "usage", "wrap_help"] }
+clap = { version = "4.1.14", default-features = false, features = ["derive", "error-context", "env", "help", "std", "string", "usage", "wrap_help"] }
 colored = { version = "2.0.0", default-features = false }
 csv = { version = "1.2", default-features = false }
 derivative = { version = "2.2.0", default-features = false }
@@ -280,10 +266,10 @@ http-body = { version = "0.4.5", default-features = false }
 hyper = { version = "0.14.25", default-features = false, features = ["client", "runtime", "http1", "http2", "server", "stream"] }
 hyper-openssl = { version = "0.9.2", default-features = false }
 hyper-proxy = { version = "0.9.1", default-features = false, features = ["openssl-tls"] }
-indexmap = { version = "~1.9.2", default-features = false, features = ["serde"] }
+indexmap = { version = "~1.9.3", default-features = false, features = ["serde"] }
 infer = { version = "0.13.0", default-features = false, optional = true}
 indoc = { version = "2.0.1", default-features = false }
-inventory = { version = "0.3.4", default-features = false }
+inventory = { version = "0.3.5", default-features = false }
 k8s-openapi = { version = "0.16.0", default-features = false, features = ["api", "v1_19"], optional = true }
 kube = { version = "0.75.0", default-features = false, features = ["client", "native-tls", "runtime"], optional = true }
 listenfd = { version = "1.0.1", default-features = false, optional = true }
@@ -309,7 +295,7 @@ rand = { version = "0.8.5", default-features = false, features = ["small_rng"] }
 rand_distr = { version = "0.4.3", default-features = false }
 rdkafka = { version = "0.29.0", default-features = false, features = ["tokio", "libz", "ssl", "zstd"], optional = true }
 redis = { version = "0.22.3", default-features = false, features = ["connection-manager", "tokio-comp", "tokio-native-tls-comp"], optional = true }
-regex = { version = "1.7.2", default-features = false, features = ["std", "perf"] }
+regex = { version = "1.7.3", default-features = false, features = ["std", "perf"] }
 roaring = { version = "0.10.1", default-features = false, optional = true }
 seahash = { version = "4.1.0", default-features = false }
 semver = { version = "1.0.17", default-features = false, features = ["serde", "std"], optional = true }
@@ -367,12 +353,12 @@ similar-asserts = "1.4.2"
 proptest = "1.1"
 quickcheck = "1.0.3"
 reqwest = { version = "0.11", features = ["json"] }
-tempfile = "3.4.0"
+tempfile = "3.5.0"
 test-generator = "0.3.1"
 tokio-test = "0.4.2"
 tokio = { version = "1.26.0", features = ["test-util"] }
 tower-test = "0.4.0"
-value = { path = "lib/vrl/value", features = ["test"] }
+value = { package = "value", git = "https://github.com/vectordotdev/vrl", rev = "v0.1.0", features = ["test"] }
 vector-core = { path = "lib/vector-core", default-features = false, features = ["vrl", "test"] }
 wiremock = "0.5.17"
 zstd = { version = "0.12.3", default-features = false }

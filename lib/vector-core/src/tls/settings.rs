@@ -42,7 +42,7 @@ pub const TEST_PEM_CLIENT_KEY_PATH: &str =
 #[configurable(metadata(docs::advanced))]
 #[derive(Clone, Debug, Default)]
 pub struct TlsEnableableConfig {
-    /// Whether or not to require TLS for incoming/outgoing connections.
+    /// Whether or not to require TLS for incoming or outgoing connections.
     ///
     /// When enabled and used for incoming connections, an identity certificate is also required. See `tls.crt_file` for
     /// more information.
@@ -68,7 +68,7 @@ impl TlsEnableableConfig {
     }
 }
 
-/// TlsEnableableConfig for `sources`, adding metadata from the client certificate
+/// TlsEnableableConfig for `sources`, adding metadata from the client certificate.
 #[configurable_component]
 #[derive(Clone, Debug, Default)]
 pub struct TlsSourceConfig {
@@ -87,10 +87,10 @@ pub struct TlsSourceConfig {
 pub struct TlsConfig {
     /// Enables certificate verification.
     ///
-    /// If enabled, certificates must be valid in terms of not being expired, as well as being issued by a trusted
-    /// issuer. This verification operates in a hierarchical manner, checking that not only the leaf certificate (the
-    /// certificate presented by the client/server) is valid, but also that the issuer of that certificate is valid, and
-    /// so on until reaching a root certificate.
+    /// If enabled, certificates must not be expired and must be issued by a trusted
+    /// issuer. This verification operates in a hierarchical manner, checking that the leaf certificate (the
+    /// certificate presented by the client/server) is not only valid, but that the issuer of that certificate is also valid, and
+    /// so on until the verification process reaches a root certificate.
     ///
     /// Relevant for both incoming and outgoing connections.
     ///
@@ -109,8 +109,8 @@ pub struct TlsConfig {
 
     /// Sets the list of supported ALPN protocols.
     ///
-    /// Declare the supported ALPN protocols, which are used during negotiation with peer. Prioritized in the order
-    /// they are defined.
+    /// Declare the supported ALPN protocols, which are used during negotiation with peer. They are prioritized in the order
+    /// that they are defined.
     #[configurable(metadata(docs::examples = "h2"))]
     pub alpn_protocols: Option<Vec<String>>,
 

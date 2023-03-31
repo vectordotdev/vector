@@ -1,5 +1,0 @@
-# read_only: .read_only
-# result: {"read_only": {"nested": 5}}
-
-.read_only.nested = 5
-.

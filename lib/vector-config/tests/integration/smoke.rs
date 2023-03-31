@@ -70,6 +70,97 @@ impl From<Template> for String {
 #[configurable_component]
 pub struct SpecialDuration(u64);
 
+/// IMDS Client Configuration for authenticating with AWS.
+#[configurable_component]
+#[derive(Clone, Debug)]
+pub struct ImdsAuthentication {
+    /// Number of IMDS retries for fetching tokens and metadata.
+    #[serde(default = "default_max_attempts")]
+    max_attempts: u32,
+}
+
+impl Default for ImdsAuthentication {
+    fn default() -> Self {
+        Self {
+            max_attempts: default_max_attempts(),
+        }
+    }
+}
+
+const fn default_max_attempts() -> u32 {
+    5
+}
+
+/// Configuration of the authentication strategy for interacting with AWS services.
+#[configurable_component]
+#[derive(Clone, Debug)]
+#[serde(untagged)]
+pub enum AwsAuthentication {
+    /// Authenticate using a fixed access key and secret pair.
+    AccessKey {
+        /// The AWS access key ID.
+        access_key_id: String,
+
+        /// The AWS secret access key.
+        secret_access_key: String,
+
+        /// The ARN of an IAM role to assume.
+        assume_role: Option<String>,
+
+        /// The AWS region to send STS requests to.
+        region: Option<String>,
+    },
+
+    /// Authenticate using credentials stored in a file.
+    File {
+        /// Path to the credentials file.
+        credentials_file: String,
+
+        /// The credentials profile to use.
+        #[serde(default = "default_profile")]
+        profile: String,
+    },
+
+    /// Assume the given role ARN.
+    Role {
+        /// The ARN of an IAM role to assume.
+        assume_role: String,
+
+        /// Timeout for assuming the role, in seconds.
+        load_timeout_secs: Option<u64>,
+
+        /// Configuration for authenticating with AWS through IMDS.
+        #[serde(default)]
+        imds: ImdsAuthentication,
+
+        /// The AWS region to send STS requests to.
+        region: Option<String>,
+    },
+
+    /// Default authentication strategy which tries a variety of substrategies in a one-after-the-other fashion.
+    Default {
+        /// Timeout for successfully loading any credentials, in seconds.
+        load_timeout_secs: Option<u64>,
+
+        /// Configuration for authenticating with AWS through IMDS.
+        #[serde(default)]
+        imds: ImdsAuthentication,
+    },
+}
+
+impl Default for AwsAuthentication {
+    fn default() -> Self {
+        Self::Default {
+            load_timeout_secs: None,
+            imds: ImdsAuthentication::default(),
+        }
+    }
+}
+
+fn default_profile() -> String {
+    "default".to_string()
+}
+
 /// Controls the batching behavior of events.
 #[derive(Clone)]
 #[configurable_component]
@@ -322,28 +413,26 @@ fn default_simple_sink_endpoint() -> String {
     String::from("https://zalgo.io")
 }
 
-/// A sink for sending events to the `advanced` service.
+/// A sink for sending events to the AWS Bleep Bloop service.
 #[derive(Clone)]
-#[configurable_component(sink("advanced"))]
+#[configurable_component(sink("aws_bleep_bloop"))]
 #[configurable(metadata(status = "stable"))]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-pub struct AdvancedSinkConfig {
-    /// The endpoint to send events to.
-    #[serde(default = "default_advanced_sink_endpoint")]
-    endpoint: String,
+pub struct AwsBleepBloopSinkConfig {
+    #[configurable(derived)]
+    #[serde(default)]
+    auth: AwsAuthentication,
 
-    /// The agent version to simulate when sending events to the downstream service.
-    ///
-    /// Must match the pattern of "v\d+\.\d+\.\d+", which allows for values such as `v1.23.0` or `v0.1.3`, and so on.
-    #[configurable(validation(pattern = "foo"))]
-    agent_version: String,
+    /// The Bleep Bloop folder ID.
+    #[configurable(validation(pattern = "foo\\d+"))]
+    folder_id: String,
 
     #[configurable(derived)]
-    #[serde(default = "default_advanced_sink_batch")]
+    #[serde(default = "default_aws_bleep_bloop_sink_batch")]
     batch: BatchConfig,
 
     #[configurable(deprecated, derived)]
-    #[serde(default = "default_advanced_sink_encoding")]
+    #[serde(default = "default_aws_bleep_bloop_sink_encoding")]
     encoding: Encoding,
 
     /// Overridden TLS description.
@@ -376,13 +465,13 @@ pub enum TagConfig {
     Multi(Vec<Option<Template>>),
 }
 
-impl GenerateConfig for AdvancedSinkConfig {
+impl GenerateConfig for AwsBleepBloopSinkConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
-            endpoint: default_advanced_sink_endpoint(),
-            agent_version: String::from("v1.2.3"),
-            batch: default_advanced_sink_batch(),
-            encoding: default_advanced_sink_encoding(),
+            auth: AwsAuthentication::default(),
+            folder_id: String::from("foo12"),
+            batch: default_aws_bleep_bloop_sink_batch(),
+            encoding: default_aws_bleep_bloop_sink_encoding(),
             tls: None,
             partition_key: default_partition_key(),
             tags: HashMap::new(),
@@ -392,7 +481,7 @@ impl GenerateConfig for AdvancedSinkConfig {
     }
 }
 
-fn default_advanced_sink_batch() -> BatchConfig {
+fn default_aws_bleep_bloop_sink_batch() -> BatchConfig {
     BatchConfig {
         max_events: Some(NonZeroU64::new(5678).expect("must be nonzero")),
         max_bytes: Some(NonZeroU64::new(36_000_000).expect("must be nonzero")),
@@ -404,11 +493,11 @@ fn default_partition_key() -> String {
     "foo".to_string()
 }
 
-const fn default_advanced_sink_encoding() -> Encoding {
+const fn default_aws_bleep_bloop_sink_encoding() -> Encoding {
     Encoding::Json { pretty: true }
 }
 
-fn default_advanced_sink_endpoint() -> String {
+fn default_aws_bleep_bloop_sink_endpoint() -> String {
     String::from("https://zalgohtml5.io")
 }
 
@@ -510,8 +599,8 @@ pub enum SinkConfig {
     /// Simple sink.
     Simple(SimpleSinkConfig),
 
-    /// Advanced sink.
-    Advanced(AdvancedSinkConfig),
+    /// AWS Bleep Bloop sink.
+    AwsBleepBloop(AwsBleepBloopSinkConfig),
 }
 
 #[derive(Clone)]
