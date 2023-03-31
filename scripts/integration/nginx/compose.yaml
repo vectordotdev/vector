@@ -20,8 +20,3 @@ services:
     - ../../../tests/data/nginx/:/etc/nginx:ro
     networks:
     - proxy
-
-networks:
-  default:
-    name: ${VECTOR_NETWORK}
-  proxy: {}

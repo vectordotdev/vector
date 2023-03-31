@@ -5,7 +5,7 @@ use std::{env, fs};
 use anyhow::{bail, Context, Result};
 use hashlink::LinkedHashMap;
 use itertools::{self, Itertools};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_yaml::Value;
 
 use crate::{app, util};
@@ -37,15 +37,21 @@ impl RustToolchainConfig {
     }
 }
 
-#[derive(Debug, Deserialize)]
+// Added the networks key, to match the structure of networks eg
+// networks: default: name: value: <some value here>
+#[derive(Debug, Deserialize, Serialize)]
 pub struct ComposeConfig {
     pub services: BTreeMap<String, ComposeService>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub volumes: BTreeMap<String, Value>,
+    #[serde(default)]
+    pub networks: BTreeMap<String, BTreeMap<String, String>>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct ComposeService {
+    pub image: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub volumes: Option<Vec<String>>,
 }
 

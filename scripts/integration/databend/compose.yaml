@@ -19,7 +19,3 @@ services:
       - minio
     healthcheck:
       test: "curl -f localhost:8080/v1/health || exit 1"
-
-networks:
-  default:
-    name: ${VECTOR_NETWORK}
