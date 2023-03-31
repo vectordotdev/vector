@@ -116,7 +116,7 @@ impl ApplicationConfig {
             match api::Server::start(
                 self.topology.config(),
                 self.topology.watch(),
-                Arc::clone(&self.topology.running),
+                std::sync::Arc::clone(&self.topology.running),
                 runtime,
             ) {
                 Ok(api_server) => {
@@ -320,8 +320,8 @@ impl FinishedApplication {
             topology_controller,
         } = self;
 
-        // At this point, we'll have the only reference to the topology controller and can safely
-        // remove it from the Arc/Mutex to shut down the topology.
+        // At this point, we'll have the only reference to the shared topology controller and can
+        // safely remove it from the wrapper to shut down the topology.
         let topology_controller = topology_controller
             .try_into_inner()
             .expect("fail to unwrap topology controller")
