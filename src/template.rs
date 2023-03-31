@@ -375,7 +375,7 @@ fn render_timestamp(items: &ParsedStrftime, event: EventRef<'_>, tz_offset: Fixe
 
 #[cfg(test)]
 mod tests {
-    use chrono::TimeZone;
+    use chrono::{TimeZone, FixedOffset};
     use lookup::metadata_path;
     use vector_core::metric_tags;
 
@@ -671,6 +671,31 @@ mod tests {
                 missing_keys: vec!["namespace".into()]
             }),
             template.render(&metric)
+        );
+    }
+
+    #[test]
+    fn render_log_with_tz_offset() {
+        let ts = Utc
+            .ymd(2001, 2, 3)
+            .and_hms_opt(4, 5, 6)
+            .expect("invalid timestamp");
+
+        let template = Template::try_from("vector-%Y-%m-%d-%H.log").unwrap();
+        let mut event = Event::Log(LogEvent::from("hello world"));
+        event.as_mut_log().insert(
+            (
+                lookup::PathPrefix::Event,
+                log_schema().timestamp_key().unwrap(),
+            ),
+            ts,
+        );
+
+        // +08:00 tz offset
+        let offset = FixedOffset::east_opt(28800).unwrap();
+        assert_eq!(
+            Ok(Bytes::from("vector-2001-02-03-12.log")),
+            template.with_tz_offset(offset).render(&event)
         );
     }
 
