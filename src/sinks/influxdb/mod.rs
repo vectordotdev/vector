@@ -244,12 +244,16 @@ pub(in crate::sinks) fn influx_line_protocol(
     }
 
     encode_string(measurement, line_protocol);
-    line_protocol.put_u8(b',');
 
     // Tags
     let unwrapped_tags = tags.unwrap_or_default();
-    encode_tags(unwrapped_tags, line_protocol);
-    line_protocol.put_u8(b' ');
+    if unwrapped_tags.is_empty() {
+        line_protocol.put_u8(b' ');
+    } else {
+        line_protocol.put_u8(b',');
+        encode_tags(unwrapped_tags, line_protocol);
+        line_protocol.put_u8(b' ');
+    }
 
     // Fields
     encode_fields(protocol_version, unwrapped_fields, line_protocol);
@@ -442,12 +446,12 @@ pub mod test_util {
     // 1542182950000000011
     //
     pub(crate) fn split_line_protocol(line_protocol: &str) -> (&str, &str, String, &str) {
-        let mut split = line_protocol.splitn(2, ',').collect::<Vec<&str>>();
-        let measurement = split[0];
+        // tags and ts may not be present
+        let parts: Vec<&str> = line_protocol.splitn(2, " ").collect();
+        let (measurement, tags) = parts[0].split_once(",").unwrap_or((parts[0], ""));
+        let (fields, ts) = parts[1].split_once(" ").unwrap_or((parts[1], ""));
 
-        split = split[1].splitn(3, ' ').collect::<Vec<&str>>();
-
-        (measurement, split[0], split[1].to_string(), split[2])
+        (measurement, tags, fields.to_string(), ts)
     }
 
     fn client() -> reqwest::Client {
