@@ -639,15 +639,13 @@ pub fn samples_to_buckets(samples: &[Sample], buckets: &[f64]) -> (Vec<Bucket>, 
 mod test {
     use std::collections::BTreeSet;
 
-    use chrono::{offset::TimeZone, DateTime, Utc};
+    use chrono::{offset::TimeZone, DateTime, Duration, Utc};
     use similar_asserts::assert_eq;
 
     use super::*;
 
     fn ts() -> DateTime<Utc> {
-        Utc.ymd(2018, 11, 14)
-            .and_hms_nano_opt(8, 9, 10, 11)
-            .expect("invalid timestamp")
+        Utc.with_ymd_and_hms(2018, 11, 14, 8, 9, 10).unwrap() + Duration::nanoseconds(11)
     }
 
     fn tags() -> MetricTags {

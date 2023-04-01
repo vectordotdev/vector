@@ -939,11 +939,7 @@ mod test {
         )
         .with_namespace(Some("zoob"))
         .with_tags(Some(metric_tags!("tig" => "tog")))
-        .with_timestamp(Some(
-            Utc.ymd(2020, 12, 10)
-                .and_hms_opt(12, 0, 0)
-                .expect("invalid timestamp"),
-        ));
+        .with_timestamp(Some(Utc.with_ymd_and_hms(2020, 12, 10, 12, 0, 0).unwrap()));
 
         let info = ProgramInfo {
             fallible: false,
@@ -965,7 +961,7 @@ mod test {
                 btreemap! {
                     "name" => "zub",
                     "namespace" => "zoob",
-                    "timestamp" => Utc.ymd(2020, 12, 10).and_hms_opt(12, 0, 0).expect("invalid timestamp"),
+                    "timestamp" => Utc.with_ymd_and_hms(2020, 12, 10, 12, 0, 0).unwrap(),
                     "tags" => btreemap! { "tig" => "tog" },
                     "kind" => "absolute",
                     "type" => "counter",
@@ -1003,10 +999,7 @@ mod test {
             (
                 owned_value_path!("timestamp"),
                 None,
-                Utc.ymd(2020, 12, 8)
-                    .and_hms_opt(12, 0, 0)
-                    .expect("invalid timestamp")
-                    .into(),
+                Utc.with_ymd_and_hms(2020, 12, 8, 12, 0, 0).unwrap().into(),
                 true,
             ),
             (

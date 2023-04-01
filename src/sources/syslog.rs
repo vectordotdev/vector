@@ -960,8 +960,10 @@ mod test {
             let year = value.as_timestamp().unwrap().naive_local().year();
 
             let expected = expected.as_mut_log();
-            let expected_date: DateTime<Utc> =
-                Utc.with_ymd_and_hms(year, 2, 13, 20, 7, 26).unwrap();
+            let expected_date: DateTime<Utc> = Local
+                .with_ymd_and_hms(year, 2, 13, 20, 7, 26)
+                .unwrap()
+                .into();
 
             expected.insert(
                 (
@@ -997,8 +999,10 @@ mod test {
             let year = value.as_timestamp().unwrap().naive_local().year();
 
             let expected = expected.as_mut_log();
-            let expected_date: DateTime<Utc> =
-                Utc.with_ymd_and_hms(year, 2, 13, 21, 31, 56).unwrap();
+            let expected_date: DateTime<Utc> = Local
+                .with_ymd_and_hms(year, 2, 13, 21, 31, 56)
+                .unwrap()
+                .into();
             expected.insert(
                 (
                     lookup::PathPrefix::Event,
