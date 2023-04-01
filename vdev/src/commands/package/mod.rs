@@ -1,6 +1,9 @@
 crate::cli_subcommands! {
     "Package Vector in various formats..."
-        archive, deb, msi, rpm,
+        archive,
+        deb,
+        mod msi,
+        rpm,
 }
 
 crate::script_wrapper! {
@@ -12,10 +15,7 @@ crate::script_wrapper! {
         => "package-deb.sh"
 }
 crate::script_wrapper! {
-    msi = "Create a .msi package for Windows"
-        => "package-msi.sh"
-}
-crate::script_wrapper! {
     rpm = "Create a .rpm package to be distributed in the YUM package manager"
         => "package-rpm.sh"
 }
+
