@@ -127,6 +127,18 @@ fn main() {
                 &["proto/", "lib/vector-core/proto/"],
             )
             .unwrap();
+
+        #[cfg(feature = "sinks-gcp")]
+        {
+            println!("cargo:rerun-if-changed=proto/google/monitoring/v3/metric_service.proto");
+
+            let files = ["proto/google/monitoring/v3/metric_service.proto"];
+
+            tonic_build::configure()
+                .build_server(false)
+                .compile(&files, &["proto"])
+                .unwrap();
+        }
     }
 
     // We keep track of which environment variables we slurp in, and then emit stanzas at the end to
