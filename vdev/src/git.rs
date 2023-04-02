@@ -123,9 +123,7 @@ pub fn push() -> Result<String> {
 
 pub fn clone(repo_url: &str) -> Result<String> {
     // We cannot use capture_output since this will need to run in the CWD
-    Command::new("git")
-        .args(["clone", repo_url])
-        .check_output()
+    Command::new("git").args(["clone", repo_url]).check_output()
 }
 
 pub fn branch_exists(branch_name: &str) -> Result<bool> {
