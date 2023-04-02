@@ -447,9 +447,9 @@ pub mod test_util {
     //
     pub(crate) fn split_line_protocol(line_protocol: &str) -> (&str, &str, String, &str) {
         // tags and ts may not be present
-        let parts: Vec<&str> = line_protocol.splitn(2, " ").collect();
-        let (measurement, tags) = parts[0].split_once(",").unwrap_or((parts[0], ""));
-        let (fields, ts) = parts[1].split_once(" ").unwrap_or((parts[1], ""));
+        let parts: Vec<&str> = line_protocol.splitn(2, ' ').collect();
+        let (measurement, tags) = parts[0].split_once(',').unwrap_or((parts[0], ""));
+        let (fields, ts) = parts[1].split_once(' ').unwrap_or((parts[1], ""));
 
         (measurement, tags, fields.to_string(), ts)
     }
