@@ -50,9 +50,20 @@ pub struct ComposeConfig {
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct ComposeService {
-    pub image: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub image: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hostname: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub container_name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub build: Option<BuildConfig>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub command: Option<Command>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ports: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub env_file: Option<Vec<String>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub volumes: Option<Vec<String>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -65,7 +76,8 @@ pub struct ComposeService {
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct HealthCheck {
-    pub test: String,
+    #[serde(rename = "test", skip_serializing_if = "Option::is_none")]
+    pub test: Option<Command>,
     #[serde(rename = "interval", skip_serializing_if = "Option::is_none")]
     pub interval: Option<String>,
     #[serde(rename = "timeout", skip_serializing_if = "Option::is_none")]
@@ -74,6 +86,12 @@ pub struct HealthCheck {
     pub retries: Option<u32>,
     #[serde(rename = "start_period", skip_serializing_if = "Option::is_none")]
     pub start_period: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct BuildConfig {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub context: Option<String>
 }
 
 #[derive(Debug, Deserialize, Serialize)]
