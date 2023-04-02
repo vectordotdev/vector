@@ -608,16 +608,12 @@ mod tests {
         let line = std::str::from_utf8(&bytes).unwrap();
         assert!(line.starts_with("vector "));
 
-       let line_protocol = split_line_protocol(line);
+        let line_protocol = split_line_protocol(line);
         assert_eq!("vector", line_protocol.0);
         assert_eq!("", line_protocol.1);
         assert_fields(
             line_protocol.2,
-            [
-                "value=100i",
-                "message=\"hello\""
-            ]
-            .to_vec(),
+            ["value=100i", "message=\"hello\""].to_vec(),
         );
 
         assert_eq!("1542182950000000011\n", line_protocol.3);
