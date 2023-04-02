@@ -35,9 +35,7 @@ impl IntegrationTest {
         // Inject the networks block
         // TODO: Inject the labels block
         compose_config.networks.insert("default".to_string(), {
-            let mut default_network = BTreeMap::new();
-            default_network.insert("name".to_string(), network_name.clone());
-            default_network
+            BTreeMap::from_iter([("name".to_string(), network_name.clone())])
         });
 
         let temp_compose_path = test_dir.join("compose-temp.yaml");
