@@ -1,4 +1,4 @@
-use chrono::{offset::TimeZone, Utc};
+use chrono::{offset::TimeZone, Duration, Utc};
 use rand::seq::SliceRandom;
 use vector_core::metric_tags;
 
@@ -80,9 +80,8 @@ async fn cloudwatch_metrics_put_data() {
                 },
             )
             .with_timestamp(Some(
-                Utc.ymd(2018, 11, 14)
-                    .and_hms_nano_opt(8, 9, 10, 123456789)
-                    .expect("invalid timestamp"),
+                Utc.with_ymd_and_hms(2018, 11, 14, 8, 9, 10).unwrap()
+                    + Duration::nanoseconds(123456789),
             )),
         );
         events.push(event);

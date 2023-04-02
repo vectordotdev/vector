@@ -53,5 +53,5 @@ pub fn table_to_timestamp(t: LuaTable<'_>) -> LuaResult<DateTime<Utc>> {
     Ok(Utc
         .with_ymd_and_hms(year, month, day, hour, min, sec)
         .unwrap()
-        + Duration::nanoseconds(nano as i64))
+        + Duration::nanoseconds(i64::from(nano)))
 }
