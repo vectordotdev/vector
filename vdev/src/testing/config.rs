@@ -52,7 +52,35 @@ pub struct ComposeConfig {
 pub struct ComposeService {
     pub image: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub command: Option<Command>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub volumes: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub environment: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub depends_on: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub healthcheck: Option<HealthCheck>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct HealthCheck {
+    pub test: String,
+    #[serde(rename = "interval", skip_serializing_if = "Option::is_none")]
+    pub interval: Option<String>,
+    #[serde(rename = "timeout", skip_serializing_if = "Option::is_none")]
+    pub timeout: Option<String>,
+    #[serde(rename = "retries", skip_serializing_if = "Option::is_none")]
+    pub retries: Option<u32>,
+    #[serde(rename = "start_period", skip_serializing_if = "Option::is_none")]
+    pub start_period: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(untagged)]
+pub enum Command {
+    Single(String),
+    Multiple(Vec<String>),
 }
 
 impl ComposeConfig {
