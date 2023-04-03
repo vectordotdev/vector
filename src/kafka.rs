@@ -59,7 +59,7 @@ pub struct KafkaSaslConfig {
     ///
     /// Only `PLAIN`- and `SCRAM`-based mechanisms are supported when configuring SASL authentication using `sasl.*`. For
     /// other mechanisms, `librdkafka_options.*` must be used directly to configure other `librdkafka`-specific values
-    /// For example, `sasl.kerberos.*`.
+    /// for example, `sasl.kerberos.*`.
     ///
     /// See the [librdkafka documentation](https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md) for details.
     ///
