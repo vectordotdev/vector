@@ -162,7 +162,7 @@ fn validate_component_received_event_bytes_total(
         TEST_SOURCE_NAME,
     )?;
 
-    let metric_bytes: f64 = sum_counters(SourceMetrics::EventsReceivedBytes, &metrics)?;
+    let metric_bytes = sum_counters(SourceMetrics::EventsReceivedBytes, &metrics)?;
 
     let expected_bytes = inputs.iter().fold(0, |acc, i| {
         if let TestEvent::Passthrough(_) = i {
@@ -214,7 +214,7 @@ fn validate_component_received_bytes_total(
         TEST_SOURCE_NAME,
     )?;
 
-    let metric_bytes: f64 = sum_counters(SourceMetrics::ReceivedBytesTotal, &metrics)?;
+    let metric_bytes = sum_counters(SourceMetrics::ReceivedBytesTotal, &metrics)?;
 
     let mut expected_bytes = 0;
     if let Some(c) = &configuration.external_resource {
