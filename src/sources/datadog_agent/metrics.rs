@@ -81,7 +81,6 @@ fn sketches_service(
                                 api_token,
                                 query_params.dd_api_key,
                             ),
-                            &source.metrics_schema_definition,
                             &source.events_received,
                         )
                     });
@@ -120,7 +119,9 @@ fn series_v1_service(
                                 api_token,
                                 query_params.dd_api_key,
                             ),
-                            &source.metrics_schema_definition,
+                            // Currently metrics do not have schemas defined, so for now we just pass a
+                            // default one.
+                            &Arc::new(schema::Definition::default_legacy_namespace()),
                             &source.events_received,
                         )
                     });
@@ -159,7 +160,6 @@ fn series_v2_service(
                                 api_token,
                                 query_params.dd_api_key,
                             ),
-                            &source.metrics_schema_definition,
                             &source.events_received,
                         )
                     });
@@ -172,7 +172,6 @@ fn series_v2_service(
 fn decode_datadog_sketches(
     body: Bytes,
     api_key: Option<Arc<str>>,
-    schema_definition: &Arc<schema::Definition>,
     events_received: &Registered<EventsReceived>,
 ) -> Result<Vec<Event>, ErrorMessage> {
     if body.is_empty() {
@@ -184,7 +183,7 @@ fn decode_datadog_sketches(
         return Ok(Vec::new());
     }
 
-    let metrics = decode_ddsketch(body, &api_key, schema_definition).map_err(|error| {
+    let metrics = decode_ddsketch(body, &api_key).map_err(|error| {
         ErrorMessage::new(
             StatusCode::UNPROCESSABLE_ENTITY,
             format!("Error decoding Datadog sketch: {:?}", error),
@@ -202,7 +201,6 @@ fn decode_datadog_sketches(
 fn decode_datadog_series_v2(
     body: Bytes,
     api_key: Option<Arc<str>>,
-    schema_definition: &Arc<schema::Definition>,
     events_received: &Registered<EventsReceived>,
 ) -> Result<Vec<Event>, ErrorMessage> {
     if body.is_empty() {
@@ -214,14 +212,12 @@ fn decode_datadog_series_v2(
         return Ok(Vec::new());
     }
 
-    let metrics = decode_ddseries_v2(body, &api_key, schema_definition, events_received).map_err(
-        |error| {
-            ErrorMessage::new(
-                StatusCode::UNPROCESSABLE_ENTITY,
-                format!("Error decoding Datadog sketch: {:?}", error),
-            )
-        },
-    )?;
+    let metrics = decode_ddseries_v2(body, &api_key, events_received).map_err(|error| {
+        ErrorMessage::new(
+            StatusCode::UNPROCESSABLE_ENTITY,
+            format!("Error decoding Datadog sketch: {:?}", error),
+        )
+    })?;
 
     events_received.emit(CountByteSize(
         metrics.len(),
@@ -234,7 +230,6 @@ fn decode_datadog_series_v2(
 pub(crate) fn decode_ddseries_v2(
     frame: Bytes,
     api_key: &Option<Arc<str>>,
-    schema_definition: &Arc<schema::Definition>,
     events_received: &Registered<EventsReceived>,
 ) -> crate::Result<Vec<Event>> {
     let payload = MetricPayload::decode(frame)?;
@@ -324,9 +319,6 @@ pub(crate) fn decode_ddseries_v2(
             if let Some(k) = &api_key {
                 metric.metadata_mut().set_datadog_api_key(Arc::clone(k));
             }
-            metric
-                .metadata_mut()
-                .set_schema_definition(schema_definition);
 
             metric.into()
         })
@@ -482,7 +474,6 @@ fn namespace_name_from_dd_metric(dd_metric_name: &str) -> (Option<&str>, &str) {
 pub(crate) fn decode_ddsketch(
     frame: Bytes,
     api_key: &Option<Arc<str>>,
-    schema_definition: &Arc<schema::Definition>,
 ) -> crate::Result<Vec<Event>> {
     let payload = SketchPayload::decode(frame)?;
     // payload.metadata is always empty for payload coming from dd agents
@@ -524,9 +515,6 @@ pub(crate) fn decode_ddsketch(
                     metric.metadata_mut().set_datadog_api_key(Arc::clone(k));
                 }
 
-                metric
-                    .metadata_mut()
-                    .set_schema_definition(schema_definition);
                 metric.into()
             })
         })

@@ -41,9 +41,9 @@ use super::{
 };
 use crate::{
     config::{
-        ComponentKey, DataType, EnrichmentTableConfig, Input, Inputs, Output, OutputId,
-        ProxyConfig, SinkConfig, SinkContext, SourceConfig, SourceContext, TransformContext,
-        TransformOuter,
+        ComponentKey, DataType, EnrichmentTableConfig, Input, Inputs, OutputId, ProxyConfig,
+        SinkConfig, SinkContext, SourceConfig, SourceContext, TransformContext, TransformOuter,
+        TransformOutput,
     },
     event::{EventArray, EventContainer},
     internal_events::EventsReceived,
@@ -188,8 +188,8 @@ pub async fn build_pieces(
         let mut controls = HashMap::new();
         let mut schema_definitions = HashMap::with_capacity(source_outputs.len());
 
-        for output in source_outputs {
-            let mut rx = builder.add_output(output.clone());
+        for output in source_outputs.into_iter() {
+            let mut rx = builder.add_source_output(output.clone());
 
             let (mut fanout, control) = Fanout::new();
             let pump = async move {
@@ -215,11 +215,10 @@ pub async fn build_pieces(
                 control,
             );
 
-            let schema_definition = output
-                .log_schema_definition
-                .unwrap_or_else(schema::Definition::default_legacy_namespace);
-
-            schema_definitions.insert(output.port, schema_definition);
+            let port = output.port.clone();
+            if let Some(definition) = output.schema_definition(config.schema.enabled) {
+                schema_definitions.insert(port, definition);
+            }
         }
 
         let (pump_error_tx, mut pump_error_rx) = oneshot::channel();
@@ -344,9 +343,15 @@ pub async fn build_pieces(
     {
         debug!(component = %key, "Building new transform.");
 
-        let mut schema_definitions = HashMap::new();
-        let merged_definition =
-            schema::merged_definition(&transform.inputs, config, &mut definition_cache);
+        let input_definitions =
+            schema::input_definitions(&transform.inputs, config, &mut definition_cache);
+
+        let merged_definition: Definition = input_definitions
+            .iter()
+            .map(|(_output_id, definition)| definition.clone())
+            .reduce(Definition::merge)
+            // We may not have any definitions if all the inputs are from metrics sources.
+            .unwrap_or_else(Definition::any);
 
         let span = error_span!(
             "transform",
@@ -357,15 +362,13 @@ pub async fn build_pieces(
             component_name = %key.id(),
         );
 
-        for output in transform
+        // Create a map of the outputs to the list of possible definitions from those outputs.
+        let schema_definitions = transform
             .inner
-            .outputs(&merged_definition, config.schema.log_namespace())
-        {
-            let definition = output
-                .log_schema_definition
-                .unwrap_or_else(|| merged_definition.clone());
-            schema_definitions.insert(output.port, definition);
-        }
+            .outputs(&input_definitions, config.schema.log_namespace())
+            .into_iter()
+            .map(|output| (output.port, output.log_schema_definitions))
+            .collect::<HashMap<_, _>>();
 
         let context = TransformContext {
             key: Some(key.clone()),
@@ -379,7 +382,7 @@ pub async fn build_pieces(
         let node = TransformNode::from_parts(
             key.clone(),
             transform,
-            &merged_definition,
+            &input_definitions,
             config.schema.log_namespace(),
         );
 
@@ -610,7 +613,7 @@ struct TransformNode {
     typetag: &'static str,
     inputs: Inputs<OutputId>,
     input_details: Input,
-    outputs: Vec<Output>,
+    outputs: Vec<TransformOutput>,
     enable_concurrency: bool,
 }
 
@@ -618,7 +621,7 @@ impl TransformNode {
     pub fn from_parts(
         key: ComponentKey,
         transform: &TransformOuter<OutputId>,
-        schema_definition: &Definition,
+        schema_definition: &[(OutputId, Definition)],
         global_log_namespace: LogNamespace,
     ) -> Self {
         Self {

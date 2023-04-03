@@ -40,8 +40,8 @@ use warp::{filters::BoxedFilter, reject::Rejection, reply::Response, Filter, Rep
 use crate::{
     codecs::{Decoder, DecodingConfig},
     config::{
-        log_schema, DataType, GenerateConfig, Output, Resource, SourceAcknowledgementsConfig,
-        SourceConfig, SourceContext,
+        log_schema, DataType, GenerateConfig, Resource, SourceAcknowledgementsConfig, SourceConfig,
+        SourceContext, SourceOutput,
     },
     event::Event,
     internal_events::{HttpBytesReceived, HttpDecompressError, StreamClosedError},
@@ -150,13 +150,6 @@ impl SourceConfig for DatadogAgentConfig {
             .expect("registered log schema required")
             .clone();
 
-        let metrics_schema_definition = cx
-            .schema_definitions
-            .get(&Some(METRICS.to_owned()))
-            .or_else(|| cx.schema_definitions.get(&None))
-            .expect("registered metrics schema required")
-            .clone();
-
         let decoder =
             DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace).build();
 
@@ -166,7 +159,6 @@ impl SourceConfig for DatadogAgentConfig {
             decoder,
             tls.http_protocol_name(),
             logs_schema_definition,
-            metrics_schema_definition,
             log_namespace,
         );
         let listener = tls.bind(&self.address).await?;
@@ -201,7 +193,7 @@ impl SourceConfig for DatadogAgentConfig {
         }))
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         let definition = self
             .decoding
             .schema_definition(global_log_namespace.merge(self.log_namespace))
@@ -251,14 +243,12 @@ impl SourceConfig for DatadogAgentConfig {
 
         if self.multiple_outputs {
             vec![
-                Output::default(DataType::Metric).with_port(METRICS),
-                Output::default(DataType::Log)
-                    .with_schema_definition(definition)
-                    .with_port(LOGS),
-                Output::default(DataType::Trace).with_port(TRACES),
+                SourceOutput::new_logs(DataType::Log, definition).with_port(LOGS),
+                SourceOutput::new_metrics().with_port(METRICS),
+                SourceOutput::new_traces().with_port(TRACES),
             ]
         } else {
-            vec![Output::default(DataType::all()).with_schema_definition(definition)]
+            vec![SourceOutput::new_logs(DataType::all(), definition)]
         }
     }
 
@@ -295,7 +285,6 @@ pub(crate) struct DatadogAgentSource {
     pub(crate) decoder: Decoder,
     protocol: &'static str,
     logs_schema_definition: Arc<schema::Definition>,
-    metrics_schema_definition: Arc<schema::Definition>,
     events_received: Registered<EventsReceived>,
 }
 
@@ -332,7 +321,6 @@ impl DatadogAgentSource {
         decoder: Decoder,
         protocol: &'static str,
         logs_schema_definition: schema::Definition,
-        metrics_schema_definition: schema::Definition,
         log_namespace: LogNamespace,
     ) -> Self {
         Self {
@@ -346,7 +334,6 @@ impl DatadogAgentSource {
             decoder,
             protocol,
             logs_schema_definition: Arc::new(logs_schema_definition),
-            metrics_schema_definition: Arc::new(metrics_schema_definition),
             log_namespace,
             events_received: register!(EventsReceived),
         }

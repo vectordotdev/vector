@@ -20,7 +20,7 @@ use vector_core::config::LogNamespace;
 use vector_core::EstimatedJsonEncodedSizeOf;
 
 use crate::{
-    config::{DataType, Output, SourceConfig, SourceContext},
+    config::{SourceConfig, SourceContext, SourceOutput},
     event::metric::{Metric, MetricKind, MetricTags, MetricValue},
     internal_events::{EventsReceived, HostMetricsScrapeDetailError, StreamClosedError},
     shutdown::ShutdownSignal,
@@ -266,8 +266,8 @@ impl SourceConfig for HostMetricsConfig {
         Ok(Box::pin(config.run(cx.out, cx.shutdown)))
     }
 
-    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
-        vec![Output::default(DataType::Metric)]
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
+        vec![SourceOutput::new_metrics()]
     }
 
     fn can_acknowledge(&self) -> bool {

@@ -233,10 +233,10 @@ mod tests {
             log_namespace: Some(true),
             ..Default::default()
         };
-        let definition = config.outputs(LogNamespace::Vector)[0]
-            .clone()
-            .log_schema_definition
-            .unwrap();
+        let definitions = config
+            .outputs(LogNamespace::Vector)
+            .remove(0)
+            .schema_definition(true);
 
         let message = "test";
         let now = Utc::now();
@@ -276,7 +276,7 @@ mod tests {
                 .to_string_lossy(),
             now.to_rfc3339_opts(SecondsFormat::AutoSi, true)
         );
-        definition.assert_valid_for_event(&events[0]);
+        definitions.unwrap().assert_valid_for_event(&events[0]);
     }
 
     #[tokio::test]
@@ -285,10 +285,10 @@ mod tests {
             log_namespace: None,
             ..Default::default()
         };
-        let definition = config.outputs(LogNamespace::Legacy)[0]
-            .clone()
-            .log_schema_definition
-            .unwrap();
+        let definitions = config
+            .outputs(LogNamespace::Legacy)
+            .remove(0)
+            .schema_definition(true);
 
         let message = "test";
         let now = Utc::now();
@@ -329,7 +329,7 @@ mod tests {
                 .to_string_lossy(),
             now.to_rfc3339_opts(SecondsFormat::AutoSi, true)
         );
-        definition.assert_valid_for_event(&events[0]);
+        definitions.unwrap().assert_valid_for_event(&events[0]);
     }
 
     #[test]

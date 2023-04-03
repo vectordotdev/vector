@@ -21,7 +21,7 @@ use self::parser::ParseError;
 use super::util::net::{try_bind_udp_socket, SocketListenAddr, TcpNullAcker, TcpSource};
 use crate::{
     codecs::Decoder,
-    config::{self, GenerateConfig, Output, Resource, SourceConfig, SourceContext},
+    config::{GenerateConfig, Resource, SourceConfig, SourceContext, SourceOutput},
     event::Event,
     internal_events::{
         EventsReceived, SocketBindError, SocketBytesReceived, SocketMode, SocketReceiveError,
@@ -174,8 +174,8 @@ impl SourceConfig for StatsdConfig {
         }
     }
 
-    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
-        vec![Output::default(config::DataType::Metric)]
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
+        vec![SourceOutput::new_metrics()]
     }
 
     fn resources(&self) -> Vec<Resource> {
