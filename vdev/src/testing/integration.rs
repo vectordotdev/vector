@@ -35,7 +35,8 @@ impl IntegrationTest {
         let Some(env_config) = config.environments().get(&environment).map(Clone::clone) else {
             bail!("Could not find environment named {environment:?}");
         };
-        let compose = Compose::new(test_dir, env_config.clone(), Some(network_name.clone()))?;
+        let network_name = format!("vector-integration-tests-{integration}");
+        let compose = Compose::new(test_dir, env_config.clone(), network_name.clone())?;
         let runner = IntegrationTestRunner::new(
             integration.clone(),
             &config.runner,
@@ -141,12 +142,12 @@ struct Compose {
     env: Environment,
     #[cfg(unix)]
     config: ComposeConfig,
-    network: Option<String>,
+    network: String,
     temp_file: NamedTempFile
 }
 
 impl Compose {
-    fn new(test_dir: PathBuf, env: Environment, network: Option<String>) -> Result<Option<Self>> {
+    fn new(test_dir: PathBuf, env: Environment, network: String) -> Result<Option<Self>> {
         let path: PathBuf = [&test_dir, Path::new("compose.yaml")].iter().collect();
 
         match path.try_exists() {
@@ -215,9 +216,8 @@ impl Compose {
         command.current_dir(&self.test_dir);
 
         command.env("DOCKER_SOCKET", &*DOCKER_SOCKET);
-        if let Some(network_name) = &self.network {
-            command.env(NETWORK_ENV_VAR, network_name);
-        }
+        command.env(NETWORK_ENV_VAR, &self.network);
+
         for (key, value) in &self.env {
             if let Some(value) = value {
                 command.env(key, value);
