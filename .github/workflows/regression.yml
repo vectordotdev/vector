@@ -87,7 +87,7 @@ jobs:
 
   build-baseline:
     name: Build baseline Vector container
-    runs-on: [linux, soak-builder]
+    runs-on: [linux, optimize-8-core]
     needs:
       - compute-metadata
     steps:
