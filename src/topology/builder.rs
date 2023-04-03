@@ -218,263 +218,6 @@ pub async fn build_pieces(
     }
 }
 
-async fn build_sinks(
-    config: &crate::config::Config,
-    diff: &ConfigDiff,
-    errors: &mut Vec<String>,
-    mut buffers: HashMap<ComponentKey, BuiltBuffer>,
-    inputs: &mut HashMap<ComponentKey, (BufferSender<EventArray>, Inputs<OutputId>)>,
-    healthchecks: &mut HashMap<ComponentKey, Task>,
-    tasks: &mut HashMap<ComponentKey, Task>,
-    detach_triggers: &mut HashMap<ComponentKey, Trigger>,
-) {
-    // Build sinks
-    for (key, sink) in config
-        .sinks()
-        .filter(|(key, _)| diff.sinks.contains_new(key))
-    {
-        debug!(component = %key, "Building new sink.");
-
-        let sink_inputs = &sink.inputs;
-        let healthcheck = sink.healthcheck();
-        let enable_healthcheck = healthcheck.enabled && config.healthchecks.enabled;
-
-        let typetag = sink.inner.get_component_name();
-        let input_type = sink.inner.input().data_type();
-
-        // At this point, we've validated that all transforms are valid, including any
-        // transform that mutates the schema provided by their sources. We can now validate the
-        // schema expectations of each individual sink.
-        if let Err(mut err) = schema::validate_sink_expectations(key, sink, config) {
-            errors.append(&mut err);
-        };
-
-        let (tx, rx) = if let Some(buffer) = buffers.remove(key) {
-            buffer
-        } else {
-            let buffer_type = match sink.buffer.stages().first().expect("cant ever be empty") {
-                BufferType::Memory { .. } => "memory",
-                BufferType::DiskV2 { .. } => "disk",
-            };
-            let buffer_span = error_span!(
-                "sink",
-                component_kind = "sink",
-                component_id = %key.id(),
-                component_type = typetag,
-                component_name = %key.id(),
-                buffer_type,
-            );
-            let buffer = sink
-                .buffer
-                .build(config.global.data_dir.clone(), key.to_string(), buffer_span)
-                .await;
-            match buffer {
-                Err(error) => {
-                    errors.push(format!("Sink \"{}\": {}", key, error));
-                    continue;
-                }
-                Ok((tx, rx)) => (tx, Arc::new(Mutex::new(Some(rx.into_stream())))),
-            }
-        };
-
-        let cx = SinkContext {
-            healthcheck,
-            globals: config.global.clone(),
-            proxy: ProxyConfig::merge_with_env(&config.global.proxy, sink.proxy()),
-            schema: config.schema,
-        };
-
-        let (sink, healthcheck) = match sink.inner.build(cx).await {
-            Err(error) => {
-                errors.push(format!("Sink \"{}\": {}", key, error));
-                continue;
-            }
-            Ok(built) => built,
-        };
-
-        let (trigger, tripwire) = Tripwire::new();
-
-        let sink = async move {
-            debug!("Sink starting.");
-
-            // Why is this Arc<Mutex<Option<_>>> needed you ask.
-            // In case when this function build_pieces errors
-            // this future won't be run so this rx won't be taken
-            // which will enable us to reuse rx to rebuild
-            // old configuration by passing this Arc<Mutex<Option<_>>>
-            // yet again.
-            let rx = rx
-                .lock()
-                .unwrap()
-                .take()
-                .expect("Task started but input has been taken.");
-
-            let mut rx = wrap(rx);
-
-            let events_received = register!(EventsReceived);
-            sink.run(
-                rx.by_ref()
-                    .filter(|events: &EventArray| ready(filter_events_type(events, input_type)))
-                    .inspect(|events| {
-                        events_received.emit(CountByteSize(
-                            events.len(),
-                            events.estimated_json_encoded_size_of(),
-                        ))
-                    })
-                    .take_until_if(tripwire),
-            )
-            .await
-            .map(|_| {
-                debug!("Sink finished normally.");
-                TaskOutput::Sink(rx)
-            })
-            .map_err(|_| {
-                debug!("Sink finished with an error.");
-                TaskError::Opaque
-            })
-        };
-
-        let task = Task::new(key.clone(), typetag, sink);
-
-        let component_key = key.clone();
-        let healthcheck_task = async move {
-            if enable_healthcheck {
-                let duration = Duration::from_secs(10);
-                timeout(duration, healthcheck)
-                    .map(|result| match result {
-                        Ok(Ok(_)) => {
-                            info!("Healthcheck passed.");
-                            Ok(TaskOutput::Healthcheck)
-                        }
-                        Ok(Err(error)) => {
-                            error!(
-                                msg = "Healthcheck failed.",
-                                %error,
-                                component_kind = "sink",
-                                component_type = typetag,
-                                component_id = %component_key.id(),
-                                // maintained for compatibility
-                                component_name = %component_key.id(),
-                            );
-                            Err(TaskError::wrapped(error))
-                        }
-                        Err(e) => {
-                            error!(
-                                msg = "Healthcheck timed out.",
-                                component_kind = "sink",
-                                component_type = typetag,
-                                component_id = %component_key.id(),
-                                // maintained for compatibility
-                                component_name = %component_key.id(),
-                            );
-                            Err(TaskError::wrapped(Box::new(e)))
-                        }
-                    })
-                    .await
-            } else {
-                info!("Healthcheck disabled.");
-                Ok(TaskOutput::Healthcheck)
-            }
-        };
-
-        let healthcheck_task = Task::new(key.clone(), typetag, healthcheck_task);
-
-        inputs.insert(key.clone(), (tx, sink_inputs.clone()));
-        healthchecks.insert(key.clone(), healthcheck_task);
-        tasks.insert(key.clone(), task);
-        detach_triggers.insert(key.clone(), trigger);
-    }
-}
-
-async fn build_transforms(
-    config: &crate::config::Config,
-    diff: &ConfigDiff,
-    enrichment_tables: &enrichment::TableRegistry,
-    errors: &mut Vec<String>,
-    inputs: &mut HashMap<ComponentKey, (BufferSender<EventArray>, Inputs<OutputId>)>,
-    outputs: &mut HashMap<OutputId, tokio::sync::mpsc::UnboundedSender<fanout::ControlMessage>>,
-    tasks: &mut HashMap<ComponentKey, Task>,
-) {
-    let mut definition_cache = HashMap::default();
-
-    // Build transforms
-    for (key, transform) in config
-        .transforms()
-        .filter(|(key, _)| diff.transforms.contains_new(key))
-    {
-        debug!(component = %key, "Building new transform.");
-
-        let input_definitions =
-            schema::input_definitions(&transform.inputs, config, &mut definition_cache);
-
-        let merged_definition: Definition = input_definitions
-            .iter()
-            .map(|(_output_id, definition)| definition.clone())
-            .reduce(Definition::merge)
-            // We may not have any definitions if all the inputs are from metrics sources.
-            .unwrap_or_else(Definition::any);
-
-        let span = error_span!(
-            "transform",
-            component_kind = "transform",
-            component_id = %key.id(),
-            component_type = %transform.inner.get_component_name(),
-            // maintained for compatibility
-            component_name = %key.id(),
-        );
-
-        // Create a map of the outputs to the list of possible definitions from those outputs.
-        let schema_definitions = transform
-            .inner
-            .outputs(&input_definitions, config.schema.log_namespace())
-            .into_iter()
-            .map(|output| (output.port, output.log_schema_definitions))
-            .collect::<HashMap<_, _>>();
-
-        let context = TransformContext {
-            key: Some(key.clone()),
-            globals: config.global.clone(),
-            enrichment_tables: enrichment_tables.clone(),
-            schema_definitions,
-            merged_schema_definition: merged_definition.clone(),
-            schema: config.schema,
-        };
-
-        let node = TransformNode::from_parts(
-            key.clone(),
-            transform,
-            &input_definitions,
-            config.schema.log_namespace(),
-        );
-
-        let transform = match transform
-            .inner
-            .build(&context)
-            .instrument(span.clone())
-            .await
-        {
-            Err(error) => {
-                errors.push(format!("Transform \"{}\": {}", key, error));
-                continue;
-            }
-            Ok(transform) => transform,
-        };
-
-        let (input_tx, input_rx) =
-            TopologyBuilder::standalone_memory(TOPOLOGY_BUFFER_SIZE, WhenFull::Block).await;
-
-        inputs.insert(key.clone(), (input_tx, node.inputs.clone()));
-
-        let (transform_task, transform_outputs) = {
-            let _span = span.enter();
-            build_transform(transform, node, input_rx)
-        };
-
-        outputs.extend(transform_outputs);
-        tasks.insert(key.clone(), transform_task);
-    }
-}
-
 async fn build_sources(
     config: &crate::config::Config,
     diff: &ConfigDiff,
@@ -663,6 +406,263 @@ async fn build_sources(
     }
 
     source_tasks
+}
+
+async fn build_transforms(
+    config: &crate::config::Config,
+    diff: &ConfigDiff,
+    enrichment_tables: &enrichment::TableRegistry,
+    errors: &mut Vec<String>,
+    inputs: &mut HashMap<ComponentKey, (BufferSender<EventArray>, Inputs<OutputId>)>,
+    outputs: &mut HashMap<OutputId, tokio::sync::mpsc::UnboundedSender<fanout::ControlMessage>>,
+    tasks: &mut HashMap<ComponentKey, Task>,
+) {
+    let mut definition_cache = HashMap::default();
+
+    // Build transforms
+    for (key, transform) in config
+        .transforms()
+        .filter(|(key, _)| diff.transforms.contains_new(key))
+    {
+        debug!(component = %key, "Building new transform.");
+
+        let input_definitions =
+            schema::input_definitions(&transform.inputs, config, &mut definition_cache);
+
+        let merged_definition: Definition = input_definitions
+            .iter()
+            .map(|(_output_id, definition)| definition.clone())
+            .reduce(Definition::merge)
+            // We may not have any definitions if all the inputs are from metrics sources.
+            .unwrap_or_else(Definition::any);
+
+        let span = error_span!(
+            "transform",
+            component_kind = "transform",
+            component_id = %key.id(),
+            component_type = %transform.inner.get_component_name(),
+            // maintained for compatibility
+            component_name = %key.id(),
+        );
+
+        // Create a map of the outputs to the list of possible definitions from those outputs.
+        let schema_definitions = transform
+            .inner
+            .outputs(&input_definitions, config.schema.log_namespace())
+            .into_iter()
+            .map(|output| (output.port, output.log_schema_definitions))
+            .collect::<HashMap<_, _>>();
+
+        let context = TransformContext {
+            key: Some(key.clone()),
+            globals: config.global.clone(),
+            enrichment_tables: enrichment_tables.clone(),
+            schema_definitions,
+            merged_schema_definition: merged_definition.clone(),
+            schema: config.schema,
+        };
+
+        let node = TransformNode::from_parts(
+            key.clone(),
+            transform,
+            &input_definitions,
+            config.schema.log_namespace(),
+        );
+
+        let transform = match transform
+            .inner
+            .build(&context)
+            .instrument(span.clone())
+            .await
+        {
+            Err(error) => {
+                errors.push(format!("Transform \"{}\": {}", key, error));
+                continue;
+            }
+            Ok(transform) => transform,
+        };
+
+        let (input_tx, input_rx) =
+            TopologyBuilder::standalone_memory(TOPOLOGY_BUFFER_SIZE, WhenFull::Block).await;
+
+        inputs.insert(key.clone(), (input_tx, node.inputs.clone()));
+
+        let (transform_task, transform_outputs) = {
+            let _span = span.enter();
+            build_transform(transform, node, input_rx)
+        };
+
+        outputs.extend(transform_outputs);
+        tasks.insert(key.clone(), transform_task);
+    }
+}
+
+async fn build_sinks(
+    config: &crate::config::Config,
+    diff: &ConfigDiff,
+    errors: &mut Vec<String>,
+    mut buffers: HashMap<ComponentKey, BuiltBuffer>,
+    inputs: &mut HashMap<ComponentKey, (BufferSender<EventArray>, Inputs<OutputId>)>,
+    healthchecks: &mut HashMap<ComponentKey, Task>,
+    tasks: &mut HashMap<ComponentKey, Task>,
+    detach_triggers: &mut HashMap<ComponentKey, Trigger>,
+) {
+    // Build sinks
+    for (key, sink) in config
+        .sinks()
+        .filter(|(key, _)| diff.sinks.contains_new(key))
+    {
+        debug!(component = %key, "Building new sink.");
+
+        let sink_inputs = &sink.inputs;
+        let healthcheck = sink.healthcheck();
+        let enable_healthcheck = healthcheck.enabled && config.healthchecks.enabled;
+
+        let typetag = sink.inner.get_component_name();
+        let input_type = sink.inner.input().data_type();
+
+        // At this point, we've validated that all transforms are valid, including any
+        // transform that mutates the schema provided by their sources. We can now validate the
+        // schema expectations of each individual sink.
+        if let Err(mut err) = schema::validate_sink_expectations(key, sink, config) {
+            errors.append(&mut err);
+        };
+
+        let (tx, rx) = if let Some(buffer) = buffers.remove(key) {
+            buffer
+        } else {
+            let buffer_type = match sink.buffer.stages().first().expect("cant ever be empty") {
+                BufferType::Memory { .. } => "memory",
+                BufferType::DiskV2 { .. } => "disk",
+            };
+            let buffer_span = error_span!(
+                "sink",
+                component_kind = "sink",
+                component_id = %key.id(),
+                component_type = typetag,
+                component_name = %key.id(),
+                buffer_type,
+            );
+            let buffer = sink
+                .buffer
+                .build(config.global.data_dir.clone(), key.to_string(), buffer_span)
+                .await;
+            match buffer {
+                Err(error) => {
+                    errors.push(format!("Sink \"{}\": {}", key, error));
+                    continue;
+                }
+                Ok((tx, rx)) => (tx, Arc::new(Mutex::new(Some(rx.into_stream())))),
+            }
+        };
+
+        let cx = SinkContext {
+            healthcheck,
+            globals: config.global.clone(),
+            proxy: ProxyConfig::merge_with_env(&config.global.proxy, sink.proxy()),
+            schema: config.schema,
+        };
+
+        let (sink, healthcheck) = match sink.inner.build(cx).await {
+            Err(error) => {
+                errors.push(format!("Sink \"{}\": {}", key, error));
+                continue;
+            }
+            Ok(built) => built,
+        };
+
+        let (trigger, tripwire) = Tripwire::new();
+
+        let sink = async move {
+            debug!("Sink starting.");
+
+            // Why is this Arc<Mutex<Option<_>>> needed you ask.
+            // In case when this function build_pieces errors
+            // this future won't be run so this rx won't be taken
+            // which will enable us to reuse rx to rebuild
+            // old configuration by passing this Arc<Mutex<Option<_>>>
+            // yet again.
+            let rx = rx
+                .lock()
+                .unwrap()
+                .take()
+                .expect("Task started but input has been taken.");
+
+            let mut rx = wrap(rx);
+
+            let events_received = register!(EventsReceived);
+            sink.run(
+                rx.by_ref()
+                    .filter(|events: &EventArray| ready(filter_events_type(events, input_type)))
+                    .inspect(|events| {
+                        events_received.emit(CountByteSize(
+                            events.len(),
+                            events.estimated_json_encoded_size_of(),
+                        ))
+                    })
+                    .take_until_if(tripwire),
+            )
+            .await
+            .map(|_| {
+                debug!("Sink finished normally.");
+                TaskOutput::Sink(rx)
+            })
+            .map_err(|_| {
+                debug!("Sink finished with an error.");
+                TaskError::Opaque
+            })
+        };
+
+        let task = Task::new(key.clone(), typetag, sink);
+
+        let component_key = key.clone();
+        let healthcheck_task = async move {
+            if enable_healthcheck {
+                let duration = Duration::from_secs(10);
+                timeout(duration, healthcheck)
+                    .map(|result| match result {
+                        Ok(Ok(_)) => {
+                            info!("Healthcheck passed.");
+                            Ok(TaskOutput::Healthcheck)
+                        }
+                        Ok(Err(error)) => {
+                            error!(
+                                msg = "Healthcheck failed.",
+                                %error,
+                                component_kind = "sink",
+                                component_type = typetag,
+                                component_id = %component_key.id(),
+                                // maintained for compatibility
+                                component_name = %component_key.id(),
+                            );
+                            Err(TaskError::wrapped(error))
+                        }
+                        Err(e) => {
+                            error!(
+                                msg = "Healthcheck timed out.",
+                                component_kind = "sink",
+                                component_type = typetag,
+                                component_id = %component_key.id(),
+                                // maintained for compatibility
+                                component_name = %component_key.id(),
+                            );
+                            Err(TaskError::wrapped(Box::new(e)))
+                        }
+                    })
+                    .await
+            } else {
+                info!("Healthcheck disabled.");
+                Ok(TaskOutput::Healthcheck)
+            }
+        };
+
+        let healthcheck_task = Task::new(key.clone(), typetag, healthcheck_task);
+
+        inputs.insert(key.clone(), (tx, sink_inputs.clone()));
+        healthchecks.insert(key.clone(), healthcheck_task);
+        tasks.insert(key.clone(), task);
+        detach_triggers.insert(key.clone(), trigger);
+    }
 }
 
 const fn filter_events_type(events: &EventArray, data_type: DataType) -> bool {
