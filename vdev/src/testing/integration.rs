@@ -136,6 +136,7 @@ impl IntegrationTest {
 }
 
 struct Compose {
+    path: PathBuf,
     test_dir: PathBuf,
     env: Environment,
     #[cfg(unix)]
@@ -175,12 +176,9 @@ impl Compose {
                     serde_yaml::to_string(&config)
                         .with_context(|| "Failed to serialize modified compose.yml".to_string())?,
                 )?;
-                println!(
-                    "[jonathanpv:debugging]\nUsing compose file: {:?}, found in: {:?}",
-                    config,
-                    temp_file.path()
-                );
+
                 Ok(Some(Self {
+                    path,
                     test_dir,
                     env,
                     #[cfg(unix)]
@@ -206,8 +204,19 @@ impl Compose {
         let mut command = CONTAINER_TOOL.clone();
         command.push("-compose");
         let mut command = Command::new(command);
-        command.arg("--file");
-        command.arg(self.temp_file.path());
+        // When the integration test environment is already active, the tempfile path does not
+        // exist because `Compose::new()` has not been called. In this case, the `stop` command
+        // needs to use the calculated path from the integration name instead of the nonexistent
+        // tempfile path. This is because `stop` doesn't go through the same logic as `start`
+        // and doesn't create a new tempfile before calling docker compose.
+        if config.is_none() {
+            command.arg("--file");
+            command.arg(&self.path);
+        } else {
+            command.arg("--file");
+            command.arg(self.temp_file.path());
+        }
+
         command.args(args);
 
         command.current_dir(&self.test_dir);
