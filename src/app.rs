@@ -1,6 +1,4 @@
 #![allow(missing_docs)]
-#[cfg(feature = "api")]
-use std::sync::{atomic::AtomicBool, Arc};
 use std::{collections::HashMap, num::NonZeroUsize, path::PathBuf};
 
 use exitcode::ExitCode;
@@ -16,8 +14,8 @@ use tokio_stream::wrappers::UnboundedReceiverStream;
 
 #[cfg(feature = "enterprise")]
 use crate::config::enterprise::{
-    attach_enterprise_components, report_configuration, report_on_reload, EnterpriseError,
-    EnterpriseMetadata, EnterpriseReporter,
+    attach_enterprise_components, report_configuration, EnterpriseError, EnterpriseMetadata,
+    EnterpriseReporter,
 };
 #[cfg(not(feature = "enterprise-tests"))]
 use crate::metrics;
@@ -28,16 +26,15 @@ use crate::{
     config::{self, Config, ConfigPath},
     heartbeat,
     signal::{SignalHandler, SignalPair, SignalRx, SignalTo},
-    topology::{self, RunningTopology},
+    topology::{
+        self, ReloadOutcome, RunningTopology, SharedTopologyController, TopologyController,
+    },
     trace,
 };
 
 pub static WORKER_THREADS: OnceNonZeroUsize = OnceNonZeroUsize::new();
 
-use crate::internal_events::{
-    VectorConfigLoadError, VectorQuit, VectorRecoveryError, VectorReloadError, VectorReloaded,
-    VectorStarted, VectorStopped,
-};
+use crate::internal_events::{VectorQuit, VectorStarted, VectorStopped};
 
 use tokio::sync::broadcast::error::RecvError;
 
@@ -116,14 +113,12 @@ impl ApplicationConfig {
     #[cfg(feature = "api")]
     pub fn setup_api(&self, runtime: &Runtime) -> Option<api::Server> {
         if self.api.enabled {
-            let api_server = api::Server::start(
+            match api::Server::start(
                 self.topology.config(),
                 self.topology.watch(),
-                Arc::<AtomicBool>::clone(&self.topology.running),
+                std::sync::Arc::clone(&self.topology.running),
                 runtime,
-            );
-
-            match api_server {
+            ) {
                 Ok(api_server) => {
                     emit!(ApiStarted {
                         addr: self.api.address.unwrap(),
@@ -216,7 +211,7 @@ impl Application {
             signals,
         } = self;
 
-        let topology_controller = TopologyController {
+        let topology_controller = SharedTopologyController::new(TopologyController {
             #[cfg(feature = "api")]
             api_server: config.setup_api(runtime),
             topology: config.topology,
@@ -224,7 +219,7 @@ impl Application {
             require_healthy,
             #[cfg(feature = "enterprise")]
             enterprise_reporter: config.enterprise,
-        };
+        });
 
         Ok(StartedApplication {
             config_paths: config.config_paths,
@@ -236,10 +231,10 @@ impl Application {
 }
 
 pub struct StartedApplication {
-    config_paths: Vec<ConfigPath>,
-    graceful_crash_receiver: mpsc::UnboundedReceiver<()>,
+    pub config_paths: Vec<ConfigPath>,
+    pub graceful_crash_receiver: mpsc::UnboundedReceiver<()>,
     pub signals: SignalPair,
-    topology_controller: TopologyController,
+    pub topology_controller: SharedTopologyController,
 }
 
 impl StartedApplication {
@@ -252,7 +247,7 @@ impl StartedApplication {
             config_paths,
             graceful_crash_receiver,
             signals,
-            mut topology_controller,
+            topology_controller,
         } = self;
 
         let mut graceful_crash = UnboundedReceiverStream::new(graceful_crash_receiver);
@@ -265,12 +260,15 @@ impl StartedApplication {
                 signal = signal_rx.recv() => {
                     match signal {
                         Ok(SignalTo::ReloadFromConfigBuilder(config_builder)) => {
+                            let mut topology_controller = topology_controller.lock().await;
                             let new_config = config_builder.build().map_err(handle_config_errors).ok();
-                            if let Some(signal) = topology_controller.reload(new_config).await {
-                                break signal;
+                            if let ReloadOutcome::FatalError = topology_controller.reload(new_config).await {
+                                break SignalTo::Shutdown;
                             }
                         }
                         Ok(SignalTo::ReloadFromDisk) => {
+                            let mut topology_controller = topology_controller.lock().await;
+
                             // Reload paths
                             if let Some(paths) = config::process_paths(&config_paths) {
                                 topology_controller.config_paths = paths;
@@ -281,8 +279,8 @@ impl StartedApplication {
                                 .await
                                 .map_err(handle_config_errors).ok();
 
-                            if let Some(signal) = topology_controller.reload(new_config).await {
-                                break signal;
+                            if let ReloadOutcome::FatalError = topology_controller.reload(new_config).await {
+                                break SignalTo::Shutdown;
                             }
                         },
                         Err(RecvError::Lagged(amt)) => warn!("Overflow, dropped {} signals.", amt),
@@ -292,7 +290,10 @@ impl StartedApplication {
                 }
                 // Trigger graceful shutdown if a component crashed, or all sources have ended.
                 _ = graceful_crash.next() => break SignalTo::Shutdown,
-                _ = topology_controller.sources_finished() => break SignalTo::Shutdown,
+                _ = TopologyController::sources_finished(topology_controller.clone()) => {
+                    info!("All sources have finished.");
+                    break SignalTo::Shutdown
+                } ,
                 else => unreachable!("Signal streams never end"),
             }
         };
@@ -306,9 +307,9 @@ impl StartedApplication {
 }
 
 pub struct FinishedApplication {
-    signal: SignalTo,
-    signal_rx: SignalRx,
-    topology_controller: TopologyController,
+    pub signal: SignalTo,
+    pub signal_rx: SignalRx,
+    pub topology_controller: SharedTopologyController,
 }
 
 impl FinishedApplication {
@@ -318,6 +319,13 @@ impl FinishedApplication {
             mut signal_rx,
             topology_controller,
         } = self;
+
+        // At this point, we'll have the only reference to the shared topology controller and can
+        // safely remove it from the wrapper to shut down the topology.
+        let topology_controller = topology_controller
+            .try_into_inner()
+            .expect("fail to unwrap topology controller")
+            .into_inner();
 
         match signal {
             SignalTo::Shutdown => {
@@ -338,82 +346,6 @@ impl FinishedApplication {
             }
             _ => unreachable!(),
         }
-    }
-}
-
-struct TopologyController {
-    topology: RunningTopology,
-    config_paths: Vec<config::ConfigPath>,
-    require_healthy: Option<bool>,
-    #[cfg(feature = "enterprise")]
-    enterprise_reporter: Option<EnterpriseReporter<BoxFuture<'static, ()>>>,
-    #[cfg(feature = "api")]
-    api_server: Option<api::Server>,
-}
-
-impl TopologyController {
-    async fn reload(&mut self, new_config: Option<config::Config>) -> Option<SignalTo> {
-        if new_config.is_none() {
-            emit!(VectorConfigLoadError);
-            return None;
-        }
-        let mut new_config = new_config.unwrap();
-
-        new_config
-            .healthchecks
-            .set_require_healthy(self.require_healthy);
-
-        #[cfg(feature = "enterprise")]
-        // Augment config to enable observability within Datadog, if applicable.
-        match EnterpriseMetadata::try_from(&new_config) {
-            Ok(metadata) => {
-                if let Some(e) = report_on_reload(
-                    &mut new_config,
-                    metadata,
-                    self.config_paths.clone(),
-                    self.enterprise_reporter.as_ref(),
-                ) {
-                    self.enterprise_reporter = Some(e);
-                }
-            }
-            Err(err) => {
-                if let EnterpriseError::MissingApiKey = err {
-                    emit!(VectorReloadError);
-                    return None;
-                }
-            }
-        }
-
-        match self.topology.reload_config_and_respawn(new_config).await {
-            Ok(true) => {
-                #[cfg(feature = "api")]
-                // Pass the new config to the API server.
-                if let Some(ref api_server) = self.api_server {
-                    api_server.update_config(self.topology.config());
-                }
-
-                emit!(VectorReloaded {
-                    config_paths: &self.config_paths
-                })
-            }
-            Ok(false) => emit!(VectorReloadError),
-            // Trigger graceful shutdown for what remains of the topology
-            Err(()) => {
-                emit!(VectorReloadError);
-                emit!(VectorRecoveryError);
-                return Some(SignalTo::Shutdown);
-            }
-        }
-
-        None
-    }
-
-    async fn sources_finished(&self) {
-        self.topology.sources_finished().await;
-    }
-
-    async fn stop(self) {
-        self.topology.stop().await;
     }
 }
 
