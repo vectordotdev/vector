@@ -497,6 +497,7 @@ async fn build_transforms(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn build_sinks(
     config: &super::Config,
     diff: &ConfigDiff,
