@@ -109,6 +109,7 @@ members = [
   "lib/vector-vrl/cli",
   "lib/vector-vrl/functions",
   "lib/vector-vrl/tests",
+  "lib/vector-vrl/web-playground",
   "vdev",
 ]
 

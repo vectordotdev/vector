@@ -3458,6 +3458,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d2fabcfbdc87f4758337ca535fb41a6d701b65693ce38287d856d1674551ec9b"
 
 [[package]]
+name = "gloo-utils"
+version = "0.1.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a8e8fc851e9c7b9852508bc6e3f690f452f474417e8545ec9857b7f7377036b5"
+dependencies = [
+ "js-sys",
+ "serde",
+ "serde_json",
+ "wasm-bindgen",
+ "web-sys",
+]
+
+[[package]]
 name = "goauth"
 version = "0.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7455,6 +7468,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "serde-wasm-bindgen"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f3b143e2833c57ab9ad3ea280d21fd34e285a42837aeb0ee301f4f41890fa00e"
+dependencies = [
+ "js-sys",
+ "serde",
+ "wasm-bindgen",
+]
+
+[[package]]
 name = "serde-xml-rs"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9788,6 +9812,22 @@ dependencies = [
  "vrl",
  "vrl-stdlib",
  "vrl-tests",
+]
+
+[[package]]
+name = "vector-vrl-web-playground"
+version = "0.1.0"
+dependencies = [
+ "enrichment",
+ "getrandom 0.2.8",
+ "gloo-utils",
+ "serde",
+ "serde-wasm-bindgen",
+ "value",
+ "vector-vrl-functions",
+ "vrl",
+ "vrl-stdlib",
+ "wasm-bindgen",
 ]
 
 [[package]]
