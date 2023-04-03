@@ -12,7 +12,7 @@ use once_cell::sync::Lazy;
 use stream_cancel::{StreamExt as StreamCancelExt, Trigger, Tripwire};
 use tokio::{
     select,
-    sync::oneshot,
+    sync::{mpsc::UnboundedSender, oneshot},
     time::{timeout, Duration},
 };
 use tracing::Instrument;
@@ -219,11 +219,11 @@ pub async fn build_pieces(
 }
 
 async fn build_sources(
-    config: &crate::config::Config,
+    config: &super::Config,
     diff: &ConfigDiff,
     shutdown_coordinator: &mut SourceShutdownCoordinator,
     errors: &mut Vec<String>,
-    outputs: &mut HashMap<OutputId, tokio::sync::mpsc::UnboundedSender<fanout::ControlMessage>>,
+    outputs: &mut HashMap<OutputId, UnboundedSender<fanout::ControlMessage>>,
     tasks: &mut HashMap<ComponentKey, Task>,
 ) -> HashMap<ComponentKey, Task> {
     let mut source_tasks = HashMap::new();
@@ -409,12 +409,12 @@ async fn build_sources(
 }
 
 async fn build_transforms(
-    config: &crate::config::Config,
+    config: &super::Config,
     diff: &ConfigDiff,
     enrichment_tables: &enrichment::TableRegistry,
     errors: &mut Vec<String>,
     inputs: &mut HashMap<ComponentKey, (BufferSender<EventArray>, Inputs<OutputId>)>,
-    outputs: &mut HashMap<OutputId, tokio::sync::mpsc::UnboundedSender<fanout::ControlMessage>>,
+    outputs: &mut HashMap<OutputId, UnboundedSender<fanout::ControlMessage>>,
     tasks: &mut HashMap<ComponentKey, Task>,
 ) {
     let mut definition_cache = HashMap::default();
@@ -498,7 +498,7 @@ async fn build_transforms(
 }
 
 async fn build_sinks(
-    config: &crate::config::Config,
+    config: &super::Config,
     diff: &ConfigDiff,
     errors: &mut Vec<String>,
     mut buffers: HashMap<ComponentKey, BuiltBuffer>,
