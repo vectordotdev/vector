@@ -61,7 +61,7 @@ pub struct InfluxDbLogsConfig {
 
     /// The endpoint to send data to.
     ///
-    /// This should be a full HTTP URI, including the schema, host, and port.
+    /// This should be a full HTTP URI, including the scheme, host, and port.
     #[configurable(metadata(docs::examples = "http://localhost:8086"))]
     pub endpoint: String,
 
