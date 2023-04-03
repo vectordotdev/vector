@@ -13,7 +13,7 @@ atty = "0.2.14"
 cached = "0.42.0"
 chrono = { version = "0.4.22", default-features = false, features = ["serde", "clock"] }
 clap = { version = "4.1.14", features = ["derive"] }
-clap-verbosity-flag = "2.0.0"
+clap-verbosity-flag = "2.0.1"
 clap_complete = "4.2.0"
 confy = "0.5.1"
 directories = "5.0.0"
