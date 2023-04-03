@@ -20,11 +20,11 @@ use crate::{event::Event, serde::skip_serializing_if_default};
 #[configurable_component(no_deser)]
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Transformer {
-    /// List of fields that will be included in the encoded event.
+    /// List of fields that are included in the encoded event.
     #[serde(default, skip_serializing_if = "skip_serializing_if_default")]
     only_fields: Option<Vec<ConfigValuePath>>,
 
-    /// List of fields that will be excluded from the encoded event.
+    /// List of fields that are excluded from the encoded event.
     #[serde(default, skip_serializing_if = "skip_serializing_if_default")]
     except_fields: Option<Vec<String>>,
 

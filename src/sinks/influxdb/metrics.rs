@@ -66,7 +66,7 @@ pub struct InfluxDbConfig {
 
     /// The endpoint to send data to.
     ///
-    /// This should be a full HTTP URI, including the scheme, host, and port.
+    /// This should be a full HTTP URI, including the schema, host, and port.
     #[configurable(metadata(docs::examples = "http://localhost:8086/"))]
     pub endpoint: String,
 
@@ -84,7 +84,7 @@ pub struct InfluxDbConfig {
     #[serde(default)]
     pub request: TowerRequestConfig,
 
-    /// A map of additional tags, in the form of key/value pairs, to add to each measurement.
+    /// A map of additional tags, in the key/value pair format, to add to each measurement.
     #[configurable(metadata(docs::additional_props_description = "A tag key/value pair."))]
     #[configurable(metadata(docs::examples = "example_tags()"))]
     pub tags: Option<HashMap<String, String>>,

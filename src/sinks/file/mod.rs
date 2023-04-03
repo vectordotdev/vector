@@ -56,7 +56,7 @@ pub struct FileSinkConfig {
 
     /// The amount of time that a file can be idle and stay open.
     ///
-    /// After not receiving any events in this amount of time, the file will be flushed and closed.
+    /// After not receiving any events in this amount of time, the file is flushed and closed.
     #[serde(default = "default_idle_timeout")]
     #[serde_as(as = "serde_with::DurationSeconds<u64>")]
     #[serde(rename = "idle_timeout_secs")]

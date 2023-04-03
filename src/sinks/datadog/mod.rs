@@ -56,7 +56,7 @@ pub struct DatadogCommonConfig {
 
     /// The default Datadog [API key][api_key] to use in authentication of HTTP requests.
     ///
-    /// If an event has a Datadog [API key][api_key] set explicitly in its metadata, it will take
+    /// If an event has a Datadog [API key][api_key] set explicitly in its metadata, it takes
     /// precedence over this setting.
     ///
     /// [api_key]: https://docs.datadoghq.com/api/?lang=bash#authentication

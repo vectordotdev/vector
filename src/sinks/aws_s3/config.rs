@@ -49,7 +49,7 @@ pub struct S3SinkConfig {
     /// A prefix to apply to all object keys.
     ///
     /// Prefixes are useful for partitioning objects, such as by creating an object key that
-    /// stores objects under a particular "directory". If using a prefix for this purpose, it must end
+    /// stores objects under a particular directory. If using a prefix for this purpose, it must end
     /// in `/` to act as a directory path. A trailing `/` is **not** automatically added.
     #[serde(default = "default_key_prefix")]
     #[configurable(metadata(docs::templateable))]
@@ -71,7 +71,7 @@ pub struct S3SinkConfig {
     /// Supports the common [`strftime`][chrono_strftime_specifiers] specifiers found in most
     /// languages.
     ///
-    /// When set to an empty string, no timestamp will be appended to the key prefix.
+    /// When set to an empty string, no timestamp is appended to the key prefix.
     ///
     /// [chrono_strftime_specifiers]: https://docs.rs/chrono/latest/chrono/format/strftime/index.html#specifiers
     #[serde(default = "default_filename_time_format")]
@@ -80,8 +80,8 @@ pub struct S3SinkConfig {
     /// Whether or not to append a UUID v4 token to the end of the object key.
     ///
     /// The UUID is appended to the timestamp portion of the object key, such that if the object key
-    /// being generated was `date=2022-07-18/1658176486`, setting this field to `true` would result
-    /// in an object key that looked like `date=2022-07-18/1658176486-30f6652c-71da-4f9f-800d-a1189c47c547`.
+    /// generated is `date=2022-07-18/1658176486`, setting this field to `true` results
+    /// in an object key that looks like `date=2022-07-18/1658176486-30f6652c-71da-4f9f-800d-a1189c47c547`.
     ///
     /// This ensures there are no name collisions, and can be useful in high-volume workloads where
     /// object keys must be unique.
@@ -107,8 +107,8 @@ pub struct S3SinkConfig {
     ///
     /// All compression algorithms use the default compression level unless otherwise specified.
     ///
-    /// Some cloud storage API clients and browsers will handle decompression transparently, so
-    /// files may not always appear to be compressed depending how they are accessed.
+    /// Some cloud storage API clients and browsers handle decompression transparently, so
+    /// depending on how they are accessed, files may not always appear to be compressed.
     #[configurable(derived)]
     #[serde(default = "Compression::gzip_default")]
     pub compression: Compression,

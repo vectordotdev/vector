@@ -224,7 +224,7 @@ pub enum SerializerConfig {
     /// [logfmt]: https://brandur.org/logfmt
     Logfmt,
 
-    /// Encodes an event in Vector’s [native Protocol Buffers format][vector_native_protobuf].
+    /// Encodes an event in the [native Protocol Buffers format][vector_native_protobuf].
     ///
     /// This codec is **[experimental][experimental]**.
     ///
@@ -232,7 +232,7 @@ pub enum SerializerConfig {
     /// [experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
     Native,
 
-    /// Encodes an event in Vector’s [native JSON format][vector_native_json].
+    /// Encodes an event in the [native JSON format][vector_native_json].
     ///
     /// This codec is **[experimental][experimental]**.
     ///
@@ -242,20 +242,20 @@ pub enum SerializerConfig {
 
     /// No encoding.
     ///
-    /// This "encoding" simply uses the `message` field of a log event.
+    /// This encoding uses the `message` field of a log event.
     ///
-    /// Users should take care if they're modifying their log events (such as by using a `remap`
-    /// transform, etc) and removing the message field while doing additional parsing on it, as this
+    /// Be careful if you are modifying your log events (for example, by using a `remap`
+    /// transform) and removing the message field while doing additional parsing on it, as this
     /// could lead to the encoding emitting empty strings for the given event.
     RawMessage,
 
     /// Plain text encoding.
     ///
-    /// This "encoding" simply uses the `message` field of a log event. For metrics, it uses an
+    /// This encoding uses the `message` field of a log event. For metrics, it uses an
     /// encoding that resembles the Prometheus export format.
     ///
-    /// Users should take care if they're modifying their log events (such as by using a `remap`
-    /// transform, etc) and removing the message field while doing additional parsing on it, as this
+    /// Be careful if you are modifying your log events (for example, by using a `remap`
+    /// transform) and removing the message field while doing additional parsing on it, as this
     /// could lead to the encoding emitting empty strings for the given event.
     Text(
         /// Encoding options specific to the text serializer.

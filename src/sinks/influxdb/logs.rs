@@ -47,7 +47,7 @@ impl SinkBatchSettings for InfluxDbLogsDefaultBatchSettings {
 pub struct InfluxDbLogsConfig {
     /// The namespace of the measurement name to use.
     ///
-    /// When specified, the measurement name will be `<namespace>.vector`.
+    /// When specified, the measurement name is `<namespace>.vector`.
     ///
     #[configurable(
         deprecated = "This field is deprecated, and `measurement` should be used instead."
@@ -55,13 +55,13 @@ pub struct InfluxDbLogsConfig {
     #[configurable(metadata(docs::examples = "service"))]
     pub namespace: Option<String>,
 
-    /// The name of the InfluxDB measurement that will be written to.
+    /// The name of the InfluxDB measurement that is written to.
     #[configurable(metadata(docs::examples = "vector-logs"))]
     pub measurement: Option<String>,
 
     /// The endpoint to send data to.
     ///
-    /// This should be a full HTTP URI, including the scheme, host, and port.
+    /// This should be a full HTTP URI, including the schema, host, and port.
     #[configurable(metadata(docs::examples = "http://localhost:8086"))]
     pub endpoint: String,
 
