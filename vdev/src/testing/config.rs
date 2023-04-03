@@ -91,7 +91,7 @@ pub struct HealthCheck {
 #[derive(Debug, Deserialize, Serialize)]
 pub struct BuildConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub context: Option<String>
+    pub context: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]

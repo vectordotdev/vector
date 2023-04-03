@@ -1,7 +1,7 @@
+use anyhow::{bail, Context, Result};
 use std::collections::BTreeMap;
 use std::{fs, path::Path, path::PathBuf, process::Command};
 use tempfile::{Builder, NamedTempFile};
-use anyhow::{bail, Context, Result};
 
 #[cfg(unix)]
 use super::config::ComposeConfig;
@@ -29,8 +29,6 @@ impl IntegrationTest {
         let integration = integration.into();
         let environment = environment.into();
         let (test_dir, config) = IntegrationTestConfig::load(&integration)?;
-
-        let network_name = format!("vector-integration-tests-{integration}");
         let envs_dir = EnvsDir::new(&integration);
         let Some(env_config) = config.environments().get(&environment).map(Clone::clone) else {
             bail!("Could not find environment named {environment:?}");
@@ -143,7 +141,7 @@ struct Compose {
     #[cfg(unix)]
     config: ComposeConfig,
     network: String,
-    temp_file: NamedTempFile
+    temp_file: NamedTempFile,
 }
 
 impl Compose {
@@ -158,12 +156,10 @@ impl Compose {
                 let mut config = ComposeConfig::parse(&path)?;
 
                 // Inject the networks block
-                if let Some(network) = network.clone() {
-                    config.networks.insert(
-                        "default".to_string(),
-                        BTreeMap::from_iter([("name".to_string(), network)]),
-                    );
-                }
+                config.networks.insert(
+                    "default".to_string(),
+                    BTreeMap::from_iter([("name".to_string(), network.clone())]),
+                );
 
                 // Create a named tempfile, there may be resource leakage here in case of SIGINT
                 // Tried tempfile::tempfile() but this returns a File object without a usable path
@@ -181,15 +177,16 @@ impl Compose {
                 )?;
                 println!(
                     "[jonathanpv:debugging]\nUsing compose file: {:?}, found in: {:?}",
-                    config, temp_file.path()
+                    config,
+                    temp_file.path()
                 );
                 Ok(Some(Self {
-                    temp_file,
                     test_dir,
                     env,
                     #[cfg(unix)]
                     config,
                     network,
+                    temp_file,
                 }))
             }
         }
@@ -210,7 +207,7 @@ impl Compose {
         command.push("-compose");
         let mut command = Command::new(command);
         command.arg("--file");
-        command.arg(&self.temp_file.path());
+        command.arg(self.temp_file.path());
         command.args(args);
 
         command.current_dir(&self.test_dir);
