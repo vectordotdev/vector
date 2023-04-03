@@ -190,7 +190,12 @@ pub(crate) fn input_definitions(
         if let Ok(maybe_output) = config.source_output_for_port(key, &input.port) {
             let mut source_definitions = input.with_definitions(
                 maybe_output
-                    .unwrap_or_else(|| unreachable!())
+                    .unwrap_or_else(|| {
+                        unreachable!(
+                            "source output mis-configured - output for port {:?} missing",
+                            &input.port
+                        )
+                    })
                     .schema_definition(config.schema_enabled()),
             );
 
@@ -205,7 +210,12 @@ pub(crate) fn input_definitions(
                 config
                     .transform_output_for_port(key, &input.port, &transform_definitions)
                     .expect("transform must exist")
-                    .unwrap_or_else(|| unreachable!())
+                    .unwrap_or_else(|| {
+                        unreachable!(
+                            "transform output mis-configured - output for port {:?} missing",
+                            &input.port
+                        )
+                    })
                     .log_schema_definitions,
             );
 
