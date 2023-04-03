@@ -36,23 +36,12 @@ use crate::{
 };
 
 #[derive(Debug, Snafu)]
-pub enum FinishError {
+enum FinishError {
     #[snafu(display(
         "Failure occurred during writing to or finalizing the compressor: {}",
         source
     ))]
     CompressionFailed { source: std::io::Error },
-}
-
-impl FinishError {
-    /// Gets the telemetry-friendly string version of this error.
-    ///
-    /// The value will be a short string with only lowercase letters and underscores.
-    pub const fn as_error_type(&self) -> &'static str {
-        match self {
-            Self::CompressionFailed { .. } => "compression_failed",
-        }
-    }
 }
 
 /// Supported compression types for the AppSignal sink.
@@ -174,6 +163,8 @@ impl SinkConfig for AppsignalSinkConfig {
     }
 }
 
+// Encode logs and metrics for requests to the AppSignal API.
+// It will use a JSON format wrapping events in either "log" or "metric", based on the type of event.
 pub struct AppsignalEventEncoder {
     transformer: Transformer,
 }
@@ -228,11 +219,7 @@ impl HttpSink for AppsignalSinkConfig {
     }
 }
 
-pub(crate) async fn healthcheck(
-    uri: Uri,
-    push_api_key: String,
-    client: HttpClient,
-) -> crate::Result<()> {
+async fn healthcheck(uri: Uri, push_api_key: String, client: HttpClient) -> crate::Result<()> {
     let request = Request::get(uri).header(AUTHORIZATION, format!("Bearer {}", push_api_key));
     let response = client.send(request.body(Body::empty()).unwrap()).await?;
 
