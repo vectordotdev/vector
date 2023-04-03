@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 use std::{fs, path::Path, path::PathBuf, process::Command};
-
+use tempfile::{Builder, NamedTempFile};
 use anyhow::{bail, Context, Result};
 
 #[cfg(unix)]
@@ -29,22 +29,8 @@ impl IntegrationTest {
         let integration = integration.into();
         let environment = environment.into();
         let (test_dir, config) = IntegrationTestConfig::load(&integration)?;
-        // Load thee compose_config
-        let mut compose_config = ComposeConfig::parse(&test_dir.join("compose.yaml"))?;
+
         let network_name = format!("vector-integration-tests-{integration}");
-        // Inject the networks block
-        // TODO: Inject the labels block
-        compose_config.networks.insert("default".to_string(), {
-            BTreeMap::from_iter([("name".to_string(), network_name.clone())])
-        });
-
-        let temp_compose_path = test_dir.join("compose-temp.yaml");
-        fs::write(
-            temp_compose_path,
-            serde_yaml::to_string(&compose_config)
-                .with_context(|| "Failed to serialize modified compose.yml".to_string())?,
-        )?;
-
         let envs_dir = EnvsDir::new(&integration);
         let Some(env_config) = config.environments().get(&environment).map(Clone::clone) else {
             bail!("Could not find environment named {environment:?}");
@@ -144,41 +130,60 @@ impl IntegrationTest {
             self.runner.remove()?;
             compose.stop()?;
             self.envs_dir.remove()?;
-            std::fs::remove_file(&compose.path)?;
         }
 
         Ok(())
     }
 }
 
-// Question: Should I inject network here or should I keep it in the compose config?
-// I am leaning towards keeping it in the compose config. Since that seems to be the
-// Compose file direct mapping, but I would like guidance on this. For now I can
-// Add to network by reading the compose config.
 struct Compose {
-    path: PathBuf,
     test_dir: PathBuf,
     env: Environment,
     #[cfg(unix)]
     config: ComposeConfig,
     network: Option<String>,
+    temp_file: NamedTempFile
 }
 
 impl Compose {
     fn new(test_dir: PathBuf, env: Environment, network: Option<String>) -> Result<Option<Self>> {
-        let path: PathBuf = [&test_dir, Path::new("compose-temp.yaml")].iter().collect();
+        let path: PathBuf = [&test_dir, Path::new("compose.yaml")].iter().collect();
+
         match path.try_exists() {
             Err(error) => Err(error).with_context(|| format!("Could not lookup {path:?}")),
             Ok(false) => Ok(None),
             Ok(true) => {
                 #[cfg(unix)]
-                let config = ComposeConfig::parse(&path)?;
+                let mut config = ComposeConfig::parse(&path)?;
+
+                // Inject the networks block
+                if let Some(network) = network.clone() {
+                    config.networks.insert(
+                        "default".to_string(),
+                        BTreeMap::from_iter([("name".to_string(), network)]),
+                    );
+                }
+
+                // Create a named tempfile, there may be resource leakage here in case of SIGINT
+                // Tried tempfile::tempfile() but this returns a File object without a usable path
+                // https://docs.rs/tempfile/latest/tempfile/#resource-leaking
+                let temp_file = Builder::new()
+                    .prefix("compose-temp-")
+                    .suffix(".yaml")
+                    .tempfile()
+                    .with_context(|| "Failed to create temporary compose file")?;
+
+                fs::write(
+                    temp_file.path(),
+                    serde_yaml::to_string(&config)
+                        .with_context(|| "Failed to serialize modified compose.yml".to_string())?,
+                )?;
                 println!(
                     "[jonathanpv:debugging]\nUsing compose file: {:?}, found in: {:?}",
-                    config, path
+                    config, temp_file.path()
                 );
                 Ok(Some(Self {
-                    path,
+                    temp_file,
                     test_dir,
                     env,
                     #[cfg(unix)]
@@ -204,7 +209,7 @@ impl Compose {
         command.push("-compose");
         let mut command = Command::new(command);
         command.arg("--file");
-        command.arg(&self.path);
+        command.arg(&self.temp_file.path());
         command.args(args);
 
         command.current_dir(&self.test_dir);
