@@ -70,7 +70,7 @@ enum BuildError {
 
 /// Configuration for the `file` source.
 #[serde_as]
-#[configurable_component(source("file"))]
+#[configurable_component(source("file", "Collect logs from files."))]
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct FileConfig {
@@ -393,6 +393,7 @@ impl Default for FileConfig {
 impl_generate_config_from_default!(FileConfig);
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "file")]
 impl SourceConfig for FileConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         // add the source name as a subdir, so that multiple sources can

@@ -43,7 +43,7 @@ use unix::{statsd_unix, UnixConfig};
 use vector_core::config::LogNamespace;
 
 /// Configuration for the `statsd` source.
-#[configurable_component(source("statsd"))]
+#[configurable_component(source("statsd", "Collect metrics emitted by the StatsD aggregator."))]
 #[derive(Clone, Debug)]
 #[serde(tag = "mode", rename_all = "snake_case")]
 #[configurable(metadata(docs::enum_tag_description = "The type of socket to use."))]
@@ -140,6 +140,7 @@ impl GenerateConfig for StatsdConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "statsd")]
 impl SourceConfig for StatsdConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         match self {

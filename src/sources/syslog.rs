@@ -37,7 +37,7 @@ use crate::{
 };
 
 /// Configuration for the `syslog` source.
-#[configurable_component(source("syslog"))]
+#[configurable_component(source("syslog", "Collect logs sent via Syslog."))]
 #[derive(Clone, Debug)]
 pub struct SyslogConfig {
     #[serde(flatten)]
@@ -158,6 +158,7 @@ impl GenerateConfig for SyslogConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "syslog")]
 impl SourceConfig for SyslogConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let log_namespace = cx.log_namespace(self.log_namespace);

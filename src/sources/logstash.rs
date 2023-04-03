@@ -36,7 +36,7 @@ use crate::{
 };
 
 /// Configuration for the `logstash` source.
-#[configurable_component(source("logstash"))]
+#[configurable_component(source("logstash", "Collect logs from a Logstash agent."))]
 #[derive(Clone, Debug)]
 pub struct LogstashConfig {
     #[configurable(derived)]
@@ -133,6 +133,7 @@ impl GenerateConfig for LogstashConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "logstash")]
 impl SourceConfig for LogstashConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let log_namespace = cx.log_namespace(self.log_namespace);

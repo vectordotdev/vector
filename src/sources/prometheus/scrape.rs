@@ -42,7 +42,10 @@ enum ConfigError {
 
 /// Configuration for the `prometheus_scrape` source.
 #[serde_as]
-#[configurable_component(source("prometheus_scrape"))]
+#[configurable_component(source(
+    "prometheus_scrape",
+    "Collect metrics from Prometheus exporters."
+))]
 #[derive(Clone, Debug)]
 pub struct PrometheusScrapeConfig {
     /// Endpoints to scrape metrics from.
@@ -122,6 +125,7 @@ impl GenerateConfig for PrometheusScrapeConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "prometheus_scrape")]
 impl SourceConfig for PrometheusScrapeConfig {
     async fn build(&self, cx: SourceContext) -> Result<sources::Source> {
         let urls = self

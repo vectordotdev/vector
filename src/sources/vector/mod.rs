@@ -114,7 +114,7 @@ async fn handle_batch_status(receiver: Option<BatchStatusReceiver>) -> Result<()
 }
 
 /// Configuration for the `vector` source.
-#[configurable_component(source("vector"))]
+#[configurable_component(source("vector", "Collect observability data from a Vector instance."))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct VectorConfig {
@@ -169,6 +169,7 @@ impl GenerateConfig for VectorConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "vector")]
 impl SourceConfig for VectorConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<Source> {
         let tls_settings = MaybeTlsSettings::from_config(&self.tls, true)?;

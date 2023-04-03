@@ -119,7 +119,10 @@ static CLIENT_ID: Lazy<String> = Lazy::new(|| uuid::Uuid::new_v4().to_string());
 
 /// Configuration for the `gcp_pubsub` source.
 #[serde_as]
-#[configurable_component(source("gcp_pubsub"))]
+#[configurable_component(source(
+    "gcp_pubsub",
+    "Fetch observability events from GCP's Pub/Sub messaging system."
+))]
 #[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
 #[serde(deny_unknown_fields)]
@@ -242,6 +245,7 @@ const fn default_poll_time() -> Duration {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "gcp_pubsub")]
 impl SourceConfig for PubsubConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<crate::sources::Source> {
         let log_namespace = cx.log_namespace(self.log_namespace);

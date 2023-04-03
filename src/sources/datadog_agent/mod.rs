@@ -57,7 +57,10 @@ pub const METRICS: &str = "metrics";
 pub const TRACES: &str = "traces";
 
 /// Configuration for the `datadog_agent` source.
-#[configurable_component(source("datadog_agent"))]
+#[configurable_component(source(
+    "datadog_agent",
+    "Receive logs, metrics, and traces collected by a Datadog Agent."
+))]
 #[derive(Clone, Debug)]
 pub struct DatadogAgentConfig {
     /// The socket address to accept connections on.
@@ -139,6 +142,7 @@ impl GenerateConfig for DatadogAgentConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "datadog_agent")]
 impl SourceConfig for DatadogAgentConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
         let log_namespace = cx.log_namespace(self.log_namespace);

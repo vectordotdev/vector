@@ -53,7 +53,10 @@ pub enum Version {
 
 /// Configuration for the `aws_ecs_metrics` source.
 #[serde_as]
-#[configurable_component(source("aws_ecs_metrics"))]
+#[configurable_component(source(
+    "aws_ecs_metrics",
+    "Collect Docker container stats for tasks running in AWS ECS and AWS Fargate."
+))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct AwsEcsMetricsSourceConfig {
@@ -142,6 +145,7 @@ impl GenerateConfig for AwsEcsMetricsSourceConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "aws_ecs_metrics")]
 impl SourceConfig for AwsEcsMetricsSourceConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let namespace = Some(self.namespace.clone()).filter(|namespace| !namespace.is_empty());

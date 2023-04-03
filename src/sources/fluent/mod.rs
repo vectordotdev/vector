@@ -36,7 +36,7 @@ mod message;
 use self::message::{FluentEntry, FluentMessage, FluentRecord, FluentTag, FluentTimestamp};
 
 /// Configuration for the `fluent` source.
-#[configurable_component(source("fluent"))]
+#[configurable_component(source("fluent", "Collect logs from a Fluentd or Fluent Bit agent."))]
 #[derive(Clone, Debug)]
 pub struct FluentConfig {
     #[configurable(derived)]
@@ -85,6 +85,7 @@ impl GenerateConfig for FluentConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "fluent")]
 impl SourceConfig for FluentConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let log_namespace = cx.log_namespace(self.log_namespace);
