@@ -9285,6 +9285,7 @@ dependencies = [
  "directories 5.0.0",
  "dunce",
  "hashlink",
+ "hex",
  "indicatif",
  "itertools",
  "log",
@@ -9293,9 +9294,12 @@ dependencies = [
  "owo-colors",
  "paste",
  "regex",
+ "reqwest",
  "serde",
  "serde_json",
  "serde_yaml 0.9.19",
+ "sha2 0.10.6",
+ "tempfile",
  "toml 0.7.3",
 ]
 
