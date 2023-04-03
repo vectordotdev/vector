@@ -37,8 +37,6 @@ impl RustToolchainConfig {
     }
 }
 
-// Added the networks key, to match the structure of networks eg
-// networks: default: name: value: <some value here>
 #[derive(Debug, Deserialize, Serialize)]
 pub struct ComposeConfig {
     pub services: BTreeMap<String, ComposeService>,
