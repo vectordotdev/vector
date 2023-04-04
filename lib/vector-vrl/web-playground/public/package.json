@@ -1,0 +1,14 @@
+{
+  "name": "vector-vrl-web-playground",
+  "version": "0.1.0",
+  "files": [
+    "vector_vrl_web_playground_bg.wasm",
+    "vector_vrl_web_playground.js",
+    "vector_vrl_web_playground.d.ts"
+  ],
+  "module": "vector_vrl_web_playground.js",
+  "types": "vector_vrl_web_playground.d.ts",
+  "sideEffects": [
+    "./snippets/*"
+  ]
+}
