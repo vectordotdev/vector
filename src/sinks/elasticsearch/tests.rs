@@ -42,7 +42,9 @@ async fn sets_create_action_when_configured() {
             lookup::PathPrefix::Event,
             log_schema().timestamp_key().unwrap(),
         ),
-        Utc.with_ymd_and_hms(2020, 12, 1, 1, 2, 3).unwrap(),
+        Utc.with_ymd_and_hms(2020, 12, 1, 1, 2, 3)
+            .single()
+            .expect("invalid timestamp"),
     );
     log.insert("action", "crea");
 
@@ -94,7 +96,9 @@ async fn encode_datastream_mode() {
             lookup::PathPrefix::Event,
             log_schema().timestamp_key().unwrap(),
         ),
-        Utc.with_ymd_and_hms(2020, 12, 1, 1, 2, 3).unwrap(),
+        Utc.with_ymd_and_hms(2020, 12, 1, 1, 2, 3)
+            .single()
+            .expect("invalid timestamp"),
     );
     log.insert("data_stream", data_stream_body());
 
@@ -145,7 +149,9 @@ async fn encode_datastream_mode_no_routing() {
             lookup::PathPrefix::Event,
             log_schema().timestamp_key().unwrap(),
         ),
-        Utc.with_ymd_and_hms(2020, 12, 1, 1, 2, 3).unwrap(),
+        Utc.with_ymd_and_hms(2020, 12, 1, 1, 2, 3)
+            .single()
+            .expect("invalid timestamp"),
     );
     let mut encoded = vec![];
     let encoded_size = es
@@ -287,7 +293,9 @@ async fn encode_datastream_mode_no_sync() {
             lookup::PathPrefix::Event,
             log_schema().timestamp_key().unwrap(),
         ),
-        Utc.with_ymd_and_hms(2020, 12, 1, 1, 2, 3).unwrap(),
+        Utc.with_ymd_and_hms(2020, 12, 1, 1, 2, 3)
+            .single()
+            .expect("invalid timestamp"),
     );
 
     let mut encoded = vec![];

@@ -591,7 +591,7 @@ impl std::fmt::Debug for File {
 
 #[cfg(test)]
 mod tests {
-    use chrono::{Duration, TimeZone};
+    use chrono::{TimeZone, Timelike};
 
     use super::*;
 
@@ -617,29 +617,41 @@ mod tests {
 
         assert_eq!(
             Ok(Value::from(
-                chrono::Utc.with_ymd_and_hms(2020, 3, 5, 0, 0, 0).unwrap()
+                chrono::Utc
+                    .with_ymd_and_hms(2020, 3, 5, 0, 0, 0)
+                    .single()
+                    .expect("invalid timestamp")
             )),
             config.parse_column(Default::default(), "col2", 1, "2020-03-05")
         );
 
         assert_eq!(
             Ok(Value::from(
-                chrono::Utc.with_ymd_and_hms(2020, 3, 5, 0, 0, 0).unwrap()
+                chrono::Utc
+                    .with_ymd_and_hms(2020, 3, 5, 0, 0, 0)
+                    .single()
+                    .expect("invalid timestamp")
             )),
             config.parse_column(Default::default(), "col3", 1, "03/05/2020")
         );
 
         assert_eq!(
             Ok(Value::from(
-                chrono::Utc.with_ymd_and_hms(2020, 3, 5, 0, 0, 0).unwrap()
+                chrono::Utc
+                    .with_ymd_and_hms(2020, 3, 5, 0, 0, 0)
+                    .single()
+                    .expect("invalid timestamp")
             )),
             config.parse_column(Default::default(), "col3-spaces", 1, "03 05 2020")
         );
 
         assert_eq!(
             Ok(Value::from(
-                chrono::Utc.with_ymd_and_hms(2001, 7, 7, 15, 4, 0).unwrap()
-                    + Duration::microseconds(26490)
+                chrono::Utc
+                    .with_ymd_and_hms(2001, 7, 7, 15, 4, 0)
+                    .single()
+                    .and_then(|t| t.with_nanosecond(26490 * 1_000))
+                    .expect("invalid timestamp")
             )),
             config.parse_column(
                 Default::default(),
@@ -651,8 +663,11 @@ mod tests {
 
         assert_eq!(
             Ok(Value::from(
-                chrono::Utc.with_ymd_and_hms(2001, 7, 7, 15, 4, 0).unwrap()
-                    + Duration::microseconds(26490)
+                chrono::Utc
+                    .with_ymd_and_hms(2001, 7, 7, 15, 4, 0)
+                    .single()
+                    .and_then(|t| t.with_nanosecond(26490 * 1_000))
+                    .expect("invalid timestamp")
             )),
             config.parse_column(
                 Default::default(),
@@ -941,11 +956,21 @@ mod tests {
             vec![
                 vec![
                     "zip".into(),
-                    Value::Timestamp(chrono::Utc.with_ymd_and_hms(2015, 12, 7, 0, 0, 0).unwrap()),
+                    Value::Timestamp(
+                        chrono::Utc
+                            .with_ymd_and_hms(2015, 12, 7, 0, 0, 0)
+                            .single()
+                            .expect("invalid timestamp"),
+                    ),
                 ],
                 vec![
                     "zip".into(),
-                    Value::Timestamp(chrono::Utc.with_ymd_and_hms(2016, 12, 7, 0, 0, 0).unwrap()),
+                    Value::Timestamp(
+                        chrono::Utc
+                            .with_ymd_and_hms(2016, 12, 7, 0, 0, 0)
+                            .single()
+                            .expect("invalid timestamp"),
+                    ),
                 ],
             ],
             vec!["field1".to_string(), "field2".to_string()],
@@ -960,8 +985,14 @@ mod tests {
             },
             Condition::BetweenDates {
                 field: "field2",
-                from: chrono::Utc.with_ymd_and_hms(2016, 1, 1, 0, 0, 0).unwrap(),
-                to: chrono::Utc.with_ymd_and_hms(2017, 1, 1, 0, 0, 0).unwrap(),
+                from: chrono::Utc
+                    .with_ymd_and_hms(2016, 1, 1, 0, 0, 0)
+                    .single()
+                    .expect("invalid timestamp"),
+                to: chrono::Utc
+                    .with_ymd_and_hms(2017, 1, 1, 0, 0, 0)
+                    .single()
+                    .expect("invalid timestamp"),
             },
         ];
 
@@ -970,7 +1001,12 @@ mod tests {
                 (String::from("field1"), Value::from("zip")),
                 (
                     String::from("field2"),
-                    Value::Timestamp(chrono::Utc.with_ymd_and_hms(2016, 12, 7, 0, 0, 0).unwrap())
+                    Value::Timestamp(
+                        chrono::Utc
+                            .with_ymd_and_hms(2016, 12, 7, 0, 0, 0)
+                            .single()
+                            .expect("invalid timestamp")
+                    )
                 )
             ])),
             file.find_table_row(Case::Sensitive, &conditions, None, Some(handle))

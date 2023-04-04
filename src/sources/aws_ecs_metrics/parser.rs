@@ -559,7 +559,7 @@ pub(super) fn parse(
 
 #[cfg(test)]
 mod test {
-    use chrono::{offset::TimeZone, DateTime, Duration, Utc};
+    use chrono::{offset::TimeZone, DateTime, Timelike, Utc};
     use vector_common::assert_event_data_eq;
     use vector_core::metric_tags;
 
@@ -567,7 +567,10 @@ mod test {
     use crate::event::metric::{Metric, MetricKind, MetricValue};
 
     fn ts() -> DateTime<Utc> {
-        Utc.with_ymd_and_hms(2018, 11, 14, 8, 9, 10).unwrap() + Duration::nanoseconds(11)
+        Utc.with_ymd_and_hms(2018, 11, 14, 8, 9, 10)
+            .single()
+            .and_then(|t| t.with_nanosecond(11))
+            .expect("invalid timestamp")
     }
 
     fn namespace() -> String {

@@ -488,7 +488,10 @@ mod tests {
 
     #[test]
     fn render_log_timestamp_strftime_style() {
-        let ts = Utc.with_ymd_and_hms(2001, 2, 3, 4, 5, 6).unwrap();
+        let ts = Utc
+            .with_ymd_and_hms(2001, 2, 3, 4, 5, 6)
+            .single()
+            .expect("invalid timestamp");
 
         let mut event = Event::Log(LogEvent::from("hello world"));
         event.as_mut_log().insert(
@@ -506,7 +509,10 @@ mod tests {
 
     #[test]
     fn render_log_timestamp_multiple_strftime_style() {
-        let ts = Utc.with_ymd_and_hms(2001, 2, 3, 4, 5, 6).unwrap();
+        let ts = Utc
+            .with_ymd_and_hms(2001, 2, 3, 4, 5, 6)
+            .single()
+            .expect("invalid timestamp");
 
         let mut event = Event::Log(LogEvent::from("hello world"));
         event.as_mut_log().insert(
@@ -527,7 +533,10 @@ mod tests {
 
     #[test]
     fn render_log_dynamic_with_strftime() {
-        let ts = Utc.with_ymd_and_hms(2001, 2, 3, 4, 5, 6).unwrap();
+        let ts = Utc
+            .with_ymd_and_hms(2001, 2, 3, 4, 5, 6)
+            .single()
+            .expect("invalid timestamp");
 
         let mut event = Event::Log(LogEvent::from("hello world"));
         event.as_mut_log().insert("foo", "butts");
@@ -549,7 +558,10 @@ mod tests {
 
     #[test]
     fn render_log_dynamic_with_nested_strftime() {
-        let ts = Utc.with_ymd_and_hms(2001, 2, 3, 4, 5, 6).unwrap();
+        let ts = Utc
+            .with_ymd_and_hms(2001, 2, 3, 4, 5, 6)
+            .single()
+            .expect("invalid timestamp");
 
         let mut event = Event::Log(LogEvent::from("hello world"));
         event.as_mut_log().insert("format", "%F");
@@ -571,7 +583,10 @@ mod tests {
 
     #[test]
     fn render_log_dynamic_with_reverse_nested_strftime() {
-        let ts = Utc.with_ymd_and_hms(2001, 2, 3, 4, 5, 6).unwrap();
+        let ts = Utc
+            .with_ymd_and_hms(2001, 2, 3, 4, 5, 6)
+            .single()
+            .expect("invalid timestamp");
 
         let mut event = Event::Log(LogEvent::from("hello world"));
         event.as_mut_log().insert("\"%F\"", "foo");
@@ -653,7 +668,11 @@ mod tests {
             MetricKind::Absolute,
             MetricValue::Counter { value: 1.1 },
         )
-        .with_timestamp(Some(Utc.with_ymd_and_hms(2002, 3, 4, 5, 6, 7).unwrap()))
+        .with_timestamp(Some(
+            Utc.with_ymd_and_hms(2002, 3, 4, 5, 6, 7)
+                .single()
+                .expect("invalid timestamp"),
+        ))
     }
 
     #[test]

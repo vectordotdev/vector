@@ -88,7 +88,7 @@ impl Encoder<Event> for JsonSerializer {
 #[cfg(test)]
 mod tests {
     use bytes::{Bytes, BytesMut};
-    use chrono::{Duration, TimeZone, Utc};
+    use chrono::{TimeZone, Timelike, Utc};
     use value::btreemap;
     use vector_core::event::{LogEvent, Metric, MetricKind, MetricValue, StatisticKind, Value};
     use vector_core::metric_tags;
@@ -122,7 +122,10 @@ mod tests {
                 "Key3" => "Value3",
             )))
             .with_timestamp(Some(
-                Utc.with_ymd_and_hms(2018, 11, 14, 8, 9, 10).unwrap() + Duration::nanoseconds(11),
+                Utc.with_ymd_and_hms(2018, 11, 14, 8, 9, 10)
+                    .single()
+                    .and_then(|t| t.with_nanosecond(11))
+                    .expect("invalid timestamp"),
             )),
         );
 

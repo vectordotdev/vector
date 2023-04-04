@@ -130,7 +130,7 @@ fn reparse_groups(groups: Vec<MetricGroup>) -> Vec<Event> {
 
 #[cfg(test)]
 mod test {
-    use chrono::{Duration, TimeZone, Utc};
+    use chrono::{TimeZone, Timelike, Utc};
     use once_cell::sync::Lazy;
     use similar_asserts::assert_eq;
     use vector_common::assert_event_data_eq;
@@ -140,7 +140,10 @@ mod test {
     use crate::event::metric::{Metric, MetricKind, MetricValue};
 
     static TIMESTAMP: Lazy<DateTime<Utc>> = Lazy::new(|| {
-        Utc.with_ymd_and_hms(2021, 2, 4, 4, 5, 6).unwrap() + Duration::milliseconds(789)
+        Utc.with_ymd_and_hms(2021, 2, 4, 4, 5, 6)
+            .single()
+            .and_then(|t| t.with_nanosecond(789 * 1_000_000))
+            .expect("invalid timestamp")
     });
 
     fn parse_text(text: &str) -> Result<Vec<Metric>, ParserError> {

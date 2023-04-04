@@ -520,7 +520,11 @@ mod tests {
         log.insert("anumber", Value::Bytes("100".into()));
         log.insert(
             "timestamp",
-            Value::Timestamp(Utc.with_ymd_and_hms(2020, 1, 1, 12, 30, 0).unwrap()),
+            Value::Timestamp(
+                Utc.with_ymd_and_hms(2020, 1, 1, 12, 30, 0)
+                    .single()
+                    .expect("invalid timestamp"),
+            ),
         );
 
         let json = encoder.encode_event(Event::from(log)).unwrap();

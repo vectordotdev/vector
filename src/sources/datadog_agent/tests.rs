@@ -820,7 +820,11 @@ async fn decode_series_endpoint_v1() {
             assert_eq!(metric.namespace(), None);
             assert_eq!(
                 metric.timestamp(),
-                Some(Utc.with_ymd_and_hms(2018, 11, 14, 8, 9, 10).unwrap())
+                Some(
+                    Utc.with_ymd_and_hms(2018, 11, 14, 8, 9, 10)
+                        .single()
+                        .expect("invalid timestamp")
+                )
             );
             assert_eq!(metric.kind(), MetricKind::Absolute);
             assert_eq!(*metric.value(), MetricValue::Gauge { value: 3.14 });
@@ -842,7 +846,11 @@ async fn decode_series_endpoint_v1() {
             assert_eq!(metric.namespace(), None);
             assert_eq!(
                 metric.timestamp(),
-                Some(Utc.with_ymd_and_hms(2018, 11, 14, 8, 9, 11).unwrap())
+                Some(
+                    Utc.with_ymd_and_hms(2018, 11, 14, 8, 9, 11)
+                        .single()
+                        .expect("invalid timestamp")
+                )
             );
             assert_eq!(metric.kind(), MetricKind::Absolute);
             assert_eq!(*metric.value(), MetricValue::Gauge { value: 3.1415 });
@@ -864,7 +872,11 @@ async fn decode_series_endpoint_v1() {
             assert_eq!(metric.namespace(), None);
             assert_eq!(
                 metric.timestamp(),
-                Some(Utc.with_ymd_and_hms(2018, 11, 14, 8, 9, 10).unwrap())
+                Some(
+                    Utc.with_ymd_and_hms(2018, 11, 14, 8, 9, 10)
+                        .single()
+                        .expect("invalid timestamp")
+                )
             );
             assert_eq!(metric.kind(), MetricKind::Incremental);
             assert_eq!(
@@ -890,7 +902,11 @@ async fn decode_series_endpoint_v1() {
             assert_eq!(metric.name(), "dd_count");
             assert_eq!(
                 metric.timestamp(),
-                Some(Utc.with_ymd_and_hms(2018, 11, 14, 8, 9, 15).unwrap())
+                Some(
+                    Utc.with_ymd_and_hms(2018, 11, 14, 8, 9, 15)
+                        .single()
+                        .expect("invalid timestamp")
+                )
             );
             assert_eq!(metric.kind(), MetricKind::Incremental);
             assert_eq!(
@@ -994,7 +1010,11 @@ async fn decode_sketches() {
             assert_eq!(metric.name(), "dd_sketch");
             assert_eq!(
                 metric.timestamp(),
-                Some(Utc.with_ymd_and_hms(2018, 11, 14, 8, 9, 10).unwrap())
+                Some(
+                    Utc.with_ymd_and_hms(2018, 11, 14, 8, 9, 10)
+                        .single()
+                        .expect("invalid timestamp")
+                )
             );
             assert_eq!(metric.kind(), MetricKind::Incremental);
             assert_tags(
@@ -1366,7 +1386,11 @@ async fn split_outputs() {
             assert_eq!(metric.name(), "dd_gauge");
             assert_eq!(
                 metric.timestamp(),
-                Some(Utc.with_ymd_and_hms(2018, 11, 14, 8, 9, 10).unwrap())
+                Some(
+                    Utc.with_ymd_and_hms(2018, 11, 14, 8, 9, 10)
+                        .single()
+                        .expect("invalid timestamp")
+                )
             );
             assert_eq!(metric.kind(), MetricKind::Absolute);
             assert_eq!(*metric.value(), MetricValue::Gauge { value: 3.14 });
@@ -1391,7 +1415,13 @@ async fn split_outputs() {
             let event = log_event.remove(0);
             let log = event.as_log();
             assert_eq!(log["message"], "baz".into());
-            assert_eq!(log["timestamp"], Utc.timestamp_opt(789, 0).unwrap().into());
+            assert_eq!(
+                log["timestamp"],
+                Utc.timestamp_opt(789, 0)
+                    .single()
+                    .expect("invalid timestamp")
+                    .into()
+            );
             assert_eq!(log["hostname"], "festeburg".into());
             assert_eq!(log["status"], "notice".into());
             assert_eq!(log["service"], "vector".into());
@@ -1939,7 +1969,11 @@ async fn decode_series_endpoint_v2() {
             assert_eq!(metric.name(), "dd_gauge");
             assert_eq!(
                 metric.timestamp(),
-                Some(Utc.with_ymd_and_hms(2018, 11, 14, 8, 9, 10).unwrap())
+                Some(
+                    Utc.with_ymd_and_hms(2018, 11, 14, 8, 9, 10)
+                        .single()
+                        .expect("invalid timestamp")
+                )
             );
             assert_eq!(metric.kind(), MetricKind::Absolute);
             assert_eq!(*metric.value(), MetricValue::Gauge { value: 3.14 });
@@ -1985,7 +2019,11 @@ async fn decode_series_endpoint_v2() {
             assert_eq!(metric.name(), "dd_rate");
             assert_eq!(
                 metric.timestamp(),
-                Some(Utc.with_ymd_and_hms(2018, 11, 14, 8, 9, 10).unwrap())
+                Some(
+                    Utc.with_ymd_and_hms(2018, 11, 14, 8, 9, 10)
+                        .single()
+                        .expect("invalid timestamp")
+                )
             );
             assert_eq!(metric.kind(), MetricKind::Incremental);
             assert_eq!(
@@ -2014,7 +2052,11 @@ async fn decode_series_endpoint_v2() {
             assert_eq!(metric.name(), "dd_count");
             assert_eq!(
                 metric.timestamp(),
-                Some(Utc.with_ymd_and_hms(2018, 11, 14, 8, 9, 15).unwrap())
+                Some(
+                    Utc.with_ymd_and_hms(2018, 11, 14, 8, 9, 15)
+                        .single()
+                        .expect("invalid timestamp")
+                )
             );
             assert_eq!(metric.kind(), MetricKind::Incremental);
             assert_eq!(

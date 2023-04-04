@@ -394,7 +394,7 @@ impl FunctionTransform for LogToMetric {
 
 #[cfg(test)]
 mod tests {
-    use chrono::{offset::TimeZone, DateTime, Duration as ChronoDuration, Utc};
+    use chrono::{offset::TimeZone, DateTime, Timelike, Utc};
     use lookup::PathPrefix;
     use std::time::Duration;
     use tokio::sync::mpsc;
@@ -426,7 +426,10 @@ mod tests {
     }
 
     fn ts() -> DateTime<Utc> {
-        Utc.with_ymd_and_hms(2018, 11, 14, 8, 9, 10).unwrap() + ChronoDuration::nanoseconds(11)
+        Utc.with_ymd_and_hms(2018, 11, 14, 8, 9, 10)
+            .single()
+            .and_then(|t| t.with_nanosecond(11))
+            .expect("invalid timestamp")
     }
 
     fn create_event(key: &str, value: impl Into<Value> + std::fmt::Debug) -> Event {

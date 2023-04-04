@@ -1,4 +1,4 @@
-use chrono::{DateTime, Datelike, Duration, TimeZone, Timelike, Utc};
+use chrono::{DateTime, Datelike, TimeZone, Timelike, Utc};
 use mlua::prelude::*;
 
 /// Convert a `DateTime<Utc>` to a `LuaTable`
@@ -52,6 +52,7 @@ pub fn table_to_timestamp(t: LuaTable<'_>) -> LuaResult<DateTime<Utc>> {
     let nano = t.raw_get::<_, Option<u32>>("nanosec")?.unwrap_or(0);
     Ok(Utc
         .with_ymd_and_hms(year, month, day, hour, min, sec)
-        .unwrap()
-        + Duration::nanoseconds(i64::from(nano)))
+        .single()
+        .and_then(|t| t.with_nanosecond(nano))
+        .expect("invalid timestamp"))
 }

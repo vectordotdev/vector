@@ -788,7 +788,8 @@ mod tests {
 
             let timestamp = Utc
                 .with_ymd_and_hms(1970, 1, 1, 0, 0, (i as u32) + 1)
-                .unwrap();
+                .single()
+                .expect("invalid timestamp");
             event.insert("timestamp", timestamp);
             event.insert("source_type", "file");
 

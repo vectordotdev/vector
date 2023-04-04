@@ -156,7 +156,10 @@ mod tests {
     /// Ensures that serialized `GcpSeries` matches the format that GCP expects (https://cloud.google.com/monitoring/api/ref_v3/rest/v3/TimeSeries).
     #[test]
     fn serialize_gcp_series() {
-        let end_time = chrono::Utc.with_ymd_and_hms(2023, 2, 14, 10, 0, 0).unwrap();
+        let end_time = chrono::Utc
+            .with_ymd_and_hms(2023, 2, 14, 10, 0, 0)
+            .single()
+            .expect("invalid timestamp");
         let gcp_series = GcpSeries {
             time_series: &[GcpSerie {
                 metric: GcpMetric {
