@@ -48,7 +48,7 @@ env:
 jobs:
   test-integration:
     name: Integration - Linux, ${{ matrix.test }}
-    runs-on: [linux, optimize-8-core]
+    runs-on: [linux, ubuntu-20.04-8core]
     if: |
       !github.event.pull_request
         || contains(github.event.pull_request.labels.*.name, 'ci-condition: integration tests enable')
