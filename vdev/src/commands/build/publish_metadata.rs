@@ -22,7 +22,7 @@ impl Cli {
         let version = util::get_version()?;
 
         let git_sha = git::get_git_sha()?;
-        let current_date = Local::today().naive_local().to_string();
+        let current_date = Local::now().naive_local().to_string();
         let build_desc = format!("{git_sha} {current_date}");
 
         // Figure out what our release channel is.

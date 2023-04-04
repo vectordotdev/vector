@@ -151,14 +151,15 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use chrono::TimeZone;
 
     /// Ensures that serialized `GcpSeries` matches the format that GCP expects (https://cloud.google.com/monitoring/api/ref_v3/rest/v3/TimeSeries).
     #[test]
     fn serialize_gcp_series() {
-        let end_time = chrono::DateTime::from_utc(
-            chrono::NaiveDate::from_ymd(2023, 2, 14).and_hms(10, 00, 00),
-            chrono::Utc,
-        );
+        let end_time = chrono::Utc
+            .with_ymd_and_hms(2023, 2, 14, 10, 0, 0)
+            .single()
+            .expect("invalid timestamp");
         let gcp_series = GcpSeries {
             time_series: &[GcpSerie {
                 metric: GcpMetric {

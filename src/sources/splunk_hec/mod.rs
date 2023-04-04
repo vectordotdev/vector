@@ -2080,14 +2080,14 @@ mod tests {
     fn parse_timestamps() {
         let cases = vec![
             Utc::now(),
-            Utc.ymd(1971, 11, 7)
-                .and_hms_opt(1, 1, 1)
+            Utc.with_ymd_and_hms(1971, 11, 7, 1, 1, 1)
+                .single()
                 .expect("invalid timestamp"),
-            Utc.ymd(2011, 8, 5)
-                .and_hms_opt(1, 1, 1)
+            Utc.with_ymd_and_hms(2011, 8, 5, 1, 1, 1)
+                .single()
                 .expect("invalid timestamp"),
-            Utc.ymd(2189, 11, 4)
-                .and_hms_opt(2, 2, 2)
+            Utc.with_ymd_and_hms(2189, 11, 4, 2, 2, 2)
+                .single()
                 .expect("invalid timestamp"),
         ];
 
