@@ -45,7 +45,7 @@ env:
 jobs:
   build-x86_64-unknown-linux-gnu:
     name: Build - x86_64-unknown-linux-gnu
-    runs-on: [linux, test-runner]
+    runs-on: [linux, ubuntu-20.04-8core]
     if: |
       !github.event.pull_request
         || contains(github.event.pull_request.labels.*.name, 'ci-condition: k8s e2e tests enable')
@@ -81,7 +81,7 @@ jobs:
   # See https://github.community/t/feature-request-and-use-case-example-to-allow-matrix-in-if-s/126067
   compute-k8s-test-plan:
     name: Compute K8s test plan
-    runs-on: [linux, test-runner]
+    runs-on: [linux, ubuntu-20.04-8core]
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     if: |
@@ -141,7 +141,7 @@ jobs:
 
   test-e2e-kubernetes:
     name: K8s ${{ matrix.kubernetes_version.version }} / ${{ matrix.container_runtime }} (${{ matrix.kubernetes_version.role }})
-    runs-on: [linux, test-runner]
+    runs-on: [linux, ubuntu-20.04-8core]
     needs:
       - build-x86_64-unknown-linux-gnu
       - compute-k8s-test-plan
