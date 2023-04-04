@@ -136,7 +136,7 @@ impl IntegrationTest {
 }
 
 struct Compose {
-    path: PathBuf,
+    original_path: PathBuf,
     test_dir: PathBuf,
     env: Environment,
     #[cfg(unix)]
@@ -147,14 +147,14 @@ struct Compose {
 
 impl Compose {
     fn new(test_dir: PathBuf, env: Environment, network: String) -> Result<Option<Self>> {
-        let path: PathBuf = [&test_dir, Path::new("compose.yaml")].iter().collect();
+        let original_path: PathBuf = [&test_dir, Path::new("compose.yaml")].iter().collect();
 
-        match path.try_exists() {
-            Err(error) => Err(error).with_context(|| format!("Could not lookup {path:?}")),
+        match original_path.try_exists() {
+            Err(error) => Err(error).with_context(|| format!("Could not lookup {original_path:?}")),
             Ok(false) => Ok(None),
             Ok(true) => {
                 #[cfg(unix)]
-                let mut config = ComposeConfig::parse(&path)?;
+                let mut config = ComposeConfig::parse(&original_path)?;
 
                 // Inject the networks block
                 config.networks.insert(
@@ -178,7 +178,7 @@ impl Compose {
                 )?;
 
                 Ok(Some(Self {
-                    path,
+                    original_path,
                     test_dir,
                     env,
                     #[cfg(unix)]
@@ -209,11 +209,11 @@ impl Compose {
         // needs to use the calculated path from the integration name instead of the nonexistent
         // tempfile path. This is because `stop` doesn't go through the same logic as `start`
         // and doesn't create a new tempfile before calling docker compose.
+        // If stop command needs to use some of the injected bits then we need to rebuild it
+        command.arg("--file");
         if config.is_none() {
-            command.arg("--file");
-            command.arg(&self.path);
+            command.arg(&self.original_path);
         } else {
-            command.arg("--file");
             command.arg(self.temp_file.path());
         }
 
