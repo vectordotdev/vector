@@ -168,7 +168,7 @@ impl Compose {
                 let temp_file = Builder::new()
                     .prefix("compose-temp-")
                     .suffix(".yaml")
-                    .tempfile()
+                    .tempfile_in(&test_dir)
                     .with_context(|| "Failed to create temporary compose file")?;
 
                 fs::write(
