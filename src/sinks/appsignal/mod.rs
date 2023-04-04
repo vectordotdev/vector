@@ -163,8 +163,8 @@ impl SinkConfig for AppsignalSinkConfig {
     }
 }
 
-// Encode logs and metrics for requests to the AppSignal API.
-// It will use a JSON format wrapping events in either "log" or "metric", based on the type of event.
+/// Encode logs and metrics for requests to the AppSignal API.
+/// It will use a JSON format wrapping events in either "log" or "metric", based on the type of event.
 pub struct AppsignalEventEncoder {
     transformer: Transformer,
 }
