@@ -38,7 +38,7 @@ src/sinks/honeycomb.rs @spencergilbert @vectordotdev/integrations-team
 src/sinks/http.rs @neuronull @vectordotdev/integrations-team
 src/sinks/humio/ @StephenWakely @vectordotdev/integrations-team # sink_humio_logs,sink_humio_metrics
 src/sinks/influxdb/ @vectordotdev/integrations-team # sink_influxdb_logs,sink_influxdb_metrics
-src/sinks/kafka/ vectordotdev/integrations-team
+src/sinks/kafka/ @vectordotdev/integrations-team
 src/sinks/logdna.rs @neuronull @vectordotdev/integrations-team
 src/sinks/loki/ @spencergilbert @vectordotdev/integrations-team
 src/sinks/nats.rs @StephenWakely @vectordotdev/integrations-team
