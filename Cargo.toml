@@ -166,7 +166,7 @@ aws-sdk-elasticsearch = {version = "0.21.0", default-features = false, features 
 aws-sdk-firehose = { version = "0.21.0", default-features = false, features = ["native-tls"], optional = true }
 aws-sdk-kinesis = { version = "0.21.0", default-features = false, features = ["native-tls"], optional = true }
 aws-types = { version = "0.51.0", default-features = false, features = ["hardcoded-credentials"], optional = true }
-aws-sigv4 = { version = "0.53.0", default-features = false, features = ["sign-http"], optional = true }
+aws-sigv4 = { version = "0.55.0", default-features = false, features = ["sign-http"], optional = true }
 aws-config = { version = "0.51.0", default-features = false, features = ["native-tls"], optional = true }
 aws-smithy-async = { version = "0.51.0", default-features = false, optional = true }
 aws-smithy-client = { version = "0.51.0", default-features = false, features = ["client-hyper"], optional = true}
@@ -240,7 +240,7 @@ bloom = { version = "0.3.2", default-features = false, optional = true }
 bollard = { version = "0.14.0", default-features = false, features = ["ssl", "chrono"], optional = true }
 bytes = { version = "1.4.0", default-features = false, features = ["serde"] }
 bytesize = { version = "1.2.0", default-features = false }
-chrono = { version = "0.4.22", default-features = false, features = ["serde"] }
+chrono = { version = "0.4.24", default-features = false, features = ["serde"] }
 cidr-utils = { version = "0.5.10", default-features = false }
 clap = { version = "4.1.14", default-features = false, features = ["derive", "error-context", "env", "help", "std", "string", "usage", "wrap_help"] }
 colored = { version = "2.0.0", default-features = false }
@@ -252,7 +252,7 @@ encoding_rs = { version = "0.8.32", default-features = false, features = ["serde
 enum_dispatch = { version = "0.3.11", default-features = false }
 exitcode = { version = "1.1.2", default-features = false }
 flate2 = { version = "1.0.25", default-features = false, features = ["default"] }
-futures-util = { version = "0.3.27", default-features = false }
+futures-util = { version = "0.3.28", default-features = false }
 glob = { version = "0.3.1", default-features = false }
 governor = { version = "0.5.1", default-features = false, features = ["dashmap", "jitter", "std"], optional = true }
 grok = { version = "2.0.0", default-features = false, optional = true }
@@ -353,7 +353,7 @@ similar-asserts = "1.4.2"
 proptest = "1.1"
 quickcheck = "1.0.3"
 reqwest = { version = "0.11", features = ["json"] }
-tempfile = "3.4.0"
+tempfile = "3.5.0"
 test-generator = "0.3.1"
 tokio-test = "0.4.2"
 tokio = { version = "1.26.0", features = ["test-util"] }
@@ -366,7 +366,7 @@ zstd = { version = "0.12.3", default-features = false }
 [patch.crates-io]
 # Removes dependency on `time` v0.1
 # https://github.com/chronotope/chrono/pull/578
-chrono = { git = "https://github.com/vectordotdev/chrono.git", branch = "no-default-time-v0.4.22-1" }
+chrono = { git = "https://github.com/vectordotdev/chrono.git", tag = "v0.4.24-no-default-time-1" }
 # The upgrade for `tokio-util` >= 0.6.9 is blocked on https://github.com/vectordotdev/vector/issues/11257.
 tokio-util = { git = "https://github.com/vectordotdev/tokio", branch = "tokio-util-0.7.4-framed-read-continue-on-error" }
 nix = { git = "https://github.com/vectordotdev/nix.git", branch = "memfd/gnu/musl" }

@@ -346,7 +346,7 @@ impl<'a> FromLua<'a> for Metric {
 
 #[cfg(test)]
 mod test {
-    use chrono::{offset::TimeZone, Utc};
+    use chrono::{offset::TimeZone, Timelike, Utc};
     use vector_common::assert_event_data_eq;
 
     use super::*;
@@ -382,8 +382,9 @@ mod test {
         .with_namespace(Some("namespace_example"))
         .with_tags(Some(crate::metric_tags!("example tag" => "example value")))
         .with_timestamp(Some(
-            Utc.ymd(2018, 11, 14)
-                .and_hms_nano_opt(8, 9, 10, 11)
+            Utc.with_ymd_and_hms(2018, 11, 14, 8, 9, 10)
+                .single()
+                .and_then(|t| t.with_nanosecond(11))
                 .expect("invalid timestamp"),
         ));
 
@@ -648,8 +649,8 @@ mod test {
         .with_namespace(Some("example_namespace"))
         .with_tags(Some(crate::metric_tags!("example tag" => "example value")))
         .with_timestamp(Some(
-            Utc.ymd(2018, 11, 14)
-                .and_hms_opt(8, 9, 10)
+            Utc.with_ymd_and_hms(2018, 11, 14, 8, 9, 10)
+                .single()
                 .expect("invalid timestamp"),
         ));
         assert_event_data_eq!(Lua::new().load(value).eval::<Metric>().unwrap(), expected);
@@ -690,8 +691,8 @@ mod test {
             ]),
         )]))))
         .with_timestamp(Some(
-            Utc.ymd(2018, 11, 14)
-                .and_hms_opt(8, 9, 10)
+            Utc.with_ymd_and_hms(2018, 11, 14, 8, 9, 10)
+                .single()
                 .expect("invalid timestamp"),
         ));
         assert_event_data_eq!(Lua::new().load(value).eval::<Metric>().unwrap(), expected);

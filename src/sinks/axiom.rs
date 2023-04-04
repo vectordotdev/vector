@@ -158,6 +158,7 @@ mod integration_tests {
         let client = reqwest::Client::new();
         let url = env::var("AXIOM_URL").unwrap();
         let token = env::var("AXIOM_TOKEN").expect("AXIOM_TOKEN environment variable to be set");
+        assert!(!token.is_empty(), "$AXIOM_TOKEN required");
         let dataset = env::var("AXIOM_DATASET").unwrap();
 
         let cx = SinkContext::new_test();

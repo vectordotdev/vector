@@ -122,8 +122,8 @@ mod tests {
                         (
                             "from".into(),
                             (expression::Literal::from(
-                                Utc.ymd(2015, 5, 15)
-                                    .and_hms_opt(0, 0, 0)
+                                Utc.with_ymd_and_hms(2015, 5, 15, 0, 0, 0)
+                                    .single()
                                     .expect("invalid timestamp"),
                             ))
                             .into(),
@@ -131,8 +131,8 @@ mod tests {
                         (
                             "to".into(),
                             (expression::Literal::from(
-                                Utc.ymd(2015, 6, 15)
-                                    .and_hms_opt(0, 0, 0)
+                                Utc.with_ymd_and_hms(2015, 6, 15, 0, 0, 0)
+                                    .single()
                                     .expect("invalid timestamp"),
                             ))
                             .into(),

@@ -489,8 +489,8 @@ mod tests {
     #[test]
     fn render_log_timestamp_strftime_style() {
         let ts = Utc
-            .ymd(2001, 2, 3)
-            .and_hms_opt(4, 5, 6)
+            .with_ymd_and_hms(2001, 2, 3, 4, 5, 6)
+            .single()
             .expect("invalid timestamp");
 
         let mut event = Event::Log(LogEvent::from("hello world"));
@@ -510,8 +510,8 @@ mod tests {
     #[test]
     fn render_log_timestamp_multiple_strftime_style() {
         let ts = Utc
-            .ymd(2001, 2, 3)
-            .and_hms_opt(4, 5, 6)
+            .with_ymd_and_hms(2001, 2, 3, 4, 5, 6)
+            .single()
             .expect("invalid timestamp");
 
         let mut event = Event::Log(LogEvent::from("hello world"));
@@ -534,8 +534,8 @@ mod tests {
     #[test]
     fn render_log_dynamic_with_strftime() {
         let ts = Utc
-            .ymd(2001, 2, 3)
-            .and_hms_opt(4, 5, 6)
+            .with_ymd_and_hms(2001, 2, 3, 4, 5, 6)
+            .single()
             .expect("invalid timestamp");
 
         let mut event = Event::Log(LogEvent::from("hello world"));
@@ -559,8 +559,8 @@ mod tests {
     #[test]
     fn render_log_dynamic_with_nested_strftime() {
         let ts = Utc
-            .ymd(2001, 2, 3)
-            .and_hms_opt(4, 5, 6)
+            .with_ymd_and_hms(2001, 2, 3, 4, 5, 6)
+            .single()
             .expect("invalid timestamp");
 
         let mut event = Event::Log(LogEvent::from("hello world"));
@@ -584,8 +584,8 @@ mod tests {
     #[test]
     fn render_log_dynamic_with_reverse_nested_strftime() {
         let ts = Utc
-            .ymd(2001, 2, 3)
-            .and_hms_opt(4, 5, 6)
+            .with_ymd_and_hms(2001, 2, 3, 4, 5, 6)
+            .single()
             .expect("invalid timestamp");
 
         let mut event = Event::Log(LogEvent::from("hello world"));
@@ -669,8 +669,8 @@ mod tests {
             MetricValue::Counter { value: 1.1 },
         )
         .with_timestamp(Some(
-            Utc.ymd(2002, 3, 4)
-                .and_hms_opt(5, 6, 7)
+            Utc.with_ymd_and_hms(2002, 3, 4, 5, 6, 7)
+                .single()
                 .expect("invalid timestamp"),
         ))
     }

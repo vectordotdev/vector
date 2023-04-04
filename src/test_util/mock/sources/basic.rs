@@ -6,9 +6,9 @@ use std::sync::{
 use async_trait::async_trait;
 use vector_buffers::topology::channel::{limited, LimitedReceiver};
 use vector_config::configurable_component;
-use vector_core::config::LogNamespace;
+use vector_core::{config::LogNamespace, schema::Definition};
 use vector_core::{
-    config::{DataType, Output},
+    config::{DataType, SourceOutput},
     event::{EventArray, EventContainer},
     source::Source,
 };
@@ -131,8 +131,11 @@ impl SourceConfig for BasicSourceConfig {
         }))
     }
 
-    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
-        vec![Output::default(self.data_type.unwrap())]
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
+        vec![SourceOutput::new_logs(
+            self.data_type.unwrap(),
+            Definition::default_legacy_namespace(),
+        )]
     }
 
     fn can_acknowledge(&self) -> bool {

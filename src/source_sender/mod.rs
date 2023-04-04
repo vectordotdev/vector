@@ -9,7 +9,7 @@ use vector_buffers::topology::channel::{self, LimitedReceiver, LimitedSender};
 #[cfg(test)]
 use vector_core::event::{into_event_stream, EventStatus};
 use vector_core::{
-    config::{log_schema, Output},
+    config::{log_schema, SourceOutput},
     event::{array, Event, EventArray, EventContainer, EventRef},
     internal_event::{
         self, CountByteSize, EventsSent, InternalEventHandle as _, Registered, DEFAULT_OUTPUT,
@@ -48,7 +48,7 @@ impl Builder {
         }
     }
 
-    pub fn add_output(&mut self, output: Output) -> LimitedReceiver<EventArray> {
+    pub fn add_source_output(&mut self, output: SourceOutput) -> LimitedReceiver<EventArray> {
         let lag_time = self.lag_time.clone();
         match output.port {
             None => {

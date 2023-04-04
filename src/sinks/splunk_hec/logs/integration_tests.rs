@@ -437,8 +437,8 @@ async fn splunk_auto_extracted_timestamp() {
         event.insert(
             "timestamp",
             Value::from(
-                Utc.ymd(2020, 3, 5)
-                    .and_hms_opt(0, 0, 0)
+                Utc.with_ymd_and_hms(2020, 3, 5, 0, 0, 0)
+                    .single()
                     .expect("invalid timestamp"),
             ),
         );
@@ -486,8 +486,8 @@ async fn splunk_non_auto_extracted_timestamp() {
         event.insert(
             "timestamp",
             Value::from(
-                Utc.ymd(2020, 3, 5)
-                    .and_hms_opt(0, 0, 0)
+                Utc.with_ymd_and_hms(2020, 3, 5, 0, 0, 0)
+                    .single()
                     .expect("invalid timestamp"),
             ),
         );

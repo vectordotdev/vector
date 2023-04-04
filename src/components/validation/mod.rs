@@ -81,7 +81,7 @@ impl ValidationConfiguration {
     pub fn from_transform(component_name: &'static str, config: impl Into<BoxedTransform>) -> Self {
         Self {
             component_name,
-            component_type: ComponentType::Source,
+            component_type: ComponentType::Transform,
             component_configuration: ComponentConfiguration::Transform(config.into()),
             external_resource: None,
         }

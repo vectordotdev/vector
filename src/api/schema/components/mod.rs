@@ -23,7 +23,7 @@ use crate::{
     config::{ComponentKey, Config},
     filter_check,
 };
-use crate::{config::SourceConfig, topology::schema::merged_definition};
+use crate::{config::SourceConfig, topology::schema::possible_definitions};
 
 #[derive(Debug, Clone, Interface)]
 #[graphql(
@@ -294,7 +294,7 @@ pub fn update_config(config: &Config) {
                 outputs: transform
                     .inner
                     .outputs(
-                        &merged_definition(&transform.inputs, config, &mut cache),
+                        &possible_definitions(&transform.inputs, config, &mut cache),
                         config.schema.log_namespace(),
                     )
                     .into_iter()

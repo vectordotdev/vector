@@ -33,7 +33,7 @@ use codecs::{
 };
 use vector_config::configurable_component;
 use vector_core::{
-    config::{log_schema, LogNamespace, Output},
+    config::{log_schema, LogNamespace, SourceOutput},
     event::Event,
 };
 
@@ -202,7 +202,7 @@ impl SourceConfig for HttpClientConfig {
         Ok(call(inputs, context, cx.out, self.method).boxed())
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         // There is a global and per-source `log_namespace` config. The source config overrides the global setting,
         // and is merged here.
         let log_namespace = global_log_namespace.merge(self.log_namespace);
@@ -212,7 +212,10 @@ impl SourceConfig for HttpClientConfig {
             .schema_definition(log_namespace)
             .with_standard_vector_source_metadata();
 
-        vec![Output::default(self.decoding.output_type()).with_schema_definition(schema_definition)]
+        vec![SourceOutput::new_logs(
+            self.decoding.output_type(),
+            schema_definition,
+        )]
     }
 
     fn can_acknowledge(&self) -> bool {

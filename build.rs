@@ -1,4 +1,4 @@
-use std::{collections::HashSet, env, fs::File, io::Write, path::Path};
+use std::{collections::HashSet, env, fs::File, io::Write, path::Path, process::Command};
 
 struct TrackedEnv {
     tracked: HashSet<String>,
@@ -93,9 +93,26 @@ impl BuildConstants {
     }
 }
 
+fn git_short_hash() -> std::io::Result<String> {
+    let output_result = Command::new("git")
+        .args(["rev-parse", "--short", "HEAD"])
+        .output();
+
+    output_result.map(|output| {
+        let mut hash = String::from_utf8(output.stdout).expect("valid UTF-8");
+        hash.retain(|c| !c.is_ascii_whitespace());
+
+        hash
+    })
+}
+
 fn main() {
     // Always rerun if the build script itself changes.
     println!("cargo:rerun-if-changed=build.rs");
+
+    // re-run if the HEAD has changed. This is only necessary for non-release and nightly builds.
+    #[cfg(not(feature = "nightly"))]
+    println!("cargo:rerun-if-changed=.git/HEAD");
 
     #[cfg(feature = "protobuf-build")]
     {
@@ -162,6 +179,24 @@ fn main() {
         .expect("Cargo-provided environment variables should always exist!");
     let build_desc = tracker.get_env_var("VECTOR_BUILD_DESC");
 
+    // Get the git short hash of the HEAD.
+    // Note that if Vector is compiled within a container, proper git permissions must be set for
+    // the repo directory.
+    // In CI build workflows this will have been pre-configured by running the command
+    // "git config --global --add safe.directory /git/vectordotdev/vector", from the vdev package
+    // subcommands.
+    let git_short_hash = git_short_hash()
+        .map_err(|e| {
+            #[allow(clippy::print_stderr)]
+            {
+                eprintln!(
+                    "Unable to determine git short hash from rev-parse command: {}",
+                    e
+                );
+            }
+        })
+        .expect("git hash detection failed");
+
     // Gather up the constants and write them out to our build constants file.
     let mut constants = BuildConstants::new();
     constants.add_required_constant(
@@ -205,6 +240,11 @@ fn main() {
         "VECTOR_BUILD_DESC",
         "Special build description, related to versioned releases.",
         build_desc,
+    );
+    constants.add_required_constant(
+        "GIT_SHORT_HASH",
+        "The short hash of the Git HEAD",
+        git_short_hash,
     );
     constants
         .write_to_file("built.rs")
