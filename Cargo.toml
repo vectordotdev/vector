@@ -222,7 +222,7 @@ tui = { version = "0.19.0", optional = true, default-features = false, features 
 
 # Datadog Pipelines
 datadog-filter = { package = "datadog-filter", git = "https://github.com/vectordotdev/vrl", rev = "v0.1.0" }
-datadog-search-syntax = { package = "datadog-search-syntax", git = "https://github.com/vectordotdev/vrl", rev = "v0.1.0" }
+datadog-search-syntax = { package = "datadog-search-syntax", git = "https://github.com/vectordotdev/vrl", rev = "v0.2.0" }
 hex = { version = "0.4.3", default-features = false, optional = true }
 sha2 = { version = "0.10.6", default-features = false, optional = true }
 

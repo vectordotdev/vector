@@ -2578,7 +2578,7 @@ name = "datadog-filter"
 version = "0.1.0"
 source = "git+https://github.com/vectordotdev/vrl?rev=v0.1.0#c515186e30058ddb5b8506d2763eaa98c1b13d93"
 dependencies = [
- "datadog-search-syntax",
+ "datadog-search-syntax 0.1.0 (git+https://github.com/vectordotdev/vrl?rev=v0.1.0)",
  "dyn-clone",
  "regex",
 ]
@@ -2611,6 +2611,18 @@ dependencies = [
 name = "datadog-search-syntax"
 version = "0.1.0"
 source = "git+https://github.com/vectordotdev/vrl?rev=v0.1.0#c515186e30058ddb5b8506d2763eaa98c1b13d93"
+dependencies = [
+ "itertools",
+ "once_cell",
+ "pest",
+ "pest_derive",
+ "regex",
+]
+
+[[package]]
+name = "datadog-search-syntax"
+version = "0.1.0"
+source = "git+https://github.com/vectordotdev/vrl?rev=v0.2.0#258cc611080c1bdb5ed6897e8a79b76ab2038fcb"
 dependencies = [
  "itertools",
  "once_cell",
@@ -9359,7 +9371,7 @@ dependencies = [
  "crossterm 0.26.1",
  "csv",
  "datadog-filter",
- "datadog-search-syntax",
+ "datadog-search-syntax 0.1.0 (git+https://github.com/vectordotdev/vrl?rev=v0.2.0)",
  "derivative",
  "dirs-next",
  "dnsmsg-parser",
@@ -9929,7 +9941,7 @@ dependencies = [
  "data-encoding",
  "datadog-filter",
  "datadog-grok",
- "datadog-search-syntax",
+ "datadog-search-syntax 0.1.0 (git+https://github.com/vectordotdev/vrl?rev=v0.1.0)",
  "dns-lookup",
  "flate2",
  "grok",
