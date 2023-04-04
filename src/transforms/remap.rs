@@ -163,7 +163,7 @@ impl RemapConfig {
 
         let mut functions = vrl_stdlib::all();
         functions.append(&mut enrichment::vrl_functions());
-        functions.append(&mut vector_vrl_functions::vrl_functions());
+        functions.append(&mut vector_vrl_functions::all());
 
         let state = TypeState {
             local: Default::default(),

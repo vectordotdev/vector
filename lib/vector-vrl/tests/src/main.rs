@@ -94,7 +94,7 @@ fn main() {
     };
 
     let mut functions = stdlib::all();
-    functions.extend(vector_vrl_functions::vrl_functions());
+    functions.extend(vector_vrl_functions::all());
     functions.extend(enrichment::vrl_functions());
 
     run_tests(
@@ -120,7 +120,7 @@ fn get_tests(cmd: &Cmd) -> Vec<Test> {
         })
         .chain(docs::tests(cmd.ignore_cue).into_iter())
         .chain(get_tests_from_functions(
-            vector_vrl_functions::vrl_functions()
+            vector_vrl_functions::all()
                 .into_iter()
                 .chain(enrichment::vrl_functions())
                 .collect(),

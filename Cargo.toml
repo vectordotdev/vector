@@ -109,6 +109,7 @@ members = [
   "lib/vector-vrl/cli",
   "lib/vector-vrl/functions",
   "lib/vector-vrl/tests",
+  "lib/vector-vrl/web-playground",
   "vdev",
 ]
 
@@ -124,7 +125,7 @@ portpicker = { path = "lib/portpicker" }
 prometheus-parser = { path = "lib/prometheus-parser", optional = true }
 opentelemetry-proto = { path = "lib/opentelemetry-proto", optional = true }
 tracing-limit = { path = "lib/tracing-limit" }
-value = { package = "value", git = "https://github.com/vectordotdev/vrl", rev = "v0.1.0" }
+value = { package = "value", git = "https://github.com/vectordotdev/vrl", rev = "v0.2.0" }
 vector-api-client = { path = "lib/vector-api-client", optional = true }
 vector-buffers = { path = "lib/vector-buffers", default-features = false }
 vector-common = { path = "lib/vector-common" }
@@ -133,7 +134,7 @@ vector-config-common = { path = "lib/vector-config-common" }
 vector-config-macros = { path = "lib/vector-config-macros" }
 vector-core = { path = "lib/vector-core", default-features = false, features = ["vrl"] }
 vector-vrl-functions = { path = "lib/vector-vrl/functions" }
-vrl-cli = { package = "vrl-cli", git = "https://github.com/vectordotdev/vrl", rev = "v0.1.0", optional = true }
+vrl-cli = { package = "vrl-cli", git = "https://github.com/vectordotdev/vrl", rev = "v0.2.0", optional = true }
 loki-logproto = { path = "lib/loki-logproto", optional = true }
 
 # Tokio / Futures
@@ -221,14 +222,14 @@ number_prefix = { version = "0.4.0", default-features = false, features = ["std"
 tui = { version = "0.19.0", optional = true, default-features = false, features = ["crossterm"] }
 
 # Datadog Pipelines
-datadog-filter = { package = "datadog-filter", git = "https://github.com/vectordotdev/vrl", rev = "v0.1.0" }
-datadog-search-syntax = { package = "datadog-search-syntax", git = "https://github.com/vectordotdev/vrl", rev = "v0.1.0" }
+datadog-filter = { package = "datadog-filter", git = "https://github.com/vectordotdev/vrl", rev = "v0.2.0" }
+datadog-search-syntax = { package = "datadog-search-syntax", git = "https://github.com/vectordotdev/vrl", rev = "v0.2.0" }
 hex = { version = "0.4.3", default-features = false, optional = true }
 sha2 = { version = "0.10.6", default-features = false, optional = true }
 
 # VRL Lang
-vrl = { package = "vrl", git = "https://github.com/vectordotdev/vrl", rev = "v0.1.0" }
-vrl-stdlib = { package = "vrl-stdlib", git = "https://github.com/vectordotdev/vrl", rev = "v0.1.0" }
+vrl = { package = "vrl", git = "https://github.com/vectordotdev/vrl", rev = "v0.2.0" }
+vrl-stdlib = { package = "vrl-stdlib", git = "https://github.com/vectordotdev/vrl", rev = "v0.2.0" }
 
 # External libs
 arc-swap = { version = "1.6", default-features = false, optional = true }
@@ -358,7 +359,7 @@ test-generator = "0.3.1"
 tokio-test = "0.4.2"
 tokio = { version = "1.26.0", features = ["test-util"] }
 tower-test = "0.4.0"
-value = { package = "value", git = "https://github.com/vectordotdev/vrl", rev = "v0.1.0", features = ["test"] }
+value = { package = "value", git = "https://github.com/vectordotdev/vrl", rev = "v0.2.0", features = ["test"] }
 vector-core = { path = "lib/vector-core", default-features = false, features = ["vrl", "test"] }
 wiremock = "0.5.17"
 zstd = { version = "0.12.3", default-features = false }
