@@ -20,3 +20,6 @@ services:
     - ../../../tests/data/nginx/:/etc/nginx:ro
     networks:
     - proxy
+
+networks:
+  proxy: {}
