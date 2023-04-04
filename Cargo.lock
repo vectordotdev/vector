@@ -1997,7 +1997,7 @@ dependencies = [
  "tokio",
  "tokio-util",
  "tracing 0.1.37",
- "value",
+ "value 0.1.0 (git+https://github.com/vectordotdev/vrl?rev=v0.1.0)",
  "vector-common",
  "vector-config",
  "vector-config-common",
@@ -2593,7 +2593,7 @@ dependencies = [
  "chrono-tz",
  "lalrpop",
  "lalrpop-util",
- "lookup",
+ "lookup 0.1.0 (git+https://github.com/vectordotdev/vrl?rev=v0.1.0)",
  "nom",
  "once_cell",
  "onig",
@@ -2603,7 +2603,7 @@ dependencies = [
  "serde_json",
  "thiserror",
  "tracing 0.1.37",
- "value",
+ "value 0.1.0 (git+https://github.com/vectordotdev/vrl?rev=v0.1.0)",
  "vrl-compiler",
 ]
 
@@ -2926,7 +2926,7 @@ dependencies = [
  "arc-swap",
  "chrono",
  "dyn-clone",
- "value",
+ "value 0.1.0 (git+https://github.com/vectordotdev/vrl?rev=v0.1.0)",
  "vector-common",
  "vrl",
 ]
@@ -4732,6 +4732,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "lookup"
+version = "0.1.0"
+source = "git+https://github.com/vectordotdev/vrl?rev=v0.2.0#258cc611080c1bdb5ed6897e8a79b76ab2038fcb"
+dependencies = [
+ "inherent",
+ "lalrpop",
+ "lalrpop-util",
+ "once_cell",
+ "regex",
+ "serde",
+ "snafu",
+]
+
+[[package]]
 name = "lru"
 version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5676,7 +5690,7 @@ dependencies = [
  "prost-build",
  "tonic",
  "tonic-build",
- "value",
+ "value 0.1.0 (git+https://github.com/vectordotdev/vrl?rev=v0.1.0)",
  "vector-core",
  "vector-lookup",
 ]
@@ -6324,7 +6338,7 @@ dependencies = [
  "prost-build",
  "prost-types",
  "snafu",
- "value",
+ "value 0.1.0 (git+https://github.com/vectordotdev/vrl?rev=v0.1.0)",
  "vector-common",
 ]
 
@@ -9252,7 +9266,7 @@ dependencies = [
  "async-graphql",
  "bytes 1.4.0",
  "chrono",
- "lookup",
+ "lookup 0.1.0 (git+https://github.com/vectordotdev/vrl?rev=v0.1.0)",
  "mlua",
  "ordered-float 3.6.0",
  "quickcheck",
@@ -9261,6 +9275,22 @@ dependencies = [
  "serde_json",
  "snafu",
  "toml 0.7.3",
+ "tracing 0.1.37",
+]
+
+[[package]]
+name = "value"
+version = "0.1.0"
+source = "git+https://github.com/vectordotdev/vrl?rev=v0.2.0#258cc611080c1bdb5ed6897e8a79b76ab2038fcb"
+dependencies = [
+ "bytes 1.4.0",
+ "chrono",
+ "lookup 0.1.0 (git+https://github.com/vectordotdev/vrl?rev=v0.2.0)",
+ "ordered-float 3.6.0",
+ "regex",
+ "serde",
+ "serde_json",
+ "snafu",
  "tracing 0.1.37",
 ]
 
@@ -9488,7 +9518,7 @@ dependencies = [
  "typetag",
  "url",
  "uuid",
- "value",
+ "value 0.1.0 (git+https://github.com/vectordotdev/vrl?rev=v0.1.0)",
  "vector-api-client",
  "vector-buffers",
  "vector-common",
@@ -9599,11 +9629,11 @@ dependencies = [
  "stream-cancel",
  "tokio",
  "tracing 0.1.37",
- "value",
+ "value 0.1.0 (git+https://github.com/vectordotdev/vrl?rev=v0.1.0)",
  "vector-config",
  "vector-config-common",
  "vector-config-macros",
- "vrl-core",
+ "vrl-core 0.1.0 (git+https://github.com/vectordotdev/vrl?rev=v0.2.0)",
 ]
 
 [[package]]
@@ -9627,7 +9657,7 @@ dependencies = [
  "vector-config-common",
  "vector-config-macros",
  "vrl-compiler",
- "vrl-core",
+ "vrl-core 0.1.0 (git+https://github.com/vectordotdev/vrl?rev=v0.2.0)",
 ]
 
 [[package]]
@@ -9731,7 +9761,7 @@ dependencies = [
  "twox-hash",
  "typetag",
  "url",
- "value",
+ "value 0.1.0 (git+https://github.com/vectordotdev/vrl?rev=v0.1.0)",
  "vector-buffers",
  "vector-common",
  "vector-config",
@@ -9745,7 +9775,7 @@ dependencies = [
 name = "vector-lookup"
 version = "0.1.0"
 dependencies = [
- "lookup",
+ "lookup 0.1.0 (git+https://github.com/vectordotdev/vrl?rev=v0.1.0)",
  "serde",
  "vector-config",
  "vector-config-macros",
@@ -9765,8 +9795,8 @@ dependencies = [
 name = "vector-vrl-functions"
 version = "0.1.0"
 dependencies = [
- "lookup",
- "value",
+ "lookup 0.1.0 (git+https://github.com/vectordotdev/vrl?rev=v0.1.0)",
+ "value 0.1.0 (git+https://github.com/vectordotdev/vrl?rev=v0.1.0)",
  "vrl",
 ]
 
@@ -9780,14 +9810,14 @@ dependencies = [
  "clap 4.1.14",
  "enrichment",
  "glob",
- "lookup",
+ "lookup 0.1.0 (git+https://github.com/vectordotdev/vrl?rev=v0.1.0)",
  "prettydiff",
  "regex",
  "serde",
  "serde_json",
  "tikv-jemallocator",
  "tracing-subscriber",
- "value",
+ "value 0.1.0 (git+https://github.com/vectordotdev/vrl?rev=v0.1.0)",
  "vector-vrl-functions",
  "vrl",
  "vrl-stdlib",
@@ -9813,12 +9843,12 @@ source = "git+https://github.com/vectordotdev/vrl?rev=v0.1.0#c515186e30058ddb5b8
 dependencies = [
  "bytes 1.4.0",
  "indoc",
- "lookup",
+ "lookup 0.1.0 (git+https://github.com/vectordotdev/vrl?rev=v0.1.0)",
  "ordered-float 3.6.0",
- "value",
+ "value 0.1.0 (git+https://github.com/vectordotdev/vrl?rev=v0.1.0)",
  "vrl-compiler",
- "vrl-core",
- "vrl-diagnostic",
+ "vrl-core 0.1.0 (git+https://github.com/vectordotdev/vrl?rev=v0.1.0)",
+ "vrl-diagnostic 0.1.0 (git+https://github.com/vectordotdev/vrl?rev=v0.1.0)",
  "vrl-parser",
 ]
 
@@ -9830,16 +9860,16 @@ dependencies = [
  "clap 4.1.14",
  "exitcode",
  "indoc",
- "lookup",
+ "lookup 0.1.0 (git+https://github.com/vectordotdev/vrl?rev=v0.1.0)",
  "once_cell",
  "prettytable-rs",
  "regex",
  "rustyline",
  "serde_json",
  "thiserror",
- "value",
+ "value 0.1.0 (git+https://github.com/vectordotdev/vrl?rev=v0.1.0)",
  "vrl",
- "vrl-core",
+ "vrl-core 0.1.0 (git+https://github.com/vectordotdev/vrl?rev=v0.1.0)",
  "vrl-stdlib",
  "webbrowser",
 ]
@@ -9855,15 +9885,15 @@ dependencies = [
  "dyn-clone",
  "getrandom 0.2.8",
  "lalrpop-util",
- "lookup",
+ "lookup 0.1.0 (git+https://github.com/vectordotdev/vrl?rev=v0.1.0)",
  "ordered-float 3.6.0",
  "paste",
  "regex",
  "serde",
  "thiserror",
- "value",
- "vrl-core",
- "vrl-diagnostic",
+ "value 0.1.0 (git+https://github.com/vectordotdev/vrl?rev=v0.1.0)",
+ "vrl-core 0.1.0 (git+https://github.com/vectordotdev/vrl?rev=v0.1.0)",
+ "vrl-diagnostic 0.1.0 (git+https://github.com/vectordotdev/vrl?rev=v0.1.0)",
  "vrl-parser",
 ]
 
@@ -9876,15 +9906,35 @@ dependencies = [
  "chrono",
  "chrono-tz",
  "derivative",
- "lookup",
+ "lookup 0.1.0 (git+https://github.com/vectordotdev/vrl?rev=v0.1.0)",
  "nom",
  "ordered-float 3.6.0",
  "serde",
  "serde_json",
  "snafu",
  "tracing 0.1.37",
- "value",
- "vrl-diagnostic",
+ "value 0.1.0 (git+https://github.com/vectordotdev/vrl?rev=v0.1.0)",
+ "vrl-diagnostic 0.1.0 (git+https://github.com/vectordotdev/vrl?rev=v0.1.0)",
+]
+
+[[package]]
+name = "vrl-core"
+version = "0.1.0"
+source = "git+https://github.com/vectordotdev/vrl?rev=v0.2.0#258cc611080c1bdb5ed6897e8a79b76ab2038fcb"
+dependencies = [
+ "bytes 1.4.0",
+ "chrono",
+ "chrono-tz",
+ "derivative",
+ "lookup 0.1.0 (git+https://github.com/vectordotdev/vrl?rev=v0.2.0)",
+ "nom",
+ "ordered-float 3.6.0",
+ "serde",
+ "serde_json",
+ "snafu",
+ "tracing 0.1.37",
+ "value 0.1.0 (git+https://github.com/vectordotdev/vrl?rev=v0.2.0)",
+ "vrl-diagnostic 0.1.0 (git+https://github.com/vectordotdev/vrl?rev=v0.2.0)",
 ]
 
 [[package]]
@@ -9897,17 +9947,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "vrl-diagnostic"
+version = "0.1.0"
+source = "git+https://github.com/vectordotdev/vrl?rev=v0.2.0#258cc611080c1bdb5ed6897e8a79b76ab2038fcb"
+dependencies = [
+ "codespan-reporting",
+ "termcolor",
+]
+
+[[package]]
 name = "vrl-parser"
 version = "0.1.0"
 source = "git+https://github.com/vectordotdev/vrl?rev=v0.1.0#c515186e30058ddb5b8506d2763eaa98c1b13d93"
 dependencies = [
  "lalrpop",
  "lalrpop-util",
- "lookup",
+ "lookup 0.1.0 (git+https://github.com/vectordotdev/vrl?rev=v0.1.0)",
  "ordered-float 3.6.0",
  "paste",
  "thiserror",
- "vrl-diagnostic",
+ "vrl-diagnostic 0.1.0 (git+https://github.com/vectordotdev/vrl?rev=v0.1.0)",
 ]
 
 [[package]]
@@ -9937,7 +9996,7 @@ dependencies = [
  "hmac",
  "hostname",
  "indexmap",
- "lookup",
+ "lookup 0.1.0 (git+https://github.com/vectordotdev/vrl?rev=v0.1.0)",
  "md-5",
  "nom",
  "ofb",
@@ -9961,9 +10020,9 @@ dependencies = [
  "url",
  "utf8-width",
  "uuid",
- "value",
+ "value 0.1.0 (git+https://github.com/vectordotdev/vrl?rev=v0.1.0)",
  "vrl",
- "vrl-core",
+ "vrl-core 0.1.0 (git+https://github.com/vectordotdev/vrl?rev=v0.1.0)",
  "woothee",
  "zstd 0.12.3+zstd.1.5.2",
 ]
@@ -9978,14 +10037,14 @@ dependencies = [
  "chrono-tz",
  "clap 4.1.14",
  "glob",
- "lookup",
+ "lookup 0.1.0 (git+https://github.com/vectordotdev/vrl?rev=v0.1.0)",
  "prettydiff",
  "regex",
  "serde",
  "serde_json",
  "tikv-jemallocator",
  "tracing-subscriber",
- "value",
+ "value 0.1.0 (git+https://github.com/vectordotdev/vrl?rev=v0.1.0)",
  "vrl",
  "vrl-stdlib",
 ]
