@@ -21,11 +21,11 @@ pub use decoding::{
 pub use decoding::{SyslogDeserializer, SyslogDeserializerConfig};
 pub use encoding::{
     BytesEncoder, BytesEncoderConfig, CharacterDelimitedEncoder, CharacterDelimitedEncoderConfig,
-    GelfSerializer, GelfSerializerConfig, JsonSerializer, JsonSerializerConfig,
-    LengthDelimitedEncoder, LengthDelimitedEncoderConfig, LogfmtSerializer, LogfmtSerializerConfig,
-    NativeJsonSerializer, NativeJsonSerializerConfig, NativeSerializer, NativeSerializerConfig,
-    NewlineDelimitedEncoder, NewlineDelimitedEncoderConfig, RawMessageSerializer,
-    RawMessageSerializerConfig, TextSerializer, TextSerializerConfig,
+    CsvSerializer, CsvSerializerConfig, GelfSerializer, GelfSerializerConfig, JsonSerializer,
+    JsonSerializerConfig, LengthDelimitedEncoder, LengthDelimitedEncoderConfig, LogfmtSerializer,
+    LogfmtSerializerConfig, NativeJsonSerializer, NativeJsonSerializerConfig, NativeSerializer,
+    NativeSerializerConfig, NewlineDelimitedEncoder, NewlineDelimitedEncoderConfig,
+    RawMessageSerializer, RawMessageSerializerConfig, TextSerializer, TextSerializerConfig,
 };
 pub use gelf::{gelf_fields, VALID_FIELD_REGEX};
 use vector_config::configurable_component;

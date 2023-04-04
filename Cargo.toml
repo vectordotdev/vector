@@ -166,7 +166,7 @@ aws-sdk-elasticsearch = {version = "0.21.0", default-features = false, features 
 aws-sdk-firehose = { version = "0.21.0", default-features = false, features = ["native-tls"], optional = true }
 aws-sdk-kinesis = { version = "0.21.0", default-features = false, features = ["native-tls"], optional = true }
 aws-types = { version = "0.51.0", default-features = false, features = ["hardcoded-credentials"], optional = true }
-aws-sigv4 = { version = "0.53.0", default-features = false, features = ["sign-http"], optional = true }
+aws-sigv4 = { version = "0.55.0", default-features = false, features = ["sign-http"], optional = true }
 aws-config = { version = "0.51.0", default-features = false, features = ["native-tls"], optional = true }
 aws-smithy-async = { version = "0.51.0", default-features = false, optional = true }
 aws-smithy-client = { version = "0.51.0", default-features = false, features = ["client-hyper"], optional = true}
@@ -252,7 +252,7 @@ encoding_rs = { version = "0.8.32", default-features = false, features = ["serde
 enum_dispatch = { version = "0.3.11", default-features = false }
 exitcode = { version = "1.1.2", default-features = false }
 flate2 = { version = "1.0.25", default-features = false, features = ["default"] }
-futures-util = { version = "0.3.27", default-features = false }
+futures-util = { version = "0.3.28", default-features = false }
 glob = { version = "0.3.1", default-features = false }
 governor = { version = "0.5.1", default-features = false, features = ["dashmap", "jitter", "std"], optional = true }
 grok = { version = "2.0.0", default-features = false, optional = true }

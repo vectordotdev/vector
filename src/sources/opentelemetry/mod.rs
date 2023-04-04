@@ -32,8 +32,8 @@ use self::{
 };
 use crate::{
     config::{
-        DataType, GenerateConfig, Output, Resource, SourceAcknowledgementsConfig, SourceConfig,
-        SourceContext,
+        DataType, GenerateConfig, Resource, SourceAcknowledgementsConfig, SourceConfig,
+        SourceContext, SourceOutput,
     },
     serde::bool_or_struct,
     sources::{util::grpc::run_grpc_server, Source},
@@ -166,7 +166,7 @@ impl SourceConfig for OpentelemetryConfig {
 
     // TODO: appropriately handle "severity" meaning across both "severity_text" and "severity_number",
     // as both are optional and can be converted to/from.
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         let log_namespace = global_log_namespace.merge(self.log_namespace);
         let schema_definition = Definition::new_with_default_metadata(Kind::any(), [log_namespace])
             .with_source_metadata(
@@ -254,9 +254,7 @@ impl SourceConfig for OpentelemetryConfig {
             }
         };
 
-        vec![Output::default(DataType::Log)
-            .with_port(LOGS)
-            .with_schema_definition(schema_definition)]
+        vec![SourceOutput::new_logs(DataType::Log, schema_definition).with_port(LOGS)]
     }
 
     fn resources(&self) -> Vec<Resource> {

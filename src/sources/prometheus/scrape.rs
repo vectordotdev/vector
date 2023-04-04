@@ -12,7 +12,7 @@ use vector_core::{config::LogNamespace, event::Event};
 use super::parser;
 use crate::sources::util::http::HttpMethod;
 use crate::{
-    config::{self, GenerateConfig, Output, SourceConfig, SourceContext},
+    config::{GenerateConfig, SourceConfig, SourceContext, SourceOutput},
     http::Auth,
     internal_events::PrometheusParseError,
     sources::{
@@ -152,8 +152,8 @@ impl SourceConfig for PrometheusScrapeConfig {
         Ok(call(inputs, builder, cx.out, HttpMethod::Get).boxed())
     }
 
-    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
-        vec![Output::default(config::DataType::Metric)]
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
+        vec![SourceOutput::new_metrics()]
     }
 
     fn can_acknowledge(&self) -> bool {
