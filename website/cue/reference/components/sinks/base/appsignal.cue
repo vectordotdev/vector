@@ -63,16 +63,21 @@ base: components: sinks: appsignal: configuration: {
 		}
 	}
 	compression: {
-		description: "Supported compression types for the AppSignal sink."
-		required:    false
+		description: """
+			Compression configuration.
+
+			All compression algorithms use the default compression level unless otherwise specified.
+			"""
+		required: false
 		type: string: {
-			default: "gzip"
+			default: "none"
 			enum: {
 				gzip: """
 					[Gzip][gzip] compression.
 
 					[gzip]: https://www.gzip.org/
 					"""
+				none: "No compression."
 				zlib: """
 					[Zlib][zlib] compression.
 

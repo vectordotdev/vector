@@ -44,24 +44,6 @@ enum FinishError {
     CompressionFailed { source: std::io::Error },
 }
 
-/// Supported compression types for the AppSignal sink.
-#[configurable_component]
-#[derive(Copy, Clone, Debug, Derivative, Eq, PartialEq)]
-#[serde(rename_all = "lowercase")]
-#[derivative(Default)]
-enum AppsignalCompression {
-    /// [Gzip][gzip] compression.
-    ///
-    /// [gzip]: https://www.gzip.org/
-    #[derivative(Default)]
-    Gzip,
-
-    /// [Zlib][zlib] compression.
-    ///
-    /// [zlib]: https://zlib.net/
-    Zlib,
-}
-
 /// Configuration for the `appsignal` sink.
 #[configurable_component(sink("appsignal"))]
 #[derive(Clone, Debug, Default)]
@@ -79,7 +61,7 @@ pub struct AppsignalSinkConfig {
 
     #[configurable(derived)]
     #[serde(default)]
-    compression: AppsignalCompression,
+    compression: Compression,
 
     #[configurable(derived)]
     #[serde(default)]
@@ -201,17 +183,16 @@ impl HttpSink for AppsignalSinkConfig {
         );
 
         let mut body = crate::serde::json::to_bytes(&events)?.freeze();
-
-        let compression = match self.compression {
-            AppsignalCompression::Gzip => {
+        let compression = self.compression;
+        match compression {
+            Compression::Gzip(_level) => {
                 request = request.header("Content-Encoding", "gzip");
-                Compression::gzip_default()
             }
-            AppsignalCompression::Zlib => {
+            Compression::Zlib(_level) => {
                 request = request.header("Content-Encoding", "deflate");
-                Compression::zlib_default()
             }
-        };
+            Compression::None => {}
+        }
         let mut compressor = Compressor::from(compression);
         write_all(&mut compressor, 0, &body)?;
         body = compressor.finish().context(CompressionFailedSnafu)?.into();
