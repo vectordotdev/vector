@@ -18,7 +18,7 @@ use crate::{
 };
 
 /// Configuration for the `aws_sqs` source.
-#[configurable_component(source("aws_sqs"))]
+#[configurable_component(source("aws_sqs", "Collect logs from AWS SQS."))]
 #[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
 #[serde(deny_unknown_fields)]
@@ -102,6 +102,7 @@ pub struct AwsSqsConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "aws_sqs")]
 impl SourceConfig for AwsSqsConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<crate::sources::Source> {
         let log_namespace = cx.log_namespace(self.log_namespace);

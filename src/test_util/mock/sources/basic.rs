@@ -16,7 +16,7 @@ use vector_core::{
 use crate::config::{SourceConfig, SourceContext};
 
 /// Configuration for the `test_basic` source.
-#[configurable_component(source("test_basic"))]
+#[configurable_component(source("test_basic", "Test (basic)."))]
 #[derive(Clone, Debug)]
 #[serde(default)]
 pub struct BasicSourceConfig {
@@ -91,6 +91,7 @@ impl BasicSourceConfig {
 }
 
 #[async_trait]
+#[typetag::serde(name = "test_basic")]
 impl SourceConfig for BasicSourceConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<Source> {
         let wrapped = Arc::clone(&self.receiver);

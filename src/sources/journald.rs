@@ -94,7 +94,7 @@ enum BuildError {
 type Matches = HashMap<String, HashSet<String>>;
 
 /// Configuration for the `journald` source.
-#[configurable_component(source("journald"))]
+#[configurable_component(source("journald", "Collect logs from JournalD."))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct JournaldConfig {
@@ -301,6 +301,7 @@ impl_generate_config_from_default!(JournaldConfig);
 type Record = HashMap<String, String>;
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "journald")]
 impl SourceConfig for JournaldConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         if self.remap_priority {

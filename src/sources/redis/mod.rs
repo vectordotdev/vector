@@ -94,7 +94,7 @@ impl From<&redis::ConnectionInfo> for ConnectionInfo {
 }
 
 /// Configuration for the `redis` source.
-#[configurable_component(source("redis"))]
+#[configurable_component(source("redis", "Collect observability data from Redis."))]
 #[derive(Clone, Debug, Derivative)]
 #[serde(deny_unknown_fields)]
 pub struct RedisSourceConfig {
@@ -155,6 +155,7 @@ impl GenerateConfig for RedisSourceConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "redis")]
 impl SourceConfig for RedisSourceConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let log_namespace = cx.log_namespace(self.log_namespace);

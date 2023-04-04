@@ -4,9 +4,9 @@ use crate::{
         util::GrpcAddress,
         ComponentConfiguration, ComponentType, ValidationConfiguration,
     },
-    config::{BoxedTransform, ConfigBuilder},
+    config::{BoxedSource, BoxedTransform, ConfigBuilder},
     sinks::{vector::VectorConfig as VectorSinkConfig, Sinks},
-    sources::{vector::VectorConfig as VectorSourceConfig, Sources},
+    sources::vector::VectorConfig as VectorSourceConfig,
     test_util::next_addr,
 };
 
@@ -48,7 +48,7 @@ impl TopologyBuilder {
     }
 
     /// Creates a component topology for validating a source.
-    fn from_source(source: Sources) -> Self {
+    fn from_source(source: BoxedSource) -> Self {
         let (output_edge, output_sink) = build_output_edge();
 
         let mut config_builder = ConfigBuilder::default();
@@ -120,7 +120,7 @@ impl TopologyBuilder {
     }
 }
 
-fn build_input_edge() -> (InputEdge, impl Into<Sources>) {
+fn build_input_edge() -> (InputEdge, impl Into<BoxedSource>) {
     let input_listen_addr = GrpcAddress::from(next_addr());
     debug!(listen_addr = %input_listen_addr, "Creating controlled input edge.");
 

@@ -1,8 +1,13 @@
+use std::cell::RefCell;
 use std::collections::HashMap;
 
 use async_trait::async_trait;
-use enum_dispatch::enum_dispatch;
-use vector_config::{configurable_component, NamedComponent};
+use dyn_clone::DynClone;
+use vector_config::{
+    configurable_component, Configurable, GenerateError, Metadata, NamedComponent,
+};
+use vector_config_common::attributes::CustomAttribute;
+use vector_config_common::schema::{SchemaGenerator, SchemaObject};
 use vector_core::{
     config::{
         AcknowledgementsConfig, GlobalOptions, LogNamespace, SourceAcknowledgementsConfig,
@@ -12,7 +17,33 @@ use vector_core::{
 };
 
 use super::{schema, ComponentKey, ProxyConfig, Resource};
-use crate::{shutdown::ShutdownSignal, sources::Sources, SourceSender};
+use crate::{shutdown::ShutdownSignal, SourceSender};
+
+pub type BoxedSource = Box<dyn SourceConfig>;
+
+impl Configurable for BoxedSource {
+    fn referenceable_name() -> Option<&'static str> {
+        Some("vector::sources::Sources")
+    }
+
+    fn metadata() -> Metadata {
+        let mut metadata = Metadata::default();
+        metadata.set_description("Configurable sources in Vector.");
+        metadata.add_custom_attribute(CustomAttribute::kv("docs::enum_tagging", "internal"));
+        metadata.add_custom_attribute(CustomAttribute::kv("docs::enum_tag_field", "type"));
+        metadata
+    }
+
+    fn generate_schema(gen: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
+        vector_config::component::SourceDescription::generate_schemas(gen)
+    }
+}
+
+impl<T: SourceConfig + 'static> From<T> for BoxedSource {
+    fn from(value: T) -> Self {
+        Box::new(value)
+    }
+}
 
 /// Fully resolved source component.
 #[configurable_component]
@@ -31,11 +62,11 @@ pub struct SourceOuter {
 
     #[configurable(metadata(docs::hidden))]
     #[serde(flatten)]
-    pub(crate) inner: Sources,
+    pub(crate) inner: BoxedSource,
 }
 
 impl SourceOuter {
-    pub(crate) fn new<I: Into<Sources>>(inner: I) -> Self {
+    pub(crate) fn new<I: Into<BoxedSource>>(inner: I) -> Self {
         Self {
             proxy: Default::default(),
             sink_acknowledgements: false,
@@ -46,8 +77,8 @@ impl SourceOuter {
 
 /// Generalized interface for describing and building source components.
 #[async_trait]
-#[enum_dispatch]
-pub trait SourceConfig: NamedComponent + core::fmt::Debug + Send + Sync {
+#[typetag::serde(tag = "type")]
+pub trait SourceConfig: DynClone + NamedComponent + core::fmt::Debug + Send + Sync {
     /// Builds the source with the given context.
     ///
     /// If the source is built successfully, `Ok(...)` is returned containing the source.
@@ -86,6 +117,8 @@ pub trait SourceConfig: NamedComponent + core::fmt::Debug + Send + Sync {
     /// topology as configured does not actually support the use of end-to-end acknowledgements.
     fn can_acknowledge(&self) -> bool;
 }
+
+dyn_clone::clone_trait_object!(SourceConfig);
 
 pub struct SourceContext {
     pub key: ComponentKey,

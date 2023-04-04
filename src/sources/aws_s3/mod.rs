@@ -70,7 +70,7 @@ enum Strategy {
 // when there's required fields.
 //
 // Maybe showing defaults at all, when there are required properties, doesn't actually make sense? :thinkies:
-#[configurable_component(source("aws_s3"))]
+#[configurable_component(source("aws_s3", "Collect logs from AWS S3."))]
 #[derive(Clone, Debug, Default)]
 #[serde(default, deny_unknown_fields)]
 pub struct AwsS3Config {
@@ -120,6 +120,7 @@ pub struct AwsS3Config {
 impl_generate_config_from_default!(AwsS3Config);
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "aws_s3")]
 impl SourceConfig for AwsS3Config {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let log_namespace = cx.log_namespace(self.log_namespace);

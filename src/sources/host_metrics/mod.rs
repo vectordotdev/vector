@@ -85,7 +85,7 @@ pub(self) struct FilterList {
 
 /// Configuration for the `host_metrics` source.
 #[serde_as]
-#[configurable_component(source("host_metrics"))]
+#[configurable_component(source("host_metrics", "Collect metric data from the local system."))]
 #[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
 #[serde(deny_unknown_fields)]
@@ -249,6 +249,7 @@ fn default_cgroups_config() -> Option<CGroupsConfig> {
 impl_generate_config_from_default!(HostMetricsConfig);
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "host_metrics")]
 impl SourceConfig for HostMetricsConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         init_roots();

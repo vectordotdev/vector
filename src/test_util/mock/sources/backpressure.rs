@@ -19,7 +19,7 @@ use vector_core::{
 use crate::config::{GenerateConfig, SourceConfig, SourceContext};
 
 /// Configuration for the `test_backpressure` source.
-#[configurable_component(source("test_backpressure"))]
+#[configurable_component(source("test_backpressure", "Test (backpressure)."))]
 #[derive(Clone, Debug)]
 pub struct BackpressureSourceConfig {
     // The number of events that have been sent.
@@ -37,6 +37,7 @@ impl GenerateConfig for BackpressureSourceConfig {
 }
 
 #[async_trait]
+#[typetag::serde(name = "test_backpressure")]
 impl SourceConfig for BackpressureSourceConfig {
     async fn build(&self, mut cx: SourceContext) -> crate::Result<Source> {
         let counter = Arc::clone(&self.counter);

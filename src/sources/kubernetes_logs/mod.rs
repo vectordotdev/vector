@@ -83,7 +83,7 @@ const SELF_NODE_NAME_ENV_KEY: &str = "VECTOR_SELF_NODE_NAME";
 
 /// Configuration for the `kubernetes_logs` source.
 #[serde_as]
-#[configurable_component(source("kubernetes_logs"))]
+#[configurable_component(source("kubernetes_logs", "Collect Pod logs from Kubernetes Nodes."))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields, default)]
 pub struct Config {
@@ -278,6 +278,7 @@ impl Default for Config {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "kubernetes_logs")]
 impl SourceConfig for Config {
     async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
         let log_namespace = cx.log_namespace(self.log_namespace);

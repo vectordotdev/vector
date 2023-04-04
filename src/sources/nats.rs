@@ -37,7 +37,10 @@ enum BuildError {
 }
 
 /// Configuration for the `nats` source.
-#[configurable_component(source("nats"))]
+#[configurable_component(source(
+    "nats",
+    "Read observability data from subjects on the NATS messaging system."
+))]
 #[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
 #[serde(deny_unknown_fields)]
@@ -113,6 +116,7 @@ impl GenerateConfig for NatsSourceConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "nats")]
 impl SourceConfig for NatsSourceConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let log_namespace = cx.log_namespace(self.log_namespace);

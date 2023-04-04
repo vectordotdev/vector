@@ -22,7 +22,7 @@ use crate::{
 };
 
 /// Configuration for the `unit_test` source.
-#[configurable_component(source("unit_test"))]
+#[configurable_component(source("unit_test", "Unit test."))]
 #[derive(Clone, Debug, Default)]
 pub struct UnitTestSourceConfig {
     /// List of events sent from this source as part of the test.
@@ -33,6 +33,7 @@ pub struct UnitTestSourceConfig {
 impl_generate_config_from_default!(UnitTestSourceConfig);
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "unit_test")]
 impl SourceConfig for UnitTestSourceConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
         let events = self.events.clone().into_iter();
@@ -58,7 +59,7 @@ impl SourceConfig for UnitTestSourceConfig {
 }
 
 /// Configuration for the `unit_test_stream` source.
-#[configurable_component(source("unit_test_stream"))]
+#[configurable_component(source("unit_test_stream", "Unit test stream."))]
 #[derive(Clone)]
 pub struct UnitTestStreamSourceConfig {
     #[serde(skip)]
@@ -90,6 +91,7 @@ impl std::fmt::Debug for UnitTestStreamSourceConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "unit_test_stream")]
 impl SourceConfig for UnitTestStreamSourceConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
         let stream = self.stream.lock().await.take().unwrap();

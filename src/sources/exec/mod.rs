@@ -43,7 +43,7 @@ use vector_core::config::{log_schema, LogNamespace};
 pub mod sized_bytes_codec;
 
 /// Configuration for the `exec` source.
-#[configurable_component(source("exec"))]
+#[configurable_component(source("exec", "Collect output from a process running on the host."))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct ExecConfig {
@@ -220,6 +220,7 @@ impl ExecConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "exec")]
 impl SourceConfig for ExecConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         self.validate()?;
