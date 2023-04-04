@@ -15,7 +15,7 @@ base: components: sinks: redis: configuration: {
 				Whether or not end-to-end acknowledgements are enabled.
 
 				When enabled for a sink, any source connected to that sink, where the source supports
-				end-to-end acknowledgements as well, will wait for events to be acknowledged by the sink
+				end-to-end acknowledgements as well, waits for events to be acknowledged by the sink
 				before acknowledging them at the source.
 
 				Enabling or disabling acknowledgements at the sink level takes precedence over any global
@@ -33,10 +33,10 @@ base: components: sinks: redis: configuration: {
 		type: object: options: {
 			max_bytes: {
 				description: """
-					The maximum size of a batch that will be processed by a sink.
+					The maximum size of a batch that is processed by a sink.
 
 					This is based on the uncompressed size of the batched events, before they are
-					serialized / compressed.
+					serialized/compressed.
 					"""
 				required: false
 				type: uint: unit: "bytes"
@@ -124,7 +124,7 @@ base: components: sinks: redis: configuration: {
 						[logfmt]: https://brandur.org/logfmt
 						"""
 					native: """
-						Encodes an event in Vector’s [native Protocol Buffers format][vector_native_protobuf].
+						Encodes an event in the [native Protocol Buffers format][vector_native_protobuf].
 
 						This codec is **[experimental][experimental]**.
 
@@ -132,7 +132,7 @@ base: components: sinks: redis: configuration: {
 						[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
 						"""
 					native_json: """
-						Encodes an event in Vector’s [native JSON format][vector_native_json].
+						Encodes an event in the [native JSON format][vector_native_json].
 
 						This codec is **[experimental][experimental]**.
 
@@ -142,20 +142,20 @@ base: components: sinks: redis: configuration: {
 					raw_message: """
 						No encoding.
 
-						This "encoding" simply uses the `message` field of a log event.
+						This encoding uses the `message` field of a log event.
 
-						Users should take care if they're modifying their log events (such as by using a `remap`
-						transform, etc) and removing the message field while doing additional parsing on it, as this
+						Be careful if you are modifying your log events (for example, by using a `remap`
+						transform) and removing the message field while doing additional parsing on it, as this
 						could lead to the encoding emitting empty strings for the given event.
 						"""
 					text: """
 						Plain text encoding.
 
-						This "encoding" simply uses the `message` field of a log event. For metrics, it uses an
+						This encoding uses the `message` field of a log event. For metrics, it uses an
 						encoding that resembles the Prometheus export format.
 
-						Users should take care if they're modifying their log events (such as by using a `remap`
-						transform, etc) and removing the message field while doing additional parsing on it, as this
+						Be careful if you are modifying your log events (for example, by using a `remap`
+						transform) and removing the message field while doing additional parsing on it, as this
 						could lead to the encoding emitting empty strings for the given event.
 						"""
 				}
@@ -179,7 +179,7 @@ base: components: sinks: redis: configuration: {
 				}
 			}
 			except_fields: {
-				description: "List of fields that will be excluded from the encoded event."
+				description: "List of fields that are excluded from the encoded event."
 				required:    false
 				type: array: items: type: string: {}
 			}
@@ -205,7 +205,7 @@ base: components: sinks: redis: configuration: {
 				}
 			}
 			only_fields: {
-				description: "List of fields that will be included in the encoded event."
+				description: "List of fields that are included in the encoded event."
 				required:    false
 				type: array: items: type: string: {}
 			}
@@ -371,7 +371,7 @@ base: components: sinks: redis: configuration: {
 				description: """
 					The amount of time to wait before attempting the first retry for a failed request.
 
-					After the first retry has failed, the fibonacci sequence will be used to select future backoffs.
+					After the first retry has failed, the fibonacci sequence is used to select future backoffs.
 					"""
 				required: false
 				type: uint: {
@@ -391,7 +391,7 @@ base: components: sinks: redis: configuration: {
 				description: """
 					The time a request can take before being aborted.
 
-					It is highly recommended that you do not lower this value below the service’s internal timeout, as this could
+					Datadog highly recommends that you do not lower this value below the service's internal timeout, as this could
 					create orphaned requests, pile on retries, and result in duplicate data downstream.
 					"""
 				required: false

@@ -10,7 +10,7 @@ base: components: sinks: splunk_hec_logs: configuration: {
 					Whether or not end-to-end acknowledgements are enabled.
 
 					When enabled for a sink, any source connected to that sink, where the source supports
-					end-to-end acknowledgements as well, will wait for events to be acknowledged by the sink
+					end-to-end acknowledgements as well, waits for events to be acknowledged by the sink
 					before acknowledging them at the source.
 
 					Enabling or disabling acknowledgements at the sink level takes precedence over any global
@@ -23,7 +23,7 @@ base: components: sinks: splunk_hec_logs: configuration: {
 			}
 			indexer_acknowledgements_enabled: {
 				description: """
-					Controls if the sink will integrate with [Splunk HEC indexer acknowledgements][splunk_indexer_ack_docs] for end-to-end acknowledgements.
+					Controls if the sink integrates with [Splunk HEC indexer acknowledgements][splunk_indexer_ack_docs] for end-to-end acknowledgements.
 
 					[splunk_indexer_ack_docs]: https://docs.splunk.com/Documentation/Splunk/8.2.3/Data/AboutHECIDXAck
 					"""
@@ -34,7 +34,7 @@ base: components: sinks: splunk_hec_logs: configuration: {
 				description: """
 					The maximum number of pending acknowledgements from events sent to the Splunk HEC collector.
 
-					Once reached, the sink will begin applying backpressure.
+					Once reached, the sink begins applying backpressure.
 					"""
 				required: false
 				type: uint: default: 1000000
@@ -48,7 +48,7 @@ base: components: sinks: splunk_hec_logs: configuration: {
 				}
 			}
 			retry_limit: {
-				description: "The maximum number of times an acknowledgement ID will be queried for its status."
+				description: "The maximum number of times an acknowledgement ID is queried for its status."
 				required:    false
 				type: uint: default: 30
 			}
@@ -61,7 +61,7 @@ base: components: sinks: splunk_hec_logs: configuration: {
 			This option is only relevant to Splunk v8.x and above, and is only applied when
 			`endpoint_target` is set to `event`.
 
-			Setting this to `true` will cause Splunk to extract the timestamp from the message text
+			Setting this to `true` causes Splunk to extract the timestamp from the message text
 			rather than use the timestamp embedded in the event. The timestamp must be in the format
 			`yyyy-mm-dd hh:mm:ss`.
 			"""
@@ -74,10 +74,10 @@ base: components: sinks: splunk_hec_logs: configuration: {
 		type: object: options: {
 			max_bytes: {
 				description: """
-					The maximum size of a batch that will be processed by a sink.
+					The maximum size of a batch that is processed by a sink.
 
 					This is based on the uncompressed size of the batched events, before they are
-					serialized / compressed.
+					serialized/compressed.
 					"""
 				required: false
 				type: uint: {
@@ -128,7 +128,7 @@ base: components: sinks: splunk_hec_logs: configuration: {
 		description: """
 			Default Splunk HEC token.
 
-			If an event has a token set in its secrets (`splunk_hec_token`), it will prevail over the one set here.
+			If an event has a token set in its secrets (`splunk_hec_token`), it prevails over the one set here.
 			"""
 		required: true
 		type: string: {}
@@ -177,7 +177,7 @@ base: components: sinks: splunk_hec_logs: configuration: {
 						[logfmt]: https://brandur.org/logfmt
 						"""
 					native: """
-						Encodes an event in Vector’s [native Protocol Buffers format][vector_native_protobuf].
+						Encodes an event in the [native Protocol Buffers format][vector_native_protobuf].
 
 						This codec is **[experimental][experimental]**.
 
@@ -185,7 +185,7 @@ base: components: sinks: splunk_hec_logs: configuration: {
 						[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
 						"""
 					native_json: """
-						Encodes an event in Vector’s [native JSON format][vector_native_json].
+						Encodes an event in the [native JSON format][vector_native_json].
 
 						This codec is **[experimental][experimental]**.
 
@@ -195,20 +195,20 @@ base: components: sinks: splunk_hec_logs: configuration: {
 					raw_message: """
 						No encoding.
 
-						This "encoding" simply uses the `message` field of a log event.
+						This encoding uses the `message` field of a log event.
 
-						Users should take care if they're modifying their log events (such as by using a `remap`
-						transform, etc) and removing the message field while doing additional parsing on it, as this
+						Be careful if you are modifying your log events (for example, by using a `remap`
+						transform) and removing the message field while doing additional parsing on it, as this
 						could lead to the encoding emitting empty strings for the given event.
 						"""
 					text: """
 						Plain text encoding.
 
-						This "encoding" simply uses the `message` field of a log event. For metrics, it uses an
+						This encoding uses the `message` field of a log event. For metrics, it uses an
 						encoding that resembles the Prometheus export format.
 
-						Users should take care if they're modifying their log events (such as by using a `remap`
-						transform, etc) and removing the message field while doing additional parsing on it, as this
+						Be careful if you are modifying your log events (for example, by using a `remap`
+						transform) and removing the message field while doing additional parsing on it, as this
 						could lead to the encoding emitting empty strings for the given event.
 						"""
 				}
@@ -232,7 +232,7 @@ base: components: sinks: splunk_hec_logs: configuration: {
 				}
 			}
 			except_fields: {
-				description: "List of fields that will be excluded from the encoded event."
+				description: "List of fields that are excluded from the encoded event."
 				required:    false
 				type: array: items: type: string: {}
 			}
@@ -258,7 +258,7 @@ base: components: sinks: splunk_hec_logs: configuration: {
 				}
 			}
 			only_fields: {
-				description: "List of fields that will be included in the encoded event."
+				description: "List of fields that are included in the encoded event."
 				required:    false
 				type: array: items: type: string: {}
 			}
@@ -313,7 +313,7 @@ base: components: sinks: splunk_hec_logs: configuration: {
 	}
 	host_key: {
 		description: """
-			Overrides the name of the log field used to grab the hostname to send to Splunk HEC.
+			Overrides the name of the log field used to retrieve the hostname to send to Splunk HEC.
 
 			By default, the [global `log_schema.host_key` option][global_host_key] is used.
 
@@ -458,7 +458,7 @@ base: components: sinks: splunk_hec_logs: configuration: {
 				description: """
 					The amount of time to wait before attempting the first retry for a failed request.
 
-					After the first retry has failed, the fibonacci sequence will be used to select future backoffs.
+					After the first retry has failed, the fibonacci sequence is used to select future backoffs.
 					"""
 				required: false
 				type: uint: {
@@ -478,7 +478,7 @@ base: components: sinks: splunk_hec_logs: configuration: {
 				description: """
 					The time a request can take before being aborted.
 
-					It is highly recommended that you do not lower this value below the service’s internal timeout, as this could
+					Datadog highly recommends that you do not lower this value below the service's internal timeout, as this could
 					create orphaned requests, pile on retries, and result in duplicate data downstream.
 					"""
 				required: false
@@ -495,7 +495,7 @@ base: components: sinks: splunk_hec_logs: configuration: {
 
 			This is typically the filename the logs originated from.
 
-			If unset, the Splunk collector will set it.
+			If unset, the Splunk collector sets it.
 			"""
 		required: false
 		type: string: {
@@ -507,7 +507,7 @@ base: components: sinks: splunk_hec_logs: configuration: {
 		description: """
 			The sourcetype of events sent to this sink.
 
-			If unset, Splunk will default to `httpevent`.
+			If unset, Splunk defaults to `httpevent`.
 			"""
 		required: false
 		type: string: {
@@ -517,8 +517,8 @@ base: components: sinks: splunk_hec_logs: configuration: {
 	}
 	timestamp_key: {
 		description: """
-			Overrides the name of the log field used to grab the timestamp to send to Splunk HEC.
-			When set to `“”`, vector omits setting a timestamp in the events sent to Splunk HEC.
+			Overrides the name of the log field used to retrieve the timestamp to send to Splunk HEC.
+			When set to `“”`, a timestamp is not set in the events sent to Splunk HEC.
 
 			By default, the [global `log_schema.timestamp_key` option][global_timestamp_key] is used.
 

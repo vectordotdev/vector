@@ -5,7 +5,7 @@ base: components: transforms: metric_to_log: configuration: {
 		description: """
 			Name of the tag in the metric to use for the source host.
 
-			If present, the value of the tag is set on the generated log event in the "host" field,
+			If present, the value of the tag is set on the generated log event in the `host` field,
 			where the field key uses the [global `host_key` option][global_log_schema_host_key].
 
 			[global_log_schema_host_key]: https://vector.dev/docs/reference/configuration//global-options#log_schema.host_key

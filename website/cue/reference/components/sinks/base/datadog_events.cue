@@ -15,7 +15,7 @@ base: components: sinks: datadog_events: configuration: {
 				Whether or not end-to-end acknowledgements are enabled.
 
 				When enabled for a sink, any source connected to that sink, where the source supports
-				end-to-end acknowledgements as well, will wait for events to be acknowledged by the sink
+				end-to-end acknowledgements as well, waits for events to be acknowledged by the sink
 				before acknowledging them at the source.
 
 				Enabling or disabling acknowledgements at the sink level takes precedence over any global
@@ -31,7 +31,7 @@ base: components: sinks: datadog_events: configuration: {
 		description: """
 			The default Datadog [API key][api_key] to use in authentication of HTTP requests.
 
-			If an event has a Datadog [API key][api_key] set explicitly in its metadata, it will take
+			If an event has a Datadog [API key][api_key] set explicitly in its metadata, it takes
 			precedence over this setting.
 
 			[api_key]: https://docs.datadoghq.com/api/?lang=bash#authentication
@@ -173,7 +173,7 @@ base: components: sinks: datadog_events: configuration: {
 				description: """
 					The amount of time to wait before attempting the first retry for a failed request.
 
-					After the first retry has failed, the fibonacci sequence will be used to select future backoffs.
+					After the first retry has failed, the fibonacci sequence is used to select future backoffs.
 					"""
 				required: false
 				type: uint: {
@@ -193,7 +193,7 @@ base: components: sinks: datadog_events: configuration: {
 				description: """
 					The time a request can take before being aborted.
 
-					It is highly recommended that you do not lower this value below the service’s internal timeout, as this could
+					Datadog highly recommends that you do not lower this value below the service's internal timeout, as this could
 					create orphaned requests, pile on retries, and result in duplicate data downstream.
 					"""
 				required: false
