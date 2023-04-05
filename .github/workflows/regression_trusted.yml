@@ -541,7 +541,7 @@ jobs:
           path: ${{ runner.temp }}/outputs/report.html
 
       - name: Post report to PR
-        uses: peter-evans/create-or-update-comment@v2
+        uses: peter-evans/create-or-update-comment@v3
         with:
           issue-number: ${{ needs.compute-metadata.outputs.github-event-number }}
           edit-mode: append
