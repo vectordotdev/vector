@@ -1,14 +1,8 @@
+use std::{collections::BTreeMap, fs, path::Path, path::PathBuf, process::Command};
+
 use anyhow::{bail, Context, Result};
-use std::{path::Path, path::PathBuf, process::Command};
+use tempfile::{Builder, NamedTempFile};
 
-#[cfg(unix)]
-use {
-    std::collections::BTreeMap,
-    std::fs,
-    tempfile::{Builder, NamedTempFile},
-};
-
-#[cfg(unix)]
 use super::config::ComposeConfig;
 use super::config::{Environment, IntegrationTestConfig};
 use super::runner::{
@@ -144,10 +138,8 @@ struct Compose {
     original_path: PathBuf,
     test_dir: PathBuf,
     env: Environment,
-    #[cfg(unix)]
     config: ComposeConfig,
     network: String,
-    #[cfg(unix)]
     temp_file: NamedTempFile,
 }
 
@@ -159,45 +151,34 @@ impl Compose {
             Err(error) => Err(error).with_context(|| format!("Could not lookup {original_path:?}")),
             Ok(false) => Ok(None),
             Ok(true) => {
-                #[cfg(unix)]
                 let mut config = ComposeConfig::parse(&original_path)?;
+                // Inject the networks block
+                config.networks.insert(
+                    "default".to_string(),
+                    BTreeMap::from_iter([("name".to_string(), network.clone())]),
+                );
 
-                #[cfg(unix)]
-                let temp_file: NamedTempFile;
+                // Create a named tempfile, there may be resource leakage here in case of SIGINT
+                // Tried tempfile::tempfile() but this returns a File object without a usable path
+                // https://docs.rs/tempfile/latest/tempfile/#resource-leaking
+                let temp_file = Builder::new()
+                    .prefix("compose-temp-")
+                    .suffix(".yaml")
+                    .tempfile_in(&test_dir)
+                    .with_context(|| "Failed to create temporary compose file")?;
 
-                #[cfg(unix)]
-                {
-                    // Inject the networks block
-                    config.networks.insert(
-                        "default".to_string(),
-                        BTreeMap::from_iter([("name".to_string(), network.clone())]),
-                    );
-
-                    // Create a named tempfile, there may be resource leakage here in case of SIGINT
-                    // Tried tempfile::tempfile() but this returns a File object without a usable path
-                    // https://docs.rs/tempfile/latest/tempfile/#resource-leaking
-                    temp_file = Builder::new()
-                        .prefix("compose-temp-")
-                        .suffix(".yaml")
-                        .tempfile_in(&test_dir)
-                        .with_context(|| "Failed to create temporary compose file")?;
-
-                    fs::write(
-                        temp_file.path(),
-                        serde_yaml::to_string(&config).with_context(|| {
-                            "Failed to serialize modified compose.yml".to_string()
-                        })?,
-                    )?;
-                }
+                fs::write(
+                    temp_file.path(),
+                    serde_yaml::to_string(&config)
+                        .with_context(|| "Failed to serialize modified compose.yml".to_string())?,
+                )?;
 
                 Ok(Some(Self {
                     original_path,
                     test_dir,
                     env,
-                    #[cfg(unix)]
                     config,
                     network,
-                    #[cfg(unix)]
                     temp_file,
                 }))
             }
@@ -228,7 +209,6 @@ impl Compose {
         if config.is_none() {
             command.arg(&self.original_path);
         } else {
-            #[cfg(unix)]
             command.arg(self.temp_file.path());
         }
 
