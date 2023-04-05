@@ -70,7 +70,7 @@ base: components: sinks: appsignal: configuration: {
 			"""
 		required: false
 		type: string: {
-			default: "none"
+			default: "gzip"
 			enum: {
 				gzip: """
 					[Gzip][gzip] compression.

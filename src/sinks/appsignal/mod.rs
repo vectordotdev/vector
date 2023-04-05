@@ -60,7 +60,7 @@ pub struct AppsignalSinkConfig {
     push_api_key: SensitiveString,
 
     #[configurable(derived)]
-    #[serde(default)]
+    #[serde(default = "Compression::gzip_default")]
     compression: Compression,
 
     #[configurable(derived)]
