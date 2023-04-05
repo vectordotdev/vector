@@ -183,17 +183,10 @@ impl HttpSink for AppsignalSinkConfig {
         );
 
         let mut body = crate::serde::json::to_bytes(&events)?.freeze();
-        let compression = self.compression;
-        match compression {
-            Compression::Gzip(_level) => {
-                request = request.header("Content-Encoding", "gzip");
-            }
-            Compression::Zlib(_level) => {
-                request = request.header("Content-Encoding", "deflate");
-            }
-            Compression::None => {}
+        if let Some(ce) = self.compression.content_encoding() {
+            request = request.header("Content-Encoding", ce);
         }
-        let mut compressor = Compressor::from(compression);
+        let mut compressor = Compressor::from(self.compression);
         write_all(&mut compressor, 0, &body)?;
         body = compressor.finish().context(CompressionFailedSnafu)?.into();
         request.body(body).map_err(Into::into)
