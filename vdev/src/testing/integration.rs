@@ -173,6 +173,13 @@ impl Compose {
                         BTreeMap::from_iter([("name".to_string(), network.clone())]),
                     );
 
+                    // Inject the labels
+                    let labels = BTreeMap::from_iter([(
+                        "com.example.integration-test".to_string(),
+                        network.clone(),
+                    )]);
+                    inject_labels(&mut config, &labels);
+
                     // Create a named tempfile, there may be resource leakage here in case of SIGINT
                     // Tried tempfile::tempfile() but this returns a File object without a usable path
                     // https://docs.rs/tempfile/latest/tempfile/#resource-leaking
@@ -268,6 +275,14 @@ fn config_env(config: &Environment) -> impl Iterator<Item = (String, String)> + 
             )
         })
     })
+}
+
+fn inject_labels(config: &mut ComposeConfig, labels: &BTreeMap<String, String>) {
+    for (_, service) in config.services.iter_mut() {
+        let mut new_labels = service.labels.clone().unwrap_or_else(BTreeMap::new);
+        new_labels.extend(labels.clone());
+        service.labels = Some(new_labels);
+    }
 }
 
 #[cfg(unix)]

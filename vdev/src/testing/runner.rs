@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{HashSet, BTreeMap};
 use std::process::{Command, Stdio};
 use std::{env, ffi::OsStr, ffi::OsString, path::PathBuf};
 
@@ -127,6 +127,32 @@ pub trait ContainerTestRunner: TestRunner {
         }
 
         Ok(RunnerState::Missing)
+    }
+
+    fn labels(&self) -> Result<BTreeMap<String, String>> {
+        let mut command = dockercmd(["ps", "-a", "--format", "{{.Names}} {{.Labels}}"]);
+        let container_name = self.container_name();
+
+        for line in command.check_output()?.lines() {
+            if let Some((name, labels)) = line.split_once(' ') {
+                if name == container_name {
+                    let label_map = labels
+                        .split(',')
+                        .filter_map(|label| {
+                            let mut parts = label.splitn(2, '=');
+                            match (parts.next(), parts.next()) {
+                                (Some(key), Some(value)) => Some((key.to_string(), value.to_string())),
+                                _ => None,
+                            }
+                        })
+                        .collect::<BTreeMap<String, String>>();
+
+                    return Ok(label_map);
+                }
+            }
+        }
+
+        Ok(BTreeMap::new())
     }
 
     fn ensure_running(&self) -> Result<()> {

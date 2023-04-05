@@ -70,6 +70,8 @@ pub struct ComposeService {
     pub depends_on: Option<Vec<String>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub healthcheck: Option<HealthCheck>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub labels: Option<BTreeMap<String, String>>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
