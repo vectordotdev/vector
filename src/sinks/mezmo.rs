@@ -88,7 +88,7 @@ pub struct MezmoConfig {
     #[configurable(metadata(docs::examples = "0.0.0.0"))]
     ip: Option<String>,
 
-    /// The tags that is attached to each batch of events.
+    /// The tags that are attached to each batch of events.
     #[configurable(metadata(docs::examples = "tag1"))]
     #[configurable(metadata(docs::examples = "tag2"))]
     tags: Option<Vec<Template>>,

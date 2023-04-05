@@ -104,7 +104,7 @@ pub struct KafkaSinkConfig {
 
     /// The log field name to use for the Kafka headers.
     ///
-    /// If omitted, no headers is written.
+    /// If omitted, no headers are written.
     #[configurable(metadata(docs::advanced))]
     #[serde(alias = "headers_field")] // accidentally released as `headers_field` in 0.18
     #[configurable(metadata(docs::examples = "headers"))]
