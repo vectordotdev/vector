@@ -1,12 +1,11 @@
 //use chrono::{DateTime, FixedOffset, ParseError};
-use chrono_tz::{UTC, Tz, ParseError};
+use chrono_tz::{ParseError, Tz, UTC};
 use std::{
-    convert::{TryFrom, Into},
+    convert::{Into, TryFrom},
     default::Default,
 };
 
 use vector_config::configurable_component;
-
 
 /// handle tz offset configuration
 #[configurable_component]
@@ -58,18 +57,15 @@ impl Default for PathTz {
 
 #[cfg(test)]
 mod tests {
-    use chrono_tz::{UTC, Tz, Asia::Singapore};
     use super::*;
+    use chrono_tz::{Asia::Singapore, Tz, UTC};
 
     #[test]
     fn parse_str() {
         let path_tz = PathTz::try_from("Asia/Singapore").unwrap();
         let tz: Tz = path_tz.timezone();
 
-        assert_eq!(
-            tz,
-            Singapore
-        );
+        assert_eq!(tz, Singapore);
     }
 
     #[test]
@@ -77,10 +73,7 @@ mod tests {
         let path_tz = PathTz::try_from("Asia/Singapore".to_string()).unwrap();
         let tz: Tz = path_tz.timezone();
 
-        assert_eq!(
-            tz,
-            Singapore
-        );
+        assert_eq!(tz, Singapore);
     }
 
     #[test]
@@ -88,9 +81,6 @@ mod tests {
         let path_tz = PathTz::try_from("UTC").unwrap();
         let tz: Tz = path_tz.timezone();
 
-        assert_eq!(
-            tz,
-            UTC
-        );
+        assert_eq!(tz, UTC);
     }
 }

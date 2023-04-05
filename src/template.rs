@@ -7,7 +7,7 @@ use chrono::{
     Utc,
 };
 
-use chrono_tz::{UTC, Tz};
+use chrono_tz::{Tz, UTC};
 use lookup::lookup_v2::parse_target_path;
 use lookup::PathPrefix;
 use once_cell::sync::Lazy;
@@ -175,7 +175,9 @@ impl Template {
         for part in &self.parts {
             match part {
                 Part::Literal(lit) => out.push_str(lit),
-                Part::Strftime(items) => out.push_str(&render_timestamp(items, event, self.path_tz.unwrap())),
+                Part::Strftime(items) => {
+                    out.push_str(&render_timestamp(items, event, self.path_tz.unwrap()))
+                }
                 Part::Reference(key) => {
                     out.push_str(
                         &match event {
@@ -375,7 +377,7 @@ fn render_timestamp(items: &ParsedStrftime, event: EventRef<'_>, path_tz: Tz) ->
 
 #[cfg(test)]
 mod tests {
-    use chrono::{Utc, TimeZone};
+    use chrono::{TimeZone, Utc};
     use lookup::metadata_path;
     use vector_core::metric_tags;
 
