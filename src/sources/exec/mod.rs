@@ -27,7 +27,7 @@ use vector_core::{config::LegacyKey, EstimatedJsonEncodedSizeOf};
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
-    config::{Output, SourceConfig, SourceContext},
+    config::{SourceConfig, SourceContext, SourceOutput},
     event::Event,
     internal_events::{
         ExecChannelClosedError, ExecCommandExecuted, ExecEventsReceived, ExecFailedError,
@@ -43,7 +43,7 @@ use vector_core::config::{log_schema, LogNamespace};
 pub mod sized_bytes_codec;
 
 /// Configuration for the `exec` source.
-#[configurable_component(source("exec"))]
+#[configurable_component(source("exec", "Collect output from a process running on the host."))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct ExecConfig {
@@ -220,6 +220,7 @@ impl ExecConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "exec")]
 impl SourceConfig for ExecConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         self.validate()?;
@@ -265,7 +266,7 @@ impl SourceConfig for ExecConfig {
         }
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         let log_namespace = global_log_namespace.merge(Some(self.log_namespace.unwrap_or(false)));
 
         let schema_definition = self
@@ -303,7 +304,10 @@ impl SourceConfig for ExecConfig {
                 None,
             );
 
-        vec![Output::default(self.decoding.output_type()).with_schema_definition(schema_definition)]
+        vec![SourceOutput::new_logs(
+            self.decoding.output_type(),
+            schema_definition,
+        )]
     }
 
     fn can_acknowledge(&self) -> bool {

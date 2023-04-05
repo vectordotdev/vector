@@ -30,7 +30,7 @@ use vector_core::config::{LegacyKey, LogNamespace};
 
 use super::util::MultilineConfig;
 use crate::{
-    config::{log_schema, DataType, Output, SourceConfig, SourceContext},
+    config::{log_schema, DataType, SourceConfig, SourceContext, SourceOutput},
     docker::{docker, DockerTlsConfig},
     event::{self, merge_state::LogEventMergeState, EstimatedJsonEncodedSizeOf, LogEvent, Value},
     internal_events::{
@@ -62,7 +62,7 @@ static CONSOLE: Lazy<Bytes> = Lazy::new(|| "console".into());
 
 /// Configuration for the `docker_logs` source.
 #[serde_as]
-#[configurable_component(source("docker_logs"))]
+#[configurable_component(source("docker_logs", "Collect container logs from a Docker Daemon."))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields, default)]
 pub struct DockerLogsConfig {
@@ -238,6 +238,7 @@ impl DockerLogsConfig {
 impl_generate_config_from_default!(DockerLogsConfig);
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "docker_logs")]
 impl SourceConfig for DockerLogsConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let log_namespace = cx.log_namespace(self.log_namespace);
@@ -271,7 +272,7 @@ impl SourceConfig for DockerLogsConfig {
         }))
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         let host_key = self.host_key.clone().path.map(LegacyKey::Overwrite);
 
         let schema_definition = BytesDeserializerConfig
@@ -350,7 +351,7 @@ impl SourceConfig for DockerLogsConfig {
                 None,
             );
 
-        vec![Output::default(DataType::Log).with_schema_definition(schema_definition)]
+        vec![SourceOutput::new_logs(DataType::Log, schema_definition)]
     }
 
     fn can_acknowledge(&self) -> bool {

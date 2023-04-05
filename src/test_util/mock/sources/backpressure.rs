@@ -9,16 +9,17 @@ use vector_config::configurable_component;
 use vector_core::{
     config::LogNamespace,
     event::{Event, LogEvent},
+    schema::Definition,
 };
 use vector_core::{
-    config::{DataType, Output},
+    config::{DataType, SourceOutput},
     source::Source,
 };
 
 use crate::config::{GenerateConfig, SourceConfig, SourceContext};
 
 /// Configuration for the `test_backpressure` source.
-#[configurable_component(source("test_backpressure"))]
+#[configurable_component(source("test_backpressure", "Test (backpressure)."))]
 #[derive(Clone, Debug)]
 pub struct BackpressureSourceConfig {
     // The number of events that have been sent.
@@ -36,6 +37,7 @@ impl GenerateConfig for BackpressureSourceConfig {
 }
 
 #[async_trait]
+#[typetag::serde(name = "test_backpressure")]
 impl SourceConfig for BackpressureSourceConfig {
     async fn build(&self, mut cx: SourceContext) -> crate::Result<Source> {
         let counter = Arc::clone(&self.counter);
@@ -61,8 +63,11 @@ impl SourceConfig for BackpressureSourceConfig {
         .boxed())
     }
 
-    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
-        vec![Output::default(DataType::all())]
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
+        vec![SourceOutput::new_logs(
+            DataType::all(),
+            Definition::default_legacy_namespace(),
+        )]
     }
 
     fn can_acknowledge(&self) -> bool {

@@ -10,7 +10,7 @@ use vector_core::config::LogNamespace;
 use vector_core::EstimatedJsonEncodedSizeOf;
 
 use crate::{
-    config::{log_schema, DataType, Output, SourceConfig, SourceContext},
+    config::{log_schema, SourceConfig, SourceContext, SourceOutput},
     internal_events::{EventsReceived, InternalMetricsBytesReceived, StreamClosedError},
     metrics::Controller,
     shutdown::ShutdownSignal,
@@ -19,7 +19,10 @@ use crate::{
 
 /// Configuration for the `internal_metrics` source.
 #[serde_as]
-#[configurable_component(source("internal_metrics"))]
+#[configurable_component(source(
+    "internal_metrics",
+    "Expose internal metrics emitted by the running Vector instance."
+))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields, default)]
 pub struct InternalMetricsConfig {
@@ -95,6 +98,7 @@ fn default_host_key() -> String {
 impl_generate_config_from_default!(InternalMetricsConfig);
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "internal_metrics")]
 impl SourceConfig for InternalMetricsConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         if self.scrape_interval_secs.is_zero() {
@@ -132,8 +136,8 @@ impl SourceConfig for InternalMetricsConfig {
         ))
     }
 
-    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
-        vec![Output::default(DataType::Metric)]
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
+        vec![SourceOutput::new_metrics()]
     }
 
     fn can_acknowledge(&self) -> bool {

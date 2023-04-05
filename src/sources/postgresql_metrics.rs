@@ -31,7 +31,7 @@ use vector_core::config::LogNamespace;
 use vector_core::{metric_tags, ByteSizeOf, EstimatedJsonEncodedSizeOf};
 
 use crate::{
-    config::{DataType, Output, SourceConfig, SourceContext},
+    config::{SourceConfig, SourceContext, SourceOutput},
     event::metric::{Metric, MetricKind, MetricTags, MetricValue},
     internal_events::{
         CollectionCompleted, EndpointBytesReceived, EventsReceived, PostgresqlMetricsCollectError,
@@ -112,7 +112,10 @@ struct PostgresqlMetricsTlsConfig {
 
 /// Configuration for the `postgresql_metrics` source.
 #[serde_as]
-#[configurable_component(source("postgresql_metrics"))]
+#[configurable_component(source(
+    "postgresql_metrics",
+    "Collect metrics from the PostgreSQL database."
+))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct PostgresqlMetricsConfig {
@@ -187,6 +190,7 @@ pub fn default_namespace() -> String {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "postgresql_metrics")]
 impl SourceConfig for PostgresqlMetricsConfig {
     async fn build(&self, mut cx: SourceContext) -> crate::Result<super::Source> {
         let datname_filter = DatnameFilter::new(
@@ -229,8 +233,8 @@ impl SourceConfig for PostgresqlMetricsConfig {
         }))
     }
 
-    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
-        vec![Output::default(DataType::Metric)]
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
+        vec![SourceOutput::new_metrics()]
     }
 
     fn can_acknowledge(&self) -> bool {

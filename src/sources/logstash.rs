@@ -25,8 +25,8 @@ use vector_core::{
 use super::util::net::{SocketListenAddr, TcpSource, TcpSourceAck, TcpSourceAcker};
 use crate::{
     config::{
-        log_schema, DataType, GenerateConfig, Output, Resource, SourceAcknowledgementsConfig,
-        SourceConfig, SourceContext,
+        log_schema, DataType, GenerateConfig, Resource, SourceAcknowledgementsConfig, SourceConfig,
+        SourceContext, SourceOutput,
     },
     event::{Event, LogEvent, Value},
     serde::bool_or_struct,
@@ -36,7 +36,7 @@ use crate::{
 };
 
 /// Configuration for the `logstash` source.
-#[configurable_component(source("logstash"))]
+#[configurable_component(source("logstash", "Collect logs from a Logstash agent."))]
 #[derive(Clone, Debug)]
 pub struct LogstashConfig {
     #[configurable(derived)]
@@ -133,6 +133,7 @@ impl GenerateConfig for LogstashConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "logstash")]
 impl SourceConfig for LogstashConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let log_namespace = cx.log_namespace(self.log_namespace);
@@ -166,10 +167,11 @@ impl SourceConfig for LogstashConfig {
         )
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         // There is a global and per-source `log_namespace` config.
         // The source config overrides the global setting and is merged here.
-        vec![Output::default(DataType::Log).with_schema_definition(
+        vec![SourceOutput::new_logs(
+            DataType::Log,
             self.schema_definition(global_log_namespace.merge(self.log_namespace)),
         )]
     }
@@ -789,10 +791,10 @@ mod test {
             ..Default::default()
         };
 
-        let definition = config.outputs(LogNamespace::Vector)[0]
-            .clone()
-            .log_schema_definition
-            .unwrap();
+        let definitions = config
+            .outputs(LogNamespace::Vector)
+            .remove(0)
+            .schema_definition(true);
 
         let expected_definition =
             Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
@@ -823,17 +825,17 @@ mod test {
                     None,
                 );
 
-        assert_eq!(definition, expected_definition)
+        assert_eq!(definitions, Some(expected_definition))
     }
 
     #[test]
     fn output_schema_definition_legacy_namespace() {
         let config = LogstashConfig::default();
 
-        let definition = config.outputs(LogNamespace::Legacy)[0]
-            .clone()
-            .log_schema_definition
-            .unwrap();
+        let definitions = config
+            .outputs(LogNamespace::Legacy)
+            .remove(0)
+            .schema_definition(true);
 
         let expected_definition = Definition::new_with_default_metadata(
             Kind::object(Collection::empty()),
@@ -848,7 +850,7 @@ mod test {
         .with_event_field(&owned_value_path!("timestamp"), Kind::timestamp(), None)
         .with_event_field(&owned_value_path!("host"), Kind::bytes(), Some("host"));
 
-        assert_eq!(definition, expected_definition)
+        assert_eq!(definitions, Some(expected_definition))
     }
 }
 

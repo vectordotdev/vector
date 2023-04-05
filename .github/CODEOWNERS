@@ -20,11 +20,11 @@ src/sinks/aws_kinesis/ @spencergilbert @vectordotdev/integrations-team # sink_aw
 src/sinks/aws_s3/ @spencergilbert @vectordotdev/integrations-team
 src/sinks/aws_sqs/ @spencergilbert @vectordotdev/integrations-team
 src/sinks/axiom.rs @spencergilbert @vectordotdev/integrations-team
-src/sinks/azure_blob/ @davidhuie-dd @vectordotdev/integrations-team
-src/sinks/azure_monitor_logs.rs @davidhuie-dd @vectordotdev/integrations-team
-src/sinks/blackhole/ @davidhuie-dd @vectordotdev/integrations-team
-src/sinks/clickhouse/ @davidhuie-dd @vectordotdev/integrations-team
-src/sinks/console/ @davidhuie-dd @vectordotdev/integrations-team
+src/sinks/azure_blob/ @vectordotdev/integrations-team
+src/sinks/azure_monitor_logs.rs  @vectordotdev/integrations-team
+src/sinks/blackhole/ @vectordotdev/integrations-team
+src/sinks/clickhouse/ @vectordotdev/integrations-team
+src/sinks/console/ @vectordotdev/integrations-team
 src/sinks/databend/ @spencergilbert @vectordotdev/integrations-team
 src/sinks/datadog_archives.rs @neuronull @vectordotdev/integrations-team
 src/sinks/datadog_events/ @neuronull @vectordotdev/integrations-team
@@ -37,15 +37,15 @@ src/sinks/gcp/ @StephenWakely @vectordotdev/integrations-team # sink_gcp_chronic
 src/sinks/honeycomb.rs @spencergilbert @vectordotdev/integrations-team
 src/sinks/http.rs @neuronull @vectordotdev/integrations-team
 src/sinks/humio/ @StephenWakely @vectordotdev/integrations-team # sink_humio_logs,sink_humio_metrics
-src/sinks/influxdb/ @davidhuie-dd @vectordotdev/integrations-team # sink_influxdb_logs,sink_influxdb_metrics
-src/sinks/kafka/ @davidhuie-dd @vectordotdev/integrations-team
+src/sinks/influxdb/ @vectordotdev/integrations-team # sink_influxdb_logs,sink_influxdb_metrics
+src/sinks/kafka/ @vectordotdev/integrations-team
 src/sinks/logdna.rs @neuronull @vectordotdev/integrations-team
 src/sinks/loki/ @spencergilbert @vectordotdev/integrations-team
 src/sinks/nats.rs @StephenWakely @vectordotdev/integrations-team
-src/sinks/new_relic/ @davidhuie-dd @vectordotdev/integrations-team # sink_newrelix,sink_newrelic_logs
+src/sinks/new_relic/ @vectordotdev/integrations-team # sink_newrelix,sink_newrelic_logs
 src/sinks/papertrail.rs @StephenWakely @vectordotdev/integrations-team
 src/sinks/prometheus/ @StephenWakely @vectordotdev/integrations-team # sink_prometheus_exporter,sink_prometheus_remote_write
-src/sinks/pulsar.rs @davidhuie-dd @vectordotdev/integrations-team
+src/sinks/pulsar.rs @vectordotdev/integrations-team
 src/sinks/redis.rs @StephenWakely @vectordotdev/integrations-team
 src/sinks/sematext/ @spencergilbert @vectordotdev/integrations-team # sink_sematext_logs,sink_sematext_metrics
 src/sinks/socket.rs @neuronull @vectordotdev/integrations-team
@@ -56,7 +56,7 @@ src/sinks/websocket/ @neuronull @vectordotdev/integrations-team
 src/source_sender/ @vectordotdev/core-team
 src/sources/ @vectordotdev/integrations-team
 src/sources/amqp.rs @StephenWakely @vectordotdev/integrations-team
-src/sources/apache_metrics/ @davidhuie-dd @vectordotdev/integrations-team
+src/sources/apache_metrics/ @vectordotdev/integrations-team
 src/sources/aws_ecs_metrics/ @spencergilbert @vectordotdev/integrations-team
 src/sources/aws_kinesis_firehose/ @spencergilbert @vectordotdev/integrations-team
 src/sources/aws_s3/ @spencergilbert @vectordotdev/integrations-team
@@ -65,27 +65,27 @@ src/sources/datadog_agent/ @neuronull @vectordotdev/integrations-team
 src/sources/demo_logs.rs @StephenWakely @vectordotdev/integrations-team
 src/sources/dnstap/ @StephenWakely @vectordotdev/integrations-team
 src/sources/docker_logs/ @spencergilbert @vectordotdev/integrations-team
-src/sources/eventstoredb_metrics/ @davidhuie-dd @vectordotdev/integrations-team
-src/sources/exec/ @davidhuie-dd @vectordotdev/integrations-team
+src/sources/eventstoredb_metrics/ @vectordotdev/integrations-team
+src/sources/exec/ @vectordotdev/integrations-team
 src/sources/file.rs @spencergilbert @vectordotdev/integrations-team
-src/sources/file_descriptors/ @davidhuie-dd @vectordotdev/integrations-team # source_file_descriptor,source_stdin
+src/sources/file_descriptors/ @vectordotdev/integrations-team # source_file_descriptor,source_stdin
 src/sources/fluent/ @neuronull @vectordotdev/integrations-team
 src/sources/gcp_pubsub.rs @StephenWakely @vectordotdev/integrations-team
 src/sources/heroku_logs.rs @spencergilbert @vectordotdev/integrations-team
-src/sources/host_metrics/ @davidhuie-dd @vectordotdev/integrations-team
+src/sources/host_metrics/ @vectordotdev/integrations-team
 src/sources/http_client/ @neuronull @vectordotdev/integrations-team
 src/sources/http_server.rs @neuronull @vectordotdev/integrations-team
 src/sources/internal_logs.rs @neuronull @vectordotdev/integrations-team
 src/sources/internal_metrics.rs @neuronull @vectordotdev/integrations-team
 src/sources/journald.rs @spencergilbert @vectordotdev/integrations-team
-src/sources/kafka.rs @davidhuie-dd @vectordotdev/integrations-team
+src/sources/kafka.rs @vectordotdev/integrations-team
 src/sources/kubernetes_logs/ @spencergilbert @vectordotdev/integrations-team
 src/sources/logstash.rs @neuronull @vectordotdev/integrations-team
-src/sources/mongodb_metrics/ @davidhuie-dd @vectordotdev/integrations-team
+src/sources/mongodb_metrics/ @vectordotdev/integrations-team
 src/sources/nats.rs @StephenWakely @vectordotdev/integrations-team
-src/sources/nginx_metrics/ @davidhuie-dd @vectordotdev/integrations-team
+src/sources/nginx_metrics/ @vectordotdev/integrations-team
 src/sources/opentelemetry/ @spencergilbert @vectordotdev/integrations-team
-src/sources/postgresql_metrics.rs @davidhuie-dd @vectordotdev/integrations-team
+src/sources/postgresql_metrics.rs @vectordotdev/integrations-team
 src/sources/prometheus/ @StephenWakely @vectordotdev/integrations-team # source_prometheus_remote_write,source_prometheus_scrape
 src/sources/redis/ @StephenWakely @vectordotdev/integrations-team
 src/sources/socket/ @neuronull @vectordotdev/integrations-team

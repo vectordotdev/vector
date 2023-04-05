@@ -11,7 +11,7 @@ use vector_config::configurable_component;
 
 use super::util::framestream::{build_framestream_unix_source, FrameHandler};
 use crate::{
-    config::{log_schema, DataType, Output, SourceConfig, SourceContext},
+    config::{log_schema, DataType, SourceConfig, SourceContext, SourceOutput},
     event::{Event, LogEvent},
     internal_events::DnstapParseError,
     Result,
@@ -27,7 +27,7 @@ pub use schema::DnstapEventSchema;
 use vector_core::config::{LegacyKey, LogNamespace};
 
 /// Configuration for the `dnstap` source.
-#[configurable_component(source("dnstap"))]
+#[configurable_component(source("dnstap", "Collect DNS logs from a dnstap-compatible server."))]
 #[derive(Clone, Debug)]
 pub struct DnstapConfig {
     /// Maximum DNSTAP frame length that the source accepts.
@@ -174,6 +174,7 @@ impl Default for DnstapConfig {
 impl_generate_config_from_default!(DnstapConfig);
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "dnstap")]
 impl SourceConfig for DnstapConfig {
     async fn build(&self, cx: SourceContext) -> Result<super::Source> {
         let log_namespace = cx.log_namespace(self.log_namespace);
@@ -181,12 +182,12 @@ impl SourceConfig for DnstapConfig {
         build_framestream_unix_source(frame_handler, cx.shutdown, cx.out)
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         let log_namespace = global_log_namespace.merge(self.log_namespace);
         let schema_definition = self
             .schema_definition(log_namespace)
             .with_standard_vector_source_metadata();
-        vec![Output::default(DataType::Log).with_schema_definition(schema_definition)]
+        vec![SourceOutput::new_logs(DataType::Log, schema_definition)]
     }
 
     fn can_acknowledge(&self) -> bool {

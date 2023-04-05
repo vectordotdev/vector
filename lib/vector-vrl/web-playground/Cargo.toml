@@ -1,0 +1,23 @@
+[package]
+name = "vector-vrl-web-playground"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+wasm-bindgen = "0.2"
+vrl = { package = "vrl", git = "https://github.com/vectordotdev/vrl", rev = "v0.2.0", default-features = false}
+value = { package = "value", git = "https://github.com/vectordotdev/vrl", rev = "v0.2.0", default-features = false}
+stdlib = { package = "vrl-stdlib", git = "https://github.com/vectordotdev/vrl", rev = "v0.2.0"}
+serde = { version = "1.0", features = ["derive"] }
+serde-wasm-bindgen = "0.5"
+gloo-utils = { version = "0.1", features = ["serde"] }
+getrandom = { version = "0.2", features = ["js"] }
+vector-vrl-functions = { path = "../functions" }
+enrichment = { path = "../../enrichment" }
+
+

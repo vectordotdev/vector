@@ -19,7 +19,7 @@ use vector_core::{config::LogNamespace, EstimatedJsonEncodedSizeOf};
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
-    config::{Output, SourceConfig, SourceContext},
+    config::{SourceConfig, SourceContext, SourceOutput},
     internal_events::{DemoLogsEventProcessed, EventsReceived, StreamClosedError},
     serde::{default_decoding, default_framing_message_based},
     shutdown::ShutdownSignal,
@@ -28,7 +28,10 @@ use crate::{
 
 /// Configuration for the `demo_logs` source.
 #[serde_as]
-#[configurable_component(source("demo_logs"))]
+#[configurable_component(source(
+    "demo_logs",
+    "Generate fake log events, which can be useful for testing and demos."
+))]
 #[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
 pub struct DemoLogsConfig {
@@ -270,6 +273,7 @@ async fn demo_logs_source(
 impl_generate_config_from_default!(DemoLogsConfig);
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "demo_logs")]
 impl SourceConfig for DemoLogsConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let log_namespace = cx.log_namespace(self.log_namespace);
@@ -288,7 +292,7 @@ impl SourceConfig for DemoLogsConfig {
         )))
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         // There is a global and per-source `log_namespace` config. The source config overrides the global setting,
         // and is merged here.
         let log_namespace = global_log_namespace.merge(self.log_namespace);
@@ -298,7 +302,10 @@ impl SourceConfig for DemoLogsConfig {
             .schema_definition(log_namespace)
             .with_standard_vector_source_metadata();
 
-        vec![Output::default(self.decoding.output_type()).with_schema_definition(schema_definition)]
+        vec![SourceOutput::new_logs(
+            self.decoding.output_type(),
+            schema_definition,
+        )]
     }
 
     fn can_acknowledge(&self) -> bool {

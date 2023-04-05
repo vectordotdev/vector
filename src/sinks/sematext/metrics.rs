@@ -303,7 +303,7 @@ fn to_fields(label: String, value: f64) -> HashMap<String, Field> {
 
 #[cfg(test)]
 mod tests {
-    use chrono::{offset::TimeZone, Utc};
+    use chrono::{offset::TimeZone, Timelike, Utc};
     use futures::StreamExt;
     use indoc::indoc;
     use vector_core::metric_tags;
@@ -332,8 +332,8 @@ mod tests {
         )
         .with_namespace(Some("jvm"))
         .with_timestamp(Some(
-            Utc.ymd(2020, 8, 18)
-                .and_hms_nano_opt(21, 0, 0, 0)
+            Utc.with_ymd_and_hms(2020, 8, 18, 21, 0, 0)
+                .single()
                 .expect("invalid timestamp"),
         ))];
 
@@ -351,8 +351,8 @@ mod tests {
             MetricValue::Counter { value: 42.0 },
         )
         .with_timestamp(Some(
-            Utc.ymd(2020, 8, 18)
-                .and_hms_nano_opt(21, 0, 0, 0)
+            Utc.with_ymd_and_hms(2020, 8, 18, 21, 0, 0)
+                .single()
                 .expect("invalid timestamp"),
         ))];
 
@@ -372,8 +372,8 @@ mod tests {
             )
             .with_namespace(Some("jvm"))
             .with_timestamp(Some(
-                Utc.ymd(2020, 8, 18)
-                    .and_hms_nano_opt(21, 0, 0, 0)
+                Utc.with_ymd_and_hms(2020, 8, 18, 21, 0, 0)
+                    .single()
                     .expect("invalid timestamp"),
             )),
             Metric::new(
@@ -383,8 +383,9 @@ mod tests {
             )
             .with_namespace(Some("jvm"))
             .with_timestamp(Some(
-                Utc.ymd(2020, 8, 18)
-                    .and_hms_nano_opt(21, 0, 0, 1)
+                Utc.with_ymd_and_hms(2020, 8, 18, 21, 0, 0)
+                    .single()
+                    .and_then(|t| t.with_nanosecond(1))
                     .expect("invalid timestamp"),
             )),
         ];
@@ -441,7 +442,9 @@ mod tests {
                 )
                 .with_namespace(Some(*namespace))
                 .with_tags(Some(metric_tags!("os.host" => "somehost")))
-                .with_timestamp(Some(Utc.ymd(2020, 8, 18).and_hms_nano_opt(21, 0, 0, i as u32).expect("invalid timestamp"))),
+                    .with_timestamp(Some(Utc.with_ymd_and_hms(2020, 8, 18, 21, 0, 0).single()
+                                         .and_then(|t| t.with_nanosecond(i as u32))
+                                         .expect("invalid timestamp"))),
             );
             events.push(event);
         }

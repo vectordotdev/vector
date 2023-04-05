@@ -15,7 +15,9 @@ use super::util::MultilineConfig;
 use crate::{
     aws::{auth::AwsAuthentication, create_client, RegionOrEndpoint},
     common::{s3::S3ClientBuilder, sqs::SqsClientBuilder},
-    config::{Output, ProxyConfig, SourceAcknowledgementsConfig, SourceConfig, SourceContext},
+    config::{
+        ProxyConfig, SourceAcknowledgementsConfig, SourceConfig, SourceContext, SourceOutput,
+    },
     line_agg,
     serde::bool_or_struct,
     tls::TlsConfig,
@@ -68,7 +70,7 @@ enum Strategy {
 // when there's required fields.
 //
 // Maybe showing defaults at all, when there are required properties, doesn't actually make sense? :thinkies:
-#[configurable_component(source("aws_s3"))]
+#[configurable_component(source("aws_s3", "Collect logs from AWS S3."))]
 #[derive(Clone, Debug, Default)]
 #[serde(default, deny_unknown_fields)]
 pub struct AwsS3Config {
@@ -118,6 +120,7 @@ pub struct AwsS3Config {
 impl_generate_config_from_default!(AwsS3Config);
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "aws_s3")]
 impl SourceConfig for AwsS3Config {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let log_namespace = cx.log_namespace(self.log_namespace);
@@ -137,7 +140,7 @@ impl SourceConfig for AwsS3Config {
         }
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         let log_namespace = global_log_namespace.merge(self.log_namespace);
         let mut schema_definition = BytesDeserializerConfig
             .schema_definition(log_namespace)
@@ -184,7 +187,7 @@ impl SourceConfig for AwsS3Config {
             schema_definition = schema_definition.unknown_fields(Kind::bytes());
         }
 
-        vec![Output::default(DataType::Log).with_schema_definition(schema_definition)]
+        vec![SourceOutput::new_logs(DataType::Log, schema_definition)]
     }
 
     fn can_acknowledge(&self) -> bool {

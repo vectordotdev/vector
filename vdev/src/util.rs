@@ -33,6 +33,13 @@ pub fn read_version() -> Result<String> {
     CargoToml::load().map(|cargo| cargo.package.version)
 }
 
+/// Use the version provided by env vars or default to reading from `Cargo.toml`.
+pub fn get_version() -> Result<String> {
+    std::env::var("VERSION")
+        .or_else(|_| std::env::var("VECTOR_VERSION"))
+        .or_else(|_| read_version())
+}
+
 pub fn git_head() -> Result<Output> {
     Command::new("git")
         .args(["describe", "--exact-match", "--tags", "HEAD"])
@@ -40,15 +47,8 @@ pub fn git_head() -> Result<Output> {
         .context("Could not execute `git`")
 }
 
-/// Calculate the release channel from `git describe`
-pub fn release_channel() -> Result<&'static str> {
-    git_head().map(|output| {
-        if output.status.success() {
-            "latest"
-        } else {
-            "nightly"
-        }
-    })
+pub fn get_channel() -> String {
+    std::env::var("CHANNEL").unwrap_or_else(|_| "custom".to_string())
 }
 
 pub fn exists(path: impl AsRef<Path> + Debug) -> Result<bool> {

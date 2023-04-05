@@ -12,13 +12,13 @@ use crate::common::sqs::SqsClientBuilder;
 use crate::tls::TlsConfig;
 use crate::{
     aws::{auth::AwsAuthentication, region::RegionOrEndpoint},
-    config::{Output, SourceAcknowledgementsConfig, SourceConfig, SourceContext},
+    config::{SourceAcknowledgementsConfig, SourceConfig, SourceContext, SourceOutput},
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
     sources::aws_sqs::source::SqsSource,
 };
 
 /// Configuration for the `aws_sqs` source.
-#[configurable_component(source("aws_sqs"))]
+#[configurable_component(source("aws_sqs", "Collect logs from AWS SQS."))]
 #[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
 #[serde(deny_unknown_fields)]
@@ -102,6 +102,7 @@ pub struct AwsSqsConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "aws_sqs")]
 impl SourceConfig for AwsSqsConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<crate::sources::Source> {
         let log_namespace = cx.log_namespace(self.log_namespace);
@@ -130,7 +131,7 @@ impl SourceConfig for AwsSqsConfig {
         ))
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         let schema_definition = self
             .decoding
             .schema_definition(global_log_namespace.merge(self.log_namespace))
@@ -143,7 +144,10 @@ impl SourceConfig for AwsSqsConfig {
                 Some("timestamp"),
             );
 
-        vec![Output::default(self.decoding.output_type()).with_schema_definition(schema_definition)]
+        vec![SourceOutput::new_logs(
+            self.decoding.output_type(),
+            schema_definition,
+        )]
     }
 
     fn can_acknowledge(&self) -> bool {

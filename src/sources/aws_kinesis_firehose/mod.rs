@@ -13,7 +13,8 @@ use warp::Filter;
 use crate::{
     codecs::DecodingConfig,
     config::{
-        GenerateConfig, Output, Resource, SourceAcknowledgementsConfig, SourceConfig, SourceContext,
+        GenerateConfig, Resource, SourceAcknowledgementsConfig, SourceConfig, SourceContext,
+        SourceOutput,
     },
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
     tls::{MaybeTlsSettings, TlsEnableableConfig},
@@ -25,7 +26,10 @@ mod handlers;
 mod models;
 
 /// Configuration for the `aws_kinesis_firehose` source.
-#[configurable_component(source("aws_kinesis_firehose"))]
+#[configurable_component(source(
+    "aws_kinesis_firehose",
+    "Collect logs from AWS Kinesis Firehose."
+))]
 #[derive(Clone, Debug)]
 pub struct AwsKinesisFirehoseConfig {
     /// The socket address to listen for connections on.
@@ -134,6 +138,7 @@ impl fmt::Display for Compression {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "aws_kinesis_firehose")]
 impl SourceConfig for AwsKinesisFirehoseConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let log_namespace = cx.log_namespace(self.log_namespace);
@@ -179,7 +184,7 @@ impl SourceConfig for AwsKinesisFirehoseConfig {
         }))
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         let schema_definition = self
             .decoding
             .schema_definition(global_log_namespace.merge(self.log_namespace))
@@ -199,7 +204,10 @@ impl SourceConfig for AwsKinesisFirehoseConfig {
                 None,
             );
 
-        vec![Output::default(self.decoding.output_type()).with_schema_definition(schema_definition)]
+        vec![SourceOutput::new_logs(
+            self.decoding.output_type(),
+            schema_definition,
+        )]
     }
 
     fn resources(&self) -> Vec<Resource> {

@@ -6,7 +6,10 @@ use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
 
 use crate::{
-    config::{DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext},
+    config::{
+        DataType, GenerateConfig, Input, OutputId, TransformConfig, TransformContext,
+        TransformOutput,
+    },
     event::{
         metric::{Metric, MetricKind, MetricTags, MetricValue, StatisticKind, TagValue},
         Event, Value,
@@ -154,8 +157,13 @@ impl TransformConfig for LogToMetricConfig {
         Input::log()
     }
 
-    fn outputs(&self, _: &schema::Definition, _: LogNamespace) -> Vec<Output> {
-        vec![Output::default(DataType::Metric)]
+    fn outputs(
+        &self,
+        _: &[(OutputId, schema::Definition)],
+        _: LogNamespace,
+    ) -> Vec<TransformOutput> {
+        // Converting the log to a metric means we lose all incoming `Definition`s.
+        vec![TransformOutput::new(DataType::Metric, Vec::new())]
     }
 
     fn enable_concurrency(&self) -> bool {
@@ -394,7 +402,7 @@ impl FunctionTransform for LogToMetric {
 
 #[cfg(test)]
 mod tests {
-    use chrono::{offset::TimeZone, DateTime, Utc};
+    use chrono::{offset::TimeZone, DateTime, Timelike, Utc};
     use lookup::PathPrefix;
     use std::time::Duration;
     use tokio::sync::mpsc;
@@ -426,8 +434,9 @@ mod tests {
     }
 
     fn ts() -> DateTime<Utc> {
-        Utc.ymd(2018, 11, 14)
-            .and_hms_nano_opt(8, 9, 10, 11)
+        Utc.with_ymd_and_hms(2018, 11, 14, 8, 9, 10)
+            .single()
+            .and_then(|t| t.with_nanosecond(11))
             .expect("invalid timestamp")
     }
 

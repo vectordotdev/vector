@@ -9,7 +9,7 @@ use indicatif::{ProgressBar, ProgressStyle};
 use log::LevelFilter;
 use once_cell::sync::{Lazy, OnceCell};
 
-use crate::{config::Config, platform, util};
+use crate::{config::Config, git, platform, util};
 
 // Use the `bash` interpreter included as part of the standard `git` install for our default shell
 // if nothing is specified in the environment.
@@ -46,8 +46,9 @@ pub fn set_repo_dir() -> Result<()> {
 }
 
 pub fn version() -> Result<String> {
-    let version = env::var("VERSION").or_else(|_| util::read_version())?;
-    let channel = env::var("CHANNEL").or_else(|_| util::release_channel().map(Into::into))?;
+    let mut version = util::get_version()?;
+
+    let channel = util::get_channel();
 
     if channel == "latest" {
         let head = util::git_head()?;
@@ -59,6 +60,14 @@ pub fn version() -> Result<String> {
         if tag != format!("v{version}") {
             bail!("On latest release channel and tag {tag:?} is different from Cargo.toml {version:?}. Aborting");
         }
+
+    // extend version for custom builds if not already
+    } else if channel == "custom" && !version.contains("custom") {
+        let sha = git::get_git_sha()?;
+
+        // use '.' instead of '-' or '_' to avoid issues with rpm and deb package naming
+        // format requirements.
+        version = format!("{version}.custom.{sha}");
     }
 
     Ok(version)

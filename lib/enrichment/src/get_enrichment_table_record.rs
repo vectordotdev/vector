@@ -113,7 +113,7 @@ impl Function for GetEnrichmentTableRecord {
 
         let case_sensitive = arguments
             .optional_literal("case_sensitive")?
-            .and_then(|literal| literal.as_value())
+            .and_then(|literal| literal.resolve_constant())
             .map(|value| value.try_boolean())
             .transpose()
             .expect("case_sensitive should be boolean") // This will have been caught by the type checker.

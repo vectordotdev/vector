@@ -7,6 +7,6 @@ publish = false
 license = "MPL-2.0"
 
 [dependencies]
-lookup = { package = "lookup", git = "https://github.com/vectordotdev/vrl", rev = "v0.1.0" }
-vrl = { package = "vrl", git = "https://github.com/vectordotdev/vrl", rev = "v0.1.0" }
-value = { package = "value", git = "https://github.com/vectordotdev/vrl", rev = "v0.1.0", default-features = false, features = [] }
+lookup = { package = "lookup", git = "https://github.com/vectordotdev/vrl", rev = "v0.2.0" }
+vrl = { package = "vrl", git = "https://github.com/vectordotdev/vrl", rev = "v0.2.0" }
+value = { package = "value", git = "https://github.com/vectordotdev/vrl", rev = "v0.2.0", default-features = false, features = [] }

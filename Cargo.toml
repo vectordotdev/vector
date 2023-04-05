@@ -109,6 +109,7 @@ members = [
   "lib/vector-vrl/cli",
   "lib/vector-vrl/functions",
   "lib/vector-vrl/tests",
+  "lib/vector-vrl/web-playground",
   "vdev",
 ]
 
@@ -124,7 +125,7 @@ portpicker = { path = "lib/portpicker" }
 prometheus-parser = { path = "lib/prometheus-parser", optional = true }
 opentelemetry-proto = { path = "lib/opentelemetry-proto", optional = true }
 tracing-limit = { path = "lib/tracing-limit" }
-value = { package = "value", git = "https://github.com/vectordotdev/vrl", rev = "v0.1.0" }
+value = { package = "value", git = "https://github.com/vectordotdev/vrl", rev = "v0.2.0" }
 vector-api-client = { path = "lib/vector-api-client", optional = true }
 vector-buffers = { path = "lib/vector-buffers", default-features = false }
 vector-common = { path = "lib/vector-common" }
@@ -133,7 +134,7 @@ vector-config-common = { path = "lib/vector-config-common" }
 vector-config-macros = { path = "lib/vector-config-macros" }
 vector-core = { path = "lib/vector-core", default-features = false, features = ["vrl"] }
 vector-vrl-functions = { path = "lib/vector-vrl/functions" }
-vrl-cli = { package = "vrl-cli", git = "https://github.com/vectordotdev/vrl", rev = "v0.1.0", optional = true }
+vrl-cli = { package = "vrl-cli", git = "https://github.com/vectordotdev/vrl", rev = "v0.2.0", optional = true }
 loki-logproto = { path = "lib/loki-logproto", optional = true }
 
 # Tokio / Futures
@@ -221,14 +222,14 @@ number_prefix = { version = "0.4.0", default-features = false, features = ["std"
 tui = { version = "0.19.0", optional = true, default-features = false, features = ["crossterm"] }
 
 # Datadog Pipelines
-datadog-filter = { package = "datadog-filter", git = "https://github.com/vectordotdev/vrl", rev = "v0.1.0" }
-datadog-search-syntax = { package = "datadog-search-syntax", git = "https://github.com/vectordotdev/vrl", rev = "v0.1.0" }
+datadog-filter = { package = "datadog-filter", git = "https://github.com/vectordotdev/vrl", rev = "v0.2.0" }
+datadog-search-syntax = { package = "datadog-search-syntax", git = "https://github.com/vectordotdev/vrl", rev = "v0.2.0" }
 hex = { version = "0.4.3", default-features = false, optional = true }
 sha2 = { version = "0.10.6", default-features = false, optional = true }
 
 # VRL Lang
-vrl = { package = "vrl", git = "https://github.com/vectordotdev/vrl", rev = "v0.1.0" }
-vrl-stdlib = { package = "vrl-stdlib", git = "https://github.com/vectordotdev/vrl", rev = "v0.1.0" }
+vrl = { package = "vrl", git = "https://github.com/vectordotdev/vrl", rev = "v0.2.0" }
+vrl-stdlib = { package = "vrl-stdlib", git = "https://github.com/vectordotdev/vrl", rev = "v0.2.0" }
 
 # External libs
 arc-swap = { version = "1.6", default-features = false, optional = true }
@@ -253,7 +254,7 @@ encoding_rs = { version = "0.8.32", default-features = false, features = ["serde
 enum_dispatch = { version = "0.3.11", default-features = false }
 exitcode = { version = "1.1.2", default-features = false }
 flate2 = { version = "1.0.25", default-features = false, features = ["default"] }
-futures-util = { version = "0.3.27", default-features = false }
+futures-util = { version = "0.3.28", default-features = false }
 glob = { version = "0.3.1", default-features = false }
 governor = { version = "0.5.1", default-features = false, features = ["dashmap", "jitter", "std"], optional = true }
 grok = { version = "2.0.0", default-features = false, optional = true }
@@ -359,7 +360,7 @@ test-generator = "0.3.1"
 tokio-test = "0.4.2"
 tokio = { version = "1.26.0", features = ["test-util"] }
 tower-test = "0.4.0"
-value = { package = "value", git = "https://github.com/vectordotdev/vrl", rev = "v0.1.0", features = ["test"] }
+value = { package = "value", git = "https://github.com/vectordotdev/vrl", rev = "v0.2.0", features = ["test"] }
 vector-core = { path = "lib/vector-core", default-features = false, features = ["vrl", "test"] }
 wiremock = "0.5.17"
 zstd = { version = "0.12.3", default-features = false }
@@ -367,7 +368,7 @@ zstd = { version = "0.12.3", default-features = false }
 [patch.crates-io]
 # Removes dependency on `time` v0.1
 # https://github.com/chronotope/chrono/pull/578
-chrono = { git = "https://github.com/vectordotdev/chrono.git", branch = "no-default-time-v0.4.22-1" }
+chrono = { git = "https://github.com/vectordotdev/chrono.git", tag = "v0.4.24-no-default-time-1" }
 # The upgrade for `tokio-util` >= 0.6.9 is blocked on https://github.com/vectordotdev/vector/issues/11257.
 tokio-util = { git = "https://github.com/vectordotdev/tokio", branch = "tokio-util-0.7.4-framed-read-continue-on-error" }
 nix = { git = "https://github.com/vectordotdev/nix.git", branch = "memfd/gnu/musl" }

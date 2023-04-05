@@ -21,7 +21,7 @@ use self::parser::ParseError;
 use super::util::net::{try_bind_udp_socket, SocketListenAddr, TcpNullAcker, TcpSource};
 use crate::{
     codecs::Decoder,
-    config::{self, GenerateConfig, Output, Resource, SourceConfig, SourceContext},
+    config::{GenerateConfig, Resource, SourceConfig, SourceContext, SourceOutput},
     event::Event,
     internal_events::{
         EventsReceived, SocketBindError, SocketBytesReceived, SocketMode, SocketReceiveError,
@@ -43,7 +43,7 @@ use unix::{statsd_unix, UnixConfig};
 use vector_core::config::LogNamespace;
 
 /// Configuration for the `statsd` source.
-#[configurable_component(source("statsd"))]
+#[configurable_component(source("statsd", "Collect metrics emitted by the StatsD aggregator."))]
 #[derive(Clone, Debug)]
 #[serde(tag = "mode", rename_all = "snake_case")]
 #[configurable(metadata(docs::enum_tag_description = "The type of socket to use."))]
@@ -140,6 +140,7 @@ impl GenerateConfig for StatsdConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "statsd")]
 impl SourceConfig for StatsdConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         match self {
@@ -174,8 +175,8 @@ impl SourceConfig for StatsdConfig {
         }
     }
 
-    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
-        vec![Output::default(config::DataType::Metric)]
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
+        vec![SourceOutput::new_metrics()]
     }
 
     fn resources(&self) -> Vec<Resource> {

@@ -11,9 +11,11 @@ use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
 use vrl::prelude::BTreeMap;
 
+use crate::config::OutputId;
 use crate::{
     config::{
-        log_schema, DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext,
+        log_schema, DataType, GenerateConfig, Input, TransformConfig, TransformContext,
+        TransformOutput,
     },
     event::{self, Event, LogEvent, Metric},
     internal_events::MetricToLogSerializeError,
@@ -90,7 +92,11 @@ impl TransformConfig for MetricToLogConfig {
         Input::metric()
     }
 
-    fn outputs(&self, _: &Definition, global_log_namespace: LogNamespace) -> Vec<Output> {
+    fn outputs(
+        &self,
+        _: &[(OutputId, Definition)],
+        global_log_namespace: LogNamespace,
+    ) -> Vec<TransformOutput> {
         let log_namespace = global_log_namespace.merge(self.log_namespace);
         let mut schema_definition =
             Definition::default_for_namespace(&BTreeSet::from([log_namespace]))
@@ -223,7 +229,7 @@ impl TransformConfig for MetricToLogConfig {
             }
         }
 
-        vec![Output::default(DataType::Log).with_schema_definition(schema_definition)]
+        vec![TransformOutput::new(DataType::Log, vec![schema_definition])]
     }
 
     fn enable_concurrency(&self) -> bool {
@@ -320,7 +326,7 @@ impl FunctionTransform for MetricToLog {
 
 #[cfg(test)]
 mod tests {
-    use chrono::{offset::TimeZone, DateTime, Utc};
+    use chrono::{offset::TimeZone, DateTime, Timelike, Utc};
     use futures::executor::block_on;
     use proptest::prelude::*;
     use similar_asserts::assert_eq;
@@ -367,8 +373,9 @@ mod tests {
     }
 
     fn ts() -> DateTime<Utc> {
-        Utc.ymd(2018, 11, 14)
-            .and_hms_nano_opt(8, 9, 10, 11)
+        Utc.with_ymd_and_hms(2018, 11, 14, 8, 9, 10)
+            .single()
+            .and_then(|t| t.with_nanosecond(11))
             .expect("invalid timestamp")
     }
 

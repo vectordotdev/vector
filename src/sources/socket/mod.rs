@@ -13,13 +13,13 @@ use vector_core::config::{log_schema, LegacyKey, LogNamespace};
 use crate::serde::default_framing_message_based;
 use crate::{
     codecs::DecodingConfig,
-    config::{GenerateConfig, Output, Resource, SourceConfig, SourceContext},
+    config::{GenerateConfig, Resource, SourceConfig, SourceContext, SourceOutput},
     sources::util::net::TcpSource,
     tls::MaybeTlsSettings,
 };
 
 /// Configuration for the `socket` source.
-#[configurable_component(source("socket"))]
+#[configurable_component(source("socket", "Collect logs over a socket."))]
 #[derive(Clone, Debug)]
 pub struct SocketConfig {
     #[serde(flatten)]
@@ -108,6 +108,7 @@ impl GenerateConfig for SocketConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "socket")]
 impl SourceConfig for SocketConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         match self.mode.clone() {
@@ -216,7 +217,7 @@ impl SourceConfig for SocketConfig {
         }
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         let log_namespace = global_log_namespace.merge(Some(self.log_namespace()));
 
         let schema_definition = self
@@ -308,8 +309,10 @@ impl SourceConfig for SocketConfig {
             }
         };
 
-        vec![Output::default(self.decoding().output_type())
-            .with_schema_definition(schema_definition)]
+        vec![SourceOutput::new_logs(
+            self.decoding().output_type(),
+            schema_definition,
+        )]
     }
 
     fn resources(&self) -> Vec<Resource> {
