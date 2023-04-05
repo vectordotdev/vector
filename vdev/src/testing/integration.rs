@@ -1,7 +1,12 @@
 use anyhow::{bail, Context, Result};
-use std::collections::BTreeMap;
-use std::{fs, path::Path, path::PathBuf, process::Command};
-use tempfile::{Builder, NamedTempFile};
+use std::{path::Path, path::PathBuf, process::Command};
+
+#[cfg(unix)]
+use {
+    std::collections::BTreeMap,
+    std::fs,
+    tempfile::{Builder, NamedTempFile},
+};
 
 #[cfg(unix)]
 use super::config::ComposeConfig;
@@ -142,6 +147,7 @@ struct Compose {
     #[cfg(unix)]
     config: ComposeConfig,
     network: String,
+    #[cfg(unix)]
     temp_file: NamedTempFile,
 }
 
@@ -155,6 +161,8 @@ impl Compose {
             Ok(true) => {
                 #[cfg(unix)]
                 let mut config = ComposeConfig::parse(&original_path)?;
+
+                #[cfg(unix)]
                 let temp_file: NamedTempFile;
 
                 #[cfg(unix)]
@@ -220,6 +228,7 @@ impl Compose {
         if config.is_none() {
             command.arg(&self.original_path);
         } else {
+            #[cfg(unix)]
             command.arg(self.temp_file.path());
         }
 
