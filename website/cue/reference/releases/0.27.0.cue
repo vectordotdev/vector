@@ -13,6 +13,15 @@ releases: "0.27.0": {
 			`component_kind`, and `component_type`). This affects reporting in `vector top`.
 			Fixed in v0.27.1.
 			""",
+		"""
+			The `log_schema.timestamp_key` cannot be set to `""` to suppress adding a timestamp.
+			Fixed in 0.28.2.
+			""",
+		"""
+			TCP-based sources like `socket`, `logstash`, and `fluent` would sometimes panic when
+			back-pressure logic calculated a lower limit on the number of incoming
+			connections than 2, which is intended to be the minimum limit. Fixed in 0.28.2.
+			""",
 	]
 
 	description: """
