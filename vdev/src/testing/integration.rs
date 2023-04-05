@@ -155,27 +155,32 @@ impl Compose {
             Ok(true) => {
                 #[cfg(unix)]
                 let mut config = ComposeConfig::parse(&original_path)?;
+                let temp_file: NamedTempFile;
 
-                // Inject the networks block
-                config.networks.insert(
-                    "default".to_string(),
-                    BTreeMap::from_iter([("name".to_string(), network.clone())]),
-                );
+                #[cfg(unix)]
+                {
+                    // Inject the networks block
+                    config.networks.insert(
+                        "default".to_string(),
+                        BTreeMap::from_iter([("name".to_string(), network.clone())]),
+                    );
 
-                // Create a named tempfile, there may be resource leakage here in case of SIGINT
-                // Tried tempfile::tempfile() but this returns a File object without a usable path
-                // https://docs.rs/tempfile/latest/tempfile/#resource-leaking
-                let temp_file = Builder::new()
-                    .prefix("compose-temp-")
-                    .suffix(".yaml")
-                    .tempfile_in(&test_dir)
-                    .with_context(|| "Failed to create temporary compose file")?;
+                    // Create a named tempfile, there may be resource leakage here in case of SIGINT
+                    // Tried tempfile::tempfile() but this returns a File object without a usable path
+                    // https://docs.rs/tempfile/latest/tempfile/#resource-leaking
+                    temp_file = Builder::new()
+                        .prefix("compose-temp-")
+                        .suffix(".yaml")
+                        .tempfile_in(&test_dir)
+                        .with_context(|| "Failed to create temporary compose file")?;
 
-                fs::write(
-                    temp_file.path(),
-                    serde_yaml::to_string(&config)
-                        .with_context(|| "Failed to serialize modified compose.yml".to_string())?,
-                )?;
+                    fs::write(
+                        temp_file.path(),
+                        serde_yaml::to_string(&config).with_context(|| {
+                            "Failed to serialize modified compose.yml".to_string()
+                        })?,
+                    )?;
+                }
 
                 Ok(Some(Self {
                     original_path,
@@ -184,6 +189,7 @@ impl Compose {
                     #[cfg(unix)]
                     config,
                     network,
+                    #[cfg(unix)]
                     temp_file,
                 }))
             }
