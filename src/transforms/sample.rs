@@ -78,7 +78,7 @@ impl TransformConfig for SampleConfig {
             DataType::Log | DataType::Trace,
             input_definitions
                 .iter()
-                .map(|(_output, definition)| definition.clone())
+                .map(|(output, definition)| (output.clone(), definition.clone()))
                 .collect(),
         )]
     }

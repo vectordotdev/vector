@@ -4,7 +4,7 @@ use bytes::Bytes;
 use futures::{Stream, StreamExt};
 use lru::LruCache;
 use vector_config::configurable_component;
-use vector_core::config::LogNamespace;
+use vector_core::config::{clone_input_definitions, LogNamespace};
 
 use crate::{
     config::{
@@ -160,10 +160,7 @@ impl TransformConfig for DedupeConfig {
     ) -> Vec<TransformOutput> {
         vec![TransformOutput::new(
             DataType::Log,
-            input_definitions
-                .iter()
-                .map(|(_output, definition)| definition.clone())
-                .collect(),
+            clone_input_definitions(input_definitions),
         )]
     }
 }

@@ -45,7 +45,7 @@ pub use cmd::{cmd, Opts};
 pub use diff::ConfigDiff;
 pub use enrichment_table::{EnrichmentTableConfig, EnrichmentTableOuter};
 pub use format::{Format, FormatHint};
-pub use id::{ComponentKey, Inputs, OutputId};
+pub use id::{ComponentKey, Inputs};
 pub use loading::{
     load, load_builder_from_paths, load_from_paths, load_from_paths_with_provider_and_secrets,
     load_from_str, load_source_from_paths, merge_path_lists, process_paths, CONFIG_PATHS,
@@ -57,7 +57,7 @@ pub use source::{SourceConfig, SourceContext, SourceOuter};
 pub use transform::{BoxedTransform, TransformConfig, TransformContext, TransformOuter};
 pub use unit_test::{build_unit_tests, build_unit_tests_main, UnitTestResult};
 pub use validation::warnings;
-pub use vector_core::config::{log_schema, proxy::ProxyConfig, LogSchema};
+pub use vector_core::config::{log_schema, proxy::ProxyConfig, LogSchema, OutputId};
 
 /// Loads Log Schema from configurations and sets global schema.
 /// Once this is done, configurations can be correctly loaded using

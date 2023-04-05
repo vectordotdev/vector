@@ -1,4 +1,4 @@
-use std::{fmt, num::NonZeroUsize};
+use std::{collections::HashMap, fmt, num::NonZeroUsize};
 
 use bitmask_enum::bitmask;
 use bytes::Bytes;
@@ -6,12 +6,14 @@ use chrono::{DateTime, Utc};
 
 mod global_options;
 mod log_schema;
+pub mod output_id;
 pub mod proxy;
 
 use crate::event::LogEvent;
 pub use global_options::GlobalOptions;
 pub use log_schema::{init_log_schema, log_schema, LogSchema};
 use lookup::{lookup_v2::ValuePath, path, PathPrefix};
+pub use output_id::OutputId;
 use serde::{Deserialize, Serialize};
 use value::Value;
 pub use vector_common::config::ComponentKey;
@@ -199,14 +201,14 @@ pub struct TransformOutput {
     /// enabled, at least one definition  should be output. If the transform
     /// has multiple connected sources, it is possible to have multiple output
     /// definitions - one for each input.
-    pub log_schema_definitions: Vec<schema::Definition>,
+    pub log_schema_definitions: HashMap<OutputId, schema::Definition>,
 }
 
 impl TransformOutput {
     /// Create a `TransformOutput` of the given data type that contains multiple [`schema::Definition`]s.
     /// Designed for use in transforms.
     #[must_use]
-    pub fn new(ty: DataType, schema_definitions: Vec<schema::Definition>) -> Self {
+    pub fn new(ty: DataType, schema_definitions: HashMap<OutputId, schema::Definition>) -> Self {
         Self {
             port: None,
             ty,
@@ -220,6 +222,18 @@ impl TransformOutput {
         self.port = Some(name.into());
         self
     }
+}
+
+/// Simple utility function that can be used by transforms that make no changes to
+/// the schema definitions of events.
+/// Takes a list of definitions with [`OutputId`] returns them as a [`HashMap`].
+pub fn clone_input_definitions(
+    input_definitions: &[(OutputId, schema::Definition)],
+) -> HashMap<OutputId, schema::Definition> {
+    input_definitions
+        .iter()
+        .map(|(output, definition)| (output.clone(), definition.clone()))
+        .collect()
 }
 
 /// Source-specific end-to-end acknowledgements configuration.
