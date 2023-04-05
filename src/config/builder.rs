@@ -10,7 +10,7 @@ use vector_core::config::GlobalOptions;
 
 use crate::{
     enrichment_tables::EnrichmentTables, providers::Providers, secrets::SecretBackends,
-    sinks::Sinks, sources::Sources,
+    sinks::Sinks,
 };
 
 #[cfg(feature = "api")]
@@ -18,7 +18,7 @@ use super::api;
 #[cfg(feature = "enterprise")]
 use super::enterprise;
 use super::{
-    compiler, schema, BoxedTransform, ComponentKey, Config, EnrichmentTableOuter,
+    compiler, schema, BoxedSource, BoxedTransform, ComponentKey, Config, EnrichmentTableOuter,
     HealthcheckOptions, SinkOuter, SourceOuter, TestDefinition, TransformOuter,
 };
 
@@ -255,7 +255,7 @@ impl ConfigBuilder {
         );
     }
 
-    pub fn add_source<K: Into<String>, S: Into<Sources>>(&mut self, key: K, source: S) {
+    pub fn add_source<K: Into<String>, S: Into<BoxedSource>>(&mut self, key: K, source: S) {
         self.sources
             .insert(ComponentKey::from(key.into()), SourceOuter::new(source));
     }

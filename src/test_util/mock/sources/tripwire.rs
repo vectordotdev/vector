@@ -14,7 +14,7 @@ use vector_core::{
 use crate::config::{GenerateConfig, SourceConfig, SourceContext};
 
 /// Configuration for the `test_tripwire` source.
-#[configurable_component(source("test_tripwire"))]
+#[configurable_component(source("test_tripwire", "Test (tripwire)."))]
 #[derive(Clone, Debug)]
 pub struct TripwireSourceConfig {
     #[serde(skip)]
@@ -43,6 +43,7 @@ impl TripwireSourceConfig {
 }
 
 #[async_trait]
+#[typetag::serde(name = "test_tripwire")]
 impl SourceConfig for TripwireSourceConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<Source> {
         let tripwire = self

@@ -5,7 +5,7 @@ use indexmap::IndexMap;
 use std::{collections::HashMap, path::PathBuf};
 use vector_core::internal_event::DEFAULT_OUTPUT;
 
-use super::{builder::ConfigBuilder, ComponentKey, Config, OutputId, Resource, SourceConfig};
+use super::{builder::ConfigBuilder, ComponentKey, Config, OutputId, Resource};
 
 /// Check that provide + topology config aren't present in the same builder, which is an error.
 pub fn check_provider(config: &ConfigBuilder) -> Result<(), Vec<String>> {

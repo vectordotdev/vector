@@ -787,8 +787,8 @@ mod tests {
             event.insert(format!("key{}", i).as_str(), format!("value{}", i));
 
             let timestamp = Utc
-                .ymd(1970, 1, 1)
-                .and_hms_nano_opt(0, 0, (i as u32) + 1, 0)
+                .with_ymd_and_hms(1970, 1, 1, 0, 0, (i as u32) + 1)
+                .single()
                 .expect("invalid timestamp");
             event.insert("timestamp", timestamp);
             event.insert("source_type", "file");

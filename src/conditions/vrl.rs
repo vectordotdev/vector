@@ -41,7 +41,7 @@ impl ConditionalConfig for VrlConfig {
         let functions = vrl_stdlib::all()
             .into_iter()
             .chain(enrichment::vrl_functions().into_iter())
-            .chain(vector_vrl_functions::vrl_functions())
+            .chain(vector_vrl_functions::all())
             .collect::<Vec<_>>();
 
         let state = vrl::state::TypeState::default();

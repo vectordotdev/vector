@@ -27,7 +27,7 @@ pub use schema::DnstapEventSchema;
 use vector_core::config::{LegacyKey, LogNamespace};
 
 /// Configuration for the `dnstap` source.
-#[configurable_component(source("dnstap"))]
+#[configurable_component(source("dnstap", "Collect DNS logs from a dnstap-compatible server."))]
 #[derive(Clone, Debug)]
 pub struct DnstapConfig {
     /// Maximum DNSTAP frame length that the source accepts.
@@ -174,6 +174,7 @@ impl Default for DnstapConfig {
 impl_generate_config_from_default!(DnstapConfig);
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "dnstap")]
 impl SourceConfig for DnstapConfig {
     async fn build(&self, cx: SourceContext) -> Result<super::Source> {
         let log_namespace = cx.log_namespace(self.log_namespace);

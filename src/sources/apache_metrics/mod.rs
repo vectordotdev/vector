@@ -32,7 +32,7 @@ use vector_core::config::LogNamespace;
 
 /// Configuration for the `apache_metrics` source.
 #[serde_as]
-#[configurable_component(source("apache_metrics"))]
+#[configurable_component(source("apache_metrics", "Collect metrics from Apache's HTTPD server."))]
 #[derive(Clone, Debug)]
 pub struct ApacheMetricsConfig {
     /// The list of `mod_status` endpoints to scrape metrics from.
@@ -71,6 +71,7 @@ impl GenerateConfig for ApacheMetricsConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "apache_metrics")]
 impl SourceConfig for ApacheMetricsConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let urls = self

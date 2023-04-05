@@ -17,10 +17,7 @@ use vector_common::trigger::DisabledTrigger;
 
 use super::{TapOutput, TapResource};
 use crate::{
-    config::{
-        ComponentKey, Config, ConfigDiff, HealthcheckOptions, Inputs, OutputId, Resource,
-        SourceConfig,
-    },
+    config::{ComponentKey, Config, ConfigDiff, HealthcheckOptions, Inputs, OutputId, Resource},
     event::EventArray,
     shutdown::SourceShutdownCoordinator,
     spawn_named,

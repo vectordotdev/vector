@@ -43,7 +43,7 @@ use crate::{
 pub const LOGS: &str = "logs";
 
 /// Configuration for the `opentelemetry` source.
-#[configurable_component(source("opentelemetry"))]
+#[configurable_component(source("opentelemetry", "Receive OTLP data through gRPC or HTTP."))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct OpentelemetryConfig {
@@ -124,6 +124,7 @@ impl GenerateConfig for OpentelemetryConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "opentelemetry")]
 impl SourceConfig for OpentelemetryConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<Source> {
         let acknowledgements = cx.do_acknowledgements(self.acknowledgements);

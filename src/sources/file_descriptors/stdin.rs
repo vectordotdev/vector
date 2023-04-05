@@ -13,7 +13,7 @@ use crate::{
 use super::{outputs, FileDescriptorConfig};
 
 /// Configuration for the `stdin` source.
-#[configurable_component(source("stdin"))]
+#[configurable_component(source("stdin", "Collect logs sent via stdin."))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields, default)]
 pub struct StdinConfig {
@@ -78,6 +78,7 @@ impl Default for StdinConfig {
 impl_generate_config_from_default!(StdinConfig);
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "stdin")]
 impl SourceConfig for StdinConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<crate::sources::Source> {
         let log_namespace = cx.log_namespace(self.log_namespace);

@@ -7,7 +7,7 @@ publish = false
 license = "MPL-2.0"
 
 [dependencies]
-vrl-cli = { package = "vrl-cli", git = "https://github.com/vectordotdev/vrl", rev = "v0.1.0" }
+vrl-cli = { package = "vrl-cli", git = "https://github.com/vectordotdev/vrl", rev = "v0.2.0" }
 clap = { version = "4.1.14", features = ["derive"] }
-vrl-stdlib = { package = "vrl-stdlib", git = "https://github.com/vectordotdev/vrl", rev = "v0.1.0" }
+vrl-stdlib = { package = "vrl-stdlib", git = "https://github.com/vectordotdev/vrl", rev = "v0.2.0" }
 vector-vrl-functions = { path = "../functions" }

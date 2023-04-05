@@ -7,11 +7,11 @@ publish = false
 
 [dependencies]
 enrichment = { path = "../../enrichment" }
-lookup = { package = "lookup", git = "https://github.com/vectordotdev/vrl", rev = "v0.1.0" }
-stdlib = { package = "vrl-stdlib", git = "https://github.com/vectordotdev/vrl", rev = "v0.1.0" }
-vrl = { package = "vrl", git = "https://github.com/vectordotdev/vrl", rev = "v0.1.0" }
-value = { package = "value", git = "https://github.com/vectordotdev/vrl", rev = "v0.1.0" }
-vrl-tests = { package = "vrl-tests", git = "https://github.com/vectordotdev/vrl", rev = "v0.1.0" }
+lookup = { package = "lookup", git = "https://github.com/vectordotdev/vrl", rev = "v0.2.0" }
+stdlib = { package = "vrl-stdlib", git = "https://github.com/vectordotdev/vrl", rev = "v0.2.0" }
+vrl = { package = "vrl", git = "https://github.com/vectordotdev/vrl", rev = "v0.2.0" }
+value = { package = "value", git = "https://github.com/vectordotdev/vrl", rev = "v0.2.0" }
+vrl-tests = { package = "vrl-tests", git = "https://github.com/vectordotdev/vrl", rev = "v0.2.0" }
 vector-vrl-functions = { path = "../../vector-vrl/functions" }
 
 ansi_term = "0.12"

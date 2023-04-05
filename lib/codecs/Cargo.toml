@@ -25,7 +25,7 @@ snafu = { version = "0.7.4", default-features = false, features = ["futures"] }
 syslog_loose = { version = "0.18", default-features = false, optional = true }
 tokio-util = { version = "0.7", default-features = false, features = ["codec"] }
 tracing = { version = "0.1", default-features = false }
-value = { package = "value", git = "https://github.com/vectordotdev/vrl", rev = "v0.1.0", default-features = false }
+value = { package = "value", git = "https://github.com/vectordotdev/vrl", rev = "v0.2.0", default-features = false }
 vector-common = { path = "../vector-common", default-features = false }
 vector-config = { path = "../vector-config", default-features = false }
 vector-config-common = { path = "../vector-config-common", default-features = false }

@@ -294,8 +294,8 @@ mod tests {
                 )
                 .with_tags(Some(metric_tags!("os.host" => "somehost")))
                 .with_timestamp(Some(
-                    Utc.ymd(2020, 8, 18)
-                        .and_hms_opt(21, 0, 1)
+                    Utc.with_ymd_and_hms(2020, 8, 18, 21, 0, 1)
+                        .single()
                         .expect("invalid timestamp"),
                 )),
             ),
@@ -310,8 +310,8 @@ mod tests {
                 )
                 .with_tags(Some(metric_tags!("os.host" => "somehost")))
                 .with_timestamp(Some(
-                    Utc.ymd(2020, 8, 18)
-                        .and_hms_opt(21, 0, 2)
+                    Utc.with_ymd_and_hms(2020, 8, 18, 21, 0, 2)
+                        .single()
                         .expect("invalid timestamp"),
                 )),
             ),
@@ -362,8 +362,8 @@ mod tests {
                 "code" => "success"
             )))
             .with_timestamp(Some(
-                Utc.ymd(2020, 8, 18)
-                    .and_hms_opt(21, 0, 1)
+                Utc.with_ymd_and_hms(2020, 8, 18, 21, 0, 1)
+                    .single()
                     .expect("invalid timestamp"),
             )),
         )];

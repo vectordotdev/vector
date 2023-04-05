@@ -17,7 +17,7 @@ dyn-clone = { version = "1.0.11", default-features = false }
 enrichment = { path = "../enrichment", optional = true }
 enumflags2 = { version = "0.7.5", default-features = false }
 float_eq = { version = "1.0", default-features = false }
-futures = { version = "0.3.27", default-features = false, features = ["std"] }
+futures = { version = "0.3.28", default-features = false, features = ["std"] }
 futures-util = { version = "0.3.28", default-features = false, features = ["std"] }
 headers = { version = "0.3.8", default-features = false }
 http = { version = "0.2.9", default-features = false }
@@ -60,7 +60,7 @@ tracing-subscriber = { version = "0.3.16", default-features = false, features = 
 typetag = { version = "0.2.7", default-features = false }
 twox-hash = { version = "1.6.3", default-features = false }
 url = { version = "2", default-features = false }
-value = { package = "value", git = "https://github.com/vectordotdev/vrl", rev = "v0.1.0", default-features = false, features = ["lua", "toml", "json", "api"] }
+value = { package = "value", git = "https://github.com/vectordotdev/vrl", rev = "v0.2.0", default-features = false, features = ["lua", "toml", "json", "api"] }
 vector-buffers = { path = "../vector-buffers", default-features = false }
 vector-common = { path = "../vector-common" }
 vector-config = { path = "../vector-config" }
@@ -68,7 +68,7 @@ vector-config-common = { path = "../vector-config-common" }
 vector-config-macros = { path = "../vector-config-macros" }
 # Rename to "vrl" once we use a release with stable `-Z namespaced-features`:
 # https://doc.rust-lang.org/cargo/reference/unstable.html#namespaced-features
-vrl-lib = { package = "vrl", git = "https://github.com/vectordotdev/vrl", rev = "v0.1.0" }
+vrl-lib = { package = "vrl", git = "https://github.com/vectordotdev/vrl", rev = "v0.2.0" }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 security-framework = "2.8.2"
@@ -97,7 +97,7 @@ rand = "0.8.5"
 rand_distr = "0.4.3"
 tracing-subscriber = { version = "0.3.16", default-features = false, features = ["env-filter", "fmt", "ansi", "registry"] }
 vector-common = { path = "../vector-common", default-features = false, features = ["test"] }
-value = { package = "value", git = "https://github.com/vectordotdev/vrl", rev = "v0.1.0", default-features = false, features = ["lua", "toml", "json", "api", "arbitrary", "test"] }
+value = { package = "value", git = "https://github.com/vectordotdev/vrl", rev = "v0.2.0", default-features = false, features = ["lua", "toml", "json", "api", "arbitrary", "test"] }
 
 [features]
 api = ["dep:async-graphql", "value/api"]

@@ -79,7 +79,7 @@ pub fn get_git_sha() -> Result<String> {
     check_output(&["rev-parse", "--short", "HEAD"]).map(|output| output.trim_end().to_string())
 }
 
-// Get a list of files that have been modified, as a vector of strings
+/// Get a list of files that have been modified, as a vector of strings
 pub fn get_modified_files() -> Result<Vec<String>> {
     let args = vec![
         "ls-files",
@@ -89,6 +89,41 @@ pub fn get_modified_files() -> Result<Vec<String>> {
         "--exclude-standard",
     ];
     Ok(check_output(&args)?.lines().map(str::to_owned).collect())
+}
+
+pub fn set_config_values(config_values: &[(&str, &str)]) -> Result<String> {
+    let mut args = vec!["config"];
+
+    for (key, value) in config_values {
+        args.push(key);
+        args.push(value);
+    }
+
+    check_output(&args)
+}
+
+/// Checks if the current directory's repo is clean
+pub fn check_git_repository_clean() -> Result<bool> {
+    Ok(Command::new("git")
+        .args(["diff-index", "--quiet", "HEAD"])
+        .stdout(std::process::Stdio::null())
+        .status()
+        .map(|status| status.success())?)
+}
+
+/// Commits changes from the current repo
+pub fn commit(commit_message: &str) -> Result<String> {
+    check_output(&["commit", "--all", "--message", commit_message])
+}
+
+/// Pushes changes from the current repo
+pub fn push() -> Result<String> {
+    check_output(&["push"])
+}
+
+pub fn clone(repo_url: &str) -> Result<String> {
+    // We cannot use capture_output since this will need to run in the CWD
+    Command::new("git").args(["clone", repo_url]).check_output()
 }
 
 pub fn branch_exists(branch_name: &str) -> Result<bool> {

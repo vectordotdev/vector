@@ -40,7 +40,7 @@ use crate::{
 };
 
 /// Configuration for `heroku_logs` source.
-#[configurable_component(source("heroku_logs"))]
+#[configurable_component(source("heroku_logs", "Collect logs from Heroku's Logplex, the router responsible for receiving logs from your Heroku apps."))]
 #[derive(Clone, Debug)]
 pub struct LogplexConfig {
     /// The socket address to listen for connections on.
@@ -156,6 +156,7 @@ impl GenerateConfig for LogplexConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "heroku_logs")]
 impl SourceConfig for LogplexConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let log_namespace = cx.log_namespace(self.log_namespace);

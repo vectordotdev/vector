@@ -330,7 +330,7 @@ test-behavior: test-behavior-transforms test-behavior-formats test-behavior-conf
 
 .PHONY: test-integration
 test-integration: ## Runs all integration tests
-test-integration: test-integration-amqp test-integration-aws test-integration-axiom test-integration-azure test-integration-chronicle test-integration-clickhouse
+test-integration: test-integration-amqp test-integration-appsignal test-integration-aws test-integration-axiom test-integration-azure test-integration-chronicle test-integration-clickhouse
 test-integration: test-integration-databend test-integration-docker-logs test-integration-elasticsearch
 test-integration: test-integration-eventstoredb test-integration-fluent test-integration-gcp test-integration-humio test-integration-http-client test-integration-influxdb
 test-integration: test-integration-kafka test-integration-logstash test-integration-loki test-integration-mongodb test-integration-nats

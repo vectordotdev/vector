@@ -49,7 +49,10 @@ enum BuildError {
 /// Configuration for the `amqp` source.
 ///
 /// Supports AMQP version 0.9.1
-#[configurable_component(source("amqp"))]
+#[configurable_component(source(
+    "amqp",
+    "Collect events from AMQP 0.9.1 compatible brokers like RabbitMQ."
+))]
 #[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
 #[serde(deny_unknown_fields)]
@@ -130,6 +133,7 @@ impl AmqpSourceConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "amqp")]
 impl SourceConfig for AmqpSourceConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let log_namespace = cx.log_namespace(self.log_namespace);
