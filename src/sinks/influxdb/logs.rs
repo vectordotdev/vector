@@ -599,6 +599,7 @@ mod tests {
             "vector",
             [].to_vec(),
         );
+        // exclude default metric_type tag so to emit empty tags
         sink.transformer
             .set_except_fields(Some(vec!["metric_type".into()]))
             .unwrap();
@@ -606,11 +607,14 @@ mod tests {
 
         let bytes = encoder.encode_event(event).unwrap();
         let line = std::str::from_utf8(&bytes).unwrap();
-        assert!(line.starts_with("vector "));
+        assert!(
+            line.starts_with("vector "),
+            "measurement (without tags) should ends with space ' '"
+        );
 
         let line_protocol = split_line_protocol(line);
         assert_eq!("vector", line_protocol.0);
-        assert_eq!("", line_protocol.1);
+        assert_eq!("", line_protocol.1, "tags should be empty");
         assert_fields(
             line_protocol.2,
             ["value=100i", "message=\"hello\""].to_vec(),
