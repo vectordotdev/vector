@@ -84,7 +84,7 @@ pub struct InfluxDbConfig {
     #[serde(default)]
     pub request: TowerRequestConfig,
 
-    /// A map of additional tags, in the form of key/value pairs, to add to each measurement.
+    /// A map of additional tags, in the key/value pair format, to add to each measurement.
     #[configurable(metadata(docs::additional_props_description = "A tag key/value pair."))]
     #[configurable(metadata(docs::examples = "example_tags()"))]
     pub tags: Option<HashMap<String, String>>,

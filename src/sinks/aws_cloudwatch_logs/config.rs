@@ -80,7 +80,7 @@ pub struct CloudwatchLogsSinkConfig {
 
     /// Dynamically create a [log group][log_group] if it does not already exist.
     ///
-    /// This will ignore `create_missing_stream` directly after creating the group and will create
+    /// This ignores `create_missing_stream` directly after creating the group and creates
     /// the first stream.
     ///
     /// [log_group]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html

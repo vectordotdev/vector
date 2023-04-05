@@ -136,7 +136,7 @@ pub struct ChronicleUnstructuredConfig {
     /// The type of log entries in a request.
     ///
     /// This must be one of the [supported log types][unstructured_log_types_doc], otherwise
-    /// Chronicle will reject the entry with an error.
+    /// Chronicle rejects the entry with an error.
     ///
     /// [unstructured_log_types_doc]: https://cloud.google.com/chronicle/docs/ingestion/parser-list/supported-default-parsers
     #[configurable(metadata(docs::examples = "WINDOWS_DNS", docs::examples = "{{ log_type }}"))]

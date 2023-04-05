@@ -40,7 +40,7 @@ pub struct HumioLogsConfig {
     /// The base URL of the Humio instance.
     ///
     /// The scheme (`http` or `https`) must be specified. No path should be included since the paths defined
-    /// by the [`Splunk`][splunk] api are used.
+    /// by the [`Splunk`][splunk] API are used.
     ///
     /// [splunk]: https://docs.splunk.com/Documentation/Splunk/8.0.0/Data/HECRESTendpoints
     #[serde(alias = "host")]
@@ -61,7 +61,7 @@ pub struct HumioLogsConfig {
 
     /// The type of events sent to this sink. Humio uses this as the name of the parser to use to ingest the data.
     ///
-    /// If unset, Humio will default it to none.
+    /// If unset, Humio defaults it to none.
     #[configurable(metadata(
         docs::examples = "json",
         docs::examples = "none",
@@ -69,7 +69,7 @@ pub struct HumioLogsConfig {
     ))]
     pub(super) event_type: Option<Template>,
 
-    /// Overrides the name of the log field used to grab the hostname to send to Humio.
+    /// Overrides the name of the log field used to retrieve the hostname to send to Humio.
     ///
     /// By default, the [global `log_schema.host_key` option][global_host_key] is used.
     ///
@@ -115,7 +115,7 @@ pub struct HumioLogsConfig {
     #[configurable(derived)]
     pub(super) tls: Option<TlsConfig>,
 
-    /// Overrides the name of the log field used to grab the nanosecond-enabled timestamp to send to Humio.
+    /// Overrides the name of the log field used to retrieve the nanosecond-enabled timestamp to send to Humio.
     #[serde(default = "timestamp_nanos_key")]
     pub(super) timestamp_nanos_key: Option<String>,
 
@@ -127,7 +127,7 @@ pub struct HumioLogsConfig {
     )]
     pub acknowledgements: AcknowledgementsConfig,
 
-    /// Overrides the name of the log field used to grab the timestamp to send to Humio.
+    /// Overrides the name of the log field used to retrieve the timestamp to send to Humio.
     ///
     /// By default, the [global `log_schema.timestamp_key` option][global_timestamp_key] is used.
     ///

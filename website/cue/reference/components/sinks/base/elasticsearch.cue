@@ -15,7 +15,7 @@ base: components: sinks: elasticsearch: configuration: {
 				Whether or not end-to-end acknowledgements are enabled.
 
 				When enabled for a sink, any source connected to that sink, where the source supports
-				end-to-end acknowledgements as well, will wait for events to be acknowledged by the sink
+				end-to-end acknowledgements as well, waits for events to be acknowledged by the sink
 				before acknowledging them at the source.
 
 				Enabling or disabling acknowledgements at the sink level takes precedence over any global
@@ -38,8 +38,8 @@ base: components: sinks: elasticsearch: configuration: {
 
 					If the [cluster state version endpoint][es_version] isn't reachable, a warning is logged to
 					stdout, and the version is assumed to be V6 if the `suppress_type_name` option is set to
-					true. Otherwise, the version is assumed to be V8. In the future, the sink will instead
-					return an Error during configuration parsing, since a wronly assumed version could lead to
+					`true`. Otherwise, the version is assumed to be V8. In the future, the sink instead
+					returns an error during configuration parsing, since a wrongly assumed version could lead to
 					incorrect API calls.
 
 					[es_version]: https://www.elastic.co/guide/en/elasticsearch/reference/current/cluster-state.html#cluster-state-api-path-params
@@ -197,10 +197,10 @@ base: components: sinks: elasticsearch: configuration: {
 		type: object: options: {
 			max_bytes: {
 				description: """
-					The maximum size of a batch that will be processed by a sink.
+					The maximum size of a batch that is processed by a sink.
 
 					This is based on the uncompressed size of the batched events, before they are
-					serialized / compressed.
+					serialized/compressed.
 					"""
 				required: false
 				type: uint: {
@@ -231,7 +231,7 @@ base: components: sinks: elasticsearch: configuration: {
 				description: """
 					Action to use when making requests to the [Elasticsearch Bulk API][es_bulk].
 
-					Currently, Vector only supports `index` and `create`. `update` and `delete` actions are not supported.
+					Only `index` and `create` actions are supported.
 
 					[es_bulk]: https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html
 					"""
@@ -289,8 +289,8 @@ base: components: sinks: elasticsearch: configuration: {
 					from the `data_stream` configuration field of the same name.
 
 					If enabled, the value of the `data_stream.type`, `data_stream.dataset`, and
-					`data_stream.namespace` event fields will be used if they are present. Otherwise, the values
-					set here in the configuration will be used.
+					`data_stream.namespace` event fields are used if they are present. Otherwise, the values
+					set in this configuration are used.
 					"""
 				required: false
 				type: bool: default: true
@@ -372,12 +372,12 @@ base: components: sinks: elasticsearch: configuration: {
 		required:    false
 		type: object: options: {
 			except_fields: {
-				description: "List of fields that will be excluded from the encoded event."
+				description: "List of fields that are excluded from the encoded event."
 				required:    false
 				type: array: items: type: string: {}
 			}
 			only_fields: {
-				description: "List of fields that will be included in the encoded event."
+				description: "List of fields that are included in the encoded event."
 				required:    false
 				type: array: items: type: string: {}
 			}
@@ -437,7 +437,7 @@ base: components: sinks: elasticsearch: configuration: {
 				description: """
 					Name of the tag in the metric to use for the source host.
 
-					If present, the value of the tag is set on the generated log event in the "host" field,
+					If present, the value of the tag is set on the generated log event in the `host` field,
 					where the field key uses the [global `host_key` option][global_log_schema_host_key].
 
 					[global_log_schema_host_key]: https://vector.dev/docs/reference/configuration//global-options#log_schema.host_key
@@ -490,9 +490,9 @@ base: components: sinks: elasticsearch: configuration: {
 		type: string: {
 			default: "bulk"
 			enum: {
-				bulk: "Ingests documents in bulk, via the bulk API `index` action."
+				bulk: "Ingests documents in bulk, using the bulk API `index` action."
 				data_stream: """
-					Ingests documents in bulk, via the bulk API `create` action.
+					Ingests documents in bulk, using the bulk API `create` action.
 
 					Elasticsearch Data Streams only support the `create` action.
 					"""
@@ -641,7 +641,7 @@ base: components: sinks: elasticsearch: configuration: {
 				description: """
 					The amount of time to wait before attempting the first retry for a failed request.
 
-					After the first retry has failed, the fibonacci sequence will be used to select future backoffs.
+					After the first retry has failed, the fibonacci sequence is used to select future backoffs.
 					"""
 				required: false
 				type: uint: {
@@ -661,7 +661,7 @@ base: components: sinks: elasticsearch: configuration: {
 				description: """
 					The time a request can take before being aborted.
 
-					It is highly recommended that you do not lower this value below the service’s internal timeout, as this could
+					Datadog highly recommends that you do not lower this value below the service's internal timeout, as this could
 					create orphaned requests, pile on retries, and result in duplicate data downstream.
 					"""
 				required: false
@@ -689,7 +689,7 @@ base: components: sinks: elasticsearch: configuration: {
 
 			The `type` field was deprecated in Elasticsearch 7.x and removed in Elasticsearch 8.x.
 
-			If enabled, the `doc_type` option will be ignored.
+			If enabled, the `doc_type` option is ignored.
 			"""
 		required: false
 		type: bool: default: false
