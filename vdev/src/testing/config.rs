@@ -55,7 +55,7 @@ pub struct ComposeService {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub container_name: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub build: Option<BuildConfig>,
+    pub build: Option<Value>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub command: Option<Command>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -69,27 +69,7 @@ pub struct ComposeService {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub depends_on: Option<Vec<String>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub healthcheck: Option<HealthCheck>,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-pub struct HealthCheck {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub test: Option<Command>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub interval: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub timeout: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub retries: Option<u32>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub start_period: Option<String>,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-pub struct BuildConfig {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub context: Option<String>,
+    pub healthcheck: Option<Value>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -100,7 +80,6 @@ pub enum Command {
 }
 
 impl ComposeConfig {
-    #[cfg(unix)]
     pub fn parse(path: &Path) -> Result<Self> {
         let contents =
             fs::read_to_string(path).with_context(|| format!("failed to read {path:?}"))?;
