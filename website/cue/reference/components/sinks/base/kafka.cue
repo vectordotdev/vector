@@ -225,7 +225,7 @@ base: components: sinks: kafka: configuration: {
 		description: """
 			The log field name to use for the Kafka headers.
 
-			If omitted, no headers is written.
+			If omitted, no headers are written.
 			"""
 		required: false
 		type: string: examples: ["headers"]

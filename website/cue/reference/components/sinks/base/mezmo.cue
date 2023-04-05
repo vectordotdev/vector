@@ -280,7 +280,7 @@ base: components: sinks: mezmo: configuration: {
 		}
 	}
 	tags: {
-		description: "The tags that is attached to each batch of events."
+		description: "The tags that are attached to each batch of events."
 		required:    false
 		type: array: items: type: string: {
 			examples: ["tag1", "tag2"]

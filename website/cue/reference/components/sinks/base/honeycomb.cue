@@ -28,7 +28,7 @@ base: components: sinks: honeycomb: configuration: {
 		}
 	}
 	api_key: {
-		description: "The team key that is used to authenticate against Honeycomb."
+		description: "The API key that is used to authenticate against Honeycomb."
 		required:    true
 		type: string: examples: ["${HONEYCOMB_API_KEY}", "some-api-key"]
 	}
