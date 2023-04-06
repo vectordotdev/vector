@@ -171,7 +171,7 @@ impl Compose {
                 fs::write(
                     temp_file.path(),
                     serde_yaml::to_string(&config)
-                        .with_context(|| "Failed to serialize modified compose.yml".to_string())?,
+                        .with_context(|| "Failed to serialize modified compose.yaml")?,
                 )?;
 
                 Ok(Some(Self {
