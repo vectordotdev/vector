@@ -14,6 +14,7 @@ use tokio_stream::{wrappers::BroadcastStream, Stream, StreamExt};
 use vector_config::NamedComponent;
 use vector_core::internal_event::DEFAULT_OUTPUT;
 
+use crate::topology::schema::possible_definitions;
 use crate::{
     api::schema::{
         components::state::component_by_component_key,
@@ -23,7 +24,6 @@ use crate::{
     config::{ComponentKey, Config},
     filter_check,
 };
-use crate::{config::SourceConfig, topology::schema::possible_definitions};
 
 #[derive(Debug, Clone, Interface)]
 #[graphql(

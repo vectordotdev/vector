@@ -21,7 +21,10 @@ use crate::{
 };
 
 /// Configuration for the `internal_logs` source.
-#[configurable_component(source("internal_logs"))]
+#[configurable_component(source(
+    "internal_logs",
+    "Expose internal log messages emitted by the running Vector instance."
+))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct InternalLogsConfig {
@@ -98,6 +101,7 @@ impl InternalLogsConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "internal_logs")]
 impl SourceConfig for InternalLogsConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let host_key = self.host_key.clone().path;

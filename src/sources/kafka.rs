@@ -67,7 +67,7 @@ struct Metrics {
 
 /// Configuration for the `kafka` source.
 #[serde_as]
-#[configurable_component(source("kafka"))]
+#[configurable_component(source("kafka", "Collect logs from Apache Kafka."))]
 #[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
 #[serde(deny_unknown_fields)]
@@ -284,6 +284,7 @@ fn example_librdkafka_options() -> HashMap<String, String> {
 impl_generate_config_from_default!(KafkaSourceConfig);
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "kafka")]
 impl SourceConfig for KafkaSourceConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let log_namespace = cx.log_namespace(self.log_namespace);

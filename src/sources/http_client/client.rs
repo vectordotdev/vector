@@ -39,7 +39,10 @@ use vector_core::{
 
 /// Configuration for the `http_client` source.
 #[serde_as]
-#[configurable_component(source("http_client"))]
+#[configurable_component(source(
+    "http_client",
+    "Pull observability data from an HTTP server at a configured interval."
+))]
 #[derive(Clone, Debug)]
 pub struct HttpClientConfig {
     /// The HTTP endpoint to collect events from.
@@ -163,6 +166,7 @@ impl Default for HttpClientConfig {
 impl_generate_config_from_default!(HttpClientConfig);
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "http_client")]
 impl SourceConfig for HttpClientConfig {
     async fn build(&self, cx: SourceContext) -> Result<sources::Source> {
         // build the url

@@ -60,7 +60,7 @@ enum NginxError {
 
 /// Configuration for the `nginx_metrics` source.
 #[serde_as]
-#[configurable_component(source("nginx_metrics"))]
+#[configurable_component(source("nginx_metrics", "Collect metrics from NGINX."))]
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct NginxMetricsConfig {
@@ -102,6 +102,7 @@ pub fn default_namespace() -> String {
 impl_generate_config_from_default!(NginxMetricsConfig);
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "nginx_metrics")]
 impl SourceConfig for NginxMetricsConfig {
     async fn build(&self, mut cx: SourceContext) -> crate::Result<super::Source> {
         let tls = TlsSettings::from_options(&self.tls)?;

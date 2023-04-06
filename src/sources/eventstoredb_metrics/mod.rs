@@ -27,7 +27,10 @@ pub mod types;
 
 /// Configuration for the `eventstoredb_metrics` source.
 #[serde_as]
-#[configurable_component(source("eventstoredb_metrics"))]
+#[configurable_component(source(
+    "eventstoredb_metrics",
+    "Receive metrics from collected by a EventStoreDB."
+))]
 #[derive(Clone, Debug, Default)]
 pub struct EventStoreDbConfig {
     /// Endpoint to scrape stats from.
@@ -58,6 +61,7 @@ pub fn default_endpoint() -> String {
 impl_generate_config_from_default!(EventStoreDbConfig);
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "eventstoredb_metrics")]
 impl SourceConfig for EventStoreDbConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         eventstoredb(

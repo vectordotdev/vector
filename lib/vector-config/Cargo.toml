@@ -24,8 +24,8 @@ serde_with = { version = "2.3.1", default-features = false, features = ["std"] }
 snafu = { version = "0.7.4", default-features = false }
 toml = { version = "0.7.3", default-features = false }
 url = { version = "2.3.1", default-features = false, features = ["serde"] }
-vrl-compiler = { package = "vrl-compiler", git = "https://github.com/vectordotdev/vrl", rev = "v0.1.0" }
-vrl-core = { package = "vrl-core", git = "https://github.com/vectordotdev/vrl", rev = "v0.1.0", default-features = false, features = ["serde"] }
+vrl-compiler = { package = "vrl-compiler", git = "https://github.com/vectordotdev/vrl", rev = "v0.2.0" }
+vrl-core = { package = "vrl-core", git = "https://github.com/vectordotdev/vrl", rev = "v0.2.0", default-features = false, features = ["serde"] }
 vector-config-common = { path = "../vector-config-common" }
 vector-config-macros = { path = "../vector-config-macros" }
 

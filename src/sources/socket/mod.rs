@@ -19,7 +19,7 @@ use crate::{
 };
 
 /// Configuration for the `socket` source.
-#[configurable_component(source("socket"))]
+#[configurable_component(source("socket", "Collect logs over a socket."))]
 #[derive(Clone, Debug)]
 pub struct SocketConfig {
     #[serde(flatten)]
@@ -108,6 +108,7 @@ impl GenerateConfig for SocketConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "socket")]
 impl SourceConfig for SocketConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         match self.mode.clone() {

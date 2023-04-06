@@ -62,7 +62,7 @@ static CONSOLE: Lazy<Bytes> = Lazy::new(|| "console".into());
 
 /// Configuration for the `docker_logs` source.
 #[serde_as]
-#[configurable_component(source("docker_logs"))]
+#[configurable_component(source("docker_logs", "Collect container logs from a Docker Daemon."))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields, default)]
 pub struct DockerLogsConfig {
@@ -238,6 +238,7 @@ impl DockerLogsConfig {
 impl_generate_config_from_default!(DockerLogsConfig);
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "docker_logs")]
 impl SourceConfig for DockerLogsConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let log_namespace = cx.log_namespace(self.log_namespace);

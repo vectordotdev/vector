@@ -26,7 +26,10 @@ mod handlers;
 mod models;
 
 /// Configuration for the `aws_kinesis_firehose` source.
-#[configurable_component(source("aws_kinesis_firehose"))]
+#[configurable_component(source(
+    "aws_kinesis_firehose",
+    "Collect logs from AWS Kinesis Firehose."
+))]
 #[derive(Clone, Debug)]
 pub struct AwsKinesisFirehoseConfig {
     /// The socket address to listen for connections on.
@@ -135,6 +138,7 @@ impl fmt::Display for Compression {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "aws_kinesis_firehose")]
 impl SourceConfig for AwsKinesisFirehoseConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let log_namespace = cx.log_namespace(self.log_namespace);

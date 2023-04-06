@@ -28,7 +28,10 @@ use crate::{
 
 /// Configuration for the `demo_logs` source.
 #[serde_as]
-#[configurable_component(source("demo_logs"))]
+#[configurable_component(source(
+    "demo_logs",
+    "Generate fake log events, which can be useful for testing and demos."
+))]
 #[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
 pub struct DemoLogsConfig {
@@ -270,6 +273,7 @@ async fn demo_logs_source(
 impl_generate_config_from_default!(DemoLogsConfig);
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "demo_logs")]
 impl SourceConfig for DemoLogsConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let log_namespace = cx.log_namespace(self.log_namespace);

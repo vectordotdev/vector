@@ -264,7 +264,7 @@ impl SubCommand {
             #[cfg(feature = "vrl-cli")]
             Self::Vrl(s) => {
                 let mut functions = vrl_stdlib::all();
-                functions.extend(vector_vrl_functions::vrl_functions());
+                functions.extend(vector_vrl_functions::all());
                 vrl_cli::cmd::cmd(s, functions)
             }
         }

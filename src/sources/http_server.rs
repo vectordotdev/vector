@@ -37,7 +37,7 @@ use crate::{
 };
 
 /// Configuration for the `http` source.
-#[configurable_component(source("http"))]
+#[configurable_component(source("http", "Host an HTTP endpoint to receive logs."))]
 #[configurable(metadata(deprecated))]
 #[derive(Clone, Debug)]
 pub struct HttpConfig(SimpleHttpConfig);
@@ -49,6 +49,7 @@ impl GenerateConfig for HttpConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "http")]
 impl SourceConfig for HttpConfig {
     async fn build(&self, cx: SourceContext) -> vector_common::Result<super::Source> {
         self.0.build(cx).await
@@ -68,7 +69,7 @@ impl SourceConfig for HttpConfig {
 }
 
 /// Configuration for the `http_server` source.
-#[configurable_component(source("http_server"))]
+#[configurable_component(source("http_server", "Host an HTTP endpoint to receive logs."))]
 #[derive(Clone, Debug)]
 pub struct SimpleHttpConfig {
     /// The socket address to listen for connections on.
@@ -310,6 +311,7 @@ fn remove_duplicates(mut list: Vec<String>, list_name: &str) -> Vec<String> {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "http_server")]
 impl SourceConfig for SimpleHttpConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let decoder = self.get_decoding_config()?.build();
