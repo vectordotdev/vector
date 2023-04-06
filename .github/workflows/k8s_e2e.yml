@@ -89,7 +89,7 @@ jobs:
         || contains(github.event.pull_request.labels.*.name, 'ci-condition: k8s e2e tests enable')
         || contains(github.event.pull_request.labels.*.name, 'ci-condition: k8s e2e all targets')
     steps:
-      - uses: actions/github-script@v6.4.0
+      - uses: actions/github-script@v6.4.1
         id: set-matrix
         with:
           script: |
