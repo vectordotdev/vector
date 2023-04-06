@@ -138,6 +138,7 @@ struct Compose {
     original_path: PathBuf,
     test_dir: PathBuf,
     env: Environment,
+    #[cfg_attr(target_family = "windows", allow(dead_code))]
     config: ComposeConfig,
     network: String,
     temp_file: NamedTempFile,
