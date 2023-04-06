@@ -192,7 +192,7 @@ fn metric_to_insert_request(metric: Metric) -> InsertRequest {
         .timestamp()
         .map(|t| t.timestamp_millis())
         .unwrap_or_else(|| Utc::now().timestamp_millis());
-    columns.push(ts_column("timestamp", timestamp));
+    columns.push(ts_column("ts", timestamp));
 
     // tags
     if let Some(tags) = metric.tags() {
@@ -341,7 +341,7 @@ mod tests {
             .iter()
             .map(|c| c.column_name.as_ref())
             .collect::<Vec<&str>>();
-        assert!(column_names.contains(&"timestamp"));
+        assert!(column_names.contains(&"ts"));
         assert!(column_names.contains(&"host"));
         assert!(column_names.contains(&"value"));
 
