@@ -10,7 +10,7 @@ use snafu::Snafu;
 use tokio_util::io::StreamReader;
 use value::{kind::Collection, Kind};
 use vector_config::configurable_component;
-use vector_core::config::{DataType, LegacyKey, LogNamespace};
+use vector_core::config::{LegacyKey, LogNamespace};
 
 use super::util::MultilineConfig;
 use crate::codecs::DecodingConfig;
@@ -210,7 +210,10 @@ impl SourceConfig for AwsS3Config {
             schema_definition = schema_definition.unknown_fields(Kind::bytes());
         }
 
-        vec![SourceOutput::new_logs(DataType::Log, schema_definition)]
+        vec![SourceOutput::new_logs(
+            self.decoding.output_type(),
+            schema_definition,
+        )]
     }
 
     fn can_acknowledge(&self) -> bool {

@@ -51,6 +51,7 @@ use crate::{
 };
 use lookup::{metadata_path, path, PathPrefix};
 use vector_core::config::{log_schema, LegacyKey, LogNamespace};
+use vector_core::event::MaybeAsLogMut;
 
 static SUPPORTED_S3_EVENT_VERSION: Lazy<semver::VersionReq> =
     Lazy::new(|| semver::VersionReq::parse("~2").unwrap());
@@ -554,22 +555,20 @@ impl IngestorProcess {
 
             let events = events
                 .into_iter()
-                .flat_map(|mut event: Event| {
-                    // only Log events are currently supported
-                    event.try_into_log().map(|mut log| {
-                        handle_single_event(
-                            &mut log,
+                .map(|mut event: Event| {
+                    if let Some(log_event) = event.maybe_as_log_mut() {
+                        handle_single_log(
+                            log_event,
                             log_namespace,
                             &s3_event,
                             &metadata,
                             timestamp,
                         );
-                        events_received
-                            .emit(CountByteSize(1, log.estimated_json_encoded_size_of()));
-                        log
-                    })
+                    }
+                    events_received.emit(CountByteSize(1, event.estimated_json_encoded_size_of()));
+                    event
                 })
-                .collect::<Vec<_>>();
+                .collect::<Vec<Event>>();
             futures::stream::iter(events)
         });
 
@@ -645,7 +644,7 @@ impl IngestorProcess {
     }
 }
 
-fn handle_single_event(
+fn handle_single_log(
     log: &mut LogEvent,
     log_namespace: LogNamespace,
     s3_event: &S3EventRecord,
