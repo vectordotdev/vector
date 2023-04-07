@@ -329,7 +329,7 @@ fn build_closed_schema_flatten_eligibility_mappings(
     parent_to_child.insert(SchemaReference::Root, root_referents);
 
     // Now we build a reverse map, going from child -> parent. We'll iterate over every child
-    // referent, for every parent/child entry, calcuating the set of referrers, and if they would
+    // referent, for every parent/child entry, calculating the set of referrers, and if they would
     // require unmarking the child.
     let mut child_to_parent = HashMap::new();
     for (parent_schema_ref, child_referents) in parent_to_child {
