@@ -47,51 +47,7 @@ impl DisallowedUnevaluatedPropertiesVisitor {
 
 impl Visitor for DisallowedUnevaluatedPropertiesVisitor {
     fn visit_root_schema(&mut self, root: &mut RootSchema) {
-        // Glossary:
-        //
-        //   mark(ed): setting or having `unevaluatedProperties` set to `Some(Schema::Bool(false))`
-        //   unmark(ed): unsetting or having `unevaluatedProperties` set to `None`
-
-        // For all definitions, visit _just_ the defined schema (no recursing) and build a map of
-        // child definitions -> (mark eligibility, [(parent definition, would_unmark)]), such that we know exactly
-        // which schemas refer to any given schema definition and if they would lead to the child
-        // schema being marked as `unevaluatedProperties: false`.
-        //
-        // We would filter out any child definitions that aren't eligible to be marked. For the
-        // remaining child schemas, we group the parent definitions by `would_unmark`, which
-        // indicates whether or not the given parent definition would cause the child definition to
-        // be unmarked.
-        //
-        // As an example, we would expect a parent schema referring to a child schema via `allOf` to
-        // unmark the child schema, while a parent schema referring to a child schema within a
-        // specific property to not unmark the child schema.
-        //
-        // With the grouped parent definitions, take the smaller of the two groups. This represents
-        // the set of parent schemas that we will indicate as needing to use a flattened version of
-        // the child schema when we execute our primary visit logic.
-
-        let mut eligible_to_flatten = HashMap::new();
-        let flattening_eligibility_map = build_closed_schema_flatten_eligibility_mappings(root);
-        for (child_schema_ref, metadata) in flattening_eligibility_map {
-            let would_unmark = metadata
-                .referrers
-                .iter()
-                .filter(|r| r.would_unmark)
-                .map(|r| r.referent.clone())
-                .collect::<HashSet<_>>();
-            let would_not_unmark = metadata
-                .referrers
-                .iter()
-                .filter(|r| !r.would_unmark)
-                .map(|r| r.referent.clone())
-                .collect::<HashSet<_>>();
-
-            if would_not_unmark.len() > would_unmark.len() {
-                eligible_to_flatten.insert(child_schema_ref.to_string(), would_unmark);
-            } else {
-                eligible_to_flatten.insert(child_schema_ref.to_string(), would_not_unmark);
-            }
-        }
+        let mut eligible_to_flatten = build_closed_schema_flatten_eligibility_mappings(root);
 
         debug!(
             "Found {} referents eligible for flattening: {:?}",
@@ -311,9 +267,9 @@ struct ChildMetadata {
 }
 
 impl ChildMetadata {
-    fn from_schema(schema: &SchemaObject) -> Self {
+    fn from_schema(definitions: &Map<String, Schema>, schema: &SchemaObject) -> Self {
         Self {
-            should_mark: is_markable_schema(schema),
+            should_mark: is_markable_schema(definitions, schema),
             referrers: HashSet::new(),
         }
     }
@@ -321,7 +277,24 @@ impl ChildMetadata {
 
 fn build_closed_schema_flatten_eligibility_mappings(
     root_schema: &RootSchema,
-) -> HashMap<String, ChildMetadata> {
+) -> HashMap<String, HashSet<SchemaReference>> {
+    // For all definitions, visit _just_ the defined schema (no recursing) and build a map of child
+    // definitions -> (mark eligibility, [(parent definition, would_unmark)]), such that we know
+    // exactly which schemas refer to any given schema definition and if they would lead to the
+    // child schema being marked as `unevaluatedProperties: false`.
+    //
+    // We would filter out any child definitions that aren't eligible to be marked. For the
+    // remaining child schemas, we group the parent definitions by `would_unmark`, which indicates
+    // whether or not the given parent definition would cause the child definition to be unmarked.
+    //
+    // As an example, we would expect a parent schema referring to a child schema via `allOf` to
+    // unmark the child schema, while a parent schema referring to a child schema within a specific
+    // property to not unmark the child schema.
+    //
+    // With the grouped parent definitions, take the smaller of the two groups. This represents the
+    // set of parent schemas that we will indicate as needing to use a flattened version of the
+    // child schema when we execute our primary visit logic.
+
     // Iterate over all definitions, and once more for the root schema, and generate a map of parent
     // schema -> (would_unmark, child schema).
     let mut parent_to_child = HashMap::new();
@@ -335,7 +308,8 @@ fn build_closed_schema_flatten_eligibility_mappings(
         // If a schema itself would not be considered markable, then we don't need to consider the
         // eligibility between parent/child since there's nothing to drive the "now unmark the child
         // schemas" logic.
-        if !is_markable_schema(parent_schema) {
+        if !is_markable_schema(&root_schema.definitions, parent_schema) {
+            debug!("Schema definition '{}' not markable.", definition_name);
             continue;
         }
 
@@ -365,7 +339,7 @@ fn build_closed_schema_flatten_eligibility_mappings(
                 .or_insert_with(|| {
                     let child_schema =
                         get_schema_from_reference(root_schema, &child_referent.referent);
-                    ChildMetadata::from_schema(child_schema)
+                    ChildMetadata::from_schema(&root_schema.definitions, child_schema)
                 });
 
             // Transform the child referent into a parent referent, which preserves the "would
@@ -377,22 +351,34 @@ fn build_closed_schema_flatten_eligibility_mappings(
         }
     }
 
-    /*
-    // Now filter out entries that are not be eligible for flattening.
-    child_to_parent
-        .into_iter()
-        // Filter out all mappings that don't involve markable schemas.
-        .filter(|(_, metadata)| metadata.should_mark)
-        // Filter out all mappings where all referrers have the same marking behavior for the
-        // referrent, as there's nothing to differentiate between for flattening vs not flattening,
-        // so long
-        .filter(|(_, metadata)| {
-            !(metadata.referrers.iter().all(|r| r.would_unmark)
-                || metadata.referrers.iter().all(|r| !r.would_unmark))
-        })
-        .collect()*/
+    let mut eligible_to_flatten = HashMap::new();
+    for (child_schema_ref, metadata) in child_to_parent {
+        // Don't flatten schemas which has less than two referrers.
+        if metadata.referrers.len() < 2 {
+            continue;
+        }
 
-    child_to_parent
+        let would_unmark = metadata
+            .referrers
+            .iter()
+            .filter(|r| r.would_unmark)
+            .map(|r| r.referent.clone())
+            .collect::<HashSet<_>>();
+        let would_not_unmark = metadata
+            .referrers
+            .iter()
+            .filter(|r| !r.would_unmark)
+            .map(|r| r.referent.clone())
+            .collect::<HashSet<_>>();
+
+        if would_not_unmark.len() >= would_unmark.len() {
+            eligible_to_flatten.insert(child_schema_ref.to_string(), would_unmark);
+        } else {
+            eligible_to_flatten.insert(child_schema_ref.to_string(), would_not_unmark);
+        }
+    }
+
+    eligible_to_flatten
 }
 
 fn get_schema_from_reference<'a>(
@@ -414,7 +400,7 @@ fn get_schema_from_reference<'a>(
 }
 
 /// Determines whether a schema is eligible to be marked.
-fn is_markable_schema(schema: &SchemaObject) -> bool {
+fn is_markable_schema(definitions: &Map<String, Schema>, schema: &SchemaObject) -> bool {
     // If the schema is an object schema, and does not have`additionalProperties` set, it can be
     // marked, as marking a schema with both `unevaluatedProperties`/`additionalProperties` would
     // otherwise be a logical inconsistency.
@@ -436,11 +422,28 @@ fn is_markable_schema(schema: &SchemaObject) -> bool {
     // subschemas: { "type": "null" } and { "$ref": "#/definitions/T" }. If the schema for `T` is,
     // say, just a scalar schema, instead of an object schema... then it wouldn't be marked, and in
     // turn, we wouldn't need to mark the schema for `Option<T>`: there's no properties at all.
+    //
+    // We'll follow schema references in subschemas up to one level deep trying to figure this out.
     if let Some(subschema) = schema.subschemas.as_ref() {
-        let mut subschemas = get_object_subschemas_from_parent(subschema);
+        let mut subschemas = get_object_subschemas_from_parent(subschema).collect::<Vec<_>>();
 
-        let has_object_subschema = subschemas.any(is_object_schema);
-        if has_object_subschema {
+        let has_object_subschema = subschemas.iter().any(|schema| is_object_schema(*schema));
+        let has_referenced_object_subschema = subschemas
+            .iter()
+            .map(|subschema| {
+                subschema
+                    .reference
+                    .as_ref()
+                    .and_then(|reference| {
+                        let reference = get_cleaned_schema_reference(&reference);
+                        definitions.get(reference)
+                    })
+                    .and_then(Schema::as_object)
+                    .map_or(false, is_object_schema)
+            })
+            .any(identity);
+
+        if has_object_subschema || has_referenced_object_subschema {
             return true;
         }
     }
@@ -966,6 +969,105 @@ mod tests {
                     "type": "object",
                     "properties": { "enabled": { "type": "boolean" } },
                     "unevaluatedProperties": false
+                }
+            },
+            "unevaluatedProperties": false
+        }));
+
+        assert_schemas_eq(expected_schema, actual_schema);
+    }
+
+    #[test]
+    fn multiple_mark_unmark_references_flattened_efficiently() {
+        // This tests that if, for example, one schema reference would be marked and unmarked by
+        // multiple referrers, the referrers we choose to flatten the reference on are in the
+        // smaller group (i.e. we do as few flattenings as possible).
+
+        let mut actual_schema = as_schema(json!({
+            "type": "object",
+            "properties": {
+                "a": { "$ref": "#/definitions/a" },
+                "b": { "$ref": "#/definitions/b" },
+                "c": { "$ref": "#/definitions/c" },
+                "one": { "$ref": "#/definitions/one" },
+                "two": { "$ref": "#/definitions/two" }
+            },
+            "definitions": {
+                "one": {
+                    "allOf": [{ "$ref": "#/definitions/c" }]
+                },
+                "two": {
+                    "allOf": [{ "$ref": "#/definitions/b" }, { "$ref": "#/definitions/c" }]
+                },
+                "a": {
+                    "type": "object",
+                    "properties": { "a": { "type": "boolean" } }
+                },
+                "b": {
+                    "type": "object",
+                    "properties": { "b": { "type": "boolean" } }
+                },
+                "c": {
+                    "type": "object",
+                    "properties": { "c": { "type": "boolean" } }
+                }
+            }
+        }));
+
+        let mut visitor = DisallowedUnevaluatedPropertiesVisitor::default();
+        visitor.visit_root_schema(&mut actual_schema);
+
+        // Expectations:
+        // - Schema A is only referenced in an object property, so it's marked normally.
+        // - Schema B is referenced twice -- once as an object property and once in a subschema --
+        //   so since we prioritize flattening usages that would unmark a schema when the
+        //   would-unmark/would-not-unmark counts are equal, schema B is only flattened for the
+        //   subschema usage.
+        // - Schema C is referenced three times -- once as an object property and twice in a
+        //   subschema -- so since there's more would-unmark usages than would-not-unmark usages, we
+        //   flatten the smallest group of usages, which is the would-not-unmark group aka object
+        //   properties.
+        let expected_schema = as_schema(json!({
+            "type": "object",
+            "properties": {
+                "a": { "$ref": "#/definitions/a" },
+                "b": { "$ref": "#/definitions/b" },
+                "c": {
+                    "type": "object",
+                    "properties": { "c": { "type": "boolean" } },
+                    "unevaluatedProperties": false
+                },
+                "one": { "$ref": "#/definitions/one" },
+                "two": { "$ref": "#/definitions/two" }
+            },
+            "definitions": {
+                "one": {
+                    "allOf": [{ "$ref": "#/definitions/c" }],
+                    "unevaluatedProperties": false
+                },
+                "two": {
+                    "allOf": [
+                        {
+                            "type": "object",
+                            "properties": { "b": { "type": "boolean" } }
+                        },
+                        { "$ref": "#/definitions/c" }
+                    ],
+                    "unevaluatedProperties": false
+                },
+                "a": {
+                    "type": "object",
+                    "properties": { "a": { "type": "boolean" } },
+                    "unevaluatedProperties": false
+                },
+                "b": {
+                    "type": "object",
+                    "properties": { "b": { "type": "boolean" } },
+                    "unevaluatedProperties": false
+                },
+                "c": {
+                    "type": "object",
+                    "properties": { "c": { "type": "boolean" } }
                 }
             },
             "unevaluatedProperties": false
