@@ -75,7 +75,7 @@ pub struct KafkaSourceConfig {
     /// A comma-separated list of Kafka bootstrap servers.
     ///
     /// These are the servers in a Kafka cluster that a client should use to bootstrap its connection to the cluster,
-    /// allowing discovering all other hosts in the cluster.
+    /// allowing discovery of all the other hosts in the cluster.
     ///
     /// Must be in the form of `host:port`, and comma-separated.
     #[configurable(metadata(docs::examples = "10.14.22.123:9092,10.14.23.332:9092"))]

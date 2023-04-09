@@ -25,7 +25,3 @@ services:
     - ES_JAVA_OPTS=-Xms400m -Xmx400m
     volumes:
     - ../../../tests/data/ca:/usr/share/elasticsearch/config/certs:ro
-
-networks:
-  default:
-    name: ${VECTOR_NETWORK}

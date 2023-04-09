@@ -83,7 +83,7 @@ pub struct ElasticsearchConfig {
     ///
     /// The `type` field was deprecated in Elasticsearch 7.x and removed in Elasticsearch 8.x.
     ///
-    /// If enabled, the `doc_type` option will be ignored.
+    /// If enabled, the `doc_type` option is ignored.
     #[serde(default)]
     #[configurable(
         deprecated = "This option has been deprecated, the `api_version` option should be used instead."
@@ -246,7 +246,7 @@ impl ElasticsearchConfig {
 pub struct BulkConfig {
     /// Action to use when making requests to the [Elasticsearch Bulk API][es_bulk].
     ///
-    /// Currently, Vector only supports `index` and `create`. `update` and `delete` actions are not supported.
+    /// Only `index` and `create` actions are supported.
     ///
     /// [es_bulk]: https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html
     #[serde(default = "default_bulk_action")]
@@ -308,8 +308,8 @@ pub struct DataStreamConfig {
     /// from the `data_stream` configuration field of the same name.
     ///
     /// If enabled, the value of the `data_stream.type`, `data_stream.dataset`, and
-    /// `data_stream.namespace` event fields will be used if they are present. Otherwise, the values
-    /// set here in the configuration will be used.
+    /// `data_stream.namespace` event fields are used if they are present. Otherwise, the values
+    /// set in this configuration are used.
     #[serde(default = "DataStreamConfig::default_auto_routing")]
     pub auto_routing: bool,
 

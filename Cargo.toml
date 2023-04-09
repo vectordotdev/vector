@@ -138,9 +138,9 @@ vrl-cli = { package = "vrl-cli", git = "https://github.com/vectordotdev/vrl", re
 loki-logproto = { path = "lib/loki-logproto", optional = true }
 
 # Tokio / Futures
-async-stream = { version = "0.3.4", default-features = false }
+async-stream = { version = "0.3.5", default-features = false }
 async-trait = { version = "0.1.68", default-features = false }
-futures = { version = "0.3.27", default-features = false, features = ["compat", "io-compat"], package = "futures" }
+futures = { version = "0.3.28", default-features = false, features = ["compat", "io-compat"], package = "futures" }
 tokio = { version = "1.26.0", default-features = false, features = ["full"] }
 tokio-openssl = { version = "0.6.3", default-features = false }
 tokio-stream = { version = "0.1.12", default-features = false, features = ["net", "sync", "time"] }
@@ -296,7 +296,7 @@ pulsar = { version = "5.1.0", default-features = false, features = ["tokio-runti
 rand = { version = "0.8.5", default-features = false, features = ["small_rng"] }
 rand_distr = { version = "0.4.3", default-features = false }
 rdkafka = { version = "0.29.0", default-features = false, features = ["tokio", "libz", "ssl", "zstd"], optional = true }
-redis = { version = "0.22.3", default-features = false, features = ["connection-manager", "tokio-comp", "tokio-native-tls-comp"], optional = true }
+redis = { version = "0.23.0", default-features = false, features = ["connection-manager", "tokio-comp", "tokio-native-tls-comp"], optional = true }
 regex = { version = "1.7.3", default-features = false, features = ["std", "perf"] }
 roaring = { version = "0.10.1", default-features = false, optional = true }
 seahash = { version = "4.1.0", default-features = false }
@@ -312,12 +312,12 @@ tikv-jemallocator = { version = "0.5.0", default-features = false, optional = tr
 tokio-postgres = { version = "0.7.7", default-features = false, features = ["runtime", "with-chrono-0_4"], optional = true }
 tokio-tungstenite = {version = "0.18.0", default-features = false, features = ["connect"], optional = true}
 toml = { version = "0.7.3", default-features = false, features = ["parse", "display"] }
-tonic = { version = "0.8", optional = true, default-features = false, features = ["transport", "codegen", "prost", "tls", "tls-roots", "gzip"] }
+tonic = { version = "0.9", optional = true, default-features = false, features = ["transport", "codegen", "prost", "tls", "tls-roots", "gzip"] }
 trust-dns-proto = { version = "0.22.0", default-features = false, features = ["dnssec"], optional = true }
 typetag = { version = "0.2.7", default-features = false }
 url = { version = "2.3.1", default-features = false, features = ["serde"] }
 uuid = { version = "1", default-features = false, features = ["serde", "v4"] }
-warp = { version = "0.3.3", default-features = false }
+warp = { version = "0.3.4", default-features = false }
 zstd = { version = "0.12.3", default-features = false }
 arr_macro = { version = "0.2.1" }
 
@@ -596,6 +596,7 @@ transforms-throttle = ["dep:governor"]
 sinks = ["sinks-logs", "sinks-metrics"]
 sinks-logs = [
   "sinks-amqp",
+  "sinks-appsignal",
   "sinks-aws_cloudwatch_logs",
   "sinks-aws_kinesis_firehose",
   "sinks-aws_kinesis_streams",
@@ -637,6 +638,7 @@ sinks-logs = [
   "sinks-websocket",
 ]
 sinks-metrics = [
+  "sinks-appsignal",
   "sinks-aws_cloudwatch_metrics",
   "sinks-blackhole",
   "sinks-console",
@@ -652,6 +654,7 @@ sinks-metrics = [
 ]
 
 sinks-amqp = ["lapin"]
+sinks-appsignal = []
 sinks-aws_cloudwatch_logs = ["aws-core", "dep:aws-sdk-cloudwatchlogs"]
 sinks-aws_cloudwatch_metrics = ["aws-core", "dep:aws-sdk-cloudwatch"]
 sinks-aws_kinesis_firehose = ["aws-core", "dep:aws-sdk-firehose"]
@@ -716,6 +719,7 @@ nightly = []
 # Testing-related features
 all-integration-tests = [
   "amqp-integration-tests",
+  "appsignal-integration-tests",
   "aws-integration-tests",
   "axiom-integration-tests",
   "azure-integration-tests",
@@ -753,6 +757,7 @@ all-integration-tests = [
 ]
 
 amqp-integration-tests = ["sources-amqp", "sinks-amqp"]
+appsignal-integration-tests = ["sinks-appsignal"]
 
 aws-integration-tests = [
   "aws-cloudwatch-logs-integration-tests",

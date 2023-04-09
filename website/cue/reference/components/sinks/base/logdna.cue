@@ -15,7 +15,7 @@ base: components: sinks: logdna: configuration: {
 				Whether or not end-to-end acknowledgements are enabled.
 
 				When enabled for a sink, any source connected to that sink, where the source supports
-				end-to-end acknowledgements as well, will wait for events to be acknowledged by the sink
+				end-to-end acknowledgements as well, waits for events to be acknowledged by the sink
 				before acknowledging them at the source.
 
 				Enabling or disabling acknowledgements at the sink level takes precedence over any global
@@ -38,10 +38,10 @@ base: components: sinks: logdna: configuration: {
 		type: object: options: {
 			max_bytes: {
 				description: """
-					The maximum size of a batch that will be processed by a sink.
+					The maximum size of a batch that is processed by a sink.
 
 					This is based on the uncompressed size of the batched events, before they are
-					serialized / compressed.
+					serialized/compressed.
 					"""
 				required: false
 				type: uint: {
@@ -65,7 +65,7 @@ base: components: sinks: logdna: configuration: {
 		}
 	}
 	default_app: {
-		description: "The default app that will be set for events that do not contain a `file` or `app` field."
+		description: "The default app that is set for events that do not contain a `file` or `app` field."
 		required:    false
 		type: string: {
 			default: "vector"
@@ -75,7 +75,7 @@ base: components: sinks: logdna: configuration: {
 		}
 	}
 	default_env: {
-		description: "The default environment that will be set for events that do not contain an `env` field."
+		description: "The default environment that is set for events that do not contain an `env` field."
 		required:    false
 		type: string: {
 			default: "production"
@@ -87,12 +87,12 @@ base: components: sinks: logdna: configuration: {
 		required:    false
 		type: object: options: {
 			except_fields: {
-				description: "List of fields that will be excluded from the encoded event."
+				description: "List of fields that are excluded from the encoded event."
 				required:    false
 				type: array: items: type: string: {}
 			}
 			only_fields: {
-				description: "List of fields that will be included in the encoded event."
+				description: "List of fields that are included in the encoded event."
 				required:    false
 				type: array: items: type: string: {}
 			}
@@ -119,7 +119,7 @@ base: components: sinks: logdna: configuration: {
 		}
 	}
 	hostname: {
-		description: "The hostname that will be attached to each batch of events."
+		description: "The hostname that is attached to each batch of events."
 		required:    true
 		type: string: {
 			examples: ["${HOSTNAME}", "my-local-machine"]
@@ -127,12 +127,12 @@ base: components: sinks: logdna: configuration: {
 		}
 	}
 	ip: {
-		description: "The IP address that will be attached to each batch of events."
+		description: "The IP address that is attached to each batch of events."
 		required:    false
 		type: string: examples: ["0.0.0.0"]
 	}
 	mac: {
-		description: "The MAC address that will be attached to each batch of events."
+		description: "The MAC address that is attached to each batch of events."
 		required:    false
 		type: string: examples: ["my-mac-address"]
 	}
@@ -248,7 +248,7 @@ base: components: sinks: logdna: configuration: {
 				description: """
 					The amount of time to wait before attempting the first retry for a failed request.
 
-					After the first retry has failed, the fibonacci sequence will be used to select future backoffs.
+					After the first retry has failed, the fibonacci sequence is used to select future backoffs.
 					"""
 				required: false
 				type: uint: {
@@ -268,7 +268,7 @@ base: components: sinks: logdna: configuration: {
 				description: """
 					The time a request can take before being aborted.
 
-					It is highly recommended that you do not lower this value below the service’s internal timeout, as this could
+					Datadog highly recommends that you do not lower this value below the service's internal timeout, as this could
 					create orphaned requests, pile on retries, and result in duplicate data downstream.
 					"""
 				required: false
@@ -280,7 +280,7 @@ base: components: sinks: logdna: configuration: {
 		}
 	}
 	tags: {
-		description: "The tags that will be attached to each batch of events."
+		description: "The tags that are attached to each batch of events."
 		required:    false
 		type: array: items: type: string: {
 			examples: ["tag1", "tag2"]

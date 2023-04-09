@@ -32,7 +32,7 @@ pub struct KafkaSinkConfig {
     /// A comma-separated list of Kafka bootstrap servers.
     ///
     /// These are the servers in a Kafka cluster that a client should use to bootstrap its
-    /// connection to the cluster, allowing discovering all other hosts in the cluster.
+    /// connection to the cluster, allowing discovery of all the other hosts in the cluster.
     ///
     /// Must be in the form of `host:port`, and comma-separated.
     #[configurable(metadata(docs::examples = "10.14.22.123:9092,10.14.23.332:9092"))]
@@ -46,9 +46,9 @@ pub struct KafkaSinkConfig {
     ))]
     pub topic: Template,
 
-    /// The log field name or tags key to use for the topic key.
+    /// The log field name or tag key to use for the topic key.
     ///
-    /// If the field does not exist in the log or in tags, a blank value will be used. If
+    /// If the field does not exist in the log or in the tags, a blank value is used. If
     /// unspecified, the key is not sent.
     ///
     /// Kafka uses a hash of the key to choose the partition or uses round-robin if the record has
@@ -104,7 +104,7 @@ pub struct KafkaSinkConfig {
 
     /// The log field name to use for the Kafka headers.
     ///
-    /// If omitted, no headers will be written.
+    /// If omitted, no headers are written.
     #[configurable(metadata(docs::advanced))]
     #[serde(alias = "headers_field")] // accidentally released as `headers_field` in 0.18
     #[configurable(metadata(docs::examples = "headers"))]

@@ -231,7 +231,7 @@ impl<B> fmt::Debug for HttpClient<B> {
 
 /// Configuration of the authentication strategy for HTTP requests.
 ///
-/// HTTP authentication should almost always be used with HTTPS only, as the authentication credentials are passed as an
+/// HTTP authentication should be used with HTTPS only, as the authentication credentials are passed as an
 /// HTTP header without any additional encryption beyond what is provided by the transport itself.
 #[configurable_component]
 #[derive(Clone, Debug, Eq, PartialEq)]

@@ -26,11 +26,11 @@ pub struct ClickhouseConfig {
     #[configurable(metadata(docs::examples = "http://localhost:8123"))]
     pub endpoint: UriSerde,
 
-    /// The table that data will be inserted into.
+    /// The table that data is inserted into.
     #[configurable(metadata(docs::examples = "mytable"))]
     pub table: String,
 
-    /// The database that contains the table that data will be inserted into.
+    /// The database that contains the table that data is inserted into.
     #[configurable(metadata(docs::examples = "mydatabase"))]
     pub database: Option<String>,
 
