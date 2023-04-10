@@ -9,7 +9,7 @@ use crate::internal_events::{HostMetricsScrapeDetailError, HostMetricsScrapeFile
 
 use super::{default_all_devices, example_devices, filter_result, FilterList, HostMetrics};
 
-/// Options for the “filesystem” metrics collector.
+/// Options for the filesystem metrics collector.
 #[configurable_component]
 #[derive(Clone, Debug, Default)]
 pub struct FilesystemConfig {

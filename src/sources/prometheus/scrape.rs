@@ -12,7 +12,7 @@ use vector_core::{config::LogNamespace, event::Event};
 use super::parser;
 use crate::sources::util::http::HttpMethod;
 use crate::{
-    config::{self, GenerateConfig, Output, SourceConfig, SourceContext},
+    config::{GenerateConfig, SourceConfig, SourceContext, SourceOutput},
     http::Auth,
     internal_events::PrometheusParseError,
     sources::{
@@ -42,7 +42,10 @@ enum ConfigError {
 
 /// Configuration for the `prometheus_scrape` source.
 #[serde_as]
-#[configurable_component(source("prometheus_scrape"))]
+#[configurable_component(source(
+    "prometheus_scrape",
+    "Collect metrics from Prometheus exporters."
+))]
 #[derive(Clone, Debug)]
 pub struct PrometheusScrapeConfig {
     /// Endpoints to scrape metrics from.
@@ -56,15 +59,15 @@ pub struct PrometheusScrapeConfig {
     #[serde(rename = "scrape_interval_secs")]
     interval: Duration,
 
-    /// The tag name added to each event representing the scraped instance's host:port.
+    /// The tag name added to each event representing the scraped instance's `host:port`.
     ///
-    /// The tag value will be the host/port of the scraped instance.
+    /// The tag value is the host and port of the scraped instance.
     #[configurable(metadata(docs::advanced))]
     instance_tag: Option<String>,
 
     /// The tag name added to each event representing the scraped instance's endpoint.
     ///
-    /// The tag value will be the endpoint of the scraped instance.
+    /// The tag value is the endpoint of the scraped instance.
     #[configurable(metadata(docs::advanced))]
     endpoint_tag: Option<String>,
 
@@ -122,6 +125,7 @@ impl GenerateConfig for PrometheusScrapeConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "prometheus_scrape")]
 impl SourceConfig for PrometheusScrapeConfig {
     async fn build(&self, cx: SourceContext) -> Result<sources::Source> {
         let urls = self
@@ -152,8 +156,8 @@ impl SourceConfig for PrometheusScrapeConfig {
         Ok(call(inputs, builder, cx.out, HttpMethod::Get).boxed())
     }
 
-    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
-        vec![Output::default(config::DataType::Metric)]
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
+        vec![SourceOutput::new_metrics()]
     }
 
     fn can_acknowledge(&self) -> bool {

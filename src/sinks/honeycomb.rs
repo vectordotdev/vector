@@ -26,7 +26,7 @@ pub struct HoneycombConfig {
     #[serde(skip, default = "default_endpoint")]
     endpoint: String,
 
-    /// The team key that will be used to authenticate against Honeycomb.
+    /// The API key that is used to authenticate against Honeycomb.
     #[configurable(metadata(docs::examples = "${HONEYCOMB_API_KEY}"))]
     #[configurable(metadata(docs::examples = "some-api-key"))]
     api_key: SensitiveString,

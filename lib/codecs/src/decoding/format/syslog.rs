@@ -437,16 +437,7 @@ mod tests {
 
     #[test]
     fn deserialize_syslog_legacy_namespace() {
-        init_log_schema(
-            || {
-                let mut schema = LogSchema::default();
-                schema.set_message_key("legacy_message".to_string());
-                schema.set_message_key("legacy_timestamp".to_string());
-                Ok(schema)
-            },
-            false,
-        )
-        .unwrap();
+        init();
 
         let input =
             Bytes::from("<34>1 2003-10-11T22:14:15.003Z mymachine.example.com su - ID47 - MSG");
@@ -462,16 +453,7 @@ mod tests {
 
     #[test]
     fn deserialize_syslog_vector_namespace() {
-        init_log_schema(
-            || {
-                let mut schema = LogSchema::default();
-                schema.set_message_key("legacy_message".to_string());
-                schema.set_message_key("legacy_timestamp".to_string());
-                Ok(schema)
-            },
-            false,
-        )
-        .unwrap();
+        init();
 
         let input =
             Bytes::from("<34>1 2003-10-11T22:14:15.003Z mymachine.example.com su - ID47 - MSG");
@@ -481,5 +463,12 @@ mod tests {
         assert_eq!(events.len(), 1);
         assert_eq!(events[0].as_log()["message"], "MSG".into());
         assert!(events[0].as_log()["timestamp"].is_timestamp());
+    }
+
+    fn init() {
+        let mut schema = LogSchema::default();
+        schema.set_message_key("legacy_message".to_string());
+        schema.set_message_key("legacy_timestamp".to_string());
+        init_log_schema(schema, false);
     }
 }

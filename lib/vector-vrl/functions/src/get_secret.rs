@@ -32,7 +32,7 @@ impl Function for GetSecret {
         &[Example {
             title: "Get the datadog api key",
             source: r#"get_secret("datadog_api_key")"#,
-            result: Ok("null"),
+            result: Ok("secret value"),
         }]
     }
 

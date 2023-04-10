@@ -8,7 +8,8 @@ use vector_core::config::LogNamespace;
 
 use crate::{
     config::{
-        log_schema, DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext,
+        log_schema, DataType, GenerateConfig, Input, OutputId, TransformConfig, TransformContext,
+        TransformOutput,
     },
     event::{Event, Value},
     internal_events::DedupeEventsDropped,
@@ -19,7 +20,7 @@ use crate::{
 /// Options to control what fields to match against.
 ///
 /// When no field matching configuration is specified, events are matched using the `timestamp`,
-/// `host`, and `message` fields from an event. The specific field names used will be those set in
+/// `host`, and `message` fields from an event. The specific field names used are those set in
 /// the global [`log schema`][global_log_schema] configuration.
 ///
 /// [global_log_schema]: https://vector.dev/docs/reference/configuration/global-options/#log_schema
@@ -152,8 +153,18 @@ impl TransformConfig for DedupeConfig {
         Input::log()
     }
 
-    fn outputs(&self, merged_definition: &schema::Definition, _: LogNamespace) -> Vec<Output> {
-        vec![Output::default(DataType::Log).with_schema_definition(merged_definition.clone())]
+    fn outputs(
+        &self,
+        input_definitions: &[(OutputId, schema::Definition)],
+        _: LogNamespace,
+    ) -> Vec<TransformOutput> {
+        vec![TransformOutput::new(
+            DataType::Log,
+            input_definitions
+                .iter()
+                .map(|(_output, definition)| definition.clone())
+                .collect(),
+        )]
     }
 }
 

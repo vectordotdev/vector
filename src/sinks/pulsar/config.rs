@@ -40,7 +40,7 @@ pub struct PulsarSinkConfig {
     #[configurable(metadata(docs::examples = "topic-1234"))]
     pub(crate) topic: Template,
 
-    /// The name of the producer. If not specified, Pulsar will generate a unique name.
+    /// The name of the producer. If not specified, the default name assigned by Pulsar is used.
     #[configurable(metadata(docs::examples = "producer-name"))]
     pub(crate) producer_name: Option<String>,
 

@@ -34,7 +34,7 @@ use self::{
     splunk_response::{HecResponse, HecResponseMetadata, HecStatusCode},
 };
 use crate::{
-    config::{log_schema, DataType, Output, Resource, SourceConfig, SourceContext},
+    config::{log_schema, DataType, Resource, SourceConfig, SourceContext, SourceOutput},
     event::{Event, LogEvent, Value},
     internal_events::{
         EventsReceived, HttpBytesReceived, SplunkHecRequestBodyInvalidError, SplunkHecRequestError,
@@ -55,7 +55,7 @@ pub const SOURCE: &str = "splunk_source";
 pub const SOURCETYPE: &str = "splunk_sourcetype";
 
 /// Configuration for the `splunk_hec` source.
-#[configurable_component(source("splunk_hec"))]
+#[configurable_component(source("splunk_hec", "Receive logs from Splunk."))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields, default)]
 pub struct SplunkConfig {
@@ -70,7 +70,7 @@ pub struct SplunkConfig {
     /// If supplied, incoming requests must supply this token in the `Authorization` header, just as a client would if
     /// it was communicating with the Splunk HEC endpoint directly.
     ///
-    /// If _not_ supplied, the `Authorization` header will be ignored and requests will not be authenticated.
+    /// If _not_ supplied, the `Authorization` header is ignored and requests are not authenticated.
     #[configurable(deprecated = "This option has been deprecated, use `valid_tokens` instead.")]
     token: Option<SensitiveString>,
 
@@ -79,14 +79,14 @@ pub struct SplunkConfig {
     /// If supplied, incoming requests must supply one of these tokens in the `Authorization` header, just as a client
     /// would if it was communicating with the Splunk HEC endpoint directly.
     ///
-    /// If _not_ supplied, the `Authorization` header will be ignored and requests will not be authenticated.
+    /// If _not_ supplied, the `Authorization` header is ignored and requests are not authenticated.
     #[configurable(metadata(docs::examples = "A94A8FE5CCB19BA61C4C08"))]
     valid_tokens: Option<Vec<SensitiveString>>,
 
     /// Whether or not to forward the Splunk HEC authentication token with events.
     ///
-    /// If set to `true`, when incoming requests contain a Splunk HEC token, the token used will kept in the
-    /// event metadata and be preferentially used if the event is sent to a Splunk HEC sink.
+    /// If set to `true`, when incoming requests contain a Splunk HEC token, the token used is kept in the
+    /// event metadata and preferentially used if the event is sent to a Splunk HEC sink.
     store_hec_token: bool,
 
     #[configurable(derived)]
@@ -123,6 +123,7 @@ fn default_socket_address() -> SocketAddr {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "splunk_hec")]
 impl SourceConfig for SplunkConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let tls = MaybeTlsSettings::from_config(&self.tls, true)?;
@@ -174,7 +175,7 @@ impl SourceConfig for SplunkConfig {
         }))
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         let log_namespace = global_log_namespace.merge(self.log_namespace);
 
         let schema_definition = match log_namespace {
@@ -236,7 +237,7 @@ impl SourceConfig for SplunkConfig {
             None,
         );
 
-        vec![Output::default(DataType::Log).with_schema_definition(schema_definition)]
+        vec![SourceOutput::new_logs(DataType::Log, schema_definition)]
     }
 
     fn resources(&self) -> Vec<Resource> {
@@ -2080,14 +2081,14 @@ mod tests {
     fn parse_timestamps() {
         let cases = vec![
             Utc::now(),
-            Utc.ymd(1971, 11, 7)
-                .and_hms_opt(1, 1, 1)
+            Utc.with_ymd_and_hms(1971, 11, 7, 1, 1, 1)
+                .single()
                 .expect("invalid timestamp"),
-            Utc.ymd(2011, 8, 5)
-                .and_hms_opt(1, 1, 1)
+            Utc.with_ymd_and_hms(2011, 8, 5, 1, 1, 1)
+                .single()
                 .expect("invalid timestamp"),
-            Utc.ymd(2189, 11, 4)
-                .and_hms_opt(2, 2, 2)
+            Utc.with_ymd_and_hms(2189, 11, 4, 2, 2, 2)
+                .single()
                 .expect("invalid timestamp"),
         ];
 
@@ -2442,10 +2443,10 @@ mod tests {
             ..Default::default()
         };
 
-        let definition = config.outputs(LogNamespace::Vector)[0]
-            .clone()
-            .log_schema_definition
-            .unwrap();
+        let definition = config
+            .outputs(LogNamespace::Vector)
+            .remove(0)
+            .schema_definition(true);
 
         let expected_definition = Definition::new_with_default_metadata(
             Kind::object(Collection::empty()).or_bytes(),
@@ -2487,16 +2488,16 @@ mod tests {
             None,
         );
 
-        assert_eq!(definition, expected_definition);
+        assert_eq!(definition, Some(expected_definition));
     }
 
     #[test]
     fn output_schema_definition_legacy_namespace() {
         let config = SplunkConfig::default();
-        let definition = config.outputs(LogNamespace::Legacy)[0]
-            .clone()
-            .log_schema_definition
-            .unwrap();
+        let definitions = config
+            .outputs(LogNamespace::Legacy)
+            .remove(0)
+            .schema_definition(true);
 
         let expected_definition = Definition::new_with_default_metadata(
             Kind::object(Collection::empty()),
@@ -2522,6 +2523,6 @@ mod tests {
         .with_event_field(&owned_value_path!("splunk_sourcetype"), Kind::bytes(), None)
         .with_event_field(&owned_value_path!("timestamp"), Kind::timestamp(), None);
 
-        assert_eq!(definition, expected_definition);
+        assert_eq!(definitions, Some(expected_definition));
     }
 }

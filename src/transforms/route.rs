@@ -5,7 +5,10 @@ use vector_core::transform::SyncTransform;
 
 use crate::{
     conditions::{AnyCondition, Condition},
-    config::{DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext},
+    config::{
+        DataType, GenerateConfig, Input, OutputId, TransformConfig, TransformContext,
+        TransformOutput,
+    },
     event::Event,
     schema,
     transforms::Transform,
@@ -61,7 +64,7 @@ pub struct RouteConfig {
     /// A table of route identifiers to logical conditions representing the filter of the route.
     ///
     /// Each route can then be referenced as an input by other components with the name
-    /// `<transform_name>.<route_id>`. If an event doesn’t match any route, it will be sent to the
+    /// `<transform_name>.<route_id>`. If an event doesn’t match any route, it is sent to the
     /// `<transform_name>._unmatched` output.
     ///
     /// Both `_unmatched`, as well as `_default`, are reserved output names and thus cannot be used
@@ -101,20 +104,34 @@ impl TransformConfig for RouteConfig {
         }
     }
 
-    fn outputs(&self, merged_definition: &schema::Definition, _: LogNamespace) -> Vec<Output> {
-        let mut result: Vec<Output> = self
+    fn outputs(
+        &self,
+        input_definitions: &[(OutputId, schema::Definition)],
+        _: LogNamespace,
+    ) -> Vec<TransformOutput> {
+        let mut result: Vec<TransformOutput> = self
             .route
             .keys()
             .map(|output_name| {
-                Output::default(DataType::all())
-                    .with_schema_definition(merged_definition.clone())
-                    .with_port(output_name)
+                TransformOutput::new(
+                    DataType::all(),
+                    input_definitions
+                        .iter()
+                        .map(|(_output, definition)| definition.clone())
+                        .collect(),
+                )
+                .with_port(output_name)
             })
             .collect();
         result.push(
-            Output::default(DataType::all())
-                .with_schema_definition(merged_definition.clone())
-                .with_port(UNMATCHED_ROUTE),
+            TransformOutput::new(
+                DataType::all(),
+                input_definitions
+                    .iter()
+                    .map(|(_output, definition)| definition.clone())
+                    .collect(),
+            )
+            .with_port(UNMATCHED_ROUTE),
         );
         result
     }
@@ -184,7 +201,7 @@ mod test {
             output_names
                 .iter()
                 .map(|output_name| {
-                    Output::default(DataType::all()).with_port(output_name.to_owned())
+                    TransformOutput::new(DataType::all(), vec![]).with_port(output_name.to_owned())
                 })
                 .collect(),
             1,
@@ -225,7 +242,7 @@ mod test {
             output_names
                 .iter()
                 .map(|output_name| {
-                    Output::default(DataType::all()).with_port(output_name.to_owned())
+                    TransformOutput::new(DataType::all(), vec![]).with_port(output_name.to_owned())
                 })
                 .collect(),
             1,
@@ -265,7 +282,7 @@ mod test {
             output_names
                 .iter()
                 .map(|output_name| {
-                    Output::default(DataType::all()).with_port(output_name.to_owned())
+                    TransformOutput::new(DataType::all(), vec![]).with_port(output_name.to_owned())
                 })
                 .collect(),
             1,

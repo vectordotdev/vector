@@ -1,4 +1,0 @@
-# result: { "bar": [null, null, { "baz": { "quux qux": { "lorem": true } } }] }
-
-foo.bar[2].baz.(qux | "quux qux")."lorem" = true
-foo

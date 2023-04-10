@@ -197,7 +197,7 @@ impl Channel {
     fn new(max_pending_acks_per_channel: u64, shutdown: ShutdownSignal) -> Self {
         let ack_ids_status = Arc::new(Mutex::new(RoaringTreemap::new()));
         let finalizer_ack_ids_status = Arc::clone(&ack_ids_status);
-        let (ack_event_finalizer, mut ack_stream) = UnorderedFinalizer::new(shutdown);
+        let (ack_event_finalizer, mut ack_stream) = UnorderedFinalizer::new(Some(shutdown));
         tokio::spawn(async move {
             while let Some((status, ack_id)) = ack_stream.next().await {
                 if status == BatchStatus::Delivered {

@@ -30,7 +30,3 @@ services:
     - MONGODB_INITIAL_PRIMARY_PORT_NUMBER=27017
     - MONGODB_INITIAL_PRIMARY_ROOT_PASSWORD=toor
     - MONGODB_REPLICA_SET_KEY=vector
-
-networks:
-  default:
-    name: ${VECTOR_NETWORK}

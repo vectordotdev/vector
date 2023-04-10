@@ -185,6 +185,7 @@ scopes:
 
   # sinks
   - amqp sink # Anything `amqp` sink related
+  - appsignal sink # Anything `appsignal` sink related
   - aws_cloudwatch_logs sink # Anything `aws_cloudwatch_logs` sink related
   - aws_cloudwatch_metrics sink # Anything `aws_cloudwatch_metrics` sink related
   - aws_kinesis_firehose sink # Anything `aws_kinesis_firehose` sink related

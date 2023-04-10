@@ -1,15 +1,14 @@
 #![allow(missing_docs)]
-use std::{collections::HashMap, num::NonZeroUsize, path::PathBuf, sync::Arc};
+use std::{collections::HashMap, num::NonZeroUsize, path::PathBuf};
 
 use exitcode::ExitCode;
 use futures::StreamExt;
 #[cfg(feature = "enterprise")]
 use futures_util::future::BoxFuture;
-use futures_util::FutureExt;
 use once_cell::race::OnceNonZeroUsize;
 use tokio::{
     runtime::{self, Runtime},
-    sync::{mpsc, Mutex},
+    sync::mpsc,
 };
 use tokio_stream::wrappers::UnboundedReceiverStream;
 
@@ -18,8 +17,6 @@ use crate::config::enterprise::{
     attach_enterprise_components, report_configuration, EnterpriseError, EnterpriseMetadata,
     EnterpriseReporter,
 };
-#[cfg(not(windows))]
-use crate::control_server::{self, ControlServer};
 #[cfg(not(feature = "enterprise-tests"))]
 use crate::metrics;
 #[cfg(feature = "api")]
@@ -29,7 +26,9 @@ use crate::{
     config::{self, Config, ConfigPath},
     heartbeat,
     signal::{SignalHandler, SignalPair, SignalRx, SignalTo},
-    topology::{self, ReloadOutcome, RunningTopology, TopologyController},
+    topology::{
+        self, ReloadOutcome, RunningTopology, SharedTopologyController, TopologyController,
+    },
     trace,
 };
 
@@ -114,16 +113,12 @@ impl ApplicationConfig {
     #[cfg(feature = "api")]
     pub fn setup_api(&self, runtime: &Runtime) -> Option<api::Server> {
         if self.api.enabled {
-            use std::sync::atomic::AtomicBool;
-
-            let api_server = api::Server::start(
+            match api::Server::start(
                 self.topology.config(),
                 self.topology.watch(),
-                Arc::<AtomicBool>::clone(&self.topology.running),
+                std::sync::Arc::clone(&self.topology.running),
                 runtime,
-            );
-
-            match api_server {
+            ) {
                 Ok(api_server) => {
                     emit!(ApiStarted {
                         addr: self.api.address.unwrap(),
@@ -216,7 +211,7 @@ impl Application {
             signals,
         } = self;
 
-        let topology_controller = TopologyController {
+        let topology_controller = SharedTopologyController::new(TopologyController {
             #[cfg(feature = "api")]
             api_server: config.setup_api(runtime),
             topology: config.topology,
@@ -224,17 +219,10 @@ impl Application {
             require_healthy,
             #[cfg(feature = "enterprise")]
             enterprise_reporter: config.enterprise,
-        };
-        let topology_controller = Arc::new(Mutex::new(topology_controller));
-
-        // If the relevant ENV var is set, start up the control server
-        #[cfg(not(windows))]
-        let control_server_pieces = setup_control_server(&topology_controller, runtime)?;
+        });
 
         Ok(StartedApplication {
             config_paths: config.config_paths,
-            #[cfg(not(windows))]
-            control_server_pieces,
             graceful_crash_receiver: config.graceful_crash_receiver,
             signals,
             topology_controller,
@@ -243,12 +231,10 @@ impl Application {
 }
 
 pub struct StartedApplication {
-    config_paths: Vec<ConfigPath>,
-    #[cfg(not(windows))]
-    control_server_pieces: Option<control_server::Pieces>,
-    graceful_crash_receiver: mpsc::UnboundedReceiver<()>,
+    pub config_paths: Vec<ConfigPath>,
+    pub graceful_crash_receiver: mpsc::UnboundedReceiver<()>,
     pub signals: SignalPair,
-    topology_controller: Arc<Mutex<TopologyController>>,
+    pub topology_controller: SharedTopologyController,
 }
 
 impl StartedApplication {
@@ -259,8 +245,6 @@ impl StartedApplication {
     pub async fn main(self) -> FinishedApplication {
         let Self {
             config_paths,
-            #[cfg(not(windows))]
-            control_server_pieces,
             graceful_crash_receiver,
             signals,
             topology_controller,
@@ -306,7 +290,7 @@ impl StartedApplication {
                 }
                 // Trigger graceful shutdown if a component crashed, or all sources have ended.
                 _ = graceful_crash.next() => break SignalTo::Shutdown,
-                _ = sources_finished(Arc::clone(&topology_controller)) => {
+                _ = TopologyController::sources_finished(topology_controller.clone()) => {
                     info!("All sources have finished.");
                     break SignalTo::Shutdown
                 } ,
@@ -315,8 +299,6 @@ impl StartedApplication {
         };
 
         FinishedApplication {
-            #[cfg(not(windows))]
-            control_server_pieces,
             signal,
             signal_rx,
             topology_controller,
@@ -325,36 +307,23 @@ impl StartedApplication {
 }
 
 pub struct FinishedApplication {
-    #[cfg(not(windows))]
-    control_server_pieces: Option<control_server::Pieces>,
-    signal: SignalTo,
-    signal_rx: SignalRx,
-    topology_controller: Arc<Mutex<TopologyController>>,
+    pub signal: SignalTo,
+    pub signal_rx: SignalRx,
+    pub topology_controller: SharedTopologyController,
 }
 
 impl FinishedApplication {
     pub async fn shutdown(self) {
         let FinishedApplication {
-            #[cfg(not(windows))]
-            control_server_pieces,
             signal,
             mut signal_rx,
             topology_controller,
         } = self;
 
-        // Shut down the control server, if running
-        #[cfg(not(windows))]
-        if let Some((shutdown_trigger, server_handle)) = control_server_pieces {
-            drop(shutdown_trigger);
-            server_handle
-                .await
-                .expect("control server task panicked")
-                .expect("control server error");
-        }
-
-        // Once any control server has stopped, we'll have the only reference to the topology
-        // controller and can safely remove it from the Arc/Mutex to shut down the topology.
-        let topology_controller = Arc::try_unwrap(topology_controller)
+        // At this point, we'll have the only reference to the shared topology controller and can
+        // safely remove it from the wrapper to shut down the topology.
+        let topology_controller = topology_controller
+            .try_into_inner()
             .expect("fail to unwrap topology controller")
             .into_inner();
 
@@ -376,40 +345,6 @@ impl FinishedApplication {
                 drop(topology_controller);
             }
             _ => unreachable!(),
-        }
-    }
-}
-
-// The `sources_finished` method on `RunningTopology` only considers sources that are currently
-// running at the time the method is called. This presents a problem when the set of running
-// sources can change while we are waiting on the resulting future to resolve.
-//
-// This function resolves that issue by waiting in two stages. The first is the usual asynchronous
-// wait for the future to complete. When it does, we know that all of the sources that existed when
-// the future was built have finished, but we don't know if that's because they were replaced as
-// part of a reload (in which case we don't want to return yet). To differentiate, we acquire the
-// lock on the topology, create a new future, and check whether it resolves immediately or not. If
-// it does resolve, we know all sources are truly finished because we held the lock during the
-// check, preventing anyone else from adding new sources. If it does not resolve, that indicates
-// that new sources have been added since our original call and we should start the process over to
-// continue waiting.
-async fn sources_finished(mutex: Arc<Mutex<TopologyController>>) {
-    loop {
-        // Do an initial async wait while the topology is running, making sure not the hold the
-        // mutex lock while we wait on sources to finish.
-        let initial = {
-            let tc = mutex.lock().await;
-            tc.topology.sources_finished()
-        };
-        initial.await;
-
-        // Once the initial signal is tripped, hold lock on the topology while checking again. This
-        // ensures that no other task is adding new sources.
-        let top = mutex.lock().await;
-        if top.topology.sources_finished().now_or_never().is_some() {
-            return;
-        } else {
-            continue;
         }
     }
 }
@@ -494,13 +429,12 @@ pub async fn load_configs(
         paths = ?config_paths.iter().map(<&PathBuf>::from).collect::<Vec<_>>()
     );
 
-    #[cfg(not(feature = "enterprise-tests"))]
-    config::init_log_schema(&config_paths, true).map_err(handle_config_errors)?;
-
     let mut config =
         config::load_from_paths_with_provider_and_secrets(&config_paths, signal_handler)
             .await
             .map_err(handle_config_errors)?;
+    #[cfg(not(feature = "enterprise-tests"))]
+    config::init_log_schema(config.global.log_schema.clone(), true);
 
     if !config.healthchecks.enabled {
         info!("Health checks are disabled.");
@@ -546,20 +480,4 @@ pub fn init_logging(color: bool, format: LogFormat, log_level: &str, rate: u64) 
         internal_log_rate_secs = rate,
     );
     info!(message = "Log level is enabled.", level = ?level);
-}
-
-#[cfg(not(windows))]
-pub fn setup_control_server(
-    topology_controller: &Arc<Mutex<TopologyController>>,
-    runtime: &Runtime,
-) -> Result<Option<control_server::Pieces>, ExitCode> {
-    std::env::var("VECTOR_CONTROL_SOCKET_PATH")
-        .ok()
-        .map(|path| {
-            ControlServer::start(path, topology_controller, runtime).map_err(|error| {
-                error!(message = "Failed to bind control server.", %error);
-                exitcode::CONFIG
-            })
-        })
-        .transpose()
 }

@@ -13,8 +13,8 @@ pub(crate) struct AmqpConfig {
     ///
     /// The default vhost can be specified by using a value of `%2f`.
     ///
-    /// In order to connect over TLS, a scheme of `amqps` can be specified instead i.e.
-    /// `amqps://...`. Additional TLS settings, such as client certificate verification, etc, can be
+    /// To connect over TLS, a scheme of `amqps` can be specified instead. For example,
+    /// `amqps://...`. Additional TLS settings, such as client certificate verification, can be
     /// configured under the `tls` section.
     #[configurable(metadata(
         docs::examples = "amqp://user:password@127.0.0.1:5672/%2f?timeout=10",

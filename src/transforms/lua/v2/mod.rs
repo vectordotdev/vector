@@ -7,10 +7,11 @@ use vector_config::configurable_component;
 pub use vector_core::event::lua;
 use vector_core::transform::runtime_transform::{RuntimeTransform, Timer};
 
+use crate::config::OutputId;
 use crate::event::lua::event::LuaEvent;
 use crate::schema::Definition;
 use crate::{
-    config::{self, DataType, Input, Output, CONFIG_PATHS},
+    config::{self, DataType, Input, TransformOutput, CONFIG_PATHS},
     event::Event,
     internal_events::{LuaBuildError, LuaGcTriggered},
     schema,
@@ -76,11 +77,11 @@ pub struct LuaConfig {
     #[serde(default)]
     timers: Vec<TimerConfig>,
 
-    /// When set to `single`, metric tag values will be exposed as single strings, the
-    /// same as they were before this config option. Tags with multiple values will show the last assigned value, and null values
-    /// will be ignored.
+    /// When set to `single`, metric tag values are exposed as single strings, the
+    /// same as they were before this config option. Tags with multiple values show the last assigned value, and null values
+    /// are ignored.
     ///
-    /// When set to `full`, all metric tags will be exposed as arrays of either string or null
+    /// When set to `full`, all metric tags are exposed as arrays of either string or null
     /// values.
     #[serde(default)]
     metric_tag_values: MetricTagValues,
@@ -177,11 +178,22 @@ impl LuaConfig {
         Input::new(DataType::Metric | DataType::Log)
     }
 
-    pub fn outputs(&self, merged_definition: &schema::Definition) -> Vec<Output> {
+    pub fn outputs(
+        &self,
+        input_definitions: &[(OutputId, schema::Definition)],
+    ) -> Vec<TransformOutput> {
         // Lua causes the type definition to be reset
-        let definition = Definition::default_for_namespace(merged_definition.log_namespaces());
+        let namespaces = input_definitions
+            .iter()
+            .flat_map(|(_output, definition)| definition.log_namespaces().clone())
+            .collect();
 
-        vec![Output::default(DataType::Metric | DataType::Log).with_schema_definition(definition)]
+        let definition = Definition::default_for_namespace(&namespaces);
+
+        vec![TransformOutput::new(
+            DataType::Metric | DataType::Log,
+            vec![definition],
+        )]
     }
 }
 

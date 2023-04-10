@@ -40,7 +40,7 @@ pub struct HecMetricsSinkConfig {
 
     /// Default Splunk HEC token.
     ///
-    /// If an event has a token set in its metadata, it will prevail over the one set here.
+    /// If an event has a token set in its metadata, it prevails over the one set here.
     #[serde(alias = "token")]
     #[configurable(metadata(
         docs::examples = "${SPLUNK_HEC_TOKEN}",
@@ -62,7 +62,7 @@ pub struct HecMetricsSinkConfig {
     #[configurable(validation(format = "uri"))]
     pub endpoint: String,
 
-    /// Overrides the name of the log field used to grab the hostname to send to Splunk HEC.
+    /// Overrides the name of the log field used to retrieve the hostname to send to Splunk HEC.
     ///
     /// By default, the [global `log_schema.host_key` option][global_host_key] is used.
     ///
@@ -79,7 +79,7 @@ pub struct HecMetricsSinkConfig {
 
     /// The sourcetype of events sent to this sink.
     ///
-    /// If unset, Splunk will default to `httpevent`.
+    /// If unset, Splunk defaults to `httpevent`.
     #[configurable(metadata(docs::advanced))]
     #[configurable(metadata(docs::examples = "{{ sourcetype }}", docs::examples = "_json",))]
     pub sourcetype: Option<Template>,
@@ -88,7 +88,7 @@ pub struct HecMetricsSinkConfig {
     ///
     /// This is typically the filename the logs originated from.
     ///
-    /// If unset, the Splunk collector will set it.
+    /// If unset, the Splunk collector sets it.
     #[configurable(metadata(docs::advanced))]
     #[configurable(metadata(
         docs::examples = "{{ file }}",

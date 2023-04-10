@@ -11,7 +11,7 @@ use vector_config::configurable_component;
 
 use super::util::framestream::{build_framestream_unix_source, FrameHandler};
 use crate::{
-    config::{log_schema, DataType, Output, SourceConfig, SourceContext},
+    config::{log_schema, DataType, SourceConfig, SourceContext, SourceOutput},
     event::{Event, LogEvent},
     internal_events::DnstapParseError,
     Result,
@@ -27,19 +27,19 @@ pub use schema::DnstapEventSchema;
 use vector_core::config::{LegacyKey, LogNamespace};
 
 /// Configuration for the `dnstap` source.
-#[configurable_component(source("dnstap"))]
+#[configurable_component(source("dnstap", "Collect DNS logs from a dnstap-compatible server."))]
 #[derive(Clone, Debug)]
 pub struct DnstapConfig {
-    /// Maximum DNSTAP frame length that the source will accept.
+    /// Maximum DNSTAP frame length that the source accepts.
     ///
-    /// If any frame is longer than this, it will be discarded.
+    /// If any frame is longer than this, it is discarded.
     #[serde(default = "default_max_frame_length")]
     #[configurable(metadata(docs::type_unit = "bytes"))]
     pub max_frame_length: usize,
 
     /// Overrides the name of the log field used to add the source path to each event.
     ///
-    /// The value will be the socket path itself.
+    /// The value is the socket path itself.
     ///
     /// By default, the [global `log_schema.host_key` option][global_host_key] is used.
     ///
@@ -48,13 +48,13 @@ pub struct DnstapConfig {
 
     /// Absolute path to the socket file to read DNSTAP data from.
     ///
-    /// The DNS server must be configured to send its DNSTAP data to this socket file. The socket file will be created
+    /// The DNS server must be configured to send its DNSTAP data to this socket file. The socket file is created
     /// if it doesn't already exist when the source first starts.
     pub socket_path: PathBuf,
 
-    /// Whether or not to skip parsing/decoding of DNSTAP frames.
+    /// Whether or not to skip parsing or decoding of DNSTAP frames.
     ///
-    /// If set to `true`, frames will not be parsed/decoded. The raw frame data will be set as a field on the event
+    /// If set to `true`, frames are not parsed or decoded. The raw frame data is set as a field on the event
     /// (called `rawData`) and encoded as a base64 string.
     raw_data_only: Option<bool>,
 
@@ -66,7 +66,7 @@ pub struct DnstapConfig {
 
     /// Unix file mode bits to be applied to the unix socket file as its designated file permissions.
     ///
-    /// Note that the file mode value can be specified in any numeric format supported by your configuration
+    /// Note: The file mode value can be specified in any numeric format supported by your configuration
     /// language, but it is most intuitive to use an octal number.
     pub socket_file_mode: Option<u32>,
 
@@ -174,6 +174,7 @@ impl Default for DnstapConfig {
 impl_generate_config_from_default!(DnstapConfig);
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "dnstap")]
 impl SourceConfig for DnstapConfig {
     async fn build(&self, cx: SourceContext) -> Result<super::Source> {
         let log_namespace = cx.log_namespace(self.log_namespace);
@@ -181,12 +182,12 @@ impl SourceConfig for DnstapConfig {
         build_framestream_unix_source(frame_handler, cx.shutdown, cx.out)
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         let log_namespace = global_log_namespace.merge(self.log_namespace);
         let schema_definition = self
             .schema_definition(log_namespace)
             .with_standard_vector_source_metadata();
-        vec![Output::default(DataType::Log).with_schema_definition(schema_definition)]
+        vec![SourceOutput::new_logs(DataType::Log, schema_definition)]
     }
 
     fn can_acknowledge(&self) -> bool {

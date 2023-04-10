@@ -17,17 +17,11 @@ static LOG_SCHEMA_DEFAULT: Lazy<LogSchema> = Lazy::new(LogSchema::default);
 /// # Panics
 ///
 /// If deny is set, will panic if schema has already been set.
-pub fn init_log_schema<F>(builder: F, deny_if_set: bool) -> Result<(), Vec<String>>
-where
-    F: FnOnce() -> Result<LogSchema, Vec<String>>,
-{
-    let log_schema = builder()?;
+pub fn init_log_schema(log_schema: LogSchema, deny_if_set: bool) {
     assert!(
         !(LOG_SCHEMA.set(log_schema).is_err() && deny_if_set),
         "Couldn't set schema"
     );
-
-    Ok(())
 }
 
 /// Components should use global `LogSchema` returned by this function.  The
