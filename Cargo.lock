@@ -9701,7 +9701,7 @@ dependencies = [
  "quote 1.0.26",
  "serde",
  "serde_json",
- "syn 1.0.109",
+ "syn 2.0.10",
 ]
 
 [[package]]
@@ -9714,7 +9714,7 @@ dependencies = [
  "quote 1.0.26",
  "serde",
  "serde_derive_internals",
- "syn 1.0.109",
+ "syn 2.0.10",
  "vector-config",
  "vector-config-common",
 ]
