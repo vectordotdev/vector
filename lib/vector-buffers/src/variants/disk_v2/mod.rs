@@ -34,14 +34,15 @@
 //!
 //! Records are represented by the following pseudo-structure:
 //!
-//!   record:
-//!     `record_len`: uint64
-//!     `checksum`:   uint32(CRC32C of `record_id` + `payload`)
-//!     `record_id`:  uint64
-//!     `payload`:    uint8[record_len]
+//! ```norun
+//! record:
+//!   record_len: uint64
+//!   checksum:   uint32(CRC32C of record_id + payload)
+//!   record_id:  uint64
+//!   payload:    uint8[record_len]
+//! ```
 //!
-//!
-//! We say "pseudo-structure" as a helper serialization library, `rkyv`, is used to handle
+//! We say "pseudo-structure" as a helper serialization library, [`rkyv`][rkyv], is used to handle
 //! serialization, and zero-copy deserialization, of records. This effectively adds some amount of
 //! padding to record fields, due to the need to structure record field data in a way that makes it
 //! transparent to access during zero-copy deserialization, when the raw buffer of a record that was
@@ -83,11 +84,13 @@
 //! Like records, the ledger file consists of a simplified structure that is optimized for being shared
 //! via a memory-mapped file interface between the reader and writer.
 //!
-//!   buffer.db:
-//!     `writer_next_record_id`:       uint64
-//!     `writer_current_data_file_id`: uint16
-//!     `reader_current_data_file_id`: uint16
-//!     `reader_last_record_id`:       uint64
+//! ```norun
+//! buffer.db:
+//!   writer_next_record_id:       uint64
+//!   writer_current_data_file_id: uint16
+//!   reader_current_data_file_id: uint16
+//!   reader_last_record_id:       uint64
+//! ```
 //!
 //! As the disk buffer structure is meant to emulate a ring buffer, most of the bookkeeping resolves
 //! around the writer and reader being able to quickly figure out where they left off. Record and
@@ -95,9 +98,9 @@
 //! incremented monotonically as new data files are created, rather than trying to always allocate
 //! from the lowest available ID.
 //!
-//! ### Buffer operation
+//! ## Buffer operation
 //!
-//! ## Writing records
+//! ### Writing records
 //!
 //! As mentioned above, records are added to a data file sequentially, and contiguously, with no
 //! gaps or data alignment adjustments, excluding the padding/alignment used by `rkyv` itself to
@@ -114,13 +117,13 @@
 //! wrap around at 65,536 (2^16), the maximum data file size in total for a given buffer is ~8TB (6
 //! 5k files * 128MB).
 //!
-//! ## Reading records
+//! ### Reading records
 //!
 //! Due to the on-disk layout, reading records is an incredibly straight-forward progress: we open a
 //! file, read it until there's no more data and we know the writer is done writing to the file, and
 //! then we open the next one, and repeat the process.
 //!
-//! ## Deleting acknowledged records
+//! ### Deleting acknowledged records
 //!
 //! As the reader emits records, we cannot yet consider them fully processed until they are
 //! acknowledged. The acknowledgement process is tied into the normal acknowledgement machinery, and
@@ -134,7 +137,7 @@
 //! that the writer can make progress as records are acknowledged, even if the buffer is close to,
 //! or at the maximum buffer size limit.
 //!
-//! ## Record ID generation, and its relation of events
+//! ### Record ID generation, and its relation of events
 //!
 //! While the buffer talks a lot about writing "records", records are ostensibly a single event, or
 //! collection of events. We manage the organization and grouping of events at at a higher level
@@ -163,6 +166,8 @@
 //! We make sure to track enough information such that when we encounter a corrupted record, or if
 //! we skip records due to missing data, we can figure out how many events we've dropped or lost,
 //! and handle the necessary adjustments to the buffer accounting.
+//!
+//! [rkyv]: https://docs.rs/rkyv
 
 use core::fmt;
 use std::{
