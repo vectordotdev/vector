@@ -53,7 +53,6 @@ impl MetaDescriptive for PulsarRequest {
     }
 }
 
-//#[derive(Clone)]
 pub struct PulsarService<Exe: Executor> {
     producer: Arc<Mutex<MultiTopicProducer<Exe>>>,
 }
