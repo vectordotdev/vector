@@ -53,7 +53,7 @@ impl MetaDescriptive for PulsarRequest {
     }
 }
 
-#[derive(Clone)]
+//#[derive(Clone)]
 pub struct PulsarService<Exe: Executor> {
     producer: Arc<Mutex<MultiTopicProducer<Exe>>>,
 }
@@ -97,7 +97,6 @@ impl<Exe: Executor> Service<PulsarRequest> for PulsarService<Exe> {
             .map(|t| t as u64);
 
         Box::pin(async move {
-            let mut producer = producer.lock().await;
             let body = request.body.clone();
 
             let mut properties = HashMap::new();
@@ -120,7 +119,9 @@ impl<Exe: Executor> Service<PulsarRequest> for PulsarService<Exe> {
                 ..Default::default()
             };
 
-            match producer.send(topic, message).await {
+            let fut = producer.lock().await.send(topic, message).await;
+
+            match fut {
                 Ok(resp) => match resp.await {
                     Ok(_) => Ok(PulsarResponse {
                         event_byte_size: request.request_metadata.events_byte_size(),
