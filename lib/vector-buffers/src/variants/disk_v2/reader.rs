@@ -917,7 +917,7 @@ where
                     // If the writer saw the same error we just saw, it will have rolled itself to
                     // the next file, lazily: for example, it discovers a bad record at the end of
                     // file ID 3, so it marks itself to open file ID 4 next, but hasn't yet
-                    // created it, and is still technically indcated as being on file ID 3.
+                    // created it, and is still technically indicated as being on file ID 3.
                     //
                     // Meanwhile, if _we_ try to also roll to file ID 4 and read from it, we'll deadlock
                     // ourselves because it doesn't yet exist. However, `next` immediately updates our
