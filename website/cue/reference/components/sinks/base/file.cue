@@ -243,4 +243,15 @@ base: components: sinks: file: configuration: {
 			syntax: "template"
 		}
 	}
+	path_tz: {
+		description: """
+			handle tz offset configuration
+			Defaults to UTC
+			"""
+		required: false
+		type: string: {
+			default: "UTC"
+			examples: ["Asia/Singapore"]
+		}
+	}
 }

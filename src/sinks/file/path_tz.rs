@@ -1,13 +1,12 @@
-//use chrono::{DateTime, FixedOffset, ParseError};
 use chrono_tz::{ParseError, Tz, UTC};
 use std::{
     convert::{Into, TryFrom},
     default::Default,
 };
-
 use vector_config::configurable_component;
 
 /// handle tz offset configuration
+/// Defaults to UTC
 #[configurable_component]
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[serde(try_from = "String", into = "String")]
@@ -48,12 +47,6 @@ impl Default for PathTz {
         PathTz(UTC)
     }
 }
-
-// impl std::fmt::Display for TzOffset {
-//     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-//         write!(f, "{}", self.0)
-//     }
-// }
 
 #[cfg(test)]
 mod tests {

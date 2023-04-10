@@ -85,6 +85,7 @@ pub struct FileSinkConfig {
     pub acknowledgements: AcknowledgementsConfig,
 
     #[configurable(derived)]
+    #[configurable(metadata(docs::examples = "Asia/Singapore"))]
     #[serde(
         default,
         skip_serializing_if = "crate::serde::skip_serializing_if_default"

@@ -678,10 +678,7 @@ mod tests {
 
     #[test]
     fn render_log_with_path_tz() {
-        let ts = Utc
-            .ymd(2001, 2, 3)
-            .and_hms_opt(4, 5, 6)
-            .expect("invalid timestamp");
+        let ts = Utc.with_ymd_and_hms(2001, 2, 3, 4, 5, 6).unwrap();
 
         let template = Template::try_from("vector-%Y-%m-%d-%H.log").unwrap();
         let mut event = Event::Log(LogEvent::from("hello world"));
