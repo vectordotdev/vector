@@ -466,7 +466,7 @@ dependencies = [
  "parking",
  "polling",
  "slab",
- "socket2",
+ "socket2 0.4.9",
  "waker-fn",
  "windows-sys 0.42.0",
 ]
@@ -2810,7 +2810,7 @@ checksum = "53ecafc952c4528d9b51a458d1a8904b81783feff9fde08ab6ed2545ff396872"
 dependencies = [
  "cfg-if",
  "libc",
- "socket2",
+ "socket2 0.4.9",
  "winapi",
 ]
 
@@ -3938,7 +3938,7 @@ dependencies = [
  "httpdate",
  "itoa",
  "pin-project-lite",
- "socket2",
+ "socket2 0.4.9",
  "tokio",
  "tower-service",
  "tracing 0.1.37",
@@ -4217,7 +4217,7 @@ version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bd302af1b90f2463a98fa5ad469fc212c8e3175a41c3068601bfa2727591c5be"
 dependencies = [
- "socket2",
+ "socket2 0.4.9",
  "widestring 0.5.1",
  "winapi",
  "winreg",
@@ -5081,7 +5081,7 @@ dependencies = [
  "serde_with 1.14.0",
  "sha-1",
  "sha2 0.10.6",
- "socket2",
+ "socket2 0.4.9",
  "stringprep",
  "strsim 0.10.0",
  "take_mut",
@@ -7966,12 +7966,22 @@ checksum = "5e9f0ab6ef7eb7353d9119c170a436d1bf248eea575ac42d19d12f4e34130831"
 
 [[package]]
 name = "socket2"
-version = "0.4.7"
+version = "0.4.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "02e2d2db9033d13a1567121ddd7a095ee144db4e1ca1b1bda3419bc0da294ebd"
+checksum = "64a4a911eed85daf18834cfaa86a79b7d266ff93ff5ba14005426219480ed662"
 dependencies = [
  "libc",
  "winapi",
+]
+
+[[package]]
+name = "socket2"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bc8d618c6641ae355025c449427f9e96b98abf99a772be3cef6708d15c77147a"
+dependencies = [
+ "libc",
+ "windows-sys 0.45.0",
 ]
 
 [[package]]
@@ -8445,7 +8455,7 @@ dependencies = [
  "parking_lot",
  "pin-project-lite",
  "signal-hook-registry",
- "socket2",
+ "socket2 0.4.9",
  "tokio-macros",
  "tracing 0.1.37",
  "windows-sys 0.45.0",
@@ -8524,7 +8534,7 @@ dependencies = [
  "pin-project-lite",
  "postgres-protocol",
  "postgres-types",
- "socket2",
+ "socket2 0.4.9",
  "tokio",
  "tokio-util",
 ]
@@ -9518,7 +9528,7 @@ dependencies = [
  "smpl_jwt",
  "snafu",
  "snap",
- "socket2",
+ "socket2 0.5.1",
  "stream-cancel",
  "strip-ansi-escapes",
  "syslog",
@@ -9776,7 +9786,7 @@ dependencies = [
  "similar-asserts",
  "smallvec",
  "snafu",
- "socket2",
+ "socket2 0.5.1",
  "tokio",
  "tokio-openssl",
  "tokio-stream",
