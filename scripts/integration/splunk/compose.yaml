@@ -13,7 +13,3 @@ services:
     - 8000:8000
     - 8088:8088
     - 8089:8089
-
-networks:
-  default:
-    name: ${VECTOR_NETWORK}

@@ -13,6 +13,18 @@ releases: "0.28.0": {
 			as Vector returns an error about them conflicting with the deprecated top-level
 			`max_length` configuration option. This is fixed in v0.28.1.
 			""",
+		"""
+			The `http_server` source incorrectly defaults to `GET` rather than `POST` for `method`.
+			Fixed in 0.28.2.
+			""",
+		"""
+			The `elasticsearch` sink panics when starting if `bulk.index` is unspecified and the
+			default `mode` of `bulk` is used. Fixed in 0.28.2.
+			""",
+		"""
+			The `syslog` source incorrectly inserted the source IP of incoming messages as
+			`source_id` rather than `source_ip`. Fixed in 0.28.2.
+			""",
 	]
 
 	description: """

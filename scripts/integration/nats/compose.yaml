@@ -43,7 +43,3 @@ services:
     - /usr/share/nats/config/nats-jwt.conf
     volumes:
     - ../../../tests/data/nats:/usr/share/nats/config
-
-networks:
-  default:
-    name: ${VECTOR_NETWORK}

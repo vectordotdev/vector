@@ -1,8 +1,8 @@
-use std::{path::Path, path::PathBuf, process::Command};
+use std::{collections::BTreeMap, fs, path::Path, path::PathBuf, process::Command};
 
 use anyhow::{bail, Context, Result};
+use tempfile::{Builder, NamedTempFile};
 
-#[cfg(unix)]
 use super::config::ComposeConfig;
 use super::config::{Environment, IntegrationTestConfig};
 use super::runner::{
@@ -135,30 +135,52 @@ impl IntegrationTest {
 }
 
 struct Compose {
-    path: PathBuf,
+    original_path: PathBuf,
     test_dir: PathBuf,
     env: Environment,
-    #[cfg(unix)]
+    #[cfg_attr(target_family = "windows", allow(dead_code))]
     config: ComposeConfig,
     network: String,
+    temp_file: NamedTempFile,
 }
 
 impl Compose {
     fn new(test_dir: PathBuf, env: Environment, network: String) -> Result<Option<Self>> {
-        let path: PathBuf = [&test_dir, Path::new("compose.yaml")].iter().collect();
-        match path.try_exists() {
-            Err(error) => Err(error).with_context(|| format!("Could not lookup {path:?}")),
+        let original_path: PathBuf = [&test_dir, Path::new("compose.yaml")].iter().collect();
+
+        match original_path.try_exists() {
+            Err(error) => Err(error).with_context(|| format!("Could not lookup {original_path:?}")),
             Ok(false) => Ok(None),
             Ok(true) => {
-                #[cfg(unix)]
-                let config = ComposeConfig::parse(&path)?;
+                let mut config = ComposeConfig::parse(&original_path)?;
+                // Inject the networks block
+                config.networks.insert(
+                    "default".to_string(),
+                    BTreeMap::from_iter([("name".to_string(), network.clone())]),
+                );
+
+                // Create a named tempfile, there may be resource leakage here in case of SIGINT
+                // Tried tempfile::tempfile() but this returns a File object without a usable path
+                // https://docs.rs/tempfile/latest/tempfile/#resource-leaking
+                let temp_file = Builder::new()
+                    .prefix("compose-temp-")
+                    .suffix(".yaml")
+                    .tempfile_in(&test_dir)
+                    .with_context(|| "Failed to create temporary compose file")?;
+
+                fs::write(
+                    temp_file.path(),
+                    serde_yaml::to_string(&config)
+                        .with_context(|| "Failed to serialize modified compose.yaml")?,
+                )?;
+
                 Ok(Some(Self {
-                    path,
+                    original_path,
                     test_dir,
                     env,
-                    #[cfg(unix)]
                     config,
                     network,
+                    temp_file,
                 }))
             }
         }
@@ -178,8 +200,19 @@ impl Compose {
         let mut command = CONTAINER_TOOL.clone();
         command.push("-compose");
         let mut command = Command::new(command);
+        // When the integration test environment is already active, the tempfile path does not
+        // exist because `Compose::new()` has not been called. In this case, the `stop` command
+        // needs to use the calculated path from the integration name instead of the nonexistent
+        // tempfile path. This is because `stop` doesn't go through the same logic as `start`
+        // and doesn't create a new tempfile before calling docker compose.
+        // If stop command needs to use some of the injected bits then we need to rebuild it
         command.arg("--file");
-        command.arg(&self.path);
+        if config.is_none() {
+            command.arg(&self.original_path);
+        } else {
+            command.arg(self.temp_file.path());
+        }
+
         command.args(args);
 
         command.current_dir(&self.test_dir);
