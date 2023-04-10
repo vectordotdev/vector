@@ -83,7 +83,10 @@ impl<Exe: Executor> Service<PulsarRequest> for PulsarService<Exe> {
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
     fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Poll::Ready(Ok(()))
+        match self.producer.try_lock() {
+            Ok(_) => Poll::Ready(Ok(())),
+            Err(_) => Poll::Pending,
+        }
     }
 
     fn call(&mut self, request: PulsarRequest) -> Self::Future {
