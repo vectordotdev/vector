@@ -83,8 +83,8 @@ pub struct GcsSinkConfig {
     /// A prefix to apply to all object keys.
     ///
     /// Prefixes are useful for partitioning objects, such as by creating an object key that
-    /// stores objects under a particular "directory". If using a prefix for this purpose, it must end
-    /// in `/` in order to act as a directory path: Vector will **not** add a trailing `/` automatically.
+    /// stores objects under a particular directory. If using a prefix for this purpose, it must end
+    /// in `/` in order to act as a directory path. A trailing `/` is **not** automatically added.
     #[configurable(metadata(docs::templateable))]
     #[configurable(metadata(
         docs::examples = "date=%F/",
@@ -108,7 +108,7 @@ pub struct GcsSinkConfig {
     /// Supports the common [`strftime`][chrono_strftime_specifiers] specifiers found in most
     /// languages.
     ///
-    /// When set to an empty string, no timestamp will be appended to the key prefix.
+    /// When set to an empty string, no timestamp is appended to the key prefix.
     ///
     /// [chrono_strftime_specifiers]: https://docs.rs/chrono/latest/chrono/format/strftime/index.html#specifiers
     #[serde(default = "default_time_format")]
@@ -118,8 +118,8 @@ pub struct GcsSinkConfig {
     /// Whether or not to append a UUID v4 token to the end of the object key.
     ///
     /// The UUID is appended to the timestamp portion of the object key, such that if the object key
-    /// being generated was `date=2022-07-18/1658176486`, setting this field to `true` would result
-    /// in an object key that looked like `date=2022-07-18/1658176486-30f6652c-71da-4f9f-800d-a1189c47c547`.
+    /// generated is `date=2022-07-18/1658176486`, setting this field to `true` results
+    /// in an object key that looks like `date=2022-07-18/1658176486-30f6652c-71da-4f9f-800d-a1189c47c547`.
     ///
     /// This ensures there are no name collisions, and can be useful in high-volume workloads where
     /// object keys must be unique.
@@ -129,7 +129,7 @@ pub struct GcsSinkConfig {
 
     /// The filename extension to use in the object key.
     ///
-    /// If not specified, the extension will be determined by the compression scheme used.
+    /// If not specified, the extension is determined by the compression scheme used.
     #[configurable(metadata(docs::advanced))]
     filename_extension: Option<String>,
 

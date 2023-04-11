@@ -75,20 +75,20 @@ pub struct MezmoConfig {
     #[configurable(metadata(docs::examples = "http://example.com"))]
     endpoint: UriSerde,
 
-    /// The hostname that will be attached to each batch of events.
+    /// The hostname that is attached to each batch of events.
     #[configurable(metadata(docs::examples = "${HOSTNAME}"))]
     #[configurable(metadata(docs::examples = "my-local-machine"))]
     hostname: Template,
 
-    /// The MAC address that will be attached to each batch of events.
+    /// The MAC address that is attached to each batch of events.
     #[configurable(metadata(docs::examples = "my-mac-address"))]
     mac: Option<String>,
 
-    /// The IP address that will be attached to each batch of events.
+    /// The IP address that is attached to each batch of events.
     #[configurable(metadata(docs::examples = "0.0.0.0"))]
     ip: Option<String>,
 
-    /// The tags that will be attached to each batch of events.
+    /// The tags that are attached to each batch of events.
     #[configurable(metadata(docs::examples = "tag1"))]
     #[configurable(metadata(docs::examples = "tag2"))]
     tags: Option<Vec<Template>>,
@@ -100,12 +100,12 @@ pub struct MezmoConfig {
     )]
     pub encoding: Transformer,
 
-    /// The default app that will be set for events that do not contain a `file` or `app` field.
+    /// The default app that is set for events that do not contain a `file` or `app` field.
     #[serde(default = "default_app")]
     #[configurable(metadata(docs::examples = "my-app"))]
     default_app: String,
 
-    /// The default environment that will be set for events that do not contain an `env` field.
+    /// The default environment that is set for events that do not contain an `env` field.
     #[serde(default = "default_env")]
     #[configurable(metadata(docs::examples = "staging"))]
     default_env: String,

@@ -36,7 +36,7 @@ pub struct SematextLogsConfig {
     #[configurable(metadata(docs::examples = "https://example.com"))]
     endpoint: Option<String>,
 
-    /// The token that will be used to write to Sematext.
+    /// The token that is used to write to Sematext.
     #[configurable(metadata(docs::examples = "${SEMATEXT_TOKEN}"))]
     #[configurable(metadata(docs::examples = "some-sematext-token"))]
     token: SensitiveString,

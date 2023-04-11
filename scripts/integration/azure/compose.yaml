@@ -6,7 +6,3 @@ services:
     command: azurite --blobHost 0.0.0.0 --loose
     volumes:
     - /var/run:/var/run
-
-networks:
-  default:
-    name: ${VECTOR_NETWORK}

@@ -62,7 +62,7 @@ pub struct AzureBlobSinkConfig {
     /// explicit connection_string (which already explicitly supports overriding the blob endpoint
     /// URL).
     ///
-    /// This may only be used with `storage_account` and will be ignored when used with
+    /// This may only be used with `storage_account` and is ignored when used with
     /// `connection_string`.
     #[configurable(metadata(docs::examples = "https://test.blob.core.usgovcloudapi.net/"))]
     #[configurable(metadata(docs::examples = "https://test.blob.core.windows.net/"))]
@@ -74,8 +74,8 @@ pub struct AzureBlobSinkConfig {
 
     /// A prefix to apply to all blob keys.
     ///
-    /// Prefixes are useful for partitioning objects, such as by creating an blob key that
-    /// stores blobs under a particular "directory". If using a prefix for this purpose, it must end
+    /// Prefixes are useful for partitioning objects, such as by creating a blob key that
+    /// stores blobs under a particular directory. If using a prefix for this purpose, it must end
     /// in `/` to act as a directory path. A trailing `/` is **not** automatically added.
     #[configurable(metadata(docs::examples = "date/%F/hour/%H/"))]
     #[configurable(metadata(docs::examples = "year=%Y/month=%m/day=%d/"))]
@@ -98,7 +98,7 @@ pub struct AzureBlobSinkConfig {
     /// Supports the common [`strftime`][chrono_strftime_specifiers] specifiers found in most
     /// languages.
     ///
-    /// When set to an empty string, no timestamp will be appended to the blob prefix.
+    /// When set to an empty string, no timestamp is appended to the blob prefix.
     ///
     /// [chrono_strftime_specifiers]: https://docs.rs/chrono/latest/chrono/format/strftime/index.html#specifiers
     #[configurable(metadata(docs::syntax_override = "strftime"))]
@@ -107,8 +107,8 @@ pub struct AzureBlobSinkConfig {
     /// Whether or not to append a UUID v4 token to the end of the blob key.
     ///
     /// The UUID is appended to the timestamp portion of the object key, such that if the blob key
-    /// being generated was `date=2022-07-18/1658176486`, setting this field to `true` would result
-    /// in an blob key that looked like
+    /// generated is `date=2022-07-18/1658176486`, setting this field to `true` results
+    /// in an blob key that looks like
     /// `date=2022-07-18/1658176486-30f6652c-71da-4f9f-800d-a1189c47c547`.
     ///
     /// This ensures there are no name collisions, and can be useful in high-volume workloads where

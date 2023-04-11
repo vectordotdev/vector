@@ -38,11 +38,11 @@ pub struct DatabendConfig {
     #[configurable(metadata(docs::examples = "http://localhost:8000"))]
     pub endpoint: UriSerde,
 
-    /// The table that data will be inserted into.
+    /// The table that data is inserted into.
     #[configurable(metadata(docs::examples = "mytable"))]
     pub table: String,
 
-    /// The database that contains the table that data will be inserted into.
+    /// The database that contains the table that data is inserted into.
     #[configurable(metadata(docs::examples = "mydatabase"))]
     #[serde(default = "DatabendConfig::default_database")]
     pub database: String,

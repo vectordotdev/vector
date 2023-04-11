@@ -22,6 +22,4 @@ services:
     - proxy
 
 networks:
-  default:
-    name: ${VECTOR_NETWORK}
   proxy: {}

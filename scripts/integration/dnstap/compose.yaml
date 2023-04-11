@@ -11,9 +11,5 @@ services:
       - dnstap-sockets:/bind2/etc/bind/socket
       - dnstap-sockets:/bind3/etc/bind/socket
 
-networks:
-  default:
-    name: ${VECTOR_NETWORK}
-
 volumes:
   dnstap-sockets: {}
