@@ -20,7 +20,7 @@ pub struct UdpConnectorConfig {
     /// The address _must_ include a port.
     address: HostAndPort,
 
-    /// The size of the socket's send buffer, in bytes.
+    /// The size of the socket's send buffer.
     ///
     /// If set, the value of the setting is passed via the `SO_SNDBUF` option.
     #[configurable(metadata(docs::type_unit = "bytes"))]
