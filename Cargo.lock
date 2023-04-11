@@ -5456,7 +5456,16 @@ version = "0.5.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1f646caf906c20226733ed5b1374287eb97e3c2a5c227ce668c1f2ce20ae57c9"
 dependencies = [
- "num_enum_derive",
+ "num_enum_derive 0.5.11",
+]
+
+[[package]]
+name = "num_enum"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a0fa9d8a04aa0af7b5845b514a828f829ae3f0ec3f60d9842e1dfaeb49a0e68b"
+dependencies = [
+ "num_enum_derive 0.6.0",
 ]
 
 [[package]]
@@ -5469,6 +5478,18 @@ dependencies = [
  "proc-macro2 1.0.55",
  "quote 1.0.26",
  "syn 1.0.109",
+]
+
+[[package]]
+name = "num_enum_derive"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3e51dcc6bafb7f3ac88b65d2ad21f4b53d878e496712060e23011862ebd2d2d1"
+dependencies = [
+ "proc-macro-crate 1.2.1",
+ "proc-macro2 1.0.55",
+ "quote 1.0.26",
+ "syn 2.0.10",
 ]
 
 [[package]]
@@ -6340,7 +6361,7 @@ version = "0.1.0"
 dependencies = [
  "indexmap",
  "nom",
- "num_enum",
+ "num_enum 0.6.0",
  "prost",
  "prost-build",
  "prost-types",
@@ -6773,7 +6794,7 @@ dependencies = [
  "cmake",
  "libc",
  "libz-sys",
- "num_enum",
+ "num_enum 0.5.11",
  "openssl-sys",
  "pkg-config",
  "sasl2-sys",
