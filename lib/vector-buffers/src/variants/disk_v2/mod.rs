@@ -34,7 +34,7 @@
 //!
 //! Records are represented by the following pseudo-structure:
 //!
-//! ```norun
+//! ```no_run
 //! record:
 //!   record_len: uint64
 //!   checksum:   uint32(CRC32C of record_id + payload)
@@ -84,7 +84,7 @@
 //! Like records, the ledger file consists of a simplified structure that is optimized for being shared
 //! via a memory-mapped file interface between the reader and writer.
 //!
-//! ```norun
+//! ```no_run
 //! buffer.db:
 //!   writer_next_record_id:       uint64
 //!   writer_current_data_file_id: uint16

@@ -866,6 +866,7 @@ norg
 norgle
 norknoog
 norknork
+no_run
 nosync
 notext
 notls
