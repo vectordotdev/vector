@@ -1,14 +1,15 @@
-//! # Disk Buffer v2: Sequential File I/O Boogaloo.
+//! # Disk buffer v2.
 //!
-//! This disk buffer implementation is a departure from the LevelDB-based disk buffer
-//! implementation, referred to internally as `disk` or `disk_v1`. It focuses on avoiding external
-//! C/C++ dependencies, as well as optimizing itself for the job at hand to provide more consistent
-//! in both throughput and latency.
+//! This disk buffer implementation focuses on a simplistic on-disk format with minimal
+//! reader/writer coordination, and no exotic I/O techniques, such that the buffer is easy to write
+//! to and read from and can provide simplistic, but reliable, recovery mechanisms when errors or
+//! corruption are encountered.
 //!
 //! ## Design constraints
 //!
 //! These constraints, or more often, invariants, are the groundwork for ensuring that the design
 //! can stay simple and understandable:
+//!
 //! - data files do not exceed 128MB
 //! - no more than 65,536 data files can exist at any given time
 //! - buffer can grow to a maximum of ~8TB in total size (65k files * 128MB)
@@ -18,42 +19,96 @@
 //! - endianness of the files is based on the host system (we don't support loading the buffer files
 //!   on a system with different endianness)
 //!
-//! ## On-disk layout
+//! ## High-level design
 //!
-//! At a high-level, records that are written end up in one of many underlying data files, while the
-//! ledger file -- number of records, writer and reader positions, etc -- is stored in a separate
-//! file. Data files function primarily with a "last process who touched it" ownership model: the
-//! writer always creates new files, and the reader deletes files when they have been fully read.
+//! ### Records
 //!
-//! ### Record structure
+//! A record is an length-prefixed payload, where an arbitrary number of bytes are contained,
+//! alongside a monotonically increasing ID, and protected by a CRC32C checksum. Since a record
+//! simply stores opaque bytes, one or more events can be stored per record.
 //!
-//! Records are packed together with a relatively simple pseudo-structure:
+//! The writer assigns record IDs based on number of events written to a record, such that a record
+//! ID of N can be determined to contain M-N events, where M is the record ID of the next record.
 //!
-//!   record:
-//!     `record_len`: uint64
-//!     `checksum`:   uint32(CRC32C of `record_id` + `payload`)
-//!     `record_id`:  uint64
-//!     `payload`:    uint8[]
+//! #### On-disk format
 //!
-//! We say pseudo-structure because we serialize these records to disk using `rkyv`, a zero-copy
-//! deserialization library which focuses on the speed of reading values by writing them to storage
-//! in a way that allows them to be "deserialized" without any copies, which means the layout of
-//! struct fields matches their in-memory representation rather than the intuitive, packed structure
-//! we might expect to see if we wrote only the bytes needed for each field, without any extra
-//! padding or alignment.
+//! Records are represented by the following pseudo-structure:
 //!
-//! This represents a small amount of extra space overhead per record, but is beneficial to us as we
-//! avoid a more formal deserialization step, with scratch buffers and memory copies.
+//! ```text
+//! record:
+//!   record_len: uint64
+//!   checksum:   uint32(CRC32C of record_id + payload)
+//!   record_id:  uint64
+//!   payload:    uint8[record_len]
+//! ```
 //!
-//! ## Writing records
+//! We say "pseudo-structure" as a helper serialization library, [`rkyv`][rkyv], is used to handle
+//! serialization, and zero-copy deserialization, of records. This effectively adds some amount of
+//! padding to record fields, due to the need to structure record field data in a way that makes it
+//! transparent to access during zero-copy deserialization, when the raw buffer of a record that was
+//! read is able to be accessed as if it was a native Rust type/value.
 //!
-//! Records are added to a data file sequentially, and contiguously, with no gaps or data alignment
-//! adjustments, excluding the padding/alignment used by `rkyv` itself to allow for zero-copy
-//! deserialization. This continues until adding another would exceed the configured data file size
-//! limit. When this occurs, the current data file is flushed and synchronized to disk, and a new
-//! data file will be open.
+//! While this padding/overhead is small, and fixed, we do not quantify it here as it can
+//! potentially changed based on the payload that a record contains. The only safe way to access the
+//! records in a disk buffer should be through the reader/writer interface in this module.
 //!
-//! If the number of data files open exceeds the maximum (65,536), or if the total data file size
+//! ### Data files
+//!
+//! Data files contain the buffered records and nothing else. Records are written
+//! sequentially/contiguously, and are not padded out to meet a minimum block/write size, except for
+//! internal padding requirements of the serialization library used.
+//!
+//! Data files have a maximum size, configured statically within a given Vector binary, which can
+//! never be exceeded: if a write would cause a data file to grow past the maximum file size, it
+//! must be written to the next data file.
+//!
+//! A maximum number of 65,536 data files can exist at any given time, due to the inclusion of a
+//! file ID in the data file name, which is represented by a 16-bit unsigned integer.
+//!
+//! ### Ledger
+//!
+//! The ledger is a small file which tracks two important items for both the reader and writer:
+//! which data file they're currently reading or writing to, and what record ID they left off on.
+//!
+//! The ledger is read during buffer initialization to determine a reader should pick up reading
+//! from, but is also used to attempt to detect where a writer left off, and if records are missing
+//! from the current writer data file according to what the writer believes it did (as in
+//! write/flush bytes to disk) and what the reality is, based on the actual data in the current
+//! writer data file.
+//!
+//! The ledger is a memory-mapped file that is updated atomically in terms of its fields, but is not
+//! updated atomically in terms of reader/writer activity.
+//!
+//! #### On-disk format
+//!
+//! Like records, the ledger file consists of a simplified structure that is optimized for being shared
+//! via a memory-mapped file interface between the reader and writer.
+//!
+//! ```text
+//! buffer.db:
+//!   writer_next_record_id:       uint64
+//!   writer_current_data_file_id: uint16
+//!   reader_current_data_file_id: uint16
+//!   reader_last_record_id:       uint64
+//! ```
+//!
+//! As the disk buffer structure is meant to emulate a ring buffer, most of the bookkeeping resolves
+//! around the writer and reader being able to quickly figure out where they left off. Record and
+//! data file IDs are simply rolled over when they reach the maximum of their data type, and are
+//! incremented monotonically as new data files are created, rather than trying to always allocate
+//! from the lowest available ID.
+//!
+//! ## Buffer operation
+//!
+//! ### Writing records
+//!
+//! As mentioned above, records are added to a data file sequentially, and contiguously, with no
+//! gaps or data alignment adjustments, excluding the padding/alignment used by `rkyv` itself to
+//! allow for zero-copy deserialization. This continues until adding another would exceed the
+//! configured data file size limit. When this occurs, the current data file is flushed and
+//! synchronized to disk, and a new data file will be opened.
+//!
+//! If the number of data files on disk exceeds the maximum (65,536), or if the total data file size
 //! limit is exceeded, the writer will wait until enough space has been freed such that the record
 //! can be written. As data files are only deleted after being read entirely, this means that space
 //! is recovered in increments of the target data file size, which is 128MB. Thus, the minimum size
@@ -62,13 +117,13 @@
 //! wrap around at 65,536 (2^16), the maximum data file size in total for a given buffer is ~8TB (6
 //! 5k files * 128MB).
 //!
-//! ## Reading records
+//! ### Reading records
 //!
 //! Due to the on-disk layout, reading records is an incredibly straight-forward progress: we open a
 //! file, read it until there's no more data and we know the writer is done writing to the file, and
 //! then we open the next one, and repeat the process.
 //!
-//! ## Deleting acknowledged records
+//! ### Deleting acknowledged records
 //!
 //! As the reader emits records, we cannot yet consider them fully processed until they are
 //! acknowledged. The acknowledgement process is tied into the normal acknowledgement machinery, and
@@ -77,12 +132,12 @@
 //! When all records from a data file have been fully acknowledged, the data file is scheduled for
 //! deletion. We only delete entire data files, rather than truncating them piecemeal, which reduces
 //! the I/O burden of the buffer. This does mean, however, that a data file will stick around until
-//! it's entirely processed. We compensate for this fact in the buffer configuration by adjusting
-//! the logical buffer size based on when records are acknowledged, so that the writer can make
-//! progress as records are acknowledged, even if the buffer is close to, or at the maximum buffer
-//! size limit.
+//! it is entirely processed and acknowledged. We compensate for this fact in the buffer
+//! configuration by adjusting the logical buffer size based on when records are acknowledged, so
+//! that the writer can make progress as records are acknowledged, even if the buffer is close to,
+//! or at the maximum buffer size limit.
 //!
-//! ## Record ID generation, and its relation of events
+//! ### Record ID generation, and its relation of events
 //!
 //! While the buffer talks a lot about writing "records", records are ostensibly a single event, or
 //! collection of events. We manage the organization and grouping of events at at a higher level
@@ -112,28 +167,7 @@
 //! we skip records due to missing data, we can figure out how many events we've dropped or lost,
 //! and handle the necessary adjustments to the buffer accounting.
 //!
-//! ## Ledger structure
-//!
-//! Likewise, the ledger file consists of a simplified structure that is optimized for being shared
-//! via a memory-mapped file interface between the writer and reader. Like the record structure, the
-//! below is a pseudo-structure as we use `rkyv` for the ledger, and so the on-disk layout will be
-//! slightly different:
-//!
-//!   buffer.db:
-//!     writer next record ID:       uint64
-//!     writer current data file ID: uint16
-//!     reader current data file ID: uint16
-//!     reader last record ID:       uint64
-//!
-//! As the disk buffer structure is meant to emulate a ring buffer, most of the bookkeeping resolves
-//! around the writer and reader being able to quickly figure out where they left off. Record and
-//! data file IDs are simply rolled over when they reach the maximum of their data type, and are
-//! incremented monotonically as new data files are created, rather than trying to always allocate
-//! from the lowest available ID.
-//!
-//! Additionally, record IDs are allocated in the same way: monotonic, sequential, and will wrap
-//! when they reach the maximum value for the data type. For record IDs, however, this would mean
-//! reaching 2^64, which will take a really, really, really long time.
+//! [rkyv]: https://docs.rs/rkyv
 
 use core::fmt;
 use std::{
