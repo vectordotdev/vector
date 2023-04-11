@@ -328,12 +328,12 @@ mod tests {
             },
         )
         .with_tags(Some(tags()));
-        let event = Event::Metric(metric1);
+
         let mut encoder = StatsdEncoder {
             default_namespace: None,
         };
         let mut frame = BytesMut::new();
-        encoder.encode(event, &mut frame).unwrap();
+        encoder.encode(&metric1, &mut frame).unwrap();
 
         let res = from_utf8(&frame).unwrap().trim();
         let mut packets = res.split('\n');

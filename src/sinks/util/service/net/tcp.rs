@@ -1,33 +1,16 @@
-use std::{
-    net::SocketAddr,
-    task::{ready, Context, Poll},
-    time::Duration,
-};
+use std::{net::SocketAddr, time::Duration};
 
-use futures::future::BoxFuture;
-use futures_util::FutureExt;
 use snafu::ResultExt;
-use tokio::{
-    io::AsyncWriteExt,
-    net::{TcpSocket, TcpStream},
-    sync::oneshot,
-    time::sleep,
-};
-use tower::Service;
+use tokio::net::{TcpSocket, TcpStream};
 
 use vector_config::configurable_component;
 use vector_core::tcp::TcpKeepaliveConfig;
 
-use crate::{
-    dns,
-    internal_events::{TcpSocketConnectionEstablished, TcpSocketOutgoingConnectionError},
-    net,
-    sinks::{util::retries::ExponentialBackoff, Healthcheck},
-};
+use crate::{dns, net};
 
-use super::{net_error::*, HostAndPort, NetError, ServiceState};
+use super::{net_error::*, ConnectorType, HostAndPort, NetError, NetworkConnector};
 
-/// `TcpConnector` configuration.
+/// TCP configuration.
 #[configurable_component]
 #[derive(Clone, Debug)]
 pub struct TcpConnectorConfig {
@@ -63,24 +46,27 @@ impl TcpConnectorConfig {
         self
     }
 
-    pub fn as_connector(&self) -> TcpConnector {
-        TcpConnector {
-            address: self.address.clone(),
-            keepalive: self.keepalive,
-            send_buffer_size: self.send_buffer_size,
+    /// Creates a [`NetworkConnector`] from this TCP connector configuration.
+    pub fn as_connector(&self) -> NetworkConnector {
+        NetworkConnector {
+            inner: ConnectorType::Tcp(TcpConnector {
+                address: self.address.clone(),
+                keepalive: self.keepalive,
+                send_buffer_size: self.send_buffer_size,
+            }),
         }
     }
 }
 
 #[derive(Clone)]
-pub struct TcpConnector {
+pub(super) struct TcpConnector {
     address: HostAndPort,
     keepalive: Option<TcpKeepaliveConfig>,
     send_buffer_size: Option<u32>,
 }
 
 impl TcpConnector {
-    async fn connect(&self) -> Result<(SocketAddr, TcpStream), NetError> {
+    pub(super) async fn connect(&self) -> Result<(SocketAddr, TcpStream), NetError> {
         let ip = dns::Resolver
             .lookup_ip(self.address.host.clone())
             .await
@@ -115,117 +101,5 @@ impl TcpConnector {
         }
 
         Ok((addr, stream))
-    }
-
-    async fn connect_backoff(&self) -> TcpStream {
-        // TODO: Make this configurable.
-        let mut backoff = ExponentialBackoff::from_millis(2)
-            .factor(250)
-            .max_delay(Duration::from_secs(60));
-
-        loop {
-            match self.connect().await {
-                Ok((addr, stream)) => {
-                    emit!(TcpSocketConnectionEstablished {
-                        peer_addr: Some(addr)
-                    });
-                    return stream;
-                }
-                Err(error) => {
-                    emit!(TcpSocketOutgoingConnectionError { error });
-                    sleep(backoff.next().unwrap()).await;
-                }
-            }
-        }
-    }
-
-    /// Gets a `Healthcheck` based on the configured destination of this connector.
-    pub fn healthcheck(&self) -> Healthcheck {
-        let connector = self.clone();
-        Box::pin(async move { connector.connect().await.map(|_| ()).map_err(Into::into) })
-    }
-
-    /// Gets a `Service` suitable for sending data to the configured destination of this connector.
-    pub fn service(&self) -> TcpService {
-        TcpService::new(self.clone())
-    }
-}
-
-pub struct TcpService {
-    connector: TcpConnector,
-    state: ServiceState<TcpStream>,
-}
-
-impl TcpService {
-    const fn new(connector: TcpConnector) -> Self {
-        Self {
-            connector,
-            state: ServiceState::Disconnected,
-        }
-    }
-}
-
-impl Service<Vec<u8>> for TcpService {
-    type Response = usize;
-    type Error = NetError;
-    type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
-
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        loop {
-            self.state = match &mut self.state {
-                ServiceState::Disconnected => {
-                    let connector = self.connector.clone();
-                    ServiceState::Connecting(Box::pin(
-                        async move { connector.connect_backoff().await },
-                    ))
-                }
-                ServiceState::Connecting(fut) => {
-                    let stream = ready!(fut.poll_unpin(cx));
-                    ServiceState::Connected(stream)
-                }
-                ServiceState::Connected(_) => break,
-                ServiceState::Sending(fut) => {
-                    match ready!(fut.poll_unpin(cx)) {
-                        // When a send concludes, and there's an error, the request future sends
-                        // back `None`. Otherwise, it'll send back `Some(...)` with the stream.
-                        Ok(maybe_stream) => match maybe_stream {
-                            Some(stream) => ServiceState::Connected(stream),
-                            None => ServiceState::Disconnected,
-                        },
-                        Err(_) => return Poll::Ready(Err(NetError::ServiceSocketChannelClosed)),
-                    }
-                }
-            };
-        }
-        Poll::Ready(Ok(()))
-    }
-
-    fn call(&mut self, buf: Vec<u8>) -> Self::Future {
-        let (tx, rx) = oneshot::channel();
-
-        let mut stream = match std::mem::replace(&mut self.state, ServiceState::Sending(rx)) {
-            ServiceState::Connected(stream) => stream,
-            _ => panic!("poll_ready must be called first"),
-        };
-
-        Box::pin(async move {
-            let buf_len = buf.len();
-
-            match stream.write_all(&buf).await.context(FailedToSend) {
-                Ok(_) => {
-                    // Send the stream back to the service.
-                    let _ = tx.send(Some(stream));
-
-                    Ok(buf_len)
-                }
-                Err(e) => {
-                    // We need to signal back to the service that it needs to create a fresh stream
-                    // since this one could be tainted.
-                    let _ = tx.send(None);
-
-                    Err(e)
-                }
-            }
-        })
     }
 }

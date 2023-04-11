@@ -13,7 +13,7 @@ use crate::{
     internal_events::SocketMode,
     sinks::{
         util::{
-            service::net::{TcpConnectorConfig, UdpConnectorConfig},
+            service::net::{NetworkConnector, TcpConnectorConfig, UdpConnectorConfig},
             BatchConfig, SinkBatchSettings,
         },
         Healthcheck,
@@ -87,6 +87,15 @@ impl Mode {
             Self::Unix(_) => SocketMode::Unix,
         }
     }
+
+    fn as_connector(&self) -> NetworkConnector {
+        match self {
+            Self::Tcp(config) => config.as_connector(),
+            Self::Udp(config) => config.as_connector(),
+            #[cfg(unix)]
+            Self::Unix(config) => config.as_connector(),
+        }
+    }
 }
 
 fn default_address() -> SocketAddr {
@@ -120,48 +129,17 @@ impl SinkConfig for StatsdSinkConfig {
             StatsdRequestBuilder::new(self.default_namespace.clone(), socket_mode)?;
         let protocol = Protocol::from(socket_mode.as_str());
 
-        match &self.mode {
-            Mode::Tcp(config) => {
-                let connector = config.as_connector();
-                let service = connector.service();
-                let healthcheck = connector.healthcheck();
+        let connector = self.mode.as_connector();
+        let service = connector.service();
+        let healthcheck = connector.healthcheck();
 
-                let sink = StatsdSink::new(
-                    StatsdService::from_transport(service),
-                    batcher_settings,
-                    request_builder,
-                    protocol,
-                );
-                Ok((VectorSink::from_event_streamsink(sink), healthcheck))
-            }
-            Mode::Udp(config) => {
-                let connector = config.as_connector();
-                let service = connector.service();
-                let healthcheck = connector.healthcheck();
-
-                let sink = StatsdSink::new(
-                    StatsdService::from_transport(service),
-                    batcher_settings,
-                    request_builder,
-                    protocol,
-                );
-                Ok((VectorSink::from_event_streamsink(sink), healthcheck))
-            }
-            #[cfg(unix)]
-            Mode::Unix(config) => {
-                let connector = config.as_connector();
-                let service = connector.service();
-                let healthcheck = connector.healthcheck();
-
-                let sink = StatsdSink::new(
-                    StatsdService::from_transport(service),
-                    batcher_settings,
-                    request_builder,
-                    protocol,
-                );
-                Ok((VectorSink::from_event_streamsink(sink), healthcheck))
-            }
-        }
+        let sink = StatsdSink::new(
+            StatsdService::from_transport(service),
+            batcher_settings,
+            request_builder,
+            protocol,
+        );
+        Ok((VectorSink::from_event_streamsink(sink), healthcheck))
     }
 
     fn input(&self) -> Input {

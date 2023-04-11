@@ -1,17 +1,49 @@
 mod tcp;
 mod udp;
+
+#[cfg(unix)]
 mod unix;
 
-use std::{io, task::{Context, Poll, ready}};
+use std::{
+    io,
+    net::SocketAddr,
+    task::{ready, Context, Poll},
+    time::Duration,
+};
 
-pub use self::tcp::{TcpConnector, TcpConnectorConfig};
-pub use self::udp::{UdpConnector, UdpConnectorConfig};
-use self::{unix::UnixEither, net_error::FailedToSend};
-pub use self::unix::{UnixConnector, UnixConnectorConfig, UnixMode};
+#[cfg(unix)]
+use std::path::PathBuf;
+
+use crate::{
+    internal_events::{
+        SocketOutgoingConnectionError, TcpSocketConnectionEstablished, UdpSendIncompleteError,
+    },
+    sinks::{util::retries::ExponentialBackoff, Healthcheck},
+};
+
+#[cfg(unix)]
+use crate::internal_events::{UnixSendIncompleteError, UnixSocketConnectionEstablished};
+
+pub use self::tcp::TcpConnectorConfig;
+pub use self::udp::UdpConnectorConfig;
+
+#[cfg(unix)]
+pub use self::unix::{UnixConnectorConfig, UnixMode};
+
+use self::tcp::TcpConnector;
+use self::udp::UdpConnector;
+#[cfg(unix)]
+use self::unix::UnixConnector;
+use self::{net_error::FailedToSend, unix::UnixEither};
 
 use futures_util::{future::BoxFuture, FutureExt};
-use snafu::{Snafu, ResultExt};
-use tokio::{sync::oneshot, net::{TcpStream, UdpSocket}, io::AsyncWriteExt};
+use snafu::{ResultExt, Snafu};
+use tokio::{
+    io::AsyncWriteExt,
+    net::{TcpStream, UdpSocket},
+    sync::oneshot,
+    time::sleep,
+};
 use tower::Service;
 use vector_config::configurable_component;
 
@@ -78,25 +110,7 @@ pub enum NetError {
     ServiceSocketChannelClosed,
 }
 
-pub enum ServiceState<C> {
-    /// The service is currently disconnected.
-    Disconnected,
-
-    /// The service is currently attempting to connect to the endpoint.
-    Connecting(BoxFuture<'static, C>),
-
-    /// The service is connected and idle.
-    Connected(C),
-
-    /// The service has an in-flight send to the socket.
-    ///
-    /// If the socket experiences an unrecoverable error during the send, `None` will be returned
-    /// over the channel to signal the need to establish a new connection rather than reusing the
-    /// existing connection.
-    Sending(oneshot::Receiver<Option<C>>),
-}
-
-pub enum ServiceState2 {
+enum NetworkServiceState {
     /// The service is currently disconnected.
     Disconnected,
 
@@ -114,30 +128,111 @@ pub enum ServiceState2 {
     Sending(oneshot::Receiver<Option<NetworkConnection>>),
 }
 
-pub enum NetworkConnection {
+enum NetworkConnection {
     Tcp(TcpStream),
     Udp(UdpSocket),
+    #[cfg(unix)]
     Unix(UnixEither),
 }
 
 impl NetworkConnection {
-    pub async fn send(&mut self, buf: &[u8]) -> io::Result<usize> {
+    fn on_partial_send(&self, data_size: usize, sent: usize) {
         match self {
-            Self::Tcp(stream) => stream.write_all(buf).await
-                .map(|()| buf.len()),
+            // Can't "successfully" partially send with TCP: it either all eventually sends or the
+            // socket has an I/O error that kills the connection entirely.
+            Self::Tcp(_) => {}
+            Self::Udp(_) => {
+                emit!(UdpSendIncompleteError { data_size, sent });
+            }
+            #[cfg(unix)]
+            Self::Unix(_) => {
+                emit!(UnixSendIncompleteError { data_size, sent });
+            }
+        }
+    }
+
+    async fn send(&mut self, buf: &[u8]) -> io::Result<usize> {
+        match self {
+            Self::Tcp(stream) => stream.write_all(buf).await.map(|()| buf.len()),
             Self::Udp(socket) => socket.send(buf).await,
+            #[cfg(unix)]
             Self::Unix(socket) => socket.send(buf).await,
         }
     }
 }
 
-pub enum NetworkConnector {
+enum ConnectionMetadata {
+    Tcp {
+        peer_addr: SocketAddr,
+    },
+    #[cfg(unix)]
+    Unix {
+        path: PathBuf,
+    },
+}
+
+#[derive(Clone)]
+enum ConnectorType {
     Tcp(TcpConnector),
     Udp(UdpConnector),
+    #[cfg(unix)]
     Unix(UnixConnector),
 }
 
+/// A connector for generically connecting to a remote network endpoint.
+///
+/// The connection can be based on TCP, UDP, or Unix Domain Sockets.
+#[derive(Clone)]
+pub struct NetworkConnector {
+    inner: ConnectorType,
+}
+
 impl NetworkConnector {
+    fn on_connected(&self, metadata: ConnectionMetadata) {
+        match metadata {
+            ConnectionMetadata::Tcp { peer_addr } => {
+                emit!(TcpSocketConnectionEstablished {
+                    peer_addr: Some(peer_addr)
+                });
+            }
+            #[cfg(unix)]
+            ConnectionMetadata::Unix { path } => {
+                emit!(UnixSocketConnectionEstablished { path: &path });
+            }
+        }
+    }
+
+    fn on_connection_error<E: std::error::Error>(&self, error: E) {
+        emit!(SocketOutgoingConnectionError { error });
+    }
+
+    async fn connect(&self) -> Result<(NetworkConnection, Option<ConnectionMetadata>), NetError> {
+        match &self.inner {
+            ConnectorType::Tcp(connector) => {
+                let (peer_addr, stream) = connector.connect().await?;
+
+                Ok((
+                    NetworkConnection::Tcp(stream),
+                    Some(ConnectionMetadata::Tcp { peer_addr }),
+                ))
+            }
+            ConnectorType::Udp(connector) => {
+                let socket = connector.connect().await?;
+
+                Ok((NetworkConnection::Udp(socket), None))
+            }
+            #[cfg(unix)]
+            ConnectorType::Unix(connector) => {
+                let (path, socket) = connector.connect().await?;
+
+                Ok((
+                    NetworkConnection::Unix(socket),
+                    Some(ConnectionMetadata::Unix { path }),
+                ))
+            }
+        }
+    }
+
     async fn connect_backoff(&self) -> NetworkConnection {
         // TODO: Make this configurable.
         let mut backoff = ExponentialBackoff::from_millis(2)
@@ -146,31 +241,46 @@ impl NetworkConnector {
 
         loop {
             match self.connect().await {
-                Ok((addr, stream)) => {
-                    emit!(TcpSocketConnectionEstablished {
-                        peer_addr: Some(addr)
-                    });
-                    return stream;
+                Ok((connection, maybe_metadata)) => {
+                    if let Some(metadata) = maybe_metadata {
+                        self.on_connected(metadata);
+                    }
+
+                    return connection;
                 }
                 Err(error) => {
-                    emit!(TcpSocketOutgoingConnectionError { error });
+                    self.on_connection_error(error);
                     sleep(backoff.next().unwrap()).await;
                 }
             }
         }
     }
+
+    /// Gets a `Healthcheck` based on the configured destination of this connector.
+    pub fn healthcheck(&self) -> Healthcheck {
+        let connector = self.clone();
+        Box::pin(async move { connector.connect().await.map(|_| ()).map_err(Into::into) })
+    }
+
+    /// Gets a `Service` suitable for sending data to the configured destination of this connector.
+    pub fn service(&self) -> NetworkService {
+        NetworkService::new(self.clone())
+    }
 }
 
+/// A `Service` implementation for generically sending bytes to a remote peer over a network connection.
+///
+/// The connection can be based on TCP, UDP, or Unix Domain Sockets.
 pub struct NetworkService {
     connector: NetworkConnector,
-    state: ServiceState2,
+    state: NetworkServiceState,
 }
 
 impl NetworkService {
     const fn new(connector: NetworkConnector) -> Self {
         Self {
             connector,
-            state: ServiceState2::Disconnected,
+            state: NetworkServiceState::Disconnected,
         }
     }
 }
@@ -183,24 +293,24 @@ impl Service<Vec<u8>> for NetworkService {
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         loop {
             self.state = match &mut self.state {
-                ServiceState2::Disconnected => {
+                NetworkServiceState::Disconnected => {
                     let connector = self.connector.clone();
-                    ServiceState2::Connecting(Box::pin(
-                        async move { connector.connect_backoff().await },
-                    ))
+                    NetworkServiceState::Connecting(Box::pin(async move {
+                        connector.connect_backoff().await
+                    }))
                 }
-                ServiceState2::Connecting(fut) => {
+                NetworkServiceState::Connecting(fut) => {
                     let socket = ready!(fut.poll_unpin(cx));
-                    ServiceState2::Connected(socket)
+                    NetworkServiceState::Connected(socket)
                 }
-                ServiceState2::Connected(_) => break,
-                ServiceState2::Sending(fut) => {
+                NetworkServiceState::Connected(_) => break,
+                NetworkServiceState::Sending(fut) => {
                     match ready!(fut.poll_unpin(cx)) {
                         // When a send concludes, and there's an error, the request future sends
                         // back `None`. Otherwise, it'll send back `Some(...)` with the socket.
                         Ok(maybe_socket) => match maybe_socket {
-                            Some(socket) => ServiceState2::Connected(socket),
-                            None => ServiceState2::Disconnected,
+                            Some(socket) => NetworkServiceState::Connected(socket),
+                            None => NetworkServiceState::Disconnected,
                         },
                         Err(_) => return Poll::Ready(Err(NetError::ServiceSocketChannelClosed)),
                     }
@@ -213,8 +323,9 @@ impl Service<Vec<u8>> for NetworkService {
     fn call(&mut self, buf: Vec<u8>) -> Self::Future {
         let (tx, rx) = oneshot::channel();
 
-        let mut socket = match std::mem::replace(&mut self.state, ServiceState2::Sending(rx)) {
-            ServiceState2::Connected(socket) => socket,
+        let mut socket = match std::mem::replace(&mut self.state, NetworkServiceState::Sending(rx))
+        {
+            NetworkServiceState::Connected(socket) => socket,
             _ => panic!("poll_ready must be called first"),
         };
 
@@ -223,10 +334,7 @@ impl Service<Vec<u8>> for NetworkService {
                 Ok(sent) => {
                     // Emit an error if we weren't able to send the entire buffer.
                     if sent != buf.len() {
-                        emit!(UnixSendIncompleteError {
-                            data_size: buf.len(),
-                            sent,
-                        });
+                        socket.on_partial_send(buf.len(), sent);
                     }
 
                     // Send the socket back to the service, since theoretically it's still valid to
