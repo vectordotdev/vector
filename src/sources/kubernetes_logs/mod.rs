@@ -700,7 +700,7 @@ impl Source {
             nodes,
             watcher::Config {
                 field_selector: Some(node_selector),
-                list_semantic: list_semantic,
+                list_semantic,
                 ..Default::default()
             },
         )
