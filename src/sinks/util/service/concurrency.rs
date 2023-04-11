@@ -24,12 +24,12 @@ pub enum Concurrency {
     /// Only one request can be outstanding at any given time.
     None,
 
-    /// Concurrency will be managed by Vector's [Adaptive Request Concurrency][arc] feature.
+    /// Concurrency is managed by the [Adaptive Request Concurrency][arc] feature.
     ///
     /// [arc]: https://vector.dev/docs/about/under-the-hood/networking/arc/
     Adaptive,
 
-    /// A fixed amount of concurrency will be allowed.
+    /// A fixed amount of concurrency is allowed.
     Fixed(usize),
 }
 

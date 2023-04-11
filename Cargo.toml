@@ -138,7 +138,7 @@ vrl-cli = { package = "vrl-cli", git = "https://github.com/vectordotdev/vrl", re
 loki-logproto = { path = "lib/loki-logproto", optional = true }
 
 # Tokio / Futures
-async-stream = { version = "0.3.4", default-features = false }
+async-stream = { version = "0.3.5", default-features = false }
 async-trait = { version = "0.1.68", default-features = false }
 futures = { version = "0.3.28", default-features = false, features = ["compat", "io-compat"], package = "futures" }
 tokio = { version = "1.26.0", default-features = false, features = ["full"] }
@@ -192,7 +192,7 @@ serde = { version = "1.0.159", default-features = false, features = ["derive"] }
 serde-toml-merge = { version = "0.3.0", default-features = false }
 serde_bytes = { version = "0.11.9", default-features = false, features = ["std"], optional = true }
 serde_json = { version = "1.0.95", default-features = false, features = ["raw_value"] }
-serde_with = { version = "2.3.1", default-features = false, features = ["macros", "std"] }
+serde_with = { version = "2.3.2", default-features = false, features = ["macros", "std"] }
 serde_yaml = { version = "0.9.19", default-features = false }
 
 # Messagepack
@@ -284,7 +284,7 @@ nkeys = { version = "0.2.0", default-features = false, optional = true }
 nom = { version = "7.1.3", default-features = false, optional = true }
 notify = { version = "5.1.0", default-features = false, features = ["macos_fsevent"] }
 once_cell = { version = "1.17", default-features = false }
-openssl = { version = "0.10.48", default-features = false, features = ["vendored"] }
+openssl = { version = "0.10.50", default-features = false, features = ["vendored"] }
 openssl-probe = { version = "0.1.5", default-features = false }
 ordered-float = { version = "3.6.0", default-features = false }
 paste = "1.0.12"
@@ -295,7 +295,7 @@ pulsar = { version = "5.1.0", default-features = false, features = ["tokio-runti
 rand = { version = "0.8.5", default-features = false, features = ["small_rng"] }
 rand_distr = { version = "0.4.3", default-features = false }
 rdkafka = { version = "0.29.0", default-features = false, features = ["tokio", "libz", "ssl", "zstd"], optional = true }
-redis = { version = "0.22.3", default-features = false, features = ["connection-manager", "tokio-comp", "tokio-native-tls-comp"], optional = true }
+redis = { version = "0.23.0", default-features = false, features = ["connection-manager", "tokio-comp", "tokio-native-tls-comp"], optional = true }
 regex = { version = "1.7.3", default-features = false, features = ["std", "perf"] }
 roaring = { version = "0.10.1", default-features = false, optional = true }
 seahash = { version = "4.1.0", default-features = false }
@@ -311,12 +311,12 @@ tikv-jemallocator = { version = "0.5.0", default-features = false, optional = tr
 tokio-postgres = { version = "0.7.7", default-features = false, features = ["runtime", "with-chrono-0_4"], optional = true }
 tokio-tungstenite = {version = "0.18.0", default-features = false, features = ["connect"], optional = true}
 toml = { version = "0.7.3", default-features = false, features = ["parse", "display"] }
-tonic = { version = "0.8", optional = true, default-features = false, features = ["transport", "codegen", "prost", "tls", "tls-roots", "gzip"] }
+tonic = { version = "0.9", optional = true, default-features = false, features = ["transport", "codegen", "prost", "tls", "tls-roots", "gzip"] }
 trust-dns-proto = { version = "0.22.0", default-features = false, features = ["dnssec"], optional = true }
 typetag = { version = "0.2.7", default-features = false }
 url = { version = "2.3.1", default-features = false, features = ["serde"] }
 uuid = { version = "1", default-features = false, features = ["serde", "v4"] }
-warp = { version = "0.3.3", default-features = false }
+warp = { version = "0.3.4", default-features = false }
 zstd = { version = "0.12.3", default-features = false }
 arr_macro = { version = "0.2.1" }
 
@@ -361,7 +361,7 @@ tokio = { version = "1.26.0", features = ["test-util"] }
 tower-test = "0.4.0"
 value = { package = "value", git = "https://github.com/vectordotdev/vrl", rev = "v0.2.0", features = ["test"] }
 vector-core = { path = "lib/vector-core", default-features = false, features = ["vrl", "test"] }
-wiremock = "0.5.17"
+wiremock = "0.5.18"
 zstd = { version = "0.12.3", default-features = false }
 
 [patch.crates-io]

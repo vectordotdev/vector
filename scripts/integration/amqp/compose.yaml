@@ -5,7 +5,3 @@ services:
     image: docker.io/rabbitmq:${CONFIG_VERSION}
     ports:
     - 5672:5672
-
-networks:
-  default:
-    name: ${VECTOR_NETWORK}

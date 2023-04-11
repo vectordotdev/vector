@@ -29,7 +29,3 @@ services:
     - DD_APM_MAX_MEMORY=0
     - DD_APM_MAX_CPU_PERCENT=0
     - DD_HOSTNAME=datadog-trace-agent-to-vector
-
-networks:
-  default:
-    name: ${VECTOR_NETWORK}

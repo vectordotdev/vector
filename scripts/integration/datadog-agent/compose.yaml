@@ -26,7 +26,3 @@ services:
     - DD_CMD_PORT=5002
     - DD_USE_DOGSTATSD=false
     - DD_HOSTNAME=datadog-trace-agent
-
-networks:
-  default:
-    name: ${VECTOR_NETWORK}

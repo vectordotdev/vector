@@ -67,8 +67,8 @@ pub struct WebHdfsConfig {
 
     /// A prefix to apply to all keys.
     ///
-    /// Prefixes are useful for partitioning objects, such as by creating an blob key that
-    /// stores blobs under a particular "directory". If using a prefix for this purpose, it must end
+    /// Prefixes are useful for partitioning objects, such as by creating a blob key that
+    /// stores blobs under a particular directory. If using a prefix for this purpose, it must end
     /// in `/` to act as a directory path. A trailing `/` is **not** automatically added.
     ///
     /// The final file path with be like `{root}/{prefix}{suffix}`.

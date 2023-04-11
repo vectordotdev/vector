@@ -15,7 +15,7 @@ base: components: sinks: prometheus_exporter: configuration: {
 				Whether or not end-to-end acknowledgements are enabled.
 
 				When enabled for a sink, any source connected to that sink, where the source supports
-				end-to-end acknowledgements as well, will wait for events to be acknowledged by the sink
+				end-to-end acknowledgements as well, waits for events to be acknowledged by the sink
 				before acknowledging them at the source.
 
 				Enabling or disabling acknowledgements at the sink level takes precedence over any global
@@ -43,7 +43,7 @@ base: components: sinks: prometheus_exporter: configuration: {
 		description: """
 			Configuration of the authentication strategy for HTTP requests.
 
-			HTTP authentication should almost always be used with HTTPS only, as the authentication credentials are passed as an
+			HTTP authentication should be used with HTTPS only, as the authentication credentials are passed as an
 			HTTP header without any additional encryption beyond what is provided by the transport itself.
 			"""
 		required: false

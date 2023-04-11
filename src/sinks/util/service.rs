@@ -97,7 +97,7 @@ pub struct TowerRequestConfig {
 
     /// The time a request can take before being aborted.
     ///
-    /// It is highly recommended that you do not lower this value below the service’s internal timeout, as this could
+    /// Datadog highly recommends that you do not lower this value below the service's internal timeout, as this could
     /// create orphaned requests, pile on retries, and result in duplicate data downstream.
     #[configurable(metadata(docs::type_unit = "seconds"))]
     #[serde(default = "default_timeout_secs")]
@@ -127,7 +127,7 @@ pub struct TowerRequestConfig {
 
     /// The amount of time to wait before attempting the first retry for a failed request.
     ///
-    /// After the first retry has failed, the fibonacci sequence will be used to select future backoffs.
+    /// After the first retry has failed, the fibonacci sequence is used to select future backoffs.
     #[configurable(metadata(docs::type_unit = "seconds"))]
     #[serde(default = "default_retry_initial_backoff_secs")]
     pub retry_initial_backoff_secs: Option<u64>,

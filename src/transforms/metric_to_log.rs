@@ -31,7 +31,7 @@ use crate::{
 pub struct MetricToLogConfig {
     /// Name of the tag in the metric to use for the source host.
     ///
-    /// If present, the value of the tag is set on the generated log event in the "host" field,
+    /// If present, the value of the tag is set on the generated log event in the `host` field,
     /// where the field key uses the [global `host_key` option][global_log_schema_host_key].
     ///
     /// [global_log_schema_host_key]: https://vector.dev/docs/reference/configuration//global-options#log_schema.host_key
@@ -94,7 +94,7 @@ impl TransformConfig for MetricToLogConfig {
 
     fn outputs(
         &self,
-        _: &[(OutputId, Definition)],
+        input_definitions: &[(OutputId, Definition)],
         global_log_namespace: LogNamespace,
     ) -> Vec<TransformOutput> {
         let log_namespace = global_log_namespace.merge(self.log_namespace);
@@ -229,7 +229,13 @@ impl TransformConfig for MetricToLogConfig {
             }
         }
 
-        vec![TransformOutput::new(DataType::Log, vec![schema_definition])]
+        vec![TransformOutput::new(
+            DataType::Log,
+            input_definitions
+                .iter()
+                .map(|(output, _)| (output.clone(), schema_definition.clone()))
+                .collect(),
+        )]
     }
 
     fn enable_concurrency(&self) -> bool {

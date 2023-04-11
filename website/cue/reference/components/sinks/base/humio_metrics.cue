@@ -15,7 +15,7 @@ base: components: sinks: humio_metrics: configuration: {
 				Whether or not end-to-end acknowledgements are enabled.
 
 				When enabled for a sink, any source connected to that sink, where the source supports
-				end-to-end acknowledgements as well, will wait for events to be acknowledged by the sink
+				end-to-end acknowledgements as well, waits for events to be acknowledged by the sink
 				before acknowledging them at the source.
 
 				Enabling or disabling acknowledgements at the sink level takes precedence over any global
@@ -33,10 +33,10 @@ base: components: sinks: humio_metrics: configuration: {
 		type: object: options: {
 			max_bytes: {
 				description: """
-					The maximum size of a batch that will be processed by a sink.
+					The maximum size of a batch that is processed by a sink.
 
 					This is based on the uncompressed size of the batched events, before they are
-					serialized / compressed.
+					serialized/compressed.
 					"""
 				required: false
 				type: uint: {
@@ -88,7 +88,7 @@ base: components: sinks: humio_metrics: configuration: {
 			The base URL of the Humio instance.
 
 			The scheme (`http` or `https`) must be specified. No path should be included since the paths defined
-			by the [`Splunk`][splunk] api are used.
+			by the [`Splunk`][splunk] API are used.
 
 			[splunk]: https://docs.splunk.com/Documentation/Splunk/8.0.0/Data/HECRESTendpoints
 			"""
@@ -102,7 +102,7 @@ base: components: sinks: humio_metrics: configuration: {
 		description: """
 			The type of events sent to this sink. Humio uses this as the name of the parser to use to ingest the data.
 
-			If unset, Humio will default it to none.
+			If unset, Humio defaults it to none.
 			"""
 		required: false
 		type: string: {
@@ -112,7 +112,7 @@ base: components: sinks: humio_metrics: configuration: {
 	}
 	host_key: {
 		description: """
-			Overrides the name of the log field used to grab the hostname to send to Humio.
+			Overrides the name of the log field used to retrieve the hostname to send to Humio.
 
 			By default, the [global `log_schema.host_key` option][global_host_key] is used.
 
@@ -125,7 +125,7 @@ base: components: sinks: humio_metrics: configuration: {
 		description: """
 			Name of the tag in the metric to use for the source host.
 
-			If present, the value of the tag is set on the generated log event in the "host" field,
+			If present, the value of the tag is set on the generated log event in the `host` field,
 			where the field key uses the [global `host_key` option][global_log_schema_host_key].
 
 			[global_log_schema_host_key]: https://vector.dev/docs/reference/configuration//global-options#log_schema.host_key
@@ -302,7 +302,7 @@ base: components: sinks: humio_metrics: configuration: {
 				description: """
 					The amount of time to wait before attempting the first retry for a failed request.
 
-					After the first retry has failed, the fibonacci sequence will be used to select future backoffs.
+					After the first retry has failed, the fibonacci sequence is used to select future backoffs.
 					"""
 				required: false
 				type: uint: {
@@ -322,7 +322,7 @@ base: components: sinks: humio_metrics: configuration: {
 				description: """
 					The time a request can take before being aborted.
 
-					It is highly recommended that you do not lower this value below the service’s internal timeout, as this could
+					Datadog highly recommends that you do not lower this value below the service's internal timeout, as this could
 					create orphaned requests, pile on retries, and result in duplicate data downstream.
 					"""
 				required: false

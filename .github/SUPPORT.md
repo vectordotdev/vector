@@ -26,6 +26,9 @@ you are observing.
 
 Essential details to include:
 
+- Errors- for each error, please provide the full error message snippet, and
+  details such as where the error is observed, at what stage in the process
+  (e.g. at boot time, after some specific condition etc.).
 - What is the version of Vector (and the Helm chart if deploying via Helm) and
   the versions of any other systems in use (like Elasticsearch, NATS, etc.).
 - What is your Vector configuration. See the below section on [how to format

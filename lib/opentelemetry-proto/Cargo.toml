@@ -16,6 +16,6 @@ hex = { version = "0.4.3", default-features = false, features = ["std"] }
 lookup = { package = "vector-lookup", path = "../vector-lookup", default-features = false }
 ordered-float = { version = "3.6.0", default-features = false }
 prost = { version = "0.11", default-features = false, features = ["std"] }
-tonic = { version = "0.8", default-features = false, features = ["codegen", "gzip", "prost", "tls", "tls-roots", "transport"] }
+tonic = { version = "0.9", default-features = false, features = ["codegen", "gzip", "prost", "tls", "tls-roots", "transport"] }
 value = { package = "value", git = "https://github.com/vectordotdev/vrl", rev = "v0.2.0" }
 vector-core = { path = "../vector-core", default-features = false }

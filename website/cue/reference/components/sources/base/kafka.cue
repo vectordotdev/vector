@@ -39,7 +39,7 @@ base: components: sources: kafka: configuration: {
 			A comma-separated list of Kafka bootstrap servers.
 
 			These are the servers in a Kafka cluster that a client should use to bootstrap its connection to the cluster,
-			allowing discovering all other hosts in the cluster.
+			allowing discovery of all the other hosts in the cluster.
 
 			Must be in the form of `host:port`, and comma-separated.
 			"""
@@ -304,9 +304,11 @@ base: components: sources: kafka: configuration: {
 				description: """
 					Enables SASL authentication.
 
-					Only `PLAIN` and `SCRAM`-based mechanisms are supported when configuring SASL authentication via `sasl.*`. For
-					other mechanisms, `librdkafka_options.*` must be used directly to configure other `librdkafka`-specific values
-					i.e. `sasl.kerberos.*` and so on.
+					Only `PLAIN`- and `SCRAM`-based mechanisms are supported when configuring SASL authentication using `sasl.*`. For
+					other mechanisms, `librdkafka_options.*` must be used directly to configure other `librdkafka`-specific values.
+					If using `sasl.kerberos.*` as an example, where `*` is `service.name`, `principal`, `kinit.md`, etc., then
+					`librdkafka_options.*` as a result becomes `librdkafka_options.sasl.kerberos.service.name`,
+					`librdkafka_options.sasl.kerberos.principal`, etc.
 
 					See the [librdkafka documentation](https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md) for details.
 

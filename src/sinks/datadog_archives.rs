@@ -104,7 +104,7 @@ pub struct DatadogArchivesSinkConfig {
     /// A prefix to apply to all object keys.
     ///
     /// Prefixes are useful for partitioning objects, such as by creating an object key that
-    /// stores objects under a particular "directory". If using a prefix for this purpose, it must end
+    /// stores objects under a particular directory. If using a prefix for this purpose, it must end
     /// in `/` to act as a directory path. A trailing `/` is **not** automatically added.
     pub key_prefix: Option<String>,
 
@@ -204,7 +204,7 @@ pub struct S3Options {
     pub server_side_encryption: Option<S3ServerSideEncryption>,
 
     /// Specifies the ID of the AWS Key Management Service (AWS KMS) symmetrical customer managed
-    /// customer master key (CMK) that will used for the created objects.
+    /// customer master key (CMK) that is used for the created objects.
     ///
     /// Only applies when `server_side_encryption` is configured to use KMS.
     ///
