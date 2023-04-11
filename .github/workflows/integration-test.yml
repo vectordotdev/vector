@@ -57,7 +57,8 @@ jobs:
       matrix:
         include:
           - test: 'amqp'
-          - test: 'appsignal'
+            # TODO: re-enable when the issue with the root CA is sorted out
+            #- test: 'appsignal'
           - test: 'aws'
           - test: 'axiom'
           - test: 'azure'
