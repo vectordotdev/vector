@@ -6,14 +6,15 @@ use lookup::owned_value_path;
 use tracing::Span;
 use value::Kind;
 use vector_common::sensitive_string::SensitiveString;
-use vector_config::{configurable_component, NamedComponent};
+use vector_config::configurable_component;
 use vector_core::config::{LegacyKey, LogNamespace};
 use warp::Filter;
 
 use crate::{
     codecs::DecodingConfig,
     config::{
-        GenerateConfig, Output, Resource, SourceAcknowledgementsConfig, SourceConfig, SourceContext,
+        GenerateConfig, Resource, SourceAcknowledgementsConfig, SourceConfig, SourceContext,
+        SourceOutput,
     },
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
     tls::{MaybeTlsSettings, TlsEnableableConfig},
@@ -25,7 +26,10 @@ mod handlers;
 mod models;
 
 /// Configuration for the `aws_kinesis_firehose` source.
-#[configurable_component(source("aws_kinesis_firehose"))]
+#[configurable_component(source(
+    "aws_kinesis_firehose",
+    "Collect logs from AWS Kinesis Firehose."
+))]
 #[derive(Clone, Debug)]
 pub struct AwsKinesisFirehoseConfig {
     /// The socket address to listen for connections on.
@@ -36,7 +40,7 @@ pub struct AwsKinesisFirehoseConfig {
     /// An optional access key to authenticate requests against.
     ///
     /// AWS Kinesis Firehose can be configured to pass along a user-configurable access key with each request. If
-    /// configured, `access_key` should be set to the same value. Otherwise, all requests will be allowed.
+    /// configured, `access_key` should be set to the same value. Otherwise, all requests are allowed.
     #[configurable(deprecated = "This option has been deprecated, use `access_keys` instead.")]
     #[configurable(metadata(docs::examples = "A94A8FE5CCB19BA61C4C08"))]
     access_key: Option<SensitiveString>,
@@ -44,20 +48,20 @@ pub struct AwsKinesisFirehoseConfig {
     /// An optional list of access keys to authenticate requests against.
     ///
     /// AWS Kinesis Firehose can be configured to pass along a user-configurable access key with each request. If
-    /// configured, `access_keys` should be set to the same value. Otherwise, all requests will be allowed.
+    /// configured, `access_keys` should be set to the same value. Otherwise, all requests are allowed.
     #[configurable(metadata(docs::examples = "access_keys_example()"))]
     access_keys: Option<Vec<SensitiveString>>,
 
     /// Whether or not to store the AWS Firehose Access Key in event secrets.
     ///
-    /// If set to `true`, when incoming requests contains an Access Key sent by AWS Firehose, it will be kept in the
+    /// If set to `true`, when incoming requests contains an access key sent by AWS Firehose, it is kept in the
     /// event secrets as "aws_kinesis_firehose_access_key".
     #[configurable(derived)]
     store_access_key: bool,
 
     /// The compression scheme to use for decompressing records within the Firehose message.
     ///
-    /// Some services, like AWS CloudWatch Logs, will [compress the events with gzip][events_with_gzip],
+    /// Some services, like AWS CloudWatch Logs, [compresses the events with gzip][events_with_gzip],
     /// before sending them AWS Kinesis Firehose. This option can be used to automatically decompress
     /// them before forwarding them to the next component.
     ///
@@ -134,6 +138,7 @@ impl fmt::Display for Compression {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "aws_kinesis_firehose")]
 impl SourceConfig for AwsKinesisFirehoseConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let log_namespace = cx.log_namespace(self.log_namespace);
@@ -179,7 +184,7 @@ impl SourceConfig for AwsKinesisFirehoseConfig {
         }))
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         let schema_definition = self
             .decoding
             .schema_definition(global_log_namespace.merge(self.log_namespace))
@@ -199,7 +204,10 @@ impl SourceConfig for AwsKinesisFirehoseConfig {
                 None,
             );
 
-        vec![Output::default(self.decoding.output_type()).with_schema_definition(schema_definition)]
+        vec![SourceOutput::new_logs(
+            self.decoding.output_type(),
+            schema_definition,
+        )]
     }
 
     fn resources(&self) -> Vec<Resource> {

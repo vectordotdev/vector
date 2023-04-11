@@ -1,8 +1,7 @@
-args:
-- --features
+features:
 - datadog-logs-integration-tests
-- --lib
-- '::datadog::logs::'
+
+test_filter: '::datadog::logs::'
 
 runner:
   env:

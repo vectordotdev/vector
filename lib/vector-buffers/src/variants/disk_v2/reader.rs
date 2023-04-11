@@ -307,9 +307,7 @@ where
         &mut self,
         is_finalized: bool,
     ) -> Result<Option<ReadToken>, ReaderError<T>> {
-        let record_len = if let Some(len) = self.read_length_delimiter(is_finalized).await? {
-            len
-        } else {
+        let Some(record_len) = self.read_length_delimiter(is_finalized).await? else {
             return Ok(None);
         };
 
@@ -852,12 +850,12 @@ where
                 } => {
                     let record = try_as_record_archive(data_file_mmap.as_ref())
                         .expect("record was already validated");
-                    let item = match decode_record_payload::<T>(record) {
-                        Ok(item) => item,
+
+                    let Ok(item) = decode_record_payload::<T>(record) else {
                         // If there's an error decoding the item, just fall back to the slow path,
                         // because this file might actually be where we left off, so we don't want
                         // to incorrectly skip ahead or anything.
-                        Err(_) => break,
+                        break
                     };
 
                     // We have to remove 1 from the event count here because otherwise the ID would
@@ -901,13 +899,42 @@ where
         // update `self.last_reader_record_id`, so basically... just keep reading records until
         // we're past the last record we had acknowledged.
         while self.last_reader_record_id < ledger_last {
-            if self.next().await?.is_none() && self.last_reader_record_id == 0 {
-                // We've hit a point where there's no more data to read.  If our "last reader record
-                // ID" hasn't moved at all, that means the buffer was already empty and we're caught
-                // up, so we just pin ourselves to where the ledger says we left off, and we're good
-                // to go.
-                self.last_reader_record_id = ledger_last;
-                break;
+            match self.next().await {
+                Ok(maybe_record) => {
+                    if maybe_record.is_none() && self.last_reader_record_id == 0 {
+                        // We've hit a point where there's no more data to read.  If our "last reader record
+                        // ID" hasn't moved at all, that means the buffer was already empty and we're caught
+                        // up, so we just pin ourselves to where the ledger says we left off, and we're good
+                        // to go.
+                        self.last_reader_record_id = ledger_last;
+                        break;
+                    }
+                }
+                Err(e) if e.is_bad_read() => {
+                    // If we hit a bad read during initialization, we should only continue calling
+                    // `next` if we have not advanced _past_ the writer in terms of file ID.
+                    //
+                    // If the writer saw the same error we just saw, it will have rolled itself to
+                    // the next file, lazily: for example, it discovers a bad record at the end of
+                    // file ID 3, so it marks itself to open file ID 4 next, but hasn't yet
+                    // created it, and is still technically indicated as being on file ID 3.
+                    //
+                    // Meanwhile, if _we_ try to also roll to file ID 4 and read from it, we'll deadlock
+                    // ourselves because it doesn't yet exist. However, `next` immediately updates our
+                    // reader file ID as soon as it hits a bad read error, so in this scenario,
+                    // we're now marked as being on file ID 4 while the writer is still on file ID
+                    // 3.
+                    //
+                    // From that, we can determine that when we've hit a bad read error, that if our
+                    // file ID is greater than the writer's file ID, we're now essentially
+                    // synchronized.
+                    let (reader_file_id, writer_file_id) =
+                        self.ledger.get_current_reader_writer_file_id();
+                    if reader_file_id > writer_file_id {
+                        break;
+                    }
+                }
+                Err(e) => return Err(e),
             }
         }
 
@@ -967,11 +994,15 @@ where
 
             let (reader_file_id, writer_file_id) = self.ledger.get_current_reader_writer_file_id();
 
-            // Essentially: is the writer still writing to this data file or not?
+            // Essentially: is the writer still writing to this data file or not, and are we
+            // actually ready to read (aka initialized)?
             //
-            // A necessary invariant to have to understand if the record reader should actually keep
-            // waiting for data, or if a data file had a partial write/missing data and should be skipped.
-            let is_finalized = reader_file_id != writer_file_id;
+            // This is a necessary invariant to understand if the record reader should actually keep
+            // waiting for data, or if a data file had a partial write/missing data and should be
+            // skipped. In particular, not only does this matter for deadlocking during shutdown due
+            // to improper writer behavior/flushing, but it also matters during initialization in
+            // case where the current data file had a partial write.
+            let is_finalized = (reader_file_id != writer_file_id) || !self.ready_to_read;
 
             // Try reading a record, which if successful, gives us a token to actually read/get a
             // reference to the record.  This is a slightly-tricky song-and-dance due to rustc not

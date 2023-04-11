@@ -168,7 +168,7 @@ impl CloudWatchMetricsSinkConfig {
         create_client::<CloudwatchMetricsClientBuilder>(
             &self.auth,
             region,
-            self.region.endpoint(),
+            self.region.endpoint()?,
             proxy,
             &self.tls,
             true,

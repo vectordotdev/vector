@@ -10,7 +10,7 @@ use vector_core::config::GlobalOptions;
 
 use crate::{
     enrichment_tables::EnrichmentTables, providers::Providers, secrets::SecretBackends,
-    sinks::Sinks, sources::Sources, transforms::Transforms,
+    sinks::Sinks,
 };
 
 #[cfg(feature = "api")]
@@ -18,8 +18,8 @@ use super::api;
 #[cfg(feature = "enterprise")]
 use super::enterprise;
 use super::{
-    compiler, schema, ComponentKey, Config, EnrichmentTableOuter, HealthcheckOptions, SinkOuter,
-    SourceOuter, TestDefinition, TransformOuter,
+    compiler, schema, BoxedSource, BoxedTransform, ComponentKey, Config, EnrichmentTableOuter,
+    HealthcheckOptions, SinkOuter, SourceOuter, TestDefinition, TransformOuter,
 };
 
 /// A complete Vector configuration.
@@ -255,7 +255,7 @@ impl ConfigBuilder {
         );
     }
 
-    pub fn add_source<K: Into<String>, S: Into<Sources>>(&mut self, key: K, source: S) {
+    pub fn add_source<K: Into<String>, S: Into<BoxedSource>>(&mut self, key: K, source: S) {
         self.sources
             .insert(ComponentKey::from(key.into()), SourceOuter::new(source));
     }
@@ -275,11 +275,11 @@ impl ConfigBuilder {
 
     // For some feature sets, no transforms are compiled, which leads to no callers using this
     // method, and in turn, annoying errors about unused variables.
-    pub fn add_transform<K: Into<String>, T: Into<Transforms>>(
+    pub fn add_transform(
         &mut self,
-        key: K,
+        key: impl Into<String>,
         inputs: &[&str],
-        transform: T,
+        transform: impl Into<BoxedTransform>,
     ) {
         let inputs = inputs
             .iter()

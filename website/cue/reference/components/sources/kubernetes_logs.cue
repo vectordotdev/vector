@@ -85,6 +85,15 @@ components: sources: kubernetes_logs: {
 					examples: ["busybox:1.30"]
 				}
 			}
+			"kubernetes.container_image_id": {
+				description: "Container image ID."
+				required:    false
+				common:      true
+				type: string: {
+					default: null
+					examples: ["busybox@sha256:1e7b63c09af457b93c17d25ef4e6aee96b5bb95f087840cffd7c4bb2fe8ae5c6"]
+				}
+			}
 			"kubernetes.container_name": {
 				description: "Container name."
 				required:    false

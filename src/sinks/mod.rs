@@ -7,6 +7,8 @@ pub mod util;
 
 #[cfg(feature = "sinks-amqp")]
 pub mod amqp;
+#[cfg(feature = "sinks-appsignal")]
+pub mod appsignal;
 #[cfg(feature = "sinks-aws_cloudwatch_logs")]
 pub mod aws_cloudwatch_logs;
 #[cfg(feature = "sinks-aws_cloudwatch_metrics")]
@@ -34,6 +36,8 @@ pub mod blackhole;
 pub mod clickhouse;
 #[cfg(feature = "sinks-console")]
 pub mod console;
+#[cfg(feature = "sinks-databend")]
+pub mod databend;
 #[cfg(any(
     feature = "sinks-datadog_events",
     feature = "sinks-datadog_logs",
@@ -61,14 +65,16 @@ pub mod humio;
 pub mod influxdb;
 #[cfg(feature = "sinks-kafka")]
 pub mod kafka;
-#[cfg(feature = "sinks-logdna")]
-pub mod logdna;
 #[cfg(feature = "sinks-loki")]
 pub mod loki;
+#[cfg(feature = "sinks-mezmo")]
+pub mod mezmo;
 #[cfg(feature = "sinks-nats")]
 pub mod nats;
 #[cfg(feature = "sinks-new_relic")]
 pub mod new_relic;
+#[cfg(feature = "sinks-webhdfs")]
+pub mod opendal_common;
 #[cfg(feature = "sinks-papertrail")]
 pub mod papertrail;
 #[cfg(feature = "sinks-prometheus")]
@@ -92,6 +98,8 @@ pub mod splunk_hec;
 pub mod statsd;
 #[cfg(feature = "sinks-vector")]
 pub mod vector;
+#[cfg(feature = "sinks-webhdfs")]
+pub mod webhdfs;
 #[cfg(feature = "sinks-websocket")]
 pub mod websocket;
 
@@ -136,6 +144,11 @@ pub enum Sinks {
     #[cfg(feature = "sinks-amqp")]
     #[configurable(metadata(docs::label = "AMQP"))]
     Amqp(amqp::AmqpSinkConfig),
+
+    /// Send events to AppSignal.
+    #[cfg(feature = "sinks-appsignal")]
+    #[configurable(metadata(docs::label = "AppSignal"))]
+    Appsignal(appsignal::AppsignalSinkConfig),
 
     /// Publish log events to AWS CloudWatch Logs.
     #[cfg(feature = "sinks-aws_cloudwatch_logs")]
@@ -197,6 +210,10 @@ pub enum Sinks {
     #[configurable(metadata(docs::label = "Console"))]
     Console(console::ConsoleSinkConfig),
 
+    /// Deliver log data to a Databend database.
+    #[cfg(feature = "sinks-databend")]
+    Databend(databend::DatabendConfig),
+
     /// Send events to Datadog Archives.
     #[cfg(feature = "sinks-datadog_archives")]
     #[configurable(metadata(docs::label = "Datadog Archives"))]
@@ -257,6 +274,11 @@ pub enum Sinks {
     #[configurable(metadata(docs::label = "GCP Pub/Sub"))]
     GcpPubsub(gcp::pubsub::PubsubConfig),
 
+    /// WebHDFS.
+    #[cfg(feature = "sinks-webhdfs")]
+    #[configurable(metadata(docs::label = "WebHDFS"))]
+    Webhdfs(webhdfs::WebHdfsConfig),
+
     /// Deliver log events to Honeycomb.
     #[cfg(feature = "sinks-honeycomb")]
     #[configurable(metadata(docs::label = "Honeycomb"))]
@@ -292,10 +314,15 @@ pub enum Sinks {
     #[configurable(metadata(docs::label = "Kafka"))]
     Kafka(kafka::KafkaSinkConfig),
 
+    /// Deliver log event data to Mezmo.
+    #[cfg(feature = "sinks-mezmo")]
+    #[configurable(metadata(docs::label = "Mezmo"))]
+    Mezmo(mezmo::MezmoConfig),
+
     /// Deliver log event data to LogDNA.
-    #[cfg(feature = "sinks-logdna")]
+    #[cfg(feature = "sinks-mezmo")]
     #[configurable(metadata(docs::label = "LogDNA"))]
-    Logdna(logdna::LogdnaConfig),
+    Logdna(mezmo::LogdnaConfig),
 
     /// Deliver log event data to the Loki aggregation system.
     #[cfg(feature = "sinks-loki")]
@@ -410,12 +437,12 @@ pub enum Sinks {
 }
 
 impl NamedComponent for Sinks {
-    const NAME: &'static str = "_invalid_usage";
-
     fn get_component_name(&self) -> &'static str {
         match self {
             #[cfg(feature = "sinks-amqp")]
             Self::Amqp(config) => config.get_component_name(),
+            #[cfg(feature = "sinks-appsignal")]
+            Self::Appsignal(config) => config.get_component_name(),
             #[cfg(feature = "sinks-aws_cloudwatch_logs")]
             Self::AwsCloudwatchLogs(config) => config.get_component_name(),
             #[cfg(feature = "sinks-aws_cloudwatch_metrics")]
@@ -440,6 +467,8 @@ impl NamedComponent for Sinks {
             Self::Clickhouse(config) => config.get_component_name(),
             #[cfg(feature = "sinks-console")]
             Self::Console(config) => config.get_component_name(),
+            #[cfg(feature = "sinks-databend")]
+            Self::Databend(config) => config.get_component_name(),
             #[cfg(feature = "sinks-datadog_archives")]
             Self::DatadogArchives(config) => config.get_component_name(),
             #[cfg(feature = "sinks-datadog_events")]
@@ -464,6 +493,8 @@ impl NamedComponent for Sinks {
             Self::GcpCloudStorage(config) => config.get_component_name(),
             #[cfg(feature = "sinks-gcp")]
             Self::GcpPubsub(config) => config.get_component_name(),
+            #[cfg(feature = "sinks-webhdfs")]
+            Self::Webhdfs(config) => config.get_component_name(),
             #[cfg(feature = "sinks-honeycomb")]
             Self::Honeycomb(config) => config.get_component_name(),
             #[cfg(feature = "sinks-http")]
@@ -478,7 +509,9 @@ impl NamedComponent for Sinks {
             Self::InfluxdbMetrics(config) => config.get_component_name(),
             #[cfg(feature = "sinks-kafka")]
             Self::Kafka(config) => config.get_component_name(),
-            #[cfg(feature = "sinks-logdna")]
+            #[cfg(feature = "sinks-mezmo")]
+            Self::Mezmo(config) => config.get_component_name(),
+            #[cfg(feature = "sinks-mezmo")]
             Self::Logdna(config) => config.get_component_name(),
             #[cfg(feature = "sinks-loki")]
             Self::Loki(config) => config.get_component_name(),

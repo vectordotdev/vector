@@ -85,7 +85,7 @@ impl Notification {
 /// directly nested into the union of [`super::OutputEventsPayload`].
 ///
 /// The GraphQL specification forbids such a nesting:
-/// http://spec.graphql.org/October2021/#sel-HAHdfFDABABkG3_I
+/// <http://spec.graphql.org/October2021/#sel-HAHdfFDABABkG3_I>
 #[derive(Debug, Clone)]
 pub struct EventNotification {
     pub notification: Notification,

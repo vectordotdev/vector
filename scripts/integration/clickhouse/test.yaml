@@ -1,8 +1,7 @@
-args:
-- --features
+features:
 - clickhouse-integration-tests
-- --lib
-- '::clickhouse::'
+
+test_filter: '::clickhouse::'
 
 env:
   CLICKHOUSE_ADDRESS: http://clickhouse:8123

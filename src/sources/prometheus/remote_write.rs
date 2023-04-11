@@ -10,7 +10,7 @@ use warp::http::{HeaderMap, StatusCode};
 use super::parser;
 use crate::{
     config::{
-        self, GenerateConfig, Output, SourceAcknowledgementsConfig, SourceConfig, SourceContext,
+        GenerateConfig, SourceAcknowledgementsConfig, SourceConfig, SourceContext, SourceOutput,
     },
     event::Event,
     internal_events::PrometheusRemoteWriteParseError,
@@ -23,7 +23,10 @@ use crate::{
 };
 
 /// Configuration for the `prometheus_remote_write` source.
-#[configurable_component(source("prometheus_remote_write"))]
+#[configurable_component(source(
+    "prometheus_remote_write",
+    "Receive metric via the Prometheus Remote Write protocol."
+))]
 #[derive(Clone, Debug)]
 pub struct PrometheusRemoteWriteConfig {
     /// The socket address to accept connections on.
@@ -69,6 +72,7 @@ impl GenerateConfig for PrometheusRemoteWriteConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "prometheus_remote_write")]
 impl SourceConfig for PrometheusRemoteWriteConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
         let source = RemoteWriteSource;
@@ -84,8 +88,8 @@ impl SourceConfig for PrometheusRemoteWriteConfig {
         )
     }
 
-    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
-        vec![Output::default(config::DataType::Metric)]
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
+        vec![SourceOutput::new_metrics()]
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -120,8 +124,8 @@ impl HttpSource for RemoteWriteSource {
     fn build_events(
         &self,
         mut body: Bytes,
-        header_map: HeaderMap,
-        _query_parameters: HashMap<String, String>,
+        header_map: &HeaderMap,
+        _query_parameters: &HashMap<String, String>,
         _full_path: &str,
     ) -> Result<Vec<Event>, ErrorMessage> {
         // If `Content-Encoding` header isn't `snappy` HttpSource won't decode it for us

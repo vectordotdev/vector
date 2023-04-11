@@ -18,8 +18,9 @@ use value::Kind;
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
 
+use crate::config::OutputId;
 use crate::{
-    config::{DataType, Input, Output, ProxyConfig, TransformConfig, TransformContext},
+    config::{DataType, Input, ProxyConfig, TransformConfig, TransformContext, TransformOutput},
     event::Event,
     http::HttpClient,
     internal_events::{AwsEc2MetadataRefreshError, AwsEc2MetadataRefreshSuccessful},
@@ -76,7 +77,10 @@ static TOKEN_HEADER: Lazy<Bytes> = Lazy::new(|| Bytes::from("X-aws-ec2-metadata-
 
 /// Configuration for the `aws_ec2_metadata` transform.
 #[serde_as]
-#[configurable_component(transform("aws_ec2_metadata"))]
+#[configurable_component(transform(
+    "aws_ec2_metadata",
+    "Parse metadata emitted by AWS EC2 instances."
+))]
 #[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
 pub struct Ec2Metadata {
@@ -189,6 +193,7 @@ struct Keys {
 impl_generate_config_from_default!(Ec2Metadata);
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "aws_ec2_metadata")]
 impl TransformConfig for Ec2Metadata {
     async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
         let state = Arc::new(ArcSwap::new(Arc::new(vec![])));
@@ -239,7 +244,11 @@ impl TransformConfig for Ec2Metadata {
         Input::new(DataType::Metric | DataType::Log)
     }
 
-    fn outputs(&self, merged_definition: &schema::Definition, _: LogNamespace) -> Vec<Output> {
+    fn outputs(
+        &self,
+        input_definitions: &[(OutputId, schema::Definition)],
+        _: LogNamespace,
+    ) -> Vec<TransformOutput> {
         let added_keys = Keys::new(self.namespace.clone());
 
         let paths = [
@@ -259,15 +268,24 @@ impl TransformConfig for Ec2Metadata {
             &added_keys.tags_key.log_path,
         ];
 
-        let mut schema_definition = merged_definition.clone();
+        let schema_definition = input_definitions
+            .iter()
+            .map(|(output, definition)| {
+                let mut schema_definition = definition.clone();
 
-        for path in paths {
-            schema_definition =
-                schema_definition.with_field(path, Kind::bytes().or_undefined(), None);
-        }
+                for path in paths {
+                    schema_definition =
+                        schema_definition.with_field(path, Kind::bytes().or_undefined(), None);
+                }
 
-        vec![Output::default(DataType::Metric | DataType::Log)
-            .with_schema_definition(schema_definition)]
+                (output.clone(), schema_definition)
+            })
+            .collect();
+
+        vec![TransformOutput::new(
+            DataType::Metric | DataType::Log,
+            schema_definition,
+        )]
     }
 }
 

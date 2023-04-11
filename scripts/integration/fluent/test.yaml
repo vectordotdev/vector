@@ -1,8 +1,7 @@
-args:
-- --features
+features:
 - fluent-integration-tests
-- --lib
-- "::fluent::"
+
+test_filter: "::fluent::"
 
 runner:
   needs_docker_socket: true

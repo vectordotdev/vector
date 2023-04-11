@@ -15,7 +15,7 @@ base: components: sinks: humio_logs: configuration: {
 				Whether or not end-to-end acknowledgements are enabled.
 
 				When enabled for a sink, any source connected to that sink, where the source supports
-				end-to-end acknowledgements as well, will wait for events to be acknowledged by the sink
+				end-to-end acknowledgements as well, waits for events to be acknowledged by the sink
 				before acknowledging them at the source.
 
 				Enabling or disabling acknowledgements at the sink level takes precedence over any global
@@ -33,10 +33,10 @@ base: components: sinks: humio_logs: configuration: {
 		type: object: options: {
 			max_bytes: {
 				description: """
-					The maximum size of a batch that will be processed by a sink.
+					The maximum size of a batch that is processed by a sink.
 
 					This is based on the uncompressed size of the batched events, before they are
-					serialized / compressed.
+					serialized/compressed.
 					"""
 				required: false
 				type: uint: {
@@ -106,6 +106,11 @@ base: components: sinks: humio_logs: configuration: {
 
 						[apache_avro]: https://avro.apache.org/
 						"""
+					csv: """
+						Encodes an event as a CSV message.
+
+						This codec must be configured with fields to encode.
+						"""
 					gelf: """
 						Encodes an event as a [GELF][gelf] message.
 
@@ -122,7 +127,7 @@ base: components: sinks: humio_logs: configuration: {
 						[logfmt]: https://brandur.org/logfmt
 						"""
 					native: """
-						Encodes an event in Vector’s [native Protocol Buffers format][vector_native_protobuf].
+						Encodes an event in the [native Protocol Buffers format][vector_native_protobuf].
 
 						This codec is **[experimental][experimental]**.
 
@@ -130,7 +135,7 @@ base: components: sinks: humio_logs: configuration: {
 						[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
 						"""
 					native_json: """
-						Encodes an event in Vector’s [native JSON format][vector_native_json].
+						Encodes an event in the [native JSON format][vector_native_json].
 
 						This codec is **[experimental][experimental]**.
 
@@ -140,26 +145,44 @@ base: components: sinks: humio_logs: configuration: {
 					raw_message: """
 						No encoding.
 
-						This "encoding" simply uses the `message` field of a log event.
+						This encoding uses the `message` field of a log event.
 
-						Users should take care if they're modifying their log events (such as by using a `remap`
-						transform, etc) and removing the message field while doing additional parsing on it, as this
+						Be careful if you are modifying your log events (for example, by using a `remap`
+						transform) and removing the message field while doing additional parsing on it, as this
 						could lead to the encoding emitting empty strings for the given event.
 						"""
 					text: """
 						Plain text encoding.
 
-						This "encoding" simply uses the `message` field of a log event. For metrics, it uses an
+						This encoding uses the `message` field of a log event. For metrics, it uses an
 						encoding that resembles the Prometheus export format.
 
-						Users should take care if they're modifying their log events (such as by using a `remap`
-						transform, etc) and removing the message field while doing additional parsing on it, as this
+						Be careful if you are modifying your log events (for example, by using a `remap`
+						transform) and removing the message field while doing additional parsing on it, as this
 						could lead to the encoding emitting empty strings for the given event.
 						"""
 				}
 			}
+			csv: {
+				description:   "The CSV Serializer Options."
+				relevant_when: "codec = \"csv\""
+				required:      true
+				type: object: options: fields: {
+					description: """
+						Configures the fields that will be encoded, as well as the order in which they
+						appear in the output.
+
+						If a field is not present in the event, the output will be an empty string.
+
+						Values of type `Array`, `Object`, and `Regex` are not supported and the
+						output will be an empty string.
+						"""
+					required: true
+					type: array: items: type: string: {}
+				}
+			}
 			except_fields: {
-				description: "List of fields that will be excluded from the encoded event."
+				description: "List of fields that are excluded from the encoded event."
 				required:    false
 				type: array: items: type: string: {}
 			}
@@ -167,25 +190,25 @@ base: components: sinks: humio_logs: configuration: {
 				description: """
 					Controls how metric tag values are encoded.
 
-					When set to `single`, only the last non-bare value of tags will be displayed with the
-					metric.  When set to `full`, all metric tags will be exposed as separate assignments.
+					When set to `single`, only the last non-bare value of tags are displayed with the
+					metric.  When set to `full`, all metric tags are exposed as separate assignments.
 					"""
 				relevant_when: "codec = \"json\" or codec = \"text\""
 				required:      false
 				type: string: {
 					default: "single"
 					enum: {
-						full: "All tags will be exposed as arrays of either string or null values."
+						full: "All tags are exposed as arrays of either string or null values."
 						single: """
-															Tag values will be exposed as single strings, the same as they were before this config
-															option. Tags with multiple values will show the last assigned value, and null values will be
-															ignored.
+															Tag values are exposed as single strings, the same as they were before this config
+															option. Tags with multiple values show the last assigned value, and null values
+															are ignored.
 															"""
 					}
 				}
 			}
 			only_fields: {
-				description: "List of fields that will be included in the encoded event."
+				description: "List of fields that are included in the encoded event."
 				required:    false
 				type: array: items: type: string: {}
 			}
@@ -204,7 +227,7 @@ base: components: sinks: humio_logs: configuration: {
 			The base URL of the Humio instance.
 
 			The scheme (`http` or `https`) must be specified. No path should be included since the paths defined
-			by the [`Splunk`][splunk] api are used.
+			by the [`Splunk`][splunk] API are used.
 
 			[splunk]: https://docs.splunk.com/Documentation/Splunk/8.0.0/Data/HECRESTendpoints
 			"""
@@ -218,7 +241,7 @@ base: components: sinks: humio_logs: configuration: {
 		description: """
 			The type of events sent to this sink. Humio uses this as the name of the parser to use to ingest the data.
 
-			If unset, Humio will default it to none.
+			If unset, Humio defaults it to none.
 			"""
 		required: false
 		type: string: {
@@ -228,7 +251,7 @@ base: components: sinks: humio_logs: configuration: {
 	}
 	host_key: {
 		description: """
-			Overrides the name of the log field used to grab the hostname to send to Humio.
+			Overrides the name of the log field used to retrieve the hostname to send to Humio.
 
 			By default, the [global `log_schema.host_key` option][global_host_key] is used.
 
@@ -383,7 +406,7 @@ base: components: sinks: humio_logs: configuration: {
 				description: """
 					The amount of time to wait before attempting the first retry for a failed request.
 
-					After the first retry has failed, the fibonacci sequence will be used to select future backoffs.
+					After the first retry has failed, the fibonacci sequence is used to select future backoffs.
 					"""
 				required: false
 				type: uint: {
@@ -403,7 +426,7 @@ base: components: sinks: humio_logs: configuration: {
 				description: """
 					The time a request can take before being aborted.
 
-					It is highly recommended that you do not lower this value below the service’s internal timeout, as this could
+					Datadog highly recommends that you do not lower this value below the service's internal timeout, as this could
 					create orphaned requests, pile on retries, and result in duplicate data downstream.
 					"""
 				required: false
@@ -425,7 +448,7 @@ base: components: sinks: humio_logs: configuration: {
 	}
 	timestamp_key: {
 		description: """
-			Overrides the name of the log field used to grab the timestamp to send to Humio.
+			Overrides the name of the log field used to retrieve the timestamp to send to Humio.
 
 			By default, the [global `log_schema.timestamp_key` option][global_timestamp_key] is used.
 
@@ -435,7 +458,7 @@ base: components: sinks: humio_logs: configuration: {
 		type: string: default: "timestamp"
 	}
 	timestamp_nanos_key: {
-		description: "Overrides the name of the log field used to grab the nanosecond-enabled timestamp to send to Humio."
+		description: "Overrides the name of the log field used to retrieve the nanosecond-enabled timestamp to send to Humio."
 		required:    false
 		type: string: default: "@timestamp.nanos"
 	}
@@ -447,8 +470,8 @@ base: components: sinks: humio_logs: configuration: {
 				description: """
 					Sets the list of supported ALPN protocols.
 
-					Declare the supported ALPN protocols, which are used during negotiation with peer. Prioritized in the order
-					they are defined.
+					Declare the supported ALPN protocols, which are used during negotiation with peer. They are prioritized in the order
+					that they are defined.
 					"""
 				required: false
 				type: array: items: type: string: examples: ["h2"]
@@ -496,10 +519,10 @@ base: components: sinks: humio_logs: configuration: {
 				description: """
 					Enables certificate verification.
 
-					If enabled, certificates must be valid in terms of not being expired, as well as being issued by a trusted
-					issuer. This verification operates in a hierarchical manner, checking that not only the leaf certificate (the
-					certificate presented by the client/server) is valid, but also that the issuer of that certificate is valid, and
-					so on until reaching a root certificate.
+					If enabled, certificates must not be expired and must be issued by a trusted
+					issuer. This verification operates in a hierarchical manner, checking that the leaf certificate (the
+					certificate presented by the client/server) is not only valid, but that the issuer of that certificate is also valid, and
+					so on until the verification process reaches a root certificate.
 
 					Relevant for both incoming and outgoing connections.
 

@@ -9,7 +9,7 @@ use listenfd::ListenFd;
 use lookup::{lookup_v2::OptionalValuePath, owned_value_path, path};
 use tokio_util::codec::FramedRead;
 use vector_common::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
-use vector_config::{configurable_component, NamedComponent};
+use vector_config::configurable_component;
 use vector_core::{
     config::{LegacyKey, LogNamespace},
     EstimatedJsonEncodedSizeOf,
@@ -71,8 +71,6 @@ pub struct UdpConfig {
     port_key: OptionalValuePath,
 
     /// The size of the receive buffer used for the listening socket.
-    ///
-    /// Generally this should not need to be configured.
     #[configurable(metadata(docs::type_unit = "bytes"))]
     receive_buffer_bytes: Option<usize>,
 

@@ -1,8 +1,7 @@
-args:
-- --features
+features:
 - splunk-integration-tests
-- --lib
-- '::splunk_hec::'
+
+test_filter: '::splunk_hec::'
 
 env:
   SPLUNK_API_ADDRESS: https://splunk-hec:8089

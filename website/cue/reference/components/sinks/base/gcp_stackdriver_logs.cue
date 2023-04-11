@@ -15,7 +15,7 @@ base: components: sinks: gcp_stackdriver_logs: configuration: {
 				Whether or not end-to-end acknowledgements are enabled.
 
 				When enabled for a sink, any source connected to that sink, where the source supports
-				end-to-end acknowledgements as well, will wait for events to be acknowledged by the sink
+				end-to-end acknowledgements as well, waits for events to be acknowledged by the sink
 				before acknowledging them at the source.
 
 				Enabling or disabling acknowledgements at the sink level takes precedence over any global
@@ -31,7 +31,7 @@ base: components: sinks: gcp_stackdriver_logs: configuration: {
 		description: """
 			An [API key][gcp_api_key].
 
-			Either an API key, or a path to a service account credentials JSON file can be specified.
+			Either an API key or a path to a service account credentials JSON file can be specified.
 
 			If both are unset, the `GOOGLE_APPLICATION_CREDENTIALS` environment variable is checked for a filename. If no
 			filename is named, an attempt is made to fetch an instance service account for the compute instance the program is
@@ -49,10 +49,10 @@ base: components: sinks: gcp_stackdriver_logs: configuration: {
 		type: object: options: {
 			max_bytes: {
 				description: """
-					The maximum size of a batch that will be processed by a sink.
+					The maximum size of a batch that is processed by a sink.
 
 					This is based on the uncompressed size of the batched events, before they are
-					serialized / compressed.
+					serialized/compressed.
 					"""
 				required: false
 				type: uint: {
@@ -86,9 +86,9 @@ base: components: sinks: gcp_stackdriver_logs: configuration: {
 	}
 	credentials_path: {
 		description: """
-			Path to a [service account] credentials JSON file.
+			Path to a [service account][gcp_service_account_credentials] credentials JSON file.
 
-			Either an API key, or a path to a service account credentials JSON file can be specified.
+			Either an API key or a path to a service account credentials JSON file can be specified.
 
 			If both are unset, the `GOOGLE_APPLICATION_CREDENTIALS` environment variable is checked for a filename. If no
 			filename is named, an attempt is made to fetch an instance service account for the compute instance the program is
@@ -105,12 +105,12 @@ base: components: sinks: gcp_stackdriver_logs: configuration: {
 		required:    false
 		type: object: options: {
 			except_fields: {
-				description: "List of fields that will be excluded from the encoded event."
+				description: "List of fields that are excluded from the encoded event."
 				required:    false
 				type: array: items: type: string: {}
 			}
 			only_fields: {
-				description: "List of fields that will be included in the encoded event."
+				description: "List of fields that are included in the encoded event."
 				required:    false
 				type: array: items: type: string: {}
 			}
@@ -282,7 +282,7 @@ base: components: sinks: gcp_stackdriver_logs: configuration: {
 				description: """
 					The amount of time to wait before attempting the first retry for a failed request.
 
-					After the first retry has failed, the fibonacci sequence will be used to select future backoffs.
+					After the first retry has failed, the fibonacci sequence is used to select future backoffs.
 					"""
 				required: false
 				type: uint: {
@@ -302,7 +302,7 @@ base: components: sinks: gcp_stackdriver_logs: configuration: {
 				description: """
 					The time a request can take before being aborted.
 
-					It is highly recommended that you do not lower this value below the service’s internal timeout, as this could
+					Datadog highly recommends that you do not lower this value below the service's internal timeout, as this could
 					create orphaned requests, pile on retries, and result in duplicate data downstream.
 					"""
 				required: false
@@ -370,8 +370,8 @@ base: components: sinks: gcp_stackdriver_logs: configuration: {
 				description: """
 					Sets the list of supported ALPN protocols.
 
-					Declare the supported ALPN protocols, which are used during negotiation with peer. Prioritized in the order
-					they are defined.
+					Declare the supported ALPN protocols, which are used during negotiation with peer. They are prioritized in the order
+					that they are defined.
 					"""
 				required: false
 				type: array: items: type: string: examples: ["h2"]
@@ -419,10 +419,10 @@ base: components: sinks: gcp_stackdriver_logs: configuration: {
 				description: """
 					Enables certificate verification.
 
-					If enabled, certificates must be valid in terms of not being expired, as well as being issued by a trusted
-					issuer. This verification operates in a hierarchical manner, checking that not only the leaf certificate (the
-					certificate presented by the client/server) is valid, but also that the issuer of that certificate is valid, and
-					so on until reaching a root certificate.
+					If enabled, certificates must not be expired and must be issued by a trusted
+					issuer. This verification operates in a hierarchical manner, checking that the leaf certificate (the
+					certificate presented by the client/server) is not only valid, but that the issuer of that certificate is also valid, and
+					so on until the verification process reaches a root certificate.
 
 					Relevant for both incoming and outgoing connections.
 

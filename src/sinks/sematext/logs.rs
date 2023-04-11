@@ -36,7 +36,7 @@ pub struct SematextLogsConfig {
     #[configurable(metadata(docs::examples = "https://example.com"))]
     endpoint: Option<String>,
 
-    /// The token that will be used to write to Sematext.
+    /// The token that is used to write to Sematext.
     #[configurable(metadata(docs::examples = "${SEMATEXT_TOKEN}"))]
     #[configurable(metadata(docs::examples = "some-sematext-token"))]
     token: SensitiveString,
@@ -93,11 +93,11 @@ impl SinkConfig for SematextLogsConfig {
             doc_type: "\
                 logs"
                 .to_string(),
-            bulk: Some(BulkConfig {
+            bulk: BulkConfig {
                 index: Template::try_from(self.token.inner())
                     .expect("unable to parse token as Template"),
                 ..Default::default()
-            }),
+            },
             batch: self.batch,
             request: RequestConfig {
                 tower: self.request,

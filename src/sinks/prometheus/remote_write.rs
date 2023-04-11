@@ -1,7 +1,7 @@
 use std::sync::Arc;
 use std::task;
 
-use aws_credential_types::provider::SharedCredentialsProvider;
+use aws_types::credentials::SharedCredentialsProvider;
 use aws_types::region::Region;
 use bytes::{Bytes, BytesMut};
 use futures::{future::BoxFuture, stream, FutureExt, SinkExt};
@@ -98,7 +98,7 @@ pub struct RemoteWriteConfig {
 
     /// The tenant ID to send.
     ///
-    /// If set, a header named `X-Scope-OrgID` will be added to outgoing requests with the value of this setting.
+    /// If set, a header named `X-Scope-OrgID` is added to outgoing requests with the value of this setting.
     ///
     /// This may be used by Cortex or other remote services to identify the tenant making the request.
     #[serde(default)]

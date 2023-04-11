@@ -4,7 +4,3 @@ services:
   loki:
     image: docker.io/grafana/loki:${CONFIG_VERSION}
     command: -config.file=/etc/loki/local-config.yaml -auth.enabled=true
-
-networks:
-  default:
-    name: ${VECTOR_NETWORK}

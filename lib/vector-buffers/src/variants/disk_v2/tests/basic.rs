@@ -24,7 +24,6 @@ async fn basic_read_write_loop() {
             assert_buffer_is_empty!(ledger);
 
             let expected_items = (512..768)
-                .into_iter()
                 .cycle()
                 .take(10)
                 .map(SizedRecord::new)
@@ -151,7 +150,6 @@ async fn initial_size_correct_with_multievents() {
             let (mut writer, _, _) = create_default_buffer_v2(data_dir.clone()).await;
 
             let input_items = (512..768)
-                .into_iter()
                 .cycle()
                 .take(2000)
                 .map(MultiEventRecord::new)

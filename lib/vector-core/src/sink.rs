@@ -125,10 +125,7 @@ impl<S: Sink<Event> + Send + Unpin> EventSink<S> {
     fn flush_queue(self: &mut Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), S::Error>> {
         while self.queue.is_some() {
             poll_ready_ok!(self.sink.poll_ready_unpin(cx));
-            let event = match self.next_event() {
-                None => break,
-                Some(event) => event,
-            };
+            let Some(event) = self.next_event() else {break};
             if let Err(err) = self.sink.start_send_unpin(event) {
                 return Poll::Ready(Err(err));
             }

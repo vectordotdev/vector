@@ -17,7 +17,7 @@ use crate::sinks::{util::UriSerde, Healthcheck, Sinks};
 #[derive(Clone, Debug)]
 pub struct SinkOuter<T>
 where
-    T: Configurable + Serialize,
+    T: Configurable + Serialize + 'static,
 {
     #[configurable(derived)]
     pub inputs: Inputs<T>,

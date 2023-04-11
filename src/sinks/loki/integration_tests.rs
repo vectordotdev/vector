@@ -461,14 +461,21 @@ async fn out_of_order_drop() {
     for (i, event) in events.iter_mut().enumerate() {
         let log = event.as_mut_log();
         log.insert(
-            log_schema().timestamp_key(),
+            (
+                lookup::PathPrefix::Event,
+                log_schema().timestamp_key().unwrap(),
+            ),
             base + Duration::seconds(i as i64),
         );
     }
     // first event of the second batch is out-of-order.
-    events[batch_size]
-        .as_mut_log()
-        .insert(log_schema().timestamp_key(), base);
+    events[batch_size].as_mut_log().insert(
+        (
+            lookup::PathPrefix::Event,
+            log_schema().timestamp_key().unwrap(),
+        ),
+        base,
+    );
 
     let mut expected = events.clone();
     expected.remove(batch_size);
@@ -490,14 +497,21 @@ async fn out_of_order_accept() {
     for (i, event) in events.iter_mut().enumerate() {
         let log = event.as_mut_log();
         log.insert(
-            log_schema().timestamp_key(),
+            (
+                lookup::PathPrefix::Event,
+                log_schema().timestamp_key().unwrap(),
+            ),
             base + Duration::seconds(i as i64),
         );
     }
     // first event of the second batch is out-of-order.
-    events[batch_size]
-        .as_mut_log()
-        .insert(log_schema().timestamp_key(), base - Duration::seconds(1));
+    events[batch_size].as_mut_log().insert(
+        (
+            lookup::PathPrefix::Event,
+            log_schema().timestamp_key().unwrap(),
+        ),
+        base - Duration::seconds(1),
+    );
 
     // move out-of-order event to where it will appear in results
     let mut expected = events.clone();
@@ -521,21 +535,32 @@ async fn out_of_order_rewrite() {
     for (i, event) in events.iter_mut().enumerate() {
         let log = event.as_mut_log();
         log.insert(
-            log_schema().timestamp_key(),
+            (
+                lookup::PathPrefix::Event,
+                log_schema().timestamp_key().unwrap(),
+            ),
             base + Duration::seconds(i as i64),
         );
     }
     // first event of the second batch is out-of-order.
-    events[batch_size]
-        .as_mut_log()
-        .insert(log_schema().timestamp_key(), base);
+    events[batch_size].as_mut_log().insert(
+        (
+            lookup::PathPrefix::Event,
+            log_schema().timestamp_key().unwrap(),
+        ),
+        base,
+    );
 
     let mut expected = events.clone();
     let time = get_timestamp(&expected[batch_size - 1]);
     // timestamp is rewritten with latest timestamp of the first batch
-    expected[batch_size]
-        .as_mut_log()
-        .insert(log_schema().timestamp_key(), time);
+    expected[batch_size].as_mut_log().insert(
+        (
+            lookup::PathPrefix::Event,
+            log_schema().timestamp_key().unwrap(),
+        ),
+        time,
+    );
 
     test_out_of_order_events(
         OutOfOrderAction::RewriteTimestamp,
@@ -561,7 +586,10 @@ async fn out_of_order_per_partition() {
     for (i, event) in events.iter_mut().enumerate() {
         let log = event.as_mut_log();
         log.insert(
-            log_schema().timestamp_key(),
+            (
+                lookup::PathPrefix::Event,
+                log_schema().timestamp_key().unwrap(),
+            ),
             base + Duration::seconds(i as i64),
         );
     }
@@ -623,7 +651,10 @@ async fn test_out_of_order_events(
 fn get_timestamp(event: &Event) -> DateTime<Utc> {
     *event
         .as_log()
-        .get(log_schema().timestamp_key())
+        .get((
+            lookup::PathPrefix::Event,
+            log_schema().timestamp_key().unwrap(),
+        ))
         .unwrap()
         .as_timestamp()
         .unwrap()

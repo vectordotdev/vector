@@ -114,6 +114,7 @@ impl InternalEvent for KafkaReadError {
 #[derive(Debug)]
 pub struct KafkaStatisticsReceived<'a> {
     pub statistics: &'a rdkafka::Statistics,
+    pub expose_lag_metrics: bool,
 }
 
 impl InternalEvent for KafkaStatisticsReceived<'_> {
@@ -149,6 +150,14 @@ impl InternalEvent for KafkaStatisticsReceived<'_> {
             "kafka_consumed_messages_bytes_total",
             self.statistics.rxmsg_bytes as u64
         );
+
+        if self.expose_lag_metrics {
+            for (topic_id, topic) in &self.statistics.topics {
+                for (partition_id, partition) in &topic.partitions {
+                    gauge!("kafka_consumer_lag", partition.consumer_lag as f64, "topic_id" => topic_id.clone(), "partition_id" => partition_id.to_string());
+                }
+            }
+        }
     }
 }
 
@@ -160,7 +169,7 @@ impl InternalEvent for KafkaHeaderExtractionError<'_> {
     fn emit(self) {
         error!(
             message = "Failed to extract header. Value should be a map of String -> Bytes.",
-            error_code = "extracing_header",
+            error_code = "extracting_header",
             error_type = error_type::PARSER_FAILED,
             stage = error_stage::RECEIVING,
             header_field = self.header_field,
@@ -168,7 +177,7 @@ impl InternalEvent for KafkaHeaderExtractionError<'_> {
         );
         counter!(
             "component_errors_total", 1,
-            "error_code" => "extracing_header",
+            "error_code" => "extracting_header",
             "error_type" => error_type::PARSER_FAILED,
             "stage" => error_stage::RECEIVING,
         );

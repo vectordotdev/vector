@@ -77,10 +77,10 @@ async fn firehose_put_records() {
             imds: ImdsAuthentication::default(),
         })),
         endpoints: vec![elasticsearch_address()],
-        bulk: Some(BulkConfig {
+        bulk: BulkConfig {
             index: Template::try_from(stream.clone()).expect("unable to parse Template"),
             ..Default::default()
-        }),
+        },
         aws: Some(region),
         ..Default::default()
     };
@@ -137,7 +137,7 @@ async fn firehose_client() -> aws_sdk_firehose::Client {
     create_client::<KinesisFirehoseClientBuilder>(
         &auth,
         region_endpoint.region(),
-        region_endpoint.endpoint(),
+        region_endpoint.endpoint().unwrap(),
         &proxy,
         &None,
         true,
@@ -156,7 +156,7 @@ async fn ensure_elasticsearch_domain(domain_name: String) -> String {
                     .await
                     .unwrap(),
             )
-            .endpoint_url(test_region_endpoint().endpoint().unwrap())
+            .endpoint_resolver(test_region_endpoint().endpoint().unwrap().unwrap())
             .region(test_region_endpoint().region())
             .build(),
     );

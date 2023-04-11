@@ -1,8 +1,7 @@
-args:
-- --features
+features:
 - redis-integration-tests
-- --lib
-- '::redis::'
+
+test_filter: "::redis::"
 
 env:
   REDIS_URL: redis://redis:6379/0

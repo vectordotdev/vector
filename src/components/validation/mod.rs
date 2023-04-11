@@ -6,7 +6,7 @@ mod test_case;
 pub mod util;
 mod validators;
 
-use crate::{sinks::Sinks, sources::Sources, transforms::Transforms};
+use crate::{config::BoxedSource, config::BoxedTransform, sinks::Sinks};
 
 pub use self::resources::*;
 #[cfg(feature = "component-validation-runner")]
@@ -37,13 +37,13 @@ impl ComponentType {
 
 /// Component type-specific configuration.
 #[allow(clippy::large_enum_variant)]
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum ComponentConfiguration {
     /// A source component.
-    Source(Sources),
+    Source(BoxedSource),
 
     /// A transform component.
-    Transform(Transforms),
+    Transform(BoxedTransform),
 
     /// A sink component.
     Sink(Sinks),
@@ -64,7 +64,7 @@ pub struct ValidationConfiguration {
 
 impl ValidationConfiguration {
     /// Creates a new `ValidationConfiguration` for a source.
-    pub fn from_source<C: Into<Sources>>(
+    pub fn from_source<C: Into<BoxedSource>>(
         component_name: &'static str,
         config: C,
         external_resource: Option<ExternalResource>,
@@ -78,10 +78,10 @@ impl ValidationConfiguration {
     }
 
     /// Creates a new `ValidationConfiguration` for a transform.
-    pub fn from_transform<C: Into<Transforms>>(component_name: &'static str, config: C) -> Self {
+    pub fn from_transform(component_name: &'static str, config: impl Into<BoxedTransform>) -> Self {
         Self {
             component_name,
-            component_type: ComponentType::Source,
+            component_type: ComponentType::Transform,
             component_configuration: ComponentConfiguration::Transform(config.into()),
             external_resource: None,
         }

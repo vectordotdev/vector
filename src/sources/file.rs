@@ -18,13 +18,14 @@ use tokio::{sync::oneshot, task::spawn_blocking};
 use tracing::{Instrument, Span};
 use value::Kind;
 use vector_common::finalizer::OrderedFinalizer;
-use vector_config::{configurable_component, NamedComponent};
+use vector_config::configurable_component;
 use vector_core::config::{LegacyKey, LogNamespace};
 
 use super::util::{EncodingConfig, MultilineConfig};
 use crate::{
     config::{
-        log_schema, DataType, Output, SourceAcknowledgementsConfig, SourceConfig, SourceContext,
+        log_schema, DataType, SourceAcknowledgementsConfig, SourceConfig, SourceContext,
+        SourceOutput,
     },
     encoding_transcode::{Decoder, Encoder},
     event::{BatchNotifier, BatchStatus, LogEvent},
@@ -69,7 +70,7 @@ enum BuildError {
 
 /// Configuration for the `file` source.
 #[serde_as]
-#[configurable_component(source("file"))]
+#[configurable_component(source("file", "Collect logs from files."))]
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct FileConfig {
@@ -88,7 +89,7 @@ pub struct FileConfig {
 
     /// Overrides the name of the log field used to add the file path to each event.
     ///
-    /// The value will be the full path to the file where the event was read message.
+    /// The value is the full path to the file where the event was read message.
     ///
     /// Set to `""` to suppress this key.
     #[serde(default = "default_file_key")]
@@ -119,7 +120,7 @@ pub struct FileConfig {
     #[configurable(metadata(docs::examples = 600))]
     pub ignore_older_secs: Option<u64>,
 
-    /// The maximum size of a line before it will be discarded.
+    /// The maximum size of a line before it is discarded.
     ///
     /// This protects against malformed lines or tailing incorrect files.
     #[serde(default = "default_max_line_bytes")]
@@ -149,7 +150,7 @@ pub struct FileConfig {
 
     /// Enables adding the file offset to each event and sets the name of the log field used.
     ///
-    /// The value will be the byte offset of the start of the line within the file.
+    /// The value is the byte offset of the start of the line within the file.
     ///
     /// Off by default, the offset is only added to the event if this is set.
     #[serde(default)]
@@ -207,9 +208,9 @@ pub struct FileConfig {
     #[serde(default)]
     pub oldest_first: bool,
 
-    /// Timeout from reaching `EOF` after which file will be removed from filesystem, unless new data is written in the meantime.
+    /// Timeout from reaching `EOF` after which the file is removed from the filesystem, unless new data is written in the meantime.
     ///
-    /// If not specified, files will not be removed.
+    /// If not specified, files are not removed.
     #[serde(alias = "remove_after", default)]
     #[configurable(metadata(docs::type_unit = "seconds"))]
     #[configurable(metadata(docs::examples = 0))]
@@ -392,6 +393,7 @@ impl Default for FileConfig {
 impl_generate_config_from_default!(FileConfig);
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "file")]
 impl SourceConfig for FileConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         // add the source name as a subdir, so that multiple sources can
@@ -430,7 +432,7 @@ impl SourceConfig for FileConfig {
         ))
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         let file_key = self.file_key.clone().path.map(LegacyKey::Overwrite);
         let host_key = self.host_key.clone().path.map(LegacyKey::Overwrite);
 
@@ -465,7 +467,7 @@ impl SourceConfig for FileConfig {
                 None,
             );
 
-        vec![Output::default(DataType::Log).with_schema_definition(schema_definition)]
+        vec![SourceOutput::new_logs(DataType::Log, schema_definition)]
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -551,7 +553,8 @@ pub fn file_source(
         // The shutdown sent in to the finalizer is the global
         // shutdown handle used to tell it to stop accepting new batch
         // statuses and just wait for the remaining acks to come in.
-        let (finalizer, mut ack_stream) = OrderedFinalizer::<FinalizerEntry>::new(shutdown.clone());
+        let (finalizer, mut ack_stream) = OrderedFinalizer::<FinalizerEntry>::new(None);
+
         // We set up a separate shutdown signal to tie together the
         // finalizer and the checkpoint writer task in the file
         // server, to make it continue to write out updated
@@ -747,7 +750,7 @@ fn create_event(
 
     log_namespace.insert_vector_metadata(
         &mut event,
-        log_schema().source_type_key(),
+        Some(log_schema().source_type_key()),
         path!("source_type"),
         Bytes::from_static(FileConfig::NAME.as_bytes()),
     );
@@ -941,62 +944,70 @@ mod tests {
 
     #[test]
     fn output_schema_definition_vector_namespace() {
-        let definition = FileConfig::default().outputs(LogNamespace::Vector)[0]
-            .clone()
-            .log_schema_definition
-            .unwrap();
+        let definitions = FileConfig::default()
+            .outputs(LogNamespace::Vector)
+            .remove(0)
+            .schema_definition(true);
 
         assert_eq!(
-            definition,
-            Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
-                .with_meaning(OwnedTargetPath::event_root(), "message")
-                .with_metadata_field(
-                    &owned_value_path!("vector", "source_type"),
-                    Kind::bytes(),
-                    None
-                )
-                .with_metadata_field(
-                    &owned_value_path!("vector", "ingest_timestamp"),
-                    Kind::timestamp(),
-                    None
-                )
-                .with_metadata_field(
-                    &owned_value_path!("file", "host"),
-                    Kind::bytes().or_undefined(),
-                    Some("host")
-                )
-                .with_metadata_field(&owned_value_path!("file", "offset"), Kind::integer(), None)
-                .with_metadata_field(&owned_value_path!("file", "path"), Kind::bytes(), None)
+            definitions,
+            Some(
+                Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
+                    .with_meaning(OwnedTargetPath::event_root(), "message")
+                    .with_metadata_field(
+                        &owned_value_path!("vector", "source_type"),
+                        Kind::bytes(),
+                        None
+                    )
+                    .with_metadata_field(
+                        &owned_value_path!("vector", "ingest_timestamp"),
+                        Kind::timestamp(),
+                        None
+                    )
+                    .with_metadata_field(
+                        &owned_value_path!("file", "host"),
+                        Kind::bytes().or_undefined(),
+                        Some("host")
+                    )
+                    .with_metadata_field(
+                        &owned_value_path!("file", "offset"),
+                        Kind::integer(),
+                        None
+                    )
+                    .with_metadata_field(&owned_value_path!("file", "path"), Kind::bytes(), None)
+            )
         )
     }
 
     #[test]
     fn output_schema_definition_legacy_namespace() {
-        let definition = FileConfig::default().outputs(LogNamespace::Legacy)[0]
-            .clone()
-            .log_schema_definition
-            .unwrap();
+        let definitions = FileConfig::default()
+            .outputs(LogNamespace::Legacy)
+            .remove(0)
+            .schema_definition(true);
 
         assert_eq!(
-            definition,
-            Definition::new_with_default_metadata(
-                Kind::object(Collection::empty()),
-                [LogNamespace::Legacy]
+            definitions,
+            Some(
+                Definition::new_with_default_metadata(
+                    Kind::object(Collection::empty()),
+                    [LogNamespace::Legacy]
+                )
+                .with_event_field(
+                    &owned_value_path!("message"),
+                    Kind::bytes(),
+                    Some("message")
+                )
+                .with_event_field(&owned_value_path!("source_type"), Kind::bytes(), None)
+                .with_event_field(&owned_value_path!("timestamp"), Kind::timestamp(), None)
+                .with_event_field(
+                    &owned_value_path!("host"),
+                    Kind::bytes().or_undefined(),
+                    Some("host")
+                )
+                .with_event_field(&owned_value_path!("offset"), Kind::undefined(), None)
+                .with_event_field(&owned_value_path!("file"), Kind::bytes(), None)
             )
-            .with_event_field(
-                &owned_value_path!("message"),
-                Kind::bytes(),
-                Some("message")
-            )
-            .with_event_field(&owned_value_path!("source_type"), Kind::bytes(), None)
-            .with_event_field(&owned_value_path!("timestamp"), Kind::timestamp(), None)
-            .with_event_field(
-                &owned_value_path!("host"),
-                Kind::bytes().or_undefined(),
-                Some("host")
-            )
-            .with_event_field(&owned_value_path!("offset"), Kind::undefined(), None)
-            .with_event_field(&owned_value_path!("file"), Kind::bytes(), None)
         )
     }
 
@@ -1019,7 +1030,7 @@ mod tests {
         assert_eq!(log["offset"], 0.into());
         assert_eq!(log[log_schema().message_key()], "hello world".into());
         assert_eq!(log[log_schema().source_type_key()], "file".into());
-        assert!(log[log_schema().timestamp_key()].is_timestamp());
+        assert!(log[log_schema().timestamp_key().unwrap().to_string()].is_timestamp());
     }
 
     #[test]
@@ -1041,7 +1052,7 @@ mod tests {
         assert_eq!(log["off"], 0.into());
         assert_eq!(log[log_schema().message_key()], "hello world".into());
         assert_eq!(log[log_schema().source_type_key()], "file".into());
-        assert!(log[log_schema().timestamp_key()].is_timestamp());
+        assert!(log[log_schema().timestamp_key().unwrap().to_string()].is_timestamp());
     }
 
     #[test]
@@ -1446,7 +1457,7 @@ mod tests {
                         .to_string(),
                     log_schema().host_key().to_string(),
                     log_schema().message_key().to_string(),
-                    log_schema().timestamp_key().to_string(),
+                    log_schema().timestamp_key().unwrap().to_string(),
                     log_schema().source_type_key().to_string()
                 ]
                 .into_iter()
@@ -1563,6 +1574,54 @@ mod tests {
         .await;
         let lines = extract_messages_string(received);
         assert_eq!(lines, vec!["the line"]);
+    }
+
+    #[tokio::test]
+    async fn file_duplicate_processing_after_restart() {
+        let dir = tempdir().unwrap();
+        let config = file::FileConfig {
+            include: vec![dir.path().join("*")],
+            ..test_default_file_config(&dir)
+        };
+
+        let path = dir.path().join("file");
+        let mut file = File::create(&path).unwrap();
+
+        let line_count = 4000;
+        for i in 0..line_count {
+            writeln!(&mut file, "Here's a line for you: {}", i).unwrap();
+        }
+        sleep_500_millis().await;
+
+        // First time server runs it should pick up a bunch of lines
+        let received = run_file_source(
+            &config,
+            true,
+            Acks,
+            LogNamespace::Legacy,
+            // shutdown signal is sent after this duration
+            sleep_500_millis(),
+        )
+        .await;
+        let lines = extract_messages_string(received);
+
+        // ...but not all the lines; if the first run processed the entire file, we may not hit the
+        // bug we're testing for, which happens if the finalizer stream exits on shutdown with pending acks
+        assert!(lines.len() < line_count);
+
+        // Restart the server, and it should read the rest without duplicating any
+        let received = run_file_source(
+            &config,
+            true,
+            Acks,
+            LogNamespace::Legacy,
+            sleep(Duration::from_secs(5)),
+        )
+        .await;
+        let lines2 = extract_messages_string(received);
+
+        // Between both runs, we should have the expected number of lines
+        assert_eq!(lines.len() + lines2.len(), line_count);
     }
 
     #[tokio::test]
@@ -2162,7 +2221,7 @@ mod tests {
             for i in 0..n {
                 writeln!(&mut file, "{}", i).unwrap();
             }
-            std::mem::drop(file);
+            drop(file);
 
             for _ in 0..10 {
                 // Wait for remove grace period to end.

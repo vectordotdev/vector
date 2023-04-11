@@ -1,8 +1,7 @@
-args:
-- --features
+features:
 - http-client-integration-tests
-- --lib
-- 'sources::http_client::'
+
+test_filter: 'sources::http_client::'
 
 env:
   DUFS_ADDRESS: http://dufs:5000

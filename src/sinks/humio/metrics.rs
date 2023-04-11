@@ -3,6 +3,7 @@ use codecs::JsonSerializerConfig;
 use futures::StreamExt;
 use futures_util::stream::BoxStream;
 use indoc::indoc;
+use lookup::lookup_v2::OptionalValuePath;
 use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
 use vector_core::{sink::StreamSink, transform::Transform};
@@ -52,7 +53,7 @@ pub struct HumioMetricsConfig {
     /// The base URL of the Humio instance.
     ///
     /// The scheme (`http` or `https`) must be specified. No path should be included since the paths defined
-    /// by the [`Splunk`][splunk] api are used.
+    /// by the [`Splunk`][splunk] API are used.
     ///
     /// [splunk]: https://docs.splunk.com/Documentation/Splunk/8.0.0/Data/HECRESTendpoints
     #[serde(alias = "host")]
@@ -70,7 +71,7 @@ pub struct HumioMetricsConfig {
 
     /// The type of events sent to this sink. Humio uses this as the name of the parser to use to ingest the data.
     ///
-    /// If unset, Humio will default it to none.
+    /// If unset, Humio defaults it to none.
     #[configurable(metadata(
         docs::examples = "json",
         docs::examples = "none",
@@ -78,7 +79,7 @@ pub struct HumioMetricsConfig {
     ))]
     event_type: Option<Template>,
 
-    /// Overrides the name of the log field used to grab the hostname to send to Humio.
+    /// Overrides the name of the log field used to retrieve the hostname to send to Humio.
     ///
     /// By default, the [global `log_schema.host_key` option][global_host_key] is used.
     ///
@@ -172,7 +173,9 @@ impl SinkConfig for HumioMetricsConfig {
             timestamp_nanos_key: None,
             acknowledgements: Default::default(),
             // hard coded as humio expects this format so no sense in making it configurable
-            timestamp_key: "timestamp".to_string(),
+            timestamp_key: OptionalValuePath {
+                path: Some(lookup::owned_value_path!("timestamp")),
+            },
         };
 
         let (sink, healthcheck) = sink.clone().build(cx).await?;
@@ -291,8 +294,8 @@ mod tests {
                 )
                 .with_tags(Some(metric_tags!("os.host" => "somehost")))
                 .with_timestamp(Some(
-                    Utc.ymd(2020, 8, 18)
-                        .and_hms_opt(21, 0, 1)
+                    Utc.with_ymd_and_hms(2020, 8, 18, 21, 0, 1)
+                        .single()
                         .expect("invalid timestamp"),
                 )),
             ),
@@ -307,8 +310,8 @@ mod tests {
                 )
                 .with_tags(Some(metric_tags!("os.host" => "somehost")))
                 .with_timestamp(Some(
-                    Utc.ymd(2020, 8, 18)
-                        .and_hms_opt(21, 0, 2)
+                    Utc.with_ymd_and_hms(2020, 8, 18, 21, 0, 2)
+                        .single()
                         .expect("invalid timestamp"),
                 )),
             ),
@@ -359,8 +362,8 @@ mod tests {
                 "code" => "success"
             )))
             .with_timestamp(Some(
-                Utc.ymd(2020, 8, 18)
-                    .and_hms_opt(21, 0, 1)
+                Utc.with_ymd_and_hms(2020, 8, 18, 21, 0, 1)
+                    .single()
                     .expect("invalid timestamp"),
             )),
         )];

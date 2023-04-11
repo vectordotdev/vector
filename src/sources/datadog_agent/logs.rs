@@ -7,7 +7,6 @@ use http::StatusCode;
 use lookup::path;
 use tokio_util::codec::Decoder;
 use vector_common::internal_event::{CountByteSize, InternalEventHandle as _};
-use vector_config::NamedComponent;
 use vector_core::{config::LegacyKey, EstimatedJsonEncodedSizeOf};
 use warp::{filters::BoxedFilter, path as warp_path, path::FullPath, reply::Response, Filter};
 

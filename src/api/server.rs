@@ -31,10 +31,13 @@ impl Server {
         config: &config::Config,
         watch_rx: topology::WatchRx,
         running: Arc<AtomicBool>,
+        runtime: &tokio::runtime::Runtime,
     ) -> crate::Result<Self> {
         let routes = make_routes(config.api.playground, watch_rx, running);
 
         let (_shutdown, rx) = oneshot::channel();
+        // warp uses `tokio::spawn` and so needs us to enter the runtime context.
+        let _guard = runtime.enter();
         let (addr, server) = warp::serve(routes)
             .try_bind_with_graceful_shutdown(
                 config.api.address.expect("No socket address"),
@@ -54,7 +57,7 @@ impl Server {
         schema::components::update_config(config);
 
         // Spawn the server in the background.
-        tokio::spawn(server);
+        runtime.spawn(server);
 
         Ok(Self { _shutdown, addr })
     }

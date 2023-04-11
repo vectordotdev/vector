@@ -23,7 +23,6 @@ env:
   DD_ENV: "ci"
   DD_API_KEY: ${{ secrets.DD_API_KEY }}
   RUST_BACKTRACE: full
-  RUST_TEST_THREADS: 1
   TEST_LOG: vector=debug
   VERBOSE: true
   CI: true
@@ -97,7 +96,7 @@ jobs:
   # Then, modify the `cross-linux` job to run `test` instead of `build`.
   test-linux:
     name: Unit - x86_64-unknown-linux-gnu
-    runs-on: [linux, test-runner]
+    runs-on: [linux, ubuntu-20.04-8core]
     needs: changes
     env:
       CARGO_INCREMENTAL: 0
@@ -127,7 +126,7 @@ jobs:
 
   test-cli:
     name: CLI - Linux
-    runs-on: [linux, test-runner]
+    runs-on: [linux, ubuntu-20.04-8core]
     needs: changes
     env:
       CARGO_INCREMENTAL: 0
@@ -155,7 +154,7 @@ jobs:
 
   test-misc:
     name: Miscellaneous - Linux
-    runs-on: [linux, test-runner]
+    runs-on: [linux, ubuntu-20.04-8core]
     needs: changes
     env:
       CARGO_INCREMENTAL: 0
@@ -182,7 +181,7 @@ jobs:
 
   cross-linux:
     name: Cross - ${{ matrix.target }}
-    runs-on: [linux, test-runner]
+    runs-on: [linux, ubuntu-20.04-8core]
     needs: changes
     env:
       CARGO_INCREMENTAL: 0
@@ -264,7 +263,7 @@ jobs:
 
   test-windows:
     name: Unit - Windows
-    runs-on: [windows, test-runner]
+    runs-on: [windows, windows-2019-8core]
     needs: changes
     if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
@@ -275,31 +274,18 @@ jobs:
   test-vrl:
     name: VRL - Linux
     continue-on-error: true
-    runs-on: [linux, test-runner]
+    runs-on: [linux, ubuntu-20.04-8core]
     needs: changes
     if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.cue == 'true' }}
     steps:
       - uses: actions/checkout@v3
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
-      - run: make test-vrl
-
-  test-vrl-wasm:
-    name: VRL WASM - Linux
-    continue-on-error: true
-    runs-on: [linux, test-runner]
-    needs: changes
-    if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.cue == 'true' }}
-    steps:
-      - uses: actions/checkout@v3
-      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - run: bash scripts/environment/prepare.sh
-      - run: bash scripts/ensure-wasm-target-installed.sh
-      - run: make compile-vrl-wasm
+      - run: cargo vdev test-vrl
 
   check-component-features:
     name: Component Features - Linux
-    runs-on: [linux, test-runner]
+    runs-on: [linux, ubuntu-20.04-8core]
     needs: changes
     if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
@@ -311,7 +297,7 @@ jobs:
 
   check-msrv:
     name: Check minimum supported Rust version
-    runs-on: [linux, test-runner]
+    runs-on: [linux, ubuntu-20.04-8core]
     needs: changes
     if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
@@ -322,7 +308,7 @@ jobs:
 
   checks:
     name: Checks
-    runs-on: [linux, test-runner]
+    runs-on: [linux, ubuntu-20.04-8core]
     needs: changes
     env:
       CARGO_INCREMENTAL: 0
@@ -370,11 +356,15 @@ jobs:
       - name: Check Component Docs
         if: needs.changes.outputs.source == 'true' || needs.changes.outputs.component_docs == 'true'
         run: make check-component-docs
+      - name: Check Rust Docs
+        if: needs.changes.outputs.source == 'true'
+        run: cd rust-doc && make docs
       - uses: actions/upload-artifact@v3
         with:
           name: "config-schema.json"
           path: "/tmp/vector-config-schema.json"
         if: success() || failure()
+
   master-failure:
     name: master-failure
     if: failure() && github.ref == 'refs/heads/master'

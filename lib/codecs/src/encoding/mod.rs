@@ -8,11 +8,11 @@ use std::fmt::Debug;
 
 use bytes::BytesMut;
 pub use format::{
-    AvroSerializer, AvroSerializerConfig, AvroSerializerOptions, GelfSerializer,
-    GelfSerializerConfig, JsonSerializer, JsonSerializerConfig, LogfmtSerializer,
-    LogfmtSerializerConfig, NativeJsonSerializer, NativeJsonSerializerConfig, NativeSerializer,
-    NativeSerializerConfig, RawMessageSerializer, RawMessageSerializerConfig, TextSerializer,
-    TextSerializerConfig,
+    AvroSerializer, AvroSerializerConfig, AvroSerializerOptions, CsvSerializer,
+    CsvSerializerConfig, GelfSerializer, GelfSerializerConfig, JsonSerializer,
+    JsonSerializerConfig, LogfmtSerializer, LogfmtSerializerConfig, NativeJsonSerializer,
+    NativeJsonSerializerConfig, NativeSerializer, NativeSerializerConfig, RawMessageSerializer,
+    RawMessageSerializerConfig, TextSerializer, TextSerializerConfig,
 };
 pub use framing::{
     BoxedFramer, BoxedFramingError, BytesEncoder, BytesEncoderConfig, CharacterDelimitedEncoder,
@@ -197,6 +197,15 @@ pub enum SerializerConfig {
         avro: AvroSerializerOptions,
     },
 
+    /// Encodes an event as a CSV message.
+    ///
+    /// This codec must be configured with fields to encode.
+    ///
+    Csv(
+        /// Options for the CSV encoder.
+        CsvSerializerConfig,
+    ),
+
     /// Encodes an event as a [GELF][gelf] message.
     ///
     /// [gelf]: https://docs.graylog.org/docs/gelf
@@ -215,7 +224,7 @@ pub enum SerializerConfig {
     /// [logfmt]: https://brandur.org/logfmt
     Logfmt,
 
-    /// Encodes an event in Vector’s [native Protocol Buffers format][vector_native_protobuf].
+    /// Encodes an event in the [native Protocol Buffers format][vector_native_protobuf].
     ///
     /// This codec is **[experimental][experimental]**.
     ///
@@ -223,7 +232,7 @@ pub enum SerializerConfig {
     /// [experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
     Native,
 
-    /// Encodes an event in Vector’s [native JSON format][vector_native_json].
+    /// Encodes an event in the [native JSON format][vector_native_json].
     ///
     /// This codec is **[experimental][experimental]**.
     ///
@@ -233,20 +242,20 @@ pub enum SerializerConfig {
 
     /// No encoding.
     ///
-    /// This "encoding" simply uses the `message` field of a log event.
+    /// This encoding uses the `message` field of a log event.
     ///
-    /// Users should take care if they're modifying their log events (such as by using a `remap`
-    /// transform, etc) and removing the message field while doing additional parsing on it, as this
+    /// Be careful if you are modifying your log events (for example, by using a `remap`
+    /// transform) and removing the message field while doing additional parsing on it, as this
     /// could lead to the encoding emitting empty strings for the given event.
     RawMessage,
 
     /// Plain text encoding.
     ///
-    /// This "encoding" simply uses the `message` field of a log event. For metrics, it uses an
+    /// This encoding uses the `message` field of a log event. For metrics, it uses an
     /// encoding that resembles the Prometheus export format.
     ///
-    /// Users should take care if they're modifying their log events (such as by using a `remap`
-    /// transform, etc) and removing the message field while doing additional parsing on it, as this
+    /// Be careful if you are modifying your log events (for example, by using a `remap`
+    /// transform) and removing the message field while doing additional parsing on it, as this
     /// could lead to the encoding emitting empty strings for the given event.
     Text(
         /// Encoding options specific to the text serializer.
@@ -257,6 +266,12 @@ pub enum SerializerConfig {
 impl From<AvroSerializerConfig> for SerializerConfig {
     fn from(config: AvroSerializerConfig) -> Self {
         Self::Avro { avro: config.avro }
+    }
+}
+
+impl From<CsvSerializerConfig> for SerializerConfig {
+    fn from(config: CsvSerializerConfig) -> Self {
+        Self::Csv(config)
     }
 }
 
@@ -309,6 +324,7 @@ impl SerializerConfig {
             SerializerConfig::Avro { avro } => Ok(Serializer::Avro(
                 AvroSerializerConfig::new(avro.schema.clone()).build()?,
             )),
+            SerializerConfig::Csv(config) => Ok(Serializer::Csv(config.build()?)),
             SerializerConfig::Gelf => Ok(Serializer::Gelf(GelfSerializerConfig::new().build())),
             SerializerConfig::Json(config) => Ok(Serializer::Json(config.build())),
             SerializerConfig::Logfmt => Ok(Serializer::Logfmt(LogfmtSerializerConfig.build())),
@@ -340,7 +356,8 @@ impl SerializerConfig {
             SerializerConfig::Avro { .. } | SerializerConfig::Native => {
                 FramingConfig::LengthDelimited
             }
-            SerializerConfig::Gelf
+            SerializerConfig::Csv(_)
+            | SerializerConfig::Gelf
             | SerializerConfig::Json(_)
             | SerializerConfig::Logfmt
             | SerializerConfig::NativeJson
@@ -355,6 +372,7 @@ impl SerializerConfig {
             SerializerConfig::Avro { avro } => {
                 AvroSerializerConfig::new(avro.schema.clone()).input_type()
             }
+            SerializerConfig::Csv(config) => config.input_type(),
             SerializerConfig::Gelf { .. } => GelfSerializerConfig::input_type(),
             SerializerConfig::Json(config) => config.input_type(),
             SerializerConfig::Logfmt => LogfmtSerializerConfig.input_type(),
@@ -371,6 +389,7 @@ impl SerializerConfig {
             SerializerConfig::Avro { avro } => {
                 AvroSerializerConfig::new(avro.schema.clone()).schema_requirement()
             }
+            SerializerConfig::Csv(config) => config.schema_requirement(),
             SerializerConfig::Gelf { .. } => GelfSerializerConfig::schema_requirement(),
             SerializerConfig::Json(config) => config.schema_requirement(),
             SerializerConfig::Logfmt => LogfmtSerializerConfig.schema_requirement(),
@@ -387,6 +406,8 @@ impl SerializerConfig {
 pub enum Serializer {
     /// Uses an `AvroSerializer` for serialization.
     Avro(AvroSerializer),
+    /// Uses a `CsvSerializer` for serialization.
+    Csv(CsvSerializer),
     /// Uses a `GelfSerializer` for serialization.
     Gelf(GelfSerializer),
     /// Uses a `JsonSerializer` for serialization.
@@ -409,6 +430,7 @@ impl Serializer {
         match self {
             Serializer::Json(_) | Serializer::NativeJson(_) | Serializer::Gelf(_) => true,
             Serializer::Avro(_)
+            | Serializer::Csv(_)
             | Serializer::Logfmt(_)
             | Serializer::Text(_)
             | Serializer::Native(_)
@@ -428,6 +450,7 @@ impl Serializer {
             Serializer::Json(serializer) => serializer.to_json_value(event),
             Serializer::NativeJson(serializer) => serializer.to_json_value(event),
             Serializer::Avro(_)
+            | Serializer::Csv(_)
             | Serializer::Logfmt(_)
             | Serializer::Text(_)
             | Serializer::Native(_)
@@ -441,6 +464,12 @@ impl Serializer {
 impl From<AvroSerializer> for Serializer {
     fn from(serializer: AvroSerializer) -> Self {
         Self::Avro(serializer)
+    }
+}
+
+impl From<CsvSerializer> for Serializer {
+    fn from(serializer: CsvSerializer) -> Self {
+        Self::Csv(serializer)
     }
 }
 
@@ -492,6 +521,7 @@ impl tokio_util::codec::Encoder<Event> for Serializer {
     fn encode(&mut self, event: Event, buffer: &mut BytesMut) -> Result<(), Self::Error> {
         match self {
             Serializer::Avro(serializer) => serializer.encode(event, buffer),
+            Serializer::Csv(serializer) => serializer.encode(event, buffer),
             Serializer::Gelf(serializer) => serializer.encode(event, buffer),
             Serializer::Json(serializer) => serializer.encode(event, buffer),
             Serializer::Logfmt(serializer) => serializer.encode(event, buffer),

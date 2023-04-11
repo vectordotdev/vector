@@ -1,0 +1,11 @@
+features:
+- appsignal-integration-tests
+
+test_filter: '::appsignal::integration_tests::'
+
+runner:
+  env:
+    TEST_APPSIGNAL_PUSH_API_KEY:
+
+matrix:
+  version: [latest]

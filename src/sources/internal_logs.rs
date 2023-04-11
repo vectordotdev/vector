@@ -4,7 +4,7 @@ use futures::{stream, StreamExt};
 use lookup::lookup_v2::OptionalValuePath;
 use lookup::{owned_value_path, path, OwnedValuePath};
 use value::Kind;
-use vector_config::{configurable_component, NamedComponent};
+use vector_config::configurable_component;
 use vector_core::config::log_schema;
 use vector_core::{
     config::{LegacyKey, LogNamespace},
@@ -12,7 +12,7 @@ use vector_core::{
 };
 
 use crate::{
-    config::{DataType, Output, SourceConfig, SourceContext},
+    config::{DataType, SourceConfig, SourceContext, SourceOutput},
     event::{EstimatedJsonEncodedSizeOf, Event},
     internal_events::{InternalLogsBytesReceived, InternalLogsEventsReceived, StreamClosedError},
     shutdown::ShutdownSignal,
@@ -21,7 +21,10 @@ use crate::{
 };
 
 /// Configuration for the `internal_logs` source.
-#[configurable_component(source("internal_logs"))]
+#[configurable_component(source(
+    "internal_logs",
+    "Expose internal log messages emitted by the running Vector instance."
+))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct InternalLogsConfig {
@@ -98,6 +101,7 @@ impl InternalLogsConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "internal_logs")]
 impl SourceConfig for InternalLogsConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let host_key = self.host_key.clone().path;
@@ -117,11 +121,11 @@ impl SourceConfig for InternalLogsConfig {
         )))
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         let schema_definition =
             self.schema_definition(global_log_namespace.merge(self.log_namespace));
 
-        vec![Output::default(DataType::Log).with_schema_definition(schema_definition)]
+        vec![SourceOutput::new_logs(DataType::Log, schema_definition)]
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -306,7 +310,7 @@ mod tests {
                 assert_eq!(log["vector.component_type"], "internal_logs".into());
             } else {
                 // The last event occurs in a nested span. Here, we expect
-                // parent fields to be preservered (unless overwritten), new
+                // parent fields to be preserved (unless overwritten), new
                 // fields to be added, and filtered fields to not exist.
                 assert_eq!(log["vector.component_id"], "foo".into());
                 assert_eq!(log["vector.component_kind"], "bar".into());
@@ -335,10 +339,10 @@ mod tests {
     fn output_schema_definition_vector_namespace() {
         let config = InternalLogsConfig::default();
 
-        let definition = config.outputs(LogNamespace::Vector)[0]
-            .clone()
-            .log_schema_definition
-            .unwrap();
+        let definitions = config
+            .outputs(LogNamespace::Vector)
+            .remove(0)
+            .schema_definition(true);
 
         let expected_definition =
             Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
@@ -364,7 +368,7 @@ mod tests {
                     Some("host"),
                 );
 
-        assert_eq!(definition, expected_definition)
+        assert_eq!(definitions, Some(expected_definition))
     }
 
     #[test]
@@ -375,10 +379,10 @@ mod tests {
 
         config.pid_key = OptionalValuePath::from(owned_value_path!(pid_key));
 
-        let definition = config.outputs(LogNamespace::Legacy)[0]
-            .clone()
-            .log_schema_definition
-            .unwrap();
+        let definitions = config
+            .outputs(LogNamespace::Legacy)
+            .remove(0)
+            .schema_definition(true);
 
         let expected_definition = Definition::new_with_default_metadata(
             Kind::object(Collection::empty()),
@@ -398,6 +402,6 @@ mod tests {
             Some("host"),
         );
 
-        assert_eq!(definition, expected_definition)
+        assert_eq!(definitions, Some(expected_definition))
     }
 }

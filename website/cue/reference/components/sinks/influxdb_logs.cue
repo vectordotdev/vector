@@ -61,7 +61,7 @@ components: sinks: influxdb_logs: {
 
 				The following matrix outlines how Log Event fields are mapped into InfluxDB Line Protocol:
 
-				| Field         | Line Protocol     |                                                                                                                                                 |
+				| Field         | Line Protocol     |
 				|---------------|-------------------|
 				| host          | tag               |
 				| message       | field             |

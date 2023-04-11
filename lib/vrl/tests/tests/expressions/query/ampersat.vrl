@@ -1,3 +1,0 @@
-# object: { "foo@bar": { "@buz" : [ { "wibble@" : 42 } ] } }
-# result: 42
-.foo@bar.(@noog | @buz)[0].wibble@

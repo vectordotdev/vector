@@ -6,13 +6,17 @@ use http::{
     Request, StatusCode, Uri,
 };
 use hyper::Body;
+use lookup::lookup_v2::OptionalValuePath;
+use lookup::{OwnedValuePath, PathPrefix};
 use once_cell::sync::Lazy;
 use openssl::{base64, hash, pkey, sign};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
+use value::Kind;
 use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
+use vector_core::schema;
 
 use crate::{
     codecs::Transformer,
@@ -36,7 +40,7 @@ fn default_host() -> String {
 
 /// Configuration for the `azure_monitor_logs` sink.
 #[configurable_component(sink("azure_monitor_logs"))]
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct AzureMonitorLogsConfig {
     /// The [unique identifier][uniq_id] for the Log Analytics workspace.
@@ -99,6 +103,17 @@ pub struct AzureMonitorLogsConfig {
     #[serde(default)]
     pub request: TowerRequestConfig,
 
+    /// Use this option to customize the log field used as [`TimeGenerated`][1] in Azure.
+    ///
+    /// The setting of `log_schema.timestamp_key`, usually `timestamp`, is used here by default.
+    /// This field should be used in rare cases where `TimeGenerated` should point to a specific log
+    /// field. For example, use this field to set the log field `source_timestamp` as holding the
+    /// value that should be used as `TimeGenerated` on the Azure side.
+    ///
+    /// [1]: https://learn.microsoft.com/en-us/azure/azure-monitor/logs/log-standard-columns#timegenerated
+    #[configurable(metadata(docs::examples = "time_generated"))]
+    pub time_generated_key: Option<OptionalValuePath>,
+
     #[configurable(derived)]
     pub tls: Option<TlsConfig>,
 
@@ -109,6 +124,24 @@ pub struct AzureMonitorLogsConfig {
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     acknowledgements: AcknowledgementsConfig,
+}
+
+impl Default for AzureMonitorLogsConfig {
+    fn default() -> Self {
+        Self {
+            customer_id: "my-customer-id".to_string(),
+            shared_key: Default::default(),
+            log_type: "MyRecordType".to_string(),
+            azure_resource_id: None,
+            host: default_host(),
+            encoding: Default::default(),
+            batch: Default::default(),
+            request: Default::default(),
+            time_generated_key: None,
+            tls: None,
+            acknowledgements: Default::default(),
+        }
+    }
 }
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
@@ -152,10 +185,12 @@ impl SinkConfig for AzureMonitorLogsConfig {
             .limit_max_bytes(MAX_BATCH_SIZE)?
             .into_batch_settings()?;
 
+        let time_generated_key = self.time_generated_key.clone().and_then(|k| k.path);
+
         let tls_settings = TlsSettings::from_options(&self.tls)?;
         let client = HttpClient::new(Some(tls_settings), &cx.proxy)?;
 
-        let sink = AzureMonitorLogsSink::new(self)?;
+        let sink = AzureMonitorLogsSink::new(self, time_generated_key)?;
         let request_settings = self.request.unwrap_with(&TowerRequestConfig::default());
 
         let healthcheck = healthcheck(sink.clone(), client.clone()).boxed();
@@ -173,7 +208,10 @@ impl SinkConfig for AzureMonitorLogsConfig {
     }
 
     fn input(&self) -> Input {
-        Input::log()
+        let requirements =
+            schema::Requirement::empty().optional_meaning("timestamp", Kind::timestamp());
+
+        Input::log().with_schema_requirement(requirements)
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
@@ -185,6 +223,7 @@ impl SinkConfig for AzureMonitorLogsConfig {
 struct AzureMonitorLogsSink {
     uri: Uri,
     customer_id: String,
+    time_generated_key: Option<OwnedValuePath>,
     transformer: Transformer,
     shared_key: pkey::PKey<pkey::Private>,
     default_headers: HeaderMap,
@@ -192,6 +231,7 @@ struct AzureMonitorLogsSink {
 
 struct AzureMonitorLogsEventEncoder {
     transformer: Transformer,
+    time_generated_key: Option<OwnedValuePath>,
 }
 
 impl HttpEventEncoder<serde_json::Value> for AzureMonitorLogsEventEncoder {
@@ -201,20 +241,23 @@ impl HttpEventEncoder<serde_json::Value> for AzureMonitorLogsEventEncoder {
         // it seems like Azure Monitor doesn't support full 9-digit nanosecond precision
         // adjust the timestamp format accordingly, keeping only milliseconds
         let mut log = event.into_log();
-        let timestamp_key = log_schema().timestamp_key();
 
-        let timestamp = if let Some(Value::Timestamp(ts)) = log.remove(timestamp_key) {
+        // `.remove_timestamp()` will return the `timestamp` value regardless of location in Event or
+        // Metadata, the following `insert()` ensures it's encoded in the request.
+        let timestamp = if let Some(Value::Timestamp(ts)) = log.remove_timestamp() {
             ts
         } else {
             chrono::Utc::now()
         };
 
-        let mut entry = serde_json::json!(&log);
-        let object_entry = entry.as_object_mut().unwrap();
-        object_entry.insert(
-            timestamp_key.to_string(),
-            JsonValue::String(timestamp.to_rfc3339_opts(chrono::SecondsFormat::Millis, true)),
-        );
+        if let Some(timestamp_key) = &self.time_generated_key {
+            log.insert(
+                (PathPrefix::Event, timestamp_key),
+                JsonValue::String(timestamp.to_rfc3339_opts(chrono::SecondsFormat::Millis, true)),
+            );
+        }
+
+        let entry = serde_json::json!(&log);
 
         Some(entry)
     }
@@ -229,6 +272,7 @@ impl HttpSink for AzureMonitorLogsSink {
     fn build_encoder(&self) -> Self::Encoder {
         AzureMonitorLogsEventEncoder {
             transformer: self.transformer.clone(),
+            time_generated_key: self.time_generated_key.clone(),
         }
     }
 
@@ -238,7 +282,10 @@ impl HttpSink for AzureMonitorLogsSink {
 }
 
 impl AzureMonitorLogsSink {
-    fn new(config: &AzureMonitorLogsConfig) -> crate::Result<AzureMonitorLogsSink> {
+    fn new(
+        config: &AzureMonitorLogsConfig,
+        time_generated_key: Option<OwnedValuePath>,
+    ) -> crate::Result<AzureMonitorLogsSink> {
         let url = format!(
             "https://{}.{}{}?api-version={}",
             config.customer_id, config.host, RESOURCE, API_VERSION
@@ -248,6 +295,9 @@ impl AzureMonitorLogsSink {
         if config.shared_key.inner().is_empty() {
             return Err("shared_key can't be an empty string".into());
         }
+
+        let time_generated_key =
+            time_generated_key.or_else(|| log_schema().timestamp_key().cloned());
 
         let shared_key_bytes = base64::decode_block(config.shared_key.inner())?;
         let shared_key = pkey::PKey::hmac(&shared_key_bytes)?;
@@ -263,11 +313,12 @@ impl AzureMonitorLogsSink {
         let log_type = HeaderValue::from_str(&config.log_type)?;
         default_headers.insert(LOG_TYPE_HEADER.clone(), log_type);
 
-        let timestamp_key = log_schema().timestamp_key();
-        default_headers.insert(
-            TIME_GENERATED_FIELD_HEADER.clone(),
-            HeaderValue::from_str(timestamp_key)?,
-        );
+        if let Some(timestamp_key) = &time_generated_key {
+            default_headers.insert(
+                TIME_GENERATED_FIELD_HEADER.clone(),
+                HeaderValue::try_from(timestamp_key.to_string())?,
+            );
+        }
 
         if let Some(azure_resource_id) = &config.azure_resource_id {
             if azure_resource_id.is_empty() {
@@ -288,6 +339,7 @@ impl AzureMonitorLogsSink {
             customer_id: config.customer_id.clone(),
             shared_key,
             default_headers,
+            time_generated_key,
         })
     }
 
@@ -396,6 +448,7 @@ mod tests {
         let sink = AzureMonitorLogsSink {
             uri: mock_endpoint,
             customer_id: "weee".to_string(),
+            time_generated_key: log_schema().timestamp_key().cloned(),
             transformer: Default::default(),
             shared_key,
             default_headers: HeaderMap::new(),
@@ -429,11 +482,11 @@ mod tests {
     fn insert_timestamp_kv(log: &mut LogEvent) -> (String, String) {
         let now = chrono::Utc::now();
 
-        let timestamp_key = log_schema().timestamp_key().to_string();
+        let timestamp_key = log_schema().timestamp_key().unwrap();
         let timestamp_value = now.to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
-        log.insert(timestamp_key.as_str(), now);
+        log.insert((PathPrefix::Event, timestamp_key), now);
 
-        (timestamp_key, timestamp_value)
+        (timestamp_key.to_string(), timestamp_value)
     }
 
     #[test]
@@ -448,7 +501,7 @@ mod tests {
         )
         .unwrap();
 
-        let sink = AzureMonitorLogsSink::new(&config).unwrap();
+        let sink = AzureMonitorLogsSink::new(&config, None).unwrap();
         let mut log = [("message", "hello world")]
             .iter()
             .copied()
@@ -478,7 +531,7 @@ mod tests {
         )
         .unwrap();
 
-        let sink = AzureMonitorLogsSink::new(&config).unwrap();
+        let sink = AzureMonitorLogsSink::new(&config, None).unwrap();
         let mut encoder = sink.build_encoder();
 
         let mut log1 = [("message", "hello")].iter().copied().collect::<LogEvent>();
@@ -530,7 +583,10 @@ mod tests {
 
         let time_generated_field = headers.get("time-generated-field").unwrap();
         let timestamp_key = log_schema().timestamp_key();
-        assert_eq!(time_generated_field.to_str().unwrap(), timestamp_key);
+        assert_eq!(
+            time_generated_field.to_str().unwrap(),
+            timestamp_key.unwrap().to_string().as_str()
+        );
 
         let azure_resource_id = headers.get("x-ms-azureresourceid").unwrap();
         assert_eq!(

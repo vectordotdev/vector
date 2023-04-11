@@ -299,6 +299,54 @@ mod tests {
 
     #[cfg(feature = "sources-statsd")]
     #[test]
+    fn test_encode_distribution_aggregated() {
+        let metric1 = Metric::new(
+            "distribution",
+            MetricKind::Incremental,
+            MetricValue::Distribution {
+                samples: vector_core::samples![2.5 => 1, 1.5 => 1, 1.5 => 1],
+                statistic: StatisticKind::Histogram,
+            },
+        )
+        .with_tags(Some(tags()));
+
+        let metric1_part1_compressed = Metric::new(
+            "distribution",
+            MetricKind::Incremental,
+            MetricValue::Distribution {
+                samples: vector_core::samples![2.5 => 1],
+                statistic: StatisticKind::Histogram,
+            },
+        )
+        .with_tags(Some(tags()));
+        let metric1_part2_compressed = Metric::new(
+            "distribution",
+            MetricKind::Incremental,
+            MetricValue::Distribution {
+                samples: vector_core::samples![1.5 => 2],
+                statistic: StatisticKind::Histogram,
+            },
+        )
+        .with_tags(Some(tags()));
+        let event = Event::Metric(metric1);
+        let mut encoder = StatsdEncoder {
+            default_namespace: None,
+        };
+        let mut frame = BytesMut::new();
+        encoder.encode(event, &mut frame).unwrap();
+
+        let res = from_utf8(&frame).unwrap().trim();
+        let mut packets = res.split('\n');
+
+        let metric2 = parse(packets.next().unwrap().trim()).unwrap();
+        vector_common::assert_event_data_eq!(metric1_part2_compressed, metric2);
+
+        let metric3 = parse(packets.next().unwrap().trim()).unwrap();
+        vector_common::assert_event_data_eq!(metric1_part1_compressed, metric3);
+    }
+
+    #[cfg(feature = "sources-statsd")]
+    #[test]
     fn test_encode_set() {
         let metric1 = Metric::new(
             "set",

@@ -1,8 +1,7 @@
-args:
-- --features
+features:
 - nats-integration-tests
-- --lib
-- '::nats::'
+
+test_filter: '::nats::'
 
 env:
   NATS_ADDRESS: nats://nats:4222

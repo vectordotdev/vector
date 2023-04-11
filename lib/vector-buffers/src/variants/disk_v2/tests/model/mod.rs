@@ -374,8 +374,7 @@ impl ReaderModel {
 
                 assert!(
                     self.filesystem.delete_file(file_id),
-                    "invariant violation: tried to delete file id {}, but file does not exist",
-                    file_id
+                    "invariant violation: tried to delete file id {file_id}, but file does not exist"
                 );
             } else {
                 // Not enough delete acks to proceed, so we can't do anything more.
@@ -460,7 +459,7 @@ impl ReaderModel {
     }
 
     fn track_read(&mut self, event_count: usize, bytes_read: u64) {
-        // We tneed to track how many acknowledgements we expect to come in based on the number of
+        // We need to track how many acknowledgements we expect to come in based on the number of
         // records read vs the number of their events that have been acknowledged, as we only adjust
         // the buffer size when a record has been fully acknowledged, since one record may contain
         // multiple events.

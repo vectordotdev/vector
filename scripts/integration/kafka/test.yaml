@@ -1,8 +1,7 @@
-args:
-- --features
+features:
 - kafka-integration-tests
-- --lib
-- '::kafka::'
+
+test_filter: '::kafka::'
 
 env:
   KAFKA_HOST: kafka

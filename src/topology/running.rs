@@ -17,10 +17,7 @@ use vector_common::trigger::DisabledTrigger;
 
 use super::{TapOutput, TapResource};
 use crate::{
-    config::{
-        ComponentKey, Config, ConfigDiff, HealthcheckOptions, Inputs, OutputId, Resource,
-        SourceConfig,
-    },
+    config::{ComponentKey, Config, ConfigDiff, HealthcheckOptions, Inputs, OutputId, Resource},
     event::EventArray,
     shutdown::SourceShutdownCoordinator,
     spawn_named,
@@ -240,8 +237,8 @@ impl RunningTopology {
         // Try to build all of the new components coming from the new configuration.  If we can
         // successfully build them, we'll attempt to connect them up to the topology and spawn their
         // respective component tasks.
-        let new_bufs = buffers.clone();
-        if let Some(mut new_pieces) = build_or_log_errors(&new_config, &diff, new_bufs).await {
+        if let Some(mut new_pieces) = build_or_log_errors(&new_config, &diff, buffers.clone()).await
+        {
             // If healthchecks are configured for any of the changing/new components, try running
             // them before moving forward with connecting and spawning.  In some cases, healthchecks
             // failing may be configured as a non-blocking issue and so we'll still continue on.

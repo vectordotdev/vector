@@ -19,14 +19,14 @@ use vector_common::internal_event::{
 };
 use vector_config::NamedComponent;
 use vector_core::{
-    config::{LegacyKey, LogNamespace, Output},
+    config::{LegacyKey, LogNamespace},
     event::Event,
     EstimatedJsonEncodedSizeOf,
 };
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
-    config::log_schema,
+    config::{log_schema, SourceOutput},
     internal_events::{EventsReceived, FileDescriptorReadError, StreamClosedError},
     shutdown::ShutdownSignal,
     SourceSender,
@@ -85,7 +85,7 @@ pub trait FileDescriptorConfig: NamedComponent {
             out,
             shutdown,
             host_key,
-            Self::NAME,
+            self.get_component_name(),
             hostname,
             log_namespace,
         )))
@@ -210,11 +210,12 @@ fn outputs(
     host_key: &Option<OptionalValuePath>,
     decoding: &DeserializerConfig,
     source_name: &'static str,
-) -> Vec<Output> {
-    let legacy_host_key = host_key
-        .clone()
-        .and_then(|k| k.path)
-        .map(LegacyKey::InsertIfEmpty);
+) -> Vec<SourceOutput> {
+    let legacy_host_key = Some(LegacyKey::InsertIfEmpty(
+        host_key.clone().and_then(|k| k.path).unwrap_or_else(|| {
+            parse_value_path(log_schema().host_key()).expect("log_schema.host_key to be valid path")
+        }),
+    ));
 
     let schema_definition = decoding
         .schema_definition(log_namespace)
@@ -223,9 +224,12 @@ fn outputs(
             legacy_host_key,
             &owned_value_path!("host"),
             Kind::bytes(),
-            None,
+            Some("host"),
         )
         .with_standard_vector_source_metadata();
 
-    vec![Output::default(decoding.output_type()).with_schema_definition(schema_definition)]
+    vec![SourceOutput::new_logs(
+        decoding.output_type(),
+        schema_definition,
+    )]
 }

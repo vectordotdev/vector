@@ -1,8 +1,7 @@
-args:
-- --features
+features:
 - mongodb_metrics-integration-tests
-- --lib
-- '::mongodb_metrics::'
+
+test_filter: '::mongodb_metrics::'
 
 env:
   PRIMARY_MONGODB_ADDRESS: mongodb://root:toor@mongodb-primary

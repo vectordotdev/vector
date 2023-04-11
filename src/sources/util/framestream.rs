@@ -356,7 +356,7 @@ pub trait FrameHandler {
     fn socket_receive_buffer_size(&self) -> Option<usize>;
     fn socket_send_buffer_size(&self) -> Option<usize>;
     fn host_key(&self) -> &Option<OwnedValuePath>;
-    fn timestamp_key(&self) -> &str;
+    fn timestamp_key(&self) -> Option<&OwnedValuePath>;
     fn source_type_key(&self) -> &str;
 }
 
@@ -636,7 +636,7 @@ mod test {
         socket_send_buffer_size: Option<usize>,
         extra_task_handling_routine: F,
         host_key: Option<OwnedValuePath>,
-        timestamp_key: String,
+        timestamp_key: Option<OwnedValuePath>,
         source_type_key: String,
         log_namespace: LogNamespace,
     }
@@ -654,7 +654,7 @@ mod test {
                 socket_send_buffer_size: None,
                 extra_task_handling_routine: extra_routine,
                 host_key: Some(owned_value_path!("test_framestream")),
-                timestamp_key: "my_timestamp".to_string(),
+                timestamp_key: Some(owned_value_path!("my_timestamp")),
                 source_type_key: "source_type".to_string(),
                 log_namespace: LogNamespace::Legacy,
             }
@@ -714,8 +714,8 @@ mod test {
             &self.host_key
         }
 
-        fn timestamp_key(&self) -> &str {
-            self.timestamp_key.as_str()
+        fn timestamp_key(&self) -> Option<&OwnedValuePath> {
+            self.timestamp_key.as_ref()
         }
 
         fn source_type_key(&self) -> &str {
@@ -866,7 +866,7 @@ mod test {
             "world".into(),
         );
 
-        std::mem::drop(sock_stream); //explicitly drop the stream so we don't get warnings about not using it
+        drop(sock_stream); //explicitly drop the stream so we don't get warnings about not using it
 
         // Ensure source actually shut down successfully.
         signal_shutdown(source_name, &mut shutdown).await;
@@ -914,7 +914,7 @@ mod test {
             .iter()
             .any(|e| e.as_log()[&log_schema().message_key()] == "world".into()));
 
-        std::mem::drop(sock_stream); //explicitly drop the stream so we don't get warnings about not using it
+        drop(sock_stream); //explicitly drop the stream so we don't get warnings about not using it
 
         // Ensure source actually shut down successfully.
         signal_shutdown(source_name, &mut shutdown).await;
@@ -944,7 +944,7 @@ mod test {
         assert_eq!(frame_vec[0].as_ref().unwrap().len(), 0);
         assert_accept_frame(frame_vec[1].as_mut().unwrap(), content_type);
 
-        std::mem::drop(sock_stream); //explicitly drop the stream so we don't get warnings about not using it
+        drop(sock_stream); //explicitly drop the stream so we don't get warnings about not using it
 
         // Ensure source actually shut down successfully.
         signal_shutdown(source_name, &mut shutdown).await;
@@ -979,7 +979,7 @@ mod test {
         assert_eq!(frame_vec[0].as_ref().unwrap().len(), 0);
         assert_accept_frame(frame_vec[1].as_mut().unwrap(), content_type);
 
-        std::mem::drop(sock_stream); //explicitly drop the stream so we don't get warnings about not using it
+        drop(sock_stream); //explicitly drop the stream so we don't get warnings about not using it
 
         // Ensure source actually shut down successfully.
         signal_shutdown(source_name, &mut shutdown).await;
@@ -1037,7 +1037,7 @@ mod test {
             "world".into(),
         );
 
-        std::mem::drop(sock_stream); //explicitly drop the stream so we don't get warnings about not using it
+        drop(sock_stream); //explicitly drop the stream so we don't get warnings about not using it
 
         // Ensure source actually shut down successfully.
         signal_shutdown(source_name, &mut shutdown).await;
@@ -1076,8 +1076,6 @@ mod test {
             events[1].as_log()[&log_schema().message_key()],
             "world".into(),
         );
-
-        // std::mem::drop(sock_stream); //explicitly drop the stream so we don't get warnings about not using it
 
         // Ensure source actually shut down successfully.
         signal_shutdown(source_name, &mut shutdown).await;

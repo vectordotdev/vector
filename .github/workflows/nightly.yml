@@ -10,5 +10,5 @@ jobs:
     uses: ./.github/workflows/publish.yml
     with:
       git_ref: ${{ github.ref }}
-      mode: Nightly
+      channel: nightly
     secrets: inherit

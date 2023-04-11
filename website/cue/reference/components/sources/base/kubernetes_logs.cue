@@ -5,7 +5,7 @@ base: components: sources: kubernetes_logs: configuration: {
 		description: """
 			Whether or not to automatically merge partial events.
 
-			Partial here is in respect to messages that were split by the Kubernetes Container Runtime
+			Partial events are messages that were split by the Kubernetes Container Runtime
 			log driver.
 			"""
 		required: false
@@ -26,9 +26,9 @@ base: components: sources: kubernetes_logs: configuration: {
 			How long to delay removing metadata entries from the cache when a pod deletion event
 			event is received from the watch stream.
 
-			A longer delay will allow for continued enrichment of logs after the originating Pod is
-			removed. If relevant metadata has been removed, the log will be forwarded un-enriched and a
-			warning will be emitted.
+			A longer delay allows for continued enrichment of logs after the originating Pod is
+			removed. If relevant metadata has been removed, the log is forwarded un-enriched and a
+			warning is emitted.
 			"""
 		required: false
 		type: uint: {
@@ -108,7 +108,7 @@ base: components: sources: kubernetes_logs: configuration: {
 		description: """
 			The interval at which the file system is polled to identify new files to read from.
 
-			This is quite efficient, yet might still create some load of the
+			This is quite efficient, yet might still create some load on the
 			file system; in addition, it is currently coupled with checksum dumping
 			in the underlying file server, so setting it too low may introduce
 			a significant overhead.
@@ -237,6 +237,18 @@ base: components: sources: kubernetes_logs: configuration: {
 					examples: [".k8s.container_image", "k8s.container_image", ""]
 				}
 			}
+			container_image_id: {
+				description: """
+					Event field for the Container's image ID.
+
+					Set to `""` to suppress this key.
+					"""
+				required: false
+				type: string: {
+					default: ".kubernetes.container_image_id"
+					examples: [".k8s.container_image_id", "k8s.container_image_id", ""]
+				}
+			}
 			container_name: {
 				description: """
 					Event field for the Container's name.
@@ -347,7 +359,7 @@ base: components: sources: kubernetes_logs: configuration: {
 			}
 			pod_uid: {
 				description: """
-					Event field for the Pod's uid.
+					Event field for the Pod's UID.
 
 					Set to `""` to suppress this key.
 					"""

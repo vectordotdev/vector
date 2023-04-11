@@ -1,9 +1,9 @@
 ---
 title: HTTP Client
-description: Pull observability data from an [HTTP](https://en.wikipedia.org/wiki/Hypertext_Transfer_Protocol#Client_request) server at a configured interval.
+description: Pull observability data from an [HTTP](https://en.wikipedia.org/wiki/Hypertext_Transfer_Protocol) server at a configured interval
 kind: source
 layout: component
-tags: ["http", "client", "scrape", "component", "source", "logs", "metrics", traces"]
+tags: ["http", "client", "scrape", "component", "source", "logs", "metrics", "traces"]
 ---
 
 {{/*

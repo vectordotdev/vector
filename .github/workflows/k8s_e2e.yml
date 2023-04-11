@@ -36,7 +36,6 @@ env:
   AWS_SECRET_ACCESS_KEY: "dummy"
   CONTAINER_TOOL: "docker"
   RUST_BACKTRACE: full
-  RUST_TEST_THREADS: 1
   TEST_LOG: vector=debug
   VERBOSE: true
   DISABLE_MOLD: true
@@ -46,7 +45,7 @@ env:
 jobs:
   build-x86_64-unknown-linux-gnu:
     name: Build - x86_64-unknown-linux-gnu
-    runs-on: [linux, test-runner]
+    runs-on: [linux, ubuntu-20.04-8core]
     if: |
       !github.event.pull_request
         || contains(github.event.pull_request.labels.*.name, 'ci-condition: k8s e2e tests enable')
@@ -68,7 +67,7 @@ jobs:
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: echo "::add-matcher::.github/matchers/rust.json"
-      - run: make package-deb-x86_64-unknown-linux-gnu
+      - run: VECTOR_VERSION="$(cargo vdev version)" make package-deb-x86_64-unknown-linux-gnu
       - uses: actions/upload-artifact@v3
         with:
           name: e2e-test-deb-package
@@ -82,7 +81,7 @@ jobs:
   # See https://github.community/t/feature-request-and-use-case-example-to-allow-matrix-in-if-s/126067
   compute-k8s-test-plan:
     name: Compute K8s test plan
-    runs-on: [linux, test-runner]
+    runs-on: [linux, ubuntu-20.04-8core]
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     if: |
@@ -90,7 +89,7 @@ jobs:
         || contains(github.event.pull_request.labels.*.name, 'ci-condition: k8s e2e tests enable')
         || contains(github.event.pull_request.labels.*.name, 'ci-condition: k8s e2e all targets')
     steps:
-      - uses: actions/github-script@v6.4.0
+      - uses: actions/github-script@v6.4.1
         id: set-matrix
         with:
           script: |
@@ -142,7 +141,7 @@ jobs:
 
   test-e2e-kubernetes:
     name: K8s ${{ matrix.kubernetes_version.version }} / ${{ matrix.container_runtime }} (${{ matrix.kubernetes_version.role }})
-    runs-on: [linux, test-runner]
+    runs-on: [linux, ubuntu-20.04-8core]
     needs:
       - build-x86_64-unknown-linux-gnu
       - compute-k8s-test-plan

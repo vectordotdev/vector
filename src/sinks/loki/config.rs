@@ -93,8 +93,8 @@ pub struct LokiConfig {
     ///
     /// Both keys and values are templateable, which enables you to attach dynamic labels to events.
     ///
-    /// Labels can be suffixed with a `*` to allow the expansion of objects into multiple labels,
-    /// see [Label expansion][label_expansion] for more information.
+    /// Valid label keys include `*`, and prefixes ending with `*`, to allow for the expansion of
+    /// objects into multiple labels. See [Label expansion][label_expansion] for more information.
     ///
     /// Note: If the set of labels has high cardinality, this can cause drastic performance issues
     /// with Loki. To prevent this from happening, reduce the number of unique label keys and
@@ -111,7 +111,7 @@ pub struct LokiConfig {
 
     /// Whether or not to remove the timestamp from the event payload.
     ///
-    /// The timestamp will still be sent as event metadata for Loki to use for indexing.
+    /// The timestamp is still sent as event metadata for Loki to use for indexing.
     #[serde(default = "crate::serde::default_true")]
     pub remove_timestamp: bool,
 
@@ -150,9 +150,10 @@ fn loki_labels_examples() -> HashMap<String, String> {
     let mut examples = HashMap::new();
     examples.insert("source".to_string(), "vector".to_string());
     examples.insert(
-        "pod_labels_*".to_string(),
+        "\"pod_labels_*\"".to_string(),
         "{{ kubernetes.pod_labels }}".to_string(),
     );
+    examples.insert("\"*\"".to_string(), "{{ metadata }}".to_string());
     examples.insert(
         "{{ event_field }}".to_string(),
         "{{ some_other_event_field }}".to_string(),
@@ -171,9 +172,9 @@ impl SinkBatchSettings for LokiDefaultBatchSettings {
 
 /// Out-of-order event behavior.
 ///
-/// Some sources may generate events with timestamps that aren’t in chronological order. While the
-/// sink will sort events before sending them to Loki, there is the chance another event comes in
-/// that is out-of-order with respective the latest events sent to Loki. Prior to Loki 2.4.0, this
+/// Some sources may generate events with timestamps that aren't in chronological order. Even though the
+/// sink sorts the events before sending them to Loki, there is a chance that another event could come in
+/// that is out of order with the latest events sent to Loki. Prior to Loki 2.4.0, this
 /// was not supported and would result in an error during the push request.
 ///
 /// If you're using Loki 2.4.0 or newer, `Accept` is the preferred action, which lets Loki handle
@@ -281,7 +282,7 @@ pub fn valid_label_name(label: &Template) -> bool {
             (ch.is_ascii_alphabetic() || ch == '_')
                 && label_chars.all(|ch| ch.is_ascii_alphanumeric() || ch == '_')
         } else {
-            false
+            label.get_ref().trim() == "*"
         }
     }
 }
@@ -300,9 +301,9 @@ mod tests {
         assert!(valid_label_name(&"a09b".try_into().unwrap()));
         assert!(valid_label_name(&"abc_*".try_into().unwrap()));
         assert!(valid_label_name(&"_*".try_into().unwrap()));
+        assert!(valid_label_name(&"*".try_into().unwrap()));
 
         assert!(!valid_label_name(&"0ab".try_into().unwrap()));
-        assert!(!valid_label_name(&"*".try_into().unwrap()));
         assert!(!valid_label_name(&"".try_into().unwrap()));
         assert!(!valid_label_name(&" ".try_into().unwrap()));
 

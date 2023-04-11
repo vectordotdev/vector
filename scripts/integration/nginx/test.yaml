@@ -1,8 +1,7 @@
-args:
-- --features
+features:
 - nginx-integration-tests
-- --lib
-- '::nginx_metrics::'
+
+test_filter: '::nginx_metrics::'
 
 runner:
   env:

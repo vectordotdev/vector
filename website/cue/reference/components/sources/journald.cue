@@ -35,7 +35,12 @@ components: sources: journald: {
 			"x86_64-pc-windows-msv": false
 		}
 
-		requirements: []
+		requirements: [
+			"""
+				This source requires permissions to run `journalctl`. When installed from a package manager this should be
+				handled automatically, otherwise ensure the running user is part of the `systemd-journal` group.
+				""",
+		]
 		warnings: []
 		notices: []
 	}
@@ -65,7 +70,9 @@ components: sources: journald: {
 						examples: ["journald"]
 					}
 				}
-				timestamp: fields._current_timestamp
+				timestamp: fields._current_timestamp & {
+					description: "The time at which the event appeared in the journal."
+				}
 				"*": {
 					common:      false
 					description: "Any Journald field"

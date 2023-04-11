@@ -46,8 +46,6 @@ pub mod cli;
 #[allow(unreachable_pub)]
 pub mod components;
 pub mod conditions;
-#[cfg(not(windows))]
-pub mod control_server;
 pub mod dns;
 #[cfg(feature = "docker")]
 pub mod docker;
@@ -126,13 +124,23 @@ pub use vector_common::{shutdown, Error, Result};
 pub use vector_core::{event, metrics, schema, tcp, tls};
 
 /// The current version of Vector in simplified format.
-/// <version-number>-nightly.
+/// `<version-number>-nightly`.
 pub fn vector_version() -> impl std::fmt::Display {
     #[cfg(feature = "nightly")]
     let pkg_version = format!("{}-nightly", built_info::PKG_VERSION);
 
     #[cfg(not(feature = "nightly"))]
-    let pkg_version = built_info::PKG_VERSION;
+    let pkg_version = match built_info::DEBUG {
+        // If any debug info is included, consider it a non-release build.
+        "1" | "2" | "true" => {
+            format!(
+                "{}-custom-{}",
+                built_info::PKG_VERSION,
+                built_info::GIT_SHORT_HASH
+            )
+        }
+        _ => built_info::PKG_VERSION.to_string(),
+    };
 
     pkg_version
 }

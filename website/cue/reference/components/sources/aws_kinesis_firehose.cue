@@ -80,7 +80,7 @@ components: sources: aws_kinesis_firehose: {
 					}
 				}
 				source_arn: {
-					description: "The AWS Kinises Firehose delivery stream that issued the request, value of the `X-Amz-Firehose-Source-Arn` header."
+					description: "The AWS Kinesis Firehose delivery stream that issued the request, value of the `X-Amz-Firehose-Source-Arn` header."
 					required:    true
 					type: string: {
 						examples: ["arn:aws:firehose:us-east-1:111111111111:deliverystream/test"]
@@ -160,10 +160,10 @@ components: sources: aws_kinesis_firehose: {
 					parsed = parse_aws_cloudwatch_log_subscription_message!(.message)
 					. = unnest(parsed.log_events)
 					. = map_values(.) -> |value| {
-						event = del(value.log_events)
-						value |= event
-						message = del(.message)
-						. |= object!(parse_json!(message))
+					  event = del(value.log_events)
+					  value |= event
+					  message = string!(del(.message))
+					  merge(value, object!(parse_json!(message)))
 					}
 					'''
 

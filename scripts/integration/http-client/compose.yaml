@@ -29,7 +29,3 @@ services:
     - ../../../tests/data/http-client/serve:/data
     - ../../../tests/data/ca/intermediate_server/certs/dufs-https-chain.cert.pem:/certs/ca.cert.pem
     - ../../../tests/data/ca/intermediate_server/private/dufs-https.key.pem:/certs/ca.key.pem
-
-networks:
-  default:
-    name: ${VECTOR_NETWORK}

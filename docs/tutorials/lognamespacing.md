@@ -375,7 +375,7 @@ within the array eg. this array will be an array of strings.
 Kind::array(Collection::empty().with_unknown(Kind::bytes()))
 ````
 
-It is also possible to specify the type for specifix indexes in the
+It is also possible to specify the type for specific indexes in the
 array eg. this array will have a string at index 0 and an integer
 at index 1:
 

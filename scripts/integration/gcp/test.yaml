@@ -1,8 +1,7 @@
-args:
-- --features
+features:
 - gcp-integration-tests
-- --lib
-- '::gcp::'
+
+test_filter: '::gcp::'
 
 env:
   EMULATOR_ADDRESS: http://gcloud-pubsub:8681

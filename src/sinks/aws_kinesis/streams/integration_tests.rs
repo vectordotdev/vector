@@ -174,7 +174,7 @@ async fn client() -> aws_sdk_kinesis::Client {
     create_client::<KinesisClientBuilder>(
         &auth,
         region.region(),
-        region.endpoint(),
+        region.endpoint().unwrap(),
         &proxy,
         &None,
         true,
