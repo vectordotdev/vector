@@ -1,0 +1,11 @@
+version: '3'
+
+services:
+  greptimedb:
+    image: docker.io/greptime/greptimedb:${CONFIG_VERSION}
+    healthcheck:
+      test: "curl -f localhost:4000/health || exit 1"
+
+networks:
+  default:
+    name: ${VECTOR_NETWORK}

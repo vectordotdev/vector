@@ -88,6 +88,8 @@ jobs:
             if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.fluent == 'true' }}
           - test_name: 'gcp'
             if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.gcp == 'true' }}
+          - test_name: 'greptimedb'
+            if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.greptimedb == 'true' }}
           - test_name: 'humio'
             if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.humio == 'true' }}
           - test_name: 'http-client'
