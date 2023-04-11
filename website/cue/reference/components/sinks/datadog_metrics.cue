@@ -3,7 +3,9 @@ package metadata
 components: sinks: datadog_metrics: {
 	title: "Datadog Metrics"
 
-	classes: sinks._datadog.classes
+	classes: sinks._datadog.classes & {
+		stateful: true
+	}
 
 	features: {
 		acknowledgements: true
