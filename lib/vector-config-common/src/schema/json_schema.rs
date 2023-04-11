@@ -1,8 +1,8 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::ops::Deref;
+use std::{iter, ops::Deref};
 
-use super::{Map, Set};
+use super::{Map, Set, DEFINITIONS_PREFIX};
 
 /// A JSON Schema.
 #[allow(clippy::large_enum_variant)]
@@ -37,6 +37,26 @@ impl Schema {
         match self {
             Schema::Object(o) => o.is_ref(),
             _ => false,
+        }
+    }
+
+    /// Gets a reference to the inner schema object if this schema is a JSON Schema object.
+    ///
+    /// Otherwise, `None` is returned.
+    pub fn as_object(&self) -> Option<&SchemaObject> {
+        match self {
+            Schema::Object(schema) => Some(schema),
+            _ => None,
+        }
+    }
+
+    /// Gets a mutable reference to the inner schema object if this schema is a JSON Schema object.
+    ///
+    /// Otherwise, `None` is returned.
+    pub fn as_object_mut(&mut self) -> Option<&mut SchemaObject> {
+        match self {
+            Schema::Object(schema) => Some(schema),
+            _ => None,
         }
     }
 
@@ -539,6 +559,30 @@ pub enum SingleOrVec<T> {
     Vec(Vec<T>),
 }
 
+impl<T: Clone> Extend<T> for SingleOrVec<T> {
+    fn extend<I: IntoIterator<Item = T>>(&mut self, iter: I) {
+        match self {
+            Self::Single(item) => {
+                *self = Self::Vec(iter::once(*item.clone()).chain(iter.into_iter()).collect());
+            }
+            Self::Vec(items) => items.extend(iter),
+        }
+    }
+}
+
+impl<'a, T> IntoIterator for &'a SingleOrVec<T> {
+    type Item = &'a T;
+
+    type IntoIter = std::slice::Iter<'a, T>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        match self {
+            SingleOrVec::Single(item) => std::slice::from_ref(item.as_ref()).iter(),
+            SingleOrVec::Vec(items) => items.as_slice().iter(),
+        }
+    }
+}
+
 impl<T> From<T> for SingleOrVec<T> {
     fn from(single: T) -> Self {
         SingleOrVec::Single(Box::new(single))
@@ -565,5 +609,16 @@ fn is_none_or_default_true(field: &Option<Box<Schema>>) -> bool {
     match field {
         None => true,
         Some(value) => matches!(value.as_ref(), Schema::Bool(true)),
+    }
+}
+
+pub fn get_cleaned_schema_reference(schema_ref: &str) -> &str {
+    if let Some(cleaned) = schema_ref.strip_prefix(DEFINITIONS_PREFIX) {
+        cleaned
+    } else {
+        panic!(
+            "Tried to clean schema reference that does not start with the definition prefix: {}",
+            schema_ref
+        );
     }
 }

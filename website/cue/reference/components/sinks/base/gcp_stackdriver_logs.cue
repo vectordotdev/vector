@@ -314,8 +314,12 @@ base: components: sinks: gcp_stackdriver_logs: configuration: {
 		}
 	}
 	resource: {
-		description: "The monitored resource to associate the logs with."
-		required:    true
+		description: """
+			A monitored resource.
+
+			The monitored resource to associate the logs with.
+			"""
+		required: true
 		type: object: {
 			examples: [{
 				instanceId: "Twilight"

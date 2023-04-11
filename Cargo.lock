@@ -9705,6 +9705,7 @@ dependencies = [
  "serde_with 2.3.2",
  "snafu",
  "toml 0.7.3",
+ "tracing 0.1.37",
  "url",
  "vector-config-common",
  "vector-config-macros",
@@ -9723,6 +9724,7 @@ dependencies = [
  "serde",
  "serde_json",
  "syn 1.0.109",
+ "tracing 0.1.37",
 ]
 
 [[package]]
