@@ -357,7 +357,7 @@ pub enum Sinks {
     /// Publish observability events to Apache Pulsar topics.
     #[cfg(feature = "sinks-pulsar")]
     #[configurable(metadata(docs::label = "Pulsar"))]
-    Pulsar(pulsar::PulsarSinkConfig),
+    Pulsar(pulsar::config::PulsarSinkConfig),
 
     /// Publish observability data to Redis.
     #[cfg(feature = "sinks-redis")]
