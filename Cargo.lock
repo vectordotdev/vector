@@ -9366,6 +9366,7 @@ dependencies = [
  "confy",
  "directories 5.0.0",
  "dunce",
+ "glob",
  "hashlink",
  "hex",
  "indicatif",
