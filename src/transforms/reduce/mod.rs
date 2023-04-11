@@ -130,9 +130,9 @@ impl TransformConfig for ReduceConfig {
         input_definitions: &[(OutputId, schema::Definition)],
         _: LogNamespace,
     ) -> Vec<TransformOutput> {
-        let mut output_definitions = Vec::new();
+        let mut output_definitions = HashMap::new();
 
-        for (_output, input) in input_definitions {
+        for (output, input) in input_definitions {
             let mut schema_definition = input.clone();
 
             for (key, merge_strategy) in self.merge_strategies.iter() {
@@ -217,7 +217,7 @@ impl TransformConfig for ReduceConfig {
                 schema_definition = schema_definition.with_field(&key, new_kind, None);
             }
 
-            output_definitions.push(schema_definition);
+            output_definitions.insert(output.clone(), schema_definition);
         }
 
         vec![TransformOutput::new(DataType::Log, output_definitions)]
@@ -558,7 +558,7 @@ group_by = [ "request_id" ]
             assert_eq!(output_1["counter"], Value::from(8));
             assert_eq!(output_1.metadata(), &metadata_1);
             schema_definitions
-                .iter()
+                .values()
                 .for_each(|definition| definition.assert_valid_for_event(&output_1.clone().into()));
 
             let output_2 = out.recv().await.unwrap().into_log();
@@ -567,7 +567,7 @@ group_by = [ "request_id" ]
             assert_eq!(output_2["counter"], Value::from(7));
             assert_eq!(output_2.metadata(), &metadata_2);
             schema_definitions
-                .iter()
+                .values()
                 .for_each(|definition| definition.assert_valid_for_event(&output_2.clone().into()));
 
             drop(tx);

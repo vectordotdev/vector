@@ -51,7 +51,7 @@ impl TransformConfig for AggregateConfig {
         _: &[(OutputId, schema::Definition)],
         _: LogNamespace,
     ) -> Vec<TransformOutput> {
-        vec![TransformOutput::new(DataType::Metric, vec![])]
+        vec![TransformOutput::new(DataType::Metric, HashMap::new())]
     }
 }
 

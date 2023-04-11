@@ -1,4 +1,4 @@
-use std::num::ParseFloatError;
+use std::{collections::HashMap, num::ParseFloatError};
 
 use chrono::Utc;
 use indexmap::IndexMap;
@@ -163,7 +163,7 @@ impl TransformConfig for LogToMetricConfig {
         _: LogNamespace,
     ) -> Vec<TransformOutput> {
         // Converting the log to a metric means we lose all incoming `Definition`s.
-        vec![TransformOutput::new(DataType::Metric, Vec::new())]
+        vec![TransformOutput::new(DataType::Metric, HashMap::new())]
     }
 
     fn enable_concurrency(&self) -> bool {
