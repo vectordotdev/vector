@@ -96,7 +96,7 @@ impl FunctionTransform for Cri {
                             self.log_namespace.insert_source_metadata(
                                 Config::NAME,
                                 log,
-                                Some(LegacyKey::Overwrite(path!(log_schema().timestamp_key()))),
+                                log_schema().timestamp_key().map(LegacyKey::Overwrite),
                                 path!(TIMESTAMP_KEY),
                                 Value::Timestamp(dt.with_timezone(&Utc)),
                             )

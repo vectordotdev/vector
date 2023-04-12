@@ -30,7 +30,7 @@ use vector_core::config::{LegacyKey, LogNamespace};
 
 use super::util::MultilineConfig;
 use crate::{
-    config::{log_schema, DataType, Output, SourceConfig, SourceContext},
+    config::{log_schema, DataType, SourceConfig, SourceContext, SourceOutput},
     docker::{docker, DockerTlsConfig},
     event::{self, merge_state::LogEventMergeState, EstimatedJsonEncodedSizeOf, LogEvent, Value},
     internal_events::{
@@ -62,7 +62,7 @@ static CONSOLE: Lazy<Bytes> = Lazy::new(|| "console".into());
 
 /// Configuration for the `docker_logs` source.
 #[serde_as]
-#[configurable_component(source("docker_logs"))]
+#[configurable_component(source("docker_logs", "Collect container logs from a Docker Daemon."))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields, default)]
 pub struct DockerLogsConfig {
@@ -94,10 +94,10 @@ pub struct DockerLogsConfig {
     /// Matching is prefix first, so specifying a value of `foo` would match any container named `foo` as well as any
     /// container whose name started with `foo`. This applies equally whether matching container IDs or names.
     ///
-    /// By default, the source will collect logs for all containers. If `exclude_containers` is configured, any
-    /// container that matches a configured exclusion will be excluded even if it is also included via
-    /// `include_containers`, so care should be taken when utilizing prefix matches as they cannot be overridden by a
-    /// corresponding entry in `include_containers` e.g. excluding `foo` by attempting to include `foo-specific-id`.
+    /// By default, the source collects logs for all containers. If `exclude_containers` is configured, any
+    /// container that matches a configured exclusion is excluded even if it is also included with
+    /// `include_containers`, so care should be taken when using prefix matches as they cannot be overridden by a
+    /// corresponding entry in `include_containers`, for example, excluding `foo` by attempting to include `foo-specific-id`.
     ///
     /// This can be used in conjunction with `include_containers`.
     #[configurable(metadata(
@@ -134,14 +134,14 @@ pub struct DockerLogsConfig {
 
     /// A list of image names to match against.
     ///
-    /// If not provided, all images will be included.
+    /// If not provided, all images are included.
     #[configurable(metadata(docs::examples = "httpd", docs::examples = "redis",))]
     include_images: Option<Vec<String>>,
 
     /// Overrides the name of the log field used to mark an event as partial.
     ///
-    /// If `auto_partial_merge` is disabled, partial events will be emitted with a log field, controlled by this
-    /// configuration value, is set, indicating that the event is not complete.
+    /// If `auto_partial_merge` is disabled, partial events are emitted with a log field, set by this
+    /// configuration value, indicating that the event is not complete.
     #[serde(default = "default_partial_event_marker_field")]
     partial_event_marker_field: Option<String>,
 
@@ -238,6 +238,7 @@ impl DockerLogsConfig {
 impl_generate_config_from_default!(DockerLogsConfig);
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "docker_logs")]
 impl SourceConfig for DockerLogsConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let log_namespace = cx.log_namespace(self.log_namespace);
@@ -271,7 +272,7 @@ impl SourceConfig for DockerLogsConfig {
         }))
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         let host_key = self.host_key.clone().path.map(LegacyKey::Overwrite);
 
         let schema_definition = BytesDeserializerConfig
@@ -327,8 +328,9 @@ impl SourceConfig for DockerLogsConfig {
             )
             .with_source_metadata(
                 Self::NAME,
-                parse_value_path(log_schema().timestamp_key())
-                    .ok()
+                log_schema()
+                    .timestamp_key()
+                    .cloned()
                     .map(LegacyKey::Overwrite),
                 &owned_value_path!("timestamp"),
                 Kind::timestamp(),
@@ -349,7 +351,7 @@ impl SourceConfig for DockerLogsConfig {
                 None,
             );
 
-        vec![Output::default(DataType::Log).with_schema_definition(schema_definition)]
+        vec![SourceOutput::new_logs(DataType::Log, schema_definition)]
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -1119,7 +1121,7 @@ impl ContainerLogInfo {
 
         log_namespace.insert_vector_metadata(
             &mut log,
-            path!(log_schema().source_type_key()),
+            Some(log_schema().source_type_key()),
             path!("source_type"),
             Bytes::from_static(DockerLogsConfig::NAME.as_bytes()),
         );
@@ -1139,7 +1141,9 @@ impl ContainerLogInfo {
             }
             LogNamespace::Legacy => {
                 if let Some(timestamp) = timestamp {
-                    log.try_insert((PathPrefix::Event, log_schema().timestamp_key()), timestamp);
+                    if let Some(timestamp_key) = log_schema().timestamp_key() {
+                        log.try_insert((PathPrefix::Event, timestamp_key), timestamp);
+                    }
                 }
             }
         };

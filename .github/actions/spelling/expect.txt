@@ -655,6 +655,7 @@ kib
 killall
 killproc
 kinesisfirehose
+kinit
 klog
 ktff
 kvlist
@@ -865,6 +866,7 @@ norg
 norgle
 norknoog
 norknork
+no_run
 nosync
 notext
 notls

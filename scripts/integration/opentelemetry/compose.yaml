@@ -5,7 +5,3 @@ services:
     image: docker.io/otel/opentelemetry-collector-contrib:${CONFIG_VERSION}
     volumes:
     - ../../../tests/data/opentelemetry/config.yaml:/etc/otelcol-contrib/config.yaml
-
-networks:
-  default:
-    name: ${VECTOR_NETWORK}

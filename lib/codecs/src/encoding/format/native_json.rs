@@ -52,7 +52,7 @@ impl Encoder<Event> for NativeJsonSerializer {
 #[cfg(test)]
 mod tests {
     use bytes::BytesMut;
-    use vector_common::btreemap;
+    use value::btreemap;
     use vector_core::event::{LogEvent, Value};
 
     use super::*;

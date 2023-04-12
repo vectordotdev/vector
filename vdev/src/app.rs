@@ -1,14 +1,15 @@
 use std::ffi::{OsStr, OsString};
 pub use std::process::Command;
-use std::{borrow::Cow, env, path::PathBuf, process::ExitStatus, time::Duration};
+use std::{
+    borrow::Cow, env, io::Read, path::PathBuf, process::ExitStatus, process::Stdio, time::Duration,
+};
 
 use anyhow::{bail, Context as _, Result};
 use indicatif::{ProgressBar, ProgressStyle};
 use log::LevelFilter;
 use once_cell::sync::{Lazy, OnceCell};
 
-use crate::config::Config;
-use crate::util;
+use crate::{config::Config, git, platform, util};
 
 // Use the `bash` interpreter included as part of the standard `git` install for our default shell
 // if nothing is specified in the environment.
@@ -45,8 +46,9 @@ pub fn set_repo_dir() -> Result<()> {
 }
 
 pub fn version() -> Result<String> {
-    let version = env::var("VERSION").or_else(|_| util::read_version())?;
-    let channel = env::var("CHANNEL").or_else(|_| util::release_channel().map(Into::into))?;
+    let mut version = util::get_version()?;
+
+    let channel = util::get_channel();
 
     if channel == "latest" {
         let head = util::git_head()?;
@@ -58,6 +60,14 @@ pub fn version() -> Result<String> {
         if tag != format!("v{version}") {
             bail!("On latest release channel and tag {tag:?} is different from Cargo.toml {version:?}. Aborting");
         }
+
+    // extend version for custom builds if not already
+    } else if channel == "custom" && !version.contains("custom") {
+        let sha = git::get_git_sha()?;
+
+        // use '.' instead of '-' or '_' to avoid issues with rpm and deb package naming
+        // format requirements.
+        version = format!("{version}.custom.{sha}");
     }
 
     Ok(version)
@@ -67,11 +77,12 @@ pub fn version() -> Result<String> {
 pub trait CommandExt {
     fn script(script: &str) -> Self;
     fn in_repo(&mut self) -> &mut Self;
-    fn capture_output(&mut self) -> Result<String>;
+    fn check_output(&mut self) -> Result<String>;
     fn check_run(&mut self) -> Result<()>;
     fn run(&mut self) -> Result<ExitStatus>;
     fn wait(&mut self, message: impl Into<Cow<'static, str>>) -> Result<()>;
     fn pre_exec(&self);
+    fn features(&mut self, features: &[String]) -> &mut Self;
 }
 
 impl CommandExt for Command {
@@ -95,9 +106,35 @@ impl CommandExt for Command {
     }
 
     /// Run the command and capture its output.
-    fn capture_output(&mut self) -> Result<String> {
+    fn check_output(&mut self) -> Result<String> {
+        // Set up the command's stdout to be piped, so we can capture it
         self.pre_exec();
-        Ok(String::from_utf8(self.output()?.stdout)?)
+        self.stdout(Stdio::piped());
+
+        // Spawn the process
+        let mut child = self.spawn()?;
+
+        // Read the output from child.stdout into a buffer
+        let mut buffer = Vec::new();
+        child.stdout.take().unwrap().read_to_end(&mut buffer)?;
+
+        // Catch the exit code
+        let status = child.wait()?;
+        // There are commands that might fail with stdout, but we probably do not
+        // want to capture
+        // If the exit code is non-zero, return an error with the command, exit code, and stderr output
+        if !status.success() {
+            let stdout = String::from_utf8_lossy(&buffer);
+            bail!(
+                "Command: {:?}\nfailed with exit code: {}\n\noutput:\n{}",
+                self,
+                status.code().unwrap(),
+                stdout
+            );
+        }
+
+        // If the command exits successfully, return the output as a string
+        Ok(String::from_utf8(buffer)?)
     }
 
     /// Run the command and catch its exit code.
@@ -154,6 +191,17 @@ impl CommandExt for Command {
                 debug!("  unset ${key}");
             }
         }
+    }
+
+    fn features(&mut self, features: &[String]) -> &mut Self {
+        self.arg("--no-default-features");
+        self.arg("--features");
+        if features.is_empty() {
+            self.arg(platform::default_features());
+        } else {
+            self.arg(features.join(","));
+        }
+        self
     }
 }
 

@@ -6,7 +6,7 @@ use vector_core::metric_tags;
 
 use super::{default_all_devices, example_devices, filter_result, FilterList, HostMetrics};
 
-/// Options for the “disk” metrics collector.
+/// Options for the disk metrics collector.
 #[configurable_component]
 #[derive(Clone, Debug, Default)]
 pub struct DiskConfig {

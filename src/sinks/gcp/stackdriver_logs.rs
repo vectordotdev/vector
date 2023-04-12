@@ -521,8 +521,8 @@ mod tests {
         log.insert(
             "timestamp",
             Value::Timestamp(
-                Utc.ymd(2020, 1, 1)
-                    .and_hms_opt(12, 30, 0)
+                Utc.with_ymd_and_hms(2020, 1, 1, 12, 30, 0)
+                    .single()
                     .expect("invalid timestamp"),
             ),
         );

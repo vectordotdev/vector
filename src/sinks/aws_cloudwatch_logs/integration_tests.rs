@@ -117,7 +117,13 @@ async fn cloudwatch_insert_log_events_sorted() {
             let timestamp = chrono::Utc::now() - Duration::days(1);
 
             events.iter_logs_mut().for_each(|log| {
-                log.insert(log_schema().timestamp_key(), Value::Timestamp(timestamp));
+                log.insert(
+                    (
+                        lookup::PathPrefix::Event,
+                        log_schema().timestamp_key().unwrap(),
+                    ),
+                    Value::Timestamp(timestamp),
+                );
             });
         }
         doit = true;
@@ -183,7 +189,13 @@ async fn cloudwatch_insert_out_of_range_timestamp() {
     let mut add_event = |offset: Duration| {
         let line = input_lines.next().unwrap();
         let mut event = LogEvent::from(line.clone());
-        event.insert(log_schema().timestamp_key(), now + offset);
+        event.insert(
+            (
+                lookup::PathPrefix::Event,
+                log_schema().timestamp_key().unwrap(),
+            ),
+            now + offset,
+        );
         events.push(Event::Log(event));
         line
     };

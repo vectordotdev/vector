@@ -97,10 +97,10 @@ pub struct BatchConfig<D: SinkBatchSettings + Clone, S = Unmerged>
 where
     S: Clone,
 {
-    /// The maximum size of a batch that will be processed by a sink.
+    /// The maximum size of a batch that is processed by a sink.
     ///
     /// This is based on the uncompressed size of the batched events, before they are
-    /// serialized / compressed.
+    /// serialized/compressed.
     #[serde(default = "default_max_bytes::<D>")]
     #[configurable(metadata(docs::type_unit = "bytes"))]
     pub max_bytes: Option<usize>,

@@ -12,9 +12,5 @@ services:
     - ../../../tests/data/postgres-init.sh:/postgres-init.sh:ro
     - ../../../tests/data/ca:/certs:ro
 
-networks:
-  default:
-    name: ${VECTOR_NETWORK}
-
 volumes:
   socket: {}

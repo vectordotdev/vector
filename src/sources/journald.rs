@@ -44,7 +44,8 @@ use vector_core::{
 
 use crate::{
     config::{
-        log_schema, DataType, Output, SourceAcknowledgementsConfig, SourceConfig, SourceContext,
+        log_schema, DataType, SourceAcknowledgementsConfig, SourceConfig, SourceContext,
+        SourceOutput,
     },
     event::{BatchNotifier, BatchStatus, BatchStatusReceiver, LogEvent},
     internal_events::{
@@ -93,7 +94,7 @@ enum BuildError {
 type Matches = HashMap<String, HashSet<String>>;
 
 /// Configuration for the `journald` source.
-#[configurable_component(source("journald"))]
+#[configurable_component(source("journald", "Collect logs from JournalD."))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct JournaldConfig {
@@ -109,14 +110,14 @@ pub struct JournaldConfig {
     ///
     /// If empty or not present, all units are accepted.
     ///
-    /// Unit names lacking a `.` will have `.service` appended to make them a valid service unit name.
+    /// Unit names lacking a `.` have `.service` appended to make them a valid service unit name.
     #[serde(default)]
     #[configurable(metadata(docs::examples = "ntpd", docs::examples = "sysinit.target"))]
     pub include_units: Vec<String>,
 
     /// A list of unit names to exclude from monitoring.
     ///
-    /// Unit names lacking a `.` will have `.service` appended to make them a valid service unit
+    /// Unit names lacking a `.` have `.service` appended to make them a valid service unit
     /// name.
     #[serde(default)]
     #[configurable(metadata(docs::examples = "badservice", docs::examples = "sysinit.target"))]
@@ -126,7 +127,7 @@ pub struct JournaldConfig {
     ///
     /// If empty or not present, all journal fields are accepted.
     ///
-    /// If `include_units` is specified, it will be merged into this list.
+    /// If `include_units` is specified, it is merged into this list.
     #[serde(default)]
     #[configurable(metadata(
         docs::additional_props_description = "The set of field values to match in journal entries that are to be included."
@@ -134,10 +135,10 @@ pub struct JournaldConfig {
     #[configurable(metadata(docs::examples = "matches_examples()"))]
     pub include_matches: Matches,
 
-    /// A list of sets of field/value pairs that, if any are present in a journal entry, will cause
-    /// the entry to be excluded from this source.
+    /// A list of sets of field/value pairs that, if any are present in a journal entry,
+    /// excludes the entry from this source.
     ///
-    /// If `exclude_units` is specified, it will be merged into this list.
+    /// If `exclude_units` is specified, it is merged into this list.
     #[serde(default)]
     #[configurable(metadata(
         docs::additional_props_description = "The set of field values to match in journal entries that are to be excluded."
@@ -168,7 +169,7 @@ pub struct JournaldConfig {
 
     /// The full path of the journal directory.
     ///
-    /// If not set, `journalctl` will use the default system journal path.
+    /// If not set, `journalctl` uses the default system journal path.
     #[serde(default)]
     pub journal_directory: Option<PathBuf>,
 
@@ -300,6 +301,7 @@ impl_generate_config_from_default!(JournaldConfig);
 type Record = HashMap<String, String>;
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "journald")]
 impl SourceConfig for JournaldConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         if self.remap_priority {
@@ -362,11 +364,11 @@ impl SourceConfig for JournaldConfig {
         ))
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         let schema_definition =
             self.schema_definition(global_log_namespace.merge(self.log_namespace));
 
-        vec![Output::default(DataType::Log).with_schema_definition(schema_definition)]
+        vec![SourceOutput::new_logs(DataType::Log, schema_definition)]
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -724,7 +726,9 @@ fn enrich_log_event(log: &mut LogEvent, log_namespace: LogNamespace) {
         }
         LogNamespace::Legacy => {
             if let Some(ts) = timestamp {
-                log.insert((PathPrefix::Event, log_schema().timestamp_key()), ts);
+                if let Some(timestamp_key) = log_schema().timestamp_key() {
+                    log.insert((PathPrefix::Event, timestamp_key), ts);
+                }
             }
         }
     }
@@ -732,7 +736,7 @@ fn enrich_log_event(log: &mut LogEvent, log_namespace: LogNamespace) {
     // Add source type.
     log_namespace.insert_vector_metadata(
         log,
-        log_schema().source_type_key(),
+        Some(log_schema().source_type_key()),
         path!("source_type"),
         JournaldConfig::NAME,
     );
@@ -885,7 +889,7 @@ impl Finalizer {
         shutdown: ShutdownSignal,
     ) -> Self {
         if acknowledgements {
-            let (finalizer, mut ack_stream) = OrderedFinalizer::new(shutdown);
+            let (finalizer, mut ack_stream) = OrderedFinalizer::new(Some(shutdown));
             tokio::spawn(async move {
                 while let Some((status, cursor)) = ack_stream.next().await {
                     if status == BatchStatus::Delivered {
@@ -1439,7 +1443,7 @@ mod tests {
     }
 
     fn timestamp(event: &Event) -> Value {
-        event.as_log()[log_schema().timestamp_key()].clone()
+        event.as_log()[log_schema().timestamp_key().unwrap().to_string()].clone()
     }
 
     fn value_ts(secs: i64, usecs: u32) -> Value {
@@ -1462,10 +1466,10 @@ mod tests {
             ..Default::default()
         };
 
-        let definition = config.outputs(LogNamespace::Vector)[0]
-            .clone()
-            .log_schema_definition
-            .unwrap();
+        let definitions = config
+            .outputs(LogNamespace::Vector)
+            .remove(0)
+            .schema_definition(true);
 
         let expected_definition =
             Definition::new_with_default_metadata(Kind::bytes().or_null(), [LogNamespace::Vector])
@@ -1495,17 +1499,17 @@ mod tests {
                     Some("host"),
                 );
 
-        assert_eq!(definition, expected_definition)
+        assert_eq!(definitions, Some(expected_definition))
     }
 
     #[test]
     fn output_schema_definition_legacy_namespace() {
         let config = JournaldConfig::default();
 
-        let definition = config.outputs(LogNamespace::Legacy)[0]
-            .clone()
-            .log_schema_definition
-            .unwrap();
+        let definitions = config
+            .outputs(LogNamespace::Legacy)
+            .remove(0)
+            .schema_definition(true);
 
         let expected_definition = Definition::new_with_default_metadata(
             Kind::object(Collection::empty()),
@@ -1520,7 +1524,7 @@ mod tests {
         )
         .unknown_fields(Kind::bytes());
 
-        assert_eq!(definition, expected_definition)
+        assert_eq!(definitions, Some(expected_definition))
     }
 
     fn matches_schema(config: &JournaldConfig, namespace: LogNamespace) {
@@ -1555,12 +1559,9 @@ mod tests {
 
         event.as_mut_log().insert("timestamp", chrono::Utc::now());
 
-        let definition = config.outputs(namespace)[0]
-            .clone()
-            .log_schema_definition
-            .unwrap();
+        let definitions = config.outputs(namespace).remove(0).schema_definition(true);
 
-        definition.assert_valid_for_event(&event)
+        definitions.unwrap().assert_valid_for_event(&event);
     }
 
     #[test]

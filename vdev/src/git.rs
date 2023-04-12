@@ -5,7 +5,7 @@ use anyhow::Result;
 use crate::app::CommandExt as _;
 
 pub fn current_branch() -> Result<String> {
-    let output = capture_output(&["rev-parse", "--abbrev-ref", "HEAD"])?;
+    let output = check_output(&["rev-parse", "--abbrev-ref", "HEAD"])?;
     Ok(output.trim_end().to_string())
 }
 
@@ -19,17 +19,17 @@ pub fn checkout_or_create_branch(branch_name: &str) -> Result<()> {
 }
 
 pub fn merge_branch(branch_name: &str) -> Result<()> {
-    let _output = capture_output(&["merge", "--ff", branch_name])?;
+    let _output = check_output(&["merge", "--ff", branch_name])?;
     Ok(())
 }
 
 pub fn tag_version(version: &str) -> Result<()> {
-    let _output = capture_output(&["tag", "--annotate", version, "--message", version])?;
+    let _output = check_output(&["tag", "--annotate", version, "--message", version])?;
     Ok(())
 }
 
 pub fn push_branch(branch_name: &str) -> Result<()> {
-    let _output = capture_output(&["push", "origin", branch_name])?;
+    let _output = check_output(&["push", "origin", branch_name])?;
     Ok(())
 }
 
@@ -39,7 +39,7 @@ pub fn changed_files() -> Result<Vec<String>> {
     // Committed e.g.:
     // A   relative/path/to/file.added
     // M   relative/path/to/file.modified
-    let output = capture_output(&["diff", "--name-status", "origin/master..."])?;
+    let output = check_output(&["diff", "--name-status", "origin/master..."])?;
     for line in output.lines() {
         if !is_warning_line(line) {
             if let Some((_, path)) = line.split_once('\t') {
@@ -49,7 +49,7 @@ pub fn changed_files() -> Result<Vec<String>> {
     }
 
     // Tracked
-    let output = capture_output(&["diff", "--name-only", "HEAD"])?;
+    let output = check_output(&["diff", "--name-only", "HEAD"])?;
     for line in output.lines() {
         if !is_warning_line(line) {
             files.insert(line.to_string());
@@ -57,7 +57,7 @@ pub fn changed_files() -> Result<Vec<String>> {
     }
 
     // Untracked
-    let output = capture_output(&["ls-files", "--others", "--exclude-standard"])?;
+    let output = check_output(&["ls-files", "--others", "--exclude-standard"])?;
     for line in output.lines() {
         files.insert(line.to_string());
     }
@@ -69,13 +69,17 @@ pub fn changed_files() -> Result<Vec<String>> {
 }
 
 pub fn list_files() -> Result<Vec<String>> {
-    Ok(capture_output(&["ls-files"])?
+    Ok(check_output(&["ls-files"])?
         .lines()
         .map(str::to_owned)
         .collect())
 }
 
-// Get a list of files that have been modified, as a vector of strings
+pub fn get_git_sha() -> Result<String> {
+    check_output(&["rev-parse", "--short", "HEAD"]).map(|output| output.trim_end().to_string())
+}
+
+/// Get a list of files that have been modified, as a vector of strings
 pub fn get_modified_files() -> Result<Vec<String>> {
     let args = vec![
         "ls-files",
@@ -84,26 +88,61 @@ pub fn get_modified_files() -> Result<Vec<String>> {
         "--others",
         "--exclude-standard",
     ];
-    Ok(capture_output(&args)?.lines().map(str::to_owned).collect())
+    Ok(check_output(&args)?.lines().map(str::to_owned).collect())
+}
+
+pub fn set_config_values(config_values: &[(&str, &str)]) -> Result<String> {
+    let mut args = vec!["config"];
+
+    for (key, value) in config_values {
+        args.push(key);
+        args.push(value);
+    }
+
+    check_output(&args)
+}
+
+/// Checks if the current directory's repo is clean
+pub fn check_git_repository_clean() -> Result<bool> {
+    Ok(Command::new("git")
+        .args(["diff-index", "--quiet", "HEAD"])
+        .stdout(std::process::Stdio::null())
+        .status()
+        .map(|status| status.success())?)
+}
+
+/// Commits changes from the current repo
+pub fn commit(commit_message: &str) -> Result<String> {
+    check_output(&["commit", "--all", "--message", commit_message])
+}
+
+/// Pushes changes from the current repo
+pub fn push() -> Result<String> {
+    check_output(&["push"])
+}
+
+pub fn clone(repo_url: &str) -> Result<String> {
+    // We cannot use capture_output since this will need to run in the CWD
+    Command::new("git").args(["clone", repo_url]).check_output()
 }
 
 pub fn branch_exists(branch_name: &str) -> Result<bool> {
-    let output = capture_output(&["rev-parse", "--verify", branch_name])?;
+    let output = check_output(&["rev-parse", "--verify", branch_name])?;
     Ok(!output.is_empty())
 }
 
 pub fn checkout_branch(branch_name: &str) -> Result<()> {
-    let _output = capture_output(&["checkout", branch_name])?;
+    let _output = check_output(&["checkout", branch_name])?;
     Ok(())
 }
 
 pub fn create_branch(branch_name: &str) -> Result<()> {
-    let _output = capture_output(&["checkout", "-b", branch_name])?;
+    let _output = check_output(&["checkout", "-b", branch_name])?;
     Ok(())
 }
 
-fn capture_output(args: &[&str]) -> Result<String> {
-    Command::new("git").in_repo().args(args).capture_output()
+fn check_output(args: &[&str]) -> Result<String> {
+    Command::new("git").in_repo().args(args).check_output()
 }
 
 fn is_warning_line(line: &str) -> bool {

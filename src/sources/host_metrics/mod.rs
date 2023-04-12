@@ -20,7 +20,7 @@ use vector_core::config::LogNamespace;
 use vector_core::EstimatedJsonEncodedSizeOf;
 
 use crate::{
-    config::{DataType, Output, SourceConfig, SourceContext},
+    config::{SourceConfig, SourceContext, SourceOutput},
     event::metric::{Metric, MetricKind, MetricTags, MetricValue},
     internal_events::{EventsReceived, HostMetricsScrapeDetailError, StreamClosedError},
     shutdown::ShutdownSignal,
@@ -85,7 +85,7 @@ pub(self) struct FilterList {
 
 /// Configuration for the `host_metrics` source.
 #[serde_as]
-#[configurable_component(source("host_metrics"))]
+#[configurable_component(source("host_metrics", "Collect metric data from the local system."))]
 #[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
 #[serde(deny_unknown_fields)]
@@ -126,7 +126,7 @@ pub struct HostMetricsConfig {
     pub network: network::NetworkConfig,
 }
 
-/// Options for the “cgroups” (controller groups) metrics collector.
+/// Options for the cgroups (controller groups) metrics collector.
 ///
 /// This collector is only available on Linux systems, and only supports either version 2 or hybrid cgroups.
 #[configurable_component]
@@ -249,6 +249,7 @@ fn default_cgroups_config() -> Option<CGroupsConfig> {
 impl_generate_config_from_default!(HostMetricsConfig);
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "host_metrics")]
 impl SourceConfig for HostMetricsConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         init_roots();
@@ -266,8 +267,8 @@ impl SourceConfig for HostMetricsConfig {
         Ok(Box::pin(config.run(cx.out, cx.shutdown)))
     }
 
-    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
-        vec![Output::default(DataType::Metric)]
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
+        vec![SourceOutput::new_metrics()]
     }
 
     fn can_acknowledge(&self) -> bool {

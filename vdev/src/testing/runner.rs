@@ -3,12 +3,11 @@ use std::process::{Command, Stdio};
 use std::{env, ffi::OsStr, ffi::OsString, path::PathBuf};
 
 use anyhow::Result;
-use atty::Stream;
 use once_cell::sync::Lazy;
 
 use super::config::{Environment, IntegrationRunnerConfig, RustToolchainConfig};
 use crate::app::{self, CommandExt as _};
-use crate::util::ChainArgs as _;
+use crate::util::{ChainArgs as _, IS_A_TTY};
 
 const MOUNT_PATH: &str = "/home/vector";
 const TARGET_PATH: &str = "/home/target";
@@ -105,7 +104,7 @@ pub trait ContainerTestRunner: TestRunner {
         let mut command = dockercmd(["ps", "-a", "--format", "{{.Names}} {{.State}}"]);
         let container_name = self.container_name();
 
-        for line in command.capture_output()?.lines() {
+        for line in command.check_output()?.lines() {
             if let Some((name, state)) = line.split_once(' ') {
                 if name == container_name {
                     return Ok(if state == "created" {
@@ -158,7 +157,7 @@ pub trait ContainerTestRunner: TestRunner {
         volumes.insert(VOLUME_TARGET);
         volumes.insert(VOLUME_CARGO_GIT);
         volumes.insert(VOLUME_CARGO_REGISTRY);
-        for volume in command.capture_output()?.lines() {
+        for volume in command.check_output()?.lines() {
             volumes.take(volume);
         }
 
@@ -175,7 +174,7 @@ pub trait ContainerTestRunner: TestRunner {
             .collect();
         let mut command = dockercmd(["build"]);
         command.current_dir(app::path());
-        if atty::is(Stream::Stdout) {
+        if *IS_A_TTY {
             command.args(["--progress", "tty"]);
         }
         command.args([
@@ -268,7 +267,7 @@ where
         self.ensure_running()?;
 
         let mut command = dockercmd(["exec"]);
-        if atty::is(Stream::Stdout) {
+        if *IS_A_TTY {
             command.arg("--tty");
         }
 
@@ -325,7 +324,7 @@ impl IntegrationTestRunner {
             let mut command = dockercmd(["network", "ls", "--format", "{{.Name}}"]);
 
             if command
-                .capture_output()?
+                .check_output()?
                 .lines()
                 .any(|network| network == network_name)
             {

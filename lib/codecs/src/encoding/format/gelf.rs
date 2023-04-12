@@ -240,8 +240,8 @@ mod tests {
 
     use super::*;
     use chrono::{DateTime, NaiveDateTime, Utc};
+    use value::btreemap;
     use value::Value;
-    use vector_common::btreemap;
     use vector_core::event::{Event, EventMetadata};
 
     fn do_serialize(

@@ -6,14 +6,14 @@ use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
 
 use crate::{
-    config::{Output, Resource, SourceConfig, SourceContext},
+    config::{Resource, SourceConfig, SourceContext, SourceOutput},
     serde::default_decoding,
 };
 
 use super::{outputs, FileDescriptorConfig};
 
 /// Configuration for the `stdin` source.
-#[configurable_component(source("stdin"))]
+#[configurable_component(source("stdin", "Collect logs sent via stdin."))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields, default)]
 pub struct StdinConfig {
@@ -78,6 +78,7 @@ impl Default for StdinConfig {
 impl_generate_config_from_default!(StdinConfig);
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "stdin")]
 impl SourceConfig for StdinConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<crate::sources::Source> {
         let log_namespace = cx.log_namespace(self.log_namespace);
@@ -89,7 +90,7 @@ impl SourceConfig for StdinConfig {
         )
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         let log_namespace = global_log_namespace.merge(self.log_namespace);
 
         outputs(log_namespace, &self.host_key, &self.decoding, Self::NAME)

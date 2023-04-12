@@ -3,8 +3,8 @@
 //! This sink will send it's output to WEBHDFS.
 //!
 //! `webhdfs` is an OpenDal based services. This mod itself only provide
-//! config to build an [`OpenDalSink`]. All real implement are powered by
-//! [`OpenDalSink`].
+//! config to build an [`crate::sinks::opendal_common::OpenDalSink`]. All real implement are powered by
+//! [`crate::sinks::opendal_common::OpenDalSink`].
 
 mod config;
 pub use self::config::WebHdfsConfig;

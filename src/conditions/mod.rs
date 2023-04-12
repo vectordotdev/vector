@@ -159,13 +159,13 @@ dyn_clone::clone_trait_object!(ConditionalConfig);
 /// or hard-coded matchers like "must be a metric" or "fields A, B, and C must match these constraints".
 ///
 /// As VRL is the most common way to apply conditions to events, this type provides a shortcut to define VRL expressions
-/// directly in configuration by passing the VRL expression as a string:
+/// directly in the configuration by passing the VRL expression as a string:
 ///
 /// ```toml
 /// condition = '.message == "hooray"'
 /// ```
 ///
-/// When other condition types are required, they can specified with an enum-style notation:
+/// When other condition types are required, they can be specified with an enum-style notation:
 ///
 /// ```toml
 /// condition.type = 'datadog_search'

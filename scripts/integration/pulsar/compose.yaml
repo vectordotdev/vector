@@ -6,7 +6,3 @@ services:
     command: bin/pulsar standalone
     ports:
     - 6650:6650
-
-networks:
-  default:
-    name: ${VECTOR_NETWORK}

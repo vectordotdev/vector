@@ -1,3 +1,0 @@
-# result: { "foo": "foo", "bar": "bar" }
-
-merge({ "foo": "foo" }, object!(parse_json!(s'{"bar":"bar"}')))

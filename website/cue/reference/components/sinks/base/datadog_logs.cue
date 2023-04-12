@@ -15,7 +15,7 @@ base: components: sinks: datadog_logs: configuration: {
 				Whether or not end-to-end acknowledgements are enabled.
 
 				When enabled for a sink, any source connected to that sink, where the source supports
-				end-to-end acknowledgements as well, will wait for events to be acknowledged by the sink
+				end-to-end acknowledgements as well, waits for events to be acknowledged by the sink
 				before acknowledging them at the source.
 
 				Enabling or disabling acknowledgements at the sink level takes precedence over any global
@@ -33,10 +33,10 @@ base: components: sinks: datadog_logs: configuration: {
 		type: object: options: {
 			max_bytes: {
 				description: """
-					The maximum size of a batch that will be processed by a sink.
+					The maximum size of a batch that is processed by a sink.
 
 					This is based on the uncompressed size of the batched events, before they are
-					serialized / compressed.
+					serialized/compressed.
 					"""
 				required: false
 				type: uint: {
@@ -87,7 +87,7 @@ base: components: sinks: datadog_logs: configuration: {
 		description: """
 			The default Datadog [API key][api_key] to use in authentication of HTTP requests.
 
-			If an event has a Datadog [API key][api_key] set explicitly in its metadata, it will take
+			If an event has a Datadog [API key][api_key] set explicitly in its metadata, it takes
 			precedence over this setting.
 
 			[api_key]: https://docs.datadoghq.com/api/?lang=bash#authentication
@@ -100,12 +100,12 @@ base: components: sinks: datadog_logs: configuration: {
 		required:    false
 		type: object: options: {
 			except_fields: {
-				description: "List of fields that will be excluded from the encoded event."
+				description: "List of fields that are excluded from the encoded event."
 				required:    false
 				type: array: items: type: string: {}
 			}
 			only_fields: {
-				description: "List of fields that will be included in the encoded event."
+				description: "List of fields that are included in the encoded event."
 				required:    false
 				type: array: items: type: string: {}
 			}
@@ -264,7 +264,7 @@ base: components: sinks: datadog_logs: configuration: {
 				description: """
 					The amount of time to wait before attempting the first retry for a failed request.
 
-					After the first retry has failed, the fibonacci sequence will be used to select future backoffs.
+					After the first retry has failed, the fibonacci sequence is used to select future backoffs.
 					"""
 				required: false
 				type: uint: {
@@ -284,7 +284,7 @@ base: components: sinks: datadog_logs: configuration: {
 				description: """
 					The time a request can take before being aborted.
 
-					It is highly recommended that you do not lower this value below the service’s internal timeout, as this could
+					Datadog highly recommends that you do not lower this value below the service's internal timeout, as this could
 					create orphaned requests, pile on retries, and result in duplicate data downstream.
 					"""
 				required: false
@@ -315,8 +315,8 @@ base: components: sinks: datadog_logs: configuration: {
 				description: """
 					Sets the list of supported ALPN protocols.
 
-					Declare the supported ALPN protocols, which are used during negotiation with peer. Prioritized in the order
-					they are defined.
+					Declare the supported ALPN protocols, which are used during negotiation with peer. They are prioritized in the order
+					that they are defined.
 					"""
 				required: false
 				type: array: items: type: string: examples: ["h2"]
@@ -344,7 +344,7 @@ base: components: sinks: datadog_logs: configuration: {
 			}
 			enabled: {
 				description: """
-					Whether or not to require TLS for incoming/outgoing connections.
+					Whether or not to require TLS for incoming or outgoing connections.
 
 					When enabled and used for incoming connections, an identity certificate is also required. See `tls.crt_file` for
 					more information.
@@ -374,10 +374,10 @@ base: components: sinks: datadog_logs: configuration: {
 				description: """
 					Enables certificate verification.
 
-					If enabled, certificates must be valid in terms of not being expired, as well as being issued by a trusted
-					issuer. This verification operates in a hierarchical manner, checking that not only the leaf certificate (the
-					certificate presented by the client/server) is valid, but also that the issuer of that certificate is valid, and
-					so on until reaching a root certificate.
+					If enabled, certificates must not be expired and must be issued by a trusted
+					issuer. This verification operates in a hierarchical manner, checking that the leaf certificate (the
+					certificate presented by the client/server) is not only valid, but that the issuer of that certificate is also valid, and
+					so on until the verification process reaches a root certificate.
 
 					Relevant for both incoming and outgoing connections.
 

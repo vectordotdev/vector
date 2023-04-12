@@ -11,8 +11,8 @@ use indexmap::IndexMap;
 pub use vector_config::component::{GenerateConfig, SinkDescription, TransformDescription};
 use vector_config::configurable_component;
 pub use vector_core::config::{
-    AcknowledgementsConfig, DataType, GlobalOptions, Input, LogNamespace, Output,
-    SourceAcknowledgementsConfig,
+    AcknowledgementsConfig, DataType, GlobalOptions, Input, LogNamespace,
+    SourceAcknowledgementsConfig, SourceOutput, TransformOutput,
 };
 
 use crate::{conditions, event::Metric, secrets::SecretBackends, serde::OneOrMany};
@@ -45,7 +45,7 @@ pub use cmd::{cmd, Opts};
 pub use diff::ConfigDiff;
 pub use enrichment_table::{EnrichmentTableConfig, EnrichmentTableOuter};
 pub use format::{Format, FormatHint};
-pub use id::{ComponentKey, Inputs, OutputId};
+pub use id::{ComponentKey, Inputs};
 pub use loading::{
     load, load_builder_from_paths, load_from_paths, load_from_paths_with_provider_and_secrets,
     load_from_str, load_source_from_paths, merge_path_lists, process_paths, CONFIG_PATHS,
@@ -53,25 +53,13 @@ pub use loading::{
 pub use provider::ProviderConfig;
 pub use secret::SecretBackend;
 pub use sink::{SinkConfig, SinkContext, SinkHealthcheckOptions, SinkOuter};
-pub use source::{SourceConfig, SourceContext, SourceOuter};
+pub use source::{BoxedSource, SourceConfig, SourceContext, SourceOuter};
 pub use transform::{BoxedTransform, TransformConfig, TransformContext, TransformOuter};
 pub use unit_test::{build_unit_tests, build_unit_tests_main, UnitTestResult};
 pub use validation::warnings;
-pub use vector_core::config::{log_schema, proxy::ProxyConfig, LogSchema};
-
-/// Loads Log Schema from configurations and sets global schema.
-/// Once this is done, configurations can be correctly loaded using
-/// configured log schema defaults.
-/// If deny is set, will panic if schema has already been set.
-pub fn init_log_schema(config_paths: &[ConfigPath], deny_if_set: bool) -> Result<(), Vec<String>> {
-    vector_core::config::init_log_schema(
-        || {
-            let (builder, _) = load_builder_from_paths(config_paths)?;
-            Ok(builder.global.log_schema)
-        },
-        deny_if_set,
-    )
-}
+pub use vector_core::config::{
+    init_log_schema, log_schema, proxy::ProxyConfig, LogSchema, OutputId,
+};
 
 #[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq)]
 pub enum ConfigPath {
@@ -846,7 +834,12 @@ mod tests {
         );
         assert_eq!(
             "timestamp",
-            config.global.log_schema.timestamp_key().to_string()
+            config
+                .global
+                .log_schema
+                .timestamp_key()
+                .unwrap()
+                .to_string()
         );
     }
 
@@ -872,7 +865,15 @@ mod tests {
 
         assert_eq!("this", config.global.log_schema.host_key().to_string());
         assert_eq!("that", config.global.log_schema.message_key().to_string());
-        assert_eq!("then", config.global.log_schema.timestamp_key().to_string());
+        assert_eq!(
+            "then",
+            config
+                .global
+                .log_schema
+                .timestamp_key()
+                .unwrap()
+                .to_string()
+        );
     }
 
     #[test]

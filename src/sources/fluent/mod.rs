@@ -22,8 +22,8 @@ use vector_core::schema::Definition;
 use super::util::net::{SocketListenAddr, TcpSource, TcpSourceAck, TcpSourceAcker};
 use crate::{
     config::{
-        log_schema, DataType, GenerateConfig, Output, Resource, SourceAcknowledgementsConfig,
-        SourceConfig, SourceContext,
+        log_schema, DataType, GenerateConfig, Resource, SourceAcknowledgementsConfig, SourceConfig,
+        SourceContext, SourceOutput,
     },
     event::{Event, LogEvent},
     internal_events::{FluentMessageDecodeError, FluentMessageReceived},
@@ -36,13 +36,13 @@ mod message;
 use self::message::{FluentEntry, FluentMessage, FluentRecord, FluentTag, FluentTimestamp};
 
 /// Configuration for the `fluent` source.
-#[configurable_component(source("fluent"))]
+#[configurable_component(source("fluent", "Collect logs from a Fluentd or Fluent Bit agent."))]
 #[derive(Clone, Debug)]
 pub struct FluentConfig {
     #[configurable(derived)]
     address: SocketListenAddr,
 
-    /// The maximum number of TCP connections that will be allowed at any given time.
+    /// The maximum number of TCP connections that are allowed at any given time.
     #[configurable(metadata(docs::type_unit = "connections"))]
     connection_limit: Option<u32>,
 
@@ -85,6 +85,7 @@ impl GenerateConfig for FluentConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "fluent")]
 impl SourceConfig for FluentConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let log_namespace = cx.log_namespace(self.log_namespace);
@@ -113,11 +114,11 @@ impl SourceConfig for FluentConfig {
         )
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         let log_namespace = global_log_namespace.merge(self.log_namespace);
         let schema_definition = self.schema_definition(log_namespace);
 
-        vec![Output::default(DataType::Log).with_schema_definition(schema_definition)]
+        vec![SourceOutput::new_logs(DataType::Log, schema_definition)]
     }
 
     fn resources(&self) -> Vec<Resource> {
@@ -582,7 +583,7 @@ impl From<FluentEvent<'_>> for LogEvent {
 
         log_namespace.insert_vector_metadata(
             &mut log,
-            log_schema().source_type_key(),
+            Some(log_schema().source_type_key()),
             path!("source_type"),
             Bytes::from_static(FluentConfig::NAME.as_bytes()),
         );
@@ -593,7 +594,9 @@ impl From<FluentEvent<'_>> for LogEvent {
                 log.insert(metadata_path!("vector", "ingest_timestamp"), Utc::now());
             }
             LogNamespace::Legacy => {
-                log.insert((PathPrefix::Event, log_schema().timestamp_key()), timestamp);
+                if let Some(timestamp_key) = log_schema().timestamp_key() {
+                    log.insert((PathPrefix::Event, timestamp_key), timestamp);
+                }
             }
         }
 
@@ -957,10 +960,10 @@ mod tests {
             log_namespace: Some(true),
         };
 
-        let definition = config.outputs(LogNamespace::Vector)[0]
-            .clone()
-            .log_schema_definition
-            .unwrap();
+        let definitions = config
+            .outputs(LogNamespace::Vector)
+            .remove(0)
+            .schema_definition(true);
 
         let expected_definition =
             Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
@@ -997,7 +1000,7 @@ mod tests {
                     None,
                 );
 
-        assert_eq!(definition, expected_definition)
+        assert_eq!(definitions, Some(expected_definition))
     }
 
     #[test]
@@ -1012,10 +1015,10 @@ mod tests {
             log_namespace: None,
         };
 
-        let definition = config.outputs(LogNamespace::Legacy)[0]
-            .clone()
-            .log_schema_definition
-            .unwrap();
+        let definitions = config
+            .outputs(LogNamespace::Legacy)
+            .remove(0)
+            .schema_definition(true);
 
         let expected_definition = Definition::new_with_default_metadata(
             Kind::object(Collection::empty()),
@@ -1032,7 +1035,7 @@ mod tests {
         .with_event_field(&owned_value_path!("host"), Kind::bytes(), Some("host"))
         .unknown_fields(Kind::bytes());
 
-        assert_eq!(definition, expected_definition)
+        assert_eq!(definitions, Some(expected_definition))
     }
 }
 

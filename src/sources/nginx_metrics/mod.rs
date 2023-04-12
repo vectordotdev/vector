@@ -16,7 +16,7 @@ use vector_config::configurable_component;
 use vector_core::{metric_tags, EstimatedJsonEncodedSizeOf};
 
 use crate::{
-    config::{DataType, Output, SourceConfig, SourceContext},
+    config::{SourceConfig, SourceContext, SourceOutput},
     event::metric::{Metric, MetricKind, MetricTags, MetricValue},
     http::{Auth, HttpClient},
     internal_events::{
@@ -60,7 +60,7 @@ enum NginxError {
 
 /// Configuration for the `nginx_metrics` source.
 #[serde_as]
-#[configurable_component(source("nginx_metrics"))]
+#[configurable_component(source("nginx_metrics", "Collect metrics from NGINX."))]
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct NginxMetricsConfig {
@@ -102,6 +102,7 @@ pub fn default_namespace() -> String {
 impl_generate_config_from_default!(NginxMetricsConfig);
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "nginx_metrics")]
 impl SourceConfig for NginxMetricsConfig {
     async fn build(&self, mut cx: SourceContext) -> crate::Result<super::Source> {
         let tls = TlsSettings::from_options(&self.tls)?;
@@ -143,8 +144,8 @@ impl SourceConfig for NginxMetricsConfig {
         }))
     }
 
-    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
-        vec![Output::default(DataType::Metric)]
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
+        vec![SourceOutput::new_metrics()]
     }
 
     fn can_acknowledge(&self) -> bool {

@@ -12,9 +12,13 @@ fn bench_elasticsearch_index(c: &mut Criterion) {
     group.bench_function("dynamic", |b| {
         let index = Template::try_from("index-%Y.%m.%d").unwrap();
         let mut event = Event::Log(LogEvent::from("hello world"));
-        event
-            .as_mut_log()
-            .insert(log_schema().timestamp_key(), Utc::now());
+        event.as_mut_log().insert(
+            (
+                lookup::PathPrefix::Event,
+                log_schema().timestamp_key().unwrap(),
+            ),
+            Utc::now(),
+        );
 
         b.iter_batched(
             || event.clone(),
@@ -26,9 +30,13 @@ fn bench_elasticsearch_index(c: &mut Criterion) {
     group.bench_function("static", |b| {
         let index = Template::try_from("index").unwrap();
         let mut event = Event::Log(LogEvent::from("hello world"));
-        event
-            .as_mut_log()
-            .insert(log_schema().timestamp_key(), Utc::now());
+        event.as_mut_log().insert(
+            (
+                lookup::PathPrefix::Event,
+                log_schema().timestamp_key().unwrap(),
+            ),
+            Utc::now(),
+        );
 
         b.iter_batched(
             || event.clone(),

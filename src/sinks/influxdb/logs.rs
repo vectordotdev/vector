@@ -47,7 +47,7 @@ impl SinkBatchSettings for InfluxDbLogsDefaultBatchSettings {
 pub struct InfluxDbLogsConfig {
     /// The namespace of the measurement name to use.
     ///
-    /// When specified, the measurement name will be `<namespace>.vector`.
+    /// When specified, the measurement name is `<namespace>.vector`.
     ///
     #[configurable(
         deprecated = "This field is deprecated, and `measurement` should be used instead."
@@ -55,7 +55,7 @@ pub struct InfluxDbLogsConfig {
     #[configurable(metadata(docs::examples = "service"))]
     pub namespace: Option<String>,
 
-    /// The name of the InfluxDB measurement that will be written to.
+    /// The name of the InfluxDB measurement that is written to.
     #[configurable(metadata(docs::examples = "vector-logs"))]
     pub measurement: Option<String>,
 
@@ -787,8 +787,8 @@ mod tests {
             event.insert(format!("key{}", i).as_str(), format!("value{}", i));
 
             let timestamp = Utc
-                .ymd(1970, 1, 1)
-                .and_hms_nano_opt(0, 0, (i as u32) + 1, 0)
+                .with_ymd_and_hms(1970, 1, 1, 0, 0, (i as u32) + 1)
+                .single()
                 .expect("invalid timestamp");
             event.insert("timestamp", timestamp);
             event.insert("source_type", "file");

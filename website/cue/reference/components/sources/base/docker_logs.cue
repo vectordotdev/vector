@@ -26,10 +26,10 @@ base: components: sources: docker_logs: configuration: {
 			Matching is prefix first, so specifying a value of `foo` would match any container named `foo` as well as any
 			container whose name started with `foo`. This applies equally whether matching container IDs or names.
 
-			By default, the source will collect logs for all containers. If `exclude_containers` is configured, any
-			container that matches a configured exclusion will be excluded even if it is also included via
-			`include_containers`, so care should be taken when utilizing prefix matches as they cannot be overridden by a
-			corresponding entry in `include_containers` e.g. excluding `foo` by attempting to include `foo-specific-id`.
+			By default, the source collects logs for all containers. If `exclude_containers` is configured, any
+			container that matches a configured exclusion is excluded even if it is also included with
+			`include_containers`, so care should be taken when using prefix matches as they cannot be overridden by a
+			corresponding entry in `include_containers`, for example, excluding `foo` by attempting to include `foo-specific-id`.
 
 			This can be used in conjunction with `include_containers`.
 			"""
@@ -66,7 +66,7 @@ base: components: sources: docker_logs: configuration: {
 		description: """
 			A list of image names to match against.
 
-			If not provided, all images will be included.
+			If not provided, all images are included.
 			"""
 		required: false
 		type: array: items: type: string: examples: ["httpd", "redis"]
@@ -116,7 +116,7 @@ base: components: sources: docker_logs: configuration: {
 
 						The first line (the line that matched the start pattern) does not need to match the `ContinueThrough` pattern.
 
-						This is useful in cases such as a Java stack trace, where some indicator in the line (such as leading
+						This is useful in cases such as a Java stack trace, where some indicator in the line (such as a leading
 						whitespace) indicates that it is an extension of the proceeding line.
 						"""
 					halt_before: """
@@ -154,8 +154,8 @@ base: components: sources: docker_logs: configuration: {
 		description: """
 			Overrides the name of the log field used to mark an event as partial.
 
-			If `auto_partial_merge` is disabled, partial events will be emitted with a log field, controlled by this
-			configuration value, is set, indicating that the event is not complete.
+			If `auto_partial_merge` is disabled, partial events are emitted with a log field, set by this
+			configuration value, indicating that the event is not complete.
 			"""
 		required: false
 		type: string: default: "_partial"
@@ -172,7 +172,7 @@ base: components: sources: docker_logs: configuration: {
 		description: """
 			Configuration of TLS when connecting to the Docker daemon.
 
-			Only relevant when connecting to Docker via an HTTPS URL.
+			Only relevant when connecting to Docker with an HTTPS URL.
 
 			If not configured, the environment variable `DOCKER_CERT_PATH` is used. If `DOCKER_CERT_PATH` is absent, then` DOCKER_CONFIG` is used. If both environment variables are absent, the certificates in `~/.docker/` are read.
 			"""

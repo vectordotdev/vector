@@ -27,7 +27,7 @@ use crate::{
 #[serde(default)]
 #[configurable(metadata(docs::advanced))]
 pub struct HecClientAcknowledgementsConfig {
-    /// Controls if the sink will integrate with [Splunk HEC indexer acknowledgements][splunk_indexer_ack_docs] for end-to-end acknowledgements.
+    /// Controls if the sink integrates with [Splunk HEC indexer acknowledgements][splunk_indexer_ack_docs] for end-to-end acknowledgements.
     ///
     /// [splunk_indexer_ack_docs]: https://docs.splunk.com/Documentation/Splunk/8.2.3/Data/AboutHECIDXAck
     pub indexer_acknowledgements_enabled: bool,
@@ -36,12 +36,12 @@ pub struct HecClientAcknowledgementsConfig {
     #[configurable(metadata(docs::type_unit = "seconds"))]
     pub query_interval: NonZeroU8,
 
-    /// The maximum number of times an acknowledgement ID will be queried for its status.
+    /// The maximum number of times an acknowledgement ID is queried for its status.
     pub retry_limit: NonZeroU8,
 
     /// The maximum number of pending acknowledgements from events sent to the Splunk HEC collector.
     ///
-    /// Once reached, the sink will begin applying backpressure.
+    /// Once reached, the sink begins applying backpressure.
     pub max_pending_acks: NonZeroU64,
 
     #[serde(

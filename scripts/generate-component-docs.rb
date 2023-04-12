@@ -338,7 +338,7 @@ def find_nested_object_property_schema(schema, property_name)
   # recursively visit each of those subschemas, looking for object schemas along the way that we can
   # check for the given property within.
   matching_property_schemas = []
-  unvisited_subschemas = schema['oneOf'].dup || schema['allOf'].dup || []
+  unvisited_subschemas = schema['oneOf'].dup || schema['anyOf'].dup|| schema['allOf'].dup || []
   while !unvisited_subschemas.empty? do
     unvisited_subschema = unvisited_subschemas.pop
 
@@ -352,7 +352,7 @@ def find_nested_object_property_schema(schema, property_name)
 
     # If the subschema had no object properties, see if it's an `oneOf`/`allOf` subschema, and if
     # so, collect any of _those_ subschemas and add them to our list of subschemas to visit.
-    maybe_unvisited_subschemas = unvisited_subschema['oneOf'].dup || unvisited_subschema['allOf'].dup || []
+    maybe_unvisited_subschemas = unvisited_subschema['oneOf'].dup || unvisited_subschema['anyOf'].dup || unvisited_subschema['allOf'].dup || []
     unvisited_subschemas.concat(maybe_unvisited_subschemas) unless maybe_unvisited_subschemas.nil?
   end
 
@@ -378,6 +378,8 @@ def get_json_schema_type(schema)
     'all-of'
   elsif schema.key?('oneOf')
     'one-of'
+  elsif schema.key?('anyOf')
+    'any-of'
   elsif schema.key?('type')
     get_json_schema_instance_type(schema)
   elsif schema.key?('const')
@@ -839,7 +841,7 @@ def resolve_bare_schema(root_schema, schema)
       reduced = schema['allOf'].filter_map { |subschema| resolve_schema(root_schema, subschema) }
                               .reduce { |acc, item| nested_merge(acc, item) }
       reduced['type']
-    when 'one-of'
+    when 'one-of', 'any-of'
       @logger.debug 'Resolving enum schema.'
 
       # We completely defer resolution of enum schemas to `resolve_enum_schema` because there's a
@@ -974,10 +976,20 @@ def resolve_bare_schema(root_schema, schema)
 end
 
 def resolve_enum_schema(root_schema, schema)
+  # Figure out if this is a one-of or any-of enum schema. Both at the same time is never correct.
+  subschemas = if schema.key?('oneOf')
+    schema['oneOf']
+  elsif schema.key?('anyOf')
+    schema['anyOf']
+  else
+    @logger.error "Enum schema had both `oneOf` and `anyOf` specified. Schema: #{schema}"
+    exit 1
+  end
+
   # Filter out all subschemas which are purely null schemas used for indicating optionality, as well
   # as any subschemas that are marked as being hidden.
   is_optional = get_schema_metadata(schema, 'docs::optional')
-  subschemas = schema['oneOf']
+  subschemas = subschemas
     .reject { |subschema| subschema['type'] == 'null' }
     .reject { |subschema| get_schema_metadata(subschema, 'docs::hidden') }
   subschema_count = subschemas.count

@@ -98,7 +98,7 @@ cli: {
 		}
 		"verbose": {
 			_short:      "v"
-			description: "Enable more detailed logging. Repeat to reduce further. Overrides `--verbose`."
+			description: "Enable more detailed logging. Repeat to reduce further. Overrides `--quiet`."
 		}
 		"version": {
 			_short:      "V"

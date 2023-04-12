@@ -33,13 +33,16 @@ use codecs::{
 };
 use vector_config::configurable_component;
 use vector_core::{
-    config::{log_schema, LogNamespace, Output},
+    config::{log_schema, LogNamespace, SourceOutput},
     event::Event,
 };
 
 /// Configuration for the `http_client` source.
 #[serde_as]
-#[configurable_component(source("http_client"))]
+#[configurable_component(source(
+    "http_client",
+    "Pull observability data from an HTTP server at a configured interval."
+))]
 #[derive(Clone, Debug)]
 pub struct HttpClientConfig {
     /// The HTTP endpoint to collect events from.
@@ -163,6 +166,7 @@ impl Default for HttpClientConfig {
 impl_generate_config_from_default!(HttpClientConfig);
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "http_client")]
 impl SourceConfig for HttpClientConfig {
     async fn build(&self, cx: SourceContext) -> Result<sources::Source> {
         // build the url
@@ -202,7 +206,7 @@ impl SourceConfig for HttpClientConfig {
         Ok(call(inputs, context, cx.out, self.method).boxed())
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         // There is a global and per-source `log_namespace` config. The source config overrides the global setting,
         // and is merged here.
         let log_namespace = global_log_namespace.merge(self.log_namespace);
@@ -212,7 +216,10 @@ impl SourceConfig for HttpClientConfig {
             .schema_definition(log_namespace)
             .with_standard_vector_source_metadata();
 
-        vec![Output::default(self.decoding.output_type()).with_schema_definition(schema_definition)]
+        vec![SourceOutput::new_logs(
+            self.decoding.output_type(),
+            schema_definition,
+        )]
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -244,7 +251,7 @@ impl ValidatableComponent for HttpClientConfig {
 register_validatable_component!(HttpClientConfig);
 
 impl HttpClientConfig {
-    fn get_decoding_config(&self, log_namespace: Option<LogNamespace>) -> DecodingConfig {
+    pub fn get_decoding_config(&self, log_namespace: Option<LogNamespace>) -> DecodingConfig {
         let decoding = self.decoding.clone();
         let framing = self.framing.clone();
         let log_namespace =
@@ -256,9 +263,9 @@ impl HttpClientConfig {
 
 /// Captures the configuration options required to decode the incoming requests into events.
 #[derive(Clone)]
-struct HttpClientContext {
-    decoder: Decoder,
-    log_namespace: LogNamespace,
+pub struct HttpClientContext {
+    pub decoder: Decoder,
+    pub log_namespace: LogNamespace,
 }
 
 impl HttpClientContext {
@@ -283,9 +290,32 @@ impl HttpClientContext {
         }
         events
     }
+}
+
+impl HttpClientBuilder for HttpClientContext {
+    type Context = HttpClientContext;
+
+    /// No additional context from request data is needed from this particular client.
+    fn build(&self, _uri: &Uri) -> Self::Context {
+        self.clone()
+    }
+}
+
+impl http_client::HttpClientContext for HttpClientContext {
+    /// Decodes the HTTP response body into events per the decoder configured.
+    fn on_response(&mut self, _url: &Uri, _header: &Parts, body: &Bytes) -> Option<Vec<Event>> {
+        // get the body into a byte array
+        let mut buf = BytesMut::new();
+        let body = String::from_utf8_lossy(body);
+        buf.extend_from_slice(body.as_bytes());
+
+        let events = self.decode_events(&mut buf);
+
+        Some(events)
+    }
 
     /// Enriches events with source_type, timestamp
-    fn enrich_events(&self, events: &mut Vec<Event>) {
+    fn enrich_events(&mut self, events: &mut Vec<Event>) {
         let now = Utc::now();
 
         for event in events {
@@ -311,30 +341,5 @@ impl HttpClientContext {
                 }
             }
         }
-    }
-}
-
-impl HttpClientBuilder for HttpClientContext {
-    type Context = HttpClientContext;
-
-    /// No additional context from request data is needed from this particular client.
-    fn build(&self, _uri: &Uri) -> Self::Context {
-        self.clone()
-    }
-}
-
-impl http_client::HttpClientContext for HttpClientContext {
-    /// Decodes the HTTP response body into events per the decoder configured.
-    fn on_response(&mut self, _url: &Uri, _header: &Parts, body: &Bytes) -> Option<Vec<Event>> {
-        // get the body into a byte array
-        let mut buf = BytesMut::new();
-        let body = String::from_utf8_lossy(body);
-        buf.extend_from_slice(body.as_bytes());
-
-        // decode and enrich
-        let mut events = self.decode_events(&mut buf);
-        self.enrich_events(&mut events);
-
-        Some(events)
     }
 }
