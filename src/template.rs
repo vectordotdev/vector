@@ -145,7 +145,7 @@ impl ConfigurableString for Template {}
 
 impl Template {
     /// set tz offset
-    pub fn with_path_tz(mut self, path_tz: Tz) -> Self {
+    pub const fn with_path_tz(mut self, path_tz: Tz) -> Self {
         self.path_tz = Some(path_tz);
         self
     }
