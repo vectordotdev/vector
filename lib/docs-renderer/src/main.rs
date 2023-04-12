@@ -6,10 +6,7 @@ use crate::renderer::SchemaRenderer;
 use anyhow::{Context, Result};
 use tracing::debug;
 use vector_config::schema::parser::{component::ComponentSchema, query::SchemaQuerier};
-use vector_config_common::{
-    attributes::CustomAttribute,
-    constants::{self, ComponentType},
-};
+use vector_config_common::constants::{self, ComponentType};
 
 fn main() -> Result<()> {
     let querier = SchemaQuerier::from_schema("/tmp/vector-config-schema.json")
@@ -26,10 +23,10 @@ fn main() -> Result<()> {
         // to be common across components of the same type, etc.
         let base_component_schema = querier
             .query()
-            .with_custom_attribute(CustomAttribute::kv(
+            .with_custom_attribute_kv(
                 constants::DOCS_META_COMPONENT_BASE_TYPE,
-                base_component_type.as_str(),
-            ))
+                base_component_type,
+            )
             .run_single()?;
 
         debug!(
@@ -40,10 +37,7 @@ fn main() -> Result<()> {
         // Find all component schemas of the same component type.
         let maybe_component_schemas = querier
             .query()
-            .with_custom_attribute(CustomAttribute::kv(
-                constants::DOCS_META_COMPONENT_TYPE,
-                base_component_type.as_str(),
-            ))
+            .with_custom_attribute_kv(constants::DOCS_META_COMPONENT_TYPE, base_component_type)
             .run()
             .into_iter()
             .try_fold(Vec::new(), |mut acc, x| {

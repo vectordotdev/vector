@@ -30,6 +30,13 @@ impl RenderData {
     where
         F: FnOnce(&mut Map<String, Value>) -> V,
     {
+        // TODO: We should refactor this method so that it takes the desired path, a boolean for
+        // whether or not to create missing path nodes, and a closure to call with the object
+        // reference/object key if it exists.. and then this way, `write` and `delete` become simple
+        // calls with simple closures that just do `map.insert(...)` and `map.delete(...)` and so
+        // on.
+        //
+        // tl;dr: make it DRY.
         let map = self
             .root
             .as_object_mut()
@@ -169,14 +176,6 @@ impl RenderData {
         }
 
         self.root.pointer(path).is_some()
-    }
-
-    /// Clears all data.
-    pub fn clear(&mut self) {
-        self.root
-            .as_object_mut()
-            .expect("Render data should always have an object value as root.")
-            .clear();
     }
 
     /// Merges the data from `other` into `self`.

@@ -31,6 +31,12 @@ impl SchemaError {
     }
 }
 
+/// A schema object that represents the schema of a single Vector component.
+///
+/// The schema represents the equivalent of the component's configuration type, excluding any common
+/// configuration fields that appear on a per-component type basis. This means that, for a sink
+/// component, this schema would include the configuration fields of the specific sink component,
+/// but wouldn't contain the common sink configuration fields such as `inputs` or `buffer`.
 pub struct ComponentSchema<'a> {
     schema: &'a SchemaObject,
     component_name: String,
@@ -38,10 +44,17 @@ pub struct ComponentSchema<'a> {
 }
 
 impl<'a> ComponentSchema<'a> {
+    /// The type of the component represented by this schema.
     pub fn component_type(&self) -> ComponentType {
         self.component_type
     }
 
+    /// The name of the component represented by this schema.
+    ///
+    /// This refers to the configuration-specific identifier used to specify the component type
+    /// within the `type` field.
+    ///
+    /// For example, the AWS S3 sink would be `aws_s3`.
     pub fn component_name(&self) -> &str {
         &self.component_name
     }

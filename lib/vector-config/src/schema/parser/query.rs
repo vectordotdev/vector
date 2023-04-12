@@ -75,7 +75,7 @@ impl<'a> SchemaQueryBuilder<'a> {
         }
     }
 
-    /// Adds a constraint on the given custom attribute.
+    /// Adds a constraint on the given custom attribute key/value.
     ///
     /// Can be used multiple times to match schemas against multiple attributes.
     ///
@@ -83,8 +83,15 @@ impl<'a> SchemaQueryBuilder<'a> {
     /// not a key/value attribute, and vise versa. For key/value attributes where the attribute in
     /// the schema itself has multiple values, the schema is considered a match so long as it
     /// contains the value specified in the query.
-    pub fn with_custom_attribute(mut self, custom_attribute: CustomAttribute) -> Self {
-        self.attributes.push(custom_attribute);
+    pub fn with_custom_attribute_kv<K, V>(mut self, key: K, value: V) -> Self
+    where
+        K: Into<String>,
+        V: Into<Value>,
+    {
+        self.attributes.push(CustomAttribute::KeyValue {
+            key: key.into(),
+            value: value.into(),
+        });
         self
     }
 
@@ -190,7 +197,7 @@ pub enum SchemaType<'a> {
 
     /// A set of subschemas in which at least one must match.
     ///
-    /// Referred to as a `AnyOf` schema in JSON Schema.
+    /// Referred to as a `anyOf` schema in JSON Schema.
     ///
     /// For a given input, the input is only valid if it is valid against at least one of the
     /// specified subschemas.
@@ -280,7 +287,7 @@ impl<'a> QueryableSchema for &'a SchemaObject {
             } else if let Some(any_of) = subschemas.any_of.as_ref() {
                 return SchemaType::AnyOf(any_of.iter().map(schema_to_simple_schema).collect());
             } else {
-                panic!("Encountered schema with subschema validation that wasn't one of the supported types: allOf, oneOf.");
+                panic!("Encountered schema with subschema validation that wasn't one of the supported types: allOf, oneOf, anyOf.");
             }
         }
 

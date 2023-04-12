@@ -1,5 +1,6 @@
 // TODO: Actually use this from `vector-config-macros` so that it's properly centralized.
 
+use serde_json::Value;
 use syn::Path;
 
 pub const COMPONENT_TYPE_ENRICHMENT_TABLE: &str = "enrichment_table";
@@ -82,5 +83,11 @@ impl<'a> TryFrom<&'a Path> for ComponentType {
             .ok_or(())
             .map(|id| id.to_string())
             .and_then(|s| Self::try_from(s.as_str()))
+    }
+}
+
+impl Into<Value> for &ComponentType {
+    fn into(self) -> Value {
+        Value::String(self.as_str().to_string())
     }
 }
