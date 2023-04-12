@@ -7,9 +7,12 @@ use criterion::{
     Criterion, SamplingMode, Throughput,
 };
 use value::Value;
-use vector::transforms::{
-    route::{Route, RouteConfig},
-    TransformOutputsBuf,
+use vector::{
+    config::OutputId,
+    transforms::{
+        route::{Route, RouteConfig},
+        TransformOutputsBuf,
+    },
 };
 use vector_core::{
     config::{DataType, TransformOutput},
@@ -60,7 +63,8 @@ fn route(c: &mut Criterion) {
             log_schema_definitions: Vec::new(),
         });
     }
-    let output_buffer: TransformOutputsBuf = TransformOutputsBuf::new_with_capacity(outputs, 10);
+    let output_buffer: TransformOutputsBuf =
+        TransformOutputsBuf::new_with_capacity(outputs, 10, OutputId::from("route"));
 
     for param in &[
         // A small filter where a sole field is mapped into a named route,

@@ -31,7 +31,6 @@ use crate::{
     },
 };
 
-#[allow(dead_code)]
 pub struct RunningTopology {
     inputs: HashMap<ComponentKey, BufferSender<EventArray>>,
     inputs_tap_metadata: HashMap<ComponentKey, Inputs<OutputId>>,

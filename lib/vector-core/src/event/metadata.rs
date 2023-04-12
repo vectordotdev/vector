@@ -8,7 +8,7 @@ use value::{Kind, Secrets, Value};
 use vector_common::EventDataEq;
 
 use super::{BatchNotifier, EventFinalizer, EventFinalizers, EventStatus};
-use crate::config::LogNamespace;
+use crate::config::{LogNamespace, OutputId};
 use crate::{schema, ByteSizeOf};
 
 const DATADOG_API_KEY: &str = "datadog_api_key";
@@ -28,6 +28,8 @@ pub struct EventMetadata {
 
     #[serde(default, skip)]
     finalizers: EventFinalizers,
+
+    source: Option<OutputId>,
 
     /// An identifier for a globally registered schema definition which provides information about
     /// the event shape (type information, and semantic meaning of fields).
@@ -58,6 +60,16 @@ impl EventMetadata {
     /// Returns a mutable reference to the metadata value
     pub fn value_mut(&mut self) -> &mut Value {
         &mut self.value
+    }
+
+    /// Returns a mutable reference to the metadata source.
+    pub fn source(&self) -> &Option<OutputId> {
+        &self.source
+    }
+
+    /// Returns a mutable reference to the metadata source.
+    pub fn source_mut(&mut self) -> &mut Option<OutputId> {
+        &mut self.source
     }
 
     /// Returns a reference to the secrets
@@ -97,6 +109,7 @@ impl Default for EventMetadata {
             value: Value::Object(BTreeMap::new()),
             secrets: Secrets::new(),
             finalizers: Default::default(),
+            source: None,
             schema_definition: default_schema_definition(),
         }
     }

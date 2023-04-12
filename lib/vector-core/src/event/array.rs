@@ -14,7 +14,7 @@ use super::{
     EstimatedJsonEncodedSizeOf, Event, EventDataEq, EventFinalizer, EventMutRef, EventRef,
     LogEvent, Metric, TraceEvent,
 };
-use crate::ByteSizeOf;
+use crate::{config::OutputId, ByteSizeOf};
 
 /// The type alias for an array of `LogEvent` elements.
 pub type LogArray = Vec<LogEvent>;
@@ -138,6 +138,28 @@ pub enum EventArray {
 }
 
 impl EventArray {
+    /// Sets the `OutputId` in the metadata for all the events in this array.
+    /// This really needs to be an `Arc`.
+    pub fn set_output_id(&mut self, output_id: &OutputId) {
+        match self {
+            EventArray::Logs(logs) => {
+                for log in logs {
+                    *log.metadata_mut().source_mut() = Some(output_id.clone());
+                }
+            }
+            EventArray::Metrics(metrics) => {
+                for metric in metrics {
+                    *metric.metadata_mut().source_mut() = Some(output_id.clone());
+                }
+            }
+            EventArray::Traces(traces) => {
+                for trace in traces {
+                    *trace.metadata_mut().source_mut() = Some(output_id.clone());
+                }
+            }
+        }
+    }
+
     /// Iterate over references to this array's events.
     pub fn iter_events(&self) -> impl Iterator<Item = EventRef> {
         match self {

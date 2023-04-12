@@ -246,10 +246,16 @@ impl<'a> Builder<'a> {
                 let mut rx = builder.add_source_output(output.clone());
 
                 let (mut fanout, control) = Fanout::new();
+                let o = OutputId {
+                    component: key.clone(),
+                    port: output.port.clone(),
+                };
+
                 let pump = async move {
                     debug!("Source pump starting.");
 
-                    while let Some(array) = rx.next().await {
+                    while let Some(mut array) = rx.next().await {
+                        array.set_output_id(&o);
                         fanout.send(array).await.map_err(|e| {
                             debug!("Source pump finished with an error.");
                             TaskError::wrapped(e)
@@ -711,7 +717,14 @@ fn build_sync_transform(
     node: TransformNode,
     input_rx: BufferReceiver<EventArray>,
 ) -> (Task, HashMap<OutputId, fanout::ControlChannel>) {
-    let (outputs, controls) = TransformOutputs::new(node.outputs);
+    let (outputs, controls) = TransformOutputs::new(
+        OutputId {
+            component: node.key.clone(),
+            // TODO Where does this come from?
+            port: None,
+        },
+        node.outputs,
+    );
 
     let runner = Runner::new(t, input_rx, node.input_details.data_type(), outputs);
     let transform = if node.enable_concurrency {
@@ -908,8 +921,13 @@ fn build_task_transform(
             ))
         });
     let events_sent = register!(EventsSent::from(internal_event::Output(None)));
+    let k = key.clone();
     let stream = t
         .transform(Box::pin(filtered))
+        .map(move |mut events: EventArray| {
+            events.set_output_id(&OutputId::from(&k));
+            events
+        })
         .inspect(move |events: &EventArray| {
             events_sent.emit(CountByteSize(
                 events.len(),

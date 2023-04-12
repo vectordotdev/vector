@@ -6,6 +6,7 @@ use vector_common::internal_event::{
 };
 use vector_common::EventDataEq;
 
+use crate::config::OutputId;
 use crate::{
     config,
     event::{
@@ -218,10 +219,12 @@ impl SyncTransform for Box<dyn FunctionTransform> {
 
 struct TransformOutput {
     fanout: Fanout,
+    // output_id: config::OutputId,
     events_sent: Registered<EventsSent>,
 }
 
 pub struct TransformOutputs {
+    output_id: config::OutputId,
     outputs_spec: Vec<config::TransformOutput>,
     primary_output: Option<TransformOutput>,
     named_outputs: HashMap<String, TransformOutput>,
@@ -229,6 +232,7 @@ pub struct TransformOutputs {
 
 impl TransformOutputs {
     pub fn new(
+        output_id: config::OutputId,
         outputs_in: Vec<config::TransformOutput>,
     ) -> (Self, HashMap<Option<String>, fanout::ControlChannel>) {
         let outputs_spec = outputs_in.clone();
@@ -242,6 +246,7 @@ impl TransformOutputs {
                 None => {
                     primary_output = Some(TransformOutput {
                         fanout,
+                        // output_id: output_id.clone(),
                         events_sent: register(EventsSent::from(internal_event::Output(Some(
                             DEFAULT_OUTPUT.into(),
                         )))),
@@ -253,6 +258,7 @@ impl TransformOutputs {
                         name.clone(),
                         TransformOutput {
                             fanout,
+                            // output_id: output_id.clone(),
                             events_sent: register(EventsSent::from(internal_event::Output(Some(
                                 name.clone().into(),
                             )))),
@@ -264,6 +270,7 @@ impl TransformOutputs {
         }
 
         let me = Self {
+            output_id,
             outputs_spec,
             primary_output,
             named_outputs,
@@ -273,7 +280,11 @@ impl TransformOutputs {
     }
 
     pub fn new_buf_with_capacity(&self, capacity: usize) -> TransformOutputsBuf {
-        TransformOutputsBuf::new_with_capacity(self.outputs_spec.clone(), capacity)
+        TransformOutputsBuf::new_with_capacity(
+            self.outputs_spec.clone(),
+            capacity,
+            self.output_id.clone(),
+        )
     }
 
     /// Sends the events in the buffer to their respective outputs.
@@ -314,12 +325,17 @@ impl TransformOutputs {
 
 #[derive(Debug, Clone)]
 pub struct TransformOutputsBuf {
+    output_id: OutputId,
     primary_buffer: Option<OutputBuffer>,
     named_buffers: HashMap<String, OutputBuffer>,
 }
 
 impl TransformOutputsBuf {
-    pub fn new_with_capacity(outputs_in: Vec<config::TransformOutput>, capacity: usize) -> Self {
+    pub fn new_with_capacity(
+        outputs_in: Vec<config::TransformOutput>,
+        capacity: usize,
+        output_id: OutputId,
+    ) -> Self {
         let mut primary_buffer = None;
         let mut named_buffers = HashMap::new();
 
@@ -335,19 +351,22 @@ impl TransformOutputsBuf {
         }
 
         Self {
+            output_id,
             primary_buffer,
             named_buffers,
         }
     }
 
-    pub fn push(&mut self, event: Event) {
+    pub fn push(&mut self, mut event: Event) {
+        *event.metadata_mut().source_mut() = Some(self.output_id.clone());
         self.primary_buffer
             .as_mut()
             .expect("no default output")
             .push(event);
     }
 
-    pub fn push_named(&mut self, name: &str, event: Event) {
+    pub fn push_named(&mut self, name: &str, mut event: Event) {
+        *event.metadata_mut().source_mut() = Some(self.output_id.clone());
         self.named_buffers
             .get_mut(name)
             .expect("unknown output")
@@ -355,6 +374,10 @@ impl TransformOutputsBuf {
     }
 
     pub fn append(&mut self, slice: &mut Vec<Event>) {
+        for event in slice.iter_mut() {
+            *event.metadata_mut().source_mut() = Some(self.output_id.clone());
+        }
+
         self.primary_buffer
             .as_mut()
             .expect("no default output")
@@ -362,6 +385,10 @@ impl TransformOutputsBuf {
     }
 
     pub fn append_named(&mut self, name: &str, slice: &mut Vec<Event>) {
+        for event in slice.iter_mut() {
+            *event.metadata_mut().source_mut() = Some(self.output_id.clone());
+        }
+
         self.named_buffers
             .get_mut(name)
             .expect("unknown output")
@@ -386,7 +413,10 @@ impl TransformOutputsBuf {
         self.primary_buffer
             .as_mut()
             .expect("no default output")
-            .extend(events);
+            .extend(events.map(|mut event| {
+                *event.metadata_mut().source_mut() = Some(self.output_id.clone());
+                event
+            }));
     }
 
     pub fn take_primary(&mut self) -> OutputBuffer {
