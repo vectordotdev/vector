@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v3
-      - run: sudo apt-get install --yes python3-setuptools python3.6-dev
+      - run: sudo apt-get install --yes python3-setuptools python3.8-dev
       - run: pip3 install awscli --upgrade --user
       - env:
           AWS_ACCESS_KEY_ID: "${{ secrets.CI_AWS_ACCESS_KEY_ID }}"
