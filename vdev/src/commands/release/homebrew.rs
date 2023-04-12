@@ -19,10 +19,6 @@ impl Cli {
         let td = TempDir::new()?;
         env::set_current_dir(td.path())?;
 
-        // Set git configurations
-        git::set_config_value("user.name", "vic")?;
-        git::set_config_value("user.email", "vector@datadoghq.com")?;
-
         let github_token = env::var("GITHUB_TOKEN")?;
 
         // Clone the homebrew-brew repository
@@ -30,6 +26,10 @@ impl Cli {
             format!("https://{github_token}:x-oauth-basic@github.com/vectordotdev/homebrew-brew");
         git::clone(&homebrew_repo)?;
         env::set_current_dir("homebrew-brew")?;
+
+        // Set git configurations
+        git::set_config_value("user.name", "vic")?;
+        git::set_config_value("user.email", "vector@datadoghq.com")?;
 
         // Get package details for updating Formula/vector.rb
         let vector_version = env::var("VECTOR_VERSION")?;
