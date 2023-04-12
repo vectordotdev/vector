@@ -6,7 +6,7 @@ use std::{
 
 use indexmap::IndexMap;
 use serde_json::{Map, Value};
-use vector_config_common::{attributes::CustomAttribute, schema::*};
+use vector_config_common::{attributes::CustomAttribute, constants, schema::*};
 
 use crate::{
     num::ConfigurableNumber, Configurable, ConfigurableRef, GenerateError, Metadata, ToValue,
@@ -315,7 +315,7 @@ pub(crate) fn generate_optional_schema(
     // differentiate a `oneOf` schema that represents a Rust enum versus one that simply represents
     // our "null or X" wrapped schema.
     let mut overrides = Metadata::default();
-    overrides.add_custom_attribute(CustomAttribute::flag("docs::optional"));
+    overrides.add_custom_attribute(CustomAttribute::flag(constants::DOCS_META_OPTIONAL));
     let mut schema = get_or_generate_schema(config, gen, Some(overrides))?;
 
     // Take the metadata and extensions of the original schema.

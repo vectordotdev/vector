@@ -1,6 +1,6 @@
 use std::cell::RefCell;
 
-use vector_config_common::attributes::CustomAttribute;
+use vector_config_common::{attributes::CustomAttribute, constants};
 
 use crate::{
     num::NumberClass,
@@ -59,10 +59,13 @@ impl Configurable for serde_with::DurationSeconds<u64, serde_with::formats::Stri
         let mut metadata = Metadata::default();
         metadata.set_description("A span of time, in whole seconds.");
         metadata.add_custom_attribute(CustomAttribute::kv(
-            "docs::numeric_type",
+            constants::DOCS_META_NUMERIC_TYPE,
             NumberClass::Unsigned,
         ));
-        metadata.add_custom_attribute(CustomAttribute::kv("docs::type_unit", "seconds"));
+        metadata.add_custom_attribute(CustomAttribute::kv(
+            constants::DOCS_META_TYPE_UNIT,
+            "seconds",
+        ));
         metadata
     }
 
@@ -85,10 +88,13 @@ impl Configurable for serde_with::DurationSeconds<f64, serde_with::formats::Stri
         let mut metadata = Metadata::default();
         metadata.set_description("A span of time, in fractional seconds.");
         metadata.add_custom_attribute(CustomAttribute::kv(
-            "docs::numeric_type",
+            constants::DOCS_META_NUMERIC_TYPE,
             NumberClass::FloatingPoint,
         ));
-        metadata.add_custom_attribute(CustomAttribute::kv("docs::type_unit", "seconds"));
+        metadata.add_custom_attribute(CustomAttribute::kv(
+            constants::DOCS_META_TYPE_UNIT,
+            "seconds",
+        ));
         metadata
     }
 
@@ -110,10 +116,13 @@ impl Configurable for serde_with::DurationMilliSeconds<u64, serde_with::formats:
         let mut metadata = Metadata::default();
         metadata.set_description("A span of time, in whole milliseconds.");
         metadata.add_custom_attribute(CustomAttribute::kv(
-            "docs::numeric_type",
+            constants::DOCS_META_NUMERIC_TYPE,
             NumberClass::Unsigned,
         ));
-        metadata.add_custom_attribute(CustomAttribute::kv("docs::type_unit", "milliseconds"));
+        metadata.add_custom_attribute(CustomAttribute::kv(
+            constants::DOCS_META_TYPE_UNIT,
+            "milliseconds",
+        ));
         metadata
     }
 

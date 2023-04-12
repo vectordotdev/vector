@@ -1,53 +1,36 @@
 use std::{fs::File, io::BufReader, path::Path};
 
-use anyhow::Result;
 use once_cell::sync::OnceCell;
-use schemars::schema::{InstanceType, RootSchema, Schema, SchemaObject, SingleOrVec};
 use serde_json::Value;
 use snafu::Snafu;
-use vector_config_common::{attributes::CustomAttribute, constants::ComponentType};
-
-fn schema_to_simple_schema<'a>(schema: &'a Schema) -> SimpleSchema<'a> {
-    static TRUE_SCHEMA_OBJECT: OnceCell<SchemaObject> = OnceCell::new();
-    static FALSE_SCHEMA_OBJECT: OnceCell<SchemaObject> = OnceCell::new();
-
-    let schema_object = match schema {
-        Schema::Bool(bool) => {
-            if *bool {
-                TRUE_SCHEMA_OBJECT.get_or_init(|| Schema::Bool(true).into_object())
-            } else {
-                FALSE_SCHEMA_OBJECT.get_or_init(|| Schema::Bool(false).into_object())
-            }
-        }
-        Schema::Object(object) => object,
-    };
-
-    SimpleSchema {
-        schema: schema_object,
-    }
-}
+use vector_config_common::{
+    attributes::CustomAttribute,
+    constants,
+    schema::{InstanceType, RootSchema, Schema, SchemaObject, SingleOrVec},
+};
 
 #[derive(Debug, Snafu)]
+#[snafu(module, context(suffix(false)))]
 pub enum QueryError {
+    #[snafu(display("I/O error during opening schema: {source}"), context(false))]
+    Io { source: std::io::Error },
+
+    #[snafu(display("deserialization failed: {source}"), context(false))]
+    Deserialization { source: serde_json::Error },
+
     #[snafu(display("no schemas matched the query"))]
     NoMatches,
+
     #[snafu(display("multiple schemas matched the query ({len})"))]
     MultipleMatches { len: usize },
+
     #[snafu(display("found matching attribute but was not a flag"))]
     AttributeNotFlag,
+
     #[snafu(display(
         "found matching attribute but expected single value; multiple values present"
     ))]
     AttributeMultipleValues,
-}
-
-#[derive(Debug, Snafu)]
-pub enum SchemaError {
-    #[snafu(display("invalid component schema: {pointer}: {reason}"))]
-    InvalidComponentSchema {
-        pointer: &'static str,
-        reason: String,
-    },
 }
 
 pub struct SchemaQuerier {
@@ -62,11 +45,10 @@ impl SchemaQuerier {
     /// If no file exists at the given schema path, or there is an I/O error during loading the file
     /// (permissions, etc), then an error variant will be returned.
     ///
-    /// If the file does not contain valid JSON, or cannot be deserialized as a schema, then an error
-    /// variant will be returned.
-    pub fn from_schema<P: AsRef<Path>>(schema_path: P) -> Result<Self> {
+    /// If the file does not contain valid JSON, or cannot be deserialized as a schema, then an
+    /// error variant will be returned.
+    pub fn from_schema<P: AsRef<Path>>(schema_path: P) -> Result<Self, QueryError> {
         let reader = File::open(schema_path).map(BufReader::new)?;
-
         let schema = serde_json::from_reader(reader)?;
 
         Ok(Self { schema })
@@ -119,7 +101,7 @@ impl<'a> SchemaQueryBuilder<'a> {
                     // If we have custom attribute matches defined, but the schema has no metadata,
                     // it's not possible for it to match, so just bail out early.
                     let has_attribute_matchers = !self.attributes.is_empty();
-                    let schema_metadata = schema_object.extensions.get("_metadata");
+                    let schema_metadata = schema_object.extensions.get(constants::METADATA);
                     if has_attribute_matchers && schema_metadata.is_none() {
                         continue 'schema;
                     }
@@ -129,32 +111,30 @@ impl<'a> SchemaQueryBuilder<'a> {
                             let attr_matched = match self_attribute {
                                 CustomAttribute::Flag(key) => schema_attributes
                                     .get(key)
-                                    .map(|value| matches!(value, Value::Bool(true)))
-                                    .unwrap_or(false),
+                                    .map_or(false, |value| matches!(value, Value::Bool(true))),
                                 CustomAttribute::KeyValue {
                                     key,
                                     value: attr_value,
-                                } => schema_attributes
-                                    .get(key)
-                                    .map(|value| match value {
-                                        // Check string values directly.
-                                        Value::String(schema_attr_value) => {
-                                            schema_attr_value == attr_value
-                                        }
-                                        // For arrays, try and convert each item to a
-                                        // string, and for the values that are strings, see
-                                        // if they match.
-                                        Value::Array(schema_attr_values) => {
-                                            schema_attr_values.iter().any(|value| {
-                                                value
-                                                    .as_str()
-                                                    .map(|s| s == attr_value)
-                                                    .unwrap_or(false)
-                                            })
-                                        }
-                                        _ => false,
-                                    })
-                                    .unwrap_or(false),
+                                } => {
+                                    schema_attributes
+                                        .get(key)
+                                        .map_or(false, |value| match value {
+                                            // Check string values directly.
+                                            Value::String(schema_attr_value) => {
+                                                schema_attr_value == attr_value
+                                            }
+                                            // For arrays, try and convert each item to a string, and
+                                            // for the values that are strings, see if they match.
+                                            Value::Array(schema_attr_values) => {
+                                                schema_attr_values.iter().any(|value| {
+                                                    value
+                                                        .as_str()
+                                                        .map_or(false, |s| s == attr_value)
+                                                })
+                                            }
+                                            _ => false,
+                                        })
+                                }
                             };
 
                             if !attr_matched {
@@ -163,9 +143,7 @@ impl<'a> SchemaQueryBuilder<'a> {
                         }
                     }
 
-                    matches.push(SimpleSchema {
-                        schema: schema_object,
-                    });
+                    matches.push(schema_object.into());
                 }
             }
         }
@@ -209,6 +187,14 @@ pub enum SchemaType<'a> {
     /// For a given input, the input is only valid if it is valid against exactly one of the
     /// specified subschemas.
     OneOf(Vec<SimpleSchema<'a>>),
+
+    /// A set of subschemas in which at least one must match.
+    ///
+    /// Referred to as a `AnyOf` schema in JSON Schema.
+    ///
+    /// For a given input, the input is only valid if it is valid against at least one of the
+    /// specified subschemas.
+    AnyOf(Vec<SimpleSchema<'a>>),
 
     /// A schema that matches a well-known, constant value.
     ///
@@ -291,6 +277,8 @@ impl<'a> QueryableSchema for &'a SchemaObject {
                 return SchemaType::AllOf(all_of.iter().map(schema_to_simple_schema).collect());
             } else if let Some(one_of) = subschemas.one_of.as_ref() {
                 return SchemaType::OneOf(one_of.iter().map(schema_to_simple_schema).collect());
+            } else if let Some(any_of) = subschemas.any_of.as_ref() {
+                return SchemaType::AnyOf(any_of.iter().map(schema_to_simple_schema).collect());
             } else {
                 panic!("Encountered schema with subschema validation that wasn't one of the supported types: allOf, oneOf.");
             }
@@ -317,17 +305,17 @@ impl<'a> QueryableSchema for &'a SchemaObject {
     fn description(&self) -> Option<&str> {
         self.metadata
             .as_ref()
-            .and_then(|metadata| metadata.description.as_ref().map(|s| s.as_str()))
+            .and_then(|metadata| metadata.description.as_deref())
     }
 
     fn title(&self) -> Option<&str> {
         self.metadata
             .as_ref()
-            .and_then(|metadata| metadata.title.as_ref().map(|s| s.as_str()))
+            .and_then(|metadata| metadata.title.as_deref())
     }
 
     fn get_attributes(&self, key: &str) -> Option<OneOrMany<CustomAttribute>> {
-        self.extensions.get("_metadata")
+        self.extensions.get(constants::METADATA)
             .map(|metadata| match metadata {
                 Value::Object(attributes) => attributes,
                 _ => panic!("Found metadata extension in schema that was not of type 'object'."),
@@ -381,6 +369,12 @@ pub struct SimpleSchema<'a> {
     schema: &'a SchemaObject,
 }
 
+impl<'a> SimpleSchema<'a> {
+    pub fn into_inner(self) -> &'a SchemaObject {
+        self.schema
+    }
+}
+
 impl<'a> From<&'a SchemaObject> for SimpleSchema<'a> {
     fn from(schema: &'a SchemaObject) -> Self {
         Self { schema }
@@ -413,101 +407,22 @@ impl<'a> QueryableSchema for SimpleSchema<'a> {
     }
 }
 
-pub struct ComponentSchema<'a> {
-    schema: &'a SchemaObject,
-    component_name: String,
-    component_type: ComponentType,
-}
+fn schema_to_simple_schema(schema: &Schema) -> SimpleSchema<'_> {
+    static TRUE_SCHEMA_OBJECT: OnceCell<SchemaObject> = OnceCell::new();
+    static FALSE_SCHEMA_OBJECT: OnceCell<SchemaObject> = OnceCell::new();
 
-impl<'a> ComponentSchema<'a> {
-    pub fn component_type(&self) -> ComponentType {
-        self.component_type
-    }
+    let schema_object = match schema {
+        Schema::Bool(bool) => {
+            if *bool {
+                TRUE_SCHEMA_OBJECT.get_or_init(|| Schema::Bool(true).into_object())
+            } else {
+                FALSE_SCHEMA_OBJECT.get_or_init(|| Schema::Bool(false).into_object())
+            }
+        }
+        Schema::Object(object) => object,
+    };
 
-    pub fn component_name(&self) -> &str {
-        &self.component_name
-    }
-}
-
-impl<'a> QueryableSchema for ComponentSchema<'a> {
-    fn schema_type(&self) -> SchemaType {
-        self.schema.schema_type()
-    }
-
-    fn description(&self) -> Option<&str> {
-        self.schema.description()
-    }
-
-    fn title(&self) -> Option<&str> {
-        self.schema.title()
-    }
-
-    fn get_attributes(&self, key: &str) -> Option<OneOrMany<CustomAttribute>> {
-        self.schema.get_attributes(key)
-    }
-
-    fn get_attribute(&self, key: &str) -> Result<Option<CustomAttribute>, QueryError> {
-        self.schema.get_attribute(key)
-    }
-
-    fn has_flag_attribute(&self, key: &str) -> Result<bool, QueryError> {
-        self.schema.has_flag_attribute(key)
-    }
-}
-
-impl<'a> TryFrom<SimpleSchema<'a>> for ComponentSchema<'a> {
-    type Error = SchemaError;
-
-    fn try_from(value: SimpleSchema<'a>) -> Result<Self, Self::Error> {
-        // Component schemas must have a component type _and_ component name defined.
-        let component_type = value
-            .get_attribute("docs::component_type")
-            .map_err(|e| SchemaError::InvalidComponentSchema {
-                pointer: "docs::component_type",
-                reason: e.to_string(),
-            })?
-            .ok_or(SchemaError::InvalidComponentSchema {
-                pointer: "docs::component_type",
-                reason: "attribute must be present".to_string(),
-            })
-            .and_then(|attr| match attr {
-                CustomAttribute::Flag(_) => Err(SchemaError::InvalidComponentSchema {
-                    pointer: "docs::component_type",
-                    reason: "expected key/value attribute".into(),
-                }),
-                CustomAttribute::KeyValue { value, .. } => Ok(value),
-            })
-            .and_then(|s| {
-                ComponentType::try_from(s.as_str()).map_err(|_| {
-                    SchemaError::InvalidComponentSchema {
-                        pointer: "docs::component_type",
-                        reason: "value was not a valid component type".into(),
-                    }
-                })
-            })?;
-
-        let component_name = value
-            .get_attribute("docs::component_name")
-            .map_err(|e| SchemaError::InvalidComponentSchema {
-                pointer: "docs::component_name",
-                reason: e.to_string(),
-            })?
-            .ok_or(SchemaError::InvalidComponentSchema {
-                pointer: "docs::component_name",
-                reason: "attribute must be present".to_string(),
-            })
-            .and_then(|attr| match attr {
-                CustomAttribute::Flag(_) => Err(SchemaError::InvalidComponentSchema {
-                    pointer: "docs::component_name",
-                    reason: "expected key/value attribute".into(),
-                }),
-                CustomAttribute::KeyValue { value, .. } => Ok(value),
-            })?;
-
-        Ok(Self {
-            schema: value.schema,
-            component_name,
-            component_type,
-        })
+    SimpleSchema {
+        schema: schema_object,
     }
 }

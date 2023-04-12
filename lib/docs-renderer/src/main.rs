@@ -1,14 +1,15 @@
 mod renderer;
-mod schema;
 
 use std::collections::HashMap;
 
-use crate::{renderer::SchemaRenderer, schema::ComponentSchema};
+use crate::renderer::SchemaRenderer;
 use anyhow::{Context, Result};
 use tracing::debug;
-use vector_config_common::{attributes::CustomAttribute, constants::ComponentType};
-
-use self::schema::SchemaQuerier;
+use vector_config::schema::parser::{component::ComponentSchema, query::SchemaQuerier};
+use vector_config_common::{
+    attributes::CustomAttribute,
+    constants::{self, ComponentType},
+};
 
 fn main() -> Result<()> {
     let querier = SchemaQuerier::from_schema("/tmp/vector-config-schema.json")
@@ -26,7 +27,7 @@ fn main() -> Result<()> {
         let base_component_schema = querier
             .query()
             .with_custom_attribute(CustomAttribute::kv(
-                "docs::component_base_type",
+                constants::DOCS_META_COMPONENT_BASE_TYPE,
                 base_component_type.as_str(),
             ))
             .run_single()?;
@@ -40,7 +41,7 @@ fn main() -> Result<()> {
         let maybe_component_schemas = querier
             .query()
             .with_custom_attribute(CustomAttribute::kv(
-                "docs::component_type",
+                constants::DOCS_META_COMPONENT_TYPE,
                 base_component_type.as_str(),
             ))
             .run()

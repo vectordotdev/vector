@@ -86,7 +86,7 @@ depends = ""
 members = [
   ".",
   "lib/codecs",
-  "lib/config-schema",
+  "lib/docs-renderer",
   "lib/dnsmsg-parser",
   "lib/enrichment",
   "lib/fakedata",

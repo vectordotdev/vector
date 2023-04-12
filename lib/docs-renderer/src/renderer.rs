@@ -5,8 +5,10 @@ use serde::Serialize;
 use serde_json::{Map, Value};
 use snafu::Snafu;
 use tracing::debug;
-
-use crate::schema::{QueryError, QueryableSchema, SchemaQuerier, SchemaType};
+use vector_config::schema::parser::query::{
+    QueryError, QueryableSchema, SchemaQuerier, SchemaType,
+};
+use vector_config_common::constants;
 
 #[derive(Debug, Snafu)]
 pub enum RenderError {
@@ -236,7 +238,7 @@ where
         } = self;
 
         // If a schema is hidden, then we intentionally do not want to render it.
-        if schema.has_flag_attribute("docs::hidden")? {
+        if schema.has_flag_attribute(constants::DOCS_META_HIDDEN)? {
             debug!("Schema is marked as hidden. Skipping rendering.");
 
             return Ok(data);
@@ -250,7 +252,7 @@ where
         // and...). We still need to return _something_, so we return some barebones render data --
         // basically just a description -- so any configuration type that is a cycle entrypoint
         // should take care to provide a _good_ description.
-        if schema.has_flag_attribute("docs::cycle_entrypoint")? {
+        if schema.has_flag_attribute(constants::DOCS_META_CYCLE_ENTRYPOINT)? {
             debug!("Schema is a cycle entrypoint.");
 
             data.write("type", "blank");
@@ -261,7 +263,7 @@ where
 
         // If a schema has an overridden type, we return some barebones render data, similar to what
         // we do for cycle entrypoint schemas.
-        if schema.has_flag_attribute("docs::type_override")? {
+        if schema.has_flag_attribute(constants::DOCS_META_TYPE_OVERRIDE)? {
             debug!("Schema has overridden type.");
 
             data.write("type", "blank");
@@ -312,6 +314,7 @@ fn render_bare_schema<T: QueryableSchema>(
             }
         }
         SchemaType::OneOf(_subschemas) => {}
+        SchemaType::AnyOf(_subschemas) => {}
         SchemaType::Constant(const_value) => {
             // All we need to do is figure out the rendered type for the constant value, so we can
             // generate the right type path and stick the constant value in it.
@@ -394,7 +397,8 @@ fn apply_schema_metadata<T: QueryableSchema>(
     // If the schema is marked as being templateable, update the syntax of the string type field to
     // use the special `template` sentinel value, which drives template-specific logic during the
     // documentation generation phase.
-    if schema.has_flag_attribute("docs::templateable")? && data.exists("/type/string") {
+    if schema.has_flag_attribute(constants::DOCS_META_TEMPLATEABLE)? && data.exists("/type/string")
+    {
         data.write("/type/string/syntax", "template");
     }
 
