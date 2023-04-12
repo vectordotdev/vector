@@ -50,7 +50,7 @@ pub fn version() -> Result<String> {
 
     let channel = util::get_channel();
 
-    if channel == "latest" {
+    if channel == "release" {
         let head = util::git_head()?;
         if !head.status.success() {
             let error = String::from_utf8_lossy(&head.stderr);

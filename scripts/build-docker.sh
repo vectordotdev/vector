@@ -58,7 +58,7 @@ build() {
 
 echo "Building $REPO:* Docker images"
 
-if [[ "$CHANNEL" == "latest" ]]; then
+if [[ "$CHANNEL" == "release" ]]; then
   VERSION_EXACT="$VERSION"
   # shellcheck disable=SC2001
   VERSION_MINOR_X=$(echo "$VERSION" | sed 's/\.[0-9]*$/.X/g')
