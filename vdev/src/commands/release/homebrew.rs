@@ -20,8 +20,9 @@ impl Cli {
         env::set_current_dir(td.path())?;
 
         // Set git configurations
-        let config_values = &[("user.name", "vic"), ("user.email", "vector@datadoghq.com")];
-        git::set_config_values(config_values)?;
+        git::set_config_value("user.name", "vic")?;
+        git::set_config_value("user.email", "vector@datadoghq.com")?;
+
         let github_token = env::var("GITHUB_TOKEN")?;
 
         // Clone the homebrew-brew repository
@@ -51,6 +52,7 @@ impl Cli {
             let commit_message = format!("Release Vector {vector_version}");
             git::commit(&commit_message)?;
         }
+
         git::push()?;
 
         // Remove temporary directory
