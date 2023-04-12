@@ -272,7 +272,7 @@ where
         }
 
         // Now that we've handled any special cases, attempt to render the schema.
-        render_bare_schema(&querier, &schema, &mut data)?;
+        render_bare_schema(querier, &schema, &mut data)?;
 
         // If the rendered schema represents an array schema, remove any description that is present
         // for the schema of the array items themselves. We want the description of whatever object
@@ -331,7 +331,7 @@ fn render_bare_schema<T: QueryableSchema>(
                 let rendered_enum_type = get_rendered_value_type(&schema, enum_value)?;
                 let type_group_entry = type_map
                     .entry(rendered_enum_type)
-                    .or_insert_with(|| Vec::new());
+                    .or_insert_with(Vec::new);
                 type_group_entry.push(enum_value.clone());
             }
 

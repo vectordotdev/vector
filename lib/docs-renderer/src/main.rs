@@ -40,12 +40,8 @@ fn main() -> Result<()> {
             .with_custom_attribute_kv(constants::DOCS_META_COMPONENT_TYPE, base_component_type)
             .run()
             .into_iter()
-            .try_fold(Vec::new(), |mut acc, x| {
-                ComponentSchema::try_from(x).map(|cs| {
-                    acc.push(cs);
-                    acc
-                })
-            })?;
+            .map(ComponentSchema::try_from)
+            .collect::<Result<Vec<_>, _>>()?;
 
         debug!(
             "Found {} component schema(s) for component type '{}'.",
