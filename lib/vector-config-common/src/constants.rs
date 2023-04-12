@@ -86,8 +86,8 @@ impl<'a> TryFrom<&'a Path> for ComponentType {
     }
 }
 
-impl Into<Value> for &ComponentType {
-    fn into(self) -> Value {
-        Value::String(self.as_str().to_string())
+impl From<&ComponentType> for Value {
+    fn from(value: &ComponentType) -> Self {
+        Value::String(value.as_str().to_string())
     }
 }

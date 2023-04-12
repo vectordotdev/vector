@@ -351,7 +351,7 @@ fn render_bare_schema<T: QueryableSchema>(
             // TODO: Technically speaking, we could have multiple instance types declared here,
             // which is _entirely_ valid for JSON Schema. The trick is simply that we'll likely want
             // to do something equivalent to how we handle composite schemas where we just render
-            // the schema in the contest of each instance type, and then merge that rendered data
+            // the schema in the context of each instance type, and then merge that rendered data
             // together.
             //
             // This means that we'll need another render method that operates on a schema + instance
@@ -359,17 +359,17 @@ fn render_bare_schema<T: QueryableSchema>(
             //
             // Practically, all of this is fine for regular ol' data types because they don't
             // intersect, but the tricky bit would be if we encountered the null instance type. It's
-            // a real/valid data type, but the main problem is that there's nothing that reall makes
-            // sense to do with it.
+            // a real/valid data type, but the main problem is that there's nothing that really
+            // makes sense to do with it.
             //
-            // An object property, for example, that can be X or null, is
-            // essentially an optional field. We handle that by including, or excluding, that
-            // property from the object's required fields, which is specific to object.
+            // An object property, for example, that can be X or null, is essentially an optional
+            // field. We handle that by including, or excluding, that property from the object's
+            // required fields, which is specific to object.
             //
             // The only real world scenario where we would theoretically hit that is for an untagged
             // enum, as a unit variant in an untagged enum is represented by `null` in JSON, in
-            // terms of its serialized value. _However_, we only generate enums as `oneOf` schemas,
-            // so the `null` instance type should only ever show up by itself.
+            // terms of its serialized value. _However_, we only generate enums as `oneOf`/`anyOf`
+            // schemas, so the `null` instance type should only ever show up by itself.
             //
             // Long story short, we can likely have a hard-coded check that rejects any "X or null"
             // instance type groupings, knowing that _we_ never generate schemas like that, but it's
