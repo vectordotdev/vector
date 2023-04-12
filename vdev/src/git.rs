@@ -92,7 +92,10 @@ pub fn get_modified_files() -> Result<Vec<String>> {
 }
 
 pub fn set_config_value(key: &str, value: &str) -> Result<String> {
-    check_output(&["config", key, value])
+    Command::new("git")
+        .args(["config", key, value])
+        .stdout(std::process::Stdio::null())
+        .check_output()
 }
 
 /// Checks if the current directory's repo is clean
@@ -107,13 +110,13 @@ pub fn check_git_repository_clean() -> Result<bool> {
 /// Commits changes from the current repo
 pub fn commit(commit_message: &str) -> Result<String> {
     Command::new("git")
-        .args(&["commit", "--all", "--message", commit_message])
+        .args(["commit", "--all", "--message", commit_message])
         .check_output()
 }
 
 /// Pushes changes from the current repo
 pub fn push() -> Result<String> {
-    Command::new("git").args(&["push"]).check_output()
+    Command::new("git").args(["push"]).check_output()
 }
 
 pub fn clone(repo_url: &str) -> Result<String> {
