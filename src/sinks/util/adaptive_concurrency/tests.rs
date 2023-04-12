@@ -426,13 +426,13 @@ async fn run_test(params: TestParams) -> TestResults {
     let demo_logs = DemoLogsConfig::repeat(
         vec!["line 1".into()],
         params.requests,
-        params.interval,
+        Duration::from_secs_f64(params.interval),
         None,
     );
     config.add_source("in", demo_logs);
     config.add_sink("out", &["in"], test_config);
 
-    let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
+    let (topology, _) = start_topology(config.build().unwrap(), false).await;
 
     let controller = metrics::Controller::get().unwrap();
 

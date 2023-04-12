@@ -4,6 +4,7 @@ use bytes::Bytes;
 use futures_util::future::BoxFuture;
 use http::{Request, StatusCode, Uri};
 use hyper::Body;
+use lookup::lookup_v2::OptionalValuePath;
 use snafu::{ResultExt, Snafu};
 use vector_core::{config::proxy::ProxyConfig, event::EventRef};
 
@@ -53,6 +54,7 @@ pub fn build_http_batch_service(
     client: HttpClient,
     http_request_builder: Arc<HttpRequestBuilder>,
     endpoint_target: EndpointTarget,
+    auto_extract_timestamp: bool,
 ) -> HttpBatchService<BoxFuture<'static, Result<Request<Bytes>, crate::Error>>, HecRequest> {
     HttpBatchService::new(client, move |req: HecRequest| {
         let request_builder = Arc::clone(&http_request_builder);
@@ -71,6 +73,7 @@ pub fn build_http_batch_service(
                         index: req.index,
                         host: req.host,
                     },
+                    auto_extract_timestamp,
                 )
             });
         future
@@ -133,8 +136,10 @@ pub fn host_key() -> String {
     crate::config::log_schema().host_key().to_string()
 }
 
-pub fn timestamp_key() -> String {
-    crate::config::log_schema().timestamp_key().to_string()
+pub fn config_timestamp_key() -> OptionalValuePath {
+    OptionalValuePath {
+        path: crate::config::log_schema().timestamp_key().cloned(),
+    }
 }
 
 pub fn render_template_string<'a>(
@@ -269,6 +274,7 @@ mod tests {
                 "/services/collector/event",
                 None,
                 MetadataFields::default(),
+                false,
             )
             .unwrap();
 
@@ -311,6 +317,7 @@ mod tests {
                 "/services/collector/event",
                 None,
                 MetadataFields::default(),
+                false,
             )
             .unwrap();
 
@@ -356,6 +363,7 @@ mod tests {
                 "/services/collector/event",
                 None,
                 MetadataFields::default(),
+                false,
             )
             .unwrap_err();
         assert_eq!(err.to_string(), "URI parse error: invalid format")

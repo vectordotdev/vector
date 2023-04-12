@@ -13,6 +13,7 @@ components: sinks: gcp_pubsub: {
 	}
 
 	features: {
+		auto_generated:   true
 		acknowledgements: true
 		healthcheck: enabled: true
 		send: {
@@ -67,33 +68,7 @@ components: sinks: gcp_pubsub: {
 		notices: []
 	}
 
-	configuration: {
-		api_key:          configuration._gcp_api_key
-		credentials_path: configuration._gcp_credentials_path
-		endpoint: {
-			common:      false
-			description: "The endpoint to which to send data."
-			required:    false
-			type: string: {
-				default: "https://pubsub.googleapis.com"
-				examples: ["https://us-central1-pubsub.googleapis.com"]
-			}
-		}
-		project: {
-			description: "The project name to which to publish logs."
-			required:    true
-			type: string: {
-				examples: ["vector-123456"]
-			}
-		}
-		topic: {
-			description: "The topic within the project to which to publish logs."
-			required:    true
-			type: string: {
-				examples: ["this-is-a-topic"]
-			}
-		}
-	}
+	configuration: base.components.sinks.gcp_pubsub.configuration
 
 	input: {
 		logs:    true

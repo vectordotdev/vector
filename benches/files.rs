@@ -55,7 +55,7 @@ fn benchmark_files_no_partitions(c: &mut Criterion) {
                     sinks::file::FileSinkConfig {
                         path: output.try_into().unwrap(),
                         idle_timeout_secs: None,
-                        encoding: (None::<FramingConfig>, TextSerializerConfig::new()).into(),
+                        encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
                         compression: sinks::file::Compression::None,
                         acknowledgements: Default::default(),
                     },

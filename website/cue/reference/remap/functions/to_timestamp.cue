@@ -10,7 +10,7 @@ remap: functions: to_timestamp: {
 	arguments: [
 		{
 			name:        "value"
-			description: "The value that is to be converted to a timestamp. If a string, must be a valid representation of a `timestamp`, and no `default` exists, an `ArgumentError` will be raised."
+			description: "The value that is to be converted to a timestamp. If a string, must be a valid representation of a `timestamp` otherwise an `ArgumentError` will be raised."
 			required:    true
 			type: ["string", "float", "integer", "timestamp"]
 		},
@@ -43,11 +43,39 @@ remap: functions: to_timestamp: {
 
 	examples: [
 		{
-			title: "Coerce to a timestamp"
+			title: "Coerce a string to a timestamp"
 			source: """
 				to_timestamp!("2020-10-21T16:00:00Z")
 				"""
 			return: "2020-10-21T16:00:00Z"
+		},
+		{
+			title: "Coerce a unix timestamp (integer) to a timestamp"
+			source: """
+				to_timestamp!(1675968923)
+				"""
+			return: "2023-02-09T18:55:23Z"
+		},
+		{
+			title: "Coerce a unix timestamp (float) to a timestamp"
+			source: """
+				to_timestamp!(1675968923.567)
+				"""
+			return: "2023-02-09T18:55:23.566999912Z"
+		},
+		{
+			title: "Coerce a unix timestamp, in milliseconds, to a timestamp"
+			source: """
+				to_timestamp!(1676478566639, unit: "milliseconds")
+				"""
+			return: "2023-02-15T16:29:26.639Z"
+		},
+		{
+			title: "Coerce a unix timestamp, in nanoseconds, to a timestamp"
+			source: """
+				to_timestamp!(1675968923012312311, unit: "nanoseconds")
+				"""
+			return: "2023-02-09T18:55:23.012312311Z"
 		},
 	]
 }

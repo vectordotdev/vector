@@ -46,6 +46,8 @@ impl Deserializer for NativeDeserializer {
     fn parse(
         &self,
         bytes: Bytes,
+        // LogNamespace is ignored because Vector owns the data format being consumed and as such there
+        // is no need to change the fields of the event.
         _log_namespace: LogNamespace,
     ) -> vector_common::Result<SmallVec<[Event; 1]>> {
         if bytes.is_empty() {

@@ -1,7 +1,7 @@
 use serde::Serialize;
 use vector_core::{
     event::{EventFinalizers, Finalizable, LogEvent, MaybeAsLogMut},
-    ByteSizeOf,
+    ByteSizeOf, EstimatedJsonEncodedSizeOf,
 };
 
 /// An event alongside metadata from preprocessing. This is useful for sinks
@@ -37,5 +37,14 @@ where
 {
     fn allocated_bytes(&self) -> usize {
         self.event.allocated_bytes() + self.metadata.allocated_bytes()
+    }
+}
+
+impl<E, M> EstimatedJsonEncodedSizeOf for ProcessedEvent<E, M>
+where
+    E: EstimatedJsonEncodedSizeOf,
+{
+    fn estimated_json_encoded_size_of(&self) -> usize {
+        self.event.estimated_json_encoded_size_of()
     }
 }

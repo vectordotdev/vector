@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 use socket2::SockRef;
 use tokio::net::UdpSocket;
 

@@ -7,7 +7,7 @@ use tokio::net::UnixDatagram;
 use tokio_util::codec::FramedRead;
 use tracing::field;
 use vector_common::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
-use vector_core::ByteSizeOf;
+use vector_core::EstimatedJsonEncodedSizeOf;
 
 use crate::{
     codecs::Decoder,
@@ -107,7 +107,7 @@ async fn listen(
                         Some(Ok((mut events, _byte_size))) => {
                             emit!(SocketEventsReceived {
                                 mode: SocketMode::Unix,
-                                byte_size: events.size_of(),
+                                byte_size: events.estimated_json_encoded_size_of(),
                                 count: events.len()
                             });
 

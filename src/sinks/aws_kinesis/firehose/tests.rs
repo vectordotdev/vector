@@ -28,7 +28,7 @@ async fn check_batch_size() {
     let base = KinesisSinkBaseConfig {
         stream_name: String::from("test"),
         region: RegionOrEndpoint::with_both("local", "http://localhost:4566"),
-        encoding: JsonSerializerConfig::new().into(),
+        encoding: JsonSerializerConfig::default().into(),
         compression: Compression::None,
         request: Default::default(),
         tls: None,
@@ -57,7 +57,7 @@ async fn check_batch_events() {
     let base = KinesisSinkBaseConfig {
         stream_name: String::from("test"),
         region: RegionOrEndpoint::with_both("local", "http://localhost:4566"),
-        encoding: JsonSerializerConfig::new().into(),
+        encoding: JsonSerializerConfig::default().into(),
         compression: Compression::None,
         request: Default::default(),
         tls: None,

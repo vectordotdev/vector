@@ -7,13 +7,14 @@ use chrono::Utc;
 use futures::{stream, FutureExt, StreamExt, TryFutureExt};
 use http::uri::Scheme;
 use hyper::{Body, Request};
+use serde_with::serde_as;
 use snafu::ResultExt;
 use tokio_stream::wrappers::IntervalStream;
 use vector_config::configurable_component;
-use vector_core::{metric_tags, ByteSizeOf};
+use vector_core::{metric_tags, EstimatedJsonEncodedSizeOf};
 
 use crate::{
-    config::{self, GenerateConfig, Output, ProxyConfig, SourceConfig, SourceContext},
+    config::{GenerateConfig, ProxyConfig, SourceConfig, SourceContext, SourceOutput},
     event::metric::{Metric, MetricKind, MetricValue},
     http::HttpClient,
     internal_events::{
@@ -30,15 +31,18 @@ pub use parser::ParseError;
 use vector_core::config::LogNamespace;
 
 /// Configuration for the `apache_metrics` source.
-#[configurable_component(source("apache_metrics"))]
+#[serde_as]
+#[configurable_component(source("apache_metrics", "Collect metrics from Apache's HTTPD server."))]
 #[derive(Clone, Debug)]
 pub struct ApacheMetricsConfig {
     /// The list of `mod_status` endpoints to scrape metrics from.
+    #[configurable(metadata(docs::examples = "http://localhost:8080/server-status/?auto"))]
     endpoints: Vec<String>,
 
-    /// The interval between scrapes, in seconds.
+    /// The interval between scrapes.
     #[serde(default = "default_scrape_interval_secs")]
-    scrape_interval_secs: u64,
+    #[serde_as(as = "serde_with::DurationSeconds<u64>")]
+    scrape_interval_secs: Duration,
 
     /// The namespace of the metric.
     ///
@@ -47,8 +51,8 @@ pub struct ApacheMetricsConfig {
     namespace: String,
 }
 
-pub const fn default_scrape_interval_secs() -> u64 {
-    15
+pub const fn default_scrape_interval_secs() -> Duration {
+    Duration::from_secs(15)
 }
 
 pub fn default_namespace() -> String {
@@ -67,6 +71,7 @@ impl GenerateConfig for ApacheMetricsConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "apache_metrics")]
 impl SourceConfig for ApacheMetricsConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let urls = self
@@ -88,8 +93,8 @@ impl SourceConfig for ApacheMetricsConfig {
         ))
     }
 
-    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
-        vec![Output::default(config::DataType::Metric)]
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
+        vec![SourceOutput::new_metrics()]
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -141,14 +146,14 @@ impl UriExt for http::Uri {
 
 fn apache_metrics(
     urls: Vec<http::Uri>,
-    interval: u64,
+    interval: Duration,
     namespace: Option<String>,
     shutdown: ShutdownSignal,
     mut out: SourceSender,
     proxy: ProxyConfig,
 ) -> super::Source {
     Box::pin(async move {
-        let mut stream = IntervalStream::new(tokio::time::interval(Duration::from_secs(interval)))
+        let mut stream = IntervalStream::new(tokio::time::interval(interval))
             .take_until(shutdown)
             .map(move |_| stream::iter(urls.clone()))
             .flatten()
@@ -221,7 +226,7 @@ fn apache_metrics(
                                     .collect::<Vec<_>>();
 
                                 emit!(ApacheMetricsEventsReceived {
-                                    byte_size: metrics.size_of(),
+                                    byte_size: metrics.estimated_json_encoded_size_of(),
                                     count: metrics.len(),
                                     endpoint: &sanitized_url,
                                 });
@@ -360,7 +365,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
 
         let config = ApacheMetricsConfig {
             endpoints: vec![format!("http://foo:bar@{}/metrics", in_addr)],
-            scrape_interval_secs: 1,
+            scrape_interval_secs: Duration::from_secs(1),
             namespace: "custom".to_string(),
         };
 
@@ -420,7 +425,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
 
         let source = ApacheMetricsConfig {
             endpoints: vec![format!("http://{}", in_addr)],
-            scrape_interval_secs: 1,
+            scrape_interval_secs: Duration::from_secs(1),
             namespace: "apache".to_string(),
         }
         .build(SourceContext::new_test(tx, None))
@@ -454,7 +459,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
 
         let source = ApacheMetricsConfig {
             endpoints: vec![format!("http://{}", in_addr)],
-            scrape_interval_secs: 1,
+            scrape_interval_secs: Duration::from_secs(1),
             namespace: "custom".to_string(),
         }
         .build(SourceContext::new_test(tx, None))

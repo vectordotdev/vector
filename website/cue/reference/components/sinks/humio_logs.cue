@@ -14,7 +14,7 @@ components: sinks: humio_logs: {
 	classes:       sinks._humio.classes
 	features:      sinks._humio.features
 	support:       sinks._humio.support
-	configuration: sinks._humio.configuration
+	configuration: base.components.sinks.humio_logs.configuration
 	telemetry:     sinks._humio.telemetry
 
 	input: {

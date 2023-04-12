@@ -49,7 +49,7 @@ where
                 let age_range = start..end;
                 future::ready(age_range.contains(&req.timestamp))
             })
-            .batched_partitioned(CloudwatchParititoner, batcher_settings)
+            .batched_partitioned(CloudwatchPartitioner, batcher_settings)
             .map(|(key, events)| {
                 let metadata =
                     RequestMetadata::from_batch(events.iter().map(|req| req.get_metadata()));
@@ -85,9 +85,9 @@ impl MetaDescriptive for BatchCloudwatchRequest {
     }
 }
 
-struct CloudwatchParititoner;
+struct CloudwatchPartitioner;
 
-impl Partitioner for CloudwatchParititoner {
+impl Partitioner for CloudwatchPartitioner {
     type Item = CloudwatchRequest;
     type Key = CloudwatchKey;
 

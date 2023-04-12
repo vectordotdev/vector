@@ -1,15 +1,17 @@
-use std::num::ParseFloatError;
+use std::{collections::HashMap, num::ParseFloatError};
 
 use chrono::Utc;
 use indexmap::IndexMap;
 use vector_config::configurable_component;
+use vector_core::config::LogNamespace;
 
 use crate::{
     config::{
-        log_schema, DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext,
+        DataType, GenerateConfig, Input, OutputId, TransformConfig, TransformContext,
+        TransformOutput,
     },
     event::{
-        metric::{Metric, MetricKind, MetricTags, MetricValue, StatisticKind},
+        metric::{Metric, MetricKind, MetricTags, MetricValue, StatisticKind, TagValue},
         Event, Value,
     },
     internal_events::{
@@ -21,7 +23,7 @@ use crate::{
 };
 
 /// Configuration for the `log_to_metric` transform.
-#[configurable_component(transform("log_to_metric"))]
+#[configurable_component(transform("log_to_metric", "Convert log events to metric events."))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct LogToMetricConfig {
@@ -63,20 +65,36 @@ pub struct MetricConfig {
     pub namespace: Option<Template>,
 
     /// Tags to apply to the metric.
-    pub tags: Option<IndexMap<String, Template>>,
+    #[configurable(metadata(docs::additional_props_description = "A metric tag."))]
+    pub tags: Option<IndexMap<String, TagConfig>>,
 
     #[configurable(derived)]
     #[serde(flatten)]
     pub metric: MetricTypeConfig,
 }
 
+/// Specification of the value of a created tag.
+///
+/// This may be a single value, a `null` for a bare tag, or an array of either.
+#[configurable_component]
+#[derive(Clone, Debug)]
+#[serde(untagged)]
+pub enum TagConfig {
+    /// A single tag value.
+    Plain(Option<Template>),
+
+    /// An array of values to give to the same tag name.
+    Multi(Vec<Option<Template>>),
+}
+
 /// Specification of the type of an individual metric, and any associated data.
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(tag = "type", rename_all = "snake_case")]
+#[configurable(metadata(docs::enum_tag_description = "The type of metric to create."))]
 pub enum MetricTypeConfig {
     /// A counter.
-    Counter(#[configurable(derived)] CounterConfig),
+    Counter(CounterConfig),
 
     /// A histogram.
     Histogram,
@@ -129,6 +147,7 @@ impl GenerateConfig for LogToMetricConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "log_to_metric")]
 impl TransformConfig for LogToMetricConfig {
     async fn build(&self, _context: &TransformContext) -> crate::Result<Transform> {
         Ok(Transform::function(LogToMetric::new(self.clone())))
@@ -138,8 +157,13 @@ impl TransformConfig for LogToMetricConfig {
         Input::log()
     }
 
-    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
-        vec![Output::default(DataType::Metric)]
+    fn outputs(
+        &self,
+        _: &[(OutputId, schema::Definition)],
+        _: LogNamespace,
+    ) -> Vec<TransformOutput> {
+        // Converting the log to a metric means we lose all incoming `Definition`s.
+        vec![TransformOutput::new(DataType::Metric, HashMap::new())]
     }
 
     fn enable_concurrency(&self) -> bool {
@@ -174,38 +198,60 @@ fn render_template(template: &Template, event: &Event) -> Result<String, Transfo
 }
 
 fn render_tags(
-    tags: &Option<IndexMap<String, Template>>,
+    tags: &Option<IndexMap<String, TagConfig>>,
     event: &Event,
 ) -> Result<Option<MetricTags>, TransformError> {
     Ok(match tags {
         None => None,
         Some(tags) => {
-            let mut map = MetricTags::default();
-            for (name, template) in tags {
-                match render_template(template, event) {
-                    Ok(tag) => {
-                        map.insert(name.to_string(), tag);
+            let mut result = MetricTags::default();
+            for (name, config) in tags {
+                match config {
+                    TagConfig::Plain(template) => {
+                        render_tag_into(event, name, template, &mut result)?
                     }
-                    Err(TransformError::TemplateRenderingError(error)) => {
-                        emit!(crate::internal_events::TemplateRenderingError {
-                            error,
-                            drop_event: false,
-                            field: Some(name.as_str()),
-                        });
+                    TagConfig::Multi(vec) => {
+                        for template in vec {
+                            render_tag_into(event, name, template, &mut result)?;
+                        }
                     }
-                    Err(other) => return Err(other),
                 }
             }
-            map.as_option()
+            result.as_option()
         }
     })
+}
+
+fn render_tag_into(
+    event: &Event,
+    name: &str,
+    template: &Option<Template>,
+    result: &mut MetricTags,
+) -> Result<(), TransformError> {
+    let value = match template {
+        None => TagValue::Bare,
+        Some(template) => match render_template(template, event) {
+            Ok(result) => TagValue::Value(result),
+            Err(TransformError::TemplateRenderingError(error)) => {
+                emit!(crate::internal_events::TemplateRenderingError {
+                    error,
+                    drop_event: false,
+                    field: Some(name),
+                });
+                return Ok(());
+            }
+            Err(other) => return Err(other),
+        },
+    };
+    result.insert(name.to_string(), value);
+    Ok(())
 }
 
 fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformError> {
     let log = event.as_log();
 
     let timestamp = log
-        .get(log_schema().timestamp_key())
+        .get_timestamp()
         .and_then(Value::as_timestamp)
         .cloned()
         .or_else(|| Some(Utc::now()));
@@ -356,7 +402,8 @@ impl FunctionTransform for LogToMetric {
 
 #[cfg(test)]
 mod tests {
-    use chrono::{offset::TimeZone, DateTime, Utc};
+    use chrono::{offset::TimeZone, DateTime, Timelike, Utc};
+    use lookup::PathPrefix;
     use std::time::Duration;
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
@@ -382,14 +429,24 @@ mod tests {
         toml::from_str(s).unwrap()
     }
 
+    fn parse_yaml_config(s: &str) -> LogToMetricConfig {
+        serde_yaml::from_str(s).unwrap()
+    }
+
     fn ts() -> DateTime<Utc> {
-        Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 11)
+        Utc.with_ymd_and_hms(2018, 11, 14, 8, 9, 10)
+            .single()
+            .and_then(|t| t.with_nanosecond(11))
+            .expect("invalid timestamp")
     }
 
     fn create_event(key: &str, value: impl Into<Value> + std::fmt::Debug) -> Event {
         let mut log = Event::Log(LogEvent::from("i am a log"));
         log.as_mut_log().insert(key, value);
-        log.as_mut_log().insert(log_schema().timestamp_key(), ts());
+        log.as_mut_log().insert(
+            (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
+            ts(),
+        );
         log
     }
 
@@ -499,6 +556,60 @@ mod tests {
             )))
             .with_timestamp(Some(ts()))
         );
+    }
+
+    #[tokio::test]
+    async fn multi_value_tags_yaml() {
+        // Have to use YAML to represent bare tags
+        let config = parse_yaml_config(
+            r#"
+            metrics:
+            - field: "message"
+              type: "counter"
+              tags:
+                tag:
+                - "one"
+                - null
+                - "two"
+            "#,
+        );
+
+        let event = create_event("message", "I am log");
+        let metric = do_transform(config, event).await.unwrap().into_metric();
+        let tags = metric.tags().expect("Metric should have tags");
+
+        assert_eq!(tags.iter_single().collect::<Vec<_>>(), vec![("tag", "two")]);
+
+        assert_eq!(tags.iter_all().count(), 3);
+        for (name, value) in tags.iter_all() {
+            assert_eq!(name, "tag");
+            assert!(value.is_none() || value == Some("one") || value == Some("two"));
+        }
+    }
+
+    #[tokio::test]
+    async fn multi_value_tags_toml() {
+        let config = parse_config(
+            r#"
+            [[metrics]]
+            field = "message"
+            type = "counter"
+            [metrics.tags]
+            tag = ["one", "two"]
+            "#,
+        );
+
+        let event = create_event("message", "I am log");
+        let metric = do_transform(config, event).await.unwrap().into_metric();
+        let tags = metric.tags().expect("Metric should have tags");
+
+        assert_eq!(tags.iter_single().collect::<Vec<_>>(), vec![("tag", "two")]);
+
+        assert_eq!(tags.iter_all().count(), 2);
+        for (name, value) in tags.iter_all() {
+            assert_eq!(name, "tag");
+            assert!(value == Some("one") || value == Some("two"));
+        }
     }
 
     #[tokio::test]
@@ -689,9 +800,10 @@ mod tests {
         );
 
         let mut event = Event::Log(LogEvent::from("i am a log"));
-        event
-            .as_mut_log()
-            .insert(log_schema().timestamp_key(), ts());
+        event.as_mut_log().insert(
+            (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
+            ts(),
+        );
         event.as_mut_log().insert("status", "42");
         event.as_mut_log().insert("backtrace", "message");
         let metadata = event.metadata().clone();
@@ -738,9 +850,10 @@ mod tests {
         );
 
         let mut event = Event::Log(LogEvent::from("i am a log"));
-        event
-            .as_mut_log()
-            .insert(log_schema().timestamp_key(), ts());
+        event.as_mut_log().insert(
+            (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
+            ts(),
+        );
         event.as_mut_log().insert("status", "42");
         event.as_mut_log().insert("backtrace", "message");
         event.as_mut_log().insert("host", "local");

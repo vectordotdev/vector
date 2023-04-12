@@ -1,6 +1,0 @@
-# result: {}
-
-abort { abort }
-abort { if false {"message"} else { abort } }
-abort { if true {"message"} else { abort } }
-assert!(false)

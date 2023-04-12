@@ -14,4 +14,5 @@
 pub mod attributes;
 pub mod constants;
 pub mod num;
+pub mod schema;
 pub mod validation;

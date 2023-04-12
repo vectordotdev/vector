@@ -1,0 +1,10 @@
+features:
+- pulsar-integration-tests
+
+test_filter: '::pulsar::'
+
+env:
+  PULSAR_ADDRESS: pulsar://pulsar:6650
+
+matrix:
+  version: [latest]

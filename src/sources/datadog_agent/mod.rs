@@ -31,7 +31,8 @@ use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use tracing::Span;
 use value::Kind;
-use vector_config::{configurable_component, NamedComponent};
+use vector_common::internal_event::{EventsReceived, Registered};
+use vector_config::configurable_component;
 use vector_core::config::{LegacyKey, LogNamespace};
 use vector_core::event::{BatchNotifier, BatchStatus};
 use warp::{filters::BoxedFilter, reject::Rejection, reply::Response, Filter, Reply};
@@ -39,8 +40,8 @@ use warp::{filters::BoxedFilter, reject::Rejection, reply::Response, Filter, Rep
 use crate::{
     codecs::{Decoder, DecodingConfig},
     config::{
-        log_schema, DataType, GenerateConfig, Output, Resource, SourceAcknowledgementsConfig,
-        SourceConfig, SourceContext,
+        log_schema, DataType, GenerateConfig, Resource, SourceAcknowledgementsConfig, SourceConfig,
+        SourceContext, SourceOutput,
     },
     event::Event,
     internal_events::{HttpBytesReceived, HttpDecompressError, StreamClosedError},
@@ -56,39 +57,51 @@ pub const METRICS: &str = "metrics";
 pub const TRACES: &str = "traces";
 
 /// Configuration for the `datadog_agent` source.
-#[configurable_component(source("datadog_agent"))]
+#[configurable_component(source(
+    "datadog_agent",
+    "Receive logs, metrics, and traces collected by a Datadog Agent."
+))]
 #[derive(Clone, Debug)]
 pub struct DatadogAgentConfig {
-    /// The address to accept connections on.
+    /// The socket address to accept connections on.
     ///
-    /// The address _must_ include a port.
+    /// It _must_ include a port.
+    #[configurable(metadata(docs::examples = "0.0.0.0:80"))]
+    #[configurable(metadata(docs::examples = "localhost:80"))]
     address: SocketAddr,
 
-    /// When incoming events contain a Datadog API key, if this setting is set to `true` the key will kept in the event
-    /// metadata and will be used if the event is sent to a Datadog sink.
+    /// If this is set to `true`, when incoming events contain a Datadog API key, it is
+    /// stored in the event metadata and used if the event is sent to a Datadog sink.
+    #[configurable(metadata(docs::advanced))]
     #[serde(default = "crate::serde::default_true")]
     store_api_key: bool,
 
-    /// If this settings is set to `true`, logs won't be accepted by the component.
+    /// If this is set to `true`, logs are not accepted by the component.
+    #[configurable(metadata(docs::advanced))]
     #[serde(default = "crate::serde::default_false")]
     disable_logs: bool,
 
-    /// If this settings is set to `true`, metrics won't be accepted by the component.
+    /// If this is set to `true`, metrics are not accepted by the component.
+    #[configurable(metadata(docs::advanced))]
     #[serde(default = "crate::serde::default_false")]
     disable_metrics: bool,
 
-    /// If this settings is set to `true`, traces won't be accepted by the component.
+    /// If this is set to `true`, traces are not accepted by the component.
+    #[configurable(metadata(docs::advanced))]
     #[serde(default = "crate::serde::default_false")]
     disable_traces: bool,
 
-    /// If this setting is set to `true` logs, metrics and traces will be sent to different outputs.
+    /// If this is set to `true` logs, metrics, and traces are sent to different outputs.
     ///
-    /// For a source component named `agent` the received logs, metrics, and traces can then be accessed by specifying
-    /// `agent.logs`, `agent.metrics`, and `agent.traces`, respectively, as the input to another component.
+    ///
+    /// For a source component named `agent`, the received logs, metrics, and traces can then be
+    /// configured as input to other components by specifying `agent.logs`, `agent.metrics`, and
+    /// `agent.traces`, respectively.
+    #[configurable(metadata(docs::advanced))]
     #[serde(default = "crate::serde::default_false")]
     multiple_outputs: bool,
 
-    /// The namespace to use for logs. This overrides the global settings
+    /// The namespace to use for logs. This overrides the global setting.
     #[serde(default)]
     #[configurable(metadata(docs::hidden))]
     log_namespace: Option<bool>,
@@ -129,6 +142,7 @@ impl GenerateConfig for DatadogAgentConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "datadog_agent")]
 impl SourceConfig for DatadogAgentConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
         let log_namespace = cx.log_namespace(self.log_namespace);
@@ -140,13 +154,6 @@ impl SourceConfig for DatadogAgentConfig {
             .expect("registered log schema required")
             .clone();
 
-        let metrics_schema_definition = cx
-            .schema_definitions
-            .get(&Some(METRICS.to_owned()))
-            .or_else(|| cx.schema_definitions.get(&None))
-            .expect("registered metrics schema required")
-            .clone();
-
         let decoder =
             DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace).build();
 
@@ -156,7 +163,6 @@ impl SourceConfig for DatadogAgentConfig {
             decoder,
             tls.http_protocol_name(),
             logs_schema_definition,
-            metrics_schema_definition,
             log_namespace,
         );
         let listener = tls.bind(&self.address).await?;
@@ -191,7 +197,7 @@ impl SourceConfig for DatadogAgentConfig {
         }))
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         let definition = self
             .decoding
             .schema_definition(global_log_namespace.merge(self.log_namespace))
@@ -241,14 +247,12 @@ impl SourceConfig for DatadogAgentConfig {
 
         if self.multiple_outputs {
             vec![
-                Output::default(DataType::Metric).with_port(METRICS),
-                Output::default(DataType::Log)
-                    .with_schema_definition(definition)
-                    .with_port(LOGS),
-                Output::default(DataType::Trace).with_port(TRACES),
+                SourceOutput::new_logs(DataType::Log, definition).with_port(LOGS),
+                SourceOutput::new_metrics().with_port(METRICS),
+                SourceOutput::new_traces().with_port(TRACES),
             ]
         } else {
-            vec![Output::default(DataType::all()).with_schema_definition(definition)]
+            vec![SourceOutput::new_logs(DataType::all(), definition)]
         }
     }
 
@@ -285,7 +289,7 @@ pub(crate) struct DatadogAgentSource {
     pub(crate) decoder: Decoder,
     protocol: &'static str,
     logs_schema_definition: Arc<schema::Definition>,
-    metrics_schema_definition: Arc<schema::Definition>,
+    events_received: Registered<EventsReceived>,
 }
 
 #[derive(Clone)]
@@ -321,7 +325,6 @@ impl DatadogAgentSource {
         decoder: Decoder,
         protocol: &'static str,
         logs_schema_definition: schema::Definition,
-        metrics_schema_definition: schema::Definition,
         log_namespace: LogNamespace,
     ) -> Self {
         Self {
@@ -335,8 +338,8 @@ impl DatadogAgentSource {
             decoder,
             protocol,
             logs_schema_definition: Arc::new(logs_schema_definition),
-            metrics_schema_definition: Arc::new(metrics_schema_definition),
             log_namespace,
+            events_received: register!(EventsReceived),
         }
     }
 

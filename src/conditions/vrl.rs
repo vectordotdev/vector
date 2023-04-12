@@ -19,7 +19,7 @@ pub struct VrlConfig {
     /// The VRL boolean expression.
     pub(crate) source: String,
 
-    #[configurable(derived)]
+    #[configurable(derived, metadata(docs::hidden))]
     #[serde(default)]
     pub(crate) runtime: VrlRuntime,
 }
@@ -41,7 +41,7 @@ impl ConditionalConfig for VrlConfig {
         let functions = vrl_stdlib::all()
             .into_iter()
             .chain(enrichment::vrl_functions().into_iter())
-            .chain(vector_vrl_functions::vrl_functions())
+            .chain(vector_vrl_functions::all())
             .collect::<Vec<_>>();
 
         let state = vrl::state::TypeState::default();
@@ -82,7 +82,7 @@ pub struct Vrl {
 
 impl Vrl {
     fn run(&self, event: Event) -> (Event, vrl::RuntimeResult) {
-        let mut target = VrlTarget::new(event, self.program.info());
+        let mut target = VrlTarget::new(event, self.program.info(), false);
         // TODO: use timezone from remap config
         let timezone = TimeZone::default();
 

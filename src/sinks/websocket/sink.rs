@@ -2,6 +2,7 @@ use std::{
     fmt::Debug,
     io,
     net::SocketAddr,
+    num::NonZeroU64,
     task::{Context, Poll},
     time::{Duration, Instant},
 };
@@ -24,8 +25,10 @@ use tokio_tungstenite::{
 };
 use tokio_util::codec::Encoder as _;
 use vector_core::{
-    internal_event::{ByteSize, BytesSent, EventsSent, InternalEventHandle as _, Protocol},
-    ByteSizeOf,
+    internal_event::{
+        ByteSize, BytesSent, CountByteSize, EventsSent, InternalEventHandle as _, Output, Protocol,
+    },
+    EstimatedJsonEncodedSizeOf,
 };
 
 use crate::{
@@ -191,8 +194,8 @@ pub struct WebSocketSink {
     transformer: Transformer,
     encoder: Encoder<()>,
     connector: WebSocketConnector,
-    ping_interval: Option<u64>,
-    ping_timeout: Option<u64>,
+    ping_interval: Option<NonZeroU64>,
+    ping_timeout: Option<NonZeroU64>,
 }
 
 impl WebSocketSink {
@@ -205,8 +208,8 @@ impl WebSocketSink {
             transformer,
             encoder,
             connector,
-            ping_interval: config.ping_interval.filter(|v| *v > 0),
-            ping_timeout: config.ping_timeout.filter(|v| *v > 0),
+            ping_interval: config.ping_interval,
+            ping_timeout: config.ping_timeout,
         })
     }
 
@@ -222,7 +225,7 @@ impl WebSocketSink {
 
     fn check_received_pong_time(&self, last_pong: Instant) -> Result<(), WsError> {
         if let Some(ping_timeout) = self.ping_timeout {
-            if last_pong.elapsed() > Duration::from_secs(ping_timeout) {
+            if last_pong.elapsed() > Duration::from_secs(ping_timeout.into()) {
                 return Err(WsError::Io(io::Error::new(
                     io::ErrorKind::TimedOut,
                     "Pong not received in time",
@@ -246,7 +249,9 @@ impl WebSocketSink {
     {
         const PING: &[u8] = b"PING";
 
-        let mut ping_interval = PingInterval::new(self.ping_interval);
+        // tokio::time::Interval panics if the period arg is zero. Since the struct members are
+        // using NonZeroU64 that is not something we need to account for.
+        let mut ping_interval = PingInterval::new(self.ping_interval.map(u64::from));
 
         if let Err(error) = ws_sink.send(Message::Ping(PING.to_vec())).await {
             emit!(WsConnectionError { error });
@@ -255,6 +260,7 @@ impl WebSocketSink {
         let mut last_pong = Instant::now();
 
         let bytes_sent = register!(BytesSent::from(Protocol("websocket".into())));
+        let events_sent = register!(EventsSent::from(Output(None)));
 
         loop {
             let result = tokio::select! {
@@ -288,7 +294,7 @@ impl WebSocketSink {
 
                     self.transformer.transform(&mut event);
 
-                    let event_byte_size = event.size_of();
+                    let event_byte_size = event.estimated_json_encoded_size_of();
 
                     let mut bytes = BytesMut::new();
                     let res = match self.encoder.encode(event, &mut bytes) {
@@ -299,11 +305,7 @@ impl WebSocketSink {
                             let message_len = message.len();
 
                             ws_sink.send(message).await.map(|_| {
-                                emit!(EventsSent {
-                                    count: 1,
-                                    byte_size: event_byte_size,
-                                    output: None
-                                });
+                                events_sent.emit(CountByteSize(1, event_byte_size));
                                 bytes_sent.emit(ByteSize(message_len));
                             })
                         },
@@ -400,7 +402,7 @@ mod tests {
         let config = WebSocketSinkConfig {
             uri: format!("ws://{}", addr),
             tls: None,
-            encoding: JsonSerializerConfig::new().into(),
+            encoding: JsonSerializerConfig::default().into(),
             ping_interval: None,
             ping_timeout: None,
             acknowledgements: Default::default(),
@@ -423,7 +425,7 @@ mod tests {
         let config = WebSocketSinkConfig {
             uri: format!("ws://{}", addr),
             tls: None,
-            encoding: JsonSerializerConfig::new().into(),
+            encoding: JsonSerializerConfig::default().into(),
             ping_interval: None,
             ping_timeout: None,
             acknowledgements: Default::default(),
@@ -453,7 +455,7 @@ mod tests {
                     ..Default::default()
                 },
             }),
-            encoding: JsonSerializerConfig::new().into(),
+            encoding: JsonSerializerConfig::default().into(),
             ping_timeout: None,
             ping_interval: None,
             acknowledgements: Default::default(),
@@ -471,7 +473,7 @@ mod tests {
         let config = WebSocketSinkConfig {
             uri: format!("ws://{}", addr),
             tls: None,
-            encoding: JsonSerializerConfig::new().into(),
+            encoding: JsonSerializerConfig::default().into(),
             ping_interval: None,
             ping_timeout: None,
             acknowledgements: Default::default(),
@@ -489,7 +491,7 @@ mod tests {
             time::sleep(Duration::from_millis(10)).await;
             event
         });
-        let _ = tokio::spawn(sink.run(events));
+        drop(tokio::spawn(sink.run(events)));
 
         receiver.connected().await;
         time::sleep(Duration::from_millis(500)).await;

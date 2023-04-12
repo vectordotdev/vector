@@ -166,7 +166,7 @@ weight = 2
 
 [[languages.en.menus.footer]]
 name = "Privacy"
-url = "https://www.datadoghq.com/privacy/"
+url = "https://www.datadoghq.com/legal/privacy/"
 parent = "about"
 weight = 3
 
@@ -253,6 +253,18 @@ name = "Chat"
 url = "https://chat.vector.dev"
 parent = "community"
 weight = 3
+
+[[languages.en.menus.footer]]
+name = "Download"
+url = "/download"
+identifier = "download"
+weight = 5
+
+[[languages.en.menus.footer]]
+name = "Releases"
+url = "/releases"
+weight = 1
+parent = "download"
 
 # Extra links under the "Meta" section in the docs
 [[languages.en.menus.meta]]

@@ -132,6 +132,66 @@ impl From<Trace> for event::TraceEvent {
     }
 }
 
+impl From<MetricValue> for event::MetricValue {
+    fn from(value: MetricValue) -> Self {
+        match value {
+            MetricValue::Counter(counter) => Self::Counter {
+                value: counter.value,
+            },
+            MetricValue::Gauge(gauge) => Self::Gauge { value: gauge.value },
+            MetricValue::Set(set) => Self::Set {
+                values: set.values.into_iter().collect(),
+            },
+            MetricValue::Distribution1(dist) => Self::Distribution {
+                statistic: dist.statistic().into(),
+                samples: event::metric::zip_samples(dist.values, dist.sample_rates),
+            },
+            MetricValue::Distribution2(dist) => Self::Distribution {
+                statistic: dist.statistic().into(),
+                samples: dist.samples.into_iter().map(Into::into).collect(),
+            },
+            MetricValue::AggregatedHistogram1(hist) => Self::AggregatedHistogram {
+                buckets: event::metric::zip_buckets(
+                    hist.buckets,
+                    hist.counts.iter().map(|h| u64::from(*h)),
+                ),
+                count: u64::from(hist.count),
+                sum: hist.sum,
+            },
+            MetricValue::AggregatedHistogram2(hist) => Self::AggregatedHistogram {
+                buckets: hist.buckets.into_iter().map(Into::into).collect(),
+                count: u64::from(hist.count),
+                sum: hist.sum,
+            },
+            MetricValue::AggregatedHistogram3(hist) => Self::AggregatedHistogram {
+                buckets: hist.buckets.into_iter().map(Into::into).collect(),
+                count: hist.count,
+                sum: hist.sum,
+            },
+            MetricValue::AggregatedSummary1(summary) => Self::AggregatedSummary {
+                quantiles: event::metric::zip_quantiles(summary.quantiles, summary.values),
+                count: u64::from(summary.count),
+                sum: summary.sum,
+            },
+            MetricValue::AggregatedSummary2(summary) => Self::AggregatedSummary {
+                quantiles: summary.quantiles.into_iter().map(Into::into).collect(),
+                count: u64::from(summary.count),
+                sum: summary.sum,
+            },
+            MetricValue::AggregatedSummary3(summary) => Self::AggregatedSummary {
+                quantiles: summary.quantiles.into_iter().map(Into::into).collect(),
+                count: summary.count,
+                sum: summary.sum,
+            },
+            MetricValue::Sketch(sketch) => match sketch.sketch.unwrap() {
+                sketch::Sketch::AgentDdSketch(ddsketch) => Self::Sketch {
+                    sketch: ddsketch.into(),
+                },
+            },
+        }
+    }
+}
+
 impl From<Metric> for event::Metric {
     fn from(metric: Metric) -> Self {
         let kind = match metric.kind() {
@@ -141,77 +201,38 @@ impl From<Metric> for event::Metric {
 
         let name = metric.name;
 
-        let namespace = if metric.namespace.is_empty() {
-            None
-        } else {
-            Some(metric.namespace)
-        };
+        let namespace = (!metric.namespace.is_empty()).then_some(metric.namespace);
 
-        let timestamp = metric
-            .timestamp
-            .map(|ts| chrono::Utc.timestamp(ts.seconds, ts.nanos as u32));
+        let timestamp = metric.timestamp.map(|ts| {
+            chrono::Utc
+                .timestamp_opt(ts.seconds, ts.nanos as u32)
+                .single()
+                .expect("invalid timestamp")
+        });
 
-        let tags = if metric.tags.is_empty() {
-            None
-        } else {
-            Some(metric.tags)
-        };
+        let mut tags = MetricTags(
+            metric
+                .tags_v2
+                .into_iter()
+                .map(|(tag, values)| {
+                    (
+                        tag,
+                        values
+                            .values
+                            .into_iter()
+                            .map(|value| event::metric::TagValue::from(value.value))
+                            .collect(),
+                    )
+                })
+                .collect(),
+        );
+        // The current Vector encoding includes copies of the "single" values of tags in `tags_v2`
+        // above. This `extend` will re-add those values, forcing them to become the last added in
+        // the value set.
+        tags.extend(metric.tags_v1.into_iter());
+        let tags = (!tags.is_empty()).then_some(tags);
 
-        let value = match metric.value.unwrap() {
-            MetricValue::Counter(counter) => event::MetricValue::Counter {
-                value: counter.value,
-            },
-            MetricValue::Gauge(gauge) => event::MetricValue::Gauge { value: gauge.value },
-            MetricValue::Set(set) => event::MetricValue::Set {
-                values: set.values.into_iter().collect(),
-            },
-            MetricValue::Distribution1(dist) => event::MetricValue::Distribution {
-                statistic: dist.statistic().into(),
-                samples: event::metric::zip_samples(dist.values, dist.sample_rates),
-            },
-            MetricValue::Distribution2(dist) => event::MetricValue::Distribution {
-                statistic: dist.statistic().into(),
-                samples: dist.samples.into_iter().map(Into::into).collect(),
-            },
-            MetricValue::AggregatedHistogram1(hist) => event::MetricValue::AggregatedHistogram {
-                buckets: event::metric::zip_buckets(
-                    hist.buckets,
-                    hist.counts.iter().map(|h| u64::from(*h)),
-                ),
-                count: u64::from(hist.count),
-                sum: hist.sum,
-            },
-            MetricValue::AggregatedHistogram2(hist) => event::MetricValue::AggregatedHistogram {
-                buckets: hist.buckets.into_iter().map(Into::into).collect(),
-                count: u64::from(hist.count),
-                sum: hist.sum,
-            },
-            MetricValue::AggregatedHistogram3(hist) => event::MetricValue::AggregatedHistogram {
-                buckets: hist.buckets.into_iter().map(Into::into).collect(),
-                count: hist.count,
-                sum: hist.sum,
-            },
-            MetricValue::AggregatedSummary1(summary) => event::MetricValue::AggregatedSummary {
-                quantiles: event::metric::zip_quantiles(summary.quantiles, summary.values),
-                count: u64::from(summary.count),
-                sum: summary.sum,
-            },
-            MetricValue::AggregatedSummary2(summary) => event::MetricValue::AggregatedSummary {
-                quantiles: summary.quantiles.into_iter().map(Into::into).collect(),
-                count: u64::from(summary.count),
-                sum: summary.sum,
-            },
-            MetricValue::AggregatedSummary3(summary) => event::MetricValue::AggregatedSummary {
-                quantiles: summary.quantiles.into_iter().map(Into::into).collect(),
-                count: summary.count,
-                sum: summary.sum,
-            },
-            MetricValue::Sketch(sketch) => match sketch.sketch.unwrap() {
-                sketch::Sketch::AgentDdSketch(ddsketch) => event::MetricValue::Sketch {
-                    sketch: ddsketch.into(),
-                },
-            },
-        };
+        let value = event::MetricValue::from(metric.value.unwrap());
 
         let mut metadata = event::EventMetadata::default();
         if let Some(metadata_value) = metric.metadata {
@@ -222,7 +243,7 @@ impl From<Metric> for event::Metric {
 
         Self::new_with_metadata(name, kind, value, metadata)
             .with_namespace(namespace)
-            .with_tags(tags.map(MetricTags::from_iter))
+            .with_tags(tags)
             .with_timestamp(timestamp)
             .with_interval_ms(std::num::NonZeroU32::new(metric.interval_ms))
     }
@@ -312,6 +333,66 @@ impl From<event::Metric> for Metric {
     }
 }
 
+impl From<event::MetricValue> for MetricValue {
+    fn from(value: event::MetricValue) -> Self {
+        match value {
+            event::MetricValue::Counter { value } => Self::Counter(Counter { value }),
+            event::MetricValue::Gauge { value } => Self::Gauge(Gauge { value }),
+            event::MetricValue::Set { values } => Self::Set(Set {
+                values: values.into_iter().collect(),
+            }),
+            event::MetricValue::Distribution { samples, statistic } => {
+                Self::Distribution2(Distribution2 {
+                    samples: samples.into_iter().map(Into::into).collect(),
+                    statistic: match statistic {
+                        event::StatisticKind::Histogram => StatisticKind::Histogram,
+                        event::StatisticKind::Summary => StatisticKind::Summary,
+                    }
+                    .into(),
+                })
+            }
+            event::MetricValue::AggregatedHistogram {
+                buckets,
+                count,
+                sum,
+            } => Self::AggregatedHistogram3(AggregatedHistogram3 {
+                buckets: buckets.into_iter().map(Into::into).collect(),
+                count,
+                sum,
+            }),
+            event::MetricValue::AggregatedSummary {
+                quantiles,
+                count,
+                sum,
+            } => Self::AggregatedSummary3(AggregatedSummary3 {
+                quantiles: quantiles.into_iter().map(Into::into).collect(),
+                count,
+                sum,
+            }),
+            event::MetricValue::Sketch { sketch } => match sketch {
+                MetricSketch::AgentDDSketch(ddsketch) => {
+                    let bin_map = ddsketch.bin_map();
+                    let (keys, counts) = bin_map.into_parts();
+                    let keys = keys.into_iter().map(i32::from).collect();
+                    let counts = counts.into_iter().map(u32::from).collect();
+
+                    Self::Sketch(Sketch {
+                        sketch: Some(sketch::Sketch::AgentDdSketch(sketch::AgentDdSketch {
+                            count: ddsketch.count(),
+                            min: ddsketch.min().unwrap_or(f64::MAX),
+                            max: ddsketch.max().unwrap_or(f64::MIN),
+                            sum: ddsketch.sum().unwrap_or(0.0),
+                            avg: ddsketch.avg().unwrap_or(0.0),
+                            k: keys,
+                            n: counts,
+                        })),
+                    })
+                }
+            },
+        }
+    }
+}
+
 impl From<event::Metric> for WithMetadata<Metric> {
     fn from(metric: event::Metric) -> Self {
         let (series, data, metadata) = metric.into_parts();
@@ -333,71 +414,40 @@ impl From<event::Metric> for WithMetadata<Metric> {
         }
         .into();
 
-        let metric = match data.value {
-            event::MetricValue::Counter { value } => MetricValue::Counter(Counter { value }),
-            event::MetricValue::Gauge { value } => MetricValue::Gauge(Gauge { value }),
-            event::MetricValue::Set { values } => MetricValue::Set(Set {
-                values: values.into_iter().collect(),
-            }),
-            event::MetricValue::Distribution { samples, statistic } => {
-                MetricValue::Distribution2(Distribution2 {
-                    samples: samples.into_iter().map(Into::into).collect(),
-                    statistic: match statistic {
-                        event::StatisticKind::Histogram => StatisticKind::Histogram,
-                        event::StatisticKind::Summary => StatisticKind::Summary,
-                    }
-                    .into(),
-                })
-            }
-            event::MetricValue::AggregatedHistogram {
-                buckets,
-                count,
-                sum,
-            } => MetricValue::AggregatedHistogram3(AggregatedHistogram3 {
-                buckets: buckets.into_iter().map(Into::into).collect(),
-                count,
-                sum,
-            }),
-            event::MetricValue::AggregatedSummary {
-                quantiles,
-                count,
-                sum,
-            } => MetricValue::AggregatedSummary3(AggregatedSummary3 {
-                quantiles: quantiles.into_iter().map(Into::into).collect(),
-                count,
-                sum,
-            }),
-            event::MetricValue::Sketch { sketch } => match sketch {
-                MetricSketch::AgentDDSketch(ddsketch) => {
-                    let bin_map = ddsketch.bin_map();
-                    let (keys, counts) = bin_map.into_parts();
-                    let keys = keys.into_iter().map(i32::from).collect();
-                    let counts = counts.into_iter().map(u32::from).collect();
+        let metric = MetricValue::from(data.value);
 
-                    MetricValue::Sketch(Sketch {
-                        sketch: Some(sketch::Sketch::AgentDdSketch(sketch::AgentDdSketch {
-                            count: ddsketch.count(),
-                            min: ddsketch.min().unwrap_or(f64::MAX),
-                            max: ddsketch.max().unwrap_or(f64::MIN),
-                            sum: ddsketch.sum().unwrap_or(0.0),
-                            avg: ddsketch.avg().unwrap_or(0.0),
-                            k: keys,
-                            n: counts,
-                        })),
+        // Include the "single" value of the tags in order to be forward-compatible with older
+        // versions of Vector.
+        let tags_v1 = tags
+            .0
+            .iter()
+            .filter_map(|(tag, values)| {
+                values
+                    .as_single()
+                    .map(|value| (tag.clone(), value.to_string()))
+            })
+            .collect();
+        // These are the full tag values.
+        let tags_v2 = tags
+            .0
+            .into_iter()
+            .map(|(tag, values)| {
+                let values = values
+                    .into_iter()
+                    .map(|value| TagValue {
+                        value: value.into_option(),
                     })
-                }
-            },
-        };
+                    .collect();
+                (tag, TagValues { values })
+            })
+            .collect();
 
         let data = Metric {
             name,
             namespace,
             timestamp,
-            tags: tags
-                .0
-                .into_iter()
-                .filter_map(|(name, values)| values.into_single().map(|value| (name, value)))
-                .collect(),
+            tags_v1,
+            tags_v2,
             kind,
             interval_ms,
             value: Some(metric),
@@ -474,7 +524,7 @@ impl From<sketch::AgentDdSketch> for MetricSketch {
             .collect::<Vec<_>>();
         MetricSketch::AgentDDSketch(
             AgentDDSketch::from_raw(
-                sketch.count as u32,
+                sketch.count,
                 sketch.min,
                 sketch.max,
                 sketch.sum,
@@ -491,7 +541,10 @@ fn decode_value(input: Value) -> Option<event::Value> {
     match input.kind {
         Some(value::Kind::RawBytes(data)) => Some(event::Value::Bytes(data)),
         Some(value::Kind::Timestamp(ts)) => Some(event::Value::Timestamp(
-            chrono::Utc.timestamp(ts.seconds, ts.nanos as u32),
+            chrono::Utc
+                .timestamp_opt(ts.seconds, ts.nanos as u32)
+                .single()
+                .expect("invalid timestamp"),
         )),
         Some(value::Kind::Integer(value)) => Some(event::Value::Integer(value)),
         Some(value::Kind::Float(value)) => Some(event::Value::Float(NotNan::new(value).unwrap())),
@@ -507,27 +560,19 @@ fn decode_value(input: Value) -> Option<event::Value> {
 }
 
 fn decode_map(fields: BTreeMap<String, Value>) -> Option<event::Value> {
-    let mut accum: BTreeMap<String, event::Value> = BTreeMap::new();
-    for (key, value) in fields {
-        match decode_value(value) {
-            Some(value) => {
-                accum.insert(key, value);
-            }
-            None => return None,
-        }
-    }
-    Some(event::Value::Object(accum))
+    fields
+        .into_iter()
+        .map(|(key, value)| decode_value(value).map(|value| (key, value)))
+        .collect::<Option<BTreeMap<_, _>>>()
+        .map(event::Value::Object)
 }
 
 fn decode_array(items: Vec<Value>) -> Option<event::Value> {
-    let mut accum = Vec::with_capacity(items.len());
-    for value in items {
-        match decode_value(value) {
-            Some(value) => accum.push(value),
-            None => return None,
-        }
-    }
-    Some(event::Value::Array(accum))
+    items
+        .into_iter()
+        .map(decode_value)
+        .collect::<Option<Vec<_>>>()
+        .map(event::Value::Array)
 }
 
 fn encode_value(value: event::Value) -> Value {

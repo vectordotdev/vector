@@ -1,7 +1,7 @@
 use std::{io, sync::Arc};
 
 use bytes::Bytes;
-use codecs::JsonSerializer;
+use codecs::JsonSerializerConfig;
 use lookup::lookup_v2::OwnedSegment;
 use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
 use vector_core::ByteSizeOf;
@@ -138,6 +138,6 @@ fn encoder() -> (Transformer, Encoder<()>) {
     (
         Transformer::new(only_fields, None, timestamp_format)
             .expect("transformer configuration must be valid"),
-        Encoder::<()>::new(JsonSerializer::new().into()),
+        Encoder::<()>::new(JsonSerializerConfig::default().build().into()),
     )
 }

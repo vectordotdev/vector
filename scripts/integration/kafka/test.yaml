@@ -1,0 +1,10 @@
+features:
+- kafka-integration-tests
+
+test_filter: '::kafka::'
+
+env:
+  KAFKA_HOST: kafka
+
+matrix:
+  version: [latest]

@@ -2,20 +2,22 @@ use std::fmt;
 
 use vector_config_common::{attributes::CustomAttribute, validation};
 
-use crate::Configurable;
+use crate::ToValue;
 
-#[derive(Clone)]
-pub struct Metadata<T> {
+/// The metadata associated with a given type or field.
+#[derive(Default)]
+pub struct Metadata {
     title: Option<&'static str>,
     description: Option<&'static str>,
-    default_value: Option<T>,
+    default_value: Option<Box<dyn ToValue>>,
     custom_attributes: Vec<CustomAttribute>,
     deprecated: bool,
+    deprecated_message: Option<&'static str>,
     transparent: bool,
     validations: Vec<validation::Validation>,
 }
 
-impl<T> Metadata<T> {
+impl Metadata {
     pub fn with_title(title: &'static str) -> Self {
         Self {
             title: Some(title),
@@ -54,39 +56,12 @@ impl<T> Metadata<T> {
         self.description = None;
     }
 
-    pub fn default_value(&self) -> Option<&T> {
-        self.default_value.as_ref()
+    pub fn default_value(&self) -> Option<&dyn ToValue> {
+        self.default_value.as_deref()
     }
 
-    pub fn with_default_value(default: T) -> Self {
-        Self {
-            default_value: Some(default),
-            ..Default::default()
-        }
-    }
-
-    pub fn set_default_value(&mut self, default_value: T) {
-        self.default_value = Some(default_value);
-    }
-
-    pub fn consume_default_value(&mut self) -> Option<T> {
-        self.default_value.take()
-    }
-
-    pub fn map_default_value<F, U>(self, f: F) -> Metadata<U>
-    where
-        F: FnOnce(T) -> U,
-        U: Configurable,
-    {
-        Metadata {
-            title: self.title,
-            description: self.description,
-            default_value: self.default_value.map(f),
-            custom_attributes: self.custom_attributes,
-            deprecated: self.deprecated,
-            transparent: self.transparent,
-            validations: self.validations,
-        }
+    pub fn set_default_value(&mut self, default_value: impl ToValue + 'static) {
+        self.default_value = Some(Box::new(default_value));
     }
 
     pub fn deprecated(&self) -> bool {
@@ -97,8 +72,19 @@ impl<T> Metadata<T> {
         self.deprecated = true;
     }
 
-    pub fn clear_deprecated(&mut self) {
-        self.deprecated = false;
+    pub fn deprecated_message(&self) -> Option<&'static str> {
+        self.deprecated_message
+    }
+
+    pub fn set_deprecated_message(&mut self, message: &'static str) {
+        self.deprecated_message = Some(message);
+    }
+
+    pub fn with_transparent(transparent: bool) -> Self {
+        Self {
+            transparent,
+            ..Default::default()
+        }
     }
 
     pub fn transparent(&self) -> bool {
@@ -109,20 +95,12 @@ impl<T> Metadata<T> {
         self.transparent = true;
     }
 
-    pub fn clear_transparent(&mut self) {
-        self.transparent = false;
-    }
-
     pub fn custom_attributes(&self) -> &[CustomAttribute] {
         &self.custom_attributes
     }
 
     pub fn add_custom_attribute(&mut self, attribute: CustomAttribute) {
         self.custom_attributes.push(attribute);
-    }
-
-    pub fn clear_custom_attributes(&mut self) {
-        self.custom_attributes.clear();
     }
 
     pub fn validations(&self) -> &[validation::Validation] {
@@ -133,11 +111,7 @@ impl<T> Metadata<T> {
         self.validations.push(validation);
     }
 
-    pub fn clear_validations(&mut self) {
-        self.validations.clear();
-    }
-
-    pub fn merge(mut self, other: Metadata<T>) -> Self {
+    pub fn merge(mut self, other: Metadata) -> Self {
         self.custom_attributes.extend(other.custom_attributes);
         self.validations.extend(other.validations);
 
@@ -147,6 +121,7 @@ impl<T> Metadata<T> {
             default_value: other.default_value.or(self.default_value),
             custom_attributes: self.custom_attributes,
             deprecated: other.deprecated,
+            deprecated_message: other.deprecated_message.or(self.deprecated_message),
             transparent: other.transparent,
             validations: self.validations,
         }
@@ -155,62 +130,21 @@ impl<T> Metadata<T> {
     /// Converts this metadata from holding a default value of `T` to `U`.
     ///
     /// If a default value was present before, it is dropped.
-    pub fn convert<U>(&self) -> Metadata<U> {
+    pub(crate) fn convert(&self) -> Metadata {
         Metadata {
             title: self.title,
             description: self.description,
             default_value: None,
             custom_attributes: self.custom_attributes.clone(),
             deprecated: self.deprecated,
+            deprecated_message: self.deprecated_message,
             transparent: self.transparent,
             validations: self.validations.clone(),
         }
     }
-
-    /// Gets a version of this metadata suitable for subschema use.
-    ///
-    /// This strips all custom attributes and validations, as well as some flags, which makes this exclusively useful
-    /// for shuttling metadata from a type that (de)serializes to an entirely different type.
-    pub fn as_subschema(&self) -> Self {
-        Self {
-            title: self.title,
-            description: self.description,
-            custom_attributes: Vec::new(),
-            transparent: self.transparent,
-            ..Default::default()
-        }
-    }
 }
 
-impl<T> Metadata<Option<T>> {
-    pub fn flatten_default(self) -> Metadata<T> {
-        Metadata {
-            title: self.title,
-            description: self.description,
-            default_value: self.default_value.flatten(),
-            custom_attributes: self.custom_attributes,
-            deprecated: self.deprecated,
-            transparent: self.transparent,
-            validations: self.validations,
-        }
-    }
-}
-
-impl<T> Default for Metadata<T> {
-    fn default() -> Self {
-        Self {
-            title: None,
-            description: None,
-            default_value: None,
-            custom_attributes: Vec::new(),
-            deprecated: false,
-            transparent: false,
-            validations: Vec::new(),
-        }
-    }
-}
-
-impl<T> fmt::Debug for Metadata<T> {
+impl fmt::Debug for Metadata {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Metadata")
             .field("title", &self.title)
@@ -225,6 +159,7 @@ impl<T> fmt::Debug for Metadata<T> {
             )
             .field("custom_attributes", &self.custom_attributes)
             .field("deprecated", &self.deprecated)
+            .field("deprecated_message", &self.deprecated_message)
             .field("transparent", &self.transparent)
             .field("validations", &self.validations)
             .finish()

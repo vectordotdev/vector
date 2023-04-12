@@ -55,7 +55,7 @@ fn tracing_context_layer_enabled() -> bool {
 }
 
 fn init(recorder: VectorRecorder) -> Result<()> {
-    // An escape hatch to allow disabing internal metrics core. May be used for
+    // An escape hatch to allow disabling internal metrics core. May be used for
     // performance reasons. This is a hidden and undocumented functionality.
     if !metrics_enabled() {
         metrics::set_boxed_recorder(Box::new(metrics::NoopRecorder))
@@ -354,7 +354,7 @@ mod tests {
             .expect("Test metric is not present");
         match metric.value() {
             MetricValue::Counter { value } => assert_eq!(*value, 2.0),
-            value => panic!("Invalid metric value {:?}", value),
+            value => panic!("Invalid metric value {value:?}"),
         }
     }
 }

@@ -60,9 +60,9 @@ mod tests {
     #[test]
     fn hide_content() {
         let value = SensitiveString("hello world".to_string());
-        let display = format!("{}", value);
+        let display = format!("{value}");
         assert_eq!(display, "**REDACTED**");
-        let debug = format!("{:?}", value);
+        let debug = format!("{value:?}");
         assert_eq!(debug, "\"**REDACTED**\"");
     }
 }

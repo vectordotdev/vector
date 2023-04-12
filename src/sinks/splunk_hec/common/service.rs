@@ -218,9 +218,12 @@ impl HttpRequestBuilder {
         path: &str,
         passthrough_token: Option<Arc<str>>,
         metadata_fields: MetadataFields,
+        auto_extract_timestamp: bool,
     ) -> Result<Request<Bytes>, crate::Error> {
         let uri = match self.endpoint_target {
             EndpointTarget::Raw => {
+                // `auto_extract_timestamp` doesn't apply to the raw endpoint since the raw endpoint
+                // always does this anyway.
                 let metadata = [
                     (super::SOURCE_FIELD, metadata_fields.source),
                     (super::SOURCETYPE_FIELD, metadata_fields.sourcetype),
@@ -231,9 +234,16 @@ impl HttpRequestBuilder {
                 .filter_map(|(key, value)| value.map(|value| (key, value)));
                 build_uri(self.endpoint.as_str(), path, metadata).context(UriParseSnafu)?
             }
-            EndpointTarget::Event => {
-                build_uri(self.endpoint.as_str(), path, None).context(UriParseSnafu)?
-            }
+            EndpointTarget::Event => build_uri(
+                self.endpoint.as_str(),
+                path,
+                if auto_extract_timestamp {
+                    Some((super::AUTO_EXTRACT_TIMESTAMP_FIELD, "true".to_string()))
+                } else {
+                    None
+                },
+            )
+            .context(UriParseSnafu)?,
         };
 
         let mut builder = Request::post(uri)
@@ -314,6 +324,7 @@ mod tests {
             client.clone(),
             Arc::clone(&http_request_builder),
             EndpointTarget::Event,
+            false,
         );
         HecService::new(
             BoxService::new(http_service),

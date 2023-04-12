@@ -74,7 +74,8 @@ pub struct KinesisStreamsSinkConfig {
 
     /// The log field used as the Kinesis record’s partition key value.
     ///
-    /// If not specified, a unique partition key will be generated for each Kinesis record.
+    /// If not specified, a unique partition key is generated for each Kinesis record.
+    #[configurable(metadata(docs::examples = "user_id"))]
     pub partition_key_field: Option<String>,
 
     #[configurable(derived)]
@@ -144,7 +145,7 @@ impl SinkConfig for KinesisStreamsSinkConfig {
             KinesisRetryLogic,
         >(
             &self.base,
-            None,
+            self.partition_key_field.clone(),
             batch_settings,
             KinesisStreamClient { client },
         )
@@ -181,6 +182,12 @@ impl RetryLogic for KinesisRetryLogic {
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
         if let SdkError::ServiceError { err, raw: _ } = error {
+            // Note that if the request partially fails (records sent to one
+            // partition fail but the others do not, for example), Vector
+            // does not retry. This line only covers a failure for the entire
+            // request.
+            //
+            // https://github.com/vectordotdev/vector/issues/359
             if let PutRecordsErrorKind::ProvisionedThroughputExceededException(_) = err.kind {
                 return true;
             }

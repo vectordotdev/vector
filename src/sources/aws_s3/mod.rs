@@ -8,14 +8,16 @@ use lookup::owned_value_path;
 use snafu::Snafu;
 use tokio_util::io::StreamReader;
 use value::{kind::Collection, Kind};
-use vector_config::{configurable_component, NamedComponent};
+use vector_config::configurable_component;
 use vector_core::config::{DataType, LegacyKey, LogNamespace};
 
 use super::util::MultilineConfig;
 use crate::{
     aws::{auth::AwsAuthentication, create_client, RegionOrEndpoint},
     common::{s3::S3ClientBuilder, sqs::SqsClientBuilder},
-    config::{Output, ProxyConfig, SourceAcknowledgementsConfig, SourceConfig, SourceContext},
+    config::{
+        ProxyConfig, SourceAcknowledgementsConfig, SourceConfig, SourceContext, SourceOutput,
+    },
     line_agg,
     serde::bool_or_struct,
     tls::TlsConfig,
@@ -25,27 +27,31 @@ pub mod sqs;
 
 /// Compression scheme for objects retrieved from S3.
 #[configurable_component]
+#[configurable(metadata(docs::advanced))]
 #[derive(Clone, Copy, Debug, Derivative, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 #[derivative(Default)]
 pub enum Compression {
     /// Automatically attempt to determine the compression scheme.
     ///
-    /// Vector will try to determine the compression scheme of the object from its: `Content-Encoding` and
-    /// `Content-Type` metadata, as well as the key suffix (e.g. `.gz`).
+    /// The compression scheme of the object is determined from its `Content-Encoding` and
+    /// `Content-Type` metadata, as well as the key suffix (for example, `.gz`).
     ///
-    /// It will fallback to 'none' if the compression scheme cannot be determined.
+    /// It is set to `none` if the compression scheme cannot be determined.
     #[derivative(Default)]
     Auto,
+
     /// Uncompressed.
     None,
+
     /// GZIP.
     Gzip,
+
     /// ZSTD.
     Zstd,
 }
 
-/// Strategies for consuming objects from S3.
+/// Strategies for consuming objects from AWS S3.
 #[configurable_component]
 #[derive(Clone, Copy, Debug, Derivative)]
 #[serde(rename_all = "lowercase")]
@@ -64,7 +70,7 @@ enum Strategy {
 // when there's required fields.
 //
 // Maybe showing defaults at all, when there are required properties, doesn't actually make sense? :thinkies:
-#[configurable_component(source("aws_s3"))]
+#[configurable_component(source("aws_s3", "Collect logs from AWS S3."))]
 #[derive(Clone, Debug, Default)]
 #[serde(default, deny_unknown_fields)]
 pub struct AwsS3Config {
@@ -75,17 +81,17 @@ pub struct AwsS3Config {
     compression: Compression,
 
     /// The strategy to use to consume objects from S3.
+    #[configurable(metadata(docs::hidden))]
     strategy: Strategy,
 
     /// Configuration options for SQS.
-    ///
-    /// Only relevant when `strategy = "sqs"`.
     sqs: Option<sqs::Config>,
 
     /// The ARN of an [IAM role][iam_role] to assume at startup.
     ///
     /// [iam_role]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles.html
     #[configurable(deprecated)]
+    #[configurable(metadata(docs::hidden))]
     assume_role: Option<String>,
 
     #[configurable(derived)]
@@ -95,6 +101,7 @@ pub struct AwsS3Config {
     /// Multiline aggregation configuration.
     ///
     /// If not specified, multiline aggregation is disabled.
+    #[configurable(derived)]
     multiline: Option<MultilineConfig>,
 
     #[configurable(derived)]
@@ -113,6 +120,7 @@ pub struct AwsS3Config {
 impl_generate_config_from_default!(AwsS3Config);
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "aws_s3")]
 impl SourceConfig for AwsS3Config {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let log_namespace = cx.log_namespace(self.log_namespace);
@@ -132,7 +140,7 @@ impl SourceConfig for AwsS3Config {
         }
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         let log_namespace = global_log_namespace.merge(self.log_namespace);
         let mut schema_definition = BytesDeserializerConfig
             .schema_definition(log_namespace)
@@ -157,7 +165,15 @@ impl SourceConfig for AwsS3Config {
                 Kind::bytes(),
                 None,
             )
+            .with_source_metadata(
+                Self::NAME,
+                None,
+                &owned_value_path!("timestamp"),
+                Kind::timestamp(),
+                Some("timestamp"),
+            )
             .with_standard_vector_source_metadata()
+            // for metadata that is added to the events dynamically from the metadata
             .with_source_metadata(
                 Self::NAME,
                 None,
@@ -166,11 +182,12 @@ impl SourceConfig for AwsS3Config {
                 None,
             );
 
+        // for metadata that is added to the events dynamically from the metadata
         if log_namespace == LogNamespace::Legacy {
             schema_definition = schema_definition.unknown_fields(Kind::bytes());
         }
 
-        vec![Output::default(DataType::Log).with_schema_definition(schema_definition)]
+        vec![SourceOutput::new_logs(DataType::Log, schema_definition)]
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -408,7 +425,6 @@ mod integration_tests {
     use lookup::path;
     use similar_asserts::assert_eq;
     use value::Value;
-    use vector_config::NamedComponent;
 
     use super::{sqs, AwsS3Config, Compression, Strategy};
     use crate::{
@@ -615,7 +631,7 @@ mod integration_tests {
                 start_pattern: "abc".to_owned(),
                 mode: line_agg::Mode::HaltWith,
                 condition_pattern: "geh".to_owned(),
-                timeout_ms: 1000,
+                timeout_ms: Duration::from_millis(1000),
             }),
             logs.join("\n").into_bytes(),
             vec!["abc\ndef\ngeh".to_owned()],

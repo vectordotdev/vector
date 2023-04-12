@@ -106,7 +106,7 @@ pub trait SinkBuilderExt: Stream {
                 let payload = builder.encode_events(events)?;
 
                 // Note: it would be nice for the RequestMetadataBuilder to build be created from the
-                // events here, and not need to be requred by split_input(). But this then requires
+                // events here, and not need to be required by split_input(). But this then requires
                 // each Event type to implement Serialize, and that causes conflicts with the Serialize
                 // implementation for EstimatedJsonEncodedSizeOf.
 

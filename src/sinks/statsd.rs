@@ -9,10 +9,10 @@ use futures::{future, stream, SinkExt, TryFutureExt};
 use futures_util::FutureExt;
 use tokio_util::codec::Encoder;
 use tower::{Service, ServiceBuilder};
+
 use vector_config::configurable_component;
 use vector_core::ByteSizeOf;
 
-use super::util::SinkBatchSettings;
 #[cfg(unix)]
 use crate::sinks::util::unix::UnixSinkConfig;
 use crate::{
@@ -31,6 +31,8 @@ use crate::{
     },
 };
 
+use super::util::SinkBatchSettings;
+
 pub struct StatsdSvc {
     inner: UdpService,
 }
@@ -44,6 +46,7 @@ pub struct StatsdSinkConfig {
     /// This namespace is only used if a metric has no existing namespace. When a namespace is
     /// present, it is used as a prefix to the metric name, and separated with a period (`.`).
     #[serde(alias = "namespace")]
+    #[configurable(metadata(docs::examples = "service"))]
     pub default_namespace: Option<String>,
 
     #[serde(flatten)]
@@ -62,16 +65,17 @@ pub struct StatsdSinkConfig {
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(tag = "mode", rename_all = "snake_case")]
+#[configurable(metadata(docs::enum_tag_description = "The type of socket to use."))]
 pub enum Mode {
-    /// TCP.
-    Tcp(#[configurable(transparent)] TcpSinkConfig),
+    /// Send over TCP.
+    Tcp(TcpSinkConfig),
 
-    /// UDP.
-    Udp(#[configurable(transparent)] StatsdUdpConfig),
+    /// Send over UDP.
+    Udp(StatsdUdpConfig),
 
-    /// Unix Domain Socket.
+    /// Send over a Unix domain socket (UDS).
     #[cfg(unix)]
-    Unix(#[configurable(transparent)] UnixSinkConfig),
+    Unix(UnixSinkConfig),
 }
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -166,17 +170,18 @@ impl SinkConfig for StatsdSinkConfig {
     }
 }
 
+// Note that if multi-valued tags are present, this encoding may change the order from the input
+// event, since the tags with multiple values may not have been grouped together.
+// This is not an issue, but noting as it may be an observed behavior.
 fn encode_tags(tags: &MetricTags) -> String {
     let parts: Vec<_> = tags
-        .iter_single()
-        .map(|(name, value)| {
-            if value == "true" {
-                name.to_string()
-            } else {
-                format!("{}:{}", name, value)
-            }
+        .iter_all()
+        .map(|(name, tag_value)| match tag_value {
+            Some(value) => format!("{}:{}", name, value),
+            None => name.to_owned(),
         })
         .collect();
+
     // `parts` is already sorted by key because of BTreeMap
     parts.join(",")
 }
@@ -241,14 +246,22 @@ impl Encoder<Event> for StatsdEncoder {
                 // This would also imply rewriting this sink in the new style to take advantage of it.
                 let mut samples = samples.clone();
                 let compressed_samples = compress_distribution(&mut samples);
+                let mut temp_buf = Vec::new();
                 for sample in compressed_samples {
                     push_event(
-                        &mut buf,
+                        &mut temp_buf,
                         metric,
                         sample.value,
                         metric_type,
                         Some(sample.rate),
                     );
+                    let msg = encode_namespace(
+                        metric.namespace().or(self.default_namespace.as_deref()),
+                        '.',
+                        temp_buf.join("|"),
+                    );
+                    buf.push(msg);
+                    temp_buf.clear()
                 }
             }
             MetricValue::Set { values } => {
@@ -266,13 +279,20 @@ impl Encoder<Event> for StatsdEncoder {
             }
         };
 
-        let message = encode_namespace(
-            metric.namespace().or(self.default_namespace.as_deref()),
-            '.',
-            buf.join("|"),
-        );
+        // TODO: this properly encodes aggregate histograms, but it does not handle sketches. There
+        // are complications with applying this to sketches, as it is required to extract the
+        // buckets and unpack the sketch in order to get the real values for distribution samples.
+        // Tracked in #11661.
+        let msg: String = match metric.value() {
+            MetricValue::Distribution { .. } => buf.join("\n"),
+            _ => encode_namespace(
+                metric.namespace().or(self.default_namespace.as_deref()),
+                '.',
+                buf.join("|"),
+            ),
+        };
 
-        bytes.put_slice(&message.into_bytes());
+        bytes.put_slice(&msg.into_bytes());
         bytes.put_u8(b'\n');
 
         Ok(())
@@ -301,7 +321,7 @@ mod test {
     use futures::{channel::mpsc, StreamExt, TryStreamExt};
     use tokio::net::UdpSocket;
     use tokio_util::{codec::BytesCodec, udp::UdpFramed};
-    use vector_core::metric_tags;
+    use vector_core::{event::metric::TagValue, metric_tags};
     #[cfg(feature = "sources-statsd")]
     use {crate::sources::statsd::parser::parse, std::str::from_utf8};
 
@@ -322,17 +342,26 @@ mod test {
     fn tags() -> MetricTags {
         metric_tags!(
             "normal_tag" => "value",
-            "true_tag" => "true",
-            "empty_tag" => "",
+            "multi_value" => "true",
+            "multi_value" => "false",
+            "multi_value" => TagValue::Bare,
+            "bare_tag" => TagValue::Bare,
         )
     }
 
     #[test]
     fn test_encode_tags() {
-        assert_eq!(
-            &encode_tags(&tags()),
-            "empty_tag:,normal_tag:value,true_tag"
-        );
+        let actual = encode_tags(&tags());
+        let mut actual = actual.split(',').collect::<Vec<_>>();
+        actual.sort();
+
+        let mut expected =
+            "bare_tag,normal_tag:value,multi_value:true,multi_value:false,multi_value"
+                .split(',')
+                .collect::<Vec<_>>();
+        expected.sort();
+
+        assert_eq!(actual, expected);
     }
 
     #[test]
@@ -465,6 +494,54 @@ mod test {
 
     #[cfg(feature = "sources-statsd")]
     #[test]
+    fn test_encode_distribution_aggregated() {
+        let metric1 = Metric::new(
+            "distribution",
+            MetricKind::Incremental,
+            MetricValue::Distribution {
+                samples: vector_core::samples![2.5 => 1, 1.5 => 1, 1.5 => 1],
+                statistic: StatisticKind::Histogram,
+            },
+        )
+        .with_tags(Some(tags()));
+
+        let metric1_part1_compressed = Metric::new(
+            "distribution",
+            MetricKind::Incremental,
+            MetricValue::Distribution {
+                samples: vector_core::samples![2.5 => 1],
+                statistic: StatisticKind::Histogram,
+            },
+        )
+        .with_tags(Some(tags()));
+        let metric1_part2_compressed = Metric::new(
+            "distribution",
+            MetricKind::Incremental,
+            MetricValue::Distribution {
+                samples: vector_core::samples![1.5 => 2],
+                statistic: StatisticKind::Histogram,
+            },
+        )
+        .with_tags(Some(tags()));
+        let event = Event::Metric(metric1);
+        let mut encoder = StatsdEncoder {
+            default_namespace: None,
+        };
+        let mut frame = BytesMut::new();
+        encoder.encode(event, &mut frame).unwrap();
+
+        let res = from_utf8(&frame).unwrap().trim();
+        let mut packets = res.split('\n');
+
+        let metric2 = parse(packets.next().unwrap().trim()).unwrap();
+        vector_common::assert_event_data_eq!(metric1_part2_compressed, metric2);
+
+        let metric3 = parse(packets.next().unwrap().trim()).unwrap();
+        vector_common::assert_event_data_eq!(metric1_part1_compressed, metric3);
+    }
+
+    #[cfg(feature = "sources-statsd")]
+    #[test]
     fn test_encode_set() {
         let metric1 = Metric::new(
             "set",
@@ -481,6 +558,7 @@ mod test {
         let mut frame = BytesMut::new();
         encoder.encode(event, &mut frame).unwrap();
         let metric2 = parse(from_utf8(&frame).unwrap().trim()).unwrap();
+
         vector_common::assert_event_data_eq!(metric1, metric2);
     }
 
@@ -549,7 +627,7 @@ mod test {
         let messages = collect_n(rx, 1).await;
         assert_eq!(
             messages[0],
-            Bytes::from("vector.counter:1.5|c|#empty_tag:,normal_tag:value,true_tag\nvector.histogram:2|h|@0.01\n"),
+            Bytes::from("vector.counter:1.5|c|#bare_tag,multi_value:true,multi_value:false,multi_value,normal_tag:value\nvector.histogram:2|h|@0.01\n"),
         );
     }
 }

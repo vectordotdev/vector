@@ -1,6 +1,6 @@
 <p align="center">
   <strong>
-    <a href="https://vector.dev">Website<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/docs/">Docs<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/community/">Community<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://github.com/vectordotdev/vector">Github<a/>
+    <a href="https://vector.dev">Website<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/docs/">Docs<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/community/">Community<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://github.com/vectordotdev/vector">GitHub<a/>
   </strong>
 </p>
 
@@ -115,7 +115,7 @@ Vector maintains special tags that are automatically updated whenever Vector is
 ### Source Files
 
 Vector's Docker source files are located
-[in it's Github repo][urls.vector_docker_source_files].
+[in it's GitHub repo][urls.vector_docker_source_files].
 
 [docs.administration]: https://vector.dev/docs/administration/
 [docs.setup.configuration]: https://vector.dev/docs/setup/configuration/

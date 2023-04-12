@@ -21,6 +21,7 @@ components: sources: heroku_logs: {
 	}
 
 	features: {
+		auto_generated:   true
 		acknowledgements: true
 		multiline: enabled: false
 		codecs: {
@@ -61,12 +62,7 @@ components: sources: heroku_logs: {
 		platform_name: null
 	}
 
-	configuration: {
-		acknowledgements: configuration._source_acknowledgements
-		address:          sources.http_server.configuration.address
-		auth:             sources.http_server.configuration.auth
-		query_parameters: sources.http_server.configuration.query_parameters
-	}
+	configuration: base.components.sources.heroku_logs.configuration
 
 	output: logs: line: {
 		description: "An individual event from a batch of events received through an HTTP POST request."

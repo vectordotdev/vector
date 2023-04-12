@@ -6,12 +6,12 @@ use futures::future;
 use http::StatusCode;
 use ordered_float::NotNan;
 use prost::Message;
-use vector_core::ByteSizeOf;
+use vector_common::internal_event::{CountByteSize, InternalEventHandle as _};
+use vector_core::EstimatedJsonEncodedSizeOf;
 use warp::{filters::BoxedFilter, path, path::FullPath, reply::Response, Filter, Rejection, Reply};
 
 use crate::{
     event::{Event, TraceEvent, Value},
-    internal_events::EventsReceived,
     sources::{
         datadog_agent::{ddtrace_proto, handle_request, ApiKeyQueryParams, DatadogAgentSource},
         util::ErrorMessage,
@@ -74,11 +74,8 @@ fn build_trace_filter(
                             )
                         })
                     });
-                if multiple_outputs {
-                    handle_request(events, acknowledgements, out.clone(), Some(super::TRACES))
-                } else {
-                    handle_request(events, acknowledgements, out.clone(), None)
-                }
+                let output = multiple_outputs.then_some(super::TRACES);
+                handle_request(events, acknowledgements, out.clone(), output)
             },
         )
         .boxed()
@@ -131,10 +128,10 @@ fn handle_dd_trace_payload_v1(
         .flat_map(convert_dd_tracer_payload)
         .collect();
 
-    emit!(EventsReceived {
-        byte_size: trace_events.size_of(),
-        count: trace_events.len(),
-    });
+    source.events_received.emit(CountByteSize(
+        trace_events.len(),
+        trace_events.estimated_json_encoded_size_of(),
+    ));
 
     let enriched_events = trace_events
         .into_iter()
@@ -241,10 +238,10 @@ fn handle_dd_trace_payload_v0(
             trace_event
         })).collect();
 
-    emit!(EventsReceived {
-        byte_size: trace_events.size_of(),
-        count: trace_events.len(),
-    });
+    source.events_received.emit(CountByteSize(
+        trace_events.len(),
+        trace_events.estimated_json_encoded_size_of(),
+    ));
 
     let enriched_events = trace_events
         .into_iter()
@@ -288,7 +285,7 @@ fn convert_span(dd_span: ddtrace_proto::Span) -> BTreeMap<String, Value> {
         "start".into(),
         Value::from(Utc.timestamp_nanos(dd_span.start)),
     );
-    span.insert("duration".into(), Value::from(dd_span.duration as i64));
+    span.insert("duration".into(), Value::from(dd_span.duration));
     span.insert("error".into(), Value::from(dd_span.error as i64));
     span.insert("meta".into(), Value::from(convert_tags(dd_span.meta)));
     span.insert(
@@ -297,14 +294,7 @@ fn convert_span(dd_span: ddtrace_proto::Span) -> BTreeMap<String, Value> {
             dd_span
                 .metrics
                 .into_iter()
-                .map(|(k, v)| {
-                    (
-                        k,
-                        NotNan::new(v as f64)
-                            .map(Value::Float)
-                            .unwrap_or(Value::Null),
-                    )
-                })
+                .map(|(k, v)| (k, NotNan::new(v).map(Value::Float).unwrap_or(Value::Null)))
                 .collect::<BTreeMap<String, Value>>(),
         ),
     );

@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 use std::path::PathBuf;
 
 use clap::{ArgAction, CommandFactory, FromArgMatches, Parser};
@@ -9,6 +10,7 @@ use crate::tap;
 #[cfg(feature = "api-client")]
 use crate::top;
 use crate::{config, generate, get_version, graph, list, unit_test, validate};
+use crate::{generate_schema, signal};
 
 #[derive(Parser, Debug)]
 #[command(rename_all = "kebab-case")]
@@ -156,6 +158,20 @@ pub struct RootOpts {
         default_value = "10"
     )]
     pub internal_log_rate_limit: u64,
+
+    /// Set runtime allocation tracing
+    #[cfg(feature = "allocation-tracing")]
+    #[arg(long, env = "ALLOCATION_TRACING", default_value = "false")]
+    pub allocation_tracing: bool,
+
+    /// Set allocation tracing reporting rate in milliseconds.
+    #[cfg(feature = "allocation-tracing")]
+    #[arg(
+        long,
+        env = "ALLOCATION_TRACING_REPORTING_INTERVAL_MS",
+        default_value = "5000"
+    )]
+    pub allocation_tracing_reporting_interval_ms: u64,
 }
 
 impl RootOpts {
@@ -191,7 +207,7 @@ pub enum SubCommand {
     /// A JSON Schema document will be written to stdout that represents the valid schema for a
     /// Vector configuration. This schema is based on the "full" configuration, such that for usages
     /// where a configuration is split into multiple files, the schema would apply to those files
-    /// only when concatentated together.
+    /// only when concatenated together.
     GenerateSchema,
 
     /// Output a provided Vector configuration file/dir as a single JSON object, useful for checking in to version control.
@@ -225,14 +241,57 @@ pub enum SubCommand {
     Vrl(vrl_cli::Opts),
 }
 
-#[derive(clap::ValueEnum, Debug, Clone, PartialEq, Eq)]
+impl SubCommand {
+    pub async fn execute(
+        &self,
+        mut signals: signal::SignalPair,
+        color: bool,
+    ) -> exitcode::ExitCode {
+        match self {
+            Self::Config(c) => config::cmd(c),
+            Self::Generate(g) => generate::cmd(g),
+            Self::GenerateSchema => generate_schema::cmd(),
+            Self::Graph(g) => graph::cmd(g),
+            Self::List(l) => list::cmd(l),
+            #[cfg(windows)]
+            Self::Service(s) => service::cmd(s),
+            #[cfg(feature = "api-client")]
+            Self::Tap(t) => tap::cmd(t, signals.receiver).await,
+            Self::Test(t) => unit_test::cmd(t, &mut signals.handler).await,
+            #[cfg(feature = "api-client")]
+            Self::Top(t) => top::cmd(t).await,
+            Self::Validate(v) => validate::validate(v, color).await,
+            #[cfg(feature = "vrl-cli")]
+            Self::Vrl(s) => {
+                let mut functions = vrl_stdlib::all();
+                functions.extend(vector_vrl_functions::all());
+                vrl_cli::cmd::cmd(s, functions)
+            }
+        }
+    }
+}
+
+#[derive(clap::ValueEnum, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Color {
     Auto,
     Always,
     Never,
 }
 
-#[derive(clap::ValueEnum, Debug, Clone, PartialEq, Eq)]
+impl Color {
+    pub fn use_color(&self) -> bool {
+        match self {
+            #[cfg(unix)]
+            Color::Auto => atty::is(atty::Stream::Stdout),
+            #[cfg(windows)]
+            Color::Auto => false, // ANSI colors are not supported by cmd.exe
+            Color::Always => true,
+            Color::Never => false,
+        }
+    }
+}
+
+#[derive(clap::ValueEnum, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LogFormat {
     Text,
     Json,

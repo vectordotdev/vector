@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 use std::{
     collections::{hash_map, HashMap},
+    num::NonZeroUsize,
     pin::Pin,
     time::{Duration, Instant},
 };
@@ -13,9 +14,10 @@ use lookup::PathPrefix;
 use serde_with::serde_as;
 use vector_config::configurable_component;
 
+use crate::config::OutputId;
 use crate::{
     conditions::{AnyCondition, Condition},
-    config::{DataType, Input, Output, TransformConfig, TransformContext},
+    config::{DataType, Input, TransformConfig, TransformContext, TransformOutput},
     event::{discriminant::Discriminant, Event, EventMetadata, LogEvent},
     internal_events::ReduceStaleEventFlushed,
     schema,
@@ -28,10 +30,14 @@ use crate::event::Value;
 pub use merge_strategy::*;
 use value::kind::Collection;
 use value::Kind;
+use vector_core::config::LogNamespace;
 
 /// Configuration for the `reduce` transform.
 #[serde_as]
-#[configurable_component(transform("reduce"))]
+#[configurable_component(transform(
+    "reduce",
+    "Collapse multiple log events into a single event based on a set of conditions and merge strategies.",
+))]
 #[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
 #[serde(deny_unknown_fields)]
@@ -49,14 +55,17 @@ pub struct ReduceConfig {
     #[derivative(Default(value = "default_flush_period_ms()"))]
     pub flush_period_ms: Duration,
 
+    /// The maximum number of events to group together.
+    pub max_events: Option<NonZeroUsize>,
+
     /// An ordered list of fields by which to group events.
     ///
     /// Each group with matching values for the specified keys is reduced independently, allowing
     /// you to keep independent event streams separate. When no fields are specified, all events
-    /// will be combined in a single group.
+    /// are combined in a single group.
     ///
     /// For example, if `group_by = ["host", "region"]`, then all incoming events that have the same
-    /// host and region will be grouped together before being reduced.
+    /// host and region are grouped together before being reduced.
     #[serde(default)]
     #[configurable(metadata(
         docs::examples = "request_id",
@@ -67,16 +76,19 @@ pub struct ReduceConfig {
 
     /// A map of field names to custom merge strategies.
     ///
-    /// For each field specified, the given strategy will be used for combining events rather than
+    /// For each field specified, the given strategy is used for combining events rather than
     /// the default behavior.
     ///
     /// The default behavior is as follows:
     ///
-    /// - The first value of a string field is kept, subsequent values are discarded.
+    /// - The first value of a string field is kept and subsequent values are discarded.
     /// - For timestamp fields the first is kept and a new field `[field-name]_end` is added with
     ///   the last received timestamp value.
     /// - Numeric values are summed.
     #[serde(default)]
+    #[configurable(metadata(
+        docs::additional_props_description = "An individual merge strategy."
+    ))]
     pub merge_strategies: IndexMap<String, MergeStrategy>,
 
     /// A condition used to distinguish the final event of a transaction.
@@ -103,6 +115,7 @@ const fn default_flush_period_ms() -> Duration {
 impl_generate_config_from_default!(ReduceConfig);
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "reduce")]
 impl TransformConfig for ReduceConfig {
     async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
         Reduce::new(self, &context.enrichment_tables).map(Transform::event_task)
@@ -112,127 +125,120 @@ impl TransformConfig for ReduceConfig {
         Input::log()
     }
 
-    fn outputs(&self, input: &schema::Definition) -> Vec<Output> {
-        let mut schema_definition = input.clone();
+    fn outputs(
+        &self,
+        input_definitions: &[(OutputId, schema::Definition)],
+        _: LogNamespace,
+    ) -> Vec<TransformOutput> {
+        let mut output_definitions = HashMap::new();
 
-        for (key, merge_strategy) in self.merge_strategies.iter() {
-            let key = if let Ok(key) = parse_target_path(key) {
-                key
-            } else {
-                continue;
-            };
+        for (output, input) in input_definitions {
+            let mut schema_definition = input.clone();
 
-            let input_kind = match key.prefix {
-                PathPrefix::Event => schema_definition.event_kind().at_path(&key.path),
-                PathPrefix::Metadata => schema_definition.metadata_kind().at_path(&key.path),
-            };
+            for (key, merge_strategy) in self.merge_strategies.iter() {
+                let key = if let Ok(key) = parse_target_path(key) {
+                    key
+                } else {
+                    continue;
+                };
 
-            let new_kind = match merge_strategy {
-                MergeStrategy::Discard | MergeStrategy::Retain => {
-                    /* does not change the type */
-                    input_kind.clone()
-                }
-                MergeStrategy::Sum | MergeStrategy::Max | MergeStrategy::Min => {
-                    // only keeps integer / float values
-                    match (input_kind.contains_integer(), input_kind.contains_float()) {
-                        (true, true) => Kind::float().or_integer(),
-                        (true, false) => Kind::integer(),
-                        (false, true) => Kind::float(),
-                        (false, false) => Kind::undefined(),
+                let input_kind = match key.prefix {
+                    PathPrefix::Event => schema_definition.event_kind().at_path(&key.path),
+                    PathPrefix::Metadata => schema_definition.metadata_kind().at_path(&key.path),
+                };
+
+                let new_kind = match merge_strategy {
+                    MergeStrategy::Discard | MergeStrategy::Retain => {
+                        /* does not change the type */
+                        input_kind.clone()
                     }
-                }
-                MergeStrategy::Array => {
-                    let unknown_kind = input_kind.clone();
-                    Kind::array(Collection::empty().with_unknown(unknown_kind))
-                }
-                MergeStrategy::Concat => {
-                    let mut new_kind = Kind::never();
+                    MergeStrategy::Sum | MergeStrategy::Max | MergeStrategy::Min => {
+                        // only keeps integer / float values
+                        match (input_kind.contains_integer(), input_kind.contains_float()) {
+                            (true, true) => Kind::float().or_integer(),
+                            (true, false) => Kind::integer(),
+                            (false, true) => Kind::float(),
+                            (false, false) => Kind::undefined(),
+                        }
+                    }
+                    MergeStrategy::Array => {
+                        let unknown_kind = input_kind.clone();
+                        Kind::array(Collection::empty().with_unknown(unknown_kind))
+                    }
+                    MergeStrategy::Concat => {
+                        let mut new_kind = Kind::never();
 
-                    if input_kind.contains_bytes() {
-                        new_kind.add_bytes();
+                        if input_kind.contains_bytes() {
+                            new_kind.add_bytes();
+                        }
+                        if let Some(array) = input_kind.as_array() {
+                            // array elements can be either any type that the field can be, or any
+                            // element of the array
+                            let array_elements =
+                                array.reduced_kind().union(input_kind.without_array());
+                            new_kind.add_array(Collection::empty().with_unknown(array_elements));
+                        }
+                        new_kind
                     }
-                    if let Some(array) = input_kind.as_array() {
-                        // array elements can be either any type that the field can be, or any
-                        // element of the array
-                        let array_elements = array.reduced_kind().union(input_kind.without_array());
-                        new_kind.add_array(Collection::empty().with_unknown(array_elements));
+                    MergeStrategy::ConcatNewline | MergeStrategy::ConcatRaw => {
+                        // can only produce bytes (or undefined)
+                        if input_kind.contains_bytes() {
+                            Kind::bytes()
+                        } else {
+                            Kind::undefined()
+                        }
                     }
+                    MergeStrategy::ShortestArray | MergeStrategy::LongestArray => {
+                        if let Some(array) = input_kind.as_array() {
+                            Kind::array(array.clone())
+                        } else {
+                            Kind::undefined()
+                        }
+                    }
+                    MergeStrategy::FlatUnique => {
+                        let mut array_elements = input_kind.without_array().without_object();
+                        if let Some(array) = input_kind.as_array() {
+                            array_elements = array_elements.union(array.reduced_kind());
+                        }
+                        if let Some(object) = input_kind.as_object() {
+                            array_elements = array_elements.union(object.reduced_kind());
+                        }
+                        Kind::array(Collection::empty().with_unknown(array_elements))
+                    }
+                };
+
+                // all of the merge strategies are optional. They won't produce a value unless a value actually exists
+                let new_kind = if input_kind.contains_undefined() {
+                    new_kind.or_undefined()
+                } else {
                     new_kind
-                }
-                MergeStrategy::ConcatNewline | MergeStrategy::ConcatRaw => {
-                    // can only produce bytes (or undefined)
-                    if input_kind.contains_bytes() {
-                        Kind::bytes()
-                    } else {
-                        Kind::undefined()
-                    }
-                }
-                MergeStrategy::ShortestArray | MergeStrategy::LongestArray => {
-                    if let Some(array) = input_kind.as_array() {
-                        Kind::array(array.clone())
-                    } else {
-                        Kind::undefined()
-                    }
-                }
-                MergeStrategy::FlatUnique => {
-                    let mut array_elements = input_kind.without_array().without_object();
-                    if let Some(array) = input_kind.as_array() {
-                        array_elements = array_elements.union(array.reduced_kind());
-                    }
-                    if let Some(object) = input_kind.as_object() {
-                        array_elements = array_elements.union(object.reduced_kind());
-                    }
-                    Kind::array(Collection::empty().with_unknown(array_elements))
-                }
-            };
+                };
 
-            // all of the merge strategies are optional. They won't produce a value unless a value actually exists
-            let new_kind = if input_kind.contains_undefined() {
-                new_kind.or_undefined()
-            } else {
-                new_kind
-            };
+                schema_definition = schema_definition.with_field(&key, new_kind, None);
+            }
 
-            schema_definition = schema_definition.with_field(&key, new_kind, None);
+            output_definitions.insert(output.clone(), schema_definition);
         }
 
-        vec![Output::default(DataType::Log).with_schema_definition(schema_definition)]
+        vec![TransformOutput::new(DataType::Log, output_definitions)]
     }
 }
 
 #[derive(Debug)]
 struct ReduceState {
+    events: usize,
     fields: HashMap<String, Box<dyn ReduceValueMerger>>,
     stale_since: Instant,
     metadata: EventMetadata,
 }
 
 impl ReduceState {
-    fn new(e: LogEvent, strategies: &IndexMap<String, MergeStrategy>) -> Self {
-        let (value, metadata) = e.into_parts();
-
-        let fields = if let Value::Object(fields) = value {
-            fields
-                .into_iter()
-                .filter_map(|(k, v)| {
-                    if let Some(strat) = strategies.get(&k) {
-                        match get_value_merger(v, strat) {
-                            Ok(m) => Some((k, m)),
-                            Err(error) => {
-                                warn!(message = "Failed to create merger.", field = ?k, %error);
-                                None
-                            }
-                        }
-                    } else {
-                        Some((k, v.into()))
-                    }
-                })
-                .collect()
-        } else {
-            HashMap::new()
-        };
+    fn new() -> Self {
+        let fields = HashMap::new();
+        let metadata = EventMetadata::default();
 
         Self {
+            events: 0,
             stale_since: Instant::now(),
             fields,
             metadata,
@@ -273,6 +279,7 @@ impl ReduceState {
                 }
             }
         }
+        self.events += 1;
         self.stale_since = Instant::now();
     }
 
@@ -283,6 +290,7 @@ impl ReduceState {
                 warn!(message = "Failed to merge values for field.", %error);
             }
         }
+        self.events = 0;
         event
     }
 }
@@ -295,6 +303,7 @@ pub struct Reduce {
     reduce_merge_states: HashMap<Discriminant, ReduceState>,
     ends_when: Option<Condition>,
     starts_when: Option<Condition>,
+    max_events: Option<usize>,
 }
 
 impl Reduce {
@@ -317,6 +326,7 @@ impl Reduce {
             .map(|c| c.build(enrichment_tables))
             .transpose()?;
         let group_by = config.group_by.clone().into_iter().collect();
+        let max_events = config.max_events.map(|max| max.into());
 
         Ok(Reduce {
             expire_after: config.expire_after_ms,
@@ -326,13 +336,15 @@ impl Reduce {
             reduce_merge_states: HashMap::new(),
             ends_when,
             starts_when,
+            max_events,
         })
     }
 
     fn flush_into(&mut self, output: &mut Vec<Event>) {
         let mut flush_discriminants = Vec::new();
+        let now = Instant::now();
         for (k, t) in &self.reduce_merge_states {
-            if t.stale_since.elapsed() >= self.expire_after {
+            if (now - t.stale_since) >= self.expire_after {
                 flush_discriminants.push(k.clone());
             }
         }
@@ -353,7 +365,9 @@ impl Reduce {
     fn push_or_new_reduce_state(&mut self, event: LogEvent, discriminant: Discriminant) {
         match self.reduce_merge_states.entry(discriminant) {
             hash_map::Entry::Vacant(entry) => {
-                entry.insert(ReduceState::new(event, &self.merge_strategies));
+                let mut state = ReduceState::new();
+                state.add_event(event, &self.merge_strategies);
+                entry.insert(state);
             }
             hash_map::Entry::Occupied(mut entry) => {
                 entry.get_mut().add_event(event, &self.merge_strategies);
@@ -367,13 +381,24 @@ impl Reduce {
             None => (false, event),
         };
 
-        let (ends_here, event) = match &self.ends_when {
+        let (mut ends_here, event) = match &self.ends_when {
             Some(condition) => condition.check(event),
             None => (false, event),
         };
 
         let event = event.into_log();
         let discriminant = Discriminant::from_log_event(&event, &self.group_by);
+
+        if let Some(max_events) = self.max_events {
+            if max_events == 1 {
+                ends_here = true;
+            } else if let Some(entry) = self.reduce_merge_states.get(&discriminant) {
+                // The current event will finish this set
+                if entry.events + 1 == max_events {
+                    ends_here = true;
+                }
+            }
+        }
 
         if starts_here {
             if let Some(state) = self.reduce_merge_states.remove(&discriminant) {
@@ -387,15 +412,15 @@ impl Reduce {
                     state.add_event(event, &self.merge_strategies);
                     state.flush().into()
                 }
-                None => ReduceState::new(event, &self.merge_strategies)
-                    .flush()
-                    .into(),
+                None => {
+                    let mut state = ReduceState::new();
+                    state.add_event(event, &self.merge_strategies);
+                    state.flush().into()
+                }
             })
         } else {
             self.push_or_new_reduce_state(event, discriminant)
         }
-
-        self.flush_into(output);
     }
 }
 
@@ -489,13 +514,12 @@ group_by = [ "request_id" ]
                     Kind::bytes().or_undefined(),
                     None,
                 );
-            let schema_definition = reduce_config
-                .outputs(&input_definition)
+            let schema_definitions = reduce_config
+                .outputs(&[("test".into(), input_definition)], LogNamespace::Legacy)
                 .first()
                 .unwrap()
-                .log_schema_definition
-                .clone()
-                .unwrap();
+                .log_schema_definitions
+                .clone();
 
             let (tx, rx) = mpsc::channel(1);
             let (topology, mut out) = create_topology(ReceiverStream::new(rx), reduce_config).await;
@@ -533,14 +557,18 @@ group_by = [ "request_id" ]
             assert_eq!(output_1["message"], "test message 1".into());
             assert_eq!(output_1["counter"], Value::from(8));
             assert_eq!(output_1.metadata(), &metadata_1);
-            schema_definition.assert_valid_for_event(&output_1.into());
+            schema_definitions
+                .values()
+                .for_each(|definition| definition.assert_valid_for_event(&output_1.clone().into()));
 
             let output_2 = out.recv().await.unwrap().into_log();
             assert_eq!(output_2["message"], "test message 2".into());
             assert_eq!(output_2["extra_field"], "value1".into());
             assert_eq!(output_2["counter"], Value::from(7));
             assert_eq!(output_2.metadata(), &metadata_2);
-            schema_definition.assert_valid_for_event(&output_2.into());
+            schema_definitions
+                .values()
+                .for_each(|definition| definition.assert_valid_for_event(&output_2.clone().into()));
 
             drop(tx);
             topology.stop().await;
@@ -671,6 +699,132 @@ group_by = [ "request_id" ]
             assert_eq!(out.recv().await, None);
         })
         .await;
+    }
+
+    #[tokio::test]
+    async fn max_events_0() {
+        let reduce_config = toml::from_str::<ReduceConfig>(
+            r#"
+group_by = [ "id" ]
+merge_strategies.id = "retain"
+merge_strategies.message = "array"
+max_events = 0
+            "#,
+        );
+
+        match reduce_config {
+            Ok(_conf) => unreachable!("max_events=0 should be rejected."),
+            Err(err) => assert!(err
+                .to_string()
+                .contains("invalid value: integer `0`, expected a nonzero usize")),
+        }
+    }
+
+    #[tokio::test]
+    async fn max_events_1() {
+        let reduce_config = toml::from_str::<ReduceConfig>(
+            r#"
+group_by = [ "id" ]
+merge_strategies.id = "retain"
+merge_strategies.message = "array"
+max_events = 1
+            "#,
+        )
+        .unwrap();
+        assert_transform_compliance(async move {
+            let (tx, rx) = mpsc::channel(1);
+            let (topology, mut out) = create_topology(ReceiverStream::new(rx), reduce_config).await;
+
+            let mut e_1 = LogEvent::from("test 1");
+            e_1.insert("id", "1");
+
+            let mut e_2 = LogEvent::from("test 2");
+            e_2.insert("id", "1");
+
+            let mut e_3 = LogEvent::from("test 3");
+            e_3.insert("id", "1");
+
+            for event in vec![e_1.into(), e_2.into(), e_3.into()] {
+                tx.send(event).await.unwrap();
+            }
+
+            let output_1 = out.recv().await.unwrap().into_log();
+            assert_eq!(output_1["message"], vec!["test 1"].into());
+            let output_2 = out.recv().await.unwrap().into_log();
+            assert_eq!(output_2["message"], vec!["test 2"].into());
+
+            let output_3 = out.recv().await.unwrap().into_log();
+            assert_eq!(output_3["message"], vec!["test 3"].into());
+
+            drop(tx);
+            topology.stop().await;
+            assert_eq!(out.recv().await, None);
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn max_events() {
+        let reduce_config = toml::from_str::<ReduceConfig>(
+            r#"
+group_by = [ "id" ]
+merge_strategies.id = "retain"
+merge_strategies.message = "array"
+max_events = 3
+            "#,
+        )
+        .unwrap();
+
+        assert_transform_compliance(async move {
+            let (tx, rx) = mpsc::channel(1);
+            let (topology, mut out) = create_topology(ReceiverStream::new(rx), reduce_config).await;
+
+            let mut e_1 = LogEvent::from("test 1");
+            e_1.insert("id", "1");
+
+            let mut e_2 = LogEvent::from("test 2");
+            e_2.insert("id", "1");
+
+            let mut e_3 = LogEvent::from("test 3");
+            e_3.insert("id", "1");
+
+            let mut e_4 = LogEvent::from("test 4");
+            e_4.insert("id", "1");
+
+            let mut e_5 = LogEvent::from("test 5");
+            e_5.insert("id", "1");
+
+            let mut e_6 = LogEvent::from("test 6");
+            e_6.insert("id", "1");
+
+            for event in vec![
+                e_1.into(),
+                e_2.into(),
+                e_3.into(),
+                e_4.into(),
+                e_5.into(),
+                e_6.into(),
+            ] {
+                tx.send(event).await.unwrap();
+            }
+
+            let output_1 = out.recv().await.unwrap().into_log();
+            assert_eq!(
+                output_1["message"],
+                vec!["test 1", "test 2", "test 3"].into()
+            );
+
+            let output_2 = out.recv().await.unwrap().into_log();
+            assert_eq!(
+                output_2["message"],
+                vec!["test 4", "test 5", "test 6"].into()
+            );
+
+            drop(tx);
+            topology.stop().await;
+            assert_eq!(out.recv().await, None);
+        })
+        .await
     }
 
     #[tokio::test]

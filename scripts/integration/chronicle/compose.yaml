@@ -1,0 +1,12 @@
+version: '3'
+
+services:
+  chronicle-emulator:
+    image: docker.io/plork/chronicle-emulator:${CONFIG_VERSION}
+    ports:
+    - 3000:3000
+    volumes:
+    - ./public.pem:/public.pem:ro
+    command:
+    - -p
+    - /public.pem

@@ -1,8 +1,12 @@
 use vector_config::configurable_component;
+use vector_core::config::LogNamespace;
 
 use crate::{
     conditions::{AnyCondition, Condition},
-    config::{DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext},
+    config::{
+        DataType, GenerateConfig, Input, OutputId, TransformConfig, TransformContext,
+        TransformOutput,
+    },
     event::Event,
     internal_events::SampleEventDiscarded,
     schema,
@@ -10,22 +14,25 @@ use crate::{
 };
 
 /// Configuration for the `sample` transform.
-#[configurable_component(transform("sample"))]
+#[configurable_component(transform(
+    "sample",
+    "Sample events from an event stream based on supplied criteria and at a configurable rate."
+))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct SampleConfig {
-    /// The rate at which events will be forwarded, expressed as `1/N`.
+    /// The rate at which events are forwarded, expressed as `1/N`.
     ///
-    /// For example, `rate = 10` means 1 out of every 10 events will be forwarded and the rest will
-    /// be dropped.
+    /// For example, `rate = 10` means 1 out of every 10 events are forwarded and the rest are
+    /// dropped.
     pub rate: u64,
 
-    /// The name of the log field whose value will be hashed to determine if the event should be
+    /// The name of the log field whose value is hashed to determine if the event should be
     /// passed.
     ///
     /// Consistently samples the same events. Actual rate of sampling may differ from the configured
     /// one if values in the field are not uniformly distributed. If left unspecified, or if the
-    /// event doesn’t have `key_field`, events will be count rated.
+    /// event doesn't have `key_field`, then events are count rated.
     #[configurable(metadata(docs::examples = "message",))]
     pub key_field: Option<String>,
 
@@ -45,6 +52,7 @@ impl GenerateConfig for SampleConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "sample")]
 impl TransformConfig for SampleConfig {
     async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
         Ok(Transform::function(Sample::new(
@@ -61,9 +69,18 @@ impl TransformConfig for SampleConfig {
         Input::new(DataType::Log | DataType::Trace)
     }
 
-    fn outputs(&self, merged_definition: &schema::Definition) -> Vec<Output> {
-        vec![Output::default(DataType::Log | DataType::Trace)
-            .with_schema_definition(merged_definition.clone())]
+    fn outputs(
+        &self,
+        input_definitions: &[(OutputId, schema::Definition)],
+        _: LogNamespace,
+    ) -> Vec<TransformOutput> {
+        vec![TransformOutput::new(
+            DataType::Log | DataType::Trace,
+            input_definitions
+                .iter()
+                .map(|(output, definition)| (output.clone(), definition.clone()))
+                .collect(),
+        )]
     }
 }
 
@@ -160,7 +177,7 @@ mod tests {
     }
 
     #[test]
-    fn genreate_config() {
+    fn generate_config() {
         crate::test_util::test_generate_config::<SampleConfig>();
     }
 

@@ -90,6 +90,7 @@ impl HttpSink for ClickhouseConfig {
             database,
             &self.table,
             self.skip_unknown_fields,
+            self.date_time_best_effort,
         )
         .expect("Unable to encode uri");
 
@@ -126,7 +127,13 @@ async fn healthcheck(client: HttpClient, config: ClickhouseConfig) -> crate::Res
     }
 }
 
-fn set_uri_query(uri: &Uri, database: &str, table: &str, skip_unknown: bool) -> crate::Result<Uri> {
+fn set_uri_query(
+    uri: &Uri,
+    database: &str,
+    table: &str,
+    skip_unknown: bool,
+    date_time_best_effort: bool,
+) -> crate::Result<Uri> {
     let query = url::form_urlencoded::Serializer::new(String::new())
         .append_pair(
             "query",
@@ -146,6 +153,9 @@ fn set_uri_query(uri: &Uri, database: &str, table: &str, skip_unknown: bool) -> 
     uri.push_str("?input_format_import_nested_json=1&");
     if skip_unknown {
         uri.push_str("input_format_skip_unknown_fields=1&");
+    }
+    if date_time_best_effort {
+        uri.push_str("date_time_input_format=best_effort&")
     }
     uri.push_str(query.as_str());
 
@@ -172,7 +182,7 @@ impl RetryLogic for ClickhouseRetryLogic {
             StatusCode::INTERNAL_SERVER_ERROR => {
                 let body = response.body();
 
-                // Currently, clickhouse returns 500's incorrect data and type mismatch errors.
+                // Currently, ClickHouse returns 500's incorrect data and type mismatch errors.
                 // This attempts to check if the body starts with `Code: {code_num}` and to not
                 // retry those errors.
                 //
@@ -209,14 +219,16 @@ mod tests {
             "my_database",
             "my_table",
             false,
+            true,
         )
         .unwrap();
-        assert_eq!(uri.to_string(), "http://localhost:80/?input_format_import_nested_json=1&query=INSERT+INTO+%22my_database%22.%22my_table%22+FORMAT+JSONEachRow");
+        assert_eq!(uri.to_string(), "http://localhost:80/?input_format_import_nested_json=1&date_time_input_format=best_effort&query=INSERT+INTO+%22my_database%22.%22my_table%22+FORMAT+JSONEachRow");
 
         let uri = set_uri_query(
             &"http://localhost:80".parse().unwrap(),
             "my_database",
             "my_\"table\"",
+            false,
             false,
         )
         .unwrap();
@@ -229,6 +241,7 @@ mod tests {
             &"localhost:80".parse().unwrap(),
             "my_database",
             "my_table",
+            false,
             false,
         )
         .unwrap_err();

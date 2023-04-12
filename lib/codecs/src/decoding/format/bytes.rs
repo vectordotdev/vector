@@ -1,6 +1,6 @@
 use bytes::Bytes;
 use lookup::lookup_v2::parse_value_path;
-use lookup::LookupBuf;
+use lookup::OwnedTargetPath;
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 use value::Kind;
@@ -43,7 +43,7 @@ impl BytesDeserializerConfig {
             ),
             LogNamespace::Vector => {
                 schema::Definition::new_with_default_metadata(Kind::bytes(), [log_namespace])
-                    .with_meaning(LookupBuf::root(), "message")
+                    .with_meaning(OwnedTargetPath::event_root(), "message")
             }
         }
     }

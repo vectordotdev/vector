@@ -34,11 +34,12 @@ concurrency:
 env:
   AWS_ACCESS_KEY_ID: "dummy"
   AWS_SECRET_ACCESS_KEY: "dummy"
+  AXIOM_TOKEN: ${{ secrets.AXIOM_TOKEN }}
+  TEST_APPSIGNAL_PUSH_API_KEY: ${{ secrets.TEST_APPSIGNAL_PUSH_API_KEY }}
   CONTAINER_TOOL: "docker"
   DD_ENV: "ci"
   DD_API_KEY: ${{ secrets.DD_API_KEY }}
   RUST_BACKTRACE: full
-  RUST_TEST_THREADS: 1
   TEST_LOG: vector=debug
   VERBOSE: true
   CI: true
@@ -47,7 +48,7 @@ env:
 jobs:
   test-integration:
     name: Integration - Linux, ${{ matrix.test }}
-    runs-on: [linux, test-runner]
+    runs-on: [linux, ubuntu-20.04-8core]
     if: |
       !github.event.pull_request
         || contains(github.event.pull_request.labels.*.name, 'ci-condition: integration tests enable')
@@ -56,12 +57,13 @@ jobs:
       matrix:
         include:
           - test: 'amqp'
-          - test: 'apex'
+            # TODO: re-enable when the issue with the root CA is sorted out
+            #- test: 'appsignal'
           - test: 'aws'
-          # Database container currently fails to start due to failing to validate the license
-          #- test: 'axiom'
+          - test: 'axiom'
           - test: 'azure'
           - test: 'clickhouse'
+          - test: 'databend'
           - test: 'datadog-agent'
           - test: 'datadog-logs'
           - test: 'datadog-metrics'
@@ -88,9 +90,7 @@ jobs:
           - test: 'redis'
           - test: 'shutdown'
           - test: 'splunk'
-            env:
-              SPLUNK_VERSION: 7.3.9
-          - test: 'splunk'
+          - test: 'webhdfs'
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v3

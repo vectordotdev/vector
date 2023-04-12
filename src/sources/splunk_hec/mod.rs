@@ -10,14 +10,20 @@ use chrono::{DateTime, TimeZone, Utc};
 use flate2::read::MultiGzDecoder;
 use futures::FutureExt;
 use http::StatusCode;
+use lookup::owned_value_path;
 use serde::Serialize;
 use serde_json::{de::Read as JsonRead, Deserializer, Value as JsonValue};
 use snafu::Snafu;
 use tracing::Span;
+use value::{kind::Collection, Kind};
+use vector_common::internal_event::{CountByteSize, InternalEventHandle as _, Registered};
 use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
-use vector_core::config::LogNamespace;
-use vector_core::{event::BatchNotifier, ByteSizeOf};
+use vector_core::{
+    config::{LegacyKey, LogNamespace},
+    event::BatchNotifier,
+    EstimatedJsonEncodedSizeOf,
+};
 use warp::{filters::BoxedFilter, path, reject::Rejection, reply::Response, Filter, Reply};
 
 use self::{
@@ -28,7 +34,7 @@ use self::{
     splunk_response::{HecResponse, HecResponseMetadata, HecStatusCode},
 };
 use crate::{
-    config::{log_schema, DataType, Output, Resource, SourceConfig, SourceContext},
+    config::{log_schema, DataType, Resource, SourceConfig, SourceContext, SourceOutput},
     event::{Event, LogEvent, Value},
     internal_events::{
         EventsReceived, HttpBytesReceived, SplunkHecRequestBodyInvalidError, SplunkHecRequestError,
@@ -49,11 +55,11 @@ pub const SOURCE: &str = "splunk_source";
 pub const SOURCETYPE: &str = "splunk_sourcetype";
 
 /// Configuration for the `splunk_hec` source.
-#[configurable_component(source("splunk_hec"))]
+#[configurable_component(source("splunk_hec", "Receive logs from Splunk."))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields, default)]
 pub struct SplunkConfig {
-    /// The address to listen for connections on.
+    /// The socket address to listen for connections on.
     ///
     /// The address _must_ include a port.
     #[serde(default = "default_socket_address")]
@@ -64,8 +70,8 @@ pub struct SplunkConfig {
     /// If supplied, incoming requests must supply this token in the `Authorization` header, just as a client would if
     /// it was communicating with the Splunk HEC endpoint directly.
     ///
-    /// If _not_ supplied, the `Authorization` header will be ignored and requests will not be authenticated.
-    #[configurable(deprecated)]
+    /// If _not_ supplied, the `Authorization` header is ignored and requests are not authenticated.
+    #[configurable(deprecated = "This option has been deprecated, use `valid_tokens` instead.")]
     token: Option<SensitiveString>,
 
     /// Optional list of valid authorization tokens.
@@ -73,13 +79,14 @@ pub struct SplunkConfig {
     /// If supplied, incoming requests must supply one of these tokens in the `Authorization` header, just as a client
     /// would if it was communicating with the Splunk HEC endpoint directly.
     ///
-    /// If _not_ supplied, the `Authorization` header will be ignored and requests will not be authenticated.
+    /// If _not_ supplied, the `Authorization` header is ignored and requests are not authenticated.
+    #[configurable(metadata(docs::examples = "A94A8FE5CCB19BA61C4C08"))]
     valid_tokens: Option<Vec<SensitiveString>>,
 
     /// Whether or not to forward the Splunk HEC authentication token with events.
     ///
-    /// If set to `true`, when incoming requests contain a Splunk HEC token, the token used will kept in the
-    /// event metadata and be preferentially used if the event is sent to a Splunk HEC sink.
+    /// If set to `true`, when incoming requests contain a Splunk HEC token, the token used is kept in the
+    /// event metadata and preferentially used if the event is sent to a Splunk HEC sink.
     store_hec_token: bool,
 
     #[configurable(derived)]
@@ -88,6 +95,11 @@ pub struct SplunkConfig {
     #[configurable(derived)]
     #[serde(deserialize_with = "bool_or_struct")]
     acknowledgements: HecAcknowledgementsConfig,
+
+    /// The namespace to use for logs. This overrides the global settings.
+    #[configurable(metadata(docs::hidden))]
+    #[serde(default)]
+    log_namespace: Option<bool>,
 }
 
 impl_generate_config_from_default!(SplunkConfig);
@@ -101,6 +113,7 @@ impl Default for SplunkConfig {
             tls: None,
             acknowledgements: Default::default(),
             store_hec_token: false,
+            log_namespace: None,
         }
     }
 }
@@ -110,6 +123,7 @@ fn default_socket_address() -> SocketAddr {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "splunk_hec")]
 impl SourceConfig for SplunkConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let tls = MaybeTlsSettings::from_config(&self.tls, true)?;
@@ -161,8 +175,69 @@ impl SourceConfig for SplunkConfig {
         }))
     }
 
-    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
-        vec![Output::default(DataType::Log)]
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
+        let log_namespace = global_log_namespace.merge(self.log_namespace);
+
+        let schema_definition = match log_namespace {
+            LogNamespace::Legacy => vector_core::schema::Definition::empty_legacy_namespace()
+                .with_event_field(
+                    &owned_value_path!(log_schema().message_key()),
+                    Kind::bytes().or_undefined(),
+                    Some("message"),
+                )
+                .with_event_field(
+                    &owned_value_path!("line"),
+                    Kind::object(Collection::empty())
+                        .or_array(Collection::empty())
+                        .or_undefined(),
+                    None,
+                ),
+            LogNamespace::Vector => vector_core::schema::Definition::new_with_default_metadata(
+                Kind::bytes().or_object(Collection::empty()),
+                [log_namespace],
+            ),
+        }
+        .with_standard_vector_source_metadata()
+        .with_source_metadata(
+            SplunkConfig::NAME,
+            Some(LegacyKey::Overwrite(owned_value_path!(
+                log_schema().host_key()
+            ))),
+            &owned_value_path!("host"),
+            Kind::bytes(),
+            Some("host"),
+        )
+        .with_source_metadata(
+            SplunkConfig::NAME,
+            Some(LegacyKey::Overwrite(owned_value_path!(CHANNEL))),
+            &owned_value_path!("channel"),
+            Kind::bytes(),
+            None,
+        )
+        .with_source_metadata(
+            SplunkConfig::NAME,
+            Some(LegacyKey::Overwrite(owned_value_path!(INDEX))),
+            &owned_value_path!("index"),
+            Kind::bytes(),
+            None,
+        )
+        .with_source_metadata(
+            SplunkConfig::NAME,
+            Some(LegacyKey::Overwrite(owned_value_path!(SOURCE))),
+            &owned_value_path!("source"),
+            Kind::bytes(),
+            None,
+        )
+        // Not to be confused with `source_type`.
+        .with_source_metadata(
+            SplunkConfig::NAME,
+            Some(LegacyKey::Overwrite(owned_value_path!(SOURCETYPE))),
+            &owned_value_path!("sourcetype"),
+            Kind::bytes(),
+            None,
+        );
+
+        vec![SourceOutput::new_logs(DataType::Log, schema_definition)]
     }
 
     fn resources(&self) -> Vec<Resource> {
@@ -180,10 +255,13 @@ struct SplunkSource {
     protocol: &'static str,
     idx_ack: Option<Arc<IndexerAcknowledgement>>,
     store_hec_token: bool,
+    log_namespace: LogNamespace,
+    events_received: Registered<EventsReceived>,
 }
 
 impl SplunkSource {
     fn new(config: &SplunkConfig, protocol: &'static str, cx: SourceContext) -> Self {
+        let log_namespace = cx.log_namespace(config.log_namespace);
         let acknowledgements = cx.do_acknowledgements(config.acknowledgements.enabled.into());
         let shutdown = cx.shutdown;
         let valid_tokens = config
@@ -206,6 +284,8 @@ impl SplunkSource {
             protocol,
             idx_ack,
             store_hec_token: config.store_hec_token,
+            log_namespace,
+            events_received: register!(EventsReceived),
         }
     }
 
@@ -221,6 +301,8 @@ impl SplunkSource {
         let protocol = self.protocol;
         let idx_ack = self.idx_ack.clone();
         let store_hec_token = self.store_hec_token;
+        let log_namespace = self.log_namespace;
+        let events_received = self.events_received.clone();
 
         warp::post()
             .and(
@@ -246,6 +328,7 @@ impl SplunkSource {
                       path: warp::path::FullPath| {
                     let mut out = out.clone();
                     let idx_ack = idx_ack.clone();
+                    let events_received = events_received.clone();
                     emit!(HttpBytesReceived {
                         byte_size: body.len(),
                         http_path: path.as_str(),
@@ -288,6 +371,7 @@ impl SplunkSource {
                             xff,
                             batch,
                             token.filter(|_| store_hec_token).map(Into::into),
+                            log_namespace,
                         );
                         for result in iter {
                             match result {
@@ -300,10 +384,10 @@ impl SplunkSource {
                         }
 
                         if !events.is_empty() {
-                            emit!(EventsReceived {
-                                count: events.len(),
-                                byte_size: events.size_of(),
-                            });
+                            events_received.emit(CountByteSize(
+                                events.len(),
+                                events.estimated_json_encoded_size_of(),
+                            ));
 
                             if let Err(ClosedError) = out.send_batch(events).await {
                                 return Err(Rejection::from(ApiError::ServerShutdown));
@@ -326,6 +410,8 @@ impl SplunkSource {
         let protocol = self.protocol;
         let idx_ack = self.idx_ack.clone();
         let store_hec_token = self.store_hec_token;
+        let events_received = self.events_received.clone();
+        let log_namespace = self.log_namespace;
 
         warp::post()
             .and(path!("raw" / "1.0").or(path!("raw")))
@@ -347,6 +433,7 @@ impl SplunkSource {
                       path: warp::path::FullPath| {
                     let mut out = out.clone();
                     let idx_ack = idx_ack.clone();
+                    let events_received = events_received.clone();
                     emit!(HttpBytesReceived {
                         byte_size: body.len(),
                         http_path: path.as_str(),
@@ -364,7 +451,16 @@ impl SplunkSource {
                             ),
                             _ => None,
                         };
-                        let mut event = raw_event(body, gzip, channel_id, remote, xff, batch)?;
+                        let mut event = raw_event(
+                            body,
+                            gzip,
+                            channel_id,
+                            remote,
+                            xff,
+                            batch,
+                            log_namespace,
+                            &events_received,
+                        )?;
                         if let Some(token) = token.filter(|_| store_hec_token) {
                             event.metadata_mut().set_splunk_hec_token(token.into());
                         }
@@ -513,6 +609,8 @@ struct EventIterator<'de, R: JsonRead<'de>> {
     batch: Option<BatchNotifier>,
     /// Splunk HEC Token for passthrough
     token: Option<Arc<str>>,
+    /// Lognamespace to put the events in
+    log_namespace: LogNamespace,
 }
 
 impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
@@ -523,6 +621,7 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
         remote_addr: Option<String>,
         batch: Option<BatchNotifier>,
         token: Option<Arc<str>>,
+        log_namespace: LogNamespace,
     ) -> Self {
         EventIterator {
             deserializer,
@@ -540,24 +639,158 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
                     remote_addr
                         .or_else(|| remote.map(|addr| addr.to_string()))
                         .map(Value::from),
+                    log_namespace,
                 ),
-                DefaultExtractor::new("index", INDEX),
-                DefaultExtractor::new("source", SOURCE),
-                DefaultExtractor::new("sourcetype", SOURCETYPE),
+                DefaultExtractor::new("index", INDEX, log_namespace),
+                DefaultExtractor::new("source", SOURCE, log_namespace),
+                DefaultExtractor::new("sourcetype", SOURCETYPE, log_namespace),
             ],
             batch,
             token,
+            log_namespace,
         }
     }
 
     fn build_event(&mut self, mut json: JsonValue) -> Result<Event, Rejection> {
         // Construct Event from parsed json event
-        let mut log = LogEvent::default();
+        let mut log = match self.log_namespace {
+            LogNamespace::Vector => self.build_log_vector(&mut json)?,
+            LogNamespace::Legacy => self.build_log_legacy(&mut json)?,
+        };
 
         // Add source type
-        log.insert(log_schema().source_type_key(), Bytes::from("splunk_hec"));
+        self.log_namespace.insert_vector_metadata(
+            &mut log,
+            Some(log_schema().source_type_key()),
+            lookup::path!("source_type"),
+            SplunkConfig::NAME,
+        );
 
-        // Process event field
+        // Process channel field
+        if let Some(JsonValue::String(guid)) = json.get_mut("channel").map(JsonValue::take) {
+            self.log_namespace.insert_source_metadata(
+                SplunkConfig::NAME,
+                &mut log,
+                Some(LegacyKey::Overwrite(CHANNEL)),
+                CHANNEL,
+                guid,
+            );
+        } else if let Some(guid) = self.channel.as_ref() {
+            self.log_namespace.insert_source_metadata(
+                SplunkConfig::NAME,
+                &mut log,
+                Some(LegacyKey::Overwrite(CHANNEL)),
+                CHANNEL,
+                guid.clone(),
+            );
+        }
+
+        // Process fields field
+        if let Some(JsonValue::Object(object)) = json.get_mut("fields").map(JsonValue::take) {
+            for (key, value) in object {
+                self.log_namespace.insert_source_metadata(
+                    SplunkConfig::NAME,
+                    &mut log,
+                    Some(LegacyKey::Overwrite(key.as_str())),
+                    key.as_str(),
+                    value,
+                );
+            }
+        }
+
+        // Process time field
+        let parsed_time = match json.get_mut("time").map(JsonValue::take) {
+            Some(JsonValue::Number(time)) => Some(Some(time)),
+            Some(JsonValue::String(time)) => Some(time.parse::<serde_json::Number>().ok()),
+            _ => None,
+        };
+
+        match parsed_time {
+            None => (),
+            Some(Some(t)) => {
+                if let Some(t) = t.as_u64() {
+                    let time = parse_timestamp(t as i64)
+                        .ok_or(ApiError::InvalidDataFormat { event: self.events })?;
+
+                    self.time = Time::Provided(time);
+                } else if let Some(t) = t.as_f64() {
+                    self.time = Time::Provided(
+                        Utc.timestamp_opt(
+                            t.floor() as i64,
+                            (t.fract() * 1000.0 * 1000.0 * 1000.0) as u32,
+                        )
+                        .single()
+                        .expect("invalid timestamp"),
+                    );
+                } else {
+                    return Err(ApiError::InvalidDataFormat { event: self.events }.into());
+                }
+            }
+            Some(None) => return Err(ApiError::InvalidDataFormat { event: self.events }.into()),
+        }
+
+        // Add time field
+        let timestamp = match self.time.clone() {
+            Time::Provided(time) => time,
+            Time::Now(time) => time,
+        };
+
+        self.log_namespace.insert_source_metadata(
+            SplunkConfig::NAME,
+            &mut log,
+            log_schema().timestamp_key().map(LegacyKey::Overwrite),
+            "timestamp",
+            timestamp,
+        );
+
+        // Extract default extracted fields
+        for de in self.extractors.iter_mut() {
+            de.extract(&mut log, &mut json);
+        }
+
+        // Add passthrough token if present
+        if let Some(token) = &self.token {
+            log.metadata_mut().set_splunk_hec_token(Arc::clone(token));
+        }
+
+        if let Some(batch) = self.batch.clone() {
+            log = log.with_batch_notifier(&batch);
+        }
+
+        self.events += 1;
+
+        Ok(log.into())
+    }
+
+    /// Build the log event for the vector namespace.
+    /// In this namespace the log event is created entirely from the event field.
+    /// No renaming of the `line` field is done.
+    fn build_log_vector(&mut self, json: &mut JsonValue) -> Result<LogEvent, Rejection> {
+        match json.get("event") {
+            Some(event) => {
+                let event: Value = event.into();
+                let mut log = LogEvent::from(event);
+
+                // The timestamp is extracted from the message for the Legacy namespace.
+                self.log_namespace.insert_vector_metadata(
+                    &mut log,
+                    log_schema().timestamp_key(),
+                    lookup::path!("ingest_timestamp"),
+                    chrono::Utc::now(),
+                );
+
+                Ok(log)
+            }
+            None => Err(ApiError::MissingEventField { event: self.events }.into()),
+        }
+    }
+
+    /// Build the log event for the legacy namespace.
+    /// If the event is a string, or the event contains a field called `line` that is a string
+    /// (the docker splunk logger places the message in the event.line field) that string
+    /// is placed in the message field.
+    fn build_log_legacy(&mut self, json: &mut JsonValue) -> Result<LogEvent, Rejection> {
+        let mut log = LogEvent::default();
         match json.get_mut("event") {
             Some(event) => match event.take() {
                 JsonValue::String(string) => {
@@ -591,71 +824,8 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
                 _ => return Err(ApiError::InvalidDataFormat { event: self.events }.into()),
             },
             None => return Err(ApiError::MissingEventField { event: self.events }.into()),
-        }
-
-        // Process channel field
-        if let Some(JsonValue::String(guid)) = json.get_mut("channel").map(JsonValue::take) {
-            log.insert(CHANNEL, guid);
-        } else if let Some(guid) = self.channel.as_ref() {
-            log.insert(CHANNEL, guid.clone());
-        }
-
-        // Process fields field
-        if let Some(JsonValue::Object(object)) = json.get_mut("fields").map(JsonValue::take) {
-            for (key, value) in object {
-                log.insert(key.as_str(), value);
-            }
-        }
-
-        // Process time field
-        let parsed_time = match json.get_mut("time").map(JsonValue::take) {
-            Some(JsonValue::Number(time)) => Some(Some(time)),
-            Some(JsonValue::String(time)) => Some(time.parse::<serde_json::Number>().ok()),
-            _ => None,
         };
-        match parsed_time {
-            None => (),
-            Some(Some(t)) => {
-                if let Some(t) = t.as_u64() {
-                    let time = parse_timestamp(t as i64)
-                        .ok_or(ApiError::InvalidDataFormat { event: self.events })?;
-
-                    self.time = Time::Provided(time);
-                } else if let Some(t) = t.as_f64() {
-                    self.time = Time::Provided(Utc.timestamp(
-                        t.floor() as i64,
-                        (t.fract() * 1000.0 * 1000.0 * 1000.0) as u32,
-                    ));
-                } else {
-                    return Err(ApiError::InvalidDataFormat { event: self.events }.into());
-                }
-            }
-            Some(None) => return Err(ApiError::InvalidDataFormat { event: self.events }.into()),
-        }
-
-        // Add time field
-        match self.time.clone() {
-            Time::Provided(time) => log.insert(log_schema().timestamp_key(), time),
-            Time::Now(time) => log.insert(log_schema().timestamp_key(), time),
-        };
-
-        // Extract default extracted fields
-        for de in self.extractors.iter_mut() {
-            de.extract(&mut log, &mut json);
-        }
-
-        // Add passthrough token if present
-        if let Some(token) = &self.token {
-            log.metadata_mut().set_splunk_hec_token(Arc::clone(token));
-        }
-
-        if let Some(batch) = self.batch.clone() {
-            log = log.with_batch_notifier(&batch);
-        }
-
-        self.events += 1;
-
-        Ok(log.into())
+        Ok(log)
     }
 }
 
@@ -706,9 +876,11 @@ fn parse_timestamp(t: i64) -> Option<DateTime<Utc>> {
     }
 
     let ts = if t < SEC_CUTOFF {
-        Utc.timestamp(t, 0)
+        Utc.timestamp_opt(t, 0).single().expect("invalid timestamp")
     } else if t < MILLISEC_CUTOFF {
-        Utc.timestamp_millis(t)
+        Utc.timestamp_millis_opt(t)
+            .single()
+            .expect("invalid timestamp")
     } else {
         Utc.timestamp_nanos(t)
     };
@@ -721,14 +893,16 @@ struct DefaultExtractor {
     field: &'static str,
     to_field: &'static str,
     value: Option<Value>,
+    log_namespace: LogNamespace,
 }
 
 impl DefaultExtractor {
-    const fn new(field: &'static str, to_field: &'static str) -> Self {
+    const fn new(field: &'static str, to_field: &'static str, log_namespace: LogNamespace) -> Self {
         DefaultExtractor {
             field,
             to_field,
             value: None,
+            log_namespace,
         }
     }
 
@@ -736,11 +910,13 @@ impl DefaultExtractor {
         field: &'static str,
         to_field: &'static str,
         value: impl Into<Option<Value>>,
+        log_namespace: LogNamespace,
     ) -> Self {
         DefaultExtractor {
             field,
             to_field,
             value: value.into(),
+            log_namespace,
         }
     }
 
@@ -752,7 +928,13 @@ impl DefaultExtractor {
 
         // Add data field
         if let Some(index) = self.value.as_ref() {
-            log.insert(self.to_field, index.clone());
+            self.log_namespace.insert_source_metadata(
+                SplunkConfig::NAME,
+                log,
+                Some(LegacyKey::Overwrite(lookup::path!(self.to_field))),
+                lookup::path!(self.to_field),
+                index.clone(),
+            )
         }
     }
 }
@@ -767,6 +949,7 @@ enum Time {
 }
 
 /// Creates event from raw request
+#[allow(clippy::too_many_arguments)]
 fn raw_event(
     bytes: Bytes,
     gzip: bool,
@@ -774,6 +957,8 @@ fn raw_event(
     remote: Option<SocketAddr>,
     xff: Option<String>,
     batch: Option<BatchNotifier>,
+    log_namespace: LogNamespace,
+    events_received: &Registered<EventsReceived>,
 ) -> Result<Event, Rejection> {
     // Process gzip
     let message: Value = if gzip {
@@ -791,37 +976,53 @@ fn raw_event(
     };
 
     // Construct event
-    let mut log = LogEvent::default();
+    let mut log = match log_namespace {
+        LogNamespace::Vector => LogEvent::from(message),
+        LogNamespace::Legacy => {
+            let mut log = LogEvent::default();
 
-    // Add message
-    log.insert(log_schema().message_key(), message);
+            // Add message
+            log.insert(log_schema().message_key(), message);
+            log
+        }
+    };
 
     // Add channel
-    log.insert(CHANNEL, channel);
+    log_namespace.insert_source_metadata(
+        SplunkConfig::NAME,
+        &mut log,
+        Some(LegacyKey::Overwrite(CHANNEL)),
+        CHANNEL,
+        channel,
+    );
 
     // host-field priority for raw endpoint:
     // - x-forwarded-for is set to `host` field first, if present. If not present:
     // - set remote addr to host field
-    if let Some(remote_address) = xff {
-        log.insert(log_schema().host_key(), remote_address);
-    } else if let Some(remote) = remote {
-        log.insert(log_schema().host_key(), remote.to_string());
+    let host = if let Some(remote_address) = xff {
+        Some(remote_address)
+    } else {
+        remote.map(|remote| remote.to_string())
+    };
+
+    if let Some(host) = host {
+        log_namespace.insert_source_metadata(
+            SplunkConfig::NAME,
+            &mut log,
+            Some(LegacyKey::Overwrite(log_schema().host_key())),
+            "host",
+            host,
+        );
     }
 
-    // Add timestamp
-    log.insert(log_schema().timestamp_key(), Utc::now());
+    log_namespace.insert_standard_vector_source_metadata(&mut log, SplunkConfig::NAME, Utc::now());
 
-    // Add source type
-    log.try_insert(log_schema().source_type_key(), Bytes::from("splunk_hec"));
     if let Some(batch) = batch {
         log = log.with_batch_notifier(&batch);
     }
 
     let event = Event::from(log);
-    emit!(EventsReceived {
-        count: 1,
-        byte_size: event.size_of(),
-    });
+    events_received.emit(CountByteSize(1, event.estimated_json_encoded_size_of()));
 
     Ok(event)
 }
@@ -922,7 +1123,7 @@ fn finish_ok(maybe_ack_id: Option<u64>) -> Response {
     } else {
         splunk_response::SUCCESS
     };
-    response_json(StatusCode::OK, &body)
+    response_json(StatusCode::OK, body)
 }
 
 async fn finish_err(rejection: Rejection) -> Result<(Response,), Rejection> {
@@ -994,15 +1195,15 @@ mod tests {
     use reqwest::{RequestBuilder, Response};
     use serde::Deserialize;
     use vector_common::sensitive_string::SensitiveString;
-    use vector_core::event::EventStatus;
+    use vector_core::{event::EventStatus, schema::Definition};
 
-    use super::{acknowledgements::HecAcknowledgementsConfig, parse_timestamp, SplunkConfig};
+    use super::*;
+    use crate::sinks::splunk_hec::common::config_timestamp_key;
     use crate::{
         codecs::EncodingConfig,
         config::{log_schema, SinkConfig, SinkContext, SourceConfig, SourceContext},
         event::{Event, LogEvent},
         sinks::{
-            splunk_hec::common::timestamp_key,
             splunk_hec::logs::config::HecLogsSinkConfig,
             util::{BatchConfig, Compression, TowerRequestConfig},
             Healthcheck, VectorSink,
@@ -1053,6 +1254,7 @@ mod tests {
                 tls: None,
                 acknowledgements: acknowledgements.unwrap_or_default(),
                 store_hec_token,
+                log_namespace: None,
             }
             .build(cx)
             .await
@@ -1084,7 +1286,8 @@ mod tests {
             tls: None,
             acknowledgements: Default::default(),
             timestamp_nanos_key: None,
-            timestamp_key: timestamp_key(),
+            timestamp_key: config_timestamp_key(),
+            auto_extract_timestamp: None,
             endpoint_target: Default::default(),
         }
         .build(SinkContext::new_test())
@@ -1155,7 +1358,7 @@ mod tests {
         opts: &SendWithOpts<'_>,
     ) -> RequestBuilder {
         let mut b = reqwest::Client::new()
-            .post(&format!("http://{}/{}", address, api))
+            .post(format!("http://{}/{}", address, api))
             .header("Authorization", format!("Splunk {}", token));
 
         b = match opts.channel {
@@ -1199,13 +1402,23 @@ mod tests {
     #[tokio::test]
     async fn no_compression_text_event() {
         let message = "gzip_text_event";
-        let (sink, source) =
-            start(TextSerializerConfig::new().into(), Compression::None, None).await;
+        let (sink, source) = start(
+            TextSerializerConfig::default().into(),
+            Compression::None,
+            None,
+        )
+        .await;
 
         let event = channel_n(vec![message], sink, source).await.remove(0);
 
         assert_eq!(event.as_log()[log_schema().message_key()], message.into());
-        assert!(event.as_log().get(log_schema().timestamp_key()).is_some());
+        assert!(event
+            .as_log()
+            .get((
+                lookup::PathPrefix::Event,
+                log_schema().timestamp_key().unwrap()
+            ))
+            .is_some());
         assert_eq!(
             event.as_log()[log_schema().source_type_key()],
             "splunk_hec".into()
@@ -1217,7 +1430,7 @@ mod tests {
     async fn one_simple_text_event() {
         let message = "one_simple_text_event";
         let (sink, source) = start(
-            TextSerializerConfig::new().into(),
+            TextSerializerConfig::default().into(),
             Compression::gzip_default(),
             None,
         )
@@ -1226,7 +1439,13 @@ mod tests {
         let event = channel_n(vec![message], sink, source).await.remove(0);
 
         assert_eq!(event.as_log()[log_schema().message_key()], message.into());
-        assert!(event.as_log().get(log_schema().timestamp_key()).is_some());
+        assert!(event
+            .as_log()
+            .get((
+                lookup::PathPrefix::Event,
+                log_schema().timestamp_key().unwrap()
+            ))
+            .is_some());
         assert_eq!(
             event.as_log()[log_schema().source_type_key()],
             "splunk_hec".into()
@@ -1237,8 +1456,12 @@ mod tests {
     #[tokio::test]
     async fn multiple_simple_text_event() {
         let n = 200;
-        let (sink, source) =
-            start(TextSerializerConfig::new().into(), Compression::None, None).await;
+        let (sink, source) = start(
+            TextSerializerConfig::default().into(),
+            Compression::None,
+            None,
+        )
+        .await;
 
         let messages = (0..n)
             .map(|i| format!("multiple_simple_text_event_{}", i))
@@ -1247,7 +1470,13 @@ mod tests {
 
         for (msg, event) in messages.into_iter().zip(events.into_iter()) {
             assert_eq!(event.as_log()[log_schema().message_key()], msg.into());
-            assert!(event.as_log().get(log_schema().timestamp_key()).is_some());
+            assert!(event
+                .as_log()
+                .get((
+                    lookup::PathPrefix::Event,
+                    log_schema().timestamp_key().unwrap()
+                ))
+                .is_some());
             assert_eq!(
                 event.as_log()[log_schema().source_type_key()],
                 "splunk_hec".into()
@@ -1260,7 +1489,7 @@ mod tests {
     async fn one_simple_json_event() {
         let message = "one_simple_json_event";
         let (sink, source) = start(
-            JsonSerializerConfig::new().into(),
+            JsonSerializerConfig::default().into(),
             Compression::gzip_default(),
             None,
         )
@@ -1269,7 +1498,13 @@ mod tests {
         let event = channel_n(vec![message], sink, source).await.remove(0);
 
         assert_eq!(event.as_log()[log_schema().message_key()], message.into());
-        assert!(event.as_log().get(log_schema().timestamp_key()).is_some());
+        assert!(event
+            .as_log()
+            .get((
+                lookup::PathPrefix::Event,
+                log_schema().timestamp_key().unwrap()
+            ))
+            .is_some());
         assert_eq!(
             event.as_log()[log_schema().source_type_key()],
             "splunk_hec".into()
@@ -1281,7 +1516,7 @@ mod tests {
     async fn multiple_simple_json_event() {
         let n = 200;
         let (sink, source) = start(
-            JsonSerializerConfig::new().into(),
+            JsonSerializerConfig::default().into(),
             Compression::gzip_default(),
             None,
         )
@@ -1294,7 +1529,13 @@ mod tests {
 
         for (msg, event) in messages.into_iter().zip(events.into_iter()) {
             assert_eq!(event.as_log()[log_schema().message_key()], msg.into());
-            assert!(event.as_log().get(log_schema().timestamp_key()).is_some());
+            assert!(event
+                .as_log()
+                .get((
+                    lookup::PathPrefix::Event,
+                    log_schema().timestamp_key().unwrap()
+                ))
+                .is_some());
             assert_eq!(
                 event.as_log()[log_schema().source_type_key()],
                 "splunk_hec".into()
@@ -1306,7 +1547,7 @@ mod tests {
     #[tokio::test]
     async fn json_event() {
         let (sink, source) = start(
-            JsonSerializerConfig::new().into(),
+            JsonSerializerConfig::default().into(),
             Compression::gzip_default(),
             None,
         )
@@ -1320,7 +1561,12 @@ mod tests {
         let event = collect_n(source, 1).await.remove(0).into_log();
         assert_eq!(event["greeting"], "hello".into());
         assert_eq!(event["name"], "bob".into());
-        assert!(event.get(log_schema().timestamp_key()).is_some());
+        assert!(event
+            .get((
+                lookup::PathPrefix::Event,
+                log_schema().timestamp_key().unwrap()
+            ))
+            .is_some());
         assert_eq!(event[log_schema().source_type_key()], "splunk_hec".into());
         assert!(event.metadata().splunk_hec_token().is_none());
     }
@@ -1328,7 +1574,7 @@ mod tests {
     #[tokio::test]
     async fn line_to_message() {
         let (sink, source) = start(
-            JsonSerializerConfig::new().into(),
+            JsonSerializerConfig::default().into(),
             Compression::gzip_default(),
             None,
         )
@@ -1354,7 +1600,13 @@ mod tests {
             let event = collect_n(source, 1).await.remove(0);
             assert_eq!(event.as_log()[log_schema().message_key()], message.into());
             assert_eq!(event.as_log()[&super::CHANNEL], "channel".into());
-            assert!(event.as_log().get(log_schema().timestamp_key()).is_some());
+            assert!(event
+                .as_log()
+                .get((
+                    lookup::PathPrefix::Event,
+                    log_schema().timestamp_key().unwrap()
+                ))
+                .is_some());
             assert_eq!(
                 event.as_log()[log_schema().source_type_key()],
                 "splunk_hec".into()
@@ -1375,7 +1627,13 @@ mod tests {
             let event = collect_n(source, 1).await.remove(0);
             assert_eq!(event.as_log()[log_schema().message_key()], "root".into());
             assert_eq!(event.as_log()[&super::CHANNEL], "channel".into());
-            assert!(event.as_log().get(log_schema().timestamp_key()).is_some());
+            assert!(event
+                .as_log()
+                .get((
+                    lookup::PathPrefix::Event,
+                    log_schema().timestamp_key().unwrap()
+                ))
+                .is_some());
             assert_eq!(
                 event.as_log()[log_schema().source_type_key()],
                 "splunk_hec".into()
@@ -1580,7 +1838,7 @@ mod tests {
             let (source, address) = source_with(None, Some(VALID_TOKENS), None, true).await;
             let (sink, health) = sink(
                 address,
-                TextSerializerConfig::new().into(),
+                TextSerializerConfig::default().into(),
                 Compression::gzip_default(),
             )
             .await;
@@ -1608,7 +1866,13 @@ mod tests {
             let event = collect_n(source, 1).await.remove(0);
             assert_eq!(event.as_log()[log_schema().message_key()], message.into());
             assert_eq!(event.as_log()[&super::CHANNEL], "channel".into());
-            assert!(event.as_log().get(log_schema().timestamp_key()).is_some());
+            assert!(event
+                .as_log()
+                .get((
+                    lookup::PathPrefix::Event,
+                    log_schema().timestamp_key().unwrap()
+                ))
+                .is_some());
             assert_eq!(
                 event.as_log()[log_schema().source_type_key()],
                 "splunk_hec".into()
@@ -1628,7 +1892,7 @@ mod tests {
             let (source, address) = source_with(None, None, None, false).await;
             let (sink, health) = sink(
                 address,
-                TextSerializerConfig::new().into(),
+                TextSerializerConfig::default().into(),
                 Compression::gzip_default(),
             )
             .await;
@@ -1649,7 +1913,7 @@ mod tests {
             let (source, address) = source_with(None, None, None, true).await;
             let (sink, health) = sink(
                 address,
-                TextSerializerConfig::new().into(),
+                TextSerializerConfig::default().into(),
                 Compression::gzip_default(),
             )
             .await;
@@ -1679,7 +1943,13 @@ mod tests {
 
             let event = collect_n(source, 1).await.remove(0);
             assert_eq!(event.as_log()[log_schema().message_key()], "first".into());
-            assert!(event.as_log().get(log_schema().timestamp_key()).is_some());
+            assert!(event
+                .as_log()
+                .get((
+                    lookup::PathPrefix::Event,
+                    log_schema().timestamp_key().unwrap()
+                ))
+                .is_some());
             assert_eq!(
                 event.as_log()[log_schema().source_type_key()],
                 "splunk_hec".into()
@@ -1703,7 +1973,13 @@ mod tests {
 
             let event = collect_n(source, 1).await.remove(0);
             assert_eq!(event.as_log()[log_schema().message_key()], "first".into());
-            assert!(event.as_log().get(log_schema().timestamp_key()).is_some());
+            assert!(event
+                .as_log()
+                .get((
+                    lookup::PathPrefix::Event,
+                    log_schema().timestamp_key().unwrap()
+                ))
+                .is_some());
             assert_eq!(
                 event.as_log()[log_schema().source_type_key()],
                 "splunk_hec".into()
@@ -1725,7 +2001,13 @@ mod tests {
 
             let event = collect_n(source, 1).await.remove(0);
             assert_eq!(event.as_log()[log_schema().message_key()], "first".into());
-            assert!(event.as_log().get(log_schema().timestamp_key()).is_some());
+            assert!(event
+                .as_log()
+                .get((
+                    lookup::PathPrefix::Event,
+                    log_schema().timestamp_key().unwrap()
+                ))
+                .is_some());
             assert_eq!(
                 event.as_log()[log_schema().source_type_key()],
                 "splunk_hec".into()
@@ -1741,7 +2023,7 @@ mod tests {
         let (source, address) = source(None).await;
 
         let b = reqwest::Client::new()
-            .post(&format!(
+            .post(format!(
                 "http://{}/{}",
                 address, "services/collector/event"
             ))
@@ -1754,7 +2036,7 @@ mod tests {
         assert_eq!(event.as_log()["non"], "A non UTF8 character �".into());
         assert_eq!(event.as_log()["number"], 2.into());
         assert_eq!(event.as_log()["bool"], true.into());
-        assert!(event.as_log().get(log_schema().timestamp_key()).is_some());
+        assert!(event.as_log().get((lookup::PathPrefix::Event, log_schema().timestamp_key().unwrap())).is_some());
         assert_eq!(
             event.as_log()[log_schema().source_type_key()],
             "splunk_hec".into()
@@ -1799,9 +2081,15 @@ mod tests {
     fn parse_timestamps() {
         let cases = vec![
             Utc::now(),
-            Utc.ymd(1971, 11, 7).and_hms(1, 1, 1),
-            Utc.ymd(2011, 8, 5).and_hms(1, 1, 1),
-            Utc.ymd(2189, 11, 4).and_hms(2, 2, 2),
+            Utc.with_ymd_and_hms(1971, 11, 7, 1, 1, 1)
+                .single()
+                .expect("invalid timestamp"),
+            Utc.with_ymd_and_hms(2011, 8, 5, 1, 1, 1)
+                .single()
+                .expect("invalid timestamp"),
+            Utc.with_ymd_and_hms(2189, 11, 4, 2, 2, 2)
+                .single()
+                .expect("invalid timestamp"),
         ];
 
         for case in cases {
@@ -1809,16 +2097,13 @@ mod tests {
             let millis = case.timestamp_millis();
             let nano = case.timestamp_nanos();
 
+            assert_eq!(parse_timestamp(sec).unwrap().timestamp(), case.timestamp());
             assert_eq!(
-                parse_timestamp(sec as i64).unwrap().timestamp(),
-                case.timestamp()
-            );
-            assert_eq!(
-                parse_timestamp(millis as i64).unwrap().timestamp_millis(),
+                parse_timestamp(millis).unwrap().timestamp_millis(),
                 case.timestamp_millis()
             );
             assert_eq!(
-                parse_timestamp(nano as i64).unwrap().timestamp_nanos(),
+                parse_timestamp(nano).unwrap().timestamp_nanos(),
                 case.timestamp_nanos()
             );
         }
@@ -1837,7 +2122,7 @@ mod tests {
         assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
             let message = "for the host";
             let (sink, source) = start(
-                TextSerializerConfig::new().into(),
+                TextSerializerConfig::default().into(),
                 Compression::gzip_default(),
                 None,
             )
@@ -2149,5 +2434,95 @@ mod tests {
             400,
             send_with(address, "services/collector/ack", message, TOKEN, &opts).await
         );
+    }
+
+    #[test]
+    fn output_schema_definition_vector_namespace() {
+        let config = SplunkConfig {
+            log_namespace: Some(true),
+            ..Default::default()
+        };
+
+        let definition = config
+            .outputs(LogNamespace::Vector)
+            .remove(0)
+            .schema_definition(true);
+
+        let expected_definition = Definition::new_with_default_metadata(
+            Kind::object(Collection::empty()).or_bytes(),
+            [LogNamespace::Vector],
+        )
+        .with_metadata_field(
+            &owned_value_path!("vector", "source_type"),
+            Kind::bytes(),
+            None,
+        )
+        .with_metadata_field(
+            &owned_value_path!("vector", "ingest_timestamp"),
+            Kind::timestamp(),
+            None,
+        )
+        .with_metadata_field(
+            &owned_value_path!("splunk_hec", "host"),
+            Kind::bytes(),
+            Some("host"),
+        )
+        .with_metadata_field(
+            &owned_value_path!("splunk_hec", "index"),
+            Kind::bytes(),
+            None,
+        )
+        .with_metadata_field(
+            &owned_value_path!("splunk_hec", "source"),
+            Kind::bytes(),
+            None,
+        )
+        .with_metadata_field(
+            &owned_value_path!("splunk_hec", "channel"),
+            Kind::bytes(),
+            None,
+        )
+        .with_metadata_field(
+            &owned_value_path!("splunk_hec", "sourcetype"),
+            Kind::bytes(),
+            None,
+        );
+
+        assert_eq!(definition, Some(expected_definition));
+    }
+
+    #[test]
+    fn output_schema_definition_legacy_namespace() {
+        let config = SplunkConfig::default();
+        let definitions = config
+            .outputs(LogNamespace::Legacy)
+            .remove(0)
+            .schema_definition(true);
+
+        let expected_definition = Definition::new_with_default_metadata(
+            Kind::object(Collection::empty()),
+            [LogNamespace::Legacy],
+        )
+        .with_event_field(&owned_value_path!("host"), Kind::bytes(), Some("host"))
+        .with_event_field(
+            &owned_value_path!("message"),
+            Kind::bytes().or_undefined(),
+            Some("message"),
+        )
+        .with_event_field(
+            &owned_value_path!("line"),
+            Kind::array(Collection::empty())
+                .or_object(Collection::empty())
+                .or_undefined(),
+            None,
+        )
+        .with_event_field(&owned_value_path!("source_type"), Kind::bytes(), None)
+        .with_event_field(&owned_value_path!("splunk_channel"), Kind::bytes(), None)
+        .with_event_field(&owned_value_path!("splunk_index"), Kind::bytes(), None)
+        .with_event_field(&owned_value_path!("splunk_source"), Kind::bytes(), None)
+        .with_event_field(&owned_value_path!("splunk_sourcetype"), Kind::bytes(), None)
+        .with_event_field(&owned_value_path!("timestamp"), Kind::timestamp(), None);
+
+        assert_eq!(definitions, Some(expected_definition));
     }
 }

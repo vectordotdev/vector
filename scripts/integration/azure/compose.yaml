@@ -1,0 +1,8 @@
+version: '3'
+
+services:
+  local-azure-blob:
+    image: mcr.microsoft.com/azure-storage/azurite:${CONFIG_VERSION}
+    command: azurite --blobHost 0.0.0.0 --loose
+    volumes:
+    - /var/run:/var/run

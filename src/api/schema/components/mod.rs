@@ -14,16 +14,16 @@ use tokio_stream::{wrappers::BroadcastStream, Stream, StreamExt};
 use vector_config::NamedComponent;
 use vector_core::internal_event::DEFAULT_OUTPUT;
 
+use crate::topology::schema::possible_definitions;
 use crate::{
     api::schema::{
         components::state::component_by_component_key,
         filter::{self, filter_items},
         relay, sort,
     },
-    config::{ComponentKey, Config, TransformConfig},
+    config::{ComponentKey, Config},
     filter_check,
 };
-use crate::{config::SourceConfig, topology::schema::merged_definition};
 
 #[derive(Debug, Clone, Interface)]
 #[graphql(
@@ -293,7 +293,10 @@ pub fn update_config(config: &Config) {
                 inputs: transform.inputs.clone(),
                 outputs: transform
                     .inner
-                    .outputs(&merged_definition(&transform.inputs, config, &mut cache))
+                    .outputs(
+                        &possible_definitions(&transform.inputs, config, &mut cache),
+                        config.schema.log_namespace(),
+                    )
                     .into_iter()
                     .map(|output| output.port.unwrap_or_else(|| DEFAULT_OUTPUT.to_string()))
                     .collect(),
@@ -316,8 +319,8 @@ pub fn update_config(config: &Config) {
     // Get the component_ids of existing components
     let existing_component_keys = state::get_component_keys();
     let new_component_keys = new_components
-        .iter()
-        .map(|(component_key, _)| component_key.clone())
+        .keys()
+        .cloned()
         .collect::<HashSet<ComponentKey>>();
 
     // Publish all components that have been removed

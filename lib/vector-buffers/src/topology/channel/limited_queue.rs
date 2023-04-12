@@ -102,15 +102,13 @@ impl<T: Bufferable> LimitedSender<T> {
     pub async fn send(&mut self, item: T) -> Result<(), SendError<T>> {
         // Calculate how many permits we need, and wait until we can acquire all of them.
         let permits_required = self.get_required_permits_for_item(&item);
-        let permits = match self
+        let Ok(permits) = self
             .inner
             .limiter
             .clone()
             .acquire_many_owned(permits_required)
-            .await
-        {
-            Ok(permits) => permits,
-            Err(_) => return Err(SendError(item)),
+            .await else {
+            return Err(SendError(item))
         };
 
         self.inner

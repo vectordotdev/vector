@@ -119,7 +119,7 @@ elegant form for string creation.
 - Template strings are used within certain fields within Vector.
 - Many programming languages offer string interpolation.
   - [Python](https://peps.python.org/pep-0498/)
-  - [Javascript](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Template_literals)
+  - [JavaScript](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Template_literals)
   - [Ruby](http://ruby-for-beginners.rubymonstas.org/bonus/string_interpolation.html)
 
 ## Drawbacks

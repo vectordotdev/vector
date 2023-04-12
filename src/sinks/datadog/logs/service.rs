@@ -5,11 +5,13 @@ use std::{
 
 use bytes::Bytes;
 use futures::future::BoxFuture;
+use headers::HeaderName;
 use http::{
     header::{CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE},
-    Request, Uri,
+    HeaderValue, Request, Uri,
 };
 use hyper::Body;
+use indexmap::IndexMap;
 use tower::Service;
 use tracing::Instrument;
 use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
@@ -21,8 +23,8 @@ use vector_core::{
 
 use crate::{
     http::HttpClient,
-    sinks::datadog::DatadogApiError,
     sinks::util::{retries::RetryLogic, Compression},
+    sinks::{datadog::DatadogApiError, util::http::validate_headers},
 };
 
 #[derive(Debug, Default, Clone)]
@@ -65,7 +67,6 @@ pub struct LogApiResponse {
     count: usize,
     events_byte_size: usize,
     raw_byte_size: usize,
-    protocol: String,
 }
 
 impl DriverResponse for LogApiResponse {
@@ -77,8 +78,8 @@ impl DriverResponse for LogApiResponse {
         CountByteSize(self.count, self.events_byte_size)
     }
 
-    fn bytes_sent(&self) -> Option<(usize, &str)> {
-        Some((self.raw_byte_size, &self.protocol))
+    fn bytes_sent(&self) -> Option<usize> {
+        Some(self.raw_byte_size)
     }
 }
 
@@ -91,16 +92,22 @@ impl DriverResponse for LogApiResponse {
 pub struct LogApiService {
     client: HttpClient,
     uri: Uri,
-    enterprise: bool,
+    user_provided_headers: IndexMap<HeaderName, HeaderValue>,
 }
 
 impl LogApiService {
-    pub const fn new(client: HttpClient, uri: Uri, enterprise: bool) -> Self {
-        Self {
+    pub fn new(
+        client: HttpClient,
+        uri: Uri,
+        headers: IndexMap<String, String>,
+    ) -> crate::Result<Self> {
+        let headers = validate_headers(&headers)?;
+
+        Ok(Self {
             client,
             uri,
-            enterprise,
-        }
+            user_provided_headers: headers,
+        })
     }
 }
 
@@ -119,14 +126,7 @@ impl Service<LogApiRequest> for LogApiService {
         let mut client = self.client.clone();
         let http_request = Request::post(&self.uri)
             .header(CONTENT_TYPE, "application/json")
-            .header(
-                "DD-EVP-ORIGIN",
-                if self.enterprise {
-                    "vector-enterprise"
-                } else {
-                    "vector"
-                },
-            )
+            .header("DD-EVP-ORIGIN", "vector")
             .header("DD-EVP-ORIGIN-VERSION", crate::get_version())
             .header("DD-API-KEY", request.api_key.to_string());
 
@@ -139,10 +139,17 @@ impl Service<LogApiRequest> for LogApiService {
         let count = request.get_metadata().event_count();
         let events_byte_size = request.get_metadata().events_byte_size();
         let raw_byte_size = request.uncompressed_size;
-        let protocol = self.uri.scheme_str().unwrap_or("http").to_string();
+
+        let mut http_request = http_request.header(CONTENT_LENGTH, request.body.len());
+
+        if let Some(headers) = http_request.headers_mut() {
+            for (name, value) in &self.user_provided_headers {
+                // Replace rather than append to any existing header values
+                headers.insert(name, value.clone());
+            }
+        }
 
         let http_request = http_request
-            .header(CONTENT_LENGTH, request.body.len())
             .body(Body::from(request.body))
             .expect("building HTTP request failed unexpectedly");
 
@@ -153,7 +160,6 @@ impl Service<LogApiRequest> for LogApiService {
                     count,
                     events_byte_size,
                     raw_byte_size,
-                    protocol,
                 },
             )
         })

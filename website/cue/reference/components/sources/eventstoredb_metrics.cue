@@ -44,35 +44,7 @@ components: sources: eventstoredb_metrics: {
 		platform_name: null
 	}
 
-	configuration: {
-		endpoints: {
-			common:      true
-			description: "Endpoints to scrape stats from."
-			required:    false
-			type: string: {
-				examples: ["https://localhost:2113/stats"]
-				default: "https://localhost:2113/stats"
-			}
-		}
-		scrape_interval_secs: {
-			common:      true
-			description: "The interval between scrapes, in seconds."
-			required:    false
-			type: uint: {
-				default: 15
-				unit:    "seconds"
-			}
-		}
-		default_namespace: {
-			common:      false
-			description: "The namespace used otherwise will be defaulted to eventstoredb."
-			required:    false
-			type: string: {
-				examples: ["app-123-eventstoredb"]
-				default: "eventstoredb"
-			}
-		}
-	}
+	configuration: base.components.sources.eventstoredb_metrics.configuration
 
 	output: metrics: {
 		_eventstoredb_metrics_tags: {

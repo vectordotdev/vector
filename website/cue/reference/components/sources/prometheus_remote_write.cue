@@ -13,6 +13,7 @@ components: sources: prometheus_remote_write: {
 	}
 
 	features: {
+		auto_generated:   true
 		acknowledgements: true
 		multiline: enabled: false
 		receive: {
@@ -48,17 +49,7 @@ components: sources: prometheus_remote_write: {
 		platform_name: null
 	}
 
-	configuration: {
-		acknowledgements: configuration._source_acknowledgements
-		address: {
-			description: "The address to accept connections on. The address _must_ include a port."
-			required:    true
-			type: string: {
-				examples: ["0.0.0.0:9090"]
-			}
-		}
-		auth: configuration._http_basic_auth
-	}
+	configuration: base.components.sources.prometheus_remote_write.configuration
 
 	output: metrics: {
 		counter: output._passthrough_counter
@@ -79,6 +70,15 @@ components: sources: prometheus_remote_write: {
 				For metrics named with a suffix of `_total`, this source
 				emits the value as a counter metric. All other metrics
 				are emitted as gauges.
+				"""
+		}
+
+		duplicate_tag_names: {
+			title: "Duplicate tag names"
+			body: """
+				Multiple tags with the same name are invalid within Prometheus. Prometheus
+				itself will reject a metric with duplicate tags. Vector will accept the metric,
+				but will only take the last value for each tag name specified.
 				"""
 		}
 	}

@@ -16,6 +16,7 @@ components: sources: logstash: {
 
 	features: {
 		acknowledgements: true
+		auto_generated:   true
 		receive: {
 			from: {
 				service: services.logstash
@@ -50,26 +51,7 @@ components: sources: logstash: {
 		platform_name: null
 	}
 
-	configuration: {
-		acknowledgements: configuration._source_acknowledgements
-		address: {
-			description: "The address to listen for TCP connections on."
-			required:    true
-			type: string: {
-				examples: ["0.0.0.0:\(_port)"]
-			}
-		}
-		connection_limit: {
-			common:        false
-			description:   "The max number of TCP connections that will be processed."
-			relevant_when: "mode = `tcp`"
-			required:      false
-			type: uint: {
-				default: null
-				unit:    "concurrency"
-			}
-		}
-	}
+	configuration: base.components.sources.logstash.configuration
 
 	output: logs: line: {
 		description: "A Logstash message"

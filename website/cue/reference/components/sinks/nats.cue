@@ -13,6 +13,7 @@ components: sinks: nats: {
 	}
 
 	features: {
+		auto_generated:   true
 		acknowledgements: true
 		healthcheck: enabled: true
 		send: {
@@ -52,7 +53,7 @@ components: sinks: nats: {
 		notices: []
 	}
 
-	configuration: components._nats.configuration & {}
+	configuration: base.components.sinks.nats.configuration
 
 	input: {
 		logs:    true

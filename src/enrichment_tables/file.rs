@@ -1,3 +1,4 @@
+//! Handles enrichment tables for `type = file`.
 use std::{
     collections::{BTreeMap, HashMap},
     fs,
@@ -10,17 +11,19 @@ use bytes::Bytes;
 use enrichment::{Case, Condition, IndexHandle, Table};
 use tracing::trace;
 use value::Value;
-use vector_common::{conversion::Conversion, datetime::TimeZone};
+use vector_common::{conversion::Conversion, TimeZone};
 use vector_config::configurable_component;
 
 use crate::config::EnrichmentTableConfig;
 
-/// File encoding options.
+/// File encoding configuration.
 #[configurable_component]
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[serde(tag = "type", rename_all = "snake_case")]
 enum Encoding {
-    /// Comma-separated values.
+    /// Decodes the file as a [CSV][csv] (comma-separated values) file.
+    ///
+    /// [csv]: https://wikipedia.org/wiki/Comma-separated_values
     Csv {
         /// Whether or not the file contains column headers.
         ///
@@ -135,7 +138,8 @@ impl FileConfig {
 
                 match (split.next(), split.next()) {
                     (Some("date"), None) => Value::Timestamp(
-                        chrono::FixedOffset::east(0)
+                        chrono::FixedOffset::east_opt(0)
+                            .expect("invalid timestamp")
                             .from_utc_datetime(
                                 &chrono::NaiveDate::parse_from_str(value, "%Y-%m-%d")
                                     .map_err(|_| {
@@ -144,12 +148,14 @@ impl FileConfig {
                                             value, row
                                         )
                                     })?
-                                    .and_hms(0, 0, 0),
+                                    .and_hms_opt(0, 0, 0)
+                                    .expect("invalid timestamp"),
                             )
                             .into(),
                     ),
                     (Some("date"), Some(format)) => Value::Timestamp(
-                        chrono::FixedOffset::east(0)
+                        chrono::FixedOffset::east_opt(0)
+                            .expect("invalid timestamp")
                             .from_utc_datetime(
                                 &chrono::NaiveDate::parse_from_str(value, format)
                                     .map_err(|_| {
@@ -158,7 +164,8 @@ impl FileConfig {
                                             value, row
                                         )
                                     })?
-                                    .and_hms(0, 0, 0),
+                                    .and_hms_opt(0, 0, 0)
+                                    .expect("invalid timestamp"),
                             )
                             .into(),
                     ),
@@ -243,6 +250,7 @@ impl EnrichmentTableConfig for FileConfig {
 
 impl_generate_config_from_default!(FileConfig);
 
+/// A struct that implements [enrichment::Table] to handle loading enrichment data from a CSV file.
 #[derive(Clone)]
 pub struct File {
     config: FileConfig,
@@ -257,6 +265,7 @@ pub struct File {
 }
 
 impl File {
+    /// Creates a new [File] based on the provided config.
     pub fn new(
         config: FileConfig,
         last_modified: SystemTime,
@@ -582,7 +591,7 @@ impl std::fmt::Debug for File {
 
 #[cfg(test)]
 mod tests {
-    use chrono::TimeZone;
+    use chrono::{TimeZone, Timelike};
 
     use super::*;
 
@@ -607,23 +616,42 @@ mod tests {
         );
 
         assert_eq!(
-            Ok(Value::from(chrono::Utc.ymd(2020, 3, 5).and_hms(0, 0, 0))),
+            Ok(Value::from(
+                chrono::Utc
+                    .with_ymd_and_hms(2020, 3, 5, 0, 0, 0)
+                    .single()
+                    .expect("invalid timestamp")
+            )),
             config.parse_column(Default::default(), "col2", 1, "2020-03-05")
         );
 
         assert_eq!(
-            Ok(Value::from(chrono::Utc.ymd(2020, 3, 5).and_hms(0, 0, 0))),
+            Ok(Value::from(
+                chrono::Utc
+                    .with_ymd_and_hms(2020, 3, 5, 0, 0, 0)
+                    .single()
+                    .expect("invalid timestamp")
+            )),
             config.parse_column(Default::default(), "col3", 1, "03/05/2020")
         );
 
         assert_eq!(
-            Ok(Value::from(chrono::Utc.ymd(2020, 3, 5).and_hms(0, 0, 0))),
+            Ok(Value::from(
+                chrono::Utc
+                    .with_ymd_and_hms(2020, 3, 5, 0, 0, 0)
+                    .single()
+                    .expect("invalid timestamp")
+            )),
             config.parse_column(Default::default(), "col3-spaces", 1, "03 05 2020")
         );
 
         assert_eq!(
             Ok(Value::from(
-                chrono::Utc.ymd(2001, 7, 7).and_hms_micro(15, 4, 0, 26490)
+                chrono::Utc
+                    .with_ymd_and_hms(2001, 7, 7, 15, 4, 0)
+                    .single()
+                    .and_then(|t| t.with_nanosecond(26490 * 1_000))
+                    .expect("invalid timestamp")
             )),
             config.parse_column(
                 Default::default(),
@@ -635,7 +663,11 @@ mod tests {
 
         assert_eq!(
             Ok(Value::from(
-                chrono::Utc.ymd(2001, 7, 7).and_hms_micro(15, 4, 0, 26490)
+                chrono::Utc
+                    .with_ymd_and_hms(2001, 7, 7, 15, 4, 0)
+                    .single()
+                    .and_then(|t| t.with_nanosecond(26490 * 1_000))
+                    .expect("invalid timestamp")
             )),
             config.parse_column(
                 Default::default(),
@@ -924,11 +956,21 @@ mod tests {
             vec![
                 vec![
                     "zip".into(),
-                    Value::Timestamp(chrono::Utc.ymd(2015, 12, 7).and_hms(0, 0, 0)),
+                    Value::Timestamp(
+                        chrono::Utc
+                            .with_ymd_and_hms(2015, 12, 7, 0, 0, 0)
+                            .single()
+                            .expect("invalid timestamp"),
+                    ),
                 ],
                 vec![
                     "zip".into(),
-                    Value::Timestamp(chrono::Utc.ymd(2016, 12, 7).and_hms(0, 0, 0)),
+                    Value::Timestamp(
+                        chrono::Utc
+                            .with_ymd_and_hms(2016, 12, 7, 0, 0, 0)
+                            .single()
+                            .expect("invalid timestamp"),
+                    ),
                 ],
             ],
             vec!["field1".to_string(), "field2".to_string()],
@@ -943,8 +985,14 @@ mod tests {
             },
             Condition::BetweenDates {
                 field: "field2",
-                from: chrono::Utc.ymd(2016, 1, 1).and_hms(0, 0, 0),
-                to: chrono::Utc.ymd(2017, 1, 1).and_hms(0, 0, 0),
+                from: chrono::Utc
+                    .with_ymd_and_hms(2016, 1, 1, 0, 0, 0)
+                    .single()
+                    .expect("invalid timestamp"),
+                to: chrono::Utc
+                    .with_ymd_and_hms(2017, 1, 1, 0, 0, 0)
+                    .single()
+                    .expect("invalid timestamp"),
             },
         ];
 
@@ -953,7 +1001,12 @@ mod tests {
                 (String::from("field1"), Value::from("zip")),
                 (
                     String::from("field2"),
-                    Value::Timestamp(chrono::Utc.ymd(2016, 12, 7).and_hms(0, 0, 0))
+                    Value::Timestamp(
+                        chrono::Utc
+                            .with_ymd_and_hms(2016, 12, 7, 0, 0, 0)
+                            .single()
+                            .expect("invalid timestamp")
+                    )
                 )
             ])),
             file.find_table_row(Case::Sensitive, &conditions, None, Some(handle))

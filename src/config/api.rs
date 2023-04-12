@@ -11,7 +11,7 @@ pub struct Options {
     #[serde(default = "default_enabled")]
     pub enabled: bool,
 
-    /// The address to listen on for the API endpoint.
+    /// The socket address to listen on for the API endpoint.
     #[serde(default = "default_address")]
     pub address: Option<SocketAddr>,
 

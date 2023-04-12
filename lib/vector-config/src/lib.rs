@@ -8,8 +8,7 @@
 // optional: either literal `Option<T>` fields or if they all have defaults.
 //
 // This could clean up some of the required properties where we have a field-level/struct-level
-// default that we can check by looking at the metadata for the type implementing `T`, maybe even
-// such that the default impl of `Configurable::is_optional` could just use that.
+// default that we can check by looking at the metadata for the type implementing `T`.
 //
 // TODO: What happens if we try to stick in a field that has a struct with a lifetime attached to
 // it? How does the name of that get generated in terms of what ends up in the schema? Do we even
@@ -23,28 +22,6 @@
 // then throw a compile-error from the macro? We would still end up throwing an error at runtime if
 // our heuristic to detect unsigned integers failed, but we might be able to give a meaningful error
 // closer to the problem, which would be much better.
-//
-// TODO: If we want to deny unknown fields on structs, JSON Schema supports that by setting
-// `additionalProperties` to `false` on a schema, which turns it into a "closed" schema. However,
-// this is at odds with types used in enums, which is all of our component configuration types. This
-// is because applying `additionalProperties` to the configuration type's schema itself would
-// consider something like an internal enum tag (i.e. `"type": "aws_s3"`) as an additional property,
-// even if `type` was already accounted for in another subschema that was validated against.
-//
-// JSON Schema draft 2019-09 has a solution for this -- `unevaluatedProperties` -- which forces the
-// validator to track what properties have been "accounted" for, so far, during subschema validation
-// during things like validating against all subschemas in `allOf`.
-//
-// Essentially, we should force all structs to generate a schema that sets `additionalProperties` to
-// `false`, if it wasn't set already, but if it gets used in a way that will place it into `allOf`
-// (which is the case for internally tagged enum variants aka all component configuration types)
-// then we need to update the schema codegen to unset that field, and re-apply it as
-// `unevaluatedProperties` on the schema which is using `allOf`.
-//
-// Logically, this makes sense because we're only creating a new wrapper schema B around some schema
-// A such that we can use it as a tagged enum variant, so rules like "no additional properties"
-// should apply to the wrapper, since schema A and B should effectively represent the same exact
-// thing.
 //
 // TODO: We may want to simply switch from using `description` as the baseline descriptive field to
 // using `title`.  While, by itself, I think `description` makes a little more sense than `title`,
@@ -75,7 +52,7 @@
 // create duplicate schemas for T" standpoint, but could manifest as a non-obvious divergence.
 //
 // TODO: We need to figure out how to handle aliases. Looking previously, it seemed like we might
-// need to do some very ugly combinatorial explosion stuff to define a schema per perumtation of all
+// need to do some very ugly combinatorial explosion stuff to define a schema per permutation of all
 // aliased fields in a config. We might be able to get away with using a combination of `allOf` and
 // `oneOf` where we define a subschema for the non-aliased fields, and then a subschema using
 // `oneOf`for each aliased field -- allowing it to match any of the possible field names for that
@@ -122,7 +99,7 @@
 // TODO: Should we always apply the transparent marker to fields when they're the only field in a
 // tuple struct/tuple variant? There's also some potential interplay with using the `derived` helper
 // attribute on the tuple struct/tuple variant itself to signal that we want to pull the
-// title/description from the field instead, which coluld be useful when using newtype wrappers
+// title/description from the field instead, which could be useful when using newtype wrappers
 // around existing/remote types for the purpose of making them `Configurable`.
 #![deny(warnings)]
 
@@ -131,13 +108,12 @@
 pub mod indexmap {
     pub use indexmap::*;
 }
-pub mod schemars {
-    pub use schemars::*;
-}
+
+pub use serde_json;
 
 pub mod component;
 mod configurable;
-pub use self::configurable::Configurable;
+pub use self::configurable::{Configurable, ConfigurableRef, ToValue};
 mod errors;
 pub use self::errors::{BoundDirection, GenerateError};
 mod external;
@@ -153,8 +129,6 @@ mod stdlib;
 mod str;
 pub use self::str::ConfigurableString;
 
-use vector_config_common::attributes::CustomAttribute;
-
 // Re-export of the `#[configurable_component]` and `#[derive(Configurable)]` proc macros.
 pub use vector_config_macros::*;
 
@@ -168,12 +142,12 @@ pub mod validation {
 }
 
 #[doc(hidden)]
-pub fn __ensure_numeric_validation_bounds<N>(metadata: &Metadata<N>) -> Result<(), GenerateError>
+pub fn __ensure_numeric_validation_bounds<N>(metadata: &Metadata) -> Result<(), GenerateError>
 where
     N: Configurable + ConfigurableNumber,
 {
     // In `Validation::ensure_conformance`, we do some checks on any supplied numeric bounds to try and ensure they're
-    // no larger than the largest f64 value where integer/floasting-point conversions are still lossless.  What we
+    // no larger than the largest f64 value where integer/floating-point conversions are still lossless.  What we
     // cannot do there, however, is ensure that the bounds make sense for the type on the Rust side, such as a user
     // supplying a negative bound which would be fine for `i64`/`f64` but not for `u64`. That's where this function
     // comes in.

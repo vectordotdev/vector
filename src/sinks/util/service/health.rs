@@ -11,6 +11,7 @@ use std::{
 use futures::FutureExt;
 use futures_util::{future::BoxFuture, TryFuture};
 use pin_project::pin_project;
+use serde_with::serde_as;
 use stream_cancel::{Trigger, Tripwire};
 use tokio::time::{sleep, Duration};
 use tower::Service;
@@ -26,16 +27,30 @@ const RETRY_MAX_DURATION_SECONDS_DEFAULT: u64 = 3_600;
 const RETRY_INITIAL_BACKOFF_SECONDS_DEFAULT: u64 = 1;
 const UNHEALTHY_AMOUNT_OF_ERRORS: usize = 5;
 
-/// Options for determining health of an endpoint.
+/// Options for determining the health of an endpoint.
+#[serde_as]
 #[configurable_component]
 #[derive(Clone, Debug, Default)]
 #[serde(rename_all = "snake_case")]
 pub struct HealthConfig {
-    /// Initial timeout, in seconds, between attempts to reactivate endpoints once they become unhealthy.
-    pub retry_initial_backoff_secs: Option<u64>,
+    /// Initial delay between attempts to reactivate endpoints once they become unhealthy.
+    #[serde(default = "default_retry_initial_backoff_secs")]
+    #[configurable(metadata(docs::type_unit = "seconds"))]
+    // not using Duration type because the value is only used as a u64.
+    pub retry_initial_backoff_secs: u64,
 
-    /// Maximum timeout, in seconds, between attempts to reactivate endpoints once they become unhealthy.
-    pub retry_max_duration_secs: Option<u64>,
+    /// Maximum delay between attempts to reactivate endpoints once they become unhealthy.
+    #[serde_as(as = "serde_with::DurationSeconds<u64>")]
+    #[serde(default = "default_retry_max_duration_secs")]
+    pub retry_max_duration_secs: Duration,
+}
+
+const fn default_retry_initial_backoff_secs() -> u64 {
+    RETRY_INITIAL_BACKOFF_SECONDS_DEFAULT
+}
+
+const fn default_retry_max_duration_secs() -> std::time::Duration {
+    Duration::from_secs(RETRY_MAX_DURATION_SECONDS_DEFAULT)
 }
 
 impl HealthConfig {
@@ -60,18 +75,8 @@ impl HealthConfig {
             // An exponential backoff starting from retry_initial_backoff_sec and doubling every time
             // up to retry_max_duration_secs.
             backoff: ExponentialBackoff::from_millis(2)
-                .factor(
-                    (self
-                        .retry_initial_backoff_secs
-                        .unwrap_or(RETRY_INITIAL_BACKOFF_SECONDS_DEFAULT)
-                        .saturating_mul(1000)
-                        / 2)
-                    .max(1),
-                )
-                .max_delay(Duration::from_secs(
-                    self.retry_max_duration_secs
-                        .unwrap_or(RETRY_MAX_DURATION_SECONDS_DEFAULT),
-                )),
+                .factor((self.retry_initial_backoff_secs.saturating_mul(1000) / 2).max(1))
+                .max_delay(self.retry_max_duration_secs),
         }
     }
 }

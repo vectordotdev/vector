@@ -16,6 +16,7 @@ components: sources: opentelemetry: {
 	}
 
 	features: {
+		auto_generated:   true
 		acknowledgements: true
 		multiline: enabled: false
 		receive: {
@@ -50,79 +51,7 @@ components: sources: opentelemetry: {
 		platform_name: null
 	}
 
-	configuration: {
-		acknowledgements: configuration._source_acknowledgements
-		grpc: {
-			description: "Configuration options for the gRPC server."
-			required:    true
-			type: object: {
-				examples: [{address: "0.0.0.0:\(_grpc_port)"}]
-				options: {
-					address: {
-						description: """
-						The gRPC address to listen for connections on. It _must_ include a port.
-						"""
-						required: true
-						type: string: {
-							examples: ["0.0.0.0:\(_grpc_port)"]
-						}
-					}
-					tls: configuration._tls_accept & {_args: {
-						can_verify_certificate: true
-						enabled_default:        false
-					}}
-				}
-			}
-		}
-		http: {
-			description: "Configuration options for the HTTP server."
-			required:    true
-			type: object: {
-				examples: [{address: "0.0.0.0:\(_http_port)"}]
-				options: {
-					address: {
-						description: """
-							The HTTP address to listen for connections on. It _must_ include a port.
-							"""
-						required: true
-						type: string: {
-							examples: ["0.0.0.0:\(_http_port)"]
-						}
-					}
-					tls: configuration._tls_accept & {_args: {
-						can_verify_certificate: true
-						enabled_default:        false
-					}}
-				}
-			}
-		}
-	}
-
-	configuration_examples: [
-		{
-			title: "OTLP Defaults"
-			configuration: {
-				opentelemetry: {
-					grpc: {
-						address: "0.0.0.0:4317"
-						tls: {
-							enabled:  true
-							crt_file: "/etc/ssl/certs/vector.pem"
-							key_file: "/etc/ssl/private/vector.key"
-						}
-					}
-					http: {
-						address: "0.0.0.0:4318"
-						tls: {
-							enabled:  true
-							crt_file: "/etc/ssl/certs/vector.pem"
-							key_file: "/etc/ssl/private/vector.key"
-						}
-					}
-				}
-			}
-		},
-	]
+	configuration: base.components.sources.opentelemetry.configuration
 
 	outputs: [
 		{

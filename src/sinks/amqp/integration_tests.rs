@@ -1,7 +1,6 @@
 use super::*;
 use crate::{
     config::{SinkConfig, SinkContext},
-    serde::{default_decoding, default_framing_message_based},
     shutdown::ShutdownSignal,
     template::Template,
     test_util::{
@@ -162,13 +161,9 @@ async fn amqp_round_trip() {
         connection: config.connection.clone(),
         queue: queue.clone(),
         consumer: format!("test-{}-amqp-source", random_string(10)),
-        routing_key_field: "routing".to_string(),
-        exchange_key: "exchange".to_string(),
-        offset_key: "offset".to_string(),
-        framing: default_framing_message_based(),
-        decoding: default_decoding(),
         log_namespace: Some(true),
         acknowledgements: true.into(),
+        ..Default::default()
     };
     let (tx, rx) = SourceSender::new_test();
     let amqp_source = crate::sources::amqp::amqp_source(

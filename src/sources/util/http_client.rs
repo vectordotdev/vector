@@ -27,17 +27,17 @@ use crate::{
     Error, SourceSender,
 };
 use vector_common::shutdown::ShutdownSignal;
-use vector_core::{config::proxy::ProxyConfig, event::Event, ByteSizeOf};
+use vector_core::{config::proxy::ProxyConfig, event::Event, EstimatedJsonEncodedSizeOf};
 
 /// Contains the inputs generic to any http client.
 pub(crate) struct GenericHttpClientInputs {
-    /// Array of URLs to call
+    /// Array of URLs to call.
     pub urls: Vec<Uri>,
-    /// Interval to call on in seconds
-    pub interval_secs: u64,
-    /// Map of Header+Value to apply to HTTP request
+    /// Interval between calls.
+    pub interval: Duration,
+    /// Map of Header+Value to apply to HTTP request.
     pub headers: HashMap<String, Vec<String>>,
-    /// Content type of the HTTP request, determined by the source
+    /// Content type of the HTTP request, determined by the source.
     pub content_type: String,
     pub auth: Option<Auth>,
     pub tls: TlsSettings,
@@ -45,9 +45,9 @@ pub(crate) struct GenericHttpClientInputs {
     pub shutdown: ShutdownSignal,
 }
 
-/// The default interval to call the http endpoint if none is configured.
-pub(crate) const fn default_scrape_interval_secs() -> u64 {
-    15
+/// The default interval to call the HTTP endpoint if none is configured.
+pub(crate) const fn default_interval() -> Duration {
+    Duration::from_secs(15)
 }
 
 /// Builds the context, allowing the source-specific implementation to leverage data from the
@@ -66,6 +66,11 @@ pub(crate) trait HttpClientContext {
 
     /// (Optional) Called if the HTTP response is not 200 ('OK').
     fn on_http_response_error(&self, _uri: &Uri, _header: &Parts) {}
+
+    // This function can be defined to enrich events with additional HTTP
+    // metadata. This function should be used rather than internal enrichment so
+    // that accurate byte count metrics can be emitted.
+    fn enrich_events(&mut self, _events: &mut Vec<Event>) {}
 }
 
 /// Builds a url for the HTTP requests.
@@ -108,102 +113,119 @@ pub(crate) async fn call<
     mut out: SourceSender,
     http_method: HttpMethod,
 ) -> Result<(), ()> {
-    let mut stream = IntervalStream::new(tokio::time::interval(Duration::from_secs(
-        inputs.interval_secs,
-    )))
-    .take_until(inputs.shutdown)
-    .map(move |_| stream::iter(inputs.urls.clone()))
-    .flatten()
-    .map(move |url| {
-        // Building the HttpClient should not fail as it is just setting up the client with the
-        // proxy and tls settings.
-        let client = HttpClient::new(inputs.tls.clone(), &inputs.proxy)
-            .expect("Building HTTP client failed");
-        let endpoint = url.to_string();
+    let mut stream = IntervalStream::new(tokio::time::interval(inputs.interval))
+        .take_until(inputs.shutdown)
+        .map(move |_| stream::iter(inputs.urls.clone()))
+        .flatten()
+        .map(move |url| {
+            // Building the HttpClient should not fail as it is just setting up the client with the
+            // proxy and tls settings.
+            let client = HttpClient::new(inputs.tls.clone(), &inputs.proxy)
+                .expect("Building HTTP client failed");
+            let endpoint = url.to_string();
 
-        let context_builder = context_builder.clone();
-        let mut context = context_builder.build(&url);
+            let context_builder = context_builder.clone();
+            let mut context = context_builder.build(&url);
 
-        let mut builder = match http_method {
-            HttpMethod::Head => Request::head(&url),
-            HttpMethod::Get => Request::get(&url),
-            HttpMethod::Post => Request::post(&url),
-            HttpMethod::Put => Request::put(&url),
-            HttpMethod::Patch => Request::patch(&url),
-            HttpMethod::Delete => Request::delete(&url),
-        };
+            let mut builder = match http_method {
+                HttpMethod::Head => Request::head(&url),
+                HttpMethod::Get => Request::get(&url),
+                HttpMethod::Post => Request::post(&url),
+                HttpMethod::Put => Request::put(&url),
+                HttpMethod::Patch => Request::patch(&url),
+                HttpMethod::Delete => Request::delete(&url),
+            };
 
-        // add user specified headers
-        for (header, values) in &inputs.headers {
-            for value in values {
-                builder = builder.header(header, value);
+            // add user specified headers
+            for (header, values) in &inputs.headers {
+                for value in values {
+                    builder = builder.header(header, value);
+                }
             }
-        }
 
-        // set ACCEPT header if not user specified
-        if !inputs.headers.contains_key(http::header::ACCEPT.as_str()) {
-            builder = builder.header(http::header::ACCEPT, &inputs.content_type);
-        }
+            // set ACCEPT header if not user specified
+            if !inputs.headers.contains_key(http::header::ACCEPT.as_str()) {
+                builder = builder.header(http::header::ACCEPT, &inputs.content_type);
+            }
 
-        // building an empty request should be infallible
-        let mut request = builder.body(Body::empty()).expect("error creating request");
+            // building an empty request should be infallible
+            let mut request = builder.body(Body::empty()).expect("error creating request");
 
-        if let Some(auth) = &inputs.auth {
-            auth.apply(&mut request);
-        }
+            if let Some(auth) = &inputs.auth {
+                auth.apply(&mut request);
+            }
 
-        let start = Instant::now();
-        client
-            .send(request)
-            .map_err(Error::from)
-            .and_then(|response| async move {
-                let (header, body) = response.into_parts();
-                let body = hyper::body::to_bytes(body).await?;
-                emit!(EndpointBytesReceived {
-                    byte_size: body.len(),
-                    protocol: "http",
-                    endpoint: endpoint.as_str(),
-                });
-                Ok((header, body))
-            })
-            .into_stream()
-            .filter_map(move |response| {
-                ready(match response {
-                    Ok((header, body)) if header.status == hyper::StatusCode::OK => {
-                        emit!(RequestCompleted {
-                            start,
-                            end: Instant::now()
-                        });
-                        context.on_response(&url, &header, &body).map(|events| {
-                            emit!(HttpClientEventsReceived {
-                                byte_size: events.size_of(),
-                                count: events.len(),
+            let start = Instant::now();
+            client
+                .send(request)
+                .map_err(Error::from)
+                .and_then(|response| async move {
+                    let (header, body) = response.into_parts();
+                    let body = hyper::body::to_bytes(body).await?;
+                    emit!(EndpointBytesReceived {
+                        byte_size: body.len(),
+                        protocol: "http",
+                        endpoint: endpoint.as_str(),
+                    });
+                    Ok((header, body))
+                })
+                .into_stream()
+                .filter_map(move |response| {
+                    ready(match response {
+                        Ok((header, body)) if header.status == hyper::StatusCode::OK => {
+                            emit!(RequestCompleted {
+                                start,
+                                end: Instant::now()
+                            });
+                            context.on_response(&url, &header, &body).map(|mut events| {
+                                let byte_size = if events.is_empty() {
+                                    // We need to explicitly set the byte size
+                                    // to 0 since
+                                    // `estimated_json_encoded_size_of` returns
+                                    // at least 1 for an empty collection. For
+                                    // the purposes of the
+                                    // HttpClientEventsReceived event, we should
+                                    // emit 0 when there aren't any usable
+                                    // metrics.
+                                    0
+                                } else {
+                                    events.estimated_json_encoded_size_of()
+                                };
+
+                                emit!(HttpClientEventsReceived {
+                                    byte_size,
+                                    count: events.len(),
+                                    url: url.to_string()
+                                });
+
+                                // We'll enrich after receiving the events so
+                                // that the byte sizes are accurate.
+                                context.enrich_events(&mut events);
+
+                                stream::iter(events)
+                            })
+                        }
+                        Ok((header, _)) => {
+                            context.on_http_response_error(&url, &header);
+                            emit!(HttpClientHttpResponseError {
+                                code: header.status,
+                                url: url.to_string(),
+                            });
+                            None
+                        }
+                        Err(error) => {
+                            emit!(HttpClientHttpError {
+                                error,
                                 url: url.to_string()
                             });
-                            stream::iter(events)
-                        })
-                    }
-                    Ok((header, _)) => {
-                        context.on_http_response_error(&url, &header);
-                        emit!(HttpClientHttpResponseError {
-                            code: header.status,
-                            url: url.to_string(),
-                        });
-                        None
-                    }
-                    Err(error) => {
-                        emit!(HttpClientHttpError {
-                            error,
-                            url: url.to_string()
-                        });
-                        None
-                    }
+                            None
+                        }
+                    })
                 })
-            })
-            .flatten()
-    })
-    .flatten()
-    .boxed();
+                .flatten()
+        })
+        .flatten()
+        .boxed();
 
     match out.send_event_stream(&mut stream).await {
         Ok(()) => {

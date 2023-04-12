@@ -20,7 +20,7 @@ pub use self::split::*;
 /// Batching mostly means that we will aggregate away timestamp information, and apply metric-specific compression to
 /// improve the performance of the pipeline. In particular, only the latest in a series of metrics are output, and
 /// incremental metrics are summed into the output buffer. Any conversion of metrics is handled by the normalization
-/// type `N: MetricNormalize`. Further, distribution metrics have their their samples compressed with
+/// type `N: MetricNormalize`. Further, distribution metrics have their samples compressed with
 /// `compress_distribution` below.
 ///
 /// Note: This has been deprecated, please do not use when creating new Sinks.

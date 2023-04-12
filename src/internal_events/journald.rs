@@ -60,7 +60,7 @@ pub struct JournaldReadError {
 impl InternalEvent for JournaldReadError {
     fn emit(self) {
         error!(
-            message = "Cound not read from journald.",
+            message = "Could not read from journald.",
             error = %self.error,
             error_type = error_type::READER_FAILED,
             stage = error_stage::PROCESSING,

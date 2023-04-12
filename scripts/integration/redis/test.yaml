@@ -1,0 +1,10 @@
+features:
+- redis-integration-tests
+
+test_filter: "::redis::"
+
+env:
+  REDIS_URL: redis://redis:6379/0
+
+matrix:
+  version: [6-alpine]

@@ -1,0 +1,11 @@
+features:
+- mongodb_metrics-integration-tests
+
+test_filter: '::mongodb_metrics::'
+
+env:
+  PRIMARY_MONGODB_ADDRESS: mongodb://root:toor@mongodb-primary
+  SECONDARY_MONGODB_ADDRESS: mongodb://root:toor@mongodb-secondary
+
+matrix:
+  version: [4.2.10]

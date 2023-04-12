@@ -1,11 +1,13 @@
 use std::{collections::BTreeMap, fmt::Debug};
 
+use lookup::lookup_v2::TargetPath;
 use serde::{Deserialize, Serialize};
 use vector_buffers::EventCount;
 use vector_common::EventDataEq;
 
 use super::{
-    BatchNotifier, EventFinalizer, EventFinalizers, EventMetadata, Finalizable, LogEvent, Value,
+    BatchNotifier, EstimatedJsonEncodedSizeOf, EventFinalizer, EventFinalizers, EventMetadata,
+    Finalizable, LogEvent, Value,
 };
 use crate::ByteSizeOf;
 
@@ -66,8 +68,9 @@ impl TraceEvent {
         self.0.as_map().expect("inner value must be a map")
     }
 
-    pub fn get(&self, key: impl AsRef<str>) -> Option<&Value> {
-        self.0.get(key.as_ref())
+    #[allow(clippy::needless_pass_by_value)] // TargetPath is always a reference
+    pub fn get<'a>(&self, key: impl TargetPath<'a>) -> Option<&Value> {
+        self.0.get(key)
     }
 
     pub fn get_mut(&mut self, key: impl AsRef<str>) -> Option<&mut Value> {
@@ -84,10 +87,6 @@ impl TraceEvent {
         value: impl Into<Value> + Debug,
     ) -> Option<Value> {
         self.0.insert(key.as_ref(), value.into())
-    }
-
-    pub fn estimated_json_encoded_size_of(&self) -> usize {
-        self.0.estimated_json_encoded_size_of()
     }
 }
 
@@ -106,6 +105,12 @@ impl From<BTreeMap<String, Value>> for TraceEvent {
 impl ByteSizeOf for TraceEvent {
     fn allocated_bytes(&self) -> usize {
         self.0.allocated_bytes()
+    }
+}
+
+impl EstimatedJsonEncodedSizeOf for TraceEvent {
+    fn estimated_json_encoded_size_of(&self) -> usize {
+        self.0.estimated_json_encoded_size_of()
     }
 }
 

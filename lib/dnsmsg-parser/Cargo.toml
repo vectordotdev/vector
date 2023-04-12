@@ -7,7 +7,7 @@ publish = false
 license = "MIT"
 
 [dependencies]
-data-encoding = "2.2"
+data-encoding = "2.3"
 thiserror = "1.0"
 trust-dns-proto = { version = "0.22", features = ["dnssec"] }
 

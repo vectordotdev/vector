@@ -37,7 +37,7 @@ releases: {
 
 		commits?: [#Commit, ...#Commit]
 		changelog:  [#ChangeLogEntry, ...#ChangeLogEntry] | *[]
-		whats_next: #Any
+		whats_next: #Any | *[]
 	}
 
 	{[Version=string]: #Release & {version: Version}}

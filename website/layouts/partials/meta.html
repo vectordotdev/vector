@@ -42,4 +42,9 @@
 <meta name="keywords" content="{{ delimit . "," }}">
 {{ end }}
 
+{{/*  facebook domain verification  */}}
+{{ if .IsHome }}
+<meta name="facebook-domain-verification" content="tlh9a8wkkmmawf51fhpt6bwsnrn3wz" />
+{{ end }}
+
 <link rel="manifest" href="/manifest.json">

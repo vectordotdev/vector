@@ -1,7 +1,7 @@
-//! The Datadog Logs [`VectorSink`]
+//! The Datadog Logs [`vector_core::sink::VectorSink`]
 //!
-//! This module contains the [`VectorSink`] instance that is responsible for
-//! taking a stream of [`Event`] instances and getting them flung out to the
+//! This module contains the [`vector_core::sink::VectorSink`] instance that is responsible for
+//! taking a stream of [`vector_core::event::Event`] instances and getting them flung out to the
 //! Datadog Log API. The log API is relatively generous in terms of its
 //! constraints, except that:
 //!

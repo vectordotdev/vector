@@ -26,7 +26,7 @@ pub struct AmqpSinkConfig {
     /// Template used to generate a routing key which corresponds to a queue binding.
     pub(crate) routing_key: Option<Template>,
 
-    /// Connection options for the `amqp` sink.
+    #[serde(flatten)]
     pub(crate) connection: AmqpConfig,
 
     #[configurable(derived)]
@@ -46,7 +46,7 @@ impl Default for AmqpSinkConfig {
         Self {
             exchange: Template::try_from("vector").unwrap(),
             routing_key: None,
-            encoding: TextSerializerConfig::new().into(),
+            encoding: TextSerializerConfig::default().into(),
             connection: AmqpConfig::default(),
             acknowledgements: AcknowledgementsConfig::default(),
         }
@@ -56,7 +56,7 @@ impl Default for AmqpSinkConfig {
 impl GenerateConfig for AmqpSinkConfig {
     fn generate_config() -> toml::Value {
         toml::from_str(
-            r#"connection.connection_string = "amqp://localhost:5672/%2f"
+            r#"connection_string = "amqp://localhost:5672/%2f"
             routing_key = "user_id"
             exchange = "test"
             encoding.codec = "json""#,

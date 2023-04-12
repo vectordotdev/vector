@@ -27,8 +27,9 @@ license-files = [
 
 [advisories]
 ignore = [
-    # Potential segfault in localtime_r invocations
-    # We resolved this by patching chrono to use a version that doesn't depend on `time` v0.1
-    # https://github.com/vectordotdev/vector/issues/9679
-    "RUSTSEC-2020-0159",
+    # The NATS official Rust clients are vulnerable to MitM when using TLS
+    #
+    # Will be resolved when we switch to `async_nats` crate
+    # https://github.com/vectordotdev/vector/pull/15533
+    "RUSTSEC-2023-0029",
 ]

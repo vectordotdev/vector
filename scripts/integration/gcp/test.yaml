@@ -1,0 +1,10 @@
+features:
+- gcp-integration-tests
+
+test_filter: '::gcp::'
+
+env:
+  EMULATOR_ADDRESS: http://gcloud-pubsub:8681
+
+matrix:
+  version: [latest]

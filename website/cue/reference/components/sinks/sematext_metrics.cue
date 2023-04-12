@@ -9,11 +9,12 @@ components: sinks: sematext_metrics: {
 		development:   "beta"
 		service_providers: ["Sematext"]
 		egress_method: "batch"
-		stateful:      false
+		stateful:      true
 	}
 
 	features: {
 		acknowledgements: true
+		auto_generated:   true
 		healthcheck: enabled: true
 		send: {
 			batch: {
@@ -47,16 +48,7 @@ components: sinks: sematext_metrics: {
 		notices: []
 	}
 
-	configuration: sinks._sematext.configuration & {
-		default_namespace: {
-			description: "Used as a namespace for metrics that don't have it."
-			required:    true
-			warnings: []
-			type: string: {
-				examples: ["service"]
-			}
-		}
-	}
+	configuration: base.components.sinks.sematext_metrics.configuration
 
 	input: {
 		logs: false

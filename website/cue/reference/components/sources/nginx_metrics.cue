@@ -49,44 +49,7 @@ components: sources: nginx_metrics: {
 		platform_name: null
 	}
 
-	configuration: {
-		endpoints: {
-			description: "HTTP/HTTPS endpoint to Nginx server with enabled `ngx_http_stub_status_module` module."
-			required:    true
-			type: array: {
-				items: type: string: {
-					examples: ["http://localhost:8000/basic_status"]
-				}
-			}
-		}
-		scrape_interval_secs: {
-			description: "The interval between scrapes."
-			common:      true
-			required:    false
-			type: uint: {
-				default: 15
-				unit:    "seconds"
-			}
-		}
-		namespace: {
-			description: "The namespace of metrics. Disabled if empty."
-			common:      false
-			required:    false
-			type: string: {
-				default: "nginx"
-			}
-		}
-		tls: configuration._tls_connect & {_args: {
-			can_verify_certificate: true
-			can_verify_hostname:    true
-			enabled_default:        false
-			enabled_by_scheme:      true
-		}}
-		auth: configuration._http_auth & {_args: {
-			password_example: "${HTTP_PASSWORD}"
-			username_example: "${HTTP_USERNAME}"
-		}}
-	}
+	configuration: base.components.sources.nginx_metrics.configuration
 
 	how_it_works: {
 		mod_status: {

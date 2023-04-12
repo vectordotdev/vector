@@ -1,7 +1,7 @@
 package metadata
 
 components: sinks: clickhouse: {
-	title: "Clickhouse"
+	title: "ClickHouse"
 
 	classes: {
 		commonly_used: true
@@ -13,6 +13,7 @@ components: sinks: clickhouse: {
 	}
 
 	features: {
+		auto_generated:   true
 		acknowledgements: true
 		healthcheck: enabled: true
 		send: {
@@ -50,7 +51,7 @@ components: sinks: clickhouse: {
 				interface: {
 					socket: {
 						api: {
-							title: "Clickhouse HTTP API"
+							title: "ClickHouse HTTP API"
 							url:   urls.clickhouse_http
 						}
 						direction: "outgoing"
@@ -65,48 +66,14 @@ components: sinks: clickhouse: {
 	support: {
 		requirements: [
 			"""
-				[Clickhouse](\(urls.clickhouse)) version `>= 1.1.54378` is required.
+				[ClickHouse](\(urls.clickhouse)) version `>= 1.1.54378` is required.
 				""",
 		]
 		warnings: []
 		notices: []
 	}
 
-	configuration: {
-		auth: configuration._http_auth & {_args: {
-			password_example: "${CLICKHOUSE_PASSWORD}"
-			username_example: "${CLICKHOUSE_USERNAME}"
-		}}
-		database: {
-			common:      true
-			description: "The database that contains the table that data will be inserted into."
-			required:    false
-			type: string: {
-				default: null
-				examples: ["mydatabase"]
-			}
-		}
-		endpoint: {
-			description: "The endpoint of the [Clickhouse](\(urls.clickhouse)) server."
-			required:    true
-			type: string: {
-				examples: ["http://localhost:8123"]
-			}
-		}
-		table: {
-			description: "The table that data will be inserted into."
-			required:    true
-			type: string: {
-				examples: ["mytable"]
-			}
-		}
-		skip_unknown_fields: {
-			common:      true
-			description: "Sets `input_format_skip_unknown_fields`, allowing Clickhouse to discard fields not present in the table schema."
-			required:    false
-			type: bool: default: false
-		}
-	}
+	configuration: base.components.sinks.clickhouse.configuration
 
 	input: {
 		logs:    true

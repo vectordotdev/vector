@@ -13,6 +13,7 @@ components: sinks: amqp: {
 	}
 
 	features: {
+		auto_generated:   true
 		acknowledgements: false
 		buffer: enabled:      true
 		healthcheck: enabled: true
@@ -49,39 +50,7 @@ components: sinks: amqp: {
 
 	support: components._amqp.support
 
-	configuration: {
-		connection: {
-			description: "Connection options for the AMQP sink."
-			required:    true
-			warnings: []
-			type: object: {
-				examples: []
-				options: {
-					connection_string: components._amqp.configuration.connection_string
-				}
-			}
-		}
-		exchange: {
-			description: "The exchange to publish messages to."
-			required:    true
-			warnings: []
-			type: string: {
-				examples: ["message_exchange"]
-				syntax: "literal"
-			}
-		}
-		routing_key: {
-			common:      false
-			description: "Template use to generate a routing key which corresponds to a queue binding."
-			required:    false
-			warnings: []
-			type: string: {
-				examples: ["{{ field_a }}-{{ field_b }}"]
-				syntax:  "literal"
-				default: null
-			}
-		}
-	}
+	configuration: base.components.sinks.amqp.configuration
 
 	input: {
 		logs:    true

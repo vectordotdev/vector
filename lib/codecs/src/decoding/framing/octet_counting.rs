@@ -42,7 +42,7 @@ pub struct OctetCountingDecoderOptions {
 }
 
 /// Codec using the `Octet Counting` format as specified in
-/// https://tools.ietf.org/html/rfc6587#section-3.4.1.
+/// <https://tools.ietf.org/html/rfc6587#section-3.4.1>.
 #[derive(Clone, Debug)]
 pub struct OctetCountingDecoder {
     other: LinesCodec,

@@ -349,22 +349,22 @@ impl CertificateMetadata {
     pub fn subject(&self) -> String {
         let mut components = Vec::<String>::with_capacity(6);
         if let Some(cn) = &self.common_name {
-            components.push(format!("CN={}", cn));
+            components.push(format!("CN={cn}"));
         }
         if let Some(ou) = &self.organizational_unit_name {
-            components.push(format!("OU={}", ou));
+            components.push(format!("OU={ou}"));
         }
         if let Some(o) = &self.organization_name {
-            components.push(format!("O={}", o));
+            components.push(format!("O={o}"));
         }
         if let Some(l) = &self.locality_name {
-            components.push(format!("L={}", l));
+            components.push(format!("L={l}"));
         }
         if let Some(st) = &self.state_or_province_name {
-            components.push(format!("ST={}", st));
+            components.push(format!("ST={st}"));
         }
         if let Some(c) = &self.country_name {
-            components.push(format!("C={}", c));
+            components.push(format!("C={c}"));
         }
         components.join(",")
     }
@@ -376,7 +376,7 @@ impl From<X509> for CertificateMetadata {
         for entry in cert.subject_name().entries() {
             let data_string = match entry.data().as_utf8() {
                 Ok(data) => data.to_string(),
-                Err(_) => "".to_string(),
+                Err(_) => String::new(),
             };
             subject_metadata.insert(entry.object().to_string(), data_string);
         }

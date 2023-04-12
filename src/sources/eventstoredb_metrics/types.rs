@@ -19,7 +19,7 @@ impl Stats {
         let now = chrono::Utc::now();
         let namespace = namespace.unwrap_or_else(|| "eventstoredb".to_string());
 
-        tags.insert("id".to_string(), self.proc.id.to_string());
+        tags.replace("id".to_string(), self.proc.id.to_string());
 
         result.push(
             Metric::new(
@@ -100,7 +100,7 @@ impl Stats {
         );
 
         if let Some(drive) = self.sys.drive.as_ref() {
-            tags.insert("path".to_string(), drive.path.clone());
+            tags.replace("path".to_string(), drive.path.clone());
 
             result.push(
                 Metric::new(

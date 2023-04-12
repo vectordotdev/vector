@@ -20,7 +20,9 @@ type = "prometheus_exporter"
 inputs = ["internal_metrics"]
 address = "0.0.0.0:9090"
 
-[sinks.blackhole]
-type = "blackhole"
-print_interval_secs = 0
+[sinks.socket_sink]
+type = "socket"
 inputs = ["file"]
+mode = "tcp"
+address = "127.0.0.1:15400"
+encoding.codec = "json"

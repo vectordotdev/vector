@@ -12,7 +12,6 @@ use vector_core::{
 use super::TemplateRenderingError;
 use crate::{
     codecs::{Encoder, Transformer},
-    config::LogSchema,
     event::{Event, Value},
     internal_events::AwsCloudwatchLogsMessageSizeError,
     sinks::{aws_cloudwatch_logs::CloudwatchKey, util::metadata::RequestMetadataBuilder},
@@ -48,7 +47,6 @@ impl MetaDescriptive for CloudwatchRequest {
 pub struct CloudwatchRequestBuilder {
     pub group_template: Template,
     pub stream_template: Template,
-    pub log_schema: LogSchema,
     pub transformer: Transformer,
     pub encoder: Encoder<()>,
 }
@@ -80,7 +78,7 @@ impl CloudwatchRequestBuilder {
         };
         let key = CloudwatchKey { group, stream };
 
-        let timestamp = match event.as_mut_log().remove(self.log_schema.timestamp_key()) {
+        let timestamp = match event.as_mut_log().remove_timestamp() {
             Some(Value::Timestamp(ts)) => ts.timestamp_millis(),
             _ => Utc::now().timestamp_millis(),
         };
@@ -122,7 +120,7 @@ impl CloudwatchRequestBuilder {
 /// ByteSizeOf is being abused to represent the encoded size of a request for the Partitioned Batcher
 ///
 /// The maximum batch size is 1,048,576 bytes. This size is calculated as the sum of all event messages in UTF-8, plus 26 bytes for each log event.
-/// source: https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_PutLogEvents.html
+/// source: <https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_PutLogEvents.html>
 impl ByteSizeOf for CloudwatchRequest {
     fn size_of(&self) -> usize {
         self.message.len() + 26
@@ -135,24 +133,30 @@ impl ByteSizeOf for CloudwatchRequest {
 
 #[cfg(test)]
 mod tests {
+    use chrono::Utc;
+    use vector_core::config::log_schema;
     use vector_core::event::LogEvent;
 
-    use super::*;
-    use crate::config::log_schema;
+    use super::CloudwatchRequestBuilder;
 
     #[test]
     fn test() {
         let mut request_builder = CloudwatchRequestBuilder {
             group_template: "group".try_into().unwrap(),
             stream_template: "stream".try_into().unwrap(),
-            log_schema: log_schema().clone(),
             transformer: Default::default(),
             encoder: Default::default(),
         };
         let timestamp = Utc::now();
         let message = "event message";
         let mut event = LogEvent::from(message);
-        event.insert(log_schema().timestamp_key(), timestamp);
+        event.insert(
+            (
+                lookup::PathPrefix::Event,
+                log_schema().timestamp_key().unwrap(),
+            ),
+            timestamp,
+        );
 
         let request = request_builder.build(event.into()).unwrap();
         assert_eq!(request.timestamp, timestamp.timestamp_millis());

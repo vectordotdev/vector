@@ -1,0 +1,12 @@
+features:
+- influxdb-integration-tests
+
+test_filter: '::influxdb::'
+
+env:
+  INFLUXDB_V1_HTTPS_ADDRESS: https://influxdb-v1-tls:8086
+  INFLUXDB_V1_HTTP_ADDRESS: http://influxdb-v1:8086
+  INFLUXDB_V2_ADDRESS: http://influxdb-v2:8086
+
+matrix:
+  version: ['1.8']

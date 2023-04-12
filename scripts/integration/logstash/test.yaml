@@ -1,0 +1,11 @@
+features:
+- logstash-integration-tests
+
+test_filter: '::logstash::integration_tests::'
+
+env:
+  HEARTBEAT_ADDRESS: 0.0.0.0:8080
+  LOGSTASH_ADDRESS: 0.0.0.0:8081
+
+matrix:
+  version: [7.12.1]

@@ -7,6 +7,7 @@ use std::{
 use crate::ByteSizeOf;
 pub use ::value::Value;
 pub use array::{into_event_stream, EventArray, EventContainer, LogArray, MetricArray, TraceArray};
+pub use estimated_json_encoded_size_of::EstimatedJsonEncodedSizeOf;
 pub use finalization::{
     BatchNotifier, BatchStatus, BatchStatusReceiver, EventFinalizer, EventFinalizers, EventStatus,
     Finalizable,
@@ -25,6 +26,7 @@ pub use vrl_target::{TargetEvents, VrlTarget};
 pub mod array;
 pub mod discriminant;
 pub mod error;
+mod estimated_json_encoded_size_of;
 mod log_event;
 #[cfg(feature = "lua")]
 pub mod lua;
@@ -62,6 +64,16 @@ impl ByteSizeOf for Event {
     }
 }
 
+impl EstimatedJsonEncodedSizeOf for Event {
+    fn estimated_json_encoded_size_of(&self) -> usize {
+        match self {
+            Event::Log(log_event) => log_event.estimated_json_encoded_size_of(),
+            Event::Metric(metric_event) => metric_event.estimated_json_encoded_size_of(),
+            Event::Trace(trace_event) => trace_event.estimated_json_encoded_size_of(),
+        }
+    }
+}
+
 impl EventCount for Event {
     fn event_count(&self) -> usize {
         1
@@ -87,7 +99,7 @@ impl Event {
     pub fn as_log(&self) -> &LogEvent {
         match self {
             Event::Log(log) => log,
-            _ => panic!("Failed type coercion, {:?} is not a log event", self),
+            _ => panic!("Failed type coercion, {self:?} is not a log event"),
         }
     }
 
@@ -99,7 +111,7 @@ impl Event {
     pub fn as_mut_log(&mut self) -> &mut LogEvent {
         match self {
             Event::Log(log) => log,
-            _ => panic!("Failed type coercion, {:?} is not a log event", self),
+            _ => panic!("Failed type coercion, {self:?} is not a log event"),
         }
     }
 
@@ -111,7 +123,7 @@ impl Event {
     pub fn into_log(self) -> LogEvent {
         match self {
             Event::Log(log) => log,
-            _ => panic!("Failed type coercion, {:?} is not a log event", self),
+            _ => panic!("Failed type coercion, {self:?} is not a log event"),
         }
     }
 
@@ -143,7 +155,7 @@ impl Event {
     pub fn as_metric(&self) -> &Metric {
         match self {
             Event::Metric(metric) => metric,
-            _ => panic!("Failed type coercion, {:?} is not a metric", self),
+            _ => panic!("Failed type coercion, {self:?} is not a metric"),
         }
     }
 
@@ -155,7 +167,7 @@ impl Event {
     pub fn as_mut_metric(&mut self) -> &mut Metric {
         match self {
             Event::Metric(metric) => metric,
-            _ => panic!("Failed type coercion, {:?} is not a metric", self),
+            _ => panic!("Failed type coercion, {self:?} is not a metric"),
         }
     }
 
@@ -167,7 +179,7 @@ impl Event {
     pub fn into_metric(self) -> Metric {
         match self {
             Event::Metric(metric) => metric,
-            _ => panic!("Failed type coercion, {:?} is not a metric", self),
+            _ => panic!("Failed type coercion, {self:?} is not a metric"),
         }
     }
 
@@ -189,7 +201,7 @@ impl Event {
     pub fn as_trace(&self) -> &TraceEvent {
         match self {
             Event::Trace(trace) => trace,
-            _ => panic!("Failed type coercion, {:?} is not a trace event", self),
+            _ => panic!("Failed type coercion, {self:?} is not a trace event"),
         }
     }
 
@@ -201,7 +213,7 @@ impl Event {
     pub fn as_mut_trace(&mut self) -> &mut TraceEvent {
         match self {
             Event::Trace(trace) => trace,
-            _ => panic!("Failed type coercion, {:?} is not a trace event", self),
+            _ => panic!("Failed type coercion, {self:?} is not a trace event"),
         }
     }
 
@@ -213,7 +225,7 @@ impl Event {
     pub fn into_trace(self) -> TraceEvent {
         match self {
             Event::Trace(trace) => trace,
-            _ => panic!("Failed type coercion, {:?} is not a trace event", self),
+            _ => panic!("Failed type coercion, {self:?} is not a trace event"),
         }
     }
 

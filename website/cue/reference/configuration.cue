@@ -228,11 +228,9 @@ configuration: {
 					type: object: options: {
 						path: {
 							description: """
-								Path to the [MaxMind GeoIP2](\(urls.maxmind_geoip2)) or [GeoLite2 binary city
-								database](\(urls.maxmind_geolite2_city)) file (`GeoLite2-City.mmdb`). Other
-								databases, such as the country database, are not supported.
+								Path to the database file.
 								"""
-							required:    true
+							required: true
 							type: string: {
 								examples: ["/path/to/GeoLite2-City.mmdb", "/path/to/GeoLite2-ISP.mmdb"]
 							}
@@ -411,7 +409,7 @@ configuration: {
 								"""
 							required: true
 							type: array: {
-								examples: [["/path/to/get-secret", "-s"], ["/path/to/vault-wrappper"]]
+								examples: [["/path/to/get-secret", "-s"], ["/path/to/vault-wrapper"]]
 								items: type: string: {}
 							}
 						}
@@ -557,7 +555,7 @@ configuration: {
 				the `SECRET[<backend_name>.<secret_key>]` notation to interpolate the secret. Interpolation will happen immediately after
 				environment variables interpolation. While Vector supports multiple commands to retrieve secrets, a
 				secret backend cannot use the secret interpolation feature for its own configuration. Currently the only supported
-				kind of secret backend is the the `exec` one that runs an external command to retrieve secrets.
+				kind of secret backend is the `exec` one that runs an external command to retrieve secrets.
 
 				The following example shows a simple configuration with two backends defined:
 

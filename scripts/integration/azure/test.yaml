@@ -1,0 +1,12 @@
+features:
+- azure-integration-tests
+
+test_filter: ::azure_
+
+env:
+  AZURE_ADDRESS: local-azure-blob
+  HEARTBEAT_ADDRESS: 0.0.0.0:8080
+  LOGSTASH_ADDRESS: 0.0.0.0:8081
+
+matrix:
+  version: [3.14.0]

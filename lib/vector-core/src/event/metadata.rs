@@ -29,7 +29,7 @@ pub struct EventMetadata {
     #[serde(default, skip)]
     finalizers: EventFinalizers,
 
-    /// An identifier for a globaly registered schema definition which provides information about
+    /// An identifier for a globally registered schema definition which provides information about
     /// the event shape (type information, and semantic meaning of fields).
     ///
     /// TODO(Jean): must not skip serialization to track schemas across restarts.

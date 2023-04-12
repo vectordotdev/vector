@@ -22,12 +22,12 @@ use tokio_stream::wrappers::IntervalStream;
 use tokio_util::codec::FramedRead;
 use value::Kind;
 use vector_common::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
-use vector_config::{configurable_component, NamedComponent};
-use vector_core::{config::LegacyKey, ByteSizeOf};
+use vector_config::configurable_component;
+use vector_core::{config::LegacyKey, EstimatedJsonEncodedSizeOf};
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
-    config::{Output, SourceConfig, SourceContext},
+    config::{SourceConfig, SourceContext, SourceOutput},
     event::Event,
     internal_events::{
         ExecChannelClosedError, ExecCommandExecuted, ExecEventsReceived, ExecFailedError,
@@ -38,14 +38,14 @@ use crate::{
     SourceSender,
 };
 use lookup::{owned_value_path, path};
-use vector_core::config::LogNamespace;
+use vector_core::config::{log_schema, LogNamespace};
 
 pub mod sized_bytes_codec;
 
 /// Configuration for the `exec` source.
-#[configurable_component(source("exec"))]
+#[configurable_component(source("exec", "Collect output from a process running on the host."))]
 #[derive(Clone, Debug)]
-#[serde(default, deny_unknown_fields)]
+#[serde(deny_unknown_fields)]
 pub struct ExecConfig {
     #[configurable(derived)]
     pub mode: Mode,
@@ -57,6 +57,7 @@ pub struct ExecConfig {
     pub streaming: Option<StreamingConfig>,
 
     /// The command to be run, plus any arguments required.
+    #[configurable(metadata(docs::examples = "echo", docs::examples = "Hello World!"))]
     pub command: Vec<String>,
 
     /// The directory in which to run the command.
@@ -66,7 +67,7 @@ pub struct ExecConfig {
     #[serde(default = "default_include_stderr")]
     pub include_stderr: bool,
 
-    /// The maximum buffer size allowed before a log event will be generated.
+    /// The maximum buffer size allowed before a log event is generated.
     #[serde(default = "default_maximum_buffer_size")]
     pub maximum_buffer_size_bytes: usize,
 
@@ -102,7 +103,7 @@ pub enum Mode {
 pub struct ScheduledConfig {
     /// The interval, in seconds, between scheduled command runs.
     ///
-    /// If the command takes longer than `exec_interval_secs` to run, it will be killed.
+    /// If the command takes longer than `exec_interval_secs` to run, it is killed.
     #[serde(default = "default_exec_interval_secs")]
     exec_interval_secs: u64,
 }
@@ -116,7 +117,7 @@ pub struct StreamingConfig {
     #[serde(default = "default_respawn_on_exit")]
     respawn_on_exit: bool,
 
-    /// The amount of time, in seconds, that Vector will wait before rerunning a streaming command that exited.
+    /// The amount of time, in seconds, before rerunning a streaming command that exited.
     #[serde(default = "default_respawn_interval_secs")]
     respawn_interval_secs: u64,
 }
@@ -219,6 +220,7 @@ impl ExecConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "exec")]
 impl SourceConfig for ExecConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         self.validate()?;
@@ -264,7 +266,7 @@ impl SourceConfig for ExecConfig {
         }
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         let log_namespace = global_log_namespace.merge(Some(self.log_namespace.unwrap_or(false)));
 
         let schema_definition = self
@@ -273,7 +275,9 @@ impl SourceConfig for ExecConfig {
             .with_standard_vector_source_metadata()
             .with_source_metadata(
                 Self::NAME,
-                Some(LegacyKey::InsertIfEmpty(owned_value_path!("host"))),
+                Some(LegacyKey::InsertIfEmpty(owned_value_path!(
+                    log_schema().host_key()
+                ))),
                 &owned_value_path!("host"),
                 Kind::bytes().or_undefined(),
                 Some("host"),
@@ -300,7 +304,10 @@ impl SourceConfig for ExecConfig {
                 None,
             );
 
-        vec![Output::default(self.decoding.output_type()).with_schema_definition(schema_definition)]
+        vec![SourceOutput::new_logs(
+            self.decoding.output_type(),
+            schema_definition,
+        )]
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -484,7 +491,7 @@ async fn run_command(
                         emit!(ExecEventsReceived {
                             count,
                             command: config.command_line().as_str(),
-                            byte_size: events.size_of(),
+                            byte_size: events.estimated_json_encoded_size_of(),
                         });
 
                         for event in &mut events {
@@ -658,7 +665,7 @@ fn handle_event(
             log_namespace.insert_source_metadata(
                 ExecConfig::NAME,
                 log,
-                Some(LegacyKey::InsertIfEmpty(path!("host"))),
+                Some(LegacyKey::InsertIfEmpty(path!(log_schema().host_key()))),
                 path!("host"),
                 hostname.clone(),
             );
@@ -682,7 +689,7 @@ fn spawn_reader_thread<R: 'static + AsyncRead + Unpin + std::marker::Send>(
     sender: Sender<((SmallVec<[Event; 1]>, usize), &'static str)>,
 ) {
     // Start the green background thread for collecting
-    let _ = Box::pin(tokio::spawn(async move {
+    drop(tokio::spawn(async move {
         debug!("Start capturing {} command output.", origin);
 
         let mut stream = FramedRead::new(reader, decoder);
@@ -753,7 +760,12 @@ mod tests {
         assert_eq!(log[COMMAND_KEY], config.command.into());
         assert_eq!(log[log_schema().message_key()], "hello world".into());
         assert_eq!(log[log_schema().source_type_key()], "exec".into());
-        assert!(log.get(log_schema().timestamp_key()).is_some());
+        assert!(log
+            .get((
+                lookup::PathPrefix::Event,
+                log_schema().timestamp_key().unwrap()
+            ))
+            .is_some());
     }
 
     #[test]
@@ -829,7 +841,12 @@ mod tests {
         assert_eq!(log[COMMAND_KEY], config.command.into());
         assert_eq!(log[log_schema().message_key()], "hello world".into());
         assert_eq!(log[log_schema().source_type_key()], "exec".into());
-        assert!(log.get(log_schema().timestamp_key()).is_some());
+        assert!(log
+            .get((
+                lookup::PathPrefix::Event,
+                log_schema().timestamp_key().unwrap()
+            ))
+            .is_some());
     }
 
     #[test]
@@ -986,27 +1003,30 @@ mod tests {
     #[cfg(unix)]
     async fn test_run_command_linux() {
         let config = standard_scheduled_test_config();
-        let hostname = Some("Some.Machine".to_string());
-        let decoder = Default::default();
-        let shutdown = ShutdownSignal::noop();
-        let (tx, mut rx) = SourceSender::new_test();
 
-        // Wait for our task to finish, wrapping it in a timeout
-        let timeout = tokio::time::timeout(
-            time::Duration::from_secs(5),
-            run_command(
-                config.clone(),
-                hostname,
-                decoder,
-                shutdown,
-                tx,
-                LogNamespace::Legacy,
-            ),
-        );
-
-        let timeout_result = crate::test_util::components::assert_source_compliance(
+        let (mut rx, timeout_result) = crate::test_util::components::assert_source_compliance(
             &crate::test_util::components::SOURCE_TAGS,
-            timeout,
+            async {
+                let hostname = Some("Some.Machine".to_string());
+                let decoder = Default::default();
+                let shutdown = ShutdownSignal::noop();
+                let (tx, rx) = SourceSender::new_test();
+
+                // Wait for our task to finish, wrapping it in a timeout
+                let result = tokio::time::timeout(
+                    time::Duration::from_secs(5),
+                    run_command(
+                        config.clone(),
+                        hostname,
+                        decoder,
+                        shutdown,
+                        tx,
+                        LogNamespace::Legacy,
+                    ),
+                )
+                .await;
+                (rx, result)
+            },
         )
         .await;
 
@@ -1023,7 +1043,12 @@ mod tests {
             assert_eq!(log[log_schema().message_key()], "Hello World!".into());
             assert_eq!(log[log_schema().host_key()], "Some.Machine".into());
             assert!(log.get(PID_KEY).is_some());
-            assert!(log.get(log_schema().timestamp_key()).is_some());
+            assert!(log
+                .get((
+                    lookup::PathPrefix::Event,
+                    log_schema().timestamp_key().unwrap()
+                ))
+                .is_some());
 
             assert_eq!(8, log.all_fields().unwrap().count());
         } else {

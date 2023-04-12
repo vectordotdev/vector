@@ -71,8 +71,8 @@ impl DriverResponse for AmqpResponse {
         CountByteSize(1, self.byte_size)
     }
 
-    fn bytes_sent(&self) -> Option<(usize, &str)> {
-        Some((self.byte_size, "amqp_0_9_1"))
+    fn bytes_sent(&self) -> Option<usize> {
+        Some(self.byte_size)
     }
 }
 

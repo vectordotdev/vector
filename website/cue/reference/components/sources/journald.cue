@@ -14,6 +14,7 @@ components: sources: journald: {
 
 	features: {
 		acknowledgements: true
+		auto_generated:   true
 		collect: {
 			checkpoint: enabled: true
 			from: {
@@ -34,7 +35,12 @@ components: sources: journald: {
 			"x86_64-pc-windows-msv": false
 		}
 
-		requirements: []
+		requirements: [
+			"""
+				This source requires permissions to run `journalctl`. When installed from a package manager this should be
+				handled automatically, otherwise ensure the running user is part of the `systemd-journal` group.
+				""",
+		]
 		warnings: []
 		notices: []
 	}
@@ -43,122 +49,7 @@ components: sources: journald: {
 		platform_name: null
 	}
 
-	configuration: {
-		acknowledgements: configuration._source_acknowledgements
-		batch_size: {
-			common:      false
-			description: "The systemd journal is read in batches, and a checkpoint is set at the end of each batch. This option limits the size of the batch."
-			required:    false
-			type: uint: {
-				default: 16
-				unit:    null
-			}
-		}
-		current_boot_only: {
-			common:      true
-			description: "Include only entries from the current boot."
-			required:    false
-			type: bool: default: true
-		}
-		since_now: {
-			common:      true
-			description: "Include only future entries."
-			required:    false
-			type: bool: default: false
-		}
-		exclude_units: {
-			common:      true
-			description: "The list of unit names to exclude from monitoring. Unit names lacking a `\".\"` will have `\".service\"` appended to make them a valid service unit name."
-			required:    false
-			type: array: {
-				default: []
-				items: type: string: {
-					examples: ["badservice", "sysinit.target"]
-				}
-			}
-		}
-		exclude_matches: {
-			common:      true
-			description: "This list contains sets of field/value pairs that, if any are present in a journal entry, will cause the entry to be excluded from this source. If `exclude_units` is specified, it will be merged into this list."
-			required:    false
-			type: object: {
-				examples: [
-					{
-						_SYSTEMD_UNIT: ["sshd.service", "ntpd.service"]
-						_TRANSPORT: ["kernel"]
-					},
-				]
-				options: {
-					"*": {
-						common:      false
-						description: "The set of field values to match in journal entries that are to be excluded."
-						required:    false
-						type: array: {
-							default: []
-							items: type: string: {
-								examples: ["sshd.service", "ntpd.service"]
-							}
-						}
-					}
-				}
-			}
-		}
-		include_units: {
-			common:      true
-			description: "The list of unit names to monitor. If empty or not present, all units are accepted. Unit names lacking a `\".\"` will have `\".service\"` appended to make them a valid service unit name."
-			required:    false
-			type: array: {
-				default: []
-				items: type: string: {
-					examples: ["ntpd", "sysinit.target"]
-				}
-			}
-		}
-		include_matches: {
-			common:      true
-			description: "This list contains sets of field/value pairs to monitor. If empty or not present, all journal fields are accepted. If `include_units` is specified, it will be merged into this list."
-			required:    false
-			type: object: {
-				examples: [
-					{
-						_SYSTEMD_UNIT: ["sshd.service", "ntpd.service"]
-						_TRANSPORT: ["kernel"]
-					},
-				]
-				options: {
-					"*": {
-						common:      false
-						description: "The set of field values to match in journal entries that are to be included."
-						required:    false
-						type: array: {
-							default: []
-							items: type: string: {
-								examples: ["sshd.service", "ntpd.service"]
-							}
-						}
-					}
-				}
-			}
-		}
-		journalctl_path: {
-			common:      false
-			description: "The full path of the `journalctl` executable. If not set, Vector will search the path for `journalctl`."
-			required:    false
-			type: string: {
-				default: "journalctl"
-				examples: ["/usr/local/bin/journalctl"]
-			}
-		}
-		journal_directory: {
-			common:      false
-			description: "The full path of the journal directory. If not set, `journalctl` will use the default system journal paths"
-			required:    false
-			type: string: {
-				default: null
-				examples: ["/run/log/journal"]
-			}
-		}
-	}
+	configuration: base.components.sources.journald.configuration
 
 	output: logs: {
 		event: {
@@ -179,7 +70,9 @@ components: sources: journald: {
 						examples: ["journald"]
 					}
 				}
-				timestamp: fields._current_timestamp
+				timestamp: fields._current_timestamp & {
+					description: "The time at which the event appeared in the journal."
+				}
 				"*": {
 					common:      false
 					description: "Any Journald field"
@@ -237,7 +130,7 @@ components: sources: journald: {
 			title: "Communication Strategy"
 			body:  """
 				To ensure the `journald` source works across all platforms, Vector interacts
-				with the Systemd journal via the `journalctl` command. This is accomplished by
+				with the systemd journal via the `journalctl` command. This is accomplished by
 				spawning a [subprocess](\(urls.rust_subprocess)) that Vector interacts
 				with. If the `journalctl` command is not in the environment path you can
 				specify the exact location via the `journalctl_path` option. For more

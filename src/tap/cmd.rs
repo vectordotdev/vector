@@ -28,7 +28,7 @@ pub(crate) async fn cmd(opts: &super::Opts, mut signal_rx: SignalRx) -> exitcode
     // features; the config is available even if `api` is disabled.
     let mut url = opts.url.clone().unwrap_or_else(|| {
         let addr = config::api::default_address().unwrap();
-        Url::parse(&*format!("http://{}/graphql", addr))
+        Url::parse(&format!("http://{}/graphql", addr))
             .expect("Couldn't parse default API URL. Please report this.")
     });
 
@@ -67,7 +67,10 @@ pub(crate) async fn cmd(opts: &super::Opts, mut signal_rx: SignalRx) -> exitcode
             Ok(SignalTo::Shutdown | SignalTo::Quit) = signal_rx.recv() => break,
             status = run(url.clone(), opts, outputs_patterns.clone(), formatter.clone()) => {
                 if status == exitcode::UNAVAILABLE || status == exitcode::TEMPFAIL && !opts.no_reconnect {
-                    eprintln!("[tap] Connection failed. Reconnecting in {:?} seconds.", RECONNECT_DELAY / 1000);
+                    #[allow(clippy::print_stderr)]
+                    {
+                        eprintln!("[tap] Connection failed. Reconnecting in {:?} seconds.", RECONNECT_DELAY / 1000);
+                    }
                     tokio::time::sleep(Duration::from_millis(RECONNECT_DELAY)).await;
                 } else {
                     break;

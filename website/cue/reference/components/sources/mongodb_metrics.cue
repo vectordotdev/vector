@@ -51,34 +51,7 @@ components: sources: mongodb_metrics: {
 		platform_name: null
 	}
 
-	configuration: {
-		endpoints: {
-			description: "MongoDB [Connection String URI Format](\(urls.mongodb_connection_string_uri_format))"
-			required:    true
-			type: array: {
-				items: type: string: {
-					examples: ["mongodb://localhost:27017"]
-				}
-			}
-		}
-		scrape_interval_secs: {
-			description: "The interval between scrapes."
-			common:      true
-			required:    false
-			type: uint: {
-				default: 15
-				unit:    "seconds"
-			}
-		}
-		namespace: {
-			description: "The namespace of metrics. Disabled if empty."
-			common:      false
-			required:    false
-			type: string: {
-				default: "mongodb"
-			}
-		}
-	}
+	configuration: base.components.sources.mongodb_metrics.configuration
 
 	how_it_works: {
 		mod_status: {

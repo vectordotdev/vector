@@ -12,7 +12,7 @@ use tokio_stream::wrappers::UnixListenerStream;
 use tokio_util::codec::FramedRead;
 use tracing::{field, Instrument};
 use vector_common::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
-use vector_core::ByteSizeOf;
+use vector_core::EstimatedJsonEncodedSizeOf;
 
 use super::AfterReadExt;
 use crate::{
@@ -43,11 +43,17 @@ pub fn build_unix_stream_source(
     out: SourceSender,
 ) -> crate::Result<Source> {
     Ok(Box::pin(async move {
-        let listener = UnixListener::bind(&listen_path).expect("Failed to bind to listener socket");
+        let listener = UnixListener::bind(&listen_path).unwrap_or_else(|e| {
+            panic!(
+                "Failed to bind to listener socket at path: {}. Err: {}",
+                listen_path.to_string_lossy(),
+                e
+            )
+        });
         info!(message = "Listening.", path = ?listen_path, r#type = "unix");
 
         change_socket_permissions(&listen_path, socket_file_mode)
-            .expect("Failed to set socket permssions");
+            .expect("Failed to set socket permissions");
 
         let bytes_received = register!(BytesReceived::from(Protocol::UNIX));
 
@@ -105,7 +111,7 @@ pub fn build_unix_stream_source(
                             Ok((mut events, _byte_size)) => {
                                 emit!(SocketEventsReceived {
                                     mode: SocketMode::Unix,
-                                    byte_size: events.size_of(),
+                                    byte_size: events.estimated_json_encoded_size_of(),
                                     count: events.len(),
                                 });
 

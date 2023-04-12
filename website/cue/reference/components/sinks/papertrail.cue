@@ -13,6 +13,7 @@ components: sinks: papertrail: {
 	}
 
 	features: {
+		auto_generated:   true
 		acknowledgements: true
 		healthcheck: enabled: true
 		send: {
@@ -58,25 +59,7 @@ components: sinks: papertrail: {
 		notices: []
 	}
 
-	configuration: {
-		endpoint: {
-			description: "The endpoint to send logs to."
-			required:    true
-			type: string: {
-				examples: ["logs.papertrailapp.com:12345"]
-			}
-		}
-		process: {
-			description: "The value to use as the `process` in Papertrail."
-			common:      true
-			required:    false
-			type: string: {
-				default: "vector"
-				examples: ["{{ process }}", "my-process"]
-				syntax: "template"
-			}
-		}
-	}
+	configuration: base.components.sinks.papertrail.configuration
 
 	input: {
 		logs:    true

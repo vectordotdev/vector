@@ -96,7 +96,7 @@ pub struct SocketEventsSent {
 impl InternalEvent for SocketEventsSent {
     fn emit(self) {
         trace!(message = "Events sent.", count = %self.count, byte_size = %self.byte_size);
-        counter!("component_sent_events_total", self.count as u64, "mode" => self.mode.as_str());
+        counter!("component_sent_events_total", self.count, "mode" => self.mode.as_str());
         counter!("component_sent_event_bytes_total", self.byte_size as u64, "mode" => self.mode.as_str());
     }
 }

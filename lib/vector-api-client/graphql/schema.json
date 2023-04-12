@@ -182,6 +182,49 @@
         },
         {
           "kind": "OBJECT",
+          "name": "ComponentAllocatedBytes",
+          "description": null,
+          "fields": [
+            {
+              "name": "componentId",
+              "description": "Component id",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "metric",
+              "description": "Allocated bytes metric",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "AllocatedBytes",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "OBJECT",
           "name": "ComponentErrorsTotal",
           "description": null,
           "fields": [
@@ -918,6 +961,45 @@
             {
               "name": "writesCompletedTotal",
               "description": "Total writes completed",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Float",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "OBJECT",
+          "name": "AllocatedBytes",
+          "description": null,
+          "fields": [
+            {
+              "name": "timestamp",
+              "description": "Metric timestamp",
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "DateTime",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "allocatedBytes",
+              "description": "Total allocated bytes count",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -5626,6 +5708,45 @@
                   "kind": "OBJECT",
                   "name": "ErrorsTotal",
                   "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "componentAllocatedBytes",
+              "description": "Component allocated bytes metrics over `interval`.",
+              "args": [
+                {
+                  "name": "interval",
+                  "description": null,
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "Int",
+                      "ofType": null
+                    }
+                  },
+                  "defaultValue": "1000"
+                }
+              ],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "OBJECT",
+                      "name": "ComponentAllocatedBytes",
+                      "ofType": null
+                    }
+                  }
                 }
               },
               "isDeprecated": false,

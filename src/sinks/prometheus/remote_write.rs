@@ -57,6 +57,9 @@ enum Errors {
 #[serde(deny_unknown_fields)]
 pub struct RemoteWriteConfig {
     /// The endpoint to send data to.
+    ///
+    /// The endpoint should include the scheme and the path to write to.
+    #[configurable(metadata(docs::examples = "https://localhost:8087/api/v1/write"))]
     pub endpoint: String,
 
     /// The default namespace for any metrics sent.
@@ -67,18 +70,22 @@ pub struct RemoteWriteConfig {
     /// It should follow the Prometheus [naming conventions][prom_naming_docs].
     ///
     /// [prom_naming_docs]: https://prometheus.io/docs/practices/naming/#metric-names
+    #[configurable(metadata(docs::examples = "service"))]
+    #[configurable(metadata(docs::advanced))]
     pub default_namespace: Option<String>,
 
     /// Default buckets to use for aggregating [distribution][dist_metric_docs] metrics into histograms.
     ///
     /// [dist_metric_docs]: https://vector.dev/docs/about/under-the-hood/architecture/data-model/metric/#distribution
     #[serde(default = "super::default_histogram_buckets")]
+    #[configurable(metadata(docs::advanced))]
     pub buckets: Vec<f64>,
 
     /// Quantiles to use for aggregating [distribution][dist_metric_docs] metrics into a summary.
     ///
     /// [dist_metric_docs]: https://vector.dev/docs/about/under-the-hood/architecture/data-model/metric/#distribution
     #[serde(default = "super::default_summary_quantiles")]
+    #[configurable(metadata(docs::advanced))]
     pub quantiles: Vec<f64>,
 
     #[configurable(derived)]
@@ -91,10 +98,12 @@ pub struct RemoteWriteConfig {
 
     /// The tenant ID to send.
     ///
-    /// If set, a header named `X-Scope-OrgID` will be added to outgoing requests with the value of this setting.
+    /// If set, a header named `X-Scope-OrgID` is added to outgoing requests with the value of this setting.
     ///
     /// This may be used by Cortex or other remote services to identify the tenant making the request.
     #[serde(default)]
+    #[configurable(metadata(docs::examples = "my-domain"))]
+    #[configurable(metadata(docs::advanced))]
     pub tenant_id: Option<Template>,
 
     #[configurable(derived)]
@@ -104,6 +113,7 @@ pub struct RemoteWriteConfig {
     pub auth: Option<PrometheusRemoteWriteAuth>,
 
     #[configurable(derived)]
+    #[configurable(metadata(docs::advanced))]
     pub aws: Option<RegionOrEndpoint>,
 
     #[configurable(derived)]
@@ -625,8 +635,8 @@ mod integration_tests {
         tls::{self, TlsConfig},
     };
 
-    const HTTP_URL: &str = "http://localhost:8086";
-    const HTTPS_URL: &str = "https://localhost:8087";
+    const HTTP_URL: &str = "http://influxdb-v1:8086";
+    const HTTPS_URL: &str = "https://influxdb-v1-tls:8087";
 
     #[tokio::test]
     async fn insert_metrics_over_http() {

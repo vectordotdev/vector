@@ -24,7 +24,7 @@ pub trait ByteSizeOf {
     ///
     /// This function returns the total number of bytes that have been allocated
     /// interior to this type instance. It does not include any bytes that are
-    /// captured by [`std::mem::size_of`] except for any bytes that are iterior
+    /// captured by [`std::mem::size_of`] except for any bytes that are interior
     /// to this type. For instance, `BTreeMap<String, Vec<u8>>` would count all
     /// bytes for `String` and `Vec<u8>` instances but not the exterior bytes
     /// for `BTreeMap`.

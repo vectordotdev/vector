@@ -98,14 +98,21 @@ pub fn register<E: RegisterInternalEvent>(event: E) -> E::Handle {
 
 pub type Registered<T> = <T as RegisterInternalEvent>::Handle;
 
+// Wrapper types used to hold data emitted by registered events
+
 #[derive(Clone, Copy)]
 pub struct ByteSize(pub usize);
 
 #[derive(Clone, Copy)]
 pub struct Count(pub usize);
 
+/// Holds the tuple `(count_of_events, size_of_events_in_bytes)`.
 #[derive(Clone, Copy)]
 pub struct CountByteSize(pub usize, pub usize);
+
+// Wrapper types used to hold parameters for registering events
+
+pub struct Output(pub Option<SharedString>);
 
 pub struct Protocol(pub SharedString);
 
@@ -122,4 +129,92 @@ impl From<&'static str> for Protocol {
     fn from(s: &'static str) -> Self {
         Self(SharedString::const_str(s))
     }
+}
+
+/// Macro to take care of some of the repetitive boilerplate in implementing a registered event. See
+/// the other events in this module for examples of how to use this.
+///
+/// ## Usage
+///
+/// ```ignore
+/// registered_event!(
+///     Event {
+///         event_field: &'static str,
+///     } => {
+///         handle_field: Counter = register_counter!("name", "tag" => self.event_field),
+///     }
+///     fn emit(&self, data: DataType) {
+///         self.handle_field.increment(data.0);
+///     }
+/// );
+///
+/// let handle = register!(Event { event_field: "message" });
+///
+/// handle.emit(DataType(123));
+/// ```
+///
+/// In this example, the first set of fields describes the data required to register the event. This
+/// is what would be used by the `register!` macro. For example, `register!(Event { event_field:
+/// "something" })`. The second set of fields describes the data required to store the registered
+/// handle, namely the `Counter`s and `Gauge`s that record the handle from `metrics` as well as any
+/// associated data for emitting traces or debug messages, followed by an initialization assignment
+/// value. The `emit` function is the code required to update the metrics and generate any log
+/// messages.
+#[macro_export]
+macro_rules! registered_event {
+    // A registered event struct with no fields (zero-sized type).
+    ($event:ident => $($tail:tt)*) => {
+        #[derive(Debug)]
+        pub struct $event;
+
+        $crate::registered_event!(=> $event $($tail)*);
+    };
+
+    // A normal registered event struct.
+    ($event:ident { $( $field:ident: $type:ty, )* } => $($tail:tt)*) => {
+        #[derive(Debug)]
+        pub struct $event {
+            $( pub $field: $type, )*
+        }
+
+        $crate::registered_event!(=> $event $($tail)*);
+    };
+
+    // Sub-matcher to implement the common bits in the above two cases.
+    (
+        => $event:ident {
+            $( $field:ident: $type:ty = $value:expr, )*
+        }
+
+        fn emit(&$slf:ident, $data_name:ident: $data:ident)
+            $emit_body:block
+    ) => {
+        paste::paste!{
+            #[derive(Clone)]
+            pub struct [<$event Handle>] {
+                $( $field: $type, )*
+            }
+
+            impl $crate::internal_event::RegisterInternalEvent for $event {
+                type Handle = [<$event Handle>];
+
+                fn name(&self) -> Option<&'static str> {
+                    Some(stringify!($event))
+                }
+
+                fn register($slf) -> Self::Handle {
+                    Self::Handle {
+                        $( $field: $value, )*
+                    }
+                }
+            }
+
+            impl $crate::internal_event::InternalEventHandle for [<$event Handle>] {
+                type Data = $data;
+
+                fn emit(&$slf, $data_name: $data)
+                    $emit_body
+            }
+        }
+    };
 }

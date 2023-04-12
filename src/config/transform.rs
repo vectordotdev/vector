@@ -1,19 +1,50 @@
+use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 
 use async_trait::async_trait;
-use enum_dispatch::enum_dispatch;
-use indexmap::IndexMap;
+use dyn_clone::DynClone;
 use serde::Serialize;
-use vector_config::{configurable_component, Configurable, NamedComponent};
+use vector_config::{
+    configurable_component,
+    schema::{SchemaGenerator, SchemaObject},
+    Configurable, GenerateError, Metadata, NamedComponent,
+};
+use vector_config_common::attributes::CustomAttribute;
 use vector_core::{
-    config::{GlobalOptions, Input, Output},
+    config::{GlobalOptions, Input, LogNamespace, TransformOutput},
     schema,
     transform::Transform,
 };
 
-use crate::transforms::Transforms;
-
+use super::schema::Options as SchemaOptions;
+use super::OutputId;
 use super::{id::Inputs, ComponentKey};
+
+pub type BoxedTransform = Box<dyn TransformConfig>;
+
+impl Configurable for BoxedTransform {
+    fn referenceable_name() -> Option<&'static str> {
+        Some("vector::transforms::Transforms")
+    }
+
+    fn metadata() -> Metadata {
+        let mut metadata = Metadata::default();
+        metadata.set_description("Configurable transforms in Vector.");
+        metadata.add_custom_attribute(CustomAttribute::kv("docs::enum_tagging", "internal"));
+        metadata.add_custom_attribute(CustomAttribute::kv("docs::enum_tag_field", "type"));
+        metadata
+    }
+
+    fn generate_schema(gen: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
+        vector_config::component::TransformDescription::generate_schemas(gen)
+    }
+}
+
+impl<T: TransformConfig + 'static> From<T> for BoxedTransform {
+    fn from(that: T) -> Self {
+        Box::new(that)
+    }
+}
 
 /// Fully resolved transform component.
 #[configurable_component]
@@ -21,14 +52,14 @@ use super::{id::Inputs, ComponentKey};
 #[derive(Clone, Debug)]
 pub struct TransformOuter<T>
 where
-    T: Configurable + Serialize,
+    T: Configurable + Serialize + 'static,
 {
     #[configurable(derived)]
     pub inputs: Inputs<T>,
 
     #[configurable(metadata(docs::hidden))]
     #[serde(flatten)]
-    pub inner: Transforms,
+    pub inner: BoxedTransform,
 }
 
 impl<T> TransformOuter<T>
@@ -38,12 +69,11 @@ where
     pub(crate) fn new<I, IT>(inputs: I, inner: IT) -> Self
     where
         I: IntoIterator<Item = T>,
-        IT: Into<Transforms>,
+        IT: Into<BoxedTransform>,
     {
-        TransformOuter {
-            inputs: Inputs::from_iter(inputs),
-            inner: inner.into(),
-        }
+        let inputs = Inputs::from_iter(inputs);
+        let inner = inner.into();
+        TransformOuter { inputs, inner }
     }
 
     pub(super) fn map_inputs<U>(self, f: impl Fn(&T) -> U) -> TransformOuter<U>
@@ -66,57 +96,6 @@ where
     }
 }
 
-impl TransformOuter<String> {
-    pub(crate) fn expand(
-        mut self,
-        key: ComponentKey,
-        parent_types: &HashSet<&'static str>,
-        transforms: &mut IndexMap<ComponentKey, TransformOuter<String>>,
-        expansions: &mut IndexMap<ComponentKey, Vec<ComponentKey>>,
-    ) -> Result<(), String> {
-        if !self.inner.nestable(parent_types) {
-            return Err(format!(
-                "the component {} cannot be nested in {:?}",
-                self.inner.get_component_name(),
-                parent_types
-            ));
-        }
-
-        let expansion = self
-            .inner
-            .expand(&key, &self.inputs)
-            .map_err(|err| format!("failed to expand transform '{}': {}", key, err))?;
-
-        let mut ptypes = parent_types.clone();
-        ptypes.insert(self.inner.get_component_name());
-
-        if let Some(inner_topology) = expansion {
-            let mut children = Vec::new();
-
-            expansions.insert(
-                key,
-                inner_topology
-                    .outputs()
-                    .into_iter()
-                    .map(ComponentKey::from)
-                    .collect(),
-            );
-
-            for (inner_name, inner_transform) in inner_topology.inner {
-                let child = TransformOuter {
-                    inputs: inner_transform.inputs,
-                    inner: inner_transform.inner,
-                };
-                children.push(inner_name.clone());
-                transforms.insert(inner_name, child);
-            }
-        } else {
-            transforms.insert(key, self);
-        }
-        Ok(())
-    }
-}
-
 #[derive(Debug)]
 pub struct TransformContext {
     // This is optional because currently there are a lot of places we use `TransformContext` that
@@ -130,9 +109,9 @@ pub struct TransformContext {
 
     /// Tracks the schema IDs assigned to schemas exposed by the transform.
     ///
-    /// Given a transform can expose multiple [`Output`] channels, the ID is tied to the identifier of
-    /// that `Output`.
-    pub schema_definitions: HashMap<Option<String>, schema::Definition>,
+    /// Given a transform can expose multiple [`TransformOutput`] channels, the ID is tied to the identifier of
+    /// that `TransformOutput`.
+    pub schema_definitions: HashMap<Option<String>, HashMap<OutputId, schema::Definition>>,
 
     /// The schema definition created by merging all inputs of the transform.
     ///
@@ -140,6 +119,8 @@ pub struct TransformContext {
     /// information, such as the `remap` transform, which passes this information along to the VRL
     /// compiler such that type coercion becomes less of a need for operators writing VRL programs.
     pub merged_schema_definition: schema::Definition,
+
+    pub schema: SchemaOptions,
 }
 
 impl Default for TransformContext {
@@ -148,8 +129,9 @@ impl Default for TransformContext {
             key: Default::default(),
             globals: Default::default(),
             enrichment_tables: Default::default(),
-            schema_definitions: HashMap::from([(None, schema::Definition::any())]),
+            schema_definitions: HashMap::from([(None, HashMap::new())]),
             merged_schema_definition: schema::Definition::any(),
+            schema: SchemaOptions::default(),
         }
     }
 }
@@ -166,18 +148,32 @@ impl TransformContext {
     }
 
     #[cfg(any(test, feature = "test"))]
-    pub fn new_test(schema_definitions: HashMap<Option<String>, schema::Definition>) -> Self {
+    pub fn new_test(
+        schema_definitions: HashMap<Option<String>, HashMap<OutputId, schema::Definition>>,
+    ) -> Self {
         Self {
             schema_definitions,
             ..Default::default()
         }
     }
+
+    /// Gets the log namespacing to use. The passed in value is from the transform itself
+    /// and will override any global default if it's set.
+    ///
+    /// This should only be used for transforms that don't originate from a log (eg: `metric_to_log`)
+    /// Most transforms will keep the log_namespace value that already exists on the event.
+    pub fn log_namespace(&self, namespace: Option<bool>) -> LogNamespace {
+        namespace
+            .or(self.schema.log_namespace)
+            .unwrap_or(false)
+            .into()
+    }
 }
 
 /// Generalized interface for describing and building transform components.
 #[async_trait]
-#[enum_dispatch]
-pub trait TransformConfig: NamedComponent + core::fmt::Debug + Send + Sync {
+#[typetag::serde(tag = "type")]
+pub trait TransformConfig: DynClone + NamedComponent + core::fmt::Debug + Send + Sync {
     /// Builds the transform with the given context.
     ///
     /// If the transform is built successfully, `Ok(...)` is returned containing the transform.
@@ -195,7 +191,11 @@ pub trait TransformConfig: NamedComponent + core::fmt::Debug + Send + Sync {
     ///
     /// The provided `merged_definition` can be used by transforms to understand the expected shape
     /// of events flowing through the transform.
-    fn outputs(&self, merged_definition: &schema::Definition) -> Vec<Output>;
+    fn outputs(
+        &self,
+        input_definitions: &[(OutputId, schema::Definition)],
+        global_log_namespace: LogNamespace,
+    ) -> Vec<TransformOutput>;
 
     /// Validates that the configuration of the transform is valid.
     ///
@@ -233,51 +233,6 @@ pub trait TransformConfig: NamedComponent + core::fmt::Debug + Send + Sync {
     fn nestable(&self, _parents: &HashSet<&'static str>) -> bool {
         true
     }
-
-    /// Attempts to expand the transform into a subtopology of transforms.
-    ///
-    /// This mechanism allows a transform to act like a macro pattern, where only one transform is
-    /// configured from the user's perspective, but multiple transforms can be created, and
-    /// connected, and returned back to the topology in a seamless way.
-    ///
-    /// If the transform supports expansion, `Ok(Some(...))` is returned containing the inner
-    /// topology that represents an organized subtopology consisting of the set of expanded
-    /// transforms. Otherwise, if expansion is not supported for this transform, `Ok(None)` is returned.
-    ///
-    /// # Errors
-    ///
-    /// If there is an error during expansion, an error variant explaining the issue is returned.
-    fn expand(
-        &mut self,
-        _name: &ComponentKey,
-        _inputs: &[String],
-    ) -> crate::Result<Option<InnerTopology>> {
-        Ok(None)
-    }
 }
 
-#[derive(Debug, Serialize)]
-pub struct InnerTopologyTransform {
-    pub inputs: Inputs<String>,
-    pub inner: Transforms,
-}
-
-#[derive(Debug, Default)]
-pub struct InnerTopology {
-    pub inner: IndexMap<ComponentKey, InnerTopologyTransform>,
-    pub outputs: Vec<(ComponentKey, Vec<Output>)>,
-}
-
-impl InnerTopology {
-    pub fn outputs(&self) -> Vec<String> {
-        self.outputs
-            .iter()
-            .flat_map(|(name, outputs)| {
-                outputs.iter().map(|output| match output.port {
-                    Some(ref port) => name.port(port),
-                    None => name.id().to_string(),
-                })
-            })
-            .collect()
-    }
-}
+dyn_clone::clone_trait_object!(TransformConfig);

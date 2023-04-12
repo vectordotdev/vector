@@ -48,9 +48,10 @@ use tokio::{
 };
 use tower::{Service, ServiceBuilder};
 use tracing::Instrument;
-use vector_common::internal_event::CallError;
+use vector_common::internal_event::{
+    CallError, CountByteSize, EventsSent, InternalEventHandle as _, Output,
+};
 // === StreamSink<Event> ===
-use vector_core::internal_event::EventsSent;
 pub use vector_core::sink::StreamSink;
 
 use super::{
@@ -159,7 +160,7 @@ where
 /// in flight batches.
 ///
 /// This type is similar to `BatchSink` with the added benefit that it has
-/// more fine grained partitioning ability. It will hold many different batches
+/// more fine-grained partitioning ability. It will hold many different batches
 /// of events and contain linger timeouts for each.
 ///
 /// Note that, unlike `BatchSink`, the `batch` given to this sink is
@@ -174,7 +175,7 @@ where
 /// in all requests will not be acked until r1 has completed.
 ///
 /// # Ordering
-/// Per partition ordering can be achived by holding onto future of a request
+/// Per partition ordering can be achieved by holding onto future of a request
 /// until it finishes. Until then all further requests in that partition are
 /// delayed.
 ///
@@ -439,20 +440,16 @@ where
             message = "Submitting service request.",
             in_flight_requests = self.in_flight.len()
         );
+        let events_sent = register!(EventsSent::from(Output(None)));
         self.service
             .call(items)
             .err_into()
             .map(move |result| {
                 let status = result_status(&result);
                 finalizers.update_status(status);
-
                 match status {
                     EventStatus::Delivered => {
-                        emit!(EventsSent {
-                            count,
-                            byte_size,
-                            output: None
-                        });
+                        events_sent.emit(CountByteSize(count, byte_size));
                         // TODO: Emit a BytesSent event here too
                     }
                     EventStatus::Rejected => {
@@ -1086,10 +1083,7 @@ mod tests {
         let mut sink = PartitionBatchSink::new(svc, VecBuffer::new(batch_settings.size), TIMEOUT);
         sink.ordered();
 
-        let input = (0..20)
-            .into_iter()
-            .map(|i| (0, i))
-            .chain((0..20).into_iter().map(|i| (1, i)));
+        let input = (0..20).map(|i| (0, i)).chain((0..20).map(|i| (1, i)));
         sink.sink_map_err(drop)
             .send_all(&mut stream::iter(input).map(|item| Ok(EncodedEvent::new(item, 0))))
             .await
@@ -1102,10 +1096,10 @@ mod tests {
         assert_eq!(
             &*output,
             &vec![
-                (0..10).into_iter().map(|i| (1, i)).collect::<Vec<_>>(),
-                (10..20).into_iter().map(|i| (1, i)).collect(),
-                (0..10).into_iter().map(|i| (0, i)).collect(),
-                (10..20).into_iter().map(|i| (0, i)).collect(),
+                (0..10).map(|i| (1, i)).collect::<Vec<_>>(),
+                (10..20).map(|i| (1, i)).collect(),
+                (0..10).map(|i| (0, i)).collect(),
+                (10..20).map(|i| (0, i)).collect(),
             ]
         );
     }

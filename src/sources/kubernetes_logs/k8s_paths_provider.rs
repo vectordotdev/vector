@@ -79,9 +79,9 @@ impl PathsProvider for K8sPathsProvider {
 /// the effective config hashsum, see the `extract_static_pod_config_hashsum`
 /// function that does this.
 ///
-/// See https://github.com/vectordotdev/vector/issues/6001
-/// See https://github.com/kubernetes/kubernetes/blob/ef3337a443b402756c9f0bfb1f844b1b45ce289d/pkg/kubelet/pod/pod_manager.go#L30-L44
-/// See https://github.com/kubernetes/kubernetes/blob/cea1d4e20b4a7886d8ff65f34c6d4f95efcb4742/pkg/kubelet/pod/mirror_client.go#L80-L81
+/// See <https://github.com/vectordotdev/vector/issues/6001>
+/// See <https://github.com/kubernetes/kubernetes/blob/ef3337a443b402756c9f0bfb1f844b1b45ce289d/pkg/kubelet/pod/pod_manager.go#L30-L44>
+/// See <https://github.com/kubernetes/kubernetes/blob/cea1d4e20b4a7886d8ff65f34c6d4f95efcb4742/pkg/kubelet/pod/mirror_client.go#L80-L81>
 fn extract_pod_logs_directory(pod: &Pod) -> Option<PathBuf> {
     let metadata = &pod.metadata;
     let namespace = metadata.namespace.as_ref()?;

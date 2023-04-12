@@ -57,7 +57,7 @@ where
         let builder_limit = NonZeroUsize::new(64);
         let request_builder = self.request_builder;
 
-        let sink = input
+        input
             .batched_partitioned(partitioner, settings)
             .filter_map(|(key, batch)| async move {
                 // We don't need to emit an error here if the event is dropped since this will occur if the template
@@ -75,9 +75,10 @@ where
                     Ok(req) => Some(req),
                 }
             })
-            .into_driver(self.service);
-
-        sink.run().await
+            .into_driver(self.service)
+            .protocol("https")
+            .run()
+            .await
     }
 }
 

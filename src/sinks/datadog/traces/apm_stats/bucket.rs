@@ -61,8 +61,8 @@ fn encode_sketch(agent_sketch: &AgentDDSketch) -> Vec<u8> {
         interpolation: ddsketch_full::index_mapping::Interpolation::None as i32,
     };
 
-    // zeroes depicts the number of values that falled around zero based on the sketch local accuracy
-    // positives and negatives stores are repectively storing positive and negative values using the
+    // zeroes depicts the number of values that fell around zero based on the sketch local accuracy
+    // positives and negatives stores are respectively storing positive and negative values using the
     // exact same mechanism.
     let (positives, negatives, zeroes) = convert_stores(agent_sketch);
     let positives_store = ddsketch_full::Store {

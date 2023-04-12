@@ -1,2 +1,0 @@
-# result: { "array": {  }, "array_unknown_infinite": { "any": true } }
-type_def(push!(.x, 5))

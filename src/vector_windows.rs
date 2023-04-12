@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 use std::{ffi::OsString, time::Duration};
 
 use windows_service::{
@@ -365,9 +366,9 @@ pub fn run() -> Result<()> {
 }
 
 fn run_service(_arguments: Vec<OsString>) -> Result<()> {
-    match Application::prepare() {
-        Ok(app) => {
-            let signal_tx = app.config.signal_handler.clone_tx();
+    match Application::prepare_start() {
+        Ok((runtime, app)) => {
+            let signal_tx = app.signals.handler.clone_tx();
             let event_handler = move |control_event| -> ServiceControlHandlerResult {
                 match control_event {
                     // Notifies a service to report its current status information to the service
@@ -397,7 +398,7 @@ fn run_service(_arguments: Vec<OsString>) -> Result<()> {
                 process_id: None,
             })?;
 
-            app.run();
+            runtime.block_on(app.run());
 
             // Tell the system that service has stopped.
             status_handle.set_service_status(ServiceStatus {

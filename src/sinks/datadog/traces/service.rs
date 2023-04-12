@@ -93,7 +93,6 @@ pub struct TraceApiResponse {
     batch_size: usize,
     byte_size: usize,
     uncompressed_size: usize,
-    protocol: String,
 }
 
 impl DriverResponse for TraceApiResponse {
@@ -111,8 +110,8 @@ impl DriverResponse for TraceApiResponse {
         CountByteSize(self.batch_size, self.byte_size)
     }
 
-    fn bytes_sent(&self) -> Option<(usize, &str)> {
-        Some((self.uncompressed_size, &self.protocol))
+    fn bytes_sent(&self) -> Option<usize> {
+        Some(self.uncompressed_size)
     }
 }
 
@@ -145,7 +144,6 @@ impl Service<TraceApiRequest> for TraceApiService {
     // Emission of Error internal event is handled upstream by the caller
     fn call(&mut self, request: TraceApiRequest) -> Self::Future {
         let client = self.client.clone();
-        let protocol = request.uri.scheme_str().unwrap_or("http").to_string();
 
         Box::pin(async move {
             let byte_size = request.get_metadata().events_byte_size();
@@ -165,7 +163,6 @@ impl Service<TraceApiRequest> for TraceApiService {
                 body,
                 batch_size,
                 byte_size,
-                protocol,
                 uncompressed_size,
             })
         })

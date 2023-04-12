@@ -33,9 +33,11 @@ pub struct KinesisSinkBaseConfig {
     /// The [stream name][stream_name] of the target Kinesis Firehose delivery stream.
     ///
     /// [stream_name]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html
+    #[configurable(metadata(docs::examples = "my-stream"))]
     pub stream_name: String,
 
     #[serde(flatten)]
+    #[configurable(derived)]
     pub region: RegionOrEndpoint,
 
     #[configurable(derived)]

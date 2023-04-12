@@ -51,7 +51,7 @@ where
         let default_namespace = self.default_namespace.as_deref();
 
         let builder_limit = NonZeroUsize::new(64);
-        let sink = input
+        input
             .map(|event| (event.size_of(), event.into_metric()))
             .filter_map(move |(event_byte_size, metric)| {
                 future::ready(process_metric(
@@ -75,9 +75,9 @@ where
                     Ok(req) => Some(req),
                 }
             })
-            .into_driver(self.service);
-
-        sink.run().await
+            .into_driver(self.service)
+            .run()
+            .await
     }
 }
 

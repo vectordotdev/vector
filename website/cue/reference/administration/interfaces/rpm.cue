@@ -4,7 +4,7 @@ administration: interfaces: rpm: {
 	title:       "RPM"
 	description: """
 		[RPM Package Manager](\(urls.rpm)) is a free and open-source package
-		management system for installing and managing software on Fedra, CentOS,
+		management system for installing and managing software on Fedora, CentOS,
 		OpenSUSE, OpenMandriva, Red Hat Enterprise Linux, and other
 		related Linux-based systems.
 		"""

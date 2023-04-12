@@ -36,7 +36,7 @@ releases: "0.21.2": {
 			scopes: ["aws provider"]
 			description: """
 				AWS components now allow configuration of the load timeout for credentials (`load_timeout_secs`). In
-				0.21.0, the default load timeout was inadvertantely changed to the new default timeout of the new Rust
+				0.21.0, the default load timeout was inadvertently changed to the new default timeout of the new Rust
 				AWS SDK which dropped it from 30 seconds to 5 seconds. This new configuration option allows
 				configuring it a higher value when necessary.
 				"""

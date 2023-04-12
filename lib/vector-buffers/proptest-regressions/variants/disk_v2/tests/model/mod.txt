@@ -2,7 +2,7 @@
 # automatically read and these particular cases re-run before any
 # novel cases are generated.
 #
-# It is recommended to check this file in to source control so that
+# It is recommended to check this file into source control so that
 # everyone who runs the test benefits from these saved cases.
 cc e1f1bcb464e296542db2d646fff85a885f7ac491ccaca7a9ff1a339bafe4b954 # shrinks to config = DiskBufferConfig { data_dir: "/tmp/vector-disk-v2-model", max_buffer_size: 64, max_data_file_size: 2, max_record_size: 34498, write_buffer_size: 61440, flush_interval: 10s, filesystem: TestFilesystem { inner: Mutex { data: FilesystemInner { files: {} } } } }, actions = [WriteRecord(Record { id: 0, size: 0, event_count: 1 }), WriteRecord(Record { id: 0, size: 0, event_count: 1 }), ReadRecord, ReadRecord]
 cc 5d5d1f2f1087a02c0f76ed9506cba3e40d0c300340b0a33e719d8bb3e0bc8b1e # shrinks to config = DiskBufferConfig { data_dir: "/tmp/vector-disk-v2-model", max_buffer_size: 64, max_data_file_size: 2, max_record_size: 62345, write_buffer_size: 61440, flush_interval: 10s, filesystem: TestFilesystem { inner: Mutex { data: FilesystemInner { files: {} } } } }, actions = [WriteRecord(Record { id: 0, size: 61385, event_count: 1 }), ReadRecord, AcknowledgeRead(1), ReadRecord]
