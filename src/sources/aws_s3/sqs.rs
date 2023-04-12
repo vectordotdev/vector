@@ -18,7 +18,6 @@ use codecs::decoding::format::Deserializer as CodecDeserializer;
 use codecs::decoding::Framer;
 use codecs::{decoding, decoding::FramingError, StreamDecodingError};
 use futures::{FutureExt, Stream, StreamExt, TryFutureExt};
-use nom::Parser;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_with::serde_as;
