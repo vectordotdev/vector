@@ -406,7 +406,8 @@ mod test {
         }
     }
 
-    const BUFFER_CONFIG_NO_MATCH_ERR: &str = "data did not match any variant of untagged enum BufferConfig";
+    const BUFFER_CONFIG_NO_MATCH_ERR: &str =
+        "data did not match any variant of untagged enum BufferConfig";
 
     #[test]
     fn parse_empty() {
