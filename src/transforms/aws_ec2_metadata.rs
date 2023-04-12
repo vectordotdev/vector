@@ -270,7 +270,7 @@ impl TransformConfig for Ec2Metadata {
 
         let schema_definition = input_definitions
             .iter()
-            .map(|(_output, definition)| {
+            .map(|(output, definition)| {
                 let mut schema_definition = definition.clone();
 
                 for path in paths {
@@ -278,7 +278,7 @@ impl TransformConfig for Ec2Metadata {
                         schema_definition.with_field(path, Kind::bytes().or_undefined(), None);
                 }
 
-                schema_definition
+                (output.clone(), schema_definition)
             })
             .collect();
 
