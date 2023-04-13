@@ -27,12 +27,12 @@ use super::scoped_visit::{
 /// with advanced subschema validation, such as `oneOf` or `allOf`, as `unevaluatedProperties`
 /// cannot simply be applied to any and all schemas indiscriminately.
 #[derive(Debug, Default)]
-pub struct DisallowedUnevaluatedPropertiesVisitor {
+pub struct DisallowUnevaluatedPropertiesVisitor {
     scope_stack: SchemaScopeStack,
     eligible_to_flatten: HashMap<String, HashSet<SchemaReference>>,
 }
 
-impl DisallowedUnevaluatedPropertiesVisitor {
+impl DisallowUnevaluatedPropertiesVisitor {
     pub fn from_settings(_: &SchemaSettings) -> Self {
         Self {
             scope_stack: SchemaScopeStack::default(),
@@ -41,7 +41,7 @@ impl DisallowedUnevaluatedPropertiesVisitor {
     }
 }
 
-impl Visitor for DisallowedUnevaluatedPropertiesVisitor {
+impl Visitor for DisallowUnevaluatedPropertiesVisitor {
     fn visit_root_schema(&mut self, root: &mut RootSchema) {
         let eligible_to_flatten = build_closed_schema_flatten_eligibility_mappings(root);
 
@@ -132,7 +132,7 @@ impl Visitor for DisallowedUnevaluatedPropertiesVisitor {
     }
 }
 
-impl ScopedVisitor for DisallowedUnevaluatedPropertiesVisitor {
+impl ScopedVisitor for DisallowUnevaluatedPropertiesVisitor {
     fn push_schema_scope<S: Into<SchemaReference>>(&mut self, scope: S) {
         self.scope_stack.push(scope.into());
     }
@@ -545,7 +545,7 @@ mod tests {
 
     use crate::schema::visitors::test::{as_schema, assert_schemas_eq};
 
-    use super::DisallowedUnevaluatedPropertiesVisitor;
+    use super::DisallowUnevaluatedPropertiesVisitor;
 
     #[test]
     fn basic_object_schema() {
@@ -556,7 +556,7 @@ mod tests {
             }
         }));
 
-        let mut visitor = DisallowedUnevaluatedPropertiesVisitor::default();
+        let mut visitor = DisallowUnevaluatedPropertiesVisitor::default();
         visitor.visit_root_schema(&mut actual_schema);
 
         let expected_schema = as_schema(json!({
@@ -584,7 +584,7 @@ mod tests {
             }
         }));
 
-        let mut visitor = DisallowedUnevaluatedPropertiesVisitor::default();
+        let mut visitor = DisallowUnevaluatedPropertiesVisitor::default();
         visitor.visit_root_schema(&mut actual_schema);
 
         let expected_schema = as_schema(json!({
@@ -621,7 +621,7 @@ mod tests {
             }]
         }));
 
-        let mut visitor = DisallowedUnevaluatedPropertiesVisitor::default();
+        let mut visitor = DisallowUnevaluatedPropertiesVisitor::default();
         visitor.visit_root_schema(&mut actual_schema);
 
         let expected_schema = as_schema(json!({
@@ -662,7 +662,7 @@ mod tests {
             }]
         }));
 
-        let mut visitor = DisallowedUnevaluatedPropertiesVisitor::default();
+        let mut visitor = DisallowUnevaluatedPropertiesVisitor::default();
         visitor.visit_root_schema(&mut actual_schema);
 
         let expected_schema = as_schema(json!({
@@ -703,7 +703,7 @@ mod tests {
             }]
         }));
 
-        let mut visitor = DisallowedUnevaluatedPropertiesVisitor::default();
+        let mut visitor = DisallowUnevaluatedPropertiesVisitor::default();
         visitor.visit_root_schema(&mut actual_schema);
 
         let expected_schema = as_schema(json!({
@@ -737,7 +737,7 @@ mod tests {
         }));
         let expected_schema = actual_schema.clone();
 
-        let mut visitor = DisallowedUnevaluatedPropertiesVisitor::default();
+        let mut visitor = DisallowUnevaluatedPropertiesVisitor::default();
         visitor.visit_root_schema(&mut actual_schema);
 
         assert_schemas_eq(expected_schema, actual_schema);
@@ -753,7 +753,7 @@ mod tests {
             "additionalProperties": false
         }));
 
-        let mut visitor = DisallowedUnevaluatedPropertiesVisitor::default();
+        let mut visitor = DisallowUnevaluatedPropertiesVisitor::default();
         visitor.visit_root_schema(&mut actual_schema);
 
         let expected_schema = as_schema(json!({
@@ -799,7 +799,7 @@ mod tests {
             }
         }));
 
-        let mut visitor = DisallowedUnevaluatedPropertiesVisitor::default();
+        let mut visitor = DisallowUnevaluatedPropertiesVisitor::default();
         visitor.visit_root_schema(&mut actual_schema);
 
         let expected_schema = as_schema(json!({
@@ -854,7 +854,7 @@ mod tests {
             }
         }));
 
-        let mut visitor = DisallowedUnevaluatedPropertiesVisitor::default();
+        let mut visitor = DisallowUnevaluatedPropertiesVisitor::default();
         visitor.visit_root_schema(&mut actual_schema);
 
         let expected_schema = as_schema(json!({
@@ -920,7 +920,7 @@ mod tests {
             }
         }));
 
-        let mut visitor = DisallowedUnevaluatedPropertiesVisitor::default();
+        let mut visitor = DisallowUnevaluatedPropertiesVisitor::default();
         visitor.visit_root_schema(&mut actual_schema);
 
         // Expectations:

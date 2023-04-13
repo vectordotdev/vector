@@ -12,7 +12,7 @@ use crate::{
     num::ConfigurableNumber, Configurable, ConfigurableRef, GenerateError, Metadata, ToValue,
 };
 
-use super::visitors::{DisallowedUnevaluatedPropertiesVisitor, InlineSingleUseReferencesVisitor};
+use super::visitors::{DisallowUnevaluatedPropertiesVisitor, InlineSingleUseReferencesVisitor};
 
 /// Applies metadata to the given schema.
 ///
@@ -482,7 +482,7 @@ pub fn generate_internal_tagged_variant_schema(
 pub fn default_schema_settings() -> SchemaSettings {
     SchemaSettings::new()
         .with_visitor(InlineSingleUseReferencesVisitor::from_settings)
-        .with_visitor(DisallowedUnevaluatedPropertiesVisitor::from_settings)
+        .with_visitor(DisallowUnevaluatedPropertiesVisitor::from_settings)
 }
 
 pub fn generate_root_schema<T>() -> Result<RootSchema, GenerateError>
