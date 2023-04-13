@@ -816,8 +816,10 @@ impl Source {
         });
         let events = events.flat_map(move |event| {
             // TODO Where we gonna get the output Id from here?
-            let mut buf =
-                OutputBuffer::with_capacity(vector_core::config::OutputId::from("huh"), 1);
+            let mut buf = OutputBuffer::with_capacity(
+                Arc::new(vector_core::config::OutputId::from("huh")),
+                1,
+            );
             parser.transform(&mut buf, event);
             futures::stream::iter(buf.into_events())
         });

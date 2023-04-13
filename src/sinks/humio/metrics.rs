@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use async_trait::async_trait;
 use codecs::JsonSerializerConfig;
 use futures::StreamExt;
@@ -210,7 +212,7 @@ impl StreamSink<EventArray> for HumioMetricsSink {
             .run(input.map(move |events| {
                 // TODO - we need to get the source from somewhere???
                 let mut buf = OutputBuffer::with_capacity(
-                    vector_core::config::OutputId::from("huh"),
+                    Arc::new(vector_core::config::OutputId::from("huh")),
                     events.len(),
                 );
                 for event in events.into_events() {

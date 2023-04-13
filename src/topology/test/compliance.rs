@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use tokio::sync::oneshot::{channel, Receiver};
 use vector_core::{
     config::OutputId,
@@ -57,7 +59,7 @@ async fn test_function_transform_single_event() {
         assert_eq!(events.len(), 1);
 
         let event = events.remove(0);
-        *original_event.metadata_mut().source_mut() = Some(OutputId::from("transform"));
+        *original_event.metadata_mut().source_mut() = Some(Arc::new(OutputId::from("transform")));
 
         assert_eq!(original_event, event);
     })
@@ -78,7 +80,7 @@ async fn test_sync_transform_single_event() {
         assert_eq!(events.len(), 1);
 
         let event = events.remove(0);
-        *original_event.metadata_mut().source_mut() = Some(OutputId::from("transform"));
+        *original_event.metadata_mut().source_mut() = Some(Arc::new(OutputId::from("transform")));
         assert_eq!(original_event, event);
     })
     .await;
@@ -98,7 +100,7 @@ async fn test_task_transform_single_event() {
 
         let event = events.remove(0);
 
-        *original_event.metadata_mut().source_mut() = Some(OutputId::from("transform"));
+        *original_event.metadata_mut().source_mut() = Some(Arc::new(OutputId::from("transform")));
         assert_eq!(original_event, event);
     })
     .await;

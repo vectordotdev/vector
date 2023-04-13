@@ -29,7 +29,7 @@ pub struct EventMetadata {
     #[serde(default, skip)]
     finalizers: EventFinalizers,
 
-    source: Option<OutputId>,
+    source: Option<Arc<OutputId>>,
 
     /// An identifier for a globally registered schema definition which provides information about
     /// the event shape (type information, and semantic meaning of fields).
@@ -63,12 +63,12 @@ impl EventMetadata {
     }
 
     /// Returns a mutable reference to the metadata source.
-    pub fn source(&self) -> &Option<OutputId> {
+    pub fn source(&self) -> &Option<Arc<OutputId>> {
         &self.source
     }
 
     /// Returns a mutable reference to the metadata source.
-    pub fn source_mut(&mut self) -> &mut Option<OutputId> {
+    pub fn source_mut(&mut self) -> &mut Option<Arc<OutputId>> {
         &mut self.source
     }
 

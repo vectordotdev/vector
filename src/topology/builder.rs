@@ -246,16 +246,16 @@ impl<'a> Builder<'a> {
                 let mut rx = builder.add_source_output(output.clone());
 
                 let (mut fanout, control) = Fanout::new();
-                let o = OutputId {
+                let source = Arc::new(OutputId {
                     component: key.clone(),
                     port: output.port.clone(),
-                };
+                });
 
                 let pump = async move {
                     debug!("Source pump starting.");
 
                     while let Some(mut array) = rx.next().await {
-                        array.set_output_id(&o);
+                        array.set_output_id(Arc::clone(&source));
                         fanout.send(array).await.map_err(|e| {
                             debug!("Source pump finished with an error.");
                             TaskError::wrapped(e)
@@ -925,11 +925,11 @@ fn build_task_transform(
             ))
         });
     let events_sent = register!(EventsSent::from(internal_event::Output(None)));
-    let k = key.clone();
+    let source = Arc::new(OutputId::from(key));
     let stream = t
         .transform(Box::pin(filtered))
         .map(move |mut events: EventArray| {
-            events.set_output_id(&OutputId::from(&k));
+            events.set_output_id(Arc::clone(&source));
             events
         })
         .inspect(move |events: &EventArray| {

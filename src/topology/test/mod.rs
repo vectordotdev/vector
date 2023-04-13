@@ -147,7 +147,7 @@ async fn topology_source_and_sink() {
 
     let res = out1.flat_map(into_event_stream).collect::<Vec<_>>().await;
 
-    *event.metadata_mut().source_mut() = Some(OutputId::from("in1"));
+    *event.metadata_mut().source_mut() = Some(Arc::new(OutputId::from("in1")));
 
     assert_eq!(vec![event], res);
 }
@@ -180,8 +180,8 @@ async fn topology_multiple_sources() {
 
     topology.stop().await;
 
-    *event1.metadata_mut().source_mut() = Some(OutputId::from("in1"));
-    *event2.metadata_mut().source_mut() = Some(OutputId::from("in2"));
+    *event1.metadata_mut().source_mut() = Some(Arc::new(OutputId::from("in1")));
+    *event2.metadata_mut().source_mut() = Some(Arc::new(OutputId::from("in2")));
 
     assert_eq!(out_event1, Some(event1.into()));
     assert_eq!(out_event2, Some(event2.into()));
@@ -216,7 +216,7 @@ async fn topology_multiple_sinks() {
     let res2 = out2.flat_map(into_event_stream).collect::<Vec<_>>().await;
 
     // We should see that both sinks got the exact same event.
-    *event.metadata_mut().source_mut() = Some(OutputId::from("in1"));
+    *event.metadata_mut().source_mut() = Some(Arc::new(OutputId::from("in1")));
     let expected = vec![event];
 
     assert_eq!(expected, res1);
@@ -291,7 +291,7 @@ async fn topology_remove_one_source() {
     drop(in2);
     topology.stop().await;
 
-    *event1.metadata_mut().source_mut() = Some(OutputId::from("in1"));
+    *event1.metadata_mut().source_mut() = Some(Arc::new(OutputId::from("in1")));
 
     let res = h_out1.await.unwrap();
     assert_eq!(vec![event1], res);
@@ -330,7 +330,7 @@ async fn topology_remove_one_sink() {
     let res1 = out1.flat_map(into_event_stream).collect::<Vec<_>>().await;
     let res2 = out2.flat_map(into_event_stream).collect::<Vec<_>>().await;
 
-    *event.metadata_mut().source_mut() = Some(OutputId::from("in1"));
+    *event.metadata_mut().source_mut() = Some(Arc::new(OutputId::from("in1")));
 
     assert_eq!(vec![event], res1);
     assert_eq!(Vec::<Event>::new(), res2);
@@ -436,7 +436,7 @@ async fn topology_swap_source() {
     let res1 = h_out1.await.unwrap();
     let res2 = h_out2.await.unwrap();
 
-    *event2.metadata_mut().source_mut() = Some(OutputId::from("in2"));
+    *event2.metadata_mut().source_mut() = Some(Arc::new(OutputId::from("in2")));
 
     // We should see that despite replacing a sink of the same name, sending to source #1 -- which
     // the sink at `out1` was initially connected to -- does not send to either sink #1 or sink #2,
@@ -548,7 +548,7 @@ async fn topology_swap_sink() {
     let res1 = h_out1.await.unwrap();
     let res2 = h_out2.await.unwrap();
 
-    *event1.metadata_mut().source_mut() = Some(OutputId::from("in1"));
+    *event1.metadata_mut().source_mut() = Some(Arc::new(OutputId::from("in1")));
 
     // We should see that since source #1 and #2 were the same, despite both being added as `in1`,
     // that source #1 was not rebuilt, so the item sent to source #1 was the item that got sent to
@@ -658,8 +658,8 @@ async fn topology_rebuild_connected() {
     drop(in1);
     topology.stop().await;
 
-    *event1.metadata_mut().source_mut() = Some(OutputId::from("in1"));
-    *event2.metadata_mut().source_mut() = Some(OutputId::from("in1"));
+    *event1.metadata_mut().source_mut() = Some(Arc::new(OutputId::from("in1")));
+    *event2.metadata_mut().source_mut() = Some(Arc::new(OutputId::from("in1")));
 
     let res = h_out1.await.unwrap();
     assert_eq!(vec![event1, event2], res);
@@ -712,7 +712,7 @@ async fn topology_rebuild_connected_transform() {
     let res1 = h_out1.await.unwrap();
     let res2 = h_out2.await.unwrap();
 
-    *event.metadata_mut().source_mut() = Some(OutputId::from("t2"));
+    *event.metadata_mut().source_mut() = Some(Arc::new(OutputId::from("t2")));
 
     assert_eq!(Vec::<Event>::new(), res1);
     assert_eq!(event.metadata().source(), res2[0].metadata().source());

@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use std::{collections::HashMap, error, pin::Pin};
 
 use futures::{Stream, StreamExt};
@@ -224,7 +225,7 @@ struct TransformOutput {
 }
 
 pub struct TransformOutputs {
-    output_id: config::OutputId,
+    output_id: Arc<config::OutputId>,
     outputs_spec: Vec<config::TransformOutput>,
     primary_output: Option<TransformOutput>,
     named_outputs: HashMap<String, TransformOutput>,
@@ -232,7 +233,7 @@ pub struct TransformOutputs {
 
 impl TransformOutputs {
     pub fn new(
-        output_id: config::OutputId,
+        output_id: Arc<config::OutputId>,
         outputs_in: Vec<config::TransformOutput>,
     ) -> (Self, HashMap<Option<String>, fanout::ControlChannel>) {
         let outputs_spec = outputs_in.clone();
@@ -280,7 +281,11 @@ impl TransformOutputs {
     }
 
     pub fn new_buf_with_capacity(&self, capacity: usize) -> TransformOutputsBuf {
-        TransformOutputsBuf::new_with_capacity(self.outputs_spec.clone(), capacity, &self.output_id)
+        TransformOutputsBuf::new_with_capacity(
+            self.outputs_spec.clone(),
+            capacity,
+            Arc::clone(&self.output_id),
+        )
     }
 
     /// Sends the events in the buffer to their respective outputs.
@@ -329,7 +334,7 @@ impl TransformOutputsBuf {
     pub fn new_with_capacity(
         outputs_in: Vec<config::TransformOutput>,
         capacity: usize,
-        source: &OutputId,
+        source: Arc<OutputId>,
     ) -> Self {
         let mut primary_buffer = None;
         let mut named_buffers = HashMap::new();
@@ -337,10 +342,11 @@ impl TransformOutputsBuf {
         for output in outputs_in {
             match output.port {
                 None => {
-                    primary_buffer = Some(OutputBuffer::with_capacity(source.clone(), capacity));
+                    primary_buffer =
+                        Some(OutputBuffer::with_capacity(Arc::clone(&source), capacity));
                 }
                 Some(name) => {
-                    named_buffers.insert(name.clone(), OutputBuffer::new(source.clone()));
+                    named_buffers.insert(name.clone(), OutputBuffer::new(Arc::clone(&source)));
                 }
             }
         }
@@ -402,7 +408,7 @@ impl TransformOutputsBuf {
 
     pub fn take_primary(&mut self) -> OutputBuffer {
         let buffer = self.primary_buffer.take().expect("no default output");
-        self.primary_buffer = Some(OutputBuffer::new(buffer.source().clone()));
+        self.primary_buffer = Some(OutputBuffer::new(Arc::clone(buffer.source())));
         buffer
     }
 
@@ -437,37 +443,31 @@ impl ByteSizeOf for TransformOutputsBuf {
 
 #[derive(Debug, Clone)]
 pub struct OutputBuffer {
-    source: OutputId,
+    source: Arc<OutputId>,
     events: Vec<EventArray>,
 }
 
 impl OutputBuffer {
-    pub fn new(source: OutputId) -> Self {
+    pub fn new(source: Arc<OutputId>) -> Self {
         Self {
             source,
             events: Vec::new(),
         }
     }
 
-    pub fn with_capacity(source: OutputId, capacity: usize) -> Self {
+    pub fn with_capacity(source: Arc<OutputId>, capacity: usize) -> Self {
         Self {
             source,
             events: Vec::with_capacity(capacity),
         }
     }
 
-    pub fn source(&self) -> &OutputId {
+    pub fn source(&self) -> &Arc<OutputId> {
         &self.source
     }
 
-    // fn from_events(source: OutputId, events: Vec<Event>) -> Self {
-    //     let mut result = Self::with_capacity(source, events.len());
-    //     result.extend(events.into_iter());
-    //     result
-    // }
-
     pub fn push(&mut self, mut event: Event) {
-        *event.metadata_mut().source_mut() = Some(self.source.clone());
+        *event.metadata_mut().source_mut() = Some(Arc::clone(&self.source));
 
         // Coalesce multiple pushes of the same type into one array.
         match (event, self.events.last_mut()) {
@@ -595,7 +595,7 @@ mod test {
 
     #[test]
     fn buffers_output() {
-        let mut buf = OutputBuffer::new(OutputId::from("test"));
+        let mut buf = OutputBuffer::new(Arc::new(OutputId::from("test")));
         assert_eq!(buf.len(), 0);
         assert_eq!(buf.events.len(), 0);
 

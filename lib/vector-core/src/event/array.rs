@@ -2,7 +2,7 @@
 //! This module contains the definitions and wrapper types for handling
 //! arrays of type `Event`, in the various forms they may appear.
 
-use std::{iter, slice, vec};
+use std::{iter, slice, sync::Arc, vec};
 
 use futures::{stream, Stream};
 #[cfg(test)]
@@ -139,22 +139,21 @@ pub enum EventArray {
 
 impl EventArray {
     /// Sets the `OutputId` in the metadata for all the events in this array.
-    /// This really needs to be an `Arc`.
-    pub fn set_output_id(&mut self, output_id: &OutputId) {
+    pub fn set_output_id(&mut self, output_id: Arc<OutputId>) {
         match self {
             EventArray::Logs(logs) => {
                 for log in logs {
-                    *log.metadata_mut().source_mut() = Some(output_id.clone());
+                    *log.metadata_mut().source_mut() = Some(Arc::clone(&output_id));
                 }
             }
             EventArray::Metrics(metrics) => {
                 for metric in metrics {
-                    *metric.metadata_mut().source_mut() = Some(output_id.clone());
+                    *metric.metadata_mut().source_mut() = Some(Arc::clone(&output_id));
                 }
             }
             EventArray::Traces(traces) => {
                 for trace in traces {
-                    *trace.metadata_mut().source_mut() = Some(output_id.clone());
+                    *trace.metadata_mut().source_mut() = Some(Arc::clone(&output_id));
                 }
             }
         }
