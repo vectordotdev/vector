@@ -12,7 +12,7 @@ use vector_core::{
 };
 
 use crate::{
-    config::{DataType, SourceConfig, SourceContext, SourceOutput},
+    config::{DataType, Output, SourceConfig, SourceContext},
     event::{EstimatedJsonEncodedSizeOf, Event},
     internal_events::{InternalLogsBytesReceived, InternalLogsEventsReceived, StreamClosedError},
     shutdown::ShutdownSignal,
@@ -121,11 +121,11 @@ impl SourceConfig for InternalLogsConfig {
         )))
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
         let schema_definition =
             self.schema_definition(global_log_namespace.merge(self.log_namespace));
 
-        vec![SourceOutput::new_logs(DataType::Log, schema_definition)]
+        vec![Output::default(DataType::Log).with_schema_definition(schema_definition)]
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -339,10 +339,10 @@ mod tests {
     fn output_schema_definition_vector_namespace() {
         let config = InternalLogsConfig::default();
 
-        let definitions = config
-            .outputs(LogNamespace::Vector)
-            .remove(0)
-            .schema_definition(true);
+        let definition = config.outputs(LogNamespace::Vector)[0]
+            .clone()
+            .log_schema_definition
+            .unwrap();
 
         let expected_definition =
             Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
@@ -368,7 +368,7 @@ mod tests {
                     Some("host"),
                 );
 
-        assert_eq!(definitions, Some(expected_definition))
+        assert_eq!(definition, expected_definition)
     }
 
     #[test]
@@ -379,10 +379,10 @@ mod tests {
 
         config.pid_key = OptionalValuePath::from(owned_value_path!(pid_key));
 
-        let definitions = config
-            .outputs(LogNamespace::Legacy)
-            .remove(0)
-            .schema_definition(true);
+        let definition = config.outputs(LogNamespace::Legacy)[0]
+            .clone()
+            .log_schema_definition
+            .unwrap();
 
         let expected_definition = Definition::new_with_default_metadata(
             Kind::object(Collection::empty()),
@@ -402,6 +402,6 @@ mod tests {
             Some("host"),
         );
 
-        assert_eq!(definitions, Some(expected_definition))
+        assert_eq!(definition, expected_definition)
     }
 }

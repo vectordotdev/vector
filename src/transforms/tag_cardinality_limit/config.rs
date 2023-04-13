@@ -1,6 +1,4 @@
-use crate::config::{
-    DataType, GenerateConfig, Input, OutputId, TransformConfig, TransformContext, TransformOutput,
-};
+use crate::config::{DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext};
 use crate::schema;
 use crate::transforms::tag_cardinality_limit::TagCardinalityLimit;
 use crate::transforms::Transform;
@@ -110,11 +108,7 @@ impl TransformConfig for TagCardinalityLimitConfig {
         Input::metric()
     }
 
-    fn outputs(
-        &self,
-        _: &[(OutputId, schema::Definition)],
-        _: LogNamespace,
-    ) -> Vec<TransformOutput> {
-        vec![TransformOutput::new(DataType::Metric, vec![])]
+    fn outputs(&self, _: &schema::Definition, _: LogNamespace) -> Vec<Output> {
+        vec![Output::default(DataType::Metric)]
     }
 }

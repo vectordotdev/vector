@@ -14,7 +14,7 @@ use vector_config::configurable_component;
 use vector_core::{metric_tags, EstimatedJsonEncodedSizeOf};
 
 use crate::{
-    config::{GenerateConfig, ProxyConfig, SourceConfig, SourceContext, SourceOutput},
+    config::{self, GenerateConfig, Output, ProxyConfig, SourceConfig, SourceContext},
     event::metric::{Metric, MetricKind, MetricValue},
     http::HttpClient,
     internal_events::{
@@ -93,8 +93,8 @@ impl SourceConfig for ApacheMetricsConfig {
         ))
     }
 
-    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
-        vec![SourceOutput::new_metrics()]
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
+        vec![Output::default(config::DataType::Metric)]
     }
 
     fn can_acknowledge(&self) -> bool {

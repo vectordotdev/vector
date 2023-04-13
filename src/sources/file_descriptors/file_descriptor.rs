@@ -8,7 +8,7 @@ use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
 
 use crate::{
-    config::{GenerateConfig, Resource, SourceConfig, SourceContext, SourceOutput},
+    config::{GenerateConfig, Output, Resource, SourceConfig, SourceContext},
     serde::default_decoding,
 };
 /// Configuration for the `file_descriptor` source.
@@ -83,7 +83,7 @@ impl SourceConfig for FileDescriptorSourceConfig {
         self.source(pipe, cx.shutdown, cx.out, log_namespace)
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
         let log_namespace = global_log_namespace.merge(self.log_namespace);
 
         outputs(log_namespace, &self.host_key, &self.decoding, Self::NAME)

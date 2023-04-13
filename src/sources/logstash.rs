@@ -25,8 +25,8 @@ use vector_core::{
 use super::util::net::{SocketListenAddr, TcpSource, TcpSourceAck, TcpSourceAcker};
 use crate::{
     config::{
-        log_schema, DataType, GenerateConfig, Resource, SourceAcknowledgementsConfig, SourceConfig,
-        SourceContext, SourceOutput,
+        log_schema, DataType, GenerateConfig, Output, Resource, SourceAcknowledgementsConfig,
+        SourceConfig, SourceContext,
     },
     event::{Event, LogEvent, Value},
     serde::bool_or_struct,
@@ -167,11 +167,10 @@ impl SourceConfig for LogstashConfig {
         )
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
         // There is a global and per-source `log_namespace` config.
         // The source config overrides the global setting and is merged here.
-        vec![SourceOutput::new_logs(
-            DataType::Log,
+        vec![Output::default(DataType::Log).with_schema_definition(
             self.schema_definition(global_log_namespace.merge(self.log_namespace)),
         )]
     }
@@ -791,10 +790,10 @@ mod test {
             ..Default::default()
         };
 
-        let definitions = config
-            .outputs(LogNamespace::Vector)
-            .remove(0)
-            .schema_definition(true);
+        let definition = config.outputs(LogNamespace::Vector)[0]
+            .clone()
+            .log_schema_definition
+            .unwrap();
 
         let expected_definition =
             Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
@@ -825,17 +824,17 @@ mod test {
                     None,
                 );
 
-        assert_eq!(definitions, Some(expected_definition))
+        assert_eq!(definition, expected_definition)
     }
 
     #[test]
     fn output_schema_definition_legacy_namespace() {
         let config = LogstashConfig::default();
 
-        let definitions = config
-            .outputs(LogNamespace::Legacy)
-            .remove(0)
-            .schema_definition(true);
+        let definition = config.outputs(LogNamespace::Legacy)[0]
+            .clone()
+            .log_schema_definition
+            .unwrap();
 
         let expected_definition = Definition::new_with_default_metadata(
             Kind::object(Collection::empty()),
@@ -850,7 +849,7 @@ mod test {
         .with_event_field(&owned_value_path!("timestamp"), Kind::timestamp(), None)
         .with_event_field(&owned_value_path!("host"), Kind::bytes(), Some("host"));
 
-        assert_eq!(definitions, Some(expected_definition))
+        assert_eq!(definition, expected_definition)
     }
 }
 

@@ -10,7 +10,7 @@ use vector_config::configurable_component;
 use vector_core::{config::LogNamespace, EstimatedJsonEncodedSizeOf};
 
 use crate::{
-    config::{GenerateConfig, SourceConfig, SourceContext, SourceOutput},
+    config::{self, GenerateConfig, Output, SourceConfig, SourceContext},
     internal_events::{
         AwsEcsMetricsEventsReceived, AwsEcsMetricsHttpError, AwsEcsMetricsParseError,
         AwsEcsMetricsResponseError, RequestCompleted, StreamClosedError,
@@ -159,8 +159,8 @@ impl SourceConfig for AwsEcsMetricsSourceConfig {
         )))
     }
 
-    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
-        vec![SourceOutput::new_metrics()]
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
+        vec![Output::default(config::DataType::Metric)]
     }
 
     fn can_acknowledge(&self) -> bool {
