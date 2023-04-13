@@ -219,10 +219,7 @@ pub struct Config {
     #[configurable(metadata(docs::examples = "/path/to/.kube/config"))]
     kube_config_file: Option<PathBuf>,
 
-    /// Replaces `MostRecent` list requests semantic with [resource version][resource_version] `Any`,
-    /// which makes vector using cached resources from kube-apiserver instead of an etcd quorum read.
-    ///
-    /// [resource_version]: https://kubernetes.io/docs/reference/using-api/api-concepts/#semantics-for-get-and-list
+    /// Determines if requests to the kube-apiserver can be served by a cache.
     use_apiserver_cache: bool,
 
     /// How long to delay removing metadata entries from the cache when a pod deletion event
