@@ -280,11 +280,7 @@ impl TransformOutputs {
     }
 
     pub fn new_buf_with_capacity(&self, capacity: usize) -> TransformOutputsBuf {
-        TransformOutputsBuf::new_with_capacity(
-            self.outputs_spec.clone(),
-            capacity,
-            self.output_id.clone(),
-        )
+        TransformOutputsBuf::new_with_capacity(self.outputs_spec.clone(), capacity, &self.output_id)
     }
 
     /// Sends the events in the buffer to their respective outputs.
@@ -325,7 +321,6 @@ impl TransformOutputs {
 
 #[derive(Debug, Clone)]
 pub struct TransformOutputsBuf {
-    output_id: OutputId,
     primary_buffer: Option<OutputBuffer>,
     named_buffers: HashMap<String, OutputBuffer>,
 }
@@ -334,7 +329,7 @@ impl TransformOutputsBuf {
     pub fn new_with_capacity(
         outputs_in: Vec<config::TransformOutput>,
         capacity: usize,
-        output_id: OutputId,
+        source: &OutputId,
     ) -> Self {
         let mut primary_buffer = None;
         let mut named_buffers = HashMap::new();
@@ -342,31 +337,28 @@ impl TransformOutputsBuf {
         for output in outputs_in {
             match output.port {
                 None => {
-                    primary_buffer = Some(OutputBuffer::with_capacity(capacity));
+                    primary_buffer = Some(OutputBuffer::with_capacity(source.clone(), capacity));
                 }
                 Some(name) => {
-                    named_buffers.insert(name.clone(), OutputBuffer::default());
+                    named_buffers.insert(name.clone(), OutputBuffer::new(source.clone()));
                 }
             }
         }
 
         Self {
-            output_id,
             primary_buffer,
             named_buffers,
         }
     }
 
-    pub fn push(&mut self, mut event: Event) {
-        *event.metadata_mut().source_mut() = Some(self.output_id.clone());
+    pub fn push(&mut self, event: Event) {
         self.primary_buffer
             .as_mut()
             .expect("no default output")
             .push(event);
     }
 
-    pub fn push_named(&mut self, name: &str, mut event: Event) {
-        *event.metadata_mut().source_mut() = Some(self.output_id.clone());
+    pub fn push_named(&mut self, name: &str, event: Event) {
         self.named_buffers
             .get_mut(name)
             .expect("unknown output")
@@ -374,10 +366,6 @@ impl TransformOutputsBuf {
     }
 
     pub fn append(&mut self, slice: &mut Vec<Event>) {
-        for event in slice.iter_mut() {
-            *event.metadata_mut().source_mut() = Some(self.output_id.clone());
-        }
-
         self.primary_buffer
             .as_mut()
             .expect("no default output")
@@ -385,10 +373,6 @@ impl TransformOutputsBuf {
     }
 
     pub fn append_named(&mut self, name: &str, slice: &mut Vec<Event>) {
-        for event in slice.iter_mut() {
-            *event.metadata_mut().source_mut() = Some(self.output_id.clone());
-        }
-
         self.named_buffers
             .get_mut(name)
             .expect("unknown output")
@@ -413,14 +397,13 @@ impl TransformOutputsBuf {
         self.primary_buffer
             .as_mut()
             .expect("no default output")
-            .extend(events.map(|mut event| {
-                *event.metadata_mut().source_mut() = Some(self.output_id.clone());
-                event
-            }));
+            .extend(events);
     }
 
     pub fn take_primary(&mut self) -> OutputBuffer {
-        std::mem::take(self.primary_buffer.as_mut().expect("no default output"))
+        let buffer = self.primary_buffer.take().expect("no default output");
+        self.primary_buffer = Some(OutputBuffer::new(buffer.source().clone()));
+        buffer
     }
 
     pub fn take_all_named(&mut self) -> HashMap<String, OutputBuffer> {
@@ -452,17 +435,42 @@ impl ByteSizeOf for TransformOutputsBuf {
     }
 }
 
-#[derive(Debug, Default, Clone)]
-pub struct OutputBuffer(Vec<EventArray>);
+#[derive(Debug, Clone)]
+pub struct OutputBuffer {
+    source: OutputId,
+    events: Vec<EventArray>,
+}
 
 impl OutputBuffer {
-    pub fn with_capacity(capacity: usize) -> Self {
-        Self(Vec::with_capacity(capacity))
+    pub fn new(source: OutputId) -> Self {
+        Self {
+            source,
+            events: Vec::new(),
+        }
     }
 
-    pub fn push(&mut self, event: Event) {
+    pub fn with_capacity(source: OutputId, capacity: usize) -> Self {
+        Self {
+            source,
+            events: Vec::with_capacity(capacity),
+        }
+    }
+
+    pub fn source(&self) -> &OutputId {
+        &self.source
+    }
+
+    // fn from_events(source: OutputId, events: Vec<Event>) -> Self {
+    //     let mut result = Self::with_capacity(source, events.len());
+    //     result.extend(events.into_iter());
+    //     result
+    // }
+
+    pub fn push(&mut self, mut event: Event) {
+        *event.metadata_mut().source_mut() = Some(self.source.clone());
+
         // Coalesce multiple pushes of the same type into one array.
-        match (event, self.0.last_mut()) {
+        match (event, self.events.last_mut()) {
             (Event::Log(log), Some(EventArray::Logs(logs))) => {
                 logs.push(log);
             }
@@ -473,7 +481,7 @@ impl OutputBuffer {
                 traces.push(trace);
             }
             (event, _) => {
-                self.0.push(event.into());
+                self.events.push(event.into());
             }
         }
     }
@@ -491,19 +499,19 @@ impl OutputBuffer {
     }
 
     pub fn is_empty(&self) -> bool {
-        self.0.is_empty()
+        self.events.is_empty()
     }
 
     pub fn len(&self) -> usize {
-        self.0.iter().map(EventArray::len).sum()
+        self.events.iter().map(EventArray::len).sum()
     }
 
     pub fn capacity(&self) -> usize {
-        self.0.capacity()
+        self.events.capacity()
     }
 
     pub fn first(&self) -> Option<EventRef> {
-        self.0.first().and_then(|first| match first {
+        self.events.first().and_then(|first| match first {
             EventArray::Logs(l) => l.first().map(Into::into),
             EventArray::Metrics(m) => m.first().map(Into::into),
             EventArray::Traces(t) => t.first().map(Into::into),
@@ -511,14 +519,14 @@ impl OutputBuffer {
     }
 
     pub fn drain(&mut self) -> impl Iterator<Item = Event> + '_ {
-        self.0.drain(..).flat_map(EventArray::into_events)
+        self.events.drain(..).flat_map(EventArray::into_events)
     }
 
     async fn send(
         &mut self,
         output: &mut Fanout,
     ) -> Result<(), Box<dyn error::Error + Send + Sync>> {
-        for array in std::mem::take(&mut self.0) {
+        for array in std::mem::take(&mut self.events) {
             output.send(array).await?;
         }
 
@@ -526,21 +534,21 @@ impl OutputBuffer {
     }
 
     fn iter_events(&self) -> impl Iterator<Item = EventRef> {
-        self.0.iter().flat_map(EventArray::iter_events)
+        self.events.iter().flat_map(EventArray::iter_events)
     }
 
     pub fn into_events(self) -> impl Iterator<Item = Event> {
-        self.0.into_iter().flat_map(EventArray::into_events)
+        self.events.into_iter().flat_map(EventArray::into_events)
     }
 
     pub fn take_events(&mut self) -> Vec<EventArray> {
-        std::mem::take(&mut self.0)
+        std::mem::take(&mut self.events)
     }
 }
 
 impl ByteSizeOf for OutputBuffer {
     fn allocated_bytes(&self) -> usize {
-        self.0.iter().map(ByteSizeOf::size_of).sum()
+        self.events.iter().map(ByteSizeOf::size_of).sum()
     }
 }
 
@@ -560,18 +568,10 @@ impl EventDataEq<Vec<Event>> for OutputBuffer {
 
 impl EstimatedJsonEncodedSizeOf for OutputBuffer {
     fn estimated_json_encoded_size_of(&self) -> usize {
-        self.0
+        self.events
             .iter()
             .map(EstimatedJsonEncodedSizeOf::estimated_json_encoded_size_of)
             .sum()
-    }
-}
-
-impl From<Vec<Event>> for OutputBuffer {
-    fn from(events: Vec<Event>) -> Self {
-        let mut result = Self::default();
-        result.extend(events.into_iter());
-        result
     }
 }
 
@@ -595,19 +595,19 @@ mod test {
 
     #[test]
     fn buffers_output() {
-        let mut buf = OutputBuffer::default();
+        let mut buf = OutputBuffer::new(OutputId::from("test"));
         assert_eq!(buf.len(), 0);
-        assert_eq!(buf.0.len(), 0);
+        assert_eq!(buf.events.len(), 0);
 
         // Push adds a new element
         buf.push(LogEvent::default().into());
         assert_eq!(buf.len(), 1);
-        assert_eq!(buf.0.len(), 1);
+        assert_eq!(buf.events.len(), 1);
 
         // Push of the same type adds to the existing element
         buf.push(LogEvent::default().into());
         assert_eq!(buf.len(), 2);
-        assert_eq!(buf.0.len(), 1);
+        assert_eq!(buf.events.len(), 1);
 
         // Push of a different type adds a new element
         buf.push(
@@ -619,11 +619,11 @@ mod test {
             .into(),
         );
         assert_eq!(buf.len(), 3);
-        assert_eq!(buf.0.len(), 2);
+        assert_eq!(buf.events.len(), 2);
 
         // And pushing again adds a new element
         buf.push(LogEvent::default().into());
         assert_eq!(buf.len(), 4);
-        assert_eq!(buf.0.len(), 3);
+        assert_eq!(buf.events.len(), 3);
     }
 }

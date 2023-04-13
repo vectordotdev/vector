@@ -505,7 +505,8 @@ mod tests {
         );
 
         let event = create_event("status", "42");
-        let metadata = event.metadata().clone();
+        let mut metadata = event.metadata().clone();
+        *metadata.source_mut() = Some(OutputId::from("transform"));
         let metric = do_transform(config, event).await.unwrap();
 
         assert_eq!(
@@ -536,7 +537,8 @@ mod tests {
         let mut event = create_event("message", "i am log");
         event.as_mut_log().insert("method", "post");
         event.as_mut_log().insert("code", "200");
-        let metadata = event.metadata().clone();
+        let mut metadata = event.metadata().clone();
+        *metadata.source_mut() = Some(OutputId::from("transform"));
 
         let metric = do_transform(config, event).await.unwrap();
 
@@ -624,7 +626,9 @@ mod tests {
         );
 
         let event = create_event("backtrace", "message");
-        let metadata = event.metadata().clone();
+        let mut metadata = event.metadata().clone();
+        *metadata.source_mut() = Some(OutputId::from("transform"));
+
         let metric = do_transform(config, event).await.unwrap();
 
         assert_eq!(
@@ -667,7 +671,9 @@ mod tests {
         );
 
         let event = create_event("amount", "33.99");
-        let metadata = event.metadata().clone();
+        let mut metadata = event.metadata().clone();
+        *metadata.source_mut() = Some(OutputId::from("transform"));
+
         let metric = do_transform(config, event).await.unwrap();
 
         assert_eq!(
@@ -696,7 +702,9 @@ mod tests {
         );
 
         let event = create_event("amount", "33.99");
-        let metadata = event.metadata().clone();
+        let mut metadata = event.metadata().clone();
+        *metadata.source_mut() = Some(OutputId::from("transform"));
+
         let metric = do_transform(config, event).await.unwrap();
 
         assert_eq!(
@@ -723,7 +731,9 @@ mod tests {
         );
 
         let event = create_event("memory_rss", "123");
-        let metadata = event.metadata().clone();
+        let mut metadata = event.metadata().clone();
+        *metadata.source_mut() = Some(OutputId::from("transform"));
+
         let metric = do_transform(config, event).await.unwrap();
 
         assert_eq!(
@@ -806,7 +816,9 @@ mod tests {
         );
         event.as_mut_log().insert("status", "42");
         event.as_mut_log().insert("backtrace", "message");
-        let metadata = event.metadata().clone();
+        let mut metadata = event.metadata().clone();
+        *metadata.source_mut() = Some(OutputId::from("transform"));
+
         let output = do_transform_multiple_events(config, event, 2).await;
 
         assert_eq!(2, output.len());
@@ -859,7 +871,8 @@ mod tests {
         event.as_mut_log().insert("host", "local");
         event.as_mut_log().insert("worker", "abc");
         event.as_mut_log().insert("service", "xyz");
-        let metadata = event.metadata().clone();
+        let mut metadata = event.metadata().clone();
+        *metadata.source_mut() = Some(OutputId::from("transform"));
 
         let output = do_transform_multiple_events(config, event, 2).await;
 
@@ -901,7 +914,8 @@ mod tests {
         );
 
         let event = create_event("user_ip", "1.2.3.4");
-        let metadata = event.metadata().clone();
+        let mut metadata = event.metadata().clone();
+        *metadata.source_mut() = Some(OutputId::from("transform"));
         let metric = do_transform(config, event).await.unwrap();
 
         assert_eq!(
@@ -929,7 +943,8 @@ mod tests {
         );
 
         let event = create_event("response_time", "2.5");
-        let metadata = event.metadata().clone();
+        let mut metadata = event.metadata().clone();
+        *metadata.source_mut() = Some(OutputId::from("transform"));
         let metric = do_transform(config, event).await.unwrap();
 
         assert_eq!(
@@ -958,7 +973,8 @@ mod tests {
         );
 
         let event = create_event("response_time", "2.5");
-        let metadata = event.metadata().clone();
+        let mut metadata = event.metadata().clone();
+        *metadata.source_mut() = Some(OutputId::from("transform"));
         let metric = do_transform(config, event).await.unwrap();
 
         assert_eq!(

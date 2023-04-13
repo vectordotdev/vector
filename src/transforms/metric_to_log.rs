@@ -662,7 +662,7 @@ mod tests {
         .with_tags(Some(tags))
         .with_timestamp(Some(ts()));
 
-        let mut output = OutputBuffer::with_capacity(1);
+        let mut output = OutputBuffer::with_capacity(OutputId::from("test"), 1);
 
         MetricToLogConfig {
             metric_tag_values,

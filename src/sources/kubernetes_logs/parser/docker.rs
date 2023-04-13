@@ -205,6 +205,8 @@ enum NormalizationError {
 
 #[cfg(test)]
 pub mod tests {
+    use vector_core::config::OutputId;
+
     use super::{super::test_util, *};
     use crate::{test_util::trace_init, transforms::Transform};
 
@@ -348,7 +350,7 @@ pub mod tests {
         for bytes in cases {
             let mut parser = Docker::new(LogNamespace::Vector);
             let input = LogEvent::from(vrl::value!(bytes));
-            let mut output = OutputBuffer::default();
+            let mut output = OutputBuffer::new(OutputId::from("test"));
             parser.transform(&mut output, input.into());
 
             assert!(output.is_empty(), "Expected no events: {:?}", output);
@@ -364,7 +366,7 @@ pub mod tests {
         for bytes in cases {
             let mut parser = Docker::new(LogNamespace::Legacy);
             let input = LogEvent::from(bytes);
-            let mut output = OutputBuffer::default();
+            let mut output = OutputBuffer::new(OutputId::from("test"));
             parser.transform(&mut output, input.into());
 
             assert!(output.is_empty(), "Expected no events: {:?}", output);

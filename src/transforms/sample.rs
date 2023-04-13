@@ -194,7 +194,7 @@ mod tests {
         let total_passed = events
             .into_iter()
             .filter_map(|event| {
-                let mut buf = OutputBuffer::with_capacity(1);
+                let mut buf = OutputBuffer::with_capacity(OutputId::from("test"), 1);
                 sampler.transform(&mut buf, event);
                 buf.into_events().next()
             })
@@ -212,7 +212,7 @@ mod tests {
         let total_passed = events
             .into_iter()
             .filter_map(|event| {
-                let mut buf = OutputBuffer::with_capacity(1);
+                let mut buf = OutputBuffer::with_capacity(OutputId::from("test"), 1);
                 sampler.transform(&mut buf, event);
                 buf.into_events().next()
             })
@@ -235,7 +235,7 @@ mod tests {
             .clone()
             .into_iter()
             .filter_map(|event| {
-                let mut buf = OutputBuffer::with_capacity(1);
+                let mut buf = OutputBuffer::with_capacity(OutputId::from("test"), 1);
                 sampler.transform(&mut buf, event);
                 buf.into_events().next()
             })
@@ -243,7 +243,7 @@ mod tests {
         let second_run = events
             .into_iter()
             .filter_map(|event| {
-                let mut buf = OutputBuffer::with_capacity(1);
+                let mut buf = OutputBuffer::with_capacity(OutputId::from("test"), 1);
                 sampler.transform(&mut buf, event);
                 buf.into_events().next()
             })

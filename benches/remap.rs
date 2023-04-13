@@ -30,7 +30,7 @@ fn benchmark_remap(c: &mut Criterion) {
         let mut outputs = TransformOutputsBuf::new_with_capacity(
             vec![TransformOutput::new(DataType::all(), HashMap::new())],
             1,
-            OutputId::from("remap"),
+            &OutputId::from("remap"),
         );
         tform.transform(event, &mut outputs);
         let result = outputs.take_primary();
@@ -83,7 +83,7 @@ fn benchmark_remap(c: &mut Criterion) {
         let mut outputs = TransformOutputsBuf::new_with_capacity(
             vec![TransformOutput::new(DataType::all(), HashMap::new())],
             1,
-            OutputId::from("remap"),
+            &OutputId::from("remap"),
         );
         tform.transform(event, &mut outputs);
         let result = outputs.take_primary();
@@ -138,7 +138,7 @@ fn benchmark_remap(c: &mut Criterion) {
             let mut outputs = TransformOutputsBuf::new_with_capacity(
                 vec![TransformOutput::new(DataType::all(), HashMap::new())],
                 1,
-                OutputId::from("remap"),
+                &OutputId::from("remap"),
             );
             tform.transform(event, &mut outputs);
             let result = outputs.take_primary();

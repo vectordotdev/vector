@@ -64,7 +64,7 @@ fn route(c: &mut Criterion) {
         });
     }
     let output_buffer: TransformOutputsBuf =
-        TransformOutputsBuf::new_with_capacity(outputs, 10, OutputId::from("route"));
+        TransformOutputsBuf::new_with_capacity(outputs, 10, &OutputId::from("route"));
 
     for param in &[
         // A small filter where a sole field is mapped into a named route,

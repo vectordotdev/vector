@@ -208,7 +208,11 @@ impl StreamSink<EventArray> for HumioMetricsSink {
         let mut transform = self.transform;
         self.inner
             .run(input.map(move |events| {
-                let mut buf = OutputBuffer::with_capacity(events.len());
+                // TODO - we need to get the source from somewhere???
+                let mut buf = OutputBuffer::with_capacity(
+                    vector_core::config::OutputId::from("huh"),
+                    events.len(),
+                );
                 for event in events.into_events() {
                     transform.as_function().transform(&mut buf, event);
                 }

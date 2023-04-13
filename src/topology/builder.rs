@@ -823,6 +823,9 @@ impl Runner {
         self.timer.start_wait();
         while let Some(events) = input_rx.next().await {
             self.on_events_received(&events);
+
+            dbg!(&outputs_buf);
+
             self.transform.transform_all(events, &mut outputs_buf);
             self.send_outputs(&mut outputs_buf)
                 .await
@@ -874,6 +877,7 @@ impl Runner {
                             let mut t = self.transform.clone();
                             let mut outputs_buf = self.outputs.new_buf_with_capacity(len);
                             let task = tokio::spawn(async move {
+                                dbg!(&outputs_buf);
                                 for events in input_arrays {
                                     t.transform_all(events, &mut outputs_buf);
                                 }

@@ -84,6 +84,7 @@ impl FunctionTransform for Parser {
 mod tests {
     use bytes::Bytes;
     use lookup::event_path;
+    use vector_core::config::OutputId;
 
     use super::*;
     use crate::{event::Event, event::LogEvent, test_util::trace_init, transforms::Transform};
@@ -131,7 +132,7 @@ mod tests {
         for bytes in cases {
             let mut parser = Parser::new(LogNamespace::Legacy);
             let input = LogEvent::from(bytes);
-            let mut output = OutputBuffer::default();
+            let mut output = OutputBuffer::new(OutputId::from("test"));
             parser.transform(&mut output, input.into());
 
             assert!(output.is_empty(), "Expected no events: {:?}", output);
@@ -159,7 +160,7 @@ mod tests {
 
         for (input, log_namespace) in cases {
             let mut parser = Parser::new(log_namespace);
-            let mut output = OutputBuffer::default();
+            let mut output = OutputBuffer::new(OutputId::from("test"));
             parser.transform(&mut output, input.into());
 
             assert!(output.is_empty(), "Expected no events: {:?}", output);

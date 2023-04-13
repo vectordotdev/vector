@@ -196,7 +196,7 @@ mod test {
                 })
                 .collect(),
             1,
-            OutputId::from("route"),
+            &OutputId::from("route"),
         );
 
         transform.transform(event.clone(), &mut outputs);
@@ -239,7 +239,7 @@ mod test {
                 })
                 .collect(),
             1,
-            OutputId::from("route"),
+            &OutputId::from("route"),
         );
 
         transform.transform(event.clone(), &mut outputs);
@@ -281,7 +281,7 @@ mod test {
                 })
                 .collect(),
             1,
-            OutputId::from("route"),
+            &OutputId::from("route"),
         );
 
         transform.transform(event.clone(), &mut outputs);

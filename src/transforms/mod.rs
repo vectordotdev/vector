@@ -50,7 +50,7 @@ mod test {
     use futures_util::SinkExt;
     use tokio::sync::mpsc;
     use tokio_util::sync::PollSender;
-    use vector_core::transform::FunctionTransform;
+    use vector_core::{config::OutputId, transform::FunctionTransform};
 
     use crate::{
         config::{
@@ -75,7 +75,7 @@ mod test {
     // issue a unused warnings about the import above.
     #[allow(dead_code)]
     pub fn transform_one(ft: &mut dyn FunctionTransform, event: Event) -> Option<Event> {
-        let mut buf = OutputBuffer::with_capacity(1);
+        let mut buf = OutputBuffer::with_capacity(OutputId::from("test"), 1);
         ft.transform(&mut buf, event);
         assert!(buf.len() <= 1);
         buf.into_events().next()

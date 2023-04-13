@@ -21,10 +21,7 @@ use k8s_paths_provider::K8sPathsProvider;
 use kube::{
     api::{Api, ListParams},
     config::{self, KubeConfigOptions},
-    runtime::{
-        reflector::{self},
-        watcher, WatchStreamExt,
-    },
+    runtime::{reflector, watcher, WatchStreamExt},
     Client, Config as ClientConfig,
 };
 use lifecycle::Lifecycle;
@@ -818,7 +815,9 @@ impl Source {
             event
         });
         let events = events.flat_map(move |event| {
-            let mut buf = OutputBuffer::with_capacity(1);
+            // TODO Where we gonna get the output Id from here?
+            let mut buf =
+                OutputBuffer::with_capacity(vector_core::config::OutputId::from("huh"), 1);
             parser.transform(&mut buf, event);
             futures::stream::iter(buf.into_events())
         });

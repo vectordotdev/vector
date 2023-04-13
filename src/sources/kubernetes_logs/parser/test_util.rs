@@ -4,7 +4,10 @@ use similar_asserts::assert_eq;
 use chrono::{DateTime, Utc};
 use lookup::{event_path, metadata_path};
 use value::Value;
-use vector_core::{config::LogNamespace, event};
+use vector_core::{
+    config::{LogNamespace, OutputId},
+    event,
+};
 
 use crate::{
     event::{Event, LogEvent},
@@ -67,7 +70,7 @@ where
         let input = loader(message);
         let mut parser = (builder)();
         let parser = parser.as_function();
-        let mut output = OutputBuffer::default();
+        let mut output = OutputBuffer::new(OutputId::from("test"));
         parser.transform(&mut output, input);
 
         let actual = output.into_events().collect::<Vec<_>>();

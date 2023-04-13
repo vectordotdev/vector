@@ -1527,7 +1527,7 @@ mod tests {
                 TransformOutput::new(DataType::all(), HashMap::new()).with_port(DROPPED),
             ],
             1,
-            OutputId::from("remap"),
+            &OutputId::from("remap"),
         );
 
         ft.transform(event, &mut outputs);
@@ -1555,7 +1555,7 @@ mod tests {
                 TransformOutput::new(DataType::all(), HashMap::new()).with_port(DROPPED),
             ],
             1,
-            OutputId::from("remap"),
+            &OutputId::from("remap"),
         );
 
         ft.transform(event, &mut outputs);
