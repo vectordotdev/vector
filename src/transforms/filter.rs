@@ -1,6 +1,6 @@
 use vector_common::internal_event::{Count, InternalEventHandle as _, Registered};
 use vector_config::configurable_component;
-use vector_core::config::{clone_input_definitions, LogNamespace};
+use vector_core::config::LogNamespace;
 
 use crate::{
     conditions::{AnyCondition, Condition},
@@ -58,7 +58,10 @@ impl TransformConfig for FilterConfig {
     ) -> Vec<TransformOutput> {
         vec![TransformOutput::new(
             DataType::all(),
-            clone_input_definitions(input_definitions),
+            input_definitions
+                .iter()
+                .map(|(_output, definition)| definition.clone())
+                .collect(),
         )]
     }
 

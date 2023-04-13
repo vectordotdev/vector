@@ -48,7 +48,7 @@ impl TransformConfig for NoopTransformConfig {
             DataType::all(),
             definitions
                 .iter()
-                .map(|(output, definition)| (output.clone(), definition.clone()))
+                .map(|(_output, definition)| definition.clone())
                 .collect(),
         )]
     }

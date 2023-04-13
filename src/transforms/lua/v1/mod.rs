@@ -58,17 +58,9 @@ impl LuaConfig {
             .flat_map(|(_output, definition)| definition.log_namespaces().clone())
             .collect();
 
-        let definition = input_definitions
-            .iter()
-            .map(|(output, _definition)| {
-                (
-                    output.clone(),
-                    Definition::default_for_namespace(&namespaces),
-                )
-            })
-            .collect();
+        let definition = Definition::default_for_namespace(&namespaces);
 
-        vec![TransformOutput::new(DataType::Log, definition)]
+        vec![TransformOutput::new(DataType::Log, vec![definition])]
     }
 }
 

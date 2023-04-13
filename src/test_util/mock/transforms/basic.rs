@@ -58,7 +58,7 @@ impl TransformConfig for BasicTransformConfig {
             DataType::all(),
             definitions
                 .iter()
-                .map(|(output, definition)| (output.clone(), definition.clone()))
+                .map(|(_output, definition)| definition.clone())
                 .collect(),
         )]
     }

@@ -399,7 +399,7 @@ mod test {
                     in_ty,
                     outputs: vec![TransformOutput::new(
                         out_ty,
-                        [("test".into(), Definition::default_legacy_namespace())].into(),
+                        vec![Definition::default_legacy_namespace()],
                     )],
                 },
             );
@@ -415,11 +415,8 @@ mod test {
             let id = id.into();
             match self.nodes.get_mut(&id) {
                 Some(Node::Transform { outputs, .. }) => outputs.push(
-                    TransformOutput::new(
-                        ty,
-                        [("test".into(), Definition::default_legacy_namespace())].into(),
-                    )
-                    .with_port(name),
+                    TransformOutput::new(ty, vec![Definition::default_legacy_namespace()])
+                        .with_port(name),
                 ),
                 _ => panic!("invalid transform"),
             }
@@ -654,11 +651,11 @@ mod test {
                 outputs: vec![
                     TransformOutput::new(
                         DataType::all(),
-                        [("test".into(), Definition::default_legacy_namespace())].into(),
+                        vec![Definition::default_legacy_namespace()],
                     ),
                     TransformOutput::new(
                         DataType::all(),
-                        [("test".into(), Definition::default_legacy_namespace())].into(),
+                        vec![Definition::default_legacy_namespace()],
                     )
                     .with_port("bar"),
                 ],
@@ -679,11 +676,11 @@ mod test {
                 outputs: vec![
                     TransformOutput::new(
                         DataType::all(),
-                        [("test".into(), Definition::default_legacy_namespace())].into(),
+                        vec![Definition::default_legacy_namespace()],
                     ),
                     TransformOutput::new(
                         DataType::all(),
-                        [("test".into(), Definition::default_legacy_namespace())].into(),
+                        vec![Definition::default_legacy_namespace()],
                     )
                     .with_port("errors"),
                 ],

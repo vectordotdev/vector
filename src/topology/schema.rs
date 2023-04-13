@@ -62,9 +62,7 @@ pub fn possible_definitions(
                             &input.port
                         )
                     })
-                    .log_schema_definitions
-                    .values()
-                    .cloned(),
+                    .log_schema_definitions,
             );
 
             definitions.append(&mut transform_definition);
@@ -143,9 +141,7 @@ pub(super) fn expanded_definitions(
                 .iter()
                 .find_map(|output| {
                     if output.port == input.port {
-                        Some(
-                            input.with_definitions(output.log_schema_definitions.values().cloned()),
-                        )
+                        Some(input.with_definitions(output.log_schema_definitions.clone()))
                     } else {
                         None
                     }
@@ -218,9 +214,7 @@ pub(crate) fn input_definitions(
                             &input.port
                         )
                     })
-                    .log_schema_definitions
-                    .values()
-                    .cloned(),
+                    .log_schema_definitions,
             );
 
             definitions.append(&mut transform_definitions);
@@ -534,15 +528,11 @@ mod tests {
                             vec![OutputId::from("source-foo")],
                             vec![TransformOutput::new(
                                 DataType::all(),
-                                [(
-                                    "source-foo".into(),
-                                    Definition::empty_legacy_namespace().with_event_field(
-                                        &owned_value_path!("baz"),
-                                        Kind::regex(),
-                                        Some("baz"),
-                                    ),
-                                )]
-                                .into(),
+                                vec![Definition::empty_legacy_namespace().with_event_field(
+                                    &owned_value_path!("baz"),
+                                    Kind::regex(),
+                                    Some("baz"),
+                                )],
                             )],
                         ),
                     )]),
@@ -609,15 +599,11 @@ mod tests {
                                 vec![OutputId::from("Source 1")],
                                 vec![TransformOutput::new(
                                     DataType::all(),
-                                    [(
-                                        "Source 1".into(),
-                                        Definition::empty_legacy_namespace().with_event_field(
-                                            &owned_value_path!("transform-1"),
-                                            Kind::regex(),
-                                            None,
-                                        ),
-                                    )]
-                                    .into(),
+                                    vec![Definition::empty_legacy_namespace().with_event_field(
+                                        &owned_value_path!("transform-1"),
+                                        Kind::regex(),
+                                        None,
+                                    )],
                                 )],
                             ),
                         ),
@@ -627,15 +613,11 @@ mod tests {
                                 vec![OutputId::from("Source 2")],
                                 vec![TransformOutput::new(
                                     DataType::all(),
-                                    [(
-                                        "Source 2".into(),
-                                        Definition::empty_legacy_namespace().with_event_field(
-                                            &owned_value_path!("transform-2"),
-                                            Kind::float().or_null(),
-                                            Some("transform-2"),
-                                        ),
-                                    )]
-                                    .into(),
+                                    vec![Definition::empty_legacy_namespace().with_event_field(
+                                        &owned_value_path!("transform-2"),
+                                        Kind::float().or_null(),
+                                        Some("transform-2"),
+                                    )],
                                 )],
                             ),
                         ),
@@ -645,15 +627,11 @@ mod tests {
                                 vec![OutputId::from("Source 2")],
                                 vec![TransformOutput::new(
                                     DataType::all(),
-                                    [(
-                                        "Source 2".into(),
-                                        Definition::empty_legacy_namespace().with_event_field(
-                                            &owned_value_path!("transform-3"),
-                                            Kind::integer(),
-                                            Some("transform-3"),
-                                        ),
-                                    )]
-                                    .into(),
+                                    vec![Definition::empty_legacy_namespace().with_event_field(
+                                        &owned_value_path!("transform-3"),
+                                        Kind::integer(),
+                                        Some("transform-3"),
+                                    )],
                                 )],
                             ),
                         ),
@@ -663,15 +641,11 @@ mod tests {
                                 vec![OutputId::from("Source 2")],
                                 vec![TransformOutput::new(
                                     DataType::all(),
-                                    [(
-                                        "Source 2".into(),
-                                        Definition::empty_legacy_namespace().with_event_field(
-                                            &owned_value_path!("transform-4"),
-                                            Kind::timestamp().or_bytes(),
-                                            Some("transform-4"),
-                                        ),
-                                    )]
-                                    .into(),
+                                    vec![Definition::empty_legacy_namespace().with_event_field(
+                                        &owned_value_path!("transform-4"),
+                                        Kind::timestamp().or_bytes(),
+                                        Some("transform-4"),
+                                    )],
                                 )],
                             ),
                         ),
@@ -681,15 +655,11 @@ mod tests {
                                 vec![OutputId::from("Transform 3"), OutputId::from("Transform 4")],
                                 vec![TransformOutput::new(
                                     DataType::all(),
-                                    [(
-                                        "Transform 3".into(),
-                                        Definition::empty_legacy_namespace().with_event_field(
-                                            &owned_value_path!("transform-5"),
-                                            Kind::boolean(),
-                                            Some("transform-5"),
-                                        ),
-                                    )]
-                                    .into(),
+                                    vec![Definition::empty_legacy_namespace().with_event_field(
+                                        &owned_value_path!("transform-5"),
+                                        Kind::boolean(),
+                                        Some("transform-5"),
+                                    )],
                                 )],
                             ),
                         ),
