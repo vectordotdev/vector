@@ -8,7 +8,7 @@ fn main() {
     #[cfg(feature = "allocation-tracing")]
     {
         use crate::vector::internal_telemetry::allocations::{
-            init_allocation_tracing, REPORTING_INTERVAL_MS, TRACK_ALLOCATIONS,
+            init_allocation_tracing_reporter, REPORTING_INTERVAL_MS, TRACE_ALLOCATIONS,
         };
         use std::sync::atomic::Ordering;
         let opts = vector::cli::Opts::get_matches()
@@ -20,18 +20,20 @@ fn main() {
             .unwrap_or_else(|code| {
                 std::process::exit(code);
             });
-        let allocation_tracing = opts.root.allocation_tracing;
-        REPORTING_INTERVAL_MS.store(
-            opts.root.allocation_tracing_reporting_interval_ms,
-            Ordering::Relaxed,
-        );
+        let enable_allocation_tracing = opts.root.allocation_tracing;
+        let reporter_interval_ms = opts.root.allocation_tracing_reporting_interval_ms;
         drop(opts);
-        // At this point, we make the following assumption:
-        // The heap does not contain any allocations that have a shorter lifetime than the program.
-        if allocation_tracing {
-            // Start tracking allocations
-            TRACK_ALLOCATIONS.store(true, Ordering::Relaxed);
-            init_allocation_tracing();
+
+        // At this point, we're making the assumption that no other heap allocations exist/are live,
+        // since we've dropped everything related to parsing the command-line arguments. This is our
+        // invariant for knowing that if we turn on allocation tracing, no previous allocations
+        // exist where, when deallocated, we'd try to extract the wrapper trailer reference to the
+        // source allocation group and trigger instant UB.
+        if enable_allocation_tracing {
+            // Start tracing allocations and configure the reporting interval for the reporter thread.
+            TRACE_ALLOCATIONS.store(true, Ordering::Relaxed);
+            REPORTING_INTERVAL_MS.store(reporter_interval_ms, Ordering::Relaxed);
+            init_allocation_tracing_reporter();
         }
     }
 
