@@ -723,6 +723,7 @@ MAINPID
 majorly
 MAKECMDGOALS
 Makefiles
+markability
 markdownify
 markdownlintrc
 marketo
