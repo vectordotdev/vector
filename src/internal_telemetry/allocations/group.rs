@@ -87,14 +87,15 @@ impl AllocationGroup {
         AllocationGroupToken(allocation_group)
     }
 
+    #[inline]
     pub fn track_allocation(&self, allocated_bytes: u64) {
         self.allocated_bytes
             .fetch_add(allocated_bytes, Ordering::Relaxed);
     }
 
+    #[inline]
     pub fn track_deallocation(&self, deallocated_bytes: u64) {
-        self.deallocated_bytes
-            .fetch_add(deallocated_bytes, Ordering::Relaxed);
+        self.deallocated_bytes.increment_local(deallocated_bytes);
     }
 
     pub fn consume_and_reset_statistics(&self) -> (u64, u64) {

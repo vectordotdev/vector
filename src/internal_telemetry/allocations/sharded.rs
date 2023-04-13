@@ -1,7 +1,4 @@
-use std::{
-    ops::Deref,
-    sync::atomic::{AtomicU64, AtomicUsize, Ordering},
-};
+use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 
 static THREAD_ID_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
@@ -9,7 +6,7 @@ thread_local! {
     static THREAD_ID: usize = THREAD_ID_COUNTER.fetch_add(1, Ordering::Relaxed);
 }
 
-const DEFAULT_SHARD_FACTOR: usize = 8;
+const DEFAULT_SHARD_FACTOR: usize = 32;
 
 #[derive(Debug)]
 pub struct ShardedAtomicU64 {
@@ -35,10 +32,18 @@ impl ShardedAtomicU64 {
         Self { slots }
     }
 
-    fn get(&self) -> &AtomicU64 {
+    #[inline]
+    pub fn increment_local(&self, amount: u64) {
         let id = THREAD_ID.try_with(|id| *id).unwrap_or_default();
         let idx = id & (DEFAULT_SHARD_FACTOR - 1);
-        &self.slots[idx]
+
+        // SAFETY: `idx` is always smaller than `DEFAULT_SHARD_FACTOR`, and `self.slots` has
+        // `DEFAULT_SHARD_FACTOR` elements, so we can never go out-of-bounds by indexing via `idx`.
+        unsafe {
+            self.slots
+                .get_unchecked(idx)
+                .fetch_add(amount, Ordering::Relaxed);
+        }
     }
 
     pub const fn get_all(&self) -> &[AtomicU64] {
@@ -49,13 +54,5 @@ impl ShardedAtomicU64 {
 impl Default for ShardedAtomicU64 {
     fn default() -> Self {
         Self::new()
-    }
-}
-
-impl Deref for ShardedAtomicU64 {
-    type Target = AtomicU64;
-
-    fn deref(&self) -> &Self::Target {
-        self.get()
     }
 }

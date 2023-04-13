@@ -29,6 +29,7 @@ impl MetadataTrailer {
     }
 
     /// Whether or not this metadata is valid based on the canary.
+    #[inline]
     const fn is_valid(&self) -> bool {
         self.canary == TRAILER_CANARY
     }
@@ -37,6 +38,7 @@ impl MetadataTrailer {
     ///
     /// If the canary is not valid, `None` is returned. Otherwise, `Some(...)` is returned
     /// containing a reference to the allocation group.
+    #[inline]
     const fn try_group(&self) -> Option<&'static AllocationGroup> {
         // The canary value is meant to be sufficiently unique that if we can read the canary value
         // from the field, we can be sure that this `MetadataTrailer` was read from a real
@@ -203,6 +205,7 @@ unsafe impl<A: GlobalAlloc> GlobalAlloc for GroupedTracingAllocator<A> {
     }
 }
 
+#[inline]
 fn get_wrapped_layout(object_layout: Layout) -> (Layout, usize) {
     static TRAILER_LAYOUT: Layout = Layout::new::<MetadataTrailer>();
 
