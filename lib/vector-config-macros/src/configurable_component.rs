@@ -409,7 +409,7 @@ fn capitalize(s: &str) -> String {
         Some(first) => {
             let name = first.to_uppercase().collect::<String>() + iter.as_str();
             match name.as_str() {
-                "Ampq" | "Aws" | "Ec2" | "Ecs" | "Gcp" | "Hec" | "Http" | "Nats" | "Nginx"
+                "Amqp" | "Aws" | "Ec2" | "Ecs" | "Gcp" | "Hec" | "Http" | "Nats" | "Nginx"
                 | "Sqs" => name.to_uppercase(),
                 "Eventstoredb" => String::from("EventStoreDB"),
                 "Mongodb" => String::from("MongoDB"),
