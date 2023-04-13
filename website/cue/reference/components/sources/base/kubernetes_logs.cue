@@ -400,13 +400,8 @@ base: components: sources: kubernetes_logs: configuration: {
 		type: string: examples: ["local", "America/New_York", "EST5EDT"]
 	}
 	use_apiserver_cache: {
-		description: """
-			Replaces `MostRecent` list requests semantic with [resource version][resource_version] `Any`,
-			which makes vector using cached resources from kube-apiserver instead of an etcd quorum read.
-
-			[resource_version]: https://kubernetes.io/docs/reference/using-api/api-concepts/#semantics-for-get-and-list
-			"""
-		required: false
+		description: "Determines if requests to the kube-apiserver can be served by a cache."
+		required:    false
 		type: bool: default: false
 	}
 }
