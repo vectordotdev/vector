@@ -265,8 +265,9 @@ impl Definition {
     /// A non-root required field means the root type must be an object, so the type will be automatically
     /// restricted to an object.
     ///
+    /// Raises a warning if the path is not root, and the definition does not allow the type to be an object.
+    ///
     /// # Panics
-    /// - If the path is not root, and the definition does not allow the type to be an object.
     /// - Provided path has one or more coalesced segments (e.g. `.(foo | bar)`).
     #[must_use]
     pub fn with_event_field(
@@ -275,10 +276,10 @@ impl Definition {
         kind: Kind,
         meaning: Option<&str>,
     ) -> Self {
-        if !path.is_root() {
-            assert!(
-                self.event_kind.as_object().is_some(),
-                "Setting a field on a value that cannot be an object"
+        if !path.is_root() && self.event_kind.as_object().is_none() {
+            warn!(
+                "Setting a field at `{}` on a value that cannot be an object",
+                path.to_string()
             );
         }
 
@@ -327,8 +328,9 @@ impl Definition {
     /// A non-root required field means the root type must be an object, so the type will be automatically
     /// restricted to an object.
     ///
+    /// Raises a warning if the path is not root, and the definition does not allow the type to be an object.
+    ///
     /// # Panics
-    /// - If the path is not root, and the definition does not allow the type to be an object
     /// - Provided path has one or more coalesced segments (e.g. `.(foo | bar)`).
     #[must_use]
     pub fn with_metadata_field(
@@ -337,10 +339,10 @@ impl Definition {
         kind: Kind,
         meaning: Option<&str>,
     ) -> Self {
-        if !path.is_root() {
-            assert!(
-                self.metadata_kind.as_object().is_some(),
-                "Setting a field on a value that cannot be an object"
+        if !path.is_root() && self.metadata_kind.as_object().is_none() {
+            warn!(
+                "Setting a field at `{}` on a value that cannot be an object",
+                path.to_string()
             );
         }
 
