@@ -400,11 +400,26 @@ pub fn configurable_component_impl(args: TokenStream, item: TokenStream) -> Toke
     derived.into()
 }
 
+// Properly capitalize labels, accounting for some exceptions
+// TODO: Replace this with an explicit requirement for a "component_human_name" or similar.
 fn capitalize(s: &str) -> String {
-    let mut iter = s.chars();
-    match iter.next() {
-        None => String::new(),
-        Some(first) => first.to_uppercase().collect::<String>() + iter.as_str(),
+    match s {
+        "Amqp" | "Aws" | "Ec2" | "Ecs" | "Gcp" | "Hec" | "Http" | "Nats" | "Nginx" | "Sqs" => {
+            s.to_uppercase()
+        }
+        "Eventstoredb" => String::from("EventStoreDB"),
+        "Mongodb" => String::from("MongoDB"),
+        "Opentelemetry" => String::from("OpenTelemetry"),
+        "Postgresql" => String::from("PostgreSQL"),
+        "Pubsub" => String::from("Pub/Sub"),
+        "Statsd" => String::from("StatsD"),
+        _ => {
+            let mut iter = s.chars();
+            match iter.next() {
+                None => String::new(),
+                Some(first) => first.to_uppercase().collect::<String>() + iter.as_str(),
+            }
+        }
     }
 }
 
