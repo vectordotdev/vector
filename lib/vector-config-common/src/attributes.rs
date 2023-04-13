@@ -53,6 +53,6 @@ impl CustomAttribute {
     }
 
     pub const fn is_kv(&self) -> bool {
-        matches!(self, Self::Flag(_))
+        matches!(self, Self::KeyValue { .. })
     }
 }
