@@ -14,6 +14,7 @@ src/config/ @vectordotdev/core-team
 src/internal_telemetry/ @vectordotdev/core-team
 src/sinks/ @vectordotdev/integrations-team
 src/sinks/amqp/ @StephenWakely @vectordotdev/integrations-team
+src/sinks/appsignal/ @neuronull @vectordotdev/integrations-team
 src/sinks/aws_cloudwatch_logs/ @spencergilbert @vectordotdev/integrations-team
 src/sinks/aws_cloudwatch_metrics/ @spencergilbert @vectordotdev/integrations-team
 src/sinks/aws_kinesis/ @spencergilbert @vectordotdev/integrations-team # sink_aws_kinesis_firehose,sink_aws_kinesis_stream

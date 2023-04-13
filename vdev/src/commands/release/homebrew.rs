@@ -1,12 +1,12 @@
-use anyhow::{Result};
-use std::env;
-use tempfile::TempDir;
 use crate::git;
+use anyhow::Result;
 use hex;
-use sha2::Digest;
-use reqwest;
-use std::path::Path;
 use regex;
+use reqwest;
+use sha2::Digest;
+use std::env;
+use std::path::Path;
+use tempfile::TempDir;
 
 /// Releases latest version to the vectordotdev homebrew tap
 #[derive(clap::Args, Debug)]
@@ -19,26 +19,32 @@ impl Cli {
         let td = TempDir::new()?;
         env::set_current_dir(td.path())?;
 
-        // Set git configurations
-        let config_values = &[
-            ("user.name", "vic"),
-            ("user.email", "vector@datadoghq.com"),
-        ];
-        git::set_config_values(config_values)?;
         let github_token = env::var("GITHUB_TOKEN")?;
 
         // Clone the homebrew-brew repository
-        let homebrew_repo = format!("https://{github_token}:x-oauth-basic@github.com/vectordotdev/homebrew-brew");
+        let homebrew_repo =
+            format!("https://{github_token}:x-oauth-basic@github.com/vectordotdev/homebrew-brew");
         git::clone(&homebrew_repo)?;
         env::set_current_dir("homebrew-brew")?;
+
+        // Set git configurations
+        git::set_config_value("user.name", "vic")?;
+        git::set_config_value("user.email", "vector@datadoghq.com")?;
 
         // Get package details for updating Formula/vector.rb
         let vector_version = env::var("VECTOR_VERSION")?;
         let package_url = format!("https://packages.timber.io/vector/{vector_version}/vector-{vector_version}-x86_64-apple-darwin.tar.gz");
-        let package_sha256 = hex::encode(sha2::Sha256::digest(reqwest::blocking::get(&package_url)?.bytes()?));
+        let package_sha256 = hex::encode(sha2::Sha256::digest(
+            reqwest::blocking::get(&package_url)?.bytes()?,
+        ));
 
         // Update content of Formula/vector.rb
-        update_content("Formula/vector.rb", &package_url, &package_sha256, &vector_version)?;
+        update_content(
+            "Formula/vector.rb",
+            &package_url,
+            &package_sha256,
+            &vector_version,
+        )?;
 
         // Check if there is any change in git index
         let has_changes = !git::check_git_repository_clean()?;
@@ -46,6 +52,7 @@ impl Cli {
             let commit_message = format!("Release Vector {vector_version}");
             git::commit(&commit_message)?;
         }
+
         git::push()?;
 
         // Remove temporary directory
@@ -55,7 +62,12 @@ impl Cli {
 }
 
 /// Open the vector.rb file and update the new content
-fn update_content<P>(file_path: P, package_url: &str, package_sha256: &str, vector_version: &str) -> Result<()>
+fn update_content<P>(
+    file_path: P,
+    package_url: &str,
+    package_sha256: &str,
+    vector_version: &str,
+) -> Result<()>
 where
     P: AsRef<Path>,
 {
