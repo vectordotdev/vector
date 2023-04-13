@@ -377,5 +377,4 @@ mod tests {
             expected_header_value.as_ref().ok()
         );
     }
-
 }
