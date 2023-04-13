@@ -237,12 +237,22 @@ fn build_closed_schema_flatten_eligibility_mappings(
             Schema::Object(schema) => schema,
         };
 
+        debug!(
+            "Evaluating schema definition '{}' for markability.",
+            definition_name
+        );
+
         // If a schema itself would not be considered markable, then we don't need to consider the
         // eligibility between parent/child since there's nothing to drive the "now unmark the child
         // schemas" logic.
         if !is_markable_schema(&root_schema.definitions, parent_schema) {
             debug!("Schema definition '{}' not markable.", definition_name);
             continue;
+        } else {
+            debug!(
+                "Schema definition '{}' markable. Collecting referents.",
+                definition_name
+            );
         }
 
         // Collect all referents for this definition, which includes both property-based referents
@@ -250,6 +260,13 @@ fn build_closed_schema_flatten_eligibility_mappings(
         // while subschema-based referents must be unmarked.
         let mut referents = HashSet::new();
         get_referents(parent_schema, &mut referents);
+
+        debug!(
+            "Collected {} referents for '{}': {:?}",
+            referents.len(),
+            definition_name,
+            referents
+        );
 
         // Store the parent/child mapping.
         parent_to_child.insert(SchemaReference::from(definition_name), referents);
@@ -328,12 +345,14 @@ fn is_markable_schema(definitions: &Map<String, Schema>, schema: &SchemaObject) 
     // subschemas: { "type": "null" } and { "$ref": "#/definitions/T" }. If the schema for `T` is,
     // say, just a scalar schema, instead of an object schema... then it wouldn't be marked, and in
     // turn, we wouldn't need to mark the schema for `Option<T>`: there's no properties at all.
-    //
-    // We'll follow schema references in subschemas up to one level deep trying to figure this out.
     if let Some(subschema) = schema.subschemas.as_ref() {
         let subschemas = get_object_subschemas_from_parent(subschema).collect::<Vec<_>>();
 
-        let has_object_subschema = subschemas.iter().any(|schema| is_object_schema(schema));
+        debug!("{} subschemas detected.", subschemas.len());
+
+        let has_object_subschema = subschemas
+            .iter()
+            .any(|schema| is_markable_schema(definitions, schema));
         let has_referenced_object_subschema = subschemas
             .iter()
             .map(|subschema| {
@@ -342,12 +361,34 @@ fn is_markable_schema(definitions: &Map<String, Schema>, schema: &SchemaObject) 
                     .as_ref()
                     .and_then(|reference| {
                         let reference = get_cleaned_schema_reference(reference);
-                        definitions.get(reference)
+                        definitions.get(reference).map(|d| (reference, d))
                     })
-                    .and_then(Schema::as_object)
-                    .map_or(false, is_object_schema)
+                    .and_then(|(definition_name, schema_definition)| {
+                        schema_definition.as_object().map(|s| (definition_name, s))
+                    })
+                    .map_or(false, |(name, schema)| {
+                        debug!(
+                            "Following schema reference '{}' for subschema markability.",
+                            name
+                        );
+                        is_markable_schema(definitions, schema)
+                    })
             })
             .any(identity);
+
+        debug!(
+            "Schema {} object subschema(s) and {} referenced subschemas.",
+            if has_object_subschema {
+                "has"
+            } else {
+                "does not have"
+            },
+            if has_referenced_object_subschema {
+                "has"
+            } else {
+                "does not have"
+            },
+        );
 
         if has_object_subschema || has_referenced_object_subschema {
             return true;
