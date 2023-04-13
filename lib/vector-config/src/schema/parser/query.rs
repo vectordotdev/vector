@@ -80,7 +80,7 @@ impl<'a> SchemaQueryBuilder<'a> {
     /// Can be used multiple times to match schemas against multiple attributes.
     ///
     /// Custom attributes are strongly matched: a flag attribute can only match a flag attribute,
-    /// not a key/value attribute, and vise versa. For key/value attributes where the attribute in
+    /// not a key/value attribute, and vice versa. For key/value attributes where the attribute in
     /// the schema itself has multiple values, the schema is considered a match so long as it
     /// contains the value specified in the query.
     pub fn with_custom_attribute_kv<K, V>(mut self, key: K, value: V) -> Self

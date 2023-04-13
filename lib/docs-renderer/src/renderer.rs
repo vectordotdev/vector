@@ -243,25 +243,7 @@ where
             return Ok(data);
         }
 
-        // If a schema is marked as a cycle entrypoint, this means that we would create a cycle (in
-        // the graph sense) if we continued trying to render it.
-        //
-        // This is necessary for some schemas that have a cyclical dependency on each other (like
-        // the `pipelines` transform referring to `Transforms`, which refers to `pipelines`,
-        // and...). We still need to return _something_, so we return some barebones render data --
-        // basically just a description -- so any configuration type that is a cycle entrypoint
-        // should take care to provide a _good_ description.
-        if schema.has_flag_attribute(constants::DOCS_META_CYCLE_ENTRYPOINT)? {
-            debug!("Schema is a cycle entrypoint.");
-
-            data.write("type", "blank");
-            apply_schema_description(&schema, &mut data)?;
-
-            return Ok(data);
-        }
-
-        // If a schema has an overridden type, we return some barebones render data, similar to what
-        // we do for cycle entrypoint schemas.
+        // If a schema has an overridden type, we return some barebones render data.
         if schema.has_flag_attribute(constants::DOCS_META_TYPE_OVERRIDE)? {
             debug!("Schema has overridden type.");
 
@@ -329,9 +311,7 @@ fn render_bare_schema<T: QueryableSchema>(
 
             for enum_value in enum_values {
                 let rendered_enum_type = get_rendered_value_type(&schema, enum_value)?;
-                let type_group_entry = type_map
-                    .entry(rendered_enum_type)
-                    .or_insert_with(Vec::new);
+                let type_group_entry = type_map.entry(rendered_enum_type).or_insert_with(Vec::new);
                 type_group_entry.push(enum_value.clone());
             }
 

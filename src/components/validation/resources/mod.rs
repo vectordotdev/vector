@@ -64,7 +64,7 @@ impl ResourceCodec {
     /// Gets an encoder for this codec.
     ///
     /// The encoder is generated as an inverse to the input codec: if a decoding configuration was
-    /// given, we generate an encoder that satisfies that decoding configuration, and vise versa.
+    /// given, we generate an encoder that satisfies that decoding configuration, and vice versa.
     pub fn into_encoder(&self) -> Encoder<encoding::Framer> {
         let (framer, serializer) = match self {
             Self::Encoding(config) => (
@@ -95,7 +95,7 @@ impl ResourceCodec {
     /// Gets a decoder for this codec.
     ///
     /// The decoder is generated as an inverse to the input codec: if an encoding configuration was
-    /// given, we generate a decoder that satisfies that encoding configuration, and vise versa.
+    /// given, we generate a decoder that satisfies that encoding configuration, and vice versa.
     pub fn into_decoder(&self) -> Decoder {
         let (framer, deserializer) = match self {
             Self::Decoding(config) => return config.build(),

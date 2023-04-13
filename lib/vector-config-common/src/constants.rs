@@ -1,5 +1,3 @@
-// TODO: Actually use this from `vector-config-macros` so that it's properly centralized.
-
 use serde_json::Value;
 use syn::Path;
 
@@ -14,7 +12,6 @@ pub const DOCS_META_ADVANCED: &str = "docs::advanced";
 pub const DOCS_META_COMPONENT_BASE_TYPE: &str = "docs::component_base_type";
 pub const DOCS_META_COMPONENT_NAME: &str = "docs::component_name";
 pub const DOCS_META_COMPONENT_TYPE: &str = "docs::component_type";
-pub const DOCS_META_CYCLE_ENTRYPOINT: &str = "docs::cycle_entrypoint";
 pub const DOCS_META_ENUM_CONTENT_FIELD: &str = "docs::enum_content_field";
 pub const DOCS_META_ENUM_TAG_DESCRIPTION: &str = "docs::enum_tag_description";
 pub const DOCS_META_ENUM_TAG_FIELD: &str = "docs::enum_tag_field";
