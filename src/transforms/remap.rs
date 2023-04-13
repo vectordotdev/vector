@@ -260,7 +260,7 @@ impl TransformConfig for RemapConfig {
                 // If the input definition is `never` this means that the
                 // upstream component has errored whilst loading (for example,
                 // with a VRL compiler error) this means data will never be
-                // recieved from that component.
+                // received from that component.
                 //
                 // This will most likely stop Vector from running, but we
                 // want to continue compiling to retrieve diagnostics. We
