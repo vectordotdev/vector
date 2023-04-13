@@ -256,6 +256,20 @@ impl TransformConfig for RemapConfig {
         let mut default_definitions = HashMap::new();
 
         for (output_id, input_definition) in input_definitions {
+            if input_definition.event_kind().is_never() {
+                // If the input definition is `never` this means that the
+                // upstream component has errored whilst loading (for example,
+                // with a VRL compiler error) this means data will never be
+                // recieved from that component.
+                //
+                // This will most likely stop Vector from running, but we
+                // want to continue compiling to retrieve diagnostics. We
+                // pass on the `never` definition downstream.
+                default_definitions.insert(output_id.clone(), input_definition.clone());
+                dropped_definitions.insert(output_id.clone(), input_definition.clone());
+                continue;
+            }
+
             let default_definition = compiled
                 .clone()
                 .map(|(state, meaning)| {
