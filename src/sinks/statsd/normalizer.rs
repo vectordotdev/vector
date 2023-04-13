@@ -22,12 +22,9 @@ impl MetricNormalize for StatsdNormalizer {
 mod tests {
     use std::fmt;
 
-    use vector_core::{
-        event::{
-            metric::{Bucket, MetricSketch, Sample},
-            Metric, MetricKind, MetricValue, StatisticKind,
-        },
-        metrics::AgentDDSketch,
+    use vector_core::event::{
+        metric::{Bucket, Sample},
+        Metric, MetricKind, MetricValue, StatisticKind,
     };
 
     use super::StatsdNormalizer;
@@ -142,25 +139,6 @@ mod tests {
                 buckets,
                 count,
                 sum,
-            },
-        )
-    }
-
-    fn get_sketch<N, S, V>(name: N, samples: S, kind: MetricKind) -> Metric
-    where
-        N: Into<String>,
-        S: IntoIterator<Item = V>,
-        V: Into<f64>,
-    {
-        let samples = samples.into_iter().map(Into::into).collect::<Vec<_>>();
-        let mut ddsketch = AgentDDSketch::with_agent_defaults();
-        ddsketch.insert_many(&samples);
-
-        Metric::new(
-            name,
-            kind,
-            MetricValue::Sketch {
-                sketch: MetricSketch::AgentDDSketch(ddsketch),
             },
         )
     }
@@ -378,28 +356,15 @@ mod tests {
     fn incremental_distribution() {
         let samples1 = generate_f64s(1, 100);
         let samples2 = generate_f64s(75, 125);
-        let sketch1_samples = samples1.clone();
-        let sketch2_samples = samples2.clone();
 
         let distributions = vec![
             get_distribution(samples1, MetricKind::Incremental),
             get_distribution(samples2, MetricKind::Incremental),
         ];
 
-        let expected_sketches = vec![
-            Some(get_sketch(
-                distributions[0].name(),
-                sketch1_samples,
-                MetricKind::Incremental,
-            )),
-            Some(get_sketch(
-                distributions[1].name(),
-                sketch2_samples,
-                MetricKind::Incremental,
-            )),
-        ];
+        let expected_distributions = distributions.iter().cloned().map(Some).collect();
 
-        run_comparisons(distributions, expected_sketches);
+        run_comparisons(distributions, expected_distributions);
     }
 
     #[test]
@@ -409,10 +374,6 @@ mod tests {
         let samples3 = generate_f64s(75, 187);
         let samples4 = generate_f64s(22, 45);
         let samples5 = generate_f64s(1, 100);
-        let sketch1_samples = samples1.clone();
-        let sketch3_samples = generate_f64s(126, 187);
-        let sketch4_samples = samples4.clone();
-        let sketch5_samples = samples5.clone();
 
         let distributions = vec![
             get_distribution(samples1, MetricKind::Incremental),
@@ -422,31 +383,18 @@ mod tests {
             get_distribution(samples5, MetricKind::Incremental),
         ];
 
-        let expected_sketches = vec![
-            Some(get_sketch(
-                distributions[0].name(),
-                sketch1_samples,
-                MetricKind::Incremental,
-            )),
+        let expected_distributions = vec![
+            Some(distributions[0].clone()),
             None,
-            Some(get_sketch(
-                distributions[2].name(),
-                sketch3_samples,
+            Some(get_distribution(
+                generate_f64s(126, 187),
                 MetricKind::Incremental,
             )),
-            Some(get_sketch(
-                distributions[3].name(),
-                sketch4_samples,
-                MetricKind::Incremental,
-            )),
-            Some(get_sketch(
-                distributions[4].name(),
-                sketch5_samples,
-                MetricKind::Incremental,
-            )),
+            Some(distributions[3].clone()),
+            Some(distributions[4].clone()),
         ];
 
-        run_comparisons(distributions, expected_sketches);
+        run_comparisons(distributions, expected_distributions);
     }
 
     #[test]
