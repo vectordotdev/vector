@@ -404,15 +404,15 @@ pub fn configurable_component_impl(args: TokenStream, item: TokenStream) -> Toke
 // TODO: Replace this with an explicit requirement for a "component_human_name" or similar.
 fn capitalize(s: &str) -> String {
     match s {
-        "Amqp" | "Aws" | "Ec2" | "Ecs" | "Gcp" | "Hec" | "Http" | "Nats" | "Nginx" | "Sqs" => {
+        "amqp" | "aws" | "ec2" | "ecs" | "gcp" | "hec" | "http" | "nats" | "nginx" | "sqs" => {
             s.to_uppercase()
         }
-        "Eventstoredb" => String::from("EventStoreDB"),
-        "Mongodb" => String::from("MongoDB"),
-        "Opentelemetry" => String::from("OpenTelemetry"),
-        "Postgresql" => String::from("PostgreSQL"),
-        "Pubsub" => String::from("Pub/Sub"),
-        "Statsd" => String::from("StatsD"),
+        "eventstoredb" => String::from("EventStoreDB"),
+        "mongodb" => String::from("MongoDB"),
+        "opentelemetry" => String::from("OpenTelemetry"),
+        "postgresql" => String::from("PostgreSQL"),
+        "pubsub" => String::from("Pub/Sub"),
+        "statsd" => String::from("StatsD"),
         _ => {
             let mut iter = s.chars();
             match iter.next() {
