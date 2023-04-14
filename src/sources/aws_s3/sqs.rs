@@ -352,7 +352,6 @@ impl IngestorProcess {
                 .message_id
                 .clone()
                 .unwrap_or_else(|| "<unknown>".to_owned());
-
             match self.handle_sqs_message(message).await {
                 Ok(()) => {
                     emit!(SqsMessageProcessingSucceeded {
@@ -555,6 +554,7 @@ impl IngestorProcess {
             let events = events
                 .into_iter()
                 .map(|mut event: Event| {
+                    event = event.with_batch_notifier_option(&batch);
                     if let Some(log_event) = event.maybe_as_log_mut() {
                         handle_single_log(
                             log_event,
@@ -603,15 +603,18 @@ impl IngestorProcess {
         } else {
             match receiver {
                 None => Ok(()),
-                Some(receiver) => match receiver.await {
-                    BatchStatus::Delivered => Ok(()),
-                    BatchStatus::Errored => Err(ProcessingError::ErrorAcknowledgement),
-                    BatchStatus::Rejected => {
-                        // Sinks are responsible for emitting ComponentEventsDropped.
-                        // Failed events cannot be retried, so continue to delete the SQS source message.
-                        Ok(())
+                Some(receiver) => {
+                    let result = receiver.await;
+                    match result {
+                        BatchStatus::Delivered => Ok(()),
+                        BatchStatus::Errored => Err(ProcessingError::ErrorAcknowledgement),
+                        BatchStatus::Rejected => {
+                            // Sinks are responsible for emitting ComponentEventsDropped.
+                            // Failed events cannot be retried, so continue to delete the SQS source message.
+                            Ok(())
+                        }
                     }
-                },
+                }
             }
         }
     }
