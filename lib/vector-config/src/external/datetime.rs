@@ -8,7 +8,7 @@ use crate::{
 use chrono_tz::Tz;
 use serde_json::Value;
 use std::cell::RefCell;
-use vector_config_common::attributes::CustomAttribute;
+use vector_config_common::{attributes::CustomAttribute, constants};
 use vrl_core::TimeZone;
 
 // TODO: Consider an approach for generating schema of "fixed string value, or remainder" structure
@@ -24,10 +24,19 @@ impl Configurable for TimeZone {
         metadata.set_description(r#"This can refer to any valid timezone as defined in the [TZ database][tzdb], or "local" which refers to the system local timezone.
 
 [tzdb]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones"#);
-        metadata.add_custom_attribute(CustomAttribute::kv("docs::enum_tagging", "untagged"));
-        metadata.add_custom_attribute(CustomAttribute::kv("docs::examples", "local"));
-        metadata.add_custom_attribute(CustomAttribute::kv("docs::examples", "America/New_York"));
-        metadata.add_custom_attribute(CustomAttribute::kv("docs::examples", "EST5EDT"));
+        metadata.add_custom_attribute(CustomAttribute::kv(
+            constants::DOCS_META_ENUM_TAGGING,
+            "untagged",
+        ));
+        metadata.add_custom_attribute(CustomAttribute::kv(constants::DOCS_META_EXAMPLES, "local"));
+        metadata.add_custom_attribute(CustomAttribute::kv(
+            constants::DOCS_META_EXAMPLES,
+            "America/New_York",
+        ));
+        metadata.add_custom_attribute(CustomAttribute::kv(
+            constants::DOCS_META_EXAMPLES,
+            "EST5EDT",
+        ));
         metadata
     }
 

@@ -2813,6 +2813,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fea41bba32d969b513997752735605054bc0dfa92b4c56bf1189f2e174be7a10"
 
 [[package]]
+name = "docs-renderer"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "serde",
+ "serde_json",
+ "snafu",
+ "tracing 0.1.37",
+ "tracing-subscriber",
+ "vector-config",
+ "vector-config-common",
+]
+
+[[package]]
 name = "duct"
 version = "0.13.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9474,6 +9488,7 @@ dependencies = [
  "inventory",
  "no-proxy",
  "num-traits",
+ "once_cell",
  "pretty_assertions",
  "serde",
  "serde_json",

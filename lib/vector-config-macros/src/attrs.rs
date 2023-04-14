@@ -10,12 +10,6 @@ impl AttributeIdent {
     }
 }
 
-pub const ENRICHMENT_TABLE: AttributeIdent = AttributeIdent("enrichment_table");
-pub const PROVIDER: AttributeIdent = AttributeIdent("provider");
-pub const SECRETS: AttributeIdent = AttributeIdent("secrets");
-pub const SINK: AttributeIdent = AttributeIdent("sink");
-pub const SOURCE: AttributeIdent = AttributeIdent("source");
-pub const TRANSFORM: AttributeIdent = AttributeIdent("transform");
 pub const NO_SER: AttributeIdent = AttributeIdent("no_ser");
 pub const NO_DESER: AttributeIdent = AttributeIdent("no_deser");
 pub const ENRICHMENT_TABLE_COMPONENT: AttributeIdent = AttributeIdent("enrichment_table_component");

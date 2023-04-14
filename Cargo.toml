@@ -87,6 +87,7 @@ members = [
   ".",
   "lib/codecs",
   "lib/dnsmsg-parser",
+  "lib/docs-renderer",
   "lib/enrichment",
   "lib/fakedata",
   "lib/file-source",
