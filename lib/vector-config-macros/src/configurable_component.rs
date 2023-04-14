@@ -403,7 +403,8 @@ pub fn configurable_component_impl(args: TokenStream, item: TokenStream) -> Toke
 // Properly capitalize labels, accounting for some exceptions
 // TODO: Replace this with an explicit requirement for a "component_human_name" or similar.
 fn capitalize(s: &str) -> String {
-    match s {
+    let as_lower = s.to_lowercase();
+    match as_lower.as_str() {
         "amqp" | "aws" | "ec2" | "ecs" | "gcp" | "hec" | "http" | "nats" | "nginx" | "sqs" => {
             s.to_uppercase()
         }
