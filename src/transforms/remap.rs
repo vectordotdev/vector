@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::sync::Arc;
 use std::{
     collections::BTreeMap,
@@ -251,10 +252,10 @@ impl TransformConfig for RemapConfig {
             })
             .map_err(|_| ());
 
-        let mut dropped_definitions = Vec::new();
-        let mut default_definitions = Vec::new();
+        let mut dropped_definitions = HashMap::new();
+        let mut default_definitions = HashMap::new();
 
-        for (_output_id, input_definition) in input_definitions {
+        for (output_id, input_definition) in input_definitions {
             let default_definition = compiled
                 .clone()
                 .map(|(state, meaning)| {
@@ -338,8 +339,8 @@ impl TransformConfig for RemapConfig {
                 );
             }
 
-            default_definitions.push(default_definition);
-            dropped_definitions.push(dropped_definition);
+            default_definitions.insert(output_id.clone(), default_definition);
+            dropped_definitions.insert(output_id.clone(), dropped_definition);
         }
 
         let default_output = TransformOutput::new(DataType::all(), default_definitions);
@@ -445,8 +446,9 @@ where
             // TODO we can now have multiple possible definitions.
             // This is going to need to be updated to store these possible definitions and then
             // choose the correct one based on the input the event has come from.
-            .get(0)
-            .cloned()
+            .iter()
+            .map(|(_output, definition)| definition.clone())
+            .next()
             .unwrap_or_else(Definition::any);
 
         let dropped_schema_definition = context
@@ -454,8 +456,9 @@ where
             .get(&Some(DROPPED.to_owned()))
             .or_else(|| context.schema_definitions.get(&None))
             .expect("dropped schema required")
-            .get(0)
-            .cloned()
+            .iter()
+            .map(|(_output, definition)| definition.clone())
+            .next()
             .unwrap_or_else(Definition::any);
 
         Ok(Remap {
@@ -702,10 +705,13 @@ mod tests {
 
     fn remap(config: RemapConfig) -> Result<Remap<AstRunner>> {
         let schema_definitions = HashMap::from([
-            (None, vec![test_default_schema_definition()]),
+            (
+                None,
+                [("source".into(), test_default_schema_definition())].into(),
+            ),
             (
                 Some(DROPPED.to_owned()),
-                vec![test_dropped_schema_definition()],
+                [("source".into(), test_dropped_schema_definition())].into(),
             ),
         ]);
 
@@ -1176,10 +1182,13 @@ mod tests {
             ..Default::default()
         };
         let schema_definitions = HashMap::from([
-            (None, vec![test_default_schema_definition()]),
+            (
+                None,
+                [("source".into(), test_default_schema_definition())].into(),
+            ),
             (
                 Some(DROPPED.to_owned()),
-                vec![test_dropped_schema_definition()],
+                [("source".into(), test_dropped_schema_definition())].into(),
             ),
         ]);
         let context = TransformContext {
@@ -1448,7 +1457,7 @@ mod tests {
             ),
             vec![TransformOutput::new(
                 DataType::all(),
-                vec![schema_definition]
+                [("test".into(), schema_definition)].into()
             )]
         );
 
@@ -1514,8 +1523,8 @@ mod tests {
     fn collect_outputs(ft: &mut dyn SyncTransform, event: Event) -> CollectedOuput {
         let mut outputs = TransformOutputsBuf::new_with_capacity(
             vec![
-                TransformOutput::new(DataType::all(), vec![]),
-                TransformOutput::new(DataType::all(), vec![]).with_port(DROPPED),
+                TransformOutput::new(DataType::all(), HashMap::new()),
+                TransformOutput::new(DataType::all(), HashMap::new()).with_port(DROPPED),
             ],
             1,
         );
@@ -1541,8 +1550,8 @@ mod tests {
     ) -> std::result::Result<Event, Event> {
         let mut outputs = TransformOutputsBuf::new_with_capacity(
             vec![
-                TransformOutput::new(DataType::all(), vec![]),
-                TransformOutput::new(DataType::all(), vec![]).with_port(DROPPED),
+                TransformOutput::new(DataType::all(), HashMap::new()),
+                TransformOutput::new(DataType::all(), HashMap::new()).with_port(DROPPED),
             ],
             1,
         );
