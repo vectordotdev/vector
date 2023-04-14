@@ -10,7 +10,7 @@ use warp::http::{HeaderMap, StatusCode};
 use super::parser;
 use crate::{
     config::{
-        self, GenerateConfig, Output, SourceAcknowledgementsConfig, SourceConfig, SourceContext,
+        GenerateConfig, SourceAcknowledgementsConfig, SourceConfig, SourceContext, SourceOutput,
     },
     event::Event,
     internal_events::PrometheusRemoteWriteParseError,
@@ -88,8 +88,8 @@ impl SourceConfig for PrometheusRemoteWriteConfig {
         )
     }
 
-    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
-        vec![Output::default(config::DataType::Metric)]
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
+        vec![SourceOutput::new_metrics()]
     }
 
     fn can_acknowledge(&self) -> bool {

@@ -34,7 +34,7 @@ use self::{
     splunk_response::{HecResponse, HecResponseMetadata, HecStatusCode},
 };
 use crate::{
-    config::{log_schema, DataType, Output, Resource, SourceConfig, SourceContext},
+    config::{log_schema, DataType, Resource, SourceConfig, SourceContext, SourceOutput},
     event::{Event, LogEvent, Value},
     internal_events::{
         EventsReceived, HttpBytesReceived, SplunkHecRequestBodyInvalidError, SplunkHecRequestError,
@@ -175,7 +175,7 @@ impl SourceConfig for SplunkConfig {
         }))
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         let log_namespace = global_log_namespace.merge(self.log_namespace);
 
         let schema_definition = match log_namespace {
@@ -237,7 +237,7 @@ impl SourceConfig for SplunkConfig {
             None,
         );
 
-        vec![Output::default(DataType::Log).with_schema_definition(schema_definition)]
+        vec![SourceOutput::new_logs(DataType::Log, schema_definition)]
     }
 
     fn resources(&self) -> Vec<Resource> {
@@ -2443,10 +2443,10 @@ mod tests {
             ..Default::default()
         };
 
-        let definition = config.outputs(LogNamespace::Vector)[0]
-            .clone()
-            .log_schema_definition
-            .unwrap();
+        let definition = config
+            .outputs(LogNamespace::Vector)
+            .remove(0)
+            .schema_definition(true);
 
         let expected_definition = Definition::new_with_default_metadata(
             Kind::object(Collection::empty()).or_bytes(),
@@ -2488,16 +2488,16 @@ mod tests {
             None,
         );
 
-        assert_eq!(definition, expected_definition);
+        assert_eq!(definition, Some(expected_definition));
     }
 
     #[test]
     fn output_schema_definition_legacy_namespace() {
         let config = SplunkConfig::default();
-        let definition = config.outputs(LogNamespace::Legacy)[0]
-            .clone()
-            .log_schema_definition
-            .unwrap();
+        let definitions = config
+            .outputs(LogNamespace::Legacy)
+            .remove(0)
+            .schema_definition(true);
 
         let expected_definition = Definition::new_with_default_metadata(
             Kind::object(Collection::empty()),
@@ -2523,6 +2523,6 @@ mod tests {
         .with_event_field(&owned_value_path!("splunk_sourcetype"), Kind::bytes(), None)
         .with_event_field(&owned_value_path!("timestamp"), Kind::timestamp(), None);
 
-        assert_eq!(definition, expected_definition);
+        assert_eq!(definitions, Some(expected_definition));
     }
 }

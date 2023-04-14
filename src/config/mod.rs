@@ -11,8 +11,8 @@ use indexmap::IndexMap;
 pub use vector_config::component::{GenerateConfig, SinkDescription, TransformDescription};
 use vector_config::configurable_component;
 pub use vector_core::config::{
-    AcknowledgementsConfig, DataType, GlobalOptions, Input, LogNamespace, Output,
-    SourceAcknowledgementsConfig,
+    AcknowledgementsConfig, DataType, GlobalOptions, Input, LogNamespace,
+    SourceAcknowledgementsConfig, SourceOutput, TransformOutput,
 };
 
 use crate::{conditions, event::Metric, secrets::SecretBackends, serde::OneOrMany};

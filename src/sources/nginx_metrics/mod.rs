@@ -16,7 +16,7 @@ use vector_config::configurable_component;
 use vector_core::{metric_tags, EstimatedJsonEncodedSizeOf};
 
 use crate::{
-    config::{DataType, Output, SourceConfig, SourceContext},
+    config::{SourceConfig, SourceContext, SourceOutput},
     event::metric::{Metric, MetricKind, MetricTags, MetricValue},
     http::{Auth, HttpClient},
     internal_events::{
@@ -144,8 +144,8 @@ impl SourceConfig for NginxMetricsConfig {
         }))
     }
 
-    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
-        vec![Output::default(DataType::Metric)]
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
+        vec![SourceOutput::new_metrics()]
     }
 
     fn can_acknowledge(&self) -> bool {
