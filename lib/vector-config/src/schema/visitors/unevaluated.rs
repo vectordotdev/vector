@@ -361,11 +361,9 @@ fn is_markable_schema(definitions: &Map<String, Schema>, schema: &SchemaObject) 
                     .as_ref()
                     .and_then(|reference| {
                         let reference = get_cleaned_schema_reference(reference);
-                        definitions.get(reference).map(|d| (reference, d))
+                        definitions.get_full(reference)
                     })
-                    .and_then(|(definition_name, schema_definition)| {
-                        schema_definition.as_object().map(|s| (definition_name, s))
-                    })
+                    .and_then(|(_, name, schema)| schema.as_object().map(|schema| (name, schema)))
                     .map_or(false, |(name, schema)| {
                         debug!(
                             "Following schema reference '{}' for subschema markability.",
