@@ -1,6 +1,6 @@
 //! Networking-related helper functions.
 
-use std::{io, os::fd::AsRawFd, time::Duration};
+use std::{io, time::Duration};
 
 use socket2::{SockRef, TcpKeepalive};
 use tokio::net::TcpStream;
@@ -14,9 +14,9 @@ use tokio::net::TcpStream;
 /// If there is an error setting the receive buffer size on the given socket, or if the value given
 /// as the socket is not a valid socket, an error variant will be returned explaining the underlying
 /// I/O error.
-pub fn set_receive_buffer_size<S>(socket: &S, size: usize) -> io::Result<()>
+pub fn set_receive_buffer_size<'s, S>(socket: &'s S, size: usize) -> io::Result<()>
 where
-    S: AsRawFd,
+    SockRef<'s>: From<&'s S>,
 {
     SockRef::from(socket).set_recv_buffer_size(size)
 }
@@ -30,9 +30,9 @@ where
 /// If there is an error setting the send buffer size on the given socket, or if the value given
 /// as the socket is not a valid socket, an error variant will be returned explaining the underlying
 /// I/O error.
-pub fn set_send_buffer_size<S>(socket: &S, size: usize) -> io::Result<()>
+pub fn set_send_buffer_size<'s, S>(socket: &'s S, size: usize) -> io::Result<()>
 where
-    S: AsRawFd,
+    SockRef<'s>: From<&'s S>,
 {
     SockRef::from(socket).set_send_buffer_size(size)
 }

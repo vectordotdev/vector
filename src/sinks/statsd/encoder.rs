@@ -151,7 +151,7 @@ mod tests {
             default_namespace: None,
         };
         let mut frame = BytesMut::new();
-        encoder.encode(&metric, &mut frame).unwrap();
+        encoder.encode(metric, &mut frame).unwrap();
         frame
     }
 
