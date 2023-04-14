@@ -140,39 +140,39 @@ impl SourceConfig for AwsS3Config {
         }
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> crate::Result<Vec<SourceOutput>> {
         let log_namespace = global_log_namespace.merge(self.log_namespace);
         let mut schema_definition = BytesDeserializerConfig
-            .schema_definition(log_namespace)
+            .schema_definition(log_namespace)?
             .with_source_metadata(
                 Self::NAME,
                 Some(LegacyKey::Overwrite(owned_value_path!("bucket"))),
                 &owned_value_path!("bucket"),
                 Kind::bytes(),
                 None,
-            )
+            )?
             .with_source_metadata(
                 Self::NAME,
                 Some(LegacyKey::Overwrite(owned_value_path!("object"))),
                 &owned_value_path!("object"),
                 Kind::bytes(),
                 None,
-            )
+            )?
             .with_source_metadata(
                 Self::NAME,
                 Some(LegacyKey::Overwrite(owned_value_path!("region"))),
                 &owned_value_path!("region"),
                 Kind::bytes(),
                 None,
-            )
+            )?
             .with_source_metadata(
                 Self::NAME,
                 None,
                 &owned_value_path!("timestamp"),
                 Kind::timestamp(),
                 Some("timestamp"),
-            )
-            .with_standard_vector_source_metadata()
+            )?
+            .with_standard_vector_source_metadata()?
             // for metadata that is added to the events dynamically from the metadata
             .with_source_metadata(
                 Self::NAME,
@@ -180,14 +180,17 @@ impl SourceConfig for AwsS3Config {
                 &owned_value_path!("metadata"),
                 Kind::object(Collection::empty().with_unknown(Kind::bytes())),
                 None,
-            );
+            )?;
 
         // for metadata that is added to the events dynamically from the metadata
         if log_namespace == LogNamespace::Legacy {
             schema_definition = schema_definition.unknown_fields(Kind::bytes());
         }
 
-        vec![SourceOutput::new_logs(DataType::Log, schema_definition)]
+        Ok(vec![SourceOutput::new_logs(
+            DataType::Log,
+            schema_definition,
+        )])
     }
 
     fn can_acknowledge(&self) -> bool {

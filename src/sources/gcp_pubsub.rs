@@ -326,35 +326,38 @@ impl SourceConfig for PubsubConfig {
         Ok(Box::pin(source))
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> crate::Result<Vec<SourceOutput>> {
         let log_namespace = global_log_namespace.merge(self.log_namespace);
         let schema_definition = self
             .decoding
-            .schema_definition(log_namespace)
-            .with_standard_vector_source_metadata()
+            .schema_definition(log_namespace)?
+            .with_standard_vector_source_metadata()?
             .with_source_metadata(
                 PubsubConfig::NAME,
                 Some(LegacyKey::Overwrite(owned_value_path!("timestamp"))),
                 &owned_value_path!("timestamp"),
                 Kind::timestamp().or_undefined(),
                 Some("timestamp"),
-            )
+            )?
             .with_source_metadata(
                 PubsubConfig::NAME,
                 Some(LegacyKey::Overwrite(owned_value_path!("attributes"))),
                 &owned_value_path!("attributes"),
                 Kind::object(Collection::empty().with_unknown(Kind::bytes())),
                 None,
-            )
+            )?
             .with_source_metadata(
                 PubsubConfig::NAME,
                 Some(LegacyKey::Overwrite(owned_value_path!("message_id"))),
                 &owned_value_path!("message_id"),
                 Kind::bytes(),
                 None,
-            );
+            )?;
 
-        vec![SourceOutput::new_logs(DataType::Log, schema_definition)]
+        Ok(vec![SourceOutput::new_logs(
+            DataType::Log,
+            schema_definition,
+        )])
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -758,6 +761,7 @@ mod tests {
 
         let definitions = config
             .outputs(LogNamespace::Vector)
+            .unwrap()
             .remove(0)
             .schema_definition(true);
 
@@ -769,26 +773,31 @@ mod tests {
                     Kind::bytes(),
                     None,
                 )
+                .unwrap()
                 .with_metadata_field(
                     &owned_value_path!("vector", "ingest_timestamp"),
                     Kind::timestamp(),
                     None,
                 )
+                .unwrap()
                 .with_metadata_field(
                     &owned_value_path!("gcp_pubsub", "timestamp"),
                     Kind::timestamp().or_undefined(),
                     Some("timestamp"),
                 )
+                .unwrap()
                 .with_metadata_field(
                     &owned_value_path!("gcp_pubsub", "attributes"),
                     Kind::object(Collection::empty().with_unknown(Kind::bytes())),
                     None,
                 )
+                .unwrap()
                 .with_metadata_field(
                     &owned_value_path!("gcp_pubsub", "message_id"),
                     Kind::bytes(),
                     None,
-                );
+                )
+                .unwrap();
 
         assert_eq!(definitions, Some(expected_definition));
     }
@@ -799,6 +808,7 @@ mod tests {
 
         let definitions = config
             .outputs(LogNamespace::Legacy)
+            .unwrap()
             .remove(0)
             .schema_definition(true);
 
@@ -811,18 +821,23 @@ mod tests {
             Kind::bytes(),
             Some("message"),
         )
+        .unwrap()
         .with_event_field(
             &owned_value_path!("timestamp"),
             Kind::timestamp().or_undefined(),
             Some("timestamp"),
         )
+        .unwrap()
         .with_event_field(&owned_value_path!("source_type"), Kind::bytes(), None)
+        .unwrap()
         .with_event_field(
             &owned_value_path!("attributes"),
             Kind::object(Collection::empty().with_unknown(Kind::bytes())),
             None,
         )
-        .with_event_field(&owned_value_path!("message_id"), Kind::bytes(), None);
+        .unwrap()
+        .with_event_field(&owned_value_path!("message_id"), Kind::bytes(), None)
+        .unwrap();
 
         assert_eq!(definitions, Some(expected_definition));
     }

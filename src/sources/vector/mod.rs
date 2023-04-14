@@ -191,14 +191,17 @@ impl SourceConfig for VectorConfig {
         Ok(Box::pin(source))
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> crate::Result<Vec<SourceOutput>> {
         let log_namespace = global_log_namespace.merge(self.log_namespace);
 
         let schema_definition = NativeDeserializerConfig
-            .schema_definition(log_namespace)
-            .with_standard_vector_source_metadata();
+            .schema_definition(log_namespace)?
+            .with_standard_vector_source_metadata()?;
 
-        vec![SourceOutput::new_logs(DataType::all(), schema_definition)]
+        Ok(vec![SourceOutput::new_logs(
+            DataType::all(),
+            schema_definition,
+        )])
     }
 
     fn resources(&self) -> Vec<Resource> {
@@ -231,6 +234,7 @@ mod test {
 
         let definitions = config
             .outputs(LogNamespace::Vector)
+            .unwrap()
             .remove(0)
             .schema_definition(true);
 
@@ -241,11 +245,13 @@ mod test {
                     Kind::bytes(),
                     None,
                 )
+                .unwrap()
                 .with_metadata_field(
                     &owned_value_path!("vector", "ingest_timestamp"),
                     Kind::timestamp(),
                     None,
-                );
+                )
+                .unwrap();
 
         assert_eq!(definitions, Some(expected_definition))
     }
@@ -256,6 +262,7 @@ mod test {
 
         let definitions = config
             .outputs(LogNamespace::Legacy)
+            .unwrap()
             .remove(0)
             .schema_definition(true);
 
@@ -264,7 +271,9 @@ mod test {
             [LogNamespace::Legacy],
         )
         .with_event_field(&owned_value_path!("source_type"), Kind::bytes(), None)
-        .with_event_field(&owned_value_path!("timestamp"), Kind::timestamp(), None);
+        .unwrap()
+        .with_event_field(&owned_value_path!("timestamp"), Kind::timestamp(), None)
+        .unwrap();
 
         assert_eq!(definitions, Some(expected_definition))
     }

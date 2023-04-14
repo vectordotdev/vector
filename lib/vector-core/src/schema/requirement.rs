@@ -248,7 +248,8 @@ mod tests {
     fn test_doesnt_validate_types() {
         let requirement = Requirement::empty().required_meaning("foo", Kind::boolean());
         let definition = Definition::default_for_namespace(&[LogNamespace::Vector].into())
-            .with_event_field(&owned_value_path!("foo"), Kind::integer(), Some("foo"));
+            .with_event_field(&owned_value_path!("foo"), Kind::integer(), Some("foo"))
+            .unwrap();
 
         assert_eq!(Ok(()), requirement.validate(&definition, false));
     }
@@ -260,13 +261,15 @@ mod tests {
         // We get an error if we have a connected component with the Vector namespace.
         let definition =
             Definition::default_for_namespace(&[LogNamespace::Vector, LogNamespace::Legacy].into())
-                .with_event_field(&owned_value_path!("foo"), Kind::integer(), Some("foo"));
+                .with_event_field(&owned_value_path!("foo"), Kind::integer(), Some("foo"))
+                .unwrap();
 
         assert_ne!(Ok(()), requirement.validate(&definition, true));
 
         // We don't get an error if we have a connected component with just the Legacy namespace.
         let definition = Definition::default_for_namespace(&[LogNamespace::Legacy].into())
-            .with_event_field(&owned_value_path!("foo"), Kind::integer(), Some("foo"));
+            .with_event_field(&owned_value_path!("foo"), Kind::integer(), Some("foo"))
+            .unwrap();
 
         assert_eq!(Ok(()), requirement.validate(&definition, true));
     }
@@ -340,7 +343,8 @@ mod tests {
                 TestCase {
                     requirement: Requirement::empty().required_meaning("foo", Kind::boolean()),
                     definition: Definition::default_for_namespace(&[LogNamespace::Vector].into())
-                        .with_event_field(&owned_value_path!("foo"), Kind::integer(), Some("foo")),
+                        .with_event_field(&owned_value_path!("foo"), Kind::integer(), Some("foo"))
+                        .unwrap(),
                     errors: vec![ValidationError::MeaningKind {
                         identifier: "foo",
                         want: Kind::boolean(),
@@ -353,7 +357,8 @@ mod tests {
                 TestCase {
                     requirement: Requirement::empty().optional_meaning("foo", Kind::boolean()),
                     definition: Definition::default_for_namespace(&[LogNamespace::Vector].into())
-                        .with_event_field(&owned_value_path!("foo"), Kind::integer(), Some("foo")),
+                        .with_event_field(&owned_value_path!("foo"), Kind::integer(), Some("foo"))
+                        .unwrap(),
                     errors: vec![ValidationError::MeaningKind {
                         identifier: "foo",
                         want: Kind::boolean(),
@@ -367,13 +372,15 @@ mod tests {
                     requirement: Requirement::empty().optional_meaning("foo", Kind::boolean()),
                     definition: Definition::default_for_namespace(&[LogNamespace::Vector].into())
                         .with_event_field(&owned_value_path!("foo"), Kind::integer(), Some("foo"))
+                        .unwrap()
                         .merge(
                             Definition::default_for_namespace(&[LogNamespace::Vector].into())
                                 .with_event_field(
                                     &owned_value_path!("bar"),
                                     Kind::boolean(),
                                     Some("foo"),
-                                ),
+                                )
+                                .unwrap(),
                         ),
                     errors: vec![ValidationError::MeaningDuplicate {
                         identifier: "foo",

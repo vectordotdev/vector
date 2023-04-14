@@ -175,7 +175,7 @@ impl SourceConfig for SplunkConfig {
         }))
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> crate::Result<Vec<SourceOutput>> {
         let log_namespace = global_log_namespace.merge(self.log_namespace);
 
         let schema_definition = match log_namespace {
@@ -184,20 +184,20 @@ impl SourceConfig for SplunkConfig {
                     &owned_value_path!(log_schema().message_key()),
                     Kind::bytes().or_undefined(),
                     Some("message"),
-                )
+                )?
                 .with_event_field(
                     &owned_value_path!("line"),
                     Kind::object(Collection::empty())
                         .or_array(Collection::empty())
                         .or_undefined(),
                     None,
-                ),
+                )?,
             LogNamespace::Vector => vector_core::schema::Definition::new_with_default_metadata(
                 Kind::bytes().or_object(Collection::empty()),
                 [log_namespace],
             ),
         }
-        .with_standard_vector_source_metadata()
+        .with_standard_vector_source_metadata()?
         .with_source_metadata(
             SplunkConfig::NAME,
             Some(LegacyKey::Overwrite(owned_value_path!(
@@ -206,28 +206,28 @@ impl SourceConfig for SplunkConfig {
             &owned_value_path!("host"),
             Kind::bytes(),
             Some("host"),
-        )
+        )?
         .with_source_metadata(
             SplunkConfig::NAME,
             Some(LegacyKey::Overwrite(owned_value_path!(CHANNEL))),
             &owned_value_path!("channel"),
             Kind::bytes(),
             None,
-        )
+        )?
         .with_source_metadata(
             SplunkConfig::NAME,
             Some(LegacyKey::Overwrite(owned_value_path!(INDEX))),
             &owned_value_path!("index"),
             Kind::bytes(),
             None,
-        )
+        )?
         .with_source_metadata(
             SplunkConfig::NAME,
             Some(LegacyKey::Overwrite(owned_value_path!(SOURCE))),
             &owned_value_path!("source"),
             Kind::bytes(),
             None,
-        )
+        )?
         // Not to be confused with `source_type`.
         .with_source_metadata(
             SplunkConfig::NAME,
@@ -235,9 +235,12 @@ impl SourceConfig for SplunkConfig {
             &owned_value_path!("sourcetype"),
             Kind::bytes(),
             None,
-        );
+        )?;
 
-        vec![SourceOutput::new_logs(DataType::Log, schema_definition)]
+        Ok(vec![SourceOutput::new_logs(
+            DataType::Log,
+            schema_definition,
+        )])
     }
 
     fn resources(&self) -> Vec<Resource> {
@@ -2445,6 +2448,7 @@ mod tests {
 
         let definition = config
             .outputs(LogNamespace::Vector)
+            .unwrap()
             .remove(0)
             .schema_definition(true);
 
@@ -2457,36 +2461,43 @@ mod tests {
             Kind::bytes(),
             None,
         )
+        .unwrap()
         .with_metadata_field(
             &owned_value_path!("vector", "ingest_timestamp"),
             Kind::timestamp(),
             None,
         )
+        .unwrap()
         .with_metadata_field(
             &owned_value_path!("splunk_hec", "host"),
             Kind::bytes(),
             Some("host"),
         )
+        .unwrap()
         .with_metadata_field(
             &owned_value_path!("splunk_hec", "index"),
             Kind::bytes(),
             None,
         )
+        .unwrap()
         .with_metadata_field(
             &owned_value_path!("splunk_hec", "source"),
             Kind::bytes(),
             None,
         )
+        .unwrap()
         .with_metadata_field(
             &owned_value_path!("splunk_hec", "channel"),
             Kind::bytes(),
             None,
         )
+        .unwrap()
         .with_metadata_field(
             &owned_value_path!("splunk_hec", "sourcetype"),
             Kind::bytes(),
             None,
-        );
+        )
+        .unwrap();
 
         assert_eq!(definition, Some(expected_definition));
     }
@@ -2496,6 +2507,7 @@ mod tests {
         let config = SplunkConfig::default();
         let definitions = config
             .outputs(LogNamespace::Legacy)
+            .unwrap()
             .remove(0)
             .schema_definition(true);
 
@@ -2504,11 +2516,13 @@ mod tests {
             [LogNamespace::Legacy],
         )
         .with_event_field(&owned_value_path!("host"), Kind::bytes(), Some("host"))
+        .unwrap()
         .with_event_field(
             &owned_value_path!("message"),
             Kind::bytes().or_undefined(),
             Some("message"),
         )
+        .unwrap()
         .with_event_field(
             &owned_value_path!("line"),
             Kind::array(Collection::empty())
@@ -2516,12 +2530,19 @@ mod tests {
                 .or_undefined(),
             None,
         )
+        .unwrap()
         .with_event_field(&owned_value_path!("source_type"), Kind::bytes(), None)
+        .unwrap()
         .with_event_field(&owned_value_path!("splunk_channel"), Kind::bytes(), None)
+        .unwrap()
         .with_event_field(&owned_value_path!("splunk_index"), Kind::bytes(), None)
+        .unwrap()
         .with_event_field(&owned_value_path!("splunk_source"), Kind::bytes(), None)
+        .unwrap()
         .with_event_field(&owned_value_path!("splunk_sourcetype"), Kind::bytes(), None)
-        .with_event_field(&owned_value_path!("timestamp"), Kind::timestamp(), None);
+        .unwrap()
+        .with_event_field(&owned_value_path!("timestamp"), Kind::timestamp(), None)
+        .unwrap();
 
         assert_eq!(definitions, Some(expected_definition));
     }

@@ -46,11 +46,11 @@ impl SourceConfig for UnitTestSourceConfig {
         }))
     }
 
-    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
-        vec![SourceOutput::new_logs(
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> crate::Result<Vec<SourceOutput>> {
+        Ok(vec![SourceOutput::new_logs(
             DataType::all(),
             schema::Definition::default_legacy_namespace(),
-        )]
+        )])
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -103,11 +103,11 @@ impl SourceConfig for UnitTestStreamSourceConfig {
         }))
     }
 
-    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
-        vec![SourceOutput::new_logs(
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> crate::Result<Vec<SourceOutput>> {
+        Ok(vec![SourceOutput::new_logs(
             DataType::all(),
             schema::Definition::default_legacy_namespace(),
-        )]
+        )])
     }
 
     fn can_acknowledge(&self) -> bool {

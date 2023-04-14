@@ -135,7 +135,7 @@ impl SourceConfig for NatsSourceConfig {
         )))
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> crate::Result<Vec<SourceOutput>> {
         let log_namespace = global_log_namespace.merge(self.log_namespace);
         let legacy_subject_key_field = self
             .subject_key_field
@@ -144,20 +144,20 @@ impl SourceConfig for NatsSourceConfig {
             .map(LegacyKey::InsertIfEmpty);
         let schema_definition = self
             .decoding
-            .schema_definition(log_namespace)
-            .with_standard_vector_source_metadata()
+            .schema_definition(log_namespace)?
+            .with_standard_vector_source_metadata()?
             .with_source_metadata(
                 NatsSourceConfig::NAME,
                 legacy_subject_key_field,
                 &owned_value_path!("subject"),
                 Kind::bytes(),
                 None,
-            );
+            )?;
 
-        vec![SourceOutput::new_logs(
+        Ok(vec![SourceOutput::new_logs(
             self.decoding.output_type(),
             schema_definition,
-        )]
+        )])
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -295,6 +295,7 @@ mod tests {
 
         let definitions = config
             .outputs(LogNamespace::Vector)
+            .unwrap()
             .remove(0)
             .schema_definition(true);
 
@@ -306,12 +307,15 @@ mod tests {
                     Kind::bytes(),
                     None,
                 )
+                .unwrap()
                 .with_metadata_field(
                     &owned_value_path!("vector", "ingest_timestamp"),
                     Kind::timestamp(),
                     None,
                 )
-                .with_metadata_field(&owned_value_path!("nats", "subject"), Kind::bytes(), None);
+                .unwrap()
+                .with_metadata_field(&owned_value_path!("nats", "subject"), Kind::bytes(), None)
+                .unwrap();
 
         assert_eq!(definitions, Some(expected_definition));
     }
@@ -324,6 +328,7 @@ mod tests {
         };
         let definitions = config
             .outputs(LogNamespace::Legacy)
+            .unwrap()
             .remove(0)
             .schema_definition(true);
 
@@ -336,9 +341,13 @@ mod tests {
             Kind::bytes(),
             Some("message"),
         )
+        .unwrap()
         .with_event_field(&owned_value_path!("timestamp"), Kind::timestamp(), None)
+        .unwrap()
         .with_event_field(&owned_value_path!("source_type"), Kind::bytes(), None)
-        .with_event_field(&owned_value_path!("subject"), Kind::bytes(), None);
+        .unwrap()
+        .with_event_field(&owned_value_path!("subject"), Kind::bytes(), None)
+        .unwrap();
 
         assert_eq!(definitions, Some(expected_definition));
     }

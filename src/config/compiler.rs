@@ -123,6 +123,7 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
 }
 
 /// Expand globs in input lists
+/// TODO - Is this the first time outputs are called? Does that mean we don't care about errors?
 pub(crate) fn expand_globs(config: &mut ConfigBuilder) {
     let candidates = config
         .sources
@@ -130,6 +131,8 @@ pub(crate) fn expand_globs(config: &mut ConfigBuilder) {
         .flat_map(|(key, s)| {
             s.inner
                 .outputs(config.schema.log_namespace())
+                // TODO - handle
+                .unwrap()
                 .into_iter()
                 .map(|output| OutputId {
                     component: key.clone(),
@@ -142,6 +145,8 @@ pub(crate) fn expand_globs(config: &mut ConfigBuilder) {
                     &[(key.into(), schema::Definition::any())],
                     config.schema.log_namespace(),
                 )
+                // TODO - handle
+                .unwrap()
                 .into_iter()
                 .map(|output| OutputId {
                     component: key.clone(),

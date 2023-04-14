@@ -73,14 +73,14 @@ impl TransformConfig for SampleConfig {
         &self,
         input_definitions: &[(OutputId, schema::Definition)],
         _: LogNamespace,
-    ) -> Vec<TransformOutput> {
-        vec![TransformOutput::new(
+    ) -> crate::Result<Vec<TransformOutput>> {
+        Ok(vec![TransformOutput::new(
             DataType::Log | DataType::Trace,
             input_definitions
                 .iter()
                 .map(|(output, definition)| (output.clone(), definition.clone()))
                 .collect(),
-        )]
+        )])
     }
 }
 

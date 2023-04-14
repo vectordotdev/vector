@@ -39,24 +39,27 @@ impl GelfDeserializerConfig {
     }
 
     /// The schema produced by the deserializer.
-    pub fn schema_definition(&self, log_namespace: LogNamespace) -> schema::Definition {
-        schema::Definition::new_with_default_metadata(
+    pub fn schema_definition(
+        &self,
+        log_namespace: LogNamespace,
+    ) -> Result<schema::Definition, schema::Error> {
+        Ok(schema::Definition::new_with_default_metadata(
             Kind::object(Collection::empty()),
             [log_namespace],
         )
-        .with_event_field(&owned_value_path!(VERSION), Kind::bytes(), None)
-        .with_event_field(&owned_value_path!(HOST), Kind::bytes(), None)
-        .with_event_field(&owned_value_path!(SHORT_MESSAGE), Kind::bytes(), None)
-        .optional_field(&owned_value_path!(FULL_MESSAGE), Kind::bytes(), None)
-        .optional_field(&owned_value_path!(TIMESTAMP), Kind::timestamp(), None)
-        .optional_field(&owned_value_path!(LEVEL), Kind::integer(), None)
-        .optional_field(&owned_value_path!(FACILITY), Kind::bytes(), None)
-        .optional_field(&owned_value_path!(LINE), Kind::integer(), None)
-        .optional_field(&owned_value_path!(FILE), Kind::bytes(), None)
+        .with_event_field(&owned_value_path!(VERSION), Kind::bytes(), None)?
+        .with_event_field(&owned_value_path!(HOST), Kind::bytes(), None)?
+        .with_event_field(&owned_value_path!(SHORT_MESSAGE), Kind::bytes(), None)?
+        .optional_field(&owned_value_path!(FULL_MESSAGE), Kind::bytes(), None)?
+        .optional_field(&owned_value_path!(TIMESTAMP), Kind::timestamp(), None)?
+        .optional_field(&owned_value_path!(LEVEL), Kind::integer(), None)?
+        .optional_field(&owned_value_path!(FACILITY), Kind::bytes(), None)?
+        .optional_field(&owned_value_path!(LINE), Kind::integer(), None)?
+        .optional_field(&owned_value_path!(FILE), Kind::bytes(), None)?
         // Every field with an underscore (_) prefix will be treated as an additional field.
         // Allowed characters in field names are any word character (letter, number, underscore), dashes and dots.
         // Libraries SHOULD not allow to send id as additional field ( _id). Graylog server nodes omit this field automatically.
-        .unknown_fields(Kind::bytes().or_integer().or_float())
+        .unknown_fields(Kind::bytes().or_integer().or_float()))
     }
 }
 

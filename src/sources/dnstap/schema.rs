@@ -5,6 +5,7 @@ use value::{
     kind::{Collection, Field},
     Kind,
 };
+use vector_core::schema::Definition;
 
 #[derive(Debug, Default, Clone)]
 pub struct DnstapEventSchema {
@@ -160,127 +161,118 @@ impl DnstapEventSchema {
     }
 
     /// Schema definition for fields stored in the root.
-    fn root_schema_definition(
-        &self,
-        schema: vector_core::schema::Definition,
-    ) -> vector_core::schema::Definition {
-        schema
+    fn root_schema_definition(&self, schema: Definition) -> crate::Result<Definition> {
+        Ok(schema
             .optional_field(
                 &owned_value_path!(self.dnstap_root_data_schema().server_identity()),
                 Kind::bytes(),
                 None,
-            )
+            )?
             .optional_field(
                 &owned_value_path!(self.dnstap_root_data_schema().server_version()),
                 Kind::bytes(),
                 None,
-            )
+            )?
             .optional_field(
                 &owned_value_path!(self.dnstap_root_data_schema().extra()),
                 Kind::bytes(),
                 None,
-            )
+            )?
             .with_event_field(
                 &owned_value_path!(self.dnstap_root_data_schema().data_type_id()),
                 Kind::integer(),
                 None,
-            )
+            )?
             .optional_field(
                 &owned_value_path!(self.dnstap_root_data_schema().data_type()),
                 Kind::bytes(),
                 None,
-            )
+            )?
             .optional_field(
                 &owned_value_path!(self.dnstap_root_data_schema().error()),
                 Kind::bytes(),
                 None,
-            )
+            )?
             .optional_field(
                 &owned_value_path!(self.dnstap_root_data_schema().raw_data()),
                 Kind::bytes(),
                 None,
-            )
+            )?
             .optional_field(
                 &owned_value_path!(self.dnstap_root_data_schema().time()),
                 Kind::integer(),
                 None,
-            )
+            )?
             .optional_field(
                 &owned_value_path!(self.dnstap_root_data_schema().time_precision()),
                 Kind::bytes(),
                 None,
-            )
+            )?)
     }
 
     /// Schema definition from the message.
-    pub fn message_schema_definition(
-        &self,
-        schema: vector_core::schema::Definition,
-    ) -> vector_core::schema::Definition {
-        schema
+    pub fn message_schema_definition(&self, schema: Definition) -> crate::Result<Definition> {
+        Ok(schema
             .optional_field(
                 &owned_value_path!(self.dnstap_message_schema().socket_family()),
                 Kind::bytes(),
                 None,
-            )
+            )?
             .optional_field(
                 &owned_value_path!(self.dnstap_message_schema().socket_protocol()),
                 Kind::bytes(),
                 None,
-            )
+            )?
             .optional_field(
                 &owned_value_path!(self.dnstap_message_schema().query_address()),
                 Kind::bytes(),
                 None,
-            )
+            )?
             .optional_field(
                 &owned_value_path!(self.dnstap_message_schema().query_port()),
                 Kind::integer(),
                 None,
-            )
+            )?
             .optional_field(
                 &owned_value_path!(self.dnstap_message_schema().response_address()),
                 Kind::bytes(),
                 None,
-            )
+            )?
             .optional_field(
                 &owned_value_path!(self.dnstap_message_schema().response_port()),
                 Kind::integer(),
                 None,
-            )
+            )?
             .optional_field(
                 &owned_value_path!(self.dnstap_message_schema().query_zone()),
                 Kind::bytes(),
                 None,
-            )
+            )?
             .with_event_field(
                 &owned_value_path!(self.dnstap_message_schema().dnstap_message_type_id()),
                 Kind::integer(),
                 None,
-            )
+            )?
             .optional_field(
                 &owned_value_path!(self.dnstap_message_schema().dnstap_message_type()),
                 Kind::bytes(),
                 None,
-            )
+            )?
             .optional_field(
                 &owned_value_path!(self.dnstap_message_schema().request_message()),
                 Kind::object(self.request_message_schema_definition()),
                 None,
-            )
+            )?
             .optional_field(
                 &owned_value_path!(self.dnstap_message_schema().response_message()),
                 Kind::object(self.request_message_schema_definition()),
                 None,
-            )
+            )?)
     }
 
     /// The schema definition for a dns tap message.
-    pub fn schema_definition(
-        &self,
-        schema: vector_core::schema::Definition,
-    ) -> vector_core::schema::Definition {
-        self.root_schema_definition(self.message_schema_definition(schema))
+    pub fn schema_definition(&self, schema: Definition) -> crate::Result<Definition> {
+        self.root_schema_definition(self.message_schema_definition(schema)?)
     }
 
     pub const fn dnstap_root_data_schema(&self) -> &DnstapRootDataSchema {

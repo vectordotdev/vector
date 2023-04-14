@@ -432,7 +432,7 @@ impl SourceConfig for FileConfig {
         ))
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> crate::Result<Vec<SourceOutput>> {
         let file_key = self.file_key.clone().path.map(LegacyKey::Overwrite);
         let host_key = self.host_key.clone().path.map(LegacyKey::Overwrite);
 
@@ -443,31 +443,34 @@ impl SourceConfig for FileConfig {
             .map(LegacyKey::Overwrite);
 
         let schema_definition = BytesDeserializerConfig
-            .schema_definition(global_log_namespace.merge(self.log_namespace))
-            .with_standard_vector_source_metadata()
+            .schema_definition(global_log_namespace.merge(self.log_namespace))?
+            .with_standard_vector_source_metadata()?
             .with_source_metadata(
                 Self::NAME,
                 host_key,
                 &owned_value_path!("host"),
                 Kind::bytes().or_undefined(),
                 Some("host"),
-            )
+            )?
             .with_source_metadata(
                 Self::NAME,
                 offset_key,
                 &owned_value_path!("offset"),
                 Kind::integer(),
                 None,
-            )
+            )?
             .with_source_metadata(
                 Self::NAME,
                 file_key,
                 &owned_value_path!("path"),
                 Kind::bytes(),
                 None,
-            );
+            )?;
 
-        vec![SourceOutput::new_logs(DataType::Log, schema_definition)]
+        Ok(vec![SourceOutput::new_logs(
+            DataType::Log,
+            schema_definition,
+        )])
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -946,6 +949,7 @@ mod tests {
     fn output_schema_definition_vector_namespace() {
         let definitions = FileConfig::default()
             .outputs(LogNamespace::Vector)
+            .unwrap()
             .remove(0)
             .schema_definition(true);
 
@@ -959,22 +963,27 @@ mod tests {
                         Kind::bytes(),
                         None
                     )
+                    .unwrap()
                     .with_metadata_field(
                         &owned_value_path!("vector", "ingest_timestamp"),
                         Kind::timestamp(),
                         None
                     )
+                    .unwrap()
                     .with_metadata_field(
                         &owned_value_path!("file", "host"),
                         Kind::bytes().or_undefined(),
                         Some("host")
                     )
+                    .unwrap()
                     .with_metadata_field(
                         &owned_value_path!("file", "offset"),
                         Kind::integer(),
                         None
                     )
+                    .unwrap()
                     .with_metadata_field(&owned_value_path!("file", "path"), Kind::bytes(), None)
+                    .unwrap()
             )
         )
     }
@@ -983,6 +992,7 @@ mod tests {
     fn output_schema_definition_legacy_namespace() {
         let definitions = FileConfig::default()
             .outputs(LogNamespace::Legacy)
+            .unwrap()
             .remove(0)
             .schema_definition(true);
 
@@ -998,15 +1008,21 @@ mod tests {
                     Kind::bytes(),
                     Some("message")
                 )
+                .unwrap()
                 .with_event_field(&owned_value_path!("source_type"), Kind::bytes(), None)
+                .unwrap()
                 .with_event_field(&owned_value_path!("timestamp"), Kind::timestamp(), None)
+                .unwrap()
                 .with_event_field(
                     &owned_value_path!("host"),
                     Kind::bytes().or_undefined(),
                     Some("host")
                 )
+                .unwrap()
                 .with_event_field(&owned_value_path!("offset"), Kind::undefined(), None)
+                .unwrap()
                 .with_event_field(&owned_value_path!("file"), Kind::bytes(), None)
+                .unwrap()
             )
         )
     }

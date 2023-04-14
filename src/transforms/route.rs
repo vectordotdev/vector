@@ -108,7 +108,7 @@ impl TransformConfig for RouteConfig {
         &self,
         input_definitions: &[(OutputId, schema::Definition)],
         _: LogNamespace,
-    ) -> Vec<TransformOutput> {
+    ) -> crate::Result<Vec<TransformOutput>> {
         let mut result: Vec<TransformOutput> = self
             .route
             .keys()
@@ -121,7 +121,7 @@ impl TransformConfig for RouteConfig {
             TransformOutput::new(DataType::all(), clone_input_definitions(input_definitions))
                 .with_port(UNMATCHED_ROUTE),
         );
-        result
+        Ok(result)
     }
 
     fn enable_concurrency(&self) -> bool {

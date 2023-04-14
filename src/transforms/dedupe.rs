@@ -157,11 +157,11 @@ impl TransformConfig for DedupeConfig {
         &self,
         input_definitions: &[(OutputId, schema::Definition)],
         _: LogNamespace,
-    ) -> Vec<TransformOutput> {
-        vec![TransformOutput::new(
+    ) -> crate::Result<Vec<TransformOutput>> {
+        Ok(vec![TransformOutput::new(
             DataType::Log,
             clone_input_definitions(input_definitions),
-        )]
+        )])
     }
 }
 

@@ -41,7 +41,10 @@ impl SyslogDeserializerConfig {
     }
 
     /// The schema produced by the deserializer.
-    pub fn schema_definition(&self, log_namespace: LogNamespace) -> schema::Definition {
+    pub fn schema_definition(
+        &self,
+        log_namespace: LogNamespace,
+    ) -> Result<schema::Definition, schema::Error> {
         match (log_namespace, self.source) {
             (LogNamespace::Legacy, _) => {
                 let mut definition = schema::Definition::empty_legacy_namespace()
@@ -51,7 +54,7 @@ impl SyslogDeserializerConfig {
                         &parse_value_path(log_schema().message_key()).expect("valid message key"),
                         Kind::bytes(),
                         Some("message"),
-                    );
+                    )?;
 
                 if let Some(timestamp_key) = log_schema().timestamp_key() {
                     // All other fields are optional.
@@ -59,25 +62,25 @@ impl SyslogDeserializerConfig {
                         timestamp_key,
                         Kind::timestamp(),
                         Some("timestamp"),
-                    )
+                    )?
                 }
 
                 definition = definition
-                    .optional_field(&owned_value_path!("hostname"), Kind::bytes(), Some("host"))
+                    .optional_field(&owned_value_path!("hostname"), Kind::bytes(), Some("host"))?
                     .optional_field(
                         &owned_value_path!("severity"),
                         Kind::bytes(),
                         Some("severity"),
-                    )
-                    .optional_field(&owned_value_path!("facility"), Kind::bytes(), None)
-                    .optional_field(&owned_value_path!("version"), Kind::integer(), None)
-                    .optional_field(&owned_value_path!("appname"), Kind::bytes(), None)
-                    .optional_field(&owned_value_path!("msgid"), Kind::bytes(), None)
+                    )?
+                    .optional_field(&owned_value_path!("facility"), Kind::bytes(), None)?
+                    .optional_field(&owned_value_path!("version"), Kind::integer(), None)?
+                    .optional_field(&owned_value_path!("appname"), Kind::bytes(), None)?
+                    .optional_field(&owned_value_path!("msgid"), Kind::bytes(), None)?
                     .optional_field(
                         &owned_value_path!("procid"),
                         Kind::integer().or_bytes(),
                         None,
-                    )
+                    )?
                     // "structured data" is placed at the root. It will always be a map of strings
                     .unknown_fields(Kind::object(Collection::from_unknown(Kind::bytes())));
 
@@ -86,11 +89,11 @@ impl SyslogDeserializerConfig {
                     // is coming from the codec.
                     definition.optional_field(&owned_value_path!("source_ip"), Kind::bytes(), None)
                 } else {
-                    definition
+                    Ok(definition)
                 }
             }
             (LogNamespace::Vector, None) => {
-                schema::Definition::new_with_default_metadata(
+                Ok(schema::Definition::new_with_default_metadata(
                     Kind::object(Collection::empty()),
                     [log_namespace],
                 )
@@ -98,29 +101,29 @@ impl SyslogDeserializerConfig {
                     &owned_value_path!("message"),
                     Kind::bytes(),
                     Some("message"),
-                )
+                )?
                 .optional_field(
                     &owned_value_path!("timestamp"),
                     Kind::timestamp(),
                     Some("timestamp"),
-                )
-                .optional_field(&owned_value_path!("hostname"), Kind::bytes(), Some("host"))
+                )?
+                .optional_field(&owned_value_path!("hostname"), Kind::bytes(), Some("host"))?
                 .optional_field(
                     &owned_value_path!("severity"),
                     Kind::bytes(),
                     Some("severity"),
-                )
-                .optional_field(&owned_value_path!("facility"), Kind::bytes(), None)
-                .optional_field(&owned_value_path!("version"), Kind::integer(), None)
-                .optional_field(&owned_value_path!("appname"), Kind::bytes(), None)
-                .optional_field(&owned_value_path!("msgid"), Kind::bytes(), None)
+                )?
+                .optional_field(&owned_value_path!("facility"), Kind::bytes(), None)?
+                .optional_field(&owned_value_path!("version"), Kind::integer(), None)?
+                .optional_field(&owned_value_path!("appname"), Kind::bytes(), None)?
+                .optional_field(&owned_value_path!("msgid"), Kind::bytes(), None)?
                 .optional_field(
                     &owned_value_path!("procid"),
                     Kind::integer().or_bytes(),
                     None,
-                )
+                )?
                 // "structured data" is placed at the root. It will always be a map strings
-                .unknown_fields(Kind::object(Collection::from_unknown(Kind::bytes())))
+                .unknown_fields(Kind::object(Collection::from_unknown(Kind::bytes()))))
             }
             (LogNamespace::Vector, Some(source)) => {
                 schema::Definition::new_with_default_metadata(Kind::bytes(), [log_namespace])
@@ -131,63 +134,63 @@ impl SyslogDeserializerConfig {
                         &owned_value_path!("timestamp"),
                         Kind::timestamp(),
                         Some("timestamp"),
-                    )
+                    )?
                     .with_source_metadata(
                         source,
                         None,
                         &owned_value_path!("hostname"),
                         Kind::bytes().or_undefined(),
                         Some("host"),
-                    )
+                    )?
                     .with_source_metadata(
                         source,
                         None,
                         &owned_value_path!("source_ip"),
                         Kind::bytes().or_undefined(),
                         None,
-                    )
+                    )?
                     .with_source_metadata(
                         source,
                         None,
                         &owned_value_path!("severity"),
                         Kind::bytes().or_undefined(),
                         Some("severity"),
-                    )
+                    )?
                     .with_source_metadata(
                         source,
                         None,
                         &owned_value_path!("facility"),
                         Kind::bytes().or_undefined(),
                         None,
-                    )
+                    )?
                     .with_source_metadata(
                         source,
                         None,
                         &owned_value_path!("version"),
                         Kind::integer().or_undefined(),
                         None,
-                    )
+                    )?
                     .with_source_metadata(
                         source,
                         None,
                         &owned_value_path!("appname"),
                         Kind::bytes().or_undefined(),
                         None,
-                    )
+                    )?
                     .with_source_metadata(
                         source,
                         None,
                         &owned_value_path!("msgid"),
                         Kind::bytes().or_undefined(),
                         None,
-                    )
+                    )?
                     .with_source_metadata(
                         source,
                         None,
                         &owned_value_path!("procid"),
                         Kind::integer().or_bytes().or_undefined(),
                         None,
-                    )
+                    )?
                     .with_source_metadata(
                         source,
                         None,
@@ -196,7 +199,7 @@ impl SyslogDeserializerConfig {
                             Collection::from_unknown(Kind::bytes()),
                         ))),
                         None,
-                    )
+                    )?
                     .with_source_metadata(
                         source,
                         None,

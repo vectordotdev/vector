@@ -197,55 +197,55 @@ impl SourceConfig for DatadogAgentConfig {
         }))
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> crate::Result<Vec<SourceOutput>> {
         let definition = self
             .decoding
-            .schema_definition(global_log_namespace.merge(self.log_namespace))
+            .schema_definition(global_log_namespace.merge(self.log_namespace))?
             .with_source_metadata(
                 Self::NAME,
                 Some(LegacyKey::InsertIfEmpty(owned_value_path!("status"))),
                 &owned_value_path!("status"),
                 Kind::bytes(),
                 Some("severity"),
-            )
+            )?
             .with_source_metadata(
                 Self::NAME,
                 Some(LegacyKey::InsertIfEmpty(owned_value_path!("timestamp"))),
                 &owned_value_path!("timestamp"),
                 Kind::timestamp(),
                 Some("timestamp"),
-            )
+            )?
             .with_source_metadata(
                 Self::NAME,
                 Some(LegacyKey::InsertIfEmpty(owned_value_path!("hostname"))),
                 &owned_value_path!("hostname"),
                 Kind::bytes(),
                 Some("host"),
-            )
+            )?
             .with_source_metadata(
                 Self::NAME,
                 Some(LegacyKey::InsertIfEmpty(owned_value_path!("service"))),
                 &owned_value_path!("service"),
                 Kind::bytes(),
                 Some("service"),
-            )
+            )?
             .with_source_metadata(
                 Self::NAME,
                 Some(LegacyKey::InsertIfEmpty(owned_value_path!("ddsource"))),
                 &owned_value_path!("ddsource"),
                 Kind::bytes(),
                 Some("source"),
-            )
+            )?
             .with_source_metadata(
                 Self::NAME,
                 Some(LegacyKey::InsertIfEmpty(owned_value_path!("ddtags"))),
                 &owned_value_path!("ddtags"),
                 Kind::bytes(),
                 Some("tags"),
-            )
-            .with_standard_vector_source_metadata();
+            )?
+            .with_standard_vector_source_metadata()?;
 
-        if self.multiple_outputs {
+        Ok(if self.multiple_outputs {
             vec![
                 SourceOutput::new_logs(DataType::Log, definition).with_port(LOGS),
                 SourceOutput::new_metrics().with_port(METRICS),
@@ -253,7 +253,7 @@ impl SourceConfig for DatadogAgentConfig {
             ]
         } else {
             vec![SourceOutput::new_logs(DataType::all(), definition)]
-        }
+        })
     }
 
     fn resources(&self) -> Vec<Resource> {

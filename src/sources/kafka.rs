@@ -305,61 +305,61 @@ impl SourceConfig for KafkaSourceConfig {
         )))
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> crate::Result<Vec<SourceOutput>> {
         let log_namespace = global_log_namespace.merge(self.log_namespace);
         let keys = self.keys();
 
         let schema_definition = self
             .decoding
-            .schema_definition(log_namespace)
-            .with_standard_vector_source_metadata()
+            .schema_definition(log_namespace)?
+            .with_standard_vector_source_metadata()?
             .with_source_metadata(
                 Self::NAME,
                 keys.timestamp.map(LegacyKey::Overwrite),
                 &owned_value_path!("timestamp"),
                 Kind::timestamp(),
                 Some("timestamp"),
-            )
+            )?
             .with_source_metadata(
                 Self::NAME,
                 keys.topic.clone().map(LegacyKey::Overwrite),
                 &owned_value_path!("topic"),
                 Kind::bytes(),
                 None,
-            )
+            )?
             .with_source_metadata(
                 Self::NAME,
                 keys.partition.clone().map(LegacyKey::Overwrite),
                 &owned_value_path!("partition"),
                 Kind::bytes(),
                 None,
-            )
+            )?
             .with_source_metadata(
                 Self::NAME,
                 keys.offset.clone().map(LegacyKey::Overwrite),
                 &owned_value_path!("offset"),
                 Kind::bytes(),
                 None,
-            )
+            )?
             .with_source_metadata(
                 Self::NAME,
                 keys.headers.clone().map(LegacyKey::Overwrite),
                 &owned_value_path!("headers"),
                 Kind::object(Collection::empty().with_unknown(Kind::bytes())),
                 None,
-            )
+            )?
             .with_source_metadata(
                 Self::NAME,
                 keys.key_field.clone().map(LegacyKey::Overwrite),
                 &owned_value_path!("message_key"),
                 Kind::bytes(),
                 None,
-            );
+            )?;
 
-        vec![SourceOutput::new_logs(
+        Ok(vec![SourceOutput::new_logs(
             self.decoding.output_type(),
             schema_definition,
-        )]
+        )])
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -795,6 +795,7 @@ mod test {
     fn test_output_schema_definition_vector_namespace() {
         let definitions = make_config("topic", "group", LogNamespace::Vector)
             .outputs(LogNamespace::Vector)
+            .unwrap()
             .remove(0)
             .schema_definition(true);
 
@@ -808,33 +809,41 @@ mod test {
                         Kind::timestamp(),
                         Some("timestamp")
                     )
+                    .unwrap()
                     .with_metadata_field(
                         &owned_value_path!("kafka", "message_key"),
                         Kind::bytes(),
                         None
                     )
+                    .unwrap()
                     .with_metadata_field(&owned_value_path!("kafka", "topic"), Kind::bytes(), None)
+                    .unwrap()
                     .with_metadata_field(
                         &owned_value_path!("kafka", "partition"),
                         Kind::bytes(),
                         None
                     )
+                    .unwrap()
                     .with_metadata_field(&owned_value_path!("kafka", "offset"), Kind::bytes(), None)
+                    .unwrap()
                     .with_metadata_field(
                         &owned_value_path!("kafka", "headers"),
                         Kind::object(Collection::empty().with_unknown(Kind::bytes())),
                         None
                     )
+                    .unwrap()
                     .with_metadata_field(
                         &owned_value_path!("vector", "ingest_timestamp"),
                         Kind::timestamp(),
                         None
                     )
+                    .unwrap()
                     .with_metadata_field(
                         &owned_value_path!("vector", "source_type"),
                         Kind::bytes(),
                         None
                     )
+                    .unwrap()
             )
         )
     }
@@ -843,6 +852,7 @@ mod test {
     fn test_output_schema_definition_legacy_namespace() {
         let definitions = make_config("topic", "group", LogNamespace::Legacy)
             .outputs(LogNamespace::Legacy)
+            .unwrap()
             .remove(0)
             .schema_definition(true);
 
@@ -856,21 +866,29 @@ mod test {
                         Kind::bytes(),
                         Some("message")
                     )
+                    .unwrap()
                     .with_event_field(
                         &owned_value_path!("timestamp"),
                         Kind::timestamp(),
                         Some("timestamp")
                     )
+                    .unwrap()
                     .with_event_field(&owned_value_path!("message_key"), Kind::bytes(), None)
+                    .unwrap()
                     .with_event_field(&owned_value_path!("topic"), Kind::bytes(), None)
+                    .unwrap()
                     .with_event_field(&owned_value_path!("partition"), Kind::bytes(), None)
+                    .unwrap()
                     .with_event_field(&owned_value_path!("offset"), Kind::bytes(), None)
+                    .unwrap()
                     .with_event_field(
                         &owned_value_path!("headers"),
                         Kind::object(Collection::empty().with_unknown(Kind::bytes())),
                         None
                     )
+                    .unwrap()
                     .with_event_field(&owned_value_path!("source_type"), Kind::bytes(), None)
+                    .unwrap()
             )
         )
     }

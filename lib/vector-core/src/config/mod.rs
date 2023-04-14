@@ -544,7 +544,9 @@ mod test {
     fn test_source_definitions_legacy() {
         let definition = schema::Definition::empty_legacy_namespace()
             .with_event_field(&owned_value_path!("zork"), Kind::bytes(), Some("zork"))
-            .with_event_field(&owned_value_path!("nork"), Kind::integer(), None);
+            .unwrap()
+            .with_event_field(&owned_value_path!("nork"), Kind::integer(), None)
+            .unwrap();
         let output = SourceOutput::new_logs(DataType::Log, definition);
 
         let valid_event = LogEvent::from(Value::from(btreemap! {
@@ -586,7 +588,9 @@ mod test {
                 Kind::integer(),
                 Some("zork"),
             )
-            .with_event_field(&owned_value_path!("nork"), Kind::integer(), None);
+            .unwrap()
+            .with_event_field(&owned_value_path!("nork"), Kind::integer(), None)
+            .unwrap();
 
         let output = SourceOutput::new_logs(DataType::Log, definition);
 

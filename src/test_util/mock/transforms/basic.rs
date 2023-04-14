@@ -53,14 +53,14 @@ impl TransformConfig for BasicTransformConfig {
         &self,
         definitions: &[(OutputId, schema::Definition)],
         _: LogNamespace,
-    ) -> Vec<TransformOutput> {
-        vec![TransformOutput::new(
+    ) -> crate::Result<Vec<TransformOutput>> {
+        Ok(vec![TransformOutput::new(
             DataType::all(),
             definitions
                 .iter()
                 .map(|(output, definition)| (output.clone(), definition.clone()))
                 .collect(),
-        )]
+        )])
     }
 }
 

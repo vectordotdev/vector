@@ -142,19 +142,19 @@ impl SourceConfig for AmqpSourceConfig {
         amqp_source(self, cx.shutdown, cx.out, log_namespace, acknowledgements).await
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> crate::Result<Vec<SourceOutput>> {
         let log_namespace = global_log_namespace.merge(self.log_namespace);
         let schema_definition = self
             .decoding
-            .schema_definition(log_namespace)
-            .with_standard_vector_source_metadata()
+            .schema_definition(log_namespace)?
+            .with_standard_vector_source_metadata()?
             .with_source_metadata(
                 AmqpSourceConfig::NAME,
                 None,
                 &owned_value_path!("timestamp"),
                 Kind::timestamp(),
                 Some("timestamp"),
-            )
+            )?
             .with_source_metadata(
                 AmqpSourceConfig::NAME,
                 self.routing_key_field
@@ -164,26 +164,26 @@ impl SourceConfig for AmqpSourceConfig {
                 &owned_value_path!("routing"),
                 Kind::bytes(),
                 None,
-            )
+            )?
             .with_source_metadata(
                 AmqpSourceConfig::NAME,
                 self.exchange_key.path.clone().map(LegacyKey::InsertIfEmpty),
                 &owned_value_path!("exchange"),
                 Kind::bytes(),
                 None,
-            )
+            )?
             .with_source_metadata(
                 AmqpSourceConfig::NAME,
                 self.offset_key.path.clone().map(LegacyKey::InsertIfEmpty),
                 &owned_value_path!("offset"),
                 Kind::integer(),
                 None,
-            );
+            )?;
 
-        vec![SourceOutput::new_logs(
+        Ok(vec![SourceOutput::new_logs(
             self.decoding.output_type(),
             schema_definition,
-        )]
+        )])
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -527,6 +527,7 @@ pub mod test {
 
         let definition = config
             .outputs(LogNamespace::Vector)
+            .unwrap()
             .remove(0)
             .schema_definition(true);
 
@@ -538,19 +539,25 @@ pub mod test {
                     Kind::bytes(),
                     None,
                 )
+                .unwrap()
                 .with_metadata_field(
                     &owned_value_path!("vector", "ingest_timestamp"),
                     Kind::timestamp(),
                     None,
                 )
+                .unwrap()
                 .with_metadata_field(
                     &owned_value_path!("amqp", "timestamp"),
                     Kind::timestamp(),
                     Some("timestamp"),
                 )
+                .unwrap()
                 .with_metadata_field(&owned_value_path!("amqp", "routing"), Kind::bytes(), None)
+                .unwrap()
                 .with_metadata_field(&owned_value_path!("amqp", "exchange"), Kind::bytes(), None)
-                .with_metadata_field(&owned_value_path!("amqp", "offset"), Kind::integer(), None);
+                .unwrap()
+                .with_metadata_field(&owned_value_path!("amqp", "offset"), Kind::integer(), None)
+                .unwrap();
 
         assert_eq!(definition, Some(expected_definition));
     }
@@ -561,6 +568,7 @@ pub mod test {
 
         let definition = config
             .outputs(LogNamespace::Legacy)
+            .unwrap()
             .remove(0)
             .schema_definition(true);
 
@@ -573,11 +581,17 @@ pub mod test {
             Kind::bytes(),
             Some("message"),
         )
+        .unwrap()
         .with_event_field(&owned_value_path!("timestamp"), Kind::timestamp(), None)
+        .unwrap()
         .with_event_field(&owned_value_path!("source_type"), Kind::bytes(), None)
+        .unwrap()
         .with_event_field(&owned_value_path!("routing"), Kind::bytes(), None)
+        .unwrap()
         .with_event_field(&owned_value_path!("exchange"), Kind::bytes(), None)
-        .with_event_field(&owned_value_path!("offset"), Kind::integer(), None);
+        .unwrap()
+        .with_event_field(&owned_value_path!("offset"), Kind::integer(), None)
+        .unwrap();
 
         assert_eq!(definition, Some(expected_definition));
     }

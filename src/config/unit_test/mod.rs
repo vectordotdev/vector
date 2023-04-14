@@ -189,6 +189,8 @@ impl UnitTestBuildMetadata {
                 transform
                     .inner
                     .outputs(&[], builder.schema.log_namespace())
+                    // TODO - SMW sort this out
+                    .unwrap()
                     .into_iter()
                     .map(|output| OutputId {
                         component: key.clone(),
@@ -460,6 +462,9 @@ fn get_loose_end_outputs_sink(config: &ConfigBuilder) -> Option<SinkOuter<String
         transform
             .inner
             .outputs(&[], config.schema.log_namespace())
+            // If the transform errors whilst producing the outputs, collecting the loose ends won't
+            // be so important.
+            .unwrap_or_default()
             .iter()
             .map(|output| {
                 if let Some(port) = &output.port {

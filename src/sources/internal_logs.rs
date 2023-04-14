@@ -74,29 +74,29 @@ impl Default for InternalLogsConfig {
 
 impl InternalLogsConfig {
     /// Generates the `schema::Definition` for this component.
-    fn schema_definition(&self, log_namespace: LogNamespace) -> Definition {
+    fn schema_definition(&self, log_namespace: LogNamespace) -> crate::Result<Definition> {
         let host_key = self.host_key.clone().path.map(LegacyKey::Overwrite);
         let pid_key = self.pid_key.clone().path.map(LegacyKey::Overwrite);
 
         // There is a global and per-source `log_namespace` config.
         // The source config overrides the global setting and is merged here.
-        BytesDeserializerConfig
-            .schema_definition(log_namespace)
-            .with_standard_vector_source_metadata()
+        Ok(BytesDeserializerConfig
+            .schema_definition(log_namespace)?
+            .with_standard_vector_source_metadata()?
             .with_source_metadata(
                 InternalLogsConfig::NAME,
                 host_key,
                 &owned_value_path!("host"),
                 Kind::bytes().or_undefined(),
                 Some("host"),
-            )
+            )?
             .with_source_metadata(
                 InternalLogsConfig::NAME,
                 pid_key,
                 &owned_value_path!("pid"),
                 Kind::integer(),
                 None,
-            )
+            )?)
     }
 }
 
@@ -121,11 +121,14 @@ impl SourceConfig for InternalLogsConfig {
         )))
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> crate::Result<Vec<SourceOutput>> {
         let schema_definition =
-            self.schema_definition(global_log_namespace.merge(self.log_namespace));
+            self.schema_definition(global_log_namespace.merge(self.log_namespace))?;
 
-        vec![SourceOutput::new_logs(DataType::Log, schema_definition)]
+        Ok(vec![SourceOutput::new_logs(
+            DataType::Log,
+            schema_definition,
+        )])
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -341,6 +344,7 @@ mod tests {
 
         let definitions = config
             .outputs(LogNamespace::Vector)
+            .unwrap()
             .remove(0)
             .schema_definition(true);
 
@@ -352,21 +356,25 @@ mod tests {
                     Kind::bytes(),
                     None,
                 )
+                .unwrap()
                 .with_metadata_field(
                     &owned_value_path!(InternalLogsConfig::NAME, "pid"),
                     Kind::integer(),
                     None,
                 )
+                .unwrap()
                 .with_metadata_field(
                     &owned_value_path!("vector", "ingest_timestamp"),
                     Kind::timestamp(),
                     None,
                 )
+                .unwrap()
                 .with_metadata_field(
                     &owned_value_path!(InternalLogsConfig::NAME, "host"),
                     Kind::bytes().or_undefined(),
                     Some("host"),
-                );
+                )
+                .unwrap();
 
         assert_eq!(definitions, Some(expected_definition))
     }
@@ -381,6 +389,7 @@ mod tests {
 
         let definitions = config
             .outputs(LogNamespace::Legacy)
+            .unwrap()
             .remove(0)
             .schema_definition(true);
 
@@ -393,14 +402,19 @@ mod tests {
             Kind::bytes(),
             Some("message"),
         )
+        .unwrap()
         .with_event_field(&owned_value_path!("source_type"), Kind::bytes(), None)
+        .unwrap()
         .with_event_field(&owned_value_path!(pid_key), Kind::integer(), None)
+        .unwrap()
         .with_event_field(&owned_value_path!("timestamp"), Kind::timestamp(), None)
+        .unwrap()
         .with_event_field(
             &owned_value_path!("host"),
             Kind::bytes().or_undefined(),
             Some("host"),
-        );
+        )
+        .unwrap();
 
         assert_eq!(definitions, Some(expected_definition))
     }

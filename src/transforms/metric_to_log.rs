@@ -96,34 +96,34 @@ impl TransformConfig for MetricToLogConfig {
         &self,
         input_definitions: &[(OutputId, Definition)],
         global_log_namespace: LogNamespace,
-    ) -> Vec<TransformOutput> {
+    ) -> crate::Result<Vec<TransformOutput>> {
         let log_namespace = global_log_namespace.merge(self.log_namespace);
         let mut schema_definition =
             Definition::default_for_namespace(&BTreeSet::from([log_namespace]))
-                .with_event_field(&owned_value_path!("name"), Kind::bytes(), None)
+                .with_event_field(&owned_value_path!("name"), Kind::bytes(), None)?
                 .with_event_field(
                     &owned_value_path!("namespace"),
                     Kind::bytes().or_undefined(),
                     None,
-                )
+                )?
                 .with_event_field(
                     &owned_value_path!("tags"),
                     Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
                     None,
-                )
-                .with_event_field(&owned_value_path!("kind"), Kind::bytes(), None)
+                )?
+                .with_event_field(&owned_value_path!("kind"), Kind::bytes(), None)?
                 .with_event_field(
                     &owned_value_path!("counter"),
                     Kind::object(Collection::empty().with_known("value", Kind::float()))
                         .or_undefined(),
                     None,
-                )
+                )?
                 .with_event_field(
                     &owned_value_path!("gauge"),
                     Kind::object(Collection::empty().with_known("value", Kind::float()))
                         .or_undefined(),
                     None,
-                )
+                )?
                 .with_event_field(
                     &owned_value_path!("set"),
                     Kind::object(Collection::empty().with_known(
@@ -132,7 +132,7 @@ impl TransformConfig for MetricToLogConfig {
                     ))
                     .or_undefined(),
                     None,
-                )
+                )?
                 .with_event_field(
                     &owned_value_path!("distribution"),
                     Kind::object(
@@ -151,7 +151,7 @@ impl TransformConfig for MetricToLogConfig {
                     )
                     .or_undefined(),
                     None,
-                )
+                )?
                 .with_event_field(
                     &owned_value_path!("aggregated_histogram"),
                     Kind::object(
@@ -171,7 +171,7 @@ impl TransformConfig for MetricToLogConfig {
                     )
                     .or_undefined(),
                     None,
-                )
+                )?
                 .with_event_field(
                     &owned_value_path!("aggregated_summary"),
                     Kind::object(
@@ -191,12 +191,12 @@ impl TransformConfig for MetricToLogConfig {
                     )
                     .or_undefined(),
                     None,
-                )
+                )?
                 .with_event_field(
                     &owned_value_path!("sketch"),
                     Kind::any().or_undefined(),
                     None,
-                );
+                )?;
 
         match log_namespace {
             LogNamespace::Vector => {
@@ -205,7 +205,7 @@ impl TransformConfig for MetricToLogConfig {
                     &owned_value_path!("timestamp"),
                     Kind::bytes().or_undefined(),
                     None,
-                );
+                )?;
 
                 // This is added as a "marker" field to determine which namespace is being used at runtime.
                 // This is normally handled automatically by sources, but this is a special case.
@@ -213,29 +213,32 @@ impl TransformConfig for MetricToLogConfig {
                     &owned_value_path!("vector"),
                     Kind::object(Collection::empty()),
                     None,
-                );
+                )?;
             }
             LogNamespace::Legacy => {
                 if let Some(timestamp_key) = log_schema().timestamp_key() {
-                    schema_definition =
-                        schema_definition.with_event_field(timestamp_key, Kind::timestamp(), None);
+                    schema_definition = schema_definition.with_event_field(
+                        timestamp_key,
+                        Kind::timestamp(),
+                        None,
+                    )?;
                 }
 
                 schema_definition = schema_definition.with_event_field(
                     &parse_value_path(log_schema().host_key()).expect("valid host key"),
                     Kind::bytes().or_undefined(),
                     None,
-                );
+                )?;
             }
         }
 
-        vec![TransformOutput::new(
+        Ok(vec![TransformOutput::new(
             DataType::Log,
             input_definitions
                 .iter()
                 .map(|(output, _)| (output.clone(), schema_definition.clone()))
                 .collect(),
-        )]
+        )])
     }
 
     fn enable_concurrency(&self) -> bool {

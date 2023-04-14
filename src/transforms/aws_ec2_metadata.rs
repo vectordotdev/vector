@@ -248,7 +248,7 @@ impl TransformConfig for Ec2Metadata {
         &self,
         input_definitions: &[(OutputId, schema::Definition)],
         _: LogNamespace,
-    ) -> Vec<TransformOutput> {
+    ) -> crate::Result<Vec<TransformOutput>> {
         let added_keys = Keys::new(self.namespace.clone());
 
         let paths = [
@@ -275,17 +275,17 @@ impl TransformConfig for Ec2Metadata {
 
                 for path in paths {
                     schema_definition =
-                        schema_definition.with_field(path, Kind::bytes().or_undefined(), None);
+                        schema_definition.with_field(path, Kind::bytes().or_undefined(), None)?;
                 }
 
-                (output.clone(), schema_definition)
+                Ok((output.clone(), schema_definition))
             })
-            .collect();
+            .collect::<crate::Result<_>>()?;
 
-        vec![TransformOutput::new(
+        Ok(vec![TransformOutput::new(
             DataType::Metric | DataType::Log,
             schema_definition,
-        )]
+        )])
     }
 }
 

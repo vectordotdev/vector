@@ -206,20 +206,20 @@ impl SourceConfig for HttpClientConfig {
         Ok(call(inputs, context, cx.out, self.method).boxed())
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> crate::Result<Vec<SourceOutput>> {
         // There is a global and per-source `log_namespace` config. The source config overrides the global setting,
         // and is merged here.
         let log_namespace = global_log_namespace.merge(self.log_namespace);
 
         let schema_definition = self
             .decoding
-            .schema_definition(log_namespace)
-            .with_standard_vector_source_metadata();
+            .schema_definition(log_namespace)?
+            .with_standard_vector_source_metadata()?;
 
-        vec![SourceOutput::new_logs(
+        Ok(vec![SourceOutput::new_logs(
             self.decoding.output_type(),
             schema_definition,
-        )]
+        )])
     }
 
     fn can_acknowledge(&self) -> bool {

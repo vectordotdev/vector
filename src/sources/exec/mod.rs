@@ -266,13 +266,13 @@ impl SourceConfig for ExecConfig {
         }
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> crate::Result<Vec<SourceOutput>> {
         let log_namespace = global_log_namespace.merge(Some(self.log_namespace.unwrap_or(false)));
 
         let schema_definition = self
             .decoding
-            .schema_definition(log_namespace)
-            .with_standard_vector_source_metadata()
+            .schema_definition(log_namespace)?
+            .with_standard_vector_source_metadata()?
             .with_source_metadata(
                 Self::NAME,
                 Some(LegacyKey::InsertIfEmpty(owned_value_path!(
@@ -281,33 +281,33 @@ impl SourceConfig for ExecConfig {
                 &owned_value_path!("host"),
                 Kind::bytes().or_undefined(),
                 Some("host"),
-            )
+            )?
             .with_source_metadata(
                 Self::NAME,
                 Some(LegacyKey::InsertIfEmpty(owned_value_path!(STREAM_KEY))),
                 &owned_value_path!(STREAM_KEY),
                 Kind::bytes().or_undefined(),
                 None,
-            )
+            )?
             .with_source_metadata(
                 Self::NAME,
                 Some(LegacyKey::InsertIfEmpty(owned_value_path!(PID_KEY))),
                 &owned_value_path!(PID_KEY),
                 Kind::integer().or_undefined(),
                 None,
-            )
+            )?
             .with_source_metadata(
                 Self::NAME,
                 Some(LegacyKey::InsertIfEmpty(owned_value_path!(COMMAND_KEY))),
                 &owned_value_path!(COMMAND_KEY),
                 Kind::bytes(),
                 None,
-            );
+            )?;
 
-        vec![SourceOutput::new_logs(
+        Ok(vec![SourceOutput::new_logs(
             self.decoding.output_type(),
             schema_definition,
-        )]
+        )])
     }
 
     fn can_acknowledge(&self) -> bool {

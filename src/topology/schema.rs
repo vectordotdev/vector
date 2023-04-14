@@ -91,10 +91,10 @@ pub(super) fn expanded_definitions(
     inputs: &[OutputId],
     config: &dyn ComponentContainer,
     cache: &mut Cache,
-) -> Vec<(OutputId, Definition)> {
+) -> crate::Result<Vec<(OutputId, Definition)>> {
     // Try to get the definition from the cache.
     if let Some(definitions) = cache.get(&(config.schema_enabled(), inputs.to_vec())) {
-        return definitions.clone();
+        return Ok(definitions.clone());
     }
 
     let mut definitions: Vec<(OutputId, Definition)> = vec![];
@@ -108,7 +108,7 @@ pub(super) fn expanded_definitions(
         // We take the full schema definition regardless of `config.schema_enabled()`, the assumption
         // being that the receiving component will not be validating the schema if schema checking is
         // not enabled.
-        if let Some(outputs) = config.source_outputs(key) {
+        if let Some(outputs) = config.source_outputs(key)? {
             // After getting the source matching to the given input, we need to further narrow the
             // actual output of the source feeding into this input, and then get the definition
             // belonging to that output.
@@ -138,7 +138,7 @@ pub(super) fn expanded_definitions(
             let input_definitions = possible_definitions(inputs, config, &mut merged_cache);
 
             let mut transform_definition = config
-                .transform_outputs(key, &input_definitions)
+                .transform_outputs(key, &input_definitions)?
                 .expect("already found inputs")
                 .iter()
                 .find_map(|output| {
@@ -165,7 +165,7 @@ pub(super) fn expanded_definitions(
         definitions.clone(),
     );
 
-    definitions
+    Ok(definitions)
 }
 
 /// Returns a list of definitions from the given inputs.
@@ -244,20 +244,23 @@ pub(super) fn validate_sink_expectations(
 
     // Get all pipeline definitions feeding into this sink.
     let mut cache = HashMap::default();
-    let definitions = expanded_definitions(&sink.inputs, config, &mut cache);
-
-    // Validate each individual definition against the sink requirement.
-    for (_output, definition) in definitions {
-        if let Err(err) = requirement.validate(&definition, config.schema.validation) {
-            errors.append(
-                &mut err
-                    .errors()
-                    .iter()
-                    .cloned()
-                    .map(|err| format!("schema error in component {}: {}", key, err))
-                    .collect(),
-            );
+    match expanded_definitions(&sink.inputs, config, &mut cache) {
+        Ok(definitions) => {
+            // Validate each individual definition against the sink requirement.
+            for (_output, definition) in definitions {
+                if let Err(err) = requirement.validate(&definition, config.schema.validation) {
+                    errors.append(
+                        &mut err
+                            .errors()
+                            .iter()
+                            .cloned()
+                            .map(|err| format!("schema error in component {}: {}", key, err))
+                            .collect(),
+                    );
+                }
+            }
         }
+        Err(err) => errors.push(err.to_string()),
     }
 
     if !errors.is_empty() {
@@ -270,7 +273,7 @@ pub(super) fn validate_sink_expectations(
 pub trait ComponentContainer {
     fn schema_enabled(&self) -> bool;
 
-    fn source_outputs(&self, key: &ComponentKey) -> Option<Vec<SourceOutput>>;
+    fn source_outputs(&self, key: &ComponentKey) -> crate::Result<Option<Vec<SourceOutput>>>;
 
     fn transform_inputs(&self, key: &ComponentKey) -> Option<&[OutputId]>;
 
@@ -278,7 +281,7 @@ pub trait ComponentContainer {
         &self,
         key: &ComponentKey,
         input_definitions: &[(OutputId, Definition)],
-    ) -> Option<Vec<TransformOutput>>;
+    ) -> crate::Result<Option<Vec<TransformOutput>>>;
 
     /// Gets the transform output for the given port.
     ///
@@ -291,7 +294,8 @@ pub trait ComponentContainer {
         port: &Option<String>,
         input_definitions: &[(OutputId, Definition)],
     ) -> Result<Option<TransformOutput>, ()> {
-        if let Some(outputs) = self.transform_outputs(key, input_definitions) {
+        // TODO SMW sort this out
+        if let Some(outputs) = self.transform_outputs(key, input_definitions).unwrap() {
             Ok(get_output_for_port(outputs, port))
         } else {
             Err(())
@@ -308,7 +312,8 @@ pub trait ComponentContainer {
         key: &ComponentKey,
         port: &Option<String>,
     ) -> Result<Option<SourceOutput>, ()> {
-        if let Some(outputs) = self.source_outputs(key) {
+        // TODO SMW sort this out
+        if let Some(outputs) = self.source_outputs(key).unwrap() {
             Ok(get_source_output_for_port(outputs, port))
         } else {
             Err(())
@@ -335,9 +340,10 @@ impl ComponentContainer for Config {
         self.schema.enabled
     }
 
-    fn source_outputs(&self, key: &ComponentKey) -> Option<Vec<SourceOutput>> {
+    fn source_outputs(&self, key: &ComponentKey) -> crate::Result<Option<Vec<SourceOutput>>> {
         self.source(key)
             .map(|source| source.inner.outputs(self.schema.log_namespace()))
+            .transpose()
     }
 
     fn transform_inputs(&self, key: &ComponentKey) -> Option<&[OutputId]> {
@@ -348,12 +354,14 @@ impl ComponentContainer for Config {
         &self,
         key: &ComponentKey,
         input_definitions: &[(OutputId, Definition)],
-    ) -> Option<Vec<TransformOutput>> {
-        self.transform(key).map(|source| {
-            source
-                .inner
-                .outputs(input_definitions, self.schema.log_namespace())
-        })
+    ) -> crate::Result<Option<Vec<TransformOutput>>> {
+        self.transform(key)
+            .map(|source| {
+                source
+                    .inner
+                    .outputs(input_definitions, self.schema.log_namespace())
+            })
+            .transpose()
     }
 }
 
@@ -383,8 +391,11 @@ mod tests {
                 true
             }
 
-            fn source_outputs(&self, key: &ComponentKey) -> Option<Vec<SourceOutput>> {
-                self.sources.get(key.id()).cloned()
+            fn source_outputs(
+                &self,
+                key: &ComponentKey,
+            ) -> crate::Result<Option<Vec<SourceOutput>>> {
+                Ok(self.sources.get(key.id()).map(|source| source.clone()))
             }
 
             fn transform_inputs(&self, key: &ComponentKey) -> Option<&[OutputId]> {
@@ -395,8 +406,8 @@ mod tests {
                 &self,
                 key: &ComponentKey,
                 _input_definitions: &[(OutputId, Definition)],
-            ) -> Option<Vec<TransformOutput>> {
-                self.transforms.get(key.id()).cloned().map(|v| v.1)
+            ) -> crate::Result<Option<Vec<TransformOutput>>> {
+                Ok(self.transforms.get(key.id()).cloned().map(|v| v.1))
             }
         }
 
@@ -433,21 +444,25 @@ mod tests {
                         "source-foo",
                         vec![SourceOutput::new_logs(
                             DataType::all(),
-                            Definition::empty_legacy_namespace().with_event_field(
-                                &owned_value_path!("foo"),
-                                Kind::integer().or_bytes(),
-                                Some("foo bar"),
-                            ),
+                            Definition::empty_legacy_namespace()
+                                .with_event_field(
+                                    &owned_value_path!("foo"),
+                                    Kind::integer().or_bytes(),
+                                    Some("foo bar"),
+                                )
+                                .unwrap(),
                         )],
                     )]),
                     transforms: IndexMap::default(),
                     want: vec![(
                         "source-foo".into(),
-                        Definition::empty_legacy_namespace().with_event_field(
-                            &owned_value_path!("foo"),
-                            Kind::integer().or_bytes(),
-                            Some("foo bar"),
-                        ),
+                        Definition::empty_legacy_namespace()
+                            .with_event_field(
+                                &owned_value_path!("foo"),
+                                Kind::integer().or_bytes(),
+                                Some("foo bar"),
+                            )
+                            .unwrap(),
                     )],
                 },
             ),
@@ -460,22 +475,26 @@ mod tests {
                             "source-foo",
                             vec![SourceOutput::new_logs(
                                 DataType::all(),
-                                Definition::empty_legacy_namespace().with_event_field(
-                                    &owned_value_path!("foo"),
-                                    Kind::integer().or_bytes(),
-                                    Some("foo bar"),
-                                ),
+                                Definition::empty_legacy_namespace()
+                                    .with_event_field(
+                                        &owned_value_path!("foo"),
+                                        Kind::integer().or_bytes(),
+                                        Some("foo bar"),
+                                    )
+                                    .unwrap(),
                             )],
                         ),
                         (
                             "source-bar",
                             vec![SourceOutput::new_logs(
                                 DataType::all(),
-                                Definition::empty_legacy_namespace().with_event_field(
-                                    &owned_value_path!("foo"),
-                                    Kind::timestamp(),
-                                    Some("baz qux"),
-                                ),
+                                Definition::empty_legacy_namespace()
+                                    .with_event_field(
+                                        &owned_value_path!("foo"),
+                                        Kind::timestamp(),
+                                        Some("baz qux"),
+                                    )
+                                    .unwrap(),
                             )],
                         ),
                     ]),
@@ -483,19 +502,23 @@ mod tests {
                     want: vec![
                         (
                             "source-foo".into(),
-                            Definition::empty_legacy_namespace().with_event_field(
-                                &owned_value_path!("foo"),
-                                Kind::integer().or_bytes(),
-                                Some("foo bar"),
-                            ),
+                            Definition::empty_legacy_namespace()
+                                .with_event_field(
+                                    &owned_value_path!("foo"),
+                                    Kind::integer().or_bytes(),
+                                    Some("foo bar"),
+                                )
+                                .unwrap(),
                         ),
                         (
                             "source-bar".into(),
-                            Definition::empty_legacy_namespace().with_event_field(
-                                &owned_value_path!("foo"),
-                                Kind::timestamp(),
-                                Some("baz qux"),
-                            ),
+                            Definition::empty_legacy_namespace()
+                                .with_event_field(
+                                    &owned_value_path!("foo"),
+                                    Kind::timestamp(),
+                                    Some("baz qux"),
+                                )
+                                .unwrap(),
                         ),
                     ],
                 },
@@ -509,22 +532,26 @@ mod tests {
                             "source-foo",
                             vec![SourceOutput::new_logs(
                                 DataType::all(),
-                                Definition::empty_legacy_namespace().with_event_field(
-                                    &owned_value_path!("foo"),
-                                    Kind::boolean(),
-                                    Some("foo"),
-                                ),
+                                Definition::empty_legacy_namespace()
+                                    .with_event_field(
+                                        &owned_value_path!("foo"),
+                                        Kind::boolean(),
+                                        Some("foo"),
+                                    )
+                                    .unwrap(),
                             )],
                         ),
                         (
                             "source-bar",
                             vec![SourceOutput::new_logs(
                                 DataType::all(),
-                                Definition::empty_legacy_namespace().with_event_field(
-                                    &owned_value_path!("bar"),
-                                    Kind::integer(),
-                                    Some("bar"),
-                                ),
+                                Definition::empty_legacy_namespace()
+                                    .with_event_field(
+                                        &owned_value_path!("bar"),
+                                        Kind::integer(),
+                                        Some("bar"),
+                                    )
+                                    .unwrap(),
                             )],
                         ),
                     ]),
@@ -536,11 +563,13 @@ mod tests {
                                 DataType::all(),
                                 [(
                                     "source-foo".into(),
-                                    Definition::empty_legacy_namespace().with_event_field(
-                                        &owned_value_path!("baz"),
-                                        Kind::regex(),
-                                        Some("baz"),
-                                    ),
+                                    Definition::empty_legacy_namespace()
+                                        .with_event_field(
+                                            &owned_value_path!("baz"),
+                                            Kind::regex(),
+                                            Some("baz"),
+                                        )
+                                        .unwrap(),
                                 )]
                                 .into(),
                             )],
@@ -549,19 +578,23 @@ mod tests {
                     want: vec![
                         (
                             "source-bar".into(),
-                            Definition::empty_legacy_namespace().with_event_field(
-                                &owned_value_path!("bar"),
-                                Kind::integer(),
-                                Some("bar"),
-                            ),
+                            Definition::empty_legacy_namespace()
+                                .with_event_field(
+                                    &owned_value_path!("bar"),
+                                    Kind::integer(),
+                                    Some("bar"),
+                                )
+                                .unwrap(),
                         ),
                         (
                             "transform-baz".into(),
-                            Definition::empty_legacy_namespace().with_event_field(
-                                &owned_value_path!("baz"),
-                                Kind::regex(),
-                                Some("baz"),
-                            ),
+                            Definition::empty_legacy_namespace()
+                                .with_event_field(
+                                    &owned_value_path!("baz"),
+                                    Kind::regex(),
+                                    Some("baz"),
+                                )
+                                .unwrap(),
                         ),
                     ],
                 },
@@ -583,22 +616,26 @@ mod tests {
                             "Source 1",
                             vec![SourceOutput::new_logs(
                                 DataType::all(),
-                                Definition::empty_legacy_namespace().with_event_field(
-                                    &owned_value_path!("source-1"),
-                                    Kind::boolean(),
-                                    Some("source-1"),
-                                ),
+                                Definition::empty_legacy_namespace()
+                                    .with_event_field(
+                                        &owned_value_path!("source-1"),
+                                        Kind::boolean(),
+                                        Some("source-1"),
+                                    )
+                                    .unwrap(),
                             )],
                         ),
                         (
                             "Source 2",
                             vec![SourceOutput::new_logs(
                                 DataType::all(),
-                                Definition::empty_legacy_namespace().with_event_field(
-                                    &owned_value_path!("source-2"),
-                                    Kind::integer(),
-                                    Some("source-2"),
-                                ),
+                                Definition::empty_legacy_namespace()
+                                    .with_event_field(
+                                        &owned_value_path!("source-2"),
+                                        Kind::integer(),
+                                        Some("source-2"),
+                                    )
+                                    .unwrap(),
                             )],
                         ),
                     ]),
@@ -611,11 +648,13 @@ mod tests {
                                     DataType::all(),
                                     [(
                                         "Source 1".into(),
-                                        Definition::empty_legacy_namespace().with_event_field(
-                                            &owned_value_path!("transform-1"),
-                                            Kind::regex(),
-                                            None,
-                                        ),
+                                        Definition::empty_legacy_namespace()
+                                            .with_event_field(
+                                                &owned_value_path!("transform-1"),
+                                                Kind::regex(),
+                                                None,
+                                            )
+                                            .unwrap(),
                                     )]
                                     .into(),
                                 )],
@@ -629,11 +668,13 @@ mod tests {
                                     DataType::all(),
                                     [(
                                         "Source 2".into(),
-                                        Definition::empty_legacy_namespace().with_event_field(
-                                            &owned_value_path!("transform-2"),
-                                            Kind::float().or_null(),
-                                            Some("transform-2"),
-                                        ),
+                                        Definition::empty_legacy_namespace()
+                                            .with_event_field(
+                                                &owned_value_path!("transform-2"),
+                                                Kind::float().or_null(),
+                                                Some("transform-2"),
+                                            )
+                                            .unwrap(),
                                     )]
                                     .into(),
                                 )],
@@ -647,11 +688,13 @@ mod tests {
                                     DataType::all(),
                                     [(
                                         "Source 2".into(),
-                                        Definition::empty_legacy_namespace().with_event_field(
-                                            &owned_value_path!("transform-3"),
-                                            Kind::integer(),
-                                            Some("transform-3"),
-                                        ),
+                                        Definition::empty_legacy_namespace()
+                                            .with_event_field(
+                                                &owned_value_path!("transform-3"),
+                                                Kind::integer(),
+                                                Some("transform-3"),
+                                            )
+                                            .unwrap(),
                                     )]
                                     .into(),
                                 )],
@@ -665,11 +708,13 @@ mod tests {
                                     DataType::all(),
                                     [(
                                         "Source 2".into(),
-                                        Definition::empty_legacy_namespace().with_event_field(
-                                            &owned_value_path!("transform-4"),
-                                            Kind::timestamp().or_bytes(),
-                                            Some("transform-4"),
-                                        ),
+                                        Definition::empty_legacy_namespace()
+                                            .with_event_field(
+                                                &owned_value_path!("transform-4"),
+                                                Kind::timestamp().or_bytes(),
+                                                Some("transform-4"),
+                                            )
+                                            .unwrap(),
                                     )]
                                     .into(),
                                 )],
@@ -683,11 +728,13 @@ mod tests {
                                     DataType::all(),
                                     [(
                                         "Transform 3".into(),
-                                        Definition::empty_legacy_namespace().with_event_field(
-                                            &owned_value_path!("transform-5"),
-                                            Kind::boolean(),
-                                            Some("transform-5"),
-                                        ),
+                                        Definition::empty_legacy_namespace()
+                                            .with_event_field(
+                                                &owned_value_path!("transform-5"),
+                                                Kind::boolean(),
+                                                Some("transform-5"),
+                                            )
+                                            .unwrap(),
                                     )]
                                     .into(),
                                 )],
@@ -698,29 +745,35 @@ mod tests {
                         // Pipeline 1
                         (
                             "Transform 1".into(),
-                            Definition::empty_legacy_namespace().with_event_field(
-                                &owned_value_path!("transform-1"),
-                                Kind::regex(),
-                                None,
-                            ),
+                            Definition::empty_legacy_namespace()
+                                .with_event_field(
+                                    &owned_value_path!("transform-1"),
+                                    Kind::regex(),
+                                    None,
+                                )
+                                .unwrap(),
                         ),
                         // Pipeline 2
                         (
                             "Transform 2".into(),
-                            Definition::empty_legacy_namespace().with_event_field(
-                                &owned_value_path!("transform-2"),
-                                Kind::float().or_null(),
-                                Some("transform-2"),
-                            ),
+                            Definition::empty_legacy_namespace()
+                                .with_event_field(
+                                    &owned_value_path!("transform-2"),
+                                    Kind::float().or_null(),
+                                    Some("transform-2"),
+                                )
+                                .unwrap(),
                         ),
                         // Pipeline 3
                         (
                             "Transform 5".into(),
-                            Definition::empty_legacy_namespace().with_event_field(
-                                &owned_value_path!("transform-5"),
-                                Kind::boolean(),
-                                Some("transform-5"),
-                            ),
+                            Definition::empty_legacy_namespace()
+                                .with_event_field(
+                                    &owned_value_path!("transform-5"),
+                                    Kind::boolean(),
+                                    Some("transform-5"),
+                                )
+                                .unwrap(),
                         ),
                     ],
                 },
@@ -736,7 +789,7 @@ mod tests {
                 })
                 .collect::<Vec<_>>();
 
-            let got = expanded_definitions(&inputs, &case, &mut HashMap::default());
+            let got = expanded_definitions(&inputs, &case, &mut HashMap::default()).unwrap();
             assert_eq!(got, case.want, "{}", title);
         }
     }

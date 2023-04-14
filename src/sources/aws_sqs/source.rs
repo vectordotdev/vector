@@ -235,6 +235,7 @@ mod tests {
         };
         let definitions = config
             .outputs(LogNamespace::Vector)
+            .unwrap()
             .remove(0)
             .schema_definition(true);
 
@@ -287,6 +288,7 @@ mod tests {
         };
         let definitions = config
             .outputs(LogNamespace::Legacy)
+            .unwrap()
             .remove(0)
             .schema_definition(true);
 

@@ -257,6 +257,8 @@ pub fn update_config(config: &Config) {
     let mut cache = HashMap::new();
     let mut new_components = HashMap::new();
 
+    // TODO - Handle these unwraps
+
     // Sources
     for (component_key, source) in config.sources() {
         new_components.insert(
@@ -267,15 +269,18 @@ pub fn update_config(config: &Config) {
                 // TODO(#10745): This is obviously wrong, but there are a lot of assumptions in the
                 // API modules about `output_type` as it's a sortable field, etc. This is a stopgap
                 // until we decide how we want to change the rest of the usages.
+                // TODO: We shouldn't need to call `outputs` twice.
                 output_type: source
                     .inner
                     .outputs(config.schema.log_namespace())
+                    .unwrap()
                     .pop()
                     .unwrap()
                     .ty,
                 outputs: source
                     .inner
                     .outputs(config.schema.log_namespace())
+                    .unwrap()
                     .into_iter()
                     .map(|output| output.port.unwrap_or_else(|| DEFAULT_OUTPUT.to_string()))
                     .collect(),
@@ -297,6 +302,7 @@ pub fn update_config(config: &Config) {
                         &possible_definitions(&transform.inputs, config, &mut cache),
                         config.schema.log_namespace(),
                     )
+                    .unwrap()
                     .into_iter()
                     .map(|output| output.port.unwrap_or_else(|| DEFAULT_OUTPUT.to_string()))
                     .collect(),

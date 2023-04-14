@@ -167,7 +167,7 @@ impl SourceConfig for OpentelemetryConfig {
 
     // TODO: appropriately handle "severity" meaning across both "severity_text" and "severity_number",
     // as both are optional and can be converted to/from.
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> crate::Result<Vec<SourceOutput>> {
         let log_namespace = global_log_namespace.merge(self.log_namespace);
         let schema_definition = Definition::new_with_default_metadata(Kind::any(), [log_namespace])
             .with_source_metadata(
@@ -176,49 +176,49 @@ impl SourceConfig for OpentelemetryConfig {
                 &owned_value_path!(RESOURCE_KEY),
                 Kind::object(Collection::from_unknown(Kind::any())).or_undefined(),
                 None,
-            )
+            )?
             .with_source_metadata(
                 Self::NAME,
                 Some(LegacyKey::Overwrite(owned_value_path!(ATTRIBUTES_KEY))),
                 &owned_value_path!(ATTRIBUTES_KEY),
                 Kind::object(Collection::from_unknown(Kind::any())).or_undefined(),
                 None,
-            )
+            )?
             .with_source_metadata(
                 Self::NAME,
                 Some(LegacyKey::Overwrite(owned_value_path!(TRACE_ID_KEY))),
                 &owned_value_path!(TRACE_ID_KEY),
                 Kind::bytes().or_undefined(),
                 None,
-            )
+            )?
             .with_source_metadata(
                 Self::NAME,
                 Some(LegacyKey::Overwrite(owned_value_path!(SPAN_ID_KEY))),
                 &owned_value_path!(SPAN_ID_KEY),
                 Kind::bytes().or_undefined(),
                 None,
-            )
+            )?
             .with_source_metadata(
                 Self::NAME,
                 Some(LegacyKey::Overwrite(owned_value_path!(SEVERITY_TEXT_KEY))),
                 &owned_value_path!(SEVERITY_TEXT_KEY),
                 Kind::bytes().or_undefined(),
                 Some("severity"),
-            )
+            )?
             .with_source_metadata(
                 Self::NAME,
                 Some(LegacyKey::Overwrite(owned_value_path!(SEVERITY_NUMBER_KEY))),
                 &owned_value_path!(SEVERITY_NUMBER_KEY),
                 Kind::integer().or_undefined(),
                 None,
-            )
+            )?
             .with_source_metadata(
                 Self::NAME,
                 Some(LegacyKey::Overwrite(owned_value_path!(FLAGS_KEY))),
                 &owned_value_path!(FLAGS_KEY),
                 Kind::integer().or_undefined(),
                 None,
-            )
+            )?
             .with_source_metadata(
                 Self::NAME,
                 Some(LegacyKey::Overwrite(owned_value_path!(
@@ -227,7 +227,7 @@ impl SourceConfig for OpentelemetryConfig {
                 &owned_value_path!(DROPPED_ATTRIBUTES_COUNT_KEY),
                 Kind::integer(),
                 None,
-            )
+            )?
             .with_source_metadata(
                 Self::NAME,
                 Some(LegacyKey::Overwrite(owned_value_path!(
@@ -236,15 +236,15 @@ impl SourceConfig for OpentelemetryConfig {
                 &owned_value_path!(OBSERVED_TIMESTAMP_KEY),
                 Kind::timestamp(),
                 None,
-            )
+            )?
             .with_source_metadata(
                 Self::NAME,
                 None,
                 &owned_value_path!("timestamp"),
                 Kind::timestamp(),
                 Some("timestamp"),
-            )
-            .with_standard_vector_source_metadata();
+            )?
+            .with_standard_vector_source_metadata()?;
 
         let schema_definition = match log_namespace {
             LogNamespace::Vector => {
@@ -255,7 +255,11 @@ impl SourceConfig for OpentelemetryConfig {
             }
         };
 
-        vec![SourceOutput::new_logs(DataType::Log, schema_definition).with_port(LOGS)]
+        Ok(vec![SourceOutput::new_logs(
+            DataType::Log,
+            schema_definition,
+        )
+        .with_port(LOGS)])
     }
 
     fn resources(&self) -> Vec<Resource> {

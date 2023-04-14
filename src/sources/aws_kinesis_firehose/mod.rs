@@ -184,30 +184,30 @@ impl SourceConfig for AwsKinesisFirehoseConfig {
         }))
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> crate::Result<Vec<SourceOutput>> {
         let schema_definition = self
             .decoding
-            .schema_definition(global_log_namespace.merge(self.log_namespace))
-            .with_standard_vector_source_metadata()
+            .schema_definition(global_log_namespace.merge(self.log_namespace))?
+            .with_standard_vector_source_metadata()?
             .with_source_metadata(
                 Self::NAME,
                 Some(LegacyKey::InsertIfEmpty(owned_value_path!("request_id"))),
                 &owned_value_path!("request_id"),
                 Kind::bytes(),
                 None,
-            )
+            )?
             .with_source_metadata(
                 Self::NAME,
                 Some(LegacyKey::InsertIfEmpty(owned_value_path!("source_arn"))),
                 &owned_value_path!("source_arn"),
                 Kind::bytes(),
                 None,
-            );
+            )?;
 
-        vec![SourceOutput::new_logs(
+        Ok(vec![SourceOutput::new_logs(
             self.decoding.output_type(),
             schema_definition,
-        )]
+        )])
     }
 
     fn resources(&self) -> Vec<Resource> {

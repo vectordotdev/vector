@@ -272,60 +272,60 @@ impl SourceConfig for DockerLogsConfig {
         }))
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> crate::Result<Vec<SourceOutput>> {
         let host_key = self.host_key.clone().path.map(LegacyKey::Overwrite);
 
         let schema_definition = BytesDeserializerConfig
-            .schema_definition(global_log_namespace.merge(self.log_namespace))
+            .schema_definition(global_log_namespace.merge(self.log_namespace))?
             .with_source_metadata(
                 Self::NAME,
                 host_key,
                 &owned_value_path!("host"),
                 Kind::bytes().or_undefined(),
                 Some("host"),
-            )
+            )?
             .with_source_metadata(
                 Self::NAME,
                 Some(LegacyKey::Overwrite(owned_value_path!(CONTAINER))),
                 &owned_value_path!(CONTAINER),
                 Kind::bytes(),
                 None,
-            )
+            )?
             .with_source_metadata(
                 Self::NAME,
                 Some(LegacyKey::Overwrite(owned_value_path!(IMAGE))),
                 &owned_value_path!(IMAGE),
                 Kind::bytes(),
                 None,
-            )
+            )?
             .with_source_metadata(
                 Self::NAME,
                 Some(LegacyKey::Overwrite(owned_value_path!(NAME))),
                 &owned_value_path!(NAME),
                 Kind::bytes(),
                 None,
-            )
+            )?
             .with_source_metadata(
                 Self::NAME,
                 Some(LegacyKey::Overwrite(owned_value_path!(CREATED_AT))),
                 &owned_value_path!(CREATED_AT),
                 Kind::timestamp(),
                 None,
-            )
+            )?
             .with_source_metadata(
                 Self::NAME,
                 Some(LegacyKey::Overwrite(owned_value_path!("label"))),
                 &owned_value_path!("labels"),
                 Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
                 None,
-            )
+            )?
             .with_source_metadata(
                 Self::NAME,
                 Some(LegacyKey::Overwrite(owned_value_path!(STREAM))),
                 &owned_value_path!(STREAM),
                 Kind::bytes(),
                 None,
-            )
+            )?
             .with_source_metadata(
                 Self::NAME,
                 log_schema()
@@ -335,7 +335,7 @@ impl SourceConfig for DockerLogsConfig {
                 &owned_value_path!("timestamp"),
                 Kind::timestamp(),
                 Some("timestamp"),
-            )
+            )?
             .with_vector_metadata(
                 parse_value_path(log_schema().source_type_key())
                     .ok()
@@ -343,15 +343,18 @@ impl SourceConfig for DockerLogsConfig {
                 &owned_value_path!("source_type"),
                 Kind::bytes(),
                 None,
-            )
+            )?
             .with_vector_metadata(
                 None,
                 &owned_value_path!("ingest_timestamp"),
                 Kind::timestamp(),
                 None,
-            );
+            )?;
 
-        vec![SourceOutput::new_logs(DataType::Log, schema_definition)]
+        Ok(vec![SourceOutput::new_logs(
+            DataType::Log,
+            schema_definition,
+        )])
     }
 
     fn can_acknowledge(&self) -> bool {

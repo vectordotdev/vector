@@ -50,6 +50,7 @@ async fn receive_grpc_logs_vector_namespace() {
         };
         let schema_definitions = source
             .outputs(LogNamespace::Vector)
+            .unwrap()
             .remove(0)
             .schema_definition(true);
 
@@ -187,6 +188,7 @@ async fn receive_grpc_logs_legacy_namespace() {
         };
         let schema_definitions = source
             .outputs(LogNamespace::Legacy)
+            .unwrap()
             .remove(0)
             .schema_definition(true);
 

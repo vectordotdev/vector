@@ -114,11 +114,14 @@ impl SourceConfig for FluentConfig {
         )
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> crate::Result<Vec<SourceOutput>> {
         let log_namespace = global_log_namespace.merge(self.log_namespace);
-        let schema_definition = self.schema_definition(log_namespace);
+        let schema_definition = self.schema_definition(log_namespace)?;
 
-        vec![SourceOutput::new_logs(DataType::Log, schema_definition)]
+        Ok(vec![SourceOutput::new_logs(
+            DataType::Log,
+            schema_definition,
+        )])
     }
 
     fn resources(&self) -> Vec<Resource> {
@@ -132,7 +135,7 @@ impl SourceConfig for FluentConfig {
 
 impl FluentConfig {
     /// Builds the `schema::Definition` for this source using the provided `LogNamespace`.
-    fn schema_definition(&self, log_namespace: LogNamespace) -> Definition {
+    fn schema_definition(&self, log_namespace: LogNamespace) -> crate::Result<Definition> {
         // `host_key` is only inserted if not present already.
         let host_key = parse_value_path(log_schema().host_key())
             .ok()
@@ -150,29 +153,29 @@ impl FluentConfig {
         // There is a global and per-source `log_namespace` config.
         // The source config overrides the global setting and is merged here.
         let mut schema_definition = BytesDeserializerConfig
-            .schema_definition(log_namespace)
-            .with_standard_vector_source_metadata()
+            .schema_definition(log_namespace)?
+            .with_standard_vector_source_metadata()?
             .with_source_metadata(
                 FluentConfig::NAME,
                 host_key,
                 &owned_value_path!("host"),
                 Kind::bytes(),
                 Some("host"),
-            )
+            )?
             .with_source_metadata(
                 FluentConfig::NAME,
                 tag_key,
                 &owned_value_path!("tag"),
                 Kind::bytes(),
                 None,
-            )
+            )?
             .with_source_metadata(
                 FluentConfig::NAME,
                 None,
                 &owned_value_path!("timestamp"),
                 Kind::timestamp(),
                 Some("timestamp"),
-            )
+            )?
             // for metadata that is added to the events dynamically from the FluentRecord
             .with_source_metadata(
                 FluentConfig::NAME,
@@ -180,21 +183,21 @@ impl FluentConfig {
                 &owned_value_path!("record"),
                 Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
                 None,
-            )
+            )?
             .with_source_metadata(
                 Self::NAME,
                 tls_client_metadata_path,
                 &owned_value_path!("tls_client_metadata"),
                 Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
                 None,
-            );
+            )?;
 
         // for metadata that is added to the events dynamically
         if log_namespace == LogNamespace::Legacy {
             schema_definition = schema_definition.unknown_fields(Kind::bytes());
         }
 
-        schema_definition
+        Ok(schema_definition)
     }
 }
 
@@ -962,6 +965,7 @@ mod tests {
 
         let definitions = config
             .outputs(LogNamespace::Vector)
+            .unwrap()
             .remove(0)
             .schema_definition(true);
 
@@ -973,32 +977,39 @@ mod tests {
                     Kind::bytes(),
                     None,
                 )
+                .unwrap()
                 .with_metadata_field(&owned_value_path!("fluent", "tag"), Kind::bytes(), None)
+                .unwrap()
                 .with_metadata_field(
                     &owned_value_path!("fluent", "timestamp"),
                     Kind::timestamp(),
                     Some("timestamp"),
                 )
+                .unwrap()
                 .with_metadata_field(
                     &owned_value_path!("fluent", "record"),
                     Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
                     None,
                 )
+                .unwrap()
                 .with_metadata_field(
                     &owned_value_path!("vector", "ingest_timestamp"),
                     Kind::timestamp(),
                     None,
                 )
+                .unwrap()
                 .with_metadata_field(
                     &owned_value_path!("fluent", "host"),
                     Kind::bytes(),
                     Some("host"),
                 )
+                .unwrap()
                 .with_metadata_field(
                     &owned_value_path!("fluent", "tls_client_metadata"),
                     Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
                     None,
-                );
+                )
+                .unwrap();
 
         assert_eq!(definitions, Some(expected_definition))
     }
@@ -1017,6 +1028,7 @@ mod tests {
 
         let definitions = config
             .outputs(LogNamespace::Legacy)
+            .unwrap()
             .remove(0)
             .schema_definition(true);
 
@@ -1029,10 +1041,15 @@ mod tests {
             Kind::bytes(),
             Some("message"),
         )
+        .unwrap()
         .with_event_field(&owned_value_path!("source_type"), Kind::bytes(), None)
+        .unwrap()
         .with_event_field(&owned_value_path!("tag"), Kind::bytes(), None)
+        .unwrap()
         .with_event_field(&owned_value_path!("timestamp"), Kind::timestamp(), None)
+        .unwrap()
         .with_event_field(&owned_value_path!("host"), Kind::bytes(), Some("host"))
+        .unwrap()
         .unknown_fields(Kind::bytes());
 
         assert_eq!(definitions, Some(expected_definition))

@@ -351,7 +351,10 @@ impl DeserializerConfig {
     }
 
     /// The schema produced by the deserializer.
-    pub fn schema_definition(&self, log_namespace: LogNamespace) -> schema::Definition {
+    pub fn schema_definition(
+        &self,
+        log_namespace: LogNamespace,
+    ) -> Result<schema::Definition, schema::Error> {
         match self {
             DeserializerConfig::Bytes => BytesDeserializerConfig.schema_definition(log_namespace),
             DeserializerConfig::Json => JsonDeserializerConfig.schema_definition(log_namespace),

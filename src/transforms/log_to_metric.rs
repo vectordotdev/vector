@@ -161,9 +161,9 @@ impl TransformConfig for LogToMetricConfig {
         &self,
         _: &[(OutputId, schema::Definition)],
         _: LogNamespace,
-    ) -> Vec<TransformOutput> {
+    ) -> crate::Result<Vec<TransformOutput>> {
         // Converting the log to a metric means we lose all incoming `Definition`s.
-        vec![TransformOutput::new(DataType::Metric, HashMap::new())]
+        Ok(vec![TransformOutput::new(DataType::Metric, HashMap::new())])
     }
 
     fn enable_concurrency(&self) -> bool {

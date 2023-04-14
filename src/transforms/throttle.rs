@@ -63,12 +63,12 @@ impl TransformConfig for ThrottleConfig {
         &self,
         input_definitions: &[(OutputId, schema::Definition)],
         _: LogNamespace,
-    ) -> Vec<TransformOutput> {
+    ) -> crate::Result<Vec<TransformOutput>> {
         // The event is not modified, so the definition is passed through as-is
-        vec![TransformOutput::new(
+        Ok(vec![TransformOutput::new(
             DataType::Log,
             clone_input_definitions(input_definitions),
-        )]
+        )])
     }
 }
 

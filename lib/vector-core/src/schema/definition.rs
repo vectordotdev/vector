@@ -3,7 +3,17 @@ use std::collections::{BTreeMap, BTreeSet};
 use crate::config::{log_schema, LegacyKey, LogNamespace};
 use lookup::lookup_v2::{parse_value_path, TargetPath};
 use lookup::{owned_value_path, OwnedTargetPath, OwnedValuePath, PathPrefix};
+use snafu::Snafu;
 use value::{kind::Collection, Kind};
+
+#[derive(Debug, Snafu)]
+pub enum Error {
+    #[snafu(display("Setting a field on a value that cannot be an object"))]
+    SettingOnNonObject,
+
+    #[snafu(display("meaning must point to a valid path"))]
+    InvalidMeaningPath,
+}
 
 /// The definition of a schema.
 ///
@@ -142,7 +152,7 @@ impl Definition {
     /// Adds the `source_type` and `ingest_timestamp` metadata fields, which are added to every Vector source.
     /// This function should be called in the same order as the values are actually inserted into the event.
     #[must_use]
-    pub fn with_standard_vector_source_metadata(self) -> Self {
+    pub fn with_standard_vector_source_metadata(self) -> Result<Self, Error> {
         self.with_vector_metadata(
             parse_value_path(log_schema().source_type_key())
                 .ok()
@@ -150,7 +160,7 @@ impl Definition {
             &owned_value_path!("source_type"),
             Kind::bytes(),
             None,
-        )
+        )?
         .with_vector_metadata(
             log_schema().timestamp_key(),
             &owned_value_path!("ingest_timestamp"),
@@ -171,7 +181,7 @@ impl Definition {
         vector_path: &OwnedValuePath,
         kind: Kind,
         meaning: Option<&str>,
-    ) -> Self {
+    ) -> Result<Self, Error> {
         self.with_namespaced_metadata(source_name, legacy_path, vector_path, kind, meaning)
     }
 
@@ -186,7 +196,7 @@ impl Definition {
         vector_path: &OwnedValuePath,
         kind: Kind,
         meaning: Option<&str>,
-    ) -> Self {
+    ) -> Result<Self, Error> {
         self.with_namespaced_metadata(
             "vector",
             legacy_path.cloned().map(LegacyKey::InsertIfEmpty),
@@ -205,40 +215,41 @@ impl Definition {
         vector_path: &OwnedValuePath,
         kind: Kind,
         meaning: Option<&str>,
-    ) -> Self {
-        let legacy_definition = legacy_path.and_then(|legacy_path| {
-            if self.log_namespaces.contains(&LogNamespace::Legacy) {
-                match legacy_path {
-                    LegacyKey::InsertIfEmpty(legacy_path) => Some(self.clone().try_with_field(
-                        &legacy_path,
-                        kind.clone(),
-                        meaning,
-                    )),
-                    LegacyKey::Overwrite(legacy_path) => Some(self.clone().with_event_field(
-                        &legacy_path,
-                        kind.clone(),
-                        meaning,
-                    )),
-                }
-            } else {
-                None
-            }
-        });
+    ) -> Result<Self, Error> {
+        let legacy_definition =
+            legacy_path
+                .and_then(|legacy_path| {
+                    if self.log_namespaces.contains(&LogNamespace::Legacy) {
+                        match legacy_path {
+                            LegacyKey::InsertIfEmpty(legacy_path) => Some(
+                                self.clone()
+                                    .try_with_field(&legacy_path, kind.clone(), meaning),
+                            ),
+                            LegacyKey::Overwrite(legacy_path) => Some(
+                                self.clone()
+                                    .with_event_field(&legacy_path, kind.clone(), meaning),
+                            ),
+                        }
+                    } else {
+                        None
+                    }
+                })
+                .transpose()?;
 
         let vector_definition = if self.log_namespaces.contains(&LogNamespace::Vector) {
             Some(self.clone().with_metadata_field(
                 &vector_path.with_field_prefix(prefix),
                 kind,
                 meaning,
-            ))
+            )?)
         } else {
             None
         };
 
         match (legacy_definition, vector_definition) {
-            (Some(a), Some(b)) => a.merge(b),
-            (Some(x), _) | (_, Some(x)) => x,
-            (None, None) => self,
+            (Some(a), Some(b)) => Ok(a.merge(b)),
+            (Some(x), _) | (_, Some(x)) => Ok(x),
+            (None, None) => Ok(self),
         }
     }
 
@@ -246,15 +257,13 @@ impl Definition {
     /// A non-root required field means the root type must be an object, so the type will be automatically
     /// restricted to an object.
     ///
-    /// # Panics
-    /// - If the path is not root, and the definition does not allow the type to be an object.
     #[must_use]
     pub fn with_field(
         self,
         target_path: &OwnedTargetPath,
         kind: Kind,
         meaning: Option<&str>,
-    ) -> Self {
+    ) -> Result<Self, Error> {
         match target_path.prefix {
             PathPrefix::Event => self.with_event_field(&target_path.path, kind, meaning),
             PathPrefix::Metadata => self.with_metadata_field(&target_path.path, kind, meaning),
@@ -266,7 +275,6 @@ impl Definition {
     /// restricted to an object.
     ///
     /// # Panics
-    /// - If the path is not root, and the definition does not allow the type to be an object.
     /// - Provided path has one or more coalesced segments (e.g. `.(foo | bar)`).
     #[must_use]
     pub fn with_event_field(
@@ -274,12 +282,9 @@ impl Definition {
         path: &OwnedValuePath,
         kind: Kind,
         meaning: Option<&str>,
-    ) -> Self {
-        if !path.is_root() {
-            assert!(
-                self.event_kind.as_object().is_some(),
-                "Setting a field on a value that cannot be an object"
-            );
+    ) -> Result<Self, Error> {
+        if !path.is_root() && self.event_kind.as_object().is_none() {
+            return Err(Error::SettingOnNonObject);
         }
 
         self.event_kind.set_at_path(path, kind);
@@ -291,7 +296,7 @@ impl Definition {
             );
         }
 
-        self
+        Ok(self)
     }
 
     /// Add type information for an event field.
@@ -302,7 +307,7 @@ impl Definition {
         path: &OwnedValuePath,
         kind: Kind,
         meaning: Option<&str>,
-    ) -> Self {
+    ) -> Result<Self, Error> {
         let existing_type = self.event_kind.at_path(path);
 
         if existing_type.is_undefined() {
@@ -310,16 +315,16 @@ impl Definition {
             self.with_event_field(path, kind, meaning)
         } else if !existing_type.contains_undefined() {
             // Guaranteed to always be set (or is never), so the insertion will always fail.
-            self
+            Ok(self)
         } else {
             // Not sure if the insertion will be successful. The type definition should contain both
             // possibilities. The meaning is not set, since it can't be relied on.
 
-            let success_definition = self.clone().with_event_field(path, kind, None);
+            let success_definition = self.clone().with_event_field(path, kind, None)?;
             // If the existing type contains `undefined`, the new type will always be used, so remove it.
             self.event_kind
                 .set_at_path(path, existing_type.without_undefined());
-            self.merge(success_definition)
+            Ok(self.merge(success_definition))
         }
     }
 
@@ -336,12 +341,9 @@ impl Definition {
         path: &OwnedValuePath,
         kind: Kind,
         meaning: Option<&str>,
-    ) -> Self {
-        if !path.is_root() {
-            assert!(
-                self.metadata_kind.as_object().is_some(),
-                "Setting a field on a value that cannot be an object"
-            );
+    ) -> Result<Self, Error> {
+        if !path.is_root() && self.metadata_kind.as_object().is_none() {
+            return Err(Error::SettingOnNonObject);
         }
 
         self.metadata_kind.set_at_path(path, kind);
@@ -353,7 +355,7 @@ impl Definition {
             );
         }
 
-        self
+        Ok(self)
     }
 
     /// Add type information for an optional event field.
@@ -362,7 +364,12 @@ impl Definition {
     ///
     /// See `Definition::require_field`.
     #[must_use]
-    pub fn optional_field(self, path: &OwnedValuePath, kind: Kind, meaning: Option<&str>) -> Self {
+    pub fn optional_field(
+        self,
+        path: &OwnedValuePath,
+        kind: Kind,
+        meaning: Option<&str>,
+    ) -> Result<Self, Error> {
         self.with_event_field(path, kind.or_undefined(), meaning)
     }
 
@@ -396,7 +403,7 @@ impl Definition {
         &mut self,
         target_path: OwnedTargetPath,
         meaning: &str,
-    ) -> Result<(), &'static str> {
+    ) -> Result<(), Error> {
         match target_path.prefix {
             PathPrefix::Event
                 if !self
@@ -404,7 +411,7 @@ impl Definition {
                     .at_path(&target_path.path)
                     .contains_any_defined() =>
             {
-                Err("meaning must point to a valid path")
+                Err(Error::InvalidMeaningPath)
             }
 
             PathPrefix::Metadata
@@ -413,7 +420,7 @@ impl Definition {
                     .at_path(&target_path.path)
                     .contains_any_defined() =>
             {
-                Err("meaning must point to a valid path")
+                Err(Error::InvalidMeaningPath)
             }
 
             _ => {
@@ -675,12 +682,14 @@ mod tests {
 
     #[test]
     fn test_empty_legacy_field() {
-        let definition = Definition::default_legacy_namespace().with_vector_metadata(
-            Some(&owned_value_path!()),
-            &owned_value_path!(),
-            Kind::integer(),
-            None,
-        );
+        let definition = Definition::default_legacy_namespace()
+            .with_vector_metadata(
+                Some(&owned_value_path!()),
+                &owned_value_path!(),
+                Kind::integer(),
+                None,
+            )
+            .unwrap();
 
         // adding empty string legacy key doesn't change the definition (insertion will never succeed)
         assert_eq!(definition, Definition::default_legacy_namespace());
@@ -758,7 +767,9 @@ mod tests {
                 },
             ),
         ]) {
-            let got = Definition::empty_legacy_namespace().with_event_field(&path, kind, meaning);
+            let got = Definition::empty_legacy_namespace()
+                .with_event_field(&path, kind, meaning)
+                .unwrap();
             assert_eq!(got.event_kind(), want.event_kind(), "{title}");
         }
     }
@@ -845,7 +856,7 @@ mod tests {
             ),
         ] {
             let mut got = Definition::new_with_default_metadata(Kind::object(BTreeMap::new()), []);
-            got = got.optional_field(&path, kind, meaning);
+            got = got.optional_field(&path, kind, meaning).unwrap();
 
             assert_eq!(got, want, "{title}");
         }
@@ -879,11 +890,13 @@ mod tests {
             Kind::boolean(),
             Some("foo_meaning"),
         )
+        .unwrap()
         .with_metadata_field(
             &owned_value_path!("bar"),
             Kind::boolean(),
             Some("bar_meaning"),
-        );
+        )
+        .unwrap();
 
         assert_eq!(
             def.meaning_path("foo_meaning").unwrap(),

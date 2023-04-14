@@ -55,11 +55,11 @@ impl TransformConfig for FilterConfig {
         &self,
         input_definitions: &[(OutputId, schema::Definition)],
         _: LogNamespace,
-    ) -> Vec<TransformOutput> {
-        vec![TransformOutput::new(
+    ) -> crate::Result<Vec<TransformOutput>> {
+        Ok(vec![TransformOutput::new(
             DataType::all(),
             clone_input_definitions(input_definitions),
-        )]
+        )])
     }
 
     fn enable_concurrency(&self) -> bool {

@@ -72,7 +72,7 @@ pub struct LogstashConfig {
 
 impl LogstashConfig {
     /// Builds the `schema::Definition` for this source using the provided `LogNamespace`.
-    fn schema_definition(&self, log_namespace: LogNamespace) -> Definition {
+    fn schema_definition(&self, log_namespace: LogNamespace) -> crate::Result<Definition> {
         // `host_key` is only inserted if not present already.
         let host_key = parse_value_path(log_schema().host_key())
             .ok()
@@ -85,30 +85,30 @@ impl LogstashConfig {
             .and_then(|k| k.path.clone())
             .map(LegacyKey::Overwrite);
 
-        BytesDeserializerConfig
-            .schema_definition(log_namespace)
-            .with_standard_vector_source_metadata()
+        Ok(BytesDeserializerConfig
+            .schema_definition(log_namespace)?
+            .with_standard_vector_source_metadata()?
             .with_source_metadata(
                 LogstashConfig::NAME,
                 None,
                 &owned_value_path!("timestamp"),
                 Kind::timestamp().or_undefined(),
                 Some("timestamp"),
-            )
+            )?
             .with_source_metadata(
                 LogstashConfig::NAME,
                 host_key,
                 &owned_value_path!("host"),
                 Kind::bytes(),
                 Some("host"),
-            )
+            )?
             .with_source_metadata(
                 Self::NAME,
                 tls_client_metadata_path,
                 &owned_value_path!("tls_client_metadata"),
                 Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
                 None,
-            )
+            )?)
     }
 }
 
@@ -167,13 +167,13 @@ impl SourceConfig for LogstashConfig {
         )
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> crate::Result<Vec<SourceOutput>> {
         // There is a global and per-source `log_namespace` config.
         // The source config overrides the global setting and is merged here.
-        vec![SourceOutput::new_logs(
+        Ok(vec![SourceOutput::new_logs(
             DataType::Log,
-            self.schema_definition(global_log_namespace.merge(self.log_namespace)),
-        )]
+            self.schema_definition(global_log_namespace.merge(self.log_namespace))?,
+        )])
     }
 
     fn resources(&self) -> Vec<Resource> {
@@ -793,6 +793,7 @@ mod test {
 
         let definitions = config
             .outputs(LogNamespace::Vector)
+            .unwrap()
             .remove(0)
             .schema_definition(true);
 
@@ -804,26 +805,31 @@ mod test {
                     Kind::bytes(),
                     None,
                 )
+                .unwrap()
                 .with_metadata_field(
                     &owned_value_path!("vector", "ingest_timestamp"),
                     Kind::timestamp(),
                     None,
                 )
+                .unwrap()
                 .with_metadata_field(
                     &owned_value_path!(LogstashConfig::NAME, "timestamp"),
                     Kind::timestamp().or_undefined(),
                     Some("timestamp"),
                 )
+                .unwrap()
                 .with_metadata_field(
                     &owned_value_path!(LogstashConfig::NAME, "host"),
                     Kind::bytes(),
                     Some("host"),
                 )
+                .unwrap()
                 .with_metadata_field(
                     &owned_value_path!(LogstashConfig::NAME, "tls_client_metadata"),
                     Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
                     None,
-                );
+                )
+                .unwrap();
 
         assert_eq!(definitions, Some(expected_definition))
     }
@@ -834,6 +840,7 @@ mod test {
 
         let definitions = config
             .outputs(LogNamespace::Legacy)
+            .unwrap()
             .remove(0)
             .schema_definition(true);
 
@@ -846,9 +853,13 @@ mod test {
             Kind::bytes(),
             Some("message"),
         )
+        .unwrap()
         .with_event_field(&owned_value_path!("source_type"), Kind::bytes(), None)
+        .unwrap()
         .with_event_field(&owned_value_path!("timestamp"), Kind::timestamp(), None)
-        .with_event_field(&owned_value_path!("host"), Kind::bytes(), Some("host"));
+        .unwrap()
+        .with_event_field(&owned_value_path!("host"), Kind::bytes(), Some("host"))
+        .unwrap();
 
         assert_eq!(definitions, Some(expected_definition))
     }

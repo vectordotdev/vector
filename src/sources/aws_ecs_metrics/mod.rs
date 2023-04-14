@@ -159,8 +159,8 @@ impl SourceConfig for AwsEcsMetricsSourceConfig {
         )))
     }
 
-    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
-        vec![SourceOutput::new_metrics()]
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> crate::Result<Vec<SourceOutput>> {
+        Ok(vec![SourceOutput::new_metrics()])
     }
 
     fn can_acknowledge(&self) -> bool {

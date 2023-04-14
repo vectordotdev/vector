@@ -50,11 +50,13 @@ use crate::{
 };
 
 fn test_logs_schema_definition() -> schema::Definition {
-    schema::Definition::empty_legacy_namespace().with_event_field(
-        &owned_value_path!("a log field"),
-        Kind::integer().or_bytes(),
-        Some("log field"),
-    )
+    schema::Definition::empty_legacy_namespace()
+        .with_event_field(
+            &owned_value_path!("a log field"),
+            Kind::integer().or_bytes(),
+            Some("log field"),
+        )
+        .unwrap()
 }
 
 impl Arbitrary for LogMsg {
@@ -1443,41 +1445,49 @@ fn test_config_outputs() {
                                 Kind::bytes(),
                                 Some("message"),
                             )
+                            .unwrap()
                             .with_event_field(
                                 &owned_value_path!("status"),
                                 Kind::bytes(),
                                 Some("severity"),
                             )
+                            .unwrap()
                             .with_event_field(
                                 &owned_value_path!("timestamp"),
                                 Kind::timestamp(),
                                 Some("timestamp"),
                             )
+                            .unwrap()
                             .with_event_field(
                                 &owned_value_path!("hostname"),
                                 Kind::bytes(),
                                 Some("host"),
                             )
+                            .unwrap()
                             .with_event_field(
                                 &owned_value_path!("service"),
                                 Kind::bytes(),
                                 Some("service"),
                             )
+                            .unwrap()
                             .with_event_field(
                                 &owned_value_path!("ddsource"),
                                 Kind::bytes(),
                                 Some("source"),
                             )
+                            .unwrap()
                             .with_event_field(
                                 &owned_value_path!("ddtags"),
                                 Kind::bytes(),
                                 Some("tags"),
                             )
+                            .unwrap()
                             .with_event_field(
                                 &owned_value_path!("source_type"),
                                 Kind::bytes(),
                                 None,
-                            ),
+                            )
+                            .unwrap(),
                     ),
                 )]),
             },
@@ -1496,41 +1506,49 @@ fn test_config_outputs() {
                                 Kind::bytes(),
                                 Some("message"),
                             )
+                            .unwrap()
                             .with_event_field(
                                 &owned_value_path!("status"),
                                 Kind::bytes(),
                                 Some("severity"),
                             )
+                            .unwrap()
                             .with_event_field(
                                 &owned_value_path!("timestamp"),
                                 Kind::timestamp(),
                                 Some("timestamp"),
                             )
+                            .unwrap()
                             .with_event_field(
                                 &owned_value_path!("hostname"),
                                 Kind::bytes(),
                                 Some("host"),
                             )
+                            .unwrap()
                             .with_event_field(
                                 &owned_value_path!("service"),
                                 Kind::bytes(),
                                 Some("service"),
                             )
+                            .unwrap()
                             .with_event_field(
                                 &owned_value_path!("ddsource"),
                                 Kind::bytes(),
                                 Some("source"),
                             )
+                            .unwrap()
                             .with_event_field(
                                 &owned_value_path!("ddtags"),
                                 Kind::bytes(),
                                 Some("tags"),
                             )
+                            .unwrap()
                             .with_event_field(
                                 &owned_value_path!("source_type"),
                                 Kind::bytes(),
                                 None,
-                            ),
+                            )
+                            .unwrap(),
                     ),
                 )]),
             },
@@ -1550,41 +1568,49 @@ fn test_config_outputs() {
                                     Kind::bytes(),
                                     Some("message"),
                                 )
+                                .unwrap()
                                 .with_event_field(
                                     &owned_value_path!("status"),
                                     Kind::bytes(),
                                     Some("severity"),
                                 )
+                                .unwrap()
                                 .with_event_field(
                                     &owned_value_path!("timestamp"),
                                     Kind::timestamp(),
                                     Some("timestamp"),
                                 )
+                                .unwrap()
                                 .with_event_field(
                                     &owned_value_path!("hostname"),
                                     Kind::bytes(),
                                     Some("host"),
                                 )
+                                .unwrap()
                                 .with_event_field(
                                     &owned_value_path!("service"),
                                     Kind::bytes(),
                                     Some("service"),
                                 )
+                                .unwrap()
                                 .with_event_field(
                                     &owned_value_path!("ddsource"),
                                     Kind::bytes(),
                                     Some("source"),
                                 )
+                                .unwrap()
                                 .with_event_field(
                                     &owned_value_path!("ddtags"),
                                     Kind::bytes(),
                                     Some("tags"),
                                 )
+                                .unwrap()
                                 .with_event_field(
                                     &owned_value_path!("source_type"),
                                     Kind::bytes(),
                                     None,
-                                ),
+                                )
+                                .unwrap(),
                         ),
                     ),
                     (Some(METRICS), None),
@@ -1606,12 +1632,19 @@ fn test_config_outputs() {
                                 Kind::json().or_timestamp(),
                                 None,
                             )
+                            .unwrap()
                             .with_event_field(&owned_value_path!("source_type"), Kind::json(), None)
+                            .unwrap()
                             .with_event_field(&owned_value_path!("ddsource"), Kind::json(), None)
+                            .unwrap()
                             .with_event_field(&owned_value_path!("ddtags"), Kind::json(), None)
+                            .unwrap()
                             .with_event_field(&owned_value_path!("hostname"), Kind::json(), None)
+                            .unwrap()
                             .with_event_field(&owned_value_path!("service"), Kind::json(), None)
+                            .unwrap()
                             .with_event_field(&owned_value_path!("status"), Kind::json(), None)
+                            .unwrap()
                             .unknown_fields(Kind::json()),
                     ),
                 )]),
@@ -1632,24 +1665,31 @@ fn test_config_outputs() {
                                     Kind::json().or_timestamp(),
                                     None,
                                 )
+                                .unwrap()
                                 .with_event_field(
                                     &owned_value_path!("source_type"),
                                     Kind::json(),
                                     None,
                                 )
+                                .unwrap()
                                 .with_event_field(
                                     &owned_value_path!("ddsource"),
                                     Kind::json(),
                                     None,
                                 )
+                                .unwrap()
                                 .with_event_field(&owned_value_path!("ddtags"), Kind::json(), None)
+                                .unwrap()
                                 .with_event_field(
                                     &owned_value_path!("hostname"),
                                     Kind::json(),
                                     None,
                                 )
+                                .unwrap()
                                 .with_event_field(&owned_value_path!("service"), Kind::json(), None)
+                                .unwrap()
                                 .with_event_field(&owned_value_path!("status"), Kind::json(), None)
+                                .unwrap()
                                 .unknown_fields(Kind::json()),
                         ),
                     ),
@@ -1673,55 +1713,69 @@ fn test_config_outputs() {
                                 Kind::bytes(),
                                 Some("message"),
                             )
+                            .unwrap()
                             .with_event_field(
                                 &owned_value_path!("timestamp"),
                                 Kind::timestamp(),
                                 Some("timestamp"),
                             )
+                            .unwrap()
                             .with_event_field(
                                 &owned_value_path!("hostname"),
                                 Kind::bytes(),
                                 Some("host"),
                             )
+                            .unwrap()
                             .optional_field(
                                 &owned_value_path!("severity"),
                                 Kind::bytes(),
                                 Some("severity"),
                             )
+                            .unwrap()
                             .optional_field(&owned_value_path!("facility"), Kind::bytes(), None)
+                            .unwrap()
                             .optional_field(&owned_value_path!("version"), Kind::integer(), None)
+                            .unwrap()
                             .optional_field(&owned_value_path!("appname"), Kind::bytes(), None)
+                            .unwrap()
                             .optional_field(&owned_value_path!("msgid"), Kind::bytes(), None)
+                            .unwrap()
                             .optional_field(
                                 &owned_value_path!("procid"),
                                 Kind::integer().or_bytes(),
                                 None,
                             )
+                            .unwrap()
                             .with_event_field(
                                 &owned_value_path!("source_type"),
                                 Kind::bytes().or_object(Collection::from_unknown(Kind::bytes())),
                                 None,
                             )
+                            .unwrap()
                             .with_event_field(
                                 &owned_value_path!("ddsource"),
                                 Kind::bytes().or_object(Collection::from_unknown(Kind::bytes())),
                                 None,
                             )
+                            .unwrap()
                             .with_event_field(
                                 &owned_value_path!("ddtags"),
                                 Kind::bytes().or_object(Collection::from_unknown(Kind::bytes())),
                                 None,
                             )
+                            .unwrap()
                             .with_event_field(
                                 &owned_value_path!("service"),
                                 Kind::bytes().or_object(Collection::from_unknown(Kind::bytes())),
                                 None,
                             )
+                            .unwrap()
                             .with_event_field(
                                 &owned_value_path!("status"),
                                 Kind::bytes().or_object(Collection::from_unknown(Kind::bytes())),
                                 None,
                             )
+                            .unwrap()
                             .unknown_fields(Kind::object(value::kind::Collection::from_unknown(
                                 Kind::bytes(),
                             ))),
@@ -1745,64 +1799,78 @@ fn test_config_outputs() {
                                     Kind::bytes(),
                                     Some("message"),
                                 )
+                                .unwrap()
                                 .with_event_field(
                                     &owned_value_path!("timestamp"),
                                     Kind::timestamp(),
                                     Some("timestamp"),
                                 )
+                                .unwrap()
                                 .with_event_field(
                                     &owned_value_path!("hostname"),
                                     Kind::bytes(),
                                     Some("host"),
                                 )
+                                .unwrap()
                                 .optional_field(
                                     &owned_value_path!("severity"),
                                     Kind::bytes(),
                                     Some("severity"),
                                 )
+                                .unwrap()
                                 .optional_field(&owned_value_path!("facility"), Kind::bytes(), None)
+                                .unwrap()
                                 .optional_field(
                                     &owned_value_path!("version"),
                                     Kind::integer(),
                                     None,
                                 )
+                                .unwrap()
                                 .optional_field(&owned_value_path!("appname"), Kind::bytes(), None)
+                                .unwrap()
                                 .optional_field(&owned_value_path!("msgid"), Kind::bytes(), None)
+                                .unwrap()
                                 .optional_field(
                                     &owned_value_path!("procid"),
                                     Kind::integer().or_bytes(),
                                     None,
                                 )
+                                .unwrap()
                                 .with_event_field(
                                     &owned_value_path!("source_type"),
                                     Kind::bytes()
                                         .or_object(Collection::from_unknown(Kind::bytes())),
                                     None,
                                 )
+                                .unwrap()
                                 .with_event_field(
                                     &owned_value_path!("ddsource"),
                                     Kind::bytes()
                                         .or_object(Collection::from_unknown(Kind::bytes())),
                                     None,
                                 )
+                                .unwrap()
                                 .with_event_field(
                                     &owned_value_path!("ddtags"),
                                     Kind::bytes()
                                         .or_object(Collection::from_unknown(Kind::bytes())),
                                     None,
                                 )
+                                .unwrap()
                                 .with_event_field(
                                     &owned_value_path!("service"),
                                     Kind::bytes()
                                         .or_object(Collection::from_unknown(Kind::bytes())),
                                     None,
                                 )
+                                .unwrap()
                                 .with_event_field(
                                     &owned_value_path!("status"),
                                     Kind::bytes()
                                         .or_object(Collection::from_unknown(Kind::bytes())),
                                     None,
                                 )
+                                .unwrap()
                                 .unknown_fields(Kind::object(
                                     value::kind::Collection::from_unknown(Kind::bytes()),
                                 )),
@@ -1830,6 +1898,7 @@ fn test_config_outputs() {
 
         let mut outputs = config
             .outputs(LogNamespace::Legacy)
+            .unwrap()
             .into_iter()
             .map(|output| (output.port.clone(), output.schema_definition(true)))
             .collect::<HashMap<_, _>>();
@@ -2063,6 +2132,7 @@ fn test_output_schema_definition_json_vector_namespace() {
         "#})
     .unwrap()
     .outputs(LogNamespace::Vector)
+    .unwrap()
     .remove(0)
     .schema_definition(true);
 
@@ -2075,41 +2145,49 @@ fn test_output_schema_definition_json_vector_namespace() {
                     Kind::bytes(),
                     Some("source")
                 )
+                .unwrap()
                 .with_metadata_field(
                     &owned_value_path!("datadog_agent", "ddtags"),
                     Kind::bytes(),
                     Some("tags")
                 )
+                .unwrap()
                 .with_metadata_field(
                     &owned_value_path!("datadog_agent", "hostname"),
                     Kind::bytes(),
                     Some("host")
                 )
+                .unwrap()
                 .with_metadata_field(
                     &owned_value_path!("datadog_agent", "service"),
                     Kind::bytes(),
                     Some("service")
                 )
+                .unwrap()
                 .with_metadata_field(
                     &owned_value_path!("datadog_agent", "status"),
                     Kind::bytes(),
                     Some("severity")
                 )
+                .unwrap()
                 .with_metadata_field(
                     &owned_value_path!("datadog_agent", "timestamp"),
                     Kind::timestamp(),
                     Some("timestamp")
                 )
+                .unwrap()
                 .with_metadata_field(
                     &owned_value_path!("vector", "ingest_timestamp"),
                     Kind::timestamp(),
                     None
                 )
+                .unwrap()
                 .with_metadata_field(
                     &owned_value_path!("vector", "source_type"),
                     Kind::bytes(),
                     None
                 )
+                .unwrap()
         )
     )
 }
@@ -2122,6 +2200,7 @@ fn test_output_schema_definition_bytes_vector_namespace() {
         "#})
     .unwrap()
     .outputs(LogNamespace::Vector)
+    .unwrap()
     .remove(0)
     .schema_definition(true);
 
@@ -2134,41 +2213,49 @@ fn test_output_schema_definition_bytes_vector_namespace() {
                     Kind::bytes(),
                     Some("source")
                 )
+                .unwrap()
                 .with_metadata_field(
                     &owned_value_path!("datadog_agent", "ddtags"),
                     Kind::bytes(),
                     Some("tags")
                 )
+                .unwrap()
                 .with_metadata_field(
                     &owned_value_path!("datadog_agent", "hostname"),
                     Kind::bytes(),
                     Some("host")
                 )
+                .unwrap()
                 .with_metadata_field(
                     &owned_value_path!("datadog_agent", "service"),
                     Kind::bytes(),
                     Some("service")
                 )
+                .unwrap()
                 .with_metadata_field(
                     &owned_value_path!("datadog_agent", "status"),
                     Kind::bytes(),
                     Some("severity")
                 )
+                .unwrap()
                 .with_metadata_field(
                     &owned_value_path!("datadog_agent", "timestamp"),
                     Kind::timestamp(),
                     Some("timestamp")
                 )
+                .unwrap()
                 .with_metadata_field(
                     &owned_value_path!("vector", "ingest_timestamp"),
                     Kind::timestamp(),
                     None
                 )
+                .unwrap()
                 .with_metadata_field(
                     &owned_value_path!("vector", "source_type"),
                     Kind::bytes(),
                     None
                 )
+                .unwrap()
                 .with_meaning(OwnedTargetPath::event_root(), "message")
         )
     )
@@ -2182,6 +2269,7 @@ fn test_output_schema_definition_json_legacy_namespace() {
         "#})
     .unwrap()
     .outputs(LogNamespace::Legacy)
+    .unwrap()
     .remove(0)
     .schema_definition(true);
 
@@ -2194,12 +2282,19 @@ fn test_output_schema_definition_json_legacy_namespace() {
                     Kind::json().or_timestamp(),
                     None
                 )
+                .unwrap()
                 .with_event_field(&owned_value_path!("ddsource"), Kind::json(), None)
+                .unwrap()
                 .with_event_field(&owned_value_path!("ddtags"), Kind::json(), None)
+                .unwrap()
                 .with_event_field(&owned_value_path!("hostname"), Kind::json(), None)
+                .unwrap()
                 .with_event_field(&owned_value_path!("service"), Kind::json(), None)
+                .unwrap()
                 .with_event_field(&owned_value_path!("source_type"), Kind::json(), None)
+                .unwrap()
                 .with_event_field(&owned_value_path!("status"), Kind::json(), None)
+                .unwrap()
         )
     )
 }
@@ -2212,6 +2307,7 @@ fn test_output_schema_definition_bytes_legacy_namespace() {
         "#})
     .unwrap()
     .outputs(LogNamespace::Legacy)
+    .unwrap()
     .remove(0)
     .schema_definition(true);
 
@@ -2227,29 +2323,37 @@ fn test_output_schema_definition_bytes_legacy_namespace() {
                 Kind::bytes(),
                 Some("source")
             )
+            .unwrap()
             .with_event_field(&owned_value_path!("ddtags"), Kind::bytes(), Some("tags"))
+            .unwrap()
             .with_event_field(&owned_value_path!("hostname"), Kind::bytes(), Some("host"))
+            .unwrap()
             .with_event_field(
                 &owned_value_path!("message"),
                 Kind::bytes(),
                 Some("message")
             )
+            .unwrap()
             .with_event_field(
                 &owned_value_path!("service"),
                 Kind::bytes(),
                 Some("service")
             )
+            .unwrap()
             .with_event_field(&owned_value_path!("source_type"), Kind::bytes(), None)
+            .unwrap()
             .with_event_field(
                 &owned_value_path!("status"),
                 Kind::bytes(),
                 Some("severity")
             )
+            .unwrap()
             .with_event_field(
                 &owned_value_path!("timestamp"),
                 Kind::timestamp(),
                 Some("timestamp")
             )
+            .unwrap()
         )
     )
 }

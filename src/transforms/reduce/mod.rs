@@ -129,7 +129,7 @@ impl TransformConfig for ReduceConfig {
         &self,
         input_definitions: &[(OutputId, schema::Definition)],
         _: LogNamespace,
-    ) -> Vec<TransformOutput> {
+    ) -> crate::Result<Vec<TransformOutput>> {
         let mut output_definitions = HashMap::new();
 
         for (output, input) in input_definitions {
@@ -214,13 +214,16 @@ impl TransformConfig for ReduceConfig {
                     new_kind
                 };
 
-                schema_definition = schema_definition.with_field(&key, new_kind, None);
+                schema_definition = schema_definition.with_field(&key, new_kind, None)?;
             }
 
             output_definitions.insert(output.clone(), schema_definition);
         }
 
-        vec![TransformOutput::new(DataType::Log, output_definitions)]
+        Ok(vec![TransformOutput::new(
+            DataType::Log,
+            output_definitions,
+        )])
     }
 }
 
@@ -503,19 +506,25 @@ group_by = [ "request_id" ]
         assert_transform_compliance(async move {
             let input_definition = schema::Definition::default_legacy_namespace()
                 .with_event_field(&owned_value_path!("counter"), Kind::integer(), None)
+                .unwrap()
                 .with_event_field(&owned_value_path!("request_id"), Kind::bytes(), None)
+                .unwrap()
                 .with_event_field(
                     &owned_value_path!("test_end"),
                     Kind::bytes().or_undefined(),
                     None,
                 )
+                .unwrap()
                 .with_event_field(
                     &owned_value_path!("extra_field"),
                     Kind::bytes().or_undefined(),
                     None,
-                );
+                )
+                .unwrap();
+
             let schema_definitions = reduce_config
                 .outputs(&[("test".into(), input_definition)], LogNamespace::Legacy)
+                .unwrap()
                 .first()
                 .unwrap()
                 .log_schema_definitions

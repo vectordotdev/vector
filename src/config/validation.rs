@@ -149,15 +149,22 @@ pub fn check_resources(config: &ConfigBuilder) -> Result<(), Vec<String>> {
 pub fn check_outputs(config: &ConfigBuilder) -> Result<(), Vec<String>> {
     let mut errors = Vec::new();
     for (key, source) in config.sources.iter() {
-        let outputs = source.inner.outputs(config.schema.log_namespace());
-        if outputs
-            .iter()
-            .map(|output| output.port.as_deref().unwrap_or(""))
-            .any(|name| name == DEFAULT_OUTPUT)
-        {
-            errors.push(format!(
+        match source.inner.outputs(config.schema.log_namespace()) {
+            Ok(outputs) => {
+                if outputs
+                    .iter()
+                    .map(|output| output.port.as_deref().unwrap_or(""))
+                    .any(|name| name == DEFAULT_OUTPUT)
+                {
+                    errors.push(format!(
                 "Source {key} cannot have a named output with reserved name: `{DEFAULT_OUTPUT}`"
             ));
+                }
+            }
+            Err(_) => {
+                // There was an error defining this output, but we ignore this
+                // here since we are just checking reserved name.
+            }
         }
     }
 
@@ -169,19 +176,25 @@ pub fn check_outputs(config: &ConfigBuilder) -> Result<(), Vec<String>> {
             errors.extend(errs.into_iter().map(|msg| format!("Transform {key} {msg}")));
         }
 
-        if transform
-            .inner
-            .outputs(
-                &[(OutputId::dummy(), definition)],
-                config.schema.log_namespace(),
-            )
-            .iter()
-            .map(|output| output.port.as_deref().unwrap_or(""))
-            .any(|name| name == DEFAULT_OUTPUT)
-        {
-            errors.push(format!(
+        match transform.inner.outputs(
+            &[(OutputId::dummy(), definition)],
+            config.schema.log_namespace(),
+        ) {
+            Ok(outputs) => {
+                if outputs
+                    .iter()
+                    .map(|output| output.port.as_deref().unwrap_or(""))
+                    .any(|name| name == DEFAULT_OUTPUT)
+                {
+                    errors.push(format!(
                 "Transform {key} cannot have a named output with reserved name: `{DEFAULT_OUTPUT}`"
             ));
+                }
+            }
+            Err(_) => {
+                // There was an error defining this output, but we ignore this
+                // here since we are just checking reserved name.
+            }
         }
     }
 
@@ -331,6 +344,7 @@ pub fn warnings(config: &Config) -> Vec<String> {
         source
             .inner
             .outputs(config.schema.log_namespace())
+            .unwrap_or_default()
             .iter()
             .map(|output| {
                 if let Some(port) = &output.port {
@@ -348,6 +362,7 @@ pub fn warnings(config: &Config) -> Vec<String> {
                 &possible_definitions(&transform.inputs, config, &mut cache),
                 config.schema.log_namespace(),
             )
+            .unwrap_or_default()
             .iter()
             .map(|output| {
                 if let Some(port) = &output.port {

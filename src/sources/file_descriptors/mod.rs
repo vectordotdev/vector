@@ -210,7 +210,7 @@ fn outputs(
     host_key: &Option<OptionalValuePath>,
     decoding: &DeserializerConfig,
     source_name: &'static str,
-) -> Vec<SourceOutput> {
+) -> crate::Result<Vec<SourceOutput>> {
     let legacy_host_key = Some(LegacyKey::InsertIfEmpty(
         host_key.clone().and_then(|k| k.path).unwrap_or_else(|| {
             parse_value_path(log_schema().host_key()).expect("log_schema.host_key to be valid path")
@@ -218,18 +218,18 @@ fn outputs(
     ));
 
     let schema_definition = decoding
-        .schema_definition(log_namespace)
+        .schema_definition(log_namespace)?
         .with_source_metadata(
             source_name,
             legacy_host_key,
             &owned_value_path!("host"),
             Kind::bytes(),
             Some("host"),
-        )
-        .with_standard_vector_source_metadata();
+        )?
+        .with_standard_vector_source_metadata()?;
 
-    vec![SourceOutput::new_logs(
+    Ok(vec![SourceOutput::new_logs(
         decoding.output_type(),
         schema_definition,
-    )]
+    )])
 }

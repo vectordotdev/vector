@@ -228,7 +228,7 @@ impl TransformConfig for RemapConfig {
         &self,
         input_definitions: &[(OutputId, schema::Definition)],
         _: LogNamespace,
-    ) -> Vec<TransformOutput> {
+    ) -> Result<Vec<TransformOutput>> {
         let merged_definition: Definition = input_definitions
             .iter()
             .map(|(_output, definition)| definition.clone())
@@ -309,7 +309,7 @@ impl TransformConfig for RemapConfig {
                             ("component_kind".into(), Kind::bytes()),
                         ])),
                         Some("metadata"),
-                    ));
+                    )?);
             }
 
             if input_definition
@@ -319,23 +319,23 @@ impl TransformConfig for RemapConfig {
                 dropped_definition = dropped_definition.merge(
                     input_definition
                         .clone()
-                        .with_metadata_field(&owned_value_path!("reason"), Kind::bytes(), None)
-                        .with_metadata_field(&owned_value_path!("message"), Kind::bytes(), None)
+                        .with_metadata_field(&owned_value_path!("reason"), Kind::bytes(), None)?
+                        .with_metadata_field(&owned_value_path!("message"), Kind::bytes(), None)?
                         .with_metadata_field(
                             &owned_value_path!("component_id"),
                             Kind::bytes(),
                             None,
-                        )
+                        )?
                         .with_metadata_field(
                             &owned_value_path!("component_type"),
                             Kind::bytes(),
                             None,
-                        )
+                        )?
                         .with_metadata_field(
                             &owned_value_path!("component_kind"),
                             Kind::bytes(),
                             None,
-                        ),
+                        )?,
                 );
             }
 
@@ -345,14 +345,14 @@ impl TransformConfig for RemapConfig {
 
         let default_output = TransformOutput::new(DataType::all(), default_definitions);
 
-        if self.reroute_dropped {
+        Ok(if self.reroute_dropped {
             vec![
                 default_output,
                 TransformOutput::new(DataType::all(), dropped_definitions).with_port(DROPPED),
             ]
         } else {
             vec![default_output]
-        }
+        })
     }
 
     fn enable_concurrency(&self) -> bool {
@@ -413,10 +413,7 @@ impl VrlRunner for AstRunner {
 }
 
 impl Remap<AstRunner> {
-    pub fn new_ast(
-        config: RemapConfig,
-        context: &TransformContext,
-    ) -> crate::Result<(Self, String)> {
+    pub fn new_ast(config: RemapConfig, context: &TransformContext) -> Result<(Self, String)> {
         let (program, warnings, _, _) = config.compile_vrl_program(
             context.enrichment_tables.clone(),
             context.merged_schema_definition.clone(),
@@ -438,7 +435,7 @@ where
         context: &TransformContext,
         program: Program,
         runner: Runner,
-    ) -> crate::Result<Self> {
+    ) -> Result<Self> {
         let default_schema_definition = context
             .schema_definitions
             .get(&None)
@@ -688,19 +685,23 @@ mod tests {
     use tokio_stream::wrappers::ReceiverStream;
 
     fn test_default_schema_definition() -> schema::Definition {
-        schema::Definition::empty_legacy_namespace().with_event_field(
-            &owned_value_path!("a default field"),
-            Kind::integer().or_bytes(),
-            Some("default"),
-        )
+        schema::Definition::empty_legacy_namespace()
+            .with_event_field(
+                &owned_value_path!("a default field"),
+                Kind::integer().or_bytes(),
+                Some("default"),
+            )
+            .unwrap()
     }
 
     fn test_dropped_schema_definition() -> schema::Definition {
-        schema::Definition::empty_legacy_namespace().with_event_field(
-            &owned_value_path!("a dropped field"),
-            Kind::boolean().or_null(),
-            Some("dropped"),
-        )
+        schema::Definition::empty_legacy_namespace()
+            .with_event_field(
+                &owned_value_path!("a dropped field"),
+                Kind::boolean().or_null(),
+                Some("dropped"),
+            )
+            .unwrap()
     }
 
     fn remap(config: RemapConfig) -> Result<Remap<AstRunner>> {
@@ -1198,7 +1199,8 @@ mod tests {
                 Kind::any_object(),
                 [LogNamespace::Legacy],
             )
-            .with_event_field(&owned_value_path!("hello"), Kind::bytes(), None),
+            .with_event_field(&owned_value_path!("hello"), Kind::bytes(), None)
+            .unwrap(),
             ..Default::default()
         };
         let mut tform = Remap::new_ast(conf, &context).unwrap().0;
@@ -1442,7 +1444,9 @@ mod tests {
             [LogNamespace::Legacy],
         )
         .with_event_field(&owned_value_path!("foo"), Kind::any(), None)
-        .with_event_field(&owned_value_path!("tags"), Kind::any(), None);
+        .unwrap()
+        .with_event_field(&owned_value_path!("tags"), Kind::any(), None)
+        .unwrap();
 
         assert_eq!(
             conf.outputs(
@@ -1454,7 +1458,8 @@ mod tests {
                     )
                 )],
                 LogNamespace::Legacy
-            ),
+            )
+            .unwrap(),
             vec![TransformOutput::new(
                 DataType::all(),
                 [("test".into(), schema_definition)].into()

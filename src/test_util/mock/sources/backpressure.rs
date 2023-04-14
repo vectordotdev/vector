@@ -63,11 +63,11 @@ impl SourceConfig for BackpressureSourceConfig {
         .boxed())
     }
 
-    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
-        vec![SourceOutput::new_logs(
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> crate::Result<Vec<SourceOutput>> {
+        Ok(vec![SourceOutput::new_logs(
             DataType::all(),
             Definition::default_legacy_namespace(),
-        )]
+        )])
     }
 
     fn can_acknowledge(&self) -> bool {

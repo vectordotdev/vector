@@ -195,7 +195,7 @@ pub trait TransformConfig: DynClone + NamedComponent + core::fmt::Debug + Send +
         &self,
         input_definitions: &[(OutputId, schema::Definition)],
         global_log_namespace: LogNamespace,
-    ) -> Vec<TransformOutput>;
+    ) -> crate::Result<Vec<TransformOutput>>;
 
     /// Validates that the configuration of the transform is valid.
     ///

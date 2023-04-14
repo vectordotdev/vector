@@ -240,13 +240,16 @@ impl SourceConfig for SyslogConfig {
         }
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> crate::Result<Vec<SourceOutput>> {
         let log_namespace = global_log_namespace.merge(self.log_namespace);
         let schema_definition = SyslogDeserializerConfig::from_source(SyslogConfig::NAME)
-            .schema_definition(log_namespace)
-            .with_standard_vector_source_metadata();
+            .schema_definition(log_namespace)?
+            .with_standard_vector_source_metadata()?;
 
-        vec![SourceOutput::new_logs(DataType::Log, schema_definition)]
+        Ok(vec![SourceOutput::new_logs(
+            DataType::Log,
+            schema_definition,
+        )])
     }
 
     fn resources(&self) -> Vec<Resource> {
@@ -500,6 +503,7 @@ mod test {
 
         let definitions = config
             .outputs(LogNamespace::Vector)
+            .unwrap()
             .remove(0)
             .schema_definition(true);
 
@@ -511,56 +515,67 @@ mod test {
                     Kind::bytes(),
                     None,
                 )
+                .unwrap()
                 .with_metadata_field(
                     &owned_value_path!("vector", "ingest_timestamp"),
                     Kind::timestamp(),
                     None,
                 )
+                .unwrap()
                 .with_metadata_field(
                     &owned_value_path!("syslog", "timestamp"),
                     Kind::timestamp(),
                     Some("timestamp"),
                 )
+                .unwrap()
                 .with_metadata_field(
                     &owned_value_path!("syslog", "hostname"),
                     Kind::bytes().or_undefined(),
                     Some("host"),
                 )
+                .unwrap()
                 .with_metadata_field(
                     &owned_value_path!("syslog", "source_ip"),
                     Kind::bytes().or_undefined(),
                     None,
                 )
+                .unwrap()
                 .with_metadata_field(
                     &owned_value_path!("syslog", "severity"),
                     Kind::bytes().or_undefined(),
                     Some("severity"),
                 )
+                .unwrap()
                 .with_metadata_field(
                     &owned_value_path!("syslog", "facility"),
                     Kind::bytes().or_undefined(),
                     None,
                 )
+                .unwrap()
                 .with_metadata_field(
                     &owned_value_path!("syslog", "version"),
                     Kind::integer().or_undefined(),
                     None,
                 )
+                .unwrap()
                 .with_metadata_field(
                     &owned_value_path!("syslog", "appname"),
                     Kind::bytes().or_undefined(),
                     None,
                 )
+                .unwrap()
                 .with_metadata_field(
                     &owned_value_path!("syslog", "msgid"),
                     Kind::bytes().or_undefined(),
                     None,
                 )
+                .unwrap()
                 .with_metadata_field(
                     &owned_value_path!("syslog", "procid"),
                     Kind::integer().or_bytes().or_undefined(),
                     None,
                 )
+                .unwrap()
                 .with_metadata_field(
                     &owned_value_path!("syslog", "structured_data"),
                     Kind::object(Collection::from_unknown(Kind::object(
@@ -568,11 +583,13 @@ mod test {
                     ))),
                     None,
                 )
+                .unwrap()
                 .with_metadata_field(
                     &owned_value_path!("syslog", "tls_client_metadata"),
                     Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
                     None,
-                );
+                )
+                .unwrap();
 
         assert_eq!(definitions, Some(expected_definition));
     }
@@ -583,6 +600,7 @@ mod test {
 
         let definitions = config
             .outputs(LogNamespace::Legacy)
+            .unwrap()
             .remove(0)
             .schema_definition(true);
 
@@ -595,53 +613,64 @@ mod test {
             Kind::bytes(),
             Some("message"),
         )
+        .unwrap()
         .with_event_field(
             &owned_value_path!("timestamp"),
             Kind::timestamp(),
             Some("timestamp"),
         )
+        .unwrap()
         .with_event_field(
             &owned_value_path!("hostname"),
             Kind::bytes().or_undefined(),
             Some("host"),
         )
+        .unwrap()
         .with_event_field(
             &owned_value_path!("source_ip"),
             Kind::bytes().or_undefined(),
             None,
         )
+        .unwrap()
         .with_event_field(
             &owned_value_path!("severity"),
             Kind::bytes().or_undefined(),
             Some("severity"),
         )
+        .unwrap()
         .with_event_field(
             &owned_value_path!("facility"),
             Kind::bytes().or_undefined(),
             None,
         )
+        .unwrap()
         .with_event_field(
             &owned_value_path!("version"),
             Kind::integer().or_undefined(),
             None,
         )
+        .unwrap()
         .with_event_field(
             &owned_value_path!("appname"),
             Kind::bytes().or_undefined(),
             None,
         )
+        .unwrap()
         .with_event_field(
             &owned_value_path!("msgid"),
             Kind::bytes().or_undefined(),
             None,
         )
+        .unwrap()
         .with_event_field(
             &owned_value_path!("procid"),
             Kind::integer().or_bytes().or_undefined(),
             None,
         )
+        .unwrap()
         .unknown_fields(Kind::object(Collection::from_unknown(Kind::bytes())))
-        .with_standard_vector_source_metadata();
+        .with_standard_vector_source_metadata()
+        .unwrap();
 
         assert_eq!(definitions, Some(expected_definition));
     }

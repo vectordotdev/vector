@@ -55,7 +55,7 @@ impl SourceConfig for HttpConfig {
         self.0.build(cx).await
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> crate::Result<Vec<SourceOutput>> {
         self.0.outputs(global_log_namespace)
     }
 
@@ -150,19 +150,19 @@ pub struct SimpleHttpConfig {
 
 impl SimpleHttpConfig {
     /// Builds the `schema::Definition` for this source using the provided `LogNamespace`.
-    fn schema_definition(&self, log_namespace: LogNamespace) -> Definition {
+    fn schema_definition(&self, log_namespace: LogNamespace) -> crate::Result<Definition> {
         let mut schema_definition = self
             .decoding
             .as_ref()
             .unwrap_or(&default_decoding())
-            .schema_definition(log_namespace)
+            .schema_definition(log_namespace)?
             .with_source_metadata(
                 SimpleHttpConfig::NAME,
                 self.path_key.path.clone().map(LegacyKey::InsertIfEmpty),
                 &owned_value_path!("path"),
                 Kind::bytes(),
                 None,
-            )
+            )?
             // for metadata that is added to the events dynamically from the self.headers
             .with_source_metadata(
                 SimpleHttpConfig::NAME,
@@ -170,7 +170,7 @@ impl SimpleHttpConfig {
                 &owned_value_path!("headers"),
                 Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
                 None,
-            )
+            )?
             // for metadata that is added to the events dynamically from the self.query_parameters
             .with_source_metadata(
                 SimpleHttpConfig::NAME,
@@ -178,15 +178,15 @@ impl SimpleHttpConfig {
                 &owned_value_path!("query_parameters"),
                 Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
                 None,
-            )
-            .with_standard_vector_source_metadata();
+            )?
+            .with_standard_vector_source_metadata()?;
 
         // for metadata that is added to the events dynamically from config options
         if log_namespace == LogNamespace::Legacy {
             schema_definition = schema_definition.unknown_fields(Kind::bytes());
         }
 
-        schema_definition
+        Ok(schema_definition)
     }
 
     fn get_decoding_config(&self) -> crate::Result<DecodingConfig> {
@@ -336,20 +336,20 @@ impl SourceConfig for SimpleHttpConfig {
         )
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> crate::Result<Vec<SourceOutput>> {
         // There is a global and per-source `log_namespace` config.
         // The source config overrides the global setting and is merged here.
         let log_namespace = global_log_namespace.merge(self.log_namespace);
 
-        let schema_definition = self.schema_definition(log_namespace);
+        let schema_definition = self.schema_definition(log_namespace)?;
 
-        vec![SourceOutput::new_logs(
+        Ok(vec![SourceOutput::new_logs(
             self.decoding
                 .as_ref()
                 .map(|d| d.output_type())
                 .unwrap_or(DataType::Log),
             schema_definition,
-        )]
+        )])
     }
 
     fn resources(&self) -> Vec<Resource> {
@@ -1318,6 +1318,7 @@ mod tests {
 
         let definitions = config
             .outputs(LogNamespace::Vector)
+            .unwrap()
             .remove(0)
             .schema_definition(true);
 
@@ -1329,26 +1330,31 @@ mod tests {
                     Kind::bytes(),
                     None,
                 )
+                .unwrap()
                 .with_metadata_field(
                     &owned_value_path!(SimpleHttpConfig::NAME, "path"),
                     Kind::bytes(),
                     None,
                 )
+                .unwrap()
                 .with_metadata_field(
                     &owned_value_path!(SimpleHttpConfig::NAME, "headers"),
                     Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
                     None,
                 )
+                .unwrap()
                 .with_metadata_field(
                     &owned_value_path!(SimpleHttpConfig::NAME, "query_parameters"),
                     Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
                     None,
                 )
+                .unwrap()
                 .with_metadata_field(
                     &owned_value_path!("vector", "ingest_timestamp"),
                     Kind::timestamp(),
                     None,
-                );
+                )
+                .unwrap();
 
         assert_eq!(definitions, Some(expected_definition))
     }
@@ -1359,6 +1365,7 @@ mod tests {
 
         let definitions = config
             .outputs(LogNamespace::Legacy)
+            .unwrap()
             .remove(0)
             .schema_definition(true);
 
@@ -1371,9 +1378,13 @@ mod tests {
             Kind::bytes(),
             Some("message"),
         )
+        .unwrap()
         .with_event_field(&owned_value_path!("source_type"), Kind::bytes(), None)
+        .unwrap()
         .with_event_field(&owned_value_path!("timestamp"), Kind::timestamp(), None)
+        .unwrap()
         .with_event_field(&owned_value_path!("path"), Kind::bytes(), None)
+        .unwrap()
         .unknown_fields(Kind::bytes());
 
         assert_eq!(definitions, Some(expected_definition))

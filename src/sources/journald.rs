@@ -228,7 +228,7 @@ impl JournaldConfig {
     }
 
     /// Builds the `schema::Definition` for this source using the provided `LogNamespace`.
-    fn schema_definition(&self, log_namespace: LogNamespace) -> Definition {
+    fn schema_definition(&self, log_namespace: LogNamespace) -> crate::Result<Definition> {
         let schema_definition = match log_namespace {
             LogNamespace::Vector => Definition::new_with_default_metadata(
                 Kind::bytes().or_null(),
@@ -241,7 +241,7 @@ impl JournaldConfig {
         };
 
         let mut schema_definition = schema_definition
-            .with_standard_vector_source_metadata()
+            .with_standard_vector_source_metadata()?
             // for metadata that is added to the events dynamically through the Record
             .with_source_metadata(
                 JournaldConfig::NAME,
@@ -249,14 +249,14 @@ impl JournaldConfig {
                 &owned_value_path!("metadata"),
                 Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
                 None,
-            )
+            )?
             .with_source_metadata(
                 JournaldConfig::NAME,
                 None,
                 &owned_value_path!("timestamp"),
                 Kind::timestamp().or_undefined(),
                 Some("timestamp"),
-            )
+            )?
             .with_source_metadata(
                 JournaldConfig::NAME,
                 parse_value_path(log_schema().host_key())
@@ -265,14 +265,14 @@ impl JournaldConfig {
                 &owned_value_path!("host"),
                 Kind::bytes().or_undefined(),
                 Some("host"),
-            );
+            )?;
 
         // for metadata that is added to the events dynamically through the Record
         if log_namespace == LogNamespace::Legacy {
             schema_definition = schema_definition.unknown_fields(Kind::bytes());
         }
 
-        schema_definition
+        Ok(schema_definition)
     }
 }
 
@@ -364,11 +364,14 @@ impl SourceConfig for JournaldConfig {
         ))
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> crate::Result<Vec<SourceOutput>> {
         let schema_definition =
-            self.schema_definition(global_log_namespace.merge(self.log_namespace));
+            self.schema_definition(global_log_namespace.merge(self.log_namespace))?;
 
-        vec![SourceOutput::new_logs(DataType::Log, schema_definition)]
+        Ok(vec![SourceOutput::new_logs(
+            DataType::Log,
+            schema_definition,
+        )])
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -1468,6 +1471,7 @@ mod tests {
 
         let definitions = config
             .outputs(LogNamespace::Vector)
+            .unwrap()
             .remove(0)
             .schema_definition(true);
 
@@ -1478,26 +1482,31 @@ mod tests {
                     Kind::bytes(),
                     None,
                 )
+                .unwrap()
                 .with_metadata_field(
                     &owned_value_path!("vector", "ingest_timestamp"),
                     Kind::timestamp(),
                     None,
                 )
+                .unwrap()
                 .with_metadata_field(
                     &owned_value_path!(JournaldConfig::NAME, "metadata"),
                     Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
                     None,
                 )
+                .unwrap()
                 .with_metadata_field(
                     &owned_value_path!(JournaldConfig::NAME, "timestamp"),
                     Kind::timestamp().or_undefined(),
                     Some("timestamp"),
                 )
+                .unwrap()
                 .with_metadata_field(
                     &owned_value_path!(JournaldConfig::NAME, "host"),
                     Kind::bytes().or_undefined(),
                     Some("host"),
-                );
+                )
+                .unwrap();
 
         assert_eq!(definitions, Some(expected_definition))
     }
@@ -1508,6 +1517,7 @@ mod tests {
 
         let definitions = config
             .outputs(LogNamespace::Legacy)
+            .unwrap()
             .remove(0)
             .schema_definition(true);
 
@@ -1516,12 +1526,15 @@ mod tests {
             [LogNamespace::Legacy],
         )
         .with_event_field(&owned_value_path!("source_type"), Kind::bytes(), None)
+        .unwrap()
         .with_event_field(&owned_value_path!("timestamp"), Kind::timestamp(), None)
+        .unwrap()
         .with_event_field(
             &owned_value_path!("host"),
             Kind::bytes().or_undefined(),
             Some("host"),
         )
+        .unwrap()
         .unknown_fields(Kind::bytes());
 
         assert_eq!(definitions, Some(expected_definition))
@@ -1559,7 +1572,11 @@ mod tests {
 
         event.as_mut_log().insert("timestamp", chrono::Utc::now());
 
-        let definitions = config.outputs(namespace).remove(0).schema_definition(true);
+        let definitions = config
+            .outputs(namespace)
+            .unwrap()
+            .remove(0)
+            .schema_definition(true);
 
         definitions.unwrap().assert_valid_for_event(&event);
     }

@@ -217,13 +217,13 @@ impl SourceConfig for SocketConfig {
         }
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> crate::Result<Vec<SourceOutput>> {
         let log_namespace = global_log_namespace.merge(Some(self.log_namespace()));
 
         let schema_definition = self
             .decoding()
-            .schema_definition(log_namespace)
-            .with_standard_vector_source_metadata();
+            .schema_definition(log_namespace)?
+            .with_standard_vector_source_metadata()?;
 
         let schema_definition = match &self.mode {
             Mode::Tcp(config) => {
@@ -245,14 +245,14 @@ impl SourceConfig for SocketConfig {
                         &owned_value_path!("host"),
                         Kind::bytes(),
                         Some("host"),
-                    )
+                    )?
                     .with_source_metadata(
                         Self::NAME,
                         legacy_port_key,
                         &owned_value_path!("port"),
                         Kind::bytes(),
                         None,
-                    )
+                    )?
                     .with_source_metadata(
                         Self::NAME,
                         tls_client_metadata_path,
@@ -260,7 +260,7 @@ impl SourceConfig for SocketConfig {
                         Kind::object(Collection::empty().with_unknown(Kind::bytes()))
                             .or_undefined(),
                         None,
-                    )
+                    )?
             }
             Mode::Udp(config) => {
                 let legacy_host_key = config.host_key().clone().path.map(LegacyKey::InsertIfEmpty);
@@ -274,14 +274,14 @@ impl SourceConfig for SocketConfig {
                         &owned_value_path!("host"),
                         Kind::bytes(),
                         None,
-                    )
+                    )?
                     .with_source_metadata(
                         Self::NAME,
                         legacy_port_key,
                         &owned_value_path!("port"),
                         Kind::bytes(),
                         None,
-                    )
+                    )?
             }
             #[cfg(unix)]
             Mode::UnixDatagram(config) => {
@@ -293,7 +293,7 @@ impl SourceConfig for SocketConfig {
                     &owned_value_path!("host"),
                     Kind::bytes(),
                     None,
-                )
+                )?
             }
             #[cfg(unix)]
             Mode::UnixStream(config) => {
@@ -305,14 +305,14 @@ impl SourceConfig for SocketConfig {
                     &owned_value_path!("host"),
                     Kind::bytes(),
                     None,
-                )
+                )?
             }
         };
 
-        vec![SourceOutput::new_logs(
+        Ok(vec![SourceOutput::new_logs(
             self.decoding().output_type(),
             schema_definition,
-        )]
+        )])
     }
 
     fn resources(&self) -> Vec<Resource> {

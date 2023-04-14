@@ -63,25 +63,36 @@ impl Graph {
 
         // First, insert all of the different node types
         for (id, config) in sources.iter() {
-            graph.nodes.insert(
-                id.clone(),
-                Node::Source {
-                    outputs: config.inner.outputs(schema.log_namespace()),
-                },
-            );
+            match config.inner.outputs(schema.log_namespace()) {
+                Ok(outputs) => {
+                    graph.nodes.insert(id.clone(), Node::Source { outputs });
+                }
+                Err(err) => errors.push(format!(
+                    "Error defining source output {}, this is likely caused by a bug.",
+                    err
+                )),
+            }
         }
 
         for (id, transform) in transforms.iter() {
-            graph.nodes.insert(
-                id.clone(),
-                Node::Transform {
-                    in_ty: transform.inner.input().data_type(),
-                    outputs: transform.inner.outputs(
-                        &[(id.into(), schema::Definition::any())],
-                        schema.log_namespace(),
-                    ),
-                },
-            );
+            match transform.inner.outputs(
+                &[(id.into(), schema::Definition::any())],
+                schema.log_namespace(),
+            ) {
+                Ok(outputs) => {
+                    graph.nodes.insert(
+                        id.clone(),
+                        Node::Transform {
+                            in_ty: transform.inner.input().data_type(),
+                            outputs,
+                        },
+                    );
+                }
+                Err(err) => errors.push(format!(
+                    "Error defining source output {}, this is likely caused by a bug.",
+                    err
+                )),
+            }
         }
 
         for (id, config) in sinks.iter() {

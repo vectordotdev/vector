@@ -219,7 +219,16 @@ impl<'a> Builder<'a> {
             debug!(component = %key, "Building new source.");
 
             let typetag = source.inner.get_component_name();
-            let source_outputs = source.inner.outputs(self.config.schema.log_namespace());
+            let source_outputs = match source.inner.outputs(self.config.schema.log_namespace()) {
+                Ok(output) => output,
+                Err(err) => {
+                    self.errors.push(format!(
+                        "Error defining source output {}, this is likely caused by a bug.",
+                        err
+                    ));
+                    continue;
+                }
+            };
 
             let span = error_span!(
                 "source",
@@ -422,9 +431,21 @@ impl<'a> Builder<'a> {
             );
 
             // Create a map of the outputs to the list of possible definitions from those outputs.
-            let schema_definitions = transform
+            let transform_outputs = match transform
                 .inner
                 .outputs(&input_definitions, self.config.schema.log_namespace())
+            {
+                Ok(output) => output,
+                Err(err) => {
+                    self.errors.push(format!(
+                        "Error defining transform output {}, this is likely caused by a bug.",
+                        err
+                    ));
+                    continue;
+                }
+            };
+
+            let schema_definitions = transform_outputs
                 .into_iter()
                 .map(|output| (output.port, output.log_schema_definitions))
                 .collect::<HashMap<_, _>>();
@@ -438,12 +459,23 @@ impl<'a> Builder<'a> {
                 schema: self.config.schema,
             };
 
-            let node = TransformNode::from_parts(
+            let node = match TransformNode::from_parts(
                 key.clone(),
                 transform,
                 &input_definitions,
                 self.config.schema.log_namespace(),
-            );
+            ) {
+                Ok(node) => node,
+                Err(err) => {
+                    // This error from calling transform::outputs will likely
+                    // have been caught a few lines previously.
+                    self.errors.push(format!(
+                        "Error defining transform output {}, this is likely caused by a bug.",
+                        err
+                    ));
+                    continue;
+                }
+            };
 
             let transform = match transform
                 .inner
@@ -673,17 +705,17 @@ impl TransformNode {
         transform: &TransformOuter<OutputId>,
         schema_definition: &[(OutputId, Definition)],
         global_log_namespace: LogNamespace,
-    ) -> Self {
-        Self {
+    ) -> crate::Result<Self> {
+        Ok(Self {
             key,
             typetag: transform.inner.get_component_name(),
             inputs: transform.inputs.clone(),
             input_details: transform.inner.input(),
             outputs: transform
                 .inner
-                .outputs(schema_definition, global_log_namespace),
+                .outputs(schema_definition, global_log_namespace)?,
             enable_concurrency: transform.inner.enable_concurrency(),
-        }
+        })
     }
 }
 

@@ -195,7 +195,7 @@ impl SourceConfig for RedisSourceConfig {
         }
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> crate::Result<Vec<SourceOutput>> {
         let log_namespace = global_log_namespace.merge(self.log_namespace);
 
         let redis_key_path = self
@@ -206,20 +206,20 @@ impl SourceConfig for RedisSourceConfig {
 
         let schema_definition = self
             .decoding
-            .schema_definition(log_namespace)
+            .schema_definition(log_namespace)?
             .with_source_metadata(
                 Self::NAME,
                 redis_key_path,
                 &owned_value_path!("key"),
                 Kind::bytes(),
                 None,
-            )
-            .with_standard_vector_source_metadata();
+            )?
+            .with_standard_vector_source_metadata()?;
 
-        vec![SourceOutput::new_logs(
+        Ok(vec![SourceOutput::new_logs(
             self.decoding.output_type(),
             schema_definition,
-        )]
+        )])
     }
 
     fn can_acknowledge(&self) -> bool {

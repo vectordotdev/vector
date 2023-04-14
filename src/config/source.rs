@@ -90,7 +90,7 @@ pub trait SourceConfig: DynClone + NamedComponent + core::fmt::Debug + Send + Sy
     async fn build(&self, cx: SourceContext) -> crate::Result<Source>;
 
     /// Gets the list of outputs exposed by this source.
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput>;
+    fn outputs(&self, global_log_namespace: LogNamespace) -> crate::Result<Vec<SourceOutput>>;
 
     /// Gets the list of resources, if any, used by this source.
     ///

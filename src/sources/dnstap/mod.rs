@@ -116,7 +116,7 @@ impl DnstapConfig {
     pub fn schema_definition(
         &self,
         log_namespace: LogNamespace,
-    ) -> vector_core::schema::Definition {
+    ) -> crate::Result<vector_core::schema::Definition> {
         let event_schema = Self::event_schema(log_schema().timestamp_key());
 
         match log_namespace {
@@ -124,11 +124,11 @@ impl DnstapConfig {
                 let schema = vector_core::schema::Definition::empty_legacy_namespace();
 
                 if self.raw_data_only.unwrap_or(false) {
-                    schema.with_event_field(
+                    Ok(schema.with_event_field(
                         &owned_value_path!(log_schema().message_key()),
                         Kind::bytes(),
                         Some("message"),
-                    )
+                    )?)
                 } else {
                     event_schema.schema_definition(schema)
                 }
@@ -138,14 +138,14 @@ impl DnstapConfig {
                     Kind::object(Collection::empty()),
                     [log_namespace],
                 )
-                .with_standard_vector_source_metadata();
+                .with_standard_vector_source_metadata()?;
 
                 if self.raw_data_only.unwrap_or(false) {
-                    schema.with_event_field(
+                    Ok(schema.with_event_field(
                         &owned_value_path!("message"),
                         Kind::bytes(),
                         Some("message"),
-                    )
+                    )?)
                 } else {
                     event_schema.schema_definition(schema)
                 }
@@ -182,12 +182,15 @@ impl SourceConfig for DnstapConfig {
         build_framestream_unix_source(frame_handler, cx.shutdown, cx.out)
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> crate::Result<Vec<SourceOutput>> {
         let log_namespace = global_log_namespace.merge(self.log_namespace);
         let schema_definition = self
-            .schema_definition(log_namespace)
-            .with_standard_vector_source_metadata();
-        vec![SourceOutput::new_logs(DataType::Log, schema_definition)]
+            .schema_definition(log_namespace)?
+            .with_standard_vector_source_metadata()?;
+        Ok(vec![SourceOutput::new_logs(
+            DataType::Log,
+            schema_definition,
+        )])
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -409,10 +412,12 @@ mod tests {
 
         let definition = DnstapConfig::event_schema(Some(&owned_value_path!("timestamp")));
         let schema = vector_core::schema::Definition::empty_legacy_namespace()
-            .with_standard_vector_source_metadata();
+            .with_standard_vector_source_metadata()
+            .unwrap();
 
         definition
             .schema_definition(schema)
+            .unwrap()
             .assert_valid_for_event(&event)
     }
 }
