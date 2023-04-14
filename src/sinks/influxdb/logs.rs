@@ -592,23 +592,31 @@ mod tests {
         event.as_mut_log().insert("value", 100);
         event.as_mut_log().insert("timestamp", ts());
 
-        let sink = create_sink(
+        let mut sink = create_sink(
             "http://localhost:9999",
             "my-token",
             ProtocolVersion::V2,
             "vector",
-            ["metric_type"].to_vec(),
+            [].to_vec(),
         );
+        // exclude default metric_type tag so to emit empty tags
+        sink.transformer
+            .set_except_fields(Some(vec!["metric_type".into()]))
+            .unwrap();
         let mut encoder = sink.build_encoder();
 
         let bytes = encoder.encode_event(event).unwrap();
-        let string = std::str::from_utf8(&bytes).unwrap();
+        let line = std::str::from_utf8(&bytes).unwrap();
+        assert!(
+            line.starts_with("vector "),
+            "measurement (without tags) should ends with space ' '"
+        );
 
-        let line_protocol = split_line_protocol(string);
+        let line_protocol = split_line_protocol(line);
         assert_eq!("vector", line_protocol.0);
-        assert_eq!("metric_type=logs", line_protocol.1);
+        assert_eq!("", line_protocol.1, "tags should be empty");
         assert_fields(
-            line_protocol.2.to_string(),
+            line_protocol.2,
             ["value=100i", "message=\"hello\""].to_vec(),
         );
 
