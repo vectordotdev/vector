@@ -39,6 +39,7 @@ pub struct Constraints {
 }
 
 impl Constraints {
+    /// Adds a new constraint.
     pub fn add<S>(&mut self, name: S, constraint: Computed)
     where
         S: Into<String>,
@@ -46,32 +47,42 @@ impl Constraints {
         self.constraint_map.insert(name.into(), constraint);
     }
 
+    /// Computes the value of all configured constraints based on the given input.
+    ///
+    /// If a constraint has no computed value, it will not be included in the output. This is the
+    /// functional equivalent of an expression returning `None` when the return type is `Option<T>`.
     pub fn compute(&self, input: &Value) -> HashMap<String, Value> {
-        self.constraint_map.iter()
+        self.constraint_map
+            .iter()
             .filter_map(|(k, v)| v.compute(input).map(|v| (k.to_string(), v)))
             .collect()
     }
 }
 
+/// A computed constraint.
 pub enum Computed {
+    /// A fixed value.
+    ///
+    /// Generally not applicable as the top-level computed value for a constraint, but more common
+    /// for specifying the value of a conditional/optional constraint.
     Fixed(Value),
 
-    Optional { condition: Condition, value: Box<Computed> },
-
+    /// An array of computed values.
+    ///
+    /// Any computed value that returns no value is excluded from the vector of computed values.
     Array(Vec<Computed>),
 
-    //IfElse { if_condition: Condition, if_value: Box<Computed>, else_value: Box<Computed> },
+    /// A value that depends on the result of a conditional.
+    ///
+    /// If the given conditional is true, the value is computed and returned. Otherwise, no value is returned.
+    Optional {
+        condition: Condition,
+        value: Box<Computed>,
+    },
 }
 
 impl Computed {
-    /*pub fn if_else<IV, EV>(if_condition: Condition, if_value: IV, else_value: EV) -> Self
-    where
-        IV: Into<Computed>,
-        EV: Into<Computed>,
-    {
-        Self::IfElse { if_condition, if_value: Box::new(if_value.into()), else_value: Box::new(else_value.into()) }
-    }*/
-
+    /// Creates an array of computed values.
     pub fn array<I, T>(items: I) -> Self
     where
         I: IntoIterator<Item = T>,
@@ -80,24 +91,30 @@ impl Computed {
         Self::Array(items.into_iter().map(Into::into).collect())
     }
 
+    /// Creates an optional computed value based on the given `condition`.
     pub fn optional<V>(condition: Condition, value: V) -> Self
     where
         V: Into<Computed>,
     {
-        Self::Optional { condition, value: Box::new(value.into()) }
+        Self::Optional {
+            condition,
+            value: Box::new(value.into()),
+        }
     }
 
+    /// Computes the output of this value.
+    ///
+    /// If the computed value is null, `None` is returned.
     pub fn compute(&self, input: &Value) -> Option<Value> {
         match self {
             Computed::Fixed(v) => Some(v.clone()).and_then(nonnull_or_none),
-            Computed::Optional { condition, value } => condition.check(input).then_some(value.compute(input)).flatten(),
-            Computed::Array(items) => Some(items.into_iter().filter_map(|c| c.compute(input)).collect()),
-            /*Computed::IfElse { if_condition, if_value, else_value } => {
-                if_condition.check(input)
-                    .then(|| if_value.compute(input))
-                    .flatten()
-                    .or_else(|| else_value.compute(input))
-            }*/
+            Computed::Optional { condition, value } => condition
+                .check(input)
+                .then_some(value.compute(input))
+                .flatten(),
+            Computed::Array(items) => {
+                Some(items.into_iter().filter_map(|c| c.compute(input)).collect())
+            }
         }
     }
 }
@@ -111,6 +128,14 @@ where
     }
 }
 
+/// A conditional check.
+///
+/// Conditions are used to evaluate the given input and then choose a particular result path to
+/// further evaluate/compute, such as only including a value if a field equals a known value, or
+/// simulating if/else logic.
+///
+/// Conditions are simplistic, supporting a fixed target path in the input, a comparison operator,
+/// and a single operand.
 pub struct Condition {
     target: &'static str,
     operator: Operator,
@@ -118,6 +143,9 @@ pub struct Condition {
 }
 
 impl Condition {
+    /// Creates an equality condition for the given `target`.
+    ///
+    /// This condition succeeds if the value at the target path in the given input is equal to the `operand`.
     pub fn eq<O>(target: &'static str, operand: O) -> Self
     where
         O: Into<Value>,
@@ -129,6 +157,10 @@ impl Condition {
         }
     }
 
+    /// Creates an inequality condition for the given `target`.
+    ///
+    /// This condition succeeds if the value at the target path in the given input is not equal to
+    /// the `operand`.
     pub fn ne<O>(target: &'static str, operand: O) -> Self
     where
         O: Into<Value>,
@@ -140,6 +172,9 @@ impl Condition {
         }
     }
 
+    /// Checks the condition against the given `input`.
+    ///
+    /// If the condition passes, `true` is returned. Otherwise, `false`.
     pub fn check(&self, input: &Value) -> bool {
         let target_value = input.pointer(self.target).unwrap_or(&Value::Null);
         match self.operator {
@@ -149,8 +184,12 @@ impl Condition {
     }
 }
 
+/// Comparison operators.
 pub enum Operator {
+    /// Compares two values for equality.
     Eq,
+
+    /// Compares two values for inequality.
     Ne,
 }
 
@@ -170,14 +209,17 @@ mod tests {
     #[test]
     fn connectability_datadog_agent_outputs() {
         let mut constraints = Constraints::default();
-        constraints.add("outputs", Computed::optional(
-            Condition::eq("/multiple_outputs", true),
-            Computed::array([
-                Computed::optional(Condition::ne("/disable_logs", true), "logs"),
-                Computed::optional(Condition::ne("/disable_metrics", true), "metrics"),
-                Computed::optional(Condition::ne("/disable_traces", true), "traces"),
-            ]),
-        ));
+        constraints.add(
+            "outputs",
+            Computed::optional(
+                Condition::eq("/multiple_outputs", true),
+                Computed::array([
+                    Computed::optional(Condition::ne("/disable_logs", true), "logs"),
+                    Computed::optional(Condition::ne("/disable_metrics", true), "metrics"),
+                    Computed::optional(Condition::ne("/disable_traces", true), "traces"),
+                ]),
+            ),
+        );
 
         let defaults = json!({});
         println!("with defaults: {:?}", constraints.compute(&defaults));
@@ -185,12 +227,18 @@ mod tests {
         let multiple_outputs = json!({
             "multiple_outputs": true
         });
-        println!("with multiple_outputs=true: {:?}", constraints.compute(&multiple_outputs));
+        println!(
+            "with multiple_outputs=true: {:?}",
+            constraints.compute(&multiple_outputs)
+        );
 
         let multiple_outputs_no_traces = json!({
             "multiple_outputs": true,
             "disable_traces": true
         });
-        println!("with multiple_outputs=true, disable_traces=true: {:?}", constraints.compute(&multiple_outputs_no_traces));
+        println!(
+            "with multiple_outputs=true, disable_traces=true: {:?}",
+            constraints.compute(&multiple_outputs_no_traces)
+        );
     }
 }
