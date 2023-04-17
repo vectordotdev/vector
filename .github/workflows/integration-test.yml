@@ -12,7 +12,6 @@ on:
       - "lib/**"
       - "proto/**"
       - "scripts/**"
-      - "skaffold/**"
       - "src/**"
       - "tests/**"
       - "build.rs"

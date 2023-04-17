@@ -7,3 +7,5 @@ mod helpers;
 pub use self::helpers::*;
 
 pub mod visitors;
+
+pub mod parser;

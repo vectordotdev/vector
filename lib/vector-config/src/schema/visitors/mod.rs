@@ -7,4 +7,4 @@ mod unevaluated;
 pub(self) mod test;
 
 pub use self::inline_single::InlineSingleUseReferencesVisitor;
-pub use self::unevaluated::DisallowedUnevaluatedPropertiesVisitor;
+pub use self::unevaluated::DisallowUnevaluatedPropertiesVisitor;

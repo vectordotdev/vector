@@ -69,8 +69,8 @@ impl StreamDecodingError for Error {
 
 /// Framing configuration.
 ///
-/// Framing deals with how events are separated when encoded in a raw byte form, where each event is
-/// a "frame" that must be prefixed, or delimited, in a way that marks where an event begins and
+/// Framing handles how events are separated when encoded in a raw byte form, where each event is
+/// a frame that must be prefixed, or delimited, in a way that marks where an event begins and
 /// ends within the byte stream.
 // Unfortunately, copying options of the nested enum variants is necessary
 // since `serde` doesn't allow `flatten`ing these:

@@ -19,7 +19,7 @@ use futures_util::Stream;
 use k8s_openapi::api::core::v1::{Namespace, Node, Pod};
 use k8s_paths_provider::K8sPathsProvider;
 use kube::{
-    api::{Api, ListParams},
+    api::Api,
     config::{self, KubeConfigOptions},
     runtime::{
         reflector::{self},
@@ -219,6 +219,9 @@ pub struct Config {
     #[configurable(metadata(docs::examples = "/path/to/.kube/config"))]
     kube_config_file: Option<PathBuf>,
 
+    /// Determines if requests to the kube-apiserver can be served by a cache.
+    use_apiserver_cache: bool,
+
     /// How long to delay removing metadata entries from the cache when a pod deletion event
     /// event is received from the watch stream.
     ///
@@ -271,6 +274,7 @@ impl Default for Config {
             ingestion_timestamp_field: None,
             timezone: None,
             kube_config_file: None,
+            use_apiserver_cache: false,
             delay_deletion_ms: default_delay_deletion_ms(),
             log_namespace: None,
         }
@@ -519,6 +523,7 @@ struct Source {
     max_line_bytes: usize,
     fingerprint_lines: usize,
     glob_minimum_cooldown: Duration,
+    use_apiserver_cache: bool,
     ingestion_timestamp_field: Option<OwnedTargetPath>,
     delay_deletion: Duration,
 }
@@ -595,6 +600,7 @@ impl Source {
             max_line_bytes: config.max_line_bytes,
             fingerprint_lines: config.fingerprint_lines,
             glob_minimum_cooldown,
+            use_apiserver_cache: config.use_apiserver_cache,
             ingestion_timestamp_field,
             delay_deletion,
         })
@@ -625,6 +631,7 @@ impl Source {
             max_line_bytes,
             fingerprint_lines,
             glob_minimum_cooldown,
+            use_apiserver_cache,
             ingestion_timestamp_field,
             delay_deletion,
         } = self;
@@ -633,11 +640,18 @@ impl Source {
 
         let pods = Api::<Pod>::all(client.clone());
 
+        let list_semantic = if use_apiserver_cache {
+            watcher::ListSemantic::Any
+        } else {
+            watcher::ListSemantic::MostRecent
+        };
+
         let pod_watcher = watcher(
             pods,
-            ListParams {
+            watcher::Config {
                 field_selector: Some(field_selector),
                 label_selector: Some(label_selector),
+                list_semantic: list_semantic.clone(),
                 ..Default::default()
             },
         )
@@ -658,8 +672,9 @@ impl Source {
         let namespaces = Api::<Namespace>::all(client.clone());
         let ns_watcher = watcher(
             namespaces,
-            ListParams {
+            watcher::Config {
                 label_selector: Some(namespace_label_selector),
+                list_semantic: list_semantic.clone(),
                 ..Default::default()
             },
         )
@@ -680,8 +695,9 @@ impl Source {
         let nodes = Api::<Node>::all(client);
         let node_watcher = watcher(
             nodes,
-            ListParams {
+            watcher::Config {
                 field_selector: Some(node_selector),
+                list_semantic,
                 ..Default::default()
             },
         )

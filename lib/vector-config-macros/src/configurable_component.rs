@@ -7,82 +7,9 @@ use syn::{
     parse_macro_input, parse_quote, parse_quote_spanned, punctuated::Punctuated, spanned::Spanned,
     token::Comma, AttributeArgs, DeriveInput, Lit, LitStr, Meta, MetaList, NestedMeta, Path,
 };
+use vector_config_common::constants::ComponentType;
 
 use crate::attrs;
-
-#[derive(Clone, Debug)]
-enum ComponentType {
-    EnrichmentTable,
-    Provider,
-    Secrets,
-    Sink,
-    Source,
-    Transform,
-}
-
-impl ComponentType {
-    /// Gets the ident of the component type-specific helper attribute for the `NamedComponent` derive.
-    ///
-    /// When we emit code for a configurable item that has been marked as a typed component, we
-    /// optionally emit the code to generate an implementation of `NamedComponent` if that component
-    /// is supposed to be named.
-    ///
-    /// This function returns the appropriate ident for the helper attribute specific to the
-    /// component, as we must pass the component type being named -- source vs transform, etc --
-    /// down to the derive for `NamedComponent`. This allows it to emit error messages that _look_
-    /// like they're coming from `configurable_component`, even though they're coming from the
-    /// derive for `NamedComponent`.
-    fn get_named_component_helper_ident(&self) -> Ident {
-        let attr = match self {
-            ComponentType::EnrichmentTable => attrs::ENRICHMENT_TABLE_COMPONENT,
-            ComponentType::Provider => attrs::PROVIDER_COMPONENT,
-            ComponentType::Secrets => attrs::SECRETS_COMPONENT,
-            ComponentType::Sink => attrs::SINK_COMPONENT,
-            ComponentType::Source => attrs::SOURCE_COMPONENT,
-            ComponentType::Transform => attrs::TRANSFORM_COMPONENT,
-        };
-
-        attr.as_ident(Span::call_site())
-    }
-
-    fn is_valid_type(path: &Path) -> bool {
-        ComponentType::try_from(path).is_ok()
-    }
-
-    /// Gets the type of this component as a string.
-    fn as_str(&self) -> &'static str {
-        match self {
-            ComponentType::EnrichmentTable => "enrichment_table",
-            ComponentType::Provider => "provider",
-            ComponentType::Secrets => "secrets",
-            ComponentType::Sink => "sink",
-            ComponentType::Source => "source",
-            ComponentType::Transform => "transform",
-        }
-    }
-}
-
-impl<'a> TryFrom<&'a Path> for ComponentType {
-    type Error = ();
-
-    fn try_from(path: &'a Path) -> Result<Self, Self::Error> {
-        if path == attrs::ENRICHMENT_TABLE {
-            Ok(Self::EnrichmentTable)
-        } else if path == attrs::PROVIDER {
-            Ok(Self::Provider)
-        } else if path == attrs::SECRETS {
-            Ok(Self::Secrets)
-        } else if path == attrs::SINK {
-            Ok(Self::Sink)
-        } else if path == attrs::SOURCE {
-            Ok(Self::Source)
-        } else if path == attrs::TRANSFORM {
-            Ok(Self::Transform)
-        } else {
-            Err(())
-        }
-    }
-}
 
 #[derive(Clone, Debug)]
 struct TypedComponent {
@@ -197,7 +124,7 @@ impl TypedComponent {
 
     /// Creates the component name registration code.
     fn get_component_name_registration(&self) -> proc_macro2::TokenStream {
-        let helper_attr = self.component_type.get_named_component_helper_ident();
+        let helper_attr = get_named_component_helper_ident(self.component_type);
         match self.component_name.as_ref() {
             None => quote_spanned! {self.span=>
                 #[derive(::vector_config_macros::NamedComponent)]
@@ -425,4 +352,28 @@ fn capitalize(s: &str) -> String {
 
 fn capitalize_words(s: &str) -> String {
     s.split('_').map(capitalize).join(" ")
+}
+
+/// Gets the ident of the component type-specific helper attribute for the `NamedComponent` derive.
+///
+/// When we emit code for a configurable item that has been marked as a typed component, we
+/// optionally emit the code to generate an implementation of `NamedComponent` if that component
+/// is supposed to be named.
+///
+/// This function returns the appropriate ident for the helper attribute specific to the
+/// component, as we must pass the component type being named -- source vs transform, etc --
+/// down to the derive for `NamedComponent`. This allows it to emit error messages that _look_
+/// like they're coming from `configurable_component`, even though they're coming from the
+/// derive for `NamedComponent`.
+fn get_named_component_helper_ident(component_type: ComponentType) -> Ident {
+    let attr = match component_type {
+        ComponentType::EnrichmentTable => attrs::ENRICHMENT_TABLE_COMPONENT,
+        ComponentType::Provider => attrs::PROVIDER_COMPONENT,
+        ComponentType::Secrets => attrs::SECRETS_COMPONENT,
+        ComponentType::Sink => attrs::SINK_COMPONENT,
+        ComponentType::Source => attrs::SOURCE_COMPONENT,
+        ComponentType::Transform => attrs::TRANSFORM_COMPONENT,
+    };
+
+    attr.as_ident(Span::call_site())
 }

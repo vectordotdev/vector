@@ -7,7 +7,7 @@ pub trait Tracer {
     /// All allocations/deallocations that occur within the call to `Tracer::trace_allocation` are ignored, so
     /// implementors can allocate/deallocate without risk of reentrancy bugs. It does mean, however, that the
     /// allocations/deallocations that occur will be effectively lost, so implementors should ensure that the only data
-    /// they deallocate in the tracer is data that was similarly allocated, and vise versa.
+    /// they deallocate in the tracer is data that was similarly allocated, and vice versa.
     ///
     /// The object size is from the original layout excluding the group ID size.
     fn trace_allocation(&self, object_size: usize, group_id: AllocationGroupId);
@@ -21,7 +21,7 @@ pub trait Tracer {
     /// All allocations/deallocations that occur within the call to `Tracer::trace_deallocation` are ignored, so
     /// implementors can allocate/deallocate without risk of reentrancy bugs. It does mean, however, that the
     /// allocations/deallocations that occur will be effectively lost, so implementors should ensure that the only data
-    /// they deallocate in the tracer is data that was similarly allocated, and vise versa.
+    /// they deallocate in the tracer is data that was similarly allocated, and vice versa.
     ///
     /// The object size is from the original layout excluding the group ID size.
     fn trace_deallocation(&self, object_size: usize, source_group_id: AllocationGroupId);
