@@ -89,7 +89,7 @@ pub enum Computed {
     Derived {
         target: &'static str,
         operation: DeriveOp,
-    }
+    },
 }
 
 impl Computed {
@@ -131,7 +131,8 @@ impl Computed {
             Computed::Array(items) => {
                 Some(items.into_iter().filter_map(|c| c.compute(input)).collect())
             }
-            Computed::Derived { target, operation } => input.pointer(target)
+            Computed::Derived { target, operation } => input
+                .pointer(target)
                 .and_then(|value| operation.derive(value)),
         }
     }
@@ -229,9 +230,11 @@ pub enum DeriveOp {
 impl DeriveOp {
     fn derive(&self, input: &Value) -> Option<Value> {
         match self {
-            DeriveOp::Raw =>Some(input.clone()),
+            DeriveOp::Raw => Some(input.clone()),
             DeriveOp::Keys => match input {
-                Value::Object(map) => Some(Value::Array(map.keys().map(|s| s.as_str().into()).collect())),
+                Value::Object(map) => Some(Value::Array(
+                    map.keys().map(|s| s.as_str().into()).collect(),
+                )),
                 _ => None,
             },
             DeriveOp::Values => match input {
@@ -290,23 +293,6 @@ mod tests {
             "with multiple_outputs=true, disable_traces=true: {:?}",
             constraints.compute(&multiple_outputs_no_traces)
         );
-    }
-
-    #[test]
-    fn route_transform() {
-        let mut constraints = Constraints::default();
-        constraints.add("outputs", Computed::derived("/route", DeriveOp::Keys));
-
-        let no_routes = json!({});
-        println!("with no routes: {:?}", constraints.compute(&no_routes));
-
-        let some_routes = json!({
-            "route": {
-                "route1": {},
-                "route2": {}
-            }
-        });
-        println!("with some routes: {:?}", constraints.compute(&some_routes));
     }
 
     #[test]
