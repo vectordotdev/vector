@@ -19,7 +19,7 @@ use crate::{
     SourceSender,
 };
 
-use super::{default_host_key, default_max_length, SocketConfig};
+use super::{default_host_key, SocketConfig};
 
 /// Unix domain socket configuration for the `socket` source.
 #[configurable_component]
@@ -40,16 +40,6 @@ pub struct UnixConfig {
     #[configurable(metadata(docs::examples = 0o600))]
     #[configurable(metadata(docs::examples = 508))]
     pub socket_file_mode: Option<u32>,
-
-    /// The maximum buffer size of incoming messages.
-    ///
-    /// Messages larger than this are truncated.
-    // TODO: communicated as deprecated in v0.29.0, can be removed in v0.30.0
-    #[configurable(
-        deprecated = "This option has been deprecated. Configure `max_length` on the framing config instead."
-    )]
-    #[configurable(metadata(docs::type_unit = "bytes"))]
-    pub max_length: Option<usize>,
 
     /// Overrides the name of the log field used to add the peer host to each event.
     ///
@@ -82,7 +72,6 @@ impl UnixConfig {
         Self {
             path,
             socket_file_mode: None,
-            max_length: default_max_length(),
             host_key: default_host_key(),
             framing: None,
             decoding: default_decoding(),
@@ -135,12 +124,22 @@ pub(super) fn unix_datagram(
     out: SourceSender,
     log_namespace: LogNamespace,
 ) -> crate::Result<Source> {
+    let max_length = config
+        .framing
+        .and_then(|framing| match framing {
+            FramingConfig::CharacterDelimited {
+                character_delimited,
+            } => character_delimited.max_length,
+            FramingConfig::NewlineDelimited { newline_delimited } => newline_delimited.max_length,
+            FramingConfig::OctetCounting { octet_counting } => octet_counting.max_length,
+            _ => None,
+        })
+        .unwrap_or_else(crate::serde::default_max_length);
+
     build_unix_datagram_source(
         config.path,
         config.socket_file_mode,
-        config
-            .max_length
-            .unwrap_or_else(crate::serde::default_max_length),
+        max_length,
         decoder,
         move |events, received_from| {
             handle_events(events, &config.host_key, received_from, log_namespace)
