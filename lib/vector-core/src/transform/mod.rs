@@ -222,14 +222,14 @@ struct TransformOutput {
 }
 
 pub struct TransformOutputs {
-    outputs_spec: Vec<config::TransformOutput>,
+    outputs_spec: Vec<config::Output>,
     primary_output: Option<TransformOutput>,
     named_outputs: HashMap<String, TransformOutput>,
 }
 
 impl TransformOutputs {
     pub fn new(
-        outputs_in: Vec<config::TransformOutput>,
+        outputs_in: Vec<config::Output>,
     ) -> (Self, HashMap<Option<String>, fanout::ControlChannel>) {
         let outputs_spec = outputs_in.clone();
         let mut primary_output = None;
@@ -319,7 +319,7 @@ pub struct TransformOutputsBuf {
 }
 
 impl TransformOutputsBuf {
-    pub fn new_with_capacity(outputs_in: Vec<config::TransformOutput>, capacity: usize) -> Self {
+    pub fn new_with_capacity(outputs_in: Vec<config::Output>, capacity: usize) -> Self {
         let mut primary_buffer = None;
         let mut named_buffers = HashMap::new();
 

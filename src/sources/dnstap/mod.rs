@@ -11,7 +11,7 @@ use vector_config::configurable_component;
 
 use super::util::framestream::{build_framestream_unix_source, FrameHandler};
 use crate::{
-    config::{log_schema, DataType, SourceConfig, SourceContext, SourceOutput},
+    config::{log_schema, DataType, Output, SourceConfig, SourceContext},
     event::{Event, LogEvent},
     internal_events::DnstapParseError,
     Result,
@@ -182,12 +182,12 @@ impl SourceConfig for DnstapConfig {
         build_framestream_unix_source(frame_handler, cx.shutdown, cx.out)
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
         let log_namespace = global_log_namespace.merge(self.log_namespace);
         let schema_definition = self
             .schema_definition(log_namespace)
             .with_standard_vector_source_metadata();
-        vec![SourceOutput::new_logs(DataType::Log, schema_definition)]
+        vec![Output::default(DataType::Log).with_schema_definition(schema_definition)]
     }
 
     fn can_acknowledge(&self) -> bool {

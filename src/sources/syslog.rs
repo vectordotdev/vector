@@ -23,9 +23,7 @@ use vector_core::config::{LegacyKey, LogNamespace};
 use crate::sources::util::build_unix_stream_source;
 use crate::{
     codecs::Decoder,
-    config::{
-        log_schema, DataType, GenerateConfig, Resource, SourceConfig, SourceContext, SourceOutput,
-    },
+    config::{log_schema, DataType, GenerateConfig, Output, Resource, SourceConfig, SourceContext},
     event::Event,
     internal_events::StreamClosedError,
     internal_events::{SocketBindError, SocketMode, SocketReceiveError},
@@ -240,13 +238,13 @@ impl SourceConfig for SyslogConfig {
         }
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
         let log_namespace = global_log_namespace.merge(self.log_namespace);
         let schema_definition = SyslogDeserializerConfig::from_source(SyslogConfig::NAME)
             .schema_definition(log_namespace)
             .with_standard_vector_source_metadata();
 
-        vec![SourceOutput::new_logs(DataType::Log, schema_definition)]
+        vec![Output::default(DataType::Log).with_schema_definition(schema_definition)]
     }
 
     fn resources(&self) -> Vec<Resource> {
@@ -498,10 +496,10 @@ mod test {
             ..Default::default()
         };
 
-        let definitions = config
-            .outputs(LogNamespace::Vector)
-            .remove(0)
-            .schema_definition(true);
+        let definition = config.outputs(LogNamespace::Vector)[0]
+            .clone()
+            .log_schema_definition
+            .unwrap();
 
         let expected_definition =
             Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
@@ -574,17 +572,17 @@ mod test {
                     None,
                 );
 
-        assert_eq!(definitions, Some(expected_definition));
+        assert_eq!(definition, expected_definition);
     }
 
     #[test]
     fn output_schema_definition_legacy_namespace() {
         let config = SyslogConfig::default();
 
-        let definitions = config
-            .outputs(LogNamespace::Legacy)
-            .remove(0)
-            .schema_definition(true);
+        let definition = config.outputs(LogNamespace::Legacy)[0]
+            .clone()
+            .log_schema_definition
+            .unwrap();
 
         let expected_definition = Definition::new_with_default_metadata(
             Kind::object(Collection::empty()),
@@ -643,7 +641,7 @@ mod test {
         .unknown_fields(Kind::object(Collection::from_unknown(Kind::bytes())))
         .with_standard_vector_source_metadata();
 
-        assert_eq!(definitions, Some(expected_definition));
+        assert_eq!(definition, expected_definition);
     }
 
     #[test]

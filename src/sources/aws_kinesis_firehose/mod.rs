@@ -13,8 +13,7 @@ use warp::Filter;
 use crate::{
     codecs::DecodingConfig,
     config::{
-        GenerateConfig, Resource, SourceAcknowledgementsConfig, SourceConfig, SourceContext,
-        SourceOutput,
+        GenerateConfig, Output, Resource, SourceAcknowledgementsConfig, SourceConfig, SourceContext,
     },
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
     tls::{MaybeTlsSettings, TlsEnableableConfig},
@@ -184,7 +183,7 @@ impl SourceConfig for AwsKinesisFirehoseConfig {
         }))
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
         let schema_definition = self
             .decoding
             .schema_definition(global_log_namespace.merge(self.log_namespace))
@@ -204,10 +203,7 @@ impl SourceConfig for AwsKinesisFirehoseConfig {
                 None,
             );
 
-        vec![SourceOutput::new_logs(
-            self.decoding.output_type(),
-            schema_definition,
-        )]
+        vec![Output::default(self.decoding.output_type()).with_schema_definition(schema_definition)]
     }
 
     fn resources(&self) -> Vec<Resource> {
