@@ -134,29 +134,37 @@ fn encode_and_write_single_event<V: Display>(
 }
 #[cfg(test)]
 mod tests {
-    use std::str::from_utf8;
-
-    use bytes::BytesMut;
-    use tokio_util::codec::Encoder;
     use vector_core::{
-        event::{metric::TagValue, MetricKind, MetricTags, MetricValue, StatisticKind},
+        event::{metric::TagValue, MetricTags},
         metric_tags,
     };
 
-    use super::{encode_tags, StatsdEncoder};
-    use crate::event::Metric;
+    use super::encode_tags;
 
-    fn encode_metric(metric: &Metric) -> BytesMut {
-        let mut encoder = StatsdEncoder {
+    #[cfg(feature = "sources-statsd")]
+    use vector_core::event::{Metric, MetricKind, MetricValue, StatisticKind};
+
+    #[cfg(feature = "sources-statsd")]
+    fn encode_metric(metric: &Metric) -> bytes::BytesMut {
+        use tokio_util::codec::Encoder;
+
+        let mut encoder = super::StatsdEncoder {
             default_namespace: None,
         };
-        let mut frame = BytesMut::new();
+        let mut frame = bytes::BytesMut::new();
         encoder.encode(metric, &mut frame).unwrap();
         frame
     }
 
     #[cfg(feature = "sources-statsd")]
-    use crate::sources::statsd::parser::parse;
+    fn parse_encoded_metrics(metric: &[u8]) -> Vec<Metric> {
+        use crate::sources::statsd::parser::parse as statsd_parse;
+
+        let s = std::str::from_utf8(metric).unwrap().trim();
+        s.split('\n')
+            .map(|packet| statsd_parse(packet).expect("should not fail to parse statsd packet"))
+            .collect()
+    }
 
     fn tags() -> MetricTags {
         metric_tags!(
@@ -213,8 +221,8 @@ mod tests {
         .with_tags(Some(tags()));
 
         let frame = encode_metric(&input);
-        let output = parse(from_utf8(&frame).unwrap().trim()).unwrap();
-        vector_common::assert_event_data_eq!(input, output);
+        let mut output = parse_encoded_metrics(&frame);
+        vector_common::assert_event_data_eq!(input, output.remove(0));
     }
 
     #[cfg(feature = "sources-statsd")]
@@ -229,7 +237,7 @@ mod tests {
         let frame = encode_metric(&input);
         // The statsd parser will parse the counter as Incremental,
         // so we can't compare it with the parsed value.
-        assert_eq!("counter:1.5|c\n", from_utf8(&frame).unwrap());
+        assert_eq!("counter:1.5|c\n", std::str::from_utf8(&frame).unwrap());
     }
 
     #[cfg(feature = "sources-statsd")]
@@ -243,8 +251,8 @@ mod tests {
         .with_tags(Some(tags()));
 
         let frame = encode_metric(&input);
-        let output = parse(from_utf8(&frame).unwrap().trim()).unwrap();
-        vector_common::assert_event_data_eq!(input, output);
+        let mut output = parse_encoded_metrics(&frame);
+        vector_common::assert_event_data_eq!(input, output.remove(0));
     }
 
     #[cfg(feature = "sources-statsd")]
@@ -258,8 +266,8 @@ mod tests {
         .with_tags(Some(tags()));
 
         let frame = encode_metric(&input);
-        let output = parse(from_utf8(&frame).unwrap().trim()).unwrap();
-        vector_common::assert_event_data_eq!(input, output);
+        let mut output = parse_encoded_metrics(&frame);
+        vector_common::assert_event_data_eq!(input, output.remove(0));
     }
 
     #[cfg(feature = "sources-statsd")]
@@ -286,8 +294,8 @@ mod tests {
         .with_tags(Some(tags()));
 
         let frame = encode_metric(&input);
-        let output = parse(from_utf8(&frame).unwrap().trim()).unwrap();
-        vector_common::assert_event_data_eq!(expected, output);
+        let mut output = parse_encoded_metrics(&frame);
+        vector_common::assert_event_data_eq!(expected, output.remove(0));
     }
 
     #[cfg(feature = "sources-statsd")]
@@ -323,14 +331,9 @@ mod tests {
         .with_tags(Some(tags()));
 
         let frame = encode_metric(&input);
-        let res = from_utf8(&frame).unwrap().trim();
-        let mut packets = res.split('\n');
-
-        let output1 = parse(packets.next().unwrap().trim()).unwrap();
-        vector_common::assert_event_data_eq!(expected1, output1);
-
-        let output2 = parse(packets.next().unwrap().trim()).unwrap();
-        vector_common::assert_event_data_eq!(expected2, output2);
+        let mut output = parse_encoded_metrics(&frame);
+        vector_common::assert_event_data_eq!(expected1, output.remove(0));
+        vector_common::assert_event_data_eq!(expected2, output.remove(0));
     }
 
     #[cfg(feature = "sources-statsd")]
@@ -346,7 +349,7 @@ mod tests {
         .with_tags(Some(tags()));
 
         let frame = encode_metric(&input);
-        let output = parse(from_utf8(&frame).unwrap().trim()).unwrap();
-        vector_common::assert_event_data_eq!(input, output);
+        let mut output = parse_encoded_metrics(&frame);
+        vector_common::assert_event_data_eq!(input, output.remove(0));
     }
 }
