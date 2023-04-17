@@ -79,7 +79,7 @@ pub struct DatadogAgentConfig {
     /// sources:
     ///  my_source_id:
     ///  type: datadog_agent
-  address: 0.0.0.0:80
+    ///  address: 0.0.0.0:80
     #[configurable(metadata(docs::examples = "0.0.0.0:80"))]
     #[configurable(metadata(docs::examples = "localhost:80"))]
     address: SocketAddr,
