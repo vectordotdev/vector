@@ -84,6 +84,7 @@ impl Mode {
         match self {
             Self::Tcp(_) => SocketMode::Tcp,
             Self::Udp(_) => SocketMode::Udp,
+            #[cfg(unix)]
             Self::Unix(_) => SocketMode::Unix,
         }
     }

@@ -33,8 +33,7 @@ pub use self::unix::{UnixConnectorConfig, UnixMode};
 use self::tcp::TcpConnector;
 use self::udp::UdpConnector;
 #[cfg(unix)]
-use self::unix::UnixConnector;
-use self::{net_error::FailedToSend, unix::UnixEither};
+use self::unix::{UnixConnector, UnixEither};
 
 use futures_util::{future::BoxFuture, FutureExt};
 use snafu::{ResultExt, Snafu};
@@ -330,7 +329,7 @@ impl Service<Vec<u8>> for NetworkService {
         };
 
         Box::pin(async move {
-            match socket.send(&buf).await.context(FailedToSend) {
+            match socket.send(&buf).await.context(net_error::FailedToSend) {
                 Ok(sent) => {
                     // Emit an error if we weren't able to send the entire buffer.
                     if sent != buf.len() {
