@@ -7,11 +7,10 @@ use vector_config::configurable_component;
 pub use vector_core::event::lua;
 use vector_core::transform::runtime_transform::{RuntimeTransform, Timer};
 
-use crate::config::OutputId;
 use crate::event::lua::event::LuaEvent;
 use crate::schema::Definition;
 use crate::{
-    config::{self, DataType, Input, TransformOutput, CONFIG_PATHS},
+    config::{self, DataType, Input, Output, CONFIG_PATHS},
     event::Event,
     internal_events::{LuaBuildError, LuaGcTriggered},
     schema,
@@ -178,30 +177,11 @@ impl LuaConfig {
         Input::new(DataType::Metric | DataType::Log)
     }
 
-    pub fn outputs(
-        &self,
-        input_definitions: &[(OutputId, schema::Definition)],
-    ) -> Vec<TransformOutput> {
+    pub fn outputs(&self, merged_definition: &schema::Definition) -> Vec<Output> {
         // Lua causes the type definition to be reset
-        let namespaces = input_definitions
-            .iter()
-            .flat_map(|(_output, definition)| definition.log_namespaces().clone())
-            .collect();
+        let definition = Definition::default_for_namespace(merged_definition.log_namespaces());
 
-        let definition = input_definitions
-            .iter()
-            .map(|(output, _definition)| {
-                (
-                    output.clone(),
-                    Definition::default_for_namespace(&namespaces),
-                )
-            })
-            .collect();
-
-        vec![TransformOutput::new(
-            DataType::Metric | DataType::Log,
-            definition,
-        )]
+        vec![Output::default(DataType::Metric | DataType::Log).with_schema_definition(definition)]
     }
 }
 
