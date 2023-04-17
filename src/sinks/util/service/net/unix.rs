@@ -1,6 +1,6 @@
 use std::{
     io,
-    os::fd::{AsRawFd, RawFd},
+    os::fd::{AsFd, BorrowedFd},
     path::{Path, PathBuf},
 };
 
@@ -88,11 +88,11 @@ impl UnixEither {
     }
 }
 
-impl AsRawFd for UnixEither {
-    fn as_raw_fd(&self) -> RawFd {
+impl AsFd for UnixEither {
+    fn as_fd(&self) -> BorrowedFd<'_> {
         match self {
-            Self::Datagram(datagram) => datagram.as_raw_fd(),
-            Self::Stream(stream) => stream.as_raw_fd(),
+            Self::Datagram(datagram) => datagram.as_fd(),
+            Self::Stream(stream) => stream.as_fd(),
         }
     }
 }
