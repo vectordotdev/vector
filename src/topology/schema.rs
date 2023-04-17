@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use snafu::Snafu;
 use vector_core::config::SourceOutput;
 
 pub(super) use crate::schema::Definition;
@@ -13,18 +14,30 @@ use crate::{
 /// TODO: Describe more, especially why we have a bool in the key.
 type Cache = HashMap<(bool, Vec<OutputId>), Vec<(OutputId, Definition)>>;
 
+#[derive(Debug, Snafu)]
+enum Error {
+    #[snafu(display("transform doesn't exist"))]
+    TransformDoesntExist,
+
+    #[snafu(display("source doesn't exist"))]
+    SourceDoesntExist,
+
+    #[snafu(display("port doesn't exist"))]
+    PortDoesntExist,
+}
+
 pub fn possible_definitions(
     inputs: &[OutputId],
     config: &dyn ComponentContainer,
     cache: &mut Cache,
-) -> Vec<(OutputId, Definition)> {
+) -> crate::Result<Vec<(OutputId, Definition)>> {
     if inputs.is_empty() {
-        return vec![];
+        return Ok(vec![]);
     }
 
     // Try to get the definition from the cache.
     if let Some(definition) = cache.get(&(config.schema_enabled(), inputs.to_vec())) {
-        return definition.clone();
+        return Ok(definition.clone());
     }
 
     let mut definitions = Vec::new();
@@ -33,35 +46,20 @@ pub fn possible_definitions(
         let key = &input.component;
 
         // If the input is a source, the output is merged into the top-level schema.
-        if let Ok(maybe_output) = config.source_output_for_port(key, &input.port) {
-            let mut source_definition = input.with_definitions(
-                maybe_output
-                    .unwrap_or_else(|| {
-                        unreachable!(
-                            "source output mis-configured - output for port {:?} missing",
-                            &input.port
-                        )
-                    })
-                    .schema_definition(config.schema_enabled()),
-            );
+        if let Some(maybe_output) = config.source_output_for_port(key, &input.port)? {
+            let mut source_definition =
+                input.with_definitions(maybe_output.schema_definition(config.schema_enabled()));
 
             definitions.append(&mut source_definition);
         }
 
         // If the input is a transform, the output is merged into the top-level schema
         if let Some(inputs) = config.transform_inputs(key) {
-            let input_definitions = possible_definitions(inputs, config, cache);
+            let input_definitions = possible_definitions(inputs, config, cache)?;
 
             let mut transform_definition = input.with_definitions(
                 config
-                    .transform_output_for_port(key, &input.port, &input_definitions)
-                    .expect("transform must exist - already found inputs")
-                    .unwrap_or_else(|| {
-                        unreachable!(
-                            "transform output mis-configured - output for port {:?} missing",
-                            &input.port
-                        )
-                    })
+                    .transform_output_for_port(key, &input.port, &input_definitions)?
                     .log_schema_definitions
                     .values()
                     .cloned(),
@@ -71,7 +69,7 @@ pub fn possible_definitions(
         }
     }
 
-    definitions
+    Ok(definitions)
 }
 
 /// Get a list of definitions from individual pipelines feeding into a component.
@@ -135,7 +133,7 @@ pub(super) fn expanded_definitions(
         // A transform can receive from multiple inputs, and each input needs to be expanded to
         // a new pipeline.
         } else if let Some(inputs) = config.transform_inputs(key) {
-            let input_definitions = possible_definitions(inputs, config, &mut merged_cache);
+            let input_definitions = possible_definitions(inputs, config, &mut merged_cache)?;
 
             let mut transform_definition = config
                 .transform_outputs(key, &input_definitions)?
@@ -173,13 +171,13 @@ pub(crate) fn input_definitions(
     inputs: &[OutputId],
     config: &Config,
     cache: &mut Cache,
-) -> Vec<(OutputId, Definition)> {
+) -> crate::Result<Vec<(OutputId, Definition)>> {
     if inputs.is_empty() {
-        return vec![];
+        return Ok(vec![]);
     }
 
     if let Some(definitions) = cache.get(&(config.schema_enabled(), inputs.to_vec())) {
-        return definitions.clone();
+        return Ok(definitions.clone());
     }
 
     let mut definitions = Vec::new();
@@ -189,17 +187,9 @@ pub(crate) fn input_definitions(
 
         // If the input is a source we retrieve the definitions from the source
         // (there should only be one) and add it to the return.
-        if let Ok(maybe_output) = config.source_output_for_port(key, &input.port) {
-            let mut source_definitions = input.with_definitions(
-                maybe_output
-                    .unwrap_or_else(|| {
-                        unreachable!(
-                            "source output mis-configured - output for port {:?} missing",
-                            &input.port
-                        )
-                    })
-                    .schema_definition(config.schema_enabled()),
-            );
+        if let Some(maybe_output) = config.source_output_for_port(key, &input.port)? {
+            let mut source_definitions =
+                input.with_definitions(maybe_output.schema_definition(config.schema_enabled()));
 
             definitions.append(&mut source_definitions);
         }
@@ -207,17 +197,10 @@ pub(crate) fn input_definitions(
         // If the input is a transform we recurse to the upstream components to retrieve
         // their definitions and pass it through the transform to get the new definitions.
         if let Some(inputs) = config.transform_inputs(key) {
-            let transform_definitions = input_definitions(inputs, config, cache);
+            let transform_definitions = input_definitions(inputs, config, cache)?;
             let mut transform_definitions = input.with_definitions(
                 config
-                    .transform_output_for_port(key, &input.port, &transform_definitions)
-                    .expect("transform must exist")
-                    .unwrap_or_else(|| {
-                        unreachable!(
-                            "transform output mis-configured - output for port {:?} missing",
-                            &input.port
-                        )
-                    })
+                    .transform_output_for_port(key, &input.port, &transform_definitions)?
                     .log_schema_definitions
                     .values()
                     .cloned(),
@@ -227,7 +210,7 @@ pub(crate) fn input_definitions(
         }
     }
 
-    definitions
+    Ok(definitions)
 }
 
 pub(super) fn validate_sink_expectations(
@@ -293,30 +276,30 @@ pub trait ComponentContainer {
         key: &ComponentKey,
         port: &Option<String>,
         input_definitions: &[(OutputId, Definition)],
-    ) -> Result<Option<TransformOutput>, ()> {
-        // TODO SMW sort this out
-        if let Some(outputs) = self.transform_outputs(key, input_definitions).unwrap() {
-            Ok(get_output_for_port(outputs, port))
+    ) -> crate::Result<TransformOutput> {
+        if let Some(outputs) = self.transform_outputs(key, input_definitions)? {
+            get_output_for_port(outputs, port).ok_or_else(|| Error::PortDoesntExist.into())
         } else {
-            Err(())
+            Err(Error::TransformDoesntExist.into())
         }
     }
 
     /// Gets the source output for the given port.
     ///
-    /// Returns Err(()) if there is no source with the given key
-    /// Returns Some(None) if the source does not have an output for the port given
+    /// Returns Ok(None) if there is no source with the given key
+    /// Returns Err if the source does not have an output for the port given
     #[allow(clippy::result_unit_err)]
     fn source_output_for_port(
         &self,
         key: &ComponentKey,
         port: &Option<String>,
-    ) -> Result<Option<SourceOutput>, ()> {
-        // TODO SMW sort this out
-        if let Some(outputs) = self.source_outputs(key).unwrap() {
-            Ok(get_source_output_for_port(outputs, port))
+    ) -> crate::Result<Option<SourceOutput>> {
+        if let Some(outputs) = self.source_outputs(key)? {
+            Ok(Some(
+                get_source_output_for_port(outputs, port).ok_or_else(|| Error::PortDoesntExist)?,
+            ))
         } else {
-            Err(())
+            Ok(None)
         }
     }
 }

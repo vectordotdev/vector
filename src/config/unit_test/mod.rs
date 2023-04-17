@@ -189,12 +189,12 @@ impl UnitTestBuildMetadata {
                 transform
                     .inner
                     .outputs(&[], builder.schema.log_namespace())
-                    // TODO - SMW sort this out
-                    .unwrap()
                     .into_iter()
-                    .map(|output| OutputId {
-                        component: key.clone(),
-                        port: output.port,
+                    .flat_map(|output| {
+                        output.into_iter().map(|output| OutputId {
+                            component: key.clone(),
+                            port: output.port,
+                        })
                     })
             })
             .collect::<HashSet<_>>();

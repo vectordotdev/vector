@@ -355,23 +355,24 @@ pub fn warnings(config: &Config) -> Vec<String> {
             })
             .collect::<Vec<_>>()
     });
+
     let transform_ids = config.transforms.iter().flat_map(|(key, transform)| {
-        transform
-            .inner
-            .outputs(
-                &possible_definitions(&transform.inputs, config, &mut cache),
-                config.schema.log_namespace(),
-            )
-            .unwrap_or_default()
-            .iter()
-            .map(|output| {
-                if let Some(port) = &output.port {
-                    ("transform", OutputId::from((key, port.clone())))
-                } else {
-                    ("transform", OutputId::from(key))
-                }
-            })
-            .collect::<Vec<_>>()
+        match possible_definitions(&transform.inputs, config, &mut cache) {
+            Ok(definitions) => transform
+                .inner
+                .outputs(&definitions, config.schema.log_namespace())
+                .unwrap_or_default()
+                .iter()
+                .map(|output| {
+                    if let Some(port) = &output.port {
+                        ("transform", OutputId::from((key, port.clone())))
+                    } else {
+                        ("transform", OutputId::from(key))
+                    }
+                })
+                .collect::<Vec<_>>(),
+            Err(_) => Vec::new(),
+        }
     });
 
     for (input_type, id) in transform_ids.chain(source_ids) {

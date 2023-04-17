@@ -411,8 +411,17 @@ impl<'a> Builder<'a> {
         {
             debug!(component = %key, "Building new transform.");
 
-            let input_definitions =
-                schema::input_definitions(&transform.inputs, self.config, &mut definition_cache);
+            let input_definitions = match schema::input_definitions(
+                &transform.inputs,
+                self.config,
+                &mut definition_cache,
+            ) {
+                Ok(definitions) => definitions,
+                Err(err) => {
+                    self.errors.push(err.to_string());
+                    Vec::new()
+                }
+            };
 
             let merged_definition: Definition = input_definitions
                 .iter()
