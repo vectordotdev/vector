@@ -230,7 +230,7 @@ base: components: sinks: webhdfs: configuration: {
 
 			For more information, see the [HDFS Architecture][hdfs_arch] documentation.
 
-			[hdfs_arch]: https://hadoop.apache.org/docs/r3.3.4/hadoop-project-dist/hadoop-hdfs/WebHdfsDesign.html#NameNode_and_DataNodes
+			[hdfs_arch]: https://hadoop.apache.org/docs/r3.3.4/hadoop-project-dist/hadoop-hdfs/HdfsDesign.html#NameNode_and_DataNodes
 			"""
 		required: false
 		type: string: {
@@ -276,7 +276,7 @@ base: components: sinks: webhdfs: configuration: {
 			stores blobs under a particular directory. If using a prefix for this purpose, it must end
 			in `/` to act as a directory path. A trailing `/` is **not** automatically added.
 
-			The final file path with be like `{root}/{prefix}{suffix}`.
+			The final file path is in the format of `{root}/{prefix}{suffix}`.
 			"""
 		required: false
 		type: string: {
@@ -290,7 +290,7 @@ base: components: sinks: webhdfs: configuration: {
 
 			Must be a valid directory.
 
-			The final file path with be like `{root}/{prefix}{suffix}`.
+			The final file path is in the format of `{root}/{prefix}{suffix}`.
 			"""
 		required: false
 		type: string: default: ""
