@@ -56,43 +56,66 @@ pub const LOGS: &str = "logs";
 pub const METRICS: &str = "metrics";
 pub const TRACES: &str = "traces";
 
+/// Datadog Agent
+///
 /// Configuration for the `datadog_agent` source.
+///
+/// The `datadog_agent` source receives logs and metrics from the Datadog Agent over HTTP
+/// or HTTPS. The source listens on a user-defined address and port.
 #[configurable_component(source(
     "datadog_agent",
     "Receive logs, metrics, and traces collected by a Datadog Agent."
 ))]
 #[derive(Clone, Debug)]
 pub struct DatadogAgentConfig {
+    /// address
+    ///
     /// The socket address to accept connections on.
     ///
     /// It _must_ include a port.
+    ///
+    /// # Examples
+    ///
+    /// sources:
+    ///  my_source_id:
+    ///  type: datadog_agent
+  address: 0.0.0.0:80
     #[configurable(metadata(docs::examples = "0.0.0.0:80"))]
     #[configurable(metadata(docs::examples = "localhost:80"))]
     address: SocketAddr,
 
+    /// store_api_key
+    ///
     /// If this is set to `true`, when incoming events contain a Datadog API key, it is
     /// stored in the event metadata and used if the event is sent to a Datadog sink.
     #[configurable(metadata(docs::advanced))]
     #[serde(default = "crate::serde::default_true")]
     store_api_key: bool,
 
+    /// disable_logs
+    ///
     /// If this is set to `true`, logs are not accepted by the component.
     #[configurable(metadata(docs::advanced))]
     #[serde(default = "crate::serde::default_false")]
     disable_logs: bool,
 
+    ///disable_metrics
+    ///
     /// If this is set to `true`, metrics are not accepted by the component.
     #[configurable(metadata(docs::advanced))]
     #[serde(default = "crate::serde::default_false")]
     disable_metrics: bool,
 
+    /// disable_traces
+    ///
     /// If this is set to `true`, traces are not accepted by the component.
     #[configurable(metadata(docs::advanced))]
     #[serde(default = "crate::serde::default_false")]
     disable_traces: bool,
 
-    /// If this is set to `true` logs, metrics, and traces are sent to different outputs.
+    /// multiple_outputs
     ///
+    /// If this is set to `true` logs, metrics, and traces are sent to different outputs.
     ///
     /// For a source component named `agent`, the received logs, metrics, and traces can then be
     /// configured as input to other components by specifying `agent.logs`, `agent.metrics`, and
@@ -101,7 +124,9 @@ pub struct DatadogAgentConfig {
     #[serde(default = "crate::serde::default_false")]
     multiple_outputs: bool,
 
-    /// The namespace to use for logs. This overrides the global setting.
+    /// log_namespace
+    ///
+    /// The namespace used for logs. This overrides the global setting.
     #[serde(default)]
     #[configurable(metadata(docs::hidden))]
     log_namespace: Option<bool>,
