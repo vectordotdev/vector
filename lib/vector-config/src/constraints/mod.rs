@@ -79,6 +79,15 @@ pub enum Computed {
         condition: Condition,
         value: Box<Computed>,
     },
+
+    /// A value that is derived from the input itself.
+    ///
+    /// A target path specifies what portion of the input to derive from, while the operation
+    /// describes how to interpret the value: derive it as-is, or slightly transform it, and so on.
+    Derived {
+        target: &'static str,
+        operation: DeriveOp,
+    }
 }
 
 impl Computed {
@@ -102,6 +111,11 @@ impl Computed {
         }
     }
 
+    /// Creates a derived value based on the given `target`.
+    pub fn derived(target: &'static str, operation: DeriveOp) -> Self {
+        Self::Derived { target, operation }
+    }
+
     /// Computes the output of this value.
     ///
     /// If the computed value is null, `None` is returned.
@@ -115,6 +129,8 @@ impl Computed {
             Computed::Array(items) => {
                 Some(items.into_iter().filter_map(|c| c.compute(input)).collect())
             }
+            Computed::Derived { target, operation } => input.pointer(target)
+                .and_then(|value| operation.derive(value)),
         }
     }
 }
@@ -193,6 +209,38 @@ pub enum Operator {
     Ne,
 }
 
+pub enum DeriveOp {
+    /// Uses the raw value at the target path.
+    Raw,
+
+    /// Takes the keys of an object at the target path.
+    ///
+    /// If the value at the target path is not an object, the derived value is null instead.
+    Keys,
+
+    /// Takes the values of an object, or array, at the target path.
+    ///
+    /// If the value at the target path is not an object or array, the derived value is null instead.
+    Values,
+}
+
+impl DeriveOp {
+    fn derive(&self, input: &Value) -> Option<Value> {
+        match self {
+            DeriveOp::Raw =>Some(input.clone()),
+            DeriveOp::Keys => match input {
+                Value::Object(map) => Some(Value::Array(map.keys().map(|s| s.as_str().into()).collect())),
+                _ => None,
+            },
+            DeriveOp::Values => match input {
+                Value::Object(map) => Some(Value::Array(map.values().cloned().collect())),
+                array @ Value::Array(_) => Some(array.clone()),
+                _ => None,
+            },
+        }
+    }
+}
+
 fn nonnull_or_none(value: Value) -> Option<Value> {
     match value {
         Value::Null => None,
@@ -207,7 +255,43 @@ mod tests {
     use serde_json::json;
 
     #[test]
-    fn connectability_datadog_agent_outputs() {
+    fn datadog_agent_source() {
+        let mut constraints = Constraints::default();
+        constraints.add(
+            "outputs",
+            Computed::optional(
+                Condition::eq("/multiple_outputs", true),
+                Computed::array([
+                    Computed::optional(Condition::ne("/disable_logs", true), "logs"),
+                    Computed::optional(Condition::ne("/disable_metrics", true), "metrics"),
+                    Computed::optional(Condition::ne("/disable_traces", true), "traces"),
+                ]),
+            ),
+        );
+
+        let defaults = json!({});
+        println!("with defaults: {:?}", constraints.compute(&defaults));
+
+        let multiple_outputs = json!({
+            "multiple_outputs": true
+        });
+        println!(
+            "with multiple_outputs=true: {:?}",
+            constraints.compute(&multiple_outputs)
+        );
+
+        let multiple_outputs_no_traces = json!({
+            "multiple_outputs": true,
+            "disable_traces": true
+        });
+        println!(
+            "with multiple_outputs=true, disable_traces=true: {:?}",
+            constraints.compute(&multiple_outputs_no_traces)
+        );
+    }
+
+    #[test]
+    fn route_transform() {
         let mut constraints = Constraints::default();
         constraints.add(
             "outputs",
