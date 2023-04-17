@@ -7658,9 +7658,9 @@ dependencies = [
 
 [[package]]
 name = "serde_yaml"
-version = "0.9.19"
+version = "0.9.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f82e6c8c047aa50a7328632d067bcae6ef38772a79e28daf32f735e0e4f3dd10"
+checksum = "d9d684e3ec7de3bf5466b32bd75303ac16f0736426e5a4e0d6e489559ce1249c"
 dependencies = [
  "indexmap",
  "itoa",
@@ -9291,7 +9291,7 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
- "serde_yaml 0.9.19",
+ "serde_yaml 0.9.21",
  "sha2 0.10.6",
  "tempfile",
  "toml 0.7.3",
@@ -9305,7 +9305,7 @@ checksum = "f1bddf1187be692e79c5ffeab891132dfb0f236ed36a43c7ed39f1165ee20191"
 
 [[package]]
 name = "vector"
-version = "0.29.0"
+version = "0.29.1"
 dependencies = [
  "apache-avro",
  "approx",
@@ -9444,7 +9444,7 @@ dependencies = [
  "serde_bytes",
  "serde_json",
  "serde_with 2.3.1",
- "serde_yaml 0.9.19",
+ "serde_yaml 0.9.21",
  "sha2 0.10.6",
  "similar-asserts",
  "smallvec",
@@ -9551,7 +9551,7 @@ dependencies = [
  "rand 0.8.5",
  "rkyv",
  "serde",
- "serde_yaml 0.9.19",
+ "serde_yaml 0.9.21",
  "snafu",
  "temp-dir",
  "tokio",
