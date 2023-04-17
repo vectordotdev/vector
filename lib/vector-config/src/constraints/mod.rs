@@ -1,3 +1,5 @@
+#![allow(warnings)]
+
 use std::collections::HashMap;
 
 use serde_json::Value;
@@ -293,36 +295,34 @@ mod tests {
     #[test]
     fn route_transform() {
         let mut constraints = Constraints::default();
-        constraints.add(
-            "outputs",
-            Computed::optional(
-                Condition::eq("/multiple_outputs", true),
-                Computed::array([
-                    Computed::optional(Condition::ne("/disable_logs", true), "logs"),
-                    Computed::optional(Condition::ne("/disable_metrics", true), "metrics"),
-                    Computed::optional(Condition::ne("/disable_traces", true), "traces"),
-                ]),
-            ),
-        );
+        constraints.add("outputs", Computed::derived("/route", DeriveOp::Keys));
 
-        let defaults = json!({});
-        println!("with defaults: {:?}", constraints.compute(&defaults));
+        let no_routes = json!({});
+        println!("with no routes: {:?}", constraints.compute(&no_routes));
 
-        let multiple_outputs = json!({
-            "multiple_outputs": true
+        let some_routes = json!({
+            "route": {
+                "route1": {},
+                "route2": {}
+            }
         });
-        println!(
-            "with multiple_outputs=true: {:?}",
-            constraints.compute(&multiple_outputs)
-        );
+        println!("with some routes: {:?}", constraints.compute(&some_routes));
+    }
 
-        let multiple_outputs_no_traces = json!({
-            "multiple_outputs": true,
-            "disable_traces": true
+    #[test]
+    fn route_transform() {
+        let mut constraints = Constraints::default();
+        constraints.add("outputs", Computed::derived("/route", DeriveOp::Keys));
+
+        let no_routes = json!({});
+        println!("with no routes: {:?}", constraints.compute(&no_routes));
+
+        let some_routes = json!({
+            "route": {
+                "route1": {},
+                "route2": {}
+            }
         });
-        println!(
-            "with multiple_outputs=true, disable_traces=true: {:?}",
-            constraints.compute(&multiple_outputs_no_traces)
-        );
+        println!("with some routes: {:?}", constraints.compute(&some_routes));
     }
 }
