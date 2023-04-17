@@ -61,6 +61,7 @@ impl TransformConfig for ThrottleConfig {
 
     fn outputs(
         &self,
+        _: enrichment::TableRegistry,
         input_definitions: &[(OutputId, schema::Definition)],
         _: LogNamespace,
     ) -> Vec<TransformOutput> {

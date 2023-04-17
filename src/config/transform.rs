@@ -193,6 +193,7 @@ pub trait TransformConfig: DynClone + NamedComponent + core::fmt::Debug + Send +
     /// of events flowing through the transform.
     fn outputs(
         &self,
+        enrichment_tables: enrichment::TableRegistry,
         input_definitions: &[(OutputId, schema::Definition)],
         global_log_namespace: LogNamespace,
     ) -> Vec<TransformOutput>;

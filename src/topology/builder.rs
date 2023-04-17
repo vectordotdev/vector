@@ -424,7 +424,11 @@ impl<'a> Builder<'a> {
             // Create a map of the outputs to the list of possible definitions from those outputs.
             let schema_definitions = transform
                 .inner
-                .outputs(&input_definitions, self.config.schema.log_namespace())
+                .outputs(
+                    enrichment_tables.clone(),
+                    &input_definitions,
+                    self.config.schema.log_namespace(),
+                )
                 .into_iter()
                 .map(|output| (output.port, output.log_schema_definitions))
                 .collect::<HashMap<_, _>>();
@@ -679,9 +683,11 @@ impl TransformNode {
             typetag: transform.inner.get_component_name(),
             inputs: transform.inputs.clone(),
             input_details: transform.inner.input(),
-            outputs: transform
-                .inner
-                .outputs(schema_definition, global_log_namespace),
+            outputs: transform.inner.outputs(
+                enrichment::TableRegistry::default(),
+                schema_definition,
+                global_log_namespace,
+            ),
             enable_concurrency: transform.inner.enable_concurrency(),
         }
     }

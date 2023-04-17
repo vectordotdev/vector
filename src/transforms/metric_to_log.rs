@@ -94,6 +94,7 @@ impl TransformConfig for MetricToLogConfig {
 
     fn outputs(
         &self,
+        _: enrichment::TableRegistry,
         input_definitions: &[(OutputId, Definition)],
         global_log_namespace: LogNamespace,
     ) -> Vec<TransformOutput> {

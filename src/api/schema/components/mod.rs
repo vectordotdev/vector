@@ -294,6 +294,8 @@ pub fn update_config(config: &Config) {
                 outputs: transform
                     .inner
                     .outputs(
+                        // TODO SMW - use proper enrichment tables here.
+                        enrichment::TableRegistry::default(),
                         &possible_definitions(&transform.inputs, config, &mut cache),
                         config.schema.log_namespace(),
                     )

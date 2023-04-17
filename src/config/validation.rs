@@ -172,6 +172,8 @@ pub fn check_outputs(config: &ConfigBuilder) -> Result<(), Vec<String>> {
         if transform
             .inner
             .outputs(
+                // TODO SMW We need the proper tables here.
+                enrichment::TableRegistry::default(),
                 &[(OutputId::dummy(), definition)],
                 config.schema.log_namespace(),
             )
@@ -345,6 +347,8 @@ pub fn warnings(config: &Config) -> Vec<String> {
         transform
             .inner
             .outputs(
+                // TODO SMW proper tables here.
+                enrichment::TableRegistry::default(),
                 &possible_definitions(&transform.inputs, config, &mut cache),
                 config.schema.log_namespace(),
             )

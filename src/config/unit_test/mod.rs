@@ -188,7 +188,11 @@ impl UnitTestBuildMetadata {
             .flat_map(|(key, transform)| {
                 transform
                     .inner
-                    .outputs(&[], builder.schema.log_namespace())
+                    .outputs(
+                        enrichment::TableRegistry::default(),
+                        &[],
+                        builder.schema.log_namespace(),
+                    )
                     .into_iter()
                     .map(|output| OutputId {
                         component: key.clone(),
@@ -459,7 +463,11 @@ fn get_loose_end_outputs_sink(config: &ConfigBuilder) -> Option<SinkOuter<String
     let transform_ids = config.transforms.iter().flat_map(|(key, transform)| {
         transform
             .inner
-            .outputs(&[], config.schema.log_namespace())
+            .outputs(
+                enrichment::TableRegistry::default(),
+                &[],
+                config.schema.log_namespace(),
+            )
             .iter()
             .map(|output| {
                 if let Some(port) = &output.port {

@@ -350,9 +350,12 @@ impl ComponentContainer for Config {
         input_definitions: &[(OutputId, Definition)],
     ) -> Option<Vec<TransformOutput>> {
         self.transform(key).map(|source| {
-            source
-                .inner
-                .outputs(input_definitions, self.schema.log_namespace())
+            source.inner.outputs(
+                // TODO SMW use proper tables
+                enrichment::TableRegistry::default(),
+                input_definitions,
+                self.schema.log_namespace(),
+            )
         })
     }
 }

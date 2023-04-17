@@ -226,6 +226,7 @@ impl TransformConfig for RemapConfig {
 
     fn outputs(
         &self,
+        enrichment_tables: enrichment::TableRegistry,
         input_definitions: &[(OutputId, schema::Definition)],
         _: LogNamespace,
     ) -> Vec<TransformOutput> {
@@ -239,7 +240,7 @@ impl TransformConfig for RemapConfig {
         // transform. We ignore any compilation errors, as those are caught by the transform build
         // step.
         let compiled = self
-            .compile_vrl_program(enrichment::TableRegistry::default(), merged_definition)
+            .compile_vrl_program(enrichment_tables, merged_definition)
             .map(|(program, _, _, external_context)| {
                 (
                     program.final_type_state(),
@@ -1460,6 +1461,7 @@ mod tests {
 
         assert_eq!(
             conf.outputs(
+                enrichment::TableRegistry::default(),
                 &[(
                     "test".into(),
                     schema::Definition::new_with_default_metadata(
