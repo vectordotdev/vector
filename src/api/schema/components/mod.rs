@@ -253,11 +253,9 @@ impl ComponentsSubscription {
 }
 
 /// Update the 'global' configuration that will be consumed by component queries
-pub fn update_config(config: &Config) {
+pub fn update_config(config: &Config) -> crate::Result<()> {
     let mut cache = HashMap::new();
     let mut new_components = HashMap::new();
-
-    // TODO - Handle these unwraps
 
     // Sources
     for (component_key, source) in config.sources() {
@@ -272,15 +270,13 @@ pub fn update_config(config: &Config) {
                 // TODO: We shouldn't need to call `outputs` twice.
                 output_type: source
                     .inner
-                    .outputs(config.schema.log_namespace())
-                    .unwrap()
+                    .outputs(config.schema.log_namespace())?
                     .pop()
                     .unwrap()
                     .ty,
                 outputs: source
                     .inner
-                    .outputs(config.schema.log_namespace())
-                    .unwrap()
+                    .outputs(config.schema.log_namespace())?
                     .into_iter()
                     .map(|output| output.port.unwrap_or_else(|| DEFAULT_OUTPUT.to_string()))
                     .collect(),
@@ -299,10 +295,9 @@ pub fn update_config(config: &Config) {
                 outputs: transform
                     .inner
                     .outputs(
-                        &possible_definitions(&transform.inputs, config, &mut cache),
+                        &possible_definitions(&transform.inputs, config, &mut cache).unwrap(),
                         config.schema.log_namespace(),
-                    )
-                    .unwrap()
+                    )?
                     .into_iter()
                     .map(|output| output.port.unwrap_or_else(|| DEFAULT_OUTPUT.to_string()))
                     .collect(),
@@ -350,6 +345,8 @@ pub fn update_config(config: &Config) {
 
     // Override the old component state
     state::update(new_components);
+
+    Ok(())
 }
 
 #[cfg(test)]

@@ -98,7 +98,11 @@ impl TopologyController {
                 #[cfg(feature = "api")]
                 // Pass the new config to the API server.
                 if let Some(ref api_server) = self.api_server {
-                    api_server.update_config(self.topology.config());
+                    if api_server.update_config(self.topology.config()).is_err() {
+                        emit!(VectorReloadError);
+                        emit!(VectorRecoveryError);
+                        return ReloadOutcome::FatalError;
+                    }
                 }
 
                 emit!(VectorReloaded {

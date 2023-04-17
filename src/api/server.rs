@@ -54,7 +54,7 @@ impl Server {
             })?;
 
         // Update component schema with the config before starting the server.
-        schema::components::update_config(config);
+        schema::components::update_config(config)?;
 
         // Spawn the server in the background.
         runtime.spawn(server);
@@ -70,7 +70,7 @@ impl Server {
     /// Update the configuration of a running server. While this instance method doesn't
     /// directly involve `self`, it provides a neater API to expose an internal implementation
     /// detail than exposing the function of the sub-mod directly.
-    pub fn update_config(&self, config: &config::Config) {
+    pub fn update_config(&self, config: &config::Config) -> crate::Result<()> {
         schema::components::update_config(config)
     }
 }

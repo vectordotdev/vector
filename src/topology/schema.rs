@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use snafu::Snafu;
+use snafu::{ResultExt, Snafu};
 use vector_core::config::SourceOutput;
 
 pub(super) use crate::schema::Definition;
@@ -24,6 +24,12 @@ enum Error {
 
     #[snafu(display("port doesn't exist"))]
     PortDoesntExist,
+
+    #[snafu(display("error producing transform outputs `{key}` : {source}"))]
+    Transform {
+        key: ComponentKey,
+        source: Box<dyn std::error::Error + Send + Sync>,
+    },
 }
 
 pub fn possible_definitions(
@@ -343,8 +349,10 @@ impl ComponentContainer for Config {
                 source
                     .inner
                     .outputs(input_definitions, self.schema.log_namespace())
+                    .with_context(|_| TransformSnafu { key: key.clone() })
             })
             .transpose()
+            .map_err(Into::into)
     }
 }
 
