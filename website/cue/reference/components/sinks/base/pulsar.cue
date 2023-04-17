@@ -87,8 +87,13 @@ base: components: sinks: pulsar: configuration: {
 		description: "Event batching behavior."
 		required:    false
 		type: object: options: max_events: {
-			description: "The maximum size of a batch before it is flushed."
-			required:    false
+			description: """
+				The maximum size of a batch before it is flushed.
+
+				Note this is an unsigned 32 bit integer which is a smaller capacity than
+				many of the other sink batch settings.
+				"""
+			required: false
 			type: uint: {
 				examples: [1000]
 				unit: "events"
@@ -258,8 +263,16 @@ base: components: sinks: pulsar: configuration: {
 		type: string: examples: ["pulsar://127.0.0.1:6650"]
 	}
 	partition_key_field: {
-		description: "Log field to use as Pulsar message key."
-		required:    false
+		description: """
+			The log field name or tags key to use for the partition key.
+
+			If the field does not exist in the log event or metric tags, a blank value will be used.
+
+			If omitted, the key is not sent.
+
+			Pulsar uses a hash of the key to choose the topic-partition or uses round-robin if the record has no key.
+			"""
+		required: false
 		type: string: examples: ["message", "my_field"]
 	}
 	producer_name: {
@@ -267,9 +280,21 @@ base: components: sinks: pulsar: configuration: {
 		required:    false
 		type: string: examples: ["producer-name"]
 	}
+	properties_key: {
+		description: """
+			The log field name to use for the Pulsar properties key.
+
+			If omitted, no properties will be written.
+			"""
+		required: false
+		type: string: {}
+	}
 	topic: {
 		description: "The Pulsar topic name to write events to."
 		required:    true
-		type: string: examples: ["topic-1234"]
+		type: string: {
+			examples: ["topic-1234"]
+			syntax: "template"
+		}
 	}
 }

@@ -21,38 +21,6 @@ use crate::{
 };
 
 /// Configuration for the `webhdfs` sink.
-///
-/// The Hadoop Distributed File System (HDFS) is a distributed file system
-/// designed to run on commodity hardware. HDFS consists of a namenode and a
-/// datanode. We will send rpc to namenode to know which datanode to send
-/// and receive data to. Also, HDFS will rebalance data across the cluster
-/// to make sure each file has enough redundancy.
-///
-/// ```txt
-///                     ┌───────────────┐
-///                     │  Data Node 2  │
-///                     └───────────────┘
-///                             ▲
-/// ┌───────────────┐           │            ┌───────────────┐
-/// │  Data Node 1  │◄──────────┼───────────►│  Data Node 3  │
-/// └───────────────┘           │            └───────────────┘
-///                     ┌───────┴───────┐
-///                     │   Name Node   │
-///                     └───────────────┘
-///                             ▲
-///                             │
-///                      ┌──────┴─────┐
-///                      │   Vector   │
-///                      └────────────┘
-/// ```
-///
-/// WebHDFS will connect to the HTTP RESTful API of HDFS.
-///
-/// For more information, please refer to:
-///
-/// - [HDFS Users Guide](https://hadoop.apache.org/docs/stable/hadoop-project-dist/hadoop-hdfs/HdfsUserGuide.html)
-/// - [WebHDFS REST API](https://hadoop.apache.org/docs/stable/hadoop-project-dist/hadoop-hdfs/WebHDFS.html)
-/// - [opendal::services::webhdfs](https://docs.rs/opendal/latest/opendal/services/struct.Webhdfs.html)
 #[configurable_component(sink("webhdfs"))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
@@ -61,7 +29,7 @@ pub struct WebHdfsConfig {
     ///
     /// Must be a valid directory.
     ///
-    /// The final file path with be like `{root}/{prefix}{suffix}`.
+    /// The final file path is in the format of `{root}/{prefix}{suffix}`.
     #[serde(default)]
     pub root: String,
 
@@ -71,7 +39,7 @@ pub struct WebHdfsConfig {
     /// stores blobs under a particular directory. If using a prefix for this purpose, it must end
     /// in `/` to act as a directory path. A trailing `/` is **not** automatically added.
     ///
-    /// The final file path with be like `{root}/{prefix}{suffix}`.
+    /// The final file path is in the format of `{root}/{prefix}{suffix}`.
     #[serde(default)]
     #[configurable(metadata(docs::templateable))]
     pub prefix: String,
@@ -82,7 +50,7 @@ pub struct WebHdfsConfig {
     ///
     /// For more information, see the [HDFS Architecture][hdfs_arch] documentation.
     ///
-    /// [hdfs_arch]: https://hadoop.apache.org/docs/r3.3.4/hadoop-project-dist/hadoop-hdfs/WebHdfsDesign.html#NameNode_and_DataNodes
+    /// [hdfs_arch]: https://hadoop.apache.org/docs/r3.3.4/hadoop-project-dist/hadoop-hdfs/HdfsDesign.html#NameNode_and_DataNodes
     #[serde(default)]
     #[configurable(metadata(docs::examples = "http://127.0.0.1:9870"))]
     pub endpoint: String,

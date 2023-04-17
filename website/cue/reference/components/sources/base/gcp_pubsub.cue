@@ -138,8 +138,8 @@ base: components: sources: gcp_pubsub: configuration: {
 		description: """
 			Framing configuration.
 
-			Framing deals with how events are separated when encoded in a raw byte form, where each event is
-			a "frame" that must be prefixed, or delimited, in a way that marks where an event begins and
+			Framing handles how events are separated when encoded in a raw byte form, where each event is
+			a frame that must be prefixed, or delimited, in a way that marks where an event begins and
 			ends within the byte stream.
 			"""
 		required: false

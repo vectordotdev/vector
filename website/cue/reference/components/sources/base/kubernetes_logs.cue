@@ -399,4 +399,9 @@ base: components: sources: kubernetes_logs: configuration: {
 		required:    false
 		type: string: examples: ["local", "America/New_York", "EST5EDT"]
 	}
+	use_apiserver_cache: {
+		description: "Determines if requests to the kube-apiserver can be served by a cache."
+		required:    false
+		type: bool: default: false
+	}
 }

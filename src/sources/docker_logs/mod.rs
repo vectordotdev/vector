@@ -112,8 +112,8 @@ pub struct DockerLogsConfig {
     /// Matching is prefix first, so specifying a value of `foo` would match any container named `foo` as well as any
     /// container whose name started with `foo`. This applies equally whether matching container IDs or names.
     ///
-    /// By default, the source will collect logs for all containers. If `include_containers` is configured, only
-    /// containers that match a configured inclusion and are also not excluded will be matched.
+    /// By default, the source collects logs for all containers. If `include_containers` is configured, only
+    /// containers that match a configured inclusion and are also not excluded get matched.
     ///
     /// This can be used in conjunction with `exclude_containers`.
     #[configurable(metadata(

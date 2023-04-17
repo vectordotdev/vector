@@ -445,6 +445,7 @@ flamegraph
 Flatbuffers
 flate
 flatmaps
+flattenings
 fleep
 flork
 florp
@@ -722,6 +723,7 @@ MAINPID
 majorly
 MAKECMDGOALS
 Makefiles
+markability
 markdownify
 markdownlintrc
 marketo
@@ -1136,7 +1138,6 @@ sinkbuilder
 sinknetworkbytessent
 sizecache
 Sizefor
-skaffold
 skinparam
 SKIPDATA
 skywalking
@@ -1343,6 +1344,7 @@ unevictable
 ungrokkable
 unioning
 unitdir
+unmark
 unmarshaler
 unnests
 unstructuredlogentries

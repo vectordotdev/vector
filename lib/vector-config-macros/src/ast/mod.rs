@@ -11,6 +11,7 @@ pub use container::Container;
 pub use field::Field;
 use syn::{Expr, NestedMeta};
 pub use variant::Variant;
+use vector_config_common::constants;
 
 const INVALID_VALUE_EXPR: &str =
     "got function call-style literal value but could not parse as expression";
@@ -86,17 +87,23 @@ impl Tagging {
     /// purpose of generating usable documentation from the schema.
     pub fn as_enum_metadata(&self) -> Vec<LazyCustomAttribute> {
         match self {
-            Self::External => vec![LazyCustomAttribute::kv("docs::enum_tagging", "external")],
+            Self::External => vec![LazyCustomAttribute::kv(
+                constants::DOCS_META_ENUM_TAGGING,
+                "external",
+            )],
             Self::Internal { tag } => vec![
-                LazyCustomAttribute::kv("docs::enum_tagging", "internal"),
-                LazyCustomAttribute::kv("docs::enum_tag_field", tag),
+                LazyCustomAttribute::kv(constants::DOCS_META_ENUM_TAGGING, "internal"),
+                LazyCustomAttribute::kv(constants::DOCS_META_ENUM_TAG_FIELD, tag),
             ],
             Self::Adjacent { tag, content } => vec![
-                LazyCustomAttribute::kv("docs::enum_tagging", "adjacent"),
-                LazyCustomAttribute::kv("docs::enum_tag_field", tag),
-                LazyCustomAttribute::kv("docs::enum_content_field", content),
+                LazyCustomAttribute::kv(constants::DOCS_META_ENUM_TAGGING, "adjacent"),
+                LazyCustomAttribute::kv(constants::DOCS_META_ENUM_TAG_FIELD, tag),
+                LazyCustomAttribute::kv(constants::DOCS_META_ENUM_CONTENT_FIELD, content),
             ],
-            Self::None => vec![LazyCustomAttribute::kv("docs::enum_tagging", "untagged")],
+            Self::None => vec![LazyCustomAttribute::kv(
+                constants::DOCS_META_ENUM_TAGGING,
+                "untagged",
+            )],
         }
     }
 }
