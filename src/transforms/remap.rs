@@ -11,6 +11,7 @@ use codecs::MetricTagValues;
 use lookup::lookup_v2::{parse_value_path, ValuePath};
 use lookup::{metadata_path, owned_value_path, path, OwnedTargetPath, PathPrefix};
 use snafu::{ResultExt, Snafu};
+use value::kind::merge::{CollisionStrategy, Strategy};
 use value::Kind;
 use vector_common::TimeZone;
 use vector_config::configurable_component;
@@ -354,8 +355,14 @@ impl TransformConfig for RemapConfig {
                 );
             }
 
-            default_definitions.insert(output_id.clone(), default_definition);
-            dropped_definitions.insert(output_id.clone(), dropped_definition);
+            default_definitions.insert(
+                output_id.clone(),
+                merge_array_definitions(default_definition),
+            );
+            dropped_definitions.insert(
+                output_id.clone(),
+                merge_array_definitions(dropped_definition),
+            );
         }
 
         let default_output = TransformOutput::new(DataType::all(), default_definitions);
@@ -665,6 +672,32 @@ fn push_dropped(
     output.push_named(DROPPED, event)
 }
 
+/// If the transform returns an array, the elements of this array will be separated
+/// out into it's individual elements and passed downstream.
+/// The potential types that the transform can output could be any of the arrays
+/// elements or any non-array elements that are within the definition. All these
+/// definitions need to be merged together.
+fn merge_array_definitions(mut definition: schema::Definition) -> schema::Definition {
+    if definition.event_kind().contains_array() {
+        let mut array = definition.event_kind().clone().into_array().unwrap();
+        array.anonymize();
+        let array_kinds = array.unknown_kind();
+        let kind = definition.event_kind_mut();
+
+        kind.remove_array();
+        kind.merge(
+            array_kinds,
+            Strategy {
+                collisions: CollisionStrategy::Union,
+            },
+        );
+
+        definition
+    } else {
+        definition
+    }
+}
+
 #[derive(Debug, Snafu)]
 pub enum BuildError {
     #[snafu(display("must provide exactly one of `source` or `file` configuration"))]
@@ -681,7 +714,10 @@ mod tests {
     use std::collections::HashMap;
 
     use indoc::{formatdoc, indoc};
-    use value::btreemap;
+    use value::{
+        btreemap,
+        kind::{Collection, Index},
+    };
     use vector_core::{config::GlobalOptions, event::EventMetadata, metric_tags};
 
     use super::*;
@@ -1606,5 +1642,75 @@ mod tests {
             assert_eq!(out.recv().await, None);
         })
         .await
+    }
+
+    #[test]
+    fn test_merged_array_definitions_simple() {
+        // Test merging the array definitions where the schema definition
+        // is simple, containing only one possible type in the array.
+        let object: BTreeMap<value::kind::Field, Kind> = [
+            ("carrot".into(), Kind::bytes()),
+            ("potato".into(), Kind::integer()),
+        ]
+        .into();
+
+        let kind = Kind::array(Collection::from_unknown(Kind::object(object.clone())));
+
+        let definition =
+            schema::Definition::new_with_default_metadata(kind, [LogNamespace::Legacy]);
+
+        let mut kind = Kind::undefined();
+        kind.add_object(BTreeMap::from([
+            ("carrot".into(), Kind::bytes()),
+            ("potato".into(), Kind::integer()),
+        ]));
+
+        let wanted = schema::Definition::new_with_default_metadata(kind, [LogNamespace::Legacy]);
+        let merged = merge_array_definitions(definition.clone());
+
+        assert_eq!(wanted, merged);
+    }
+
+    #[test]
+    fn test_merged_array_definitions_complex() {
+        // Test merging the array definitions where the schema definition
+        // is fairly complex containing multiple different possible types.
+        let object: BTreeMap<value::kind::Field, Kind> = [
+            ("carrot".into(), Kind::bytes()),
+            ("potato".into(), Kind::integer()),
+        ]
+        .into();
+
+        let array: BTreeMap<Index, Kind> = [
+            (Index::from(0), Kind::integer()),
+            (Index::from(1), Kind::boolean()),
+            (
+                Index::from(2),
+                Kind::object(BTreeMap::from([("peas".into(), Kind::bytes())])),
+            ),
+        ]
+        .into();
+
+        let mut kind = Kind::bytes();
+        kind.add_object(object.clone());
+        kind.add_array(array);
+
+        let definition =
+            schema::Definition::new_with_default_metadata(kind, [LogNamespace::Legacy]);
+
+        let mut kind = Kind::undefined();
+        kind.add_bytes();
+        kind.add_integer();
+        kind.add_boolean();
+        kind.add_object(BTreeMap::from([
+            ("carrot".into(), Kind::bytes().or_undefined()),
+            ("potato".into(), Kind::integer().or_undefined()),
+            ("peas".into(), Kind::bytes().or_undefined()),
+        ]));
+
+        let wanted = schema::Definition::new_with_default_metadata(kind, [LogNamespace::Legacy]);
+        let merged = merge_array_definitions(definition.clone());
+
+        assert_eq!(wanted, merged);
     }
 }
