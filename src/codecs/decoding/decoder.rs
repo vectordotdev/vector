@@ -15,11 +15,11 @@ use crate::{
 /// messages.
 #[derive(Clone)]
 pub struct Decoder {
-    /// The framer being used
+    /// The framer being used.
     pub framer: Framer,
-    /// The deserializer being used
+    /// The deserializer being used.
     pub deserializer: Deserializer,
-    /// The `log_namespace` being used
+    /// The `log_namespace` being used.
     pub log_namespace: LogNamespace,
 }
 

@@ -1,5 +1,3 @@
-#![allow(unused)]
-
 use std::collections::HashMap;
 use std::{future::ready, num::NonZeroUsize, panic, sync::Arc};
 
@@ -545,7 +543,7 @@ impl IngestorProcess {
             let events = match self.state.decoder.deserializer_parse(line) {
                 Ok((events, _events_size)) => events,
                 Err(error) => {
-                    // Error is logged by `codecs::Decoder`, no further handling
+                    // Error is handled by `codecs::Decoder`, no further handling
                     // is needed here.
                     SmallVec::new()
                 }
