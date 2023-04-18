@@ -13,6 +13,7 @@
 #![deny(warnings)]
 pub mod attributes;
 pub mod constants;
+pub mod human_friendly;
 pub mod num;
 pub mod schema;
 pub mod validation;

@@ -9,7 +9,6 @@ proc-macro = true
 
 [dependencies]
 darling = { version = "0.13", default-features = false, features = ["suggestions"] }
-itertools = { version = "0.10.5", default-features = false, features = ["use_std"] }
 proc-macro2 = { version = "1.0", default-features = false }
 quote = { version = "1.0", default-features = false }
 serde_derive_internals = "0.26"
