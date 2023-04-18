@@ -14,7 +14,7 @@ use vector_config_common::{
 ///
 /// This visitor generates a human-friendly name for types and fields, stored in metadata
 /// (`docs::human_name`) using a simple set of heuristics to figure out how to break apart
-/// type/field names, as well as what the case of each word should be, including accomodations for
+/// type/field names, as well as what the case of each word should be, including accommodations for
 /// well-known technical terms/acronyms, and so on.
 ///
 /// ## Opting out of the visitor behavior
