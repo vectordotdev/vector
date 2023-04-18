@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::sync::Arc;
 use std::{
     collections::BTreeMap,
@@ -25,11 +24,9 @@ use vrl::{
     CompileConfig, Program, Runtime, Terminate, VrlRuntime,
 };
 
-use crate::config::OutputId;
 use crate::{
     config::{
-        log_schema, ComponentKey, DataType, Input, TransformConfig, TransformContext,
-        TransformOutput,
+        log_schema, ComponentKey, DataType, Input, Output, TransformConfig, TransformContext,
     },
     event::{Event, TargetEvents, VrlTarget},
     internal_events::{RemapMappingAbort, RemapMappingError},
@@ -224,131 +221,92 @@ impl TransformConfig for RemapConfig {
         Input::all()
     }
 
-    fn outputs(
-        &self,
-        input_definitions: &[(OutputId, schema::Definition)],
-        _: LogNamespace,
-    ) -> Vec<TransformOutput> {
-        let merged_definition: Definition = input_definitions
-            .iter()
-            .map(|(_output, definition)| definition.clone())
-            .reduce(Definition::merge)
-            .unwrap_or_else(Definition::any);
-
+    fn outputs(&self, input_definition: &schema::Definition, _: LogNamespace) -> Vec<Output> {
         // We need to compile the VRL program in order to know the schema definition output of this
         // transform. We ignore any compilation errors, as those are caught by the transform build
         // step.
-        let compiled = self
-            .compile_vrl_program(enrichment::TableRegistry::default(), merged_definition)
+        let default_definition = self
+            .compile_vrl_program(
+                enrichment::TableRegistry::default(),
+                input_definition.clone(),
+            )
             .map(|(program, _, _, external_context)| {
-                (
-                    program.final_type_state(),
-                    external_context
-                        .get_custom::<MeaningList>()
-                        .cloned()
-                        .expect("context exists")
-                        .0,
-                )
-            })
-            .map_err(|_| ());
+                // Apply any semantic meanings set in the VRL program
+                let meaning = external_context
+                    .get_custom::<MeaningList>()
+                    .cloned()
+                    .expect("context exists")
+                    .0;
 
-        let mut dropped_definitions = HashMap::new();
-        let mut default_definitions = HashMap::new();
+                let state = program.final_type_state();
 
-        for (output_id, input_definition) in input_definitions {
-            let default_definition = compiled
-                .clone()
-                .map(|(state, meaning)| {
-                    let mut new_type_def = Definition::new(
-                        state.external.target_kind().clone(),
-                        state.external.metadata_kind().clone(),
-                        input_definition.log_namespaces().clone(),
-                    );
-
-                    for (id, path) in input_definition.meanings() {
-                        // Attempt to copy over the meanings from the input definition.
-                        // The function will fail if the meaning that now points to a field that no longer exists,
-                        // this is fine since we will no longer want that meaning in the output definition.
-                        let _ = new_type_def.try_with_meaning(path.clone(), id);
-                    }
-
-                    // Apply any semantic meanings set in the VRL program
-                    for (id, path) in meaning {
-                        // currently only event paths are supported
-                        new_type_def = new_type_def.with_meaning(OwnedTargetPath::event(path), &id);
-                    }
-                    new_type_def
-                })
-                .unwrap_or_else(|_| {
-                    Definition::new_with_default_metadata(
-                        // The program failed to compile, so it can "never" return a value
-                        Kind::never(),
-                        input_definition.log_namespaces().clone(),
-                    )
-                });
-
-            // When a message is dropped and re-routed, we keep the original event, but also annotate
-            // it with additional metadata.
-            let mut dropped_definition = Definition::new_with_default_metadata(
-                Kind::never(),
-                input_definition.log_namespaces().clone(),
-            );
-
-            if input_definition
-                .log_namespaces()
-                .contains(&LogNamespace::Legacy)
-            {
-                dropped_definition =
-                    dropped_definition.merge(input_definition.clone().with_event_field(
-                        &parse_value_path(log_schema().metadata_key()).expect("valid metadata key"),
-                        Kind::object(BTreeMap::from([
-                            ("reason".into(), Kind::bytes()),
-                            ("message".into(), Kind::bytes()),
-                            ("component_id".into(), Kind::bytes()),
-                            ("component_type".into(), Kind::bytes()),
-                            ("component_kind".into(), Kind::bytes()),
-                        ])),
-                        Some("metadata"),
-                    ));
-            }
-
-            if input_definition
-                .log_namespaces()
-                .contains(&LogNamespace::Vector)
-            {
-                dropped_definition = dropped_definition.merge(
-                    input_definition
-                        .clone()
-                        .with_metadata_field(&owned_value_path!("reason"), Kind::bytes(), None)
-                        .with_metadata_field(&owned_value_path!("message"), Kind::bytes(), None)
-                        .with_metadata_field(
-                            &owned_value_path!("component_id"),
-                            Kind::bytes(),
-                            None,
-                        )
-                        .with_metadata_field(
-                            &owned_value_path!("component_type"),
-                            Kind::bytes(),
-                            None,
-                        )
-                        .with_metadata_field(
-                            &owned_value_path!("component_kind"),
-                            Kind::bytes(),
-                            None,
-                        ),
+                let mut new_type_def = Definition::new_with_default_metadata(
+                    state.external.target_kind().clone(),
+                    input_definition.log_namespaces().clone(),
                 );
-            }
+                for (id, path) in meaning {
+                    // currently only event paths are supported
+                    new_type_def = new_type_def.with_meaning(OwnedTargetPath::event(path), &id);
+                }
+                new_type_def
+            })
+            .unwrap_or_else(|_| {
+                Definition::new_with_default_metadata(
+                    // The program failed to compile, so it can "never" return a value
+                    Kind::never(),
+                    input_definition.log_namespaces().clone(),
+                )
+            });
 
-            default_definitions.insert(output_id.clone(), default_definition);
-            dropped_definitions.insert(output_id.clone(), dropped_definition);
+        // When a message is dropped and re-routed, we keep the original event, but also annotate
+        // it with additional metadata.
+        let mut dropped_definition = Definition::new_with_default_metadata(
+            Kind::never(),
+            input_definition.log_namespaces().clone(),
+        );
+
+        if input_definition
+            .log_namespaces()
+            .contains(&LogNamespace::Legacy)
+        {
+            dropped_definition =
+                dropped_definition.merge(input_definition.clone().with_event_field(
+                    &parse_value_path(log_schema().metadata_key()).expect("valid metadata key"),
+                    Kind::object(BTreeMap::from([
+                        ("reason".into(), Kind::bytes()),
+                        ("message".into(), Kind::bytes()),
+                        ("component_id".into(), Kind::bytes()),
+                        ("component_type".into(), Kind::bytes()),
+                        ("component_kind".into(), Kind::bytes()),
+                    ])),
+                    Some("metadata"),
+                ));
         }
 
-        let default_output = TransformOutput::new(DataType::all(), default_definitions);
+        if input_definition
+            .log_namespaces()
+            .contains(&LogNamespace::Vector)
+        {
+            dropped_definition = dropped_definition.merge(
+                input_definition
+                    .clone()
+                    .with_metadata_field(&owned_value_path!("reason"), Kind::bytes(), None)
+                    .with_metadata_field(&owned_value_path!("message"), Kind::bytes(), None)
+                    .with_metadata_field(&owned_value_path!("component_id"), Kind::bytes(), None)
+                    .with_metadata_field(&owned_value_path!("component_type"), Kind::bytes(), None)
+                    .with_metadata_field(&owned_value_path!("component_kind"), Kind::bytes(), None),
+            );
+        }
+
+        let default_output =
+            Output::default(DataType::all()).with_schema_definition(default_definition);
 
         if self.reroute_dropped {
             vec![
                 default_output,
-                TransformOutput::new(DataType::all(), dropped_definitions).with_port(DROPPED),
+                Output::default(DataType::all())
+                    .with_schema_definition(dropped_definition)
+                    .with_port(DROPPED),
             ]
         } else {
             vec![default_output]
@@ -443,23 +401,14 @@ where
             .schema_definitions
             .get(&None)
             .expect("default schema required")
-            // TODO we can now have multiple possible definitions.
-            // This is going to need to be updated to store these possible definitions and then
-            // choose the correct one based on the input the event has come from.
-            .iter()
-            .map(|(_output, definition)| definition.clone())
-            .next()
-            .unwrap_or_else(Definition::any);
+            .clone();
 
         let dropped_schema_definition = context
             .schema_definitions
             .get(&Some(DROPPED.to_owned()))
             .or_else(|| context.schema_definitions.get(&None))
             .expect("dropped schema required")
-            .iter()
-            .map(|(_output, definition)| definition.clone())
-            .next()
-            .unwrap_or_else(Definition::any);
+            .clone();
 
         Ok(Remap {
             component_key: context.key.clone(),
@@ -705,14 +654,8 @@ mod tests {
 
     fn remap(config: RemapConfig) -> Result<Remap<AstRunner>> {
         let schema_definitions = HashMap::from([
-            (
-                None,
-                [("source".into(), test_default_schema_definition())].into(),
-            ),
-            (
-                Some(DROPPED.to_owned()),
-                [("source".into(), test_dropped_schema_definition())].into(),
-            ),
+            (None, test_default_schema_definition()),
+            (Some(DROPPED.to_owned()), test_dropped_schema_definition()),
         ]);
 
         Remap::new_ast(config, &TransformContext::new_test(schema_definitions))
@@ -1182,14 +1125,8 @@ mod tests {
             ..Default::default()
         };
         let schema_definitions = HashMap::from([
-            (
-                None,
-                [("source".into(), test_default_schema_definition())].into(),
-            ),
-            (
-                Some(DROPPED.to_owned()),
-                [("source".into(), test_dropped_schema_definition())].into(),
-            ),
+            (None, test_default_schema_definition()),
+            (Some(DROPPED.to_owned()), test_dropped_schema_definition()),
         ]);
         let context = TransformContext {
             key: Some(ComponentKey::from("remapper")),
@@ -1446,19 +1383,13 @@ mod tests {
 
         assert_eq!(
             conf.outputs(
-                &[(
-                    "test".into(),
-                    schema::Definition::new_with_default_metadata(
-                        Kind::any_object(),
-                        [LogNamespace::Legacy]
-                    )
-                )],
+                &schema::Definition::new_with_default_metadata(
+                    Kind::any_object(),
+                    [LogNamespace::Legacy]
+                ),
                 LogNamespace::Legacy
             ),
-            vec![TransformOutput::new(
-                DataType::all(),
-                [("test".into(), schema_definition)].into()
-            )]
+            vec![Output::default(DataType::all()).with_schema_definition(schema_definition)]
         );
 
         let context = TransformContext {
@@ -1523,8 +1454,8 @@ mod tests {
     fn collect_outputs(ft: &mut dyn SyncTransform, event: Event) -> CollectedOuput {
         let mut outputs = TransformOutputsBuf::new_with_capacity(
             vec![
-                TransformOutput::new(DataType::all(), HashMap::new()),
-                TransformOutput::new(DataType::all(), HashMap::new()).with_port(DROPPED),
+                Output::default(DataType::all()),
+                Output::default(DataType::all()).with_port(DROPPED),
             ],
             1,
         );
@@ -1550,8 +1481,8 @@ mod tests {
     ) -> std::result::Result<Event, Event> {
         let mut outputs = TransformOutputsBuf::new_with_capacity(
             vec![
-                TransformOutput::new(DataType::all(), HashMap::new()),
-                TransformOutput::new(DataType::all(), HashMap::new()).with_port(DROPPED),
+                Output::default(DataType::all()),
+                Output::default(DataType::all()).with_port(DROPPED),
             ],
             1,
         );

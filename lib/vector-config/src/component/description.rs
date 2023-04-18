@@ -2,7 +2,7 @@ use std::{cell::RefCell, marker::PhantomData};
 
 use snafu::Snafu;
 use toml::Value;
-use vector_config_common::attributes::CustomAttribute;
+use vector_config_common::{attributes::CustomAttribute, constants};
 
 use super::{ComponentMarker, GenerateConfig};
 use crate::schema::{SchemaGenerator, SchemaObject};
@@ -119,7 +119,8 @@ where
 
         let mut variant_metadata = Metadata::default();
         variant_metadata.set_description(self.description);
-        variant_metadata.add_custom_attribute(CustomAttribute::kv("docs::label", self.label));
+        variant_metadata
+            .add_custom_attribute(CustomAttribute::kv(constants::DOCS_META_LABEL, self.label));
         variant_metadata
             .add_custom_attribute(CustomAttribute::kv("logical_name", self.logical_name));
         schema::apply_base_metadata(&mut subschema, variant_metadata);

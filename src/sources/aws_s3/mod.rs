@@ -2,7 +2,7 @@ use std::{convert::TryInto, io::ErrorKind};
 
 use async_compression::tokio::bufread;
 use aws_sdk_s3::types::ByteStream;
-use codecs::decoding::{CharacterDelimitedDecoderOptions, DeserializerConfig, FramingConfig};
+use codecs::decoding::{DeserializerConfig, FramingConfig, NewlineDelimitedDecoderOptions};
 use codecs::BytesDeserializerConfig;
 use futures::{stream, stream::StreamExt, TryStreamExt};
 use lookup::owned_value_path;
@@ -14,12 +14,11 @@ use vector_core::config::{LegacyKey, LogNamespace};
 
 use super::util::MultilineConfig;
 use crate::codecs::DecodingConfig;
+use crate::config::DataType;
 use crate::{
     aws::{auth::AwsAuthentication, create_client, RegionOrEndpoint},
     common::{s3::S3ClientBuilder, sqs::SqsClientBuilder},
-    config::{
-        ProxyConfig, SourceAcknowledgementsConfig, SourceConfig, SourceContext, SourceOutput,
-    },
+    config::{Output, ProxyConfig, SourceAcknowledgementsConfig, SourceConfig, SourceContext},
     line_agg,
     serde::{bool_or_struct, default_decoding},
     tls::TlsConfig,
@@ -132,11 +131,8 @@ pub struct AwsS3Config {
 
 const fn default_framing() -> FramingConfig {
     // This is used for backwards compatibility. It used to be the only (hardcoded) option.
-    FramingConfig::CharacterDelimited {
-        character_delimited: CharacterDelimitedDecoderOptions {
-            delimiter: b'\n',
-            max_length: None,
-        },
+    FramingConfig::NewlineDelimited {
+        newline_delimited: NewlineDelimitedDecoderOptions { max_length: None },
     }
 }
 
@@ -163,7 +159,7 @@ impl SourceConfig for AwsS3Config {
         }
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
         let log_namespace = global_log_namespace.merge(self.log_namespace);
         let mut schema_definition = BytesDeserializerConfig
             .schema_definition(log_namespace)
@@ -210,10 +206,7 @@ impl SourceConfig for AwsS3Config {
             schema_definition = schema_definition.unknown_fields(Kind::bytes());
         }
 
-        vec![SourceOutput::new_logs(
-            self.decoding.output_type(),
-            schema_definition,
-        )]
+        vec![Output::default(DataType::Log).with_schema_definition(schema_definition)]
     }
 
     fn can_acknowledge(&self) -> bool {

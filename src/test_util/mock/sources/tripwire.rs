@@ -5,9 +5,8 @@ use futures_util::{future, FutureExt};
 use stream_cancel::{Trigger, Tripwire};
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
-use vector_core::schema::Definition;
 use vector_core::{
-    config::{DataType, SourceOutput},
+    config::{DataType, Output},
     source::Source,
 };
 
@@ -66,11 +65,8 @@ impl SourceConfig for TripwireSourceConfig {
         ))
     }
 
-    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
-        vec![SourceOutput::new_logs(
-            DataType::Log,
-            Definition::default_legacy_namespace(),
-        )]
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
+        vec![Output::default(DataType::Log)]
     }
 
     fn can_acknowledge(&self) -> bool {

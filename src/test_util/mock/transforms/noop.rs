@@ -5,13 +5,13 @@ use futures_util::Stream;
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
 use vector_core::{
-    config::{DataType, Input, TransformOutput},
+    config::{DataType, Input, Output},
     event::{Event, EventContainer},
     schema::Definition,
     transform::{FunctionTransform, OutputBuffer, TaskTransform, Transform},
 };
 
-use crate::config::{GenerateConfig, OutputId, TransformConfig, TransformContext};
+use crate::config::{GenerateConfig, TransformConfig, TransformContext};
 
 use super::TransformType;
 
@@ -39,18 +39,8 @@ impl TransformConfig for NoopTransformConfig {
         Input::all()
     }
 
-    fn outputs(
-        &self,
-        definitions: &[(OutputId, Definition)],
-        _: LogNamespace,
-    ) -> Vec<TransformOutput> {
-        vec![TransformOutput::new(
-            DataType::all(),
-            definitions
-                .iter()
-                .map(|(output, definition)| (output.clone(), definition.clone()))
-                .collect(),
-        )]
+    fn outputs(&self, _: &Definition, _: LogNamespace) -> Vec<Output> {
+        vec![Output::default(DataType::all())]
     }
 
     async fn build(&self, _: &TransformContext) -> crate::Result<Transform> {

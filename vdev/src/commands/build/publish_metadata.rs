@@ -9,7 +9,7 @@ use std::io::{self, Write};
 /// Setting necessary metadata for our publish workflow in CI.
 ///
 /// Responsible for setting necessary metadata for our publish workflow in CI.
-/// Computes the Vector version (from Cargo.toml), the release channel (nightly vs latest), which Cloudsmith
+/// Computes the Vector version (from Cargo.toml), the release channel (nightly vs release), which Cloudsmith
 /// repository to publish to, and more. All of this information is emitted in a way that sets native outputs on the
 /// GitHub Actions workflow step running the script, which can be passed on to subsequent jobs/steps.
 #[derive(clap::Args, Debug)]

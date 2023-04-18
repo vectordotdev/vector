@@ -11,13 +11,12 @@ use vector_config::{
 };
 use vector_config_common::attributes::CustomAttribute;
 use vector_core::{
-    config::{GlobalOptions, Input, LogNamespace, TransformOutput},
+    config::{GlobalOptions, Input, LogNamespace, Output},
     schema,
     transform::Transform,
 };
 
 use super::schema::Options as SchemaOptions;
-use super::OutputId;
 use super::{id::Inputs, ComponentKey};
 
 pub type BoxedTransform = Box<dyn TransformConfig>;
@@ -109,9 +108,9 @@ pub struct TransformContext {
 
     /// Tracks the schema IDs assigned to schemas exposed by the transform.
     ///
-    /// Given a transform can expose multiple [`TransformOutput`] channels, the ID is tied to the identifier of
-    /// that `TransformOutput`.
-    pub schema_definitions: HashMap<Option<String>, HashMap<OutputId, schema::Definition>>,
+    /// Given a transform can expose multiple [`Output`] channels, the ID is tied to the identifier of
+    /// that `Output`.
+    pub schema_definitions: HashMap<Option<String>, schema::Definition>,
 
     /// The schema definition created by merging all inputs of the transform.
     ///
@@ -129,7 +128,7 @@ impl Default for TransformContext {
             key: Default::default(),
             globals: Default::default(),
             enrichment_tables: Default::default(),
-            schema_definitions: HashMap::from([(None, HashMap::new())]),
+            schema_definitions: HashMap::from([(None, schema::Definition::any())]),
             merged_schema_definition: schema::Definition::any(),
             schema: SchemaOptions::default(),
         }
@@ -148,9 +147,7 @@ impl TransformContext {
     }
 
     #[cfg(any(test, feature = "test"))]
-    pub fn new_test(
-        schema_definitions: HashMap<Option<String>, HashMap<OutputId, schema::Definition>>,
-    ) -> Self {
+    pub fn new_test(schema_definitions: HashMap<Option<String>, schema::Definition>) -> Self {
         Self {
             schema_definitions,
             ..Default::default()
@@ -193,9 +190,9 @@ pub trait TransformConfig: DynClone + NamedComponent + core::fmt::Debug + Send +
     /// of events flowing through the transform.
     fn outputs(
         &self,
-        input_definitions: &[(OutputId, schema::Definition)],
+        merged_definition: &schema::Definition,
         global_log_namespace: LogNamespace,
-    ) -> Vec<TransformOutput>;
+    ) -> Vec<Output>;
 
     /// Validates that the configuration of the transform is valid.
     ///

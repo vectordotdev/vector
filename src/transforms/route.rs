@@ -1,14 +1,11 @@
 use indexmap::IndexMap;
 use vector_config::configurable_component;
-use vector_core::config::{clone_input_definitions, LogNamespace};
+use vector_core::config::LogNamespace;
 use vector_core::transform::SyncTransform;
 
 use crate::{
     conditions::{AnyCondition, Condition},
-    config::{
-        DataType, GenerateConfig, Input, OutputId, TransformConfig, TransformContext,
-        TransformOutput,
-    },
+    config::{DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext},
     event::Event,
     schema,
     transforms::Transform,
@@ -104,21 +101,19 @@ impl TransformConfig for RouteConfig {
         }
     }
 
-    fn outputs(
-        &self,
-        input_definitions: &[(OutputId, schema::Definition)],
-        _: LogNamespace,
-    ) -> Vec<TransformOutput> {
-        let mut result: Vec<TransformOutput> = self
+    fn outputs(&self, merged_definition: &schema::Definition, _: LogNamespace) -> Vec<Output> {
+        let mut result: Vec<Output> = self
             .route
             .keys()
             .map(|output_name| {
-                TransformOutput::new(DataType::all(), clone_input_definitions(input_definitions))
+                Output::default(DataType::all())
+                    .with_schema_definition(merged_definition.clone())
                     .with_port(output_name)
             })
             .collect();
         result.push(
-            TransformOutput::new(DataType::all(), clone_input_definitions(input_definitions))
+            Output::default(DataType::all())
+                .with_schema_definition(merged_definition.clone())
                 .with_port(UNMATCHED_ROUTE),
         );
         result
@@ -131,8 +126,6 @@ impl TransformConfig for RouteConfig {
 
 #[cfg(test)]
 mod test {
-    use std::collections::HashMap;
-
     use indoc::indoc;
     use vector_core::transform::TransformOutputsBuf;
 
@@ -191,8 +184,7 @@ mod test {
             output_names
                 .iter()
                 .map(|output_name| {
-                    TransformOutput::new(DataType::all(), HashMap::new())
-                        .with_port(output_name.to_owned())
+                    Output::default(DataType::all()).with_port(output_name.to_owned())
                 })
                 .collect(),
             1,
@@ -233,8 +225,7 @@ mod test {
             output_names
                 .iter()
                 .map(|output_name| {
-                    TransformOutput::new(DataType::all(), HashMap::new())
-                        .with_port(output_name.to_owned())
+                    Output::default(DataType::all()).with_port(output_name.to_owned())
                 })
                 .collect(),
             1,
@@ -274,8 +265,7 @@ mod test {
             output_names
                 .iter()
                 .map(|output_name| {
-                    TransformOutput::new(DataType::all(), HashMap::new())
-                        .with_port(output_name.to_owned())
+                    Output::default(DataType::all()).with_port(output_name.to_owned())
                 })
                 .collect(),
             1,

@@ -5,7 +5,10 @@ use std::{
 };
 
 use async_trait::async_trait;
-use tokio::io::DuplexStream;
+use tokio::{
+    fs::OpenOptions,
+    io::{AsyncWriteExt, DuplexStream},
+};
 
 use super::{
     io::{AsyncFile, Metadata, ProductionFilesystem, ReadableMemoryMap, WritableMemoryMap},
@@ -22,6 +25,7 @@ type FilesystemUnderTest = ProductionFilesystem;
 
 mod acknowledgements;
 mod basic;
+mod initialization;
 mod invariants;
 mod known_errors;
 mod model;
@@ -380,4 +384,29 @@ where
     read_next(reader)
         .await
         .expect("read should produce a record")
+}
+
+pub(crate) async fn set_file_length<P: AsRef<Path>>(
+    path: P,
+    initial_len: u64,
+    target_len: u64,
+) -> io::Result<()> {
+    let mut file = OpenOptions::new()
+        .write(true)
+        .open(&path)
+        .await
+        .expect("open should not fail");
+
+    // Just to make sure the file matches the expected starting length before futzing with it.
+    let metadata = file.metadata().await.expect("metadata should not fail");
+    assert_eq!(initial_len, metadata.len());
+
+    file.set_len(target_len)
+        .await
+        .expect("set_len should not fail");
+    file.flush().await.expect("flush should not fail");
+    file.sync_all().await.expect("sync should not fail");
+    drop(file);
+
+    Ok(())
 }

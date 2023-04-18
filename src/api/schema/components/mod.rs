@@ -14,7 +14,7 @@ use tokio_stream::{wrappers::BroadcastStream, Stream, StreamExt};
 use vector_config::NamedComponent;
 use vector_core::internal_event::DEFAULT_OUTPUT;
 
-use crate::topology::schema::possible_definitions;
+use crate::topology::schema::merged_definition;
 use crate::{
     api::schema::{
         components::state::component_by_component_key,
@@ -294,7 +294,7 @@ pub fn update_config(config: &Config) {
                 outputs: transform
                     .inner
                     .outputs(
-                        &possible_definitions(&transform.inputs, config, &mut cache),
+                        &merged_definition(&transform.inputs, config, &mut cache),
                         config.schema.log_namespace(),
                     )
                     .into_iter()

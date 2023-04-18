@@ -218,6 +218,7 @@ async fn validate_healthchecks(
             fmt.error(error);
         };
 
+        trace!("Healthcheck for {id} starting.");
         match tokio::spawn(healthcheck).await {
             Ok(Ok(_)) => {
                 if config
@@ -238,6 +239,7 @@ async fn validate_healthchecks(
             }
             Err(_) => failed(format!("Health check for \"{}\" panicked", id)),
         }
+        trace!("Healthcheck for {id} done.");
     }
 
     validated

@@ -13,7 +13,7 @@ use std::{
 
 use indexmap::IndexMap;
 use serde_json::{Number, Value};
-use vector_config_common::{attributes::CustomAttribute, validation::Validation};
+use vector_config_common::{attributes::CustomAttribute, constants, validation::Validation};
 
 use crate::{
     num::ConfigurableNumber,
@@ -141,8 +141,10 @@ macro_rules! impl_configurable_numeric {
             fn metadata() -> Metadata {
                 let mut metadata = Metadata::with_transparent(true);
                 let numeric_type = <Self as ConfigurableNumber>::class();
-                metadata
-                    .add_custom_attribute(CustomAttribute::kv("docs::numeric_type", numeric_type));
+                metadata.add_custom_attribute(CustomAttribute::kv(
+                    constants::DOCS_META_NUMERIC_TYPE,
+                    numeric_type,
+                ));
 
                 metadata
             }

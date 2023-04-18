@@ -10,7 +10,7 @@ use vector_core::config::LogNamespace;
 use vector_core::EstimatedJsonEncodedSizeOf;
 
 use crate::{
-    config::{log_schema, SourceConfig, SourceContext, SourceOutput},
+    config::{log_schema, DataType, Output, SourceConfig, SourceContext},
     internal_events::{EventsReceived, InternalMetricsBytesReceived, StreamClosedError},
     metrics::Controller,
     shutdown::ShutdownSignal,
@@ -136,8 +136,8 @@ impl SourceConfig for InternalMetricsConfig {
         ))
     }
 
-    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
-        vec![SourceOutput::new_metrics()]
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
+        vec![Output::default(DataType::Metric)]
     }
 
     fn can_acknowledge(&self) -> bool {

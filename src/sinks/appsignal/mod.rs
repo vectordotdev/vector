@@ -32,7 +32,7 @@ use crate::{
         },
         BuildError,
     },
-    tls::TlsSettings,
+    tls::{TlsConfig, TlsSettings},
 };
 
 #[derive(Debug, Snafu)]
@@ -70,6 +70,9 @@ pub struct AppsignalSinkConfig {
     #[configurable(derived)]
     #[serde(default)]
     request: TowerRequestConfig,
+
+    #[configurable(derived)]
+    tls: Option<TlsConfig>,
 
     #[configurable(derived)]
     #[serde(
@@ -114,7 +117,7 @@ impl SinkConfig for AppsignalSinkConfig {
 
         let buffer = JsonArrayBuffer::new(batch_settings.size);
 
-        let tls_settings = TlsSettings::from_options(&None)?;
+        let tls_settings = TlsSettings::from_options(&self.tls)?;
         let client = HttpClient::new(tls_settings, cx.proxy())?;
 
         let sink = BatchedHttpSink::new(

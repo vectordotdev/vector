@@ -1,2 +1,10 @@
+mod inline_single;
+pub mod merge;
+pub mod scoped_visit;
 mod unevaluated;
-pub use self::unevaluated::DisallowedUnevaluatedPropertiesVisitor;
+
+#[cfg(test)]
+pub(self) mod test;
+
+pub use self::inline_single::InlineSingleUseReferencesVisitor;
+pub use self::unevaluated::DisallowUnevaluatedPropertiesVisitor;

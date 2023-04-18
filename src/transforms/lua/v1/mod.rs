@@ -5,10 +5,9 @@ use ordered_float::NotNan;
 use snafu::{ResultExt, Snafu};
 use vector_config::configurable_component;
 
-use crate::config::OutputId;
 use crate::schema::Definition;
 use crate::{
-    config::{DataType, Input, TransformOutput},
+    config::{DataType, Input, Output},
     event::{Event, Value},
     internal_events::{LuaGcTriggered, LuaScriptError},
     schema,
@@ -48,27 +47,11 @@ impl LuaConfig {
         Input::log()
     }
 
-    pub fn outputs(
-        &self,
-        input_definitions: &[(OutputId, schema::Definition)],
-    ) -> Vec<TransformOutput> {
+    pub fn outputs(&self, merged_definition: &schema::Definition) -> Vec<Output> {
         // Lua causes the type definition to be reset
-        let namespaces = input_definitions
-            .iter()
-            .flat_map(|(_output, definition)| definition.log_namespaces().clone())
-            .collect();
+        let definition = Definition::default_for_namespace(merged_definition.log_namespaces());
 
-        let definition = input_definitions
-            .iter()
-            .map(|(output, _definition)| {
-                (
-                    output.clone(),
-                    Definition::default_for_namespace(&namespaces),
-                )
-            })
-            .collect();
-
-        vec![TransformOutput::new(DataType::Log, definition)]
+        vec![Output::default(DataType::Log).with_schema_definition(definition)]
     }
 }
 

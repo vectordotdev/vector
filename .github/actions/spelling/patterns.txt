@@ -218,3 +218,6 @@ k8s
 
 # ignore comment in package-msi.sh
 [#].*custom\.a28ecdc.*
+
+# ignore specific user:password string containing special chars for unit testing
+user:P@ssw0rd
