@@ -64,16 +64,9 @@ impl Decoder {
             Error::FramingError(error)
         })?;
 
-        // let frame = match frame {
-        //     Some(frame) => frame,
-        //     _ => return Ok(None),
-        // };
-
         frame
             .map(|frame| self.deserializer_parse(frame))
             .transpose()
-
-        // .map(|value|Some(value))
     }
 
     /// Parses a frame using the included deserializer, and handles any errors by logging.
