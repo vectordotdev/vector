@@ -5,7 +5,7 @@ use value::Value;
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
 use vector_core::{
-    config::{DataType, Input, TransformOutput},
+    config::{DataType, Input, Output},
     event::{
         metric::{MetricData, Sample},
         Event, MetricValue,
@@ -14,7 +14,7 @@ use vector_core::{
     transform::{FunctionTransform, OutputBuffer, Transform},
 };
 
-use crate::config::{OutputId, TransformConfig, TransformContext};
+use crate::config::{TransformConfig, TransformContext};
 
 /// Configuration for the `test_basic` transform.
 #[configurable_component(transform("test_basic", "Test (basic)"))]
@@ -49,18 +49,8 @@ impl TransformConfig for BasicTransformConfig {
         Input::all()
     }
 
-    fn outputs(
-        &self,
-        definitions: &[(OutputId, schema::Definition)],
-        _: LogNamespace,
-    ) -> Vec<TransformOutput> {
-        vec![TransformOutput::new(
-            DataType::all(),
-            definitions
-                .iter()
-                .map(|(output, definition)| (output.clone(), definition.clone()))
-                .collect(),
-        )]
+    fn outputs(&self, _: &schema::Definition, _: LogNamespace) -> Vec<Output> {
+        vec![Output::default(DataType::all())]
     }
 }
 

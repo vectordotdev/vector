@@ -13,7 +13,7 @@ use vector_core::config::{log_schema, LegacyKey, LogNamespace};
 use crate::serde::default_framing_message_based;
 use crate::{
     codecs::DecodingConfig,
-    config::{GenerateConfig, Resource, SourceConfig, SourceContext, SourceOutput},
+    config::{GenerateConfig, Output, Resource, SourceConfig, SourceContext},
     sources::util::net::TcpSource,
     tls::MaybeTlsSettings,
 };
@@ -217,7 +217,7 @@ impl SourceConfig for SocketConfig {
         }
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
         let log_namespace = global_log_namespace.merge(Some(self.log_namespace()));
 
         let schema_definition = self
@@ -309,10 +309,8 @@ impl SourceConfig for SocketConfig {
             }
         };
 
-        vec![SourceOutput::new_logs(
-            self.decoding().output_type(),
-            schema_definition,
-        )]
+        vec![Output::default(self.decoding().output_type())
+            .with_schema_definition(schema_definition)]
     }
 
     fn resources(&self) -> Vec<Resource> {

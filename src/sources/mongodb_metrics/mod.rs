@@ -19,7 +19,7 @@ use vector_config::configurable_component;
 use vector_core::{metric_tags, ByteSizeOf, EstimatedJsonEncodedSizeOf};
 
 use crate::{
-    config::{SourceConfig, SourceContext, SourceOutput},
+    config::{self, Output, SourceConfig, SourceContext},
     event::metric::{Metric, MetricKind, MetricTags, MetricValue},
     internal_events::{
         CollectionCompleted, EndpointBytesReceived, MongoDbMetricsBsonParseError,
@@ -156,8 +156,8 @@ impl SourceConfig for MongoDbMetricsConfig {
         }))
     }
 
-    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
-        vec![SourceOutput::new_metrics()]
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
+        vec![Output::default(config::DataType::Metric)]
     }
 
     fn can_acknowledge(&self) -> bool {

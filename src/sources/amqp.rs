@@ -3,7 +3,7 @@
 use crate::{
     amqp::AmqpConfig,
     codecs::{Decoder, DecodingConfig},
-    config::{SourceConfig, SourceContext, SourceOutput},
+    config::{Output, SourceConfig, SourceContext},
     event::{BatchNotifier, BatchStatus},
     internal_events::{
         source::{AmqpAckError, AmqpBytesReceived, AmqpEventError, AmqpRejectError},
@@ -142,7 +142,7 @@ impl SourceConfig for AmqpSourceConfig {
         amqp_source(self, cx.shutdown, cx.out, log_namespace, acknowledgements).await
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
         let log_namespace = global_log_namespace.merge(self.log_namespace);
         let schema_definition = self
             .decoding
@@ -180,10 +180,7 @@ impl SourceConfig for AmqpSourceConfig {
                 None,
             );
 
-        vec![SourceOutput::new_logs(
-            self.decoding.output_type(),
-            schema_definition,
-        )]
+        vec![Output::default(self.decoding.output_type()).with_schema_definition(schema_definition)]
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -525,10 +522,10 @@ pub mod test {
             ..Default::default()
         };
 
-        let definition = config
-            .outputs(LogNamespace::Vector)
-            .remove(0)
-            .schema_definition(true);
+        let definition = config.outputs(LogNamespace::Vector)[0]
+            .clone()
+            .log_schema_definition
+            .unwrap();
 
         let expected_definition =
             Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
@@ -552,17 +549,17 @@ pub mod test {
                 .with_metadata_field(&owned_value_path!("amqp", "exchange"), Kind::bytes(), None)
                 .with_metadata_field(&owned_value_path!("amqp", "offset"), Kind::integer(), None);
 
-        assert_eq!(definition, Some(expected_definition));
+        assert_eq!(definition, expected_definition);
     }
 
     #[test]
     fn output_schema_definition_legacy_namespace() {
         let config = AmqpSourceConfig::default();
 
-        let definition = config
-            .outputs(LogNamespace::Legacy)
-            .remove(0)
-            .schema_definition(true);
+        let definition = config.outputs(LogNamespace::Legacy)[0]
+            .clone()
+            .log_schema_definition
+            .unwrap();
 
         let expected_definition = Definition::new_with_default_metadata(
             Kind::object(Collection::empty()),
@@ -579,7 +576,7 @@ pub mod test {
         .with_event_field(&owned_value_path!("exchange"), Kind::bytes(), None)
         .with_event_field(&owned_value_path!("offset"), Kind::integer(), None);
 
-        assert_eq!(definition, Some(expected_definition));
+        assert_eq!(definition, expected_definition);
     }
 }
 
