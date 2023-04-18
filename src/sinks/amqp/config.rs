@@ -13,6 +13,7 @@ use vector_config::configurable_component;
 use vector_core::config::AcknowledgementsConfig;
 
 use super::sink::AmqpSink;
+use super::properties::AmqpPropertiesConfig;
 
 /// Configuration for the `amqp` sink.
 ///
@@ -25,6 +26,9 @@ pub struct AmqpSinkConfig {
 
     /// Template used to generate a routing key which corresponds to a queue binding.
     pub(crate) routing_key: Option<Template>,
+
+    /// AMQP Properties for the messages.
+    pub(crate) properties: Option<AmqpPropertiesConfig>,
 
     #[serde(flatten)]
     pub(crate) connection: AmqpConfig,
@@ -46,6 +50,7 @@ impl Default for AmqpSinkConfig {
         Self {
             exchange: Template::try_from("vector").unwrap(),
             routing_key: None,
+            properties: None,
             encoding: TextSerializerConfig::default().into(),
             connection: AmqpConfig::default(),
             acknowledgements: AcknowledgementsConfig::default(),
