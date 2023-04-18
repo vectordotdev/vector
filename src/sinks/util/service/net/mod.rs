@@ -45,6 +45,7 @@ use tokio::{
 };
 use tower::Service;
 use vector_config::configurable_component;
+use vector_core::tls::{MaybeTlsStream, TlsError};
 
 /// Hostname and port tuple.
 #[configurable_component]
@@ -96,6 +97,9 @@ pub enum NetError {
     #[snafu(display("Failed to configure socket: {}.", source))]
     FailedToConfigure { source: std::io::Error },
 
+    #[snafu(display("Failed to configure TLS: {}.", source))]
+    FailedToConfigureTLS { source: TlsError },
+
     #[snafu(display("Failed to bind socket: {}.", source))]
     FailedToBind { source: std::io::Error },
 
@@ -104,6 +108,9 @@ pub enum NetError {
 
     #[snafu(display("Failed to connect to endpoint: {}", source))]
     FailedToConnect { source: std::io::Error },
+
+    #[snafu(display("Failed to connect to TLS endpoint: {}", source))]
+    FailedToConnectTLS { source: TlsError },
 
     #[snafu(display("Failed to get socket back after send as channel closed unexpectedly."))]
     ServiceSocketChannelClosed,
@@ -128,7 +135,7 @@ enum NetworkServiceState {
 }
 
 enum NetworkConnection {
-    Tcp(TcpStream),
+    Tcp(MaybeTlsStream<TcpStream>),
     Udp(UdpSocket),
     #[cfg(unix)]
     Unix(UnixEither),

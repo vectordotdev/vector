@@ -57,11 +57,6 @@ impl UnixConnectorConfig {
         }
     }
 
-    pub const fn set_unix_mode(mut self, unix_mode: UnixMode) -> Self {
-        self.unix_mode = unix_mode;
-        self
-    }
-
     /// Creates a [`NetworkConnector`] from this Unix Domain Socket connector configuration.
     pub fn as_connector(&self) -> NetworkConnector {
         NetworkConnector {

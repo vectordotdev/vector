@@ -1,12 +1,15 @@
-use std::{net::SocketAddr, time::Duration};
+use std::net::SocketAddr;
 
 use snafu::ResultExt;
-use tokio::net::{TcpSocket, TcpStream};
+use tokio::net::TcpStream;
 
 use vector_config::configurable_component;
-use vector_core::tcp::TcpKeepaliveConfig;
+use vector_core::{
+    tcp::TcpKeepaliveConfig,
+    tls::{MaybeTlsSettings, MaybeTlsStream, TlsEnableableConfig},
+};
 
-use crate::{dns, net};
+use crate::dns;
 
 use super::{net_error::*, ConnectorType, HostAndPort, NetError, NetworkConnector};
 
@@ -29,7 +32,10 @@ pub struct TcpConnectorConfig {
     /// If set, the value of the setting is passed via the `SO_SNDBUF` option.
     #[configurable(metadata(docs::type_unit = "bytes"))]
     #[configurable(metadata(docs::examples = 65536))]
-    send_buffer_size: Option<u32>,
+    send_buffer_size: Option<usize>,
+
+    #[configurable(derived)]
+    tls: Option<TlsEnableableConfig>,
 }
 
 impl TcpConnectorConfig {
@@ -38,12 +44,8 @@ impl TcpConnectorConfig {
             address: HostAndPort { host, port },
             keepalive: None,
             send_buffer_size: None,
+            tls: None,
         }
-    }
-
-    pub const fn set_keepalive(mut self, keepalive: TcpKeepaliveConfig) -> Self {
-        self.keepalive = Some(keepalive);
-        self
     }
 
     /// Creates a [`NetworkConnector`] from this TCP connector configuration.
@@ -53,6 +55,7 @@ impl TcpConnectorConfig {
                 address: self.address.clone(),
                 keepalive: self.keepalive,
                 send_buffer_size: self.send_buffer_size,
+                tls: self.tls.clone(),
             }),
         }
     }
@@ -62,11 +65,14 @@ impl TcpConnectorConfig {
 pub(super) struct TcpConnector {
     address: HostAndPort,
     keepalive: Option<TcpKeepaliveConfig>,
-    send_buffer_size: Option<u32>,
+    send_buffer_size: Option<usize>,
+    tls: Option<TlsEnableableConfig>,
 }
 
 impl TcpConnector {
-    pub(super) async fn connect(&self) -> Result<(SocketAddr, TcpStream), NetError> {
+    pub(super) async fn connect(
+        &self,
+    ) -> Result<(SocketAddr, MaybeTlsStream<TcpStream>), NetError> {
         let ip = dns::Resolver
             .lookup_ip(self.address.host.clone())
             .await
@@ -76,26 +82,20 @@ impl TcpConnector {
 
         let addr = SocketAddr::new(ip, self.address.port);
 
-        let socket = if addr.is_ipv4() {
-            TcpSocket::new_v4().context(FailedToConfigure)?
-        } else {
-            TcpSocket::new_v6().context(FailedToConfigure)?
-        };
+        let tls = MaybeTlsSettings::from_config(&self.tls, false).context(FailedToConfigureTLS)?;
+        let mut stream = tls
+            .connect(self.address.host.as_str(), &addr)
+            .await
+            .context(FailedToConnectTLS)?;
 
         if let Some(send_buffer_size) = self.send_buffer_size {
-            if let Err(error) = socket.set_send_buffer_size(send_buffer_size) {
+            if let Err(error) = stream.set_send_buffer_bytes(send_buffer_size) {
                 warn!(%error, "Failed configuring send buffer size on TCP socket.");
             }
         }
 
-        let stream = socket.connect(addr).await.context(FailedToConnect)?;
-
-        let maybe_keepalive_secs = self
-            .keepalive
-            .as_ref()
-            .and_then(|config| config.time_secs.map(Duration::from_secs));
-        if let Some(keepalive_secs) = maybe_keepalive_secs {
-            if let Err(error) = net::set_keepalive(&stream, keepalive_secs) {
+        if let Some(keepalive) = self.keepalive {
+            if let Err(error) = stream.set_keepalive(keepalive) {
                 warn!(%error, "Failed configuring keepalive on TCP socket.");
             }
         }
