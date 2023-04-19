@@ -7,8 +7,7 @@ use syn::{
     token::Comma, AttributeArgs, DeriveInput, Lit, LitStr, Meta, MetaList, NestedMeta, Path,
 };
 use vector_config_common::{
-    constants::ComponentType,
-    human_friendly::generate_human_friendly_string,
+    constants::ComponentType, human_friendly::generate_human_friendly_string,
 };
 
 use crate::attrs;

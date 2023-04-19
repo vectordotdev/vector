@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use convert_case::{Case, Converter, Boundary};
+use convert_case::{Boundary, Case, Converter};
 use once_cell::sync::Lazy;
 
 /// Well-known replacements.
@@ -43,7 +43,7 @@ static WELL_KNOWN_REPLACEMENTS: Lazy<HashMap<String, &'static str>> = Lazy::new(
 /// Acronyms are distinct from replacements because they should be entirely capitalized (i.e. "aws"
 /// or "aWs" or "Aws" should always be replaced with "AWS") whereas replacements may insert
 /// additional characters or capitalize specific characters within the original string.
-const WELL_KNOWN_ACRONYMS: Lazy<HashSet<String>> = Lazy::new(|| {
+static WELL_KNOWN_ACRONYMS: Lazy<HashSet<String>> = Lazy::new(|| {
     let acronyms = &[
         "api", "amqp", "aws", "ec2", "ecs", "gcp", "hec", "http", "https", "nats", "nginx", "s3",
         "sqs", "tls", "ssl", "otel", "gelf", "csv", "json", "rfc3339", "lz4", "us", "eu", "bsd",
