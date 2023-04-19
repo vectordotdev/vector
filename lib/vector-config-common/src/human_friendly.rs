@@ -65,7 +65,7 @@ static WELL_KNOWN_ACRONYMS: Lazy<HashSet<String>> = Lazy::new(|| {
 /// well-known replacements to ensure that brand-specific casing (such as "CloudWatch" instead of
 /// "Cloudwatch", or handling acronyms like AWS, GCP, and so on) makes it into the final version.
 pub fn generate_human_friendly_string(input: &str) -> String {
-    // Create our case converter, which specificially ignores letter/digit boundaries, which is
+    // Create our case converter, which specifically ignores letter/digit boundaries, which is
     // important for not turning substrings like "Ec2" or "S3" into "Ec"/"2" and "S"/"3",
     // respectively.
     let converter = Converter::new()
