@@ -6358,9 +6358,9 @@ dependencies = [
 
 [[package]]
 name = "pulsar"
-version = "5.1.0"
+version = "5.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "87daa9156db61c325625c7015d8b1f2ff0c841651c12d5ca2e4e3e408ecd0ad1"
+checksum = "20f237570b5665b38c7d5228f9a1d2990e369c00e635704528996bcd5219f540"
 dependencies = [
  "async-trait",
  "bit-vec 0.6.3",
