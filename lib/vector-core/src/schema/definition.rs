@@ -87,7 +87,7 @@ impl Definition {
     ) -> Self {
         Self {
             event_kind,
-            metadata_kind: Kind::object(Collection::empty()),
+            metadata_kind: Kind::object(Collection::any()),
             meaning: BTreeMap::default(),
             log_namespaces: log_namespaces.into(),
         }
@@ -265,8 +265,9 @@ impl Definition {
     /// A non-root required field means the root type must be an object, so the type will be automatically
     /// restricted to an object.
     ///
+    /// Raises a warning if the path is not root, and the definition does not allow the type to be an object.
+    ///
     /// # Panics
-    /// - If the path is not root, and the definition does not allow the type to be an object.
     /// - Provided path has one or more coalesced segments (e.g. `.(foo | bar)`).
     #[must_use]
     pub fn with_event_field(
@@ -275,10 +276,10 @@ impl Definition {
         kind: Kind,
         meaning: Option<&str>,
     ) -> Self {
-        if !path.is_root() {
-            assert!(
-                self.event_kind.as_object().is_some(),
-                "Setting a field on a value that cannot be an object"
+        if !path.is_root() && self.event_kind.as_object().is_none() {
+            warn!(
+                "Setting a field at `{}` on a value that cannot be an object",
+                path.to_string()
             );
         }
 
@@ -327,8 +328,9 @@ impl Definition {
     /// A non-root required field means the root type must be an object, so the type will be automatically
     /// restricted to an object.
     ///
+    /// Raises a warning if the path is not root, and the definition does not allow the type to be an object.
+    ///
     /// # Panics
-    /// - If the path is not root, and the definition does not allow the type to be an object
     /// - Provided path has one or more coalesced segments (e.g. `.(foo | bar)`).
     #[must_use]
     pub fn with_metadata_field(
@@ -337,10 +339,10 @@ impl Definition {
         kind: Kind,
         meaning: Option<&str>,
     ) -> Self {
-        if !path.is_root() {
-            assert!(
-                self.metadata_kind.as_object().is_some(),
-                "Setting a field on a value that cannot be an object"
+        if !path.is_root() && self.metadata_kind.as_object().is_none() {
+            warn!(
+                "Setting a field at `{}` on a value that cannot be an object",
+                path.to_string()
             );
         }
 
@@ -373,25 +375,55 @@ impl Definition {
     /// This method panics if the provided path points to an unknown location in the collection.
     #[must_use]
     pub fn with_meaning(mut self, target_path: OwnedTargetPath, meaning: &str) -> Self {
-        // Ensure the path exists in the collection.
-        match target_path.prefix {
-            PathPrefix::Event => assert!(
-                self.event_kind
-                    .at_path(&target_path.path)
-                    .contains_any_defined(),
-                "meaning must point to a valid path"
-            ),
-            PathPrefix::Metadata => assert!(
-                self.metadata_kind
-                    .at_path(&target_path.path)
-                    .contains_any_defined(),
-                "meaning must point to a valid path"
-            ),
-        };
-
-        self.meaning
-            .insert(meaning.to_owned(), MeaningPointer::Valid(target_path));
+        self.add_meaning(target_path, meaning);
         self
+    }
+
+    /// Adds the meaning pointing to the given path to our list of meanings.
+    ///
+    /// # Panics
+    ///
+    /// This method panics if the provided path points to an unknown location in the collection.
+    fn add_meaning(&mut self, target_path: OwnedTargetPath, meaning: &str) {
+        self.try_with_meaning(target_path, meaning)
+            .unwrap_or_else(|err| panic!("{}", err));
+    }
+
+    /// Register a semantic meaning for the definition.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the provided path points to an unknown location in the collection.
+    pub fn try_with_meaning(
+        &mut self,
+        target_path: OwnedTargetPath,
+        meaning: &str,
+    ) -> Result<(), &'static str> {
+        match target_path.prefix {
+            PathPrefix::Event
+                if !self
+                    .event_kind
+                    .at_path(&target_path.path)
+                    .contains_any_defined() =>
+            {
+                Err("meaning must point to a valid path")
+            }
+
+            PathPrefix::Metadata
+                if !self
+                    .metadata_kind
+                    .at_path(&target_path.path)
+                    .contains_any_defined() =>
+            {
+                Err("meaning must point to a valid path")
+            }
+
+            _ => {
+                self.meaning
+                    .insert(meaning.to_owned(), MeaningPointer::Valid(target_path));
+                Ok(())
+            }
+        }
     }
 
     /// Set the kind for all unknown fields.
@@ -451,6 +483,21 @@ impl Definition {
             })
     }
 
+    /// Adds the meanings provided by an iterator over the given meanings.
+    ///
+    /// # Panics
+    ///
+    /// This method panics if the provided path from any of the incoming meanings point to
+    /// an unknown location in the collection.
+    pub fn add_meanings<'a>(
+        &'a mut self,
+        meanings: impl Iterator<Item = (&'a String, &'a OwnedTargetPath)>,
+    ) {
+        for (meaning, path) in meanings {
+            self.add_meaning(path.clone(), meaning);
+        }
+    }
+
     pub fn event_kind(&self) -> &Kind {
         &self.event_kind
     }
@@ -481,6 +528,7 @@ mod test_utils {
         /// Checks that the schema definition is _valid_ for the given event.
         ///
         /// # Errors
+        ///
         /// If the definition is not valid, debug info will be returned.
         pub fn is_valid_for_event(&self, event: &Event) -> Result<(), String> {
             if let Some(log) = event.maybe_as_log() {
@@ -522,12 +570,26 @@ mod test_utils {
         }
 
         /// Asserts that the schema definition is _valid_ for the given event.
+        ///
         /// # Panics
+        ///
         /// If the definition is not valid for the event.
         pub fn assert_valid_for_event(&self, event: &Event) {
             if let Err(err) = self.is_valid_for_event(event) {
                 panic!("Schema definition assertion failed: {err}");
             }
+        }
+
+        /// Asserts that the schema definition is _invalid_ for the given event.
+        ///
+        /// # Panics
+        ///
+        /// If the definition is valid for the event.
+        pub fn assert_invalid_for_event(&self, event: &Event) {
+            assert!(
+                self.is_valid_for_event(event).is_err(),
+                "Schema definition assertion should not be valid"
+            );
         }
     }
 }
@@ -732,7 +794,7 @@ mod tests {
                             "foo".into(),
                             Kind::boolean().or_undefined(),
                         )])),
-                        metadata_kind: Kind::object(Collection::empty()),
+                        metadata_kind: Kind::object(Collection::any()),
                         meaning: [(
                             "foo_meaning".to_owned(),
                             MeaningPointer::Valid(parse_target_path("foo").unwrap()),
@@ -756,7 +818,7 @@ mod tests {
                                 Kind::regex().or_null().or_undefined(),
                             )])),
                         )])),
-                        metadata_kind: Kind::object(Collection::empty()),
+                        metadata_kind: Kind::object(Collection::any()),
                         meaning: [(
                             "foobar".to_owned(),
                             MeaningPointer::Valid(parse_target_path(".foo.bar").unwrap()),
@@ -777,7 +839,7 @@ mod tests {
                             "foo".into(),
                             Kind::boolean().or_undefined(),
                         )])),
-                        metadata_kind: Kind::object(Collection::empty()),
+                        metadata_kind: Kind::object(Collection::any()),
                         meaning: BTreeMap::default(),
                         log_namespaces: BTreeSet::new(),
                     },
@@ -795,7 +857,7 @@ mod tests {
     fn test_unknown_fields() {
         let want = Definition {
             event_kind: Kind::object(Collection::from_unknown(Kind::bytes().or_integer())),
-            metadata_kind: Kind::object(Collection::empty()),
+            metadata_kind: Kind::object(Collection::any()),
             meaning: BTreeMap::default(),
             log_namespaces: BTreeSet::new(),
         };
