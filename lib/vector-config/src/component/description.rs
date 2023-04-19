@@ -119,8 +119,10 @@ where
 
         let mut variant_metadata = Metadata::default();
         variant_metadata.set_description(self.description);
-        variant_metadata
-            .add_custom_attribute(CustomAttribute::kv(constants::DOCS_META_LABEL, self.label));
+        variant_metadata.add_custom_attribute(CustomAttribute::kv(
+            constants::DOCS_META_HUMAN_NAME,
+            self.label,
+        ));
         variant_metadata
             .add_custom_attribute(CustomAttribute::kv("logical_name", self.logical_name));
         schema::apply_base_metadata(&mut subschema, variant_metadata);

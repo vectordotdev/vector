@@ -1,5 +1,4 @@
 use darling::{Error, FromMeta};
-use itertools::Itertools as _;
 use proc_macro::TokenStream;
 use proc_macro2::{Ident, Span};
 use quote::{quote, quote_spanned};
@@ -7,7 +6,9 @@ use syn::{
     parse_macro_input, parse_quote, parse_quote_spanned, punctuated::Punctuated, spanned::Spanned,
     token::Comma, AttributeArgs, DeriveInput, Lit, LitStr, Meta, MetaList, NestedMeta, Path,
 };
-use vector_config_common::constants::ComponentType;
+use vector_config_common::{
+    constants::ComponentType, human_friendly::generate_human_friendly_string,
+};
 
 use crate::attrs;
 
@@ -95,8 +96,8 @@ impl TypedComponent {
                 }
             };
 
-            // Derive the label from the component name, but capitalized.
-            let label = capitalize_words(&component_name.value());
+            // Derive the human-friendly name from the component name.
+            let label = generate_human_friendly_string(&component_name.value());
 
             // Derive the logical name from the config type, with the trailing "Config" dropped.
             let logical_name = config_ty.to_string();
@@ -325,33 +326,6 @@ pub fn configurable_component_impl(args: TokenStream, item: TokenStream) -> Toke
     };
 
     derived.into()
-}
-
-// Properly capitalize labels, accounting for some exceptions
-// TODO: Replace this with an explicit requirement for a "component_human_name" or similar.
-fn capitalize(s: &str) -> String {
-    match s {
-        "Amqp" | "Aws" | "Ec2" | "Ecs" | "Gcp" | "Hec" | "Http" | "Nats" | "Nginx" | "Sqs" => {
-            s.to_uppercase()
-        }
-        "Eventstoredb" => String::from("EventStoreDB"),
-        "Mongodb" => String::from("MongoDB"),
-        "Opentelemetry" => String::from("OpenTelemetry"),
-        "Postgresql" => String::from("PostgreSQL"),
-        "Pubsub" => String::from("Pub/Sub"),
-        "Statsd" => String::from("StatsD"),
-        _ => {
-            let mut iter = s.chars();
-            match iter.next() {
-                None => String::new(),
-                Some(first) => first.to_uppercase().collect::<String>() + iter.as_str(),
-            }
-        }
-    }
-}
-
-fn capitalize_words(s: &str) -> String {
-    s.split('_').map(capitalize).join(" ")
 }
 
 /// Gets the ident of the component type-specific helper attribute for the `NamedComponent` derive.
