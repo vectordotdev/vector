@@ -2,7 +2,6 @@
 //! Handles version AMQP 0.9.1 which is used by RabbitMQ.
 mod config;
 mod encoder;
-mod properties;
 mod request_builder;
 mod service;
 mod sink;

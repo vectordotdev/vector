@@ -15,9 +15,11 @@ use vector_buffers::EventCount;
 use vector_core::{sink::StreamSink, ByteSizeOf, EstimatedJsonEncodedSizeOf};
 
 use super::{
-    config::AmqpSinkConfig, encoder::AmqpEncoder, request_builder::AmqpRequestBuilder,
-    service::AmqpService, BuildError,
-    properties::AmqpPropertiesConfig,
+    config::{AmqpPropertiesConfig, AmqpSinkConfig},
+    encoder::AmqpEncoder,
+    request_builder::AmqpRequestBuilder,
+    service::AmqpService,
+    BuildError,
 };
 
 /// Stores the event together with the rendered exchange and routing_key values.
