@@ -1,9 +1,58 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use convert_case::{Boundary, Case, Casing};
-use once_cell::sync::OnceCell;
+use once_cell::sync::Lazy;
 
-static WELL_KNOWN_REPLACEMENTS: OnceCell<HashMap<String, &'static str>> = OnceCell::new();
+/// Well-known replacements.
+///
+/// Replacements are instances of strings with unique capitalization that cannot be acheived
+/// programmatically, as well as the potential insertion of additional characters, such as the
+/// replacement of "pubsub" with "Pub/Sub".
+static WELL_KNOWN_REPLACEMENTS: Lazy<HashMap<String, &'static str>> = Lazy::new(|| {
+    let pairs = vec![
+        ("eventstoredb", "EventStoreDB"),
+        ("mongodb", "MongoDB"),
+        ("opentelemetry", "OpenTelemetry"),
+        ("otel", "OTEL"),
+        ("postgresql", "PostgreSQL"),
+        ("pubsub", "Pub/Sub"),
+        ("statsd", "StatsD"),
+        ("journald", "JournalD"),
+        ("appsignal", "AppSignal"),
+        ("clickhouse", "ClickHouse"),
+        ("influxdb", "InfluxDB"),
+        ("webhdfs", "WebHDFS"),
+        ("cloudwatch", "CloudWatch"),
+        ("logdna", "LogDNA"),
+        ("geoip", "GeoIP"),
+        ("ssekms", "SSE-KMS"),
+        ("aes256", "AES-256"),
+        ("apiserver", "API Server"),
+        ("dir", "Directory"),
+        ("ids", "IDs"),
+        ("ips", "IPs"),
+        ("grpc", "gRPC"),
+        ("oauth2", "OAuth2"),
+    ];
+
+    pairs.iter().map(|(k, v)| (k.to_lowercase(), *v)).collect()
+});
+
+/// Well-known acronyms.
+///
+/// Acronyms are distinct from replacements because they should be entirely capitalized (i.e. "aws"
+/// or "aWs" or "Aws" should always be replaced with "AWS") whereas replacements may insert
+/// additional characters or capitalize specific characters within the original string.
+const WELL_KNOWN_ACRONYMS: Lazy<HashSet<String>> = Lazy::new(|| {
+    let acronyms = &[
+        "api", "amqp", "aws", "ec2", "ecs", "gcp", "hec", "http", "https", "nats", "nginx", "s3",
+        "sqs", "tls", "ssl", "otel", "gelf", "csv", "json", "rfc3339", "lz4", "us", "eu", "bsd",
+        "vrl", "tcp", "udp", "id", "uuid", "kms", "uri", "url", "acp", "uid", "ip", "pid",
+        "ndjson", "ewma", "rtt", "cpu", "acl",
+    ];
+
+    acronyms.iter().map(|s| s.to_lowercase()).collect()
+});
 
 /// Methods for splitting an input string into word segments.
 pub enum SplitMethod {
@@ -50,59 +99,12 @@ pub fn generate_human_friendly_version(input: &str, split: SplitMethod) -> Strin
 }
 
 fn replace_well_known_segments(input: &str) -> String {
-    let well_known_replacements = get_well_known_replacements_map();
-    let well_known_acronyms = get_well_known_acronyms();
-
     let as_lower = input.to_lowercase();
-    if let Some(replacement) = well_known_replacements.get(&as_lower) {
+    if let Some(replacement) = WELL_KNOWN_REPLACEMENTS.get(&as_lower) {
         replacement.to_string()
-    } else if well_known_acronyms.contains(&as_lower.as_str()) {
+    } else if WELL_KNOWN_ACRONYMS.contains(&as_lower) {
         input.to_uppercase()
     } else {
         input.to_string()
     }
-}
-
-fn get_well_known_acronyms() -> &'static [&'static str] {
-    &[
-        "api", "amqp", "aws", "ec2", "ecs", "gcp", "hec", "http", "https", "nats", "nginx", "s3",
-        "sqs", "tls", "ssl", "otel", "gelf", "csv", "json", "rfc3339", "lz4", "us", "eu", "bsd",
-        "vrl", "tcp", "udp", "id", "uuid", "kms", "uri", "url", "acp", "uid", "ip", "pid",
-        "ndjson", "ewma", "rtt", "cpu", "acl",
-    ]
-}
-
-fn get_well_known_replacements_map() -> &'static HashMap<String, &'static str> {
-    WELL_KNOWN_REPLACEMENTS.get_or_init(|| {
-        let pairs = vec![
-            ("eventstoredb", "EventStoreDB"),
-            ("mongodb", "MongoDB"),
-            ("opentelemetry", "OpenTelemetry"),
-            ("otel", "OTEL"),
-            ("postgresql", "PostgreSQL"),
-            ("pubsub", "Pub/Sub"),
-            ("statsd", "StatsD"),
-            ("journald", "JournalD"),
-            ("appsignal", "AppSignal"),
-            ("clickhouse", "ClickHouse"),
-            ("influxdb", "InfluxDB"),
-            ("webhdfs", "WebHDFS"),
-            ("cloudwatch", "CloudWatch"),
-            ("logdna", "LogDNA"),
-            ("geoip", "GeoIP"),
-            ("ssekms", "SSE-KMS"),
-            ("aes256", "AES-256"),
-            ("apiserver", "API Server"),
-            ("dir", "Directory"),
-            ("ids", "IDs"),
-            ("ips", "IPs"),
-            ("grpc", "gRPC"),
-            ("oauth2", "OAuth2"),
-        ];
-
-        pairs
-            .iter()
-            .map(|(k, v)| (k.to_lowercase(), *v))
-            .collect()
-    })
 }
