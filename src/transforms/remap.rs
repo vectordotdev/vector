@@ -678,24 +678,21 @@ fn push_dropped(
 /// elements or any non-array elements that are within the definition. All these
 /// definitions need to be merged together.
 fn merge_array_definitions(mut definition: schema::Definition) -> schema::Definition {
-    if definition.event_kind().contains_array() {
-        let mut array = definition.event_kind().clone().into_array().unwrap();
-        array.anonymize();
-        let array_kinds = array.unknown_kind();
+    if let Some(array) = definition.event_kind().as_array() {
+        let array_kinds = array.reduced_kind();
         let kind = definition.event_kind_mut();
 
         kind.remove_array();
+
         kind.merge(
             array_kinds,
             Strategy {
                 collisions: CollisionStrategy::Union,
             },
         );
-
-        definition
-    } else {
-        definition
     }
+
+    definition
 }
 
 #[derive(Debug, Snafu)]
@@ -1659,8 +1656,7 @@ mod tests {
         let definition =
             schema::Definition::new_with_default_metadata(kind, [LogNamespace::Legacy]);
 
-        let mut kind = Kind::undefined();
-        kind.add_object(BTreeMap::from([
+        let kind = Kind::object(BTreeMap::from([
             ("carrot".into(), Kind::bytes()),
             ("potato".into(), Kind::integer()),
         ]));
@@ -1698,8 +1694,7 @@ mod tests {
         let definition =
             schema::Definition::new_with_default_metadata(kind, [LogNamespace::Legacy]);
 
-        let mut kind = Kind::undefined();
-        kind.add_bytes();
+        let mut kind = Kind::bytes();
         kind.add_integer();
         kind.add_boolean();
         kind.add_object(BTreeMap::from([
@@ -1712,5 +1707,239 @@ mod tests {
         let merged = merge_array_definitions(definition.clone());
 
         assert_eq!(wanted, merged);
+    }
+
+    #[test]
+    fn test_combined_transforms_simple() {
+        // Make sure that when getting the definitions from one transform and
+        // passing them to another the correct definition is still produced.
+
+        // Transform 1 sets a simple value.
+        let transform1 = RemapConfig {
+            source: Some(r#".thing = "potato""#.to_string()),
+            ..Default::default()
+        };
+
+        let transform2 = RemapConfig {
+            source: Some(".thang = .thing".to_string()),
+            ..Default::default()
+        };
+
+        let enrichment_tables = enrichment::TableRegistry::default();
+
+        let outputs1 = transform1.outputs(
+            enrichment_tables.clone(),
+            &[("in".into(), schema::Definition::default_legacy_namespace())],
+            LogNamespace::Legacy,
+        );
+
+        assert_eq!(
+            vec![TransformOutput {
+                port: None,
+                ty: DataType::all(),
+                // The `never` definition should have been passod on to the end.
+                log_schema_definitions: [(
+                    "in".into(),
+                    Definition::default_legacy_namespace().with_event_field(
+                        &owned_value_path!("thing"),
+                        Kind::bytes(),
+                        None
+                    ),
+                )]
+                .into(),
+            }],
+            outputs1
+        );
+
+        let outputs2 = transform2.outputs(
+            enrichment_tables,
+            &[(
+                "in1".into(),
+                outputs1[0].log_schema_definitions[&"in".into()].clone(),
+            )],
+            LogNamespace::Legacy,
+        );
+
+        assert_eq!(
+            vec![TransformOutput {
+                port: None,
+                ty: DataType::all(),
+                log_schema_definitions: [(
+                    "in1".into(),
+                    Definition::default_legacy_namespace()
+                        .with_event_field(&owned_value_path!("thing"), Kind::bytes(), None)
+                        .with_event_field(&owned_value_path!("thang"), Kind::bytes(), None),
+                )]
+                .into(),
+            }],
+            outputs2
+        );
+    }
+
+    #[test]
+    fn test_combined_transforms_error() {
+        // Make sure that when getting the definitions from one transform and
+        // passing them to another the correct definition is still produced.
+
+        // Transform 1 loads from a non existent enrichment table.
+        let transform1 = RemapConfig {
+            source: Some(r#". |= get_enrichment_table_record!("invalid", {"id" .id})"#.to_string()),
+            ..Default::default()
+        };
+
+        let transform2 = RemapConfig {
+            source: Some(".thing = .thang".to_string()),
+            ..Default::default()
+        };
+
+        let enrichment_tables = enrichment::TableRegistry::default();
+
+        let outputs1 = transform1.outputs(
+            enrichment_tables.clone(),
+            &[(
+                "in".into(),
+                schema::Definition::default_legacy_namespace().with_event_field(
+                    &owned_value_path!("id"),
+                    Kind::bytes(),
+                    None,
+                ),
+            )],
+            LogNamespace::Legacy,
+        );
+
+        assert_eq!(
+            vec![TransformOutput {
+                port: None,
+                ty: DataType::all(),
+                // The `never` definition should have been passod on to the end.
+                log_schema_definitions: [(
+                    "in".into(),
+                    Definition::new_with_default_metadata(Kind::never(), [LogNamespace::Legacy],)
+                )]
+                .into(),
+            }],
+            outputs1
+        );
+
+        let outputs2 = transform2.outputs(
+            enrichment_tables,
+            &[(
+                "in1".into(),
+                outputs1[0].log_schema_definitions[&"in".into()].clone(),
+            )],
+            LogNamespace::Legacy,
+        );
+
+        assert_eq!(
+            vec![TransformOutput {
+                port: None,
+                ty: DataType::all(),
+                // The `never` definition should have been passod on to the end.
+                log_schema_definitions: [(
+                    "in1".into(),
+                    Definition::new_with_default_metadata(Kind::never(), [LogNamespace::Legacy],)
+                )]
+                .into(),
+            }],
+            outputs2
+        );
+    }
+
+    #[test]
+    fn test_combined_transforms_unnest() {
+        // Make sure that when getting the definitions from one transform and
+        // passing them to another the correct definition is still produced.
+
+        // Transform 1 sets a simple value.
+        let transform1 = RemapConfig {
+            source: Some(
+                indoc! {
+                r#"
+                .thing = [{"thung": 32}, {"theng": 45}]
+                . = unnest(.thing)
+                "#
+                }
+                .to_string(),
+            ),
+            ..Default::default()
+        };
+
+        let transform2 = RemapConfig {
+            source: Some(r#".thang = .thing.thung || "beetroot""#.to_string()),
+            ..Default::default()
+        };
+
+        let enrichment_tables = enrichment::TableRegistry::default();
+
+        let outputs1 = transform1.outputs(
+            enrichment_tables.clone(),
+            &[(
+                "in".into(),
+                schema::Definition::new_with_default_metadata(
+                    Kind::any_object(),
+                    [LogNamespace::Legacy],
+                ),
+            )],
+            LogNamespace::Legacy,
+        );
+
+        assert_eq!(
+            vec![TransformOutput {
+                port: None,
+                ty: DataType::all(),
+                log_schema_definitions: [(
+                    "in".into(),
+                    Definition::new_with_default_metadata(
+                        Kind::any_object(),
+                        [LogNamespace::Legacy]
+                    )
+                    .with_event_field(
+                        &owned_value_path!("thing"),
+                        Kind::object(Collection::from(BTreeMap::from([
+                            ("thung".into(), Kind::integer().or_undefined(),),
+                            ("theng".into(), Kind::integer().or_undefined(),)
+                        ]))),
+                        None
+                    ),
+                )]
+                .into(),
+            }],
+            outputs1
+        );
+
+        let outputs2 = transform2.outputs(
+            enrichment_tables,
+            &[(
+                "in1".into(),
+                outputs1[0].log_schema_definitions[&"in".into()].clone(),
+            )],
+            LogNamespace::Legacy,
+        );
+
+        assert_eq!(
+            vec![TransformOutput {
+                port: None,
+                ty: DataType::all(),
+                log_schema_definitions: [(
+                    "in1".into(),
+                    Definition::default_legacy_namespace()
+                        .with_event_field(
+                            &owned_value_path!("thing"),
+                            Kind::object(Collection::from(BTreeMap::from([
+                                ("thung".into(), Kind::integer().or_undefined(),),
+                                ("theng".into(), Kind::integer().or_undefined(),)
+                            ]))),
+                            None
+                        )
+                        .with_event_field(
+                            &owned_value_path!("thang"),
+                            Kind::integer().or_null(),
+                            None
+                        ),
+                )]
+                .into(),
+            }],
+            outputs2
+        );
     }
 }
