@@ -38,7 +38,7 @@ impl OctetCountingDecoderConfig {
 pub struct OctetCountingDecoderOptions {
     /// The maximum length of the byte buffer.
     #[serde(skip_serializing_if = "vector_core::serde::skip_serializing_if_default")]
-    max_length: Option<usize>,
+    pub max_length: Option<usize>,
 }
 
 /// Codec using the `Octet Counting` format as specified in

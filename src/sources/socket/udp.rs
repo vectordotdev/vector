@@ -45,7 +45,7 @@ pub struct UdpConfig {
     /// Messages larger than this are truncated.
     #[serde(default = "default_max_length")]
     #[configurable(metadata(docs::type_unit = "bytes"))]
-    pub(super) max_length: Option<usize>,
+    pub(super) max_length: usize,
 
     /// Overrides the name of the log field used to add the peer host to each event.
     ///
@@ -95,8 +95,8 @@ fn default_port_key() -> OptionalValuePath {
     OptionalValuePath::from(owned_value_path!("port"))
 }
 
-fn default_max_length() -> Option<usize> {
-    Some(crate::serde::default_max_length())
+fn default_max_length() -> usize {
+    crate::serde::default_max_length()
 }
 
 impl UdpConfig {
@@ -163,9 +163,7 @@ pub(super) fn udp(
             }
         }
 
-        let mut max_length = config
-            .max_length
-            .unwrap_or_else(|| default_max_length().unwrap());
+        let mut max_length = config.max_length;
 
         if let Some(receive_buffer_bytes) = config.receive_buffer_bytes {
             max_length = std::cmp::min(max_length, receive_buffer_bytes);

@@ -191,15 +191,17 @@ base: components: sources: socket: configuration: {
 		type: uint: unit: "seconds"
 	}
 	max_length: {
-		deprecated:         true
-		deprecated_message: "This option has been deprecated. Configure `max_length` on the framing config instead."
 		description: """
 			The maximum buffer size of incoming messages.
 
 			Messages larger than this are truncated.
 			"""
-		required: false
-		type: uint: unit: "bytes"
+		relevant_when: "mode = \"udp\""
+		required:      false
+		type: uint: {
+			default: 102400
+			unit:    "bytes"
+		}
 	}
 	mode: {
 		description: "The type of socket to use."
