@@ -8,7 +8,7 @@ use syn::{
 };
 use vector_config_common::{
     constants::ComponentType,
-    human_friendly::{generate_human_friendly_version, SplitMethod},
+    human_friendly::generate_human_friendly_string,
 };
 
 use crate::attrs;
@@ -98,8 +98,7 @@ impl TypedComponent {
             };
 
             // Derive the human-friendly name from the component name.
-            let label =
-                generate_human_friendly_version(&component_name.value(), SplitMethod::Underscore);
+            let label = generate_human_friendly_string(&component_name.value());
 
             // Derive the logical name from the config type, with the trailing "Config" dropped.
             let logical_name = config_ty.to_string();

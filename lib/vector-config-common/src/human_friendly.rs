@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use convert_case::{Boundary, Case, Casing};
+use convert_case::{Case, Converter, Boundary};
 use once_cell::sync::Lazy;
 
 /// Well-known replacements.
@@ -54,15 +54,6 @@ const WELL_KNOWN_ACRONYMS: Lazy<HashSet<String>> = Lazy::new(|| {
     acronyms.iter().map(|s| s.to_lowercase()).collect()
 });
 
-/// Methods for splitting an input string into word segments.
-pub enum SplitMethod {
-    /// Split inputs on case change boundaries.
-    Case,
-
-    /// Split inputs on underscore boundaries.
-    Underscore,
-}
-
 /// Generates a human-friendly version of the given string.
 ///
 /// Many instances exist where type names, or string constants, represent a condensed form of an
@@ -73,23 +64,14 @@ pub enum SplitMethod {
 /// splitting it on the relevant word boundaries, adjusting the input to title case, and applying
 /// well-known replacements to ensure that brand-specific casing (such as "CloudWatch" instead of
 /// "Cloudwatch", or handling acronyms like AWS, GCP, and so on) makes it into the final version.
-pub fn generate_human_friendly_version(input: &str, split: SplitMethod) -> String {
-    // This specifically instructs the splitter to avoid treating a letter, followed by a
-    // digit, as a word boundary. This matters for acronyms like "EC2" where they'll currently be
-    // written out in code as "Ec2", as well as acronyms like "S3", where they're already set as
-    // "S3" in code, and we want to keep them intact.
-    let digit_boundaries = &[Boundary::LowerDigit, Boundary::UpperDigit];
-
-    let normalized = match split {
-        SplitMethod::Case => input
-            .from_case(Case::Pascal)
-            .without_boundaries(digit_boundaries)
-            .to_case(Case::Title),
-        SplitMethod::Underscore => input
-            .from_case(Case::Snake)
-            .without_boundaries(digit_boundaries)
-            .to_case(Case::Title),
-    };
+pub fn generate_human_friendly_string(input: &str) -> String {
+    // Create our case converter, which specificially ignores letter/digit boundaries, which is
+    // important for not turning substrings like "Ec2" or "S3" into "Ec"/"2" and "S"/"3",
+    // respectively.
+    let converter = Converter::new()
+        .to_case(Case::Title)
+        .remove_boundaries(&[Boundary::LowerDigit, Boundary::UpperDigit]);
+    let normalized = converter.convert(input);
 
     let replaced_segments = normalized
         .split(' ')
@@ -106,5 +88,36 @@ fn replace_well_known_segments(input: &str) -> String {
         input.to_uppercase()
     } else {
         input.to_string()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::generate_human_friendly_string;
+
+    #[test]
+    fn autodetect_input_case() {
+        let pascal_input = "LogToMetric";
+        let snake_input = "log_to_metric";
+
+        let pascal_friendly = generate_human_friendly_string(pascal_input);
+        let snake_friendly = generate_human_friendly_string(snake_input);
+
+        let expected = "Log To Metric";
+        assert_eq!(expected, pascal_friendly);
+        assert_eq!(expected, snake_friendly);
+    }
+
+    #[test]
+    fn digit_letter_boundaries() {
+        let input1 = "Ec2Metadata";
+        let expected1 = "EC2 Metadata";
+        let actual1 = generate_human_friendly_string(input1);
+        assert_eq!(expected1, actual1);
+
+        let input2 = "AwsS3";
+        let expected2 = "AWS S3";
+        let actual2 = generate_human_friendly_string(input2);
+        assert_eq!(expected2, actual2);
     }
 }

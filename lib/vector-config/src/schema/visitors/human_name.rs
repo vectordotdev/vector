@@ -1,7 +1,7 @@
 use serde_json::Value;
 use vector_config_common::{
     constants,
-    human_friendly::{generate_human_friendly_version, SplitMethod},
+    human_friendly::generate_human_friendly_string,
     schema::{visit::Visitor, *},
 };
 
@@ -51,7 +51,7 @@ impl Visitor for GenerateHumanFriendlyNameVisitor {
         // generating the human-friendly name. Logical name is populated for schemas that represent
         // an enum variant.
         if let Some(logical_name) = get_schema_metadata_attr_str(schema, constants::LOGICAL_NAME) {
-            let human_name = generate_human_friendly_version(logical_name, SplitMethod::Case);
+            let human_name = generate_human_friendly_string(logical_name);
             set_schema_metadata_attr_str(schema, constants::DOCS_META_HUMAN_NAME, human_name);
         }
 
@@ -64,8 +64,7 @@ impl Visitor for GenerateHumanFriendlyNameVisitor {
                         property_schema,
                         constants::DOCS_META_HUMAN_NAME,
                     ) {
-                        let human_name =
-                            generate_human_friendly_version(property_name, SplitMethod::Underscore);
+                        let human_name = generate_human_friendly_string(property_name);
                         set_schema_metadata_attr_str(
                             property_schema,
                             constants::DOCS_META_HUMAN_NAME,
