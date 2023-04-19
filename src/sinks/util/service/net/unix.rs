@@ -38,6 +38,7 @@ pub struct UnixConnectorConfig {
     path: PathBuf,
 
     /// The Unix socket mode to use.
+    #[serde(default = "default_unix_mode")]
     unix_mode: UnixMode,
 
     /// The size of the socket's send buffer.
@@ -46,6 +47,10 @@ pub struct UnixConnectorConfig {
     #[configurable(metadata(docs::type_unit = "bytes"))]
     #[configurable(metadata(docs::examples = 65536))]
     send_buffer_size: Option<usize>,
+}
+
+const fn default_unix_mode() -> UnixMode {
+    UnixMode::Stream
 }
 
 impl UnixConnectorConfig {
