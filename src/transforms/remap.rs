@@ -680,10 +680,9 @@ fn push_dropped(
 fn merge_array_definitions(mut definition: schema::Definition) -> schema::Definition {
     if let Some(array) = definition.event_kind().as_array() {
         let array_kinds = array.reduced_kind();
+
         let kind = definition.event_kind_mut();
-
         kind.remove_array();
-
         kind.merge(
             array_kinds,
             Strategy {
