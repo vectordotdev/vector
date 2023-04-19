@@ -5,7 +5,7 @@ use once_cell::sync::Lazy;
 
 /// Well-known replacements.
 ///
-/// Replacements are instances of strings with unique capitalization that cannot be acheived
+/// Replacements are instances of strings with unique capitalization that cannot be achieved
 /// programmatically, as well as the potential insertion of additional characters, such as the
 /// replacement of "pubsub" with "Pub/Sub".
 static WELL_KNOWN_REPLACEMENTS: Lazy<HashMap<String, &'static str>> = Lazy::new(|| {
