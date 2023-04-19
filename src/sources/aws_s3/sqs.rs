@@ -12,9 +12,7 @@ use aws_smithy_client::SdkError;
 use aws_types::region::Region;
 use bytes::Bytes;
 use chrono::{DateTime, TimeZone, Utc};
-use codecs::decoding::format::Deserializer as CodecDeserializer;
-use codecs::decoding::Framer;
-use codecs::{decoding, decoding::FramingError, StreamDecodingError};
+use codecs::decoding::FramingError;
 use futures::{FutureExt, Stream, StreamExt, TryFutureExt};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -542,7 +540,7 @@ impl IngestorProcess {
         let mut stream = lines.flat_map(|line| {
             let events = match self.state.decoder.deserializer_parse(line) {
                 Ok((events, _events_size)) => events,
-                Err(error) => {
+                Err(_error) => {
                     // Error is handled by `codecs::Decoder`, no further handling
                     // is needed here.
                     SmallVec::new()
