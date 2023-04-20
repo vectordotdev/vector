@@ -707,7 +707,7 @@ pub enum BuildError {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
+    use std::collections::{HashMap, HashSet};
 
     use indoc::{formatdoc, indoc};
     use value::{
@@ -1979,6 +1979,42 @@ mod tests {
                 .into(),
             }],
             outputs1
+        );
+    }
+
+    #[test]
+    fn test_error_outputs() {
+        // Even if we fail to compile the VRL it should still output
+        // the correct ports. This may change if we separate the
+        // `outputs` function into one returning outputs and a separate
+        // returning schema definitions.
+        let transform1 = RemapConfig {
+            // This enrichment table does not exist.
+            source: Some(r#". |= get_enrichment_table_record("carrot", {"id": .id})"#.to_string()),
+            reroute_dropped: true,
+            ..Default::default()
+        };
+
+        let enrichment_tables = enrichment::TableRegistry::default();
+
+        let outputs1 = transform1.outputs(
+            enrichment_tables.clone(),
+            &[(
+                "in".into(),
+                schema::Definition::new_with_default_metadata(
+                    Kind::any_object(),
+                    [LogNamespace::Legacy],
+                ),
+            )],
+            LogNamespace::Legacy,
+        );
+
+        assert_eq!(
+            HashSet::from([None, Some("dropped".to_string())]),
+            outputs1
+                .into_iter()
+                .map(|output| output.port)
+                .collect::<HashSet<_>>()
         );
     }
 }
