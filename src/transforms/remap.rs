@@ -1941,4 +1941,44 @@ mod tests {
             outputs2
         );
     }
+
+    #[test]
+    fn test_transform_abort() {
+        // An abort should not change the typedef.
+
+        let transform1 = RemapConfig {
+            source: Some(r#"abort"#.to_string()),
+            ..Default::default()
+        };
+
+        let enrichment_tables = enrichment::TableRegistry::default();
+
+        let outputs1 = transform1.outputs(
+            enrichment_tables.clone(),
+            &[(
+                "in".into(),
+                schema::Definition::new_with_default_metadata(
+                    Kind::any_object(),
+                    [LogNamespace::Legacy],
+                ),
+            )],
+            LogNamespace::Legacy,
+        );
+
+        assert_eq!(
+            vec![TransformOutput {
+                port: None,
+                ty: DataType::all(),
+                log_schema_definitions: [(
+                    "in".into(),
+                    Definition::new_with_default_metadata(
+                        Kind::any_object(),
+                        [LogNamespace::Legacy]
+                    ),
+                )]
+                .into(),
+            }],
+            outputs1
+        );
+    }
 }
