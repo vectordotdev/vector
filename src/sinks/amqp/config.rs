@@ -30,7 +30,7 @@ pub struct AmqpPropertiesConfig {
 }
 
 impl AmqpPropertiesConfig {
-    pub fn build(&self) -> BasicProperties {
+    pub(super) fn build(&self) -> BasicProperties {
         let mut prop = BasicProperties::default();
         if let Some(content_type) = &self.content_type {
             prop = prop.with_content_type(ShortString::from(content_type.clone()));
