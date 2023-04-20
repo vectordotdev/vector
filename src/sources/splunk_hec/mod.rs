@@ -79,6 +79,9 @@ pub struct SplunkConfig {
     /// If supplied, incoming requests must supply one of these tokens in the `Authorization` header, just as a client
     /// would if it was communicating with the Splunk HEC endpoint directly.
     ///
+    /// Values in the list is split on commas and merged back into the list. This makes it possible
+    /// to provide this value via the environment.
+    ///
     /// If _not_ supplied, the `Authorization` header is ignored and requests are not authenticated.
     #[configurable(metadata(docs::examples = "A94A8FE5CCB19BA61C4C08"))]
     valid_tokens: Option<Vec<SensitiveString>>,
@@ -261,33 +264,43 @@ struct SplunkSource {
 
 impl SplunkSource {
     fn new(config: &SplunkConfig, protocol: &'static str, cx: SourceContext) -> Self {
-        let log_namespace = cx.log_namespace(config.log_namespace);
-        let acknowledgements = cx.do_acknowledgements(config.acknowledgements.enabled.into());
-        let shutdown = cx.shutdown;
-        let valid_tokens = config
-            .valid_tokens
-            .iter()
-            .flatten()
-            .chain(config.token.iter());
+    let log_namespace = cx.log_namespace(config.log_namespace);
+    let acknowledgements = cx.do_acknowledgements(config.acknowledgements.enabled.into());
+    let shutdown = cx.shutdown;
+    let mut valid_tokens = Vec::new();
 
-        let idx_ack = acknowledgements.then(|| {
-            Arc::new(IndexerAcknowledgement::new(
-                config.acknowledgements.clone(),
-                shutdown,
-            ))
-        });
-
-        SplunkSource {
-            valid_credentials: valid_tokens
-                .map(|token| format!("Splunk {}", token.inner()))
-                .collect(),
-            protocol,
-            idx_ack,
-            store_hec_token: config.store_hec_token,
-            log_namespace,
-            events_received: register!(EventsReceived),
+    for token in config.valid_tokens.iter().flatten().chain(config.token.iter()) {
+        if token.inner().contains(',') {
+            valid_tokens.extend(
+            token
+                .inner()
+                .split(',')
+                .map(|s| SensitiveString::from(String::from(s)))
+            );
+        } else {
+            valid_tokens.push(token.clone());
         }
     }
+
+    let idx_ack = acknowledgements.then(|| {
+        Arc::new(IndexerAcknowledgement::new(
+            config.acknowledgements.clone(),
+            shutdown,
+        ))
+    });
+
+    SplunkSource {
+        valid_credentials: valid_tokens
+            .iter()
+            .map(|token| format!("Splunk {}", token.inner()))
+            .collect(),
+        protocol,
+        idx_ack,
+        store_hec_token: config.store_hec_token,
+        log_namespace,
+        events_received: register!(EventsReceived),
+    }
+}
 
     fn event_service(&self, out: SourceSender) -> BoxedFilter<(Response,)> {
         let splunk_channel_query_param = warp::query::<HashMap<String, String>>()
