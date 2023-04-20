@@ -1358,7 +1358,6 @@ mod test {
         fn from(e: Event) -> Self {
             let (value, _) = e.into_log().into_parts();
             let mut fields = value.into_object().unwrap();
-            fields.remove("source_ip");
 
             Self {
                 msgid: fields.remove("msgid").map(value_to_string).unwrap(),
