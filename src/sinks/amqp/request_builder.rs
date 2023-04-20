@@ -9,8 +9,8 @@ use crate::{
     },
 };
 use bytes::Bytes;
-use std::io;
 use lapin::BasicProperties;
+use std::io;
 use vector_common::{
     finalization::{EventFinalizers, Finalizable},
     request_metadata::RequestMetadata,
