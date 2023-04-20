@@ -17,7 +17,7 @@ use super::sink::AmqpSink;
 
 /// AMQP Properties options.
 #[configurable_component]
-#[configurable(title = "Configure AMQP properties for the messages.")]
+#[configurable(title = "Configure the AMQP message properties.")]
 #[derive(Clone, Debug, Default)]
 pub struct AmqpPropertiesConfig {
     /// Content-Type for the AMQP messages.
