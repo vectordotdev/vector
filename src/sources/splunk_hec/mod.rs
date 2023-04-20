@@ -264,43 +264,43 @@ struct SplunkSource {
 
 impl SplunkSource {
     fn new(config: &SplunkConfig, protocol: &'static str, cx: SourceContext) -> Self {
-    let log_namespace = cx.log_namespace(config.log_namespace);
-    let acknowledgements = cx.do_acknowledgements(config.acknowledgements.enabled.into());
-    let shutdown = cx.shutdown;
-    let mut valid_tokens = Vec::new();
+        let log_namespace = cx.log_namespace(config.log_namespace);
+        let acknowledgements = cx.do_acknowledgements(config.acknowledgements.enabled.into());
+        let shutdown = cx.shutdown;
+        let mut valid_tokens = Vec::new();
 
-    for token in config.valid_tokens.iter().flatten().chain(config.token.iter()) {
-        if token.inner().contains(',') {
-            valid_tokens.extend(
-            token
-                .inner()
-                .split(',')
-                .map(|s| SensitiveString::from(String::from(s)))
-            );
-        } else {
-            valid_tokens.push(token.clone());
+        for token in config.valid_tokens.iter().flatten().chain(config.token.iter()) {
+            if token.inner().contains(',') {
+                valid_tokens.extend(
+                token
+                    .inner()
+                    .split(',')
+                    .map(|s| SensitiveString::from(String::from(s)))
+                );
+            } else {
+                valid_tokens.push(token.clone());
+            }
+        }
+
+        let idx_ack = acknowledgements.then(|| {
+            Arc::new(IndexerAcknowledgement::new(
+                config.acknowledgements.clone(),
+                shutdown,
+            ))
+        });
+
+        SplunkSource {
+            valid_credentials: valid_tokens
+                .iter()
+                .map(|token| format!("Splunk {}", token.inner()))
+                .collect(),
+            protocol,
+            idx_ack,
+            store_hec_token: config.store_hec_token,
+            log_namespace,
+            events_received: register!(EventsReceived),
         }
     }
-
-    let idx_ack = acknowledgements.then(|| {
-        Arc::new(IndexerAcknowledgement::new(
-            config.acknowledgements.clone(),
-            shutdown,
-        ))
-    });
-
-    SplunkSource {
-        valid_credentials: valid_tokens
-            .iter()
-            .map(|token| format!("Splunk {}", token.inner()))
-            .collect(),
-        protocol,
-        idx_ack,
-        store_hec_token: config.store_hec_token,
-        log_namespace,
-        events_received: register!(EventsReceived),
-    }
-}
 
     fn event_service(&self, out: SourceSender) -> BoxedFilter<(Response,)> {
         let splunk_channel_query_param = warp::query::<HashMap<String, String>>()
