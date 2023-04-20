@@ -15,7 +15,7 @@ use vector_core::config::AcknowledgementsConfig;
 
 use super::sink::AmqpSink;
 
-/// AMQP Properties options.
+/// AMQP properties configuration.
 #[configurable_component]
 #[configurable(title = "Configure the AMQP message properties.")]
 #[derive(Clone, Debug, Default)]
@@ -54,7 +54,7 @@ pub struct AmqpSinkConfig {
     /// Template used to generate a routing key which corresponds to a queue binding.
     pub(crate) routing_key: Option<Template>,
 
-    /// AMQP Properties for the messages.
+    /// AMQP message properties.
     pub(crate) properties: Option<AmqpPropertiesConfig>,
 
     #[serde(flatten)]
