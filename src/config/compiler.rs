@@ -1,7 +1,8 @@
 use indexmap::IndexSet;
 
 use super::{
-    builder::ConfigBuilder, graph::Graph, id::Inputs, schema, validation, Config, OutputId,
+    builder::ConfigBuilder, graph::Graph, id::Inputs, transform::transform_output_ids, validation,
+    Config, OutputId,
 };
 
 pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<String>> {
@@ -137,18 +138,7 @@ pub(crate) fn expand_globs(config: &mut ConfigBuilder) {
                 })
         })
         .chain(config.transforms.iter().flat_map(|(key, t)| {
-            t.inner
-                .outputs(
-                    // TODO SMW - we need the proper enrichment tables here...
-                    enrichment::TableRegistry::default(),
-                    &[(key.into(), schema::Definition::any())],
-                    config.schema.log_namespace(),
-                )
-                .into_iter()
-                .map(|output| OutputId {
-                    component: key.clone(),
-                    port: output.port,
-                })
+            transform_output_ids(t.inner.as_ref(), key.clone(), config.schema.log_namespace())
         }))
         .map(|output_id| output_id.to_string())
         .collect::<IndexSet<String>>();
