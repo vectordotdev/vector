@@ -32,7 +32,7 @@ fn experiment_no_truncations(actions: Vec<FileWatcherAction>) {
     for action in actions.iter() {
         match *action {
             FileWatcherAction::DeleteFile => {
-                let _ = fs::remove_file(&path);
+                _ = fs::remove_file(&path);
                 assert!(!path.exists());
                 fwfiles[0].reset();
                 break;

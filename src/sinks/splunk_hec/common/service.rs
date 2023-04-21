@@ -562,7 +562,7 @@ mod tests {
         let mock_server = get_hec_mock_server(true, ack_response_always_fail).await;
         let mut service = get_hec_service(mock_server.uri(), Default::default());
 
-        let _ = service.call(get_hec_request()).await;
+        _ = service.call(get_hec_request()).await;
     }
 
     #[tokio::test]

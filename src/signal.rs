@@ -130,7 +130,7 @@ impl SignalHandler {
     pub fn clear(&mut self) {
         for shutdown_tx in self.shutdown_txs.drain(..) {
             // An error just means the channel was already shut down; safe to ignore.
-            let _ = shutdown_tx.send(());
+            _ = shutdown_tx.send(());
         }
     }
 }

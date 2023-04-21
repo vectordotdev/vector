@@ -102,7 +102,7 @@ impl<const N: usize> FixedEncodable for Message<N> {
         let id = buffer.get_u64();
         for _ in 0..N {
             // this covers self._padding
-            let _ = buffer.get_u64();
+            _ = buffer.get_u64();
         }
         Ok(Message::new(id))
     }
@@ -177,6 +177,6 @@ pub async fn war_measurement<const N: usize>(
 ) {
     for msg in messages.into_iter() {
         sender.send(msg).await.unwrap();
-        let _ = receiver.next().await.unwrap();
+        _ = receiver.next().await.unwrap();
     }
 }

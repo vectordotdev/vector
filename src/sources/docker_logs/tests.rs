@@ -224,7 +224,7 @@ mod integration_tests {
         trace!("Removing container.");
 
         // Don't panic, as this is unrelated to the test, and there are possibly other containers that need to be removed
-        let _ = docker
+        _ = docker
             .remove_container(id, None::<RemoveContainerOptions>)
             .await
             .map_err(|e| error!(%e));
@@ -633,7 +633,7 @@ mod integration_tests {
             let out = source_with(&[name], None, None).await;
 
             let events = collect_n(out, 1).await;
-            let _ = container_kill(&id, &docker).await;
+            _ = container_kill(&id, &docker).await;
             container_remove(&id, &docker).await;
 
             schema_definition.assert_valid_for_event(&events[0]);
@@ -736,8 +736,8 @@ mod integration_tests {
             let exclude_out = source_with_config(config_ex).await;
             let include_out = source_with_config(config_in).await;
 
-            let _ = collect_n(include_out, 1).await;
-            let _ = container_kill(&id, &docker).await;
+            _ = collect_n(include_out, 1).await;
+            _ = container_kill(&id, &docker).await;
             container_remove(&id, &docker).await;
 
             assert!(is_empty(exclude_out));
@@ -766,7 +766,7 @@ mod integration_tests {
             let out = source_with(&[name], None, None).await;
 
             let events = collect_n(out, 1).await;
-            let _ = container_kill(&id, &docker).await;
+            _ = container_kill(&id, &docker).await;
             container_remove(&id, &docker).await;
 
             schema_definition.assert_valid_for_event(&events[0]);

@@ -613,7 +613,7 @@ mod tests {
         database = "my-database"
     "#;
         let config: InfluxDbTestConfig = toml::from_str(config).unwrap();
-        let _ = influxdb_settings(config.influxdb1_settings, config.influxdb2_settings).unwrap();
+        _ = influxdb_settings(config.influxdb1_settings, config.influxdb2_settings).unwrap();
     }
 
     #[test]
@@ -624,7 +624,7 @@ mod tests {
         token = "my-token"
     "#;
         let config: InfluxDbTestConfig = toml::from_str(config).unwrap();
-        let _ = influxdb_settings(config.influxdb1_settings, config.influxdb2_settings).unwrap();
+        _ = influxdb_settings(config.influxdb1_settings, config.influxdb2_settings).unwrap();
     }
 
     #[test]

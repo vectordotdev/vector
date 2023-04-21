@@ -420,7 +420,7 @@ async fn kafka_source(
     if let Ok(current_assignment) = consumer.assignment() {
         // not logging on error because it will error if there are no offsets stored for a partition,
         // and this is best-effort cleanup anyway
-        let _ = consumer.commit(&current_assignment, CommitMode::Sync);
+        _ = consumer.commit(&current_assignment, CommitMode::Sync);
     }
     Ok(())
 }

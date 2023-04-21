@@ -319,7 +319,7 @@ impl Lua {
             emit!(LuaGcTriggered {
                 used_memory: self.lua.used_memory()
             });
-            let _ = self
+            _ = self
                 .lua
                 .gc_collect()
                 .context(RuntimeErrorGcSnafu)
@@ -349,7 +349,7 @@ impl RuntimeTransform for Lua {
         F: FnMut(Event),
     {
         let lua = &self.lua;
-        let _ = lua
+        _ = lua
             .scope(|scope| -> mlua::Result<()> {
                 lua.registry_value::<mlua::Function>(&self.hook_process)?
                     .call((
@@ -371,7 +371,7 @@ impl RuntimeTransform for Lua {
         F: FnMut(Event),
     {
         let lua = &self.lua;
-        let _ = lua
+        _ = lua
             .scope(|scope| -> mlua::Result<()> {
                 match &self.hook_init {
                     Some(key) => lua
@@ -391,7 +391,7 @@ impl RuntimeTransform for Lua {
         F: FnMut(Event),
     {
         let lua = &self.lua;
-        let _ = lua
+        _ = lua
             .scope(|scope| -> mlua::Result<()> {
                 match &self.hook_shutdown {
                     Some(key) => lua
@@ -411,7 +411,7 @@ impl RuntimeTransform for Lua {
         F: FnMut(Event),
     {
         let lua = &self.lua;
-        let _ = lua
+        _ = lua
             .scope(|scope| -> mlua::Result<()> {
                 let handler_key = &self.timers[timer.id as usize].1;
                 lua.registry_value::<mlua::Function>(handler_key)?

@@ -930,7 +930,7 @@ mod tests {
 
         let mut writer = Cursor::new(Vec::new());
         let encoding = DatadogArchivesEncoding::new(Default::default());
-        let _ = encoding.encode_input(vec![event], &mut writer);
+        _ = encoding.encode_input(vec![event], &mut writer);
 
         let encoded = writer.into_inner();
         let json: BTreeMap<String, serde_json::Value> =
@@ -1016,7 +1016,7 @@ mod tests {
         let log1 = Event::Log(LogEvent::from("test event 1"));
         let mut writer = Cursor::new(Vec::new());
         let encoding = DatadogArchivesEncoding::new(Default::default());
-        let _ = encoding.encode_input(vec![log1], &mut writer);
+        _ = encoding.encode_input(vec![log1], &mut writer);
         let encoded = writer.into_inner();
         let json: BTreeMap<String, serde_json::Value> =
             serde_json::from_slice(encoded.as_slice()).unwrap();
@@ -1030,7 +1030,7 @@ mod tests {
         // check that id is different for the next event
         let log2 = Event::Log(LogEvent::from("test event 2"));
         let mut writer = Cursor::new(Vec::new());
-        let _ = encoding.encode_input(vec![log2], &mut writer);
+        _ = encoding.encode_input(vec![log2], &mut writer);
         let encoded = writer.into_inner();
         let json: BTreeMap<String, serde_json::Value> =
             serde_json::from_slice(encoded.as_slice()).unwrap();
@@ -1048,7 +1048,7 @@ mod tests {
         let log = Event::Log(LogEvent::from("test message"));
         let mut writer = Cursor::new(Vec::new());
         let encoding = DatadogArchivesEncoding::new(Default::default());
-        let _ = encoding.encode_input(vec![log], &mut writer);
+        _ = encoding.encode_input(vec![log], &mut writer);
         let encoded = writer.into_inner();
         let json: BTreeMap<String, serde_json::Value> =
             serde_json::from_slice(encoded.as_slice()).unwrap();

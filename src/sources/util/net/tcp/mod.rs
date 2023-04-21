@@ -143,7 +143,7 @@ where
 
             let tripwire = cx.shutdown.clone();
             let tripwire = async move {
-                let _ = tripwire.await;
+                _ = tripwire.await;
                 sleep(shutdown_timeout_secs).await;
             }
             .shared();

@@ -468,7 +468,7 @@ where
                 // If the rx end is dropped we still completed
                 // the request so this is a weird case that we can
                 // ignore for now.
-                let _ = tx.send(());
+                _ = tx.send(());
             })
             .instrument(info_span!("request", %request_id).or_current())
             .boxed()

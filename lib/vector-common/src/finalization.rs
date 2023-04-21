@@ -266,7 +266,7 @@ impl OwnedBatchNotifier {
             let status = self.status.load();
             // Ignore the error case, as it will happen during normal
             // source shutdown and we can't detect that here.
-            let _ = notifier.send(status);
+            _ = notifier.send(status);
         }
     }
 }

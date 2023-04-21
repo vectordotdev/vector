@@ -134,7 +134,7 @@ mod tests {
     fn suppress_type_with_id() {
         let mut writer = Vec::new();
 
-        let _ = write_bulk_action(
+        _ = write_bulk_action(
             &mut writer,
             "ACTION",
             "INDEX",
@@ -162,7 +162,7 @@ mod tests {
     fn suppress_type_without_id() {
         let mut writer = Vec::new();
 
-        let _ = write_bulk_action(&mut writer, "ACTION", "INDEX", "TYPE", true, &None);
+        _ = write_bulk_action(&mut writer, "ACTION", "INDEX", "TYPE", true, &None);
 
         let value: serde_json::Value = serde_json::from_slice(&writer).unwrap();
         let value = value.as_object().unwrap();
@@ -182,7 +182,7 @@ mod tests {
     fn type_with_id() {
         let mut writer = Vec::new();
 
-        let _ = write_bulk_action(
+        _ = write_bulk_action(
             &mut writer,
             "ACTION",
             "INDEX",
@@ -211,7 +211,7 @@ mod tests {
     fn type_without_id() {
         let mut writer = Vec::new();
 
-        let _ = write_bulk_action(&mut writer, "ACTION", "INDEX", "TYPE", false, &None);
+        _ = write_bulk_action(&mut writer, "ACTION", "INDEX", "TYPE", false, &None);
 
         let value: serde_json::Value = serde_json::from_slice(&writer).unwrap();
         let value = value.as_object().unwrap();

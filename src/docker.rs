@@ -149,7 +149,7 @@ async fn pull_image(docker: &Docker, image: &str, tag: &str) {
 async fn remove_container(docker: &Docker, id: &str) {
     trace!("Stopping container.");
 
-    let _ = docker
+    _ = docker
         .stop_container(id, None)
         .await
         .map_err(|e| error!(%e));
@@ -157,7 +157,7 @@ async fn remove_container(docker: &Docker, id: &str) {
     trace!("Removing container.");
 
     // Don't panic, as this is unrelated to the test
-    let _ = docker
+    _ = docker
         .remove_container(id, None)
         .await
         .map_err(|e| error!(%e));
