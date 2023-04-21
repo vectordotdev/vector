@@ -269,7 +269,7 @@ impl<'a> IntoIterator for &'a TagValueSet {
 
 // The impl for `Hash` here follows the guarantees for the derived `PartialEq`, The resulting hash
 // will always be the same if the contents compare equal, so we can ignore the clippy lint.
-#[allow(clippy::derive_hash_xor_eq)]
+#[allow(clippy::derived_hash_with_manual_eq)]
 impl Hash for TagValueSet {
     fn hash<H: Hasher>(&self, hasher: &mut H) {
         match self {
