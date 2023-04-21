@@ -12,6 +12,7 @@ use lookup::lookup_v2::{parse_value_path, ValuePath};
 use lookup::{metadata_path, owned_value_path, path, OwnedTargetPath, PathPrefix};
 use snafu::{ResultExt, Snafu};
 use value::kind::merge::{CollisionStrategy, Strategy};
+use value::kind::Collection;
 use value::Kind;
 use vector_common::TimeZone;
 use vector_config::configurable_component;
@@ -357,11 +358,11 @@ impl TransformConfig for RemapConfig {
 
             default_definitions.insert(
                 output_id.clone(),
-                merge_array_definitions(default_definition),
+                move_fields_into_message(merge_array_definitions(default_definition)),
             );
             dropped_definitions.insert(
                 output_id.clone(),
-                merge_array_definitions(dropped_definition),
+                move_fields_into_message(merge_array_definitions(dropped_definition)),
             );
         }
 
@@ -670,6 +671,49 @@ fn push_dropped(
         .set_schema_definition(schema_definition);
 
     output.push_named(DROPPED, event)
+}
+
+/// If the VRL returns a value that is not an array (see [`merge_array_definitions`]),
+/// or an object, that data is moved into the `message` field.
+fn move_fields_into_message(mut definition: schema::Definition) -> schema::Definition {
+    let mut message = Kind::never();
+
+    if definition.event_kind_mut().remove_bytes() {
+        message.add_bytes();
+    }
+    if definition.event_kind_mut().remove_integer() {
+        message.add_integer();
+    }
+    if definition.event_kind_mut().remove_float() {
+        message.add_float();
+    }
+    if definition.event_kind_mut().remove_boolean() {
+        message.add_boolean();
+    }
+    if definition.event_kind_mut().remove_timestamp() {
+        message.add_timestamp();
+    }
+    if definition.event_kind_mut().remove_regex() {
+        message.add_regex();
+    }
+
+    if !message.is_never() {
+        // We need to add the given message type to a field called `message`
+        // in the event.
+        let message = Kind::object(Collection::from(BTreeMap::from([(
+            log_schema().message_key().into(),
+            message,
+        )])));
+
+        definition.event_kind_mut().merge(
+            message,
+            Strategy {
+                collisions: CollisionStrategy::Union,
+            },
+        )
+    }
+
+    definition
 }
 
 /// If the transform returns an array, the elements of this array will be separated
@@ -1641,6 +1685,35 @@ mod tests {
     }
 
     #[test]
+    fn test_field_definitions_in_message() {
+        let definition =
+            schema::Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Legacy]);
+        assert_eq!(
+            schema::Definition::new_with_default_metadata(
+                Kind::object(BTreeMap::from([("message".into(), Kind::bytes())])),
+                [LogNamespace::Legacy]
+            ),
+            move_fields_into_message(definition)
+        );
+
+        // Test when a message field already exists.
+        let definition = schema::Definition::new_with_default_metadata(
+            Kind::object(BTreeMap::from([("message".into(), Kind::integer())])).or_bytes(),
+            [LogNamespace::Legacy],
+        );
+        assert_eq!(
+            schema::Definition::new_with_default_metadata(
+                Kind::object(BTreeMap::from([(
+                    "message".into(),
+                    Kind::bytes().or_integer()
+                )])),
+                [LogNamespace::Legacy]
+            ),
+            move_fields_into_message(definition)
+        )
+    }
+
+    #[test]
     fn test_merged_array_definitions_simple() {
         // Test merging the array definitions where the schema definition
         // is simple, containing only one possible type in the array.
@@ -2015,6 +2088,92 @@ mod tests {
                 .into_iter()
                 .map(|output| output.port)
                 .collect::<HashSet<_>>()
+        );
+    }
+
+    #[test]
+    fn test_non_object_events() {
+        let transform1 = RemapConfig {
+            // This enrichment table does not exist.
+            source: Some(r#". = "fish" "#.to_string()),
+            ..Default::default()
+        };
+
+        let enrichment_tables = enrichment::TableRegistry::default();
+
+        let outputs1 = transform1.outputs(
+            enrichment_tables.clone(),
+            &[(
+                "in".into(),
+                schema::Definition::new_with_default_metadata(
+                    Kind::any_object(),
+                    [LogNamespace::Legacy],
+                ),
+            )],
+            LogNamespace::Legacy,
+        );
+
+        let wanted = schema::Definition::new_with_default_metadata(
+            Kind::any_object(),
+            [LogNamespace::Legacy],
+        )
+        .with_event_field(&owned_value_path!("message"), Kind::bytes(), None);
+
+        assert_eq!(
+            HashMap::from([(OutputId::from("in"), wanted)]),
+            outputs1[0].log_schema_definitions,
+        );
+    }
+
+    #[test]
+    fn test_array_and_non_object_events() {
+        let transform1 = RemapConfig {
+            source: Some(
+                indoc! {r#"
+                    if .lizard == true {
+                        .thing = [{"thung": 42}];
+                        . = unnest(.thing)
+                    } else {
+                      . = "fish"
+                    } 
+                    "#}
+                .to_string(),
+            ),
+            ..Default::default()
+        };
+
+        let enrichment_tables = enrichment::TableRegistry::default();
+
+        let outputs1 = transform1.outputs(
+            enrichment_tables.clone(),
+            &[(
+                "in".into(),
+                schema::Definition::new_with_default_metadata(
+                    Kind::any_object(),
+                    [LogNamespace::Legacy],
+                ),
+            )],
+            LogNamespace::Legacy,
+        );
+
+        let wanted = schema::Definition::new_with_default_metadata(
+            Kind::any_object(),
+            [LogNamespace::Legacy],
+        )
+        .with_event_field(&owned_value_path!("message"), Kind::any(), None)
+        .with_event_field(
+            &owned_value_path!("thing"),
+            Kind::object(Collection::from(BTreeMap::from([(
+                "thung".into(),
+                Kind::integer(),
+            )])))
+            .or_undefined(),
+            None,
+        );
+
+        assert_eq!(
+            HashMap::from([(OutputId::from("in"), wanted)]),
+            outputs1[0].log_schema_definitions,
         );
     }
 }
