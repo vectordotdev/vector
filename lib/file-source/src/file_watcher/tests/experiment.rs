@@ -49,6 +49,7 @@ fn experiment(actions: Vec<FileWatcherAction>) {
         match *action {
             FileWatcherAction::DeleteFile => {
                 _ = fs::remove_file(&path);
+                #[cfg(not(windows))] // Windows will only remove after the file is closed.
                 assert!(!path.exists());
                 fwfiles[0].reset();
                 break;
