@@ -1,0 +1,42 @@
+name: Master Merge Queue Suite
+
+on:
+  merge_group:
+    types: [checks_requested]
+  push:
+    branches:
+      - master
+
+env:
+  AWS_ACCESS_KEY_ID: "dummy"
+  AWS_SECRET_ACCESS_KEY: "dummy"
+  CONTAINER_TOOL: "docker"
+  DD_ENV: "ci"
+  DD_API_KEY: ${{ secrets.DD_API_KEY }}
+  RUST_BACKTRACE: full
+  TEST_LOG: vector=debug
+  VERBOSE: true
+  CI: true
+  PROFILE: debug
+  # observing issues fetching boringssl via HTTPS in the OSX build, seeing if this helps
+  # can be removed when we switch back to the upstream openssl-sys crate
+  CARGO_NET_GIT_FETCH_WITH_CLI: true
+
+jobs:
+  unit-mac:
+    uses: ./.github/workflows/unit_mac.yml
+    secrets: inherit
+
+  master-failure:
+    name: master-failure
+    if: failure() && github.ref == 'refs/heads/master'
+    needs:
+      - unit-mac
+    runs-on: ubuntu-20.04
+    steps:
+    - name: Discord notification
+      env:
+        DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+      uses: Ilshidur/action-discord@0.3.2
+      with:
+        args: "Master merge queue tests failed: <https://github.com/${{github.repository}}/actions/runs/${{github.run_id}}>"
