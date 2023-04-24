@@ -239,7 +239,7 @@ pub async fn build_pieces(
                 if let Err(e) = output {
                     // Immediately send the error to the source's wrapper future, but ignore any
                     // errors during the send, since nested errors wouldn't make any sense here.
-                    let _ = pump_error_tx.send(e);
+                    _ = pump_error_tx.send(e);
                     had_pump_error = true;
                     break;
                 }

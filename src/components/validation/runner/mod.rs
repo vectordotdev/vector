@@ -446,7 +446,7 @@ fn spawn_component_topology(
     config.healthchecks.set_require_healthy(Some(true));
     let config_diff = ConfigDiff::initial(&config);
 
-    let _ = std::thread::spawn(move || {
+    _ = std::thread::spawn(move || {
         let test_runtime = Builder::new_current_thread()
             .enable_all()
             .build()

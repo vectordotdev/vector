@@ -152,7 +152,7 @@ impl FrameStreamReader {
             None
         } else if self.state.expect_control_frame {
             self.state.expect_control_frame = false;
-            let _ = self.handle_control_frame(frame);
+            _ = self.handle_control_frame(frame);
             None
         } else {
             //data frame
@@ -196,7 +196,7 @@ impl FrameStreamReader {
                     }
                     ControlHeader::Start => {
                         //check for content type
-                        let _ = self.process_fields(header, &mut frame)?;
+                        _ = self.process_fields(header, &mut frame)?;
                         //if didn't error, then we are ok to change state
                         self.state.control_state = ControlState::ReadingData;
                         self.state.is_bidirectional = false; //if first message was START then we are unidirectional (no responses)
@@ -208,7 +208,7 @@ impl FrameStreamReader {
                 match header {
                     ControlHeader::Start => {
                         //check for content type
-                        let _ = self.process_fields(header, &mut frame)?;
+                        _ = self.process_fields(header, &mut frame)?;
                         //if didn't error, then we are ok to change state
                         self.state.control_state = ControlState::ReadingData;
                     }
@@ -219,7 +219,7 @@ impl FrameStreamReader {
                 match header {
                     ControlHeader::Stop => {
                         //check there aren't any fields
-                        let _ = self.process_fields(header, &mut frame)?;
+                        _ = self.process_fields(header, &mut frame)?;
                         if self.state.is_bidirectional {
                             //send FINISH frame -- but only if we are bidirectional
                             self.send_control_frame(Self::make_frame(ControlHeader::Finish, None));
@@ -390,7 +390,7 @@ pub fn build_framestream_unix_source(
 
     // system's 'net.core.rmem_max' might have to be changed if socket receive buffer is not updated properly
     if let Some(socket_receive_buffer_size) = frame_handler.socket_receive_buffer_size() {
-        let _ = nix::sys::socket::setsockopt(
+        _ = nix::sys::socket::setsockopt(
             listener.as_raw_fd(),
             nix::sys::socket::sockopt::RcvBuf,
             &(socket_receive_buffer_size),
@@ -405,7 +405,7 @@ pub fn build_framestream_unix_source(
 
     // system's 'net.core.wmem_max' might have to be changed if socket send buffer is not updated properly
     if let Some(socket_send_buffer_size) = frame_handler.socket_send_buffer_size() {
-        let _ = nix::sys::socket::setsockopt(
+        _ = nix::sys::socket::setsockopt(
             listener.as_raw_fd(),
             nix::sys::socket::sockopt::SndBuf,
             &(socket_send_buffer_size),
@@ -762,7 +762,7 @@ mod test {
     ) {
         let mut stream = stream::iter(frames.into_iter());
         //send and send_all consume the sink
-        let _ = sock_sink.send_all(&mut stream).await;
+        _ = sock_sink.send_all(&mut stream).await;
     }
 
     async fn send_control_frame<S: Sink<Bytes, Error = std::io::Error> + Unpin>(
@@ -870,7 +870,7 @@ mod test {
 
         // Ensure source actually shut down successfully.
         signal_shutdown(source_name, &mut shutdown).await;
-        let _ = source_handle.await.unwrap();
+        _ = source_handle.await.unwrap();
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -918,7 +918,7 @@ mod test {
 
         // Ensure source actually shut down successfully.
         signal_shutdown(source_name, &mut shutdown).await;
-        let _ = source_handle.await.unwrap();
+        _ = source_handle.await.unwrap();
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -948,7 +948,7 @@ mod test {
 
         // Ensure source actually shut down successfully.
         signal_shutdown(source_name, &mut shutdown).await;
-        let _ = source_handle.await.unwrap();
+        _ = source_handle.await.unwrap();
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -983,7 +983,7 @@ mod test {
 
         // Ensure source actually shut down successfully.
         signal_shutdown(source_name, &mut shutdown).await;
-        let _ = source_handle.await.unwrap();
+        _ = source_handle.await.unwrap();
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -1041,7 +1041,7 @@ mod test {
 
         // Ensure source actually shut down successfully.
         signal_shutdown(source_name, &mut shutdown).await;
-        let _ = source_handle.await.unwrap();
+        _ = source_handle.await.unwrap();
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -1079,7 +1079,7 @@ mod test {
 
         // Ensure source actually shut down successfully.
         signal_shutdown(source_name, &mut shutdown).await;
-        let _ = source_handle.await.unwrap();
+        _ = source_handle.await.unwrap();
     }
 
     #[tokio::test(flavor = "multi_thread")]

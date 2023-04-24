@@ -179,7 +179,7 @@ fn shutdown_trigger(control_tx: ControlChannel, sink_id: ComponentKey) -> Shutdo
     let (shutdown_tx, shutdown_rx) = oneshot::channel();
 
     tokio::spawn(async move {
-        let _ = shutdown_rx.await;
+        _ = shutdown_rx.await;
         if control_tx
             .send(fanout::ControlMessage::Remove(sink_id.clone()))
             .is_err()

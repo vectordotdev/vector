@@ -91,7 +91,7 @@ mod tests {
 
         // Test one of the AsyncBufRead extension functions
         let mut line_one = String::new();
-        let _ = reader.read_line(&mut line_one).await;
+        _ = reader.read_line(&mut line_one).await;
 
         assert_eq!("First line\n", line_one);
 
@@ -99,7 +99,7 @@ mod tests {
         writer.flush().await.unwrap();
 
         let mut line_two = String::new();
-        let _ = reader.read_line(&mut line_two).await;
+        _ = reader.read_line(&mut line_two).await;
 
         assert_eq!("Second line\n", line_two);
 
@@ -124,7 +124,7 @@ mod tests {
 
         // Test one of the AsyncBufRead extension functions
         let mut line_one = String::new();
-        let _ = reader.read_line(&mut line_one).await;
+        _ = reader.read_line(&mut line_one).await;
 
         assert_eq!("First line\n", line_one);
 
@@ -134,7 +134,7 @@ mod tests {
         writer.flush().await.unwrap();
 
         let mut line_two = String::new();
-        let _ = reader.read_line(&mut line_two).await;
+        _ = reader.read_line(&mut line_two).await;
 
         assert_eq!("", line_two);
 

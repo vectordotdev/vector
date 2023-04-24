@@ -707,7 +707,7 @@ mod test {
             assert!(shutdown_success);
 
             // Ensure source actually shut down successfully.
-            let _ = source_handle.await.unwrap();
+            _ = source_handle.await.unwrap();
         })
         .await;
     }
@@ -1112,7 +1112,7 @@ mod test {
             let (tx, rx) = SourceSender::new_test();
             let address = init_udp(tx, false).await;
 
-            let _ = send_lines_udp(address, vec!["test".to_string()]);
+            _ = send_lines_udp(address, vec!["test".to_string()]);
             let events = collect_n(rx, 1).await;
 
             assert_eq!(
@@ -1148,7 +1148,7 @@ mod test {
             assert!(shutdown_success);
 
             // Ensure source actually shut down successfully.
-            let _ = source_handle.await.unwrap();
+            _ = source_handle.await.unwrap();
         })
         .await;
     }
@@ -1187,7 +1187,7 @@ mod test {
             assert!(shutdown_success);
 
             // Ensure that the source has actually shut down.
-            let _ = source_handle.await.unwrap();
+            _ = source_handle.await.unwrap();
 
             // Stop the pump from sending lines forever.
             run_pump_atomic_sender.store(false, Ordering::Relaxed);

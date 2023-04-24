@@ -185,7 +185,7 @@ mod tests {
         .unwrap();
 
         // Make sure we can build the config
-        let _ = config.build(cx.clone()).await.unwrap();
+        _ = config.build(cx.clone()).await.unwrap();
 
         let addr = next_addr();
         // Swap out the host so we can force send it

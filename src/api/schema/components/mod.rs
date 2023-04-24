@@ -327,7 +327,7 @@ pub fn update_config(config: &Config) {
     existing_component_keys
         .difference(&new_component_keys)
         .for_each(|component_key| {
-            let _ = COMPONENT_CHANGED.send(ComponentChanged::Removed(
+            _ = COMPONENT_CHANGED.send(ComponentChanged::Removed(
                 state::component_by_component_key(component_key)
                     .expect("Couldn't get component by key"),
             ));
@@ -337,7 +337,7 @@ pub fn update_config(config: &Config) {
     new_component_keys
         .difference(&existing_component_keys)
         .for_each(|component_key| {
-            let _ = COMPONENT_CHANGED.send(ComponentChanged::Added(
+            _ = COMPONENT_CHANGED.send(ComponentChanged::Added(
                 new_components.get(component_key).unwrap().clone(),
             ));
         });
