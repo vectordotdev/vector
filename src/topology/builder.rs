@@ -402,12 +402,20 @@ impl<'a> Builder<'a> {
         {
             debug!(component = %key, "Building new transform.");
 
-            let input_definitions = schema::input_definitions(
+            let input_definitions = match schema::input_definitions(
                 &transform.inputs,
                 self.config,
                 enrichment_tables.clone(),
                 &mut definition_cache,
-            );
+            ) {
+                Ok(definitions) => definitions,
+                Err(_) => {
+                    // We have recieved an error whilst retrieving the definitions,
+                    // there is no point in continuing.
+
+                    return;
+                }
+            };
 
             let merged_definition: Definition = input_definitions
                 .iter()
