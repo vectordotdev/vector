@@ -53,7 +53,7 @@ pub fn docker(host: Option<String>, tls: Option<DockerTlsConfig>) -> crate::Resu
                 .and_then(|uri| uri.into_parts().scheme);
 
             match scheme.as_ref().map(|scheme| scheme.as_str()) {
-                Some("http") => {
+                Some("http") | Some("tcp") => {
                     let host = get_authority(&host)?;
                     Docker::connect_with_http(&host, DEFAULT_TIMEOUT, API_DEFAULT_VERSION)
                         .map_err(Into::into)
