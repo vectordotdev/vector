@@ -1,11 +1,9 @@
 name: Unit - Mac
 
 on:
-  merge_group:
-    types: [checks_requested]
-  push:
-    branches:
-      - master
+  workflow_call:
+  issue_comment:
+    types: [created]
 
 concurrency:
   # For pull requests, cancel running workflows, for master, run all
@@ -35,8 +33,7 @@ jobs:
     uses: ./.github/workflows/changes.yml
     secrets: inherit
 
-  test-mac:
-    name: Unit - Mac
+  unit-mac:
     # Full CI suites for this platform were only recently introduced.
     # Some failures are permitted until we can properly correct them.
     continue-on-error: true
@@ -44,7 +41,9 @@ jobs:
     needs: changes
     env:
       CARGO_INCREMENTAL: 0
-    if: ${{ needs.changes.outputs.source == 'true' }}
+    if: |
+      ${{ needs.changes.outputs.source == 'true' }} ||
+      github.event.issue.pull_request && contains(github.event.comment.body, '/ci-deploy-unit-mac')
     steps:
       - uses: actions/checkout@v3
       - uses: actions/cache@v3
