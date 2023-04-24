@@ -259,20 +259,6 @@ impl TransformConfig for RemapConfig {
         let mut default_definitions = HashMap::new();
 
         for (output_id, input_definition) in input_definitions {
-            if input_definition.event_kind().is_never() {
-                // If the input definition is `never` this means that the
-                // upstream component has errored whilst loading (for example,
-                // with a VRL compiler error) this means data will never be
-                // received from that component.
-                //
-                // This will most likely stop Vector from running, but we
-                // want to continue compiling to retrieve diagnostics. We
-                // pass on the `never` definition downstream.
-                default_definitions.insert(output_id.clone(), input_definition.clone());
-                dropped_definitions.insert(output_id.clone(), input_definition.clone());
-                continue;
-            }
-
             let default_definition = compiled
                 .clone()
                 .map(|(state, meaning)| {
@@ -1809,7 +1795,7 @@ mod tests {
             vec![TransformOutput {
                 port: None,
                 ty: DataType::all(),
-                // The `never` definition should have been passod on to the end.
+                // The `never` definition should have been passed on to the end.
                 log_schema_definitions: [(
                     "in".into(),
                     Definition::default_legacy_namespace().with_event_field(
@@ -1841,75 +1827,6 @@ mod tests {
                     Definition::default_legacy_namespace()
                         .with_event_field(&owned_value_path!("thing"), Kind::bytes(), None)
                         .with_event_field(&owned_value_path!("thang"), Kind::bytes(), None),
-                )]
-                .into(),
-            }],
-            outputs2
-        );
-    }
-
-    #[test]
-    fn test_combined_transforms_error() {
-        // Make sure that when getting the definitions from one transform and
-        // passing them to another the correct definition is still produced.
-
-        // Transform 1 loads from a non existent enrichment table.
-        let transform1 = RemapConfig {
-            source: Some(r#". |= get_enrichment_table_record!("invalid", {"id" .id})"#.to_string()),
-            ..Default::default()
-        };
-
-        let transform2 = RemapConfig {
-            source: Some(".thing = .thang".to_string()),
-            ..Default::default()
-        };
-
-        let enrichment_tables = enrichment::TableRegistry::default();
-
-        let outputs1 = transform1.outputs(
-            enrichment_tables.clone(),
-            &[(
-                "in".into(),
-                schema::Definition::default_legacy_namespace().with_event_field(
-                    &owned_value_path!("id"),
-                    Kind::bytes(),
-                    None,
-                ),
-            )],
-            LogNamespace::Legacy,
-        );
-
-        assert_eq!(
-            vec![TransformOutput {
-                port: None,
-                ty: DataType::all(),
-                // The `never` definition should have been passod on to the end.
-                log_schema_definitions: [(
-                    "in".into(),
-                    Definition::new_with_default_metadata(Kind::never(), [LogNamespace::Legacy],)
-                )]
-                .into(),
-            }],
-            outputs1
-        );
-
-        let outputs2 = transform2.outputs(
-            enrichment_tables,
-            &[(
-                "in1".into(),
-                outputs1[0].log_schema_definitions[&"in".into()].clone(),
-            )],
-            LogNamespace::Legacy,
-        );
-
-        assert_eq!(
-            vec![TransformOutput {
-                port: None,
-                ty: DataType::all(),
-                // The `never` definition should have been passod on to the end.
-                log_schema_definitions: [(
-                    "in1".into(),
-                    Definition::new_with_default_metadata(Kind::never(), [LogNamespace::Legacy],)
                 )]
                 .into(),
             }],
@@ -2114,7 +2031,7 @@ mod tests {
         );
 
         let wanted = schema::Definition::new_with_default_metadata(
-            Kind::any_object(),
+            Kind::object(Collection::from_unknown(Kind::undefined())),
             [LogNamespace::Legacy],
         )
         .with_event_field(&owned_value_path!("message"), Kind::bytes(), None);
