@@ -187,6 +187,26 @@ base: components: sinks: amqp: configuration: {
 		required:    true
 		type: string: syntax: "template"
 	}
+	properties: {
+		description: """
+			Configure the AMQP message properties.
+
+			AMQP message properties.
+			"""
+		required: false
+		type: object: options: {
+			content_encoding: {
+				description: "Content-Encoding for the AMQP messages."
+				required:    false
+				type: string: {}
+			}
+			content_type: {
+				description: "Content-Type for the AMQP messages."
+				required:    false
+				type: string: {}
+			}
+		}
+	}
 	routing_key: {
 		description: "Template used to generate a routing key which corresponds to a queue binding."
 		required:    false

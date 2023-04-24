@@ -23,6 +23,7 @@ pub(super) struct AmqpRequest {
     body: Bytes,
     exchange: String,
     routing_key: String,
+    properties: BasicProperties,
     finalizers: EventFinalizers,
     metadata: RequestMetadata,
 }
@@ -32,6 +33,7 @@ impl AmqpRequest {
         body: Bytes,
         exchange: String,
         routing_key: String,
+        properties: BasicProperties,
         finalizers: EventFinalizers,
         metadata: RequestMetadata,
     ) -> Self {
@@ -39,6 +41,7 @@ impl AmqpRequest {
             body,
             exchange,
             routing_key,
+            properties,
             finalizers,
             metadata,
         }
@@ -117,7 +120,7 @@ impl Service<AmqpRequest> for AmqpService {
                     &req.routing_key,
                     BasicPublishOptions::default(),
                     req.body.as_ref(),
-                    BasicProperties::default(),
+                    req.properties,
                 )
                 .await;
 
