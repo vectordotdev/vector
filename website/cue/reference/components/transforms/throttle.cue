@@ -104,10 +104,11 @@ components: transforms: throttle: {
 				{
 					title: "Rate Limited Events"
 					body: """
-						The rate limiter will allow up to `threshold` number of events through and drop any further events
-						for that particular bucket when the rate limiter is at capacity. Any event passed when the rate
-						limiter is at capacity will be discarded and tracked by an `events_discarded_total` metric tagged
-						by the bucket's `key`.
+						The rate limiter will allow events through until `threshold` is reached, where each event's contribution
+						against `threshold` is determined by `mode`. The rate limiter will drop any further events for that
+						particular bucket when the rate limiter is at capacity. Any event passed when the rate limiter is at
+						capacity will be discarded and tracked by an `events_discarded_total` metric tagged by the bucket's
+						`key`.
 						"""
 				},
 			]
