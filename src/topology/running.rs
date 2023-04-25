@@ -685,7 +685,7 @@ impl RunningTopology {
                 // output for the first time, since there's nothing to actually replace at this point.
                 debug!(component = %key, fanout_id = %input, "Adding component input to fanout.");
 
-                let _ = output.send(ControlMessage::Add(key.clone(), tx.clone()));
+                _ = output.send(ControlMessage::Add(key.clone(), tx.clone()));
             } else {
                 // We know that if this component is connected to a given input, and neither
                 // components were changed, then the output must still exist, which means we paused
@@ -693,7 +693,7 @@ impl RunningTopology {
                 // now:
                 debug!(component = %key, fanout_id = %input, "Replacing component input in fanout.");
 
-                let _ = output.send(ControlMessage::Replace(key.clone(), tx.clone()));
+                _ = output.send(ControlMessage::Replace(key.clone(), tx.clone()));
             }
         }
 
@@ -737,14 +737,14 @@ impl RunningTopology {
                     // Case 3: This component is no longer connected to the input from new config.
                     debug!(component = %key, fanout_id = %input, "Removing component input from fanout.");
 
-                    let _ = output.send(ControlMessage::Remove(key.clone()));
+                    _ = output.send(ControlMessage::Remove(key.clone()));
                 } else {
                     // We know that if this component is connected to a given input, and it isn't being
                     // changed, then it will exist when we reconnect inputs, so we should pause it
                     // now to pause further sends through that component until we reconnect:
                     debug!(component = %key, fanout_id = %input, "Pausing component input in fanout.");
 
-                    let _ = output.send(ControlMessage::Pause(key.clone()));
+                    _ = output.send(ControlMessage::Pause(key.clone()));
                 }
             }
         }
@@ -762,7 +762,7 @@ impl RunningTopology {
 
                 let input = self.inputs.get(transform_key).cloned().unwrap();
                 let output = self.outputs.get_mut(&output_id).unwrap();
-                let _ = output.send(ControlMessage::Add(transform_key.clone(), input));
+                _ = output.send(ControlMessage::Add(transform_key.clone(), input));
             }
         }
 
@@ -777,7 +777,7 @@ impl RunningTopology {
 
                 let input = self.inputs.get(sink_key).cloned().unwrap();
                 let output = self.outputs.get_mut(&output_id).unwrap();
-                let _ = output.send(ControlMessage::Add(sink_key.clone(), input));
+                _ = output.send(ControlMessage::Add(sink_key.clone(), input));
             }
         }
     }

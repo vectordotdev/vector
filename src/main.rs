@@ -14,7 +14,7 @@ fn main() {
         let opts = vector::cli::Opts::get_matches()
             .map_err(|error| {
                 // Printing to stdout/err can itself fail; ignore it.
-                let _ = error.print();
+                _ = error.print();
                 exitcode::USAGE
             })
             .unwrap_or_else(|code| {

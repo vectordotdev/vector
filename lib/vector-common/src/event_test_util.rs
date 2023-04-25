@@ -21,7 +21,7 @@ pub fn contains_name_once(pattern: &str) -> Result<(), String> {
                     names.push_str(", ");
                 }
                 n_events += 1;
-                let _ = write!(names, "`{event}`");
+                _ = write!(names, "`{event}`");
             }
         }
         if n_events == 0 {

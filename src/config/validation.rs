@@ -1,4 +1,5 @@
-use crate::{config::schema, topology::schema::possible_definitions};
+use crate::config::schema;
+use crate::topology::schema::merged_definition;
 use futures_util::{stream, FutureExt, StreamExt, TryFutureExt, TryStreamExt};
 use heim::{disk::Partition, units::information::byte};
 use indexmap::IndexMap;
@@ -171,10 +172,7 @@ pub fn check_outputs(config: &ConfigBuilder) -> Result<(), Vec<String>> {
 
         if transform
             .inner
-            .outputs(
-                &[(OutputId::dummy(), definition)],
-                config.schema.log_namespace(),
-            )
+            .outputs(&definition, config.schema.log_namespace())
             .iter()
             .map(|output| output.port.as_deref().unwrap_or(""))
             .any(|name| name == DEFAULT_OUTPUT)
@@ -345,7 +343,7 @@ pub fn warnings(config: &Config) -> Vec<String> {
         transform
             .inner
             .outputs(
-                &possible_definitions(&transform.inputs, config, &mut cache),
+                &merged_definition(&transform.inputs, config, &mut cache),
                 config.schema.log_namespace(),
             )
             .iter()

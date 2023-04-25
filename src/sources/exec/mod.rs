@@ -27,7 +27,7 @@ use vector_core::{config::LegacyKey, EstimatedJsonEncodedSizeOf};
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
-    config::{SourceConfig, SourceContext, SourceOutput},
+    config::{Output, SourceConfig, SourceContext},
     event::Event,
     internal_events::{
         ExecChannelClosedError, ExecCommandExecuted, ExecEventsReceived, ExecFailedError,
@@ -266,7 +266,7 @@ impl SourceConfig for ExecConfig {
         }
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
         let log_namespace = global_log_namespace.merge(Some(self.log_namespace.unwrap_or(false)));
 
         let schema_definition = self
@@ -304,10 +304,7 @@ impl SourceConfig for ExecConfig {
                 None,
             );
 
-        vec![SourceOutput::new_logs(
-            self.decoding.output_type(),
-            schema_definition,
-        )]
+        vec![Output::default(self.decoding.output_type()).with_schema_definition(schema_definition)]
     }
 
     fn can_acknowledge(&self) -> bool {

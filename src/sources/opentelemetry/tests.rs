@@ -48,10 +48,13 @@ async fn receive_grpc_logs_vector_namespace() {
             acknowledgements: Default::default(),
             log_namespace: Some(true),
         };
-        let schema_definitions = source
+        let schema_definition = source
             .outputs(LogNamespace::Vector)
-            .remove(0)
-            .schema_definition(true);
+            .first()
+            .unwrap()
+            .log_schema_definition
+            .clone()
+            .unwrap();
 
         let (sender, logs_output, _) = new_source(EventStatus::Delivered);
         let server = source
@@ -103,12 +106,12 @@ async fn receive_grpc_logs_vector_namespace() {
                 schema_url: "v1".into(),
             }],
         });
-        let _ = client.export(req).await;
+        _ = client.export(req).await;
         let mut output = test_util::collect_ready(logs_output).await;
         // we just send one, so only one output
         assert_eq!(output.len(), 1);
         let event = output.pop().unwrap();
-        schema_definitions.unwrap().assert_valid_for_event(&event);
+        schema_definition.assert_valid_for_event(&event);
 
         assert_eq!(event.as_log().get(".").unwrap(), &vrl::value!("log body"));
 
@@ -185,10 +188,13 @@ async fn receive_grpc_logs_legacy_namespace() {
             acknowledgements: Default::default(),
             log_namespace: Default::default(),
         };
-        let schema_definitions = source
+        let schema_definition = source
             .outputs(LogNamespace::Legacy)
-            .remove(0)
-            .schema_definition(true);
+            .first()
+            .unwrap()
+            .log_schema_definition
+            .clone()
+            .unwrap();
 
         let (sender, logs_output, _) = new_source(EventStatus::Delivered);
         let server = source
@@ -240,14 +246,12 @@ async fn receive_grpc_logs_legacy_namespace() {
                 schema_url: "v1".into(),
             }],
         });
-        let _ = client.export(req).await;
+        _ = client.export(req).await;
         let mut output = test_util::collect_ready(logs_output).await;
         // we just send one, so only one output
         assert_eq!(output.len(), 1);
         let actual_event = output.pop().unwrap();
-        schema_definitions
-            .unwrap()
-            .assert_valid_for_event(&actual_event);
+        schema_definition.assert_valid_for_event(&actual_event);
         let expect_vec = vec_into_btmap(vec![
             (
                 "attributes",

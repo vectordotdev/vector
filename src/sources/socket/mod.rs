@@ -3,7 +3,7 @@ pub mod udp;
 #[cfg(unix)]
 mod unix;
 
-use codecs::{decoding::DeserializerConfig, NewlineDelimitedDecoderConfig};
+use codecs::decoding::DeserializerConfig;
 use lookup::{lookup_v2::OptionalValuePath, owned_value_path};
 use value::{kind::Collection, Kind};
 use vector_config::configurable_component;
@@ -13,7 +13,7 @@ use vector_core::config::{log_schema, LegacyKey, LogNamespace};
 use crate::serde::default_framing_message_based;
 use crate::{
     codecs::DecodingConfig,
-    config::{GenerateConfig, Resource, SourceConfig, SourceContext, SourceOutput},
+    config::{GenerateConfig, Output, Resource, SourceConfig, SourceContext},
     sources::util::net::TcpSource,
     tls::MaybeTlsSettings,
 };
@@ -113,26 +113,18 @@ impl SourceConfig for SocketConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         match self.mode.clone() {
             Mode::Tcp(config) => {
-                let decoding = config.decoding().clone();
-                // TODO: in v0.30.0 , remove the `max_length` setting from
-                // the UnixConfig, and all of the below mess and replace
-                // it with the configured framing /
-                // decoding.default_stream_framing().
-                let framing = match (config.framing().clone(), config.max_length()) {
-                    (Some(framing), Some(_)) => {
-                        warn!(message = "DEPRECATION: The `max_length` setting is deprecated and will be removed in an upcoming release. Since a `framing` setting was provided, the `max_length` setting has no effect.");
-                        framing
-                    }
-                    (Some(framing), None) => framing,
-                    (None, Some(max_length)) => {
-                        warn!(message = "DEPRECATION: The `max_length` setting is deprecated and will be removed in an upcoming release. Please configure the `max_length` from the `framing` setting instead.");
-                        NewlineDelimitedDecoderConfig::new_with_max_length(max_length).into()
-                    }
-                    (None, None) => decoding.default_stream_framing(),
-                };
-
                 let log_namespace = cx.log_namespace(config.log_namespace);
-                let decoder = DecodingConfig::new(framing, decoding, log_namespace).build();
+
+                let decoding = config.decoding().clone();
+                let decoder = DecodingConfig::new(
+                    config
+                        .framing
+                        .clone()
+                        .unwrap_or_else(|| decoding.default_stream_framing()),
+                    decoding,
+                    log_namespace,
+                )
+                .build();
 
                 let tcp = tcp::RawTcpSource::new(config.clone(), decoder, log_namespace);
                 let tls_config = config.tls().as_ref().map(|tls| tls.tls_config.clone());
@@ -190,34 +182,25 @@ impl SourceConfig for SocketConfig {
             }
             #[cfg(unix)]
             Mode::UnixStream(config) => {
-                let decoding = config.decoding.clone();
-
-                // TODO: in v0.30.0 , remove the `max_length` setting from
-                // the UnixConfig, and all of the below mess and replace
-                // it with the configured framing /
-                // decoding.default_stream_framing().
-                let framing = match (config.framing.clone(), config.max_length) {
-                    (Some(framing), Some(_)) => {
-                        warn!(message = "DEPRECATION: The `max_length` setting is deprecated and will be removed in an upcoming release. Since a `framing` setting was provided, the `max_length` setting has no effect.");
-                        framing
-                    }
-                    (Some(framing), None) => framing,
-                    (None, Some(max_length)) => {
-                        warn!(message = "DEPRECATION: The `max_length` setting is deprecated and will be removed in an upcoming release. Please configure the `max_length` from the `framing` setting instead.");
-                        NewlineDelimitedDecoderConfig::new_with_max_length(max_length).into()
-                    }
-                    (None, None) => decoding.default_stream_framing(),
-                };
-
                 let log_namespace = cx.log_namespace(config.log_namespace);
-                let decoder = DecodingConfig::new(framing, decoding, log_namespace).build();
+
+                let decoding = config.decoding().clone();
+                let decoder = DecodingConfig::new(
+                    config
+                        .framing
+                        .clone()
+                        .unwrap_or_else(|| decoding.default_stream_framing()),
+                    decoding,
+                    log_namespace,
+                )
+                .build();
 
                 unix::unix_stream(config, decoder, cx.shutdown, cx.out, log_namespace)
             }
         }
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
         let log_namespace = global_log_namespace.merge(Some(self.log_namespace()));
 
         let schema_definition = self
@@ -309,10 +292,8 @@ impl SourceConfig for SocketConfig {
             }
         };
 
-        vec![SourceOutput::new_logs(
-            self.decoding().output_type(),
-            schema_definition,
-        )]
+        vec![Output::default(self.decoding().output_type())
+            .with_schema_definition(schema_definition)]
     }
 
     fn resources(&self) -> Vec<Resource> {
@@ -333,10 +314,6 @@ impl SourceConfig for SocketConfig {
 
 pub(crate) fn default_host_key() -> OptionalValuePath {
     OptionalValuePath::from(owned_value_path!(log_schema().host_key()))
-}
-
-fn default_max_length() -> Option<usize> {
-    Some(crate::serde::default_max_length())
 }
 
 #[cfg(test)]
@@ -529,7 +506,6 @@ mod test {
             let addr = next_addr();
 
             let mut config = TcpConfig::from_address(addr.into());
-            config.set_max_length(None);
             config.set_framing(Some(
                 NewlineDelimitedDecoderConfig::new_with_max_length(10).into(),
             ));
@@ -731,7 +707,7 @@ mod test {
             assert!(shutdown_success);
 
             // Ensure source actually shut down successfully.
-            let _ = source_handle.await.unwrap();
+            _ = source_handle.await.unwrap();
         })
         .await;
     }
@@ -1026,7 +1002,7 @@ mod test {
             let (tx, rx) = SourceSender::new_test();
             let address = next_addr();
             let mut config = UdpConfig::from_address(address.into());
-            config.max_length = Some(11);
+            config.max_length = 11;
             let address = init_udp_with_config(tx, config).await;
 
             send_lines_udp(
@@ -1062,7 +1038,7 @@ mod test {
             let (tx, rx) = SourceSender::new_test();
             let address = next_addr();
             let mut config = UdpConfig::from_address(address.into());
-            config.max_length = Some(10);
+            config.max_length = 10;
             config.framing = CharacterDelimitedDecoderConfig {
                 character_delimited: CharacterDelimitedDecoderOptions::new(b',', None),
             }
@@ -1136,7 +1112,7 @@ mod test {
             let (tx, rx) = SourceSender::new_test();
             let address = init_udp(tx, false).await;
 
-            let _ = send_lines_udp(address, vec!["test".to_string()]);
+            _ = send_lines_udp(address, vec!["test".to_string()]);
             let events = collect_n(rx, 1).await;
 
             assert_eq!(
@@ -1172,7 +1148,7 @@ mod test {
             assert!(shutdown_success);
 
             // Ensure source actually shut down successfully.
-            let _ = source_handle.await.unwrap();
+            _ = source_handle.await.unwrap();
         })
         .await;
     }
@@ -1211,7 +1187,7 @@ mod test {
             assert!(shutdown_success);
 
             // Ensure that the source has actually shut down.
-            let _ = source_handle.await.unwrap();
+            _ = source_handle.await.unwrap();
 
             // Stop the pump from sending lines forever.
             run_pump_atomic_sender.store(false, Ordering::Relaxed);

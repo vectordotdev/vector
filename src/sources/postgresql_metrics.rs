@@ -31,7 +31,7 @@ use vector_core::config::LogNamespace;
 use vector_core::{metric_tags, ByteSizeOf, EstimatedJsonEncodedSizeOf};
 
 use crate::{
-    config::{SourceConfig, SourceContext, SourceOutput},
+    config::{DataType, Output, SourceConfig, SourceContext},
     event::metric::{Metric, MetricKind, MetricTags, MetricValue},
     internal_events::{
         CollectionCompleted, EndpointBytesReceived, EventsReceived, PostgresqlMetricsCollectError,
@@ -233,8 +233,8 @@ impl SourceConfig for PostgresqlMetricsConfig {
         }))
     }
 
-    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
-        vec![SourceOutput::new_metrics()]
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
+        vec![Output::default(DataType::Metric)]
     }
 
     fn can_acknowledge(&self) -> bool {

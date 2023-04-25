@@ -6,13 +6,16 @@ use std::{
 
 use indexmap::IndexMap;
 use serde_json::{Map, Value};
-use vector_config_common::{attributes::CustomAttribute, schema::*};
+use vector_config_common::{attributes::CustomAttribute, constants, schema::*};
 
 use crate::{
     num::ConfigurableNumber, Configurable, ConfigurableRef, GenerateError, Metadata, ToValue,
 };
 
-use super::visitors::{DisallowedUnevaluatedPropertiesVisitor, InlineSingleUseReferencesVisitor};
+use super::visitors::{
+    DisallowUnevaluatedPropertiesVisitor, GenerateHumanFriendlyNameVisitor,
+    InlineSingleUseReferencesVisitor,
+};
 
 /// Applies metadata to the given schema.
 ///
@@ -315,7 +318,7 @@ pub(crate) fn generate_optional_schema(
     // differentiate a `oneOf` schema that represents a Rust enum versus one that simply represents
     // our "null or X" wrapped schema.
     let mut overrides = Metadata::default();
-    overrides.add_custom_attribute(CustomAttribute::flag("docs::optional"));
+    overrides.add_custom_attribute(CustomAttribute::flag(constants::DOCS_META_OPTIONAL));
     let mut schema = get_or_generate_schema(config, gen, Some(overrides))?;
 
     // Take the metadata and extensions of the original schema.
@@ -482,7 +485,8 @@ pub fn generate_internal_tagged_variant_schema(
 pub fn default_schema_settings() -> SchemaSettings {
     SchemaSettings::new()
         .with_visitor(InlineSingleUseReferencesVisitor::from_settings)
-        .with_visitor(DisallowedUnevaluatedPropertiesVisitor::from_settings)
+        .with_visitor(DisallowUnevaluatedPropertiesVisitor::from_settings)
+        .with_visitor(GenerateHumanFriendlyNameVisitor::from_settings)
 }
 
 pub fn generate_root_schema<T>() -> Result<RootSchema, GenerateError>

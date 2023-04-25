@@ -30,7 +30,7 @@ use vector_core::config::{LegacyKey, LogNamespace};
 
 use super::util::MultilineConfig;
 use crate::{
-    config::{log_schema, DataType, SourceConfig, SourceContext, SourceOutput},
+    config::{log_schema, DataType, Output, SourceConfig, SourceContext},
     docker::{docker, DockerTlsConfig},
     event::{self, merge_state::LogEventMergeState, EstimatedJsonEncodedSizeOf, LogEvent, Value},
     internal_events::{
@@ -112,8 +112,8 @@ pub struct DockerLogsConfig {
     /// Matching is prefix first, so specifying a value of `foo` would match any container named `foo` as well as any
     /// container whose name started with `foo`. This applies equally whether matching container IDs or names.
     ///
-    /// By default, the source will collect logs for all containers. If `include_containers` is configured, only
-    /// containers that match a configured inclusion and are also not excluded will be matched.
+    /// By default, the source collects logs for all containers. If `include_containers` is configured, only
+    /// containers that match a configured inclusion and are also not excluded get matched.
     ///
     /// This can be used in conjunction with `exclude_containers`.
     #[configurable(metadata(
@@ -272,7 +272,7 @@ impl SourceConfig for DockerLogsConfig {
         }))
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
         let host_key = self.host_key.clone().path.map(LegacyKey::Overwrite);
 
         let schema_definition = BytesDeserializerConfig
@@ -351,7 +351,7 @@ impl SourceConfig for DockerLogsConfig {
                 None,
             );
 
-        vec![SourceOutput::new_logs(DataType::Log, schema_definition)]
+        vec![Output::default(DataType::Log).with_schema_definition(schema_definition)]
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -839,7 +839,7 @@ impl EventStreamBuilder {
     fn finish(self, result: Result<ContainerLogInfo, (ContainerId, ErrorPersistence)>) {
         // This can legally fail when shutting down, and any other
         // reason should have been logged in the main future.
-        let _ = self.main_send.send(result);
+        _ = self.main_send.send(result);
     }
 }
 

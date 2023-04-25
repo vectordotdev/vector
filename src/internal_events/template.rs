@@ -15,7 +15,7 @@ impl<'a> InternalEvent for TemplateRenderingError<'a> {
         let mut msg = "Failed to render template".to_owned();
         if let Some(field) = self.field {
             use std::fmt::Write;
-            let _ = write!(msg, " for \"{}\"", field);
+            _ = write!(msg, " for \"{}\"", field);
         }
         msg.push('.');
 

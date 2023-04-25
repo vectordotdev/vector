@@ -6,7 +6,7 @@ use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
 
 use crate::{
-    config::{Resource, SourceConfig, SourceContext, SourceOutput},
+    config::{Output, Resource, SourceConfig, SourceContext},
     serde::default_decoding,
 };
 
@@ -90,7 +90,7 @@ impl SourceConfig for StdinConfig {
         )
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
         let log_namespace = global_log_namespace.merge(self.log_namespace);
 
         outputs(log_namespace, &self.host_key, &self.decoding, Self::NAME)

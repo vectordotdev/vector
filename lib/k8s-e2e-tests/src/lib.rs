@@ -17,7 +17,7 @@ pub mod metrics;
 pub const BUSYBOX_IMAGE: &str = "busybox:1.28";
 
 pub fn init() {
-    let _ = env_logger::builder().is_test(true).try_init();
+    _ = env_logger::builder().is_test(true).try_init();
 }
 
 pub fn get_namespace() -> String {

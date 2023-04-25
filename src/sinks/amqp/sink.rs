@@ -7,7 +7,7 @@ use crate::{
 use async_trait::async_trait;
 use futures::StreamExt;
 use futures_util::stream::BoxStream;
-use lapin::options::ConfirmSelectOptions;
+use lapin::{options::ConfirmSelectOptions, BasicProperties};
 use serde::Serialize;
 use std::sync::Arc;
 use tower::ServiceBuilder;
@@ -15,8 +15,11 @@ use vector_buffers::EventCount;
 use vector_core::{sink::StreamSink, ByteSizeOf, EstimatedJsonEncodedSizeOf};
 
 use super::{
-    config::AmqpSinkConfig, encoder::AmqpEncoder, request_builder::AmqpRequestBuilder,
-    service::AmqpService, BuildError,
+    config::{AmqpPropertiesConfig, AmqpSinkConfig},
+    encoder::AmqpEncoder,
+    request_builder::AmqpRequestBuilder,
+    service::AmqpService,
+    BuildError,
 };
 
 /// Stores the event together with the rendered exchange and routing_key values.
@@ -29,6 +32,7 @@ pub(super) struct AmqpEvent {
     pub(super) event: Event,
     pub(super) exchange: String,
     pub(super) routing_key: String,
+    pub(super) properties: BasicProperties,
 }
 
 impl EventCount for AmqpEvent {
@@ -54,6 +58,7 @@ pub(super) struct AmqpSink {
     pub(super) channel: Arc<lapin::Channel>,
     exchange: Template,
     routing_key: Option<Template>,
+    properties: Option<AmqpPropertiesConfig>,
     transformer: Transformer,
     encoder: crate::codecs::Encoder<()>,
 }
@@ -81,6 +86,7 @@ impl AmqpSink {
             channel: Arc::new(channel),
             exchange: config.exchange,
             routing_key: config.routing_key,
+            properties: config.properties,
             transformer,
             encoder,
         })
@@ -115,10 +121,16 @@ impl AmqpSink {
                 .ok()?,
         };
 
+        let properties = match &self.properties {
+            None => BasicProperties::default(),
+            Some(prop) => prop.build(),
+        };
+
         Some(AmqpEvent {
             event,
             exchange,
             routing_key,
+            properties,
         })
     }
 

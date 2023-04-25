@@ -74,7 +74,7 @@ pub trait RequestBuilder<Input> {
         // of clash-y with `Self::Metadata`.
         let mut compressor = Compressor::from(self.compression());
         let is_compressed = compressor.is_compressed();
-        let _ = self.encoder().encode_input(events, &mut compressor)?;
+        _ = self.encoder().encode_input(events, &mut compressor)?;
 
         let payload = compressor.into_inner().freeze();
         let result = if is_compressed {

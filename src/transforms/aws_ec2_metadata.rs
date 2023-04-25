@@ -18,9 +18,8 @@ use value::Kind;
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
 
-use crate::config::OutputId;
 use crate::{
-    config::{DataType, Input, ProxyConfig, TransformConfig, TransformContext, TransformOutput},
+    config::{DataType, Input, Output, ProxyConfig, TransformConfig, TransformContext},
     event::Event,
     http::HttpClient,
     internal_events::{AwsEc2MetadataRefreshError, AwsEc2MetadataRefreshSuccessful},
@@ -244,11 +243,7 @@ impl TransformConfig for Ec2Metadata {
         Input::new(DataType::Metric | DataType::Log)
     }
 
-    fn outputs(
-        &self,
-        input_definitions: &[(OutputId, schema::Definition)],
-        _: LogNamespace,
-    ) -> Vec<TransformOutput> {
+    fn outputs(&self, merged_definition: &schema::Definition, _: LogNamespace) -> Vec<Output> {
         let added_keys = Keys::new(self.namespace.clone());
 
         let paths = [
@@ -268,24 +263,15 @@ impl TransformConfig for Ec2Metadata {
             &added_keys.tags_key.log_path,
         ];
 
-        let schema_definition = input_definitions
-            .iter()
-            .map(|(output, definition)| {
-                let mut schema_definition = definition.clone();
+        let mut schema_definition = merged_definition.clone();
 
-                for path in paths {
-                    schema_definition =
-                        schema_definition.with_field(path, Kind::bytes().or_undefined(), None);
-                }
+        for path in paths {
+            schema_definition =
+                schema_definition.with_field(path, Kind::bytes().or_undefined(), None);
+        }
 
-                (output.clone(), schema_definition)
-            })
-            .collect();
-
-        vec![TransformOutput::new(
-            DataType::Metric | DataType::Log,
-            schema_definition,
-        )]
+        vec![Output::default(DataType::Metric | DataType::Log)
+            .with_schema_definition(schema_definition)]
     }
 }
 

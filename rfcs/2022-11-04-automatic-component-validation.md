@@ -249,7 +249,7 @@ what the sink is sending. While the existing encoding/decoding enums --  where w
 standard supported codecs -- do not have parity between each other to seamlessly facilitate this,
 we'll look to remedy that situation as part of the work to actually implement support for each of
 these codecs. There's no fundamental reason why all of the currently supported encodings cannot have
-reciprocal decoders, and vise versa.
+reciprocal decoders, and vice versa.
 
 #### Test cases
 

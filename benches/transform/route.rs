@@ -12,7 +12,7 @@ use vector::transforms::{
     TransformOutputsBuf,
 };
 use vector_core::{
-    config::{DataType, TransformOutput},
+    config::{DataType, Output},
     event::{Event, EventContainer, EventMetadata, LogEvent},
     transform::{SyncTransform, TransformContext},
 };
@@ -54,10 +54,10 @@ fn route(c: &mut Criterion) {
         "bba", "bbca", "dba", "bea", "fba", "gba", "hba", "iba", "jba", "bka", "bal", "bma", "bna",
         "boa", "bpa", "bqa", "bra", "bsa", "bta", "bua", "bva", "bwa", "xba", "aby", "zba",
     ] {
-        outputs.push(TransformOutput {
+        outputs.push(Output {
             port: Some(String::from(name)),
             ty: DataType::Log,
-            log_schema_definitions: Vec::new(),
+            log_schema_definition: None,
         });
     }
     let output_buffer: TransformOutputsBuf = TransformOutputsBuf::new_with_capacity(outputs, 10);

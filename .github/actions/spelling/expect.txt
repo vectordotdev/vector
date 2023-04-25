@@ -723,6 +723,7 @@ MAINPID
 majorly
 MAKECMDGOALS
 Makefiles
+markability
 markdownify
 markdownlintrc
 marketo
@@ -1137,7 +1138,6 @@ sinkbuilder
 sinknetworkbytessent
 sizecache
 Sizefor
-skaffold
 skinparam
 SKIPDATA
 skywalking

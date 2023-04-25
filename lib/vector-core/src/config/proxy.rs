@@ -356,4 +356,25 @@ mod tests {
             expected_header_value.as_ref().ok()
         );
     }
+
+    #[ignore]
+    #[test]
+    fn build_proxy_with_special_chars_url_encoded() {
+        let config = ProxyConfig {
+            http: Some("http://user:P%40ssw0rd@1.2.3.4:5678".into()),
+            https: Some("https://user:P%40ssw0rd@2.3.4.5:9876".into()),
+            ..Default::default()
+        };
+        let first = config
+            .http_proxy()
+            .expect("should not be an error")
+            .expect("should not be None");
+        let encoded_header = format!("Basic {}", BASE64_STANDARD.encode("user:P@ssw0rd"));
+        let expected_header_value = HeaderValue::from_str(encoded_header.as_str());
+
+        assert_eq!(
+            first.headers().get("authorization"),
+            expected_header_value.as_ref().ok()
+        );
+    }
 }

@@ -110,7 +110,7 @@ impl<T> Generational<T> {
         F: Fn(&T) -> V,
     {
         let result = f(&self.inner);
-        let _ = self.gen.fetch_add(1, Ordering::AcqRel);
+        _ = self.gen.fetch_add(1, Ordering::AcqRel);
         result
     }
 }
