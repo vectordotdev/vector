@@ -704,7 +704,8 @@ fn move_fields_into_message(mut definition: schema::Definition) -> schema::Defin
 
 /// If the transform returns an array, the elements of this array will be separated
 /// out into it's individual elements and passed downstream.
-/// The potential types that the transform can output could be any of the arrays
+///
+/// The potential types that the transform can output are any of the arrays
 /// elements or any non-array elements that are within the definition. All these
 /// definitions need to be merged together.
 fn merge_array_definitions(mut definition: schema::Definition) -> schema::Definition {
