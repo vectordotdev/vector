@@ -20,7 +20,7 @@ use crate::{
         filter::{self, filter_items},
         relay, sort,
     },
-    config::{transform_output_ids, ComponentKey, Config},
+    config::{get_transform_output_ids, ComponentKey, Config},
     filter_check,
 };
 
@@ -289,7 +289,7 @@ pub fn update_config(config: &Config) {
                 component_key: component_key.clone(),
                 component_type: transform.inner.get_component_name().to_string(),
                 inputs: transform.inputs.clone(),
-                outputs: transform_output_ids(
+                outputs: get_transform_output_ids(
                     transform.inner.as_ref(),
                     "".into(),
                     config.schema.log_namespace(),

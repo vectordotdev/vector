@@ -265,8 +265,6 @@ impl Definition {
     /// A non-root required field means the root type must be an object, so the type will be automatically
     /// restricted to an object.
     ///
-    /// Raises a warning if the path is not root, and the definition does not allow the type to be an object.
-    ///
     /// # Panics
     /// - If the path is not root, and the definition does not allow the type to be an object.
     /// - Provided path has one or more coalesced segments (e.g. `.(foo | bar)`).
@@ -328,8 +326,6 @@ impl Definition {
     /// Add type information for an event field.
     /// A non-root required field means the root type must be an object, so the type will be automatically
     /// restricted to an object.
-    ///
-    /// Raises a warning if the path is not root, and the definition does not allow the type to be an object.
     ///
     /// # Panics
     /// - If the path is not root, and the definition does not allow the type to be an object

@@ -20,7 +20,7 @@ pub use self::unit_test_components::{
     UnitTestSinkCheck, UnitTestSinkConfig, UnitTestSinkResult, UnitTestSourceConfig,
     UnitTestStreamSinkConfig, UnitTestStreamSourceConfig,
 };
-use super::{compiler::expand_globs, graph::Graph, transform::transform_output_ids, OutputId};
+use super::{compiler::expand_globs, graph::Graph, transform::get_transform_output_ids, OutputId};
 use crate::{
     conditions::Condition,
     config::{
@@ -186,7 +186,7 @@ impl UnitTestBuildMetadata {
             .transforms
             .iter()
             .flat_map(|(key, transform)| {
-                transform_output_ids(
+                get_transform_output_ids(
                     transform.inner.as_ref(),
                     key.clone(),
                     builder.schema.log_namespace(),
@@ -454,7 +454,7 @@ async fn build_unit_test(
 fn get_loose_end_outputs_sink(config: &ConfigBuilder) -> Option<SinkOuter<String>> {
     let config = config.clone();
     let transform_ids = config.transforms.iter().flat_map(|(key, transform)| {
-        transform_output_ids(
+        get_transform_output_ids(
             transform.inner.as_ref(),
             key.clone(),
             config.schema.log_namespace(),

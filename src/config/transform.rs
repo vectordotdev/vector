@@ -240,7 +240,7 @@ dyn_clone::clone_trait_object!(TransformConfig);
 
 /// Often we want to call outputs just to retreive the OutputId's without needing
 /// the schema definitions.
-pub fn transform_output_ids<T: TransformConfig + ?Sized>(
+pub fn get_transform_output_ids<T: TransformConfig + ?Sized>(
     transform: &T,
     key: ComponentKey,
     global_log_namespace: LogNamespace,

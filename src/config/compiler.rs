@@ -1,8 +1,8 @@
 use indexmap::IndexSet;
 
 use super::{
-    builder::ConfigBuilder, graph::Graph, id::Inputs, transform::transform_output_ids, validation,
-    Config, OutputId,
+    builder::ConfigBuilder, graph::Graph, id::Inputs, transform::get_transform_output_ids,
+    validation, Config, OutputId,
 };
 
 pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<String>> {
@@ -138,7 +138,7 @@ pub(crate) fn expand_globs(config: &mut ConfigBuilder) {
                 })
         })
         .chain(config.transforms.iter().flat_map(|(key, t)| {
-            transform_output_ids(t.inner.as_ref(), key.clone(), config.schema.log_namespace())
+            get_transform_output_ids(t.inner.as_ref(), key.clone(), config.schema.log_namespace())
         }))
         .map(|output_id| output_id.to_string())
         .collect::<IndexSet<String>>();

@@ -6,7 +6,7 @@ use std::{collections::HashMap, path::PathBuf};
 use vector_core::internal_event::DEFAULT_OUTPUT;
 
 use super::{
-    builder::ConfigBuilder, transform::transform_output_ids, ComponentKey, Config, OutputId,
+    builder::ConfigBuilder, transform::get_transform_output_ids, ComponentKey, Config, OutputId,
     Resource,
 };
 
@@ -172,7 +172,7 @@ pub fn check_outputs(config: &ConfigBuilder) -> Result<(), Vec<String>> {
             errors.extend(errs.into_iter().map(|msg| format!("Transform {key} {msg}")));
         }
 
-        if transform_output_ids(
+        if get_transform_output_ids(
             transform.inner.as_ref(),
             "dummy".into(),
             config.schema.log_namespace(),
@@ -341,7 +341,7 @@ pub fn warnings(config: &Config) -> Vec<String> {
             .collect::<Vec<_>>()
     });
     let transform_ids = config.transforms.iter().flat_map(|(key, transform)| {
-        transform_output_ids(
+        get_transform_output_ids(
             transform.inner.as_ref(),
             key.clone(),
             config.schema.log_namespace(),
