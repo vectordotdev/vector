@@ -34,6 +34,7 @@ jobs:
     secrets: inherit
 
   unit-mac:
+    #name: Unit - Mac
     # Full CI suites for this platform were only recently introduced.
     # Some failures are permitted until we can properly correct them.
     continue-on-error: true

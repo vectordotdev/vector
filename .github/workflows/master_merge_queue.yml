@@ -1,6 +1,8 @@
 name: Master Merge Queue Suite
 
 on:
+  # TODO remove before merging
+  pull_request:
   merge_group:
     types: [checks_requested]
   push:
@@ -27,11 +29,16 @@ jobs:
     uses: ./.github/workflows/unit_mac.yml
     secrets: inherit
 
+  check-msrv:
+    uses: ./.github/workflows/msrv.yml
+    secrets: inherit
+
   master-failure:
     name: master-failure
     if: failure() && github.ref == 'refs/heads/master'
     needs:
       - unit-mac
+      - check-msrv
     runs-on: ubuntu-20.04
     steps:
     - name: Discord notification

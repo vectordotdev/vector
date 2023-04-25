@@ -1,0 +1,36 @@
+name: Check minimum supported Rust version
+
+on:
+  workflow_call:
+
+concurrency:
+  # For pull requests, cancel running workflows, for master, run all
+  #
+  # `github.event.number` exists for pull requests, otherwise fall back to SHA
+  # for master
+  group: ${{ github.workflow }}-${{ github.event.number || github.sha }}
+  cancel-in-progress: true
+
+env:
+  RUST_BACKTRACE: full
+  CI: true
+  PROFILE: debug
+  # observing issues fetching boringssl via HTTPS in the OSX build, seeing if this helps
+  # can be removed when we switch back to the upstream openssl-sys crate
+  CARGO_NET_GIT_FETCH_WITH_CLI: true
+
+jobs:
+  changes:
+    uses: ./.github/workflows/changes.yml
+    secrets: inherit
+
+  check-msrv:
+    name: Check minimum supported Rust version
+    runs-on: [linux, ubuntu-latest]
+    needs: changes
+    if: ${{ needs.changes.outputs.source == 'true' }}
+    steps:
+      - uses: actions/checkout@v3
+      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: cargo install cargo-msrv --version 0.15.1
+      - run: cargo msrv verify

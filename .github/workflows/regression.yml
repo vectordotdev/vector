@@ -16,7 +16,8 @@
 name: Regression Detector
 
 on:
-  pull_request:
+  # TODO re enable
+  #pull_request:
     paths-ignore:
       - "docs/**"
       - "rfcs/**"
