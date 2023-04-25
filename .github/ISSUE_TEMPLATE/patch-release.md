@@ -10,6 +10,7 @@ Before the release:
 - [ ] Create a new release preparation branch from the current release branch
   - `git fetch && git checkout v0.<current minor version> && git checkout -b prepare-v0.<new version number>`
 - [ ] Cherry-pick in all commits to be released from the associated release milestone
+  - If any merge conflicts occur, attempt to solve them and if needed enist the aid of those familiar with the conflicting commits. 
 - [ ] Run `cargo vdev build release-cue` to generate a new cue file for the release
 - [ ] Add `changelog` key to generated cue file
   - [ ] `git log --no-merges --cherry-pick --right-only <last release tag>...`
@@ -32,9 +33,11 @@ On the day of release:
 - [ ] Rebase the release preparation branch on the release branch
     - [ ] Ensure release date in cue matches current date.
     - [ ] Squash the release preparation commits (but not the cherry-picked commits!) to a single
-        commit. This makes it easier to cherry-pick to master after the release. 
+        commit. This makes it easier to cherry-pick to master after the release.
 - [ ] Merge release preparation branch into the release branch
     - `git co v0.<current minor version> && git merge --ff-only prepare-v0.<current minor version>.<patch>`
+- [ ] Push the release branch to update the remote
+    - (This should close the preparation branch PR)
 - [ ] Tag new release
   - [ ] `git tag v0.<minor>.<patch> -a -m v0.<minor>.<patch>`
   - [ ] `git push origin v0.<minor>.<patch>`
