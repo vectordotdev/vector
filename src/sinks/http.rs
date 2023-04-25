@@ -631,7 +631,7 @@ mod tests {
 
         let cx = SinkContext::new_test();
 
-        let _ = config.build(cx).await.unwrap();
+        _ = config.build(cx).await.unwrap();
     }
 
     #[tokio::test]

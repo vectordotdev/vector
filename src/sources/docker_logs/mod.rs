@@ -839,7 +839,7 @@ impl EventStreamBuilder {
     fn finish(self, result: Result<ContainerLogInfo, (ContainerId, ErrorPersistence)>) {
         // This can legally fail when shutting down, and any other
         // reason should have been logged in the main future.
-        let _ = self.main_send.send(result);
+        _ = self.main_send.send(result);
     }
 }
 

@@ -474,7 +474,7 @@ async fn create_client_test() -> CloudwatchLogsClient {
 
 async fn ensure_group() {
     let client = create_client_test().await;
-    let _ = client
+    _ = client
         .create_log_group()
         .log_group_name(GROUP_NAME)
         .send()

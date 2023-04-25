@@ -103,7 +103,7 @@ async fn receive_grpc_logs_vector_namespace() {
                 schema_url: "v1".into(),
             }],
         });
-        let _ = client.export(req).await;
+        _ = client.export(req).await;
         let mut output = test_util::collect_ready(logs_output).await;
         // we just send one, so only one output
         assert_eq!(output.len(), 1);
@@ -240,7 +240,7 @@ async fn receive_grpc_logs_legacy_namespace() {
                 schema_url: "v1".into(),
             }],
         });
-        let _ = client.export(req).await;
+        _ = client.export(req).await;
         let mut output = test_util::collect_ready(logs_output).await;
         // we just send one, so only one output
         assert_eq!(output.len(), 1);

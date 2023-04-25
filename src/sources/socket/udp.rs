@@ -215,7 +215,7 @@ pub(super) fn udp(
                             Ok((mut events, _byte_size)) => {
                                 if last && truncated {
                                     // The last event in this payload was truncated, so we want to drop it.
-                                    let _ = events.pop();
+                                    _ = events.pop();
                                     warn!(
                                         message = "Discarding frame larger than max_length.",
                                         max_length = max_length,

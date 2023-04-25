@@ -368,6 +368,7 @@ nixpkgs
 nokia
 nslookup
 nsupdate
+ntapi
 ntfs
 opendal
 opensearch

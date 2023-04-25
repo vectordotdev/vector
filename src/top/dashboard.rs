@@ -361,12 +361,12 @@ pub async fn init_dashboard<'a>(
             },
             k = key_press_rx.recv() => {
                 if let KeyCode::Esc | KeyCode::Char('q') = k.unwrap() {
-                    let _ = key_press_kill_tx.send(());
+                    _ = key_press_kill_tx.send(());
                     break
                 }
             }
             _ = &mut shutdown_rx => {
-                let _ = key_press_kill_tx.send(());
+                _ = key_press_kill_tx.send(());
                 break
             }
         }
