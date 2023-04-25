@@ -189,6 +189,8 @@ async fn haproxy() -> Result<(), Box<dyn std::error::Error>> {
     const CONFIG: &str = indoc! {r#"
         haproxy:
           enabled: true
+          image:
+            tag: "2.6.12"
     "#};
 
     let vector_aggregator = framework
