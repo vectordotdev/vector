@@ -10,7 +10,7 @@ Before the release:
 - [ ] Create a new release preparation branch from the current release branch
   - `git fetch && git checkout v0.<current minor version> && git checkout -b prepare-v0.<new version number>`
 - [ ] Cherry-pick in all commits to be released from the associated release milestone
-  - If any merge conflicts occur, attempt to solve them and if needed enist the aid of those familiar with the conflicting commits. 
+  - If any merge conflicts occur, attempt to solve them and if needed enlist the aid of those familiar with the conflicting commits. 
 - [ ] Run `cargo vdev build release-cue` to generate a new cue file for the release
 - [ ] Add `changelog` key to generated cue file
   - [ ] `git log --no-merges --cherry-pick --right-only <last release tag>...`
