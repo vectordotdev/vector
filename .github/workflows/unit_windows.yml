@@ -26,7 +26,7 @@ jobs:
     runs-on: [windows, windows-2019-8core]
     if: |
       !github.event.pull_request
-        || github.event.issue.pull_request && contains(github.event.comment.body, '/ci-deploy-unit-windows')
+        || github.event.issue.pull_request && contains(github.event.payload.comment.body, '/ci-deploy-unit-windows')
     steps:
       - uses: actions/checkout@v3
       - run: .\scripts\environment\bootstrap-windows-2019.ps1

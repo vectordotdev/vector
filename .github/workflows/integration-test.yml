@@ -59,7 +59,7 @@ jobs:
 #        || contains(github.event.pull_request.labels.*.name, 'ci-condition: integration tests enable')
     if: |
       !github.event.pull_request
-        || github.event.issue.pull_request && contains(github.event.comment.body, '/ci-deploy-integration-tests')
+        || github.event.issue.pull_request && contains(github.event.payload.comment.body, '/ci-deploy-integration-tests')
     strategy:
       fail-fast: false
       matrix:

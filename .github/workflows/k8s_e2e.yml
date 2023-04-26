@@ -51,7 +51,7 @@ jobs:
     runs-on: [linux, ubuntu-20.04-8core]
     if: |
       !github.event.pull_request
-        || github.event.issue.pull_request && contains(github.event.comment.body, '/ci-deploy-k8s-tests')
+        || github.event.issue.pull_request && contains(github.event.payload.comment.body, '/ci-deploy-k8s-tests')
     # cargo-deb requires a release build, but we don't need optimizations for tests
     env:
       CARGO_PROFILE_RELEASE_OPT_LEVEL: 0
@@ -88,7 +88,7 @@ jobs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     if: |
       !github.event.pull_request
-        || github.event.issue.pull_request && contains(github.event.comment.body, '/ci-deploy-k8s-tests')
+        || github.event.issue.pull_request && contains(github.event.payload.comment.body, '/ci-deploy-k8s-tests')
     steps:
       - uses: actions/github-script@v6.4.1
         id: set-matrix
