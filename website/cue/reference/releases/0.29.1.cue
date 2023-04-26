@@ -16,10 +16,9 @@ releases: "0.29.1": {
 			type: "fix"
 			scopes: ["transforms"]
 			description: """
-				Configurations containing a chain of at least two transforms no longer
-				result in a panic at startup.
+				Certain configurations containing a chain of at least two `remap` transforms no
+				longer result in a panic at startup.
 				"""
-			contributors: ["StephenWakely"]
 			pr_numbers: [17146]
 		},
 	]
