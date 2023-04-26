@@ -30,22 +30,24 @@ Before the release:
 
 On the day of release:
 
+- [ ] Ensure release date in cue matches current date.
 - [ ] Rebase the release preparation branch on the release branch
-    - [ ] Ensure release date in cue matches current date.
-    - [ ] Squash the release preparation commits (but not the cherry-picked commits!) to a single
-        commit. This makes it easier to cherry-pick to master after the release.
+  - Squash the release preparation commits (but not the cherry-picked commits!) to a single
+    commit. This makes it easier to cherry-pick to master after the release.
+  - `git checkout prepare-v0.<new version number> && git rebase -i v0.<current minor version>`
 - [ ] Merge release preparation branch into the release branch
-    - `git co v0.<current minor version> && git merge --ff-only prepare-v0.<current minor version>.<patch>`
-- [ ] Push the release branch to update the remote
-    - (This should close the preparation branch PR)
+  - `git co v0.<current minor version> && git merge --ff-only prepare-v0.<current minor version>.<patch>`
 - [ ] Tag new release
   - [ ] `git tag v0.<minor>.<patch> -a -m v0.<minor>.<patch>`
   - [ ] `git push origin v0.<minor>.<patch>`
 - [ ] Wait for release workflow to complete
   - Discoverable via [https://github.com/timberio/vector/actions/workflows/release.yml](https://github.com/timberio/vector/actions/workflows/release.yml)
+- [ ] Push the release branch to update the remote (This should close the preparation branch PR).
+  - `git checkout v0.<current minor version> && git push`
 - [ ] Release updated Helm chart. See [releasing Helm chart](https://github.com/vectordotdev/helm-charts#releasing).
 - [ ] Once Helm chart is released, updated Vector manifests
-    - Run `cargo vdev build manifests` and open a PR with changes
+  - Run `cargo vdev build manifests` and open a PR with changes
 - [ ] Add docker images to [https://github.com/DataDog/images](https://github.com/DataDog/images/tree/master/vector) to have them available internally.
+  - Follow the [instructions at the top of the mirror.yaml file](https://github.com/DataDog/images/blob/fbf12868e90d52e513ebca0389610dea8a3c7e1a/mirror.yaml#L33-L49). 
 - [ ] Cherry-pick any release commits from the release branch that are not on `master`, to `master`
 - [ ] Kick-off post-mortems for any regressions resolved by the release
