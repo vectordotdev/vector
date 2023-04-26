@@ -1,6 +1,7 @@
 name: Master Merge Queue Test Suite
 
 on:
+  workflow_dispatch:
   # TODO remove before merging
   #pull_request:
   merge_group:
