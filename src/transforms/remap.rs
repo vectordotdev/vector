@@ -1845,7 +1845,7 @@ mod tests {
             source: Some(
                 indoc! {
                 r#"
-                .thing = [{"thung": 32}, {"theng": 45}]
+                .thing = [{"cabbage": 32}, {"parsnips": 45}]
                 . = unnest(.thing)
                 "#
                 }
@@ -1855,7 +1855,7 @@ mod tests {
         };
 
         let transform2 = RemapConfig {
-            source: Some(r#".thang = .thing.thung || "beetroot""#.to_string()),
+            source: Some(r#".thang = .thing.cabbage || "beetroot""#.to_string()),
             ..Default::default()
         };
 
@@ -1886,8 +1886,8 @@ mod tests {
                     .with_event_field(
                         &owned_value_path!("thing"),
                         Kind::object(Collection::from(BTreeMap::from([
-                            ("thung".into(), Kind::integer().or_undefined(),),
-                            ("theng".into(), Kind::integer().or_undefined(),)
+                            ("cabbage".into(), Kind::integer().or_undefined(),),
+                            ("parsnips".into(), Kind::integer().or_undefined(),)
                         ]))),
                         None
                     ),
@@ -1916,8 +1916,8 @@ mod tests {
                         .with_event_field(
                             &owned_value_path!("thing"),
                             Kind::object(Collection::from(BTreeMap::from([
-                                ("thung".into(), Kind::integer().or_undefined(),),
-                                ("theng".into(), Kind::integer().or_undefined(),)
+                                ("cabbage".into(), Kind::integer().or_undefined(),),
+                                ("parsnips".into(), Kind::integer().or_undefined(),)
                             ]))),
                             None
                         )
@@ -2049,7 +2049,7 @@ mod tests {
             source: Some(
                 indoc! {r#"
                     if .lizard == true {
-                        .thing = [{"thung": 42}];
+                        .thing = [{"cabbage": 42}];
                         . = unnest(.thing)
                     } else {
                       . = "fish"
@@ -2082,7 +2082,7 @@ mod tests {
         .with_event_field(
             &owned_value_path!("thing"),
             Kind::object(Collection::from(BTreeMap::from([(
-                "thung".into(),
+                "cabbage".into(),
                 Kind::integer(),
             )])))
             .or_undefined(),

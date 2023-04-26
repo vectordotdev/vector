@@ -410,7 +410,7 @@ impl<'a> Builder<'a> {
             ) {
                 Ok(definitions) => definitions,
                 Err(_) => {
-                    // We have recieved an error whilst retrieving the definitions,
+                    // We have received an error whilst retrieving the definitions,
                     // there is no point in continuing.
 
                     return;

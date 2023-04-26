@@ -238,7 +238,7 @@ pub trait TransformConfig: DynClone + NamedComponent + core::fmt::Debug + Send +
 
 dyn_clone::clone_trait_object!(TransformConfig);
 
-/// Often we want to call outputs just to retreive the OutputId's without needing
+/// Often we want to call outputs just to retrieve the OutputId's without needing
 /// the schema definitions.
 pub fn get_transform_output_ids<T: TransformConfig + ?Sized>(
     transform: &T,
