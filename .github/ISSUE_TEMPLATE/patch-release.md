@@ -10,7 +10,7 @@ Before the release:
 - [ ] Create a new release preparation branch from the current release branch
   - `git fetch && git checkout v0.<current minor version> && git checkout -b prepare-v0.<new version number>`
 - [ ] Cherry-pick in all commits to be released from the associated release milestone
-  - If any merge conflicts occur, attempt to solve them and if needed enlist the aid of those familiar with the conflicting commits. 
+  - If any merge conflicts occur, attempt to solve them and if needed enlist the aid of those familiar with the conflicting commits.
 - [ ] Run `cargo vdev build release-cue` to generate a new cue file for the release
 - [ ] Add `changelog` key to generated cue file
   - [ ] `git log --no-merges --cherry-pick --right-only <last release tag>...`
@@ -48,6 +48,6 @@ On the day of release:
 - [ ] Once Helm chart is released, updated Vector manifests
   - Run `cargo vdev build manifests` and open a PR with changes
 - [ ] Add docker images to [https://github.com/DataDog/images](https://github.com/DataDog/images/tree/master/vector) to have them available internally.
-  - Follow the [instructions at the top of the mirror.yaml file](https://github.com/DataDog/images/blob/fbf12868e90d52e513ebca0389610dea8a3c7e1a/mirror.yaml#L33-L49). 
+  - Follow the [instructions at the top of the mirror.yaml file](https://github.com/DataDog/images/blob/fbf12868e90d52e513ebca0389610dea8a3c7e1a/mirror.yaml#L33-L49).
 - [ ] Cherry-pick any release commits from the release branch that are not on `master`, to `master`
 - [ ] Kick-off post-mortems for any regressions resolved by the release
