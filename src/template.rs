@@ -68,7 +68,7 @@ pub struct Template {
     reserve_size: usize,
 
     #[serde(skip)]
-    path_tz: Option<Tz>,
+    timezone: Option<Tz>,
 }
 
 impl TryFrom<&str> for Template {
@@ -122,7 +122,7 @@ impl TryFrom<Cow<'_, str>> for Template {
                 src: src.into_owned(),
                 is_static,
                 reserve_size,
-                path_tz: Some(UTC),
+                timezone: Some(UTC),
             }
         })
     }
@@ -145,8 +145,8 @@ impl ConfigurableString for Template {}
 
 impl Template {
     /// set tz offset
-    pub const fn with_path_tz(mut self, path_tz: Tz) -> Self {
-        self.path_tz = Some(path_tz);
+    pub const fn with_timezone(mut self, timezone: Tz) -> Self {
+        self.timezone = Some(timezone);
         self
     }
     /// Renders the given template with data from the event.
@@ -176,7 +176,7 @@ impl Template {
             match part {
                 Part::Literal(lit) => out.push_str(lit),
                 Part::Strftime(items) => {
-                    out.push_str(&render_timestamp(items, event, self.path_tz.unwrap()))
+                    out.push_str(&render_timestamp(items, event, self.timezone.unwrap()))
                 }
                 Part::Reference(key) => {
                     out.push_str(
@@ -354,7 +354,7 @@ fn render_metric_field<'a>(key: &str, metric: &'a Metric) -> Option<&'a str> {
     }
 }
 
-fn render_timestamp(items: &ParsedStrftime, event: EventRef<'_>, path_tz: Tz) -> String {
+fn render_timestamp(items: &ParsedStrftime, event: EventRef<'_>, timezone: Tz) -> String {
     match event {
         EventRef::Log(log) => log_schema().timestamp_key().and_then(|timestamp_key| {
             log.get((PathPrefix::Event, timestamp_key))
@@ -370,7 +370,7 @@ fn render_timestamp(items: &ParsedStrftime, event: EventRef<'_>, path_tz: Tz) ->
         }),
     }
     .unwrap_or_else(Utc::now)
-    .with_timezone(&path_tz)
+    .with_timezone(&timezone)
     .format_with_items(items.as_items())
     .to_string()
 }
@@ -677,7 +677,7 @@ mod tests {
     }
 
     #[test]
-    fn render_log_with_path_tz() {
+    fn render_log_with_timezone() {
         let ts = Utc.with_ymd_and_hms(2001, 2, 3, 4, 5, 6).unwrap();
 
         let template = Template::try_from("vector-%Y-%m-%d-%H.log").unwrap();
@@ -693,7 +693,7 @@ mod tests {
         let tz = "Asia/Singapore".parse().unwrap();
         assert_eq!(
             Ok(Bytes::from("vector-2001-02-03-12.log")),
-            template.with_path_tz(tz).render(&event)
+            template.with_timezone(tz).render(&event)
         );
     }
 
