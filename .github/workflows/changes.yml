@@ -1,4 +1,4 @@
-name: Changes
+name: Identify Changes
 
 on:
   workflow_call:
