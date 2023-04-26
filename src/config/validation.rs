@@ -174,7 +174,7 @@ pub fn check_outputs(config: &ConfigBuilder) -> Result<(), Vec<String>> {
 
         if get_transform_output_ids(
             transform.inner.as_ref(),
-            "dummy".into(),
+            key.clone(),
             config.schema.log_namespace(),
         )
         .any(|output| matches!(output.port, Some(output) if output == DEFAULT_OUTPUT))

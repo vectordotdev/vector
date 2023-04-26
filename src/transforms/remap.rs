@@ -344,11 +344,11 @@ impl TransformConfig for RemapConfig {
 
             default_definitions.insert(
                 output_id.clone(),
-                move_fields_into_message(merge_array_definitions(default_definition)),
+                move_field_definitions_into_message(merge_array_definitions(default_definition)),
             );
             dropped_definitions.insert(
                 output_id.clone(),
-                move_fields_into_message(merge_array_definitions(dropped_definition)),
+                move_field_definitions_into_message(merge_array_definitions(dropped_definition)),
             );
         }
 
@@ -661,7 +661,7 @@ fn push_dropped(
 
 /// If the VRL returns a value that is not an array (see [`merge_array_definitions`]),
 /// or an object, that data is moved into the `message` field.
-fn move_fields_into_message(mut definition: schema::Definition) -> schema::Definition {
+fn move_field_definitions_into_message(mut definition: schema::Definition) -> schema::Definition {
     let mut message = Kind::never();
 
     if definition.event_kind_mut().remove_bytes() {
@@ -1680,7 +1680,7 @@ mod tests {
                 Kind::object(BTreeMap::from([("message".into(), Kind::bytes())])),
                 [LogNamespace::Legacy]
             ),
-            move_fields_into_message(definition)
+            move_field_definitions_into_message(definition)
         );
 
         // Test when a message field already exists.
@@ -1696,7 +1696,7 @@ mod tests {
                 )])),
                 [LogNamespace::Legacy]
             ),
-            move_fields_into_message(definition)
+            move_field_definitions_into_message(definition)
         )
     }
 
