@@ -16,11 +16,12 @@
 name: Regression Detector
 
 on:
-  pull_request:
-    paths-ignore:
-      - "docs/**"
-      - "rfcs/**"
-      - "website/**"
+  # TODO re enable
+  #pull_request:
+  #  paths-ignore:
+  #    - "docs/**"
+  #    - "rfcs/**"
+  #    - "website/**"
   merge_group:
     types: [checks_requested]
 
@@ -52,8 +53,12 @@ jobs:
 
       - name: Setup PR metadata
         id: pr-metadata
+        # TODO the github event appears to not be a pull request event when this is triggered by a merge queue
+        # temporarily trying out using the event id, which appears to be a common event property.
+#        run: |
+#          echo "PR_NUMBER=${{ github.event.number }}" >> $GITHUB_OUTPUT
         run: |
-          echo "PR_NUMBER=${{ github.event.number }}" >> $GITHUB_OUTPUT
+          echo "PR_NUMBER=${{ github.event.id }}" >> $GITHUB_OUTPUT
 
       - name: Setup baseline variables
         id: baseline

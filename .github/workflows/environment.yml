@@ -1,11 +1,11 @@
 name: Environment Suite
 
 on:
-  pull_request: {}
-  push:
-    branches:
-      - master
-  workflow_dispatch:
+  workflow_call:
+  # TODO temp disabling
+  #push:
+  #  branches:
+  #    - master
 
 env:
   VERBOSE: true

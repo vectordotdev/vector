@@ -1,0 +1,34 @@
+name: Component Features - Linux
+
+on:
+  workflow_call:
+  issue_comment:
+    types: [created]
+
+env:
+  AWS_ACCESS_KEY_ID: "dummy"
+  AWS_SECRET_ACCESS_KEY: "dummy"
+  CONTAINER_TOOL: "docker"
+  DD_ENV: "ci"
+  DD_API_KEY: ${{ secrets.DD_API_KEY }}
+  RUST_BACKTRACE: full
+  TEST_LOG: vector=debug
+  VERBOSE: true
+  CI: true
+  PROFILE: debug
+  # observing issues fetching boringssl via HTTPS in the OSX build, seeing if this helps
+  # can be removed when we switch back to the upstream openssl-sys crate
+  CARGO_NET_GIT_FETCH_WITH_CLI: true
+
+jobs:
+  check-component-features:
+    runs-on: [linux, ubuntu-20.04-8core]
+    if: |
+      !github.event.pull_request
+        || github.event.issue.pull_request && contains(github.event.comment.body, '/ci-deploy-component-features')
+    steps:
+      - uses: actions/checkout@v3
+      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: bash scripts/environment/prepare.sh
+      - run: echo "::add-matcher::.github/matchers/rust.json"
+      - run: make check-component-features
