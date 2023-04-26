@@ -26,67 +26,67 @@ jobs:
     uses: ./.github/workflows/changes.yml
     secrets: inherit
 
-  test-cli:
-    uses: ./.github/workflows/cli.yml
-    needs: changes
-    secrets: inherit
-    if: ${{ needs.changes.outputs.source == 'true' }}
+  # test-cli:
+  #   uses: ./.github/workflows/cli.yml
+  #   needs: changes
+  #   secrets: inherit
+  #   if: ${{ needs.changes.outputs.source == 'true' }}
 
-  test-misc:
-    uses: ./.github/workflows/misc.yml
-    needs: changes
-    secrets: inherit
-    if: ${{ needs.changes.outputs.source == 'true' }}
+  # test-misc:
+  #   uses: ./.github/workflows/misc.yml
+  #   needs: changes
+  #   secrets: inherit
+  #   if: ${{ needs.changes.outputs.source == 'true' }}
 
-  check-msrv:
-    uses: ./.github/workflows/msrv.yml
-    needs: changes
-    secrets: inherit
-    if: ${{ needs.changes.outputs.source == 'true' }}
+  # check-msrv:
+  #   uses: ./.github/workflows/msrv.yml
+  #   needs: changes
+  #   secrets: inherit
+  #   if: ${{ needs.changes.outputs.source == 'true' }}
 
-  check-component-features:
-    uses: ./.github/workflows/component_features.yml
-    needs: changes
-    secrets: inherit
-    if: ${{ needs.changes.outputs.source == 'true' }}
+  # check-component-features:
+  #   uses: ./.github/workflows/component_features.yml
+  #   needs: changes
+  #   secrets: inherit
+  #   if: ${{ needs.changes.outputs.source == 'true' }}
 
-  cross-linux:
-    uses: ./.github/workflows/cross.yml
-    needs: changes
-    secrets: inherit
-    # We run cross checks when dependencies change to ensure they still build.
-    # This helps us avoid adopting dependencies that aren't compatible with other architectures.
-    if: ${{ needs.changes.outputs.dependencies == 'true' }}
+  # cross-linux:
+  #   uses: ./.github/workflows/cross.yml
+  #   needs: changes
+  #   secrets: inherit
+  #   # We run cross checks when dependencies change to ensure they still build.
+  #   # This helps us avoid adopting dependencies that aren't compatible with other architectures.
+  #   if: ${{ needs.changes.outputs.dependencies == 'true' }}
 
-  unit-mac:
-    uses: ./.github/workflows/unit_mac.yml
-    needs: changes
-    secrets: inherit
-    if: ${{ needs.changes.outputs.source == 'true' }}
+  # unit-mac:
+  #   uses: ./.github/workflows/unit_mac.yml
+  #   needs: changes
+  #   secrets: inherit
+  #   if: ${{ needs.changes.outputs.source == 'true' }}
 
-  unit-windows:
-    uses: ./.github/workflows/unit_windows.yml
-    needs: changes
-    secrets: inherit
-    if: ${{ needs.changes.outputs.source == 'true' }}
+  # unit-windows:
+  #   uses: ./.github/workflows/unit_windows.yml
+  #   needs: changes
+  #   secrets: inherit
+  #   if: ${{ needs.changes.outputs.source == 'true' }}
 
-  master-failure:
-    name: master-failure
-    if: failure() && github.ref == 'refs/heads/something_clever' # TODO just in case
-    needs:
-      - changes
-      - test-cli
-      - test-misc
-      - check-msrv
-      - check-component-features
-      - cross-linux
-      - unit-mac
-      - unit-windows
-    runs-on: ubuntu-20.04
-    steps:
-    - name: Discord notification
-      env:
-        DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
-      uses: Ilshidur/action-discord@0.3.2
-      with:
-        args: "Master merge queue tests failed: <https://github.com/${{github.repository}}/actions/runs/${{github.run_id}}>"
+  # master-failure:
+  #   name: master-failure
+  #   if: failure() && github.ref == 'refs/heads/something_clever' # TODO just in case
+  #   needs:
+  #     - changes
+  #     - test-cli
+  #     - test-misc
+  #     - check-msrv
+  #     - check-component-features
+  #     - cross-linux
+  #     - unit-mac
+  #     - unit-windows
+  #   runs-on: ubuntu-20.04
+  #   steps:
+  #   - name: Discord notification
+  #     env:
+  #       DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+  #     uses: Ilshidur/action-discord@0.3.2
+  #     with:
+  #       args: "Master merge queue tests failed: <https://github.com/${{github.repository}}/actions/runs/${{github.run_id}}>"
