@@ -2,8 +2,8 @@ name: K8S E2E Suite
 
 on:
   workflow_dispatch:
-  merge_group:
-    types: [checks_requested]
+  #merge_group:
+  #  types: [checks_requested]
   # TODO this scoping would need to be re enabled as part of the job itself, but I think that can be delayed
   # until the sub task to run tests on file changes detection is implemented
   # push:

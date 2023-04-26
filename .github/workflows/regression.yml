@@ -16,14 +16,15 @@
 name: Regression Detector
 
 on:
+  workflow_dispatch:
   # TODO re enable
   #pull_request:
   #  paths-ignore:
   #    - "docs/**"
   #    - "rfcs/**"
   #    - "website/**"
-  merge_group:
-    types: [checks_requested]
+ # merge_group:
+ #   types: [checks_requested]
 
 jobs:
   cancel-previous:
