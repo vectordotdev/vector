@@ -5659,7 +5659,7 @@ dependencies = [
  "ordered-float 3.6.0",
  "prost",
  "prost-build",
- "tonic 0.9.1",
+ "tonic 0.9.2",
  "tonic-build",
  "value",
  "vector-core",
@@ -8473,9 +8473,9 @@ dependencies = [
 
 [[package]]
 name = "tonic"
-version = "0.9.1"
+version = "0.9.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "38bd8e87955eb13c1986671838177d6792cdc52af9bffced0d2c8a9a7f741ab3"
+checksum = "3082666a3a6433f7f511c7192923fa1fe07c69332d3c6a2e6bb040b569199d5a"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -9297,7 +9297,7 @@ dependencies = [
  "tokio-tungstenite",
  "tokio-util",
  "toml 0.7.3",
- "tonic 0.9.1",
+ "tonic 0.9.2",
  "tonic-build",
  "tower",
  "tower-http",
@@ -9551,7 +9551,7 @@ dependencies = [
  "tokio-test",
  "tokio-util",
  "toml 0.7.3",
- "tonic 0.9.1",
+ "tonic 0.9.2",
  "tower",
  "tracing 0.1.37",
  "tracing-core 0.1.30",
