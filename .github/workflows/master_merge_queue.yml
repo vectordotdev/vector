@@ -91,3 +91,12 @@ jobs:
   #     uses: Ilshidur/action-discord@0.3.2
   #     with:
   #       args: "Master merge queue tests failed: <https://github.com/${{github.repository}}/actions/runs/${{github.run_id}}>"
+
+  master-merge-queue-check:
+    name: Master Merge Queue
+    runs-on: ubuntu-20.04
+    needs:
+      - changes
+    steps:
+      - name: validate
+        run: echo "OK"
