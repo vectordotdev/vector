@@ -28,7 +28,7 @@ use vector_core::{
 
 use crate::{
     codecs::{Encoder, EncodingConfigWithFraming, SinkType, Transformer},
-    config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext},
+    config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, PathTz, SinkConfig, SinkContext},
     event::{Event, EventStatus, Finalizable},
     expiring_hash_map::ExpiringHashMap,
     internal_events::{FileBytesSent, FileIoError, FileOpen, TemplateRenderingError},
@@ -36,10 +36,8 @@ use crate::{
     template::Template,
 };
 mod bytes_path;
-mod path_tz;
 
 use bytes_path::BytesPath;
-use path_tz::PathTz;
 
 /// Configuration for the `file` sink.
 #[serde_as]
