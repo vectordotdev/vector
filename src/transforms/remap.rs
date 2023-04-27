@@ -2031,7 +2031,7 @@ mod tests {
                         . = unnest(.thing)
                     } else {
                       . = "fish"
-                    } 
+                    }
                     "#}
                 .to_string(),
             ),
