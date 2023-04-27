@@ -125,5 +125,5 @@ jobs:
           CLI_RESULT: ${{ needs.test-cli.result }}
         run: |
           [ "$EVENT_NAME" != "merge_group" ] && echo "Success" && exit 0
-          [ "$CHANGES_RESULT" == "failure" || "$CLI_RESULT" == "failure" ]
+          [[ "$CHANGES_RESULT" == "failure" || "$CLI_RESULT" == "failure" ]]
             && echo "Failed" && exit 1
