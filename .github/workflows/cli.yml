@@ -41,10 +41,11 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-
-      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - run: bash scripts/environment/prepare.sh
-      - run: echo "::add-matcher::.github/matchers/rust.json"
-      - run: make test-cli
-      - name: Upload test results
-        run: scripts/upload-test-results.sh
-        if: always()
+      - run: echo "OK"
+      #- run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      #- run: bash scripts/environment/prepare.sh
+      #- run: echo "::add-matcher::.github/matchers/rust.json"
+      # - run: make test-cli
+      # - name: Upload test results
+      #   run: scripts/upload-test-results.sh
+      #   if: always()

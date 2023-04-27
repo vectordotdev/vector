@@ -1,9 +1,9 @@
 name: Master Merge Queue Test Suite
 
 on:
-  workflow_dispatch:
-  # TODO remove before merging
-  #pull_request:
+  # Only want to run this on merge queue, but because GH doesn't allow specifying different required checks
+  # for pull request and merge queue, we need to "run" it in pull request, but in the jobs we will just auto pass.
+  pull_request:
   merge_group:
     types: [checks_requested]
 
@@ -23,15 +23,20 @@ env:
   CARGO_NET_GIT_FETCH_WITH_CLI: true
 
 jobs:
+
+  # This is the entry job which is required for all the actual tests in this workflow.
+  # If we don't run this job (such as in a pull request), then by consequence all downstream
+  # test jobs are not run. This allows us to not have to check for merge group in each test job.
   changes:
+    if: ${{ github.event_name == 'merge_group' }}
     uses: ./.github/workflows/changes.yml
     secrets: inherit
 
-  # test-cli:
-  #   uses: ./.github/workflows/cli.yml
-  #   needs: changes
-  #   secrets: inherit
-  #   if: ${{ needs.changes.outputs.source == 'true' }}
+  test-cli:
+    if: ${{ needs.changes.outputs.source == 'true' }}
+    uses: ./.github/workflows/cli.yml
+    needs: changes
+    secrets: inherit
 
   # test-misc:
   #   uses: ./.github/workflows/misc.yml
@@ -95,8 +100,18 @@ jobs:
   master-merge-queue-check:
     name: Master Merge Queue
     runs-on: ubuntu-20.04
+    if: always()
     needs:
       - changes
+      - test-cli
     steps:
+      # if the trigger was a merge group we evaluate the status of each required prerequisite job. Otherwise, return success.
       - name: validate
+        if: |
+          ${{ github.event_name == 'merge_group' }}
+            && (${{ needs.changes.result == 'failure' }}
+              || ${{ needs.changes.test-cli == 'failure' }}
+            )
+        run: exit 1
+      - name: success
         run: echo "OK"
