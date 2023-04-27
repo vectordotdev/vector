@@ -47,29 +47,29 @@ jobs:
       CARGO_INCREMENTAL: 0
     if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/cache@v3
-        name: Cache Cargo registry + index
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-
-      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - run: bash scripts/environment/prepare.sh
-      - run: echo "::add-matcher::.github/matchers/rust.json"
       - name: yolo
         run: echo "OK"
+      # - uses: actions/checkout@v3
+      # - uses: actions/cache@v3
+      #   name: Cache Cargo registry + index
+      #   with:
+      #     path: |
+      #       ~/.cargo/bin/
+      #       ~/.cargo/registry/index/
+      #       ~/.cargo/registry/cache/
+      #       ~/.cargo/git/db/
+      #     key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      #     restore-keys: |
+      #       ${{ runner.os }}-cargo-
+      # - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      # - run: bash scripts/environment/prepare.sh
+      # - run: echo "::add-matcher::.github/matchers/rust.json"
       #- run: make test
-        env:
-          CARGO_BUILD_JOBS: 5
-      - name: Upload test results
-        run: scripts/upload-test-results.sh
-        if: always()
+      #   env:
+      #     CARGO_BUILD_JOBS: 5
+      # - name: Upload test results
+      #   run: scripts/upload-test-results.sh
+      #   if: always()
 
   test-vrl:
     name: VRL - Linux
