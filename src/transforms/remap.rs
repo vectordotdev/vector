@@ -662,26 +662,9 @@ fn push_dropped(
 /// If the VRL returns a value that is not an array (see [`merge_array_definitions`]),
 /// or an object, that data is moved into the `message` field.
 fn move_field_definitions_into_message(mut definition: schema::Definition) -> schema::Definition {
-    let mut message = Kind::never();
-
-    if definition.event_kind_mut().remove_bytes() {
-        message.add_bytes();
-    }
-    if definition.event_kind_mut().remove_integer() {
-        message.add_integer();
-    }
-    if definition.event_kind_mut().remove_float() {
-        message.add_float();
-    }
-    if definition.event_kind_mut().remove_boolean() {
-        message.add_boolean();
-    }
-    if definition.event_kind_mut().remove_timestamp() {
-        message.add_timestamp();
-    }
-    if definition.event_kind_mut().remove_regex() {
-        message.add_regex();
-    }
+    let mut message = definition.event_kind().clone();
+    message.remove_object();
+    message.remove_array();
 
     if !message.is_never() {
         // We need to add the given message type to a field called `message`
@@ -691,12 +674,7 @@ fn move_field_definitions_into_message(mut definition: schema::Definition) -> sc
             message,
         )])));
 
-        definition.event_kind_mut().merge(
-            message,
-            Strategy {
-                collisions: CollisionStrategy::Union,
-            },
-        )
+        *definition.event_kind_mut() = definition.event_kind().union(message);
     }
 
     definition
