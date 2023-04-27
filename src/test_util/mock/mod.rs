@@ -66,7 +66,7 @@ pub fn basic_transform(suffix: &str, increase: f64) -> BasicTransformConfig {
     BasicTransformConfig::new(suffix.to_owned(), increase)
 }
 
-pub fn error_definition_transform() -> ErrorDefinitionTransformConfig {
+pub const fn error_definition_transform() -> ErrorDefinitionTransformConfig {
     ErrorDefinitionTransformConfig {}
 }
 

@@ -523,7 +523,7 @@ group_by = [ "request_id" ]
                 )
                 .first()
                 .unwrap()
-                .log_schema_definitions
+                .schema_definitions(true)
                 .clone();
 
             let (tx, rx) = mpsc::channel(1);

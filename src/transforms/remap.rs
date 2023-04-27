@@ -1688,7 +1688,7 @@ mod tests {
         ]
         .into();
 
-        let kind = Kind::array(Collection::from_unknown(Kind::object(object.clone())));
+        let kind = Kind::array(Collection::from_unknown(Kind::object(object)));
 
         let definition =
             schema::Definition::new_with_default_metadata(kind, [LogNamespace::Legacy]);
@@ -1699,7 +1699,7 @@ mod tests {
         ]));
 
         let wanted = schema::Definition::new_with_default_metadata(kind, [LogNamespace::Legacy]);
-        let merged = merge_array_definitions(definition.clone());
+        let merged = merge_array_definitions(definition);
 
         assert_eq!(wanted, merged);
     }
@@ -1725,7 +1725,7 @@ mod tests {
         .into();
 
         let mut kind = Kind::bytes();
-        kind.add_object(object.clone());
+        kind.add_object(object);
         kind.add_array(array);
 
         let definition =
@@ -1741,7 +1741,7 @@ mod tests {
         ]));
 
         let wanted = schema::Definition::new_with_default_metadata(kind, [LogNamespace::Legacy]);
-        let merged = merge_array_definitions(definition.clone());
+        let merged = merge_array_definitions(definition);
 
         assert_eq!(wanted, merged);
     }
@@ -1771,11 +1771,10 @@ mod tests {
         );
 
         assert_eq!(
-            vec![TransformOutput {
-                port: None,
-                ty: DataType::all(),
+            vec![TransformOutput::new(
+                DataType::all(),
                 // The `never` definition should have been passed on to the end.
-                log_schema_definitions: [(
+                [(
                     "in".into(),
                     Definition::default_legacy_namespace().with_event_field(
                         &owned_value_path!("thing"),
@@ -1783,8 +1782,8 @@ mod tests {
                         None
                     ),
                 )]
-                .into(),
-            }],
+                .into()
+            )],
             outputs1
         );
 
@@ -1792,23 +1791,22 @@ mod tests {
             enrichment_tables,
             &[(
                 "in1".into(),
-                outputs1[0].log_schema_definitions[&"in".into()].clone(),
+                outputs1[0].schema_definitions(true)[&"in".into()].clone(),
             )],
             LogNamespace::Legacy,
         );
 
         assert_eq!(
-            vec![TransformOutput {
-                port: None,
-                ty: DataType::all(),
-                log_schema_definitions: [(
+            vec![TransformOutput::new(
+                DataType::all(),
+                [(
                     "in1".into(),
                     Definition::default_legacy_namespace()
                         .with_event_field(&owned_value_path!("thing"), Kind::bytes(), None)
                         .with_event_field(&owned_value_path!("thang"), Kind::bytes(), None),
                 )]
                 .into(),
-            }],
+            )],
             outputs2
         );
     }
@@ -1852,10 +1850,9 @@ mod tests {
         );
 
         assert_eq!(
-            vec![TransformOutput {
-                port: None,
-                ty: DataType::all(),
-                log_schema_definitions: [(
+            vec![TransformOutput::new(
+                DataType::all(),
+                [(
                     "in".into(),
                     Definition::new_with_default_metadata(
                         Kind::any_object(),
@@ -1871,7 +1868,7 @@ mod tests {
                     ),
                 )]
                 .into(),
-            }],
+            )],
             outputs1
         );
 
@@ -1879,16 +1876,15 @@ mod tests {
             enrichment_tables,
             &[(
                 "in1".into(),
-                outputs1[0].log_schema_definitions[&"in".into()].clone(),
+                outputs1[0].schema_definitions(true)[&"in".into()].clone(),
             )],
             LogNamespace::Legacy,
         );
 
         assert_eq!(
-            vec![TransformOutput {
-                port: None,
-                ty: DataType::all(),
-                log_schema_definitions: [(
+            vec![TransformOutput::new(
+                DataType::all(),
+                [(
                     "in1".into(),
                     Definition::default_legacy_namespace()
                         .with_event_field(
@@ -1906,7 +1902,7 @@ mod tests {
                         ),
                 )]
                 .into(),
-            }],
+            )],
             outputs2
         );
     }
@@ -1923,7 +1919,7 @@ mod tests {
         let enrichment_tables = enrichment::TableRegistry::default();
 
         let outputs1 = transform1.outputs(
-            enrichment_tables.clone(),
+            enrichment_tables,
             &[(
                 "in".into(),
                 schema::Definition::new_with_default_metadata(
@@ -1935,10 +1931,9 @@ mod tests {
         );
 
         assert_eq!(
-            vec![TransformOutput {
-                port: None,
-                ty: DataType::all(),
-                log_schema_definitions: [(
+            vec![TransformOutput::new(
+                DataType::all(),
+                [(
                     "in".into(),
                     Definition::new_with_default_metadata(
                         Kind::any_object(),
@@ -1946,7 +1941,7 @@ mod tests {
                     ),
                 )]
                 .into(),
-            }],
+            )],
             outputs1
         );
     }
@@ -1967,7 +1962,7 @@ mod tests {
         let enrichment_tables = enrichment::TableRegistry::default();
 
         let outputs1 = transform1.outputs(
-            enrichment_tables.clone(),
+            enrichment_tables,
             &[(
                 "in".into(),
                 schema::Definition::new_with_default_metadata(
@@ -1998,7 +1993,7 @@ mod tests {
         let enrichment_tables = enrichment::TableRegistry::default();
 
         let outputs1 = transform1.outputs(
-            enrichment_tables.clone(),
+            enrichment_tables,
             &[(
                 "in".into(),
                 schema::Definition::new_with_default_metadata(
@@ -2017,7 +2012,7 @@ mod tests {
 
         assert_eq!(
             HashMap::from([(OutputId::from("in"), wanted)]),
-            outputs1[0].log_schema_definitions,
+            outputs1[0].schema_definitions(true),
         );
     }
 
@@ -2041,7 +2036,7 @@ mod tests {
         let enrichment_tables = enrichment::TableRegistry::default();
 
         let outputs1 = transform1.outputs(
-            enrichment_tables.clone(),
+            enrichment_tables,
             &[(
                 "in".into(),
                 schema::Definition::new_with_default_metadata(
@@ -2069,7 +2064,7 @@ mod tests {
 
         assert_eq!(
             HashMap::from([(OutputId::from("in"), wanted)]),
-            outputs1[0].log_schema_definitions,
+            outputs1[0].schema_definitions(true),
         );
     }
 }
