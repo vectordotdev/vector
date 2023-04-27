@@ -827,10 +827,17 @@ mod test {
             expected.insert("version", 1);
             expected.insert("appname", "root");
             expected.insert("procid", 8449);
+            expected.insert("source_ip", "192.168.0.254");
         }
 
         assert_event_data_eq!(
-            event_from_bytes("host", None, raw.into(), LogNamespace::Legacy).unwrap(),
+            event_from_bytes(
+                "host",
+                Some(Bytes::from("192.168.0.254")),
+                raw.into(),
+                LogNamespace::Legacy
+            )
+            .unwrap(),
             expected
         );
     }
@@ -863,9 +870,16 @@ mod test {
             expected.insert("version", 1);
             expected.insert("appname", "root");
             expected.insert("procid", 8449);
+            expected.insert("source_ip", "192.168.0.254");
         }
 
-        let event = event_from_bytes("host", None, raw.into(), LogNamespace::Legacy).unwrap();
+        let event = event_from_bytes(
+            "host",
+            Some(Bytes::from("192.168.0.254")),
+            raw.into(),
+            LogNamespace::Legacy,
+        )
+        .unwrap();
         assert_event_data_eq!(event, expected);
 
         let raw = format!(
@@ -873,7 +887,13 @@ mod test {
             r#"[incorrect x=]"#, msg
         );
 
-        let event = event_from_bytes("host", None, raw.into(), LogNamespace::Legacy).unwrap();
+        let event = event_from_bytes(
+            "host",
+            Some(Bytes::from("192.168.0.254")),
+            raw.into(),
+            LogNamespace::Legacy,
+        )
+        .unwrap();
         assert_event_data_eq!(event, expected);
     }
 
@@ -956,7 +976,13 @@ mod test {
     fn syslog_ng_default_network() {
         let msg = "i am foobar";
         let raw = format!(r#"<13>Feb 13 20:07:26 74794bfb6795 root[8539]: {}"#, msg);
-        let event = event_from_bytes("host", None, raw.into(), LogNamespace::Legacy).unwrap();
+        let event = event_from_bytes(
+            "host",
+            Some(Bytes::from("192.168.0.254")),
+            raw.into(),
+            LogNamespace::Legacy,
+        )
+        .unwrap();
 
         let mut expected = Event::Log(LogEvent::from(msg));
         {
@@ -984,6 +1010,7 @@ mod test {
             expected.insert("facility", "user");
             expected.insert("appname", "root");
             expected.insert("procid", 8539);
+            expected.insert("source_ip", "192.168.0.254");
         }
 
         assert_event_data_eq!(event, expected);
@@ -996,7 +1023,13 @@ mod test {
             r#"<190>Feb 13 21:31:56 74794bfb6795 liblogging-stdlog:  [origin software="rsyslogd" swVersion="8.24.0" x-pid="8979" x-info="http://www.rsyslog.com"] {}"#,
             msg
         );
-        let event = event_from_bytes("host", None, raw.into(), LogNamespace::Legacy).unwrap();
+        let event = event_from_bytes(
+            "host",
+            Some(Bytes::from("192.168.0.254")),
+            raw.into(),
+            LogNamespace::Legacy,
+        )
+        .unwrap();
 
         let mut expected = Event::Log(LogEvent::from(msg));
         {
@@ -1024,6 +1057,7 @@ mod test {
             expected.insert("appname", "liblogging-stdlog");
             expected.insert("origin.software", "rsyslogd");
             expected.insert("origin.swVersion", "8.24.0");
+            expected.insert("source_ip", "192.168.0.254");
             expected.insert(event_path!("origin", "x-pid"), "8979");
             expected.insert(event_path!("origin", "x-info"), "http://www.rsyslog.com");
         }
