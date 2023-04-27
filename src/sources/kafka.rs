@@ -5,6 +5,9 @@ use std::{
     time::Duration,
 };
 
+#[cfg(test)]
+use std::collections::HashSet;
+
 use async_stream::stream;
 use bytes::Bytes;
 use chrono::{DateTime, TimeZone, Utc};
@@ -301,6 +304,8 @@ impl SourceConfig for KafkaSourceConfig {
             cx.shutdown,
             cx.out,
             acknowledgements,
+            #[cfg(test)]
+            false,
             log_namespace,
         )))
     }
@@ -374,6 +379,7 @@ async fn kafka_source(
     mut shutdown: ShutdownSignal,
     mut out: SourceSender,
     acknowledgements: bool,
+    #[cfg(test)] eof: bool,
     log_namespace: LogNamespace,
 ) -> Result<(), ()> {
     let consumer = Arc::new(consumer);
@@ -390,6 +396,9 @@ async fn kafka_source(
 
     let mut stream = consumer.stream();
 
+    #[cfg(test)]
+    let mut eof_partitions = HashSet::new();
+
     loop {
         tokio::select! {
             biased;
@@ -404,8 +413,26 @@ async fn kafka_source(
                 }
             },
             message = stream.next() => match message {
-                None => break,  // WHY?
-                Some(Err(error)) => emit!(KafkaReadError { error }),
+                None => unreachable!("MessageStream never returns Ready(None)"),
+                Some(Err(error)) => match error {
+                    #[cfg(test)]
+                    rdkafka::error::KafkaError::PartitionEOF(partition) if eof => {
+                        // Optionally exit on partition EOF. This is used in tests to collect events
+                        // when the precise number of events is not known (e.g. restarting the source after
+                        // shutdown or a consumer rebalance). Note that the client should set "enable.partition.eof"
+                        // to true, or the client won't get this notification
+                        // Note also, this assumes a single topic is being consumed, since
+                        // PartitionEOF does not include the topic name
+                        eof_partitions.insert(partition);
+                        if let Ok(assignment) = consumer.assignment() {
+                            debug!("Reached end of partition {} ({} of {}).", partition, eof_partitions.len(), assignment.count());
+                            if eof_partitions.len() == assignment.count() {
+                                break;
+                            }
+                        }
+                    },
+                    _ => emit!(KafkaReadError { error }),
+                },
                 Some(Ok(msg)) => {
                     emit!(KafkaBytesReceived {
                         byte_size: msg.payload_len(),
@@ -758,9 +785,17 @@ mod test {
     pub fn kafka_host() -> String {
         std::env::var("KAFKA_HOST").unwrap_or_else(|_| "localhost".into())
     }
+    pub fn kafka_port() -> u16 {
+        let port = std::env::var("KAFKA_PORT").unwrap_or_else(|_| "9091".into());
+        port.parse().expect("Invalid port number")
+    }
 
-    pub fn kafka_address(port: u16) -> String {
-        format!("{}:{}", kafka_host(), port)
+    pub fn kafka_address() -> String {
+        format!("{}:{}", kafka_host(), kafka_port())
+    }
+
+    fn kafka_max_bytes() -> String {
+        std::env::var("KAFKA_MAX_BYTES").unwrap_or_else(|_| "1024".into())
     }
 
     #[test]
@@ -773,13 +808,19 @@ mod test {
         group: &str,
         log_namespace: LogNamespace,
     ) -> KafkaSourceConfig {
+        let mut kafka_options = HashMap::new();
+        kafka_options.insert("enable.partition.eof".into(), "true".into());
+        // Fetch in small batches
+        kafka_options.insert("fetch.message.max.bytes".into(), kafka_max_bytes().into());
+
         KafkaSourceConfig {
-            bootstrap_servers: kafka_address(9091),
+            bootstrap_servers: kafka_address(),
             topics: vec![topic.into()],
             group_id: group.into(),
             auto_offset_reset: "beginning".into(),
             session_timeout_ms: Duration::from_millis(6000),
             commit_interval_ms: Duration::from_millis(1),
+            librdkafka_options: Some(kafka_options),
             key_field: default_key_field(),
             topic_key: default_topic_key(),
             partition_key: default_partition_key(),
@@ -928,9 +969,14 @@ mod integration_test {
     const HEADER_KEY: &str = "my header";
     const HEADER_VALUE: &str = "my header value";
 
+    fn kafka_test_topic() -> String {
+        std::env::var("KAFKA_TEST_TOPIC")
+            .unwrap_or_else(|_| format!("test-topic-{}", random_string(10)).into())
+    }
+
     fn client_config<T: FromClientConfig>(group: Option<&str>) -> T {
         let mut client = ClientConfig::new();
-        client.set("bootstrap.servers", kafka_address(9091));
+        client.set("bootstrap.servers", kafka_address());
         client.set("produce.offset.report", "true");
         client.set("message.timeout.ms", "5000");
         client.set("auto.commit.interval.ms", "1");
@@ -940,30 +986,47 @@ mod integration_test {
         client.create().expect("Producer creation error")
     }
 
-    async fn send_events(topic: String, count: usize) -> DateTime<Utc> {
+    async fn send_events(topic: String, partitions: i32, count: usize) -> DateTime<Utc> {
         let now = Utc::now();
         let timestamp = now.timestamp_millis();
 
-        let producer: FutureProducer = client_config(None);
+        let producer: &FutureProducer = &client_config(None);
+        let topic_name = topic.as_ref();
 
-        for i in 0..count {
-            let text = format!("{} {:03}", TEXT, i);
-            let key = format!("{} {}", KEY, i);
-            let record = FutureRecord::to(&topic)
-                .payload(&text)
-                .key(&key)
-                .timestamp(timestamp)
-                .headers(OwnedHeaders::new().insert(Header {
-                    key: HEADER_KEY,
-                    value: Some(HEADER_VALUE),
-                }));
+        create_topic(topic_name, partitions).await;
 
-            if let Err(error) = producer.send(record, Timeout::Never).await {
+        let writes = (0..count)
+            .map(|i| async move {
+                let text = format!("{} {:03}", TEXT, i);
+                let key = format!("{} {}", KEY, i);
+                let record = FutureRecord::to(topic_name)
+                    .payload(&text)
+                    .key(&key)
+                    .timestamp(timestamp)
+                    .headers(OwnedHeaders::new().insert(Header {
+                        key: HEADER_KEY,
+                        value: Some(HEADER_VALUE),
+                    }));
+                producer.send(record, Timeout::Never).await
+            })
+            .collect::<Vec<_>>();
+
+        for res in writes {
+            if let Err(error) = res.await {
                 panic!("Cannot send event to Kafka: {:?}", error);
             }
         }
 
         now
+    }
+
+    async fn send_to_test_topic(partitions: i32, count: usize) -> (String, String, DateTime<Utc>) {
+        let topic = kafka_test_topic();
+        let group_id = format!("test-group-{}", random_string(10));
+
+        let sent_at = send_events(topic.clone(), partitions, count).await;
+
+        (topic, group_id, sent_at)
     }
 
     #[tokio::test]
@@ -1018,12 +1081,12 @@ mod integration_test {
         let group_id = format!("test-group-{}", random_string(10));
         let config = make_config(&topic, &group_id, log_namespace);
 
-        let now = send_events(topic.clone(), 10).await;
+        let now = send_events(topic.clone(), 1, 10).await;
 
         let events = assert_source_compliance(&["protocol", "topic", "partition"], async move {
             let (tx, rx) = SourceSender::new_test_errors(error_at);
             let (trigger_shutdown, shutdown_done) =
-                spawn_kafka(tx, config, acknowledgements, log_namespace);
+                spawn_kafka(tx, config, acknowledgements, false, log_namespace);
             let events = collect_n(rx, SEND_COUNT).await;
             // Yield to the finalization task to let it collect the
             // batch status receivers before signalling the shutdown.
@@ -1138,6 +1201,7 @@ mod integration_test {
         tx: SourceSender,
         config: KafkaSourceConfig,
         acknowledgements: bool,
+        eof: bool,
         log_namespace: LogNamespace,
     ) -> (Trigger, Tripwire) {
         let (trigger_shutdown, shutdown, shutdown_done) = ShutdownSignal::new_wired();
@@ -1157,6 +1221,7 @@ mod integration_test {
             shutdown,
             tx,
             acknowledgements,
+            eof,
             log_namespace,
         ));
         (trigger_shutdown, shutdown_done)
@@ -1176,9 +1241,9 @@ mod integration_test {
             .offset()
     }
 
-    async fn create_topic(group_id: &str, topic: &str, partitions: i32) {
-        let client: AdminClient<DefaultClientContext> = client_config(Some(group_id));
-        for result in client
+    async fn create_topic(topic: &str, partitions: i32) {
+        let client: AdminClient<DefaultClientContext> = client_config(None);
+        let topic_results = client
             .create_topics(
                 [&NewTopic {
                     name: topic,
@@ -1189,9 +1254,14 @@ mod integration_test {
                 &AdminOptions::default(),
             )
             .await
-            .expect("create_topics failed")
-        {
-            result.expect("Creating a topic failed");
+            .expect("create_topics failed");
+
+        for result in topic_results {
+            if let Err((topic, err)) = result {
+                if err != rdkafka::types::RDKafkaErrorCode::TopicAlreadyExists {
+                    panic!("Creating a topic failed: {:?}", (topic, err))
+                }
+            }
         }
     }
 
@@ -1224,20 +1294,20 @@ mod integration_test {
         const DELAY: u64 = 100;
 
         let (topic, group_id, config) = make_rand_config();
-        create_topic(&group_id, &topic, 2).await;
+        create_topic(&topic, 2).await;
 
-        let _send_start = send_events(topic.clone(), NEVENTS).await;
+        let _send_start = send_events(topic.clone(), 1, NEVENTS).await;
 
         let (tx, rx1) = delay_pipeline(1, Duration::from_millis(200), EventStatus::Delivered);
         let (trigger_shutdown1, shutdown_done1) =
-            spawn_kafka(tx, config.clone(), true, LogNamespace::Legacy);
+            spawn_kafka(tx, config.clone(), true, false, LogNamespace::Legacy);
         let events1 = tokio::spawn(collect_n(rx1, NEVENTS));
 
         sleep(Duration::from_secs(1)).await;
 
         let (tx, rx2) = delay_pipeline(2, Duration::from_millis(DELAY), EventStatus::Delivered);
         let (trigger_shutdown2, shutdown_done2) =
-            spawn_kafka(tx, config, true, LogNamespace::Legacy);
+            spawn_kafka(tx, config, true, true, LogNamespace::Legacy);
         let events2 = tokio::spawn(collect_n(rx2, NEVENTS));
 
         sleep(Duration::from_secs(5)).await;
@@ -1279,6 +1349,163 @@ mod integration_test {
         all_events.sort();
 
         // Assert they are all in sequential order and no dupes, TODO
+    }
+
+    #[tokio::test]
+    async fn drains_acknowledgements_at_shutdown() {
+        // 1. Send N events (if running against a pre-populated kafka topic, use send_count=0 and expect_count=expected number of messages; otherwise just set send_count)
+        let send_count: usize = std::env::var("KAFKA_SEND_COUNT")
+            .unwrap_or_else(|_| "100".into())
+            .parse()
+            .expect("Number of messages to send to kafka.");
+        let expect_count: usize = std::env::var("KAFKA_EXPECT_COUNT")
+            .unwrap_or_else(|_| format!("{}", send_count).into())
+            .parse()
+            .expect("Number of messages to expect consumers to process.");
+        let delay_ms: u64 = std::env::var("KAFKA_SHUTDOWN_DELAY")
+            .unwrap_or_else(|_| "3000".into())
+            .parse()
+            .expect("Number of milliseconds before shutting down first consumer.");
+
+        let (topic, group_id, _) = send_to_test_topic(1, send_count).await;
+
+        // 2. Run the kafka source to read some of the events
+        // 3. Send a shutdown signal (at some point before all events are read)
+        let events1 = {
+            let config = make_config(&topic, &group_id, LogNamespace::Legacy);
+            let (tx, rx) = SourceSender::new_test_errors(|_| false);
+            let (trigger_shutdown, shutdown_done) =
+                spawn_kafka(tx, config, true, false, LogNamespace::Legacy);
+            let (events, _) = tokio::join!(rx.collect::<Vec<Event>>(), async move {
+                sleep(Duration::from_millis(delay_ms)).await;
+                drop(trigger_shutdown);
+            });
+            shutdown_done.await;
+            events
+        };
+
+        debug!("Consumer group.id: {}", &group_id);
+        debug!(
+            "First consumer read {} of {} messages.",
+            events1.len(),
+            expect_count
+        );
+
+        // 4. Run the kafka source again to finish reading the events
+        let events2 = {
+            let config = make_config(&topic, &group_id, LogNamespace::Legacy);
+            let (tx, rx) = SourceSender::new_test_errors(|_| false);
+            let (trigger_shutdown, shutdown_done) =
+                spawn_kafka(tx, config, true, true, LogNamespace::Legacy);
+            let events = rx.collect::<Vec<Event>>().await;
+            drop(trigger_shutdown);
+            shutdown_done.await;
+            events
+        };
+
+        debug!(
+            "Second consumer read {} of {} messages.",
+            events2.len(),
+            expect_count
+        );
+
+        // 5. Total number of events processed should equal the number sent
+        let total = events1.len() + events2.len();
+        assert_ne!(
+            events1.len(),
+            0,
+            "First batch of events is non-zero (increase KAFKA_SHUTDOWN_DELAY?)"
+        );
+        assert_ne!(events2.len(), 0, "Second batch of events is non-zero (decrease KAFKA_SHUTDOWN_DELAY or increase KAFKA_SEND_COUNT?) ");
+        assert_eq!(total, expect_count);
+    }
+
+    #[tokio::test]
+    async fn drains_acknowledgements_during_rebalance() {
+        // 1. Send N events (if running against a pre-populated kafka topic, use send_count=0 and expect_count=expected number of messages; otherwise just set send_count)
+        let send_count: usize = std::env::var("KAFKA_SEND_COUNT")
+            .unwrap_or_else(|_| "100".into())
+            .parse()
+            .expect("Number of messages to send to kafka.");
+        let expect_count: usize = std::env::var("KAFKA_EXPECT_COUNT")
+            .unwrap_or_else(|_| format!("{}", send_count).into())
+            .parse()
+            .expect("Number of messages to expect consumers to process.");
+        let delay_ms: u64 = std::env::var("KAFKA_CONSUMER_DELAY")
+            .unwrap_or_else(|_| "3000".into())
+            .parse()
+            .expect("Number of milliseconds before shutting down first consumer.");
+
+        let (topic, group_id, _) = send_to_test_topic(2, send_count).await;
+        debug!("Consumer group.id: {}", &group_id);
+
+        // 2. Run the kafka source to read some of the events
+        // 3. Start 2nd & 3rd consumers using the same group.id, triggering rebalance events
+        let config1 = make_config(&topic, &group_id, LogNamespace::Legacy);
+        let config2 = make_config(&topic, &group_id, LogNamespace::Legacy);
+        let config3 = make_config(&topic, &group_id, LogNamespace::Legacy);
+
+        let (events1, events2, events3) = tokio::join!(
+            async move {
+                let (tx, rx) = SourceSender::new_test_errors(|_| false);
+                let (_trigger_shutdown, _shutdown_done) =
+                    spawn_kafka(tx, config1, true, true, LogNamespace::Legacy);
+
+                rx.collect::<Vec<Event>>().await
+            },
+            async move {
+                sleep(Duration::from_millis(delay_ms)).await;
+                let (tx, rx) = SourceSender::new_test_errors(|_| false);
+                let (_trigger_shutdown, _shutdown_done) =
+                    spawn_kafka(tx, config2, true, true, LogNamespace::Legacy);
+
+                rx.collect::<Vec<Event>>().await
+            },
+            async move {
+                sleep(Duration::from_millis(delay_ms * 2)).await;
+                let (tx, rx) = SourceSender::new_test_errors(|_| false);
+                let (_trigger_shutdown, _shutdown_done) =
+                    spawn_kafka(tx, config3, true, true, LogNamespace::Legacy);
+
+                rx.collect::<Vec<Event>>().await
+            }
+        );
+
+        debug!(
+            "First consumer read {} of {} messages.",
+            events1.len(),
+            expect_count
+        );
+
+        debug!(
+            "Second consumer read {} of {} messages.",
+            events2.len(),
+            expect_count
+        );
+        debug!(
+            "Third consumer read {} of {} messages.",
+            events3.len(),
+            expect_count
+        );
+
+        // 5. Total number of events processed should equal the number sent
+        let total = events1.len() + events2.len() + events3.len();
+        assert_ne!(
+            events1.len(),
+            0,
+            "First batch of events should be non-zero (increase delay?)"
+        );
+        assert_ne!(
+            events2.len(),
+            0,
+            "Second batch of events is non-zero (decrease delay or increase KAFKA_SEND_COUNT?) "
+        );
+        assert_ne!(
+            events3.len(),
+            0,
+            "Third batch of events is non-zero (decrease delay or increase KAFKA_SEND_COUNT?) "
+        );
+        assert_eq!(total, expect_count);
     }
 
     fn map_logs(events: EventArray) -> impl Iterator<Item = String> {
