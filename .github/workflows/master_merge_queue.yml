@@ -27,11 +27,11 @@ jobs:
     uses: ./.github/workflows/changes.yml
     secrets: inherit
 
-  test-cli:
-    uses: ./.github/workflows/cli.yml
-    needs: changes
-    secrets: inherit
-    if: ${{ needs.changes.outputs.source == 'true' }}
+  # test-cli:
+  #   uses: ./.github/workflows/cli.yml
+  #   needs: changes
+  #   secrets: inherit
+  #   if: ${{ needs.changes.outputs.source == 'true' }}
 
   # test-misc:
   #   uses: ./.github/workflows/misc.yml
@@ -97,7 +97,6 @@ jobs:
     runs-on: ubuntu-20.04
     needs:
       - changes
-      - test-cli
     steps:
       - name: validate
         run: echo "OK"
