@@ -442,7 +442,10 @@ impl<'a> Builder<'a> {
                     self.config.schema.log_namespace(),
                 )
                 .into_iter()
-                .map(|output| (output.port, output.log_schema_definitions))
+                .map(|output| {
+                    let definitions = output.schema_definitions(config.schema_enabled());
+                    (output.port, definitions)
+                })
                 .collect::<HashMap<_, _>>();
 
             let context = TransformContext {

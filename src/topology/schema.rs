@@ -79,7 +79,7 @@ pub fn possible_definitions(
                             &input.port
                         )
                     })
-                    .log_schema_definitions
+                    .schema_definitions(config.schema_enabled())
                     .values()
                     .cloned(),
             );
@@ -171,7 +171,12 @@ pub(super) fn expanded_definitions(
                 .find_map(|output| {
                     if output.port == input.port {
                         Some(
-                            input.with_definitions(output.log_schema_definitions.values().cloned()),
+                            input.with_definitions(
+                                output
+                                    .schema_definitions(config.schema_enabled())
+                                    .values()
+                                    .cloned(),
+                            ),
                         )
                     } else {
                         None
@@ -267,7 +272,7 @@ pub(crate) fn input_definitions(
                             &input.port
                         )
                     })
-                    .log_schema_definitions
+                    .schema_definitions(config.schema_enabled())
                     .values()
                     .cloned(),
             );
