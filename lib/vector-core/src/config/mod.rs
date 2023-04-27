@@ -201,7 +201,7 @@ pub struct TransformOutput {
     /// enabled, at least one definition  should be output. If the transform
     /// has multiple connected sources, it is possible to have multiple output
     /// definitions - one for each input.
-    pub log_schema_definitions: HashMap<OutputId, schema::Definition>,
+    log_schema_definitions: HashMap<OutputId, schema::Definition>,
 }
 
 impl TransformOutput {
@@ -221,6 +221,37 @@ impl TransformOutput {
     pub fn with_port(mut self, name: impl Into<String>) -> Self {
         self.port = Some(name.into());
         self
+    }
+
+    /// Return the schema [`schema::Definition`] from this output.
+    ///
+    /// Takes a `schema_enabled` flag to determine if the full definition including the fields
+    /// and associated types should be returned, or if a simple definition should be returned.
+    /// A simple definition is just the default for the namespace. For the Vector namespace the
+    /// meanings are included.
+    /// Schema enabled is set in the users configuration.
+    #[must_use]
+    pub fn schema_definitions(
+        &self,
+        schema_enabled: bool,
+    ) -> HashMap<OutputId, schema::Definition> {
+        if schema_enabled {
+            self.log_schema_definitions.clone()
+        } else {
+            self.log_schema_definitions
+                .iter()
+                .map(|(output, definition)| {
+                    let mut new_definition =
+                        schema::Definition::default_for_namespace(definition.log_namespaces());
+
+                    if definition.log_namespaces().contains(&LogNamespace::Vector) {
+                        new_definition.add_meanings(definition.meanings());
+                    }
+
+                    (output.clone(), new_definition)
+                })
+                .collect()
+        }
     }
 }
 

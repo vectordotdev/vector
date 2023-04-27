@@ -14,14 +14,13 @@ use tokio_stream::{wrappers::BroadcastStream, Stream, StreamExt};
 use vector_config::NamedComponent;
 use vector_core::internal_event::DEFAULT_OUTPUT;
 
-use crate::topology::schema::possible_definitions;
 use crate::{
     api::schema::{
         components::state::component_by_component_key,
         filter::{self, filter_items},
         relay, sort,
     },
-    config::{ComponentKey, Config},
+    config::{get_transform_output_ids, ComponentKey, Config},
     filter_check,
 };
 
@@ -254,7 +253,6 @@ impl ComponentsSubscription {
 
 /// Update the 'global' configuration that will be consumed by component queries
 pub fn update_config(config: &Config) {
-    let mut cache = HashMap::new();
     let mut new_components = HashMap::new();
 
     // Sources
@@ -291,15 +289,13 @@ pub fn update_config(config: &Config) {
                 component_key: component_key.clone(),
                 component_type: transform.inner.get_component_name().to_string(),
                 inputs: transform.inputs.clone(),
-                outputs: transform
-                    .inner
-                    .outputs(
-                        &possible_definitions(&transform.inputs, config, &mut cache),
-                        config.schema.log_namespace(),
-                    )
-                    .into_iter()
-                    .map(|output| output.port.unwrap_or_else(|| DEFAULT_OUTPUT.to_string()))
-                    .collect(),
+                outputs: get_transform_output_ids(
+                    transform.inner.as_ref(),
+                    "".into(),
+                    config.schema.log_namespace(),
+                )
+                .map(|output| output.port.unwrap_or_else(|| DEFAULT_OUTPUT.to_string()))
+                .collect(),
             })),
         );
     }

@@ -106,6 +106,7 @@ impl TransformConfig for RouteConfig {
 
     fn outputs(
         &self,
+        _: enrichment::TableRegistry,
         input_definitions: &[(OutputId, schema::Definition)],
         _: LogNamespace,
     ) -> Vec<TransformOutput> {

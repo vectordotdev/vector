@@ -41,6 +41,7 @@ impl TransformConfig for NoopTransformConfig {
 
     fn outputs(
         &self,
+        _: enrichment::TableRegistry,
         definitions: &[(OutputId, Definition)],
         _: LogNamespace,
     ) -> Vec<TransformOutput> {

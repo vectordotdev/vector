@@ -127,6 +127,7 @@ impl TransformConfig for ReduceConfig {
 
     fn outputs(
         &self,
+        _: enrichment::TableRegistry,
         input_definitions: &[(OutputId, schema::Definition)],
         _: LogNamespace,
     ) -> Vec<TransformOutput> {
@@ -515,10 +516,14 @@ group_by = [ "request_id" ]
                     None,
                 );
             let schema_definitions = reduce_config
-                .outputs(&[("test".into(), input_definition)], LogNamespace::Legacy)
+                .outputs(
+                    enrichment::TableRegistry::default(),
+                    &[("test".into(), input_definition)],
+                    LogNamespace::Legacy,
+                )
                 .first()
                 .unwrap()
-                .log_schema_definitions
+                .schema_definitions(true)
                 .clone();
 
             let (tx, rx) = mpsc::channel(1);

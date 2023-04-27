@@ -159,6 +159,7 @@ impl TransformConfig for LogToMetricConfig {
 
     fn outputs(
         &self,
+        _: enrichment::TableRegistry,
         _: &[(OutputId, schema::Definition)],
         _: LogNamespace,
     ) -> Vec<TransformOutput> {

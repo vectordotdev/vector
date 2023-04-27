@@ -118,7 +118,7 @@ impl<'a> Builder<'a> {
         let enrichment_tables = self.load_enrichment_tables().await;
         let source_tasks = self.build_sources().await;
         self.build_transforms(enrichment_tables).await;
-        self.build_sinks().await;
+        self.build_sinks(enrichment_tables).await;
 
         // We should have all the data for the enrichment tables loaded now, so switch them over to
         // readonly.
@@ -402,8 +402,20 @@ impl<'a> Builder<'a> {
         {
             debug!(component = %key, "Building new transform.");
 
-            let input_definitions =
-                schema::input_definitions(&transform.inputs, self.config, &mut definition_cache);
+            let input_definitions = match schema::input_definitions(
+                &transform.inputs,
+                self.config,
+                enrichment_tables.clone(),
+                &mut definition_cache,
+            ) {
+                Ok(definitions) => definitions,
+                Err(_) => {
+                    // We have received an error whilst retrieving the definitions,
+                    // there is no point in continuing.
+
+                    return;
+                }
+            };
 
             let merged_definition: Definition = input_definitions
                 .iter()
@@ -424,9 +436,16 @@ impl<'a> Builder<'a> {
             // Create a map of the outputs to the list of possible definitions from those outputs.
             let schema_definitions = transform
                 .inner
-                .outputs(&input_definitions, self.config.schema.log_namespace())
+                .outputs(
+                    enrichment_tables.clone(),
+                    &input_definitions,
+                    self.config.schema.log_namespace(),
+                )
                 .into_iter()
-                .map(|output| (output.port, output.log_schema_definitions))
+                .map(|output| {
+                    let definitions = output.schema_definitions(self.config.schema.enabled);
+                    (output.port, definitions)
+                })
                 .collect::<HashMap<_, _>>();
 
             let context = TransformContext {
@@ -440,6 +459,7 @@ impl<'a> Builder<'a> {
 
             let node = TransformNode::from_parts(
                 key.clone(),
+                enrichment_tables.clone(),
                 transform,
                 &input_definitions,
                 self.config.schema.log_namespace(),
@@ -475,7 +495,7 @@ impl<'a> Builder<'a> {
         }
     }
 
-    async fn build_sinks(&mut self) {
+    async fn build_sinks(&mut self, enrichment_tables: &enrichment::TableRegistry) {
         for (key, sink) in self
             .config
             .sinks()
@@ -493,7 +513,12 @@ impl<'a> Builder<'a> {
             // At this point, we've validated that all transforms are valid, including any
             // transform that mutates the schema provided by their sources. We can now validate the
             // schema expectations of each individual sink.
-            if let Err(mut err) = schema::validate_sink_expectations(key, sink, self.config) {
+            if let Err(mut err) = schema::validate_sink_expectations(
+                key,
+                sink,
+                self.config,
+                enrichment_tables.clone(),
+            ) {
                 self.errors.append(&mut err);
             };
 
@@ -670,6 +695,7 @@ struct TransformNode {
 impl TransformNode {
     pub fn from_parts(
         key: ComponentKey,
+        enrichment_tables: enrichment::TableRegistry,
         transform: &TransformOuter<OutputId>,
         schema_definition: &[(OutputId, Definition)],
         global_log_namespace: LogNamespace,
@@ -679,9 +705,11 @@ impl TransformNode {
             typetag: transform.inner.get_component_name(),
             inputs: transform.inputs.clone(),
             input_details: transform.inner.input(),
-            outputs: transform
-                .inner
-                .outputs(schema_definition, global_log_namespace),
+            outputs: transform.inner.outputs(
+                enrichment_tables,
+                schema_definition,
+                global_log_namespace,
+            ),
             enable_concurrency: transform.inner.enable_concurrency(),
         }
     }

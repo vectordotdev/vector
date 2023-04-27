@@ -51,6 +51,7 @@ impl TransformConfig for BasicTransformConfig {
 
     fn outputs(
         &self,
+        _: enrichment::TableRegistry,
         definitions: &[(OutputId, schema::Definition)],
         _: LogNamespace,
     ) -> Vec<TransformOutput> {
