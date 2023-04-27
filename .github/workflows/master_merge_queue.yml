@@ -107,11 +107,14 @@ jobs:
     steps:
       # if the trigger was a merge group we evaluate the status of each required prerequisite job. Otherwise, return success.
       - name: validate
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          CHANGES_RESULT: ${{ needs.changes.result }}
+          CLI_RESULT: ${{ needs.test-cli.result }}
         if: |
           ${{ github.event_name == 'merge_group' }}
             && (${{ needs.changes.result == 'failure' }}
-              || ${{ needs.changes.test-cli == 'failure' }}
-            )
-        run: exit 1
+              || ${{ needs.changes.test-cli == 'failure' }})
+        run: echo "event_name=$EVENT_NAME changes_result=$CHANGES_RESULT cli_result=$CLI_RESULT" && exit 1
       - name: success
         run: echo "OK"
