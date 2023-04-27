@@ -105,16 +105,25 @@ jobs:
       - changes
       - test-cli
     steps:
+      # - uses: actions/checkout@v2
+      # - name: Succeed if pull_request
+      #   if: ${{ github.event_name == 'pull_request' }}
+      #   uses: Sibz/github-status-action@v1
+      #   with:
+      #     authToken: ${{secrets.GITHUB_TOKEN}}
+      #     context: 'Master Merge Queue'
+      #     description: 'Passed'
+      #     state: 'success'
+      #     sha: ${{github.event.pull_request.head.sha || github.sha}}
+
       # if the trigger was a merge group we evaluate the status of each required prerequisite job. Otherwise, return success.
       - name: validate
+        #if: always()
         env:
           EVENT_NAME: ${{ github.event_name }}
           CHANGES_RESULT: ${{ needs.changes.result }}
           CLI_RESULT: ${{ needs.test-cli.result }}
-        if: |
-          ${{ github.event_name == 'merge_group' }}
-            && (${{ needs.changes.result == 'failure' }}
-              || ${{ needs.changes.test-cli == 'failure' }})
-        run: echo "event_name=$EVENT_NAME changes_result=$CHANGES_RESULT cli_result=$CLI_RESULT" && exit 1
-      - name: success
-        run: echo "OK"
+        run: |
+          [$EVENT_NAME != "merge_group"] && echo "Success" && exit 0
+          [$CHANGES_RESULT == "failure" || $CLI_RESULT" == "failure" ]
+            && echo "Failed" && exit 1
