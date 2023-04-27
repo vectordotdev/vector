@@ -223,7 +223,7 @@ impl TransformOutput {
         self
     }
 
-    /// Return the schema [`schema::Definitions`] from this output.
+    /// Return the schema [`schema::Definition`] from this output.
     ///
     /// Takes a `schema_enabled` flag to determine if the full definition including the fields
     /// and associated types should be returned, or if a simple definition should be returned.

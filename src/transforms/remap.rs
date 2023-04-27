@@ -674,6 +674,14 @@ fn move_field_definitions_into_message(mut definition: schema::Definition) -> sc
             message,
         )])));
 
+        definition.event_kind_mut().remove_bytes();
+        definition.event_kind_mut().remove_integer();
+        definition.event_kind_mut().remove_float();
+        definition.event_kind_mut().remove_boolean();
+        definition.event_kind_mut().remove_timestamp();
+        definition.event_kind_mut().remove_regex();
+        definition.event_kind_mut().remove_null();
+
         *definition.event_kind_mut() = definition.event_kind().union(message);
     }
 
