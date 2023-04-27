@@ -2,18 +2,18 @@ use indexmap::{set::IndexSet, IndexMap};
 use std::collections::{HashMap, HashSet, VecDeque};
 
 use super::{
-    schema, ComponentKey, DataType, Output, OutputId, SinkConfig, SinkOuter, SourceOuter,
-    TransformOuter,
+    schema, ComponentKey, DataType, OutputId, SinkConfig, SinkOuter, SourceOuter, SourceOutput,
+    TransformOuter, TransformOutput,
 };
 
 #[derive(Debug, Clone)]
 pub enum Node {
     Source {
-        outputs: Vec<Output>,
+        outputs: Vec<SourceOutput>,
     },
     Transform {
         in_ty: DataType,
-        outputs: Vec<Output>,
+        outputs: Vec<TransformOutput>,
     },
     Sink {
         ty: DataType,
@@ -76,9 +76,10 @@ impl Graph {
                 id.clone(),
                 Node::Transform {
                     in_ty: transform.inner.input().data_type(),
-                    outputs: transform
-                        .inner
-                        .outputs(&schema::Definition::any(), schema.log_namespace()),
+                    outputs: transform.inner.outputs(
+                        &[(id.into(), schema::Definition::any())],
+                        schema.log_namespace(),
+                    ),
                 },
             );
         }
@@ -166,7 +167,12 @@ impl Graph {
     /// have inputs.
     fn get_output_type(&self, id: &OutputId) -> DataType {
         match &self.nodes[&id.component] {
-            Node::Source { outputs } | Node::Transform { outputs, .. } => outputs
+            Node::Source { outputs } => outputs
+                .iter()
+                .find(|output| output.port == id.port)
+                .map(|output| output.ty)
+                .expect("output didn't exist"),
+            Node::Transform { outputs, .. } => outputs
                 .iter()
                 .find(|output| output.port == id.port)
                 .map(|output| output.ty)
@@ -257,7 +263,14 @@ impl Graph {
             .iter()
             .flat_map(|(key, node)| match node {
                 Node::Sink { .. } => vec![],
-                Node::Source { outputs } | Node::Transform { outputs, .. } => outputs
+                Node::Source { outputs } => outputs
+                    .iter()
+                    .map(|output| OutputId {
+                        component: key.clone(),
+                        port: output.port.clone(),
+                    })
+                    .collect(),
+                Node::Transform { outputs, .. } => outputs
                     .iter()
                     .map(|output| OutputId {
                         component: key.clone(),
@@ -353,6 +366,7 @@ impl Graph {
 #[cfg(test)]
 mod test {
     use similar_asserts::assert_eq;
+    use vector_core::schema::Definition;
 
     use super::*;
 
@@ -361,7 +375,11 @@ mod test {
             self.nodes.insert(
                 id.into(),
                 Node::Source {
-                    outputs: vec![Output::default(ty)],
+                    outputs: vec![match ty {
+                        DataType::Metric => SourceOutput::new_metrics(),
+                        DataType::Trace => SourceOutput::new_traces(),
+                        _ => SourceOutput::new_logs(ty, Definition::any()),
+                    }],
                 },
             );
         }
@@ -379,7 +397,10 @@ mod test {
                 id.clone(),
                 Node::Transform {
                     in_ty,
-                    outputs: vec![Output::default(out_ty)],
+                    outputs: vec![TransformOutput::new(
+                        out_ty,
+                        [("test".into(), Definition::default_legacy_namespace())].into(),
+                    )],
                 },
             );
             for from in inputs {
@@ -393,9 +414,13 @@ mod test {
         fn add_transform_output(&mut self, id: &str, name: &str, ty: DataType) {
             let id = id.into();
             match self.nodes.get_mut(&id) {
-                Some(Node::Transform { outputs, .. }) => {
-                    outputs.push(Output::default(ty).with_port(name))
-                }
+                Some(Node::Transform { outputs, .. }) => outputs.push(
+                    TransformOutput::new(
+                        ty,
+                        [("test".into(), Definition::default_legacy_namespace())].into(),
+                    )
+                    .with_port(name),
+                ),
                 _ => panic!("invalid transform"),
             }
         }
@@ -613,13 +638,13 @@ mod test {
         graph.nodes.insert(
             ComponentKey::from("foo.bar"),
             Node::Source {
-                outputs: vec![Output::default(DataType::all())],
+                outputs: vec![SourceOutput::new_logs(DataType::all(), Definition::any())],
             },
         );
         graph.nodes.insert(
             ComponentKey::from("foo.bar"),
             Node::Source {
-                outputs: vec![Output::default(DataType::all())],
+                outputs: vec![SourceOutput::new_logs(DataType::all(), Definition::any())],
             },
         );
         graph.nodes.insert(
@@ -627,8 +652,15 @@ mod test {
             Node::Transform {
                 in_ty: DataType::all(),
                 outputs: vec![
-                    Output::default(DataType::all()),
-                    Output::default(DataType::all()).with_port("bar"),
+                    TransformOutput::new(
+                        DataType::all(),
+                        [("test".into(), Definition::default_legacy_namespace())].into(),
+                    ),
+                    TransformOutput::new(
+                        DataType::all(),
+                        [("test".into(), Definition::default_legacy_namespace())].into(),
+                    )
+                    .with_port("bar"),
                 ],
             },
         );
@@ -637,7 +669,7 @@ mod test {
         graph.nodes.insert(
             ComponentKey::from("baz.errors"),
             Node::Source {
-                outputs: vec![Output::default(DataType::all())],
+                outputs: vec![SourceOutput::new_logs(DataType::all(), Definition::any())],
             },
         );
         graph.nodes.insert(
@@ -645,8 +677,15 @@ mod test {
             Node::Transform {
                 in_ty: DataType::all(),
                 outputs: vec![
-                    Output::default(DataType::all()),
-                    Output::default(DataType::all()).with_port("errors"),
+                    TransformOutput::new(
+                        DataType::all(),
+                        [("test".into(), Definition::default_legacy_namespace())].into(),
+                    ),
+                    TransformOutput::new(
+                        DataType::all(),
+                        [("test".into(), Definition::default_legacy_namespace())].into(),
+                    )
+                    .with_port("errors"),
                 ],
             },
         );

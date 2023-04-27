@@ -5,14 +5,17 @@ use futures_util::{future, stream::BoxStream, FutureExt, StreamExt};
 use tokio::sync::{oneshot, Mutex};
 use vector_config::configurable_component;
 use vector_core::{
-    config::{DataType, Input, LogNamespace, Output},
+    config::{DataType, Input, LogNamespace},
     event::Event,
+    schema,
     sink::{StreamSink, VectorSink},
 };
 
 use crate::{
     conditions::Condition,
-    config::{AcknowledgementsConfig, SinkConfig, SinkContext, SourceConfig, SourceContext},
+    config::{
+        AcknowledgementsConfig, SinkConfig, SinkContext, SourceConfig, SourceContext, SourceOutput,
+    },
     impl_generate_config_from_default,
     sinks::Healthcheck,
     sources,
@@ -43,8 +46,11 @@ impl SourceConfig for UnitTestSourceConfig {
         }))
     }
 
-    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
-        vec![Output::default(DataType::all())]
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
+        vec![SourceOutput::new_logs(
+            DataType::all(),
+            schema::Definition::default_legacy_namespace(),
+        )]
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -97,8 +103,11 @@ impl SourceConfig for UnitTestStreamSourceConfig {
         }))
     }
 
-    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
-        vec![Output::default(DataType::all())]
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
+        vec![SourceOutput::new_logs(
+            DataType::all(),
+            schema::Definition::default_legacy_namespace(),
+        )]
     }
 
     fn can_acknowledge(&self) -> bool {

@@ -16,7 +16,7 @@ use vector_core::{
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
-    config::{GenerateConfig, Output, SourceConfig, SourceContext},
+    config::{GenerateConfig, SourceConfig, SourceContext, SourceOutput},
     event::Event,
     internal_events::StreamClosedError,
     nats::{from_tls_auth_config, NatsAuthConfig, NatsConfigError},
@@ -135,7 +135,7 @@ impl SourceConfig for NatsSourceConfig {
         )))
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         let log_namespace = global_log_namespace.merge(self.log_namespace);
         let legacy_subject_key_field = self
             .subject_key_field
@@ -154,7 +154,10 @@ impl SourceConfig for NatsSourceConfig {
                 None,
             );
 
-        vec![Output::default(self.decoding.output_type()).with_schema_definition(schema_definition)]
+        vec![SourceOutput::new_logs(
+            self.decoding.output_type(),
+            schema_definition,
+        )]
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -290,10 +293,10 @@ mod tests {
             ..Default::default()
         };
 
-        let definition = config.outputs(LogNamespace::Vector)[0]
-            .clone()
-            .log_schema_definition
-            .unwrap();
+        let definitions = config
+            .outputs(LogNamespace::Vector)
+            .remove(0)
+            .schema_definition(true);
 
         let expected_definition =
             Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
@@ -310,7 +313,7 @@ mod tests {
                 )
                 .with_metadata_field(&owned_value_path!("nats", "subject"), Kind::bytes(), None);
 
-        assert_eq!(definition, expected_definition);
+        assert_eq!(definitions, Some(expected_definition));
     }
 
     #[test]
@@ -319,10 +322,10 @@ mod tests {
             subject_key_field: default_subject_key_field(),
             ..Default::default()
         };
-        let definition = config.outputs(LogNamespace::Legacy)[0]
-            .clone()
-            .log_schema_definition
-            .unwrap();
+        let definitions = config
+            .outputs(LogNamespace::Legacy)
+            .remove(0)
+            .schema_definition(true);
 
         let expected_definition = Definition::new_with_default_metadata(
             Kind::object(Collection::empty()),
@@ -337,7 +340,7 @@ mod tests {
         .with_event_field(&owned_value_path!("source_type"), Kind::bytes(), None)
         .with_event_field(&owned_value_path!("subject"), Kind::bytes(), None);
 
-        assert_eq!(definition, expected_definition);
+        assert_eq!(definitions, Some(expected_definition));
     }
 }
 

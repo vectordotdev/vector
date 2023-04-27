@@ -1,10 +1,13 @@
 use vector_common::internal_event::{Count, InternalEventHandle as _, Registered};
 use vector_config::configurable_component;
-use vector_core::config::LogNamespace;
+use vector_core::config::{clone_input_definitions, LogNamespace};
 
 use crate::{
     conditions::{AnyCondition, Condition},
-    config::{DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext},
+    config::{
+        DataType, GenerateConfig, Input, OutputId, TransformConfig, TransformContext,
+        TransformOutput,
+    },
     event::Event,
     internal_events::FilterEventsDropped,
     schema,
@@ -48,8 +51,15 @@ impl TransformConfig for FilterConfig {
         Input::all()
     }
 
-    fn outputs(&self, merged_definition: &schema::Definition, _: LogNamespace) -> Vec<Output> {
-        vec![Output::default(DataType::all()).with_schema_definition(merged_definition.clone())]
+    fn outputs(
+        &self,
+        input_definitions: &[(OutputId, schema::Definition)],
+        _: LogNamespace,
+    ) -> Vec<TransformOutput> {
+        vec![TransformOutput::new(
+            DataType::all(),
+            clone_input_definitions(input_definitions),
+        )]
     }
 
     fn enable_concurrency(&self) -> bool {

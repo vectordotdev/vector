@@ -12,7 +12,7 @@ use crate::common::sqs::SqsClientBuilder;
 use crate::tls::TlsConfig;
 use crate::{
     aws::{auth::AwsAuthentication, region::RegionOrEndpoint},
-    config::{Output, SourceAcknowledgementsConfig, SourceConfig, SourceContext},
+    config::{SourceAcknowledgementsConfig, SourceConfig, SourceContext, SourceOutput},
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
     sources::aws_sqs::source::SqsSource,
 };
@@ -131,7 +131,7 @@ impl SourceConfig for AwsSqsConfig {
         ))
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         let schema_definition = self
             .decoding
             .schema_definition(global_log_namespace.merge(self.log_namespace))
@@ -144,7 +144,10 @@ impl SourceConfig for AwsSqsConfig {
                 Some("timestamp"),
             );
 
-        vec![Output::default(self.decoding.output_type()).with_schema_definition(schema_definition)]
+        vec![SourceOutput::new_logs(
+            self.decoding.output_type(),
+            schema_definition,
+        )]
     }
 
     fn can_acknowledge(&self) -> bool {

@@ -3,7 +3,10 @@ use vector_core::config::LogNamespace;
 
 use crate::{
     conditions::{AnyCondition, Condition},
-    config::{DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext},
+    config::{
+        DataType, GenerateConfig, Input, OutputId, TransformConfig, TransformContext,
+        TransformOutput,
+    },
     event::Event,
     internal_events::SampleEventDiscarded,
     schema,
@@ -66,9 +69,18 @@ impl TransformConfig for SampleConfig {
         Input::new(DataType::Log | DataType::Trace)
     }
 
-    fn outputs(&self, merged_definition: &schema::Definition, _: LogNamespace) -> Vec<Output> {
-        vec![Output::default(DataType::Log | DataType::Trace)
-            .with_schema_definition(merged_definition.clone())]
+    fn outputs(
+        &self,
+        input_definitions: &[(OutputId, schema::Definition)],
+        _: LogNamespace,
+    ) -> Vec<TransformOutput> {
+        vec![TransformOutput::new(
+            DataType::Log | DataType::Trace,
+            input_definitions
+                .iter()
+                .map(|(output, definition)| (output.clone(), definition.clone()))
+                .collect(),
+        )]
     }
 }
 

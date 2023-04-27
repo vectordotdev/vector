@@ -15,7 +15,9 @@ use super::util::MultilineConfig;
 use crate::{
     aws::{auth::AwsAuthentication, create_client, RegionOrEndpoint},
     common::{s3::S3ClientBuilder, sqs::SqsClientBuilder},
-    config::{Output, ProxyConfig, SourceAcknowledgementsConfig, SourceConfig, SourceContext},
+    config::{
+        ProxyConfig, SourceAcknowledgementsConfig, SourceConfig, SourceContext, SourceOutput,
+    },
     line_agg,
     serde::bool_or_struct,
     tls::TlsConfig,
@@ -138,7 +140,7 @@ impl SourceConfig for AwsS3Config {
         }
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         let log_namespace = global_log_namespace.merge(self.log_namespace);
         let mut schema_definition = BytesDeserializerConfig
             .schema_definition(log_namespace)
@@ -185,7 +187,7 @@ impl SourceConfig for AwsS3Config {
             schema_definition = schema_definition.unknown_fields(Kind::bytes());
         }
 
-        vec![Output::default(DataType::Log).with_schema_definition(schema_definition)]
+        vec![SourceOutput::new_logs(DataType::Log, schema_definition)]
     }
 
     fn can_acknowledge(&self) -> bool {
