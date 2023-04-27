@@ -443,7 +443,7 @@ impl<'a> Builder<'a> {
                 )
                 .into_iter()
                 .map(|output| {
-                    let definitions = output.schema_definitions(config.schema_enabled());
+                    let definitions = output.schema_definitions(self.config.schema.enabled);
                     (output.port, definitions)
                 })
                 .collect::<HashMap<_, _>>();
