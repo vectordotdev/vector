@@ -559,25 +559,8 @@ where
     Runner: VrlRunner + Clone + Send + Sync,
 {
     fn transform(&mut self, event: Event, output: &mut TransformOutputsBuf) {
-        // If a program can fail or abort at runtime and we know that we will still need to forward
-        // the event in that case (either to the main output or `dropped`, depending on the
-        // config), we need to clone the original event and keep it around, to allow us to discard
-        // any mutations made to the event while the VRL program runs, before it failed or aborted.
-        //
-        // The `drop_on_{error, abort}` transform config allows operators to remove events from the
-        // main output if they're failed or aborted, in which case we can skip the cloning, since
-        // any mutations made by VRL will be ignored regardless. If they hav configured
-        // `reroute_dropped`, however, we still need to do the clone to ensure that we can forward
-        // the event to the `dropped` output.
-        let forward_on_error = !self.drop_on_error || self.reroute_dropped;
-        let forward_on_abort = !self.drop_on_abort || self.reroute_dropped;
-        let original_event = if (self.program.info().fallible && forward_on_error)
-            || (self.program.info().abortable && forward_on_abort)
-        {
-            Some(event.clone())
-        } else {
-            None
-        };
+        // save the original event to output in in the case of errors
+        let original_event = event.clone();
 
         let mut target = VrlTarget::new(
             event,
@@ -619,12 +602,9 @@ where
                 };
 
                 if !drop {
-                    let event = original_event.expect("event will be set");
-
-                    push_default(event, output, &self.default_schema_definition);
+                    push_default(original_event, output, &self.default_schema_definition);
                 } else if self.reroute_dropped {
-                    let mut event = original_event.expect("event will be set");
-
+                    let mut event = original_event;
                     self.annotate_dropped(&mut event, reason, error);
                     push_dropped(event, output, &self.dropped_schema_definition);
                 }
