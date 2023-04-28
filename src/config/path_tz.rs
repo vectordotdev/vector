@@ -5,8 +5,7 @@ use std::{
 };
 use vector_config::configurable_component;
 
-/// handle tz offset configuration
-/// Defaults to UTC
+/// Configure timezone
 #[configurable_component]
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[serde(try_from = "String", into = "String")]
