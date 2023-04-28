@@ -14,10 +14,11 @@ use crate::{
         mock::{
             basic_sink, basic_sink_failing_healthcheck, basic_sink_with_data, basic_source,
             basic_source_with_data, basic_source_with_event_counter, basic_transform,
+            error_definition_transform,
         },
         start_topology, trace_init,
     },
-    topology,
+    topology::{self, builder},
 };
 use futures::{future, stream, StreamExt};
 use tokio::{
@@ -817,4 +818,27 @@ async fn topology_disk_buffer_flushes_on_idle() {
     // make sure there are no unexpected stragglers
     let rest = out1.collect::<Vec<_>>().await;
     assert_eq!(rest, vec![]);
+}
+
+#[tokio::test]
+async fn topology_transform_error_definition() {
+    trace_init();
+
+    let mut config = Config::builder();
+
+    config.add_source("in", basic_source().1);
+    config.add_transform("transform", &["in"], error_definition_transform());
+    config.add_sink("sink", &["transform"], basic_sink(10).1);
+
+    let config = config.build().unwrap();
+    let diff = ConfigDiff::initial(&config);
+    let errors = match builder::build_pieces(&config, &diff, HashMap::new()).await {
+        Ok(_) => panic!("build pieces should not succeed"),
+        Err(err) => err,
+    };
+
+    assert_eq!(
+        r#"Transform "transform": It all went horribly wrong"#,
+        errors[0]
+    );
 }

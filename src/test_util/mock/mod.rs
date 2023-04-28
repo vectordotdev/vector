@@ -16,7 +16,7 @@ use self::{
         BackpressureSourceConfig, BasicSourceConfig, ErrorSourceConfig, PanicSourceConfig,
         TripwireSourceConfig,
     },
-    transforms::BasicTransformConfig,
+    transforms::{BasicTransformConfig, ErrorDefinitionTransformConfig},
 };
 
 pub mod sinks;
@@ -64,6 +64,10 @@ pub fn tripwire_source() -> (Trigger, TripwireSourceConfig) {
 
 pub fn basic_transform(suffix: &str, increase: f64) -> BasicTransformConfig {
     BasicTransformConfig::new(suffix.to_owned(), increase)
+}
+
+pub const fn error_definition_transform() -> ErrorDefinitionTransformConfig {
+    ErrorDefinitionTransformConfig {}
 }
 
 pub const fn backpressure_sink(num_to_consume: usize) -> BackpressureSinkConfig {

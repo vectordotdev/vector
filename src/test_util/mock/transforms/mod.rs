@@ -6,6 +6,9 @@ pub use self::basic::BasicTransformConfig;
 mod noop;
 pub use self::noop::NoopTransformConfig;
 
+mod error_definitions;
+pub use self::error_definitions::ErrorDefinitionTransformConfig;
+
 /// Transform types.
 #[configurable_component]
 #[derive(Clone, Debug)]
