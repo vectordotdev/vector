@@ -1,0 +1,44 @@
+data_dir = "/var/lib/vector"
+
+##
+## Sources
+##
+
+[sources.internal_metrics]
+type = "internal_metrics"
+
+[sources.datadog_agent]
+type = "datadog_agent"
+acknowledgements = false
+address = "0.0.0.0:8282"
+
+##
+## Transforms
+##
+
+[transforms.remap]
+type = "remap"
+inputs = ["datadog_agent"]
+drop_on_abort = false
+drop_on_error = false
+source = '''
+.hostname = "vector"
+
+if random_bool() {
+  abort!("ohno")
+}
+'''
+
+##
+## Sinks
+##
+
+[sinks.prometheus]
+type = "prometheus_exporter"
+inputs = ["internal_metrics"]
+address = "0.0.0.0:9090"
+
+[sinks.blackhole]
+type = "blackhole"
+print_interval_secs = 0
+inputs = ["remap"]
