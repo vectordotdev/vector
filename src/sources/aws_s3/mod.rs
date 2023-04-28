@@ -2,6 +2,7 @@ use std::{convert::TryInto, io::ErrorKind};
 
 use async_compression::tokio::bufread;
 use aws_sdk_s3::types::ByteStream;
+use codecs::decoding::{DeserializerConfig, FramingConfig, NewlineDelimitedDecoderOptions};
 use codecs::BytesDeserializerConfig;
 use futures::{stream, stream::StreamExt, TryStreamExt};
 use lookup::owned_value_path;
@@ -9,9 +10,11 @@ use snafu::Snafu;
 use tokio_util::io::StreamReader;
 use value::{kind::Collection, Kind};
 use vector_config::configurable_component;
-use vector_core::config::{DataType, LegacyKey, LogNamespace};
+use vector_core::config::{LegacyKey, LogNamespace};
 
 use super::util::MultilineConfig;
+use crate::codecs::DecodingConfig;
+use crate::config::DataType;
 use crate::{
     aws::{auth::AwsAuthentication, create_client, RegionOrEndpoint},
     common::{s3::S3ClientBuilder, sqs::SqsClientBuilder},
@@ -19,7 +22,7 @@ use crate::{
         ProxyConfig, SourceAcknowledgementsConfig, SourceConfig, SourceContext, SourceOutput,
     },
     line_agg,
-    serde::bool_or_struct,
+    serde::{bool_or_struct, default_decoding},
     tls::TlsConfig,
 };
 
@@ -71,7 +74,8 @@ enum Strategy {
 //
 // Maybe showing defaults at all, when there are required properties, doesn't actually make sense? :thinkies:
 #[configurable_component(source("aws_s3", "Collect logs from AWS S3."))]
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Derivative)]
+#[derivative(Default)]
 #[serde(default, deny_unknown_fields)]
 pub struct AwsS3Config {
     #[serde(flatten)]
@@ -115,6 +119,23 @@ pub struct AwsS3Config {
     #[configurable(metadata(docs::hidden))]
     #[serde(default)]
     log_namespace: Option<bool>,
+
+    #[configurable(derived)]
+    #[serde(default = "default_framing")]
+    #[derivative(Default(value = "default_framing()"))]
+    pub framing: FramingConfig,
+
+    #[configurable(derived)]
+    #[serde(default = "default_decoding")]
+    #[derivative(Default(value = "default_decoding()"))]
+    pub decoding: DeserializerConfig,
+}
+
+const fn default_framing() -> FramingConfig {
+    // This is used for backwards compatibility. It used to be the only (hardcoded) option.
+    FramingConfig::NewlineDelimited {
+        newline_delimited: NewlineDelimitedDecoderOptions { max_length: None },
+    }
 }
 
 impl_generate_config_from_default!(AwsS3Config);
@@ -133,7 +154,7 @@ impl SourceConfig for AwsS3Config {
 
         match self.strategy {
             Strategy::Sqs => Ok(Box::pin(
-                self.create_sqs_ingestor(multiline_config, &cx.proxy)
+                self.create_sqs_ingestor(multiline_config, &cx.proxy, log_namespace)
                     .await?
                     .run(cx, self.acknowledgements, log_namespace),
             )),
@@ -200,6 +221,7 @@ impl AwsS3Config {
         &self,
         multiline: Option<line_agg::Config>,
         proxy: &ProxyConfig,
+        log_namespace: LogNamespace,
     ) -> crate::Result<sqs::Ingestor> {
         let region = self
             .region
@@ -221,6 +243,9 @@ impl AwsS3Config {
         )
         .await?;
 
+        let decoder =
+            DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace).build();
+
         match self.sqs {
             Some(ref sqs) => {
                 let sqs_client = create_client::<SqsClientBuilder>(
@@ -240,6 +265,7 @@ impl AwsS3Config {
                     sqs.clone(),
                     self.compression,
                     multiline,
+                    decoder,
                 )
                 .await?;
 
