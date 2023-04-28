@@ -25,7 +25,7 @@ source = '''
 .hostname = "vector"
 
 if random_bool() {
-  abort!("ohno")
+  abort
 }
 '''
 
