@@ -39,6 +39,12 @@ jobs:
     steps:
       # For PR comment trigger, extra steps are required to associate the workflow with the PR.
 
+      # Find the branch that the comment was made in.
+      - name: (PR comment) Get PR branch
+        if: ${{ github.event_name != 'workflow_call' }}
+        uses: xt0rted/pull-request-comment-branch@v1
+        id: comment-branch
+
       # Indicate in the PR's CI pane that this job is running.
       - name: (PR comment) Set latest commit status as pending
         uses: myrotvorets/set-commit-status-action@master
@@ -46,12 +52,6 @@ jobs:
           sha: ${{ steps.comment-branch.outputs.head_sha }}
           token: ${{ secrets.GITHUB_TOKEN }}
           status: pending
-
-      # Find the branch that the comment was made in.
-      - name: (PR comment) Get PR branch
-        if: ${{ github.event_name != 'workflow_call' }}
-        uses: xt0rted/pull-request-comment-branch@v1
-        id: comment-branch
 
       # Checkout the branch, using the PR ref.
       - name: (PR comment) Checkout PR branch
