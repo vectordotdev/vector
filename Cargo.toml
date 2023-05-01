@@ -236,7 +236,7 @@ vrl-stdlib = { package = "vrl-stdlib", git = "https://github.com/vectordotdev/vr
 arc-swap = { version = "1.6", default-features = false, optional = true }
 async-compression = { version = "0.3.15", default-features = false, features = ["tokio", "gzip", "zstd"], optional = true }
 apache-avro = { version = "0.14.0", default-features = false, optional = true }
-axum = { version = "0.6.7", default-features = false }
+axum = { version = "0.6.18", default-features = false }
 base64 = { version = "0.21.0", default-features = false, optional = true }
 bloom = { version = "0.3.2", default-features = false, optional = true }
 bollard = { version = "0.14.0", default-features = false, features = ["ssl", "chrono"], optional = true }
