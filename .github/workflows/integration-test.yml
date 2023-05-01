@@ -142,14 +142,14 @@ jobs:
           TEST_DATADOG_API_KEY: ${{ secrets.CI_TEST_DATADOG_API_KEY }}
           SPLUNK_VERSION: ${{ matrix.env.SPLUNK_VERSION }}
 
-      # Indicate in the PR's CI pane that this job is complete
-      - name: (PR comment) Set latest commit status as ${{ job.status }}
+      # Indicate in the PR's CI pane that this job is complete if necessary
+      - name: (PR comment) Set latest commit status as failure
         uses: myrotvorets/set-commit-status-action@master
-        if: always() && github.event_name == 'issue_comment'
+        if: failure() && github.event_name == 'issue_comment'
         with:
           sha: ${{ steps.comment-branch.outputs.head_sha }}
           token: ${{ secrets.GITHUB_TOKEN }}
-          status: ${{ job.status }}
+          status: 'failure'
 
   test-integration-check:
     name: Integration Tests
@@ -157,19 +157,35 @@ jobs:
     needs:
       - test-integration
     steps:
+      # Find the branch that the comment was made in.
+      - name: (PR comment) Get PR branch
+        if: ${{ github.event_name == 'issue_comment' }}
+        uses: xt0rted/pull-request-comment-branch@v1
+        id: comment-branch
+
+      # Indicate in the PR's CI pane that this job is complete
+      - name: (PR comment) Set latest commit status as success
+        uses: myrotvorets/set-commit-status-action@master
+        if: github.event_name == 'issue_comment'
+        with:
+          sha: ${{ steps.comment-branch.outputs.head_sha }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          status: 'success'
+
       - name: validate
         run: echo "OK"
 
-  master-failure:
-    name: master-failure
-    if: failure() && github.ref == 'refs/heads/something_clever' # TODO just to be safe
-    needs:
-      - test-integration-check
-    runs-on: ubuntu-20.04
-    steps:
-    - name: Discord notification
-      env:
-        DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
-      uses: Ilshidur/action-discord@0.3.2
-      with:
-        args: "Master integration tests failed: <https://github.com/${{github.repository}}/actions/runs/${{github.run_id}}>"
+ # TODO I guess don't need this if not triggering on master
+  # master-failure:
+  #   name: master-failure
+  #   if: failure() && github.ref == 'refs/heads/something_clever' # TODO just to be safe
+  #   needs:
+  #     - test-integration-check
+  #   runs-on: ubuntu-20.04
+  #   steps:
+  #   - name: Discord notification
+  #     env:
+  #       DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+  #     uses: Ilshidur/action-discord@0.3.2
+  #     with:
+  #       args: "Master integration tests failed: <https://github.com/${{github.repository}}/actions/runs/${{github.run_id}}>"
