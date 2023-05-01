@@ -29,7 +29,34 @@ jobs:
       github.event.workflow_call
         || (github.event.issue.pull_request && contains(github.event.payload.comment.body, '/ci-deploy-misc'))
     steps:
-      - uses: actions/checkout@v3
+      # For PR comment trigger, extra steps are required to associate the workflow with the PR.
+
+      # Indicate in the PR's CI pane that this job is running.
+      - name: (PR comment) Set latest commit status as pending
+        uses: myrotvorets/set-commit-status-action@master
+        with:
+          sha: ${{ steps.comment-branch.outputs.head_sha }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          status: pending
+
+      # Find the branch that the comment was made in.
+      - name: (PR comment) Get PR branch
+        if: ${{ github.event_name != 'workflow_call' }}
+        uses: xt0rted/pull-request-comment-branch@v1
+        id: comment-branch
+
+      # Checkout the branch, using the PR ref.
+      - name: (PR comment) Checkout PR branch
+        if: ${{ github.event_name != 'workflow_call' }}
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ steps.comment-branch.outputs.head_ref }}
+
+      # Checkout the default branch otherwise.
+      - name: Checkout branch
+        if: ${{ github.event_name == 'workflow_call' }}
+        uses: actions/checkout@v3
+
       - uses: actions/cache@v3
         name: Cache Cargo registry + index
         with:
@@ -41,9 +68,19 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-
+
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: echo "::add-matcher::.github/matchers/rust.json"
       - run: make test-behavior
       - run: make check-examples
       - run: make test-docs
+
+      # Indicate in the PR's CI pane that this job is complete
+      - name: (PR comment) Set latest commit status as ${{ job.status }}
+        uses: myrotvorets/set-commit-status-action@master
+        if: always() && github.event_name != 'workflow_call'
+        with:
+          sha: ${{ steps.comment-branch.outputs.head_sha }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          status: ${{ job.status }}
