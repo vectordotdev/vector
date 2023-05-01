@@ -29,10 +29,37 @@ jobs:
     env:
       CARGO_INCREMENTAL: 0
     if: |
-      github.event.workflow_call
-        || (github.event.issue.pull_request && contains(github.event.payload.comment.body, '/ci-deploy-unit-mac'))
+      github.event_name == 'workflow_call'
+        || (github.event_name == 'issue_comment' && contains(github.event.comment.body, '/ci-deploy-unit-mac'))
     steps:
-      - uses: actions/checkout@v3
+
+      # For PR comment trigger, extra steps are required to get the branch associated with the PR
+      # that the comment was made in.
+      - name: (PR comment) Get PR branch
+        if: ${{ github.event_name != 'workflow_call' }}
+        uses: xt0rted/pull-request-comment-branch@v1
+        id: comment-branch
+
+      # Checkout the branch, using the PR ref, if this is from a PR comment trigger
+      - name: (PR comment) Checkout PR branch
+        if: ${{ github.event_name != 'workflow_call' }}
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ steps.comment-branch.outputs.head_ref }}
+
+      # Checkout the default branch otherwise
+      - name: Checkout branch
+        if: ${{ github.event_name == 'workflow_call' }}
+        uses: actions/checkout@v3
+
+      # Indicate in the PR's CI pane that this job is running
+      - name: (PR comment) Set latest commit status as pending
+        uses: myrotvorets/set-commit-status-action@master
+        with:
+          sha: ${{ steps.comment-branch.outputs.head_sha }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          status: pending
+
       - uses: actions/cache@v3
         name: Cache Cargo registry + index
         with:
@@ -44,8 +71,18 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-
+
       - run: bash scripts/environment/bootstrap-macos-10.sh
       - run: bash scripts/environment/prepare.sh
       - run: echo "::add-matcher::.github/matchers/rust.json"
       - run: make test
       - run: make test-behavior
+
+      # Indicate in the PR's CI pane that this job is complete
+      - name: (PR comment) Set latest commit status as ${{ job.status }}
+        uses: myrotvorets/set-commit-status-action@master
+        if: always() && github.event_name != 'workflow_call'
+        with:
+          sha: ${{ steps.comment-branch.outputs.head_sha }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          status: ${{ job.status }}
