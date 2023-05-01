@@ -27,8 +27,8 @@ jobs:
       CARGO_INCREMENTAL: 0
     if: |
       github.event_name == 'workflow_call'
-        || (github.event_name == 'issue_comment')
-#        || (github.event_name == 'issue_comment' && contains(github.event.payload.comment.body, '/ci-deploy-cli'))
+         || (github.event_name == 'issue_comment' && contains(github.event.comment.body, '/ci-deploy-cli'))
+#        || (github.event_name == 'issue_comment')
     steps:
       - name: test
         run: echo "OK"
@@ -38,14 +38,15 @@ jobs:
         uses: xt0rted/pull-request-comment-branch@v1
         id: comment-branch
 
-      - name: Checkout PR branch
+      - name: Get PR branch
         if: ${{ github.event_name != 'workflow_call' }}
         uses: actions/checkout@v3
         with:
           ref: ${{ steps.comment-branch.outputs.head_ref }}
 
-      - uses: actions/checkout@v3
+      - name: Get PR branch
         if: ${{ github.event_name == 'workflow_call' }}
+        uses: actions/checkout@v3
 
       - name: Cache Cargo registry + index
         uses: actions/cache@v3
