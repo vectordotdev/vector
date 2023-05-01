@@ -241,7 +241,14 @@ jobs:
     needs: test-e2e-kubernetes
     if: success() && github.event_name == 'issue_comment'
     steps:
-      - uses: myrotvorets/set-commit-status-action@master
+      # Find the branch that the comment was made in.
+      - name: Get PR branch
+        if: ${{ github.event_name == 'issue_comment' }}
+        uses: xt0rted/pull-request-comment-branch@v1
+        id: comment-branch
+
+      - name: Submit success
+        uses: myrotvorets/set-commit-status-action@master
         with:
           sha: ${{ steps.comment-branch.outputs.head_sha }}
           token: ${{ secrets.GITHUB_TOKEN }}
