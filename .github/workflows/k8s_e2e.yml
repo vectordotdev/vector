@@ -2,10 +2,10 @@ name: K8S E2E Suite
 
 on:
   workflow_dispatch:
+  # For now, only trigger this on comment. We can run it based on files changed, in the merge queue.
   issue_comment:
     types: [created]
-  #merge_group:
-  #  types: [checks_requested]
+
   # TODO this scoping would need to be re enabled as part of the job itself, but I think that can be delayed
   # until the sub task to run tests on file changes detection is implemented
   # push:
@@ -117,7 +117,7 @@ jobs:
             const ci_condition_label = 'ci-condition: k8s e2e all targets'
 
             // Planing.
-            const is_in_pull_request = !!context.payload.pull_request;
+            const is_in_pull_request = !!context.payload.issue_comment;
             const should_test_all_targets = (
               !is_in_pull_request ||
               context.payload.pull_request.labels.some(label => label.name === ci_condition_label)
