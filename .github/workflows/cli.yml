@@ -27,7 +27,7 @@ jobs:
       CARGO_INCREMENTAL: 0
     if: |
       github.event_name == 'workflow_call'
-        || (github.event_name == 'pull_request' && contains(github.event.payload.comment.body, '/ci-deploy-cli'))
+        || (github.event_name == 'issue_comment' && contains(github.event.payload.comment.body, '/ci-deploy-cli'))
     steps:
       - name: Get PR branch
         if: ${{ github.event_name != 'workflow_call' }}
