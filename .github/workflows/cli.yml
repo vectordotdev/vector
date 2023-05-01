@@ -27,11 +27,19 @@ jobs:
       CARGO_INCREMENTAL: 0
     if: |
       !github.event.pull_request
-        || github.event.issue.pull_request && contains(github.event.payload.comment.body, '/ci-deploy-cli')
+        || (github.event.issue.pull_request && contains(github.event.payload.comment.body, '/ci-deploy-cli'))
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/cache@v3
-        name: Cache Cargo registry + index
+      - name: Get PR branch
+        uses: xt0rted/pull-request-comment-branch@v1
+        id: comment-branch
+
+      - name: Checkout PR branch
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ steps.comment-branch.outputs.head_ref }}
+
+      - name: Cache Cargo registry + index
+        uses: actions/cache@v3
         with:
           path: |
             ~/.cargo/bin/
@@ -41,6 +49,7 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-
+
       - run: echo "OK"
       #- run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       #- run: bash scripts/environment/prepare.sh
