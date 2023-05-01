@@ -81,7 +81,7 @@ jobs:
       # Indicate in the PR's CI pane that this job is complete
       - name: (PR comment) Set latest commit status as ${{ job.status }}
         uses: myrotvorets/set-commit-status-action@master
-        if: always() && ${{ github.event_name == 'workflow_call' }} # TODO temp
+        if: always() && github.event_name == 'workflow_call' # TODO temp
         with:
           sha: ${{ steps.comment-branch.outputs.head_sha }}
           token: ${{ secrets.GITHUB_TOKEN }}
