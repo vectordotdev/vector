@@ -25,8 +25,8 @@ jobs:
     name: Cross - ${{ matrix.target }}
     runs-on: [linux, ubuntu-20.04-8core]
     if: |
-      github.event.workflow_call
-      || (github.event.issue.pull_request && contains(github.event.payload.comment.body, '/ci-deploy-cross'))
+      github.event_name == 'workflow_call'
+      || (github.event_name == 'issue_comment' && contains(github.event.payload.comment.body, '/ci-deploy-cross'))
     env:
       CARGO_INCREMENTAL: 0
     strategy:
@@ -39,7 +39,34 @@ jobs:
           - armv7-unknown-linux-gnueabihf
           - armv7-unknown-linux-musleabihf
     steps:
-      - uses: actions/checkout@v3
+      # For PR comment trigger, extra steps are required to associate the workflow with the PR.
+
+      # Indicate in the PR's CI pane that this job is running.
+      - name: (PR comment) Set latest commit status as pending
+        uses: myrotvorets/set-commit-status-action@master
+        with:
+          sha: ${{ steps.comment-branch.outputs.head_sha }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          status: pending
+
+      # Find the branch that the comment was made in.
+      - name: (PR comment) Get PR branch
+        if: ${{ github.event_name != 'workflow_call' }}
+        uses: xt0rted/pull-request-comment-branch@v1
+        id: comment-branch
+
+      # Checkout the branch, using the PR ref.
+      - name: (PR comment) Checkout PR branch
+        if: ${{ github.event_name != 'workflow_call' }}
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ steps.comment-branch.outputs.head_ref }}
+
+      # Checkout the default branch otherwise.
+      - name: Checkout branch
+        if: ${{ github.event_name == 'workflow_call' }}
+        uses: actions/checkout@v3
+
       - uses: actions/cache@v3
         name: Cache Cargo registry + index
         with:
@@ -51,6 +78,7 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-
+
       - run: echo "::add-matcher::.github/matchers/rust.json"
       - run: 'cargo install cross --version 0.2.4 --force --locked'
       # Why is this build, not check? Because we need to make sure the linking phase works.
@@ -61,6 +89,15 @@ jobs:
         with:
           name: "vector-debug-${{ matrix.target }}"
           path: "./target/${{ matrix.target }}/debug/vector"
+
+      # Indicate in the PR's CI pane that this job is complete
+      - name: (PR comment) Set latest commit status as ${{ job.status }}
+        uses: myrotvorets/set-commit-status-action@master
+        if: always() && github.event_name != 'workflow_call'
+        with:
+          sha: ${{ steps.comment-branch.outputs.head_sha }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          status: ${{ job.status }}
 
   cross-linux-check:
     name: Cross - Linux
