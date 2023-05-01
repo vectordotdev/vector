@@ -29,32 +29,33 @@ jobs:
       github.event_name == 'workflow_call'
          || (github.event_name == 'issue_comment' && contains(github.event.comment.body, '/ci-deploy-cli'))
     steps:
-      # For PR comment trigger, extra steps are required to get the branch associated with the PR
-      # that the comment was made in.
-      - name: (PR comment) Get PR branch
-        if: ${{ github.event_name != 'workflow_call' }}
-        uses: xt0rted/pull-request-comment-branch@v1
-        id: comment-branch
+      # For PR comment trigger, extra steps are required to associate the workflow with the PR.
 
-      # Checkout the branch, using the PR ref, if this is from a PR comment trigger
-      - name: (PR comment) Checkout PR branch
-        if: ${{ github.event_name != 'workflow_call' }}
-        uses: actions/checkout@v3
-        with:
-          ref: ${{ steps.comment-branch.outputs.head_ref }}
-
-      # Checkout the default branch otherwise
-      - name: Checkout branch
-        if: ${{ github.event_name == 'workflow_call' }}
-        uses: actions/checkout@v3
-
-      # Indicate in the PR's CI pane that this job is running
+      # Indicate in the PR's CI pane that this job is running.
       - name: (PR comment) Set latest commit status as pending
         uses: myrotvorets/set-commit-status-action@master
         with:
           sha: ${{ steps.comment-branch.outputs.head_sha }}
           token: ${{ secrets.GITHUB_TOKEN }}
           status: pending
+
+      # Find the branch that the comment was made in.
+      - name: (PR comment) Get PR branch
+        if: ${{ github.event_name != 'workflow_call' }}
+        uses: xt0rted/pull-request-comment-branch@v1
+        id: comment-branch
+
+      # Checkout the branch, using the PR ref.
+      - name: (PR comment) Checkout PR branch
+        if: ${{ github.event_name != 'workflow_call' }}
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ steps.comment-branch.outputs.head_ref }}
+
+      # Checkout the default branch otherwise.
+      - name: Checkout branch
+        if: ${{ github.event_name == 'workflow_call' }}
+        uses: actions/checkout@v3
 
       - name: Cache Cargo registry + index
         uses: actions/cache@v3
