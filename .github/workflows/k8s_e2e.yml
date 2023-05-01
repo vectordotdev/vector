@@ -227,14 +227,27 @@ jobs:
           CARGO_INCREMENTAL: 0
 
       # Indicate in the PR's CI pane that this job is complete
-      - name: (PR comment) Set latest commit status as ${{ job.status }}
+      - name: (PR comment) Set latest commit status as failure
         uses: myrotvorets/set-commit-status-action@master
-        if: always() && github.event_name == 'issue_comment'
+        if: failure() && github.event_name == 'issue_comment'
         with:
           sha: ${{ steps.comment-branch.outputs.head_sha }}
           token: ${{ secrets.GITHUB_TOKEN }}
-          status: ${{ job.status }}
+          status: 'failure'
 
+  success:
+    name: Signal success to PR
+    runs-on: ubuntu-20.04
+    needs: test-e2e-kubernetes
+    if: success() && github.event_name == 'issue_comment'
+    steps:
+      - uses: myrotvorets/set-commit-status-action@master
+        with:
+          sha: ${{ steps.comment-branch.outputs.head_sha }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          status: 'success'
+
+    
  # TODO I guess don't need this if not triggering on master
   # master-failure:
   #   name: master-failure
