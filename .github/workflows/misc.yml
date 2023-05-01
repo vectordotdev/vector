@@ -26,8 +26,8 @@ jobs:
     env:
       CARGO_INCREMENTAL: 0
     if: |
-      github.event.workflow_call
-        || (github.event.issue.pull_request && contains(github.event.payload.comment.body, '/ci-deploy-misc'))
+      github.event_name == 'workflow_call'
+        || (github.event_name == 'issue_comment' && contains(github.event.payload.comment.body, '/ci-deploy-misc'))
     steps:
       # For PR comment trigger, extra steps are required to associate the workflow with the PR.
 

@@ -25,8 +25,8 @@ jobs:
   test-windows:
     runs-on: [windows, windows-2019-8core]
     if: |
-      github.event.workflow_call
-        || (github.event.issue.pull_request && contains(github.event.payload.comment.body, '/ci-deploy-unit-windows'))
+      github.event_name == 'workflow_call'
+        || (github.event_name == 'issue_comment' && contains(github.event.payload.comment.body, '/ci-deploy-unit-windows'))
     steps:
       # For PR comment trigger, extra steps are required to associate the workflow with the PR.
 
