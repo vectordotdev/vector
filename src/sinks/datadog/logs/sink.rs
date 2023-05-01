@@ -134,7 +134,7 @@ impl crate::sinks::util::encoding::Encoder<Vec<Event>> for JsonEncoding {
             log.rename_key(message_path.as_str(), event_path!("message"));
 
             if let Some(host_path) = log.host_path() {
-                log.rename_key(host_path.as_str(), event_path!("hostname"));
+                log.rename_key(host_path.as_str(), event_path!("host"));
             }
 
             if let Some(Value::Timestamp(ts)) = log.remove(
