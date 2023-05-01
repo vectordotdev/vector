@@ -57,7 +57,7 @@ jobs:
 #    if: |
 #      !github.event.pull_request
 #        || contains(github.event.pull_request.labels.*.name, 'ci-condition: integration tests enable')
-    if: github.event_name != 'issue_comment' || contains(github.event.payload.comment.body, '/ci-deploy-integration-tests')
+    if: github.event_name != 'issue_comment' || contains(github.event.comment.body, '/ci-deploy-integration-tests')
     strategy:
       fail-fast: false
       matrix:
