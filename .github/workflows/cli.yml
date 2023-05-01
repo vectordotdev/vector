@@ -26,17 +26,22 @@ jobs:
     env:
       CARGO_INCREMENTAL: 0
     if: |
-      !github.event.pull_request
+      github.event.workflow_call
         || (github.event.issue.pull_request && contains(github.event.payload.comment.body, '/ci-deploy-cli'))
     steps:
       - name: Get PR branch
+        if: ${{ !github.event.workflow_call }}
         uses: xt0rted/pull-request-comment-branch@v1
         id: comment-branch
 
       - name: Checkout PR branch
+        if: ${{ !github.event.workflow_call }}
         uses: actions/checkout@v3
         with:
           ref: ${{ steps.comment-branch.outputs.head_ref }}
+
+      - uses: actions/checkout@v3
+        if: ${{ github.event.workflow_call }}
 
       - name: Cache Cargo registry + index
         uses: actions/cache@v3

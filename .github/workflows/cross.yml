@@ -25,8 +25,8 @@ jobs:
     name: Cross - ${{ matrix.target }}
     runs-on: [linux, ubuntu-20.04-8core]
     if: |
-      !github.event.pull_request
-      || github.event.issue.pull_request && contains(github.event.payload.comment.body, '/ci-deploy-cross')
+      github.event.workflow_call
+      || (github.event.issue.pull_request && contains(github.event.payload.comment.body, '/ci-deploy-cross'))
     env:
       CARGO_INCREMENTAL: 0
     strategy:

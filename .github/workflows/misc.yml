@@ -26,8 +26,8 @@ jobs:
     env:
       CARGO_INCREMENTAL: 0
     if: |
-      !github.event.pull_request
-        || github.event.issue.pull_request && contains(github.event.payload.comment.body, '/ci-deploy-misc')
+      github.event.workflow_call
+        || (github.event.issue.pull_request && contains(github.event.payload.comment.body, '/ci-deploy-misc'))
     steps:
       - uses: actions/checkout@v3
       - uses: actions/cache@v3
