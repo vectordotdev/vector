@@ -86,9 +86,7 @@ jobs:
     runs-on: [linux, ubuntu-20.04-8core]
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
-    if: |
-      !github.event.pull_request
-        || github.event.issue.pull_request && contains(github.event.payload.comment.body, '/ci-deploy-k8s-tests')
+    if: github.event_name != 'issue_comment' || contains(github.event.comment.body, '/ci-deploy-k8s-tests')
     steps:
       - uses: actions/github-script@v6.4.1
         id: set-matrix
