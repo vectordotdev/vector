@@ -1,6 +1,9 @@
 name: Integration Test Suite
 
 on:
+  # Don't want to run this on every PR but because GH doesn't allow specifying different required checks
+  # for pull request and merge queue, we need to "run" it in pull request, but in the jobs we will just auto pass.
+  pull_request:
   workflow_dispatch:
   merge_group:
     types: [checks_requested]
@@ -54,10 +57,9 @@ jobs:
   test-integration:
     name: Integration - Linux, ${{ matrix.test }}
     runs-on: [linux, ubuntu-20.04-8core]
-#    if: |
-#      !github.event.pull_request
-#        || contains(github.event.pull_request.labels.*.name, 'ci-condition: integration tests enable')
-    if: github.event_name != 'issue_comment' || contains(github.event.comment.body, '/ci-deploy-integration-tests')
+    if: |
+        (github.event_name != 'issue_comment' || contains(github.event.comment.body, '/ci-deploy-integration-tests'))
+          && github.event_name != 'pull_request'
     strategy:
       fail-fast: false
       matrix:
@@ -154,6 +156,7 @@ jobs:
   test-integration-check:
     name: Integration Tests
     runs-on: ubuntu-20.04
+    if: always()
     needs:
       - test-integration
     steps:
@@ -173,7 +176,20 @@ jobs:
           status: 'success'
 
       - name: validate
-        run: echo "OK"
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INT_RESULT: ${{ needs.test-integration.result }}
+        run: |
+          if [ "$EVENT_NAME" == "pull_request" ] ; then
+              echo "success"
+              exit 0
+          fi
+          if [[ "$INT_RESULT" == "failure" ]] ; then
+              echo "failed"
+              exit 1
+          fi
+          echo "success"
+          exit 0
 
  # TODO I guess don't need this if not triggering on master
   # master-failure:

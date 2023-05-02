@@ -1,6 +1,9 @@
 name: K8S E2E Suite
 
 on:
+  # Don't want to run this on every PR but because GH doesn't allow specifying different required checks
+  # for pull request and merge queue, we need to "run" it in pull request, but in the jobs we will just auto pass.
+  pull_request:
   workflow_dispatch:
   merge_group:
     types: [checks_requested]
@@ -53,7 +56,9 @@ jobs:
   build-x86_64-unknown-linux-gnu:
     name: Build - x86_64-unknown-linux-gnu
     runs-on: [linux, ubuntu-20.04-8core]
-    if: github.event_name != 'issue_comment' || contains(github.event.comment.body, '/ci-deploy-k8s-tests')
+    if: |
+        (github.event_name != 'issue_comment' || contains(github.event.comment.body, '/ci-deploy-k8s-tests'))
+          && github.event_name != 'pull_request'
     # cargo-deb requires a release build, but we don't need optimizations for tests
     env:
       CARGO_PROFILE_RELEASE_OPT_LEVEL: 0
@@ -128,7 +133,9 @@ jobs:
     runs-on: [linux, ubuntu-20.04-8core]
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
-    if: github.event_name != 'issue_comment' || contains(github.event.comment.body, '/ci-deploy-k8s-tests')
+    if: |
+        (github.event_name != 'issue_comment' || contains(github.event.comment.body, '/ci-deploy-k8s-tests'))
+          && github.event_name != 'pull_request'
     steps:
       - uses: actions/github-script@v6.4.1
         id: set-matrix
@@ -237,25 +244,41 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           status: 'failure'
 
-  success:
-    name: Signal success to PR
+  k8s-e2e-check:
+    name: Validate K8s E2E Test Result
     runs-on: ubuntu-20.04
     needs: test-e2e-kubernetes
-    if: success() && github.event_name == 'issue_comment'
+    if: always()
+    #if: success() && github.event_name == 'issue_comment'
+    env:
+      EVENT_NAME: ${{ github.event_name }}
+      K8S_RESULT: ${{ needs.test-e2e-kubernetes.result }}
     steps:
       # Find the branch that the comment was made in.
-      - name: Get PR branch
+      - name: (PR comment) Get PR branch
         if: ${{ github.event_name == 'issue_comment' }}
         uses: xt0rted/pull-request-comment-branch@v1
         id: comment-branch
 
-      - name: Submit success
+      - name: (PR comment) Submit PR result
         uses: myrotvorets/set-commit-status-action@master
         with:
           sha: ${{ steps.comment-branch.outputs.head_sha }}
           token: ${{ secrets.GITHUB_TOKEN }}
           status: 'success'
 
+      - name: validate
+        run: |
+          if [ "$EVENT_NAME" == "pull_request" ] ; then
+              echo "success"
+              exit 0
+          fi
+          if [[ "$K8S_RESULT" == "failure" ]] ; then
+              echo "failed"
+              exit 1
+          fi
+          echo "success"
+          exit 0
     
  # TODO I guess don't need this if not triggering on master
   # master-failure:
