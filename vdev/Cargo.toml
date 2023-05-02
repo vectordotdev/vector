@@ -14,11 +14,11 @@ cached = "0.43.0"
 chrono = { version = "0.4.22", default-features = false, features = ["serde", "clock"] }
 clap = { version = "4.1.14", features = ["derive"] }
 clap-verbosity-flag = "2.0.1"
-clap_complete = "4.2.0"
+clap_complete = "4.2.1"
 confy = "0.5.1"
 directories = "5.0.0"
 # remove this when stabilized https://doc.rust-lang.org/stable/std/path/fn.absolute.html
-dunce = "1.0.3"
+dunce = "1.0.4"
 glob = { version = "0.3.1", default-features = false }
 hashlink = { version = "0.8.1", features = ["serde_impl"] }
 hex = "0.4.3"
@@ -33,7 +33,7 @@ paste = "1.0.12"
 regex = { version = "1.8.1", default-features = false, features = ["std", "perf"] }
 reqwest = { version = "0.11", features = ["json", "blocking"] }
 serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0.95"
+serde_json = "1.0.96"
 serde_yaml = "0.9.21"
 sha2 = "0.10.6"
 tempfile = "3.5.0"
