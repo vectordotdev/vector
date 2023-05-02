@@ -90,20 +90,7 @@ jobs:
       - unit-mac
       - unit-windows
     steps:
-      # - uses: actions/checkout@v2
-      # - name: Succeed if pull_request
-      #   if: ${{ github.event_name == 'pull_request' }}
-      #   uses: Sibz/github-status-action@v1
-      #   with:
-      #     authToken: ${{secrets.GITHUB_TOKEN}}
-      #     context: 'Master Merge Queue'
-      #     description: 'Passed'
-      #     state: 'success'
-      #     sha: ${{github.event.pull_request.head.sha || github.sha}}
-
-      # if the trigger was a merge group we evaluate the status of each required prerequisite job. Otherwise, return success.
       - name: validate
-        #if: always()
         env:
           EVENT_NAME: ${{ github.event_name }}
           CHANGES_RESULT: ${{ needs.changes.result }}
@@ -114,6 +101,7 @@ jobs:
           CROSS_RESULT: ${{ needs.cross-linux.result }}
           MAC_RESULT: ${{ needs.unit-mac.result }}
           WIN_RESULT: ${{ needs.unit-windows.result }}
+        # If the trigger was a merge group we evaluate the status of each required prerequisite job.
         run: |
           if [ "$EVENT_NAME" != "merge_group" ] ; then
               echo "success"

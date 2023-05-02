@@ -159,22 +159,17 @@ jobs:
     if: always()
     needs:
       - test-integration
-    env:
-      INT_RESULT: ${{ needs.test-integration.result }}
-      EVENT_NAME: ${{ github.event_name }}
     steps:
       # Find the branch that the comment was made in.
       - name: (PR comment) Get PR branch
-        if: |
-          "$EVENT_NAME" == 'issue_comment' && "$INT_RESULT" == 'success'
+        if: ${{ github.event_name }} == 'issue_comment' && ${{ needs.test-integration.result == 'success' }}
         uses: xt0rted/pull-request-comment-branch@v1
         id: comment-branch
 
       # Indicate in the PR's CI pane that this job is complete
       - name: (PR comment) Set latest commit status as success
         uses: myrotvorets/set-commit-status-action@master
-        if: |
-          "$EVENT_NAME" == 'issue_comment' && "$INT_RESULT" == 'success'
+        if: ${{ github.event_name }} == 'issue_comment' && ${{ needs.test-integration.result == 'success' }}
         with:
           sha: ${{ steps.comment-branch.outputs.head_sha }}
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -182,11 +177,11 @@ jobs:
 
       - name: validate
         run: |
-          if [ "$EVENT_NAME" == "pull_request" ] ; then
+          if [ ${{ github.event_name }} == 'pull_request' ] ; then
               echo "success"
               exit 0
           fi
-          if [[ "$INT_RESULT" == "failure" ]] ; then
+          if [[ ${{ needs.test-integration.result }} == 'failure' ]] ; then
               echo "failed"
               exit 1
           fi

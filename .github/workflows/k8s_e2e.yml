@@ -249,20 +249,15 @@ jobs:
     runs-on: ubuntu-20.04
     needs: test-e2e-kubernetes
     if: always()
-    env:
-      EVENT_NAME: ${{ github.event_name }}
-      K8S_RESULT: ${{ needs.test-e2e-kubernetes.result }}
     steps:
       # Find the branch that the comment was made in.
       - name: (PR comment) Get PR branch
-        if: |
-          "$EVENT_NAME" == 'issue_comment' && "$K8S_RESULT" == 'success'
+        if: ${{ github.event_name }} == 'issue_comment' && ${{ needs.test-e2e-kubernetes.result == 'success' }}
         uses: xt0rted/pull-request-comment-branch@v1
         id: comment-branch
 
       - name: (PR comment) Submit PR result as success
-        if: |
-          "$EVENT_NAME" == 'issue_comment' && "$K8S_RESULT" == 'success'
+        if: ${{ github.event_name }} == 'issue_comment' && ${{ needs.test-e2e-kubernetes.result == 'success' }}
         uses: myrotvorets/set-commit-status-action@master
         with:
           sha: ${{ steps.comment-branch.outputs.head_sha }}
@@ -271,11 +266,11 @@ jobs:
 
       - name: validate
         run: |
-          if [ "$EVENT_NAME" == "pull_request" ] ; then
+          if [ ${{ github.event_name }} == 'pull_request' ] ; then
               echo "success"
               exit 0
           fi
-          if [[ "$K8S_RESULT" == "failure" ]] ; then
+          if [[ ${{ needs.test-e2e-kubernetes.result }} == 'failure' ]] ; then
               echo "failed"
               exit 1
           fi

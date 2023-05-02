@@ -109,14 +109,12 @@ jobs:
     steps:
       # Find the branch that the comment was made in.
       - name: (PR comment) Get PR branch
-        if: |
-          "$EVENT_NAME" == 'issue_comment' && "$CROSS_RESULT" == 'success'
+        if: ${{ github.event_name }} == 'issue_comment' && ${{ needs.test-cross.result == 'success' }}
         uses: xt0rted/pull-request-comment-branch@v1
         id: comment-branch
 
       - name: (PR comment) Submit PR result as success
-        if: |
-          "$EVENT_NAME" == 'issue_comment' && "$CROSS_RESULT" == 'success'
+        if: ${{ github.event_name }} == 'issue_comment' && ${{ needs.test-cross.result == 'success' }}
         uses: myrotvorets/set-commit-status-action@master
         with:
           sha: ${{ steps.comment-branch.outputs.head_sha }}
@@ -125,11 +123,11 @@ jobs:
 
       - name: validate
         run: |
-          if [ "$EVENT_NAME" == "pull_request" ] ; then
+          if [ ${{ github.event_name }} == 'pull_request' ] ; then
               echo "success"
               exit 0
           fi
-          if [[ "$CROSS_RESULT" == "failure" ]] ; then
+          if [[ ${{ needs.test-cross.result }} == 'failure' ]] ; then
               echo "failed"
               exit 1
           fi
