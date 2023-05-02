@@ -236,7 +236,7 @@ jobs:
           CARGO_INCREMENTAL: 0
 
       # Indicate in the PR's CI pane that this job is complete
-      - name: (PR comment) Set latest commit status as failure
+      - name: (PR comment) Set latest commit status as failure if needed
         uses: myrotvorets/set-commit-status-action@master
         if: failure() && github.event_name == 'issue_comment'
         with:
@@ -249,18 +249,18 @@ jobs:
     runs-on: ubuntu-20.04
     needs: test-e2e-kubernetes
     if: always()
-    #if: success() && github.event_name == 'issue_comment'
     env:
       EVENT_NAME: ${{ github.event_name }}
       K8S_RESULT: ${{ needs.test-e2e-kubernetes.result }}
     steps:
       # Find the branch that the comment was made in.
       - name: (PR comment) Get PR branch
-        if: ${{ github.event_name == 'issue_comment' }}
+        if: ${{ github.event_name == 'issue_comment' && $K8S_RESULT == 'success' }}
         uses: xt0rted/pull-request-comment-branch@v1
         id: comment-branch
 
-      - name: (PR comment) Submit PR result
+      - name: (PR comment) Submit PR result as success
+        if: ${{ github.event_name == 'issue_comment' && $K8S_RESULT == 'success' }}
         uses: myrotvorets/set-commit-status-action@master
         with:
           sha: ${{ steps.comment-branch.outputs.head_sha }}

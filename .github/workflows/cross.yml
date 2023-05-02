@@ -90,19 +90,46 @@ jobs:
           path: "./target/${{ matrix.target }}/debug/vector"
 
       # Indicate in the PR's CI pane that this job is complete
-      - name: (PR comment) Set latest commit status as ${{ job.status }}
+      - name: (PR comment) Set latest commit status as failed if needed
         uses: myrotvorets/set-commit-status-action@master
-        if: always() && github.event_name == 'issue_comment'
+        if: failure() && github.event_name == 'issue_comment'
         with:
           sha: ${{ steps.comment-branch.outputs.head_sha }}
           token: ${{ secrets.GITHUB_TOKEN }}
-          status: ${{ job.status }}
+          status: 'failure'
 
   cross-linux-check:
     name: Cross - Linux
     runs-on: ubuntu-20.04
     needs: cross-linux
+    if: always()
     steps:
-      - name: Check cross matrix status
-        if: ${{ needs.cross-linux.result != 'success' }}
-        run: exit 1
+      # Find the branch that the comment was made in.
+      - name: (PR comment) Get PR branch
+        if: ${{ github.event_name == 'issue_comment' && needs.cross-linux.result == 'success '}}
+        uses: xt0rted/pull-request-comment-branch@v1
+        id: comment-branch
+
+      - name: (PR comment) Submit PR result as success
+        if: ${{ github.event_name == 'issue_comment' && needs.cross-linux.result == 'success '}}
+        uses: myrotvorets/set-commit-status-action@master
+        with:
+          sha: ${{ steps.comment-branch.outputs.head_sha }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          status: 'success'
+
+      - name: validate
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          CROSS_RESULT: ${{ needs.test-cross.result }}
+        run: |
+          if [ "$EVENT_NAME" == "pull_request" ] ; then
+              echo "success"
+              exit 0
+          fi
+          if [[ "$CROSS_RESULT" == "failure" ]] ; then
+              echo "failed"
+              exit 1
+          fi
+          echo "success"
+          exit 0
