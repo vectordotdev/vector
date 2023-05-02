@@ -110,13 +110,13 @@ jobs:
       # Find the branch that the comment was made in.
       - name: (PR comment) Get PR branch
         if: |
-          $EVENT_NAME == 'issue_comment' && $CROSS_RESULT == 'success'
+          "$EVENT_NAME" == 'issue_comment' && "$CROSS_RESULT" == 'success'
         uses: xt0rted/pull-request-comment-branch@v1
         id: comment-branch
 
       - name: (PR comment) Submit PR result as success
         if: |
-          $EVENT_NAME == 'issue_comment' && $CROSS_RESULT == 'success'
+          "$EVENT_NAME" == 'issue_comment' && "$CROSS_RESULT" == 'success'
         uses: myrotvorets/set-commit-status-action@master
         with:
           sha: ${{ steps.comment-branch.outputs.head_sha }}
