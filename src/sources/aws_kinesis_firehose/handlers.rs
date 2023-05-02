@@ -20,7 +20,7 @@ use vector_core::{
     event::BatchNotifier,
     EstimatedJsonEncodedSizeOf,
 };
-use vrl::SecretTarget;
+use vrl::compiler::SecretTarget;
 use warp::reject;
 
 use super::{

@@ -4,7 +4,8 @@ use std::{collections::BTreeMap, convert::TryFrom, marker::PhantomData};
 use lookup::lookup_v2::OwnedSegment;
 use lookup::{OwnedTargetPath, OwnedValuePath, PathPrefix};
 use snafu::Snafu;
-use vrl_lib::{prelude::VrlValueConvert, ProgramInfo, SecretTarget};
+use vrl_lib::compiler::value::VrlValueConvert;
+use vrl_lib::compiler::{ProgramInfo, SecretTarget, Target};
 
 use super::{Event, EventMetadata, LogEvent, Metric, MetricKind, TraceEvent, Value};
 use crate::config::log_schema;
@@ -198,7 +199,7 @@ fn set_metric_tag_values(name: String, value: &Value, metric: &mut Metric, multi
     }
 }
 
-impl vrl_lib::Target for VrlTarget {
+impl Target for VrlTarget {
     fn target_insert(
         &mut self,
         target_path: &OwnedTargetPath,

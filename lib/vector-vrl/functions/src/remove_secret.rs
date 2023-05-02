@@ -1,6 +1,4 @@
-use ::value::Value;
-use vrl::prelude::*;
-use vrl::state::TypeState;
+use vrl::stdlib::prelude::*;
 
 fn remove_secret(ctx: &mut Context, key: Value) -> std::result::Result<Value, ExpressionError> {
     let key_bytes = key.as_bytes().expect("argument must be a string");

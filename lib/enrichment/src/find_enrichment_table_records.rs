@@ -1,8 +1,5 @@
 use std::collections::BTreeMap;
-
-use ::value::Value;
-use vrl::prelude::*;
-use vrl::state::TypeState;
+use vrl::stdlib::prelude::*;
 
 use crate::{
     vrl_util::{self, add_index, evaluate_condition},
@@ -164,7 +161,7 @@ impl FunctionExpression for FindEnrichmentTableRecordsFn {
                 let value = value.resolve(ctx)?;
                 evaluate_condition(key, value)
             })
-            .collect::<Result<Vec<Condition>>>()?;
+            .collect::<ExpressionResult<Vec<Condition>>>()?;
 
         let select = self
             .select
@@ -196,7 +193,8 @@ impl FunctionExpression for FindEnrichmentTableRecordsFn {
 mod tests {
     use ::value::Secrets;
     use vector_common::TimeZone;
-    use vrl::TargetValue;
+    use vrl::compiler::TargetValue;
+    use vrl::value::Secrets;
 
     use super::*;
     use crate::test_util::get_table_registry;

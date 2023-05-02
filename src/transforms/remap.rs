@@ -20,12 +20,10 @@ use vector_core::compile_vrl;
 use vector_core::config::LogNamespace;
 use vector_core::schema::Definition;
 use vector_vrl_functions::set_semantic_meaning::MeaningList;
-use vrl::prelude::state::TypeState;
-use vrl::{
-    diagnostic::{Formatter, Note},
-    prelude::{DiagnosticMessage, ExpressionError},
-    CompileConfig, Program, Runtime, Terminate, VrlRuntime,
-};
+use vrl::compiler::runtime::{Runtime, Terminate};
+use vrl::compiler::state::ExternalEnv;
+use vrl::compiler::{CompileConfig, ExpressionError, Function, Program, TypeState, VrlRuntime};
+use vrl::diagnostic::{DiagnosticMessage, Formatter, Note};
 
 use crate::config::OutputId;
 use crate::{
@@ -143,12 +141,7 @@ impl RemapConfig {
         &self,
         enrichment_tables: enrichment::TableRegistry,
         merged_schema_definition: schema::Definition,
-    ) -> Result<(
-        vrl::Program,
-        String,
-        Vec<Box<dyn vrl::Function>>,
-        CompileConfig,
-    )> {
+    ) -> Result<(Program, String, Vec<Box<dyn Function>>, CompileConfig)> {
         let source = match (&self.source, &self.file) {
             (Some(source), None) => source.to_owned(),
             (None, Some(path)) => {
@@ -170,7 +163,7 @@ impl RemapConfig {
 
         let state = TypeState {
             local: Default::default(),
-            external: vrl::state::ExternalEnv::new_with_kind(
+            external: ExternalEnv::new_with_kind(
                 merged_schema_definition.event_kind().clone(),
                 merged_schema_definition.metadata_kind().clone(),
             ),

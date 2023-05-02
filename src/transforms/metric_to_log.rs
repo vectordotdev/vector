@@ -3,13 +3,12 @@ use codecs::MetricTagValues;
 use lookup::lookup_v2::parse_value_path;
 use lookup::{event_path, owned_value_path, path, PathPrefix};
 use serde_json::Value;
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use value::kind::Collection;
 use value::Kind;
 use vector_common::TimeZone;
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
-use vrl::prelude::BTreeMap;
 
 use crate::config::OutputId;
 use crate::{

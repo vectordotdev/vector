@@ -35,7 +35,7 @@ use std::{
 };
 
 use arc_swap::ArcSwap;
-use value::Value;
+use vrl::value::Value;
 
 use super::{Condition, IndexHandle, Table};
 use crate::Case;

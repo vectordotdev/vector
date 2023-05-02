@@ -1999,7 +1999,7 @@ dependencies = [
  "indoc",
  "memchr",
  "once_cell",
- "ordered-float 3.6.0",
+ "ordered-float 3.7.0",
  "prost",
  "regex",
  "serde",
@@ -2583,7 +2583,7 @@ checksum = "8d7439c3735f405729d52c3fbbe4de140eaf938a1fe47d227c27f8254d4302a5"
 [[package]]
 name = "datadog-filter"
 version = "0.1.0"
-source = "git+https://github.com/vectordotdev/vrl?rev=v0.2.0#258cc611080c1bdb5ed6897e8a79b76ab2038fcb"
+source = "git+https://github.com/vectordotdev/vrl?rev=8d27cd2cdd3#8d27cd2cdd3ba291bdd6fe1271d87ec1631a181e"
 dependencies = [
  "datadog-search-syntax",
  "dyn-clone",
@@ -2593,18 +2593,18 @@ dependencies = [
 [[package]]
 name = "datadog-grok"
 version = "0.1.0"
-source = "git+https://github.com/vectordotdev/vrl?rev=v0.2.0#258cc611080c1bdb5ed6897e8a79b76ab2038fcb"
+source = "git+https://github.com/vectordotdev/vrl?rev=8d27cd2cdd3#8d27cd2cdd3ba291bdd6fe1271d87ec1631a181e"
 dependencies = [
  "bytes 1.4.0",
  "chrono",
  "chrono-tz",
  "lalrpop",
  "lalrpop-util",
- "lookup",
  "nom",
  "once_cell",
  "onig",
- "ordered-float 3.6.0",
+ "ordered-float 3.7.0",
+ "path",
  "peeking_take_while",
  "regex",
  "serde_json",
@@ -2617,7 +2617,7 @@ dependencies = [
 [[package]]
 name = "datadog-search-syntax"
 version = "0.1.0"
-source = "git+https://github.com/vectordotdev/vrl?rev=v0.2.0#258cc611080c1bdb5ed6897e8a79b76ab2038fcb"
+source = "git+https://github.com/vectordotdev/vrl?rev=8d27cd2cdd3#8d27cd2cdd3ba291bdd6fe1271d87ec1631a181e"
 dependencies = [
  "itertools",
  "once_cell",
@@ -2929,7 +2929,6 @@ dependencies = [
  "arc-swap",
  "chrono",
  "dyn-clone",
- "value",
  "vector-common",
  "vrl",
 ]
@@ -4128,17 +4127,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f551f8c3a39f68f986517db0d1759de85881894fdc7db798bd2a9df9cb04b7fc"
 
 [[package]]
-name = "inherent"
-version = "1.0.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a036328c11e86e024522cb1e9b78ba9df3e316995e004e98854a18e4a326d2e1"
-dependencies = [
- "proc-macro2 1.0.56",
- "quote 1.0.26",
- "syn 1.0.109",
-]
-
-[[package]]
 name = "inotify"
 version = "0.9.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4541,7 +4529,6 @@ dependencies = [
  "itertools",
  "lalrpop-util",
  "petgraph",
- "pico-args",
  "regex",
  "regex-syntax 0.6.29",
  "string_cache",
@@ -4555,9 +4542,6 @@ name = "lalrpop-util"
 version = "0.19.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e5c1f7869c94d214466c5fd432dfed12c379fd87786768d36455892d46b18edd"
-dependencies = [
- "regex",
-]
 
 [[package]]
 name = "lapin"
@@ -4719,21 +4703,6 @@ dependencies = [
  "prost-build",
  "prost-types",
  "snap",
-]
-
-[[package]]
-name = "lookup"
-version = "0.1.0"
-source = "git+https://github.com/vectordotdev/vrl?rev=v0.2.0#258cc611080c1bdb5ed6897e8a79b76ab2038fcb"
-dependencies = [
- "inherent",
- "lalrpop",
- "lalrpop-util",
- "once_cell",
- "quickcheck",
- "regex",
- "serde",
- "snafu",
 ]
 
 [[package]]
@@ -5665,7 +5634,7 @@ dependencies = [
  "bytes 1.4.0",
  "chrono",
  "hex",
- "ordered-float 3.6.0",
+ "ordered-float 3.7.0",
  "prost",
  "prost-build",
  "tonic 0.9.2",
@@ -5686,9 +5655,9 @@ dependencies = [
 
 [[package]]
 name = "ordered-float"
-version = "3.6.0"
+version = "3.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "13a384337e997e6860ffbaa83708b2ef329fd8c54cb67a5f64d421e0f943254f"
+checksum = "2fc2dbde8f8a79f2102cc474ceb0ad68e3b80b85289ea62389b60e66777e4213"
 dependencies = [
  "num-traits",
 ]
@@ -5783,6 +5752,17 @@ name = "paste"
 version = "1.0.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9f746c4065a8fa3fe23974dd82f15431cc8d40779821001404d10d2e79ca7d79"
+
+[[package]]
+name = "path"
+version = "0.1.0"
+source = "git+https://github.com/vectordotdev/vrl?rev=8d27cd2cdd3#8d27cd2cdd3ba291bdd6fe1271d87ec1631a181e"
+dependencies = [
+ "once_cell",
+ "regex",
+ "serde",
+ "snafu",
+]
 
 [[package]]
 name = "pbkdf2"
@@ -5923,12 +5903,6 @@ checksum = "e1fb5f6f826b772a8d4c0394209441e7d37cbbb967ae9c7e0e8134365c9ee676"
 dependencies = [
  "siphasher",
 ]
-
-[[package]]
-name = "pico-args"
-version = "0.4.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "db8bcd96cb740d03149cbad5518db9fd87126a10ab519c011893b1754134c468"
 
 [[package]]
 name = "pin-project"
@@ -9086,14 +9060,15 @@ checksum = "830b7e5d4d90034032940e4ace0d9a9a057e7a45cd94e6c007832e39edb82f6d"
 [[package]]
 name = "value"
 version = "0.1.0"
-source = "git+https://github.com/vectordotdev/vrl?rev=v0.2.0#258cc611080c1bdb5ed6897e8a79b76ab2038fcb"
+source = "git+https://github.com/vectordotdev/vrl?rev=8d27cd2cdd3#8d27cd2cdd3ba291bdd6fe1271d87ec1631a181e"
 dependencies = [
  "async-graphql",
  "bytes 1.4.0",
  "chrono",
- "lookup",
  "mlua",
- "ordered-float 3.6.0",
+ "once_cell",
+ "ordered-float 3.7.0",
+ "path",
  "quickcheck",
  "regex",
  "serde",
@@ -9261,7 +9236,7 @@ dependencies = [
  "openssl-probe",
  "openssl-src",
  "opentelemetry-proto",
- "ordered-float 3.6.0",
+ "ordered-float 3.7.0",
  "paste",
  "percent-encoding",
  "pin-project",
@@ -9426,7 +9401,7 @@ dependencies = [
  "indexmap",
  "metrics",
  "nom",
- "ordered-float 3.6.0",
+ "ordered-float 3.7.0",
  "paste",
  "pin-project",
  "quickcheck",
@@ -9537,7 +9512,7 @@ dependencies = [
  "noisy_float",
  "once_cell",
  "openssl",
- "ordered-float 3.6.0",
+ "ordered-float 3.7.0",
  "parking_lot",
  "pin-project",
  "proptest",
@@ -9589,10 +9564,10 @@ dependencies = [
 name = "vector-lookup"
 version = "0.1.0"
 dependencies = [
- "lookup",
  "serde",
  "vector-config",
  "vector-config-macros",
+ "vrl",
 ]
 
 [[package]]
@@ -9609,8 +9584,6 @@ dependencies = [
 name = "vector-vrl-functions"
 version = "0.1.0"
 dependencies = [
- "lookup",
- "value",
  "vrl",
 ]
 
@@ -9624,7 +9597,7 @@ dependencies = [
  "clap 4.1.14",
  "enrichment",
  "glob",
- "lookup",
+ "path",
  "prettydiff",
  "regex",
  "serde",
@@ -9669,37 +9642,39 @@ checksum = "6a02e4885ed3bc0f2de90ea6dd45ebcbb66dacffe03547fadbb0eeae2770887d"
 [[package]]
 name = "vrl"
 version = "0.1.0"
-source = "git+https://github.com/vectordotdev/vrl?rev=v0.2.0#258cc611080c1bdb5ed6897e8a79b76ab2038fcb"
+source = "git+https://github.com/vectordotdev/vrl?rev=8d27cd2cdd3#8d27cd2cdd3ba291bdd6fe1271d87ec1631a181e"
 dependencies = [
- "bytes 1.4.0",
- "indoc",
- "lookup",
- "ordered-float 3.6.0",
+ "datadog-filter",
+ "datadog-grok",
+ "datadog-search-syntax",
+ "path",
  "value",
  "vrl-compiler",
  "vrl-core",
  "vrl-diagnostic",
  "vrl-parser",
+ "vrl-stdlib",
 ]
 
 [[package]]
 name = "vrl-cli"
 version = "0.1.0"
-source = "git+https://github.com/vectordotdev/vrl?rev=v0.2.0#258cc611080c1bdb5ed6897e8a79b76ab2038fcb"
+source = "git+https://github.com/vectordotdev/vrl?rev=8d27cd2cdd3#8d27cd2cdd3ba291bdd6fe1271d87ec1631a181e"
 dependencies = [
  "clap 4.1.14",
  "exitcode",
  "indoc",
- "lookup",
  "once_cell",
+ "path",
  "prettytable-rs",
  "regex",
  "rustyline",
  "serde_json",
  "thiserror",
  "value",
- "vrl",
+ "vrl-compiler",
  "vrl-core",
+ "vrl-diagnostic",
  "vrl-stdlib",
  "webbrowser",
 ]
@@ -9707,7 +9682,7 @@ dependencies = [
 [[package]]
 name = "vrl-compiler"
 version = "0.1.0"
-source = "git+https://github.com/vectordotdev/vrl?rev=v0.2.0#258cc611080c1bdb5ed6897e8a79b76ab2038fcb"
+source = "git+https://github.com/vectordotdev/vrl?rev=8d27cd2cdd3#8d27cd2cdd3ba291bdd6fe1271d87ec1631a181e"
 dependencies = [
  "anymap",
  "bytes 1.4.0",
@@ -9715,9 +9690,9 @@ dependencies = [
  "dyn-clone",
  "getrandom 0.2.9",
  "lalrpop-util",
- "lookup",
- "ordered-float 3.6.0",
+ "ordered-float 3.7.0",
  "paste",
+ "path",
  "regex",
  "serde",
  "thiserror",
@@ -9730,15 +9705,15 @@ dependencies = [
 [[package]]
 name = "vrl-core"
 version = "0.1.0"
-source = "git+https://github.com/vectordotdev/vrl?rev=v0.2.0#258cc611080c1bdb5ed6897e8a79b76ab2038fcb"
+source = "git+https://github.com/vectordotdev/vrl?rev=8d27cd2cdd3#8d27cd2cdd3ba291bdd6fe1271d87ec1631a181e"
 dependencies = [
  "bytes 1.4.0",
  "chrono",
  "chrono-tz",
  "derivative",
- "lookup",
  "nom",
- "ordered-float 3.6.0",
+ "ordered-float 3.7.0",
+ "path",
  "serde",
  "serde_json",
  "snafu",
@@ -9750,7 +9725,7 @@ dependencies = [
 [[package]]
 name = "vrl-diagnostic"
 version = "0.1.0"
-source = "git+https://github.com/vectordotdev/vrl?rev=v0.2.0#258cc611080c1bdb5ed6897e8a79b76ab2038fcb"
+source = "git+https://github.com/vectordotdev/vrl?rev=8d27cd2cdd3#8d27cd2cdd3ba291bdd6fe1271d87ec1631a181e"
 dependencies = [
  "codespan-reporting",
  "termcolor",
@@ -9759,13 +9734,13 @@ dependencies = [
 [[package]]
 name = "vrl-parser"
 version = "0.1.0"
-source = "git+https://github.com/vectordotdev/vrl?rev=v0.2.0#258cc611080c1bdb5ed6897e8a79b76ab2038fcb"
+source = "git+https://github.com/vectordotdev/vrl?rev=8d27cd2cdd3#8d27cd2cdd3ba291bdd6fe1271d87ec1631a181e"
 dependencies = [
  "lalrpop",
  "lalrpop-util",
- "lookup",
- "ordered-float 3.6.0",
+ "ordered-float 3.7.0",
  "paste",
+ "path",
  "thiserror",
  "vrl-diagnostic",
 ]
@@ -9773,7 +9748,7 @@ dependencies = [
 [[package]]
 name = "vrl-stdlib"
 version = "0.1.0"
-source = "git+https://github.com/vectordotdev/vrl?rev=v0.2.0#258cc611080c1bdb5ed6897e8a79b76ab2038fcb"
+source = "git+https://github.com/vectordotdev/vrl?rev=8d27cd2cdd3#8d27cd2cdd3ba291bdd6fe1271d87ec1631a181e"
 dependencies = [
  "aes",
  "base16",
@@ -9797,11 +9772,13 @@ dependencies = [
  "hmac",
  "hostname",
  "indexmap",
- "lookup",
+ "indoc",
  "md-5",
  "nom",
  "ofb",
  "once_cell",
+ "ordered-float 3.7.0",
+ "path",
  "percent-encoding",
  "quoted_printable",
  "rand 0.8.5",
@@ -9822,7 +9799,7 @@ dependencies = [
  "utf8-width",
  "uuid",
  "value",
- "vrl",
+ "vrl-compiler",
  "vrl-core",
  "vrl-diagnostic",
  "woothee",
@@ -9832,14 +9809,14 @@ dependencies = [
 [[package]]
 name = "vrl-tests"
 version = "0.1.0"
-source = "git+https://github.com/vectordotdev/vrl?rev=v0.2.0#258cc611080c1bdb5ed6897e8a79b76ab2038fcb"
+source = "git+https://github.com/vectordotdev/vrl?rev=8d27cd2cdd3#8d27cd2cdd3ba291bdd6fe1271d87ec1631a181e"
 dependencies = [
  "ansi_term",
  "chrono",
  "chrono-tz",
  "clap 4.1.14",
  "glob",
- "lookup",
+ "path",
  "prettydiff",
  "regex",
  "serde",
@@ -9847,7 +9824,9 @@ dependencies = [
  "tikv-jemallocator",
  "tracing-subscriber",
  "value",
- "vrl",
+ "vrl-compiler",
+ "vrl-core",
+ "vrl-diagnostic",
  "vrl-stdlib",
 ]
 

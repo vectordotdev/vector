@@ -25,7 +25,6 @@ pub use vrl_target::{TargetEvents, VrlTarget};
 
 pub mod array;
 pub mod discriminant;
-pub mod error;
 mod estimated_json_encoded_size_of;
 mod log_event;
 #[cfg(feature = "lua")]

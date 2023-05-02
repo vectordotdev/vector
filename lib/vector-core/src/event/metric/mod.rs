@@ -10,7 +10,7 @@ use chrono::{DateTime, Utc};
 use vector_common::EventDataEq;
 use vector_config::configurable_component;
 #[cfg(feature = "vrl")]
-use vrl_lib::prelude::VrlValueConvert;
+use vrl_lib::compiler::value::VrlValueConvert;
 
 use crate::{
     event::{
