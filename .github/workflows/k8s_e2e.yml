@@ -2,6 +2,8 @@ name: K8S E2E Suite
 
 on:
   workflow_dispatch:
+  merge_group:
+    types: [checks_requested]
   # For now, only trigger this on comment. We can run it based on files changed, in the merge queue.
   issue_comment:
     types: [created]
