@@ -2,8 +2,6 @@ name: Baseline Timings
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron: "0 */2 * * *"
 
 env:
   CI: true
