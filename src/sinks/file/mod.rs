@@ -217,7 +217,7 @@ impl FileSink {
         let encoder = Encoder::<Framer>::new(framer, serializer);
 
         Ok(Self {
-            path: config.path.clone().with_path_tz(config.path_tz.timezone()),
+            path: config.path.clone().with_timezone(config.path_tz.timezone()),
             transformer,
             encoder,
             idle_timeout: config.idle_timeout,
