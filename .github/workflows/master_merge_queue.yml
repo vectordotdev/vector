@@ -38,64 +38,43 @@ jobs:
     needs: changes
     secrets: inherit
 
-  # test-misc:
-  #   uses: ./.github/workflows/misc.yml
-  #   needs: changes
-  #   secrets: inherit
-  #   if: ${{ needs.changes.outputs.source == 'true' }}
+  test-misc:
+    uses: ./.github/workflows/misc.yml
+    needs: changes
+    secrets: inherit
+    if: ${{ needs.changes.outputs.source == 'true' }}
 
-  # check-msrv:
-  #   uses: ./.github/workflows/msrv.yml
-  #   needs: changes
-  #   secrets: inherit
-  #   if: ${{ needs.changes.outputs.source == 'true' }}
+  check-msrv:
+    uses: ./.github/workflows/msrv.yml
+    needs: changes
+    secrets: inherit
+    if: ${{ needs.changes.outputs.source == 'true' }}
 
-  # check-component-features:
-  #   uses: ./.github/workflows/component_features.yml
-  #   needs: changes
-  #   secrets: inherit
-  #   if: ${{ needs.changes.outputs.source == 'true' }}
+  check-component-features:
+    uses: ./.github/workflows/component_features.yml
+    needs: changes
+    secrets: inherit
+    if: ${{ needs.changes.outputs.source == 'true' }}
 
-  # cross-linux:
-  #   uses: ./.github/workflows/cross.yml
-  #   needs: changes
-  #   secrets: inherit
-  #   # We run cross checks when dependencies change to ensure they still build.
-  #   # This helps us avoid adopting dependencies that aren't compatible with other architectures.
-  #   if: ${{ needs.changes.outputs.dependencies == 'true' }}
+  cross-linux:
+    uses: ./.github/workflows/cross.yml
+    needs: changes
+    secrets: inherit
+    # We run cross checks when dependencies change to ensure they still build.
+    # This helps us avoid adopting dependencies that aren't compatible with other architectures.
+    if: ${{ needs.changes.outputs.dependencies == 'true' }}
 
-  # unit-mac:
-  #   uses: ./.github/workflows/unit_mac.yml
-  #   needs: changes
-  #   secrets: inherit
-  #   if: ${{ needs.changes.outputs.source == 'true' }}
+  unit-mac:
+    uses: ./.github/workflows/unit_mac.yml
+    needs: changes
+    secrets: inherit
+    if: ${{ needs.changes.outputs.source == 'true' }}
 
-  # unit-windows:
-  #   uses: ./.github/workflows/unit_windows.yml
-  #   needs: changes
-  #   secrets: inherit
-  #   if: ${{ needs.changes.outputs.source == 'true' }}
-
-  # master-failure:
-  #   name: master-failure
-  #   if: failure() && github.ref == 'refs/heads/something_clever' # TODO just in case
-  #   needs:
-  #     - changes
-  #     - test-cli
-  #     - test-misc
-  #     - check-msrv
-  #     - check-component-features
-  #     - cross-linux
-  #     - unit-mac
-  #     - unit-windows
-  #   runs-on: ubuntu-20.04
-  #   steps:
-  #   - name: Discord notification
-  #     env:
-  #       DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
-  #     uses: Ilshidur/action-discord@0.3.2
-  #     with:
-  #       args: "Master merge queue tests failed: <https://github.com/${{github.repository}}/actions/runs/${{github.run_id}}>"
+  unit-windows:
+    uses: ./.github/workflows/unit_windows.yml
+    needs: changes
+    secrets: inherit
+    if: ${{ needs.changes.outputs.source == 'true' }}
 
   master-merge-queue-check:
     name: Master Merge Queue
@@ -104,6 +83,12 @@ jobs:
     needs:
       - changes
       - test-cli
+      - test-misc
+      - check-msrv
+      - check-component-features
+      - cross-linux
+      - unit-mac
+      - unit-windows
     steps:
       # - uses: actions/checkout@v2
       # - name: Succeed if pull_request
@@ -123,12 +108,23 @@ jobs:
           EVENT_NAME: ${{ github.event_name }}
           CHANGES_RESULT: ${{ needs.changes.result }}
           CLI_RESULT: ${{ needs.test-cli.result }}
+          MISC_RESULT: ${{ needs.test-misc.result }}
+          MSRV_RESULT: ${{ needs.check-msrv.result }}
+          COMP_RESULT: ${{ needs.check-component-features.result }}
+          CROSS_RESULT: ${{ needs.cross-linux.result }}
+          MAC_RESULT: ${{ needs.unit-mac.result }}
+          WIN_RESULT: ${{ needs.unit-windows.result }}
         run: |
           if [ "$EVENT_NAME" != "merge_group" ] ; then
-              echo "success" && exit 0
+              echo "success"
+              exit 0
           fi
-          if [[ "$CHANGES_RESULT" == "failure" || "$CLI_RESULT" == "failure" ]] ; then
-               echo "failed" && exit 1
+          if [[ "$CHANGES_RESULT" == "failure" || "$CLI_RESULT" == "failure"
+                  || $MISC_RESULT == "failure" || $MSRV_RESULT == "failure"
+                  || $COMP_RESULT == "failure" || $CROSS_RESULT == "failure"
+                  || $MAC_RESULT == "failure"  || $WIN_RESULT == "failure" ]] ; then
+              echo "failed"
+              exit 1
           fi
           echo "success"
           exit 0
