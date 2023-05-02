@@ -103,15 +103,20 @@ jobs:
     runs-on: ubuntu-20.04
     needs: cross-linux
     if: always()
+    env:
+      EVENT_NAME: ${{ github.event_name }}
+      CROSS_RESULT: ${{ needs.test-cross.result }}
     steps:
       # Find the branch that the comment was made in.
       - name: (PR comment) Get PR branch
-        if: ${{ github.event_name == 'issue_comment' && needs.cross-linux.result == 'success '}}
+        if: |
+          $EVENT_NAME == 'issue_comment' && $CROSS_RESULT == 'success'
         uses: xt0rted/pull-request-comment-branch@v1
         id: comment-branch
 
       - name: (PR comment) Submit PR result as success
-        if: ${{ github.event_name == 'issue_comment' && needs.cross-linux.result == 'success '}}
+        if: |
+          $EVENT_NAME == 'issue_comment' && $CROSS_RESULT == 'success'
         uses: myrotvorets/set-commit-status-action@master
         with:
           sha: ${{ steps.comment-branch.outputs.head_sha }}
@@ -119,9 +124,6 @@ jobs:
           status: 'success'
 
       - name: validate
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-          CROSS_RESULT: ${{ needs.test-cross.result }}
         run: |
           if [ "$EVENT_NAME" == "pull_request" ] ; then
               echo "success"

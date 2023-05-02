@@ -255,12 +255,14 @@ jobs:
     steps:
       # Find the branch that the comment was made in.
       - name: (PR comment) Get PR branch
-        if: ${{ github.event_name == 'issue_comment' && $K8S_RESULT == 'success' }}
+        if: |
+          $EVENT_NAME == 'issue_comment' && $K8S_RESULT == 'success'
         uses: xt0rted/pull-request-comment-branch@v1
         id: comment-branch
 
       - name: (PR comment) Submit PR result as success
-        if: ${{ github.event_name == 'issue_comment' && $K8S_RESULT == 'success' }}
+        if: |
+          $EVENT_NAME == 'issue_comment' && $K8S_RESULT == 'success'
         uses: myrotvorets/set-commit-status-action@master
         with:
           sha: ${{ steps.comment-branch.outputs.head_sha }}
