@@ -1,3 +1,7 @@
+# Executes various builds of vector to time the results in order to track build times.
+#
+# This workflow is unrelated to the Regression workflow.
+
 name: Baseline Timings
 
 on:
