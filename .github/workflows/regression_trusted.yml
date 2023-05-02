@@ -10,9 +10,7 @@ jobs:
   compute-metadata:
     name: Compute metadata for regression experiments
     runs-on: ubuntu-22.04
-    if: >
-      github.event.workflow_run.event == 'merge_queue' &&
-      github.event.workflow_run.conclusion == 'success'
+    if: github.event.workflow_run.conclusion == 'success'
     outputs:
       cpus: ${{ steps.system.outputs.CPUS }}
       memory: ${{ steps.system.outputs.MEMORY }}
