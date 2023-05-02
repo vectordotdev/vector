@@ -58,7 +58,7 @@ jobs:
 #        run: |
 #          echo "PR_NUMBER=${{ github.event.number }}" >> $GITHUB_OUTPUT
         run: |
-          echo PR_NUMBER=$(echo "${{github.ref}}" | sed -n 's|^refs/heads/gh-readonly-queue/main/pr-\([0-9]*\)-.*$|\1|p') >> $GITHUB_OUTPUT
+          echo PR_NUMBER=$(echo "${{github.ref}}" | sed -n 's|^refs/heads/gh-readonly-queue/master/pr-\([0-9]*\)-.*$|\1|p') >> $GITHUB_OUTPUT
 
       - name: Setup baseline variables
         id: baseline
