@@ -1,9 +1,11 @@
+# Executes various builds of vector to time the results in order to track build times.
+#
+# This workflow is unrelated to the Regression workflow.
+
 name: Baseline Timings
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron: "0 */2 * * *"
 
 env:
   CI: true
