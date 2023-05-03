@@ -9,8 +9,7 @@ use std::{
 use chrono::{DateTime, Utc};
 use vector_common::EventDataEq;
 use vector_config::configurable_component;
-#[cfg(feature = "vrl")]
-use vrl_lib::compiler::value::VrlValueConvert;
+use vrl::compiler::value::VrlValueConvert;
 
 use crate::{
     event::{
@@ -495,10 +494,10 @@ pub enum MetricKind {
 }
 
 #[cfg(feature = "vrl")]
-impl TryFrom<::value::Value> for MetricKind {
+impl TryFrom<vrl::value::Value> for MetricKind {
     type Error = String;
 
-    fn try_from(value: ::value::Value) -> Result<Self, Self::Error> {
+    fn try_from(value: vrl::value::Value) -> Result<Self, Self::Error> {
         let value = value.try_bytes().map_err(|e| e.to_string())?;
         match std::str::from_utf8(&value).map_err(|e| e.to_string())? {
             "incremental" => Ok(Self::Incremental),
@@ -511,7 +510,7 @@ impl TryFrom<::value::Value> for MetricKind {
 }
 
 #[cfg(feature = "vrl")]
-impl From<MetricKind> for ::value::Value {
+impl From<MetricKind> for vrl::value::Value {
     fn from(kind: MetricKind) -> Self {
         match kind {
             MetricKind::Incremental => "incremental".into(),

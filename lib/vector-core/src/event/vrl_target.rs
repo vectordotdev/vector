@@ -4,10 +4,11 @@ use std::{collections::BTreeMap, convert::TryFrom, marker::PhantomData};
 use lookup::lookup_v2::OwnedSegment;
 use lookup::{OwnedTargetPath, OwnedValuePath, PathPrefix};
 use snafu::Snafu;
-use vrl_lib::compiler::value::VrlValueConvert;
-use vrl_lib::compiler::{ProgramInfo, SecretTarget, Target};
+use vrl::compiler::value::VrlValueConvert;
+use vrl::compiler::{ProgramInfo, SecretTarget, Target};
+use vrl::value::Value;
 
-use super::{Event, EventMetadata, LogEvent, Metric, MetricKind, TraceEvent, Value};
+use super::{Event, EventMetadata, LogEvent, Metric, MetricKind, TraceEvent};
 use crate::config::log_schema;
 use crate::event::metric::TagValue;
 
@@ -200,11 +201,7 @@ fn set_metric_tag_values(name: String, value: &Value, metric: &mut Metric, multi
 }
 
 impl Target for VrlTarget {
-    fn target_insert(
-        &mut self,
-        target_path: &OwnedTargetPath,
-        value: ::value::Value,
-    ) -> Result<(), String> {
+    fn target_insert(&mut self, target_path: &OwnedTargetPath, value: Value) -> Result<(), String> {
         let path = &target_path.path;
         match target_path.prefix {
             PathPrefix::Event => match self {
@@ -327,7 +324,7 @@ impl Target for VrlTarget {
         &mut self,
         target_path: &OwnedTargetPath,
         compact: bool,
-    ) -> Result<Option<::value::Value>, String> {
+    ) -> Result<Option<vrl::value::Value>, String> {
         match target_path.prefix {
             PathPrefix::Event => match self {
                 VrlTarget::LogEvent(ref mut log, _) | VrlTarget::Trace(ref mut log, _) => {
@@ -353,7 +350,7 @@ impl Target for VrlTarget {
                             ["tags"] => metric.series.tags.take().map(|map| {
                                 map.into_iter_single()
                                     .map(|(k, v)| (k, v.into()))
-                                    .collect::<::value::Value>()
+                                    .collect::<vrl::value::Value>()
                             }),
                             ["tags", field] => metric.remove_tag(field).map(Into::into),
                             _ => {

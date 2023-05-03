@@ -3,7 +3,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use crate::config::{log_schema, LegacyKey, LogNamespace};
 use lookup::lookup_v2::{parse_value_path, TargetPath};
 use lookup::{owned_value_path, OwnedTargetPath, OwnedValuePath, PathPrefix};
-use value::{kind::Collection, Kind};
+use vrl::value::{kind::Collection, Kind};
 
 /// The definition of a schema.
 ///
