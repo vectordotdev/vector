@@ -32,8 +32,8 @@ jobs:
   # This job will always pass and is how we implicitly succeed on PR triggers.
   always:
     runs-on: ubuntu-20.04
-    run: |
-      echo "OK"
+    steps:
+      - run: echo "OK"
 
   # This is the entry job which is required for all the actual tests in this workflow.
   # If we don't run this job (such as in a pull request), then by consequence all downstream
