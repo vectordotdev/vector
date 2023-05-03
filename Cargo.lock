@@ -2011,13 +2011,13 @@ dependencies = [
  "tokio",
  "tokio-util",
  "tracing 0.1.37",
- "value",
  "vector-common",
  "vector-config",
  "vector-config-common",
  "vector-config-macros",
  "vector-core",
  "vector-lookup",
+ "vrl",
 ]
 
 [[package]]

@@ -1,5 +1,9 @@
 #[cfg(feature = "vrl")]
 use std::convert::TryFrom;
+
+#[cfg(feature = "vrl")]
+use vrl::compiler::value::VrlValueConvert;
+
 use std::{
     convert::AsRef,
     fmt::{self, Display, Formatter},
@@ -9,7 +13,6 @@ use std::{
 use chrono::{DateTime, Utc};
 use vector_common::EventDataEq;
 use vector_config::configurable_component;
-use vrl::compiler::value::VrlValueConvert;
 
 use crate::{
     event::{
