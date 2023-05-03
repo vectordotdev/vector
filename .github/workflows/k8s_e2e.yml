@@ -101,7 +101,6 @@ jobs:
   compute-k8s-test-plan:
     name: Compute K8s test plan
     runs-on: [linux, ubuntu-20.04-8core]
-    needs: changes
     # - If trigger is comment, run if comment contains `/ci-deploy-k8s-tests`, otherwise always run.
     if: github.event_name != 'issue_comment' || contains(github.event.comment.body, '/ci-deploy-k8s-tests')
     outputs:
