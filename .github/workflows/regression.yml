@@ -53,10 +53,6 @@ jobs:
 
       - name: Setup PR metadata
         id: pr-metadata
-        # TODO the github event appears to not be a pull request event when this is triggered by a merge queue
-        # temporarily trying out using the event id, which appears to be a common event property.
-#        run: |
-#          echo "PR_NUMBER=${{ github.event.number }}" >> $GITHUB_OUTPUT
         run: |
           echo PR_NUMBER=$(echo "${{github.ref}}" | sed -n 's|^refs/heads/gh-readonly-queue/master/pr-\([0-9]*\)-.*$|\1|p') >> $GITHUB_OUTPUT
 
@@ -67,7 +63,7 @@ jobs:
           export BASELINE_SHA=$(git rev-parse HEAD)
           popd
 
-          export BASELINE_TAG="${{ github.event.pull_request.head.sha }}-${BASELINE_SHA}"
+          export BASELINE_TAG="${{ github.event.merge_group.head_sha }}-${BASELINE_SHA}"
           echo "baseline sha is: ${BASELINE_SHA}"
           echo "baseline tag is: ${BASELINE_TAG}"
 
@@ -77,8 +73,8 @@ jobs:
       - name: Setup comparison variables
         id: comparison
         run: |
-          export COMPARISON_SHA=${{ github.event.pull_request.head.sha }}
-          export COMPARISON_TAG="${{ github.event.pull_request.head.sha }}-${{ github.event.pull_request.head.sha }}"
+          export COMPARISON_SHA=${{ github.event.merge_group.head_sha }}
+          export COMPARISON_TAG="${{ github.event.merge_group.head_sha }}-${{ github.event.merge_group.head_sha }}"
 
           echo "comparison sha is: ${COMPARISON_SHA}"
           echo "comparison tag is: ${COMPARISON_TAG}"
@@ -177,8 +173,8 @@ jobs:
           echo "BASELINE_TAG=${{ needs.compute-metadata.outputs.pr-number }}-${{ needs.compute-metadata.outputs.baseline-tag }}" >> ${{ runner.temp }}/meta
           echo "BASELINE_SHA=${{ needs.compute-metadata.outputs.baseline-sha }}" >> ${{ runner.temp }}/meta
           echo "CHECKOUT_SHA=${{ github.sha }}" >> ${{ runner.temp }}/meta
-          echo "HEAD_SHA=${{ github.event.pull_request.head.sha }}" >> ${{ runner.temp }}/meta
-          echo "BASE_SHA=${{ github.event.pull_request.base.sha }}" >> ${{ runner.temp }}/meta
+          echo "HEAD_SHA=${{ github.event.merge_group.head_sha }}" >> ${{ runner.temp }}/meta
+          echo "BASE_SHA=${{ github.event.merge_group.base_sha }}" >> ${{ runner.temp }}/meta
           echo "GITHUB_EVENT_NUMBER=${{ github.event.number }}" >> ${{ runner.temp }}/meta
 
       - name: Upload metadata

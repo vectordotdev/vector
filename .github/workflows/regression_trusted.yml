@@ -431,7 +431,7 @@ jobs:
           name: vector-submission-metadata
           path: ${{ runner.temp }}/
 
-      - name: Determine if PR introduced a regression
+      - name: Determine if introduced a regression
         env:
           RUST_LOG: info
         run: |
@@ -538,12 +538,12 @@ jobs:
         with:
           path: ${{ runner.temp }}/outputs/report.html
 
-      - name: Post report to PR
-        uses: peter-evans/create-or-update-comment@v3
-        with:
-          issue-number: ${{ needs.compute-metadata.outputs.github-event-number }}
-          edit-mode: append
-          body: ${{ steps.read-analysis.outputs.content }}
+      # - name: Post report to PR
+      #   uses: peter-evans/create-or-update-comment@v3
+      #   with:
+      #     issue-number: ${{ needs.compute-metadata.outputs.github-event-number }}
+      #     edit-mode: append
+      #     body: ${{ steps.read-analysis.outputs.content }}
 
       - name: Upload regression report to artifacts
         uses: actions/upload-artifact@v3
@@ -591,3 +591,40 @@ jobs:
             -f description='Analyze experimental results from Regression Detector failed.' \
             -f context='Regression Detector / analyze-experiment' \
             -f target_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+  # TODO this worklow will be harder to adapt to the trigger on comment
+  # validate:
+  #   name: Regression Detector
+  #   runs-on: ubuntu-22.04
+  #   if: always()
+  #   needs:
+  #     - detect-regression
+  #   steps:
+  #     # Find the branch that the comment was made in.
+  #     - name: (PR comment) Get PR branch
+  #       if: github.event_name == 'issue_comment' && needs.detect-regression.result == 'success'
+  #       uses: xt0rted/pull-request-comment-branch@v1
+  #       id: comment-branch
+
+  #     # Indicate in the PR's CI pane that this job is complete
+  #     - name: (PR comment) Set latest commit status as success
+  #       uses: myrotvorets/set-commit-status-action@master
+  #       if: github.event_name == 'issue_comment' && needs.test-integration.result == 'success'
+  #       with:
+  #         sha: ${{ steps.comment-branch.outputs.head_sha }}
+  #         token: ${{ secrets.GITHUB_TOKEN }}
+  #         status: 'success'
+
+  #     - name: validate
+  #       run: |
+  #         if [ ${{ github.event_name }} == 'pull_request' ] ; then
+  #             echo "success"
+  #             exit 0
+  #         fi
+  #         if [ ${{ needs.test-integration.result }} == 'failure' ] ; then
+  #             echo "failed"
+  #             exit 1
+  #         fi
+  #         echo "success"
+  #         exit 0
+
