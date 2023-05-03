@@ -61,9 +61,7 @@ jobs:
       - name: Setup baseline variables
         id: baseline
         run: |
-          pushd baseline-vector
           export BASELINE_SHA="${{ github.event.merge_group.base_sha}}"
-          popd
 
           export BASELINE_TAG="${{ github.event.merge_group.head_sha }}-${BASELINE_SHA}"
           echo "baseline sha is: ${BASELINE_SHA}"
