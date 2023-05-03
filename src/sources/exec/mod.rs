@@ -722,7 +722,7 @@ mod tests {
     use bytes::Bytes;
     use std::io::Cursor;
     use vector_core::event::EventMetadata;
-    use vrl::compiler::value;
+    use vrl::value::value;
 
     #[cfg(unix)]
     use futures::task::Poll;

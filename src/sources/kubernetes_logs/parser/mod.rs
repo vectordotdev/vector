@@ -84,7 +84,7 @@ impl FunctionTransform for Parser {
 mod tests {
     use bytes::Bytes;
     use lookup::event_path;
-    use vrl::compiler::value;
+    use vrl::value::value;
 
     use super::*;
     use crate::{event::Event, event::LogEvent, test_util::trace_init, transforms::Transform};

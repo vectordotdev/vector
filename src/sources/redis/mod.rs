@@ -321,7 +321,7 @@ mod integration_test {
         },
         SourceSender,
     };
-    use vrl::compiler::value;
+    use vrl::value::value;
 
     const REDIS_SERVER: &str = "redis://redis:6379/0";
 

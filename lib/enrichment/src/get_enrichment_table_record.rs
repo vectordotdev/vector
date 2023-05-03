@@ -1,5 +1,4 @@
 use std::collections::BTreeMap;
-use vrl::compiler::value::Error;
 use vrl::stdlib::prelude::*;
 
 use crate::{
@@ -21,7 +20,7 @@ fn get_enrichment_table_record(
                 .iter()
                 .map(|value| Ok(value.try_bytes_utf8_lossy()?.to_string()))
                 .collect::<std::result::Result<Vec<_>, _>>(),
-            value => Err(Error::Expected {
+            value => Err(ValueError::Expected {
                 got: value.kind(),
                 expected: Kind::array(Collection::any()),
             }),

@@ -818,7 +818,7 @@ mod tests {
         sources::file,
         test_util::components::{assert_source_compliance, FILE_SOURCE_TAGS},
     };
-    use vrl::compiler::value;
+    use vrl::value::value;
 
     #[test]
     fn generate_config() {

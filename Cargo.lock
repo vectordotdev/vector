@@ -9413,6 +9413,7 @@ dependencies = [
  "vector-config",
  "vector-config-common",
  "vector-config-macros",
+ "vrl-compiler",
  "vrl-core",
 ]
 
@@ -9438,8 +9439,7 @@ dependencies = [
  "url",
  "vector-config-common",
  "vector-config-macros",
- "vrl-compiler",
- "vrl-core",
+ "vrl",
 ]
 
 [[package]]
@@ -9679,6 +9679,7 @@ dependencies = [
  "anymap",
  "bytes 1.4.0",
  "chrono",
+ "chrono-tz",
  "dyn-clone",
  "getrandom 0.2.9",
  "lalrpop-util",
@@ -9687,9 +9688,10 @@ dependencies = [
  "path",
  "regex",
  "serde",
+ "snafu",
  "thiserror",
+ "tracing 0.1.37",
  "value",
- "vrl-core",
  "vrl-diagnostic",
  "vrl-parser",
 ]

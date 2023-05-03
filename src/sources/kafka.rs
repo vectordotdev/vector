@@ -912,7 +912,7 @@ mod integration_test {
     use tokio::time::sleep;
     use vector_buffers::topology::channel::BufferReceiver;
     use vector_core::event::EventStatus;
-    use vrl::compiler::value;
+    use vrl::value::value;
 
     use super::{test::*, *};
     use crate::{

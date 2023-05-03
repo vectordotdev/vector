@@ -117,7 +117,7 @@ mod tests {
     };
     use futures::StreamExt;
     use lookup::path;
-    use vrl::compiler::value;
+    use vrl::value::value;
 
     #[test]
     fn generate_config() {

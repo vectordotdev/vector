@@ -255,7 +255,7 @@ mod tests {
     use similar_asserts::assert_eq;
     use tokio::time::{sleep, Duration};
     use vector_common::assert_event_data_eq;
-    use vrl::compiler::value;
+    use vrl::value::value;
 
     use super::*;
     use crate::{

@@ -21,7 +21,7 @@ pub mod byte_size_of;
 pub mod config;
 
 #[cfg(feature = "conversion")]
-pub use vrl_core::TimeZone;
+pub use vrl_compiler::TimeZone;
 
 #[cfg(feature = "encoding")]
 pub mod encode_logfmt {
@@ -29,7 +29,7 @@ pub mod encode_logfmt {
 }
 
 pub mod conversion {
-    pub use vrl_core::conversion::*;
+    pub use vrl_compiler::conversion::*;
 }
 
 pub mod event_data_eq;

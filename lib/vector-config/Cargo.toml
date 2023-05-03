@@ -26,8 +26,7 @@ snafu = { version = "0.7.4", default-features = false }
 toml = { version = "0.7.3", default-features = false }
 tracing = { version = "0.1.34", default-features = false }
 url = { version = "2.3.1", default-features = false, features = ["serde"] }
-vrl-compiler = { package = "vrl-compiler", path = "/home/nathan/repos/vrl/lib/compiler" }
-vrl-core = { package = "vrl-core", path = "/home/nathan/repos/vrl/lib/core", default-features = false, features = ["serde"] }
+vrl = { path = "/home/nathan/repos/vrl", default-features = false, features = ["compiler"] }
 vector-config-common = { path = "../vector-config-common" }
 vector-config-macros = { path = "../vector-config-macros" }
 

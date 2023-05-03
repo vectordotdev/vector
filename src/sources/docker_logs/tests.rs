@@ -45,7 +45,7 @@ mod integration_tests {
     };
     use futures::{stream::TryStreamExt, FutureExt};
     use similar_asserts::assert_eq;
-    use vrl::compiler::value;
+    use vrl::value::value;
 
     /// None if docker is not present on the system
     async fn source_with<'a, L: Into<Option<&'a str>>>(

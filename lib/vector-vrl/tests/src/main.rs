@@ -9,8 +9,7 @@ use vrl_tests::{get_tests_from_functions, run_tests, Test, TestConfig};
 use chrono_tz::Tz;
 use clap::Parser;
 use glob::glob;
-use vrl::compiler::{CompileConfig, VrlRuntime};
-use vrl::core::TimeZone;
+use vrl::compiler::{CompileConfig, TimeZone, VrlRuntime};
 
 #[cfg(not(target_env = "msvc"))]
 #[global_allocator]
