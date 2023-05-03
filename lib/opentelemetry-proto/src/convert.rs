@@ -3,11 +3,11 @@ use chrono::{DateTime, TimeZone, Utc};
 use lookup::path;
 use ordered_float::NotNan;
 use std::collections::BTreeMap;
-use value::Value;
 use vector_core::{
     config::{log_schema, LegacyKey, LogNamespace},
     event::{Event, LogEvent},
 };
+use vrl::value::Value;
 
 use super::proto::{
     common::v1::{any_value::Value as PBValue, KeyValue},

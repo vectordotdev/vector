@@ -5636,9 +5636,9 @@ dependencies = [
  "prost-build",
  "tonic 0.9.2",
  "tonic-build",
- "value",
  "vector-core",
  "vector-lookup",
+ "vrl",
 ]
 
 [[package]]
