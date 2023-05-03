@@ -114,6 +114,7 @@ impl SinkConfig for StackdriverConfig {
             auth,
         };
 
+        auth.spawn_regenerate_token();
         let sink = BatchedHttpSink::new(
             sink,
             MetricsBuffer::new(batch_settings.size),
