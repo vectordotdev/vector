@@ -1,11 +1,20 @@
+# This workflow is a collection of workflows that are required for the merge queue.
+#
+# Many of the workflows that are jobs within this one, are able to be run on demand
+# by issuing a comment with the respective command to trigger said workflow.
+#
+# The design of this workflow relies on the first real job "changes" to detect file
+# changes against the base, and each downstream workflow after that will only be
+# called if the files for that area have changed.
+
 name: Master Merge Queue Test Suite
 
 on:
   # Only want to run this on merge queue, but because GH doesn't allow specifying different required checks
   # for pull request and merge queue, we need to "run" it in pull request, but in the jobs we will just auto pass.
   pull_request:
-  #merge_group:
-  #  types: [checks_requested]
+  merge_group:
+    types: [checks_requested]
 
 concurrency:
   # `github.event.number` exists for pull requests, otherwise fall back to SHA for merge queue
@@ -101,6 +110,40 @@ jobs:
     needs: changes
     secrets: inherit
     if: needs.changes.outputs.k8s == 'true'
+
+  regression:
+    uses: ./.github/workflows/regression.yml
+    needs: changes
+    secrets: inherit
+    if: needs.changes.outputs.source == 'true'
+    with:
+      #pr_number: ${{ $(echo "${{github.ref}}" | sed -n 's|^refs/heads/gh-readonly-queue/master/pr-\([0-9]*\)-.*$|\1|p')
+      base_sha: ${{ github.event.merge_group.base_sha }}
+      head_sha: ${{ github.event.merge_group.head_sha }}
+
+  regression-trusted:
+    uses: ./.github/workflows/regression_trusted.yml
+    needs: regression
+    secrets: inherit
+
+  master-merge-queue-check:
+    name: Master Merge Queue
+    runs-on: ubuntu-20.04
+    needs:
+      - changes
+      - test-cli
+      - test-misc
+      - check-msrv
+      - check-component-features
+      - cross-linux
+      - unit-mac
+      - unit-windows
+      - install-sh
+      - k8s
+      - regression-trusted
+    steps:
+      - name: validate
+        run: echo "OK"
 
   # master-merge-queue-check:
   #   name: Master Merge Queue
