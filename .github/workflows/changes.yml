@@ -2,6 +2,13 @@ name: Identify Changes
 
 on:
   workflow_call:
+    inputs:
+      base_ref:
+        required: true
+        type: string
+      base_ref:
+        required: true
+        type: string
     outputs:
       source:
         value: ${{ jobs.changes.outputs.source }}
@@ -32,6 +39,8 @@ jobs:
     - uses: dorny/paths-filter@v2
       id: filter
       with:
+        base: ${{ inputs.base_ref }}
+        ref: ${{ inputs.head_ref }}
         filters: |
           source:
             - ".github/workflows/test.yml"
