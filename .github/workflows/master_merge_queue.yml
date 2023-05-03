@@ -31,8 +31,8 @@ jobs:
     if: ${{ github.event_name == 'merge_group' }}
     uses: ./.github/workflows/changes.yml
     with:
-      base_ref: ${{ github.event.merge_queue.base_ref }}
-      head_ref: ${{ github.event.merge_queue.head_ref }}
+      base_ref: ${{ github.event.merge_group.base_ref }}
+      head_ref: ${{ github.event.merge_group.head_ref }}
     secrets: inherit
 
   test-cli:

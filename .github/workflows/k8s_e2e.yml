@@ -40,11 +40,11 @@ jobs:
     - uses: actions/checkout@v3
 
     - uses: dorny/paths-filter@v2
-      if: github.event_name == 'merge_queue'
+      if: github.event_name == 'merge_group'
       id: filter
       with:
-        base: ${{ github.event.merge_queue.base_ref }}
-        ref: ${{ github.event.merge_queue.head_ref }}
+        base: ${{ github.event.merge_group.base_ref }}
+        ref: ${{ github.event.merge_group.head_ref }}
         # TODO check if worth keying off the other internal components that the tests utilize, suspect not.
         filters: |
           k8s:
@@ -60,7 +60,7 @@ jobs:
     # - If trigger is pull_request, skip.
     if: |
         (github.event_name == 'issue_comment' && contains(github.event.comment.body, '/ci-deploy-k8s-tests'))
-          || (github.event_name == 'merge_queue' && needs.changes.outputs.k8s == 'true')
+          || (github.event_name == 'merge_group' && needs.changes.outputs.k8s == 'true')
           || github.event_name == 'workflow_dispatch'
     # cargo-deb requires a release build, but we don't need optimizations for tests
     env:
@@ -140,7 +140,7 @@ jobs:
     # - If trigger is manual dispatch, always run.
     if: |
         (github.event_name == 'issue_comment' && contains(github.event.comment.body, '/ci-deploy-k8s-tests'))
-          || (github.event_name == 'merge_queue' && needs.changes.outputs.k8s == 'true')
+          || (github.event_name == 'merge_group' && needs.changes.outputs.k8s == 'true')
           || github.event_name == 'workflow_dispatch'
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}

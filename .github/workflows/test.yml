@@ -37,8 +37,8 @@ jobs:
     uses: ./.github/workflows/changes.yml
     secrets: inherit
     with:
-      base_ref: ${{ github.event.merge_queue.base_ref || github.event.pull_request.base.ref }}
-      head_ref: ${{ github.event.merge_queue.head_ref || github.event.pull_request.head.ref }}
+      base_ref: ${{ github.event.merge_group.base_ref || github.event.pull_request.base.ref }}
+      head_ref: ${{ github.event.merge_group.head_ref || github.event.pull_request.head.ref }}
 
   # Remove this once https://github.com/vectordotdev/vector/issues/3771 is closed.
   # Then, modify the `cross-linux` job to run `test` instead of `build`.
