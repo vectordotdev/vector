@@ -34,15 +34,17 @@ jobs:
   # Detects if the k8s related source files changed
   changes:
     runs-on: ubuntu-20.04
-    if: github.event_name != 'pull_request'
-    # Set job outputs to values from filter step
     outputs:
       k8s: ${{ steps.filter.outputs.k8s }}
     steps:
     - uses: actions/checkout@v3
+
     - uses: dorny/paths-filter@v2
+      if: github.event_name == 'merge_queue'
       id: filter
       with:
+        base: ${{ github.event.merge_queue.base_ref }}
+        ref: ${{ github.event.merge_queue.head_ref }}
         # TODO check if worth keying off the other internal components that the tests utilize, suspect not.
         filters: |
           k8s:
@@ -52,9 +54,10 @@ jobs:
     name: Build - x86_64-unknown-linux-gnu
     runs-on: [linux, ubuntu-20.04-8core]
     needs: changes
-    # - If trigger is comment, run if comment contains `/ci-deploy-k8s-tests`
-    # - If trigger is merge queue, run if files changed
+    # - If trigger is comment, run if comment contains `/ci-deploy-k8s-tests`.
+    # - If trigger is merge queue, run if files changed.
     # - If trigger is manual dispatch, always run.
+    # - If trigger is pull_request, skip.
     if: |
         (github.event_name == 'issue_comment' && contains(github.event.comment.body, '/ci-deploy-k8s-tests'))
           || (github.event_name == 'merge_queue' && needs.changes.outputs.k8s == 'true')
