@@ -48,10 +48,10 @@ jobs:
       baseline-sha: ${{ steps.baseline.outputs.BASELINE }}
       baseline-tag: ${{ steps.baseline.outputs.BASELINE_TAG }}
     steps:
-      - uses: actions/checkout@v3
-        with:
-          ref: ${{ github.base_ref }}
-          path: baseline-vector
+      # - uses: actions/checkout@v3
+      #   with:
+      #     ref: ${{ github.base_ref }}
+      #     path: baseline-vector
 
       - name: Setup PR metadata
         id: pr-metadata
@@ -62,7 +62,7 @@ jobs:
         id: baseline
         run: |
           pushd baseline-vector
-          export BASELINE_SHA=$(git rev-parse HEAD)
+          export BASELINE_SHA="${{ github.event.merge_group.base_sha}}"
           popd
 
           export BASELINE_TAG="${{ github.event.merge_group.head_sha }}-${BASELINE_SHA}"
