@@ -191,8 +191,8 @@ impl FunctionExpression for FindEnrichmentTableRecordsFn {
 
 #[cfg(test)]
 mod tests {
-    use ::value::Secrets;
     use vector_common::TimeZone;
+    use vrl::compiler::state::RuntimeState;
     use vrl::compiler::TargetValue;
     use vrl::value::Secrets;
 
@@ -221,7 +221,7 @@ mod tests {
             metadata: value!({}),
             secrets: Secrets::new(),
         };
-        let mut runtime_state = vrl::state::Runtime::default();
+        let mut runtime_state = RuntimeState::default();
         let mut ctx = Context::new(&mut target, &mut runtime_state, &tz);
 
         registry.finish_load();

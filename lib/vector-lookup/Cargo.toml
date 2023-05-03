@@ -10,4 +10,4 @@ license = "MPL-2.0"
 serde = { version = "1.0.159", default-features = false, features = ["derive", "alloc"] }
 vector-config = { path = "../vector-config" }
 vector-config-macros = { path = "../vector-config-macros" }
-vrl = { git = "https://github.com/vectordotdev/vrl", rev = "8d27cd2cdd3", default-features = false, features = ["path"] }
+vrl = { path = "/home/nathan_fox/repos/vrl", default-features = false, features = ["path"] }

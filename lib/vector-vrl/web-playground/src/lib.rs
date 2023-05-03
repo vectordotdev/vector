@@ -4,7 +4,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use value::Secrets;
 use vrl::compiler::runtime::{Runtime, Terminate};
-use vrl::compiler::{CompileConfig, TargetValue, TypeState};
+use vrl::compiler::{compile_with_state, CompileConfig, TargetValue, TypeState};
+use vrl::core::TimeZone;
 use vrl::diagnostic::DiagnosticList;
 use vrl::diagnostic::Formatter;
 use wasm_bindgen::prelude::*;
@@ -88,7 +89,7 @@ fn compile(mut input: Input) -> Result<VrlCompileResult, VrlDiagnosticResult> {
         secrets: Secrets::new(),
     };
 
-    let program = match vrl::compile_with_state(&input.program, &functions, &state, config) {
+    let program = match compile_with_state(&input.program, &functions, &state, config) {
         Ok(program) => program,
         Err(diagnostics) => return Err(VrlDiagnosticResult::new(&input.program, diagnostics)),
     };

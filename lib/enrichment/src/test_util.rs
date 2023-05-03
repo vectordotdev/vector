@@ -3,7 +3,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use value::Value;
+use vrl::value::Value;
 
 use crate::{Case, Condition, IndexHandle, Table, TableRegistry};
 

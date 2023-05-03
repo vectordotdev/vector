@@ -62,8 +62,8 @@ snafu = { version = "0.7", optional = true }
 stream-cancel = { version = "0.8.1", default-features = false }
 tokio = { version = "1.28.0", default-features = false, features = ["macros", "time"] }
 tracing = { version = "0.1.34", default-features = false }
-value = { package = "value", git = "https://github.com/vectordotdev/vrl", rev = "8d27cd2cdd3", features = ["json", "arbitrary"] }
-vrl-core = { package = "vrl-core", git = "https://github.com/vectordotdev/vrl", rev = "8d27cd2cdd3", default-features = false }
+value = { package = "value", path = "/home/nathan_fox/repos/vrl/lib/value", features = ["json", "arbitrary"] }
+vrl-core = { package = "vrl-core", path = "/home/nathan_fox/repos/vrl/lib/core", default-features = false }
 vector-config = { path = "../vector-config" }
 vector-config-common = { path = "../vector-config-common" }
 vector-config-macros = { path = "../vector-config-macros" }

@@ -7,4 +7,4 @@ publish = false
 license = "MPL-2.0"
 
 [dependencies]
-vrl = { git = "https://github.com/vectordotdev/vrl", rev = "8d27cd2cdd3" }
+vrl = { path = "/home/nathan_fox/repos/vrl" }

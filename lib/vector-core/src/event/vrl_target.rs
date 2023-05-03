@@ -592,7 +592,6 @@ mod test {
     use lookup::owned_value_path;
     use similar_asserts::assert_eq;
     use value::btreemap;
-    use vrl_lib::Target;
 
     use super::super::MetricValue;
     use super::*;
@@ -647,7 +646,7 @@ mod test {
             let path = OwnedTargetPath::event(path);
 
             assert_eq!(
-                vrl_lib::Target::target_get(&target, &path).map(Option::<&Value>::cloned),
+                Target::target_get(&target, &path).map(Option::<&Value>::cloned),
                 expect
             );
         }
@@ -755,11 +754,11 @@ mod test {
             let path = OwnedTargetPath::event(path);
 
             assert_eq!(
-                vrl_lib::Target::target_insert(&mut target, &path, value.clone()),
+                Target::target_insert(&mut target, &path, value.clone()),
                 result
             );
             assert_eq!(
-                vrl_lib::Target::target_get(&target, &path).map(Option::<&Value>::cloned),
+                Target::target_get(&target, &path).map(Option::<&Value>::cloned),
                 Ok(Some(value))
             );
             assert_eq!(
@@ -850,16 +849,14 @@ mod test {
             };
             let mut target = VrlTarget::new(Event::Log(LogEvent::from(object)), &info, false);
             let path = OwnedTargetPath::event(path);
-            let removed = vrl_lib::Target::target_get(&target, &path)
-                .unwrap()
-                .cloned();
+            let removed = Target::target_get(&target, &path).unwrap().cloned();
 
             assert_eq!(
-                vrl_lib::Target::target_remove(&mut target, &path, compact),
+                Target::target_remove(&mut target, &path, compact),
                 Ok(removed)
             );
             assert_eq!(
-                vrl_lib::Target::target_get(&target, &OwnedTargetPath::event_root())
+                Target::target_get(&target, &OwnedTargetPath::event_root())
                     .map(Option::<&Value>::cloned),
                 Ok(expect)
             );
@@ -914,8 +911,7 @@ mod test {
                 false,
             );
 
-            ::vrl_lib::Target::target_insert(&mut target, &OwnedTargetPath::event_root(), value)
-                .unwrap();
+            Target::target_insert(&mut target, &OwnedTargetPath::event_root(), value).unwrap();
 
             assert_eq!(
                 match target.into_events() {
