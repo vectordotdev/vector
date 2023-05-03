@@ -9409,10 +9409,10 @@ dependencies = [
  "stream-cancel",
  "tokio",
  "tracing 0.1.37",
- "value",
  "vector-config",
  "vector-config-common",
  "vector-config-macros",
+ "vrl",
  "vrl-compiler",
  "vrl-core",
 ]
