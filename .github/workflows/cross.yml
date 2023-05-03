@@ -98,38 +98,20 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           status: 'failure'
 
-  cross-linux-check:
-    name: Cross - Linux
+  update-pr-status:
+    name: (PR comment) Signal result to PR
     runs-on: ubuntu-20.04
     needs: cross-linux
-    if: always()
-    env:
-      EVENT_NAME: ${{ github.event_name }}
-      CROSS_RESULT: ${{ needs.test-cross.result }}
+    if: success() && github.event_name == 'issue_comment'
     steps:
       # Find the branch that the comment was made in.
       - name: (PR comment) Get PR branch
-        if: github.event_name == 'issue_comment' && needs.test-cross.result == 'success'
         uses: xt0rted/pull-request-comment-branch@v1
         id: comment-branch
 
       - name: (PR comment) Submit PR result as success
-        if: github.event_name == 'issue_comment' && needs.test-cross.result == 'success'
         uses: myrotvorets/set-commit-status-action@master
         with:
           sha: ${{ steps.comment-branch.outputs.head_sha }}
           token: ${{ secrets.GITHUB_TOKEN }}
           status: 'success'
-
-      - name: validate
-        run: |
-          if [ ${{ github.event_name }} == 'pull_request' ] ; then
-              echo "success"
-              exit 0
-          fi
-          if [ ${{ needs.test-cross.result }} == 'failure' ] ; then
-              echo "failed"
-              exit 1
-          fi
-          echo "success"
-          exit 0

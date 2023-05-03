@@ -1,9 +1,7 @@
 name: K8S E2E Suite
 
 on:
-  # Don't want to run this on every PR but because GH doesn't allow specifying different required checks
-  # for pull request and merge queue, we need to "run" it in pull request, but in the jobs will auto pass.
-  pull_request:
+  workflow_call:
   workflow_dispatch:
   merge_group:
     types: [checks_requested]
@@ -11,10 +9,7 @@ on:
     types: [created]
 
 concurrency:
-  # For pull requests, cancel running workflows, for master, run all
-  #
   # `github.event.number` exists for pull requests, otherwise fall back to SHA
-  # for master
   group: ${{ github.workflow }}-${{ github.event.number || github.sha }}
   cancel-in-progress: true
 
@@ -31,37 +26,11 @@ env:
 
 jobs:
 
-  # Detects if the k8s related source files changed
-  changes:
-    runs-on: ubuntu-20.04
-    outputs:
-      k8s: ${{ steps.filter.outputs.k8s }}
-    steps:
-    - uses: actions/checkout@v3
-
-    - uses: dorny/paths-filter@v2
-      if: github.event_name == 'merge_queue'
-      id: filter
-      with:
-        base: ${{ github.event.merge_queue.base_ref }}
-        ref: ${{ github.event.merge_queue.head_ref }}
-        # TODO check if worth keying off the other internal components that the tests utilize, suspect not.
-        filters: |
-          k8s:
-            - "src/sources/kubernetes_logs/**"
-
   build-x86_64-unknown-linux-gnu:
     name: Build - x86_64-unknown-linux-gnu
     runs-on: [linux, ubuntu-20.04-8core]
-    needs: changes
-    # - If trigger is comment, run if comment contains `/ci-deploy-k8s-tests`.
-    # - If trigger is merge queue, run if files changed.
-    # - If trigger is manual dispatch, always run.
-    # - If trigger is pull_request, skip.
-    if: |
-        (github.event_name == 'issue_comment' && contains(github.event.comment.body, '/ci-deploy-k8s-tests'))
-          || (github.event_name == 'merge_queue' && needs.changes.outputs.k8s == 'true')
-          || github.event_name == 'workflow_dispatch'
+    # - If trigger is comment, run if comment contains `/ci-deploy-k8s-tests`, otherwise always run.
+    if: github.event_name != 'issue_comment' || contains(github.event.comment.body, '/ci-deploy-k8s-tests')
     # cargo-deb requires a release build, but we don't need optimizations for tests
     env:
       CARGO_PROFILE_RELEASE_OPT_LEVEL: 0
@@ -135,13 +104,8 @@ jobs:
     name: Compute K8s test plan
     runs-on: [linux, ubuntu-20.04-8core]
     needs: changes
-    # - If trigger is comment, run if comment contains `/ci-deploy-k8s-tests`
-    # - If trigger is merge queue, run if files changed
-    # - If trigger is manual dispatch, always run.
-    if: |
-        (github.event_name == 'issue_comment' && contains(github.event.comment.body, '/ci-deploy-k8s-tests'))
-          || (github.event_name == 'merge_queue' && needs.changes.outputs.k8s == 'true')
-          || github.event_name == 'workflow_dispatch'
+    # - If trigger is comment, run if comment contains `/ci-deploy-k8s-tests`, otherwise always run.
+    if: github.event_name != 'issue_comment' || contains(github.event.comment.body, '/ci-deploy-k8s-tests')
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
@@ -252,52 +216,20 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           status: 'failure'
 
-  k8s-e2e-check:
-    name: Validate K8s E2E Test Result
+  update-pr-status:
+    name: (PR comment) Signal result to PR
     runs-on: ubuntu-20.04
     needs: test-e2e-kubernetes
-    if: always()
+    if: success() && github.event_name == 'issue_comment'
     steps:
       # Find the branch that the comment was made in.
       - name: (PR comment) Get PR branch
-        if: github.event_name == 'issue_comment' && needs.test-e2e-kubernetes.result == 'success'
         uses: xt0rted/pull-request-comment-branch@v1
         id: comment-branch
 
       - name: (PR comment) Submit PR result as success
-        if: github.event_name == 'issue_comment' && needs.test-e2e-kubernetes.result == 'success'
         uses: myrotvorets/set-commit-status-action@master
         with:
           sha: ${{ steps.comment-branch.outputs.head_sha }}
           token: ${{ secrets.GITHUB_TOKEN }}
           status: 'success'
-
-      - name: validate
-        run: |
-          if [ ${{ github.event_name }} == 'pull_request' ] ; then
-              echo "success"
-              exit 0
-          fi
-          if [ ${{ needs.test-e2e-kubernetes.result }} == 'failure' ] ; then
-              echo "failed"
-              exit 1
-          fi
-          echo "success"
-          exit 0
-    
- # TODO I guess don't need this if not triggering on master
-  # master-failure:
-  #   name: master-failure
-  #   if: failure() && github.ref == 'refs/heads/something_clever' # TODO just to be safe
-  #   needs:
-  #     - build-x86_64-unknown-linux-gnu
-  #     - compute-k8s-test-plan
-  #     - test-e2e-kubernetes
-  #   runs-on: ubuntu-20.04
-  #   steps:
-  #   - name: Discord notification
-  #     env:
-  #       DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
-  #     uses: Ilshidur/action-discord@0.3.2
-  #     with:
-  #       args: "Master k8s e2e tests failed: <https://github.com/${{github.repository}}/actions/runs/${{github.run_id}}>"
