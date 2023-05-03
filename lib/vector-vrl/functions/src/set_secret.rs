@@ -1,6 +1,4 @@
-use vrl::stdlib::prelude::*;
-// use vrl::value::kind:
-use vrl::compiler::TypeDef;
+use vrl::compiler::prelude::*;
 
 fn set_secret(
     ctx: &mut Context,

@@ -9682,6 +9682,7 @@ dependencies = [
  "chrono-tz",
  "dyn-clone",
  "getrandom 0.2.9",
+ "indoc",
  "lalrpop-util",
  "ordered-float 3.7.0",
  "paste",
@@ -9710,7 +9711,6 @@ dependencies = [
  "serde",
  "serde_json",
  "snafu",
- "tracing 0.1.37",
  "value",
  "vrl-diagnostic",
 ]
