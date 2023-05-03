@@ -22,6 +22,8 @@ on:
         value: ${{ jobs.changes.outputs.component_docs }}
       markdown:
         value: ${{ jobs.changes.outputs.markdown }}
+      install:
+        value: ${{ jobs.changes.outputs.install }}
 
 jobs:
   changes:
@@ -34,6 +36,7 @@ jobs:
       cue: ${{ steps.filter.outputs.cue }}
       component_docs: ${{ steps.filter.outputs.component_docs }}
       markdown: ${{ steps.filter.outputs.markdown }}
+      install: ${{ steps.filter.outputs.install }}
     steps:
     - uses: actions/checkout@v3
     - uses: dorny/paths-filter@v2
@@ -84,3 +87,6 @@ jobs:
           docker:
             - 'distribution/docker/**'
             - "vdev/**"
+          install:
+            - ".github/workflows/install-sh.yml"
+            - "distribution/install.sh"

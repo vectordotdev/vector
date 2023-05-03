@@ -7,6 +7,11 @@ on:
   #merge_group:
   #  types: [checks_requested]
 
+concurrency:
+  # `github.event.number` exists for pull requests, otherwise fall back to SHA for merge queue
+  group: ${{ github.workflow }}-${{ github.event.number || github.event.merge_group.base_sha }}
+  cancel-in-progress: true
+
 env:
   AWS_ACCESS_KEY_ID: "dummy"
   AWS_SECRET_ACCESS_KEY: "dummy"
@@ -79,6 +84,12 @@ jobs:
     secrets: inherit
     if: needs.changes.outputs.source == 'true'
 
+  install-sh:
+    uses: ./.github/workflows/install-sh.yml
+    needs: changes
+    secrets: inherit
+    if: needs.changes.outputs.install == 'true'
+
   master-merge-queue-check:
     name: Master Merge Queue
     runs-on: ubuntu-20.04
@@ -92,6 +103,7 @@ jobs:
       - cross-linux
       - unit-mac
       - unit-windows
+      - install-sh
     steps:
       - name: validate
         env:
@@ -104,6 +116,7 @@ jobs:
           CROSS_RESULT: ${{ needs.cross-linux.result }}
           MAC_RESULT: ${{ needs.unit-mac.result }}
           WIN_RESULT: ${{ needs.unit-windows.result }}
+          INS_RESULT: ${{ needs.install-sh.result }}
         # If the trigger was a merge group we evaluate the status of each required prerequisite job.
         run: |
           if [ "$EVENT_NAME" != "merge_group" ] ; then
@@ -111,9 +124,10 @@ jobs:
               exit 0
           fi
           if [[ "$CHANGES_RESULT" == "failure" || "$CLI_RESULT" == "failure"
-                  || $MISC_RESULT == "failure" || $MSRV_RESULT == "failure"
-                  || $COMP_RESULT == "failure" || $CROSS_RESULT == "failure"
-                  || $MAC_RESULT == "failure"  || $WIN_RESULT == "failure" ]] ; then
+                  || "$MISC_RESULT" == "failure" || "$MSRV_RESULT" == "failure"
+                  || "$COMP_RESULT" == "failure" || "$CROSS_RESULT" == "failure"
+                  || "$MAC_RESULT" == "failure"  || "$WIN_RESULT" == "failure"
+                  || "$INS_RESULT" == "failure" ]] ; then
               echo "failed"
               exit 1
           fi

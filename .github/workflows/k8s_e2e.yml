@@ -11,11 +11,8 @@ on:
     types: [created]
 
 concurrency:
-  # For pull requests, cancel running workflows, for master, run all
-  #
-  # `github.event.number` exists for pull requests, otherwise fall back to SHA
-  # for master
-  group: ${{ github.workflow }}-${{ github.event.number || github.sha }}
+  # `github.event.number` exists for pull requests, otherwise fall back to SHA for merge queue
+  group: ${{ github.workflow }}-${{ github.event.number || github.event.merge_group.base_sha }}
   cancel-in-progress: true
 
 env:
