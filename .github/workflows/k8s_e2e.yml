@@ -31,6 +31,7 @@ env:
 
 jobs:
 
+  # Detects if the k8s related source files changed
   changes:
     runs-on: ubuntu-20.04
     if: github.event_name != 'pull_request'
