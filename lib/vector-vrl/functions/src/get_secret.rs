@@ -1,4 +1,4 @@
-use vrl::compiler::prelude::*;
+use vrl::prelude::*;
 
 fn get_secret(ctx: &mut Context, key: Value) -> std::result::Result<Value, ExpressionError> {
     let key_bytes = key.as_bytes().expect("argument must be a string");

@@ -1,8 +1,8 @@
 use std::collections::BTreeMap;
 use std::ops::{Deref, DerefMut};
-use vrl::compiler::prelude::*;
 use vrl::diagnostic::Label;
 use vrl::path::OwnedValuePath;
+use vrl::prelude::*;
 
 #[derive(Debug, Default, Clone)]
 pub struct MeaningList(pub BTreeMap<String, OwnedValuePath>);

@@ -1,4 +1,4 @@
-use vrl::compiler::prelude::*;
+use vrl::prelude::*;
 
 fn set_secret(
     ctx: &mut Context,

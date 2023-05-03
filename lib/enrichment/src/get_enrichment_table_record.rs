@@ -1,5 +1,5 @@
 use std::collections::BTreeMap;
-use vrl::stdlib::prelude::*;
+use vrl::prelude::*;
 
 use crate::{
     vrl_util::{self, add_index, evaluate_condition},
