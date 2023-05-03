@@ -108,13 +108,13 @@ impl SinkConfig for StackdriverConfig {
         let client = HttpClient::new(tls_settings, cx.proxy())?;
         let batch_settings = self.batch.into_batch_settings()?;
 
+        auth.spawn_regenerate_token();
         let sink = HttpEventSink {
             config: self.clone(),
             started,
             auth,
         };
 
-        auth.spawn_regenerate_token();
         let sink = BatchedHttpSink::new(
             sink,
             MetricsBuffer::new(batch_settings.size),
