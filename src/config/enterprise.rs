@@ -838,8 +838,6 @@ mod test {
     use vector_core::config::proxy::ProxyConfig;
     use vrl::compiler::state::ExternalEnv;
     use vrl::compiler::{compile, compile_with_external, CompileConfig};
-    use vrl::prelude::Collection;
-    use vrl::CompileConfig;
     use wiremock::{matchers, Mock, MockServer, ResponseTemplate};
 
     use super::{

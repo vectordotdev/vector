@@ -345,7 +345,7 @@ mod test {
     };
     use vector_core::event::EventContainer;
     use vrl::compiler::value;
-    use vrl::compiler::value::btreemap;
+
     #[cfg(unix)]
     use {
         super::{unix::UnixConfig, Mode},

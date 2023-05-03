@@ -883,6 +883,7 @@ mod integration_tests {
     use std::sync::Arc;
     use vector_core::config::{LegacyKey, LogNamespace};
     use vector_core::event::{BatchNotifier, BatchStatus, Event, LogEvent};
+    use vrl::compiler::value;
 
     use super::*;
     use crate::{
@@ -939,7 +940,7 @@ mod integration_tests {
         event2.insert("source_type", "file");
 
         let mut namespaced_log =
-            LogEvent::from(vrl::value!("namespaced message")).with_batch_notifier(&batch);
+            LogEvent::from(value!("namespaced message")).with_batch_notifier(&batch);
         LogNamespace::Vector.insert_source_metadata(
             "file",
             &mut namespaced_log,
