@@ -9410,8 +9410,6 @@ dependencies = [
  "vector-config-common",
  "vector-config-macros",
  "vrl",
- "vrl-compiler",
- "vrl-core",
 ]
 
 [[package]]

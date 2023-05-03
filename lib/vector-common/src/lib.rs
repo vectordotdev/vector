@@ -21,15 +21,15 @@ pub mod byte_size_of;
 pub mod config;
 
 #[cfg(feature = "conversion")]
-pub use vrl_compiler::TimeZone;
+pub use vrl::compiler::TimeZone;
 
 #[cfg(feature = "encoding")]
 pub mod encode_logfmt {
-    pub use vrl_core::encode_logfmt::*;
+    pub use vrl::core::encode_logfmt::*;
 }
 
 pub mod conversion {
-    pub use vrl_compiler::conversion::*;
+    pub use vrl::compiler::conversion::*;
 }
 
 pub mod event_data_eq;
