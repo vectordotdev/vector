@@ -4,17 +4,10 @@ on:
   pull_request:
   merge_group:
     types: [checks_requested]
-  # Don't think this is needed since it will run in the merge queue
-  #push:
-  #  branches:
-  #    - master
 
 concurrency:
-  # For pull requests, cancel running workflows, for master, run all
-  #
-  # `github.event.number` exists for pull requests, otherwise fall back to SHA
-  # for master
-  group: ${{ github.workflow }}-${{ github.event.number || github.sha }}
+  # `github.event.number` exists for pull requests, otherwise fall back to SHA for merge queue
+  group: ${{ github.workflow }}-${{ github.event.number || github.event.merge_group.base_sha }}
   cancel-in-progress: true
 
 env:
@@ -36,6 +29,9 @@ jobs:
   changes:
     uses: ./.github/workflows/changes.yml
     secrets: inherit
+    with:
+      base_ref: ${{ github.event.merge_group.base_ref || github.event.pull_request.base.ref }}
+      head_ref: ${{ github.event.merge_group.head_ref || github.event.pull_request.head.ref }}
 
   # Remove this once https://github.com/vectordotdev/vector/issues/3771 is closed.
   # Then, modify the `cross-linux` job to run `test` instead of `build`.
@@ -148,19 +144,3 @@ jobs:
       #     path: "/tmp/vector-config-schema.json"
       #   if: success() || failure()
 
-  master-failure:
-    name: master-failure
-    if: failure() && github.ref == 'refs/heads/something_clever' # TODO: changed this to be safe
-    needs:
-      - changes
-      - test-linux
-      - test-vrl
-      - checks
-    runs-on: ubuntu-20.04
-    steps:
-    - name: Discord notification
-      env:
-        DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
-      uses: Ilshidur/action-discord@0.3.2
-      with:
-        args: "Master tests failed: <https://github.com/${{github.repository}}/actions/runs/${{github.run_id}}>"
