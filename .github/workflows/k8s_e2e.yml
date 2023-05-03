@@ -2,36 +2,13 @@ name: K8S E2E Suite
 
 on:
   # Don't want to run this on every PR but because GH doesn't allow specifying different required checks
-  # for pull request and merge queue, we need to "run" it in pull request, but in the jobs we will just auto pass.
+  # for pull request and merge queue, we need to "run" it in pull request, but in the jobs will auto pass.
   pull_request:
   workflow_dispatch:
-  #merge_group:
-  #  types: [checks_requested]
-  # For now, only trigger this on comment. We can run it based on files changed, in the merge queue.
+  merge_group:
+    types: [checks_requested]
   issue_comment:
     types: [created]
-
-  # TODO this scoping would need to be re enabled as part of the job itself, but I think that can be delayed
-  # until the sub task to run tests on file changes detection is implemented
-  # push:
-  #   branches:
-  #     - master
-  #   paths:
-  #     - ".github/workflows/k8s_e2e.yml"
-  #     - ".cargo/**"
-  #     - "benches/**"
-  #     - "lib/**"
-  #     - "proto/**"
-  #     - "scripts/**"
-  #     - "src/**"
-  #     - "tests/**"
-  #     - "build.rs"
-  #     - "Cargo.lock"
-  #     - "Cargo.toml"
-  #     - "Makefile"
-  #     - "rust-toolchain"
-  #     - "distribution/**"
-  #pull_request:
 
 concurrency:
   # For pull requests, cancel running workflows, for master, run all
