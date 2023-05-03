@@ -345,6 +345,7 @@ mod test {
     };
     use vector_core::event::EventContainer;
     use vrl::compiler::value;
+    use vrl::value::{btreemap, Value};
 
     #[cfg(unix)]
     use {
@@ -587,7 +588,7 @@ mod test {
                 "one line".into()
             );
 
-            let tls_meta: BTreeMap<String, value::Value> = btreemap!(
+            let tls_meta: BTreeMap<String, Value> = btreemap!(
                 "subject" => "CN=localhost,OU=Vector,O=Datadog,L=New York,ST=New York,C=US"
             );
 

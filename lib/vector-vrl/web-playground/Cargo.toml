@@ -10,9 +10,9 @@ crate-type = ["cdylib"]
 
 [dependencies]
 wasm-bindgen = "0.2"
-vrl = { package = "vrl", path = "/home/nathan_fox/repos/vrl", default-features = false}
-value = { package = "value", path = "/home/nathan_fox/repos/vrl/lib/value", default-features = false}
-stdlib = { package = "vrl-stdlib", path = "/home/nathan_fox/repos/vrl/lib/stdlib"}
+vrl = { package = "vrl", path = "/home/nathan/repos/vrl", default-features = false}
+value = { package = "value", path = "/home/nathan/repos/vrl/lib/value", default-features = false}
+stdlib = { package = "vrl-stdlib", path = "/home/nathan/repos/vrl/lib/stdlib"}
 serde = { version = "1.0", features = ["derive"] }
 serde-wasm-bindgen = "0.5"
 gloo-utils = { version = "0.1", features = ["serde"] }

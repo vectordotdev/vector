@@ -321,6 +321,7 @@ mod integration_test {
         },
         SourceSender,
     };
+    use vrl::compiler::value;
 
     const REDIS_SERVER: &str = "redis://redis:6379/0";
 
@@ -393,7 +394,7 @@ mod integration_test {
             meta.value()
                 .get(path!(RedisSourceConfig::NAME, "key"))
                 .unwrap(),
-            &vrl::value!(key)
+            &value!(key)
         );
     }
 

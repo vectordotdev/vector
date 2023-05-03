@@ -25,6 +25,7 @@ use vector_core::{
     event::{metric::TagValue, MetricTags},
     metric_tags,
 };
+use vrl::compiler::value::Collection;
 
 use crate::schema::Definition;
 use crate::{

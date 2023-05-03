@@ -722,6 +722,7 @@ mod tests {
     use bytes::Bytes;
     use std::io::Cursor;
     use vector_core::event::EventMetadata;
+    use vrl::compiler::value;
 
     #[cfg(unix)]
     use futures::task::Poll;
@@ -776,7 +777,7 @@ mod tests {
         let pid = Some(8888_u32);
 
         let mut event: Event =
-            LogEvent::from_parts(vrl::value!("hello world"), EventMetadata::default()).into();
+            LogEvent::from_parts(value!("hello world"), EventMetadata::default()).into();
 
         handle_event(
             &config,
@@ -792,24 +793,24 @@ mod tests {
 
         assert_eq!(
             meta.get(path!(ExecConfig::NAME, "host")).unwrap(),
-            &vrl::value!("Some.Machine")
+            &value!("Some.Machine")
         );
         assert_eq!(
             meta.get(path!(ExecConfig::NAME, STREAM_KEY)).unwrap(),
-            &vrl::value!(STDOUT)
+            &value!(STDOUT)
         );
         assert_eq!(
             meta.get(path!(ExecConfig::NAME, PID_KEY)).unwrap(),
-            &vrl::value!(8888_i64)
+            &value!(8888_i64)
         );
         assert_eq!(
             meta.get(path!(ExecConfig::NAME, COMMAND_KEY)).unwrap(),
-            &vrl::value!(config.command)
+            &value!(config.command)
         );
-        assert_eq!(log.value(), &vrl::value!("hello world"));
+        assert_eq!(log.value(), &value!("hello world"));
         assert_eq!(
             meta.get(path!("vector", "source_type")).unwrap(),
-            &vrl::value!("exec")
+            &value!("exec")
         );
         assert!(meta
             .get(path!("vector", "ingest_timestamp"))
@@ -857,7 +858,7 @@ mod tests {
         let pid = Some(8888_u32);
 
         let mut event: Event =
-            LogEvent::from_parts(vrl::value!("hello world"), EventMetadata::default()).into();
+            LogEvent::from_parts(value!("hello world"), EventMetadata::default()).into();
 
         handle_event(
             &config,
@@ -873,24 +874,24 @@ mod tests {
 
         assert_eq!(
             meta.get(path!(ExecConfig::NAME, "host")).unwrap(),
-            &vrl::value!("Some.Machine")
+            &value!("Some.Machine")
         );
         assert_eq!(
             meta.get(path!(ExecConfig::NAME, STREAM_KEY)).unwrap(),
-            &vrl::value!(STDOUT)
+            &value!(STDOUT)
         );
         assert_eq!(
             meta.get(path!(ExecConfig::NAME, PID_KEY)).unwrap(),
-            &vrl::value!(8888_i64)
+            &value!(8888_i64)
         );
         assert_eq!(
             meta.get(path!(ExecConfig::NAME, COMMAND_KEY)).unwrap(),
-            &vrl::value!(config.command)
+            &value!(config.command)
         );
-        assert_eq!(log.value(), &vrl::value!("hello world"));
+        assert_eq!(log.value(), &value!("hello world"));
         assert_eq!(
             meta.get(path!("vector", "source_type")).unwrap(),
-            &vrl::value!("exec")
+            &value!("exec")
         );
         assert!(meta
             .get(path!("vector", "ingest_timestamp"))
