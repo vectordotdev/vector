@@ -3,8 +3,6 @@ name: K8S E2E Suite
 on:
   workflow_call:
   workflow_dispatch:
-  merge_group:
-    types: [checks_requested]
   issue_comment:
     types: [created]
 
