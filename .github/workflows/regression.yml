@@ -16,12 +16,9 @@
 name: Regression Detector
 
 on:
-  # Only want to run this on merge queue, but because GH doesn't allow specifying different required checks
-  # for pull request and merge queue, we need to "run" it in pull request, but in the jobs we will just auto pass.
-  pull_request:
+  # TODO need to trigger this on PR comment.
   merge_group:
     types: [checks_requested]
-  # TODO need to trigger this on PR comment.
 
   # TODO need to apply this scoping in the steps
   #pull_request:
@@ -33,7 +30,6 @@ on:
 jobs:
   cancel-previous:
     runs-on: ubuntu-22.04
-    if: ${{ github.event_name != 'pull_request' }}
     timeout-minutes: 3
     steps:
       - uses: styfle/cancel-workflow-action@0.11.0
@@ -44,7 +40,6 @@ jobs:
   compute-metadata:
     name: Compute metadata for regression experiments
     runs-on: ubuntu-22.04
-    if: ${{ github.event_name != 'pull_request' }}
     outputs:
       pr-number: ${{ steps.pr-metadata.outputs.PR_NUMBER }}
 
@@ -189,25 +184,3 @@ jobs:
         with:
           name: meta
           path: "${{ runner.temp }}/meta"
-
-  finish:
-    name: Final status
-    runs-on: ubuntu-22.04
-    needs:
-      - transmit-metadata
-      - build-comparison
-      - build-baseline
-    if: always()
-    steps:
-      - run: |
-          if [ ${{ github.event_name }} == 'pull_request' ] ; then
-              echo "success"
-              exit 0
-          fi
-          if [[ ${{ needs.transmit-metadata.result }} == 'failure' || ${{ needs.build-comparison.result }} == 'failure'
-                || ${{ needs.build-baseline.result }} == 'failure' ]] ; then
-              echo "failed"
-              exit 1
-          fi
-          echo "success"
-          exit 0

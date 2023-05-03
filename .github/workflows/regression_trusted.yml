@@ -1,6 +1,9 @@
 name: Regression Detector (trusted)
 
 on:
+  # Only want to run this on merge queue, but because GH doesn't allow specifying different required checks
+  # for pull request and merge queue, we need to "run" it in pull request, but in the jobs we will just auto pass.
+  pull_request:
   workflow_run:
     workflows: ["Regression Detector"]
     types:
@@ -10,7 +13,7 @@ jobs:
   compute-metadata:
     name: Compute metadata for regression experiments
     runs-on: ubuntu-22.04
-    if: github.event.workflow_run.conclusion == 'success'
+    if: github.event_name != 'pull_request' && github.event.workflow_run.conclusion == 'success'
     outputs:
       cpus: ${{ steps.system.outputs.CPUS }}
       memory: ${{ steps.system.outputs.MEMORY }}
@@ -592,39 +595,22 @@ jobs:
             -f context='Regression Detector / analyze-experiment' \
             -f target_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
-  # TODO this worklow will be harder to adapt to the trigger on comment
-  # validate:
-  #   name: Regression Detector
-  #   runs-on: ubuntu-22.04
-  #   if: always()
-  #   needs:
-  #     - detect-regression
-  #   steps:
-  #     # Find the branch that the comment was made in.
-  #     - name: (PR comment) Get PR branch
-  #       if: github.event_name == 'issue_comment' && needs.detect-regression.result == 'success'
-  #       uses: xt0rted/pull-request-comment-branch@v1
-  #       id: comment-branch
-
-  #     # Indicate in the PR's CI pane that this job is complete
-  #     - name: (PR comment) Set latest commit status as success
-  #       uses: myrotvorets/set-commit-status-action@master
-  #       if: github.event_name == 'issue_comment' && needs.test-integration.result == 'success'
-  #       with:
-  #         sha: ${{ steps.comment-branch.outputs.head_sha }}
-  #         token: ${{ secrets.GITHUB_TOKEN }}
-  #         status: 'success'
-
-  #     - name: validate
-  #       run: |
-  #         if [ ${{ github.event_name }} == 'pull_request' ] ; then
-  #             echo "success"
-  #             exit 0
-  #         fi
-  #         if [ ${{ needs.test-integration.result }} == 'failure' ] ; then
-  #             echo "failed"
-  #             exit 1
-  #         fi
-  #         echo "success"
-  #         exit 0
-
+  finish:
+    name: Final status
+    runs-on: ubuntu-22.04
+    needs:
+      - detect-regression
+      - analyze-experiment
+    if: always()
+    steps:
+      - run: |
+          if [ ${{ github.event_name }} == 'pull_request' ] ; then
+              echo "success"
+              exit 0
+          fi
+          if [[ ${{ needs.detect-regression.result }} == 'failure' || ${{ needs.analyze-experiment.result }} == 'failure' ]] ; then
+              echo "failed"
+              exit 1
+          fi
+          echo "success"
+          exit 0
