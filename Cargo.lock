@@ -6226,7 +6226,6 @@ dependencies = [
  "prost-build",
  "prost-types",
  "snafu",
- "value",
  "vector-common",
 ]
 
