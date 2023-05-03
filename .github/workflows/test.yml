@@ -136,7 +136,7 @@ jobs:
           path: "/tmp/vector-config-schema.json"
         if: success() || failure()
 
-  checks:
+  all-checks:
     name: Test Suite
     runs-on: ubuntu-20.04
     needs:
