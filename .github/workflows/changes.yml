@@ -6,7 +6,7 @@ on:
       base_ref:
         required: true
         type: string
-      base_ref:
+      head_ref:
         required: true
         type: string
     outputs:
