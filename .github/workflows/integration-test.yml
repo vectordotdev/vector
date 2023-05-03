@@ -187,18 +187,3 @@ jobs:
           fi
           echo "success"
           exit 0
-
- # TODO I guess don't need this if not triggering on master
-  # master-failure:
-  #   name: master-failure
-  #   if: failure() && github.ref == 'refs/heads/something_clever' # TODO just to be safe
-  #   needs:
-  #     - test-integration-check
-  #   runs-on: ubuntu-20.04
-  #   steps:
-  #   - name: Discord notification
-  #     env:
-  #       DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
-  #     uses: Ilshidur/action-discord@0.3.2
-  #     with:
-  #       args: "Master integration tests failed: <https://github.com/${{github.repository}}/actions/runs/${{github.run_id}}>"
