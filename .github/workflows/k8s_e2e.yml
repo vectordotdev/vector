@@ -55,8 +55,9 @@ jobs:
     # - If trigger is merge queue, run if files changed
     # - If trigger is manual dispatch, always run.
     if: |
-        (github.event_name != 'issue_comment' || contains(github.event.comment.body, '/ci-deploy-k8s-tests'))
-          && (github.event_name != 'merge_queue' || needs.changes.outputs.k8s == 'true')
+        (github.event_name == 'issue_comment' && contains(github.event.comment.body, '/ci-deploy-k8s-tests'))
+          || (github.event_name == 'merge_queue' && needs.changes.outputs.k8s == 'true')
+          || github.event_name == 'workflow_dispatch'
     # cargo-deb requires a release build, but we don't need optimizations for tests
     env:
       CARGO_PROFILE_RELEASE_OPT_LEVEL: 0
@@ -134,8 +135,9 @@ jobs:
     # - If trigger is merge queue, run if files changed
     # - If trigger is manual dispatch, always run.
     if: |
-        (github.event_name != 'issue_comment' || contains(github.event.comment.body, '/ci-deploy-k8s-tests'))
-          && (github.event_name != 'merge_queue' || needs.changes.outputs.k8s == 'true')
+        (github.event_name == 'issue_comment' && contains(github.event.comment.body, '/ci-deploy-k8s-tests'))
+          || (github.event_name == 'merge_queue' && needs.changes.outputs.k8s == 'true')
+          || github.event_name == 'workflow_dispatch'
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
