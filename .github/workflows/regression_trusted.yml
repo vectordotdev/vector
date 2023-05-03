@@ -596,11 +596,9 @@ jobs:
             -f target_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
   finish:
-    name: Final status
+    name: Detect Regression Status
     runs-on: ubuntu-22.04
-    needs:
-      - detect-regression
-      - analyze-experiment
+    needs: detect-regression
     if: always()
     steps:
       - run: |
@@ -608,7 +606,7 @@ jobs:
               echo "success"
               exit 0
           fi
-          if [[ ${{ needs.detect-regression.result }} == 'failure' || ${{ needs.analyze-experiment.result }} == 'failure' ]] ; then
+          if [[ ${{ needs.detect-regression.result }} == 'failure' ]] ; then
               echo "failed"
               exit 1
           fi
