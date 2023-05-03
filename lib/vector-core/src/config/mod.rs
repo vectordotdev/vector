@@ -553,8 +553,8 @@ mod test {
     use crate::event::LogEvent;
     use chrono::Utc;
     use lookup::{event_path, owned_value_path, OwnedTargetPath};
-    use value::Kind;
     use vector_common::btreemap;
+    use vrl::value::Kind;
 
     #[test]
     fn test_insert_standard_vector_source_metadata() {

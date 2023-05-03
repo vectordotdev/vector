@@ -598,7 +598,7 @@ mod tests {
     use lookup::lookup_v2::parse_target_path;
     use lookup::owned_value_path;
     use std::collections::{BTreeMap, HashMap};
-    use value::Value;
+    use vrl::value::Value;
 
     use super::*;
 

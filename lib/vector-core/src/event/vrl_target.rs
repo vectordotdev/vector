@@ -588,7 +588,7 @@ mod test {
     use chrono::{offset::TimeZone, Utc};
     use lookup::owned_value_path;
     use similar_asserts::assert_eq;
-    use value::btreemap;
+    use vrl::value::btreemap;
 
     use super::super::MetricValue;
     use super::*;
@@ -596,8 +596,6 @@ mod test {
 
     #[test]
     fn log_get() {
-        use value::btreemap;
-
         let cases = vec![
             (
                 BTreeMap::new(),
@@ -652,8 +650,6 @@ mod test {
     #[allow(clippy::too_many_lines)]
     #[test]
     fn log_insert() {
-        use value::btreemap;
-
         let cases = vec![
             (
                 BTreeMap::from([("foo".into(), "bar".into())]),
@@ -747,7 +743,7 @@ mod test {
             };
             let mut target = VrlTarget::new(Event::Log(LogEvent::from(object)), &info, false);
             let expect = LogEvent::from(expect);
-            let value: ::value::Value = value;
+            let value: Value = value;
             let path = OwnedTargetPath::event(path);
 
             assert_eq!(
@@ -862,28 +858,22 @@ mod test {
 
     #[test]
     fn log_into_events() {
-        use value::btreemap;
+        use vrl::value::btreemap;
 
         let cases = vec![
             (
-                ::value::Value::from(btreemap! {"foo" => "bar"}),
+                Value::from(btreemap! {"foo" => "bar"}),
                 vec![btreemap! {"foo" => "bar"}],
             ),
-            (::value::Value::from(1), vec![btreemap! {"message" => 1}]),
+            (Value::from(1), vec![btreemap! {"message" => 1}]),
+            (Value::from("2"), vec![btreemap! {"message" => "2"}]),
+            (Value::from(true), vec![btreemap! {"message" => true}]),
             (
-                ::value::Value::from("2"),
-                vec![btreemap! {"message" => "2"}],
-            ),
-            (
-                ::value::Value::from(true),
-                vec![btreemap! {"message" => true}],
-            ),
-            (
-                ::value::Value::from(vec![
-                    ::value::Value::from(1),
-                    ::value::Value::from("2"),
-                    ::value::Value::from(true),
-                    ::value::Value::from(btreemap! {"foo" => "bar"}),
+                Value::from(vec![
+                    Value::from(1),
+                    Value::from("2"),
+                    Value::from(true),
+                    Value::from(btreemap! {"foo" => "bar"}),
                 ]),
                 vec![
                     btreemap! {"message" => 1},
@@ -983,10 +973,10 @@ mod test {
 
         let cases = vec![
             (
-                owned_value_path!("name"),          // Path
-                Some(::value::Value::from("name")), // Current value
-                ::value::Value::from("namefoo"),    // New value
-                false,                              // Test deletion
+                owned_value_path!("name"), // Path
+                Some(Value::from("name")), // Current value
+                Value::from("namefoo"),    // New value
+                false,                     // Test deletion
             ),
             (
                 owned_value_path!("namespace"),
@@ -1005,7 +995,7 @@ mod test {
             ),
             (
                 owned_value_path!("kind"),
-                Some(::value::Value::from("absolute")),
+                Some(Value::from("absolute")),
                 "incremental".into(),
                 false,
             ),
