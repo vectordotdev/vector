@@ -49,7 +49,7 @@ jobs:
   # test jobs are not run. This allows us to not have to check for merge group in each test job.
   changes:
     if: ${{ github.event_name == 'merge_group' }}
-    uses: ./.github/workflows/changes.yml
+    uses: ./.github/workflows/merge_queue/changes.yml
     with:
       base_ref: ${{ github.event.merge_group.base_ref }}
       head_ref: ${{ github.event.merge_group.head_ref }}
@@ -57,30 +57,30 @@ jobs:
 
   test-cli:
     if: ${{ needs.changes.outputs.source == 'true' }}
-    uses: ./.github/workflows/cli.yml
+    uses: ./.github/workflows/merge_queue/cli.yml
     needs: changes
     secrets: inherit
 
   test-misc:
-    uses: ./.github/workflows/misc.yml
+    uses: ./.github/workflows/merge_queue/misc.yml
     needs: changes
     secrets: inherit
     if: needs.changes.outputs.source == 'true'
 
   check-msrv:
-    uses: ./.github/workflows/msrv.yml
+    uses: ./.github/workflows/merge_queue/msrv.yml
     needs: changes
     secrets: inherit
     if: needs.changes.outputs.source == 'true'
 
   check-component-features:
-    uses: ./.github/workflows/component_features.yml
+    uses: ./.github/workflows/merge_queue/component_features.yml
     needs: changes
     secrets: inherit
     if: needs.changes.outputs.source == 'true'
 
   cross-linux:
-    uses: ./.github/workflows/cross.yml
+    uses: ./.github/workflows/merge_queue/cross.yml
     needs: changes
     secrets: inherit
     # We run cross checks when dependencies change to ensure they still build.
@@ -88,31 +88,31 @@ jobs:
     if: needs.changes.outputs.dependencies == 'true'
 
   unit-mac:
-    uses: ./.github/workflows/unit_mac.yml
+    uses: ./.github/workflows/merge_queue/unit_mac.yml
     needs: changes
     secrets: inherit
     if: needs.changes.outputs.source == 'true'
 
   unit-windows:
-    uses: ./.github/workflows/unit_windows.yml
+    uses: ./.github/workflows/merge_queue/unit_windows.yml
     needs: changes
     secrets: inherit
     if: needs.changes.outputs.source == 'true'
 
   install-sh:
-    uses: ./.github/workflows/install-sh.yml
+    uses: ./.github/workflows/merge_queue/install-sh.yml
     needs: changes
     secrets: inherit
     if: needs.changes.outputs.install == 'true'
 
   k8s:
-    uses: ./.github/workflows/k8s_e2e.yml
+    uses: ./.github/workflows/merge_queue/k8s_e2e.yml
     needs: changes
     secrets: inherit
     if: needs.changes.outputs.k8s == 'true'
 
   regression:
-    uses: ./.github/workflows/regression.yml
+    uses: ./.github/workflows/merge_queue/regression.yml
     needs: changes
     secrets: inherit
     if: needs.changes.outputs.source == 'true'
@@ -122,7 +122,7 @@ jobs:
       head_sha: ${{ github.event.merge_group.head_sha }}
 
   regression-trusted:
-    uses: ./.github/workflows/regression_trusted.yml
+    uses: ./.github/workflows/merge_queue/regression_trusted.yml
     needs: regression
     secrets: inherit
 
