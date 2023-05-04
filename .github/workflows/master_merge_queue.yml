@@ -48,9 +48,6 @@ jobs:
     outputs:
       cli: ${{ steps.cli.outputs.CLI }}
     steps:
-      - id: print
-        run: echo "${{ env.COMMENT }}"
-
       - id: cli
         if: contains(${{ env.COMMENT }}, '/ci-deploy-cli')
         run: |
@@ -69,19 +66,12 @@ jobs:
       head_ref: ${{ github.event.merge_group.head_ref }}
     secrets: inherit
 
-  debug:
-    runs-on: ubuntu-latest
-    needs:
-      - comment
-    steps:
-      - run: echo "${{ needs.comment.outputs.cli }}"
-
   test-cli:
     uses: ./.github/workflows/cli.yml
     needs:
       - changes
       - comment
-    if: ${{ needs.changes.outputs.source == 'true' || needs.comment.outputs.cli == 'true' }}
+    if: always() && (needs.changes.outputs.source == 'true' || needs.comment.outputs.cli == 'true')
     secrets: inherit
 
   test-misc:
