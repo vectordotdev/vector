@@ -148,7 +148,7 @@ jobs:
   test-integration-check:
     name: Integration Tests
     runs-on: ubuntu-20.04
-    if: always()
+    if: (github.event_name != 'issue_comment' || contains(github.event.comment.body, '/ci-deploy-integration-tests')) && always()
     needs:
       - test-integration
     steps:
