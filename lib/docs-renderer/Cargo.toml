@@ -6,7 +6,7 @@ edition = "2021"
 publish = false
 
 [dependencies]
-anyhow = { version = "1.0.66", default-features = false, features = ["std"] }
+anyhow = { version = "1.0.71", default-features = false, features = ["std"] }
 serde = { version = "1.0", default-features = false }
 serde_json = { version = "1.0", default-features = false, features = ["std"] }
 snafu = { version = "0.7.4", default-features = false }
