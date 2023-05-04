@@ -90,9 +90,8 @@ impl TagCardinalityLimit {
     }
 
     fn transform_one(&mut self, mut event: Event) -> Option<Event> {
-        let event_clone = event.clone();
-        let metric_name = event_clone.as_metric().name();
         let metric = event.as_mut_metric();
+        let metric_name = metric.name().to_string();
         if let Some(tags_map) = metric.tags_mut() {
             match self.config.limit_exceeded_action {
                 LimitExceededAction::DropEvent => {
@@ -102,7 +101,7 @@ impl TagCardinalityLimit {
                     for (key, value) in tags_map.iter_sets() {
                         if self.tag_limit_exceeded(key, value) {
                             emit!(TagCardinalityLimitRejectingEvent {
-                                metric_name: metric_name,
+                                metric_name: &metric_name,
                                 tag_key: key,
                                 tag_value: &value.to_string(),
                             });
@@ -119,7 +118,7 @@ impl TagCardinalityLimit {
                             true
                         } else {
                             emit!(TagCardinalityLimitRejectingTag {
-                                metric_name: metric_name,
+                                metric_name: &metric_name,
                                 tag_key: key,
                                 tag_value: &value.to_string(),
                             });
