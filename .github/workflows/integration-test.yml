@@ -3,9 +3,9 @@ name: Integration Test Suite
 on:
   workflow_call:
     inputs:
-      # if:
-      #   required: false
-      #   type: boolean
+      if:
+         required: false
+         type: boolean
       test_name:
         required: true
         type: string
@@ -43,7 +43,7 @@ jobs:
   test-integration:
     #name: Integration - Linux, ${{ inputs.test_name }}
     runs-on: [linux, ubuntu-20.04-8core]
-    #if: ${{ inputs.if }}
+    if: ${{ inputs.if }}
     timeout-minutes: 20
     steps:
       # For PR comment trigger, extra steps are required to associate the workflow with the PR.
