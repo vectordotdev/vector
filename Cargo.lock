@@ -9585,18 +9585,14 @@ dependencies = [
  "clap 4.1.14",
  "enrichment",
  "glob",
- "path",
  "prettydiff",
  "regex",
  "serde",
  "serde_json",
  "tikv-jemallocator",
  "tracing-subscriber",
- "value",
  "vector-vrl-functions",
  "vrl",
- "vrl-stdlib",
- "vrl-tests",
 ]
 
 [[package]]
@@ -9642,6 +9638,7 @@ dependencies = [
  "vrl-diagnostic",
  "vrl-parser",
  "vrl-stdlib",
+ "vrl-tests",
 ]
 
 [[package]]

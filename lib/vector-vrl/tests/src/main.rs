@@ -4,7 +4,7 @@
 mod docs;
 mod test_enrichment;
 
-use vrl_tests::{get_tests_from_functions, run_tests, Test, TestConfig};
+use vrl::test::{get_tests_from_functions, run_tests, Test, TestConfig};
 
 use chrono_tz::Tz;
 use clap::Parser;
@@ -93,7 +93,7 @@ fn main() {
         timezone: cmd.timezone(),
     };
 
-    let mut functions = stdlib::all();
+    let mut functions = vrl::stdlib::all();
     functions.extend(vector_vrl_functions::all());
     functions.extend(enrichment::vrl_functions());
 

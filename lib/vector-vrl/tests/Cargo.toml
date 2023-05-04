@@ -7,11 +7,7 @@ publish = false
 
 [dependencies]
 enrichment = { path = "../../enrichment" }
-lookup = { package = "path", path = "/home/nathan/repos/vrl/lib/path" }
-stdlib = { package = "vrl-stdlib", path = "/home/nathan/repos/vrl/lib/stdlib" }
-vrl = { package = "vrl", path = "/home/nathan/repos/vrl" }
-value = { package = "value", path = "/home/nathan/repos/vrl/lib/value" }
-vrl-tests = { package = "vrl-tests", path = "/home/nathan/repos/vrl/lib/tests" }
+vrl = { path = "/home/nathan/repos/vrl", features = ["test_framework"]}
 vector-vrl-functions = { path = "../../vector-vrl/functions" }
 
 ansi_term = "0.12"
