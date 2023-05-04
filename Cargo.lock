@@ -9604,10 +9604,8 @@ dependencies = [
  "gloo-utils",
  "serde",
  "serde-wasm-bindgen",
- "value",
  "vector-vrl-functions",
  "vrl",
- "vrl-stdlib",
  "wasm-bindgen",
 ]
 
