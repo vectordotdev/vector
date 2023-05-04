@@ -68,6 +68,13 @@ jobs:
       head_ref: ${{ github.event.merge_group.head_ref }}
     secrets: inherit
 
+  debug:
+    runs-on: ubuntu-latest
+    needs:
+      - comment
+    steps:
+      - run: echo "${{ needs.comment.outputs.cli }}"
+
   test-cli:
     uses: ./.github/workflows/cli.yml
     needs:
