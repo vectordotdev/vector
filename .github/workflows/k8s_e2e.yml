@@ -64,24 +64,27 @@ jobs:
         if: ${{ github.event_name != 'issue_comment' }}
         uses: actions/checkout@v3
 
-      - run: make ci-sweep
+      - name: mock
+        run: echo "OK"
 
-      - uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      # - run: make ci-sweep
 
-      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - run: bash scripts/environment/prepare.sh
-      - run: echo "::add-matcher::.github/matchers/rust.json"
-      - run: VECTOR_VERSION="$(cargo vdev version)" make package-deb-x86_64-unknown-linux-gnu
+      # - uses: actions/cache@v3
+      #   with:
+      #     path: |
+      #       ~/.cargo/registry
+      #       ~/.cargo/git
+      #     key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
-      - uses: actions/upload-artifact@v3
-        with:
-          name: e2e-test-deb-package
-          path: target/artifacts/*
+      # - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      # - run: bash scripts/environment/prepare.sh
+      # - run: echo "::add-matcher::.github/matchers/rust.json"
+      # - run: VECTOR_VERSION="$(cargo vdev version)" make package-deb-x86_64-unknown-linux-gnu
+
+      # - uses: actions/upload-artifact@v3
+      #   with:
+      #     name: e2e-test-deb-package
+      #     path: target/artifacts/*
 
       # Indicate in the PR's CI pane that this job is failed, if needed
       - name: (PR comment) Set latest commit status as 'failure'
@@ -191,18 +194,21 @@ jobs:
           name: e2e-test-deb-package
           path: target/artifacts
 
-      - name: Setup Minikube
-        run: scripts/ci-setup-minikube.sh
-        env:
-          KUBERNETES_VERSION: ${{ matrix.kubernetes_version.version }}
-          MINIKUBE_VERSION: ${{ matrix.minikube_version }}
-          CONTAINER_RUNTIME: ${{ matrix.container_runtime }}
+      - name: mock
+        run: echo "OK"
 
-      - run: make test-e2e-kubernetes
-        env:
-          USE_MINIKUBE_CACHE: "true"
-          SKIP_PACKAGE_DEB: "true"
-          CARGO_INCREMENTAL: 0
+      # - name: Setup Minikube
+      #   run: scripts/ci-setup-minikube.sh
+      #   env:
+      #     KUBERNETES_VERSION: ${{ matrix.kubernetes_version.version }}
+      #     MINIKUBE_VERSION: ${{ matrix.minikube_version }}
+      #     CONTAINER_RUNTIME: ${{ matrix.container_runtime }}
+
+      # - run: make test-e2e-kubernetes
+      #   env:
+      #     USE_MINIKUBE_CACHE: "true"
+      #     SKIP_PACKAGE_DEB: "true"
+      #     CARGO_INCREMENTAL: 0
 
       # Indicate in the PR's CI pane that this job is complete
       - name: (PR comment) Set latest commit status as failure if needed

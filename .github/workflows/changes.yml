@@ -97,7 +97,6 @@ jobs:
           k8s:
             - "src/sources/kubernetes_logs/**"
 
-          
           amqp:
             - "src/amqp.rs"
             - "src/internal_events/amqp.rs"

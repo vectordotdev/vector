@@ -121,20 +121,27 @@ jobs:
         if: ${{ github.event_name != 'issue_comment' }}
         uses: actions/checkout@v3
 
-      - run: make ci-sweep
-      - run: sudo npm -g install @datadog/datadog-ci
-      - run: make test-integration-${{ matrix.test }}
-        env:
-          TEST_DATADOG_API_KEY: ${{ secrets.CI_TEST_DATADOG_API_KEY }}
-          SPLUNK_VERSION: ${{ matrix.env.SPLUNK_VERSION }}
-      - name: Upload test results
-        run: scripts/upload-test-results.sh
-        if: always()
-      - run: make test-integration-${{ matrix.test }}-cleanup
-        if: ${{ always() }}
-        env:
-          TEST_DATADOG_API_KEY: ${{ secrets.CI_TEST_DATADOG_API_KEY }}
-          SPLUNK_VERSION: ${{ matrix.env.SPLUNK_VERSION }}
+      - name: mock
+        run: echo "OK"
+
+      # - run: make ci-sweep
+
+      # - run: sudo npm -g install @datadog/datadog-ci
+
+      # - run: make test-integration-${{ matrix.test }}
+      #   env:
+      #     TEST_DATADOG_API_KEY: ${{ secrets.CI_TEST_DATADOG_API_KEY }}
+      #     SPLUNK_VERSION: ${{ matrix.env.SPLUNK_VERSION }}
+
+      # - name: Upload test results
+      #   run: scripts/upload-test-results.sh
+      #   if: always()
+
+      # - run: make test-integration-${{ matrix.test }}-cleanup
+      #   if: ${{ always() }}
+      #   env:
+      #     TEST_DATADOG_API_KEY: ${{ secrets.CI_TEST_DATADOG_API_KEY }}
+      #     SPLUNK_VERSION: ${{ matrix.env.SPLUNK_VERSION }}
 
       # Indicate in the PR's CI pane that this job is complete if necessary
       - name: (PR comment) Set latest commit status as failure

@@ -68,7 +68,8 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-
 
-      - run: echo "OK"
+      - name: mock
+        run: echo "OK"
 
       #- run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       #- run: bash scripts/environment/prepare.sh
