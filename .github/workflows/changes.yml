@@ -116,3 +116,32 @@ jobs:
             - "src/sinks/azure_**"
           clickhouse:
             - "src/sinks/clickhouse/**"
+          databend:
+            - "src/sinks/databend/**"
+          datadog:
+            - "src/common/datadog.rs"
+            - "src/internal_events/datadog_*"
+            - "src/sources/datadog_agent/**"
+            - "src/sinks/datadog/**"
+            - "src/sinks/datadog_archives.rs"
+          docker_logs:
+            - "src/docker.rs"
+            - "src/internal_events/docker_logs.rs"
+            - "src/sources/docker_logs/**"
+          elasticsearch:
+            - "src/sinks/elasticsearch/**"
+          eventstoredb:
+            - "src/internal_events/eventstoredb_metrics.rs"
+            - "src/sources/eventstoredb_metrics/**"
+          fluent:
+            - "src/internal_events/fluent.rs"
+            - "src/sources/fluent/**"
+          gcp:
+            - "src/internal_events/gcp_pubsub.rs"
+            - "src/sources/gcp_pubsub.rs"
+            - "src/sinks/gcp/**"
+            - "src/gcp.rs"
+          humio:
+            - "src/sinks/humio/**"
+          http_client:
+            - "src/sinks/humio/**"
