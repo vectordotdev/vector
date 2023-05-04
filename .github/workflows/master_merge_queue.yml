@@ -136,6 +136,7 @@ jobs:
   master-merge-queue-check:
     name: Master Merge Queue
     runs-on: ubuntu-20.04
+    if: always()
     needs:
       - changes
       - test-cli
@@ -150,5 +151,10 @@ jobs:
       #- regression-trusted
       - integration
     steps:
-      - name: validate
-        run: echo "OK"
+      - name: failure
+        if: failure()
+        run: echo "failure" && exit 1
+
+      - name: success
+        if: success()
+        run: echo "success"
