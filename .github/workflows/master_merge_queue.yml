@@ -126,7 +126,6 @@ jobs:
   integration-prep:
     runs-on: ubuntu-latest
     needs: changes
-    secrets: inherit
     outputs:
       test: ${{ toJSON(steps.*.outputs.test )}}
     steps:
