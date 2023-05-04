@@ -6,7 +6,6 @@ on:
       if:
         required: false
         type: boolean
-        default: true
       test_name:
         required: true
         type: string
@@ -16,10 +15,10 @@ on:
   #merge_group:
   #  types: [checks_requested]
 
-concurrency:
+#concurrency:
   # `github.event.number` exists for pull requests, otherwise fall back to SHA for merge queue
-  group: ${{ github.workflow }}-${{ github.event.number || github.event.merge_group.base_sha }}
-  cancel-in-progress: true
+#  group: ${{ github.workflow }}-${{ github.event.number || github.event.merge_group.base_sha }}
+#  cancel-in-progress: true
 
 env:
   AWS_ACCESS_KEY_ID: "dummy"
@@ -37,7 +36,7 @@ env:
 
 jobs:
   test-integration:
-    name: Integration - Linux, ${{ inputs.test_name }}
+    #name: Integration - Linux, ${{ inputs.test_name }}
     runs-on: [linux, ubuntu-20.04-8core]
     if: ${{ inputs.if }}
     timeout-minutes: 20
