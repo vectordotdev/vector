@@ -49,7 +49,8 @@ jobs:
       cli: ${{ steps.cli.outputs.CLI }}
     steps:
       - id: print
-        run: echo ${{ env.COMMENT }}
+        run: echo "${{ env.COMMENT }}"
+
       - id: cli
         if: contains(${{ env.COMMENT }}, '/ci-deploy-cli')
         run: |
