@@ -26,8 +26,6 @@ on:
         value: ${{ jobs.changes.outputs.install }}
       k8s:
         value: ${{ jobs.changes.outputs.k8s }}
-      k8s:
-        value: ${{ jobs.changes.outputs.k8s }}
       amqp:
         value: ${{ jobs.changes.outputs.amqp}}
       http-client:
