@@ -1012,7 +1012,7 @@ mod test {
         );
         assert!(compile_with_external(
             vrl.as_str(),
-            vrl_stdlib::all().as_ref(),
+            vrl::stdlib::all().as_ref(),
             &state,
             CompileConfig::default()
         )
@@ -1032,6 +1032,6 @@ mod test {
             vrl,
             r#". = merge(., {"pull_request":"1234","replica":"abcd","variant":"baseline"}, deep: true)"#
         );
-        assert!(compile(vrl.as_str(), vrl_stdlib::all().as_ref()).is_ok());
+        assert!(compile(vrl.as_str(), vrl::stdlib::all().as_ref()).is_ok());
     }
 }

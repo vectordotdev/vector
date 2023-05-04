@@ -263,7 +263,7 @@ impl SubCommand {
             Self::Validate(v) => validate::validate(v, color).await,
             #[cfg(feature = "vrl-cli")]
             Self::Vrl(s) => {
-                let mut functions = vrl_stdlib::all();
+                let mut functions = vrl::stdlib::all();
                 functions.extend(vector_vrl_functions::all());
                 vrl_cli::cmd::cmd(s, functions)
             }

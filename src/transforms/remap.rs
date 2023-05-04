@@ -157,7 +157,7 @@ impl RemapConfig {
             _ => return Err(Box::new(BuildError::SourceAndOrFile)),
         };
 
-        let mut functions = vrl_stdlib::all();
+        let mut functions = vrl::stdlib::all();
         functions.append(&mut enrichment::vrl_functions());
         functions.append(&mut vector_vrl_functions::all());
 

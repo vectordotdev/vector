@@ -227,7 +227,6 @@ sha2 = { version = "0.10.6", default-features = false, optional = true }
 
 # VRL Lang
 vrl = { package = "vrl", path = "/home/nathan/repos/vrl" }
-vrl-stdlib = { package = "vrl-stdlib", path = "/home/nathan/repos/vrl/lib/stdlib" }
 datadog-filter = { package = "datadog-filter", path = "/home/nathan/repos/vrl/lib/datadog/filter" }
 datadog-search-syntax = { package = "datadog-search-syntax", path = "/home/nathan/repos/vrl/lib/datadog/search-syntax" }
 

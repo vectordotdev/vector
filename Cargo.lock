@@ -9308,7 +9308,6 @@ dependencies = [
  "vector-lookup",
  "vector-vrl-functions",
  "vrl",
- "vrl-stdlib",
  "warp",
  "windows-service",
  "wiremock",
