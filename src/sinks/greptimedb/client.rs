@@ -421,7 +421,7 @@ mod tests {
             },
         );
         let insert = metric_to_insert_request(metric);
-        assert_eq!(insert.columns.len(), 5);
+        assert_eq!(insert.columns.len(), 6);
 
         assert_eq!(get_column(&insert.columns, "b1.0"), 1.0);
         assert_eq!(get_column(&insert.columns, "b2.0"), 2.0);
@@ -443,7 +443,7 @@ mod tests {
         );
 
         let insert = metric_to_insert_request(metric);
-        assert_eq!(insert.columns.len(), 5);
+        assert_eq!(insert.columns.len(), 6);
 
         assert_eq!(get_column(&insert.columns, "p01"), 1.5);
         assert_eq!(get_column(&insert.columns, "p50"), 2.0);
