@@ -94,10 +94,13 @@ jobs:
     if: needs.changes.outputs.source == 'true'
 
   install-sh:
-    uses: ./.github/workflows/install-sh.yml
-    needs: changes
-    secrets: inherit
-    if: needs.changes.outputs.install == 'true'
+  #   uses: ./.github/workflows/install-sh.yml
+  #   needs: changes
+  #   secrets: inherit
+  #   if: needs.changes.outputs.install == 'true'
+    runs-on: ubuntu-20.04
+    steps:
+      - run: exit 1
 
   # k8s:
   #   uses: ./.github/workflows/k8s_e2e.yml
@@ -124,7 +127,7 @@ jobs:
     uses: ./.github/workflows/integration-test.yml
     with:
       if: ${{ matrix.run.if }}
-      test_name: ${{ matrix.run.test }}
+      test_name: ${{ matrix.run.test_name }}
     needs: changes
     secrets: inherit
     strategy:
@@ -151,7 +154,7 @@ jobs:
          # - test: 'fluent'
          # - test: 'gcp'
          # - test: 'humio'
-          - test: 'http-client'
+          - test_name: 'http-client'
             if: ${{ needs.changes.outputs.http-client == 'true' }}
          # - test: 'influxdb'
          # - test: 'kafka'
