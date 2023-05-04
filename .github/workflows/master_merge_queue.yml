@@ -127,12 +127,14 @@ jobs:
     runs-on: ubuntu-latest
     needs: changes
     outputs:
-      test: ${{ toJSON(steps.*.outputs.test )}}
+      test: ${{ toJSON(steps.*.outputs.test) }}
     steps:
-      - run: echo "test=amqp" >> $GITHUB_OUTPUT
+      - id: amqp
+        run: echo "test=amqp" >> $GITHUB_OUTPUT
         if: needs.changes.outputs.amqp == 'true'
 
-      - run: echo "test=http-client" >> $GITHUB_OUTPUT
+      - id: http-client
+        run: echo "test=http-client" >> $GITHUB_OUTPUT
         if: needs.changes.outputs.http-client == 'true'
 
   integration:
@@ -145,7 +147,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        test: ${{ fromJSON(needs.integration-prep.outputs.test )}}
+        test: ${{ fromJSON(needs.integration-prep.outputs.test) }}
 
   master-merge-queue-check:
     name: Master Merge Queue
