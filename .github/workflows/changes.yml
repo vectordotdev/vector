@@ -50,7 +50,7 @@ jobs:
         # TODO check if worth keying off the other internal components that the k8s tests utilize, suspect not.
         filters: |
           source:
-            - ".github/workflows/merge_queue/test.yml"
+            - ".github/workflows/test.yml"
             - ".cargo/**"
             - "benches/**"
             - "lib/**"
@@ -92,7 +92,7 @@ jobs:
             - 'distribution/docker/**'
             - "vdev/**"
           install:
-            - ".github/workflows/changes/install-sh.yml"
+            - ".github/workflows/install-sh.yml"
             - "distribution/install.sh"
           k8s:
             - "src/sources/kubernetes_logs/**"
