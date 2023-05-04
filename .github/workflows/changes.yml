@@ -143,5 +143,5 @@ jobs:
             - "src/gcp.rs"
           humio:
             - "src/sinks/humio/**"
-          http_client:
+          http-client:
             - "src/sinks/humio/**"
