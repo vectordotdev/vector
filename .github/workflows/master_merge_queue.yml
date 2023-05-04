@@ -15,8 +15,6 @@ on:
   pull_request:
   merge_group:
     types: [checks_requested]
-  issue_comment:
-    types: [created]
 
 concurrency:
   # `github.event.number` exists for pull requests, otherwise fall back to SHA for merge queue
@@ -39,22 +37,6 @@ env:
   CARGO_NET_GIT_FETCH_WITH_CLI: true
 
 jobs:
-
-  comment:
-    if: ${{ github.event_name == 'issue_comment' }}
-    runs-on: ubuntu-latest
-    env:
-      COMMENT: ${{ github.event.comment.body }}
-    outputs:
-      cli: ${{ steps.cli.outputs.CLI }}
-    steps:
-      - id: cli
-        if: contains(${{ env.COMMENT }}, '/ci-deploy-cli')
-        run: |
-          export "CLI=true"
-          echo "CLI=${CLI}" >> $GITHUB_OUTPUT
-
-
   # This is the entry job which is required for all the actual tests in this workflow.
   # If we don't run this job (such as in a pull request), then by consequence all downstream
   # test jobs are not run. This allows us to not have to check for merge group in each test job.
@@ -68,10 +50,8 @@ jobs:
 
   test-cli:
     uses: ./.github/workflows/cli.yml
-    needs:
-      - changes
-      - comment
-    if: always() && (needs.changes.outputs.source == 'true' || needs.comment.outputs.cli == 'true')
+    needs: changes
+    if: needs.changes.outputs.source == 'true'
     secrets: inherit
 
   test-misc:

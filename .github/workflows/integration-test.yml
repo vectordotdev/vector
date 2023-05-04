@@ -1,6 +1,8 @@
 name: Integration Test Suite
 
 on:
+  issue_comment:
+    types: [created]
   workflow_call:
     inputs:
       if:
@@ -15,10 +17,6 @@ on:
         description: "Which integration to test. If not specified, runs all."
         required: false
         type: string
-  #issue_comment:
-  #  types: [created]
-  #merge_group:
-  #  types: [checks_requested]
 
 #concurrency:
   # `github.event.number` exists for pull requests, otherwise fall back to SHA for merge queue
@@ -41,9 +39,11 @@ env:
 
 jobs:
   test-integration:
-    #name: Integration - Linux, ${{ inputs.test_name }}
     runs-on: [linux, ubuntu-20.04-8core]
-    if: ${{ inputs.if || github.event_name == 'workflow_dispatch' }}
+    needs: comment-trigger
+    if: |
+      always() && (inputs.if || github.event_name == 'workflow_dispatch'
+        || (github.event_name == 'issue_comment' && contains(github.event.comment.body, 'ci-deploy-integration-tests')))
     timeout-minutes: 20
     steps:
       # For PR comment trigger, extra steps are required to associate the workflow with the PR.
