@@ -95,7 +95,7 @@ jobs:
 
   install-sh:
   #   uses: ./.github/workflows/install-sh.yml
-  #   needs: changes
+    needs: changes
   #   secrets: inherit
   #   if: needs.changes.outputs.install == 'true'
     runs-on: ubuntu-20.04
