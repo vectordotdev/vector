@@ -42,7 +42,7 @@ jobs:
       matrix:
         include:
           - test: 'amqp'
-            if: ${{ inputs.amqp }}
+            if: ${{ inputs.amqp }} == true
           #- test: 'appsignal'
           - test: 'aws'
           #- test: 'axiom'
