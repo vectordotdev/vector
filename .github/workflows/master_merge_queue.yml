@@ -224,5 +224,5 @@ jobs:
     steps:
       - name: exit
         run: |
-          echo "${{ FAILED }}"
-          exit ${{ FAILED }} == 'false'
+          echo "failed=${{ env.FAILED }}"
+          exit ${{ env.FAILED }} == 'false'
