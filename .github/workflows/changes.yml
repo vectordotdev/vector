@@ -26,6 +26,12 @@ on:
         value: ${{ jobs.changes.outputs.install }}
       k8s:
         value: ${{ jobs.changes.outputs.k8s }}
+      k8s:
+        value: ${{ jobs.changes.outputs.k8s }}
+      amqp:
+        value: ${{ jobs.changes.outputs.amqp}}
+      http-client:
+        value: ${{ jobs.changes.outputs.http-client}}
 
 jobs:
   changes:
@@ -40,6 +46,8 @@ jobs:
       markdown: ${{ steps.filter.outputs.markdown }}
       install: ${{ steps.filter.outputs.install }}
       k8s: ${{ steps.filter.outputs.k8s }}
+      amqp: ${{ steps.filter.outputs.amqp }}
+      http-client: ${{ steps.filter.outputs.http-client }}
     steps:
     - uses: actions/checkout@v3
     - uses: dorny/paths-filter@v2

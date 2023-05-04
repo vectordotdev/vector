@@ -123,34 +123,84 @@ jobs:
   #   needs: regression
   #   secrets: inherit
 
-  integration-prep:
-    runs-on: ubuntu-latest
-    needs: changes
-    outputs:
-      test: ${{ toJSON(steps.*.outputs.test) }}
-    env:
-      AMQP: ${{ needs.changes.outputs.amqp }}
-      HTTP_CLIENT: ${{ needs.changes.outputs.http-client}}
-    steps:
-      - id: amqp
-        run: echo "test=amqp" >> $GITHUB_OUTPUT
-        if: ${{ env.AMQP == 'true' }}
-
-      - id: http-client
-        run: echo "test=http-client" >> $GITHUB_OUTPUT
-        if: ${{ env.HTTP_CLIENT == 'true' }}
-
   integration:
     uses: ./.github/workflows/integration-test.yml
     with:
-      #if: ${{ matrix.run.if }}
-      test_name: ${{ matrix.test }}
-    needs: integration-prep
+      if: ${{ matrix.run.if }}
+      test_name: ${{ matrix.run.test_name }}
+    needs: changes
     secrets: inherit
     strategy:
       fail-fast: false
       matrix:
-        test: ${{ fromJSON(needs.integration-prep.outputs.test) }}
+        run:
+          - test_name: 'amqp'
+            if: ${{ needs.changes.outputs.amqp == 'true' }}
+          # - test_name: 'appsignal'
+          #   if: ${{ false }}
+         #- test: 'aws'
+         #- test: 'axiom'
+         # - test: 'azure'
+         # - test: 'clickhouse'
+         # - test: 'databend'
+         #- test: 'datadog-agent'
+         #- test: 'datadog-logs'
+         #- test: 'datadog-metrics'
+         #- test: 'datadog-traces'
+         # - test: 'dnstap'
+         # - test: 'docker-logs'
+         # - test: 'elasticsearch'
+         # - test: 'eventstoredb'
+         # - test: 'fluent'
+         # - test: 'gcp'
+         # - test: 'humio'
+          - test_name: 'http-client'
+            if: ${{ needs.changes.outputs.http-client == 'true' }}
+         # - test: 'influxdb'
+         # - test: 'kafka'
+         # - test: 'logstash'
+         # - test: 'loki'
+         # - test: 'mongodb'
+         # - test: 'nats'
+         # - test: 'nginx'
+         # - test: 'opentelemetry'
+         # - test: 'postgres'
+         # - test: 'prometheus'
+         # - test: 'pulsar'
+         # - test: 'redis'
+         # - test: 'shutdown'
+         # - test: 'splunk'
+         # - test: 'webhdfs'
+
+
+  # integration-prep:
+  #   runs-on: ubuntu-latest
+  #   needs: changes
+  #   outputs:
+  #     test: ${{ toJSON(steps.*.outputs.test) }}
+  #   env:
+  #     AMQP: ${{ needs.changes.outputs.amqp }}
+  #     HTTP_CLIENT: ${{ needs.changes.outputs.http-client}}
+  #   steps:
+  #     - id: amqp
+  #       run: echo "test=amqp" >> $GITHUB_OUTPUT
+  #       if: ${{ env.AMQP == 'true' }}
+
+  #     - id: http-client
+  #       run: echo "test=http-client" >> $GITHUB_OUTPUT
+  #       if: ${{ env.HTTP_CLIENT == 'true' }}
+
+  # integration:
+  #   uses: ./.github/workflows/integration-test.yml
+  #   with:
+  #     #if: ${{ matrix.run.if }}
+  #     test_name: ${{ matrix.test }}
+  #   needs: integration-prep
+  #   secrets: inherit
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #       test: ${{ fromJSON(needs.integration-prep.outputs.test) }}
 
   master-merge-queue-check:
     name: Master Merge Queue
@@ -169,11 +219,10 @@ jobs:
       #- k8s
       #- regression-trusted
       - integration
+    env:
+      FAILED: ${{ contains(needs.*.result, 'failure') }}
     steps:
-      - name: failure
-        if: failure()
-        run: echo "failure" && exit 1
-
-      - name: success
-        if: success()
-        run: echo "success"
+      - name: exit
+        run: |
+          echo "${{ FAILED }}"
+          exit ${{ FAILED }} == 'false'
