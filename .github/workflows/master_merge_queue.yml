@@ -132,7 +132,7 @@ jobs:
       matrix:
         run:
           - test_name: 'amqp'
-            if: ${{ false }}
+            if: false
           # - test_name: 'appsignal'
           #   if: ${{ false }}
          #- test: 'aws'
@@ -152,7 +152,7 @@ jobs:
          # - test: 'gcp'
          # - test: 'humio'
           - test: 'http-client'
-            if: ${{ true }}
+            if: true
          # - test: 'influxdb'
          # - test: 'kafka'
          # - test: 'logstash'
