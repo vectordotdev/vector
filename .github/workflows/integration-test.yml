@@ -3,11 +3,16 @@ name: Integration Test Suite
 on:
   workflow_call:
     inputs:
-      amqp:
+      if:
+        required: false
         type: boolean
+        default: true
+      test_name:
+        required: true
+        type: string
   workflow_dispatch:
-  issue_comment:
-    types: [created]
+  #issue_comment:
+  #  types: [created]
   #merge_group:
   #  types: [checks_requested]
 
@@ -32,80 +37,39 @@ env:
 
 jobs:
   test-integration:
-    name: Integration - Linux, ${{ matrix.test }}
+    name: Integration - Linux, ${{ inputs.test_name }}
     runs-on: [linux, ubuntu-20.04-8core]
-    if: |
-        (github.event_name != 'issue_comment' || contains(github.event.comment.body, '/ci-deploy-integration-tests'))
-          && github.event_name != 'pull_request'
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - test: 'amqp'
-            if: ${{ inputs.amqp }} == true
-          #- test: 'appsignal'
-          - test: 'aws'
-          #- test: 'axiom'
-          - test: 'azure'
-          - test: 'clickhouse'
-          - test: 'databend'
-          #- test: 'datadog-agent'
-          #- test: 'datadog-logs'
-          #- test: 'datadog-metrics'
-          #- test: 'datadog-traces'
-          - test: 'dnstap'
-          - test: 'docker-logs'
-          - test: 'elasticsearch'
-          - test: 'eventstoredb'
-          - test: 'fluent'
-          - test: 'gcp'
-          - test: 'humio'
-          - test: 'http-client'
-          - test: 'influxdb'
-          - test: 'kafka'
-          - test: 'logstash'
-          - test: 'loki'
-          - test: 'mongodb'
-          - test: 'nats'
-          - test: 'nginx'
-          - test: 'opentelemetry'
-          - test: 'postgres'
-          - test: 'prometheus'
-          - test: 'pulsar'
-          - test: 'redis'
-          - test: 'shutdown'
-          - test: 'splunk'
-          - test: 'webhdfs'
+    if: ${{ inputs.if }}
     timeout-minutes: 20
     steps:
       # For PR comment trigger, extra steps are required to associate the workflow with the PR.
 
-      # Find the branch that the comment was made in.
-      - name: (PR comment) Get PR branch
-        if: ${{ github.event_name == 'issue_comment' }}
-        uses: xt0rted/pull-request-comment-branch@v1
-        id: comment-branch
+      # # Find the branch that the comment was made in.
+      # - name: (PR comment) Get PR branch
+      #   if: ${{ github.event_name == 'issue_comment' }}
+      #   uses: xt0rted/pull-request-comment-branch@v1
+      #   id: comment-branch
 
-      # Indicate in the PR's CI pane that this job is running.
-      - name: (PR comment) Set latest commit status as pending
-        if: ${{ github.event_name == 'issue_comment' }}
-        uses: myrotvorets/set-commit-status-action@master
-        with:
-          sha: ${{ steps.comment-branch.outputs.head_sha }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-          status: pending
+      # # Indicate in the PR's CI pane that this job is running.
+      # - name: (PR comment) Set latest commit status as pending
+      #   if: ${{ github.event_name == 'issue_comment' }}
+      #   uses: myrotvorets/set-commit-status-action@master
+      #   with:
+      #     sha: ${{ steps.comment-branch.outputs.head_sha }}
+      #     token: ${{ secrets.GITHUB_TOKEN }}
+      #     status: pending
 
-      # Checkout the branch, using the PR ref.
-      - name: (PR comment) Checkout PR branch
-        if: ${{ github.event_name == 'issue_comment' }}
-        uses: actions/checkout@v3
-        with:
-          ref: ${{ steps.comment-branch.outputs.head_ref }}
+      # # Checkout the branch, using the PR ref.
+      # - name: (PR comment) Checkout PR branch
+      #   if: ${{ github.event_name == 'issue_comment' }}
+      #   uses: actions/checkout@v3
+      #   with:
+      #     ref: ${{ steps.comment-branch.outputs.head_ref }}
 
       # Checkout the default branch otherwise.
-      - name: Checkout branch
-        if: ${{ github.event_name != 'issue_comment' }}
-        uses: actions/checkout@v3
+      # - name: Checkout branch
+      #   if: ${{ github.event_name != 'issue_comment' }}
+      #   uses: actions/checkout@v3
 
       - name: mock
         run: echo "OK"
@@ -130,45 +94,88 @@ jobs:
       #     SPLUNK_VERSION: ${{ matrix.env.SPLUNK_VERSION }}
 
       # Indicate in the PR's CI pane that this job is complete if necessary
-      - name: (PR comment) Set latest commit status as failure
-        uses: myrotvorets/set-commit-status-action@master
-        if: failure() && github.event_name == 'issue_comment'
-        with:
-          sha: ${{ steps.comment-branch.outputs.head_sha }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-          status: 'failure'
+      # - name: (PR comment) Set latest commit status as failure
+      #   uses: myrotvorets/set-commit-status-action@master
+      #   if: failure() && github.event_name == 'issue_comment'
+      #   with:
+      #     sha: ${{ steps.comment-branch.outputs.head_sha }}
+      #     token: ${{ secrets.GITHUB_TOKEN }}
+      #     status: 'failure'
 
-  test-integration-check:
-    name: Integration Tests
-    runs-on: ubuntu-20.04
-    if: (github.event_name != 'issue_comment' || contains(github.event.comment.body, '/ci-deploy-integration-tests')) && always()
-    needs:
-      - test-integration
-    steps:
-      # Find the branch that the comment was made in.
-      - name: (PR comment) Get PR branch
-        if: github.event_name == 'issue_comment' && needs.test-integration.result == 'success'
-        uses: xt0rted/pull-request-comment-branch@v1
-        id: comment-branch
+    #if: |
+    #    (github.event_name != 'issue_comment' || contains(github.event.comment.body, '/ci-deploy-integration-tests'))
+    #      && github.event_name != 'pull_request'
+    # strategy:
+    #   fail-fast: false
+    #   matrix:
+    #     include:
+    #       - test: 'amqp'
+    #         if: ${{ inputs.amqp }} == true
+          #- test: 'appsignal'
+          #- test: 'aws'
+          #- test: 'axiom'
+          # - test: 'azure'
+          # - test: 'clickhouse'
+          # - test: 'databend'
+          #- test: 'datadog-agent'
+          #- test: 'datadog-logs'
+          #- test: 'datadog-metrics'
+          #- test: 'datadog-traces'
+          # - test: 'dnstap'
+          # - test: 'docker-logs'
+          # - test: 'elasticsearch'
+          # - test: 'eventstoredb'
+          # - test: 'fluent'
+          # - test: 'gcp'
+          # - test: 'humio'
+          # - test: 'http-client'
+          # - test: 'influxdb'
+          # - test: 'kafka'
+          # - test: 'logstash'
+          # - test: 'loki'
+          # - test: 'mongodb'
+          # - test: 'nats'
+          # - test: 'nginx'
+          # - test: 'opentelemetry'
+          # - test: 'postgres'
+          # - test: 'prometheus'
+          # - test: 'pulsar'
+          # - test: 'redis'
+          # - test: 'shutdown'
+          # - test: 'splunk'
+          # - test: 'webhdfs'
 
-      # Indicate in the PR's CI pane that this job is complete
-      - name: (PR comment) Set latest commit status as success
-        uses: myrotvorets/set-commit-status-action@master
-        if: github.event_name == 'issue_comment' && needs.test-integration.result == 'success'
-        with:
-          sha: ${{ steps.comment-branch.outputs.head_sha }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-          status: 'success'
+  # test-integration-check:
+  #   name: Integration Tests
+  #   runs-on: ubuntu-20.04
+  #   if: (github.event_name != 'issue_comment' || contains(github.event.comment.body, '/ci-deploy-integration-tests')) && always()
+  #   needs:
+  #     - test-integration
+  #   steps:
+  #     # Find the branch that the comment was made in.
+  #     - name: (PR comment) Get PR branch
+  #       if: github.event_name == 'issue_comment' && needs.test-integration.result == 'success'
+  #       uses: xt0rted/pull-request-comment-branch@v1
+  #       id: comment-branch
 
-      - name: validate
-        run: |
-          if [ ${{ github.event_name }} == 'pull_request' ] ; then
-              echo "success"
-              exit 0
-          fi
-          if [ ${{ needs.test-integration.result }} == 'failure' ] ; then
-              echo "failed"
-              exit 1
-          fi
-          echo "success"
-          exit 0
+  #     # Indicate in the PR's CI pane that this job is complete
+  #     - name: (PR comment) Set latest commit status as success
+  #       uses: myrotvorets/set-commit-status-action@master
+  #       if: github.event_name == 'issue_comment' && needs.test-integration.result == 'success'
+  #       with:
+  #         sha: ${{ steps.comment-branch.outputs.head_sha }}
+  #         token: ${{ secrets.GITHUB_TOKEN }}
+  #         status: 'success'
+
+  #     - name: validate
+  #       run: |
+  #         if [ ${{ github.event_name }} == 'pull_request' ] ; then
+  #             echo "success"
+  #             exit 0
+  #         fi
+  #         if [ ${{ needs.test-integration.result }} == 'failure' ] ; then
+  #             echo "failed"
+  #             exit 1
+  #         fi
+  #         echo "success"
+  #         exit 0

@@ -122,10 +122,52 @@ jobs:
 
   integration:
     uses: ./.github/workflows/integration-test.yml
+    with:
+      if: ${{ matrix.run.if }}
+      test_name: ${{ matrix.run.test }}
     needs: changes
     secrets: inherit
-    with:
-      amqp: false
+    strategy:
+      fail-fast: false
+      matrix:
+        run:
+          - test_name: 'amqp'
+            if: ${{ false }}
+          # - test_name: 'appsignal'
+          #   if: ${{ false }}
+         #- test: 'aws'
+         #- test: 'axiom'
+         # - test: 'azure'
+         # - test: 'clickhouse'
+         # - test: 'databend'
+         #- test: 'datadog-agent'
+         #- test: 'datadog-logs'
+         #- test: 'datadog-metrics'
+         #- test: 'datadog-traces'
+         # - test: 'dnstap'
+         # - test: 'docker-logs'
+         # - test: 'elasticsearch'
+         # - test: 'eventstoredb'
+         # - test: 'fluent'
+         # - test: 'gcp'
+         # - test: 'humio'
+          - test: 'http-client'
+            if: ${{ true }}
+         # - test: 'influxdb'
+         # - test: 'kafka'
+         # - test: 'logstash'
+         # - test: 'loki'
+         # - test: 'mongodb'
+         # - test: 'nats'
+         # - test: 'nginx'
+         # - test: 'opentelemetry'
+         # - test: 'postgres'
+         # - test: 'prometheus'
+         # - test: 'pulsar'
+         # - test: 'redis'
+         # - test: 'shutdown'
+         # - test: 'splunk'
+         # - test: 'webhdfs'
 
   master-merge-queue-check:
     name: Master Merge Queue
