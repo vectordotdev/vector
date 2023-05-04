@@ -832,12 +832,12 @@ mod test {
     use http::StatusCode;
     use indexmap::IndexMap;
     use tokio::time::sleep;
-    use value::btreemap;
-    use value::kind::Collection;
-    use value::Kind;
     use vector_core::config::proxy::ProxyConfig;
     use vrl::compiler::state::ExternalEnv;
     use vrl::compiler::{compile, compile_with_external, CompileConfig};
+    use vrl::value::btreemap;
+    use vrl::value::kind::Collection;
+    use vrl::value::Kind;
     use wiremock::{matchers, Mock, MockServer, ResponseTemplate};
 
     use super::{

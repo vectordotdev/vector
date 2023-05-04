@@ -1,9 +1,9 @@
 use indoc::indoc;
 use tower::ServiceBuilder;
-use value::Kind;
 use vector_config::configurable_component;
 use vector_core::config::proxy::ProxyConfig;
 use vector_core::schema;
+use vrl::value::Kind;
 
 use crate::{
     common::datadog::{get_base_domain_region, Region},

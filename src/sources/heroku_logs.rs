@@ -14,7 +14,7 @@ use codecs::{
 use lookup::{lookup_v2::parse_value_path, owned_value_path, path};
 use smallvec::SmallVec;
 use tokio_util::codec::Decoder as _;
-use value::{kind::Collection, Kind};
+use vrl::value::{kind::Collection, Kind};
 use warp::http::{HeaderMap, StatusCode};
 
 use vector_config::configurable_component;
@@ -407,12 +407,12 @@ mod tests {
     use futures::Stream;
     use lookup::{owned_value_path, OwnedTargetPath};
     use similar_asserts::assert_eq;
-    use value::{kind::Collection, Kind};
     use vector_core::{
         config::LogNamespace,
         event::{Event, EventStatus, Value},
         schema::Definition,
     };
+    use vrl::value::{kind::Collection, Kind};
 
     use super::{HttpSourceAuthConfig, LogplexConfig};
     use crate::{

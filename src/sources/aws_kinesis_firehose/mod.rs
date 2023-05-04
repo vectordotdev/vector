@@ -4,10 +4,10 @@ use codecs::decoding::{DeserializerConfig, FramingConfig};
 use futures::FutureExt;
 use lookup::owned_value_path;
 use tracing::Span;
-use value::Kind;
 use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
 use vector_core::config::{LegacyKey, LogNamespace};
+use vrl::value::Kind;
 use warp::Filter;
 
 use crate::{

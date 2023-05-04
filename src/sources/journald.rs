@@ -28,7 +28,6 @@ use tokio::{
     time::sleep,
 };
 use tokio_util::codec::FramedRead;
-use value::{kind::Collection, Kind, Value};
 use vector_common::{
     finalizer::OrderedFinalizer,
     internal_event::{
@@ -41,6 +40,7 @@ use vector_core::{
     schema::Definition,
     EstimatedJsonEncodedSizeOf,
 };
+use vrl::value::{kind::Collection, Kind, Value};
 
 use crate::{
     config::{
@@ -1048,7 +1048,7 @@ mod tests {
 
     use tempfile::tempdir;
     use tokio::time::{sleep, timeout, Duration, Instant};
-    use value::{kind::Collection, Value};
+    use vrl::value::{kind::Collection, Value};
 
     use super::*;
     use crate::{

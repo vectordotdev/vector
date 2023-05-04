@@ -5,9 +5,9 @@ mod unix;
 
 use codecs::decoding::DeserializerConfig;
 use lookup::{lookup_v2::OptionalValuePath, owned_value_path};
-use value::{kind::Collection, Kind};
 use vector_config::configurable_component;
 use vector_core::config::{log_schema, LegacyKey, LogNamespace};
+use vrl::value::{kind::Collection, Kind};
 
 #[cfg(unix)]
 use crate::serde::default_framing_message_based;

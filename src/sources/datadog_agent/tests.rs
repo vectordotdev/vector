@@ -19,13 +19,13 @@ use ordered_float::NotNan;
 use prost::Message;
 use quickcheck::{Arbitrary, Gen, QuickCheck, TestResult};
 use similar_asserts::assert_eq;
-use value::Kind;
 use vector_core::{
     config::LogNamespace,
     event::{metric::TagValue, MetricTags},
     metric_tags,
 };
 use vrl::compiler::value::Collection;
+use vrl::value::Kind;
 
 use crate::schema::Definition;
 use crate::{

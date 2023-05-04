@@ -9056,6 +9056,7 @@ checksum = "830b7e5d4d90034032940e4ace0d9a9a057e7a45cd94e6c007832e39edb82f6d"
 name = "value"
 version = "0.1.0"
 dependencies = [
+ "async-graphql",
  "bytes 1.4.0",
  "chrono",
  "mlua",
@@ -9067,6 +9068,7 @@ dependencies = [
  "serde",
  "serde_json",
  "snafu",
+ "toml 0.7.3",
  "tracing 0.1.37",
 ]
 
@@ -9306,7 +9308,6 @@ dependencies = [
  "vector-lookup",
  "vector-vrl-functions",
  "vrl",
- "vrl-cli",
  "vrl-stdlib",
  "warp",
  "windows-service",
@@ -9540,6 +9541,7 @@ dependencies = [
  "twox-hash",
  "typetag",
  "url",
+ "value",
  "vector-buffers",
  "vector-common",
  "vector-config",

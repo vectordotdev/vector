@@ -6,7 +6,6 @@ use criterion::{
     black_box, criterion_group, measurement::WallTime, BatchSize, BenchmarkGroup, BenchmarkId,
     Criterion, SamplingMode, Throughput,
 };
-use value::Value;
 use vector::transforms::{
     route::{Route, RouteConfig},
     TransformOutputsBuf,
@@ -16,6 +15,7 @@ use vector_core::{
     event::{Event, EventContainer, EventMetadata, LogEvent},
     transform::{SyncTransform, TransformContext},
 };
+use vrl::value::Value;
 
 #[derive(Debug)]
 struct Param {

@@ -11,9 +11,6 @@ use codecs::MetricTagValues;
 use lookup::lookup_v2::{parse_value_path, ValuePath};
 use lookup::{metadata_path, owned_value_path, path, OwnedTargetPath, PathPrefix};
 use snafu::{ResultExt, Snafu};
-use value::kind::merge::{CollisionStrategy, Strategy};
-use value::kind::Collection;
-use value::Kind;
 use vector_common::TimeZone;
 use vector_config::configurable_component;
 use vector_core::compile_vrl;
@@ -24,6 +21,9 @@ use vrl::compiler::runtime::{Runtime, Terminate};
 use vrl::compiler::state::ExternalEnv;
 use vrl::compiler::{CompileConfig, ExpressionError, Function, Program, TypeState, VrlRuntime};
 use vrl::diagnostic::{DiagnosticMessage, Formatter, Note};
+use vrl::value::kind::merge::{CollisionStrategy, Strategy};
+use vrl::value::kind::Collection;
+use vrl::value::{Kind, Value};
 
 use crate::config::OutputId;
 use crate::{
@@ -385,7 +385,7 @@ pub trait VrlRunner {
         target: &mut VrlTarget,
         program: &Program,
         timezone: &TimeZone,
-    ) -> std::result::Result<value::Value, Terminate>;
+    ) -> std::result::Result<Value, Terminate>;
 }
 
 #[derive(Debug)]
@@ -407,7 +407,7 @@ impl VrlRunner for AstRunner {
         target: &mut VrlTarget,
         program: &Program,
         timezone: &TimeZone,
-    ) -> std::result::Result<value::Value, Terminate> {
+    ) -> std::result::Result<Value, Terminate> {
         let result = self.runtime.resolve(target, program, timezone);
         self.runtime.clear();
         result
@@ -542,7 +542,7 @@ where
         }
     }
 
-    fn run_vrl(&mut self, target: &mut VrlTarget) -> std::result::Result<value::Value, Terminate> {
+    fn run_vrl(&mut self, target: &mut VrlTarget) -> std::result::Result<Value, Terminate> {
         self.runner.run(target, &self.program, &self.timezone)
     }
 }
@@ -720,11 +720,11 @@ mod tests {
     use std::collections::{HashMap, HashSet};
 
     use indoc::{formatdoc, indoc};
-    use value::{
+    use vector_core::{config::GlobalOptions, event::EventMetadata, metric_tags};
+    use vrl::value::{
         btreemap,
         kind::{Collection, Index},
     };
-    use vector_core::{config::GlobalOptions, event::EventMetadata, metric_tags};
 
     use super::*;
     use crate::{

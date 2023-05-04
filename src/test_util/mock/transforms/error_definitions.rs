@@ -1,12 +1,12 @@
 use async_trait::async_trait;
 use snafu::Snafu;
-use value::Kind;
 use vector_config::configurable_component;
 use vector_core::{
     config::{DataType, Input, LogNamespace, TransformOutput},
     schema::Definition,
     transform::Transform,
 };
+use vrl::value::Kind;
 
 use crate::config::{OutputId, TransformConfig, TransformContext};
 

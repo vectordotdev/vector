@@ -6,10 +6,10 @@ use http::{Request, Uri};
 use indoc::indoc;
 use lookup::lookup_v2::{parse_value_path, OptionalValuePath};
 use lookup::{OwnedValuePath, PathPrefix};
-use value::Kind;
 use vector_config::configurable_component;
 use vector_core::config::log_schema;
 use vector_core::schema;
+use vrl::value::Kind;
 
 use crate::{
     codecs::Transformer,
