@@ -1722,9 +1722,9 @@ fn test_config_outputs() {
                                 Kind::bytes().or_object(Collection::from_unknown(Kind::bytes())),
                                 None,
                             )
-                            .unknown_fields(Kind::object(value::kind::Collection::from_unknown(
-                                Kind::bytes(),
-                            ))),
+                            .unknown_fields(Kind::object(
+                                vrl::value::kind::Collection::from_unknown(Kind::bytes()),
+                            )),
                     ),
                 )]),
             },
@@ -1804,7 +1804,7 @@ fn test_config_outputs() {
                                     None,
                                 )
                                 .unknown_fields(Kind::object(
-                                    value::kind::Collection::from_unknown(Kind::bytes()),
+                                    vrl::value::kind::Collection::from_unknown(Kind::bytes()),
                                 )),
                         ),
                     ),

@@ -1683,7 +1683,7 @@ mod tests {
     fn test_merged_array_definitions_simple() {
         // Test merging the array definitions where the schema definition
         // is simple, containing only one possible type in the array.
-        let object: BTreeMap<value::kind::Field, Kind> = [
+        let object: BTreeMap<vrl::value::kind::Field, Kind> = [
             ("carrot".into(), Kind::bytes()),
             ("potato".into(), Kind::integer()),
         ]
@@ -1709,7 +1709,7 @@ mod tests {
     fn test_merged_array_definitions_complex() {
         // Test merging the array definitions where the schema definition
         // is fairly complex containing multiple different possible types.
-        let object: BTreeMap<value::kind::Field, Kind> = [
+        let object: BTreeMap<vrl::value::kind::Field, Kind> = [
             ("carrot".into(), Kind::bytes()),
             ("potato".into(), Kind::integer()),
         ]

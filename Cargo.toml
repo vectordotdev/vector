@@ -227,8 +227,6 @@ sha2 = { version = "0.10.6", default-features = false, optional = true }
 
 # VRL Lang
 vrl = { package = "vrl", path = "/home/nathan/repos/vrl" }
-datadog-filter = { package = "datadog-filter", path = "/home/nathan/repos/vrl/lib/datadog/filter" }
-datadog-search-syntax = { package = "datadog-search-syntax", path = "/home/nathan/repos/vrl/lib/datadog/search-syntax" }
 
 # External libs
 arc-swap = { version = "1.6", default-features = false, optional = true }
@@ -358,7 +356,6 @@ test-generator = "0.3.1"
 tokio-test = "0.4.2"
 tokio = { version = "1.28.0", features = ["test-util"] }
 tower-test = "0.4.0"
-value = { package = "value", path = "/home/nathan/repos/vrl/lib/value", features = ["test"] }
 vector-core = { path = "lib/vector-core", default-features = false, features = ["vrl", "test"] }
 wiremock = "0.5.18"
 zstd = { version = "0.12.3", default-features = false }

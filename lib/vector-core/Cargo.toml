@@ -95,7 +95,6 @@ rand_distr = "0.4.3"
 tracing-subscriber = { version = "0.3.16", default-features = false, features = ["env-filter", "fmt", "ansi", "registry"] }
 vector-common = { path = "../vector-common", default-features = false, features = ["test"] }
 vrl = { path = "/home/nathan/repos/vrl", default-features = false, features = ["value", "arbitrary", "lua"] }
-value = { package = "value", path = "/home/nathan/repos/vrl/lib/value", default-features = false, features = ["lua", "toml", "json", "api", "arbitrary", "test"] }
 
 [features]
 api = ["dep:async-graphql"]

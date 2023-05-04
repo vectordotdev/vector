@@ -404,7 +404,7 @@ mod tests {
                          }"#;
 
         let json: serde_json::Value = serde_json::from_str(record).unwrap();
-        let mut event = Event::from(LogEvent::from(value::Value::from(json)));
+        let mut event = Event::from(LogEvent::from(vrl::value::Value::from(json)));
         event.as_mut_log().insert("timestamp", chrono::Utc::now());
 
         let definition = DnstapConfig::event_schema(Some(&owned_value_path!("timestamp")));
