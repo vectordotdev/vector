@@ -125,7 +125,7 @@ impl Service<Vec<Metric>> for GreptimeDBService {
         // TODO(sunng87): group metrics by name and send metrics with same name
         // in batch
         let requests = items.into_iter().map(metric_to_insert_request);
-        let client = self.client.clone();
+        let client = Arc::clone(&self.client);
 
         Box::pin(async move {
             let mut outputs = Vec::with_capacity(requests.len());
@@ -230,7 +230,7 @@ fn metric_to_insert_request(metric: Metric) -> InsertRequest {
         }
         MetricValue::Sketch { sketch } => {
             let MetricSketch::AgentDDSketch(sketch) = sketch;
-            encode_sketch(&sketch, &mut columns);
+            encode_sketch(sketch, &mut columns);
         }
     }
 
@@ -252,7 +252,7 @@ fn encode_distribution(samples: &[Sample], columns: &mut Vec<Column>) {
         columns.push(f64_field("count", stats.count as f64));
 
         for (quantile, value) in stats.quantiles {
-            columns.push(f64_field(&format!("p{:2}", quantile * 100f64), value));
+            columns.push(f64_field(&format!("p{:02}", quantile * 100f64), value));
         }
     }
 }
@@ -266,7 +266,8 @@ fn encode_histogram(buckets: &[Bucket], columns: &mut Vec<Column>) {
 
 fn encode_quantiles(quantiles: &[Quantile], columns: &mut Vec<Column>) {
     for quantile in quantiles {
-        let column_name = format!("p{:2}", quantile.quantile * 100f64);
+        let column_name = format!("p{:02}", quantile.quantile * 100f64);
+        dbg!(&column_name);
         columns.push(f64_field(&column_name, quantile.value));
     }
 }
@@ -316,7 +317,7 @@ mod tests {
 
     fn get_column(columns: &[Column], name: &str) -> f64 {
         let col = columns.iter().find(|c| c.column_name == name).unwrap();
-        *(col.values.as_ref().unwrap().f64_values.get(0).unwrap())
+        *(col.values.as_ref().unwrap().f64_values.first().unwrap())
     }
 
     #[test]
@@ -423,9 +424,9 @@ mod tests {
         let insert = metric_to_insert_request(metric);
         assert_eq!(insert.columns.len(), 6);
 
-        assert_eq!(get_column(&insert.columns, "b1.0"), 1.0);
-        assert_eq!(get_column(&insert.columns, "b2.0"), 2.0);
-        assert_eq!(get_column(&insert.columns, "b3.0"), 1.0);
+        assert_eq!(get_column(&insert.columns, "b1"), 1.0);
+        assert_eq!(get_column(&insert.columns, "b2"), 2.0);
+        assert_eq!(get_column(&insert.columns, "b3"), 1.0);
         assert_eq!(get_column(&insert.columns, "count"), 4.0);
         assert_eq!(get_column(&insert.columns, "sum"), 8.0);
     }

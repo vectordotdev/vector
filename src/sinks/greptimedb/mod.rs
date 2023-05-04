@@ -68,8 +68,8 @@ impl_generate_config_from_default!(GreptimeDBConfig);
 #[async_trait::async_trait]
 impl SinkConfig for GreptimeDBConfig {
     async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let sink = client::GreptimeDBService::new_sink(&self)?;
-        let healthcheck = healthcheck(&self)?;
+        let sink = client::GreptimeDBService::new_sink(self)?;
+        let healthcheck = healthcheck(self)?;
         Ok((sink, healthcheck))
     }
 
