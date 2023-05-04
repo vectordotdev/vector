@@ -99,7 +99,7 @@ vrl = { path = "/home/nathan/repos/vrl", default-features = false, features = ["
 [features]
 api = ["dep:async-graphql"]
 default = []
-lua = ["dep:mlua", "dep:tokio-stream"]
+lua = ["dep:mlua", "dep:tokio-stream", "vrl/lua"]
 vrl = ["dep:enrichment"]
 test = ["vector-common/test", "proptest"]
 
