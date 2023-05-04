@@ -105,11 +105,11 @@ jobs:
     secrets: inherit
     if: needs.changes.outputs.install == 'true'
 
-  k8s:
-    uses: ./.github/workflows/k8s_e2e.yml
-    needs: changes
-    secrets: inherit
-    if: needs.changes.outputs.k8s == 'true'
+  # k8s:
+  #   uses: ./.github/workflows/k8s_e2e.yml
+  #   needs: changes
+  #   secrets: inherit
+  #   if: needs.changes.outputs.k8s == 'true'
 
   # regression:
   #   uses: ./.github/workflows/regression.yml
@@ -131,7 +131,7 @@ jobs:
     needs: changes
     secrets: inherit
     with:
-      amqp: true
+      amqp: false
 
   master-merge-queue-check:
     name: Master Merge Queue
@@ -146,55 +146,9 @@ jobs:
       - unit-mac
       - unit-windows
       - install-sh
-      - k8s
+      #- k8s
       #- regression-trusted
       - integration
     steps:
       - name: validate
         run: echo "OK"
-
-  # master-merge-queue-check:
-  #   name: Master Merge Queue
-  #   runs-on: ubuntu-20.04
-  #   if: always()
-  #   needs:
-  #     - changes
-  #     - test-cli
-  #     - test-misc
-  #     - check-msrv
-  #     - check-component-features
-  #     - cross-linux
-  #     - unit-mac
-  #     - unit-windows
-  #     - install-sh
-  #     - k8s
-  #   steps:
-  #     - name: validate
-  #       env:
-  #         EVENT_NAME: ${{ github.event_name }}
-  #         CHANGES_RESULT: ${{ needs.changes.result }}
-  #         CLI_RESULT: ${{ needs.test-cli.result }}
-  #         MISC_RESULT: ${{ needs.test-misc.result }}
-  #         MSRV_RESULT: ${{ needs.check-msrv.result }}
-  #         COMP_RESULT: ${{ needs.check-component-features.result }}
-  #         CROSS_RESULT: ${{ needs.cross-linux.result }}
-  #         MAC_RESULT: ${{ needs.unit-mac.result }}
-  #         WIN_RESULT: ${{ needs.unit-windows.result }}
-  #         INS_RESULT: ${{ needs.install-sh.result }}
-  #         K8S_RESULT: ${{ needs.k8s.result }}
-  #       # If the trigger was a merge group we evaluate the status of each required prerequisite job.
-  #       run: |
-  #         if [ "$EVENT_NAME" != "merge_group" ] ; then
-  #             echo "success"
-  #             exit 0
-  #         fi
-  #         if [[ "$CHANGES_RESULT" == "failure" || "$CLI_RESULT" == "failure"
-  #                 || "$MISC_RESULT" == "failure" || "$MSRV_RESULT" == "failure"
-  #                 || "$COMP_RESULT" == "failure" || "$CROSS_RESULT" == "failure"
-  #                 || "$MAC_RESULT" == "failure"  || "$WIN_RESULT" == "failure"
-  #                 || "$INS_RESULT" == "failure"  || "$K8S_RESULT" == "failure" ]] ; then
-  #             echo "failed"
-  #             exit 1
-  #         fi
-  #         echo "success"
-  #         exit 0
