@@ -43,7 +43,7 @@ jobs:
   test-integration:
     #name: Integration - Linux, ${{ inputs.test_name }}
     runs-on: [linux, ubuntu-20.04-8core]
-    if: ${{ inputs.if }} || ${{ github.event_name == 'workflow_dispatch' }}
+    if: ${{ inputs.if || github.event_name == 'workflow_dispatch' }}
     timeout-minutes: 20
     steps:
       # For PR comment trigger, extra steps are required to associate the workflow with the PR.

@@ -48,9 +48,13 @@ jobs:
     outputs:
       cli: ${{ steps.cli.outputs.CLI }}
     steps:
+      - id: print
+        run: echo ${{ env.COMMENT }}
       - id: cli
         if: contains(${{ env.COMMENT }}, '/ci-deploy-cli')
-        run: export CLI=true ; echo "CLI=${CLI}" >> $GITHUB_OUTPUT
+        run: |
+          export "CLI=true"
+          echo "CLI=${CLI}" >> $GITHUB_OUTPUT
 
 
   # This is the entry job which is required for all the actual tests in this workflow.
