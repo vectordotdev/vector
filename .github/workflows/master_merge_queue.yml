@@ -128,14 +128,17 @@ jobs:
     needs: changes
     outputs:
       test: ${{ toJSON(steps.*.outputs.test) }}
+    env:
+      AMQP: ${{ needs.changes.outputs.amqp }}
+      HTTP_CLIENT: ${{ needs.changes.outputs.http-client}}
     steps:
       - id: amqp
         run: echo "test=amqp" >> $GITHUB_OUTPUT
-        if: needs.changes.outputs.amqp == 'true'
+        if: ${{ env.AMQP == 'true' }}
 
       - id: http-client
         run: echo "test=http-client" >> $GITHUB_OUTPUT
-        if: needs.changes.outputs.http-client == 'true'
+        if: ${{ env.HTTP_CLIENT == 'true' }}
 
   integration:
     uses: ./.github/workflows/integration-test.yml
