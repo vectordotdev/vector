@@ -15,6 +15,8 @@ on:
   pull_request:
   merge_group:
     types: [checks_requested]
+  issue_comment:
+    types: [created]
 
 concurrency:
   # `github.event.number` exists for pull requests, otherwise fall back to SHA for merge queue
@@ -38,6 +40,19 @@ env:
 
 jobs:
 
+  comment:
+    if: ${{ github.event_name == 'issue_comment' }}
+    runs-on: ubuntu-latest
+    env:
+      COMMENT: ${{ github.event.comment.body }}
+    outputs:
+      cli: ${{ steps.cli.outputs.CLI }}
+    steps:
+      - id: cli
+        if: contains(${{ env.COMMENT }}, '/ci-deploy-cli')
+        run: export CLI=true ; echo "CLI=${CLI}" >> $GITHUB_OUTPUT
+
+
   # This is the entry job which is required for all the actual tests in this workflow.
   # If we don't run this job (such as in a pull request), then by consequence all downstream
   # test jobs are not run. This allows us to not have to check for merge group in each test job.
@@ -50,9 +65,11 @@ jobs:
     secrets: inherit
 
   test-cli:
-    if: ${{ needs.changes.outputs.source == 'true' }}
     uses: ./.github/workflows/cli.yml
-    needs: changes
+    needs:
+      - changes
+      - comment
+    if: ${{ needs.changes.outputs.source == 'true' || needs.comment.outputs.cli == 'true' }}
     secrets: inherit
 
   test-misc:
@@ -136,71 +153,66 @@ jobs:
         run:
           - test_name: 'amqp'
             if: ${{ needs.changes.outputs.amqp == 'true' }}
-          # - test_name: 'appsignal'
-          #   if: ${{ false }}
-         #- test: 'aws'
-         #- test: 'axiom'
-         # - test: 'azure'
-         # - test: 'clickhouse'
-         # - test: 'databend'
-         #- test: 'datadog-agent'
-         #- test: 'datadog-logs'
-         #- test: 'datadog-metrics'
-         #- test: 'datadog-traces'
-         # - test: 'dnstap'
-         # - test: 'docker-logs'
-         # - test: 'elasticsearch'
-         # - test: 'eventstoredb'
-         # - test: 'fluent'
-         # - test: 'gcp'
-         # - test: 'humio'
+          - test_name: 'appsignal'
+            if: ${{ needs.changes.outputs.appsignal == 'true' }}
+          - test_name: 'aws'
+            if: ${{ needs.changes.outputs.aws == 'true' }}
+          - test_name: 'axiom'
+            if: ${{ needs.changes.outputs.axiom == 'true' }}
+          - test_name: 'azure'
+            if: ${{ needs.changes.outputs.azure == 'true' }}
+          - test_name: 'clickhouse'
+            if: ${{ needs.changes.outputs.clickhouse == 'true' }}
+          - test_name: 'databend'
+            if: ${{ needs.changes.outputs.databend == 'true' }}
+          - test_name: 'datadog'
+            if: ${{ needs.changes.outputs.datadog == 'true' }}
+          - test_name: 'dnstap'
+            if: ${{ needs.changes.outputs.dnstap == 'true' }}
+          - test_name: 'docker-logs'
+            if: ${{ needs.changes.outputs.docker-logs == 'true' }}
+          - test_name: 'elasticsearch'
+            if: ${{ needs.changes.outputs.elasticsearch == 'true' }}
+          - test_name: 'eventstoredb'
+            if: ${{ needs.changes.outputs.eventstoredb == 'true' }}
+          - test_name: 'fluent'
+            if: ${{ needs.changes.outputs.fluent == 'true' }}
+          - test_name: 'gcp'
+            if: ${{ needs.changes.outputs.gcp == 'true' }}
+          - test_name: 'humio'
+            if: ${{ needs.changes.outputs.humio == 'true' }}
           - test_name: 'http-client'
             if: ${{ needs.changes.outputs.http-client == 'true' }}
-         # - test: 'influxdb'
-         # - test: 'kafka'
-         # - test: 'logstash'
-         # - test: 'loki'
-         # - test: 'mongodb'
-         # - test: 'nats'
-         # - test: 'nginx'
-         # - test: 'opentelemetry'
-         # - test: 'postgres'
-         # - test: 'prometheus'
-         # - test: 'pulsar'
-         # - test: 'redis'
-         # - test: 'shutdown'
-         # - test: 'splunk'
-         # - test: 'webhdfs'
-
-
-  # integration-prep:
-  #   runs-on: ubuntu-latest
-  #   needs: changes
-  #   outputs:
-  #     test: ${{ toJSON(steps.*.outputs.test) }}
-  #   env:
-  #     AMQP: ${{ needs.changes.outputs.amqp }}
-  #     HTTP_CLIENT: ${{ needs.changes.outputs.http-client}}
-  #   steps:
-  #     - id: amqp
-  #       run: echo "test=amqp" >> $GITHUB_OUTPUT
-  #       if: ${{ env.AMQP == 'true' }}
-
-  #     - id: http-client
-  #       run: echo "test=http-client" >> $GITHUB_OUTPUT
-  #       if: ${{ env.HTTP_CLIENT == 'true' }}
-
-  # integration:
-  #   uses: ./.github/workflows/integration-test.yml
-  #   with:
-  #     #if: ${{ matrix.run.if }}
-  #     test_name: ${{ matrix.test }}
-  #   needs: integration-prep
-  #   secrets: inherit
-  #   strategy:
-  #     fail-fast: false
-  #     matrix:
-  #       test: ${{ fromJSON(needs.integration-prep.outputs.test) }}
+          - test_name: 'influxdb'
+            if: ${{ needs.changes.outputs.influxdb == 'true' }}
+          - test_name: 'kafka'
+            if: ${{ needs.changes.outputs.kafka == 'true' }}
+          - test_name: 'logstash'
+            if: ${{ needs.changes.outputs.logstash == 'true' }}
+          - test_name: 'loki'
+            if: ${{ needs.changes.outputs.loki == 'true' }}
+          - test_name: 'mongodb'
+            if: ${{ needs.changes.outputs.mongodb == 'true' }}
+          - test_name: 'nats'
+            if: ${{ needs.changes.outputs.nats == 'true' }}
+          - test_name: 'nginx'
+            if: ${{ needs.changes.outputs.nginx == 'true' }}
+          - test_name: 'opentelemetry'
+            if: ${{ needs.changes.outputs.opentelemetry == 'true' }}
+          - test_name: 'postgres'
+            if: ${{ needs.changes.outputs.postgres == 'true' }}
+          - test_name: 'prometheus'
+            if: ${{ needs.changes.outputs.prometheus == 'true' }}
+          - test_name: 'pulsar'
+            if: ${{ needs.changes.outputs.pulsar == 'true' }}
+          - test_name: 'redis'
+            if: ${{ needs.changes.outputs.redis == 'true' }}
+          - test_name: 'shutdown'
+            if: ${{ needs.changes.outputs.shutdown == 'true' }}
+          - test_name: 'splunk'
+            if: ${{ needs.changes.outputs.splunk == 'true' }}
+          - test_name: 'webhdfs'
+            if: ${{ needs.changes.outputs.webhdfs == 'true' }}
 
   master-merge-queue-check:
     name: Master Merge Queue
