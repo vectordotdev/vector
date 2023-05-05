@@ -1,7 +1,13 @@
+# This workflow identifies changes between the base and the head ref, for use in
+# other workflows to decide if they should be executed.
+
 name: Identify Changes
 
 on:
   workflow_call:
+    # These inputs allow the filter action to be able to access the correct refs for
+    # comparison in changes detection, it is required as this is called from the
+    # merge_group context.
     inputs:
       base_ref:
         required: true
@@ -10,8 +16,6 @@ on:
         required: true
         type: string
     outputs:
-      pr-number:
-        value: ${{ jobs.changes.outputs.pr-number }}
       source:
         value: ${{ jobs.changes.outputs.source }}
       dependencies:
@@ -96,8 +100,6 @@ jobs:
     runs-on: ubuntu-20.04
     # Set job outputs to values from filter step
     outputs:
-      # PR number
-      pr-number: ${{ steps.pr-number.outputs.PR_NUMBER}}
       # General source code
       source: ${{ steps.filter.outputs.source }}
       dependencies: ${{ steps.filter.outputs.dependencies }}
@@ -142,10 +144,6 @@ jobs:
       webhdfs: ${{ steps.filter.outputs.webhdfs }}
     steps:
     - uses: actions/checkout@v3
-
-    - id: pr-number
-      run: |
-        echo PR_NUMBER=$(echo "${{github.ref}}" | sed -n 's|^refs/heads/gh-readonly-queue/master/pr-\([0-9]*\)-.*$|\1|p') >> $GITHUB_OUTPUT
 
     - uses: dorny/paths-filter@v2
       id: filter
