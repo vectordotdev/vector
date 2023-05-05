@@ -24,13 +24,11 @@ on:
       head_sha:
         required: true
         type: string
-      #pr_number:
-      #  required: true
-      #  type: string
+      pr_number:
+        required: true
+        type: string
 
   # TODO need to trigger this on PR comment.
-  #merge_group:
-  #  types: [checks_requested]
 
 jobs:
   cancel-previous:
@@ -48,12 +46,14 @@ jobs:
     outputs:
       baseline-tag: ${{ steps.baseline.outputs.BASELINE_TAG }}
       comparison-tag: ${{ steps.comparison.outputs.COMPARISON_TAG }}
-      pr-number: ${{ steps.pr-metadata.outputs.PR_NUMBER }}
+      # pr-number: ${{ steps.pr-metadata.outputs.PR_NUMBER }}
     steps:
-      - name: Setup PR metadata
-        id: pr-metadata
-        run: |
-          echo PR_NUMBER=$(echo "${{github.ref}}" | sed -n 's|^refs/heads/gh-readonly-queue/master/pr-\([0-9]*\)-.*$|\1|p') >> $GITHUB_OUTPUT
+      # - name: Setup PR metadata
+      #   id: pr-metadata
+      #   run: |
+      #     echo PR_NUMBER=$(echo "${{github.ref}}" | sed -n 's|^refs/heads/gh-readonly-queue/master/pr-\([0-9]*\)-.*$|\1|p') >> $GITHUB_OUTPUT
+      - name: Print PR metadata
+        run: echo PR_NUMBER=${{ inputs.pr_number }}
 
       - name: Setup baseline variables
         id: baseline
@@ -108,7 +108,7 @@ jobs:
           builder: ${{ steps.buildx.outputs.name }}
           outputs: type=docker,dest=${{ runner.temp }}/baseline-image.tar
           tags: |
-            vector:${{ needs.compute-metadata.outputs.pr-number }}-${{ needs.compute-metadata.outputs.baseline-tag }}
+            vector:${{ inputs.pr_number }}-${{ needs.compute-metadata.outputs.baseline-tag }}
 
       - name: Upload image as artifact
         uses: actions/upload-artifact@v3
@@ -145,7 +145,7 @@ jobs:
           builder: ${{ steps.buildx.outputs.name }}
           outputs: type=docker,dest=${{ runner.temp }}/comparison-image.tar
           tags: |
-            vector:${{ needs.compute-metadata.outputs.pr-number }}-${{ needs.compute-metadata.outputs.comparison-tag }}
+            vector:${{ inputs.pr_number }}-${{ needs.compute-metadata.outputs.comparison-tag }}
 
       - name: Upload image as artifact
         uses: actions/upload-artifact@v3
@@ -161,9 +161,9 @@ jobs:
     steps:
       - name: Write out metadata
         run: |
-          echo "COMPARISON_TAG=${{ needs.compute-metadata.outputs.pr-number }}-${{ needs.compute-metadata.outputs.comparison-tag }}" > ${{ runner.temp }}/meta
+          echo "COMPARISON_TAG=${{ inputs.pr_number }}-${{ needs.compute-metadata.outputs.comparison-tag }}" > ${{ runner.temp }}/meta
           echo "COMPARISON_SHA=${{ inputs.comparison_sha }}" >> ${{ runner.temp }}/meta
-          echo "BASELINE_TAG=${{ needs.compute-metadata.outputs.pr-number }}-${{ needs.compute-metadata.outputs.baseline-tag }}" >> ${{ runner.temp }}/meta
+          echo "BASELINE_TAG=${{ inputs.pr_number }}-${{ needs.compute-metadata.outputs.baseline-tag }}" >> ${{ runner.temp }}/meta
           echo "BASELINE_SHA=${{ inputs.baseline_sha }}" >> ${{ runner.temp }}/meta
           echo "CHECKOUT_SHA=${{ github.sha }}" >> ${{ runner.temp }}/meta
           echo "HEAD_SHA=${{ inputs.head_sha }}" >> ${{ runner.temp }}/meta

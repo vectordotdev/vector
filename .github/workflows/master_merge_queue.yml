@@ -107,20 +107,21 @@ jobs:
   #   secrets: inherit
   #   if: needs.changes.outputs.k8s == 'true'
 
-  # regression:
-  #   uses: ./.github/workflows/regression.yml
-  #   needs: changes
-  #   secrets: inherit
-  #   if: needs.changes.outputs.source == 'true'
-  #   with:
-  #     #pr_number: ${{ $(echo "${{github.ref}}" | sed -n 's|^refs/heads/gh-readonly-queue/master/pr-\([0-9]*\)-.*$|\1|p')
-  #     base_sha: ${{ github.event.merge_group.base_sha }}
-  #     head_sha: ${{ github.event.merge_group.head_sha }}
 
-  # regression-trusted:
-  #   uses: ./.github/workflows/regression_trusted.yml
-  #   needs: regression
-  #   secrets: inherit
+  regression:
+    uses: ./.github/workflows/regression.yml
+    needs: changes
+    secrets: inherit
+    if: needs.changes.outputs.source == 'true'
+    with:
+      pr_number: ${{ needs.changes.outputs.pr-number }}
+      base_sha: ${{ github.event.merge_group.base_sha }}
+      head_sha: ${{ github.event.merge_group.head_sha }}
+
+  regression-trusted:
+    uses: ./.github/workflows/regression_trusted.yml
+    needs: regression
+    secrets: inherit
 
   integration:
     uses: ./.github/workflows/integration-test.yml
