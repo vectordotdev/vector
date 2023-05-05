@@ -61,6 +61,11 @@ jobs:
     secrets: inherit
     if: needs.changes.outputs.source == 'true'
 
+  test-environment:
+    uses: ./.github/workflows/environment.yml
+    needs: changes
+    secrets: inherit
+
   check-msrv:
     uses: ./.github/workflows/msrv.yml
     needs: changes
@@ -153,7 +158,13 @@ jobs:
             if: ${{ needs.changes.outputs.clickhouse == 'true' }}
           - test_name: 'databend'
             if: ${{ needs.changes.outputs.databend == 'true' }}
-          - test_name: 'datadog'
+          - test_name: 'datadog-agent'
+            if: ${{ needs.changes.outputs.datadog == 'true' }}
+          - test_name: 'datadog-logs'
+            if: ${{ needs.changes.outputs.datadog == 'true' }}
+          - test_name: 'datadog-metrics'
+            if: ${{ needs.changes.outputs.datadog == 'true' }}
+          - test_name: 'datadog-traces'
             if: ${{ needs.changes.outputs.datadog == 'true' }}
           - test_name: 'dnstap'
             if: ${{ needs.changes.outputs.dnstap == 'true' }}
@@ -211,6 +222,7 @@ jobs:
       - changes
       - test-cli
       - test-misc
+      - test-environment
       - check-msrv
       - check-component-features
       - cross-linux

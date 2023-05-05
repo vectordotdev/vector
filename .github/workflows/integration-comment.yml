@@ -86,7 +86,13 @@ jobs:
             if: ${{ contains(github.event.comment.body, 'clickhouse') || contains(github.event.comment.body, 'all') }}
           - test_name: 'databend'
             if: ${{ contains(github.event.comment.body, 'databend') || contains(github.event.comment.body, 'all') }}
-          - test_name: 'datadog'
+          - test_name: 'datadog-agent'
+            if: ${{ contains(github.event.comment.body, 'datadog') || contains(github.event.comment.body, 'all') }}
+          - test_name: 'datadog-logs'
+            if: ${{ contains(github.event.comment.body, 'datadog') || contains(github.event.comment.body, 'all') }}
+          - test_name: 'datadog-metrics'
+            if: ${{ contains(github.event.comment.body, 'datadog') || contains(github.event.comment.body, 'all') }}
+          - test_name: 'datadog-traces'
             if: ${{ contains(github.event.comment.body, 'datadog') || contains(github.event.comment.body, 'all') }}
           - test_name: 'dnstap'
             if: ${{ contains(github.event.comment.body, 'dnstap') || contains(github.event.comment.body, 'all') }}
