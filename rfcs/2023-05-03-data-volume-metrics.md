@@ -1,4 +1,4 @@
-# RFC <issue#> - 2023-05-02 - Data Volume Insights metrics
+# RFC 2023-05-02 - Data Volume Insights metrics
 
 Vector needs to be able to emit accurate metrics that can be usefully queried
 to give users insights into the volume of data moving through the system.
