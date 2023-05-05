@@ -1,8 +1,6 @@
 name: Integration Test Suite
 
 on:
-  issue_comment:
-    types: [created]
   workflow_call:
     inputs:
       if:
@@ -14,8 +12,8 @@ on:
   workflow_dispatch:
     inputs:
       test_name:
-        description: "Which integration to test. If not specified, runs all."
-        required: false
+        description: "Which integration to test."
+        required: true
         type: string
 
 #concurrency:
@@ -40,21 +38,18 @@ env:
 jobs:
   test-integration:
     runs-on: [linux, ubuntu-20.04-8core]
-    needs: comment-trigger
-    if: |
-      always() && (inputs.if || github.event_name == 'workflow_dispatch'
-        || (github.event_name == 'issue_comment' && contains(github.event.comment.body, 'ci-deploy-integration-tests')))
+    if: inputs.if || github.event_name == 'workflow_dispatch'
     timeout-minutes: 20
     steps:
       # For PR comment trigger, extra steps are required to associate the workflow with the PR.
 
-      # # Find the branch that the comment was made in.
-      # - name: (PR comment) Get PR branch
-      #   if: ${{ github.event_name == 'issue_comment' }}
-      #   uses: xt0rted/pull-request-comment-branch@v1
-      #   id: comment-branch
+      # Find the branch that the comment was made in.
+      - name: (PR comment) Get PR branch
+        if: ${{ github.event_name == 'issue_comment' }}
+        uses: xt0rted/pull-request-comment-branch@v1
+        id: comment-branch
 
-      # # Indicate in the PR's CI pane that this job is running.
+      # Indicate in the PR's CI pane that this job is running.
       # - name: (PR comment) Set latest commit status as pending
       #   if: ${{ github.event_name == 'issue_comment' }}
       #   uses: myrotvorets/set-commit-status-action@master
@@ -63,17 +58,17 @@ jobs:
       #     token: ${{ secrets.GITHUB_TOKEN }}
       #     status: pending
 
-      # # Checkout the branch, using the PR ref.
-      # - name: (PR comment) Checkout PR branch
-      #   if: ${{ github.event_name == 'issue_comment' }}
-      #   uses: actions/checkout@v3
-      #   with:
-      #     ref: ${{ steps.comment-branch.outputs.head_ref }}
+      # Checkout the branch, using the PR ref.
+      - name: (PR comment) Checkout PR branch
+        if: ${{ github.event_name == 'issue_comment' }}
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ steps.comment-branch.outputs.head_ref }}
 
       # Checkout the default branch otherwise.
-      # - name: Checkout branch
-      #   if: ${{ github.event_name != 'issue_comment' }}
-      #   uses: actions/checkout@v3
+      - name: Checkout branch
+        if: ${{ github.event_name != 'issue_comment' }}
+        uses: actions/checkout@v3
 
       - name: mock
         run: echo "${{ inputs.test_name }}"
@@ -105,49 +100,6 @@ jobs:
       #     sha: ${{ steps.comment-branch.outputs.head_sha }}
       #     token: ${{ secrets.GITHUB_TOKEN }}
       #     status: 'failure'
-
-    #if: |
-    #    (github.event_name != 'issue_comment' || contains(github.event.comment.body, '/ci-deploy-integration-tests'))
-    #      && github.event_name != 'pull_request'
-    # strategy:
-    #   fail-fast: false
-    #   matrix:
-    #     include:
-    #       - test: 'amqp'
-    #         if: ${{ inputs.amqp }} == true
-          #- test: 'appsignal'
-          #- test: 'aws'
-          #- test: 'axiom'
-          # - test: 'azure'
-          # - test: 'clickhouse'
-          # - test: 'databend'
-          #- test: 'datadog-agent'
-          #- test: 'datadog-logs'
-          #- test: 'datadog-metrics'
-          #- test: 'datadog-traces'
-          # - test: 'dnstap'
-          # - test: 'docker-logs'
-          # - test: 'elasticsearch'
-          # - test: 'eventstoredb'
-          # - test: 'fluent'
-          # - test: 'gcp'
-          # - test: 'humio'
-          # - test: 'http-client'
-          # - test: 'influxdb'
-          # - test: 'kafka'
-          # - test: 'logstash'
-          # - test: 'loki'
-          # - test: 'mongodb'
-          # - test: 'nats'
-          # - test: 'nginx'
-          # - test: 'opentelemetry'
-          # - test: 'postgres'
-          # - test: 'prometheus'
-          # - test: 'pulsar'
-          # - test: 'redis'
-          # - test: 'shutdown'
-          # - test: 'splunk'
-          # - test: 'webhdfs'
 
   # test-integration-check:
   #   name: Integration Tests
