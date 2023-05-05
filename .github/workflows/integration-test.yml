@@ -49,15 +49,6 @@ jobs:
         uses: xt0rted/pull-request-comment-branch@v1
         id: comment-branch
 
-      # Indicate in the PR's CI pane that this job is running.
-      # - name: (PR comment) Set latest commit status as pending
-      #   if: ${{ github.event_name == 'issue_comment' }}
-      #   uses: myrotvorets/set-commit-status-action@master
-      #   with:
-      #     sha: ${{ steps.comment-branch.outputs.head_sha }}
-      #     token: ${{ secrets.GITHUB_TOKEN }}
-      #     status: pending
-
       # Checkout the branch, using the PR ref.
       - name: (PR comment) Checkout PR branch
         if: ${{ github.event_name == 'issue_comment' }}
