@@ -40,7 +40,7 @@ env:
 jobs:
   # This is the entry job which is required for all the actual tests in this workflow.
   # If we don't run this job (such as in a pull request), then by consequence all downstream
-  # test jobs are not run. This allows us to not have to check for merge group in each test job.
+  # test jobs are not run. This allows us to not have to check for merge group in each job.
   changes:
     if: ${{ github.event_name == 'merge_group' }}
     uses: ./.github/workflows/changes.yml
@@ -114,20 +114,20 @@ jobs:
   # At a later time, we may want to revisit this in order to allow multiple PRs to be included in a merge
   # queue execution. At such time, the logic of uploading of the report will need to change to account for
   # multiple PRs.
-  regression:
-    uses: ./.github/workflows/regression.yml
-    needs: changes
-    secrets: inherit
-    if: needs.changes.outputs.source == 'true'
-    with:
-      pr_number: ${{ needs.changes.outputs.pr-number }}
-      base_sha: ${{ github.event.merge_group.base_sha }}
-      head_sha: ${{ github.event.merge_group.head_sha }}
+  # regression:
+  #   uses: ./.github/workflows/regression.yml
+  #   needs: changes
+  #   secrets: inherit
+  #   if: needs.changes.outputs.source == 'true'
+  #   with:
+  #     pr_number: ${{ needs.changes.outputs.pr-number }}
+  #     base_sha: ${{ github.event.merge_group.base_sha }}
+  #     head_sha: ${{ github.event.merge_group.head_sha }}
 
-  regression-trusted:
-    uses: ./.github/workflows/regression_trusted.yml
-    needs: regression
-    secrets: inherit
+  # regression-trusted:
+  #   uses: ./.github/workflows/regression_trusted.yml
+  #   needs: regression
+  #   secrets: inherit
 
   # Calls the Integration Test workflow for each integration that was detected to have files changed
   # that impact it.
@@ -205,8 +205,9 @@ jobs:
           - test_name: 'webhdfs'
             if: ${{ needs.changes.outputs.webhdfs == 'true' }}
 
+  # Always run this so that pull_request triggers are marked as success.
   master-merge-queue-check:
-    name: Master Merge Queue
+    name: Master Merge Queue Suite
     runs-on: ubuntu-20.04
     if: always()
     needs:
@@ -220,7 +221,7 @@ jobs:
       - unit-windows
       - install-sh
       #- k8s
-      - regression-trusted
+      #- regression-trusted
       - integration
     env:
       FAILED: ${{ contains(needs.*.result, 'failure') }}

@@ -16,19 +16,24 @@
 name: Regression Detector
 
 on:
-  workflow_call:
-    inputs:
-      base_sha:
-        required: true
-        type: string
-      head_sha:
-        required: true
-        type: string
-      pr_number:
-        required: true
-        type: string
-
   # TODO need to trigger this on PR comment.
+  merge_group:
+    types: [checks_requested]
+  # workflow_call:
+  #   inputs:
+  #     base_sha:
+  #       required: true
+  #       type: string
+  #     head_sha:
+  #       required: true
+  #       type: string
+  #     pr_number:
+  #       required: true
+  #       type: string
+  #   outputs:
+  #     run_id:
+  #       value: $ {{ }}
+
 
 jobs:
   cancel-previous:
@@ -44,35 +49,39 @@ jobs:
     name: Compute metadata for regression experiments
     runs-on: ubuntu-22.04
     outputs:
-      baseline-tag: ${{ steps.baseline.outputs.BASELINE_TAG }}
+      pr-number: ${{ steps.pr-metadata.outputs.PR_NUMBER }}
+      comparison-sha: ${{ steps.comparison.outputs.COMPARISON }}
       comparison-tag: ${{ steps.comparison.outputs.COMPARISON_TAG }}
-      # pr-number: ${{ steps.pr-metadata.outputs.PR_NUMBER }}
+      baseline-sha: ${{ steps.baseline.outputs.BASELINE }}
+      baseline-tag: ${{ steps.baseline.outputs.BASELINE_TAG }}
     steps:
-      # - name: Setup PR metadata
-      #   id: pr-metadata
-      #   run: |
-      #     echo PR_NUMBER=$(echo "${{github.ref}}" | sed -n 's|^refs/heads/gh-readonly-queue/master/pr-\([0-9]*\)-.*$|\1|p') >> $GITHUB_OUTPUT
-      - name: Print PR metadata
-        run: echo PR_NUMBER=${{ inputs.pr_number }}
+      - name: Setup PR metadata
+        id: pr-metadata
+        run: |
+          echo PR_NUMBER=$(echo "${{github.ref}}" | sed -n 's|^refs/heads/gh-readonly-queue/master/pr-\([0-9]*\)-.*$|\1|p') >> $GITHUB_OUTPUT
 
       - name: Setup baseline variables
         id: baseline
         run: |
-          export BASELINE_TAG="${{ inputs.head_sha }}-${{ inputs.base_sha}}"
+          export BASELINE_SHA=${{ github.event.merge_group.base_sha }}
+          export BASELINE_TAG="${{ github.event.merge_group.head_sha }}-${{ github.event.merge_group.base_sha }}"
 
-          echo "baseline sha is: ${{ inputs.base_sha }}"
+          echo "baseline sha is: ${BASELINE_SHA}"
           echo "baseline tag is: ${BASELINE_TAG}"
 
+          echo "BASELINE=${BASELINE_SHA}" >> $GITHUB_OUTPUT
           echo "BASELINE_TAG=${BASELINE_TAG}" >> $GITHUB_OUTPUT
 
       - name: Setup comparison variables
         id: comparison
         run: |
-          export COMPARISON_TAG="${{ inputs.head_sha }}-${{ inputs.head_sha }}"
+          export COMPARISON_SHA=${{ github.event.merge_group.head_sha }}
+          export COMPARISON_TAG="${{ github.event.merge_group.head_sha }}-${{ github.event.merge_group.head_sha }}"
 
-          echo "comparison sha is: ${{ inputs.head_sha }}"
+          echo "comparison sha is: ${COMPARISON_SHA}"
           echo "comparison tag is: ${COMPARISON_TAG}"
 
+          echo "COMPARISON=${COMPARISON_SHA}" >> $GITHUB_OUTPUT
           echo "COMPARISON_TAG=${COMPARISON_TAG}" >> $GITHUB_OUTPUT
 
   ##
@@ -91,7 +100,7 @@ jobs:
 
       - uses: actions/checkout@v3
         with:
-          ref: ${{ inputs.baseline_sha }}
+          ref: ${{needs.compute-metadata.outputs.baseline-sha }}
           path: baseline-vector
 
       - name: Set up Docker Buildx
@@ -108,7 +117,7 @@ jobs:
           builder: ${{ steps.buildx.outputs.name }}
           outputs: type=docker,dest=${{ runner.temp }}/baseline-image.tar
           tags: |
-            vector:${{ inputs.pr_number }}-${{ needs.compute-metadata.outputs.baseline-tag }}
+            vector:${{ needs.compute-metadata.outputs.pr-number }}-${{ needs.compute-metadata.outputs.baseline-tag }}
 
       - name: Upload image as artifact
         uses: actions/upload-artifact@v3
@@ -128,7 +137,7 @@ jobs:
 
       - uses: actions/checkout@v3
         with:
-          ref: ${{ inputs.comparison_sha }}
+          ref: ${{ needs.compute-metadata.outputs.comparison-sha }}
           path: comparison-vector
 
       - name: Set up Docker Buildx
@@ -145,7 +154,7 @@ jobs:
           builder: ${{ steps.buildx.outputs.name }}
           outputs: type=docker,dest=${{ runner.temp }}/comparison-image.tar
           tags: |
-            vector:${{ inputs.pr_number }}-${{ needs.compute-metadata.outputs.comparison-tag }}
+            vector:${{ needs.compute-metadata.outputs.pr-number }}-${{ needs.compute-metadata.outputs.comparison-tag }}
 
       - name: Upload image as artifact
         uses: actions/upload-artifact@v3
@@ -161,13 +170,13 @@ jobs:
     steps:
       - name: Write out metadata
         run: |
-          echo "COMPARISON_TAG=${{ inputs.pr_number }}-${{ needs.compute-metadata.outputs.comparison-tag }}" > ${{ runner.temp }}/meta
+          echo "COMPARISON_TAG=${{ needs.compute-metadata.outputs.pr-number }}-${{ needs.compute-metadata.outputs.comparison-tag }}" > ${{ runner.temp }}/meta
           echo "COMPARISON_SHA=${{ inputs.comparison_sha }}" >> ${{ runner.temp }}/meta
-          echo "BASELINE_TAG=${{ inputs.pr_number }}-${{ needs.compute-metadata.outputs.baseline-tag }}" >> ${{ runner.temp }}/meta
-          echo "BASELINE_SHA=${{ inputs.baseline_sha }}" >> ${{ runner.temp }}/meta
+          echo "BASELINE_TAG=${{ needs.compute-metadata.outputs.pr-number }}-${{ needs.compute-metadata.outputs.baseline-tag }}" >> ${{ runner.temp }}/meta
+          echo "BASELINE_SHA=${{ needs.compute-metadata.outputs.baseline-sha }}" >> ${{ runner.temp }}/meta
           echo "CHECKOUT_SHA=${{ github.sha }}" >> ${{ runner.temp }}/meta
-          echo "HEAD_SHA=${{ inputs.head_sha }}" >> ${{ runner.temp }}/meta
-          echo "BASE_SHA=${{ inputs.base_sha }}" >> ${{ runner.temp }}/meta
+          echo "HEAD_SHA=${{ github.event.merge_group.head_sha }}" >> ${{ runner.temp }}/meta
+          echo "BASE_SHA=${{ github.event.merge_group.base_sha }}" >> ${{ runner.temp }}/meta
           echo "GITHUB_EVENT_NUMBER=${{ github.event.number }}" >> ${{ runner.temp }}/meta
 
       - name: Upload metadata
