@@ -93,13 +93,13 @@ jobs:
     if: needs.changes.outputs.source == 'true'
 
   install-sh:
-  #   uses: ./.github/workflows/install-sh.yml
+    uses: ./.github/workflows/install-sh.yml
     needs: changes
-  #   secrets: inherit
-  #   if: needs.changes.outputs.install == 'true'
-    runs-on: ubuntu-20.04
-    steps:
-      - run: exit 1
+    secrets: inherit
+    if: needs.changes.outputs.install == 'true'
+    # runs-on: ubuntu-20.04
+    # steps:
+    #   - run: exit 1
 
   # k8s:
   #   uses: ./.github/workflows/k8s_e2e.yml
