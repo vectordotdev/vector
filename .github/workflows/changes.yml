@@ -11,7 +11,7 @@ on:
         type: string
     outputs:
       pr-number:
-        value: ${{ jobs.changes.outputs.pr-number}}
+        value: ${{ jobs.changes.outputs.pr-number }}
       source:
         value: ${{ jobs.changes.outputs.source }}
       dependencies:
