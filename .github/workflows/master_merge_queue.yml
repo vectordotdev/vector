@@ -212,7 +212,7 @@ jobs:
       - unit-windows
       - install-sh
       #- k8s
-      #- regression-trusted
+      - regression-trusted
       - integration
     env:
       FAILED: ${{ contains(needs.*.result, 'failure') }}
