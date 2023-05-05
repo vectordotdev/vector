@@ -207,6 +207,7 @@ enum NormalizationError {
 pub mod tests {
     use super::{super::test_util, *};
     use crate::{test_util::trace_init, transforms::Transform};
+    use vrl::value::value;
 
     fn make_long_string(base: &str, len: usize) -> String {
         base.chars().cycle().take(len).collect()
@@ -220,7 +221,7 @@ pub mod tests {
                     r#"{"log": "The actual log line\n", "stream": "stderr", "time": "2016-10-05T00:00:30.082640485Z"}"#,
                 ),
                 vec![test_util::make_log_event(
-                    vrl::value!("The actual log line"),
+                    value!("The actual log line"),
                     "2016-10-05T00:00:30.082640485Z",
                     "stderr",
                     false,
@@ -232,7 +233,7 @@ pub mod tests {
                     r#"{"log": "A line without newline char at the end", "stream": "stdout", "time": "2016-10-05T00:00:30.082640485Z"}"#,
                 ),
                 vec![test_util::make_log_event(
-                    vrl::value!("A line without newline char at the end"),
+                    value!("A line without newline char at the end"),
                     "2016-10-05T00:00:30.082640485Z",
                     "stdout",
                     false,
@@ -250,7 +251,7 @@ pub mod tests {
                     .join(""),
                 ),
                 vec![test_util::make_log_event(
-                    vrl::value!(make_long_string("partial ", 16 * 1024)),
+                    value!(make_long_string("partial ", 16 * 1024)),
                     "2016-10-05T00:00:30.082640485Z",
                     "stdout",
                     true,
@@ -270,7 +271,7 @@ pub mod tests {
                     .join(""),
                 ),
                 vec![test_util::make_log_event(
-                    vrl::value!(make_long_string("non-partial ", 16 * 1024 - 1)),
+                    value!(make_long_string("non-partial ", 16 * 1024 - 1)),
                     "2016-10-05T00:00:30.082640485Z",
                     "stdout",
                     false,
@@ -319,7 +320,7 @@ pub mod tests {
                     log_namespace: LogNamespace::Vector,
                 })
             },
-            |bytes| Event::Log(LogEvent::from(vrl::value!(bytes))),
+            |bytes| Event::Log(LogEvent::from(value!(bytes))),
             valid_cases(LogNamespace::Vector),
         );
     }
@@ -347,7 +348,7 @@ pub mod tests {
 
         for bytes in cases {
             let mut parser = Docker::new(LogNamespace::Vector);
-            let input = LogEvent::from(vrl::value!(bytes));
+            let input = LogEvent::from(value!(bytes));
             let mut output = OutputBuffer::default();
             parser.transform(&mut output, input.into());
 

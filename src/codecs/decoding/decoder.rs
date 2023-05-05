@@ -109,7 +109,7 @@ mod tests {
     };
     use futures::{stream, StreamExt};
     use tokio_util::{codec::FramedRead, io::StreamReader};
-    use value::Value;
+    use vrl::value::Value;
 
     #[tokio::test]
     async fn framed_read_recover_from_error() {

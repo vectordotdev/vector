@@ -213,8 +213,8 @@ impl SourceConfig for VectorConfig {
 #[cfg(test)]
 mod test {
     use lookup::owned_value_path;
-    use value::{kind::Collection, Kind};
     use vector_core::{config::LogNamespace, schema::Definition};
+    use vrl::value::{kind::Collection, Kind};
 
     use crate::config::SourceConfig;
 

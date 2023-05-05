@@ -80,8 +80,8 @@ impl Encoder<Event> for AvroSerializer {
 mod tests {
     use bytes::BytesMut;
     use indoc::indoc;
-    use value::btreemap;
     use vector_core::event::{LogEvent, Value};
+    use vrl::value::btreemap;
 
     use super::*;
 

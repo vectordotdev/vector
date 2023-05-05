@@ -23,15 +23,15 @@ headers = { version = "0.3.8", default-features = false }
 http = { version = "0.2.9", default-features = false }
 hyper-proxy = { version = "0.9.1", default-features = false, features = ["openssl-tls"] }
 indexmap = { version = "~1.9.3", default-features = false, features = ["serde"] }
-lookup = { package = "vector-lookup", path = "../vector-lookup", features = ["arbitrary"] }
+lookup = { package = "vector-lookup", path = "../vector-lookup" }
 metrics = "0.20.1"
 metrics-tracing-context = { version = "0.12.0", default-features = false }
 metrics-util = { version = "0.14.0", default-features = false, features = ["registry"] }
 mlua = { version = "0.8.8", default-features = false, features = ["lua54", "send", "vendored"], optional = true }
 no-proxy = { version  = "0.3.2", default-features = false, features = ["serialize"] }
 once_cell = { version = "1.17", default-features = false }
+ordered-float = { version = "3.7.0", default-features = false }
 openssl = { version = "0.10.52", default-features = false, features = ["vendored"] }
-ordered-float = { version = "3.6.0", default-features = false }
 parking_lot = { version = "0.12.1", default-features = false }
 pin-project = { version = "1.0.12", default-features = false }
 proptest = { version = "1.1", optional = true }
@@ -60,15 +60,12 @@ tracing-subscriber = { version = "0.3.17", default-features = false, features = 
 typetag = { version = "0.2.8", default-features = false }
 twox-hash = { version = "1.6.3", default-features = false }
 url = { version = "2", default-features = false }
-value = { package = "value", git = "https://github.com/vectordotdev/vrl", rev = "v0.2.0", default-features = false, features = ["lua", "toml", "json", "api"] }
 vector-buffers = { path = "../vector-buffers", default-features = false }
 vector-common = { path = "../vector-common" }
 vector-config = { path = "../vector-config" }
 vector-config-common = { path = "../vector-config-common" }
 vector-config-macros = { path = "../vector-config-macros" }
-# Rename to "vrl" once we use a release with stable `-Z namespaced-features`:
-# https://doc.rust-lang.org/cargo/reference/unstable.html#namespaced-features
-vrl-lib = { package = "vrl", git = "https://github.com/vectordotdev/vrl", rev = "v0.2.0" }
+vrl = { git = "https://github.com/vectordotdev/vrl", rev = "v0.3.0" }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 security-framework = "2.8.2"
@@ -97,12 +94,12 @@ rand = "0.8.5"
 rand_distr = "0.4.3"
 tracing-subscriber = { version = "0.3.17", default-features = false, features = ["env-filter", "fmt", "ansi", "registry"] }
 vector-common = { path = "../vector-common", default-features = false, features = ["test"] }
-value = { package = "value", git = "https://github.com/vectordotdev/vrl", rev = "v0.2.0", default-features = false, features = ["lua", "toml", "json", "api", "arbitrary", "test"] }
+vrl = { git = "https://github.com/vectordotdev/vrl", rev = "v0.3.0", default-features = false, features = ["value", "arbitrary", "lua"] }
 
 [features]
-api = ["dep:async-graphql", "value/api"]
+api = ["dep:async-graphql"]
 default = []
-lua = ["dep:mlua", "dep:tokio-stream"]
+lua = ["dep:mlua", "dep:tokio-stream", "vrl/lua"]
 vrl = ["dep:enrichment"]
 test = ["vector-common/test", "proptest"]
 

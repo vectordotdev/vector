@@ -3,13 +3,12 @@ use codecs::MetricTagValues;
 use lookup::lookup_v2::parse_value_path;
 use lookup::{event_path, owned_value_path, path, PathPrefix};
 use serde_json::Value;
-use std::collections::BTreeSet;
-use value::kind::Collection;
-use value::Kind;
+use std::collections::{BTreeMap, BTreeSet};
 use vector_common::TimeZone;
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
-use vrl::prelude::BTreeMap;
+use vrl::value::kind::Collection;
+use vrl::value::Kind;
 
 use crate::config::OutputId;
 use crate::{
@@ -312,7 +311,7 @@ impl MetricToLog {
                         // This can be removed once metrics support namespacing.
                         log.insert(
                             (PathPrefix::Metadata, path!("vector")),
-                            value::Value::Object(BTreeMap::new()),
+                            vrl::value::Value::Object(BTreeMap::new()),
                         );
                     }
                     Some(log)

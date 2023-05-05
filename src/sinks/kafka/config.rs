@@ -4,9 +4,9 @@ use codecs::JsonSerializerConfig;
 use futures::FutureExt;
 use rdkafka::ClientConfig;
 use serde_with::serde_as;
-use value::Kind;
 use vector_config::configurable_component;
 use vector_core::schema::Requirement;
+use vrl::value::Kind;
 
 use crate::{
     codecs::EncodingConfig,

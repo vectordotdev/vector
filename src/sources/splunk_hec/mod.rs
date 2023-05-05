@@ -15,7 +15,6 @@ use serde::Serialize;
 use serde_json::{de::Read as JsonRead, Deserializer, Value as JsonValue};
 use snafu::Snafu;
 use tracing::Span;
-use value::{kind::Collection, Kind};
 use vector_common::internal_event::{CountByteSize, InternalEventHandle as _, Registered};
 use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
@@ -24,6 +23,7 @@ use vector_core::{
     event::BatchNotifier,
     EstimatedJsonEncodedSizeOf,
 };
+use vrl::value::{kind::Collection, Kind};
 use warp::{filters::BoxedFilter, path, reject::Rejection, reply::Response, Filter, Reply};
 
 use self::{

@@ -13,11 +13,11 @@ use rmp_serde::{decode, Deserializer};
 use serde::Deserialize;
 use smallvec::{smallvec, SmallVec};
 use tokio_util::codec::Decoder;
-use value::kind::Collection;
-use value::{Kind, Value};
 use vector_config::configurable_component;
 use vector_core::config::{LegacyKey, LogNamespace};
 use vector_core::schema::Definition;
+use vrl::value::kind::Collection;
+use vrl::value::{Kind, Value};
 
 use super::util::net::{SocketListenAddr, TcpSource, TcpSourceAck, TcpSourceAcker};
 use crate::{
@@ -635,9 +635,9 @@ mod tests {
         time::{error::Elapsed, timeout, Duration},
     };
     use tokio_util::codec::Decoder;
-    use value::kind::Collection;
     use vector_common::assert_event_data_eq;
     use vector_core::{event::Value, schema::Definition};
+    use vrl::value::kind::Collection;
 
     use super::{message::FluentMessageOptions, *};
     use crate::{

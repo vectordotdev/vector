@@ -12,6 +12,7 @@ use similar_asserts::assert_eq;
 use std::collections::BTreeMap;
 use tonic::Request;
 use vector_core::config::LogNamespace;
+use vrl::value::value;
 
 use crate::{
     config::{SourceConfig, SourceContext},
@@ -110,12 +111,12 @@ async fn receive_grpc_logs_vector_namespace() {
         let event = output.pop().unwrap();
         schema_definitions.unwrap().assert_valid_for_event(&event);
 
-        assert_eq!(event.as_log().get(".").unwrap(), &vrl::value!("log body"));
+        assert_eq!(event.as_log().get(".").unwrap(), &value!("log body"));
 
         let meta = event.as_log().metadata().value();
         assert_eq!(
             meta.get(path!("vector", "source_type")).unwrap(),
-            &vrl::value!(OpentelemetryConfig::NAME)
+            &value!(OpentelemetryConfig::NAME)
         );
         assert!(meta
             .get(path!("vector", "ingest_timestamp"))
@@ -123,45 +124,45 @@ async fn receive_grpc_logs_vector_namespace() {
             .is_timestamp());
         assert_eq!(
             meta.get(path!("opentelemetry", "resources")).unwrap(),
-            &vrl::value!({res_key: "res_val"})
+            &value!({res_key: "res_val"})
         );
         assert_eq!(
             meta.get(path!("opentelemetry", "attributes")).unwrap(),
-            &vrl::value!({attr_key: "attr_val"})
+            &value!({attr_key: "attr_val"})
         );
         assert_eq!(
             meta.get(path!("opentelemetry", "trace_id")).unwrap(),
-            &vrl::value!("4ac52aadf321c2e531db005df08792f5")
+            &value!("4ac52aadf321c2e531db005df08792f5")
         );
         assert_eq!(
             meta.get(path!("opentelemetry", "span_id")).unwrap(),
-            &vrl::value!("0b9e4bda2a55530d")
+            &value!("0b9e4bda2a55530d")
         );
         assert_eq!(
             meta.get(path!("opentelemetry", "severity_text")).unwrap(),
-            &vrl::value!("info")
+            &value!("info")
         );
         assert_eq!(
             meta.get(path!("opentelemetry", "severity_number")).unwrap(),
-            &vrl::value!(9)
+            &value!(9)
         );
         assert_eq!(
             meta.get(path!("opentelemetry", "flags")).unwrap(),
-            &vrl::value!(4)
+            &value!(4)
         );
         assert_eq!(
             meta.get(path!("opentelemetry", "observed_timestamp"))
                 .unwrap(),
-            &vrl::value!(Utc.timestamp_nanos(2))
+            &value!(Utc.timestamp_nanos(2))
         );
         assert_eq!(
             meta.get(path!("opentelemetry", "timestamp")).unwrap(),
-            &vrl::value!(Utc.timestamp_nanos(1))
+            &value!(Utc.timestamp_nanos(1))
         );
         assert_eq!(
             meta.get(path!("opentelemetry", "dropped_attributes_count"))
                 .unwrap(),
-            &vrl::value!(3)
+            &value!(3)
         );
     })
     .await;

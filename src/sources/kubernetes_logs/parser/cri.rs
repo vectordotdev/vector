@@ -189,6 +189,7 @@ pub mod tests {
 
     use super::{super::test_util, *};
     use crate::{event::LogEvent, test_util::trace_init, transforms::Transform};
+    use vrl::value::value;
 
     fn make_long_string(base: &str, len: usize) -> String {
         base.chars().cycle().take(len).collect()
@@ -202,7 +203,7 @@ pub mod tests {
                     "2016-10-06T00:17:09.669794202Z stdout F The content of the log entry 1",
                 ),
                 vec![test_util::make_log_event(
-                    vrl::value!("The content of the log entry 1"),
+                    value!("The content of the log entry 1"),
                     "2016-10-06T00:17:09.669794202Z",
                     "stdout",
                     false,
@@ -212,7 +213,7 @@ pub mod tests {
             (
                 Bytes::from("2016-10-06T00:17:09.669794202Z stdout P First line of log entry 2"),
                 vec![test_util::make_log_event(
-                    vrl::value!("First line of log entry 2"),
+                    value!("First line of log entry 2"),
                     "2016-10-06T00:17:09.669794202Z",
                     "stdout",
                     true,
@@ -224,7 +225,7 @@ pub mod tests {
                     "2016-10-06T00:17:09.669794202Z stdout P Second line of the log entry 2",
                 ),
                 vec![test_util::make_log_event(
-                    vrl::value!("Second line of the log entry 2"),
+                    value!("Second line of the log entry 2"),
                     "2016-10-06T00:17:09.669794202Z",
                     "stdout",
                     true,
@@ -234,7 +235,7 @@ pub mod tests {
             (
                 Bytes::from("2016-10-06T00:17:10.113242941Z stderr F Last line of the log entry 2"),
                 vec![test_util::make_log_event(
-                    vrl::value!("Last line of the log entry 2"),
+                    value!("Last line of the log entry 2"),
                     "2016-10-06T00:17:10.113242941Z",
                     "stderr",
                     false,
@@ -251,7 +252,7 @@ pub mod tests {
                     .join(""),
                 ),
                 vec![test_util::make_log_event(
-                    vrl::value!(make_long_string("very long message ", 16 * 1024)),
+                    value!(make_long_string("very long message ", 16 * 1024)),
                     "2016-10-06T00:17:10.113242941Z",
                     "stdout",
                     true,
@@ -268,7 +269,7 @@ pub mod tests {
                     128, 208, 184, 208, 178, 208, 181, 209, 130, 32, 208, 156, 208, 184, 209, 10,
                 ]),
                 vec![test_util::make_log_event(
-                    vrl::value!(Bytes::from(vec![
+                    value!(Bytes::from(vec![
                         72, 101, 108, 108, 111, 32, 87, 111, 114, 108, 100, 32, 208, 159, 209, 128,
                         208, 184, 208, 178, 208, 181, 209, 130, 32, 208, 156, 208, 184, 209,
                     ])),
@@ -286,7 +287,7 @@ pub mod tests {
         trace_init();
         test_util::test_parser(
             || Transform::function(Cri::new(LogNamespace::Vector)),
-            |bytes| Event::Log(LogEvent::from(vrl::value!(bytes))),
+            |bytes| Event::Log(LogEvent::from(value!(bytes))),
             valid_cases(LogNamespace::Vector),
         );
     }

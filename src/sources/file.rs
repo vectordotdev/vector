@@ -16,10 +16,10 @@ use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
 use tokio::{sync::oneshot, task::spawn_blocking};
 use tracing::{Instrument, Span};
-use value::Kind;
 use vector_common::finalizer::OrderedFinalizer;
 use vector_config::configurable_component;
 use vector_core::config::{LegacyKey, LogNamespace};
+use vrl::value::Kind;
 
 use super::util::{EncodingConfig, MultilineConfig};
 use crate::{
@@ -807,8 +807,8 @@ mod tests {
     use similar_asserts::assert_eq;
     use tempfile::tempdir;
     use tokio::time::{sleep, timeout, Duration};
-    use value::kind::Collection;
     use vector_core::schema::Definition;
+    use vrl::value::kind::Collection;
 
     use super::*;
     use crate::{
@@ -818,6 +818,7 @@ mod tests {
         sources::file,
         test_util::components::{assert_source_compliance, FILE_SOURCE_TAGS},
     };
+    use vrl::value::value;
 
     #[test]
     fn generate_config() {
@@ -1069,14 +1070,14 @@ mod tests {
         };
         let log = create_event(line, offset, file, &meta, LogNamespace::Vector);
 
-        assert_eq!(log.value(), &vrl::value!("hello world"));
+        assert_eq!(log.value(), &value!("hello world"));
 
         assert_eq!(
             log.metadata()
                 .value()
                 .get(path!("vector", "source_type"))
                 .unwrap(),
-            &vrl::value!("file")
+            &value!("file")
         );
         assert!(log
             .metadata()
@@ -1090,21 +1091,21 @@ mod tests {
                 .value()
                 .get(path!(FileConfig::NAME, "host"))
                 .unwrap(),
-            &vrl::value!("Some.Machine")
+            &value!("Some.Machine")
         );
         assert_eq!(
             log.metadata()
                 .value()
                 .get(path!(FileConfig::NAME, "offset"))
                 .unwrap(),
-            &vrl::value!(0)
+            &value!(0)
         );
         assert_eq!(
             log.metadata()
                 .value()
                 .get(path!(FileConfig::NAME, "path"))
                 .unwrap(),
-            &vrl::value!("some_file.rs")
+            &value!("some_file.rs")
         );
     }
 

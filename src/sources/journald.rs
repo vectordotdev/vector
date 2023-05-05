@@ -28,7 +28,6 @@ use tokio::{
     time::sleep,
 };
 use tokio_util::codec::FramedRead;
-use value::{kind::Collection, Kind, Value};
 use vector_common::{
     finalizer::OrderedFinalizer,
     internal_event::{
@@ -41,6 +40,7 @@ use vector_core::{
     schema::Definition,
     EstimatedJsonEncodedSizeOf,
 };
+use vrl::value::{kind::Collection, Kind, Value};
 
 use crate::{
     config::{
@@ -1048,7 +1048,7 @@ mod tests {
 
     use tempfile::tempdir;
     use tokio::time::{sleep, timeout, Duration, Instant};
-    use value::{kind::Collection, Value};
+    use vrl::value::{kind::Collection, Value};
 
     use super::*;
     use crate::{
@@ -1555,7 +1555,7 @@ mod tests {
         }"#;
 
         let json: serde_json::Value = serde_json::from_str(record).unwrap();
-        let mut event = Event::from(LogEvent::from(value::Value::from(json)));
+        let mut event = Event::from(LogEvent::from(vrl::value::Value::from(json)));
 
         event.as_mut_log().insert("timestamp", chrono::Utc::now());
 

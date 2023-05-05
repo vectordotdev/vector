@@ -11,21 +11,19 @@ use codecs::MetricTagValues;
 use lookup::lookup_v2::{parse_value_path, ValuePath};
 use lookup::{metadata_path, owned_value_path, path, OwnedTargetPath, PathPrefix};
 use snafu::{ResultExt, Snafu};
-use value::kind::merge::{CollisionStrategy, Strategy};
-use value::kind::Collection;
-use value::Kind;
 use vector_common::TimeZone;
 use vector_config::configurable_component;
 use vector_core::compile_vrl;
 use vector_core::config::LogNamespace;
 use vector_core::schema::Definition;
 use vector_vrl_functions::set_semantic_meaning::MeaningList;
-use vrl::prelude::state::TypeState;
-use vrl::{
-    diagnostic::{Formatter, Note},
-    prelude::{DiagnosticMessage, ExpressionError},
-    CompileConfig, Program, Runtime, Terminate, VrlRuntime,
-};
+use vrl::compiler::runtime::{Runtime, Terminate};
+use vrl::compiler::state::ExternalEnv;
+use vrl::compiler::{CompileConfig, ExpressionError, Function, Program, TypeState, VrlRuntime};
+use vrl::diagnostic::{DiagnosticMessage, Formatter, Note};
+use vrl::value::kind::merge::{CollisionStrategy, Strategy};
+use vrl::value::kind::Collection;
+use vrl::value::{Kind, Value};
 
 use crate::config::OutputId;
 use crate::{
@@ -143,12 +141,7 @@ impl RemapConfig {
         &self,
         enrichment_tables: enrichment::TableRegistry,
         merged_schema_definition: schema::Definition,
-    ) -> Result<(
-        vrl::Program,
-        String,
-        Vec<Box<dyn vrl::Function>>,
-        CompileConfig,
-    )> {
+    ) -> Result<(Program, String, Vec<Box<dyn Function>>, CompileConfig)> {
         let source = match (&self.source, &self.file) {
             (Some(source), None) => source.to_owned(),
             (None, Some(path)) => {
@@ -164,13 +157,13 @@ impl RemapConfig {
             _ => return Err(Box::new(BuildError::SourceAndOrFile)),
         };
 
-        let mut functions = vrl_stdlib::all();
+        let mut functions = vrl::stdlib::all();
         functions.append(&mut enrichment::vrl_functions());
         functions.append(&mut vector_vrl_functions::all());
 
         let state = TypeState {
             local: Default::default(),
-            external: vrl::state::ExternalEnv::new_with_kind(
+            external: ExternalEnv::new_with_kind(
                 merged_schema_definition.event_kind().clone(),
                 merged_schema_definition.metadata_kind().clone(),
             ),
@@ -392,7 +385,7 @@ pub trait VrlRunner {
         target: &mut VrlTarget,
         program: &Program,
         timezone: &TimeZone,
-    ) -> std::result::Result<value::Value, Terminate>;
+    ) -> std::result::Result<Value, Terminate>;
 }
 
 #[derive(Debug)]
@@ -414,7 +407,7 @@ impl VrlRunner for AstRunner {
         target: &mut VrlTarget,
         program: &Program,
         timezone: &TimeZone,
-    ) -> std::result::Result<value::Value, Terminate> {
+    ) -> std::result::Result<Value, Terminate> {
         let result = self.runtime.resolve(target, program, timezone);
         self.runtime.clear();
         result
@@ -549,7 +542,7 @@ where
         }
     }
 
-    fn run_vrl(&mut self, target: &mut VrlTarget) -> std::result::Result<value::Value, Terminate> {
+    fn run_vrl(&mut self, target: &mut VrlTarget) -> std::result::Result<Value, Terminate> {
         self.runner.run(target, &self.program, &self.timezone)
     }
 }
@@ -727,11 +720,11 @@ mod tests {
     use std::collections::{HashMap, HashSet};
 
     use indoc::{formatdoc, indoc};
-    use value::{
+    use vector_core::{config::GlobalOptions, event::EventMetadata, metric_tags};
+    use vrl::value::{
         btreemap,
         kind::{Collection, Index},
     };
-    use vector_core::{config::GlobalOptions, event::EventMetadata, metric_tags};
 
     use super::*;
     use crate::{
@@ -1690,7 +1683,7 @@ mod tests {
     fn test_merged_array_definitions_simple() {
         // Test merging the array definitions where the schema definition
         // is simple, containing only one possible type in the array.
-        let object: BTreeMap<value::kind::Field, Kind> = [
+        let object: BTreeMap<vrl::value::kind::Field, Kind> = [
             ("carrot".into(), Kind::bytes()),
             ("potato".into(), Kind::integer()),
         ]
@@ -1716,7 +1709,7 @@ mod tests {
     fn test_merged_array_definitions_complex() {
         // Test merging the array definitions where the schema definition
         // is fairly complex containing multiple different possible types.
-        let object: BTreeMap<value::kind::Field, Kind> = [
+        let object: BTreeMap<vrl::value::kind::Field, Kind> = [
             ("carrot".into(), Kind::bytes()),
             ("potato".into(), Kind::integer()),
         ]

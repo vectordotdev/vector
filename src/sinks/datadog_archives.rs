@@ -26,7 +26,6 @@ use rand::{thread_rng, Rng};
 use snafu::Snafu;
 use tower::ServiceBuilder;
 use uuid::Uuid;
-use value::Kind;
 use vector_common::request_metadata::RequestMetadata;
 use vector_config::{configurable_component, NamedComponent};
 use vector_core::{
@@ -34,6 +33,7 @@ use vector_core::{
     event::{Event, EventFinalizers, Finalizable},
     schema, ByteSizeOf,
 };
+use vrl::value::Kind;
 
 use crate::{
     aws::{AwsAuthentication, RegionOrEndpoint},

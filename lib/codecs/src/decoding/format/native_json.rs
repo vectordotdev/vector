@@ -1,9 +1,9 @@
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
-use value::kind::Collection;
-use value::Kind;
 use vector_core::{config::DataType, event::Event, schema};
+use vrl::value::kind::Collection;
+use vrl::value::Kind;
 
 use super::Deserializer;
 use vector_core::config::LogNamespace;

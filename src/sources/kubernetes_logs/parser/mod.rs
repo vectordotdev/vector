@@ -84,6 +84,7 @@ impl FunctionTransform for Parser {
 mod tests {
     use bytes::Bytes;
     use lookup::event_path;
+    use vrl::value::value;
 
     use super::*;
     use crate::{event::Event, event::LogEvent, test_util::trace_init, transforms::Transform};
@@ -107,7 +108,7 @@ mod tests {
         trace_init();
         test_util::test_parser(
             || Transform::function(Parser::new(LogNamespace::Vector)),
-            |bytes| Event::Log(LogEvent::from(vrl::value!(bytes))),
+            |bytes| Event::Log(LogEvent::from(value!(bytes))),
             valid_cases(LogNamespace::Vector),
         );
     }
@@ -146,7 +147,7 @@ mod tests {
             // No `message` field.
             (LogEvent::default(), LogNamespace::Legacy),
             // Non-bytes `message` field.
-            (LogEvent::from(vrl::value!(123)), LogNamespace::Vector),
+            (LogEvent::from(value!(123)), LogNamespace::Vector),
             (
                 {
                     let mut input = LogEvent::default();

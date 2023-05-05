@@ -11,8 +11,8 @@ use maxminddb::{
     geoip2::{City, ConnectionType, Isp},
     MaxMindDBError, Reader,
 };
-use value::Value;
 use vector_config::configurable_component;
+use vrl::value::Value;
 
 use crate::config::{EnrichmentTableConfig, GenerateConfig};
 

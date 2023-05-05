@@ -15,9 +15,9 @@ pub use log_schema::{init_log_schema, log_schema, LogSchema};
 use lookup::{lookup_v2::ValuePath, path, PathPrefix};
 pub use output_id::OutputId;
 use serde::{Deserialize, Serialize};
-use value::Value;
 pub use vector_common::config::ComponentKey;
 use vector_config::configurable_component;
+use vrl::value::Value;
 
 use crate::schema;
 
@@ -553,8 +553,8 @@ mod test {
     use crate::event::LogEvent;
     use chrono::Utc;
     use lookup::{event_path, owned_value_path, OwnedTargetPath};
-    use value::Kind;
     use vector_common::btreemap;
+    use vrl::value::Kind;
 
     #[test]
     fn test_insert_standard_vector_source_metadata() {

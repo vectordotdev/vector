@@ -451,7 +451,6 @@ mod tests {
     use futures::poll;
     use tokio::sync::mpsc::UnboundedSender;
     use tokio_test::{assert_pending, assert_ready, task::spawn};
-    use value::Value;
     use vector_buffers::{
         topology::{
             builder::TopologyBuilder,
@@ -459,6 +458,7 @@ mod tests {
         },
         WhenFull,
     };
+    use vrl::value::Value;
 
     use super::{ControlMessage, Fanout};
     use crate::event::{Event, EventArray, LogEvent};

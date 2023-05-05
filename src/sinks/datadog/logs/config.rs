@@ -2,9 +2,9 @@ use std::{convert::TryFrom, sync::Arc};
 
 use indoc::indoc;
 use tower::ServiceBuilder;
-use value::Kind;
 use vector_config::configurable_component;
 use vector_core::config::proxy::ProxyConfig;
+use vrl::value::Kind;
 
 use super::{service::LogApiRetry, sink::LogSinkBuilder};
 use crate::{

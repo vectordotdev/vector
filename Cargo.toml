@@ -126,7 +126,6 @@ portpicker = { path = "lib/portpicker" }
 prometheus-parser = { path = "lib/prometheus-parser", optional = true }
 opentelemetry-proto = { path = "lib/opentelemetry-proto", optional = true }
 tracing-limit = { path = "lib/tracing-limit" }
-value = { package = "value", git = "https://github.com/vectordotdev/vrl", rev = "v0.2.0" }
 vector-api-client = { path = "lib/vector-api-client", optional = true }
 vector-buffers = { path = "lib/vector-buffers", default-features = false }
 vector-common = { path = "lib/vector-common" }
@@ -135,7 +134,6 @@ vector-config-common = { path = "lib/vector-config-common" }
 vector-config-macros = { path = "lib/vector-config-macros" }
 vector-core = { path = "lib/vector-core", default-features = false, features = ["vrl"] }
 vector-vrl-functions = { path = "lib/vector-vrl/functions" }
-vrl-cli = { package = "vrl-cli", git = "https://github.com/vectordotdev/vrl", rev = "v0.2.0", optional = true }
 loki-logproto = { path = "lib/loki-logproto", optional = true }
 
 # Tokio / Futures
@@ -223,14 +221,12 @@ number_prefix = { version = "0.4.0", default-features = false, features = ["std"
 tui = { version = "0.19.0", optional = true, default-features = false, features = ["crossterm"] }
 
 # Datadog Pipelines
-datadog-filter = { package = "datadog-filter", git = "https://github.com/vectordotdev/vrl", rev = "v0.2.0" }
-datadog-search-syntax = { package = "datadog-search-syntax", git = "https://github.com/vectordotdev/vrl", rev = "v0.2.0" }
+
 hex = { version = "0.4.3", default-features = false, optional = true }
 sha2 = { version = "0.10.6", default-features = false, optional = true }
 
 # VRL Lang
-vrl = { package = "vrl", git = "https://github.com/vectordotdev/vrl", rev = "v0.2.0" }
-vrl-stdlib = { package = "vrl-stdlib", git = "https://github.com/vectordotdev/vrl", rev = "v0.2.0" }
+vrl = { package = "vrl", git = "https://github.com/vectordotdev/vrl", rev = "v0.3.0", features = ["cli"] }
 
 # External libs
 arc-swap = { version = "1.6", default-features = false, optional = true }
@@ -287,7 +283,7 @@ notify = { version = "5.1.0", default-features = false, features = ["macos_fseve
 once_cell = { version = "1.17", default-features = false }
 openssl = { version = "0.10.52", default-features = false, features = ["vendored"] }
 openssl-probe = { version = "0.1.5", default-features = false }
-ordered-float = { version = "3.6.0", default-features = false }
+ordered-float = { version = "3.7.0", default-features = false }
 paste = "1.0.12"
 percent-encoding = { version = "2.2.0", default-features = false }
 pin-project = { version = "1.0.12", default-features = false }
@@ -360,7 +356,6 @@ test-generator = "0.3.1"
 tokio-test = "0.4.2"
 tokio = { version = "1.28.0", features = ["test-util"] }
 tower-test = "0.4.0"
-value = { package = "value", git = "https://github.com/vectordotdev/vrl", rev = "v0.2.0", features = ["test"] }
 vector-core = { path = "lib/vector-core", default-features = false, features = ["vrl", "test"] }
 wiremock = "0.5.18"
 zstd = { version = "0.12.3", default-features = false }
@@ -378,16 +373,16 @@ ntapi = { git = "https://github.com/MSxDOS/ntapi.git", rev = "24fc1e47677fc9f6e3
 
 [features]
 # Default features for *-unknown-linux-gnu and *-apple-darwin
-default = ["api", "api-client", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "unix", "rdkafka?/gssapi-vendored", "vrl-cli", "enterprise", "component-validation-runner"]
+default = ["api", "api-client", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "unix", "rdkafka?/gssapi-vendored", "enterprise", "component-validation-runner"]
 # Default features for `cargo docs`. The same as `default` but without `rdkafka?/gssapi-vendored` which would require installing libsasl in our doc build environment.
-docs = ["api", "api-client", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vrl-cli", "enterprise", "component-validation-runner"]
+docs = ["api", "api-client", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "unix", "enterprise", "component-validation-runner"]
 # Default features for *-unknown-linux-* which make use of `cmake` for dependencies
-default-cmake = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "rdkafka?/gssapi-vendored", "vrl-cli", "enterprise"]
+default-cmake = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "rdkafka?/gssapi-vendored", "enterprise"]
 # Default features for *-pc-windows-msvc
 # TODO: Enable SASL https://github.com/vectordotdev/vector/pull/3081#issuecomment-659298042
-default-msvc = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "transforms", "vrl-cli", "enterprise"]
-default-musl = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "rdkafka?/gssapi-vendored", "vrl-cli", "enterprise"]
-default-no-api-client = ["api", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "unix", "rdkafka?/gssapi-vendored", "vrl-cli", "enterprise"]
+default-msvc = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "transforms", "enterprise"]
+default-musl = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "rdkafka?/gssapi-vendored", "enterprise"]
+default-no-api-client = ["api", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "unix", "rdkafka?/gssapi-vendored", "enterprise"]
 default-no-vrl-cli = ["api", "sinks", "sources", "sources-dnstap", "transforms", "unix", "rdkafka?/gssapi-vendored", "enterprise"]
 tokio-console = ["dep:console-subscriber", "tokio/tracing"]
 
@@ -397,16 +392,16 @@ all-metrics = ["sinks-metrics", "sources-metrics", "transforms-metrics", "enterp
 # Target specific release features.
 # The `make` tasks will select this according to the appropriate triple.
 # Use this section to turn off or on specific features for specific triples.
-target-aarch64-unknown-linux-gnu = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vrl-cli", "enterprise"]
-target-aarch64-unknown-linux-musl = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vrl-cli", "enterprise"]
-target-armv7-unknown-linux-gnueabihf = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vrl-cli", "enterprise"]
-target-armv7-unknown-linux-musleabihf = ["api", "api-client", "rdkafka?/cmake_build", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "vrl-cli", "enterprise"]
-target-x86_64-unknown-linux-gnu = ["api", "api-client", "rdkafka?/cmake_build", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "unix", "rdkafka?/gssapi-vendored", "vrl-cli", "enterprise"]
-target-x86_64-unknown-linux-musl = ["api", "api-client", "rdkafka?/cmake_build", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vrl-cli", "enterprise"]
+target-aarch64-unknown-linux-gnu = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "enterprise"]
+target-aarch64-unknown-linux-musl = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "enterprise"]
+target-armv7-unknown-linux-gnueabihf = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "enterprise"]
+target-armv7-unknown-linux-musleabihf = ["api", "api-client", "rdkafka?/cmake_build", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "enterprise"]
+target-x86_64-unknown-linux-gnu = ["api", "api-client", "rdkafka?/cmake_build", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "unix", "rdkafka?/gssapi-vendored", "enterprise"]
+target-x86_64-unknown-linux-musl = ["api", "api-client", "rdkafka?/cmake_build", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "unix", "enterprise"]
 # Does not currently build
-target-powerpc64le-unknown-linux-gnu = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vrl-cli", "enterprise"]
+target-powerpc64le-unknown-linux-gnu = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "enterprise"]
 # Currently doesn't build due to lack of support for 64-bit atomics
-target-powerpc-unknown-linux-gnu = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vrl-cli", "enterprise"]
+target-powerpc-unknown-linux-gnu = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "enterprise"]
 
 # Enables features that work only on systems providing `cfg(unix)`
 unix = ["tikv-jemallocator", "allocation-tracing"]

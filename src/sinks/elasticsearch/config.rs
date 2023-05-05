@@ -33,8 +33,8 @@ use crate::{
     transforms::metric_to_log::MetricToLogConfig,
 };
 use lookup::event_path;
-use value::Kind;
 use vector_core::schema::Requirement;
+use vrl::value::Kind;
 
 /// The field name for the timestamp required by data stream mode
 pub const DATA_STREAM_TIMESTAMP_KEY: &str = "@timestamp";

@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
 use futures::future::FutureExt;
-use value::Kind;
 use vector_config::configurable_component;
+use vrl::value::Kind;
 
 use super::{healthcheck::healthcheck, sink::LokiSink};
 use crate::{
