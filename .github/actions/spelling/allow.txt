@@ -295,6 +295,8 @@ gpg
 gql
 grafana
 graphiql
+greptime
+greptimedb
 gvisor
 gws
 hadoop

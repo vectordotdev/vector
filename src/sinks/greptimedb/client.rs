@@ -122,8 +122,6 @@ impl Service<Vec<Metric>> for GreptimeDBService {
 
     // Convert vector metrics into GreptimeDB format and send them in batch
     fn call(&mut self, items: Vec<Metric>) -> Self::Future {
-        // TODO(sunng87): group metrics by name and send metrics with same name
-        // in batch
         let requests = items.into_iter().map(metric_to_insert_request);
         let client = Arc::clone(&self.client);
 
@@ -187,7 +185,7 @@ fn metric_to_insert_request(metric: Metric) -> InsertRequest {
     };
 
     let mut columns = Vec::new();
-    // timetamp
+    // timestamp
     let timestamp = metric
         .timestamp()
         .map(|t| t.timestamp_millis())
@@ -267,7 +265,6 @@ fn encode_histogram(buckets: &[Bucket], columns: &mut Vec<Column>) {
 fn encode_quantiles(quantiles: &[Quantile], columns: &mut Vec<Column>) {
     for quantile in quantiles {
         let column_name = format!("p{:02}", quantile.quantile * 100f64);
-        dbg!(&column_name);
         columns.push(f64_field(&column_name, quantile.value));
     }
 }
@@ -328,7 +325,7 @@ mod tests {
             MetricValue::Gauge { value: 1.1 },
         )
         .with_namespace(Some("ns"))
-        .with_tags(Some([("host".to_owned(), "thinkneo".to_owned())].into()))
+        .with_tags(Some([("host".to_owned(), "my_host".to_owned())].into()))
         .with_timestamp(Some(Utc::now()));
 
         let insert = metric_to_insert_request(metric);
@@ -413,7 +410,7 @@ mod tests {
     #[test]
     fn test_histogram() {
         let metric = Metric::new(
-            "cpu_seconds_totoal",
+            "cpu_seconds_total",
             MetricKind::Incremental,
             MetricValue::AggregatedHistogram {
                 buckets: vector_core::buckets![1.0 => 1, 2.0 => 2, 3.0 => 1],
@@ -434,7 +431,7 @@ mod tests {
     #[test]
     fn test_summary() {
         let metric = Metric::new(
-            "cpu_seconds_totoal",
+            "cpu_seconds_total",
             MetricKind::Incremental,
             MetricValue::AggregatedSummary {
                 quantiles: vector_core::quantiles![0.01 => 1.5, 0.5 => 2.0, 0.99 => 3.0],
@@ -493,7 +490,7 @@ mod integration_tests {
                 std::env::var("GREPTIMEDB_HTTP")
                     .unwrap_or_else(|_| "http://localhost:4000".to_owned())
             ))
-            .query(&[("sql", "SELECT region, value FROM ms_mycounter")])
+            .query(&[("sql", "SELECT region, value FROM ns_my_counter")])
             .send()
             .await
             .unwrap()
@@ -506,7 +503,7 @@ mod integration_tests {
             result
                 .pointer("/output/0/records/rows")
                 .and_then(|v| v.as_array())
-                .expect("Error getting greptimedb resposne array")
+                .expect("Error getting greptimedb response array")
                 .len(),
             10
         )
@@ -519,7 +516,7 @@ mod integration_tests {
     fn create_event(i: i32) -> Event {
         Event::Metric(
             Metric::new(
-                format!("mycounter"),
+                format!("my_counter"),
                 MetricKind::Incremental,
                 MetricValue::Counter { value: i as f64 },
             )
