@@ -1,4 +1,4 @@
-name: Integration Test Suite Comment
+name: Integration Test Comment
 
 on:
   issue_comment:
