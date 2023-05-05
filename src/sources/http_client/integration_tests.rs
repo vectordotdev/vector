@@ -293,7 +293,7 @@ async fn shutdown() {
     let source = source
         .build(context)
         .await
-        .expect("source should not fail to build");
+        .expect("source should not fail to build!");
     let source_handle = tokio::spawn(source);
 
     // signal the source to shut down

@@ -1,0 +1,232 @@
+# This workflow orchestrates a collection of workflows that are required for the merge queue check.
+#
+# Most of the workflows that are jobs within this one, are able to be run on demand
+# by issuing a PR comment with the respective command to trigger said workflow.
+#
+# The design of this workflow relies on the first real job "changes" to detect file
+# changes against the base, and each downstream workflow after that will only be
+# called if the files for that area have changed.
+#
+
+name: Master Merge Queue Test Suite
+
+on:
+  # Only want to run this on merge queue, but because GH doesn't allow specifying different required checks
+  # for pull request and merge queue, we need to "run" it in pull request, but in the jobs we will just auto pass.
+  pull_request:
+  merge_group:
+    types: [checks_requested]
+
+concurrency:
+  # `github.event.number` exists for pull requests, otherwise fall back to SHA for merge queue
+  group: ${{ github.workflow }}-${{ github.event.number || github.event.merge_group.base_sha }}
+  cancel-in-progress: true
+
+env:
+  AWS_ACCESS_KEY_ID: "dummy"
+  AWS_SECRET_ACCESS_KEY: "dummy"
+  CONTAINER_TOOL: "docker"
+  DD_ENV: "ci"
+  DD_API_KEY: ${{ secrets.DD_API_KEY }}
+  RUST_BACKTRACE: full
+  TEST_LOG: vector=debug
+  VERBOSE: true
+  CI: true
+  PROFILE: debug
+  # observing issues fetching boringssl via HTTPS in the OSX build, seeing if this helps
+  # can be removed when we switch back to the upstream openssl-sys crate
+  CARGO_NET_GIT_FETCH_WITH_CLI: true
+
+jobs:
+  # This is the entry job which is required for all the actual tests in this workflow.
+  # If we don't run this job (such as in a pull request), then by consequence all downstream
+  # test jobs are not run. This allows us to not have to check for merge group in each job.
+  changes:
+    if: ${{ github.event_name == 'merge_group' }}
+    uses: ./.github/workflows/changes.yml
+    with:
+      base_ref: ${{ github.event.merge_group.base_ref }}
+      head_ref: ${{ github.event.merge_group.head_ref }}
+    secrets: inherit
+
+  test-cli:
+    uses: ./.github/workflows/cli.yml
+    needs: changes
+    if: needs.changes.outputs.source == 'true'
+    secrets: inherit
+
+  test-misc:
+    uses: ./.github/workflows/misc.yml
+    needs: changes
+    secrets: inherit
+    if: needs.changes.outputs.source == 'true'
+
+  check-msrv:
+    uses: ./.github/workflows/msrv.yml
+    needs: changes
+    secrets: inherit
+    if: needs.changes.outputs.source == 'true'
+
+  check-component-features:
+    uses: ./.github/workflows/component_features.yml
+    needs: changes
+    secrets: inherit
+    if: needs.changes.outputs.source == 'true'
+
+  cross-linux:
+    uses: ./.github/workflows/cross.yml
+    needs: changes
+    secrets: inherit
+    # We run cross checks when dependencies change to ensure they still build.
+    # This helps us avoid adopting dependencies that aren't compatible with other architectures.
+    if: needs.changes.outputs.dependencies == 'true'
+
+  unit-mac:
+    uses: ./.github/workflows/unit_mac.yml
+    needs: changes
+    secrets: inherit
+    if: needs.changes.outputs.source == 'true'
+
+  unit-windows:
+    uses: ./.github/workflows/unit_windows.yml
+    needs: changes
+    secrets: inherit
+    if: needs.changes.outputs.source == 'true'
+
+  install-sh:
+    uses: ./.github/workflows/install-sh.yml
+    needs: changes
+    secrets: inherit
+    if: needs.changes.outputs.install == 'true'
+
+  k8s:
+    uses: ./.github/workflows/k8s_e2e.yml
+    needs: changes
+    secrets: inherit
+    if: needs.changes.outputs.k8s == 'true'
+
+  # NOTE: This design of passing in the pr-number to the Regression workflow requires that the merge queue
+  # be configured contain a maximum of one PR per execution. This is so that the regression report generated
+  # by the workflow can be posted as a comment to the PR.
+  # At a later time, we may want to revisit this in order to allow multiple PRs to be included in a merge
+  # queue execution. At such time, the logic of uploading of the report will need to change to account for
+  # multiple PRs.
+  # regression:
+  #   uses: ./.github/workflows/regression.yml
+  #   needs: changes
+  #   secrets: inherit
+  #   if: needs.changes.outputs.source == 'true'
+  #   with:
+  #     pr_number: ${{ needs.changes.outputs.pr-number }}
+  #     base_sha: ${{ github.event.merge_group.base_sha }}
+  #     head_sha: ${{ github.event.merge_group.head_sha }}
+
+  # regression-trusted:
+  #   uses: ./.github/workflows/regression_trusted.yml
+  #   needs: regression
+  #   secrets: inherit
+
+  # Calls the Integration Test workflow for each integration that was detected to have files changed
+  # that impact it.
+  integration:
+    uses: ./.github/workflows/integration-test.yml
+    with:
+      if: ${{ matrix.run.if }}
+      test_name: ${{ matrix.run.test_name }}
+    needs: changes
+    secrets: inherit
+    strategy:
+      fail-fast: false
+      matrix:
+        run:
+          - test_name: 'amqp'
+            if: ${{ needs.changes.outputs.amqp == 'true' }}
+          - test_name: 'appsignal'
+            if: ${{ needs.changes.outputs.appsignal == 'true' }}
+          - test_name: 'aws'
+            if: ${{ needs.changes.outputs.aws == 'true' }}
+          - test_name: 'axiom'
+            if: ${{ needs.changes.outputs.axiom == 'true' }}
+          - test_name: 'azure'
+            if: ${{ needs.changes.outputs.azure == 'true' }}
+          - test_name: 'clickhouse'
+            if: ${{ needs.changes.outputs.clickhouse == 'true' }}
+          - test_name: 'databend'
+            if: ${{ needs.changes.outputs.databend == 'true' }}
+          - test_name: 'datadog'
+            if: ${{ needs.changes.outputs.datadog == 'true' }}
+          - test_name: 'dnstap'
+            if: ${{ needs.changes.outputs.dnstap == 'true' }}
+          - test_name: 'docker-logs'
+            if: ${{ needs.changes.outputs.docker-logs == 'true' }}
+          - test_name: 'elasticsearch'
+            if: ${{ needs.changes.outputs.elasticsearch == 'true' }}
+          - test_name: 'eventstoredb'
+            if: ${{ needs.changes.outputs.eventstoredb == 'true' }}
+          - test_name: 'fluent'
+            if: ${{ needs.changes.outputs.fluent == 'true' }}
+          - test_name: 'gcp'
+            if: ${{ needs.changes.outputs.gcp == 'true' }}
+          - test_name: 'humio'
+            if: ${{ needs.changes.outputs.humio == 'true' }}
+          - test_name: 'http-client'
+            if: ${{ needs.changes.outputs.http-client == 'true' }}
+          - test_name: 'influxdb'
+            if: ${{ needs.changes.outputs.influxdb == 'true' }}
+          - test_name: 'kafka'
+            if: ${{ needs.changes.outputs.kafka == 'true' }}
+          - test_name: 'logstash'
+            if: ${{ needs.changes.outputs.logstash == 'true' }}
+          - test_name: 'loki'
+            if: ${{ needs.changes.outputs.loki == 'true' }}
+          - test_name: 'mongodb'
+            if: ${{ needs.changes.outputs.mongodb == 'true' }}
+          - test_name: 'nats'
+            if: ${{ needs.changes.outputs.nats == 'true' }}
+          - test_name: 'nginx'
+            if: ${{ needs.changes.outputs.nginx == 'true' }}
+          - test_name: 'opentelemetry'
+            if: ${{ needs.changes.outputs.opentelemetry == 'true' }}
+          - test_name: 'postgres'
+            if: ${{ needs.changes.outputs.postgres == 'true' }}
+          - test_name: 'prometheus'
+            if: ${{ needs.changes.outputs.prometheus == 'true' }}
+          - test_name: 'pulsar'
+            if: ${{ needs.changes.outputs.pulsar == 'true' }}
+          - test_name: 'redis'
+            if: ${{ needs.changes.outputs.redis == 'true' }}
+          - test_name: 'shutdown'
+            if: ${{ needs.changes.outputs.shutdown == 'true' }}
+          - test_name: 'splunk'
+            if: ${{ needs.changes.outputs.splunk == 'true' }}
+          - test_name: 'webhdfs'
+            if: ${{ needs.changes.outputs.webhdfs == 'true' }}
+
+  # Always run this so that pull_request triggers are marked as success.
+  master-merge-queue-check:
+    name: Master Merge Queue Suite
+    runs-on: ubuntu-20.04
+    if: always()
+    needs:
+      - changes
+      - test-cli
+      - test-misc
+      - check-msrv
+      - check-component-features
+      - cross-linux
+      - unit-mac
+      - unit-windows
+      - install-sh
+      - k8s
+      - integration
+    env:
+      FAILED: ${{ contains(needs.*.result, 'failure') }}
+    steps:
+      - name: exit
+        run: |
+          echo "failed=${{ env.FAILED }}"
+          if [[ "$FAILED" == "true" ]] ; then
+            exit 1
+          else
+            exit 0
+          fi
