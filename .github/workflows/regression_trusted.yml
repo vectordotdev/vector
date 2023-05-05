@@ -1,6 +1,5 @@
 name: Regression Detector (trusted)
 
-
 on:
   # Don't want to run for each PR, but because GH doesn't allow specifying different required checks
   # for pull request and merge queue, we need to "run" it in pull request, but in the jobs we will just auto pass.
