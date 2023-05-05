@@ -1,5 +1,6 @@
 name: Regression Detector (trusted)
 
+
 on:
   workflow_call:
 
@@ -7,7 +8,7 @@ jobs:
   compute-metadata:
     name: Compute metadata for regression experiments
     runs-on: ubuntu-22.04
-    if: github.event_name != 'pull_request' && github.event.workflow_run.conclusion == 'success'
+    #if: github.event_name != 'pull_request' && github.event.workflow_run.conclusion == 'success'
     outputs:
       cpus: ${{ steps.system.outputs.CPUS }}
       memory: ${{ steps.system.outputs.MEMORY }}
@@ -535,12 +536,12 @@ jobs:
         with:
           path: ${{ runner.temp }}/outputs/report.html
 
-      # - name: Post report to PR
-      #   uses: peter-evans/create-or-update-comment@v3
-      #   with:
-      #     issue-number: ${{ needs.compute-metadata.outputs.github-event-number }}
-      #     edit-mode: append
-      #     body: ${{ steps.read-analysis.outputs.content }}
+      - name: Post report to PR
+        uses: peter-evans/create-or-update-comment@v3
+        with:
+          issue-number: ${{ needs.compute-metadata.outputs.github-event-number }}
+          edit-mode: append
+          body: ${{ steps.read-analysis.outputs.content }}
 
       - name: Upload regression report to artifacts
         uses: actions/upload-artifact@v3
@@ -588,21 +589,3 @@ jobs:
             -f description='Analyze experimental results from Regression Detector failed.' \
             -f context='Regression Detector / analyze-experiment' \
             -f target_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-
-  finish:
-    name: Detect Regression Status
-    runs-on: ubuntu-22.04
-    needs: detect-regression
-    if: always()
-    steps:
-      - run: |
-          if [ ${{ github.event_name }} == 'pull_request' ] ; then
-              echo "success"
-              exit 0
-          fi
-          if [[ ${{ needs.detect-regression.result }} == 'failure' ]] ; then
-              echo "failed"
-              exit 1
-          fi
-          echo "success"
-          exit 0
