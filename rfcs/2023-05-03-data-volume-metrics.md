@@ -20,7 +20,7 @@ to give users insights into the volume of data moving through the system.
 
 ### Out of scope
 
-- A separete metric, `component_sent_bytes_total` that indicates network bytes
+- A separate metric, `component_sent_bytes_total` that indicates network bytes
   sent by Vector is not considered here.
 
 ## Pain
@@ -33,7 +33,7 @@ from.
 
 ### User Experience
 
-Global config optionns will be provided allowing the `service` tag and the
+Global config options will be provided allowing the `service` tag and the
 `source` tag to be specified. For example:
 
 ```yaml
@@ -51,7 +51,7 @@ The default will be to not emit these tags.
 
 *service* - to attach the service, we need to add a new meaning to Vector - *service*. Any sources that
             receive data that could potentially be considered a service will need to indicate which field
-            means `service`. 
+            means `service`.
             This work has largely already been done with the LogNamespacing work, so it will be trivial to add
             this new field.
 
@@ -64,17 +64,17 @@ and `component_sent_event_bytes_total` metrics are the estimated JSON size of th
 #### `component_received_event_bytes_total`
 
 This metric is emitted by the framework [here][source_sender], so it looks like the only change needed is
-to add the service tag. 
+to add the service tag.
 
 #### `component_sent_event_bytes_total`
 
-For stream based sinks this will typically be the byte value returned by `DriverResponse::events_sent`. 
+For stream based sinks this will typically be the byte value returned by `DriverResponse::events_sent`.
 
 Despite being in the [Component Spec][component_spec], not all sinks currently conform to this.
 
 As an example, from a cursory glance over a couple of sinks:
 
-The Amqp sink currently emits this value as the length of the binary data that is sent. By the time the data has 
+The Amqp sink currently emits this value as the length of the binary data that is sent. By the time the data has
 reached the code where the `component_sent_event_bytes_total` event is emitted, that event has been encoded
 and the actual estimated JSON size has been lost. The sink will need to be updated so that when the event is
 encoded, the encoded event together with the pre-encoded JSON bytesize will be sent to the service where the
@@ -83,7 +83,7 @@ event is emitted.
 The Kafka sink also currently sends the binary size, but it looks like the estimated JSON bytesize is easily
 accessible at the point of emitting, so would not need too much of a change.
 
-To ensure that the correct metric is sent in a typesafe manner, we will wrap the estimated JSON size in a 
+To ensure that the correct metric is sent in a type-safe manner, we will wrap the estimated JSON size in a
 newtype:
 
 ```rust
@@ -95,12 +95,12 @@ The `EventsSent` metric will only accept this type.
 ## Rationale
 
 The ability to visualize data flowing through Vector will allow users to ascertain
-the effectiveness of the current use of Vector. This will enable users to 
+the effectiveness of the current use of Vector. This will enable users to
 optimise their configurations to make the best use of Vector's features.
 
 ## Drawbacks
 
-The additional tags being added to the metrics will increase the cardinality of 
+The additional tags being added to the metrics will increase the cardinality of
 those metrics if they are enabled.
 
 ## Prior Art
@@ -111,17 +111,17 @@ those metrics if they are enabled.
 We could use an alternative metric instead of estimated JSON size.
 
 - *Network bytes* This provides a more accurate picture of the actual data being received
-  and sent by Vector, but will regularly produce different sizes for an incoming event 
+  and sent by Vector, but will regularly produce different sizes for an incoming event
   to an outgoing event.
 - *In memory size* The size of the event as held in memory. This may be more accurate in
-  determining the amount of memory Vector will be utilizing at any time, will often be 
-  less accurate compared to the data being sent and recieved which is often JSON.
+  determining the amount of memory Vector will be utilizing at any time, will often be
+  less accurate compared to the data being sent and received which is often JSON.
 
 ## Outstanding Questions
 
-- Should the default be to not emit tags? Could the default be different for OP users and standard Vector 
+- Should the default be to not emit tags? Could the default be different for OP users and standard Vector
   users?
-- What should the source be tagged as for events that go through a transform that could potentially 
+- What should the source be tagged as for events that go through a transform that could potentially
   combine one event from multiple sources - eg. `reduce`?
 - What should the source be for events that come from no source (emitted by the `lua` transform)?
 - Not all sources will have a `service`. Should we default the service to a value, emit a null service tag
