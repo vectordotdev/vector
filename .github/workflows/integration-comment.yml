@@ -22,7 +22,7 @@ jobs:
   prep-pr:
     name: (PR comment) Signal pending to PR
     runs-on: ubuntu-latest
-    if: contains(github.event.comment.body, '/ci-deploy-integration-')))
+    if: contains(github.event.comment.body, '/ci-deploy-integration-')
     steps:
       # Find the branch that the comment was made in.
       - name: (PR comment) Get PR branch
