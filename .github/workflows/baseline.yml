@@ -1,9 +1,6 @@
-name: Baseline Timings
+name: Compilation Timings
 
-on:
-  workflow_dispatch
-  #schedule:
-  #  - cron: "0 */2 * * *"
+on: workflow_dispatch
 
 env:
   CI: true
