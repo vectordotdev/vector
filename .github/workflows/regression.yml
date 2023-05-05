@@ -177,7 +177,7 @@ jobs:
           echo "CHECKOUT_SHA=${{ github.sha }}" >> ${{ runner.temp }}/meta
           echo "HEAD_SHA=${{ github.event.merge_group.head_sha }}" >> ${{ runner.temp }}/meta
           echo "BASE_SHA=${{ github.event.merge_group.base_sha }}" >> ${{ runner.temp }}/meta
-          echo "GITHUB_EVENT_NUMBER=${{ github.event.number }}" >> ${{ runner.temp }}/meta
+          echo "GITHUB_EVENT_NUMBER=${{ needs.compute-metadata.outputs.pr-number }}" >> ${{ runner.temp }}/meta
 
       - name: Upload metadata
         uses: actions/upload-artifact@v3

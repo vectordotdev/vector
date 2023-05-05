@@ -38,6 +38,10 @@ env:
   CI: true
   PROFILE: debug
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.issue_comment.issue.id }}
+  cancel-in-progress: true
+
 jobs:
   prep-pr:
     name: (PR comment) Signal pending to PR

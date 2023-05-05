@@ -8,7 +8,7 @@ on:
 
 concurrency:
   # `github.event.number` exists for pull requests, otherwise fall back to SHA
-  group: ${{ github.workflow }}-${{ github.event.number || github.sha }}
+  group: ${{ github.workflow }}-${{ github.event.issue_comment.issue.id || github.event.merge_group.base_sha || github.sha }}
   cancel-in-progress: true
 
 env:

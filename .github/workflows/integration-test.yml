@@ -24,11 +24,6 @@ on:
         required: true
         type: string
 
-#concurrency:
-  # `github.event.number` exists for pull requests, otherwise fall back to SHA for merge queue
-#  group: ${{ github.workflow }}-${{ github.event.number || github.event.merge_group.base_sha }}
-#  cancel-in-progress: true
-
 env:
   AWS_ACCESS_KEY_ID: "dummy"
   AWS_SECRET_ACCESS_KEY: "dummy"
