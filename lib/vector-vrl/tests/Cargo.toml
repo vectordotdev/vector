@@ -7,7 +7,7 @@ publish = false
 
 [dependencies]
 enrichment = { path = "../../enrichment" }
-vrl = { path = "/home/nathan/repos/vrl", features = ["test_framework"]}
+vrl = { git = "https://github.com/vectordotdev/vrl", rev = "v0.3.0", features = ["test_framework"]}
 vector-vrl-functions = { path = "../../vector-vrl/functions" }
 
 ansi_term = "0.12"
@@ -19,7 +19,7 @@ prettydiff = "0.6"
 regex = "1"
 serde = "1"
 serde_json = "1"
-tracing-subscriber = { version = "0.3.16", default-features = false, features = ["fmt"] }
+tracing-subscriber = { version = "0.3.17", default-features = false, features = ["fmt"] }
 
 [target.'cfg(not(target_env = "msvc"))'.dependencies]
 tikv-jemallocator = { version = "0.5.0" }

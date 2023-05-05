@@ -5,9 +5,6 @@ cargo-timing*.html
 *~
 **/*.rs.bk
 .DS_Store
-.idea/
-.vscode/
-.helix/
 .dir-locals.el
 checkpoints/*
 miniodat

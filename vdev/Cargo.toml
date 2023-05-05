@@ -8,7 +8,7 @@ readme = "README.md"
 publish = false
 
 [dependencies]
-anyhow = "1.0.70"
+anyhow = "1.0.71"
 atty = "0.2.14"
 cached = "0.43.0"
 chrono = { version = "0.4.22", default-features = false, features = ["serde", "clock"] }
@@ -16,7 +16,7 @@ clap = { version = "4.1.14", features = ["derive"] }
 clap-verbosity-flag = "2.0.1"
 clap_complete = "4.2.1"
 confy = "0.5.1"
-directories = "5.0.0"
+directories = "5.0.1"
 # remove this when stabilized https://doc.rust-lang.org/stable/std/path/fn.absolute.html
 dunce = "1.0.4"
 glob = { version = "0.3.1", default-features = false }
