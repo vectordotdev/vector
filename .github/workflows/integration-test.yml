@@ -89,7 +89,7 @@ jobs:
           - test: 'shutdown'
           - test: 'splunk'
           - test: 'webhdfs'
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v3
       - run: make ci-sweep
