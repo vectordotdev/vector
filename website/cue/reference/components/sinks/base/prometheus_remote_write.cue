@@ -223,6 +223,18 @@ base: components: sinks: prometheus_remote_write: configuration: {
 			items: type: float: {}
 		}
 	}
+	compression: {
+		description: "Supported compression types for Prometheus Remote Write."
+		required:    false
+		type: string: {
+			default: "snappy"
+			enum: {
+				gzip:   "Gzip."
+				snappy: "Snappy."
+				zstd:   "Zstandard."
+			}
+		}
+	}
 	default_namespace: {
 		description: """
 			The default namespace for any metrics sent.
