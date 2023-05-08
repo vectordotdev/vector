@@ -643,7 +643,9 @@ jobs:
     name: Regression Detection Suite
     runs-on: ubuntu-latest
     if: always()
-    needs: detect-regression
+    needs:
+      - check-skipped
+      - detect-regression
     env:
       FAILED: ${{ contains(needs.*.result, 'failure') }}
     steps:
