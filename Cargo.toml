@@ -35,11 +35,15 @@ path = "src/config/loading/secret_backend_example.rs"
 test = false
 bench = false
 
+[profile.dev]
+lto = true
+
 # CI-based builds use full release optimization.  See scripts/environment/release-flags.sh.
 # This results in roughly a 5% reduction in performance when compiling locally vs when
 # compiled via the CI pipeline.
 [profile.release]
 debug = false # Do not include debug symbols in the executable.
+lto = true
 
 [profile.bench]
 debug = true
@@ -366,7 +370,6 @@ zstd = { version = "0.12.3", default-features = false }
 chrono = { git = "https://github.com/vectordotdev/chrono.git", tag = "v0.4.24-no-default-time-1" }
 # The upgrade for `tokio-util` >= 0.6.9 is blocked on https://github.com/vectordotdev/vector/issues/11257.
 tokio-util = { git = "https://github.com/vectordotdev/tokio", branch = "tokio-util-0.7.4-framed-read-continue-on-error" }
-nix = { git = "https://github.com/vectordotdev/nix.git", branch = "memfd/gnu/musl" }
 # The `heim` crates depend on `ntapi` 0.3.7 on Windows, but that version has an
 # unaligned access bug fixed in the following revision.
 ntapi = { git = "https://github.com/MSxDOS/ntapi.git", rev = "24fc1e47677fc9f6e38e5f154e6011dc9b270da6" }
