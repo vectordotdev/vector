@@ -150,7 +150,6 @@ jobs:
       with:
         base: ${{ inputs.base_ref }}
         ref: ${{ inputs.head_ref }}
-        # TODO check if worth keying off the other internal components that the k8s tests utilize, suspect not.
         filters: |
           source:
             - ".github/workflows/test.yml"

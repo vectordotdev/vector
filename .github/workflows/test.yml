@@ -108,8 +108,8 @@ jobs:
       - name: Check clippy
         if: needs.changes.outputs.source == 'true'
         run: make check-clippy
-      #- name: Check version
-      #  run: make check-version
+      - name: Check version
+        run: make check-version
       - name: Check scripts
         run: make check-scripts
       - name: Check events

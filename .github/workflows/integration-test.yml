@@ -71,8 +71,6 @@ jobs:
       - run: make test-integration-${{ inputs.test_name }}
         env:
           TEST_DATADOG_API_KEY: ${{ secrets.CI_TEST_DATADOG_API_KEY }}
-          # TODO: It looks like this used to be used but isn't anymore
-          #SPLUNK_VERSION: ${{ matrix.env.SPLUNK_VERSION }}
 
       - name: Upload test results
         run: scripts/upload-test-results.sh
@@ -82,5 +80,3 @@ jobs:
         if: ${{ always() }}
         env:
           TEST_DATADOG_API_KEY: ${{ secrets.CI_TEST_DATADOG_API_KEY }}
-          # TODO: It looks like this used to be used but isn't anymore
-          #SPLUNK_VERSION: ${{ matrix.env.SPLUNK_VERSION }}
