@@ -651,13 +651,27 @@ jobs:
       HEAD_SHA: ${{ needs.check-skipped.outputs.head-sha }}
     steps:
 
+      # - name: Submit result as success
+      #   if: github.event_name != 'pull_request' && needs.check-skipped.outputs.skipped == 'true' || !contains(needs.*.result, 'failure')
+      #   uses: myrotvorets/set-commit-status-action@master
+      #   with:
+      #     sha: ${{ env.HEAD_SHA }}
+      #     token: ${{ secrets.GITHUB_TOKEN }}
+      #     status: 'success'
+
       - name: Submit result as success
         if: github.event_name != 'pull_request' && needs.check-skipped.outputs.skipped == 'true' || !contains(needs.*.result, 'failure')
-        uses: myrotvorets/set-commit-status-action@master
-        with:
-          sha: ${{ env.HEAD_SHA }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-          status: 'success'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api \
+            --method POST \
+            -H "Accept: application/vnd.github+json" \
+            /repos/${{ github.repository }}/statuses/${{ env.HEAD_SHA }} \
+            -f state='success' \
+            -f description='Regression detection skipped or succeeded.' \
+            -f context='Regression Detector / regression-check' \
+            -f target_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
       - name: Submit result as failure
         if: github.event_name != 'pull_request' && needs.check-skipped.outputs.skipped != 'true' && contains(needs.*.result, 'failure')
