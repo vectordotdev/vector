@@ -213,12 +213,6 @@ jobs:
           - test_name: 'webhdfs'
             if: ${{ needs.changes.outputs.webhdfs == 'true' }}
 
-  regression-check:
-    runs-on: ubuntu-latest
-    needs: changes
-    steps:
-      - run: echo "OK"
-
   # Always run this so that pull_request triggers are marked as success.
   master-merge-queue-check:
     name: Master Merge Queue Suite
@@ -237,7 +231,6 @@ jobs:
       - install-sh
       - k8s
       - integration
-      - regression-check
     env:
       FAILED: ${{ contains(needs.*.result, 'failure') }}
     steps:
