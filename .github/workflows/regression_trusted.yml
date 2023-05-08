@@ -699,7 +699,7 @@ jobs:
   #         token: ${{ secrets.GITHUB_TOKEN }}
   #         status: 'failure'
 
-      - name: exit
+      - name: regression-check
         run: |
           echo "failed=${{ contains(needs.*.result, 'failure') }}"
           if [[ "$FAILED" == "true" ]] ; then
