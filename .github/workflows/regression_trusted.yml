@@ -5,15 +5,12 @@ on:
     workflows: ["Regression Detector"]
     types:
       - completed
-  merge_group:
-    types: [checks_requested]
 
 jobs:
   compute-metadata:
     name: Compute metadata for regression experiments
     runs-on: ubuntu-22.04
-    if: |
-      github.event_name != 'merge_group' &&
+    if: >
       github.event.workflow_run.event == 'pull_request' &&
       github.event.workflow_run.conclusion == 'success'
     outputs:
@@ -596,10 +593,3 @@ jobs:
             -f description='Analyze experimental results from Regression Detector failed.' \
             -f context='Regression Detector / analyze-experiment' \
             -f target_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-
-  regression-check:
-    runs-on: ubuntu-latest
-    if: always()
-    needs: detect-regression
-    steps:
-      - run: echo "OK"
