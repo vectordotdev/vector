@@ -210,3 +210,10 @@ jobs:
         with:
           name: meta
           path: "${{ runner.temp }}/meta"
+
+  always:
+    name: Always run
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - run: echo "OK"

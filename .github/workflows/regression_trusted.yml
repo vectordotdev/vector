@@ -598,7 +598,7 @@ jobs:
             -f context='Regression Detector / analyze-experiment' \
             -f target_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
-  # Always run this so that pull_request triggers are marked as success.
+  # Always run this so that pull_request triggers or merge queue changes not requiring regression run are marked as success.
   regression-check:
     name: Regression Detection Suite
     runs-on: ubuntu-latest
