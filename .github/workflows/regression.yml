@@ -20,11 +20,41 @@ on:
   merge_group:
     types: [checks_requested]
 
-# TODO need to add filter on changes
 
 jobs:
-  cancel-previous:
+  # Only run this workflow if files changed in areas that could possibly introduce a regression
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      source: ${{ steps.filter.outputs.source }}
+    steps:
+    - uses: actions/checkout@v3
+
+    - uses: dorny/paths-filter@v2
+      id: filter
+      with:
+        # TODO need to adapt this when add trigger comment
+        base: ${{ github.event.merge_group.base_ref }}
+        ref: ${{ github.event.merge_group.head_ref }}
+        filters: |
+          source:
+            - ".cargo/**"
+            - "benches/**"
+            - "lib/**"
+            - "proto/**"
+            - "scripts/**"
+            - "src/**"
+            - "tests/**"
+            - "build.rs"
+            - "Cargo.lock"
+            - "Cargo.toml"
+            - "Makefile"
+            - "rust-toolchain.toml"
+            - "vdev/**"
+
+    cancel-previous:
     runs-on: ubuntu-22.04
+    needs: changes
     timeout-minutes: 3
     steps:
       - uses: styfle/cancel-workflow-action@0.11.0
@@ -32,9 +62,11 @@ jobs:
           access_token: ${{ secrets.GITHUB_TOKEN }}
           all_but_latest: true # can cancel workflows scheduled later
 
+
   compute-metadata:
     name: Compute metadata for regression experiments
     runs-on: ubuntu-22.04
+    needs: changes
     outputs:
       pr-number: ${{ steps.pr-metadata.outputs.PR_NUMBER }}
       comparison-sha: ${{ steps.comparison.outputs.COMPARISON }}
