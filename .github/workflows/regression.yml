@@ -16,13 +16,12 @@
 name: Regression Detector
 
 on:
-  pull_request:
-    paths-ignore:
-      - "docs/**"
-      - "rfcs/**"
-      - "website/**"
-  merge_group:
-    types: [checks_requested]
+  workflow_dispatch:
+  # pull_request:
+  #   paths-ignore:
+  #     - "docs/**"
+  #     - "rfcs/**"
+  #     - "website/**"
 
 jobs:
   cancel-previous:
