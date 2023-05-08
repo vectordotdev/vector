@@ -22,7 +22,8 @@ on:
     types: [checks_requested]
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.issue_comment.issue.id || github.event.merge_group.base_sha }}
+  # TODO need to adapt this when add trigger comment
+  group: ${{ github.workflow }}-${{ github.event.merge_group.base_sha }}
   cancel-in-progress: true
 
 jobs:
@@ -56,7 +57,7 @@ jobs:
             - "rust-toolchain.toml"
             - "vdev/**"
 
-    cancel-previous:
+  cancel-previous:
     runs-on: ubuntu-22.04
     needs: changes
     if: needs.changes.outputs.source == 'true'
@@ -84,6 +85,7 @@ jobs:
         run: |
           echo PR_NUMBER=$(echo "${{github.ref}}" | sed -n 's|^refs/heads/gh-readonly-queue/master/pr-\([0-9]*\)-.*$|\1|p') >> $GITHUB_OUTPUT
 
+        # TODO need to adapt this when add trigger comment
       - name: Setup baseline variables
         id: baseline
         run: |
