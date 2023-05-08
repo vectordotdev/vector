@@ -43,8 +43,6 @@ jobs:
       CARGO_INCREMENTAL: 0
     if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
-      # - name: mock
-      #   run: echo "OK"
       - uses: actions/checkout@v3
       - uses: actions/cache@v3
         name: Cache Cargo registry + index
@@ -74,8 +72,6 @@ jobs:
     needs: changes
     if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.cue == 'true' }}
     steps:
-      # - name: mock
-      #   run: echo "OK"
       - uses: actions/checkout@v3
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
@@ -88,9 +84,6 @@ jobs:
     env:
       CARGO_INCREMENTAL: 0
     steps:
-      # - name: mock
-      #   run: echo "OK"
-
       - uses: actions/checkout@v3
         with:
           # check-version needs tags

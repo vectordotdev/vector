@@ -64,9 +64,6 @@ jobs:
         if: ${{ github.event_name != 'issue_comment' }}
         uses: actions/checkout@v3
 
-      # - name: mock
-      #   run: echo "${{ inputs.test_name }}"
-
       - run: make ci-sweep
 
       - run: sudo npm -g install @datadog/datadog-ci
