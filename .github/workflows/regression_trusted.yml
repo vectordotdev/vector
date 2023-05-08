@@ -56,7 +56,7 @@ jobs:
     name: Compute metadata for regression experiments
     runs-on: ubuntu-22.04
     needs: check-skipped
-    if: github.event_name != 'pull_request' && github.event.workflow_run.conclusion == 'success' && needs.outputs.skipped != 'true'
+    if: github.event_name != 'pull_request' && github.event.workflow_run.conclusion == 'success' && needs.check-skipped.outputs.skipped != 'true'
     outputs:
       cpus: ${{ steps.system.outputs.CPUS }}
       memory: ${{ steps.system.outputs.MEMORY }}
