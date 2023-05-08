@@ -1,8 +1,6 @@
 name: Regression Detector (trusted)
 
 on:
-  # TODO temp to test
-  pull_request:
   workflow_run:
     workflows: ["Regression Detector"]
     types:
