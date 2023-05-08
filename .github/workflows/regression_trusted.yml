@@ -13,6 +13,7 @@ jobs:
   # The output 'skipped' will only be true if the previous worflow did not detect file changes requiring the regression detection to run.
   check-skipped:
     runs-on: ubuntu-22.04
+    if: github.event_name != 'pull_request'
     outputs:
       skipped: ${{ steps.metadata.outputs.SKIPPED }}
       head-sha: ${{ steps.metadata.outputs.HEAD_SHA}}
