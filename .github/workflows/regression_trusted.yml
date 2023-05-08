@@ -12,7 +12,7 @@ on:
 jobs:
   # The output 'skipped' will only be true if the previous worflow did not detect file changes requiring the regression detection to run.
   check-skipped:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     outputs:
       skipped: ${{ steps.metadata.outputs.SKIPPED }}
       head-sha: ${{ steps.metadata.outputs.HEAD_SHA}}
@@ -642,7 +642,7 @@ jobs:
   # Always run this so that pull_request triggers or merge queue changes not requiring regression run are marked as success.
   regression-check:
     name: Regression Detection Suite
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     if: always()
     needs:
       - check-skipped
