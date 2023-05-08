@@ -54,8 +54,8 @@ on:
         value: ${{ jobs.changes.outputs.docker-logs}}
       elasticsearch:
         value: ${{ jobs.changes.outputs.elasticsearch}}
-      eventsoredb:
-        value: ${{ jobs.changes.outputs.eventsoredb}}
+      eventstoredb:
+        value: ${{ jobs.changes.outputs.eventstoredb}}
       fluent:
         value: ${{ jobs.changes.outputs.fluent}}
       gcp:
@@ -122,7 +122,7 @@ jobs:
       dnstap: ${{ steps.filter.outputs.dnstap }}
       docker-logs: ${{ steps.filter.outputs.docker-logs }}
       elasticsearch: ${{ steps.filter.outputs.elasticsearch }}
-      evenstoredb: ${{ steps.filter.outputs.evenstoredb }}
+      eventstoredb: ${{ steps.filter.outputs.eventstoredb }}
       fluent: ${{ steps.filter.outputs.fluent }}
       gcp: ${{ steps.filter.outputs.gcp }}
       humio: ${{ steps.filter.outputs.humio }}
