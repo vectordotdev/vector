@@ -57,6 +57,22 @@ jobs:
             - "rust-toolchain.toml"
             - "vdev/**"
 
+  # Signal to trusted workflow to skip
+  changes:
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.source != true
+    steps:
+    - name: Write out metadata skipped
+      run: |
+        echo "SKIPPED=true" >> ${{ runner.temp }}/meta
+
+    - name: Upload metadata
+      uses: actions/upload-artifact@v3
+      with:
+        name: meta
+        path: "${{ runner.temp }}/meta"
+
   cancel-previous:
     runs-on: ubuntu-22.04
     needs: changes
@@ -210,10 +226,3 @@ jobs:
         with:
           name: meta
           path: "${{ runner.temp }}/meta"
-
-  always:
-    name: Always run
-    runs-on: ubuntu-latest
-    if: always()
-    steps:
-      - run: echo "OK"
