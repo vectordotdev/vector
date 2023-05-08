@@ -1,22 +1,18 @@
 name: Regression Detector (trusted)
 
 on:
-  # Don't want to run for each PR, but because GH doesn't allow specifying different required checks
-  # for pull request and merge queue, we need to "run" it in pull request, but in the jobs we will just auto pass.
-  pull_request:
   workflow_run:
     workflows: ["Regression Detector"]
     types:
       - completed
 
 jobs:
-  # This is the entry job which is required for all subsequent jobs in the workflow.
-  # If we don't run this job (such as in a pull request), then by consequence all downstream
-  # test jobs are not run. This allows us to not have to check for merge group in each job.
   compute-metadata:
     name: Compute metadata for regression experiments
     runs-on: ubuntu-22.04
-    if: github.event_name != 'pull_request' && github.event.workflow_run.conclusion == 'success'
+    if: >
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.conclusion == 'success'
     outputs:
       cpus: ${{ steps.system.outputs.CPUS }}
       memory: ${{ steps.system.outputs.MEMORY }}
@@ -93,7 +89,7 @@ jobs:
             var artifacts = await github.rest.actions.listWorkflowRunArtifacts({
                owner: context.repo.owner,
                repo: context.repo.repo,
-               run_id: ${{ github.event.workflow_run.id }},
+               run_id: ${{github.event.workflow_run.id }},
             });
 
             var matchArtifact = artifacts.data.artifacts.filter((artifact) => {
@@ -163,7 +159,7 @@ jobs:
             var artifacts = await github.rest.actions.listWorkflowRunArtifacts({
                owner: context.repo.owner,
                repo: context.repo.repo,
-               run_id: ${{ github.event.workflow_run.id }},
+               run_id: ${{github.event.workflow_run.id }},
             });
 
             var matchArtifact = artifacts.data.artifacts.filter((artifact) => {
@@ -231,7 +227,7 @@ jobs:
             var artifacts = await github.rest.actions.listWorkflowRunArtifacts({
                owner: context.repo.owner,
                repo: context.repo.repo,
-               run_id: ${{ github.event.workflow_run.id }},
+               run_id: ${{github.event.workflow_run.id }},
             });
 
             var matchArtifact = artifacts.data.artifacts.filter((artifact) => {
@@ -597,21 +593,3 @@ jobs:
             -f description='Analyze experimental results from Regression Detector failed.' \
             -f context='Regression Detector / analyze-experiment' \
             -f target_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-
-  # Always run this so that pull_request triggers are marked as success.
-  regression-check:
-    name: Regression Detection Suite
-    runs-on: ubuntu-latest
-    if: always()
-    needs: detect-regression
-    env:
-      FAILED: ${{ contains(needs.*.result, 'failure') }}
-    steps:
-      - name: exit
-        run: |
-          echo "failed=${{ env.FAILED }}"
-          if [[ "$FAILED" == "true" ]] ; then
-            exit 1
-          else
-            exit 0
-          fi
