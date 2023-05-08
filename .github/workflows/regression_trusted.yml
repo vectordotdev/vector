@@ -664,7 +664,7 @@ jobs:
     needs:
       - check-skipped
       - detect-regression
-    env:
+    #env:
       #HEAD_SHA: ${{ needs.check-skipped.outputs.head-sha }}
     steps:
 
