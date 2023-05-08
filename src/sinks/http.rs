@@ -29,6 +29,8 @@ use crate::{
     tls::{TlsConfig, TlsSettings},
 };
 
+use super::util::zstd::ZstdEncoder;
+
 /// Configuration for the `http` sink.
 #[configurable_component(sink("http"))]
 #[derive(Clone, Debug)]
@@ -391,7 +393,15 @@ impl util::http::HttpSink for HttpSink {
                 let mut w = ZlibEncoder::new(buffer.writer(), level.as_flate2());
                 w.write_all(&body).expect("Writing to Vec can't fail");
                 body = w.finish().expect("Writing to Vec can't fail").into_inner();
-            }
+            },
+            Compression::Zstd(level) => {
+                builder = builder.header("Content-Encoding", "zstd");
+
+                let buffer = BytesMut::new();
+                let mut w = ZstdEncoder::new(buffer.writer(), level)?;
+                w.write_all(&body).expect("Writing to Vec can't fail");
+                body = w.finish().expect("Writing to Vec can't fail").into_inner();
+            },
             Compression::None => {}
         }
 

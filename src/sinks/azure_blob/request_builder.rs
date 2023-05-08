@@ -106,6 +106,7 @@ impl Compression {
             Self::None => "text/plain",
             Self::Gzip(_) => "application/gzip",
             Self::Zlib(_) => "application/zlib",
+            Self::Zstd(_) => "application/zstd",
         }
     }
 }

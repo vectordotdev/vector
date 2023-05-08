@@ -13,6 +13,8 @@ use vector_config::{
 };
 use vector_config_common::attributes::CustomAttribute;
 
+use crate::sinks::util::zstd::DEFAULT_COMPRESSION_LEVEL;
+
 /// Compression configuration.
 #[derive(Copy, Clone, Debug, Derivative, Eq, PartialEq)]
 #[derivative(Default)]
@@ -30,6 +32,11 @@ pub enum Compression {
     ///
     /// [zlib]: https://zlib.net/
     Zlib(CompressionLevel),
+
+    /// [Zstandard][zstd] compression.
+    ///
+    /// [zstd]: https://facebook.github.io/zstd/
+    Zstd(i32),
 }
 
 impl Compression {
@@ -58,6 +65,7 @@ impl Compression {
             Self::None => None,
             Self::Gzip(_) => Some("gzip"),
             Self::Zlib(_) => Some("deflate"),
+            Self::Zstd(_) => Some("zstd"),
         }
     }
 
@@ -65,6 +73,7 @@ impl Compression {
         match self {
             Self::Gzip(_) => Some("gzip"),
             Self::Zlib(_) => Some("deflate"),
+            Self::Zstd(_) => Some("zstd"),
             _ => None,
         }
     }
@@ -74,12 +83,14 @@ impl Compression {
             Self::None => "log",
             Self::Gzip(_) => "log.gz",
             Self::Zlib(_) => "log.zz",
+            Self::Zstd(_) => "log.zst",
         }
     }
 
     pub const fn level(self) -> flate2::Compression {
         match self {
             Self::None => flate2::Compression::none(),
+            Self::Zstd(level) => flate2::Compression::new(level as u32), 
             Self::Gzip(level) | Self::Zlib(level) => level.as_flate2(),
         }
     }
@@ -91,6 +102,7 @@ impl fmt::Display for Compression {
             Compression::None => write!(f, "none"),
             Compression::Gzip(ref level) => write!(f, "gzip({})", level.as_flate2().level()),
             Compression::Zlib(ref level) => write!(f, "zlib({})", level.as_flate2().level()),
+            Compression::Zstd(ref level) => write!(f, "zstd({})", level),
         }
     }
 }
@@ -200,6 +212,16 @@ impl ser::Serialize for Compression {
                     map.end()
                 } else {
                     serializer.serialize_str("zlib")
+                }
+            },
+            Compression::Zstd(zstd_level) => {
+                if *zstd_level != DEFAULT_COMPRESSION_LEVEL {
+                    let mut map = serializer.serialize_map(None)?;
+                    map.serialize_entry("algorithm", "zstd")?;
+                    map.serialize_entry("level", &zstd_level)?;
+                    map.end()
+                } else {
+                    serializer.serialize_str("zstd")
                 }
             }
         }
@@ -548,6 +570,7 @@ mod test {
             Compression::Gzip(CompressionLevel::new(7)),
             Compression::Zlib(CompressionLevel::best()),
             Compression::Zlib(CompressionLevel::new(7)),
+            Compression::Zstd(6),
         ];
 
         for v in fixtures_valid {
