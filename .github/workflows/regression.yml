@@ -19,21 +19,8 @@ on:
   # TODO need to trigger this on PR comment.
   merge_group:
     types: [checks_requested]
-  # workflow_call:
-  #   inputs:
-  #     base_sha:
-  #       required: true
-  #       type: string
-  #     head_sha:
-  #       required: true
-  #       type: string
-  #     pr_number:
-  #       required: true
-  #       type: string
-  #   outputs:
-  #     run_id:
-  #       value: $ {{ }}
 
+# TODO need to add filter on changes
 
 jobs:
   cancel-previous:
