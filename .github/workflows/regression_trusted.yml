@@ -458,10 +458,13 @@ jobs:
     needs:
       - submit-job
       - compute-metadata
+    #if: always()
     steps:
+
       - uses: actions/checkout@v3
 
       - name: Configure AWS Credentials
+        #if: needs.submit-job.result != 'skipped'
         uses: aws-actions/configure-aws-credentials@v2.0.0
         with:
           aws-access-key-id: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_ACCESS_KEY_ID }}
@@ -469,6 +472,7 @@ jobs:
           aws-region: us-west-2
 
       - name: Download SMP binary
+        #if: needs.submit-job.result != 'skipped'
         run: |
           aws s3 cp s3://smp-cli-releases/v${{ needs.compute-metadata.outputs.smp-version }}/x86_64-unknown-linux-gnu/smp ${{ runner.temp }}/bin/smp
 
@@ -479,6 +483,7 @@ jobs:
           path: ${{ runner.temp }}/
 
       - name: Determine if PR introduced a regression
+        #if: needs.submit-job.result != 'skipped'
         env:
           RUST_LOG: info
         run: |
@@ -488,7 +493,8 @@ jobs:
             --submission-metadata ${{ runner.temp }}/submission-metadata
 
       - name: Check status, cancelled
-        if: ${{ cancelled() }}
+        #if: needs.submit-job.result != 'skipped' && cancelled()
+        if: cancelled()
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -502,6 +508,7 @@ jobs:
             -f target_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
       - name: Check status, success
+        #if: needs.submit-job.result != 'skipped'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -515,7 +522,8 @@ jobs:
             -f target_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
       - name: Check status, failure
-        if: ${{ failure() }}
+        #if: needs.submit-job.result != 'skipped' && failure()
+        if: failure()
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -527,6 +535,15 @@ jobs:
             -f description='Analyze experimental results from Regression Detector failed.' \
             -f context='Regression Detector / detect-regression' \
             -f target_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+      # - name: exit
+      #   run: |
+      #     echo "failed=${{ contains(needs.*.result, 'failure') }}"
+      #     if [[ "$FAILED" == "true" ]] ; then
+      #       exit 1
+      #     else
+      #       exit 0
+      #     fi
 
   analyze-experiment:
     name: Download regression analysis & upload report
@@ -648,38 +665,38 @@ jobs:
       - check-skipped
       - detect-regression
     env:
-      HEAD_SHA: ${{ needs.check-skipped.outputs.head-sha }}
+      #HEAD_SHA: ${{ needs.check-skipped.outputs.head-sha }}
     steps:
 
-      # - name: Submit result as success
-      #   if: github.event_name != 'pull_request' && needs.check-skipped.outputs.skipped == 'true' || !contains(needs.*.result, 'failure')
-      #   uses: myrotvorets/set-commit-status-action@master
-      #   with:
-      #     sha: ${{ env.HEAD_SHA }}
-      #     token: ${{ secrets.GITHUB_TOKEN }}
-      #     status: 'success'
+  #     # - name: Submit result as success
+  #     #   if: github.event_name != 'pull_request' && needs.check-skipped.outputs.skipped == 'true' || !contains(needs.*.result, 'failure')
+  #     #   uses: myrotvorets/set-commit-status-action@master
+  #     #   with:
+  #     #     sha: ${{ env.HEAD_SHA }}
+  #     #     token: ${{ secrets.GITHUB_TOKEN }}
+  #     #     status: 'success'
 
-      - name: Submit result as success
-        if: github.event_name != 'pull_request' && needs.check-skipped.outputs.skipped == 'true' || !contains(needs.*.result, 'failure')
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh api \
-            --method POST \
-            -H "Accept: application/vnd.github+json" \
-            /repos/${{ github.repository }}/statuses/${{ env.HEAD_SHA }} \
-            -f state='success' \
-            -f description='Regression detection skipped or succeeded.' \
-            -f context='Regression Detector / regression-check' \
-            -f target_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+  #     - name: Submit result as success
+  #       if: github.event_name != 'pull_request' && needs.check-skipped.outputs.skipped == 'true' || !contains(needs.*.result, 'failure')
+  #       env:
+  #         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  #       run: |
+  #         gh api \
+  #           --method POST \
+  #           -H "Accept: application/vnd.github+json" \
+  #           /repos/${{ github.repository }}/statuses/${{ env.HEAD_SHA }} \
+  #           -f state='success' \
+  #           -f description='Regression detection skipped or succeeded.' \
+  #           -f context='Regression Detector / regression-check' \
+  #           -f target_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
-      - name: Submit result as failure
-        if: github.event_name != 'pull_request' && needs.check-skipped.outputs.skipped != 'true' && contains(needs.*.result, 'failure')
-        uses: myrotvorets/set-commit-status-action@master
-        with:
-          sha: ${{ env.HEAD_SHA }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-          status: 'failure'
+  #     - name: Submit result as failure
+  #       if: github.event_name != 'pull_request' && needs.check-skipped.outputs.skipped != 'true' && contains(needs.*.result, 'failure')
+  #       uses: myrotvorets/set-commit-status-action@master
+  #       with:
+  #         sha: ${{ env.HEAD_SHA }}
+  #         token: ${{ secrets.GITHUB_TOKEN }}
+  #         status: 'failure'
 
       - name: exit
         run: |
