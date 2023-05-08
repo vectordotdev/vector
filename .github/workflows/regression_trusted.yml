@@ -15,6 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       skipped: ${{ steps.metadata.outputs.SKIPPED }}
+      head-sha: ${{ steps.metadata.outputs.HEAD_SHA}}
     steps:
       - name: 'Download metadata'
         uses: actions/github-script@v6.4.1
@@ -647,11 +648,28 @@ jobs:
       - check-skipped
       - detect-regression
     env:
-      FAILED: ${{ contains(needs.*.result, 'failure') }}
+      HEAD_SHA: ${{ needs.check-skipped.outputs.head-sha }}
     steps:
+
+      - name: Submit result as success
+        if: github.event_name != 'pull_request' && needs.check-skipped.outputs.skipped == 'true' || !contains(needs.*.result, 'failure')
+        uses: myrotvorets/set-commit-status-action@master
+        with:
+          sha: ${{ env.HEAD_SHA }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          status: 'success'
+
+      - name: Submit result as failure
+        if: github.event_name != 'pull_request' && needs.check-skipped.outputs.skipped != 'true' && contains(needs.*.result, 'failure')
+        uses: myrotvorets/set-commit-status-action@master
+        with:
+          sha: ${{ env.HEAD_SHA }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          status: 'failure'
+
       - name: exit
         run: |
-          echo "failed=${{ env.FAILED }}"
+          echo "failed=${{ contains(needs.*.result, 'failure') }}"
           if [[ "$FAILED" == "true" ]] ; then
             exit 1
           else

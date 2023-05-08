@@ -66,6 +66,7 @@ jobs:
     - name: Write out metadata skipped
       run: |
         echo "SKIPPED=true" >> ${{ runner.temp }}/meta
+        echo "HEAD_SHA=${{ github.event.merge_group.head_sha }}" >> ${{ runner.temp }}/meta
 
     - name: Upload metadata
       uses: actions/upload-artifact@v3
