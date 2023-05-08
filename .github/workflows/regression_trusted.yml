@@ -659,7 +659,6 @@ jobs:
 
   # Always run this so that pull_request triggers or merge queue changes not requiring regression run are marked as success.
   regression-check:
-    name: Regression Detection Suite
     runs-on: ubuntu-22.04
     if: always()
     needs:
