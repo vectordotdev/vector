@@ -4110,7 +4110,7 @@ checksum = "cef509aa9bc73864d6756f0d34d35504af3cf0844373afe9b8669a5b8005a729"
 dependencies = [
  "console",
  "number_prefix",
- "portable-atomic",
+ "portable-atomic 0.3.15",
  "unicode-segmentation",
  "unicode-width",
 ]
@@ -4901,8 +4901,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7b9b8653cec6897f73b519a43fba5ee3d50f62fe9af80b428accdcc093b4a849"
 dependencies = [
  "ahash 0.7.6",
- "metrics-macros",
- "portable-atomic",
+ "metrics-macros 0.6.0",
+ "portable-atomic 0.3.15",
+]
+
+[[package]]
+name = "metrics"
+version = "0.21.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "aa8ebbd1a9e57bbab77b9facae7f5136aea44c356943bf9a198f647da64285d6"
+dependencies = [
+ "ahash 0.8.2",
+ "metrics-macros 0.7.0",
+ "portable-atomic 1.3.1",
 ]
 
 [[package]]
@@ -4917,6 +4928,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "metrics-macros"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ddece26afd34c31585c74a4db0630c376df271c285d682d1e55012197830b6df"
+dependencies = [
+ "proc-macro2 1.0.56",
+ "quote 1.0.26",
+ "syn 2.0.10",
+]
+
+[[package]]
 name = "metrics-tracing-context"
 version = "0.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4924,8 +4946,8 @@ checksum = "6097e2772147f332c9aedba572e9cd334b7946e1762d8ae4d05db0faf962542a"
 dependencies = [
  "itoa",
  "lockfree-object-pool",
- "metrics",
- "metrics-util",
+ "metrics 0.20.1",
+ "metrics-util 0.14.0",
  "once_cell",
  "tracing 0.1.37",
  "tracing-core 0.1.30",
@@ -4943,14 +4965,29 @@ dependencies = [
  "crossbeam-utils",
  "hashbrown 0.12.3",
  "indexmap",
- "metrics",
+ "metrics 0.20.1",
  "num_cpus",
  "ordered-float 2.10.0",
  "parking_lot",
- "portable-atomic",
+ "portable-atomic 0.3.15",
  "quanta 0.10.1",
  "radix_trie",
  "sketches-ddsketch",
+]
+
+[[package]]
+name = "metrics-util"
+version = "0.15.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "111cb375987443c3de8d503580b536f77dc8416d32db62d9456db5d93bd7ac47"
+dependencies = [
+ "crossbeam-epoch",
+ "crossbeam-utils",
+ "hashbrown 0.13.2",
+ "indexmap",
+ "metrics 0.21.0",
+ "num_cpus",
+ "ordered-float 3.7.0",
 ]
 
 [[package]]
@@ -6041,6 +6078,12 @@ name = "portable-atomic"
 version = "0.3.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "15eb2c6e362923af47e13c23ca5afb859e83d54452c55b0b9ac763b8f7c1ac16"
+
+[[package]]
+name = "portable-atomic"
+version = "1.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1bbda379e6e462c97ea6afe9f6233619b202bbc4968d7caa6917788d2070a044"
 
 [[package]]
 name = "portpicker"
@@ -9237,7 +9280,7 @@ dependencies = [
  "lru",
  "maxminddb",
  "md-5",
- "metrics",
+ "metrics 0.20.1",
  "metrics-tracing-context",
  "mlua",
  "mongodb",
@@ -9376,9 +9419,9 @@ dependencies = [
  "futures 0.3.28",
  "hdrhistogram",
  "memmap2",
- "metrics",
+ "metrics 0.20.1",
  "metrics-tracing-context",
- "metrics-util",
+ "metrics-util 0.15.0",
  "num-traits",
  "once_cell",
  "pin-project",
@@ -9414,7 +9457,7 @@ dependencies = [
  "derivative",
  "futures 0.3.28",
  "indexmap",
- "metrics",
+ "metrics 0.20.1",
  "nom",
  "ordered-float 3.7.0",
  "paste",
@@ -9515,9 +9558,9 @@ dependencies = [
  "http",
  "hyper-proxy",
  "indexmap",
- "metrics",
+ "metrics 0.20.1",
  "metrics-tracing-context",
- "metrics-util",
+ "metrics-util 0.15.0",
  "mlua",
  "ndarray",
  "ndarray-stats",
