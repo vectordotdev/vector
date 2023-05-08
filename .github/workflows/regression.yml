@@ -58,7 +58,7 @@ jobs:
             - "vdev/**"
 
   # Signal to trusted workflow to skip
-  changes:
+  mark-skipped:
     runs-on: ubuntu-latest
     needs: changes
     if: needs.changes.outputs.source != true
