@@ -346,9 +346,6 @@ jobs:
       - name: Check cargo deny advisories/licenses
         if: needs.changes.outputs.dependencies == 'true' || needs.changes.outputs.deny == 'true'
         run: make check-deny
-      - name: Install the 3rd-party license tool
-        if: needs.changes.outputs.dependencies == 'true'
-        run: cargo install --git https://github.com/DataDog/rust-license-tool
       - name: Check that the 3rd-party license file is up to date
         if: needs.changes.outputs.dependencies == 'true'
         run: make check-licenses
