@@ -456,7 +456,7 @@ jobs:
             /repos/${{ github.repository }}/statuses/${{ needs.compute-metadata.outputs.head-sha }} \
             -f state='failure' \
             -f description='Analyze experimental results from Regression Detector cancelled.' \
-            -f context='Regression Detector / detect-regression' \
+            -f context='regression-check' \
             -f target_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
       - name: Check status, success
@@ -469,7 +469,7 @@ jobs:
             /repos/${{ github.repository }}/statuses/${{ needs.compute-metadata.outputs.head-sha }} \
             -f state='success' \
             -f description='Analyze experimental results from Regression Detector succeeded.' \
-            -f context='Regression Detector / detect-regression' \
+            -f context='regression-check' \
             -f target_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
       - name: Check status, failure
@@ -481,9 +481,9 @@ jobs:
             --method POST \
             -H "Accept: application/vnd.github+json" \
             /repos/${{ github.repository }}/statuses/${{ needs.compute-metadata.outputs.head-sha }} \
-            -f state='success' \
+            -f state='failure' \
             -f description='Analyze experimental results from Regression Detector failed.' \
-            -f context='Regression Detector / detect-regression' \
+            -f context='regression-check' \
             -f target_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
   analyze-experiment:
@@ -592,7 +592,7 @@ jobs:
             --method POST \
             -H "Accept: application/vnd.github+json" \
             /repos/${{ github.repository }}/statuses/${{ needs.compute-metadata.outputs.head-sha }} \
-            -f state='success' \
+            -f state='failure' \
             -f description='Analyze experimental results from Regression Detector failed.' \
             -f context='Regression Detector / analyze-experiment' \
             -f target_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
@@ -600,6 +600,17 @@ jobs:
   regression-check:
     runs-on: ubuntu-latest
     if: always()
-    needs: detect-regression
+    needs:
+      - compute-metadata
+      - detect-regression
+    env:
+      FAILED: ${{ contains(needs.*.result, 'failure') }}
     steps:
-      - run: echo "OK"
+      - name: exit
+        run: |
+          echo "failed=${{ env.FAILED }}"
+          if [[ "$FAILED" == "true" ]] ; then
+            exit 1
+          else
+            exit 0
+          fi
