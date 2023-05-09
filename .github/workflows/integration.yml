@@ -8,7 +8,6 @@ on:
   pull_request:
   merge_group:
     types: [checks_requested]
-      
 
 concurrency:
   # `github.event.number` exists for pull requests, otherwise fall back to SHA for merge queue
