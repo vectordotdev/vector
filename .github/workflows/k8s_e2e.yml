@@ -226,20 +226,31 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           status: 'failure'
 
-  update-pr-status:
-    name: (PR comment) Signal result to PR
-    runs-on: ubuntu-20.04
+  final-result:
+    name: K8s E2E Test Suite
+    runs-on: ubuntu-latest
     needs: test-e2e-kubernetes
-    if: success() && github.event_name == 'issue_comment'
+    if: always()
+    env:
+      FAILED: ${{ contains(needs.*.result, 'failure') }}
     steps:
-      # Find the branch that the comment was made in.
       - name: (PR comment) Get PR branch
+        if: success() && github.event_name == 'issue_comment'
         uses: xt0rted/pull-request-comment-branch@v1
         id: comment-branch
 
       - name: (PR comment) Submit PR result as success
+        if: success() && github.event_name == 'issue_comment'
         uses: myrotvorets/set-commit-status-action@1.1.6
         with:
           sha: ${{ steps.comment-branch.outputs.head_sha }}
           token: ${{ secrets.GITHUB_TOKEN }}
           status: 'success'
+
+      - run: |
+          echo "failed=${{ env.FAILED }}"
+          if [[ "$FAILED" == "true" ]] ; then
+            exit 1
+          else
+            exit 0
+          fi
