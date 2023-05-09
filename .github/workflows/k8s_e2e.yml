@@ -1,14 +1,16 @@
 name: K8S E2E Suite
 
 on:
-  workflow_call:
   workflow_dispatch:
+  pull_request:
   issue_comment:
     types: [created]
+  merge_group:
+    types: [checks_requested]
 
 concurrency:
-  # `github.event.number` exists for pull requests, otherwise fall back to SHA
-  group: ${{ github.workflow }}-${{ github.event.issue_comment.issue.id || github.event.merge_group.base_sha || github.sha }}
+  # `github.event.number` exists for PRs, issue.id for comments, merge_group for merge queue otherwise fall back to SHA
+  group: ${{ github.workflow }}-${{ github.event.number || github.event.issue_comment.issue.id || github.event.merge_group.base_sha || github.sha }}
   cancel-in-progress: true
 
 env:
@@ -24,11 +26,23 @@ env:
 
 jobs:
 
+  changes:
+    if: github.event_name == 'pull_request'
+    uses: ./.github/workflows/changes.yml
+    with:
+      base_ref: ${{ github.event.pull_request.base.ref }}
+      head_ref: ${{ github.event.pull_request.head.ref  }}
+    secrets: inherit
+
   build-x86_64-unknown-linux-gnu:
     name: Build - x86_64-unknown-linux-gnu
     runs-on: [linux, ubuntu-20.04-8core]
-    # - If trigger is comment, run if comment contains `/ci-run-k8s-tests`, otherwise always run.
-    if: github.event_name != 'issue_comment' || contains(github.event.comment.body, '/ci-run-k8s-tests')
+    needs: changes
+    if: |
+      always() && (
+      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '/ci-deploy-k8s-tests')
+        || (github.event_name == 'pull_request' && needs.changes.outputs.k8s == 'true')
+        || (github.event_name == 'workflow_dispatch' || github.event_name == 'merge_group'))
     # cargo-deb requires a release build, but we don't need optimizations for tests
     env:
       CARGO_PROFILE_RELEASE_OPT_LEVEL: 0
@@ -101,8 +115,12 @@ jobs:
   compute-k8s-test-plan:
     name: Compute K8s test plan
     runs-on: [linux, ubuntu-20.04-8core]
-    # - If trigger is comment, run if comment contains `/ci-run-k8s-tests`, otherwise always run.
-    if: github.event_name != 'issue_comment' || contains(github.event.comment.body, '/ci-run-k8s-tests')
+    needs: changes
+    if: |
+      always() && (
+      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '/ci-deploy-k8s-tests')
+        || (github.event_name == 'pull_request' && needs.changes.outputs.k8s == 'true')
+        || (github.event_name == 'workflow_dispatch' || github.event_name == 'merge_group'))
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
@@ -132,14 +150,9 @@ jobs:
               // https://github.com/kubernetes/minikube/issues/12928
               // "crio",
             ]
-            const ci_condition_label = 'ci-condition: k8s e2e all targets'
-
             // Planing.
-            const is_in_pull_request = !!context.payload.issue_comment;
-            const should_test_all_targets = (
-              !is_in_pull_request ||
-              context.payload.pull_request.labels.some(label => label.name === ci_condition_label)
-            )
+            const should_test_all_targets = (!!context.payload.issue_comment && !!context.payload.merge_group)
+            const should_test_all_targets = !is_in_pull_request
             const filter_targets = array => array.filter(val => should_test_all_targets || val.is_essential)
 
             const matrix = {

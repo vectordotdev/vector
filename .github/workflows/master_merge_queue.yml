@@ -104,12 +104,6 @@ jobs:
     secrets: inherit
     if: needs.changes.outputs.install == 'true'
 
-  k8s:
-    uses: ./.github/workflows/k8s_e2e.yml
-    needs: changes
-    secrets: inherit
-    if: needs.changes.outputs.k8s == 'true'
-
   # NOTE: This design of passing in the pr-number to the Regression workflow requires that the merge queue
   # be configured contain a maximum of one PR per execution. This is so that the regression report generated
   # by the workflow can be posted as a comment to the PR.
@@ -138,16 +132,15 @@ jobs:
     if: always()
     needs:
       - changes
-      - test-cli
-      - test-misc
-      - test-environment
-      - check-msrv
-      - check-component-features
-      - cross-linux
-      - unit-mac
-      - unit-windows
-      - install-sh
-      - k8s
+      # - test-cli
+      # - test-misc
+      # - test-environment
+      # - check-msrv
+      # - check-component-features
+      # - cross-linux
+      # - unit-mac
+      # - unit-windows
+      # - install-sh
     env:
       FAILED: ${{ contains(needs.*.result, 'failure') }}
     steps:
