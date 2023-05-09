@@ -35,7 +35,7 @@ jobs:
 
       # Indicate in the PR's CI pane that this job is running.
       - name: (PR comment) Set latest commit status as pending
-        uses: myrotvorets/set-commit-status-action@master
+        uses: myrotvorets/set-commit-status-action@1.1.6
         if: ${{ github.event_name == 'issue_comment' }}
         with:
           sha: ${{ steps.comment-branch.outputs.head_sha }}
@@ -64,7 +64,7 @@ jobs:
 
       # Indicate in the PR's CI pane that this job is complete
       - name: (PR comment) Set latest commit status as ${{ job.status }}
-        uses: myrotvorets/set-commit-status-action@master
+        uses: myrotvorets/set-commit-status-action@1.1.6
         if: always() && github.event_name == 'issue_comment'
         with:
           sha: ${{ steps.comment-branch.outputs.head_sha }}
