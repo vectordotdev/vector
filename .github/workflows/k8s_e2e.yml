@@ -118,7 +118,7 @@ jobs:
     needs: changes
     if: |
       always() && (
-      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '/ci-deploy-k8s-tests')
+      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '/ci-deploy-k8s-tests'))
         || (github.event_name == 'pull_request' && needs.changes.outputs.k8s == 'true')
         || (github.event_name == 'workflow_dispatch' || github.event_name == 'merge_group'))
     outputs:
