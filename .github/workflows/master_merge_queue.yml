@@ -110,7 +110,7 @@ jobs:
     secrets: inherit
     if: needs.changes.outputs.k8s == 'true'
 
-  # TODO: in a followup PR, run the regregression workflow here, as a single reusable workflow.
+  # TODO: in a followup PR, run the regression workflow here, as a single reusable workflow.
   #
   # NOTE: This design of passing in the pr-number to the Regression workflow requires that the merge queue
   # be configured contain a maximum of one PR per execution. This is so that the regression report generated
