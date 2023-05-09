@@ -600,7 +600,9 @@ jobs:
   regression-check:
     runs-on: ubuntu-latest
     if: always()
-    needs: detect-regression
+    needs:
+      - compute-metadata
+      - detect-regression
     env:
       FAILED: ${{ contains(needs.*.result, 'failure') }}
     steps:
