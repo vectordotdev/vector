@@ -32,68 +32,70 @@ on:
         value: ${{ jobs.changes.outputs.install }}
       k8s:
         value: ${{ jobs.changes.outputs.k8s }}
+      all-int:
+        value: ${{ jobs.changes.outputs.all-int }}
       amqp:
-        value: ${{ jobs.changes.outputs.amqp}}
+        value: ${{ jobs.changes.outputs.amqp }}
       appsignal:
-        value: ${{ jobs.changes.outputs.appsignal}}
+        value: ${{ jobs.changes.outputs.appsignal }}
       aws:
-        value: ${{ jobs.changes.outputs.aws}}
+        value: ${{ jobs.changes.outputs.aws }}
       axiom:
-        value: ${{ jobs.changes.outputs.axiom}}
+        value: ${{ jobs.changes.outputs.axiom }}
       azure:
-        value: ${{ jobs.changes.outputs.azure}}
+        value: ${{ jobs.changes.outputs.azure }}
       clickhouse:
-        value: ${{ jobs.changes.outputs.clickhouse}}
+        value: ${{ jobs.changes.outputs.clickhouse }}
       databend:
-        value: ${{ jobs.changes.outputs.databend}}
+        value: ${{ jobs.changes.outputs.databend }}
       datadog:
-        value: ${{ jobs.changes.outputs.datadog}}
+        value: ${{ jobs.changes.outputs.datadog }}
       dnstap:
-        value: ${{ jobs.changes.outputs.dnstap}}
+        value: ${{ jobs.changes.outputs.dnstap }}
       docker-logs:
-        value: ${{ jobs.changes.outputs.docker-logs}}
+        value: ${{ jobs.changes.outputs.docker-logs }}
       elasticsearch:
-        value: ${{ jobs.changes.outputs.elasticsearch}}
+        value: ${{ jobs.changes.outputs.elasticsearch }}
       eventsoredb:
-        value: ${{ jobs.changes.outputs.eventsoredb}}
+        value: ${{ jobs.changes.outputs.eventsoredb }}
       fluent:
-        value: ${{ jobs.changes.outputs.fluent}}
+        value: ${{ jobs.changes.outputs.fluent }}
       gcp:
-        value: ${{ jobs.changes.outputs.gcp}}
+        value: ${{ jobs.changes.outputs.gcp }}
       humio:
-        value: ${{ jobs.changes.outputs.humio}}
+        value: ${{ jobs.changes.outputs.humio }}
       http-client:
-        value: ${{ jobs.changes.outputs.http-client}}
+        value: ${{ jobs.changes.outputs.http-client }}
       influxdb:
-        value: ${{ jobs.changes.outputs.influxdb}}
+        value: ${{ jobs.changes.outputs.influxdb }}
       kafka:
-        value: ${{ jobs.changes.outputs.kafka}}
+        value: ${{ jobs.changes.outputs.kafka }}
       logstash:
-        value: ${{ jobs.changes.outputs.logstash}}
+        value: ${{ jobs.changes.outputs.logstash }}
       loki:
-        value: ${{ jobs.changes.outputs.loki}}
+        value: ${{ jobs.changes.outputs.loki }}
       mongodb:
-        value: ${{ jobs.changes.outputs.mongodb}}
+        value: ${{ jobs.changes.outputs.mongodb }}
       nats:
-        value: ${{ jobs.changes.outputs.nats}}
+        value: ${{ jobs.changes.outputs.nats }}
       nginx:
-        value: ${{ jobs.changes.outputs.nginx}}
+        value: ${{ jobs.changes.outputs.nginx }}
       opentelemetry:
-        value: ${{ jobs.changes.outputs.opentelemetry}}
+        value: ${{ jobs.changes.outputs.opentelemetry }}
       postgres:
-        value: ${{ jobs.changes.outputs.postgres}}
+        value: ${{ jobs.changes.outputs.postgres }}
       prometheus:
-        value: ${{ jobs.changes.outputs.prometheus}}
+        value: ${{ jobs.changes.outputs.prometheus }}
       pulsar:
-        value: ${{ jobs.changes.outputs.pulsar}}
+        value: ${{ jobs.changes.outputs.pulsar }}
       redis:
-        value: ${{ jobs.changes.outputs.redis}}
+        value: ${{ jobs.changes.outputs.redis }}
       shutdown:
-        value: ${{ jobs.changes.outputs.shutdown}}
+        value: ${{ jobs.changes.outputs.shutdown }}
       splunk:
-        value: ${{ jobs.changes.outputs.splunk}}
+        value: ${{ jobs.changes.outputs.splunk }}
       webhdfs:
-        value: ${{ jobs.changes.outputs.webhdfs}}
+        value: ${{ jobs.changes.outputs.webhdfs }}
 
 jobs:
   changes:
@@ -111,6 +113,7 @@ jobs:
       # K8s
       k8s: ${{ steps.filter.outputs.k8s }}
       # Integrations
+      all-int: ${{ steps.filter.outputs.all-int }}
       amqp: ${{ steps.filter.outputs.amqp }}
       appsignal: ${{ steps.filter.outputs.appsignal}}
       aws: ${{ steps.filter.outputs.aws }}
@@ -199,6 +202,8 @@ jobs:
             - "distribution/install.sh"
           k8s:
             - "src/sources/kubernetes_logs/**"
+          all-int:
+            - "lib/vector-core/**"
           amqp:
             - "src/amqp.rs"
             - "src/internal_events/amqp.rs"

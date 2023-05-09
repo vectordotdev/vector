@@ -145,73 +145,73 @@ jobs:
       matrix:
         run:
           - test_name: 'amqp'
-            if: ${{ needs.changes.outputs.amqp == 'true' }}
+            if: ${{ needs.changes.outputs.amqp == 'true' || needs.changes.outputs.all-int }}
           - test_name: 'appsignal'
-            if: ${{ needs.changes.outputs.appsignal == 'true' }}
+            if: ${{ needs.changes.outputs.appsignal == 'true' || needs.changes.outputs.all-int }}
           - test_name: 'aws'
-            if: ${{ needs.changes.outputs.aws == 'true' }}
+            if: ${{ needs.changes.outputs.aws == 'true' || needs.changes.outputs.all-int }}
           - test_name: 'axiom'
-            if: ${{ needs.changes.outputs.axiom == 'true' }}
+            if: ${{ needs.changes.outputs.axiom == 'true' || needs.changes.outputs.all-int }}
           - test_name: 'azure'
-            if: ${{ needs.changes.outputs.azure == 'true' }}
+            if: ${{ needs.changes.outputs.azure == 'true' || needs.changes.outputs.all-int }}
           - test_name: 'clickhouse'
-            if: ${{ needs.changes.outputs.clickhouse == 'true' }}
+            if: ${{ needs.changes.outputs.clickhouse == 'true' || needs.changes.outputs.all-int }}
           - test_name: 'databend'
-            if: ${{ needs.changes.outputs.databend == 'true' }}
+            if: ${{ needs.changes.outputs.databend == 'true' || needs.changes.outputs.all-int }}
           - test_name: 'datadog-agent'
-            if: ${{ needs.changes.outputs.datadog == 'true' }}
+            if: ${{ needs.changes.outputs.datadog == 'true' || needs.changes.outputs.all-int }}
           - test_name: 'datadog-logs'
-            if: ${{ needs.changes.outputs.datadog == 'true' }}
+            if: ${{ needs.changes.outputs.datadog == 'true' || needs.changes.outputs.all-int }}
           - test_name: 'datadog-metrics'
-            if: ${{ needs.changes.outputs.datadog == 'true' }}
+            if: ${{ needs.changes.outputs.datadog == 'true' || needs.changes.outputs.all-int }}
           - test_name: 'datadog-traces'
-            if: ${{ needs.changes.outputs.datadog == 'true' }}
+            if: ${{ needs.changes.outputs.datadog == 'true' || needs.changes.outputs.all-int }}
           - test_name: 'dnstap'
-            if: ${{ needs.changes.outputs.dnstap == 'true' }}
+            if: ${{ needs.changes.outputs.dnstap == 'true' || needs.changes.outputs.all-int }}
           - test_name: 'docker-logs'
-            if: ${{ needs.changes.outputs.docker-logs == 'true' }}
+            if: ${{ needs.changes.outputs.docker-logs == 'true' || needs.changes.outputs.all-int }}
           - test_name: 'elasticsearch'
-            if: ${{ needs.changes.outputs.elasticsearch == 'true' }}
+            if: ${{ needs.changes.outputs.elasticsearch == 'true' || needs.changes.outputs.all-int }}
           - test_name: 'eventstoredb'
-            if: ${{ needs.changes.outputs.eventstoredb == 'true' }}
+            if: ${{ needs.changes.outputs.eventstoredb == 'true' || needs.changes.outputs.all-int }}
           - test_name: 'fluent'
-            if: ${{ needs.changes.outputs.fluent == 'true' }}
+            if: ${{ needs.changes.outputs.fluent == 'true' || needs.changes.outputs.all-int }}
           - test_name: 'gcp'
-            if: ${{ needs.changes.outputs.gcp == 'true' }}
+            if: ${{ needs.changes.outputs.gcp == 'true' || needs.changes.outputs.all-int }}
           - test_name: 'humio'
-            if: ${{ needs.changes.outputs.humio == 'true' }}
+            if: ${{ needs.changes.outputs.humio == 'true' || needs.changes.outputs.all-int }}
           - test_name: 'http-client'
-            if: ${{ needs.changes.outputs.http-client == 'true' }}
+            if: ${{ needs.changes.outputs.http-client == 'true' || needs.changes.outputs.all-int }}
           - test_name: 'influxdb'
-            if: ${{ needs.changes.outputs.influxdb == 'true' }}
+            if: ${{ needs.changes.outputs.influxdb == 'true' || needs.changes.outputs.all-int }}
           - test_name: 'kafka'
-            if: ${{ needs.changes.outputs.kafka == 'true' }}
+            if: ${{ needs.changes.outputs.kafka == 'true' || needs.changes.outputs.all-int }}
           - test_name: 'logstash'
-            if: ${{ needs.changes.outputs.logstash == 'true' }}
+            if: ${{ needs.changes.outputs.logstash == 'true' || needs.changes.outputs.all-int }}
           - test_name: 'loki'
-            if: ${{ needs.changes.outputs.loki == 'true' }}
+            if: ${{ needs.changes.outputs.loki == 'true' || needs.changes.outputs.all-int }}
           - test_name: 'mongodb'
-            if: ${{ needs.changes.outputs.mongodb == 'true' }}
+            if: ${{ needs.changes.outputs.mongodb == 'true' || needs.changes.outputs.all-int }}
           - test_name: 'nats'
-            if: ${{ needs.changes.outputs.nats == 'true' }}
+            if: ${{ needs.changes.outputs.nats == 'true' || needs.changes.outputs.all-int }}
           - test_name: 'nginx'
-            if: ${{ needs.changes.outputs.nginx == 'true' }}
+            if: ${{ needs.changes.outputs.nginx == 'true' || needs.changes.outputs.all-int }}
           - test_name: 'opentelemetry'
-            if: ${{ needs.changes.outputs.opentelemetry == 'true' }}
+            if: ${{ needs.changes.outputs.opentelemetry == 'true' || needs.changes.outputs.all-int }}
           - test_name: 'postgres'
-            if: ${{ needs.changes.outputs.postgres == 'true' }}
+            if: ${{ needs.changes.outputs.postgres == 'true' || needs.changes.outputs.all-int }}
           - test_name: 'prometheus'
-            if: ${{ needs.changes.outputs.prometheus == 'true' }}
+            if: ${{ needs.changes.outputs.prometheus == 'true' || needs.changes.outputs.all-int }}
           - test_name: 'pulsar'
-            if: ${{ needs.changes.outputs.pulsar == 'true' }}
+            if: ${{ needs.changes.outputs.pulsar == 'true' || needs.changes.outputs.all-int }}
           - test_name: 'redis'
-            if: ${{ needs.changes.outputs.redis == 'true' }}
+            if: ${{ needs.changes.outputs.redis == 'true' || needs.changes.outputs.all-int }}
           - test_name: 'shutdown'
-            if: ${{ needs.changes.outputs.shutdown == 'true' }}
+            if: ${{ needs.changes.outputs.shutdown == 'true' || needs.changes.outputs.all-int }}
           - test_name: 'splunk'
-            if: ${{ needs.changes.outputs.splunk == 'true' }}
+            if: ${{ needs.changes.outputs.splunk == 'true' || needs.changes.outputs.all-int }}
           - test_name: 'webhdfs'
-            if: ${{ needs.changes.outputs.webhdfs == 'true' }}
+            if: ${{ needs.changes.outputs.webhdfs == 'true' || needs.changes.outputs.all-int }}
 
   # Collects the matrix results, which makes it easier to see failures from the int tests.
   integration:
