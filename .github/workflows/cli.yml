@@ -25,7 +25,7 @@ jobs:
     runs-on: [linux, ubuntu-20.04-8core]
     env:
       CARGO_INCREMENTAL: 0
-    if: github.event_name != 'issue_comment' || contains(github.event.comment.body, '/ci-deploy-cli')
+    if: github.event_name != 'issue_comment' || contains(github.event.comment.body, '/ci-run-cli')
     steps:
       # For PR comment trigger, extra steps are required to associate the workflow with the PR.
 
