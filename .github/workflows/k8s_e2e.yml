@@ -151,7 +151,7 @@ jobs:
               // "crio",
             ]
             // Planing.
-            const should_test_all_targets = (!!context.payload.issue_comment && !!context.payload.merge_group)
+            const is_in_pull_request = (!!context.payload.issue_comment && !!context.payload.merge_group)
             const should_test_all_targets = !is_in_pull_request
             const filter_targets = array => array.filter(val => should_test_all_targets || val.is_essential)
 
