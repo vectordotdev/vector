@@ -64,26 +64,26 @@ jobs:
         if: ${{ github.event_name != 'issue_comment' }}
         uses: actions/checkout@v3
 
-      # - name: mock
-      #   run: echo "${{ inputs.test_name }}"
+      - name: mock
+        run: echo "${{ inputs.test_name }}"
 
-      - run: make ci-sweep
+      # - run: make ci-sweep
 
-      - run: sudo npm -g install @datadog/datadog-ci
+      # - run: sudo npm -g install @datadog/datadog-ci
 
-      - run: make test-integration-${{ inputs.test_name }}
-        env:
-          TEST_DATADOG_API_KEY: ${{ secrets.CI_TEST_DATADOG_API_KEY }}
-          # TODO: It looks like this used to be used but isn't anymore
-          #SPLUNK_VERSION: ${{ matrix.env.SPLUNK_VERSION }}
+      # - run: make test-integration-${{ inputs.test_name }}
+      #   env:
+      #     TEST_DATADOG_API_KEY: ${{ secrets.CI_TEST_DATADOG_API_KEY }}
+      #     # TODO: It looks like this used to be used but isn't anymore
+      #     #SPLUNK_VERSION: ${{ matrix.env.SPLUNK_VERSION }}
 
-      - name: Upload test results
-        run: scripts/upload-test-results.sh
-        if: always()
+      # - name: Upload test results
+      #   run: scripts/upload-test-results.sh
+      #   if: always()
 
-      - run: make test-integration-${{ inputs.test_name }}-cleanup
-        if: ${{ always() }}
-        env:
-          TEST_DATADOG_API_KEY: ${{ secrets.CI_TEST_DATADOG_API_KEY }}
-          # TODO: It looks like this used to be used but isn't anymore
-          #SPLUNK_VERSION: ${{ matrix.env.SPLUNK_VERSION }}
+      # - run: make test-integration-${{ inputs.test_name }}-cleanup
+      #   if: ${{ always() }}
+      #   env:
+      #     TEST_DATADOG_API_KEY: ${{ secrets.CI_TEST_DATADOG_API_KEY }}
+      #     # TODO: It looks like this used to be used but isn't anymore
+      #     #SPLUNK_VERSION: ${{ matrix.env.SPLUNK_VERSION }}

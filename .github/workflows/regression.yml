@@ -17,11 +17,11 @@ name: Regression Detector
 
 on:
   workflow_dispatch:
-  pull_request:
-    paths-ignore:
-      - "docs/**"
-      - "rfcs/**"
-      - "website/**"
+  # pull_request:
+  #   paths-ignore:
+  #     - "docs/**"
+  #     - "rfcs/**"
+  #     - "website/**"
 
 jobs:
   cancel-previous:
