@@ -1,6 +1,6 @@
 # This workflow runs one or more integration tests triggered by a comment in a PR.
 # The comment include '/ci-run-integration'.
-# Then, any if the integration names will triger that specific integration.
+# Then, any if the integration names will trigger that specific integration.
 # 'all' will trigger every integration to run.
 # The order does not matter and can be anywhere inside the comment body.
 #
