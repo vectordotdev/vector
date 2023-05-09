@@ -416,8 +416,6 @@ jobs:
     needs:
       - submit-job
       - compute-metadata
-    outputs:
-      result: ${{ steps.experimental-meta.outputs.LADING_VERSION }}
     steps:
       - uses: actions/checkout@v3
 
