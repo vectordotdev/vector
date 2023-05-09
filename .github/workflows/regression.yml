@@ -24,7 +24,6 @@ on:
       - "website/**"
 
 jobs:
-  mock:
 
   transmit-metadata:
     name: Transmit metadata to trusted workflow
