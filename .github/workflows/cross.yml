@@ -37,15 +37,11 @@ jobs:
           - armv7-unknown-linux-gnueabihf
           - armv7-unknown-linux-musleabihf
     steps:
-      # For PR comment trigger, extra steps are required to associate the workflow with the PR.
-
-      # Find the branch that the comment was made in.
       - name: (PR comment) Get PR branch
         if: ${{ github.event_name == 'issue_comment' }}
         uses: xt0rted/pull-request-comment-branch@v1
         id: comment-branch
 
-      # Indicate in the PR's CI pane that this job is running.
       - name: (PR comment) Set latest commit status as pending
         if: ${{ github.event_name == 'issue_comment' }}
         uses: myrotvorets/set-commit-status-action@1.1.6
@@ -54,14 +50,12 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           status: pending
 
-      # Checkout the branch, using the PR ref.
       - name: (PR comment) Checkout PR branch
         if: ${{ github.event_name == 'issue_comment' }}
         uses: actions/checkout@v3
         with:
           ref: ${{ steps.comment-branch.outputs.head_ref }}
 
-      # Checkout the default branch otherwise.
       - name: Checkout branch
         if: ${{ github.event_name != 'issue_comment' }}
         uses: actions/checkout@v3
@@ -89,8 +83,7 @@ jobs:
           name: "vector-debug-${{ matrix.target }}"
           path: "./target/${{ matrix.target }}/debug/vector"
 
-      # Indicate in the PR's CI pane that this job is complete
-      - name: (PR comment) Set latest commit status as failed if needed
+      - name: (PR comment) Set latest commit status as failed
         uses: myrotvorets/set-commit-status-action@1.1.6
         if: failure() && github.event_name == 'issue_comment'
         with:
@@ -104,7 +97,6 @@ jobs:
     needs: cross-linux
     if: success() && github.event_name == 'issue_comment'
     steps:
-      # Find the branch that the comment was made in.
       - name: (PR comment) Get PR branch
         uses: xt0rted/pull-request-comment-branch@v1
         id: comment-branch
