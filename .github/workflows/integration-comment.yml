@@ -145,7 +145,7 @@ jobs:
     name: Signal result to PR
     runs-on: ubuntu-latest
     needs: test-integration
-    if: always()
+    if: always() && contains(github.event.comment.body, '/ci-deploy-integration')
     steps:
       # Find the branch that the comment was made in.
       - name: (PR comment) Get PR branch
