@@ -44,7 +44,7 @@ impl VectorSink {
     pub fn into_sink(self) -> Box<dyn Sink<EventArray, Error = ()> + Send + Unpin> {
         match self {
             Self::Sink(sink) => sink,
-            _ => panic!("Failed type coercion, {self:?} is not a Sink."),
+            _ => panic!("Failed type coercion, {self:?} is not a Sink!"),
         }
     }
 
