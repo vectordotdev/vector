@@ -8,7 +8,7 @@ use value::{Kind, Secrets, Value};
 use vector_common::EventDataEq;
 
 use super::{BatchNotifier, EventFinalizer, EventFinalizers, EventStatus};
-use crate::config::LogNamespace;
+use crate::config::{LogNamespace, OutputId};
 use crate::{schema, ByteSizeOf};
 
 const DATADOG_API_KEY: &str = "datadog_api_key";
@@ -28,6 +28,9 @@ pub struct EventMetadata {
 
     #[serde(default, skip)]
     finalizers: EventFinalizers,
+
+    /// The id of the source
+    source: Option<Arc<OutputId>>,
 
     /// An identifier for a globally registered schema definition which provides information about
     /// the event shape (type information, and semantic meaning of fields).
@@ -70,6 +73,16 @@ impl EventMetadata {
         &mut self.secrets
     }
 
+    /// Returns a mutable reference to the metadata source.
+    pub fn source(&self) -> &Option<Arc<OutputId>> {
+        &self.source
+    }
+
+    /// Returns a mutable reference to the metadata source.
+    pub fn source_mut(&mut self) -> &mut Option<Arc<OutputId>> {
+        &mut self.source
+    }
+
     /// Return the datadog API key, if it exists
     pub fn datadog_api_key(&self) -> Option<Arc<str>> {
         self.secrets.get(DATADOG_API_KEY).cloned()
@@ -98,6 +111,7 @@ impl Default for EventMetadata {
             secrets: Secrets::new(),
             finalizers: Default::default(),
             schema_definition: default_schema_definition(),
+            source: None,
         }
     }
 }
