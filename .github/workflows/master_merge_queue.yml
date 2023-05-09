@@ -104,12 +104,6 @@ jobs:
     secrets: inherit
     if: needs.changes.outputs.install == 'true'
 
-  k8s:
-    uses: ./.github/workflows/k8s_e2e.yml
-    needs: changes
-    secrets: inherit
-    if: needs.changes.outputs.k8s == 'true'
-
   # TODO: in a followup PR, run the regression workflow here, as a single reusable workflow.
   #
   # NOTE: This design of passing in the pr-number to the Regression workflow requires that the merge queue
@@ -128,88 +122,6 @@ jobs:
   #     base_sha: ${{ github.event.merge_group.base_sha }}
   #     head_sha: ${{ github.event.merge_group.head_sha }}
 
-  # Calls the Integration Test workflow for each integration that was detected to have files changed
-  # that impact it.
-  integration:
-    uses: ./.github/workflows/integration-test.yml
-    with:
-      if: ${{ matrix.run.if }}
-      test_name: ${{ matrix.run.test_name }}
-    needs: changes
-    secrets: inherit
-    strategy:
-      fail-fast: false
-      matrix:
-        run:
-          - test_name: 'amqp'
-            if: ${{ needs.changes.outputs.amqp == 'true' }}
-          - test_name: 'appsignal'
-            if: ${{ needs.changes.outputs.appsignal == 'true' }}
-          - test_name: 'aws'
-            if: ${{ needs.changes.outputs.aws == 'true' }}
-          - test_name: 'axiom'
-            if: ${{ needs.changes.outputs.axiom == 'true' }}
-          - test_name: 'azure'
-            if: ${{ needs.changes.outputs.azure == 'true' }}
-          - test_name: 'clickhouse'
-            if: ${{ needs.changes.outputs.clickhouse == 'true' }}
-          - test_name: 'databend'
-            if: ${{ needs.changes.outputs.databend == 'true' }}
-          - test_name: 'datadog-agent'
-            if: ${{ needs.changes.outputs.datadog == 'true' }}
-          - test_name: 'datadog-logs'
-            if: ${{ needs.changes.outputs.datadog == 'true' }}
-          - test_name: 'datadog-metrics'
-            if: ${{ needs.changes.outputs.datadog == 'true' }}
-          - test_name: 'datadog-traces'
-            if: ${{ needs.changes.outputs.datadog == 'true' }}
-          - test_name: 'dnstap'
-            if: ${{ needs.changes.outputs.dnstap == 'true' }}
-          - test_name: 'docker-logs'
-            if: ${{ needs.changes.outputs.docker-logs == 'true' }}
-          - test_name: 'elasticsearch'
-            if: ${{ needs.changes.outputs.elasticsearch == 'true' }}
-          - test_name: 'eventstoredb'
-            if: ${{ needs.changes.outputs.eventstoredb == 'true' }}
-          - test_name: 'fluent'
-            if: ${{ needs.changes.outputs.fluent == 'true' }}
-          - test_name: 'gcp'
-            if: ${{ needs.changes.outputs.gcp == 'true' }}
-          - test_name: 'humio'
-            if: ${{ needs.changes.outputs.humio == 'true' }}
-          - test_name: 'http-client'
-            if: ${{ needs.changes.outputs.http-client == 'true' }}
-          - test_name: 'influxdb'
-            if: ${{ needs.changes.outputs.influxdb == 'true' }}
-          - test_name: 'kafka'
-            if: ${{ needs.changes.outputs.kafka == 'true' }}
-          - test_name: 'logstash'
-            if: ${{ needs.changes.outputs.logstash == 'true' }}
-          - test_name: 'loki'
-            if: ${{ needs.changes.outputs.loki == 'true' }}
-          - test_name: 'mongodb'
-            if: ${{ needs.changes.outputs.mongodb == 'true' }}
-          - test_name: 'nats'
-            if: ${{ needs.changes.outputs.nats == 'true' }}
-          - test_name: 'nginx'
-            if: ${{ needs.changes.outputs.nginx == 'true' }}
-          - test_name: 'opentelemetry'
-            if: ${{ needs.changes.outputs.opentelemetry == 'true' }}
-          - test_name: 'postgres'
-            if: ${{ needs.changes.outputs.postgres == 'true' }}
-          - test_name: 'prometheus'
-            if: ${{ needs.changes.outputs.prometheus == 'true' }}
-          - test_name: 'pulsar'
-            if: ${{ needs.changes.outputs.pulsar == 'true' }}
-          - test_name: 'redis'
-            if: ${{ needs.changes.outputs.redis == 'true' }}
-          - test_name: 'shutdown'
-            if: ${{ needs.changes.outputs.shutdown == 'true' }}
-          - test_name: 'splunk'
-            if: ${{ needs.changes.outputs.splunk == 'true' }}
-          - test_name: 'webhdfs'
-            if: ${{ needs.changes.outputs.webhdfs == 'true' }}
-
   # Always run this so that pull_request triggers are marked as success.
   master-merge-queue-check:
     name: Master Merge Queue Suite
@@ -226,8 +138,6 @@ jobs:
       - unit-mac
       - unit-windows
       - install-sh
-      - k8s
-      - integration
     env:
       FAILED: ${{ contains(needs.*.result, 'failure') }}
     steps:
