@@ -27,8 +27,8 @@ jobs:
   build-x86_64-unknown-linux-gnu:
     name: Build - x86_64-unknown-linux-gnu
     runs-on: [linux, ubuntu-20.04-8core]
-    # - If trigger is comment, run if comment contains `/ci-deploy-k8s-tests`, otherwise always run.
-    if: github.event_name != 'issue_comment' || contains(github.event.comment.body, '/ci-deploy-k8s-tests')
+    # - If trigger is comment, run if comment contains `/ci-run-k8s-tests`, otherwise always run.
+    if: github.event_name != 'issue_comment' || contains(github.event.comment.body, '/ci-run-k8s-tests')
     # cargo-deb requires a release build, but we don't need optimizations for tests
     env:
       CARGO_PROFILE_RELEASE_OPT_LEVEL: 0
@@ -101,8 +101,8 @@ jobs:
   compute-k8s-test-plan:
     name: Compute K8s test plan
     runs-on: [linux, ubuntu-20.04-8core]
-    # - If trigger is comment, run if comment contains `/ci-deploy-k8s-tests`, otherwise always run.
-    if: github.event_name != 'issue_comment' || contains(github.event.comment.body, '/ci-deploy-k8s-tests')
+    # - If trigger is comment, run if comment contains `/ci-run-k8s-tests`, otherwise always run.
+    if: github.event_name != 'issue_comment' || contains(github.event.comment.body, '/ci-run-k8s-tests')
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:

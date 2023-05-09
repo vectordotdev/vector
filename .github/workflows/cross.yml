@@ -24,7 +24,7 @@ jobs:
   cross-linux:
     name: Cross - ${{ matrix.target }}
     runs-on: [linux, ubuntu-20.04-8core]
-    if: github.event_name != 'issue_comment' || contains(github.event.comment.body, '/ci-deploy-cross')
+    if: github.event_name != 'issue_comment' || contains(github.event.comment.body, '/ci-run-cross')
     env:
       CARGO_INCREMENTAL: 0
     strategy:

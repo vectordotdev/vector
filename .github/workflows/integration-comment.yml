@@ -1,5 +1,5 @@
 # This workflow runs one or more integration tests triggered by a comment in a PR.
-# The comment include '/ci-deploy-integration'.
+# The comment include '/ci-run-integration'.
 # Then, any if the integration names will triger that specific integration.
 # 'all' will trigger every integration to run.
 # The order does not matter and can be anywhere inside the comment body.
@@ -8,15 +8,15 @@
 #
 # 1. Run a single integration test:
 #
-#     /ci-deploy-integration amqp
+#     /ci-run-integration amqp
 #
 # 2. Run three specific integration tests:
 #
-#     /ci-deploy-integration dnstap redis amqp
+#     /ci-run-integration dnstap redis amqp
 #
 # 3. Run all integration tests:
 #
-#     /ci-deploy-integration all
+#     /ci-run-integration all
 
 name: Integration Test Comment
 
@@ -46,7 +46,7 @@ jobs:
   prep-pr:
     name: (PR comment) Signal pending to PR
     runs-on: ubuntu-latest
-    if: contains(github.event.comment.body, '/ci-deploy-integration')
+    if: contains(github.event.comment.body, '/ci-run-integration')
     steps:
       # Find the branch that the comment was made in.
       - name: (PR comment) Get PR branch

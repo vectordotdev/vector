@@ -133,7 +133,7 @@ jobs:
 
   # Calls the Integration Test workflow for each integration that was detected to have files changed
   # that impact it.
-  integration:
+  integration-matrix:
     uses: ./.github/workflows/integration-test.yml
     with:
       if: ${{ matrix.run.if }}
@@ -212,6 +212,22 @@ jobs:
             if: ${{ needs.changes.outputs.splunk == 'true' }}
           - test_name: 'webhdfs'
             if: ${{ needs.changes.outputs.webhdfs == 'true' }}
+
+  # Collects the matrix results, which makes it easier to see failures from the int tests.
+  integration:
+    runs-on: ubuntu-latest
+    needs:
+      - integration-matrix
+    env:
+      FAILED: ${{ contains(needs.*.result, 'failure') }}
+    steps:
+      - run: |
+          echo "failed=${{ env.FAILED }}"
+          if [[ "$FAILED" == "true" ]] ; then
+            exit 1
+          else
+            exit 0
+          fi
 
   # Always run this so that pull_request triggers are marked as success.
   master-merge-queue-check:
