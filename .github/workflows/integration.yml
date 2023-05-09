@@ -116,7 +116,7 @@ jobs:
           - test_name: 'redis'
             if: ${{ github.event_name == 'merge_queue' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.redis == 'true' }}
           - test_name: 'shutdown'
-            if: ${{ github.event_name == 'merge_queue' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.shutdown == 'true' }}
+            if: ${{ github.event_name == 'merge_queue' || needs.changes.outputs.int-all == 'true' }}
           - test_name: 'splunk'
             if: ${{ github.event_name == 'merge_queue' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.splunk == 'true' }}
           - test_name: 'webhdfs'

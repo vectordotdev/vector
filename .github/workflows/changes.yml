@@ -90,8 +90,6 @@ on:
         value: ${{ jobs.changes.outputs.pulsar }}
       redis:
         value: ${{ jobs.changes.outputs.redis }}
-      shutdown:
-        value: ${{ jobs.changes.outputs.shutdown }}
       splunk:
         value: ${{ jobs.changes.outputs.splunk }}
       webhdfs:
@@ -142,7 +140,6 @@ jobs:
       prometheus: ${{ steps.filter.outputs.prometheus }}
       pulsar: ${{ steps.filter.outputs.pulsar }}
       redis: ${{ steps.filter.outputs.redis }}
-      shutdown: ${{ steps.filter.outputs.shutdown }}
       splunk: ${{ steps.filter.outputs.splunk }}
       webhdfs: ${{ steps.filter.outputs.webhdfs }}
     steps:
@@ -325,9 +322,6 @@ jobs:
             - "src/sources/util/**"
             - "src/sinks/redis.rs"
             - "src/sinks/util/**"
-          shutdown:
-            - "src/**"
-            - "lib/**"
           splunk:
             - "src/internal_events/splunk_hec.rs"
             - "src/sources/splunk_hec/**"
