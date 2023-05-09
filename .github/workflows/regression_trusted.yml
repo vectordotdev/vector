@@ -604,6 +604,21 @@ jobs:
     env:
       FAILED: ${{ contains(needs.*.result, 'failure') }}
     steps:
+
+      - name: Check status, success
+        if: github.event_name != 'merge_group'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api \
+            --method POST \
+            -H "Accept: application/vnd.github+json" \
+            /repos/${{ github.repository }}/statuses/${{ needs.compute-metadata.outputs.head-sha }} \
+            -f state='success' \
+            -f description='Analyze experimental results from Regression Detector succeeded.' \
+            -f context='regression-check' \
+            -f target_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
       - name: exit
         run: |
           echo "failed=${{ env.FAILED }}"
