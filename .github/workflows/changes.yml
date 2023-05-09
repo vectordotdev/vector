@@ -30,72 +30,72 @@ on:
         value: ${{ jobs.changes.outputs.markdown }}
       install:
         value: ${{ jobs.changes.outputs.install }}
-      k8s:
-        value: ${{ jobs.changes.outputs.k8s }}
       all-int:
-        value: ${{ jobs.changes.outputs.all-int }}
+        value: ${{ jobs.changes-integrations.outputs.all-int }}
+      k8s:
+        value: ${{ jobs.changes-integrations.outputs.k8s }}
       amqp:
-        value: ${{ jobs.changes.outputs.amqp }}
+        value: ${{ jobs.changes-integrations.outputs.amqp }}
       appsignal:
-        value: ${{ jobs.changes.outputs.appsignal }}
+        value: ${{ jobs.changes-integrations.outputs.appsignal }}
       aws:
-        value: ${{ jobs.changes.outputs.aws }}
+        value: ${{ jobs.changes-integrations.outputs.aws }}
       axiom:
-        value: ${{ jobs.changes.outputs.axiom }}
+        value: ${{ jobs.changes-integrations.outputs.axiom }}
       azure:
-        value: ${{ jobs.changes.outputs.azure }}
+        value: ${{ jobs.changes-integrations.outputs.azure }}
       clickhouse:
-        value: ${{ jobs.changes.outputs.clickhouse }}
+        value: ${{ jobs.changes-integrations.outputs.clickhouse }}
       databend:
-        value: ${{ jobs.changes.outputs.databend }}
+        value: ${{ jobs.changes-integrations.outputs.databend }}
       datadog:
-        value: ${{ jobs.changes.outputs.datadog }}
+        value: ${{ jobs.changes-integrations.outputs.datadog }}
       dnstap:
-        value: ${{ jobs.changes.outputs.dnstap }}
+        value: ${{ jobs.changes-integrations.outputs.dnstap }}
       docker-logs:
-        value: ${{ jobs.changes.outputs.docker-logs }}
+        value: ${{ jobs.changes-integrations.outputs.docker-logs }}
       elasticsearch:
-        value: ${{ jobs.changes.outputs.elasticsearch }}
+        value: ${{ jobs.changes-integrations.outputs.elasticsearch }}
       eventsoredb:
-        value: ${{ jobs.changes.outputs.eventsoredb }}
+        value: ${{ jobs.changes-integrations.outputs.eventsoredb }}
       fluent:
-        value: ${{ jobs.changes.outputs.fluent }}
+        value: ${{ jobs.changes-integrations.outputs.fluent }}
       gcp:
-        value: ${{ jobs.changes.outputs.gcp }}
+        value: ${{ jobs.changes-integrations.outputs.gcp }}
       humio:
-        value: ${{ jobs.changes.outputs.humio }}
+        value: ${{ jobs.changes-integrations.outputs.humio }}
       http-client:
-        value: ${{ jobs.changes.outputs.http-client }}
+        value: ${{ jobs.changes-integrations.outputs.http-client }}
       influxdb:
-        value: ${{ jobs.changes.outputs.influxdb }}
+        value: ${{ jobs.changes-integrations.outputs.influxdb }}
       kafka:
-        value: ${{ jobs.changes.outputs.kafka }}
+        value: ${{ jobs.changes-integrations.outputs.kafka }}
       logstash:
-        value: ${{ jobs.changes.outputs.logstash }}
+        value: ${{ jobs.changes-integrations.outputs.logstash }}
       loki:
-        value: ${{ jobs.changes.outputs.loki }}
+        value: ${{ jobs.changes-integrations.outputs.loki }}
       mongodb:
-        value: ${{ jobs.changes.outputs.mongodb }}
+        value: ${{ jobs.changes-integrations.outputs.mongodb }}
       nats:
-        value: ${{ jobs.changes.outputs.nats }}
+        value: ${{ jobs.changes-integrations.outputs.nats }}
       nginx:
-        value: ${{ jobs.changes.outputs.nginx }}
+        value: ${{ jobs.changes-integrations.outputs.nginx }}
       opentelemetry:
-        value: ${{ jobs.changes.outputs.opentelemetry }}
+        value: ${{ jobs.changes-integrations.outputs.opentelemetry }}
       postgres:
-        value: ${{ jobs.changes.outputs.postgres }}
+        value: ${{ jobs.changes-integrations.outputs.postgres }}
       prometheus:
-        value: ${{ jobs.changes.outputs.prometheus }}
+        value: ${{ jobs.changes-integrations.outputs.prometheus }}
       pulsar:
-        value: ${{ jobs.changes.outputs.pulsar }}
+        value: ${{ jobs.changes-integrations.outputs.pulsar }}
       redis:
-        value: ${{ jobs.changes.outputs.redis }}
+        value: ${{ jobs.changes-integrations.outputs.redis }}
       shutdown:
-        value: ${{ jobs.changes.outputs.shutdown }}
+        value: ${{ jobs.changes-integrations.outputs.shutdown }}
       splunk:
-        value: ${{ jobs.changes.outputs.splunk }}
+        value: ${{ jobs.changes-integrations.outputs.splunk }}
       webhdfs:
-        value: ${{ jobs.changes.outputs.webhdfs }}
+        value: ${{ jobs.changes-integrations.outputs.webhdfs }}
 
 jobs:
   # General source code changes
