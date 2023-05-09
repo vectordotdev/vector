@@ -46,8 +46,8 @@ jobs:
     with:
       if: ${{ matrix.run.if }}
       test_name: ${{ matrix.run.test_name }}
-    needs: changes
     secrets: inherit
+    needs: changes
     strategy:
       fail-fast: false
       matrix:

@@ -50,16 +50,16 @@ jobs:
     secrets: inherit
 
   test-cli:
+    if: needs.changes.outputs.source == 'true'
     uses: ./.github/workflows/cli.yml
     needs: changes
-    if: needs.changes.outputs.source == 'true'
     secrets: inherit
 
   test-misc:
+    if: needs.changes.outputs.source == 'true'
     uses: ./.github/workflows/misc.yml
     needs: changes
     secrets: inherit
-    if: needs.changes.outputs.source == 'true'
 
   test-environment:
     uses: ./.github/workflows/environment.yml
@@ -67,42 +67,42 @@ jobs:
     secrets: inherit
 
   check-msrv:
+    if: needs.changes.outputs.source == 'true'
     uses: ./.github/workflows/msrv.yml
     needs: changes
     secrets: inherit
-    if: needs.changes.outputs.source == 'true'
 
   check-component-features:
+    if: needs.changes.outputs.source == 'true'
     uses: ./.github/workflows/component_features.yml
     needs: changes
     secrets: inherit
-    if: needs.changes.outputs.source == 'true'
 
   cross-linux:
-    uses: ./.github/workflows/cross.yml
-    needs: changes
-    secrets: inherit
     # We run cross checks when dependencies change to ensure they still build.
     # This helps us avoid adopting dependencies that aren't compatible with other architectures.
     if: needs.changes.outputs.dependencies == 'true'
+    uses: ./.github/workflows/cross.yml
+    needs: changes
+    secrets: inherit
 
   unit-mac:
+    if: needs.changes.outputs.source == 'true'
     uses: ./.github/workflows/unit_mac.yml
     needs: changes
     secrets: inherit
-    if: needs.changes.outputs.source == 'true'
 
   unit-windows:
+    if: needs.changes.outputs.source == 'true'
     uses: ./.github/workflows/unit_windows.yml
     needs: changes
     secrets: inherit
-    if: needs.changes.outputs.source == 'true'
 
   install-sh:
+    if: needs.changes.outputs.install == 'true'
     uses: ./.github/workflows/install-sh.yml
     needs: changes
     secrets: inherit
-    if: needs.changes.outputs.install == 'true'
 
   # TODO: in a followup PR, run the regression workflow here, as a single reusable workflow.
   #
@@ -113,20 +113,20 @@ jobs:
   # queue execution. At such time, the logic of uploading of the report will need to change to account for
   # multiple PRs.
   # regression:
-  #   uses: ./.github/workflows/regression.yml
-  #   needs: changes
-  #   secrets: inherit
   #   if: needs.changes.outputs.source == 'true'
+  #   uses: ./.github/workflows/regression.yml
   #   with:
   #     pr_number: ${{ needs.changes.outputs.pr-number }}
   #     base_sha: ${{ github.event.merge_group.base_sha }}
   #     head_sha: ${{ github.event.merge_group.head_sha }}
+  #   needs: changes
+  #   secrets: inherit
 
-  # Always run this so that pull_request triggers are marked as success.
   master-merge-queue-check:
     name: Master Merge Queue Suite
-    runs-on: ubuntu-20.04
+    # Always run this so that pull_request triggers are marked as success.
     if: always()
+    runs-on: ubuntu-20.04
     needs:
       - changes
       - test-cli
