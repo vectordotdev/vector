@@ -27,7 +27,6 @@ env:
 jobs:
 
   changes:
-    if: github.event_name == 'pull_request'
     uses: ./.github/workflows/changes.yml
     with:
       base_ref: ${{ github.event.pull_request.base.ref }}
@@ -39,10 +38,9 @@ jobs:
     runs-on: [linux, ubuntu-20.04-8core]
     needs: changes
     if: |
-      always() && (
       (github.event_name == 'issue_comment' && contains(github.event.comment.body, '/ci-run-k8s-tests'))
         || (github.event_name == 'pull_request' && needs.changes.outputs.k8s == 'true')
-        || (github.event_name == 'workflow_dispatch' || github.event_name == 'merge_group'))
+        || github.event_name == 'workflow_dispatch' || github.event_name == 'merge_group'
     # cargo-deb requires a release build, but we don't need optimizations for tests
     env:
       CARGO_PROFILE_RELEASE_OPT_LEVEL: 0
@@ -117,10 +115,9 @@ jobs:
     runs-on: [linux, ubuntu-20.04-8core]
     needs: changes
     if: |
-      always() && (
       (github.event_name == 'issue_comment' && contains(github.event.comment.body, '/ci-run-k8s-tests'))
         || (github.event_name == 'pull_request' && needs.changes.outputs.k8s == 'true')
-        || (github.event_name == 'workflow_dispatch' || github.event_name == 'merge_group'))
+        || github.event_name == 'workflow_dispatch' || github.event_name == 'merge_group'
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
@@ -150,9 +147,12 @@ jobs:
               // https://github.com/kubernetes/minikube/issues/12928
               // "crio",
             ]
-            // Planing.
-            const is_in_pull_request = (!!context.payload.issue_comment && !!context.payload.merge_group)
-            const should_test_all_targets = !is_in_pull_request
+
+            // Planning.
+            const is_in_pull_request = !!context.payload.pull_request;
+            const should_test_all_targets = (
+              !is_in_pull_request
+            )
             const filter_targets = array => array.filter(val => should_test_all_targets || val.is_essential)
 
             const matrix = {
