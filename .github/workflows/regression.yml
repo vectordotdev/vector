@@ -24,159 +24,175 @@ on:
       - "website/**"
 
 jobs:
-  cancel-previous:
-    runs-on: ubuntu-22.04
-    timeout-minutes: 3
-    steps:
-      - uses: styfle/cancel-workflow-action@0.11.0
-        with:
-          access_token: ${{ secrets.GITHUB_TOKEN }}
-          all_but_latest: true # can cancel workflows scheduled later
-
-  compute-metadata:
-    name: Compute metadata for regression experiments
-    runs-on: ubuntu-22.04
-    outputs:
-      pr-number: ${{ steps.pr-metadata.outputs.PR_NUMBER }}
-
-      comparison-sha: ${{ steps.comparison.outputs.COMPARISON }}
-      comparison-tag: ${{ steps.comparison.outputs.COMPARISON_TAG }}
-      baseline-sha: ${{ steps.baseline.outputs.BASELINE }}
-      baseline-tag: ${{ steps.baseline.outputs.BASELINE_TAG }}
-    steps:
-      - uses: actions/checkout@v3
-        with:
-          ref: ${{ github.base_ref }}
-          path: baseline-vector
-
-      - name: Setup PR metadata
-        id: pr-metadata
-        run: |
-          echo "PR_NUMBER=${{ github.event.number }}" >> $GITHUB_OUTPUT
-
-      - name: Setup baseline variables
-        id: baseline
-        run: |
-          pushd baseline-vector
-          export BASELINE_SHA=$(git rev-parse HEAD)
-          popd
-
-          export BASELINE_TAG="${{ github.event.pull_request.head.sha }}-${BASELINE_SHA}"
-          echo "baseline sha is: ${BASELINE_SHA}"
-          echo "baseline tag is: ${BASELINE_TAG}"
-
-          echo "BASELINE=${BASELINE_SHA}" >> $GITHUB_OUTPUT
-          echo "BASELINE_TAG=${BASELINE_TAG}" >> $GITHUB_OUTPUT
-
-      - name: Setup comparison variables
-        id: comparison
-        run: |
-          export COMPARISON_SHA=${{ github.event.pull_request.head.sha }}
-          export COMPARISON_TAG="${{ github.event.pull_request.head.sha }}-${{ github.event.pull_request.head.sha }}"
-
-          echo "comparison sha is: ${COMPARISON_SHA}"
-          echo "comparison tag is: ${COMPARISON_TAG}"
-
-          echo "COMPARISON=${COMPARISON_SHA}" >> $GITHUB_OUTPUT
-          echo "COMPARISON_TAG=${COMPARISON_TAG}" >> $GITHUB_OUTPUT
-
-  ##
-  ## BUILD
-  ##
-
-  build-baseline:
-    name: Build baseline Vector container
-    runs-on: [linux, ubuntu-20.04-8core]
-    needs:
-      - compute-metadata
-    steps:
-      - uses: colpal/actions-clean@v1
-
-      - uses: actions/checkout@v3
-
-      - uses: actions/checkout@v3
-        with:
-          ref: ${{ needs.compute-metadata.outputs.baseline-sha }}
-          path: baseline-vector
-
-      - name: Set up Docker Buildx
-        id: buildx
-        uses: docker/setup-buildx-action@v2.5.0
-
-      - name: Build 'vector' target image
-        uses: docker/build-push-action@v4.0.0
-        with:
-          context: baseline-vector/
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          file: regression/Dockerfile
-          builder: ${{ steps.buildx.outputs.name }}
-          outputs: type=docker,dest=${{ runner.temp }}/baseline-image.tar
-          tags: |
-            vector:${{ needs.compute-metadata.outputs.pr-number }}-${{ needs.compute-metadata.outputs.baseline-tag }}
-
-      - name: Upload image as artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: baseline-image
-          path: "${{ runner.temp }}/baseline-image.tar"
-
-  build-comparison:
-    name: Build comparison Vector container
-    runs-on: [linux, soak-builder]
-    needs:
-      - compute-metadata
-    steps:
-      - uses: colpal/actions-clean@v1
-
-      - uses: actions/checkout@v3
-
-      - uses: actions/checkout@v3
-        with:
-          ref: ${{ needs.compute-metadata.outputs.comparison-sha }}
-          path: comparison-vector
-
-      - name: Set up Docker Buildx
-        id: buildx
-        uses: docker/setup-buildx-action@v2.5.0
-
-      - name: Build 'vector' target image
-        uses: docker/build-push-action@v4.0.0
-        with:
-          context: comparison-vector/
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          file: regression/Dockerfile
-          builder: ${{ steps.buildx.outputs.name }}
-          outputs: type=docker,dest=${{ runner.temp }}/comparison-image.tar
-          tags: |
-            vector:${{ needs.compute-metadata.outputs.pr-number }}-${{ needs.compute-metadata.outputs.comparison-tag }}
-
-      - name: Upload image as artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: comparison-image
-          path: "${{ runner.temp }}/comparison-image.tar"
+  mock:
 
   transmit-metadata:
     name: Transmit metadata to trusted workflow
     runs-on: ubuntu-22.04
-    needs:
-      - compute-metadata
     steps:
       - name: Write out metadata
         run: |
-          echo "COMPARISON_TAG=${{ needs.compute-metadata.outputs.pr-number }}-${{ needs.compute-metadata.outputs.comparison-tag }}" > ${{ runner.temp }}/meta
-          echo "COMPARISON_SHA=${{ needs.compute-metadata.outputs.comparison-sha }}" >> ${{ runner.temp }}/meta
-          echo "BASELINE_TAG=${{ needs.compute-metadata.outputs.pr-number }}-${{ needs.compute-metadata.outputs.baseline-tag }}" >> ${{ runner.temp }}/meta
-          echo "BASELINE_SHA=${{ needs.compute-metadata.outputs.baseline-sha }}" >> ${{ runner.temp }}/meta
-          echo "CHECKOUT_SHA=${{ github.sha }}" >> ${{ runner.temp }}/meta
           echo "HEAD_SHA=${{ github.event.pull_request.head.sha }}" >> ${{ runner.temp }}/meta
-          echo "BASE_SHA=${{ github.event.pull_request.base.sha }}" >> ${{ runner.temp }}/meta
-          echo "GITHUB_EVENT_NUMBER=${{ github.event.number }}" >> ${{ runner.temp }}/meta
 
       - name: Upload metadata
         uses: actions/upload-artifact@v3
         with:
           name: meta
           path: "${{ runner.temp }}/meta"
+
+  # cancel-previous:
+  #   runs-on: ubuntu-22.04
+  #   timeout-minutes: 3
+  #   steps:
+  #     - uses: styfle/cancel-workflow-action@0.11.0
+  #       with:
+  #         access_token: ${{ secrets.GITHUB_TOKEN }}
+  #         all_but_latest: true # can cancel workflows scheduled later
+
+  # compute-metadata:
+  #   name: Compute metadata for regression experiments
+  #   runs-on: ubuntu-22.04
+  #   outputs:
+  #     pr-number: ${{ steps.pr-metadata.outputs.PR_NUMBER }}
+
+  #     comparison-sha: ${{ steps.comparison.outputs.COMPARISON }}
+  #     comparison-tag: ${{ steps.comparison.outputs.COMPARISON_TAG }}
+  #     baseline-sha: ${{ steps.baseline.outputs.BASELINE }}
+  #     baseline-tag: ${{ steps.baseline.outputs.BASELINE_TAG }}
+  #   steps:
+  #     - uses: actions/checkout@v3
+  #       with:
+  #         ref: ${{ github.base_ref }}
+  #         path: baseline-vector
+
+  #     - name: Setup PR metadata
+  #       id: pr-metadata
+  #       run: |
+  #         echo "PR_NUMBER=${{ github.event.number }}" >> $GITHUB_OUTPUT
+
+  #     - name: Setup baseline variables
+  #       id: baseline
+  #       run: |
+  #         pushd baseline-vector
+  #         export BASELINE_SHA=$(git rev-parse HEAD)
+  #         popd
+
+  #         export BASELINE_TAG="${{ github.event.pull_request.head.sha }}-${BASELINE_SHA}"
+  #         echo "baseline sha is: ${BASELINE_SHA}"
+  #         echo "baseline tag is: ${BASELINE_TAG}"
+
+  #         echo "BASELINE=${BASELINE_SHA}" >> $GITHUB_OUTPUT
+  #         echo "BASELINE_TAG=${BASELINE_TAG}" >> $GITHUB_OUTPUT
+
+  #     - name: Setup comparison variables
+  #       id: comparison
+  #       run: |
+  #         export COMPARISON_SHA=${{ github.event.pull_request.head.sha }}
+  #         export COMPARISON_TAG="${{ github.event.pull_request.head.sha }}-${{ github.event.pull_request.head.sha }}"
+
+  #         echo "comparison sha is: ${COMPARISON_SHA}"
+  #         echo "comparison tag is: ${COMPARISON_TAG}"
+
+  #         echo "COMPARISON=${COMPARISON_SHA}" >> $GITHUB_OUTPUT
+  #         echo "COMPARISON_TAG=${COMPARISON_TAG}" >> $GITHUB_OUTPUT
+
+  # ##
+  # ## BUILD
+  # ##
+
+  # build-baseline:
+  #   name: Build baseline Vector container
+  #   runs-on: [linux, ubuntu-20.04-8core]
+  #   needs:
+  #     - compute-metadata
+  #   steps:
+  #     - uses: colpal/actions-clean@v1
+
+  #     - uses: actions/checkout@v3
+
+  #     - uses: actions/checkout@v3
+  #       with:
+  #         ref: ${{ needs.compute-metadata.outputs.baseline-sha }}
+  #         path: baseline-vector
+
+  #     - name: Set up Docker Buildx
+  #       id: buildx
+  #       uses: docker/setup-buildx-action@v2.5.0
+
+  #     - name: Build 'vector' target image
+  #       uses: docker/build-push-action@v4.0.0
+  #       with:
+  #         context: baseline-vector/
+  #         cache-from: type=gha
+  #         cache-to: type=gha,mode=max
+  #         file: regression/Dockerfile
+  #         builder: ${{ steps.buildx.outputs.name }}
+  #         outputs: type=docker,dest=${{ runner.temp }}/baseline-image.tar
+  #         tags: |
+  #           vector:${{ needs.compute-metadata.outputs.pr-number }}-${{ needs.compute-metadata.outputs.baseline-tag }}
+
+  #     - name: Upload image as artifact
+  #       uses: actions/upload-artifact@v3
+  #       with:
+  #         name: baseline-image
+  #         path: "${{ runner.temp }}/baseline-image.tar"
+
+  # build-comparison:
+  #   name: Build comparison Vector container
+  #   runs-on: [linux, soak-builder]
+  #   needs:
+  #     - compute-metadata
+  #   steps:
+  #     - uses: colpal/actions-clean@v1
+
+  #     - uses: actions/checkout@v3
+
+  #     - uses: actions/checkout@v3
+  #       with:
+  #         ref: ${{ needs.compute-metadata.outputs.comparison-sha }}
+  #         path: comparison-vector
+
+  #     - name: Set up Docker Buildx
+  #       id: buildx
+  #       uses: docker/setup-buildx-action@v2.5.0
+
+  #     - name: Build 'vector' target image
+  #       uses: docker/build-push-action@v4.0.0
+  #       with:
+  #         context: comparison-vector/
+  #         cache-from: type=gha
+  #         cache-to: type=gha,mode=max
+  #         file: regression/Dockerfile
+  #         builder: ${{ steps.buildx.outputs.name }}
+  #         outputs: type=docker,dest=${{ runner.temp }}/comparison-image.tar
+  #         tags: |
+  #           vector:${{ needs.compute-metadata.outputs.pr-number }}-${{ needs.compute-metadata.outputs.comparison-tag }}
+
+  #     - name: Upload image as artifact
+  #       uses: actions/upload-artifact@v3
+  #       with:
+  #         name: comparison-image
+  #         path: "${{ runner.temp }}/comparison-image.tar"
+
+  # transmit-metadata:
+  #   name: Transmit metadata to trusted workflow
+  #   runs-on: ubuntu-22.04
+  #   needs:
+  #     - compute-metadata
+  #   steps:
+  #     - name: Write out metadata
+  #       run: |
+  #         echo "COMPARISON_TAG=${{ needs.compute-metadata.outputs.pr-number }}-${{ needs.compute-metadata.outputs.comparison-tag }}" > ${{ runner.temp }}/meta
+  #         echo "COMPARISON_SHA=${{ needs.compute-metadata.outputs.comparison-sha }}" >> ${{ runner.temp }}/meta
+  #         echo "BASELINE_TAG=${{ needs.compute-metadata.outputs.pr-number }}-${{ needs.compute-metadata.outputs.baseline-tag }}" >> ${{ runner.temp }}/meta
+  #         echo "BASELINE_SHA=${{ needs.compute-metadata.outputs.baseline-sha }}" >> ${{ runner.temp }}/meta
+  #         echo "CHECKOUT_SHA=${{ github.sha }}" >> ${{ runner.temp }}/meta
+  #         echo "HEAD_SHA=${{ github.event.pull_request.head.sha }}" >> ${{ runner.temp }}/meta
+  #         echo "BASE_SHA=${{ github.event.pull_request.base.sha }}" >> ${{ runner.temp }}/meta
+  #         echo "GITHUB_EVENT_NUMBER=${{ github.event.number }}" >> ${{ runner.temp }}/meta
+
+  #     - name: Upload metadata
+  #       uses: actions/upload-artifact@v3
+  #       with:
+  #         name: meta
+  #         path: "${{ runner.temp }}/meta"
