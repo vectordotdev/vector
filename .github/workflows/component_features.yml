@@ -23,7 +23,7 @@ env:
 jobs:
   check-component-features:
     runs-on: [linux, ubuntu-20.04-8core]
-    if: github.event_name != 'issue_comment' || contains(github.event.comment.body, '/ci-run-component-features')
+    if: github.event_name != 'issue_comment' || (github.event.issue.pull_request && contains(github.event.comment.body, '/ci-deploy-component-features'))
     steps:
       # For PR comment trigger, extra steps are required to associate the workflow with the PR.
 
@@ -35,7 +35,7 @@ jobs:
 
       # Indicate in the PR's CI pane that this job is running.
       - name: (PR comment) Set latest commit status as pending
-        uses: myrotvorets/set-commit-status-action@1.1.6
+        uses: myrotvorets/set-commit-status-action@master
         if: ${{ github.event_name == 'issue_comment' }}
         with:
           sha: ${{ steps.comment-branch.outputs.head_sha }}
@@ -64,7 +64,7 @@ jobs:
 
       # Indicate in the PR's CI pane that this job is complete
       - name: (PR comment) Set latest commit status as ${{ job.status }}
-        uses: myrotvorets/set-commit-status-action@1.1.6
+        uses: myrotvorets/set-commit-status-action@master
         if: always() && github.event_name == 'issue_comment'
         with:
           sha: ${{ steps.comment-branch.outputs.head_sha }}

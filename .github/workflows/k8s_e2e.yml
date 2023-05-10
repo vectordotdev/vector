@@ -10,7 +10,7 @@ on:
 
 concurrency:
   # `github.event.number` exists for PRs, issue.id for comments, merge_group for merge queue otherwise fall back to SHA
-  group: ${{ github.workflow }}-${{ github.event.number || github.event.issue_comment.issue.id || github.event.merge_group.base_sha || github.sha }}
+  group: ${{ github.workflow }}-${{ github.event.number || github.event.issue.issue.id || github.event.merge_group.base_sha || github.sha }}
   cancel-in-progress: true
 
 env:
@@ -38,7 +38,7 @@ jobs:
     runs-on: [linux, ubuntu-20.04-8core]
     needs: changes
     if: |
-      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '/ci-run-k8s-tests'))
+      (github.event_name == 'issue_comment' && github.event.issue.pull_request && contains(github.event.comment.body, '/ci-run-k8s-tests'))
         || (github.event_name == 'pull_request' && needs.changes.outputs.k8s == 'true')
         || github.event_name == 'workflow_dispatch' || github.event_name == 'merge_group'
     # cargo-deb requires a release build, but we don't need optimizations for tests
@@ -115,7 +115,7 @@ jobs:
     runs-on: [linux, ubuntu-20.04-8core]
     needs: changes
     if: |
-      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '/ci-run-k8s-tests'))
+      (github.event_name == 'issue_comment' && github.event.issue.pull_request && contains(github.event.comment.body, '/ci-run-k8s-tests'))
         || (github.event_name == 'pull_request' && needs.changes.outputs.k8s == 'true')
         || github.event_name == 'workflow_dispatch' || github.event_name == 'merge_group'
     outputs:
