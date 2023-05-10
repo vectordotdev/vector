@@ -1,12 +1,14 @@
 name: Regression Detector (trusted)
 
 on:
-  workflow_run:
-    workflows: ["Regression Detector"]
-    types:
-      - completed
-  merge_group:
-    types: [checks_requested]
+  # TODO temporary
+  workflow_dispatch:
+  # workflow_run:
+  #   workflows: ["Regression Detector"]
+  #   types:
+  #     - completed
+  # merge_group:
+  #   types: [checks_requested]
 
 jobs:
   compute-metadata:
