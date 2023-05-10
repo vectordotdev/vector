@@ -24,7 +24,7 @@ to give users insights into the volume of data moving through the system.
 
 ### Out of scope
 
-- Separate metrics, `component_sent_bytes_total`  and `component_received_bytes_total` 
+- Separate metrics, `component_sent_bytes_total`  and `component_received_bytes_total`
   that indicate network bytes sent by Vector are not considered here.
 
 ## Pain
@@ -73,6 +73,14 @@ and `component_sent_event_bytes_total` metrics are the estimated JSON size of th
 
 These tags will be given the name that was configured in [User Experience](#user-experience).
 
+Transforms `reduce` and `aggregate` combine multiple events together. In this case the `source` and `service`
+of the first event will be taken.
+
+If there is no `source` specified (the event was created by the `lua` trnasform) - a source of `_no_source` will
+be emitted.
+
+If there is no `service` available, a service of `_no_service` will be emitted.
+
 #### `component_received_event_bytes_total`
 
 This metric is emitted by the framework [here][source_sender], so it looks like the only change needed is
@@ -115,7 +123,7 @@ optimise their configurations to make the best use of Vector's features.
 The additional tags being added to the metrics will increase the cardinality of
 those metrics if they are enabled.
 
-We will lose the ability to preregister the metrics since the tags will need to be 
+We will lose the ability to preregister the metrics since the tags will need to be
 dynamic. This will cause a noticable, but likely negligible performance loss.
 
 ## Prior Art
@@ -134,14 +142,6 @@ We could use an alternative metric instead of estimated JSON size.
 
 ## Outstanding Questions
 
-- Should the default be to not emit tags? Could the default be different for OP users and standard Vector
-  users?
-- What should the source be tagged as for events that go through a transform that could potentially
-  combine one event from multiple sources - eg. `reduce`?
-- What should the source be for events that come from no source (emitted by the `lua` transform)?
-- Not all sources will have a `service`. Should we default the service to a value, emit a null service tag
-  or not include the tag at all if there is no service?
-
 ## Plan Of Attack
 
 Incremental steps to execute this change. These will be converted to issues after the RFC is approved:
@@ -151,7 +151,7 @@ Incremental steps to execute this change. These will be converted to issues afte
       emitted use this.
 - [ ] Add the Service meaning. Update any sources that potentially create a service to point the meaning
       to the relevant field.
-- [ ] Update the emitted events to accept the new tags - taking the `telemetry` configuration options 
+- [ ] Update the emitted events to accept the new tags - taking the `telemetry` configuration options
       into account.
 
 ## Future Improvements
