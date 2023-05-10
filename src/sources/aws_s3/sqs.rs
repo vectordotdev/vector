@@ -406,12 +406,13 @@ impl IngestorProcess {
 
     async fn handle_sqs_message(&mut self, message: Message) -> Result<(), ProcessingError> {
         let mut sqs_body: String = message.body.unwrap_or_default();
-        let sns_notification_res: Result<SnsNotification, _> = serde_json::from_str(sqs_body.as_ref());
+        let sns_notification_res: Result<SnsNotification, _> =
+            serde_json::from_str(sqs_body.as_ref());
         if let Ok(sns_notification) = sns_notification_res {
             sqs_body = sns_notification.message;
         }
-        let s3_event: SqsEvent = serde_json::from_str(sqs_body.as_ref())
-            .context(InvalidSqsMessageSnafu {
+        let s3_event: SqsEvent =
+            serde_json::from_str(sqs_body.as_ref()).context(InvalidSqsMessageSnafu {
                 message_id: message
                     .message_id
                     .clone()
@@ -722,7 +723,7 @@ fn handle_single_log(
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 pub struct SnsNotification {
-    pub message: String
+    pub message: String,
 }
 
 // https://docs.aws.amazon.com/AmazonS3/latest/userguide/how-to-enable-disable-notification-intro.html
