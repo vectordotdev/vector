@@ -7,21 +7,25 @@ to give users insights into the volume of data moving through the system.
 
 ### In scope
 
-- All event metrics within Vector need to emit the estimated JSON size of the
-  event. With a consistent method for determining the size it will be easier
-  to accurately compare data in vs data out.
+- All volume event metrics within Vector need to emit the estimated JSON size of the
+  event. With a consistent method for determining the size it will be easier to accurately
+  compare data in vs data out.
+  - `component_received_event_bytes_total`
+  - `component_sent_event_bytes_total`
+  - `component_received_event_total`
+  - `component_sent_event_total`
 - The metrics sent by each sink needs to be tagged with the source id of the
   event so the route an event takes through Vector can be queried.
 - Each event needs to be labelled with a `service`. This is a new concept
-  within Vector and represents the application that generated the log or
-  metric.
+  within Vector and represents the application that generated the log,
+  metric or trace.
 - The service tag and source tag in the metrics needs to be opt in so customers
   that don't need the increased cardinality are unaffected.
 
 ### Out of scope
 
-- A separate metric, `component_sent_bytes_total` that indicates network bytes
-  sent by Vector is not considered here.
+- Separate metrics, `component_sent_bytes_total`  and `component_received_bytes_total` 
+  that indicate network bytes sent by Vector are not considered here.
 
 ## Pain
 
@@ -33,14 +37,20 @@ from.
 
 ### User Experience
 
-Global config options will be provided allowing the `service` tag and the
+Global config options will be provided allowing the name of the `service` tag and the
 `source` tag to be specified. For example:
 
 ```yaml
-metrics:
+telemetry:
   tags:
-    service: service
-    source: input
+    service: theservice
+    source: theinput
+```
+
+This will cause Vector to emit a metric like (note the last two tags):
+
+```statds
+vector.component_sent_event_bytes_total:123|c|#component_id:out,component_kind:sink,component_name:out,component_type:console,host:machine,theservice:somekindofservice,theinput:stdin
 ```
 
 The default will be to not emit these tags.
@@ -49,17 +59,19 @@ The default will be to not emit these tags.
 
 #### Metric tags
 
-*service* - to attach the service, we need to add a new meaning to Vector - *service*. Any sources that
-            receive data that could potentially be considered a service will need to indicate which field
-            means `service`.
-            This work has largely already been done with the LogNamespacing work, so it will be trivial to add
-            this new field.
+**service** - to attach the service, we need to add a new meaning to Vector - *service*. Any sources that
+              receive data that could potentially be considered a service will need to indicate which field
+              means `service`.
+              This work has largely already been done with the LogNamespacing work, so it will be trivial to add
+              this new field.
 
-*source* - A new field will be added to the [Event metadata][event_metadata] - `Arc<ComponentId>` that will indicate the source
-           of the event.
+**source** - A new field will be added to the [Event metadata][event_metadata] - `Arc<ComponentId>` that will indicate the source
+             of the event.
 
 We will need to do an audit of all components to ensure the bytes emitted for the `component_received_event_bytes_total`
 and `component_sent_event_bytes_total` metrics are the estimated JSON size of the event.
+
+These tags will be given the name that was configured in [User Experience](#user-experience).
 
 #### `component_received_event_bytes_total`
 
@@ -103,6 +115,9 @@ optimise their configurations to make the best use of Vector's features.
 The additional tags being added to the metrics will increase the cardinality of
 those metrics if they are enabled.
 
+We will lose the ability to preregister the metrics since the tags will need to be 
+dynamic. This will cause a noticable, but likely negligible performance loss.
+
 ## Prior Art
 
 
@@ -131,12 +146,13 @@ We could use an alternative metric instead of estimated JSON size.
 
 Incremental steps to execute this change. These will be converted to issues after the RFC is approved:
 
-- [ ] Submit a PR with spike-level code _roughly_ demonstrating the change.
-- [ ] Incremental change #1
-- [ ] Incremental change #2
-- [ ] ...
-
-Note: This can be filled out during the review process.
+- [ ] Add the `source` field to the Event metadata to indicate the source the event has come from.
+- [ ] Update the Volume event metrics to take a `JsonSize` value. Use the compiler to ensure all metrics
+      emitted use this.
+- [ ] Add the Service meaning. Update any sources that potentially create a service to point the meaning
+      to the relevant field.
+- [ ] Update the emitted events to accept the new tags - taking the `telemetry` configuration options 
+      into account.
 
 ## Future Improvements
 
