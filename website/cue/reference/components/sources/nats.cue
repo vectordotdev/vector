@@ -28,7 +28,7 @@ components: sources: nats: {
 		commonly_used: true
 		deployment_roles: ["aggregator"]
 		delivery:      "best_effort"
-		development:   "beta"
+		development:   "stable"
 		egress_method: "stream"
 		stateful:      false
 	}

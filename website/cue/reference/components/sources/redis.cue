@@ -32,7 +32,7 @@ components: sources: redis: {
 		commonly_used: false
 		delivery:      "best_effort"
 		deployment_roles: ["aggregator"]
-		development:   "beta"
+		development:   "stable"
 		egress_method: "stream"
 		stateful:      false
 	}

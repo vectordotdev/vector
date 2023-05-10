@@ -13,7 +13,7 @@ components: sources: host_metrics: {
 		commonly_used: false
 		delivery:      "at_least_once"
 		deployment_roles: ["daemon"]
-		development:   "beta"
+		development:   "stable"
 		egress_method: "batch"
 		stateful:      false
 	}

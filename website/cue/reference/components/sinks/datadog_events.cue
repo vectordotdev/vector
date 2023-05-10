@@ -3,9 +3,7 @@ package metadata
 components: sinks: datadog_events: {
 	title: "Datadog Events"
 
-	classes: sinks._datadog.classes & {
-		development: "beta"
-	}
+	classes: sinks._datadog.classes
 
 	features: {
 		acknowledgements: true

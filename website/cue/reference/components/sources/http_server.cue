@@ -10,7 +10,7 @@ components: sources: http_server: {
 		commonly_used: false
 		delivery:      "at_least_once"
 		deployment_roles: ["aggregator", "sidecar"]
-		development:   "beta"
+		development:   "stable"
 		egress_method: "batch"
 		stateful:      false
 	}
