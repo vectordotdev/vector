@@ -210,7 +210,7 @@ smpl_jwt = { version = "0.7.1", default-features = false, optional = true }
 lapin = { version = "2.1.1", default-features = false, features = ["native-tls"], optional = true }
 
 # API
-async-graphql = { version = "5.0.7", default-features = false, optional = true, features = ["chrono"] }
+async-graphql = { version = "5.0.8", default-features = false, optional = true, features = ["chrono"] }
 async-graphql-warp = { version = "5.0.7", default-features = false, optional = true }
 itertools = { version = "0.10.5", default-features = false, optional = true }
 
