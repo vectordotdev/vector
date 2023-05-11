@@ -28,7 +28,7 @@ jobs:
     runs-on: macos-11
     env:
       CARGO_INCREMENTAL: 0
-    if: github.event_name != 'issue_comment' || contains(github.event.comment.body, '/ci-run-unit-mac')
+    if: github.event_name != 'issue_comment' || (github.event.issue.pull_request && contains(github.event.comment.body, '/ci-run-unit-mac'))
     steps:
       - name: (PR comment) Get PR branch
         if: ${{ github.event_name == 'issue_comment' }}

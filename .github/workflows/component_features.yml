@@ -23,7 +23,7 @@ env:
 jobs:
   check-component-features:
     runs-on: [linux, ubuntu-20.04-8core]
-    if: github.event_name != 'issue_comment' || contains(github.event.comment.body, '/ci-run-component-features')
+    if: github.event_name != 'issue_comment' || (github.event.issue.pull_request && contains(github.event.comment.body, '/ci-run-component-features'))
     steps:
       - name: (PR comment) Get PR branch
         if: ${{ github.event_name == 'issue_comment' }}
