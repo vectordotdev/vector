@@ -59,52 +59,64 @@ The default will be to not emit these tags.
 
 #### Metric tags
 
-**service** - to attach the service, we need to add a new meaning to Vector - *service*. Any sources that
-              receive data that could potentially be considered a service will need to indicate which field
-              means `service`.
-              This work has largely already been done with the LogNamespacing work, so it will be trivial to add
-              this new field.
+**service** - to attach the service, we need to add a new meaning to Vector - 
+              `service`. Any sources that receive data that could potentially 
+              be considered a service will need to indicate which field means 
+              `service`. This work has largely already been done with the 
+              LogNamespacing work, so it will be trivial to add this new field.
 
-**source** - A new field will be added to the [Event metadata][event_metadata] - `Arc<ComponentId>` that will indicate the source
-             of the event.
+**source** - A new field will be added to the [Event metadata][event_metadata] - 
+             `Arc<OutputId>` that will indicate the source of the event. 
+             `OutputId` will need to be serializable so it can be stored in the
+             disk buffer. If the event is loaded from the buffer and it is pointing
+             to a source that no longer exists, given that it is just an identifier
+             it won't cause any issues.
 
-We will need to do an audit of all components to ensure the bytes emitted for the `component_received_event_bytes_total`
-and `component_sent_event_bytes_total` metrics are the estimated JSON size of the event.
+We will need to do an audit of all components to ensure the
+bytes emitted for the `component_received_event_bytes_total` and
+`component_sent_event_bytes_total` metrics are the estimated JSON size of the
+event.
 
-These tags will be given the name that was configured in [User Experience](#user-experience).
+These tags will be given the name that was configured in [User Experience]
+(#user-experience).
 
-Transforms `reduce` and `aggregate` combine multiple events together. In this case the `source` and `service`
-of the first event will be taken.
+Transforms `reduce` and `aggregate` combine multiple events together. In this
+case the `source` and `service` of the first event will be taken.
 
-If there is no `source` specified (the event was created by the `lua` trnasform) - a source of `_no_source` will
-be emitted.
+If there is no `source` specified (the event was created by the `lua` transform)
+- a source of `-` will be emitted.
 
-If there is no `service` available, a service of `_no_service` will be emitted.
+If there is no `service` available, a service of `-` will be emitted.
 
 #### `component_received_event_bytes_total`
 
-This metric is emitted by the framework [here][source_sender], so it looks like the only change needed is
-to add the service tag.
+This metric is emitted by the framework [here][source_sender], so it looks like
+the only change needed is to add the service tag.
 
 #### `component_sent_event_bytes_total`
 
-For stream based sinks this will typically be the byte value returned by `DriverResponse::events_sent`.
+For stream based sinks this will typically be the byte value returned by
+`DriverResponse::events_sent`.
 
-Despite being in the [Component Spec][component_spec], not all sinks currently conform to this.
+Despite being in the [Component Spec][component_spec], not all sinks currently
+conform to this.
 
 As an example, from a cursory glance over a couple of sinks:
 
-The Amqp sink currently emits this value as the length of the binary data that is sent. By the time the data has
-reached the code where the `component_sent_event_bytes_total` event is emitted, that event has been encoded
-and the actual estimated JSON size has been lost. The sink will need to be updated so that when the event is
-encoded, the encoded event together with the pre-encoded JSON bytesize will be sent to the service where the
-event is emitted.
+The Amqp sink currently emits this value as the length of the binary
+data that is sent. By the time the data has reached the code where the
+`component_sent_event_bytes_total` event is emitted, that event has been
+encoded and the actual estimated JSON size has been lost. The sink will need
+to be updated so that when the event is encoded, the encoded event together
+with the pre-encoded JSON bytesize will be sent to the service where the event
+is emitted.
 
-The Kafka sink also currently sends the binary size, but it looks like the estimated JSON bytesize is easily
-accessible at the point of emitting, so would not need too much of a change.
+The Kafka sink also currently sends the binary size, but it looks like the
+estimated JSON bytesize is easily accessible at the point of emitting, so would
+not need too much of a change.
 
-To ensure that the correct metric is sent in a type-safe manner, we will wrap the estimated JSON size in a
-newtype:
+To ensure that the correct metric is sent in a type-safe manner, we will wrap
+the estimated JSON size in a newtype:
 
 ```rust
 pub struct JsonSize(usize);
