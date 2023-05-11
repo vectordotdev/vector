@@ -56,7 +56,7 @@ impl Buffer {
                     InnerBuffer::Zlib(ZlibEncoder::new(writer, level.as_flate2()))
                 },
                 Compression::Zstd(level) => {
-                    InnerBuffer::Zstd(ZstdEncoder::new(writer, level).unwrap())
+                    InnerBuffer::Zstd(ZstdEncoder::new(writer, level.into()).unwrap())
                 },
             }
         })

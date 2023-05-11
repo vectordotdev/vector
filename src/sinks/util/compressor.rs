@@ -31,7 +31,7 @@ impl From<Compression> for Writer {
             Compression::Gzip(level) => Writer::Gzip(GzEncoder::new(writer, level.as_flate2())),
             Compression::Zlib(level) => Writer::Zlib(ZlibEncoder::new(writer, level.as_flate2())),
             Compression::Zstd(level) => {
-                let encoder = ZstdEncoder::new(writer, level)
+                let encoder = ZstdEncoder::new(writer, level.into())
                     .expect("zstd encoder should not fail on init");
                 Writer::Zstd(encoder)
             },

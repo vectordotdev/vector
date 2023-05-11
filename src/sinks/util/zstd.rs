@@ -1,15 +1,36 @@
-use std::io;
+use std::{io, fmt::Display};
 
+use super::buffer::compression::CompressionLevel;
 
-pub const DEFAULT_COMPRESSION_LEVEL: i32 = zstd::DEFAULT_COMPRESSION_LEVEL;
+#[derive(Debug)]
+pub struct ZstdCompressionLevel(i32);
+
+impl From<CompressionLevel> for ZstdCompressionLevel {
+    fn from(value: CompressionLevel) -> Self {
+        let val: i32 = match value {
+            CompressionLevel::None => 0,
+            CompressionLevel::Default => zstd::DEFAULT_COMPRESSION_LEVEL,
+            CompressionLevel::Best => 21,
+            CompressionLevel::Fast => 1,
+            CompressionLevel::Val(v) => v as i32,
+        };
+        ZstdCompressionLevel(val)
+    }
+}
+
+impl Display for ZstdCompressionLevel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
 
 pub struct ZstdEncoder<W: io::Write> {
     inner: zstd::Encoder<'static, W>,
 }
 
 impl<W: io::Write> ZstdEncoder<W> {
-    pub fn new(writer: W, level: i32) -> io::Result<Self> {
-        let encoder = zstd::Encoder::new(writer, level)?;
+    pub fn new(writer: W, level: ZstdCompressionLevel) -> io::Result<Self> {
+        let encoder = zstd::Encoder::new(writer, level.0)?;
         Ok(Self {
             inner: encoder,
         })
