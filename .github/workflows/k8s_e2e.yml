@@ -48,6 +48,14 @@ jobs:
       CARGO_PROFILE_RELEASE_CODEGEN_UNITS: 256
       CARGO_INCREMENTAL: 0
     steps:
+      - name: Validate issue comment
+        if: github.event_name == 'issue_comment'
+        uses: tspascoal/get-user-teams-membership@v2
+        with:
+          username: ${{ github.actor }}
+          team: 'Vector'
+          GITHUB_TOKEN: ${{ secrets.GH_PAT_ORG }}
+
       - name: (PR comment) Get PR branch
         if: ${{ github.event_name == 'issue_comment' }}
         uses: xt0rted/pull-request-comment-branch@v1
@@ -111,6 +119,14 @@ jobs:
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
+      - name: Validate issue comment
+        if: github.event_name == 'issue_comment'
+        uses: tspascoal/get-user-teams-membership@v2
+        with:
+          username: ${{ github.actor }}
+          team: 'Vector'
+          GITHUB_TOKEN: ${{ secrets.GH_PAT_ORG }}
+
       - uses: actions/github-script@v6.4.1
         id: set-matrix
         with:
@@ -221,6 +237,14 @@ jobs:
     env:
       FAILED: ${{ contains(needs.*.result, 'failure') }}
     steps:
+      - name: Validate issue comment
+        if: github.event_name == 'issue_comment'
+        uses: tspascoal/get-user-teams-membership@v2
+        with:
+          username: ${{ github.actor }}
+          team: 'Vector'
+          GITHUB_TOKEN: ${{ secrets.GH_PAT_ORG }}
+
       - name: (PR comment) Get PR branch
         if: success() && github.event_name == 'issue_comment'
         uses: xt0rted/pull-request-comment-branch@v1

@@ -18,6 +18,14 @@ jobs:
     runs-on: ubuntu-20.04
     if: github.event_name != 'issue_comment' || (github.event.issue.pull_request && contains(github.evemt.comment.body, '/ci-run-all'))
     steps:
+      - name: Validate issue comment
+        if: github.event_name == 'issue_comment'
+        uses: tspascoal/get-user-teams-membership@v2
+        with:
+          username: ${{ github.actor }}
+          team: 'Vector'
+          GITHUB_TOKEN: ${{ secrets.GH_PAT_ORG }}
+
       - name: Checkout
         uses: actions/checkout@v3
       - name: Set up QEMU
