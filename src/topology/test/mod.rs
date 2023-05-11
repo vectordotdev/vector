@@ -26,6 +26,7 @@ use tokio::{
     time::{sleep, Duration},
 };
 use vector_buffers::{BufferConfig, BufferType, WhenFull};
+use vector_core::config::OutputId;
 
 mod backpressure;
 mod compliance;
@@ -840,5 +841,46 @@ async fn topology_transform_error_definition() {
     assert_eq!(
         r#"Transform "transform": It all went horribly wrong"#,
         errors[0]
+    );
+}
+
+#[tokio::test]
+async fn source_metadata_reaches_sink() {
+    trace_init();
+
+    let (mut in1, source1) = basic_source();
+    let (mut in2, source2) = basic_source();
+    let (mut out1, sink1) = basic_sink(10);
+
+    let mut config = Config::builder();
+    config.add_source("in1", source1);
+    config.add_source("in2", source2);
+    config.add_transform("transform", &["in1", "in2"], basic_transform("", 0.0));
+    config.add_sink("out1", &["transform"], sink1);
+
+    let (topology, _) = start_topology(config.build().unwrap(), false).await;
+
+    let event1 = Event::Log(LogEvent::from("this"));
+    let event2 = Event::Log(LogEvent::from("that"));
+
+    in1.send_event(event1.clone()).await.unwrap();
+
+    let out_event1 = out1.next().await.unwrap();
+    let out_event1 = out_event1.iter_events().next().unwrap();
+
+    in2.send_event(event2.clone()).await.unwrap();
+
+    let out_event2 = out1.next().await.unwrap();
+    let out_event2 = out_event2.iter_events().next().unwrap();
+
+    topology.stop().await;
+
+    assert_eq!(
+        out_event1.into_log().metadata().source().clone().unwrap(),
+        Arc::new(OutputId::from("in1"))
+    );
+    assert_eq!(
+        out_event2.into_log().metadata().source().clone().unwrap(),
+        Arc::new(OutputId::from("in2"))
     );
 }
