@@ -295,6 +295,7 @@ jobs:
     needs:
       - compute-metadata-experiments
       - confirm-valid-credentials
+      - build-baseline
     steps:
       - name: 'Download baseline image'
         uses: actions/download-artifact@v3
@@ -332,6 +333,7 @@ jobs:
     needs:
       - compute-metadata-experiments
       - confirm-valid-credentials
+      - build-comparison
     steps:
       - name: 'Download comparison image'
         uses: actions/download-artifact@v3
