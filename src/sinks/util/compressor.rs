@@ -3,7 +3,7 @@ use std::io;
 use bytes::{BufMut, BytesMut};
 use flate2::write::{GzEncoder, ZlibEncoder};
 
-use super::{Compression, zstd::ZstdEncoder};
+use super::{zstd::ZstdEncoder, Compression};
 
 enum Writer {
     Plain(bytes::buf::Writer<BytesMut>),
@@ -34,7 +34,7 @@ impl From<Compression> for Writer {
                 let encoder = ZstdEncoder::new(writer, level.into())
                     .expect("zstd encoder should not fail on init");
                 Writer::Zstd(encoder)
-            },
+            }
         }
     }
 }

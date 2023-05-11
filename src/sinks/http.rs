@@ -393,7 +393,7 @@ impl util::http::HttpSink for HttpSink {
                 let mut w = ZlibEncoder::new(buffer.writer(), level.as_flate2());
                 w.write_all(&body).expect("Writing to Vec can't fail");
                 body = w.finish().expect("Writing to Vec can't fail").into_inner();
-            },
+            }
             Compression::Zstd(level) => {
                 builder = builder.header("Content-Encoding", "zstd");
 
@@ -401,7 +401,7 @@ impl util::http::HttpSink for HttpSink {
                 let mut w = ZstdEncoder::new(buffer.writer(), level.into())?;
                 w.write_all(&body).expect("Writing to Vec can't fail");
                 body = w.finish().expect("Writing to Vec can't fail").into_inner();
-            },
+            }
             Compression::None => {}
         }
 

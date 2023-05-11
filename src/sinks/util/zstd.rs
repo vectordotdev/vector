@@ -1,4 +1,4 @@
-use std::{io, fmt::Display};
+use std::{fmt::Display, io};
 
 use super::buffer::compression::CompressionLevel;
 
@@ -31,9 +31,7 @@ pub struct ZstdEncoder<W: io::Write> {
 impl<W: io::Write> ZstdEncoder<W> {
     pub fn new(writer: W, level: ZstdCompressionLevel) -> io::Result<Self> {
         let encoder = zstd::Encoder::new(writer, level.0)?;
-        Ok(Self {
-            inner: encoder,
-        })
+        Ok(Self { inner: encoder })
     }
 
     pub fn finish(self) -> io::Result<W> {
@@ -64,7 +62,6 @@ impl<W: io::Write + std::fmt::Debug> std::fmt::Debug for ZstdEncoder<W> {
 }
 
 /// Safety:
-/// 1. There is no sharing references to zstd encoder. `Write` requires unique reference, and `finish` moves the instance itself. 
+/// 1. There is no sharing references to zstd encoder. `Write` requires unique reference, and `finish` moves the instance itself.
 /// 2. Sharing only internal writer, which implements `Sync`
-unsafe impl<W: io::Write + Sync> Sync for ZstdEncoder<W> {
-}
+unsafe impl<W: io::Write + Sync> Sync for ZstdEncoder<W> {}

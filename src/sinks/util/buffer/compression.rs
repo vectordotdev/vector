@@ -103,7 +103,7 @@ impl Compression {
     pub const fn compression_level(self) -> CompressionLevel {
         match self {
             Self::None => CompressionLevel::None,
-            Self::Gzip(level) | Self::Zlib(level) | Self::Zstd(level) => level
+            Self::Gzip(level) | Self::Zlib(level) | Self::Zstd(level) => level,
         }
     }
 }
@@ -114,7 +114,9 @@ impl fmt::Display for Compression {
             Compression::None => write!(f, "none"),
             Compression::Gzip(ref level) => write!(f, "gzip({})", level.as_flate2().level()),
             Compression::Zlib(ref level) => write!(f, "zlib({})", level.as_flate2().level()),
-            Compression::Zstd(ref level) => write!(f, "zstd({})", ZstdCompressionLevel::from(*level)),
+            Compression::Zstd(ref level) => {
+                write!(f, "zstd({})", ZstdCompressionLevel::from(*level))
+            }
         }
     }
 }
@@ -193,13 +195,17 @@ impl<'de> de::Deserialize<'de> for Compression {
 
                 match compression.compression_level() {
                     CompressionLevel::Val(level) => {
-                        let max_level = compression.max_compression_level_val(); 
+                        let max_level = compression.max_compression_level_val();
                         if level > max_level {
-                            let msg = std::format!("invalid value `{}`, expected value in range [0, {}]", level, max_level);
+                            let msg = std::format!(
+                                "invalid value `{}`, expected value in range [0, {}]",
+                                level,
+                                max_level
+                            );
                             return Err(de::Error::custom(msg));
                         }
-                    },
-                    _ => {},
+                    }
+                    _ => {}
                 };
 
                 Ok(compression)
@@ -238,7 +244,7 @@ impl ser::Serialize for Compression {
                 } else {
                     serializer.serialize_str("zlib")
                 }
-            },
+            }
             Compression::Zstd(zstd_level) => {
                 if *zstd_level != CompressionLevel::Default {
                     let mut map = serializer.serialize_map(None)?;
@@ -308,14 +314,14 @@ impl Configurable for Compression {
         let zstd_string_sbuscheme = generate_string_schema(
             "Zstd",
             Some("[Zstandard][zstd] compression."),
-            "[zstd]: https://facebook.github.io/zstd/"
+            "[zstd]: https://facebook.github.io/zstd/",
         );
 
         let mut all_string_oneof_subschema = generate_one_of_schema(&[
             none_string_subschema,
             gzip_string_subschema,
             zlib_string_subschema,
-            zstd_string_sbuscheme
+            zstd_string_sbuscheme,
         ]);
         apply_base_metadata(&mut all_string_oneof_subschema, string_metadata);
 
@@ -500,14 +506,8 @@ mod test {
     fn deserialization() {
         let fixtures_valid = [
             (r#""none""#, Compression::None),
-            (
-                r#""gzip""#,
-                Compression::Gzip(CompressionLevel::default()),
-            ),
-            (
-                r#""zlib""#,
-                Compression::Zlib(CompressionLevel::default()),
-            ),
+            (r#""gzip""#, Compression::Gzip(CompressionLevel::default())),
+            (r#""zlib""#, Compression::Zlib(CompressionLevel::default())),
             (r#"{"algorithm": "none"}"#, Compression::None),
             (
                 r#"{"algorithm": "gzip"}"#,

@@ -3,7 +3,10 @@ use std::io::Write;
 use bytes::{BufMut, BytesMut};
 use flate2::write::{GzEncoder, ZlibEncoder};
 
-use super::{batch::{err_event_too_large, Batch, BatchSize, PushResult}, zstd::ZstdEncoder};
+use super::{
+    batch::{err_event_too_large, Batch, BatchSize, PushResult},
+    zstd::ZstdEncoder,
+};
 
 pub mod compression;
 pub mod json;
@@ -51,13 +54,13 @@ impl Buffer {
                 Compression::None => InnerBuffer::Plain(writer),
                 Compression::Gzip(level) => {
                     InnerBuffer::Gzip(GzEncoder::new(writer, level.as_flate2()))
-                },
+                }
                 Compression::Zlib(level) => {
                     InnerBuffer::Zlib(ZlibEncoder::new(writer, level.as_flate2()))
-                },
+                }
                 Compression::Zstd(level) => {
                     InnerBuffer::Zstd(ZstdEncoder::new(writer, level.into()).unwrap())
-                },
+                }
             }
         })
     }
@@ -73,10 +76,10 @@ impl Buffer {
             }
             InnerBuffer::Zlib(inner) => {
                 inner.write_all(input).unwrap();
-            },
+            }
             InnerBuffer::Zstd(inner) => {
                 inner.write_all(input).unwrap();
-            },
+            }
         }
     }
 
