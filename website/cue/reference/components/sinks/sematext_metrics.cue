@@ -6,7 +6,7 @@ components: sinks: sematext_metrics: {
 	classes: {
 		commonly_used: false
 		delivery:      "at_least_once"
-		development:   "beta"
+		development:   "stable"
 		service_providers: ["Sematext"]
 		egress_method: "batch"
 		stateful:      true

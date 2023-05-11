@@ -6,7 +6,7 @@ components: sinks: nats: {
 	classes: {
 		commonly_used: false
 		delivery:      "best_effort"
-		development:   "beta"
+		development:   "stable"
 		egress_method: "stream"
 		service_providers: []
 		stateful: false

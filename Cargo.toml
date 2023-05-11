@@ -140,11 +140,11 @@ loki-logproto = { path = "lib/loki-logproto", optional = true }
 async-stream = { version = "0.3.5", default-features = false }
 async-trait = { version = "0.1.68", default-features = false }
 futures = { version = "0.3.28", default-features = false, features = ["compat", "io-compat"], package = "futures" }
-tokio = { version = "1.28.0", default-features = false, features = ["full"] }
+tokio = { version = "1.28.1", default-features = false, features = ["full"] }
 tokio-openssl = { version = "0.6.3", default-features = false }
 tokio-stream = { version = "0.1.14", default-features = false, features = ["net", "sync", "time"] }
 tokio-util = { version = "0.7", default-features = false, features = ["io", "time"] }
-console-subscriber = { version = "0.1.8", default-features = false, optional = true }
+console-subscriber = { version = "0.1.9", default-features = false, optional = true }
 
 # Tracing
 tracing = { version = "0.1.34", default-features = false }
@@ -181,13 +181,13 @@ azure_storage = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev =
 azure_storage_blobs = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "b4544d4920fa3064eb921340054cd9cc130b7664", default-features = false, optional = true }
 
 # OpenDAL
-opendal = {version = "0.33", default-features = false, features = ["native-tls", "services-webhdfs"], optional = true}
+opendal = {version = "0.34", default-features = false, features = ["native-tls", "services-webhdfs"], optional = true}
 
 # Tower
 tower = { version = "0.4.13", default-features = false, features = ["buffer", "limit", "retry", "timeout", "util", "balance", "discover"] }
 tower-http = { version = "0.4.0", default-features = false, features = ["decompression-gzip"]}
 # Serde
-serde = { version = "1.0.162", default-features = false, features = ["derive"] }
+serde = { version = "1.0.163", default-features = false, features = ["derive"] }
 serde-toml-merge = { version = "0.3.0", default-features = false }
 serde_bytes = { version = "0.11.9", default-features = false, features = ["std"], optional = true }
 serde_json = { version = "1.0.96", default-features = false, features = ["raw_value"] }
@@ -210,8 +210,8 @@ smpl_jwt = { version = "0.7.1", default-features = false, optional = true }
 lapin = { version = "2.1.1", default-features = false, features = ["native-tls"], optional = true }
 
 # API
-async-graphql = { version = "5.0.7", default-features = false, optional = true, features = ["chrono"] }
-async-graphql-warp = { version = "5.0.7", default-features = false, optional = true }
+async-graphql = { version = "5.0.8", default-features = false, optional = true, features = ["chrono"] }
+async-graphql-warp = { version = "5.0.8", default-features = false, optional = true }
 itertools = { version = "0.10.5", default-features = false, optional = true }
 
 # API client
@@ -230,7 +230,7 @@ vrl = { package = "vrl", git = "https://github.com/vectordotdev/vrl", rev = "v0.
 
 # External libs
 arc-swap = { version = "1.6", default-features = false, optional = true }
-async-compression = { version = "0.3.15", default-features = false, features = ["tokio", "gzip", "zstd"], optional = true }
+async-compression = { version = "0.4.0", default-features = false, features = ["tokio", "gzip", "zstd"], optional = true }
 apache-avro = { version = "0.14.0", default-features = false, optional = true }
 axum = { version = "0.6.18", default-features = false }
 base64 = { version = "0.21.0", default-features = false, optional = true }
@@ -354,7 +354,7 @@ reqwest = { version = "0.11", features = ["json"] }
 tempfile = "3.5.0"
 test-generator = "0.3.1"
 tokio-test = "0.4.2"
-tokio = { version = "1.28.0", features = ["test-util"] }
+tokio = { version = "1.28.1", features = ["test-util"] }
 tower-test = "0.4.0"
 vector-core = { path = "lib/vector-core", default-features = false, features = ["vrl", "test"] }
 wiremock = "0.5.18"

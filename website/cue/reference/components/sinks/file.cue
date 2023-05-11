@@ -7,7 +7,7 @@ components: sinks: file: {
 		commonly_used: false
 		delivery:      "at_least_once"
 
-		development:   "beta"
+		development:   "stable"
 		egress_method: "stream"
 		service_providers: []
 		stateful: false
