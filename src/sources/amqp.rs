@@ -38,7 +38,7 @@ use vector_core::{
 
 #[derive(Debug, Snafu)]
 enum BuildError {
-    #[snafu(display("Could not create AMQP consumer!: {}", source))]
+    #[snafu(display("Could not create AMQP consumer: {}", source))]
     AmqpCreateError {
         source: Box<dyn std::error::Error + Send + Sync>,
     },
