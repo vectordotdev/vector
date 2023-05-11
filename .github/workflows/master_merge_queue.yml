@@ -6,6 +6,7 @@
 # The design of this workflow relies on the first real job "changes" to detect file
 # changes against the base, and each downstream workflow after that will only be
 # called if the files for that area have changed.
+#
 
 name: Master Merge Queue Test Suite
 
@@ -15,8 +16,6 @@ on:
   pull_request:
   merge_group:
     types: [checks_requested]
-  issue_comment:
-    types: [created]
 
 concurrency:
   # `github.event.number` exists for pull requests, otherwise fall back to SHA for merge queue
@@ -43,7 +42,7 @@ jobs:
   # If we don't run this job (such as in a pull request), then by consequence all downstream
   # test jobs are not run. This allows us to not have to check for merge group in each job.
   changes:
-    if: github.event_name == 'merge_group' || (github.event.issue.pull_request && contains(github.event.comment.body, '/ci-run-all'))
+    if: ${{ github.event_name == 'merge_group' }}
     uses: ./.github/workflows/changes.yml
     with:
       base_ref: ${{ github.event.merge_group.base_ref }}
@@ -53,32 +52,31 @@ jobs:
   test-cli:
     uses: ./.github/workflows/cli.yml
     needs: changes
-    if: needs.changes.outputs.source == 'true' || (github.event.issue.pull_request && contains(github.event.comment.body, '/ci-run-all'))
+    if: needs.changes.outputs.source == 'true'
     secrets: inherit
 
   test-misc:
     uses: ./.github/workflows/misc.yml
     needs: changes
     secrets: inherit
-    if: needs.changes.outputs.source == 'true' || (github.event.issue.pull_request && contains(github.event.comment.body, '/ci-run-all'))
+    if: needs.changes.outputs.source == 'true'
 
   test-environment:
     uses: ./.github/workflows/environment.yml
     needs: changes
     secrets: inherit
-    if: needs.changes.outputs.source == 'true' || (github.event.issue.pull_request && contains(github.event.comment.body, '/ci-run-all'))
 
   check-msrv:
     uses: ./.github/workflows/msrv.yml
     needs: changes
     secrets: inherit
-    if: needs.changes.outputs.source == 'true' || (github.event.issue.pull_request && contains(github.event.comment.body, '/ci-run-all'))
+    if: needs.changes.outputs.source == 'true'
 
   check-component-features:
     uses: ./.github/workflows/component_features.yml
     needs: changes
     secrets: inherit
-    if: needs.changes.outputs.source == 'true' || (github.event.issue.pull_request && contains(github.event.comment.body, '/ci-run-all'))
+    if: needs.changes.outputs.source == 'true'
 
   cross-linux:
     uses: ./.github/workflows/cross.yml
@@ -86,25 +84,25 @@ jobs:
     secrets: inherit
     # We run cross checks when dependencies change to ensure they still build.
     # This helps us avoid adopting dependencies that aren't compatible with other architectures.
-    if: needs.changes.outputs.dependencies == 'true' || (github.event.issue.pull_request && contains(github.event.comment.body, '/ci-run-all'))
+    if: needs.changes.outputs.dependencies == 'true'
 
   unit-mac:
     uses: ./.github/workflows/unit_mac.yml
     needs: changes
     secrets: inherit
-    if: needs.changes.outputs.source == 'true' || (github.event.issue.pull_request && contains(github.event.comment.body, '/ci-run-all'))
+    if: needs.changes.outputs.source == 'true'
 
   unit-windows:
     uses: ./.github/workflows/unit_windows.yml
     needs: changes
     secrets: inherit
-    if: needs.changes.outputs.source == 'true' || (github.event.issue.pull_request && contains(github.event.comment.body, '/ci-run-all'))
+    if: needs.changes.outputs.source == 'true'
 
   install-sh:
     uses: ./.github/workflows/install-sh.yml
     needs: changes
     secrets: inherit
-    if: needs.changes.outputs.install == 'true' || (github.event.issue.pull_request && contains(github.event.comment.body, '/ci-run-all'))
+    if: needs.changes.outputs.install == 'true'
 
   # NOTE: This design of passing in the pr-number to the Regression workflow requires that the merge queue
   # be configured contain a maximum of one PR per execution. This is so that the regression report generated
@@ -131,9 +129,7 @@ jobs:
   master-merge-queue-check:
     name: Master Merge Queue Suite
     runs-on: ubuntu-20.04
-    if: |
-      always() &&
-        (github.event_name != 'issue_comment' || (github.event.issue.pull_request && contains(github.event.comment.body, '/ci-run-all')))
+    if: always()
     needs:
       - changes
       - test-cli

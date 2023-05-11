@@ -25,11 +25,17 @@ jobs:
     runs-on: [linux, ubuntu-20.04-8core]
     env:
       CARGO_INCREMENTAL: 0
-    if: |
-      github.event_name != 'issue_comment' || (github.event.issue.pull_request
-        && (contains(github.event.comment.body, '/ci-deploy-cli') || contains(github.event.comment.body, '/ci-run-all')))
+    if: github.event_name != 'issue_comment' || (github.event.issue.pull_request && contains(github.event.comment.body, '/ci-deploy-cli'))
     steps:
-      # For PR comment trigger, extra steps are required to associate the workflow with the PR.
+
+      - name: Validate issue comment
+        id: comment
+        if: github.event_name == 'issue_comment'
+        uses: tspascoal/get-user-teams-membership@v2
+        with:
+          username: ${{ github.actor }}
+          team: 'Vector'
+          GITHUB_TOKEN: ${{ secrets.GH_PAT_ORG }}
 
       # Find the branch that the comment was made in.
       - name: (PR comment) Get PR branch
