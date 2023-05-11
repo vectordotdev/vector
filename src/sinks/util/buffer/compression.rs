@@ -311,7 +311,7 @@ impl Configurable for Compression {
             "[zlib]: https://zlib.net/",
         );
 
-        let zstd_string_sbuscheme = generate_string_schema(
+        let zstd_string_subschema = generate_string_schema(
             "Zstd",
             Some("[Zstandard][zstd] compression."),
             "[zstd]: https://facebook.github.io/zstd/",
@@ -321,7 +321,7 @@ impl Configurable for Compression {
             none_string_subschema,
             gzip_string_subschema,
             zlib_string_subschema,
-            zstd_string_sbuscheme,
+            zstd_string_subschema,
         ]);
         apply_base_metadata(&mut all_string_oneof_subschema, string_metadata);
 
