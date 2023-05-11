@@ -4,6 +4,7 @@ components: sinks: datadog_traces: {
 	title: "Datadog Traces"
 
 	classes: sinks._datadog.classes & {
+		stateful:    true
 		development: "beta"
 	}
 
