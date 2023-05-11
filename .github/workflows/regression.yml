@@ -69,7 +69,7 @@ jobs:
       with:
         username: ${{ github.event.issue_comment.sender }}
         team: 'Vector'
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   compute-metadata-build:
     name: Compute metadata for building regression experiments
