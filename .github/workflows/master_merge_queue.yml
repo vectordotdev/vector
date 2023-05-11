@@ -16,6 +16,8 @@ on:
   pull_request:
   merge_group:
     types: [checks_requested]
+  issue_comment:
+    types: [created]
 
 concurrency:
   # `github.event.number` exists for pull requests, otherwise fall back to SHA for merge queue
@@ -42,7 +44,7 @@ jobs:
   # If we don't run this job (such as in a pull request), then by consequence all downstream
   # test jobs are not run. This allows us to not have to check for merge group in each job.
   changes:
-    if: ${{ github.event_name == 'merge_group' }}
+    if: github.event_name == 'merge_group' || (github.event.issue.pull_request && contains(github.event.comment.body, '/ci-run-all'))
     uses: ./.github/workflows/changes.yml
     with:
       base_ref: ${{ github.event.merge_group.base_ref }}
@@ -129,7 +131,9 @@ jobs:
   master-merge-queue-check:
     name: Master Merge Queue Suite
     runs-on: ubuntu-20.04
-    if: always()
+    if: |
+      always() &&
+        (github.event_name != 'issue_comment' || (github.event.issue.pull_request && contains(github.event.comment.body, '/ci-run-all')))
     needs:
       - changes
       - test-cli
