@@ -132,15 +132,15 @@ jobs:
     if: always()
     needs:
       - changes
-      # - test-cli
-      # - test-misc
-      # - test-environment
-      # - check-msrv
-      # - check-component-features
-      # - cross-linux
-      # - unit-mac
-      # - unit-windows
-      # - install-sh
+      - test-cli
+      - test-misc
+      - test-environment
+      - check-msrv
+      - check-component-features
+      - cross-linux
+      - unit-mac
+      - unit-windows
+      - install-sh
     env:
       FAILED: ${{ contains(needs.*.result, 'failure') }}
     steps:
