@@ -30,7 +30,7 @@ pub struct EventMetadata {
     finalizers: EventFinalizers,
 
     /// The id of the source
-    source: Option<Arc<OutputId>>,
+    source_id: Option<Arc<OutputId>>,
 
     /// An identifier for a globally registered schema definition which provides information about
     /// the event shape (type information, and semantic meaning of fields).
@@ -74,13 +74,13 @@ impl EventMetadata {
     }
 
     /// Returns a mutable reference to the metadata source.
-    pub fn source(&self) -> &Option<Arc<OutputId>> {
-        &self.source
+    pub fn source_id(&self) -> &Option<Arc<OutputId>> {
+        &self.source_id
     }
 
     /// Returns a mutable reference to the metadata source.
-    pub fn source_mut(&mut self) -> &mut Option<Arc<OutputId>> {
-        &mut self.source
+    pub fn source_id_mut(&mut self) -> &mut Option<Arc<OutputId>> {
+        &mut self.source_id
     }
 
     /// Return the datadog API key, if it exists
@@ -111,7 +111,7 @@ impl Default for EventMetadata {
             secrets: Secrets::new(),
             finalizers: Default::default(),
             schema_definition: default_schema_definition(),
-            source: None,
+            source_id: None,
         }
     }
 }

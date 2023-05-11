@@ -58,7 +58,7 @@ async fn test_function_transform_single_event() {
         let mut events = events.into_events().collect::<Vec<_>>();
         assert_eq!(events.len(), 1);
 
-        *original_event.metadata_mut().source_mut() = Some(Arc::new(OutputId::from("in")));
+        *original_event.metadata_mut().source_id_mut() = Some(Arc::new(OutputId::from("in")));
 
         let event = events.remove(0);
         assert_eq!(original_event, event);
@@ -79,7 +79,7 @@ async fn test_sync_transform_single_event() {
         let mut events = events.into_events().collect::<Vec<_>>();
         assert_eq!(events.len(), 1);
 
-        *original_event.metadata_mut().source_mut() = Some(Arc::new(OutputId::from("in")));
+        *original_event.metadata_mut().source_id_mut() = Some(Arc::new(OutputId::from("in")));
 
         let event = events.remove(0);
         assert_eq!(original_event, event);
@@ -99,7 +99,7 @@ async fn test_task_transform_single_event() {
         let mut events = events.into_events().collect::<Vec<_>>();
         assert_eq!(events.len(), 1);
 
-        *original_event.metadata_mut().source_mut() = Some(Arc::new(OutputId::from("in")));
+        *original_event.metadata_mut().source_id_mut() = Some(Arc::new(OutputId::from("in")));
 
         let event = events.remove(0);
         assert_eq!(original_event, event);

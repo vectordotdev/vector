@@ -143,17 +143,17 @@ impl EventArray {
         match self {
             EventArray::Logs(logs) => {
                 for log in logs {
-                    *log.metadata_mut().source_mut() = Some(Arc::clone(&output_id));
+                    *log.metadata_mut().source_id_mut() = Some(Arc::clone(&output_id));
                 }
             }
             EventArray::Metrics(metrics) => {
                 for metric in metrics {
-                    *metric.metadata_mut().source_mut() = Some(Arc::clone(&output_id));
+                    *metric.metadata_mut().source_id_mut() = Some(Arc::clone(&output_id));
                 }
             }
             EventArray::Traces(traces) => {
                 for trace in traces {
-                    *trace.metadata_mut().source_mut() = Some(Arc::clone(&output_id));
+                    *trace.metadata_mut().source_id_mut() = Some(Arc::clone(&output_id));
                 }
             }
         }
