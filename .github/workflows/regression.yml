@@ -65,13 +65,11 @@ jobs:
     - name: Validate issue comment
       id: comment
       if: github.event_name == 'issue_comment' && github.event.issue.pull_request && contains(github.event.comment.body, '/ci-run-regression')
-      env:
-        COMMENT_ISSUER: ${{ github.actor }} # this is necessary because the integration doesn't have access to this property
       uses: tspascoal/get-user-teams-membership@v2
       with:
-        username: ${{ env.COMMENT_ISSUER }}
+        username: ${{ github.actor }}
         team: 'Vector'
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_TOKEN: ${{ secrets.GH_PAT_ORG }}
 
   compute-metadata-build:
     name: Compute metadata for building regression experiments
