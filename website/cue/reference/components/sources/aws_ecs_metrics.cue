@@ -12,7 +12,7 @@ components: sources: aws_ecs_metrics: {
 		commonly_used: false
 		delivery:      "at_least_once"
 		deployment_roles: ["sidecar"]
-		development:   "beta"
+		development:   "stable"
 		egress_method: "batch"
 		stateful:      false
 	}

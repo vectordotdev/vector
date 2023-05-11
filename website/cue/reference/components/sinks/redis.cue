@@ -5,7 +5,7 @@ components: sinks: redis: {
 	classes: {
 		commonly_used: false
 		delivery:      "best_effort"
-		development:   "beta"
+		development:   "stable"
 		egress_method: "batch"
 		service_providers: []
 		stateful: false

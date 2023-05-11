@@ -6,7 +6,7 @@ components: sinks: honeycomb: {
 	classes: {
 		commonly_used: false
 		delivery:      "at_least_once"
-		development:   "beta"
+		development:   "stable"
 		egress_method: "batch"
 		service_providers: ["Honeycomb"]
 		stateful: false

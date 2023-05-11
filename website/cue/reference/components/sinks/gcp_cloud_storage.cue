@@ -6,7 +6,7 @@ components: sinks: gcp_cloud_storage: {
 	classes: {
 		commonly_used: true
 		delivery:      "at_least_once"
-		development:   "beta"
+		development:   "stable"
 		egress_method: "batch"
 		service_providers: ["GCP"]
 		stateful: false
