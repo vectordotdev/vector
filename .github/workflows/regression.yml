@@ -297,7 +297,7 @@ jobs:
       - confirm-valid-credentials
     steps:
       - name: 'Download baseline image'
-      - uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v3
         with:
           name: baseline-image
 
@@ -334,7 +334,7 @@ jobs:
       - confirm-valid-credentials
     steps:
       - name: 'Download comparison image'
-      - uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v3
         with:
           name: comparison-image
 
