@@ -39,14 +39,14 @@ env:
   PROFILE: debug
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.issue_comment.issue.id }}
+  group: ${{ github.workflow }}-${{ github.event.issue.id }}
   cancel-in-progress: true
 
 jobs:
   prep-pr:
     name: (PR comment) Signal pending to PR
     runs-on: ubuntu-latest
-    if: contains(github.event.comment.body, '/ci-run-integration')
+    if: contains(github.event.comment.body, '/ci-run-integration') || contains(github.event.comment.body, '/ci-run-all')
     steps:
       - name: (PR comment) Get PR branch
         uses: xt0rted/pull-request-comment-branch@v1
@@ -143,7 +143,7 @@ jobs:
     name: Signal result to PR
     runs-on: ubuntu-latest
     needs: test-integration
-    if: always() && contains(github.event.comment.body, '/ci-run-integration')
+    if: always() && (contains(github.event.comment.body, '/ci-run-integration') || contains(github.event.comment.body, '/ci-run-all'))
     steps:
       - name: (PR comment) Get PR branch
         uses: xt0rted/pull-request-comment-branch@v1

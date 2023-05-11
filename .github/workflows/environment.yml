@@ -3,6 +3,8 @@ name: Environment Suite
 on:
   workflow_call:
   workflow_dispatch:
+  issue_comment:
+    types: [created]
   push:
     branches:
       - master
@@ -14,6 +16,7 @@ env:
 jobs:
   publish-new-environment:
     runs-on: ubuntu-20.04
+    if: github.event_name != 'issue_comment' || (github.event.issue.pull_request && contains(github.evemt.comment.body, '/ci-run-all'))
     steps:
       - name: Checkout
         uses: actions/checkout@v3

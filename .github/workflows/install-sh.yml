@@ -3,11 +3,14 @@ name: Update install.sh Suite
 on:
   workflow_call:
   workflow_dispatch:
+  issue_comment:
+    types: [created]
 
 jobs:
 
   sync-install:
     runs-on: ubuntu-20.04
+    if: github.event_name != 'issue_comment' || (github.event.issue.pull_request && contains(github.evemt.comment.body, '/ci-run-all'))
     steps:
       - uses: actions/checkout@v3
       - run: pip3 install awscli --upgrade --user

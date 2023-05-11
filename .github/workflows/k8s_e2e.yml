@@ -28,7 +28,8 @@ env:
 jobs:
   changes:
     if: |
-      (github.event_name == 'issue_comment' && github.event.issue.pull_request && contains(github.event.comment.body, '/ci-run-k8s-tests'))
+      (github.event_name == 'issue_comment' && github.event.issue.pull_request
+          && (contains(github.event.comment.body, '/ci-run-k8s-tests') || contains(github.event.comment.body, '/ci-run-all')))
         || (github.event_name == 'pull_request' && needs.changes.outputs.k8s == 'true')
         || github.event_name == 'workflow_dispatch' || github.event_name == 'merge_group'
     uses: ./.github/workflows/changes.yml
@@ -215,7 +216,8 @@ jobs:
     needs: test-e2e-kubernetes
     if: |
       always() &&
-      (github.event_name != 'issue_comment' || (github.event.issue.pull_request && contains(github.event.comment.body, '/ci-run-k8s-tests')))
+      (github.event_name != 'issue_comment' || (github.event.issue.pull_request
+        && (contains(github.event.comment.body, '/ci-run-k8s-tests') || contains(github.event.comment.body, '/ci-run-all'))))
     env:
       FAILED: ${{ contains(needs.*.result, 'failure') }}
     steps:

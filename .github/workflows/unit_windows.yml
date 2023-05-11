@@ -24,7 +24,9 @@ jobs:
 
   test-windows:
     runs-on: [windows, windows-2019-8core]
-    if: github.event_name != 'issue_comment' || (github.event.issue.pull_request && contains(github.event.comment.body, '/ci-run-unit-windows'))
+    if: |
+      github.event_name != 'issue_comment' || (github.event.issue.pull_request
+        && (contains(github.event.comment.body, '/ci-run-unit-windows') || contains(github.event.comment.body, '/ci-run-all')))
     steps:
       - name: (PR comment) Get PR branch
         if: ${{ github.event_name == 'issue_comment' }}
