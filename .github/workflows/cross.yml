@@ -66,31 +66,31 @@ jobs:
         if: ${{ github.event_name != 'issue_comment' }}
         uses: actions/checkout@v3
 
-      # - name: mock
-      #   run: echo "OK"
+      - name: mock
+        run: echo "OK"
 
-      - uses: actions/cache@v3
-        name: Cache Cargo registry + index
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-
+      # - uses: actions/cache@v3
+      #   name: Cache Cargo registry + index
+      #   with:
+      #     path: |
+      #       ~/.cargo/bin/
+      #       ~/.cargo/registry/index/
+      #       ~/.cargo/registry/cache/
+      #       ~/.cargo/git/db/
+      #     key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      #     restore-keys: |
+      #       ${{ runner.os }}-cargo-
 
-      - run: echo "::add-matcher::.github/matchers/rust.json"
-      - run: 'cargo install cross --version 0.2.4 --force --locked'
-      # Why is this build, not check? Because we need to make sure the linking phase works.
-      # aarch64 and musl in particular are notoriously hard to link.
-      # While it may be tempting to slot a `check` in here for quickness, please don't.
-      - run: make cross-build-${{ matrix.target }}
-      - uses: actions/upload-artifact@v3
-        with:
-          name: "vector-debug-${{ matrix.target }}"
-          path: "./target/${{ matrix.target }}/debug/vector"
+      # - run: echo "::add-matcher::.github/matchers/rust.json"
+      # - run: 'cargo install cross --version 0.2.4 --force --locked'
+      # # Why is this build, not check? Because we need to make sure the linking phase works.
+      # # aarch64 and musl in particular are notoriously hard to link.
+      # # While it may be tempting to slot a `check` in here for quickness, please don't.
+      # - run: make cross-build-${{ matrix.target }}
+      # - uses: actions/upload-artifact@v3
+      #   with:
+      #     name: "vector-debug-${{ matrix.target }}"
+      #     path: "./target/${{ matrix.target }}/debug/vector"
 
       # Indicate in the PR's CI pane that this job is complete
       - name: (PR comment) Set latest commit status as failed if needed

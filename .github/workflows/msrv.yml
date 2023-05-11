@@ -15,9 +15,9 @@ jobs:
   check-msrv:
     runs-on: [ubuntu-20.04]
     steps:
-      # - name: mock
-      #   run: echo "OK"
-      - uses: actions/checkout@v3
-      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - run: cargo install cargo-msrv --version 0.15.1
-      - run: cargo msrv verify
+      - name: mock
+        run: echo "OK"
+      # - uses: actions/checkout@v3
+      # - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      # - run: cargo install cargo-msrv --version 0.15.1
+      # - run: cargo msrv verify

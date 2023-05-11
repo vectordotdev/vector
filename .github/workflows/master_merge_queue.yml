@@ -6,7 +6,6 @@
 # The design of this workflow relies on the first real job "changes" to detect file
 # changes against the base, and each downstream workflow after that will only be
 # called if the files for that area have changed.
-#
 
 name: Master Merge Queue Test Suite
 
@@ -54,31 +53,32 @@ jobs:
   test-cli:
     uses: ./.github/workflows/cli.yml
     needs: changes
-    if: needs.changes.outputs.source == 'true'
+    if: needs.changes.outputs.source == 'true' || (github.event.issue.pull_request && contains(github.event.comment.body, '/ci-run-all'))
     secrets: inherit
 
   test-misc:
     uses: ./.github/workflows/misc.yml
     needs: changes
     secrets: inherit
-    if: needs.changes.outputs.source == 'true'
+    if: needs.changes.outputs.source == 'true' || (github.event.issue.pull_request && contains(github.event.comment.body, '/ci-run-all'))
 
   test-environment:
     uses: ./.github/workflows/environment.yml
     needs: changes
     secrets: inherit
+    if: needs.changes.outputs.source == 'true' || (github.event.issue.pull_request && contains(github.event.comment.body, '/ci-run-all'))
 
   check-msrv:
     uses: ./.github/workflows/msrv.yml
     needs: changes
     secrets: inherit
-    if: needs.changes.outputs.source == 'true'
+    if: needs.changes.outputs.source == 'true' || (github.event.issue.pull_request && contains(github.event.comment.body, '/ci-run-all'))
 
   check-component-features:
     uses: ./.github/workflows/component_features.yml
     needs: changes
     secrets: inherit
-    if: needs.changes.outputs.source == 'true'
+    if: needs.changes.outputs.source == 'true' || (github.event.issue.pull_request && contains(github.event.comment.body, '/ci-run-all'))
 
   cross-linux:
     uses: ./.github/workflows/cross.yml
@@ -86,25 +86,25 @@ jobs:
     secrets: inherit
     # We run cross checks when dependencies change to ensure they still build.
     # This helps us avoid adopting dependencies that aren't compatible with other architectures.
-    if: needs.changes.outputs.dependencies == 'true'
+    if: needs.changes.outputs.dependencies == 'true' || (github.event.issue.pull_request && contains(github.event.comment.body, '/ci-run-all'))
 
   unit-mac:
     uses: ./.github/workflows/unit_mac.yml
     needs: changes
     secrets: inherit
-    if: needs.changes.outputs.source == 'true'
+    if: needs.changes.outputs.source == 'true' || (github.event.issue.pull_request && contains(github.event.comment.body, '/ci-run-all'))
 
   unit-windows:
     uses: ./.github/workflows/unit_windows.yml
     needs: changes
     secrets: inherit
-    if: needs.changes.outputs.source == 'true'
+    if: needs.changes.outputs.source == 'true' || (github.event.issue.pull_request && contains(github.event.comment.body, '/ci-run-all'))
 
   install-sh:
     uses: ./.github/workflows/install-sh.yml
     needs: changes
     secrets: inherit
-    if: needs.changes.outputs.install == 'true'
+    if: needs.changes.outputs.install == 'true' || (github.event.issue.pull_request && contains(github.event.comment.body, '/ci-run-all'))
 
   # NOTE: This design of passing in the pr-number to the Regression workflow requires that the merge queue
   # be configured contain a maximum of one PR per execution. This is so that the regression report generated
