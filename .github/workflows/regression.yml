@@ -33,6 +33,7 @@ jobs:
   # Only run this workflow if files changed in areas that could possibly introduce a regression, or by valid comment
   should-run:
     runs-on: ubuntu-latest
+    if: github.event_name != 'issue_comment' || (github.event.issue.pull_request && contains(github.event.comment.body, '/ci-run-regression'))
     outputs:
       source_changed: ${{ steps.filter.outputs.source }}
       comment_valid: ${{ steps.comment.outputs.isTeamMember }}
@@ -64,7 +65,7 @@ jobs:
 
     - name: Validate issue comment
       id: comment
-      if: github.event_name == 'issue_comment' && github.event.issue.pull_request && contains(github.event.comment.body, '/ci-run-regression')
+      if: github.event_name == 'issue_comment'
       uses: tspascoal/get-user-teams-membership@v2
       with:
         username: ${{ github.actor }}
@@ -690,7 +691,9 @@ jobs:
   regression-check:
     name: Regression Detection Suite
     runs-on: ubuntu-latest
-    if: always()
+    if: |
+      always() &&
+        (github.event_name != 'issue_comment' || (github.event.issue.pull_request && contains(github.event.comment.body, '/ci-run-regression')))
     needs:
       - detect-regression
     env:
