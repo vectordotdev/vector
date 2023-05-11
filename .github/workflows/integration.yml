@@ -8,7 +8,6 @@ on:
   pull_request:
   merge_group:
     types: [checks_requested]
-      
 
 concurrency:
   # `github.event.number` exists for pull requests, otherwise fall back to SHA for merge queue
@@ -33,7 +32,6 @@ env:
 jobs:
 
   changes:
-    if: github.event_name == 'pull_request'
     uses: ./.github/workflows/changes.yml
     with:
       base_ref: ${{ github.event.pull_request.base.ref }}
@@ -42,7 +40,6 @@ jobs:
 
   # Calls the Integration Test workflow for each integration that was detected to have files changed that impact it.
   integration-matrix:
-    if: always()
     uses: ./.github/workflows/integration-test.yml
     with:
       if: ${{ matrix.run.if }}
