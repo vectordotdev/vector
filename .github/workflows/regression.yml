@@ -81,9 +81,9 @@ jobs:
     outputs:
       pr-number: ${{ steps.pr-metadata-merge-queue.outputs.PR_NUMBER || steps.pr-metadata-comment.outputs.PR_NUMBER }}
       baseline-sha: ${{ steps.pr-metadata-merge-queue.outputs.BASELINE_SHA || steps.pr-metadata-comment.outputs.BASELINE_SHA }}
-      baseline-tag: ${{ steps.pr-metadata-merge-queue.outputs.BASELINE_TAG || steps.pr-metadata-comment.outputs.BASELINE_TAG }}}
+      baseline-tag: ${{ steps.pr-metadata-merge-queue.outputs.BASELINE_TAG || steps.pr-metadata-comment.outputs.BASELINE_TAG }}
       comparison-sha: ${{ steps.pr-metadata-merge-queue.outputs.COMPARISON_SHA || steps.pr-metadata-comment.outputs.COMPARISON_SHA }}
-      comparison-tag: ${{ steps.pr-metadata-merge-queue.outputs.COMPARISON_TAG || steps.pr-metadata-comment.outputs.COMPARISON_TAG }}}
+      comparison-tag: ${{ steps.pr-metadata-merge-queue.outputs.COMPARISON_TAG || steps.pr-metadata-comment.outputs.COMPARISON_TAG }}
 
       # below are used in the experiment/analyze jobs
       cpus: ${{ steps.system.outputs.CPUS }}
@@ -250,7 +250,7 @@ jobs:
           builder: ${{ steps.buildx.outputs.name }}
           outputs: type=docker,dest=${{ runner.temp }}/baseline-image.tar
           tags: |
-            vector:${{ needs.compute-metadata.outputs.pr-number }}-${{ needs.compute-metadata.outputs.baseline-tag }}
+            vector:${{ needs.compute-metadata.outputs.baseline-tag-exp }}
 
       - name: Upload image as artifact
         uses: actions/upload-artifact@v3
@@ -287,7 +287,7 @@ jobs:
           builder: ${{ steps.buildx.outputs.name }}
           outputs: type=docker,dest=${{ runner.temp }}/comparison-image.tar
           tags: |
-            vector:${{ needs.compute-metadata.outputs.pr-number }}-${{ needs.compute-metadata.outputs.comparison-tag }}
+            vector:${{ needs.compute-metadata.outputs.comparison-tag-exp }}
 
       - name: Upload image as artifact
         uses: actions/upload-artifact@v3
@@ -721,7 +721,15 @@ jobs:
       always() &&
         (github.event_name != 'issue_comment' || (github.event.issue.pull_request && contains(github.event.comment.body, '/ci-run-regression')))
     needs:
+      - compute-metadata
+      - build-baseline
+      - build-comparison
+      - confirm-valid-credentials
+      - upload-baseline-image-to-ecr
+      - upload-comparison-image-to-ecr
+      - submit-job
       - detect-regression
+      - analyze-experiment
     env:
       FAILED: ${{ contains(needs.*.result, 'failure') }}
     steps:
