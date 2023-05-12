@@ -567,7 +567,7 @@ jobs:
             /repos/${{ github.repository }}/statuses/${{ needs.compute-metadata.outputs.comparison-sha }} \
             -f state='failure' \
             -f description='Analyze experimental results from Regression Detection Suite cancelled.' \
-            -f context='regression-check' \
+            -f context='Regression Detection Suite / detect-regression' \
             -f target_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
       - name: Check status, success
@@ -580,7 +580,7 @@ jobs:
             /repos/${{ github.repository }}/statuses/${{ needs.compute-metadata.outputs.comparison-sha }} \
             -f state='success' \
             -f description='Analyze experimental results from Regression Detection Suite succeeded.' \
-            -f context='regression-check' \
+            -f context='Regression Detection Suite / detect-regression' \
             -f target_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
       - name: Check status, failure
@@ -594,7 +594,7 @@ jobs:
             /repos/${{ github.repository }}/statuses/${{ needs.compute-metadata.outputs.comparison-sha }} \
             -f state='failure' \
             -f description='Analyze experimental results from Regression Detection Suite failed.' \
-            -f context='regression-check' \
+            -f context='Regression Detection Suite / detect-regression' \
             -f target_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
   analyze-experiment:
@@ -708,7 +708,7 @@ jobs:
             -f context='Regression Detection Suite / analyze-experiment' \
             -f target_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
-  regression-check:
+  regression-detection-suite:
     name: Regression Detection Suite
     runs-on: ubuntu-latest
     if: |
