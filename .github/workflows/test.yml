@@ -346,6 +346,9 @@ jobs:
       - name: Check cargo deny advisories/licenses
         if: needs.changes.outputs.dependencies == 'true' || needs.changes.outputs.deny == 'true'
         run: make check-deny
+      - name: Check that the 3rd-party license file is up to date
+        if: needs.changes.outputs.dependencies == 'true'
+        run: make check-licenses
       - name: Check Cue docs
         if: needs.changes.outputs.cue == 'true'
         run: make check-docs
