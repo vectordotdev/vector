@@ -90,9 +90,6 @@ jobs:
       memory: ${{ steps.system.outputs.MEMORY }}
       vector-cpus: ${{ steps.system.outputs.VECTOR_CPUS }}
 
-      comparison-tag-exp: ${{ steps.pr-metadata-merge-queue.outputs.COMPARISON_TAG_EXP || steps.pr-metadata-comment.outputs.COMPARISON_TAG_EXP }}
-      baseline-tag-exp: ${{ steps.pr-metadata-merge-queue.outputs.BASELINE_TAG_EXP || steps.pr-metadata-comment.outputs.BASELINE_TAG_EXP }}
-
       replicas: ${{ steps.experimental-meta.outputs.REPLICAS }}
       warmup-seconds: ${{ steps.experimental-meta.outputs.WARMUP_SECONDS }}
       total-samples: ${{ steps.experimental-meta.outputs.TOTAL_SAMPLES }}
@@ -122,27 +119,19 @@ jobs:
           export COMPARISON_SHA=$(git rev-parse HEAD)
           echo "COMPARISON_SHA=${COMPARISON_SHA}" >> $GITHUB_OUTPUT
 
-          export BASELINE_TAG="${COMPARISON_SHA}-${BASELINE_SHA}"
+          export BASELINE_TAG="${PR_NUMBER}-${COMPARISON_SHA}-${BASELINE_SHA}"
           echo "BASELINE_TAG=${BASELINE_TAG}" >> $GITHUB_OUTPUT
 
-          export "BASELINE_TAG_EXP=${PR_NUMBER}-${BASELINE_TAG}"
-          echo "BASELINE_TAG_EXP=${BASELINE_TAG_EXP}" >> $GITHUB_OUTPUT
-
-          export COMPARISON_TAG="${COMPARISON_SHA}-${COMPARISON_SHA}"
+          export COMPARISON_TAG="${PR_NUMBER}-${COMPARISON_SHA}-${COMPARISON_SHA}"
           echo "COMPARISON_TAG=${COMPARISON_TAG}" >> $GITHUB_OUTPUT
-
-          export "COMPARISON_TAG_EXP=${PR_NUMBER}-${COMPARISON_TAG}"
-          echo "COMPARISON_TAG_EXP=${COMPARISON_TAG_EXP}" >> $GITHUB_OUTPUT
 
           echo "pr number is: ${PR_NUMBER}"
 
           echo "baseline sha is: ${BASELINE_SHA}"
           echo "baseline tag is: ${BASELINE_TAG}"
-          echo "baseline tag experiments is: ${BASELINE_TAG_EXP}"
 
           echo "comparison sha is: ${COMPARISON_SHA}"
           echo "comparison tag is: ${COMPARISON_TAG}"
-          echo "comparison tag experiments is: ${COMPARISON_TAG_EXP}"
 
       - name: Get PR metadata (merge queue)
         id: pr-metadata-merge-queue
@@ -157,27 +146,19 @@ jobs:
           export COMPARISON_SHA=${{ github.event.merge_group.head_sha }}
           echo "COMPARISON_SHA=${COMPARISON_SHA}" >> $GITHUB_OUTPUT
 
-          export BASELINE_TAG="${COMPARISON_SHA}-${BASELINE_SHA}"
+          export BASELINE_TAG="${PR_NUMBER}-${COMPARISON_SHA}-${BASELINE_SHA}"
           echo "BASELINE_TAG=${BASELINE_TAG}" >> $GITHUB_OUTPUT
 
-          export COMPARISON_TAG="${COMPARISON_SHA}-${COMPARISON_SHA}"
+          export COMPARISON_TAG="${PR_NUMBER}-${COMPARISON_SHA}-${COMPARISON_SHA}"
           echo "COMPARISON_TAG=${COMPARISON_TAG}" >> $GITHUB_OUTPUT
-
-          export "COMPARISON_TAG_EXP=${PR_NUMBER}-${COMPARISON-TAG}"
-          echo "COMPARISON_TAG_EXP=${COMPARISON_TAG_EXP}" >> $GITHUB_OUTPUT
-
-          export "BASELINE_TAG_EXP=${PR_NUMBER}-${BASELINE_TAG}"
-          echo "BASELINE_TAG_EXP=${BASELINE_TAG_EXP}" >> $GITHUB_OUTPUT
 
           echo "pr number is: ${PR_NUMBER}"
 
           echo "baseline sha is: ${BASELINE_SHA}"
           echo "baseline tag is: ${BASELINE_TAG}"
-          echo "baseline tag experiments is: ${BASELINE_TAG_EXP}"
 
           echo "comparison sha is: ${COMPARISON_SHA}"
           echo "comparison tag is: ${COMPARISON_TAG}"
-          echo "comparison tag experiments is: ${COMPARISON_TAG_EXP}"
 
       - name: Setup experimental metadata
         id: experimental-meta
@@ -250,7 +231,7 @@ jobs:
           builder: ${{ steps.buildx.outputs.name }}
           outputs: type=docker,dest=${{ runner.temp }}/baseline-image.tar
           tags: |
-            vector:${{ needs.compute-metadata.outputs.baseline-tag-exp }}
+            vector:${{ needs.compute-metadata.outputs.baseline-tag }}
 
       - name: Upload image as artifact
         uses: actions/upload-artifact@v3
@@ -287,7 +268,7 @@ jobs:
           builder: ${{ steps.buildx.outputs.name }}
           outputs: type=docker,dest=${{ runner.temp }}/comparison-image.tar
           tags: |
-            vector:${{ needs.compute-metadata.outputs.comparison-tag-exp }}
+            vector:${{ needs.compute-metadata.outputs.comparison-tag }}
 
       - name: Upload image as artifact
         uses: actions/upload-artifact@v3
@@ -317,7 +298,7 @@ jobs:
   ##
 
   upload-baseline-image-to-ecr:
-    name: Upload images to ECR
+    name: Upload baseline images to ECR
     runs-on: ubuntu-22.04
     needs:
       - compute-metadata
@@ -355,7 +336,7 @@ jobs:
           docker push ${{ steps.login-ecr.outputs.registry }}/${{ secrets.SINGLE_MACHINE_PERFORMANCE_TEAM_ID }}-vector:${{ needs.compute-metadata.outputs.baseline-tag }}
 
   upload-comparison-image-to-ecr:
-    name: Upload images to ECR
+    name: Upload comparison images to ECR
     runs-on: ubuntu-22.04
     needs:
       - compute-metadata
