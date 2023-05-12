@@ -736,7 +736,7 @@ jobs:
         if: github.event_name == 'issue_comment' && env.FAILED == 'true'
         uses: myrotvorets/set-commit-status-action@1.1.6
         with:
-          sha: ${{ steps.compute-metadata.outputs.comparison_sha }}
+          sha: ${{ steps.compute-metadata.outputs.comparison-sha }}
           token: ${{ secrets.GITHUB_TOKEN }}
           status: 'failure'
 
@@ -744,7 +744,7 @@ jobs:
         if: github.event_name == 'issue_comment' && env.FAILED != 'true'
         uses: myrotvorets/set-commit-status-action@1.1.6
         with:
-          sha: ${{ steps.compute-metadata.outputs.comparison_sha }}
+          sha: ${{ steps.compute-metadata.outputs.comparison-sha }}
           token: ${{ secrets.GITHUB_TOKEN }}
           status: 'success'
 
