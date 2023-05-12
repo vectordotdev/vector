@@ -73,14 +73,15 @@ impl EventMetadata {
         &mut self.secrets
     }
 
-    /// Returns a mutable reference to the metadata source.
-    pub fn source_id(&self) -> &Option<Arc<OutputId>> {
-        &self.source_id
+    /// Returns a reference to the metadata source.
+    #[must_use]
+    pub fn source_id(&self) -> Option<&OutputId> {
+        self.source_id.as_deref()
     }
 
-    /// Returns a mutable reference to the metadata source.
-    pub fn source_id_mut(&mut self) -> &mut Option<Arc<OutputId>> {
-        &mut self.source_id
+    /// Sets the `source_id` in the metadata to the provided value.
+    pub fn set_source_id(&mut self, source_id: Arc<OutputId>) {
+        self.source_id = Some(source_id);
     }
 
     /// Return the datadog API key, if it exists
