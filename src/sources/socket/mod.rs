@@ -344,8 +344,9 @@ mod test {
         time::{timeout, Duration, Instant},
     };
     use vector_core::event::EventContainer;
-    use vrl::value::value;
-    use vrl::value::{btreemap, Value};
+    use vrl::btreemap;
+    use vrl::value;
+    use vrl::value::Value;
 
     #[cfg(unix)]
     use {

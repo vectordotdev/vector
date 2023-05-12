@@ -226,7 +226,7 @@ hex = { version = "0.4.3", default-features = false, optional = true }
 sha2 = { version = "0.10.6", default-features = false, optional = true }
 
 # VRL Lang
-vrl = { package = "vrl", git = "https://github.com/vectordotdev/vrl", rev = "v0.3.0", features = ["cli"] }
+vrl = { package = "vrl", version = "0.4.0", features = ["cli", "test"] }
 
 # External libs
 arc-swap = { version = "1.6", default-features = false, optional = true }

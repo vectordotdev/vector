@@ -883,7 +883,7 @@ mod integration_tests {
     use std::sync::Arc;
     use vector_core::config::{LegacyKey, LogNamespace};
     use vector_core::event::{BatchNotifier, BatchStatus, Event, LogEvent};
-    use vrl::value::value;
+    use vrl::value;
 
     use super::*;
     use crate::{
