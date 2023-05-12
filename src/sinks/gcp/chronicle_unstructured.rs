@@ -12,7 +12,6 @@ use snafu::Snafu;
 use std::io;
 use tokio_util::codec::Encoder as _;
 use tower::{Service, ServiceBuilder};
-use value::Kind;
 use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
 use vector_config::configurable_component;
 use vector_core::{
@@ -20,6 +19,7 @@ use vector_core::{
     event::{Event, EventFinalizers, Finalizable},
     sink::VectorSink,
 };
+use vrl::value::Kind;
 
 use crate::{
     codecs::{self, EncodingConfig},

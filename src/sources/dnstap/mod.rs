@@ -3,11 +3,11 @@ use std::path::PathBuf;
 use base64::prelude::{Engine as _, BASE64_STANDARD};
 use bytes::Bytes;
 use lookup::{owned_value_path, path, OwnedValuePath};
-use value::{kind::Collection, Kind};
 use vector_common::internal_event::{
     ByteSize, BytesReceived, InternalEventHandle as _, Protocol, Registered,
 };
 use vector_config::configurable_component;
+use vrl::value::{kind::Collection, Kind};
 
 use super::util::framestream::{build_framestream_unix_source, FrameHandler};
 use crate::{
@@ -404,7 +404,7 @@ mod tests {
                          }"#;
 
         let json: serde_json::Value = serde_json::from_str(record).unwrap();
-        let mut event = Event::from(LogEvent::from(value::Value::from(json)));
+        let mut event = Event::from(LogEvent::from(vrl::value::Value::from(json)));
         event.as_mut_log().insert("timestamp", chrono::Utc::now());
 
         let definition = DnstapConfig::event_schema(Some(&owned_value_path!("timestamp")));

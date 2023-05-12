@@ -28,9 +28,9 @@ mod merge_strategy;
 
 use crate::event::Value;
 pub use merge_strategy::*;
-use value::kind::Collection;
-use value::Kind;
 use vector_core::config::LogNamespace;
+use vrl::value::kind::Collection;
+use vrl::value::Kind;
 
 /// Configuration for the `reduce` transform.
 #[serde_as]
@@ -475,7 +475,7 @@ mod test {
     use serde_json::json;
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
-    use value::Kind;
+    use vrl::value::Kind;
 
     use super::*;
     use crate::event::{LogEvent, Value};

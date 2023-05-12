@@ -14,13 +14,13 @@ use lookup::{event_path, metadata_path, owned_value_path, path, OwnedValuePath, 
 use smallvec::{smallvec, SmallVec};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::Decoder;
-use value::kind::Collection;
-use value::Kind;
 use vector_config::configurable_component;
 use vector_core::{
     config::{LegacyKey, LogNamespace},
     schema::Definition,
 };
+use vrl::value::kind::Collection;
+use vrl::value::Kind;
 
 use super::util::net::{SocketListenAddr, TcpSource, TcpSourceAck, TcpSourceAcker};
 use crate::{
@@ -682,7 +682,7 @@ mod test {
     use lookup::OwnedTargetPath;
     use rand::{thread_rng, Rng};
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
-    use value::kind::Collection;
+    use vrl::value::kind::Collection;
 
     use super::*;
     use crate::{

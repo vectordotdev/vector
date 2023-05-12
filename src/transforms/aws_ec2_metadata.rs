@@ -14,9 +14,9 @@ use serde_with::serde_as;
 use snafu::ResultExt as _;
 use tokio::time::{sleep, Duration, Instant};
 use tracing::Instrument;
-use value::Kind;
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
+use vrl::value::Kind;
 
 use crate::config::OutputId;
 use crate::{
@@ -723,7 +723,7 @@ mod integration_tests {
         transforms::test::create_topology,
     };
     use std::collections::BTreeMap;
-    use value::Value;
+    use vrl::value::Value;
     use warp::Filter;
 
     fn ec2_metadata_address() -> String {

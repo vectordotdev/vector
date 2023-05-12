@@ -11,12 +11,12 @@ use codecs::{
 use http::{StatusCode, Uri};
 use lookup::{lookup_v2::OptionalValuePath, owned_value_path, path};
 use tokio_util::codec::Decoder as _;
-use value::{kind::Collection, Kind};
 use vector_config::configurable_component;
 use vector_core::{
     config::{DataType, LegacyKey, LogNamespace},
     schema::Definition,
 };
+use vrl::value::{kind::Collection, Kind};
 use warp::http::{HeaderMap, HeaderValue};
 
 use crate::{
@@ -463,11 +463,11 @@ mod tests {
     use lookup::{event_path, owned_value_path, OwnedTargetPath};
     use std::str::FromStr;
     use std::{collections::BTreeMap, io::Write, net::SocketAddr};
-    use value::kind::Collection;
-    use value::Kind;
     use vector_core::config::LogNamespace;
     use vector_core::event::LogEvent;
     use vector_core::schema::Definition;
+    use vrl::value::kind::Collection;
+    use vrl::value::Kind;
 
     use codecs::{
         decoding::{DeserializerConfig, FramingConfig},

@@ -3,8 +3,8 @@ use similar_asserts::assert_eq;
 
 use chrono::{DateTime, Utc};
 use lookup::{event_path, metadata_path};
-use value::Value;
 use vector_core::{config::LogNamespace, event};
+use vrl::value::{value, Value};
 
 use crate::{
     event::{Event, LogEvent},
@@ -29,7 +29,7 @@ pub fn make_log_event(
 
     let log = match log_namespace {
         LogNamespace::Vector => {
-            let mut log = LogEvent::from(vrl::value!(message));
+            let mut log = LogEvent::from(value!(message));
             log.insert(metadata_path!(Config::NAME, "timestamp"), timestamp);
             log.insert(metadata_path!(Config::NAME, "stream"), stream);
             if is_partial {

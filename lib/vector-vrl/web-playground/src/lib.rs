@@ -1,11 +1,13 @@
-use ::value::Value;
 use gloo_utils::format::JsValueSerdeExt;
 use serde::{Deserialize, Serialize};
-use value::Secrets;
+use std::collections::BTreeMap;
+use vrl::compiler::runtime::{Runtime, Terminate};
+use vrl::compiler::TimeZone;
+use vrl::compiler::{compile_with_state, CompileConfig, TargetValue, TypeState};
 use vrl::diagnostic::DiagnosticList;
-use vrl::state::TypeState;
-use vrl::{diagnostic::Formatter, prelude::BTreeMap, CompileConfig, Runtime};
-use vrl::{TargetValue, Terminate, TimeZone};
+use vrl::diagnostic::Formatter;
+use vrl::value::Secrets;
+use vrl::value::Value;
 use wasm_bindgen::prelude::*;
 
 #[derive(Serialize, Deserialize)]
@@ -71,7 +73,7 @@ impl VrlDiagnosticResult {
 }
 
 fn compile(mut input: Input) -> Result<VrlCompileResult, VrlDiagnosticResult> {
-    let mut functions = stdlib::all();
+    let mut functions = vrl::stdlib::all();
     functions.extend(vector_vrl_functions::all());
     functions.extend(enrichment::vrl_functions());
 
@@ -87,7 +89,7 @@ fn compile(mut input: Input) -> Result<VrlCompileResult, VrlDiagnosticResult> {
         secrets: Secrets::new(),
     };
 
-    let program = match vrl::compile_with_state(&input.program, &functions, &state, config) {
+    let program = match compile_with_state(&input.program, &functions, &state, config) {
         Ok(program) => program,
         Err(diagnostics) => return Err(VrlDiagnosticResult::new(&input.program, diagnostics)),
     };

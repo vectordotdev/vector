@@ -4,7 +4,7 @@ use bytes::Bytes;
 use chrono::{DateTime, Timelike, Utc};
 use ordered_float::NotNan;
 use smallvec::SmallVec;
-use value::Value;
+use vrl::value::Value;
 
 const NULL_SIZE: usize = 4;
 const TRUE_SIZE: usize = 4;

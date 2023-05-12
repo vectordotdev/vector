@@ -392,12 +392,12 @@ _values: {
 	#Syntax: {
 		name:        !=""
 		description: !=""
-		example:     !=""
+		example:     string | null
 	}
 
 	#ConditionExample: {
 		title:    !=""
-		name:     "vrl" | "datadog_search"
+		name:     "vrl" | "datadog_search" | "is_log" | "is_metric" | "is_trace"
 		example:  !=""
 		vrl_only: bool | *false
 	}
@@ -415,6 +415,21 @@ _values: {
 			name:        "datadog_search"
 			description: "A [Datadog Search](\(urls.datadog_search_syntax)) query string."
 			example:     #"*stack"#
+		},
+		{
+			name:        "is_log"
+			description: "Whether the incoming event is a log."
+			example:     null
+		},
+		{
+			name:        "is_metric"
+			description: "Whether the incoming event is a metric."
+			example:     null
+		},
+		{
+			name:        "is_trace"
+			description: "Whether the incoming event is a trace."
+			example:     null
 		},
 	]
 

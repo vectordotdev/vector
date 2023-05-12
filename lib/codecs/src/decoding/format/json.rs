@@ -5,12 +5,12 @@ use chrono::Utc;
 use lookup::PathPrefix;
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
-use value::Kind;
 use vector_core::{
     config::{log_schema, DataType, LogNamespace},
     event::Event,
     schema,
 };
+use vrl::value::Kind;
 
 use super::Deserializer;
 

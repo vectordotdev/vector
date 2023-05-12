@@ -19,13 +19,13 @@ use ordered_float::NotNan;
 use prost::Message;
 use quickcheck::{Arbitrary, Gen, QuickCheck, TestResult};
 use similar_asserts::assert_eq;
-use value::Kind;
 use vector_core::{
     config::LogNamespace,
     event::{metric::TagValue, MetricTags},
     metric_tags,
 };
-use vrl::prelude::Collection;
+use vrl::compiler::value::Collection;
+use vrl::value::Kind;
 
 use crate::schema::Definition;
 use crate::{
@@ -1722,9 +1722,9 @@ fn test_config_outputs() {
                                 Kind::bytes().or_object(Collection::from_unknown(Kind::bytes())),
                                 None,
                             )
-                            .unknown_fields(Kind::object(value::kind::Collection::from_unknown(
-                                Kind::bytes(),
-                            ))),
+                            .unknown_fields(Kind::object(
+                                vrl::value::kind::Collection::from_unknown(Kind::bytes()),
+                            )),
                     ),
                 )]),
             },
@@ -1804,7 +1804,7 @@ fn test_config_outputs() {
                                     None,
                                 )
                                 .unknown_fields(Kind::object(
-                                    value::kind::Collection::from_unknown(Kind::bytes()),
+                                    vrl::value::kind::Collection::from_unknown(Kind::bytes()),
                                 )),
                         ),
                     ),

@@ -452,9 +452,9 @@ mod test {
     use serde::Deserialize;
     use tokio::time::{sleep, Duration, Instant};
     use tokio_util::codec::BytesCodec;
-    use value::{kind::Collection, Kind, Value};
     use vector_common::assert_event_data_eq;
     use vector_core::{config::ComponentKey, schema::Definition};
+    use vrl::value::{kind::Collection, Kind, Value};
 
     use super::*;
     use crate::{

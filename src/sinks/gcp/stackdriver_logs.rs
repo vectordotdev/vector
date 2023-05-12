@@ -6,8 +6,8 @@ use http::{Request, Uri};
 use hyper::Body;
 use serde_json::{json, map};
 use snafu::Snafu;
-use value::Kind;
 use vector_config::configurable_component;
+use vrl::value::Kind;
 
 use crate::{
     codecs::Transformer,

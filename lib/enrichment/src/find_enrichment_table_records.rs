@@ -1,8 +1,5 @@
 use std::collections::BTreeMap;
-
-use ::value::Value;
 use vrl::prelude::*;
-use vrl::state::TypeState;
 
 use crate::{
     vrl_util::{self, add_index, evaluate_condition},
@@ -23,7 +20,7 @@ fn find_enrichment_table_records(
                 .iter()
                 .map(|value| Ok(value.try_bytes_utf8_lossy()?.to_string()))
                 .collect::<std::result::Result<Vec<_>, _>>(),
-            value => Err(value::Error::Expected {
+            value => Err(ValueError::Expected {
                 got: value.kind(),
                 expected: Kind::array(Collection::any()),
             }),
@@ -164,7 +161,7 @@ impl FunctionExpression for FindEnrichmentTableRecordsFn {
                 let value = value.resolve(ctx)?;
                 evaluate_condition(key, value)
             })
-            .collect::<Result<Vec<Condition>>>()?;
+            .collect::<ExpressionResult<Vec<Condition>>>()?;
 
         let select = self
             .select
@@ -194,9 +191,10 @@ impl FunctionExpression for FindEnrichmentTableRecordsFn {
 
 #[cfg(test)]
 mod tests {
-    use ::value::Secrets;
     use vector_common::TimeZone;
-    use vrl::TargetValue;
+    use vrl::compiler::state::RuntimeState;
+    use vrl::compiler::TargetValue;
+    use vrl::value::Secrets;
 
     use super::*;
     use crate::test_util::get_table_registry;
@@ -223,7 +221,7 @@ mod tests {
             metadata: value!({}),
             secrets: Secrets::new(),
         };
-        let mut runtime_state = vrl::state::Runtime::default();
+        let mut runtime_state = RuntimeState::default();
         let mut ctx = Context::new(&mut target, &mut runtime_state, &tz);
 
         registry.finish_load();

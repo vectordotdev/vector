@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 
 use serde_json::Value;
-use vrl_compiler::VrlRuntime;
+use vrl::compiler::VrlRuntime;
 
 use crate::{
     schema::{generate_string_schema, SchemaGenerator, SchemaObject},

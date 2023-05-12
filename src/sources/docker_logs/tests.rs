@@ -25,16 +25,6 @@ fn exclude_self() {
 
 #[cfg(all(test, feature = "docker-logs-integration-tests"))]
 mod integration_tests {
-    use bollard::{
-        container::{
-            Config as ContainerConfig, CreateContainerOptions, KillContainerOptions,
-            RemoveContainerOptions, StartContainerOptions, WaitContainerOptions,
-        },
-        image::{CreateImageOptions, ListImagesOptions},
-    };
-    use futures::{stream::TryStreamExt, FutureExt};
-    use similar_asserts::assert_eq;
-
     use crate::sources::docker_logs::*;
     use crate::sources::docker_logs::{CONTAINER, CREATED_AT, IMAGE, NAME};
     use crate::{
@@ -46,6 +36,16 @@ mod integration_tests {
         },
         SourceSender,
     };
+    use bollard::{
+        container::{
+            Config as ContainerConfig, CreateContainerOptions, KillContainerOptions,
+            RemoveContainerOptions, StartContainerOptions, WaitContainerOptions,
+        },
+        image::{CreateImageOptions, ListImagesOptions},
+    };
+    use futures::{stream::TryStreamExt, FutureExt};
+    use similar_asserts::assert_eq;
+    use vrl::value::value;
 
     /// None if docker is not present on the system
     async fn source_with<'a, L: Into<Option<&'a str>>>(
@@ -315,7 +315,7 @@ mod integration_tests {
             schema_definitions
                 .unwrap()
                 .assert_valid_for_event(&events[0]);
-            assert_eq!(events[0].as_log().get(".").unwrap(), &vrl::value!(message));
+            assert_eq!(events[0].as_log().get(".").unwrap(), &value!(message));
         })
         .await;
     }
@@ -382,28 +382,28 @@ mod integration_tests {
 
             let log = events[0].as_log();
             let meta = log.metadata().value();
-            assert_eq!(log.get(".").unwrap(), &vrl::value!(message));
+            assert_eq!(log.get(".").unwrap(), &value!(message));
             assert_eq!(
                 meta.get(path!(DockerLogsConfig::NAME, CONTAINER)).unwrap(),
-                &vrl::value!(id)
+                &value!(id)
             );
             assert!(meta
                 .get(path!(DockerLogsConfig::NAME, CREATED_AT))
                 .is_some());
             assert_eq!(
                 meta.get(path!(DockerLogsConfig::NAME, IMAGE)).unwrap(),
-                &vrl::value!("busybox")
+                &value!("busybox")
             );
             assert!(meta
                 .get(path!(DockerLogsConfig::NAME, "labels", label))
                 .is_some());
             assert_eq!(
                 meta.get(path!(DockerLogsConfig::NAME, NAME)).unwrap(),
-                &vrl::value!(name)
+                &value!(name)
             );
             assert_eq!(
                 meta.get(path!("vector", "source_type")).unwrap(),
-                &vrl::value!(DockerLogsConfig::NAME)
+                &value!(DockerLogsConfig::NAME)
             );
             assert!(meta
                 .get(path!("vector", "ingest_timestamp"))

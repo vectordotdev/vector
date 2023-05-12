@@ -8,9 +8,9 @@ use futures::{stream, stream::StreamExt, TryStreamExt};
 use lookup::owned_value_path;
 use snafu::Snafu;
 use tokio_util::io::StreamReader;
-use value::{kind::Collection, Kind};
 use vector_config::configurable_component;
 use vector_core::config::{LegacyKey, LogNamespace};
+use vrl::value::{kind::Collection, Kind};
 
 use super::util::MultilineConfig;
 use crate::codecs::DecodingConfig;
@@ -450,7 +450,7 @@ mod integration_tests {
     use aws_sdk_sqs::{model::QueueAttributeName, Client as SqsClient};
     use lookup::path;
     use similar_asserts::assert_eq;
-    use value::Value;
+    use vrl::value::Value;
 
     use super::{sqs, AwsS3Config, Compression, Strategy};
     use crate::{

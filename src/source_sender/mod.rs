@@ -4,7 +4,6 @@ use std::{collections::HashMap, fmt};
 use chrono::Utc;
 use futures::{Stream, StreamExt};
 use metrics::{register_histogram, Histogram};
-use value::Value;
 use vector_buffers::topology::channel::{self, LimitedReceiver, LimitedSender};
 #[cfg(test)]
 use vector_core::event::{into_event_stream, EventStatus};
@@ -16,6 +15,7 @@ use vector_core::{
     },
     ByteSizeOf, EstimatedJsonEncodedSizeOf,
 };
+use vrl::value::Value;
 
 mod errors;
 
