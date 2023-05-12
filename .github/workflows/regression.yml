@@ -38,22 +38,8 @@ jobs:
     outputs:
       source_changed: ${{ steps.filter.outputs.source }}
       comment_valid: ${{ steps.comment.outputs.isTeamMember }}
-      head_sha: ${{ steps.metadata.outputs.HEAD_SHA }}
     steps:
     - uses: actions/checkout@v3
-
-    - name: Dump GitHub context
-      env:
-        GITHUB_CONTEXT: ${{ toJSON(github) }}
-      run: echo "$GITHUB_CONTEXT"
-
-    - name: Get PR metadata
-      id: metadata
-      if: github.event_name == 'issue_comment'
-      run: |
-        gh pr checkout ${{ github.event.issue.number }}
-        export HEAD_SHA=$(git rev-parse HEAD)
-        echo "HEAD_SHA=${HEAD_SHA}" >> $GITHUB_OUTPUT
 
     - name: Determine if source code changed
       id: filter
@@ -87,144 +73,25 @@ jobs:
         team: 'Vector'
         GITHUB_TOKEN: ${{ secrets.GH_PAT_ORG }}
 
-  compute-metadata-build:
+  compute-metadata:
     name: Compute metadata for building regression experiments
     runs-on: ubuntu-22.04
     needs: should-run
-    if: false
-    #if: needs.should-run.outputs.source_changed == 'true' || needs.should-run.outputs.comment_valid == 'true'
+    if: needs.should-run.outputs.source_changed == 'true' || needs.should-run.outputs.comment_valid == 'true'
     outputs:
       pr-number: ${{ steps.pr-metadata.outputs.PR_NUMBER }}
+      baseline-sha: ${{ steps.pr-metadata.outputs.BASELINE_SHA }}
+      baseline-tag: ${{ steps.tags.outputs.BASELINE_TAG }}
+      comparison-sha: ${{ steps.pr-metadata.outputs.COMPARISON_SHA }}
+      comparison-tag: ${{ steps.tags.outputs.COMPARISON_TAG }}
 
-      comparison-sha: ${{ steps.comparison.outputs.COMPARISON }}
-      comparison-tag: ${{ steps.comparison.outputs.COMPARISON_TAG }}
-      baseline-sha: ${{ steps.baseline.outputs.BASELINE }}
-      baseline-tag: ${{ steps.baseline.outputs.BASELINE_TAG }}
-    steps:
-
-      - name: Setup PR metadata
-        id: pr-metadata
-        run: |
-          echo PR_NUMBER=$(echo "${{github.ref}}" | sed -n 's|^refs/heads/gh-readonly-queue/master/pr-\([0-9]*\)-.*$|\1|p') >> $GITHUB_OUTPUT
-
-      - name: Setup baseline variables
-        id: baseline
-        run: |
-          export BASELINE_SHA=${{ github.event.merge_group.base_sha }}
-          export BASELINE_TAG="${{ github.event.merge_group.head_sha }}-${{ github.event.merge_group.base_sha }}"
-
-          echo "baseline sha is: ${BASELINE_SHA}"
-          echo "baseline tag is: ${BASELINE_TAG}"
-
-          echo "BASELINE=${BASELINE_SHA}" >> $GITHUB_OUTPUT
-          echo "BASELINE_TAG=${BASELINE_TAG}" >> $GITHUB_OUTPUT
-
-      - name: Setup comparison variables
-        id: comparison
-        run: |
-          export COMPARISON_SHA=${{ github.event.merge_group.head_sha }}
-          export COMPARISON_TAG="${{ github.event.merge_group.head_sha }}-${{ github.event.merge_group.head_sha }}"
-
-          echo "comparison sha is: ${COMPARISON_SHA}"
-          echo "comparison tag is: ${COMPARISON_TAG}"
-
-          echo "COMPARISON=${COMPARISON_SHA}" >> $GITHUB_OUTPUT
-          echo "COMPARISON_TAG=${COMPARISON_TAG}" >> $GITHUB_OUTPUT
-
-  ##
-  ## BUILD
-  ##
-
-  build-baseline:
-    name: Build baseline Vector container
-    runs-on: [linux, ubuntu-20.04-8core]
-    needs:
-      - compute-metadata-build
-    steps:
-      - uses: colpal/actions-clean@v1
-
-      - uses: actions/checkout@v3
-
-      - uses: actions/checkout@v3
-        with:
-          ref: ${{ needs.compute-metadata-build.outputs.baseline-sha }}
-          path: baseline-vector
-
-      - name: Set up Docker Buildx
-        id: buildx
-        uses: docker/setup-buildx-action@v2.5.0
-
-      - name: Build 'vector' target image
-        uses: docker/build-push-action@v4.0.0
-        with:
-          context: baseline-vector/
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          file: regression/Dockerfile
-          builder: ${{ steps.buildx.outputs.name }}
-          outputs: type=docker,dest=${{ runner.temp }}/baseline-image.tar
-          tags: |
-            vector:${{ needs.compute-metadata-build.outputs.pr-number }}-${{ needs.compute-metadata-build.outputs.baseline-tag }}
-
-      - name: Upload image as artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: baseline-image
-          path: "${{ runner.temp }}/baseline-image.tar"
-
-  build-comparison:
-    name: Build comparison Vector container
-    runs-on: [linux, soak-builder]
-    needs:
-      - compute-metadata-build
-    steps:
-      - uses: colpal/actions-clean@v1
-
-      - uses: actions/checkout@v3
-
-      - uses: actions/checkout@v3
-        with:
-          ref: ${{ needs.compute-metadata-build.outputs.comparison-sha }}
-          path: comparison-vector
-
-      - name: Set up Docker Buildx
-        id: buildx
-        uses: docker/setup-buildx-action@v2.5.0
-
-      - name: Build 'vector' target image
-        uses: docker/build-push-action@v4.0.0
-        with:
-          context: comparison-vector/
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          file: regression/Dockerfile
-          builder: ${{ steps.buildx.outputs.name }}
-          outputs: type=docker,dest=${{ runner.temp }}/comparison-image.tar
-          tags: |
-            vector:${{ needs.compute-metadata-build.outputs.pr-number }}-${{ needs.compute-metadata-build.outputs.comparison-tag }}
-
-      - name: Upload image as artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: comparison-image
-          path: "${{ runner.temp }}/comparison-image.tar"
-
-  compute-metadata-experiments:
-    name: Compute metadata for regression experiments
-    needs: compute-metadata-build
-    runs-on: ubuntu-22.04
-    outputs:
+      # below are used in the experiment/analyze jobs
       cpus: ${{ steps.system.outputs.CPUS }}
       memory: ${{ steps.system.outputs.MEMORY }}
       vector-cpus: ${{ steps.system.outputs.VECTOR_CPUS }}
 
-      comparison-sha: ${{ steps.metadata.outputs.COMPARISON_SHA }}
-      comparison-tag: ${{ steps.metadata.outputs.COMPARISON_TAG }}
-      baseline-sha: ${{ steps.metadata.outputs.BASELINE_SHA }}
-      baseline-tag: ${{ steps.metadata.outputs.BASELINE_TAG }}
-      head-sha: ${{ steps.metadata.outputs.HEAD_SHA }}
-      checkout-sha: ${{ steps.metadata.outputs.CHECKOUT_SHA }}
-      github-event-number: ${{ steps.metadata.outputs.GITHUB_EVENT_NUMBER }}
+      comparison-tag-exp: ${{ steps.tags.outputs.COMPARISON_TAG_EXP }}
+      baseline-tag-exp: ${{ steps.tags.outputs.BASELINE_TAG_EXP }}
 
       replicas: ${{ steps.experimental-meta.outputs.REPLICAS }}
       warmup-seconds: ${{ steps.experimental-meta.outputs.WARMUP_SECONDS }}
@@ -232,8 +99,71 @@ jobs:
       p-value: ${{ steps.experimental-meta.outputs.P_VALUE }}
       smp-version: ${{ steps.experimental-meta.outputs.SMP_CRATE_VERSION }}
       lading-version: ${{ steps.experimental-meta.outputs.LADING_VERSION }}
-
     steps:
+
+      # If triggered by issue comment, the event data doesn't directly contain the head and base sha from the PR.
+      # But, we can retreive this info from some git/gh commands.
+      - name: Get PR metadata (issue_comment)
+        id: pr-metadata
+        if: github.event_name == 'issue_comment'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          export PR_NUMBER=$ {{ github.event.issue.number}}
+          echo "PR_NUMBER=${PR_NUMBER}" >> $GITHUB_OUTPUT
+          echo "::set-env name=PR_NUMBER::$PR_NUMBER"
+
+          gh pr checkout ${PR_NUMBER}
+
+          export BASELINE_SHA=$(git merge-base --fork-point master)
+          echo "BASELINE_SHA=${BASELINE_SHA}" >> $GITHUB_OUTPUT
+          echo "::set-env name=BASELINE_SHA::$BASELINE_SHA"
+
+          export COMPARISON_SHA=$(git rev-parse HEAD)
+          echo "COMPARISON_SHA=${COMPARISON_SHA}" >> $GITHUB_OUTPUT
+          echo "::set-env name=COMPARISON_SHA::$COMPARISON_SHA"
+
+      - name: Get PR metadata (merge queue)
+        id: pr-metadata
+        if: github.event_name != 'issue_comment'
+        run: |
+          export PR_NUMBER=$(echo "${{ github.ref }}" | sed -n 's|^refs/heads/gh-readonly-queue/master/pr-\([0-9]*\)-.*$|\1|p')
+          echo "PR_NUMBER=${PR_NUMBER}" >> $GITHUB_OUTPUT
+          echo "::set-env name=PR_NUMBER::$PR_NUMBER"
+
+          export BASELINE_SHA=${{ github.event.merge_group.base_sha }}
+          echo "BASELINE_SHA=${BASELINE_SHA}" >> $GITHUB_OUTPUT
+          echo "::set-env name=BASELINE_SHA::$BASELINE_SHA"
+
+          export COMPARISON_SHA=${{ github.event.merge_group.head_sha }}
+          echo "COMPARISON_SHA=${COMPARISON_SHA}" >> $GITHUB_OUTPUT
+          echo "::set-env name=COMPARISON_SHA::$COMPARISON_SHA"
+
+      - name: Setup tag variables
+        id: tags
+        run: |
+          export BASELINE_TAG="${COMPARISON_SHA}-${BASELINE_SHA}"
+          echo "BASELINE_TAG=${BASELINE_TAG}" >> $GITHUB_OUTPUT
+
+          export COMPARISON_TAG="${COMPARISON_SHA}-${COMPARISON_SHA}"
+          echo "COMPARISON_TAG=${COMPARISON_TAG}" >> $GITHUB_OUTPUT
+
+          export "COMPARISON_TAG_EXP=${PR_NUMBER}-${COMPARISON-TAG}"
+          echo "COMPARISON_TAG_EXP=${COMPARISON_TAG_EXP}" >> $GITHUB_OUTPUT
+
+          export "BASELINE_TAG_EXP=${PR_NUMBER}-${BASELINE_TAG}"
+          echo "BASELINE_TAG_EXP=${BASELINE_TAG_EXP}" >> $GITHUB_OUTPUT
+
+          echo "pr number is: ${PR_NUMBER}"
+
+          echo "baseline sha is: ${BASELINE_SHA}"
+          echo "baseline tag is: ${BASELINE_TAG}"
+          echo "baseline tag experiments is: ${BASELINE_TAG_EXP}"
+
+          echo "comparison sha is: ${COMPARISON_SHA}"
+          echo "comparison tag is: ${COMPARISON_TAG}"
+          echo "comparison tag experiments is: ${COMPARISON_TAG_EXP}"
+
       - name: Setup experimental metadata
         id: experimental-meta
         run: |
@@ -272,24 +202,89 @@ jobs:
           echo "CPUS=${CPUS}" >> $GITHUB_OUTPUT
           echo "MEMORY=${MEMORY}" >> $GITHUB_OUTPUT
           echo "VECTOR_CPUS=${VECTOR_CPUS}" >> $GITHUB_OUTPUT
+  ##
+  ## BUILD
+  ##
 
-      - name: Setup metadata
-        id: metadata
-        run: |
-          echo "COMPARISON_TAG=${{ needs.compute-metadata-build.outputs.pr-number }}-${{ needs.compute-metadata-build.outputs.comparison-tag }}" > $GITHUB_OUTPUT
-          echo "COMPARISON_SHA=${{ needs.compute-metadata-build.outputs.comparison-sha }}" >> $GITHUB_OUTPUT
-          echo "BASELINE_TAG=${{ needs.compute-metadata-build.outputs.pr-number }}-${{ needs.compute-metadata-build.outputs.baseline-tag }}" >> $GITHUB_OUTPUT
-          echo "BASELINE_SHA=${{ needs.compute-metadata-build.outputs.baseline-sha }}" >> $GITHUB_OUTPUT
-          echo "CHECKOUT_SHA=${{ github.sha }}" >> $GITHUB_OUTPUT
-          echo "HEAD_SHA=${{ github.event.merge_group.head_sha }}" >> $GITHUB_OUTPUT
-          echo "BASE_SHA=${{ github.event.merge_group.head_sha }}" >> $GITHUB_OUTPUT
-          echo "GITHUB_EVENT_NUMBER=${{ needs.compute-metadata-build.outputs.pr-number }}" >> $GITHUB_OUTPUT
+  build-baseline:
+    name: Build baseline Vector container
+    runs-on: [linux, ubuntu-20.04-8core]
+    needs:
+      - compute-metadata
+    steps:
+      - uses: colpal/actions-clean@v1
+
+      - uses: actions/checkout@v3
+
+      - uses: actions/checkout@v3
+        with:
+          ref: ${{ needs.compute-metadata.outputs.baseline-sha }}
+          path: baseline-vector
+
+      - name: Set up Docker Buildx
+        id: buildx
+        uses: docker/setup-buildx-action@v2.5.0
+
+      - name: Build 'vector' target image
+        uses: docker/build-push-action@v4.0.0
+        with:
+          context: baseline-vector/
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          file: regression/Dockerfile
+          builder: ${{ steps.buildx.outputs.name }}
+          outputs: type=docker,dest=${{ runner.temp }}/baseline-image.tar
+          tags: |
+            vector:${{ needs.compute-metadata.outputs.pr-number }}-${{ needs.compute-metadata.outputs.baseline-tag }}
+
+      - name: Upload image as artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: baseline-image
+          path: "${{ runner.temp }}/baseline-image.tar"
+
+  build-comparison:
+    name: Build comparison Vector container
+    runs-on: [linux, soak-builder]
+    needs:
+      - compute-metadata
+    steps:
+      - uses: colpal/actions-clean@v1
+
+      - uses: actions/checkout@v3
+
+      - uses: actions/checkout@v3
+        with:
+          ref: ${{ needs.compute-metadata.outputs.comparison-sha }}
+          path: comparison-vector
+
+      - name: Set up Docker Buildx
+        id: buildx
+        uses: docker/setup-buildx-action@v2.5.0
+
+      - name: Build 'vector' target image
+        uses: docker/build-push-action@v4.0.0
+        with:
+          context: comparison-vector/
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          file: regression/Dockerfile
+          builder: ${{ steps.buildx.outputs.name }}
+          outputs: type=docker,dest=${{ runner.temp }}/comparison-image.tar
+          tags: |
+            vector:${{ needs.compute-metadata.outputs.pr-number }}-${{ needs.compute-metadata.outputs.comparison-tag }}
+
+      - name: Upload image as artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: comparison-image
+          path: "${{ runner.temp }}/comparison-image.tar"
 
   confirm-valid-credentials:
     name: Confirm AWS credentials are minimally valid
     runs-on: ubuntu-22.04
     needs:
-      - compute-metadata-experiments
+      - compute-metadata
     steps:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v2.0.0
@@ -300,7 +295,7 @@ jobs:
 
       - name: Download SMP binary
         run: |
-          aws s3 cp s3://smp-cli-releases/v${{ needs.compute-metadata-experiments.outputs.smp-version }}/x86_64-unknown-linux-gnu/smp ${{ runner.temp }}/bin/smp
+          aws s3 cp s3://smp-cli-releases/v${{ needs.compute-metadata.outputs.smp-version }}/x86_64-unknown-linux-gnu/smp ${{ runner.temp }}/bin/smp
 
   ##
   ## SUBMIT
@@ -310,7 +305,7 @@ jobs:
     name: Upload images to ECR
     runs-on: ubuntu-22.04
     needs:
-      - compute-metadata-experiments
+      - compute-metadata
       - confirm-valid-credentials
       - build-baseline
     steps:
@@ -341,14 +336,14 @@ jobs:
 
       - name: Tag & push baseline image
         run: |
-          docker tag vector:${{ needs.compute-metadata-experiments.outputs.baseline-tag }} ${{ steps.login-ecr.outputs.registry }}/${{ secrets.SINGLE_MACHINE_PERFORMANCE_TEAM_ID }}-vector:${{ needs.compute-metadata-experiments.outputs.baseline-tag }}
-          docker push ${{ steps.login-ecr.outputs.registry }}/${{ secrets.SINGLE_MACHINE_PERFORMANCE_TEAM_ID }}-vector:${{ needs.compute-metadata-experiments.outputs.baseline-tag }}
+          docker tag vector:${{ needs.compute-metadata.outputs.baseline-tag }} ${{ steps.login-ecr.outputs.registry }}/${{ secrets.SINGLE_MACHINE_PERFORMANCE_TEAM_ID }}-vector:${{ needs.compute-metadata.outputs.baseline-tag }}
+          docker push ${{ steps.login-ecr.outputs.registry }}/${{ secrets.SINGLE_MACHINE_PERFORMANCE_TEAM_ID }}-vector:${{ needs.compute-metadata.outputs.baseline-tag }}
 
   upload-comparison-image-to-ecr:
     name: Upload images to ECR
     runs-on: ubuntu-22.04
     needs:
-      - compute-metadata-experiments
+      - compute-metadata
       - confirm-valid-credentials
       - build-comparison
     steps:
@@ -379,14 +374,14 @@ jobs:
 
       - name: Tag & push comparison image
         run: |
-          docker tag vector:${{ needs.compute-metadata-experiments.outputs.comparison-tag }} ${{ steps.login-ecr.outputs.registry }}/${{ secrets.SINGLE_MACHINE_PERFORMANCE_TEAM_ID }}-vector:${{ needs.compute-metadata-experiments.outputs.comparison-tag }}
-          docker push ${{ steps.login-ecr.outputs.registry }}/${{ secrets.SINGLE_MACHINE_PERFORMANCE_TEAM_ID }}-vector:${{ needs.compute-metadata-experiments.outputs.comparison-tag }}
+          docker tag vector:${{ needs.compute-metadata.outputs.comparison-tag }} ${{ steps.login-ecr.outputs.registry }}/${{ secrets.SINGLE_MACHINE_PERFORMANCE_TEAM_ID }}-vector:${{ needs.compute-metadata.outputs.comparison-tag }}
+          docker push ${{ steps.login-ecr.outputs.registry }}/${{ secrets.SINGLE_MACHINE_PERFORMANCE_TEAM_ID }}-vector:${{ needs.compute-metadata.outputs.comparison-tag }}
 
   submit-job:
     name: Submit regression job
     runs-on: ubuntu-22.04
     needs:
-      - compute-metadata-experiments
+      - compute-metadata
       - upload-baseline-image-to-ecr
       - upload-comparison-image-to-ecr
     steps:
@@ -397,7 +392,7 @@ jobs:
           gh api \
             --method POST \
             -H "Accept: application/vnd.github+json" \
-            /repos/${{ github.repository }}/statuses/${{ needs.compute-metadata-experiments.outputs.head-sha }} \
+            /repos/${{ github.repository }}/statuses/${{ needs.compute-metadata.outputs.head-sha }} \
             -f state='pending' \
             -f description='Experiments submitted to the Regression Detector cluster.' \
             -f context='Regression Detector / submission' \
@@ -405,7 +400,7 @@ jobs:
 
       - uses: actions/checkout@v3
         with:
-          ref: ${{ needs.compute-metadata-experiments.outputs.checkout-sha }}
+          ref: ${{ needs.compute-metadata.outputs.comparison-sha }}
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v2.0.0
@@ -420,7 +415,7 @@ jobs:
 
       - name: Download SMP binary
         run: |
-          aws s3 cp s3://smp-cli-releases/v${{ needs.compute-metadata-experiments.outputs.smp-version }}/x86_64-unknown-linux-gnu/smp ${{ runner.temp }}/bin/smp
+          aws s3 cp s3://smp-cli-releases/v${{ needs.compute-metadata.outputs.smp-version }}/x86_64-unknown-linux-gnu/smp ${{ runner.temp }}/bin/smp
 
       - name: Submit job
         env:
@@ -429,19 +424,19 @@ jobs:
           chmod +x ${{ runner.temp }}/bin/smp
 
           ${{ runner.temp }}/bin/smp --team-id ${{ secrets.SINGLE_MACHINE_PERFORMANCE_TEAM_ID }} job submit \
-            --lading-version ${{ needs.compute-metadata-experiments.outputs.lading-version }} \
-            --total-samples ${{ needs.compute-metadata-experiments.outputs.total-samples }} \
-            --warmup-seconds ${{ needs.compute-metadata-experiments.outputs.warmup-seconds }} \
-            --replicas ${{ needs.compute-metadata-experiments.outputs.replicas }} \
-            --baseline-image ${{ steps.login-ecr.outputs.registry }}/${{ secrets.SINGLE_MACHINE_PERFORMANCE_TEAM_ID }}-vector:${{ needs.compute-metadata-experiments.outputs.baseline-tag }} \
-            --comparison-image ${{ steps.login-ecr.outputs.registry }}/${{ secrets.SINGLE_MACHINE_PERFORMANCE_TEAM_ID }}-vector:${{ needs.compute-metadata-experiments.outputs.comparison-tag }} \
-            --baseline-sha ${{ needs.compute-metadata-experiments.outputs.baseline-sha }} \
-            --comparison-sha ${{ needs.compute-metadata-experiments.outputs.comparison-sha }} \
+            --lading-version ${{ needs.compute-metadata.outputs.lading-version }} \
+            --total-samples ${{ needs.compute-metadata.outputs.total-samples }} \
+            --warmup-seconds ${{ needs.compute-metadata.outputs.warmup-seconds }} \
+            --replicas ${{ needs.compute-metadata.outputs.replicas }} \
+            --baseline-image ${{ steps.login-ecr.outputs.registry }}/${{ secrets.SINGLE_MACHINE_PERFORMANCE_TEAM_ID }}-vector:${{ needs.compute-metadata.outputs.baseline-tag }} \
+            --comparison-image ${{ steps.login-ecr.outputs.registry }}/${{ secrets.SINGLE_MACHINE_PERFORMANCE_TEAM_ID }}-vector:${{ needs.compute-metadata.outputs.comparison-tag }} \
+            --baseline-sha ${{ needs.compute-metadata.outputs.baseline-sha }} \
+            --comparison-sha ${{ needs.compute-metadata.outputs.comparison-sha }} \
             --target-command "/usr/local/bin/vector" \
             --target-config-dir ${{ github.workspace }}/regression/ \
-            --target-cpu-allotment "${{ needs.compute-metadata-experiments.outputs.cpus }}" \
-            --target-memory-allotment "${{ needs.compute-metadata-experiments.outputs.memory }}" \
-            --target-environment-variables "VECTOR_THREADS=${{ needs.compute-metadata-experiments.outputs.vector-cpus }},VECTOR_REQUIRE_HEALTHY=true" \
+            --target-cpu-allotment "${{ needs.compute-metadata.outputs.cpus }}" \
+            --target-memory-allotment "${{ needs.compute-metadata.outputs.memory }}" \
+            --target-environment-variables "VECTOR_THREADS=${{ needs.compute-metadata.outputs.vector-cpus }},VECTOR_REQUIRE_HEALTHY=true" \
             --target-name vector \
             --submission-metadata ${{ runner.temp }}/submission-metadata
 
@@ -480,7 +475,7 @@ jobs:
           gh api \
             --method POST \
             -H "Accept: application/vnd.github+json" \
-            /repos/${{ github.repository }}/statuses/${{ needs.compute-metadata-experiments.outputs.head-sha }} \
+            /repos/${{ github.repository }}/statuses/${{ needs.compute-metadata.outputs.head-sha }} \
             -f state='failure' \
             -f description='Experiments submitted to the Regression Detector cluster cancelled.' \
             -f context='Regression Detector / submission' \
@@ -493,7 +488,7 @@ jobs:
           gh api \
             --method POST \
             -H "Accept: application/vnd.github+json" \
-            /repos/${{ github.repository }}/statuses/${{ needs.compute-metadata-experiments.outputs.head-sha }} \
+            /repos/${{ github.repository }}/statuses/${{ needs.compute-metadata.outputs.head-sha }} \
             -f state='success' \
             -f description='Experiments submitted to the Regression Detector cluster successfully.' \
             -f context='Regression Detector / submission' \
@@ -507,7 +502,7 @@ jobs:
           gh api \
             --method POST \
             -H "Accept: application/vnd.github+json" \
-            /repos/${{ github.repository }}/statuses/${{ needs.compute-metadata-experiments.outputs.head-sha }} \
+            /repos/${{ github.repository }}/statuses/${{ needs.compute-metadata.outputs.head-sha }} \
             -f state='success' \
             -f description='Experiments submitted to the Regression Detector cluster failed.' \
             -f context='Regression Detector / submission' \
@@ -522,7 +517,7 @@ jobs:
     runs-on: ubuntu-22.04
     needs:
       - submit-job
-      - compute-metadata-experiments
+      - compute-metadata
     steps:
       - uses: actions/checkout@v3
 
@@ -535,7 +530,7 @@ jobs:
 
       - name: Download SMP binary
         run: |
-          aws s3 cp s3://smp-cli-releases/v${{ needs.compute-metadata-experiments.outputs.smp-version }}/x86_64-unknown-linux-gnu/smp ${{ runner.temp }}/bin/smp
+          aws s3 cp s3://smp-cli-releases/v${{ needs.compute-metadata.outputs.smp-version }}/x86_64-unknown-linux-gnu/smp ${{ runner.temp }}/bin/smp
 
       - name: Download submission metadata
         uses: actions/download-artifact@v3
@@ -560,7 +555,7 @@ jobs:
           gh api \
             --method POST \
             -H "Accept: application/vnd.github+json" \
-            /repos/${{ github.repository }}/statuses/${{ needs.compute-metadata-experiments.outputs.head-sha }} \
+            /repos/${{ github.repository }}/statuses/${{ needs.compute-metadata.outputs.comparison-sha }} \
             -f state='failure' \
             -f description='Analyze experimental results from Regression Detector cancelled.' \
             -f context='regression-check' \
@@ -573,7 +568,7 @@ jobs:
           gh api \
             --method POST \
             -H "Accept: application/vnd.github+json" \
-            /repos/${{ github.repository }}/statuses/${{ needs.compute-metadata-experiments.outputs.head-sha }} \
+            /repos/${{ github.repository }}/statuses/${{ needs.compute-metadata.outputs.comparison-sha }} \
             -f state='success' \
             -f description='Analyze experimental results from Regression Detector succeeded.' \
             -f context='regression-check' \
@@ -587,7 +582,7 @@ jobs:
           gh api \
             --method POST \
             -H "Accept: application/vnd.github+json" \
-            /repos/${{ github.repository }}/statuses/${{ needs.compute-metadata-experiments.outputs.head-sha }} \
+            /repos/${{ github.repository }}/statuses/${{ needs.compute-metadata.outputs.comparison-sha }} \
             -f state='failure' \
             -f description='Analyze experimental results from Regression Detector failed.' \
             -f context='regression-check' \
@@ -598,7 +593,7 @@ jobs:
     runs-on: ubuntu-22.04
     needs:
       - submit-job
-      - compute-metadata-experiments
+      - compute-metadata
     steps:
       - name: Check status, in-progress
         env:
@@ -607,7 +602,7 @@ jobs:
           gh api \
             --method POST \
             -H "Accept: application/vnd.github+json" \
-            /repos/${{ github.repository }}/statuses/${{ needs.compute-metadata-experiments.outputs.head-sha }} \
+            /repos/${{ github.repository }}/statuses/${{ needs.compute-metadata.outputs.comparison-sha }} \
             -f state='pending' \
             -f description='Analyze experimental results from Regression Detector.' \
             -f context='Regression Detector / analyze-experiment' \
@@ -615,7 +610,7 @@ jobs:
 
       - uses: actions/checkout@v3
         with:
-          ref: ${{ needs.compute-metadata-experiments.outputs.checkout-sha }}
+          ref: ${{ needs.compute-metadata.outputs.comparison-sha }}
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v2.0.0
@@ -626,7 +621,7 @@ jobs:
 
       - name: Download SMP binary
         run: |
-          aws s3 cp s3://smp-cli-releases/v${{ needs.compute-metadata-experiments.outputs.smp-version }}/x86_64-unknown-linux-gnu/smp ${{ runner.temp }}/bin/smp
+          aws s3 cp s3://smp-cli-releases/v${{ needs.compute-metadata.outputs.smp-version }}/x86_64-unknown-linux-gnu/smp ${{ runner.temp }}/bin/smp
 
       - name: Download submission metadata
         uses: actions/download-artifact@v3
@@ -653,7 +648,7 @@ jobs:
       - name: Post report to PR
         uses: peter-evans/create-or-update-comment@v3
         with:
-          issue-number: ${{ needs.compute-metadata-experiments.outputs.github-event-number }}
+          issue-number: ${{ needs.compute-metadata.outputs.pr-number }}
           edit-mode: append
           body: ${{ steps.read-analysis.outputs.content }}
 
@@ -671,7 +666,7 @@ jobs:
           gh api \
             --method POST \
             -H "Accept: application/vnd.github+json" \
-            /repos/${{ github.repository }}/statuses/${{ needs.compute-metadata-experiments.outputs.head-sha }} \
+            /repos/${{ github.repository }}/statuses/${{ needs.compute-metadata.outputs.comparison-sha }} \
             -f state='failure' \
             -f description='Analyze experimental results from Regression Detector cancelled.' \
             -f context='Regression Detector / analyze-experiment' \
@@ -684,7 +679,7 @@ jobs:
           gh api \
             --method POST \
             -H "Accept: application/vnd.github+json" \
-            /repos/${{ github.repository }}/statuses/${{ needs.compute-metadata-experiments.outputs.head-sha }} \
+            /repos/${{ github.repository }}/statuses/${{ needs.compute-metadata.outputs.comparison-sha }} \
             -f state='success' \
             -f description='Analyze experimental results from Regression Detector succeeded.' \
             -f context='Regression Detector / analyze-experiment' \
@@ -698,7 +693,7 @@ jobs:
           gh api \
             --method POST \
             -H "Accept: application/vnd.github+json" \
-            /repos/${{ github.repository }}/statuses/${{ needs.compute-metadata-experiments.outputs.head-sha }} \
+            /repos/${{ github.repository }}/statuses/${{ needs.compute-metadata.outputs.comparison-sha }} \
             -f state='failure' \
             -f description='Analyze experimental results from Regression Detector failed.' \
             -f context='Regression Detector / analyze-experiment' \
