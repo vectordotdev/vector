@@ -101,8 +101,10 @@ jobs:
       lading-version: ${{ steps.experimental-meta.outputs.LADING_VERSION }}
     steps:
 
-      # If triggered by issue comment, the event data doesn't directly contain the head and base sha from the PR.
-      # But, we can retreive this info from some git/gh commands.
+      - uses: actions/checkout@v3
+
+      # If triggered by issue comment, the event payload doesn't directly contain the head and base sha from the PR.
+      # But, we can retreive this info from some commands.
       - name: Get PR metadata (issue_comment)
         id: pr-metadata-comment
         if: github.event_name == 'issue_comment'
