@@ -79,10 +79,10 @@ jobs:
     needs: should-run
     if: needs.should-run.outputs.source_changed == 'true' || needs.should-run.outputs.comment_valid == 'true'
     outputs:
-      pr-number: ${{ steps.pr-metadata.outputs.PR_NUMBER }}
-      baseline-sha: ${{ steps.pr-metadata.outputs.BASELINE_SHA }}
+      pr-number: ${{ steps.pr-metadata-merge-queue.outputs.PR_NUMBER || steps.pr-metadata-comment.outputs.PR_NUMBER }}
+      baseline-sha: ${{ steps.pr-metadata-merge-queue.outputs.BASELINE_SHA || steps.pr-metadata-comment.outputs.BASELINE_SHA }}
       baseline-tag: ${{ steps.tags.outputs.BASELINE_TAG }}
-      comparison-sha: ${{ steps.pr-metadata.outputs.COMPARISON_SHA }}
+      comparison-sha: ${{ steps.pr-metadata-merge-queue.outputs.COMPARISON_SHA || steps.pr-metadata-comment.outputs.COMPARISON_SHA }}
       comparison-tag: ${{ steps.tags.outputs.COMPARISON_TAG }}
 
       # below are used in the experiment/analyze jobs
@@ -104,7 +104,7 @@ jobs:
       # If triggered by issue comment, the event data doesn't directly contain the head and base sha from the PR.
       # But, we can retreive this info from some git/gh commands.
       - name: Get PR metadata (issue_comment)
-        id: pr-metadata
+        id: pr-metadata-comment
         if: github.event_name == 'issue_comment'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -124,7 +124,7 @@ jobs:
           echo "::set-env name=COMPARISON_SHA::$COMPARISON_SHA"
 
       - name: Get PR metadata (merge queue)
-        id: pr-metadata
+        id: pr-metadata-merge-queue
         if: github.event_name != 'issue_comment'
         run: |
           export PR_NUMBER=$(echo "${{ github.ref }}" | sed -n 's|^refs/heads/gh-readonly-queue/master/pr-\([0-9]*\)-.*$|\1|p')
