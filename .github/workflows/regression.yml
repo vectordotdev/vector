@@ -198,6 +198,19 @@ jobs:
           echo "CPUS=${CPUS}" >> $GITHUB_OUTPUT
           echo "MEMORY=${MEMORY}" >> $GITHUB_OUTPUT
           echo "VECTOR_CPUS=${VECTOR_CPUS}" >> $GITHUB_OUTPUT
+
+      - name: (PR comment) Get PR branch
+        if: ${{ github.event_name == 'issue_comment' }}
+        uses: xt0rted/pull-request-comment-branch@v1
+        id: comment-branch
+
+      - name: (PR comment) Set latest commit status as pending
+        if: ${{ github.event_name == 'issue_comment' }}
+        uses: myrotvorets/set-commit-status-action@1.1.6
+        with:
+          sha: ${{ steps.pr-metadata-comment.outputs.COMPARISON_SHA }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          status: pending
   ##
   ## BUILD
   ##
@@ -388,7 +401,7 @@ jobs:
           gh api \
             --method POST \
             -H "Accept: application/vnd.github+json" \
-            /repos/${{ github.repository }}/statuses/${{ needs.compute-metadata.outputs.head-sha }} \
+            /repos/${{ github.repository }}/statuses/${{ needs.compute-metadata.outputs.comparison-sha }} \
             -f state='pending' \
             -f description='Experiments submitted to the Regression Detector cluster.' \
             -f context='Regression Detector / submission' \
@@ -471,7 +484,7 @@ jobs:
           gh api \
             --method POST \
             -H "Accept: application/vnd.github+json" \
-            /repos/${{ github.repository }}/statuses/${{ needs.compute-metadata.outputs.head-sha }} \
+            /repos/${{ github.repository }}/statuses/${{ needs.compute-metadata.outputs.comparison-sha }} \
             -f state='failure' \
             -f description='Experiments submitted to the Regression Detector cluster cancelled.' \
             -f context='Regression Detector / submission' \
@@ -484,7 +497,7 @@ jobs:
           gh api \
             --method POST \
             -H "Accept: application/vnd.github+json" \
-            /repos/${{ github.repository }}/statuses/${{ needs.compute-metadata.outputs.head-sha }} \
+            /repos/${{ github.repository }}/statuses/${{ needs.compute-metadata.outputs.comparison-sha }} \
             -f state='success' \
             -f description='Experiments submitted to the Regression Detector cluster successfully.' \
             -f context='Regression Detector / submission' \
@@ -498,7 +511,7 @@ jobs:
           gh api \
             --method POST \
             -H "Accept: application/vnd.github+json" \
-            /repos/${{ github.repository }}/statuses/${{ needs.compute-metadata.outputs.head-sha }} \
+            /repos/${{ github.repository }}/statuses/${{ needs.compute-metadata.outputs.comparison-sha }} \
             -f state='success' \
             -f description='Experiments submitted to the Regression Detector cluster failed.' \
             -f context='Regression Detector / submission' \
@@ -714,6 +727,27 @@ jobs:
     env:
       FAILED: ${{ contains(needs.*.result, 'failure') }}
     steps:
+      - name: (PR comment) Get PR branch
+        if: github.event_name == 'issue_comment'
+        uses: xt0rted/pull-request-comment-branch@v1
+        id: comment-branch
+
+      - name: (PR comment) Submit PR result as failed
+        if: github.event_name == 'issue_comment' && env.FAILED == 'true'
+        uses: myrotvorets/set-commit-status-action@1.1.6
+        with:
+          sha: ${{ steps.compute-metadata.outputs.comparison_sha }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          status: 'failure'
+
+      - name: (PR comment) Submit PR result as success
+        if: github.event_name == 'issue_comment' && env.FAILED != 'true'
+        uses: myrotvorets/set-commit-status-action@1.1.6
+        with:
+          sha: ${{ steps.compute-metadata.outputs.comparison_sha }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          status: 'success'
+
       - name: exit
         run: |
           echo "failed=${{ env.FAILED }}"
