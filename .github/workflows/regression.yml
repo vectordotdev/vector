@@ -74,7 +74,7 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GH_PAT_ORG }}
 
   compute-metadata:
-    name: Compute metadata for building regression experiments
+    name: Compute metadata
     runs-on: ubuntu-22.04
     needs: should-run
     if: needs.should-run.outputs.source_changed == 'true' || needs.should-run.outputs.comment_valid == 'true'
@@ -109,7 +109,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          export PR_NUMBER=$ {{ github.event.issue.number}}
+          export PR_NUMBER=${{ github.event.issue.number }}
           echo "PR_NUMBER=${PR_NUMBER}" >> $GITHUB_OUTPUT
           echo "::set-env name=PR_NUMBER::$PR_NUMBER"
 
