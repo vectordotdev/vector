@@ -96,6 +96,8 @@ impl FunctionTransform for Filter {
 
 #[cfg(test)]
 mod test {
+    use std::sync::Arc;
+
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
     use vector_core::event::{Metric, MetricKind, MetricValue};
@@ -122,9 +124,10 @@ mod test {
             let (topology, mut out) =
                 create_topology(ReceiverStream::new(rx), transform_config).await;
 
-            let log = Event::from(LogEvent::from("message"));
+            let mut log = Event::from(LogEvent::from("message"));
             tx.send(log.clone()).await.unwrap();
 
+            log.set_source_id(Arc::new(OutputId::from("in")));
             assert_eq!(out.recv().await.unwrap(), log);
 
             let metric = Event::from(Metric::new(

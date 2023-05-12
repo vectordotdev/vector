@@ -139,21 +139,21 @@ pub enum EventArray {
 
 impl EventArray {
     /// Sets the `OutputId` in the metadata for all the events in this array.
-    pub fn set_output_id(&mut self, output_id: Arc<OutputId>) {
+    pub fn set_output_id(&mut self, output_id: &Arc<OutputId>) {
         match self {
             EventArray::Logs(logs) => {
                 for log in logs {
-                    log.metadata_mut().set_source_id(Arc::clone(&output_id));
+                    log.metadata_mut().set_source_id(Arc::clone(output_id));
                 }
             }
             EventArray::Metrics(metrics) => {
                 for metric in metrics {
-                    metric.metadata_mut().set_source_id(Arc::clone(&output_id));
+                    metric.metadata_mut().set_source_id(Arc::clone(output_id));
                 }
             }
             EventArray::Traces(traces) => {
                 for trace in traces {
-                    trace.metadata_mut().set_source_id(Arc::clone(&output_id));
+                    trace.metadata_mut().set_source_id(Arc::clone(output_id));
                 }
             }
         }

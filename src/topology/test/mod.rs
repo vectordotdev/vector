@@ -897,21 +897,11 @@ async fn source_metadata_reaches_sink() {
     topology.stop().await;
 
     assert_eq!(
-        out_event1
-            .into_log()
-            .metadata()
-            .source_id()
-            .clone()
-            .unwrap(),
+        out_event1.into_log().metadata().source_id().unwrap(),
         &OutputId::from("in1")
     );
     assert_eq!(
-        out_event2
-            .into_log()
-            .metadata()
-            .source_id()
-            .clone()
-            .unwrap(),
+        out_event2.into_log().metadata().source_id().unwrap(),
         &OutputId::from("in2")
     );
 }

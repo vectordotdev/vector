@@ -333,6 +333,8 @@ impl FunctionTransform for MetricToLog {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+
     use chrono::{offset::TimeZone, DateTime, Timelike, Utc};
     use futures::executor::block_on;
     use proptest::prelude::*;
@@ -402,7 +404,8 @@ mod tests {
         )
         .with_tags(Some(tags()))
         .with_timestamp(Some(ts()));
-        let metadata = counter.metadata().clone();
+        let mut metadata = counter.metadata().clone();
+        metadata.set_source_id(Arc::new(OutputId::from("in")));
 
         let log = do_transform(counter).await.unwrap();
         let collected: Vec<_> = log.all_fields().unwrap().collect();
@@ -429,7 +432,8 @@ mod tests {
             MetricValue::Gauge { value: 1.0 },
         )
         .with_timestamp(Some(ts()));
-        let metadata = gauge.metadata().clone();
+        let mut metadata = gauge.metadata().clone();
+        metadata.set_source_id(Arc::new(OutputId::from("in")));
 
         let log = do_transform(gauge).await.unwrap();
         let collected: Vec<_> = log.all_fields().unwrap().collect();
@@ -456,7 +460,8 @@ mod tests {
             },
         )
         .with_timestamp(Some(ts()));
-        let metadata = set.metadata().clone();
+        let mut metadata = set.metadata().clone();
+        metadata.set_source_id(Arc::new(OutputId::from("in")));
 
         let log = do_transform(set).await.unwrap();
         let collected: Vec<_> = log.all_fields().unwrap().collect();
@@ -485,7 +490,8 @@ mod tests {
             },
         )
         .with_timestamp(Some(ts()));
-        let metadata = distro.metadata().clone();
+        let mut metadata = distro.metadata().clone();
+        metadata.set_source_id(Arc::new(OutputId::from("in")));
 
         let log = do_transform(distro).await.unwrap();
         let collected: Vec<_> = log.all_fields().unwrap().collect();
@@ -533,7 +539,8 @@ mod tests {
             },
         )
         .with_timestamp(Some(ts()));
-        let metadata = histo.metadata().clone();
+        let mut metadata = histo.metadata().clone();
+        metadata.set_source_id(Arc::new(OutputId::from("in")));
 
         let log = do_transform(histo).await.unwrap();
         let collected: Vec<_> = log.all_fields().unwrap().collect();
@@ -579,7 +586,8 @@ mod tests {
             },
         )
         .with_timestamp(Some(ts()));
-        let metadata = summary.metadata().clone();
+        let mut metadata = summary.metadata().clone();
+        metadata.set_source_id(Arc::new(OutputId::from("in")));
 
         let log = do_transform(summary).await.unwrap();
         let collected: Vec<_> = log.all_fields().unwrap().collect();

@@ -255,7 +255,7 @@ impl<'a> Builder<'a> {
                     debug!("Source pump starting.");
 
                     while let Some(mut array) = rx.next().await {
-                        array.set_output_id(Arc::clone(&source));
+                        array.set_output_id(&source);
                         fanout.send(array).await.map_err(|e| {
                             debug!("Source pump finished with an error.");
                             TaskError::wrapped(e)
