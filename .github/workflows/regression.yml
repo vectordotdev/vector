@@ -1,4 +1,4 @@
-# Regression Detection
+# Regression Detection Suite
 #
 # This workflow runs our regression detection experiments, which are relative
 # evaluations of the base SHA for the PR to whatever SHA was just pushed into
@@ -13,14 +13,14 @@
 # that triggered this workflow, the second is the one of the Vector being
 # tested. For comparison images the two SHAs are identical.
 
-name: Regression Detector
+name: Regression Detection Suite
 
 on:
   issue_comment:
     types: [created]
   merge_group:
     types: [checks_requested]
-  # Don't want to run this on PR commits, but because GH doesn't allow specifying different required checks
+  # Don't want to run this on each PR commit, but because GH doesn't allow specifying different required checks
   # for pull request and merge queue, we need to "run" it in pull request, but in the jobs we will just auto pass.
   pull_request:
 
@@ -33,12 +33,27 @@ jobs:
   # Only run this workflow if files changed in areas that could possibly introduce a regression, or by valid comment
   should-run:
     runs-on: ubuntu-latest
-    if: github.event_name != 'issue_comment' || (github.event.issue.pull_request && contains(github.event.comment.body, '/ci-run-regression'))
+    if: github.event_name != 'issue_comment' || (github.event.issue.pull_request
+        && (contains(github.event.comment.body, '/ci-run-regression') || contains(github.event.comment.body, '/ci-run-all'))
     outputs:
       source_changed: ${{ steps.filter.outputs.source }}
       comment_valid: ${{ steps.comment.outputs.isTeamMember }}
+      head_sha: ${{ steps.metadata.outputs.HEAD_SHA }}
     steps:
     - uses: actions/checkout@v3
+
+    - name: Dump GitHub context
+      env:
+        GITHUB_CONTEXT: ${{ toJSON(github) }}
+      run: echo "$GITHUB_CONTEXT"
+
+    - name: Get PR metadata
+      id: metadata
+      if: github.event_name == 'issue_comment'
+      run: |
+        gh pr checkout ${{ github.event.issue.number }}
+        export HEAD_SHA=$(git rev-parse HEAD)
+        echo "HEAD_SHA=${HEAD_SHA}" >> $GITHUB_OUTPUT
 
     - name: Determine if source code changed
       id: filter
@@ -76,7 +91,8 @@ jobs:
     name: Compute metadata for building regression experiments
     runs-on: ubuntu-22.04
     needs: should-run
-    if: needs.should-run.outputs.source_changed == 'true' || needs.should-run.outputs.comment_valid == 'true'
+    if: false
+    #if: needs.should-run.outputs.source_changed == 'true' || needs.should-run.outputs.comment_valid == 'true'
     outputs:
       pr-number: ${{ steps.pr-metadata.outputs.PR_NUMBER }}
 
