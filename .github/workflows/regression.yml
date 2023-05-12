@@ -83,15 +83,15 @@ jobs:
       baseline-sha: ${{ steps.pr-metadata-merge-queue.outputs.BASELINE_SHA || steps.pr-metadata-comment.outputs.BASELINE_SHA }}
       baseline-tag: ${{ steps.pr-metadata-merge-queue.outputs.BASELINE_TAG || steps.pr-metadata-comment.outputs.BASELINE_TAG }}}
       comparison-sha: ${{ steps.pr-metadata-merge-queue.outputs.COMPARISON_SHA || steps.pr-metadata-comment.outputs.COMPARISON_SHA }}
-      comparison-tag: ${{ steps.tags.outputs.COMPARISON_TAG || steps.pr-metadata-comment.outputs.COMPARISON_TAG }}}
+      comparison-tag: ${{ steps.pr-metadata-merge-queue.outputs.COMPARISON_TAG || steps.pr-metadata-comment.outputs.COMPARISON_TAG }}}
 
       # below are used in the experiment/analyze jobs
       cpus: ${{ steps.system.outputs.CPUS }}
       memory: ${{ steps.system.outputs.MEMORY }}
       vector-cpus: ${{ steps.system.outputs.VECTOR_CPUS }}
 
-      comparison-tag-exp: ${{ steps.tags.outputs.COMPARISON_TAG_EXP }}
-      baseline-tag-exp: ${{ steps.tags.outputs.BASELINE_TAG_EXP }}
+      comparison-tag-exp: ${{ steps.pr-metadata-merge-queue.outputs.COMPARISON_TAG_EXP || steps.pr-metadata-comment.outputs.COMPARISON_TAG_EXP }}
+      baseline-tag-exp: ${{ steps.pr-metadata-merge-queue.outputs.BASELINE_TAG_EXP || steps.pr-metadata-comment.outputs.BASELINE_TAG_EXP }}
 
       replicas: ${{ steps.experimental-meta.outputs.REPLICAS }}
       warmup-seconds: ${{ steps.experimental-meta.outputs.WARMUP_SECONDS }}
@@ -131,7 +131,7 @@ jobs:
           export COMPARISON_TAG="${COMPARISON_SHA}-${COMPARISON_SHA}"
           echo "COMPARISON_TAG=${COMPARISON_TAG}" >> $GITHUB_OUTPUT
 
-          export "COMPARISON_TAG_EXP=${PR_NUMBER}-${COMPARISON-TAG}"
+          export "COMPARISON_TAG_EXP=${PR_NUMBER}-${COMPARISON_TAG}"
           echo "COMPARISON_TAG_EXP=${COMPARISON_TAG_EXP}" >> $GITHUB_OUTPUT
 
           echo "pr number is: ${PR_NUMBER}"
