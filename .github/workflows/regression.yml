@@ -81,9 +81,9 @@ jobs:
     outputs:
       pr-number: ${{ steps.pr-metadata-merge-queue.outputs.PR_NUMBER || steps.pr-metadata-comment.outputs.PR_NUMBER }}
       baseline-sha: ${{ steps.pr-metadata-merge-queue.outputs.BASELINE_SHA || steps.pr-metadata-comment.outputs.BASELINE_SHA }}
-      baseline-tag: ${{ steps.tags.outputs.BASELINE_TAG }}
+      baseline-tag: ${{ steps.pr-metadata-merge-queue.outputs.BASELINE_TAG || steps.pr-metadata-comment.outputs.BASELINE_TAG }}}
       comparison-sha: ${{ steps.pr-metadata-merge-queue.outputs.COMPARISON_SHA || steps.pr-metadata-comment.outputs.COMPARISON_SHA }}
-      comparison-tag: ${{ steps.tags.outputs.COMPARISON_TAG }}
+      comparison-tag: ${{ steps.tags.outputs.COMPARISON_TAG || steps.pr-metadata-comment.outputs.COMPARISON_TAG }}}
 
       # below are used in the experiment/analyze jobs
       cpus: ${{ steps.system.outputs.CPUS }}
@@ -111,17 +111,36 @@ jobs:
         run: |
           export PR_NUMBER=${{ github.event.issue.number }}
           echo "PR_NUMBER=${PR_NUMBER}" >> $GITHUB_OUTPUT
-          echo "::set-env name=PR_NUMBER::$PR_NUMBER"
 
           gh pr checkout ${PR_NUMBER}
 
           export BASELINE_SHA=$(git merge-base --fork-point master)
           echo "BASELINE_SHA=${BASELINE_SHA}" >> $GITHUB_OUTPUT
-          echo "::set-env name=BASELINE_SHA::$BASELINE_SHA"
 
           export COMPARISON_SHA=$(git rev-parse HEAD)
           echo "COMPARISON_SHA=${COMPARISON_SHA}" >> $GITHUB_OUTPUT
-          echo "::set-env name=COMPARISON_SHA::$COMPARISON_SHA"
+
+          export BASELINE_TAG="${COMPARISON_SHA}-${BASELINE_SHA}"
+          echo "BASELINE_TAG=${BASELINE_TAG}" >> $GITHUB_OUTPUT
+
+          export "BASELINE_TAG_EXP=${PR_NUMBER}-${BASELINE_TAG}"
+          echo "BASELINE_TAG_EXP=${BASELINE_TAG_EXP}" >> $GITHUB_OUTPUT
+
+          export COMPARISON_TAG="${COMPARISON_SHA}-${COMPARISON_SHA}"
+          echo "COMPARISON_TAG=${COMPARISON_TAG}" >> $GITHUB_OUTPUT
+
+          export "COMPARISON_TAG_EXP=${PR_NUMBER}-${COMPARISON-TAG}"
+          echo "COMPARISON_TAG_EXP=${COMPARISON_TAG_EXP}" >> $GITHUB_OUTPUT
+
+          echo "pr number is: ${PR_NUMBER}"
+
+          echo "baseline sha is: ${BASELINE_SHA}"
+          echo "baseline tag is: ${BASELINE_TAG}"
+          echo "baseline tag experiments is: ${BASELINE_TAG_EXP}"
+
+          echo "comparison sha is: ${COMPARISON_SHA}"
+          echo "comparison tag is: ${COMPARISON_TAG}"
+          echo "comparison tag experiments is: ${COMPARISON_TAG_EXP}"
 
       - name: Get PR metadata (merge queue)
         id: pr-metadata-merge-queue
@@ -129,19 +148,13 @@ jobs:
         run: |
           export PR_NUMBER=$(echo "${{ github.ref }}" | sed -n 's|^refs/heads/gh-readonly-queue/master/pr-\([0-9]*\)-.*$|\1|p')
           echo "PR_NUMBER=${PR_NUMBER}" >> $GITHUB_OUTPUT
-          echo "::set-env name=PR_NUMBER::$PR_NUMBER"
 
           export BASELINE_SHA=${{ github.event.merge_group.base_sha }}
           echo "BASELINE_SHA=${BASELINE_SHA}" >> $GITHUB_OUTPUT
-          echo "::set-env name=BASELINE_SHA::$BASELINE_SHA"
 
           export COMPARISON_SHA=${{ github.event.merge_group.head_sha }}
           echo "COMPARISON_SHA=${COMPARISON_SHA}" >> $GITHUB_OUTPUT
-          echo "::set-env name=COMPARISON_SHA::$COMPARISON_SHA"
 
-      - name: Setup tag variables
-        id: tags
-        run: |
           export BASELINE_TAG="${COMPARISON_SHA}-${BASELINE_SHA}"
           echo "BASELINE_TAG=${BASELINE_TAG}" >> $GITHUB_OUTPUT
 
