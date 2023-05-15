@@ -2,15 +2,14 @@ name: K8S E2E Suite
 
 on:
   workflow_dispatch:
+  workflow_call:
   pull_request:
-  issue_comment:
-    types: [created]
   merge_group:
     types: [checks_requested]
 
 concurrency:
   # `github.event.number` exists for PRs, issue.id for comments, merge_group for merge queue otherwise fall back to SHA
-  group: ${{ github.workflow }}-${{ github.event.number || github.event.issue.issue.id || github.event.merge_group.base_sha || github.sha }}
+  group: ${{ github.workflow }}-${{ github.event.number || github.event.merge_group.base_sha || github.sha }}
   cancel-in-progress: true
 
 env:
@@ -26,10 +25,7 @@ env:
 
 jobs:
   changes:
-    if: |
-      (github.event_name == 'issue_comment' && github.event.issue.pull_request && contains(github.event.comment.body, '/ci-run-k8s-tests'))
-        || (github.event_name == 'pull_request' && needs.changes.outputs.k8s == 'true')
-        || github.event_name == 'workflow_dispatch' || github.event_name == 'merge_group'
+    if: github.event_name == 'pull_request'
     uses: ./.github/workflows/changes.yml
     with:
       base_ref: ${{ github.event.pull_request.base.ref }}
@@ -40,6 +36,7 @@ jobs:
     name: Build - x86_64-unknown-linux-gnu
     runs-on: [linux, ubuntu-20.04-8core]
     needs: changes
+    if: always() && (github.event_name != 'pull_request' || needs.changes.outputs.k8s == 'true')
     # cargo-deb requires a release build, but we don't need optimizations for tests
     env:
       CARGO_PROFILE_RELEASE_OPT_LEVEL: 0
@@ -225,19 +222,17 @@ jobs:
     name: K8s E2E Test Suite
     runs-on: ubuntu-latest
     needs: test-e2e-kubernetes
-    if: |
-      always() &&
-        (github.event_name != 'issue_comment' || (github.event.issue.pull_request && contains(github.event.comment.body, '/ci-run-k8s-tests')))
+    if: always()
     env:
       FAILED: ${{ contains(needs.*.result, 'failure') }}
     steps:
       - name: (PR comment) Get PR branch
-        if: success() && github.event_name == 'issue_comment'
+        if: needs.test-e2e-kubernetes.result == 'success' && github.event_name == 'issue_comment'
         uses: xt0rted/pull-request-comment-branch@v1
         id: comment-branch
 
       - name: (PR comment) Submit PR result as success
-        if: success() && github.event_name == 'issue_comment'
+        if: needs.test-e2e-kubernetes.result == 'success' && github.event_name == 'issue_comment'
         uses: myrotvorets/set-commit-status-action@1.1.6
         with:
           sha: ${{ steps.comment-branch.outputs.head_sha }}
