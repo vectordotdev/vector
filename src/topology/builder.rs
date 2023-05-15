@@ -246,10 +246,16 @@ impl<'a> Builder<'a> {
                 let mut rx = builder.add_source_output(output.clone());
 
                 let (mut fanout, control) = Fanout::new();
+                let source = Arc::new(OutputId {
+                    component: key.clone(),
+                    port: output.port.clone(),
+                });
+
                 let pump = async move {
                     debug!("Source pump starting.");
 
-                    while let Some(array) = rx.next().await {
+                    while let Some(mut array) = rx.next().await {
+                        array.set_output_id(&source);
                         fanout.send(array).await.map_err(|e| {
                             debug!("Source pump finished with an error.");
                             TaskError::wrapped(e)

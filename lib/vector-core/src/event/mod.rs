@@ -2,9 +2,10 @@ use std::{
     collections::BTreeMap,
     convert::{TryFrom, TryInto},
     fmt::Debug,
+    sync::Arc,
 };
 
-use crate::ByteSizeOf;
+use crate::{config::OutputId, ByteSizeOf};
 pub use array::{into_event_stream, EventArray, EventContainer, LogArray, MetricArray, TraceArray};
 pub use estimated_json_encoded_size_of::EstimatedJsonEncodedSizeOf;
 pub use finalization::{
@@ -279,6 +280,24 @@ impl Event {
             Self::Metric(metric) => metric.with_batch_notifier_option(batch).into(),
             Self::Trace(trace) => trace.with_batch_notifier_option(batch).into(),
         }
+    }
+
+    /// Returns a reference to the event metadata source.
+    #[must_use]
+    pub fn source_id(&self) -> Option<&OutputId> {
+        self.metadata().source_id()
+    }
+
+    /// Sets the `source_id` in the event metadata to the provided value.
+    pub fn set_source_id(&mut self, source_id: Arc<OutputId>) {
+        self.metadata_mut().set_source_id(source_id);
+    }
+
+    /// Sets the `source_id` in the event metadata to the provided value.
+    #[must_use]
+    pub fn with_source_id(mut self, source_id: Arc<OutputId>) -> Self {
+        self.metadata_mut().set_source_id(source_id);
+        self
     }
 }
 
