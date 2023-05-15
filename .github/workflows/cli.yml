@@ -2,41 +2,13 @@ name: CLI - Linux
 
 on:
   workflow_call:
-  issue_comment:
-    types: [created]
-
-env:
-  AWS_ACCESS_KEY_ID: "dummy"
-  AWS_SECRET_ACCESS_KEY: "dummy"
-  CONTAINER_TOOL: "docker"
-  DD_ENV: "ci"
-  DD_API_KEY: ${{ secrets.DD_API_KEY }}
-  RUST_BACKTRACE: full
-  TEST_LOG: vector=debug
-  VERBOSE: true
-  CI: true
-  PROFILE: debug
-  # observing issues fetching boringssl via HTTPS in the OSX build, seeing if this helps
-  # can be removed when we switch back to the upstream openssl-sys crate
-  CARGO_NET_GIT_FETCH_WITH_CLI: true
 
 jobs:
   test-cli:
     runs-on: [linux, ubuntu-20.04-8core]
     env:
       CARGO_INCREMENTAL: 0
-    if: |
-      github.event_name != 'issue_comment' || (github.event.issue.pull_request
-        && (contains(github.event.comment.body, '/ci-run-cli') || contains(github.event.comment.body, '/ci-run-all')))
     steps:
-      - name: Validate issue comment
-        if: github.event_name == 'issue_comment'
-        uses: tspascoal/get-user-teams-membership@v2
-        with:
-          username: ${{ github.actor }}
-          team: 'Vector'
-          GITHUB_TOKEN: ${{ secrets.GH_PAT_ORG }}
-
       - name: (PR comment) Get PR branch
         if: ${{ github.event_name == 'issue_comment' }}
         uses: xt0rted/pull-request-comment-branch@v1
@@ -48,6 +20,7 @@ jobs:
         with:
           sha: ${{ steps.comment-branch.outputs.head_sha }}
           token: ${{ secrets.GITHUB_TOKEN }}
+          context: CLI - Linux
           status: pending
 
       - name: (PR comment) Checkout PR branch
@@ -86,4 +59,5 @@ jobs:
         with:
           sha: ${{ steps.comment-branch.outputs.head_sha }}
           token: ${{ secrets.GITHUB_TOKEN }}
+          context: CLI - Linux
           status: ${{ job.status }}
