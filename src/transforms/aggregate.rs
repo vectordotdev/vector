@@ -149,7 +149,7 @@ impl TaskTransform<Event> for Aggregate {
 
 #[cfg(test)]
 mod tests {
-    use std::{collections::BTreeSet, task::Poll};
+    use std::{collections::BTreeSet, sync::Arc, task::Poll};
 
     use futures::stream;
     use tokio::sync::mpsc;
@@ -172,7 +172,7 @@ mod tests {
         kind: metric::MetricKind,
         value: metric::MetricValue,
     ) -> Event {
-        Event::Metric(Metric::new(name, kind, value))
+        Event::Metric(Metric::new(name, kind, value)).with_source_id(Arc::new(OutputId::from("in")))
     }
 
     #[test]

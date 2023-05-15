@@ -1,6 +1,7 @@
 crate::cli_subcommands! {
     "Build, generate or regenerate components..."
     component_docs,
+    mod licenses,
     manifests,
     mod publish_metadata,
     release_cue,
