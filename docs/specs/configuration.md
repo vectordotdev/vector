@@ -2,8 +2,8 @@
 
 This document specifies Vector's configuration for the development of Vector.
 
-The key words “MUST”, “MUST NOT”, “REQUIRED”, “SHALL”, “SHALL NOT”, “SHOULD”,
-“SHOULD NOT”, “RECOMMENDED”, “MAY”, and “OPTIONAL” in this document are to be
+The keywords "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD",
+"SHOULD NOT", "RECOMMENDED", "MAY", and "OPTIONAL" in this document are to be
 interpreted as described in [RFC 2119].
 
 - [Introduction](#introduction)
@@ -56,17 +56,17 @@ under entities and also used to define global Vector behavior.
 #### Entity naming
 
 - MUST only contain ASCII alphanumeric, lowercase, and underscores
-  - The `.` character is reserved for special purposes (e.g., error stream routing)
-- MUST be in snake case format when multiple words are used (e.g., `timeout_seconds`)
+  - The `.` character is reserved for special purposes (for example, error stream routing)
+- MUST be in snake case format when multiple words are used (for example, `timeout_seconds`)
 
 #### Option naming
 
 - MUST only contain ASCII alphanumeric, lowercase, and underscores
-- MUST be in snake case format when multiple words are used (e.g., `timeout_seconds`)
-- SHOULD use nouns, not verbs, as names (e.g., `fingerprint` instead of `fingerprinting`)
-- MUST suffix options with their _full_ unit name (e.g., `_seconds`, `_bytes`, etc.)
-- SHOULD consistent with units within the same scope. (e.g., don't mix seconds and milliseconds)
-- MUST NOT repeat the name space in the option name (e.g., `fingerprint.bytes` instead of `fingerprint.fingerprint_bytes`)
+- MUST be in snake case format when multiple words are used (for example, `timeout_seconds`)
+- SHOULD use nouns, not verbs, as names (for example, `fingerprint` instead of `fingerprinting`)
+- MUST suffix options with their _full_ unit name (for example, `_seconds`, `_bytes`, etc.)
+- SHOULD consistent with units within the same scope. (for example, don't mix seconds and milliseconds)
+- MUST NOT repeat the name space in the option name (for example, `fingerprint.bytes` instead of `fingerprint.fingerprint_bytes`)
 
 ### Types
 

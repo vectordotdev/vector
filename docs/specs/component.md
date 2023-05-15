@@ -3,8 +3,8 @@
 This document specifies Vector Component behavior (source, transforms, and
 sinks) for the development of Vector.
 
-The key words “MUST”, “MUST NOT”, “REQUIRED”, “SHALL”, “SHALL NOT”, “SHOULD”,
-“SHOULD NOT”, “RECOMMENDED”, “MAY”, and “OPTIONAL” in this document are to be
+The keywords "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD",
+"SHOULD NOT", "RECOMMENDED", "MAY", and "OPTIONAL" in this document are to be
 interpreted as described in [RFC 2119].
 
 - [Component Specification](#component-specification)
@@ -59,13 +59,13 @@ follow the following guidelines.
 - MUST be a noun named after the protocol or service that the component
   integrates with.
 - MAY be suffixed with the event type only if the component is specific to
-  that type, `logs`, `metrics`, or `traces` (e.g., `kubernetes_logs`,
+  that type, `logs`, `metrics`, or `traces` (for example, `kubernetes_logs`,
   `apache_metrics`).
 
 ### Transform naming
 
 - MUST only contain ASCII alphanumeric, lowercase, and underscores.
-- MUST be a verb describing the broad purpose of the transform (e.g., `route`,
+- MUST be a verb describing the broad purpose of the transform (for example, `route`,
   `sample`, `delegate`).
 
 ## Configuration
@@ -141,7 +141,7 @@ and filtering bytes from the upstream source and before the creation of a Vector
       represented by the `Content-Length` header.
     - For files, the total number of bytes read from the file excluding the
       delimiter.
-  - `protocol` - The protocol used to send the bytes (i.e., `tcp`, `udp`,
+  - `protocol` - The protocol used to send the bytes (for example, `tcp`, `udp`,
     `unix`, `http`, `https`, `file`, etc.).
   - `http_path` - If relevant, the HTTP path, excluding query strings.
   - `socket` - If relevant, the socket number that bytes were received from.
@@ -170,7 +170,7 @@ sending it, like the `prometheus_exporter` sink, SHOULD NOT publish this metric.
       represented by the `Content-Length` header.
     - For files, the total number of bytes written to the file excluding the
       delimiter.
-  - `protocol` - The protocol used to send the bytes (i.e., `tcp`, `udp`,
+  - `protocol` - The protocol used to send the bytes (for example, `tcp`, `udp`,
     `unix`, `http`, `https`, `file`, etc.).
   - `endpoint` - If relevant, the endpoint that the bytes were sent to. For
     HTTP, this MUST be the host and path only, excluding the query string.

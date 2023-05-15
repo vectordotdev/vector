@@ -136,8 +136,8 @@ writes these bytes:
 
 Next we create a request builder that turns the event into a request. The
 request that we build here is a struct containing any data required by a [Tower
-service][tower] that is responsible for actually sending the data  to the
-sink's final destination external to Vector, in this case the HTTP endpoint..
+service][tower] that is responsible for actually sending the data to the
+sink's final destination external to Vector, in this case the HTTP endpoint.
 We will build this service shortly.
 
 The request looks like:
@@ -236,7 +236,7 @@ we described earlier.
 The following functions for the [`RequestBuilder`][request_builder] trait need
 implementing:
 
-[*compression*][request_builder_compression] -  The payload for the built request can be compressed. Here we return
+[*compression*][request_builder_compression] - The payload for the built request can be compressed. Here we return
 [`Compression::None`][compression_none] to indicate that we will not be compressing.
 
 ```rust
@@ -245,7 +245,7 @@ implementing:
     }
 ```
 
-[*encoder*][request_builder_encoder] -  We return the encoder to use. This is the `BasicEncoder` defined earlier.
+[*encoder*][request_builder_encoder] - We return the encoder to use. This is the `BasicEncoder` defined earlier.
 
 ```rust
     fn encoder(&self) -> &Self::Encoder {

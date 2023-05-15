@@ -17,18 +17,18 @@ buffer with a binary built from this PR.
 
 ## Plan
 
-Start by grabbing a Vector binary for 0.20.0, and build one from the PR branch.  We'll use a simple
+Start by grabbing a Vector binary for 0.20.0, and build one from the PR branch. We'll use a simple
 configuration that will read records from stdin and attempt to send them to an HTTP sink.
 
 For the HTTP sink, we'll have one configuration that uses an invalid port and another, an identical
 version, which has the correct port. Since Vector will retry "connection refused" errors, and retry
 them infinitely, the messages will never be acknowledged, which ensures they remain in the buffer.
 For the purposes of verifying that the same data that went in is still present after migrating the
-disk v1 buffer, etc, we can use `dummyhttp` (a Rust project for serving up a simplistic HTTP
+disk v1 buffer, etc., we can use `dummyhttp` (a Rust project for serving up a simplistic HTTP
 endpoint that can be configured to respond a certain way) to listen on the port and inspect the HTTP
 request made by the sink.
 
-For generating logs so we can fill up our disk buffers to their limit, we'll use [`flog`][flog]
+For generating logs, so we can fill up our disk buffers to their limit, we'll use [`flog`][flog]
 which is a handy tool for generating fake logs, and a lot of them very quickly.
 
 ## Test Case(s)
@@ -75,7 +75,7 @@ which is a handy tool for generating fake logs, and a lot of them very quickly.
    - Observe that the old buffer data directory is the only one that exists.
    - Run the PR binary, using the "wrong big buffer" configuration. Do not feed any input to STDIN.
    - Vector should immediately exit after reporting that the old buffer has been migrated.
-   - Observe that the old buffer directory is now gone, and the new one should exist.  Likewise, the
+   - Observe that the old buffer directory is now gone, and the new one should exist. Likewise, the
      new one should be the same size or larger than the old one.
 
 [flog]: https://github.com/mingrammer/flog

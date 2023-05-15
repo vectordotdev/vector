@@ -19,7 +19,7 @@ Provide some module level comments to explain what the sink does.
 
 # Imports
 
-Let's setup all the imports we will need for the tutorial:
+First, setup all the imports we will need for the tutorial:
 
 ```rust
 use super::Healthcheck;
@@ -61,7 +61,7 @@ is used by Vector to generate documentation from the struct. To do this, doc
 comments must be included above the struct - Vector won't compile if they
 aren't.
 
-We also include a single member in our struct - `acknowledgements`.  This
+We also include a single member in our struct - `acknowledgements`. This
 struct configures end-to-end acknowledgements for the sink, which is the ability
 for the sink to inform the upstream sources if the event has been successfully
 delivered. See Vector's [documentation][acknowledgements] for more details. We
@@ -129,7 +129,7 @@ Lets implement `BasicSink`.
 struct BasicSink;
 ```
 
-Our sink is so basic it has no properties to determine it's behaviour.
+Our sink is so basic it has no properties to determine its behaviour.
 
 For it to work with Vector it must implement the [`StreamSink`][stream_sink]
 trait:
@@ -177,7 +177,7 @@ representation of the object.
 ## Feature flag
 
 Each sink is kept behind a feature flag which allows copies of Vector to be
-build with just the components required. We need to add this feature to the
+built with just the components required. We need to add this feature to the
 `Cargo.toml`.
 
 ```diff
@@ -297,7 +297,7 @@ we retry delivery, we update the status with [`EventStatus::Rejected`][event_sta
 
 # Emitting internal events
 
-Vector should be observable. It emit events about how it is running so users
+Vector should be observable. It emits events about how it is running so users
 can introspect its state to allow users to determine how healthy it is running.
 Our sink must emit some metric when an event has been delivered to update the
 count of how many events have been delivered.
@@ -333,7 +333,7 @@ emit the event. Change the body of `run_inner` to look like the following:
 
 ## EventSent
 
-[`EventSent`][events_sent] is emmitted by each component in Vector to
+[`EventSent`][events_sent] is emitted by each component in Vector to
 instrument how many bytes have been sent to the next downstream component.
 
 Add the following after emitting `BytesSent`:

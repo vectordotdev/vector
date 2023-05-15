@@ -14,7 +14,7 @@ Before the release:
 - [ ] Run `cargo vdev build release-cue` to generate a new cue file for the release
 - [ ] Add `changelog` key to generated cue file
   - [ ] `git log --no-merges --cherry-pick --right-only <last release tag>...`
-  - [ ] Should be hand-written list of changes
+  - [ ] Should be handwritten list of changes
         ([example](https://github.com/vectordotdev/vector/blob/9fecdc8b5c45c613de2d01d4d2aee22be3a2e570/website/cue/reference/releases/0.19.0.cue#L44))
   - [ ] Add description key to the generated cue file with a description of the release (see
         previous releases for examples).

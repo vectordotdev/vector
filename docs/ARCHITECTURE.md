@@ -120,7 +120,7 @@ Sinks have two components that make building them somewhat more complex than
 either sources or transforms: healthchecks and buffers.
 
 Healthchecks are one-off tasks that run at startup with the goal of discovering
-any issues that may prevent the sink from running properly (e.g. permissions
+any issues that may prevent the sink from running properly (for example permissions
 or connectivity issues) and notifying the user in a nice way. They can be
 enabled or disabled both individually and at a global level, and the user can
 choose whether a failing healthcheck should prevent Vector from starting.

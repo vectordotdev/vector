@@ -48,7 +48,7 @@ which tests go where.
 
 - **I've made changes to VRL, resulting in many broken tests!**
 
-  This is an unfortunate — but expected — side-effect of using "UI testing".
+  This is an unfortunate—but expected—side effect of using "UI testing".
 
   We're planning on adding a `--update-tests` flag to mass-update existing tests
   in one go, but until then, you'll have to update tests manually.

@@ -26,7 +26,7 @@ Please see the [FAQ](#faq) section for more info.**
 
 Vector adheres to the [Semantic Versioning 2.0] convention. In summary:
 
-* Versions follow the `MAJOR.MINOR.PATCH` format (i.e., `2.5.1`)
+* Versions follow the `MAJOR.MINOR.PATCH` format (that is, `2.5.1`)
 * `PATCH` increments only when backward compatible bug fixes are introduced.
 * `MINOR` increments only when new, backward compatible functionality is introduced.
 * `MAJOR` increments if any backwards incompatible changes are introduced.
@@ -112,8 +112,7 @@ As defined by [Semantic Versioning]:
 > any time.
 
 And while this is true to the spec, Vector takes breaking changes *very*
-seriously during this phase. What's outlined in the
-[major versions](#major-versions-breaking-changes) section still holds true
+seriously during this phase. What's outlined in the major versions section still holds true
 here. Each minor release bump will include an upgrade guide in the
 [release notes] if necessary.
 

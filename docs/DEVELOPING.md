@@ -86,7 +86,7 @@ make environment CLI_OPTS="--publish 3000:2000"
 
 Now you can use the jobs detailed in **"Bring your own toolbox"** below.
 
-Want to run from outside of the environment? _Clever. Good thinking._ You can run any of the following:
+Want to run from outside the environment? _Clever. Good thinking._ You can run any of the following:
 
 ```bash
 # Validate your code can compile
@@ -204,7 +204,7 @@ make fmt
 - Events should be capitalized and end with a period, `.`.
 - Never use `e` or `err` - always spell out `error` to enrich logs and make it
   clear what the output is.
-- Prefer Display over Debug, `%error` and not `?error`.
+- Prefer Display to Debug, `%error` and not `?error`.
 
 Nope!
 
@@ -284,7 +284,7 @@ This leads to a general strategy of mimicking what the sink itself does.
 Unfortunately, the fact that health checks don't have real events available to
 them leads to some limitations here. The most obvious example of this is with
 sinks where the exact target of a write depends on the value of some field in
-the event (e.g. an interpolated Kinesis stream name). It also pops up for sinks
+the event (for example an interpolated Kinesis stream name). It also pops up for sinks
 where incoming events are expected to conform to a specific schema. In both
 cases, random test data is reasonably likely to trigger a potential
 false-negative result. Even in simpler cases, we need to think about the effects
@@ -293,7 +293,7 @@ invasive. The answer usually depends on the system we're interfacing with.
 
 In some cases, like the Kinesis example above, the right thing to do might be
 nothing at all. If we require dynamic information to figure out what entity
-(i.e. Kinesis stream in this case) that we're even dealing with, odds are very
+(that is Kinesis stream in this case) that we're even dealing with, odds are very
 low that we'll be able to come up with a way to meaningfully validate that it's
 in working order. It's perfectly valid to have a health check that falls back to
 doing nothing when there is a data dependency like this.
@@ -302,7 +302,7 @@ With all that in mind, here is a simple checklist to go over when writing a new
 health check:
 
 - [ ] Does this check perform different fallible operations from the sink itself?
-- [ ] Does this check have side effects the user would consider undesirable (e.g. data pollution)?
+- [ ] Does this check have side effects the user would consider undesirable (for example data pollution)?
 - [ ] Are there situations where this check would fail but the sink would operate normally?
 
 Not all the answers need to be a hard "no", but we should think about the

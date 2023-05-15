@@ -10,13 +10,13 @@ think you could try doing it this way" into "we always do X this way: <link to s
 ## Formatting
 
 At a high-level, code formatting is straightforward: we use the native `rustfmt` exclusively, and
-comprehensively.  All Rust source code within the repository should be formatted using `rustfmt`.
+comprehensively. All Rust source code within the repository should be formatted using `rustfmt`.
 
 You can acquire `rustfmt` -- which is invoked as `cargo fmt` -- by following the directions listed
 out [in the rustfmt repository](https://github.com/rust-lang/rustfmt#on-the-stable-toolchain).
 
 Vector has its own formatting rules (`.rustfmt.toml`) that will automatically be used when you run
-`cargo fmt` within the repository.  If you're ever in doubt, you can also run `make check-fmt` which
+`cargo fmt` within the repository. If you're ever in doubt, you can also run `make check-fmt` which
 will invoke `cargo fmt` in a dry-run mode, checking to see if any changed files are not currently
 formatted correctly.
 
@@ -39,7 +39,7 @@ informed about errors, warnings, and so on.
 
 ### `src/`: main binary and all related functionality
 
-The bulk of functional code resides in the `src/` directory/crate.  When we refer to functional
+The bulk of functional code resides in the `src/` directory/crate. When we refer to functional
 code, we're talking about code that powers user-visible aspects of Vector, such as the sources,
 transforms, and sinks themselves. There is also, of course, the requisite glue code such as parsing
 command-line arguments, reading the configuration, constructing and configuring components, and
@@ -60,7 +60,7 @@ metadata by utilizing [spans](https://docs.rs/tracing/latest/tracing/#spans).
 #### Basic Usage
 
 For logging, we use `tracing`'s event macros which should look very similar to almost all other
-logging libraries, with names that emulate the logging level being used i.e. `info!("A wild log has
+logging libraries, with names that emulate the logging level being used that is `info!("A wild log has
 appeared.");`.
 
 All of tracing's event macros -- `trace!`, `debug!`, `info!`, `warn!`, and `error!` -- support the
@@ -74,8 +74,8 @@ info!("Server has started.");
 debug!("User connected: {}", username);
 
 // Adding structured fields to the even, mixing and matching the message format:
-trace!(bytes_sent = 22, "Sent heartbeat packet to client.")`
-error!(client_addr = %conn.get_ref().peer_addr, "Client actor received malformed packet: {}", parse_err.to_string())
+trace!(bytes_sent = 22, "Sent heartbeat packet to client.");
+error!(client_addr = %conn.get_ref().peer_addr, "Client actor received malformed packet: {}", parse_err.to_string());
 ```
 
 While this does not cover all the permutations of what the macros in `tracing` support, these
@@ -104,13 +104,13 @@ debug!(%client_id, "Client entered authentication phase.");
 In general, there are both a few rules and a few suggestions to follow when it comes to writing a
 (good) log message:
 
-- Messages must be written in English. No preference on which specific English dialect is used e.g.
+- Messages must be written in English. No preference on which specific English dialect is used for example
   American English, British English, Canadian English, etc.
 - Sentences must be capitalized, and end with a period.
 - Proper spelling and grammar when possible. Not all of us are native English speakers, and so this
   is simply an ask, but not a hard requirement.
-- Identifiers, or passages of note, should be called out by some means i.e. wrapping them in
-  backticks or quotes.  Wrapping with special characters can be helpful in drawing the users eye to
+- Identifiers, or passages of note, should be called out by some means that is wrapping them in
+  backticks or quotes. Wrapping with special characters can be helpful in drawing the users eye to
   anything of importance.
 - If it's longer than one or two sentences, it's probably better suited as a single sentence briefly
   explaining the event, with a link to external documentation that explains further.
@@ -119,18 +119,18 @@ In general, there are both a few rules and a few suggestions to follow when it c
 
 Similarly, choosing the right level can be important, both from the perspective of making it easy
 for users to grok what they should pay attention to, but also to avoid the performance overhead of
-excess logging (even if we filter it out and it never makes it to the console).
+excess logging (even if we filter it out, and it never makes it to the console).
 
 - **TRACE**: Typically contains a high level of detail for deep/rich debugging.
 
   As trace logging is typically reached for when instrumenting algorithms and core pieces of logic,
   care should be taken to avoid trace logging being added to tight loops, or commonly used
-  codepaths, where possible. Even when disabled, there can still be a small overhead associated with
+  code-paths, where possible. Even when disabled, there can still be a small overhead associated with
   logging an event at all.
 - **DEBUG**: Basic information that can be helpful for initially debugging issues.
 
   Should typically not be used for things that happen per-event, or scales with event throughput,
-  but in some cases -- i.e. if it happens every 1000th event, etc -- it can safely be used.
+  but in some cases -- that is if it happens every 1000th event, etc. -- it can safely be used.
 - **INFO**: Common information about normal processes.
 
   This includes logical/temporal events such as notifications when components are stopped and
@@ -176,7 +176,7 @@ increment_counter!("requests_processed_total", "service" => "admin_grpc");
 gauge!("bytes_allocated", 42.0);
 increment_gauge!("bytes_allocated", 2048.0, "table_name" => self.table_name.to_string());
 increment_gauge!("bytes_allocated", 512.0, "table_name" => self.table_name.to_string());
-decrement_gauge!("bytes_allocated", 2560.0, "table_name" => self.table_name.to_string())
+decrement_gauge!("bytes_allocated", 2560.0, "table_name" => self.table_name.to_string());
 
 // Histograms simply record a measurement, but there's a fun little trait that `metrics`
 // uses called `IntoF64` that lets custom types provide a way to convert themselves to a
@@ -190,8 +190,8 @@ histogram!("request_duration_ns", 742_130, "endpoint" => "frontend");
 
 Many values can appear, at first, to be best tracked as a gauge: current connection count, in-flight
 request count, and so on. However, in some cases, the value being measured may change too frequently
-to be reliably tracked.  Metrics are typically collected on an interval, which is fine for counters
-and histograms: they're purely additive.  However, since a gauge is simply the _latest_ value, you
+to be reliably tracked. Metrics are typically collected on an interval, which is fine for counters
+and histograms: they're purely additive. However, since a gauge is simply the _latest_ value, you
 cannot know _how_ it's changed since the last time you've observed it.
 
 This is a common problem where a gauge tracks something like a queue size. If there's an event where
@@ -204,7 +204,7 @@ the equivalent of the "current" value. In our example above, we might have `queu
 `queued_items_popped`, and if `queue_items_pushed` equals 100, and `queued_items_popped` equals 80,
 we know our queue size is 20. More importantly, if we queried both of them at the same time, and
 they were both zero, and then queried them both a second later, and saw that both were 100,000, we
-would know that the queue size was _currently_ zero but we'd also know that we just processed
+would know that the queue size was _currently_ zero, but we'd also know that we just processed
 100,000 items in the past second.
 
 #### Best Practices
@@ -217,10 +217,10 @@ would know that the queue size was _currently_ zero but we'd also know that we j
   [Component
   Specification](https://github.com/vectordotdev/vector/blob/master/docs/specs/component.md).
 - **Don't** emit metrics in tight loops. Each metric emission carries an overhead, and emitting them
-  in tight loops can cause that overhead to become noticable in terms of CPU usage and throughput
+  in tight loops can cause that overhead to become noticeable in terms of CPU usage and throughput
   reduction. Instead of incrementing a counter every time a loop iteration occurs, you might
   consider incrementing a local variable instead, and then emitting that sum after the loop is over.
-- **Don't** update a counter to measure the total number of operations/events/etc if you're already
+- **Don't** update a counter to measure the total number of operations/events/etc. if you're already
   tracking a histogram of those operations/events/etc. Histograms have a `count` property that
   counts how many samples the histogram has recorded, as well as a `sum` property that is a sum of
   the value of all samples the histogram has recorded. This means you can potentially get three
@@ -278,7 +278,7 @@ we prefer **[`once_cell`](https://docs.rs/once_cell)**. It is slightly faster th
 
 If you're working with data that _changes over time_, but has a very high read-to-write ratio, such
 as _many readers_, but _one writer_ and infrequent writes, we prefer
-**[`arc-swap`](https://docs.rs/arc-swap)**.  The main feature of this crate is allowing a piece of
+**[`arc-swap`](https://docs.rs/arc-swap)**. The main feature of this crate is allowing a piece of
 data to be atomically updated while being shared concurrently. It does this by wrapping all data in
 `Arc<T>` to provide the safe, concurrent access, while adding the ability to atomically swap the
 `Arc<T>` itself. As it cannot be constructed in a const fashion, `arc-swap` pairs well with
@@ -286,8 +286,8 @@ data to be atomically updated while being shared concurrently. It does this by w
 
 #### Concurrent data structures
 
-When there is a need for a concurrent and _indexable_ storage, we prefer
-**[`sharded-slab`](https://docs.rs/sharded-slab)**.  This crate provides a means to insert items
+When there is a need for a concurrent and _index-able_ storage, we prefer
+**[`sharded-slab`](https://docs.rs/sharded-slab)**. This crate provides a means to insert items
 such that the caller gets back to the index by which it can access the item again in the future.
 Additionally, when an item is removed, its storage can be reused by future inserts, making
 `sharded-slab` a good choice for long-running processes where memory allocation reduction is
@@ -296,8 +296,8 @@ itself for use cases where pooling is desired.
 
 ### Synchronization
 
-Synchronization can be a very common sight when writing multi-threaded code in any language, and
-this document does not aim to familiarize you with all of the common synchronization primitives and
+Synchronization can be a very common sight when writing multithreaded code in any language, and
+this document does not aim to familiarize you with all the common synchronization primitives and
 their intended usage. Instead, however, there are some caveats that you must be aware of when using
 synchronization primitives in synchronous versus asynchronous code.
 
@@ -308,8 +308,8 @@ and have been improving over time in terms of performance. However, developers m
 using these primitives in asynchronous code, as their behavior can sometimes adversely affect the
 performance and correctness of Vector.
 
-To wit, developers must exercise caution when using synchronous (i.e. `std::sync`, `parking_lot`,
-etc) synchronization primitives in asynchronous code, as they can be used in a way that deadlocks
+To wit, developers must exercise caution when using synchronous (that is `std::sync`, `parking_lot`,
+etc.) synchronization primitives in asynchronous code, as they can be used in a way that deadlocks
 the asynchronous runtime even though the code compiles and appears to be correct. In some cases,
 you'll need to use an asynchronous-specific synchronization primitives, namely the ones from `tokio`
 itself. The documentation on `tokio`'s own

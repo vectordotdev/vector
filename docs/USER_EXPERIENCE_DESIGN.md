@@ -57,7 +57,7 @@ Examples:
 - Avoiding analytics specific use cases.
 - Leaning into tools like Kafka instead of trying to completely replace them.
 - Building a data processing DSL optimized our [design goals](#goals) as opposed
-  to offering multiple languages for processing (i.e., javascript)
+  to offering multiple languages for processing (for example, JavaScript)
 
 ### Be opinionated & reduce decisions
 

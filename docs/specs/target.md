@@ -3,8 +3,8 @@
 This document specifies requirements for installation targets for the
 integration of Vector.
 
-The key words “MUST”, “MUST NOT”, “REQUIRED”, “SHALL”, “SHALL NOT”, “SHOULD”,
-“SHOULD NOT”, “RECOMMENDED”, “MAY”, and “OPTIONAL” in this document are to be
+The keywords "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD",
+"SHOULD NOT", "RECOMMENDED", "MAY", and "OPTIONAL" in this document are to be
 interpreted as described in [RFC 2119].
 
 Other words, such as "agent", "aggregator", "node", and "service" are to be
@@ -60,13 +60,13 @@ architectures:
 
 - Targets MUST support the [agent architecture][agent_architecture] by
   providing a single command that deploys Vector and achieves the
-  [agent architecture requirements](#agent-architecture).
+  [agent architecture requirements](#4-agent-architecture).
 - Targets SHOULD support the [aggregator architecture][aggregator_architecture] by
   providing a single command that deploys Vector and achieves the
-  [aggregator architecture requirements](#aggregator-architecture).
+  [aggregator architecture requirements](#5-aggregator-architecture).
 - Targets MAY support the [unified architecture][unified_architecture] by
   providing a single command that deploys Vector and achieves the
-  [unified architecture requirements](#unified-architecture).
+  [unified architecture requirements](#6-unified-architecture).
 
 ### 4. Agent Architecture
 
@@ -122,8 +122,8 @@ targets:
 - Scaling
   - SHOULD provide facilities for provisioning a load balancer to enable horizontal scaling
     out of the box. MUST be overridable by the user.
-    - Cloud-managed load balancers (i.e., AWS NLB) SHOULD be supported in addition to
-      self-managed load balancers (i.e., HAProxy).
+    - Cloud-managed load balancers (that is an AWS NLB) SHOULD be supported in addition to
+      self-managed load balancers (that is a HAProxy).
     - Cloud-managed load balancers SHOULD be prioritized by default over self-managed
       load balancers.
     - Network load balancers (layer-4) SHOULD be prioritized over HTTP load balancers (layer-7)
@@ -166,7 +166,7 @@ targets as there is little added benefit.
     - Vector SHOULD be run under an unprivileged, dedicated service account.
     - Vector's service account SHOULD NOT have the ability to overwrite Vector's
       binary or configuration files. The only directory the Vector service
-      account should write to is Vector’s data directory.
+      account should write to is Vector's data directory.
 - Network hardening
   - Configured sources and sinks SHOULD use encrypted channels by default.
 

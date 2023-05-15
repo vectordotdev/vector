@@ -2,8 +2,8 @@
 
 This document specifies Vector's instrumentation for the development of Vector.
 
-The key words “MUST”, “MUST NOT”, “REQUIRED”, “SHALL”, “SHALL NOT”, “SHOULD”,
-“SHOULD NOT”, “RECOMMENDED”, “MAY”, and “OPTIONAL” in this document are to be
+The keywords "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD",
+"SHOULD NOT", "RECOMMENDED", "MAY", and "OPTIONAL" in this document are to be
 interpreted as described in [RFC 2119].
 
 - [Introduction](#introduction)
@@ -20,7 +20,7 @@ interpreted as described in [RFC 2119].
 ## Introduction
 
 Vector's telemetry drives various interfaces that operators depend on to manage
-mission critical Vector deployments. Therefore, Vector's telemetry should be
+mission-critical Vector deployments. Therefore, Vector's telemetry should be
 high quality and treated as a first class feature in the development of Vector.
 This document strives to guide developers towards achieving this.
 
@@ -45,8 +45,8 @@ event names MUST adhere to the following rules:
 - MUST be in [camelcase] format
 - MUST follow the `<Namespace><Noun><Verb>[Error]` template
   - `Namespace` - the [internal domain](#namespaces) the event belongs to
-  - `Noun` - the subject of the event (e.g., `Bytes`, `Events`)
-  - `Verb` - the past tense verb describing when the event occurred (e.g., `Received`, `Sent`, `Processes`)
+  - `Noun` - the subject of the event (for example, `Bytes`, `Events`)
+  - `Verb` - the past tense verb describing when the event occurred (for example, `Received`, `Sent`, `Processes`)
   - `[Error]` - if the event is an error it MUST end with `Error`
 
 ### Metric naming
@@ -57,10 +57,10 @@ Vector broadly follows the [Prometheus metric naming standards]:
 - MUST be in [snakecase] format
 - MUST follow the `<namespace>_<name>_<unit>_[total]` template
   - `namespace` - the [internal domain](#namespaces) the event belongs to
-  - `name` - is one or more words that describes the measurement (e.g., `memory_rss`, `requests`)
-  - `unit` - MUST be a single [base unit] in plural form, if applicable (e.g., `seconds`, `bytes`)
-  - Counters MUST end with `total` (e.g., `disk_written_bytes_total`, `http_requests_total`)
-- SHOULD be broad in purpose and use tags to differentiate characteristics of the measurement (e.g., `host_cpu_seconds_total{cpu="0",mode="idle"}`)
+  - `name` - is one or more words that describes the measurement (for example, `memory_rss`, `requests`)
+  - `unit` - MUST be a single [base unit] in plural form, if applicable (for example, `seconds`, `bytes`)
+  - Counters MUST end with `total` (for example, `disk_written_bytes_total`, `http_requests_total`)
+- SHOULD be broad in purpose and use tags to differentiate characteristics of the measurement (for example, `host_cpu_seconds_total{cpu="0",mode="idle"}`)
 
 ## Emission
 
@@ -153,7 +153,7 @@ know if the client will retry them.
   - MUST increment the `<namespace>_discarded_events_total` counter by the
     number of events discarded.
   - MUST only include the `intentional` property and component properties that
-    are inherited implicitly (e.g. `component_type`).
+    are inherited implicitly (for example, `component_type`).
 - Logs
   - MUST log a `Events dropped` message.
   - MUST include the defined properties as key-value pairs.

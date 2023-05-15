@@ -2,7 +2,7 @@
 
 ## Context
 
-As this PR introduces `EventArray`, it represents a change to the type flowing through buffers.  In
+As this PR introduces `EventArray`, it represents a change to the type flowing through buffers. In
 order to prevent a backwards-incompatible change, this PR adds a change that allows the encoding
 scheme to try to decode as either `EventArray` or `Event` in order to be able to load older buffer
 files and continue processing them while using `EventArray` going forward.
@@ -12,14 +12,14 @@ newer code.
 
 ## Plan
 
-Start by grabbing a Vector binary for 0.19.0, and build one from the PR branch.  We'll use a simple
+Start by grabbing a Vector binary for 0.19.0, and build one from the PR branch. We'll use a simple
 configuration that will read records from stdin and attempt to send them to an HTTP sink.
 
 For the HTTP sink, we'll have one configuration that uses an invalid port and another, an identical
 version, which has the correct port. Since Vector will retry "connection refused" errors, and retry
 them infinitely, the messages will never be acknowledged, which ensures they remain in the buffer.
 For the purposes of verifying that the same data that went in is still present after renaming the
-data directory, etc, we can use `dummyhttp` (a Rust project for serving up a simplistic HTTP
+data directory, etc., we can use `dummyhttp` (a Rust project for serving up a simplistic HTTP
 endpoint that can be configured to respond a certain way) to listen on the port and inspect the HTTP
 request made by the sink.
 
@@ -32,7 +32,7 @@ request made by the sink.
      `five-lines-first` file should be piped to STDIN.
    - Stop Vector.
    - Run the PR binary, using the "right" configuration, and ensure that it reads the records from
-     the buffer and sends them to the HTTP sink.  This should be five records: all five from the run
+     the buffer and sends them to the HTTP sink. This should be five records: all five from the run
      using Vector 0.19.0.
 
 2. Ensure that records written to a v1 disk buffer from a version of Vector without this change can
@@ -46,5 +46,5 @@ request made by the sink.
      piped to STDIN.
    - Stop Vector.
    - Run the PR binary, using the "right" configuration, and ensure that it reads all the records
-     from the buffer and sends them to the HTTP sink.  This should be ten records: all five from
+     from the buffer and sends them to the HTTP sink. This should be ten records: all five from
      `five-lines-first`, and all five from `five-lines-second`.
