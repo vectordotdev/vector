@@ -22,7 +22,6 @@
 # Docker image tags are SHA-SHA. The first SHA is the one that triggered this
 # workflow, the second is the one of the Vector being tested.
 # For comparison images the two SHAs are identical.
-#
 
 name: Regression Detection Suite
 
