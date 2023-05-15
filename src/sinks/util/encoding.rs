@@ -1,10 +1,14 @@
-use std::io;
+use std::{io, sync::Arc};
 
 use bytes::BytesMut;
 use codecs::encoding::Framer;
 use tokio_util::codec::Encoder as _;
 
-use crate::{codecs::Transformer, event::Event, internal_events::EncoderWriteError};
+use crate::{
+    codecs::Transformer,
+    event::Event,
+    internal_events::{EncoderSerializeError, EncoderWriteError},
+};
 
 pub trait Encoder<T> {
     /// Encodes the input into the provided writer.
@@ -66,6 +70,38 @@ impl Encoder<Event> for (Transformer, crate::codecs::Encoder<()>) {
             .serialize(event, &mut bytes)
             .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
         write_all(writer, 1, &bytes)?;
+        Ok(bytes.len())
+    }
+}
+
+impl<T, D: Encoder<T> + ?Sized> Encoder<T> for Arc<D> {
+    fn encode_input(&self, input: T, writer: &mut dyn io::Write) -> io::Result<usize> {
+        (**self).encode_input(input, writer)
+    }
+}
+
+impl Encoder<Vec<Event>> for (Transformer, codecs::encoding::BatchSerializer) {
+    fn encode_input(
+        &self,
+        mut events: Vec<Event>,
+        writer: &mut dyn io::Write,
+    ) -> io::Result<usize> {
+        let mut encoder = self.1.clone();
+        let n_events_pending = events.len();
+
+        for event in &mut events {
+            self.0.transform(event);
+        }
+
+        let mut bytes = BytesMut::new();
+        encoder.encode(events, &mut bytes).map_err(|error| {
+            let error: crate::Error = error.into();
+            emit!(EncoderSerializeError { error: &error });
+            io::Error::new(io::ErrorKind::InvalidData, error)
+        })?;
+
+        write_all(writer, n_events_pending, &bytes)?;
+
         Ok(bytes.len())
     }
 }

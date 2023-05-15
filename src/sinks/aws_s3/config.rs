@@ -1,4 +1,4 @@
-use std::convert::TryInto;
+use std::{convert::TryInto, sync::Arc};
 
 use aws_sdk_s3::Client as S3Client;
 use codecs::{
@@ -14,6 +14,7 @@ use crate::{
     aws::{AwsAuthentication, RegionOrEndpoint},
     codecs::{Encoder, EncodingConfigWithFraming, SinkType},
     config::{AcknowledgementsConfig, GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext},
+    event::Event,
     sinks::{
         s3_common::{
             self,
@@ -206,8 +207,14 @@ impl S3SinkConfig {
         let partitioner = S3KeyPartitioner::new(key_prefix, ssekms_key_id);
 
         let transformer = self.encoding.transformer();
-        let (framer, serializer) = self.encoding.build(SinkType::MessageBased)?;
-        let encoder = Encoder::<Framer>::new(framer, serializer);
+        let encoder = if let Some(serializer) = self.encoding.build_batched()? {
+            Arc::new((transformer, serializer))
+                as Arc<dyn crate::sinks::util::encoding::Encoder<Vec<Event>> + Send + Sync>
+        } else {
+            let (framer, serializer) = self.encoding.build(SinkType::MessageBased)?;
+            let encoder = Encoder::<Framer>::new(framer, serializer);
+            Arc::new((transformer, encoder)) as _
+        };
 
         let request_options = S3RequestOptions {
             bucket: self.bucket.clone(),
@@ -215,7 +222,7 @@ impl S3SinkConfig {
             filename_extension: self.filename_extension.clone(),
             filename_time_format: self.filename_time_format.clone(),
             filename_append_uuid: self.filename_append_uuid,
-            encoder: (transformer, encoder),
+            encoder,
             compression: self.compression,
         };
 
