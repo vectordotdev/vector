@@ -35,7 +35,7 @@ concurrency:
 
 jobs:
   validate:
-    name: Validate comment has valid text and is by team member
+    name: Validate comment
     runs-on: ubuntu-latest
     if: |
       github.event.issue.pull_request && ( contains(github.event.comment.body, '/ci-run-all')

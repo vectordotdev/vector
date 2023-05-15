@@ -110,6 +110,7 @@ jobs:
     name: Compute K8s test plan
     runs-on: [linux, ubuntu-20.04-8core]
     needs: changes
+    if: always() && (github.event_name != 'pull_request' || needs.changes.outputs.k8s == 'true')
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
