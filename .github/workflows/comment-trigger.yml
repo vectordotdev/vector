@@ -13,7 +13,6 @@
 # /ci-run-cross               : runs Cross
 # /ci-run-unit-mac            : runs Unit - Mac
 # /ci-run-unit-windows        : runs Unit - Windows
-# /ci-run-k8s                 : runs K8s E2E Suite
 
 name: Comment Trigger
 
@@ -37,7 +36,6 @@ jobs:
   validate:
     name: Validate comment
     runs-on: ubuntu-latest
-#          || contains(github.event.comment.body, '/ci-run-k8s')
     if: |
       github.event.issue.pull_request && ( contains(github.event.comment.body, '/ci-run-all')
           || contains(github.event.comment.body, '/ci-run-cli')
@@ -91,9 +89,3 @@ jobs:
     if: contains(github.event.comment.body, '/ci-run-all') || contains(github.event.comment.body, '/ci-run-unit-windows')
     uses: ./.github/workflows/unit_windows.yml
     secrets: inherit
-
-  # k8s:
-  #   needs: validate
-  #   if: contains(github.event.comment.body, '/ci-run-all') || contains(github.event.comment.body, '/ci-run-k8s')
-  #   uses: ./.github/workflows/k8s_e2e.yml
-  #   secrets: inherit
