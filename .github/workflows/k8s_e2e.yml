@@ -58,6 +58,7 @@ jobs:
         with:
           sha: ${{ steps.comment-branch.outputs.head_sha }}
           token: ${{ secrets.GITHUB_TOKEN }}
+          context: K8s E2E Test Suite
           status: pending
 
       # Checkout the branch, using the PR ref.
@@ -98,6 +99,7 @@ jobs:
         with:
           sha: ${{ steps.comment-branch.outputs.head_sha }}
           token: ${{ secrets.GITHUB_TOKEN }}
+          context: K8s E2E Test Suite
           status: 'failure'
 
   # GitHub Actions don't support `matrix` at the job-level `if:` condition.
@@ -217,6 +219,7 @@ jobs:
         with:
           sha: ${{ steps.comment-branch.outputs.head_sha }}
           token: ${{ secrets.GITHUB_TOKEN }}
+          context: K8s E2E Test Suite
           status: 'failure'
 
   final-result:
@@ -228,20 +231,22 @@ jobs:
       FAILED: ${{ contains(needs.*.result, 'failure') }}
     steps:
       - name: (PR comment) Get PR branch
-        if: needs.test-e2e-kubernetes.result == 'success' && github.event_name == 'issue_comment'
+        if: github.event_name == 'issue_comment' && needs.test-e2e-kubernetes.result == 'success'
         uses: xt0rted/pull-request-comment-branch@v1
         id: comment-branch
 
-      - name: (PR comment) Submit PR result as success
-        if: needs.test-e2e-kubernetes.result == 'success' && github.event_name == 'issue_comment'
+      - name: (PR comment) Submit PR result
+        if: github.event_name == 'issue_comment' && needs.test-e2e-kubernetes.result == 'success'
         uses: myrotvorets/set-commit-status-action@1.1.6
         with:
           sha: ${{ steps.comment-branch.outputs.head_sha }}
           token: ${{ secrets.GITHUB_TOKEN }}
-          status: 'success'
+          status: $ {{ needs.test-kubernetes.result }}
+          context: K8s E2E Test Suite
 
       - run: |
           echo "failed=${{ env.FAILED }}"
+          echo "${{ needs.test-e2e-kubernetes.result }}"
           if [[ "$FAILED" == "true" ]] ; then
             exit 1
           else
