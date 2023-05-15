@@ -129,14 +129,14 @@ components: sinks: loki: {
 
 				```toml
 				[sinks.my_sink_id.labels]
-				\"pod_labels_*\": "{{ kubernetes.pod_labels }}"
-				\"*\": "{{ metadata }}"
-				cluster_name: static_cluster_name
+				\"pod_labels_*\" = "{{ kubernetes.pod_labels }}"
+				\"*\" = "{{ metadata }}"
+				cluster_name = "static_cluster_name"
 				```
 
 				this would expand into the following labels:
 
-				```toml
+				```yaml
 				pod_labels_app: web-server
 				pod_labels_name: unicorn
 				cluster_name: static_cluster_name
