@@ -1,0 +1,57 @@
+
+name: Comment Trigger
+
+on:
+  issue_comment:
+    types: [created]
+
+env:
+  #AWS_ACCESS_KEY_ID: "dummy"
+  #AWS_SECRET_ACCESS_KEY: "dummy"
+  CONTAINER_TOOL: "docker"
+  DD_ENV: "ci"
+  #DD_API_KEY: ${{ secrets.DD_API_KEY }}
+  RUST_BACKTRACE: full
+  TEST_LOG: vector=debug
+  VERBOSE: true
+  CI: true
+  PROFILE: debug
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.issue_comment.issue.id }}-${{ github.event.comment.body }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate comment has valid text and is by team member
+    runs-on: ubuntu-latest
+    if: |
+      github.event.issue.pull_request && (
+        contains(github.event.comment.body, '/ci-run-all') ||
+        contains(github.event.comment.body, '/ci-run-k8s-tests') ||
+        contains(github.event.comment.body, '/ci-run-unit-mac') ||
+        contains(github.event.comment.body, '/ci-run-unit-windows') ||
+        contains(github.event.comment.body, '/ci-run-cross') ||
+        contains(github.event.comment.body, '/ci-run-component-features') ||
+        contains(github.event.comment.body, '/ci-run-misc') ||
+        contains(github.event.comment.body, '/ci-run-cli') )
+    steps:
+      - name: Validate issue comment
+        id: comment
+        uses: tspascoal/get-user-teams-membership@v2
+        with:
+          username: ${{ github.actor }}
+          team: 'Vector'
+          GITHUB_TOKEN: ${{ secrets.GH_PAT_ORG }}
+
+  cli:
+    needs: validate
+    if: contains(github.event.comment.body, '/ci-run-all') || contains(github.event.comment.body, '/ci-run-cli')
+    uses: ./.github/workflows/cli.yml
+    secrets: inherit
+
+  misc:
+    needs: validate
+    if: contains(github.event.comment.body, '/ci-run-all') || contains(github.event.comment.body, '/ci-run-misc')
+    uses: ./.github/workflows/misc.yml
+    secrets: inherit
