@@ -8,7 +8,7 @@ base: components: transforms: throttle: configuration: {
 	}
 	key_field: {
 		description: """
-			The value to group events into a separate buckets to be rate limited independently.
+			The value to group events into separate buckets to be rate limited independently.
 
 			If left unspecified, or if the event doesn't have `key_field`, then the event is not rate
 			limited separately.
