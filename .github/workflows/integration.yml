@@ -1,3 +1,5 @@
+# Integration Test Suite
+#
 # This workflow runs the integration tests. If the workflow is triggered in the merge queue, all integration tests
 # are run. If the workflow is triggered in a PR commit, then the files changed in the PR are evaluated to determine
 # if any integration tests will run.
