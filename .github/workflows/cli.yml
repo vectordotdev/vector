@@ -23,6 +23,7 @@ jobs:
         with:
           sha: ${{ steps.comment-branch.outputs.head_sha }}
           token: ${{ secrets.GITHUB_TOKEN }}
+          context: CLI - Linux
           status: pending
 
       # Checkout the branch, using the PR ref.
@@ -67,4 +68,5 @@ jobs:
         with:
           sha: ${{ steps.comment-branch.outputs.head_sha }}
           token: ${{ secrets.GITHUB_TOKEN }}
+          context: CLI - Linux
           status: ${{ job.status }}
