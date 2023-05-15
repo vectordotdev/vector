@@ -1,3 +1,14 @@
+# K8s E2E Suite
+#
+# This workflow runs under any of the following conditions:
+#    - manual dispatch in GH UI
+#    - on a PR commit if the kubernetes_logs source was changed
+#    - in the merge queue
+#    - on demand by either of the following comments in a PR:
+#        - '/ci-run-k8s'
+#        - '/ci-run-all'
+#
+
 name: K8S E2E Suite
 
 on:
