@@ -187,7 +187,10 @@ where
             match previous_count {
                 0 => self.inner.on_event(event, ctx),
                 1 => {
-                    let message = format!("Internal log [{}] is being suppressed.", state.message);
+                    let message = format!(
+                        "Internal log [{}] is being suppressed to avoid flooding.",
+                        state.message
+                    );
                     self.create_event(&ctx, metadata, message, state.limit);
                 }
                 _ => {}
