@@ -177,28 +177,30 @@ where
             State::new(message, limit)
         });
 
-        // Update our rate limiting state for this event, and see if we should still be rate limiting it.
+        // Update our suppressed state for this event, and see if we should still be suppressing it.
         //
         // When this is the first time seeing the event, we emit it like we normally would. The second time we see it in
-        // the limit period, we emit a new event to indicate that the original event is being actively rate limited.
+        // the limit period, we emit a new event to indicate that the original event is being actively suppressed.
         // Otherwise, we don't emit anything.
         let previous_count = state.increment_count();
         if state.should_limit() {
             match previous_count {
                 0 => self.inner.on_event(event, ctx),
                 1 => {
-                    let message =
-                        format!("Internal log [{}] is being rate limited.", state.message);
+                    let message = format!(
+                        "Internal log [{}] is being suppressed to avoid flooding.",
+                        state.message
+                    );
                     self.create_event(&ctx, metadata, message, state.limit);
                 }
                 _ => {}
             }
         } else {
             // If we saw this event 3 or more times total, emit an event that indicates the total number of times we
-            // rate limited the event in the limit period.
+            // suppressed the event in the limit period.
             if previous_count > 1 {
                 let message = format!(
-                    "Internal log [{}] has been rate limited {} times.",
+                    "Internal log [{}] has been suppressed {} times.",
                     state.message,
                     previous_count - 1
                 );
@@ -206,7 +208,7 @@ where
                 self.create_event(&ctx, metadata, message, state.limit);
             }
 
-            // We're not rate limiting anymore, so we also emit the current event as normal.. but we update our rate
+            // We're not suppressing anymore, so we also emit the current event as normal.. but we update our rate
             // limiting state since this is effectively equivalent to seeing the event again for the first time.
             self.inner.on_event(event, ctx);
 
@@ -510,11 +512,11 @@ mod test {
             *events,
             vec![
                 "Hello world!",
-                "Internal log [Hello world!] is being rate limited.",
-                "Internal log [Hello world!] has been rate limited 9 times.",
+                "Internal log [Hello world!] is being suppressed to avoid flooding.",
+                "Internal log [Hello world!] has been suppressed 9 times.",
                 "Hello world!",
-                "Internal log [Hello world!] is being rate limited.",
-                "Internal log [Hello world!] has been rate limited 9 times.",
+                "Internal log [Hello world!] is being suppressed to avoid flooding.",
+                "Internal log [Hello world!] has been suppressed 9 times.",
                 "Hello world!",
             ]
             .into_iter()
@@ -547,11 +549,11 @@ mod test {
             *events,
             vec![
                 "Hello world!",
-                "Internal log [Hello world!] is being rate limited.",
-                "Internal log [Hello world!] has been rate limited 9 times.",
+                "Internal log [Hello world!] is being suppressed to avoid flooding.",
+                "Internal log [Hello world!] has been suppressed 9 times.",
                 "Hello world!",
-                "Internal log [Hello world!] is being rate limited.",
-                "Internal log [Hello world!] has been rate limited 9 times.",
+                "Internal log [Hello world!] is being suppressed to avoid flooding.",
+                "Internal log [Hello world!] has been suppressed 9 times.",
                 "Hello world!",
             ]
             .into_iter()
@@ -594,29 +596,29 @@ mod test {
                 "Hello foo on line_number 2!",
                 "Hello bar on line_number 1!",
                 "Hello bar on line_number 2!",
-                "Internal log [Hello foo on line_number 1!] is being rate limited.",
-                "Internal log [Hello foo on line_number 2!] is being rate limited.",
-                "Internal log [Hello bar on line_number 1!] is being rate limited.",
-                "Internal log [Hello bar on line_number 2!] is being rate limited.",
-                "Internal log [Hello foo on line_number 1!] has been rate limited 9 times.",
+                "Internal log [Hello foo on line_number 1!] is being suppressed to avoid flooding.",
+                "Internal log [Hello foo on line_number 2!] is being suppressed to avoid flooding.",
+                "Internal log [Hello bar on line_number 1!] is being suppressed to avoid flooding.",
+                "Internal log [Hello bar on line_number 2!] is being suppressed to avoid flooding.",
+                "Internal log [Hello foo on line_number 1!] has been suppressed 9 times.",
                 "Hello foo on line_number 1!",
-                "Internal log [Hello foo on line_number 2!] has been rate limited 9 times.",
+                "Internal log [Hello foo on line_number 2!] has been suppressed 9 times.",
                 "Hello foo on line_number 2!",
-                "Internal log [Hello bar on line_number 1!] has been rate limited 9 times.",
+                "Internal log [Hello bar on line_number 1!] has been suppressed 9 times.",
                 "Hello bar on line_number 1!",
-                "Internal log [Hello bar on line_number 2!] has been rate limited 9 times.",
+                "Internal log [Hello bar on line_number 2!] has been suppressed 9 times.",
                 "Hello bar on line_number 2!",
-                "Internal log [Hello foo on line_number 1!] is being rate limited.",
-                "Internal log [Hello foo on line_number 2!] is being rate limited.",
-                "Internal log [Hello bar on line_number 1!] is being rate limited.",
-                "Internal log [Hello bar on line_number 2!] is being rate limited.",
-                "Internal log [Hello foo on line_number 1!] has been rate limited 9 times.",
+                "Internal log [Hello foo on line_number 1!] is being suppressed to avoid flooding.",
+                "Internal log [Hello foo on line_number 2!] is being suppressed to avoid flooding.",
+                "Internal log [Hello bar on line_number 1!] is being suppressed to avoid flooding.",
+                "Internal log [Hello bar on line_number 2!] is being suppressed to avoid flooding.",
+                "Internal log [Hello foo on line_number 1!] has been suppressed 9 times.",
                 "Hello foo on line_number 1!",
-                "Internal log [Hello foo on line_number 2!] has been rate limited 9 times.",
+                "Internal log [Hello foo on line_number 2!] has been suppressed 9 times.",
                 "Hello foo on line_number 2!",
-                "Internal log [Hello bar on line_number 1!] has been rate limited 9 times.",
+                "Internal log [Hello bar on line_number 1!] has been suppressed 9 times.",
                 "Hello bar on line_number 1!",
-                "Internal log [Hello bar on line_number 2!] has been rate limited 9 times.",
+                "Internal log [Hello bar on line_number 2!] has been suppressed 9 times.",
                 "Hello bar on line_number 2!",
             ]
             .into_iter()
@@ -658,29 +660,29 @@ mod test {
                 "Hello foo on line_number 2!",
                 "Hello bar on line_number 1!",
                 "Hello bar on line_number 2!",
-                "Internal log [Hello foo on line_number 1!] is being rate limited.",
-                "Internal log [Hello foo on line_number 2!] is being rate limited.",
-                "Internal log [Hello bar on line_number 1!] is being rate limited.",
-                "Internal log [Hello bar on line_number 2!] is being rate limited.",
-                "Internal log [Hello foo on line_number 1!] has been rate limited 9 times.",
+                "Internal log [Hello foo on line_number 1!] is being suppressed to avoid flooding.",
+                "Internal log [Hello foo on line_number 2!] is being suppressed to avoid flooding.",
+                "Internal log [Hello bar on line_number 1!] is being suppressed to avoid flooding.",
+                "Internal log [Hello bar on line_number 2!] is being suppressed to avoid flooding.",
+                "Internal log [Hello foo on line_number 1!] has been suppressed 9 times.",
                 "Hello foo on line_number 1!",
-                "Internal log [Hello foo on line_number 2!] has been rate limited 9 times.",
+                "Internal log [Hello foo on line_number 2!] has been suppressed 9 times.",
                 "Hello foo on line_number 2!",
-                "Internal log [Hello bar on line_number 1!] has been rate limited 9 times.",
+                "Internal log [Hello bar on line_number 1!] has been suppressed 9 times.",
                 "Hello bar on line_number 1!",
-                "Internal log [Hello bar on line_number 2!] has been rate limited 9 times.",
+                "Internal log [Hello bar on line_number 2!] has been suppressed 9 times.",
                 "Hello bar on line_number 2!",
-                "Internal log [Hello foo on line_number 1!] is being rate limited.",
-                "Internal log [Hello foo on line_number 2!] is being rate limited.",
-                "Internal log [Hello bar on line_number 1!] is being rate limited.",
-                "Internal log [Hello bar on line_number 2!] is being rate limited.",
-                "Internal log [Hello foo on line_number 1!] has been rate limited 9 times.",
+                "Internal log [Hello foo on line_number 1!] is being suppressed to avoid flooding.",
+                "Internal log [Hello foo on line_number 2!] is being suppressed to avoid flooding.",
+                "Internal log [Hello bar on line_number 1!] is being suppressed to avoid flooding.",
+                "Internal log [Hello bar on line_number 2!] is being suppressed to avoid flooding.",
+                "Internal log [Hello foo on line_number 1!] has been suppressed 9 times.",
                 "Hello foo on line_number 1!",
-                "Internal log [Hello foo on line_number 2!] has been rate limited 9 times.",
+                "Internal log [Hello foo on line_number 2!] has been suppressed 9 times.",
                 "Hello foo on line_number 2!",
-                "Internal log [Hello bar on line_number 1!] has been rate limited 9 times.",
+                "Internal log [Hello bar on line_number 1!] has been suppressed 9 times.",
                 "Hello bar on line_number 1!",
-                "Internal log [Hello bar on line_number 2!] has been rate limited 9 times.",
+                "Internal log [Hello bar on line_number 2!] has been suppressed 9 times.",
                 "Hello bar on line_number 2!",
             ]
             .into_iter()
