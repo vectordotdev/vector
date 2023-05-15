@@ -8,7 +8,7 @@
 #
 # /ci-run-all                 : runs all of the below
 # /ci-run-cli                 : runs CLI - Linux
-# /ci-run-misc                : runs Miscellaneious - Linux
+# /ci-run-misc                : runs Miscellaneous - Linux
 # /ci-run-component-features  : runs Component Features - Linux
 # /ci-run-cross               : runs Cross
 # /ci-run-unit-mac            : runs Unit - Mac
