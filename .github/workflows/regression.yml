@@ -133,6 +133,8 @@ jobs:
           echo "comparison sha is: ${COMPARISON_SHA}"
           echo "comparison tag is: ${COMPARISON_TAG}"
 
+      # If triggered by merge queue, the PR number is not available in the payload. While we restrict the number of PRs in the
+      # queue to 1, we can get the PR number by parsing the merge queue temp branch's ref.
       - name: Get PR metadata (merge queue)
         id: pr-metadata-merge-queue
         if: github.event_name != 'issue_comment'
