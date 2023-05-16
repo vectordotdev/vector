@@ -106,5 +106,5 @@ jobs:
   install:
     needs: validate
     if: contains(github.event.comment.body, '/ci-run-all') || contains(github.event.comment.body, '/ci-run-install'
-    uses: ./.github/install-sh.yml
+    uses: ./.github/workflows/install-sh.yml
     secrets: inherit
