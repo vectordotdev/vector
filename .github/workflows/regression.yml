@@ -86,7 +86,7 @@ jobs:
         ALL: ${{ steps.changes.outputs.all_changed_files }}
         IGNORE: ${{ steps.changes.outputs.ignore_files }}
       run: |
-        echo "ALL='${{ env.ALL }}''"
+        echo "ALL='${{ env.ALL }}'"
         echo "IGNORE='${{ env.IGNORE }}'"
         export SOURCE_CHANGED=$(comm -2 -3 <(printf "%s\n" "${{ env.ALL }}") <(printf "%s\n" "${{ env.IGNORE }}"))
         echo "SOURCE_CHANGED='${SOURCE_CHANGED}'"
