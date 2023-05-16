@@ -682,10 +682,7 @@ mod tests {
             metric_tag_values,
             ..Default::default()
         }
-        .build(&TransformContext::default())
-        .await
-        .unwrap()
-        .into_function()
+        .build_transform(&TransformContext::default())
         .transform(&mut output, counter.into());
 
         assert_eq!(output.len(), 1);

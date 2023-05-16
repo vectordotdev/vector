@@ -87,7 +87,7 @@ mod tests {
     use vrl::value::value;
 
     use super::*;
-    use crate::{event::Event, event::LogEvent, test_util::trace_init, transforms::Transform};
+    use crate::{event::Event, event::LogEvent, test_util::trace_init};
 
     /// Picker has to work for all test cases for underlying parsers.
     fn valid_cases(log_namespace: LogNamespace) -> Vec<(Bytes, Vec<Event>)> {

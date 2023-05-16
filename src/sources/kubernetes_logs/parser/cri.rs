@@ -188,7 +188,7 @@ pub mod tests {
     use bytes::Bytes;
 
     use super::{super::test_util, *};
-    use crate::{event::LogEvent, test_util::trace_init, transforms::Transform};
+    use crate::{event::LogEvent, test_util::trace_init};
     use vrl::value::value;
 
     fn make_long_string(base: &str, len: usize) -> String {
