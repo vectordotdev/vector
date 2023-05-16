@@ -1,7 +1,7 @@
 use mlua::prelude::*;
 
 use crate::event::lua::metric::LuaMetric;
-use crate::event::{Event, LogEvent, Metric};
+use crate::event::{Event, LogEvent, TraceEvent, Metric};
 
 pub struct LuaEvent {
     pub event: Event,
@@ -22,13 +22,7 @@ impl<'a> ToLua<'a> for LuaEvent {
                 }
                 .to_lua(lua)?,
             )?,
-            Event::Trace(_) => {
-                return Err(LuaError::ToLuaConversionError {
-                    from: "Event",
-                    to: "table",
-                    message: Some("Trace are not supported".to_string()),
-                })
-            }
+            Event::Trace(trace) => table.raw_set("trace", trace.to_lua(lua)?)?,
         }
         Ok(LuaValue::Table(table))
     }
@@ -43,11 +37,14 @@ impl<'a> FromLua<'a> for Event {
                 message: Some("Event should be a Lua table".to_string()),
             })
         };
-        match (table.raw_get("log")?, table.raw_get("metric")?) {
-            (LuaValue::Table(log), LuaValue::Nil) => {
+        match (table.raw_get("log")?, table.raw_get("metric")?, table.raw_get("trace")?) {
+            (LuaValue::Table(log), LuaValue::Nil, LuaValue::Nil) => {
                 Ok(Event::Log(LogEvent::from_lua(LuaValue::Table(log), lua)?))
             }
-            (LuaValue::Nil, LuaValue::Table(metric)) => Ok(Event::Metric(Metric::from_lua(
+            (LuaValue::Nil, LuaValue::Nil, LuaValue::Table(trace)) => {
+                Ok(Event::Trace(TraceEvent::from_lua(LuaValue::Table(trace), lua)?))
+            }
+            (LuaValue::Nil, LuaValue::Table(metric), LuaValue::Nil) => Ok(Event::Metric(Metric::from_lua(
                 LuaValue::Table(metric),
                 lua,
             )?)),
@@ -55,7 +52,7 @@ impl<'a> FromLua<'a> for Event {
                 from: value.type_name(),
                 to: "Event",
                 message: Some(
-                    "Event should contain either \"log\" or \"metric\" key at the top level"
+                    "Event should contain either \"log\" or \"metric\" or \"trace\" key at the top level"
                         .to_string(),
                 ),
             }),

@@ -175,7 +175,7 @@ impl LuaConfig {
     }
 
     pub fn input(&self) -> Input {
-        Input::new(DataType::Metric | DataType::Log)
+        Input::new(DataType::Metric | DataType::Log | DataType::Trace)
     }
 
     pub fn outputs(
