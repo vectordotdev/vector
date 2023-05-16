@@ -239,6 +239,7 @@ jobs:
         with:
           sha: ${{ steps.pr-metadata-comment.outputs.COMPARISON_SHA }}
           token: ${{ secrets.GITHUB_TOKEN }}
+          context: Regression Detection Suite
           status: pending
   ##
   ## BUILD
@@ -767,6 +768,7 @@ jobs:
         with:
           sha: ${{ steps.compute-metadata.outputs.comparison-sha }}
           token: ${{ secrets.GITHUB_TOKEN }}
+          context: Regression Detection Suite
           status: 'failure'
 
       - name: (PR comment) Submit PR result as success
@@ -775,6 +777,7 @@ jobs:
         with:
           sha: ${{ steps.comment-branch.outputs.head_sha }}
           token: ${{ secrets.GITHUB_TOKEN }}
+          context: Regression Detection Suite
           status: 'success'
 
       - name: exit
