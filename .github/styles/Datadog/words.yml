@@ -1,0 +1,40 @@
+extends: substitution
+message: "Use '%s' instead of '%s'."
+link: "https://github.com/DataDog/documentation/blob/master/CONTRIBUTING.md#words-and-phrases"
+ignorecase: true
+level: warning
+action:
+  name: replace
+swap:
+  # bad: good
+  'acknowledgement': acknowledgment
+  'auto-complete': 'autocomplete'
+  'a number of': few|several|many
+  'and/or': 'and|or|either or'
+  'back end': backend
+  'Datadog app': 'Datadog|Datadog site'
+  'Datadog application': 'Datadog|Datadog site'
+  'Datadog product': 'Datadog|Datadog service'
+  'front end': 'frontend'
+  'Note that': '**Note**:'
+  'please': ''
+  'easy': ''
+  'easily': ''
+  'just': ''
+  'quickly': ''
+  'simple': ''
+  'simply': ''
+  'reenable': re-enable
+  'run time': runtime
+  'refer to|visit': see|read
+  'screen board': screenboard
+  'time board': timeboard
+  'time series': timeseries
+  'toplist': top list
+  'tradeoff': 'trade-off'
+  'turnkey': turn-key
+  'utilize': use
+  'via': with|through
+  'webserver': 'web server'
+  'web site': 'website'
+  'multi-alert': 'multi alert'

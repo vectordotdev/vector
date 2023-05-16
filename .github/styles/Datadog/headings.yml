@@ -1,0 +1,270 @@
+extends: capitalization
+message: "'%s' should use sentence-style capitalization."
+link: "https://github.com/DataDog/documentation/blob/master/CONTRIBUTING.md#headers"
+level: warning
+scope: heading
+match: $sentence
+exceptions:
+  - ACLs
+  - ActiveMQ XML Integration
+  - Agent
+  - Agentless
+  - Agents
+  - Airflow
+  - Amazon
+  - Amazon Web Services
+  - APCu
+  - APIs
+  - APM
+  - Application Performance Monitoring
+  - APM & Continuous Profiler
+  - App Analytics
+  - App Service
+  - AppVeyor
+  - Application Security Management
+  - Application Vulnerability Management
+  - AuthN
+  - Autodiscovery
+  - AWS Step Functions
+  - AWS Systems Manager
+  - Azure
+  - Azure App Service
+  - Azure App Service Plan
+  - Azure Blob Storage
+  - Azure Event Hub
+  - Audit Trail
+  - BitBucket
+  - BuildKite
+  - Browser Monitoring
+  - CakePHP
+  - Cassandra Nodetool
+  - Cassandra Nodetool Integration
+  - CentOS
+  - Chef
+  - CircleCI
+  - CI/CD
+  - CI Visibility
+  - Clipboard
+  - Cloud Cost Management
+  - Cloud Pub Sub
+  - Cloud Security Management
+  - Cloud Security Posture Management
+  - Cloud SIEM
+  - Cloud Workload Security
+  - CloudFormation
+  - CloudSQL
+  - CloudTrail
+  - CloudWatch
+  - Cluster Agent
+  - Continuous Profiler
+  - Continuous Testing
+  - DaemonSet
+  - Data Collected
+  - Database Monitoring
+  - Datadog
+  - DatadogMetric
+  - Datadog Agent Manager
+  - Datadog for Government
+  - Datadog Forwarder
+  - Datadog Lambda Extension
+  - Datadog Operator
+  - Datadog Plugin
+  - Datadog Watchdog
+  - DatadogHook
+  - Debian
+  - Detection Rules
+  - Docker
+  - Docker Compose
+  - Docker Swarm
+  - Dockerfile
+  - DogStatsD
+  - Envoy
+  - Fargate
+  - FastCGI
+  - Firehose Nozzle
+  - FireLens
+  - Fluent Bit
+  - Fluentd
+  - FreeBSD
+  - FreeSwitch
+  - Further Reading
+  - GeoIP
+  - Git
+  - GitHub
+  - GitHub Actions
+  - GitLab
+  - Gitlab Runner Integration
+  - Google
+  - Google Analytics
+  - Google Cloud
+  - Google Cloud Functions
+  - GraphQL
+  - Gunicorn
+  - HAProxy
+  - HBase RegionServer Integration
+  - HDFS DataNode Integration
+  - HDFS NameNode Integration
+  - Helm
+  - Heroku
+  - HipChat
+  - HostPort
+  - I
+  - IdP
+  - IDs
+  - iLert
+  - Incident Management
+  - Infrastructure Monitoring
+  - Ingress Controller
+  - Internet Information Services
+  - IoT
+  - IPs
+  - Java
+  - JavaScript
+  - JBoss
+  - Jenkins
+  - JFrog
+  - JFrog Artifactory
+  - Jira
+  - JMXFetch
+  - Journald
+  - Kafka
+  - Kafka Consumer Integration
+  - Kubernetes
+  - Kubernetes Engine
+  - Kubernetes Pod
+  - Kubernetes Service
+  - Lambda
+  - Lambda Layer
+  - Lambda@Edge
+  - LaunchDarkly
+  - Linux
+  - Live Analytics
+  - Live Search
+  - Live Tail
+  - Log Explorer
+  - Log Management
+  - Log Rehydration
+  - Logback
+  - macOS
+  - Marketplace
+  - MarkLogic
+  - Meraki
+  - Mesos Slave Integration
+  - Metrics Explorer
+  - Metrics without Limits
+  - Mobile Monitoring
+  - MongoDB
+  - MsTest
+  - MySQL
+  - Network Address Translation
+  - Network Device Monitoring
+  - Network Performance Monitoring
+  - New Relic
+  - NGINX Plus
+  - NixOS
+  - Node
+  - Notebook
+  - Notebook List
+  - npm
+  - NXLog
+  - Observability Pipelines
+  - OkHttp
+  - OneLogin
+  - OPcache
+  - OpenLDAP
+  - OpenMetrics
+  - OpenShift
+  - OpenStack
+  - openSUSE
+  - OpenTelemetry
+  - OpenTracing
+  - OpenVPN
+  - OpsGenie
+  - OpsWorks
+  - Oracle Instant Client
+  - Phusion Passenger
+  - Pipeline Visibility
+  - Pivotal Platform
+  - Postgres
+  - PostgreSQL
+  - PowerDNS
+  - Prometheus
+  - Prometheus Alertmanager
+  - Puppet
+  - Python
+  - RabbitMQ
+  - Rails
+  - Rancher
+  - Real User Monitoring
+  - Red Hat
+  - Redis
+  - ReplicaSet
+  - RocketPants
+  - Roku Monitoring
+  - Root Cause Analysis
+  - Route53
+  - RSpec
+  - Ruby
+  - RUM
+  - RumMonitor
+  - SafeNet
+  - SaltStack
+  - Security Monitoring
+  - Security Signal
+  - Security Signals
+  - SELinux
+  - Sensitive Data Scanner
+  - Serverless APM
+  - Serverless Framework
+  - Serverless Monitoring
+  - Serverless Workload Monitoring
+  - Service Checks
+  - Session Replay
+  - Siri
+  - Slack
+  - SLIs
+  - SLOs
+  - socat
+  - Social Security
+  - SQL Server
+  - SQLDelight
+  - SQLite
+  - Stackdriver
+  - StackPulse
+  - StackStorm
+  - StatsD
+  - Sumo Logic
+  - Swift
+  - Synthetic Monitoring
+  - Syslog
+  - sysOID
+  - System Core
+  - System Swap
+  - Teamcity
+  - Terraform
+  - Testing Visibility
+  - TokuMX
+  - Tracing Without Limits
+  - Trello
+  - Twilio
+  - TypeScript
+  - Ubuntu
+  - Unified Service Tagging
+  - Unix
+  - Unix Domain Socket
+  - URLs
+  - User Datagram Protocol
+  - USM
+  - Universal Service Monitoring
+  - Varnish
+  - Vector
+  - Vertica
+  - VMWare
+  - vSphere
+  - Watchdog
+  - Watchdog Insights
+  - Webhook
+  - WildFly
+  - Windows
+  - Xray
+  - ZooKeeper

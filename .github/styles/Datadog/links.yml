@@ -1,0 +1,10 @@
+extends: existence
+message: "Avoid vague text in links like '%s' unless you can pair it with more descriptive text."
+link: 'https://github.com/DataDog/documentation/blob/master/CONTRIBUTING.md#links'
+ignorecase: true
+scope: link
+level: warning
+tokens:
+  - here
+  - this
+  - ^page$

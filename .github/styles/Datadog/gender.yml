@@ -1,0 +1,14 @@
+extends: existence
+message: "Use a gender-neutral pronoun instead of '%s'."
+link: "https://github.com/DataDog/documentation/blob/master/CONTRIBUTING.md#gender"
+level: error
+ignorecase: true
+tokens:
+  - he/she
+  - s/he
+  - \(s\)he
+  - \bhe\b
+  - \bhim\b
+  - \bhis\b
+  - \bshe\b
+  - \bher\b

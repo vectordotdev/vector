@@ -1,0 +1,11 @@
+extends: existence
+message: "Avoid temporal words like '%s'."
+link: 'https://github.com/DataDog/documentation/blob/master/CONTRIBUTING.md#tense'
+ignorecase: true
+level: warning
+tokens:
+  - currently
+  - now
+  - will
+  - won't
+  - "[a-zA-Z]*'ll"

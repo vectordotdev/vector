@@ -1,0 +1,13 @@
+extends: substitution
+message: "Use '%s' instead of '%s'."
+link: "https://github.com/DataDog/documentation/blob/master/CONTRIBUTING.md#inclusive-language"
+ignorecase: true
+level: error
+action:
+  name: replace
+swap:
+  # bad: good
+  'black ?list': 'disallow list|exclude list'
+  'master': primary
+  'slave': secondary
+  'white ?list': 'allow list|include list'

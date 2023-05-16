@@ -1,0 +1,7 @@
+extends: existence
+message: "Use only one space between words and sentences (not two)."
+link: 'https://github.com/DataDog/documentation/blob/master/CONTRIBUTING.md#spaces'
+level: error
+nonword: true
+tokens:
+  - '[\w.?!,\(\)\-":] {2,}[\w.?!,\(\)\-":]'

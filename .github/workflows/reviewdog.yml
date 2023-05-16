@@ -1,0 +1,40 @@
+name: reviewdog
+on: [pull_request]
+
+jobs:
+  vale:
+    name: runner / vale
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup CUE
+        uses: cue-lang/setup-cue@v1.0.0-alpha.2
+        with:
+          version: v0.5.0
+      - name: Setup Node.js and npm
+        uses: actions/setup-node@v3
+        with:
+          node-version-file: 'website/.nvmrc'
+      - name: Install Yarn
+        run: npm install --location=global yarn
+      - name: Setup Node.js with Yarn caching
+        uses: actions/setup-node@v3
+        with:
+          node-version-file: 'website/.nvmrc'
+          cache: 'yarn'
+          cache-dependency-path: 'website/yarn.lock'
+      - name: Setup Hugo
+        uses: peaceiris/actions-hugo@v2
+        with:
+          hugo-version: '0.84.0'
+          extended: true
+      - name: Build website
+        run: |
+          pushd website
+          make setup
+          make quick-build
+          popd
+      - uses: errata-ai/vale-action@reviewdog
+        with:
+          fail_on_error: true
+          files: '["website/public/"]'

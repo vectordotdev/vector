@@ -1,0 +1,8 @@
+
+extends: existence
+message: "Use the Oxford comma in '%s'."
+link: "https://github.com/DataDog/documentation/blob/master/CONTRIBUTING.md#commas"
+scope: sentence
+level: suggestion
+tokens:
+  - '(?:[^,]+,){1,}\s\w+\s(?:and|or)'

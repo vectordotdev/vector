@@ -1,0 +1,11 @@
+extends: occurrence
+message: "Try to keep your sentence length to 25 words or fewer."
+level: warning
+# Here, we're counting the number of words
+# in a sentence.
+#
+# If there are more than 25, we'll flag it.
+scope: sentence
+ignorecase: false
+max: 25
+token: (\w+)

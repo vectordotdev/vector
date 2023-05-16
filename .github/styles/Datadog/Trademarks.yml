@@ -1,0 +1,19 @@
+extends: existence
+message: Missing ™ on phrase '%s'
+link: https://www.datadoghq.com
+ignorecase: true
+level: error
+nonword: true
+
+# phrases that don't start with * and don't end with tm or \* should be fixed
+# this covers
+# \*Logging without Limits is a trademark of Datadog, Inc.
+# *Logging without Limits is a trademark of Datadog, Inc.
+# Logging without Limits*
+# Logging without Limits\*
+# Logging without Limits™
+tokens:
+  - '(?<!\*)Logging without Limits(?!\s*(\™|\\\*|\*))'
+  - '(?<!\*)Tracing without Limits(?!\s*(\™|\\\*|\*))'
+  - '(?<!\*)Metrics without Limits(?!\s*(\™|\\\*|\*))'
+  - '(?<!\*)Log Rehydration(?!\s*(\™|\\\*|\*))'

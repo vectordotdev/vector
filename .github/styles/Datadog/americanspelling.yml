@@ -1,0 +1,17 @@
+extends: existence
+message: "In general, use American spelling instead of '%s'."
+link: 'https://github.com/DataDog/documentation/blob/master/CONTRIBUTING.md'
+ignorecase: true
+level: warning
+tokens:
+  - '(?:\w+)nised'
+  - '(?:\w+)ise'
+  - '(?:\w+)logue'
+  - '(?:\w+)lour'
+  - '(?:\w+)lyse'
+exceptions:
+ [advertise, advise, appraise, apprise, arise, chastise, circumcise, clockwise, 
+ comprise, compromise, concise, counterclockwise, demise, despise, devise, disguise,
+ enterprise, excise, exercise, expertise, franchise, imprecise, improvise, incise, 
+ likewise, merchandise, otherwise, paradise, praise, precise, premise, promise, 
+ revise, rise, supervise, surmise, surprise, televise, wise]
