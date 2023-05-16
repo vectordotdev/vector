@@ -225,8 +225,8 @@ case of rotating invalid API keys.
 
 When encoding logs for sinks, fields indicated by `log_schema` keys should be mapped to where the
 destination expects to find them in the encoded payloads. For example, if the sink requires
-a "hostname", it should fetch it from the log event using `log_schema.host_key` and place it in the
-encoded payload where the "hostname" is expected.
+a "hostname", it should fetch it from the log event using `LogEvent#host_path` to fetch the value
+from the appropriate field and place it in the encoded payload where the "hostname" is expected.
 
 ## Adherence
 
