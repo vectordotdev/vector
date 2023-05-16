@@ -18,10 +18,14 @@ on:
     types: [created]
   merge_group:
     types: [checks_requested]
+  schedule:
+    # At midnight UTC Tue-Sat
+    #- cron: '0 0 * * 2-6'
+    # TODO temporary to test
+    - cron: '30 17 * * *'
 
 concurrency:
-  # `github.event.number` exists for PRs, issue.id for comments, merge_group for merge queue otherwise fall back to SHA
-  group: ${{ github.workflow }}-${{ github.event.number || github.event.issue.id || github.event.merge_group.base_sha || github.sha }}
+  group: ${{ github.workflow }}-${{ github.event.number || github.event.issue.id || github.event.merge_group.base_sha || github.event.schedule || github.sha }}
 
   cancel-in-progress: true
 
@@ -151,11 +155,11 @@ jobs:
             // https://cloud.google.com/kubernetes-engine/docs/release-notes
             // https://docs.microsoft.com/en-us/azure/aks/supported-kubernetes-versions?tabs=azure-cli#aks-kubernetes-release-calendar
             const kubernetes_version = [
-              { version: "v1.23.3", is_essential: true },
-              { version: "v1.22.5", is_essential: true },
-              { version: "v1.21.8", is_essential: true },
-              { version: "v1.20.14", is_essential: true },
-              { version: "v1.19.8" },
+              { version: "v1.23.3",  is_essential: true  },
+              { version: "v1.22.5",  is_essential: false },
+              { version: "v1.21.8",  is_essential: false },
+              { version: "v1.20.14", is_essential: false },
+              { version: "v1.19.8",  is_essential: false },
             ]
             const container_runtime = [
               "docker",
@@ -164,12 +168,9 @@ jobs:
               // "crio",
             ]
 
-            // Planning.
-            const is_in_pull_request = !!context.payload.pull_request;
-            const should_test_all_targets = (
-              !is_in_pull_request
-            )
-            const filter_targets = array => array.filter(val => should_test_all_targets || val.is_essential)
+            // Run all versions if triggered by nightly schedule. Otherwise only run latest.
+            const run_all = context.event_name == "schedule";
+            const filter_targets = array => array.filter(val => run_all || val.is_essential)
 
             const matrix = {
               minikube_version,
