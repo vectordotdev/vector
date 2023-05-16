@@ -59,7 +59,7 @@ jobs:
         list-files: shell
         filters: |
           all_changed:
-            - "**"
+            - added|deleted|modified: "**"
           ignore:
             - "distribution/**"
             - "rust-doc/**"
