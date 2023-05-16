@@ -4,10 +4,13 @@
 #    - manual dispatch in GH UI
 #    - on a PR commit if the kubernetes_logs source was changed
 #    - in the merge queue
+#    - on a schedule at midnight UTC Tue-Sat
 #    - on demand by either of the following comments in a PR:
 #        - '/ci-run-k8s'
 #        - '/ci-run-all'
 #
+# If the workflow trigger is the nightly schedule, all the k8s versions
+# are run in the matrix, otherwise, only the latest is run.
 
 name: K8S E2E Suite
 
