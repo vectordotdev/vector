@@ -117,7 +117,7 @@ mod tests {
     fn test_parsing_valid_legacy_namespace() {
         trace_init();
         test_util::test_parser(
-            || Transform::function(Parser::new(LogNamespace::Legacy)),
+            || Parser::new(LogNamespace::Legacy),
             |bytes| Event::Log(LogEvent::from(bytes)),
             valid_cases(LogNamespace::Legacy),
         );

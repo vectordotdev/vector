@@ -316,9 +316,9 @@ pub mod tests {
 
         test_util::test_parser(
             || {
-                Transform::function(Docker {
+                Docker {
                     log_namespace: LogNamespace::Vector,
-                })
+                }
             },
             |bytes| Event::Log(LogEvent::from(value!(bytes))),
             valid_cases(LogNamespace::Vector),
@@ -330,10 +330,8 @@ pub mod tests {
         trace_init();
 
         test_util::test_parser(
-            || {
-                Transform::function(Docker {
-                    log_namespace: LogNamespace::Legacy,
-                })
+            || Docker {
+                log_namespace: LogNamespace::Legacy,
             },
             |bytes| Event::Log(LogEvent::from(bytes)),
             valid_cases(LogNamespace::Legacy),

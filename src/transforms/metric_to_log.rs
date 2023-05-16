@@ -63,6 +63,17 @@ pub struct MetricToLogConfig {
     pub metric_tag_values: MetricTagValues,
 }
 
+impl MetricToLogConfig {
+    pub fn build(&self, context: &TransformContext) -> MetricToLog {
+        MetricToLog::new(
+            self.host_tag.as_deref(),
+            self.timezone.unwrap_or_else(|| context.globals.timezone()),
+            context.log_namespace(self.log_namespace),
+            self.metric_tag_values,
+        )
+    }
+}
+
 impl GenerateConfig for MetricToLogConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
@@ -79,12 +90,7 @@ impl GenerateConfig for MetricToLogConfig {
 #[typetag::serde(name = "metric_to_log")]
 impl TransformConfig for MetricToLogConfig {
     async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
-        Ok(Transform::function(MetricToLog::new(
-            self.host_tag.as_deref(),
-            self.timezone.unwrap_or_else(|| context.globals.timezone()),
-            context.log_namespace(self.log_namespace),
-            self.metric_tag_values,
-        )))
+        Ok(Transform::function(self.build(context)))
     }
 
     fn input(&self) -> Input {
