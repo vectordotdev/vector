@@ -146,6 +146,15 @@ pub enum AwsAuthentication {
         /// Configuration for authenticating with AWS through IMDS.
         #[serde(default)]
         imds: ImdsAuthentication,
+
+        /// The [AWS region][aws_region] to send STS requests to.
+        ///
+        /// If not set, this defaults to the configured region
+        /// for the service itself.
+        ///
+        /// [aws_region]: https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints
+        #[configurable(metadata(docs::examples = "us-west-2"))]
+        region: Option<String>,
     },
 }
 
@@ -213,8 +222,14 @@ impl AwsAuthentication {
             AwsAuthentication::Default {
                 load_timeout_secs,
                 imds,
+                region,
             } => Ok(SharedCredentialsProvider::new(
-                default_credentials_provider(service_region, *load_timeout_secs, *imds).await?,
+                default_credentials_provider(
+                    region.clone().map(Region::new).unwrap_or(service_region),
+                    *load_timeout_secs,
+                    *imds,
+                )
+                .await?,
             )),
         }
     }
@@ -294,8 +309,26 @@ mod tests {
             AwsAuthentication::Default {
                 load_timeout_secs: Some(10),
                 imds: ImdsAuthentication { .. },
+                region: None,
             }
         ));
+    }
+
+    #[test]
+    fn parsing_default_with_region() {
+        let config = toml::from_str::<ComponentConfig>(
+            r#"
+            auth.region = "us-east-2"
+        "#,
+        )
+        .unwrap();
+
+        match config.auth {
+            AwsAuthentication::Default { region, .. } => {
+                assert_eq!(region.unwrap(), "us-east-2");
+            }
+            _ => panic!(),
+        }
     }
 
     #[test]
@@ -313,6 +346,7 @@ mod tests {
             config.auth,
             AwsAuthentication::Default {
                 load_timeout_secs: None,
+                region: None,
                 imds: ImdsAuthentication {
                     max_attempts: 5,
                     connect_timeout: CONNECT_TIMEOUT,
