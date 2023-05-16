@@ -723,9 +723,9 @@ mod integration_tests {
         transforms::test::create_topology,
     };
     use std::collections::BTreeMap;
+    use vector_common::assert_event_data_eq;
     use vrl::value::Value;
     use warp::Filter;
-    use vector_common::assert_event_data_eq;
 
     fn ec2_metadata_address() -> String {
         std::env::var("EC2_METADATA_ADDRESS").unwrap_or_else(|_| "http://localhost:1338".into())
@@ -852,11 +852,11 @@ mod integration_tests {
             tx.send(log.into()).await.unwrap();
 
             let event = out.recv().await.unwrap();
-            assert_eq!(event.into_log(), expected_log);
+            assert_event_data_eq!(event.into_log(), expected_log);
 
             drop(tx);
             topology.stop().await;
-            assert_event_data_eq!(out.recv().await, None);
+            assert_eq!(out.recv().await, None);
         })
         .await;
     }
