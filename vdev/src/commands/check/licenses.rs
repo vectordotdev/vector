@@ -10,7 +10,7 @@ pub struct Cli {}
 impl Cli {
     pub fn exec(self) -> Result<()> {
         app::exec("rust-license-tool", ["check"], true).map_err(|err| {
-            eprintln!("Run `cargo vdev build licenses` to regenerate the file");
+            info!("Run `cargo vdev build licenses` to regenerate the file");
             err
         })
     }
