@@ -1,3 +1,14 @@
+# K8s E2E Suite
+#
+# This workflow runs under any of the following conditions:
+#    - manual dispatch in GH UI
+#    - on a PR commit if the kubernetes_logs source was changed
+#    - in the merge queue
+#    - on demand by either of the following comments in a PR:
+#        - '/ci-run-k8s'
+#        - '/ci-run-all'
+#
+
 name: K8S E2E Suite
 
 on:
@@ -10,7 +21,8 @@ on:
 
 concurrency:
   # `github.event.number` exists for PRs, issue.id for comments, merge_group for merge queue otherwise fall back to SHA
-  group: ${{ github.workflow }}-${{ github.event.number || github.event.issue.issue.id || github.event.merge_group.base_sha || github.sha }}
+  group: ${{ github.workflow }}-${{ github.event.number || github.event.issue.id || github.event.merge_group.base_sha || github.sha }}
+
   cancel-in-progress: true
 
 env:
@@ -26,11 +38,12 @@ env:
 
 jobs:
   changes:
-    if: github.event_name != 'issue_comment' || (github.event.issue.pull_request && contains(github.event.comment.body, '/ci-run-k8s-tests'))
+    if: github.event_name != 'issue_comment' || (github.event.issue.pull_request &&
+          (contains(github.event.comment.body, '/ci-run-k8s') || contains(github.event.comment.body, '/ci-run-all')))
     uses: ./.github/workflows/changes.yml
     with:
       base_ref: ${{ github.event.pull_request.base.ref }}
-      head_ref: ${{ github.event.pull_request.head.ref  }}
+      head_ref: ${{ github.event.pull_request.head.ref }}
     secrets: inherit
 
   build-x86_64-unknown-linux-gnu:
@@ -44,15 +57,19 @@ jobs:
       CARGO_PROFILE_RELEASE_CODEGEN_UNITS: 256
       CARGO_INCREMENTAL: 0
     steps:
-      # For PR comment trigger, extra steps are required to associate the workflow with the PR.
+      - name: Validate issue comment
+        if: github.event_name == 'issue_comment'
+        uses: tspascoal/get-user-teams-membership@v2
+        with:
+          username: ${{ github.actor }}
+          team: 'Vector'
+          GITHUB_TOKEN: ${{ secrets.GH_PAT_ORG }}
 
-      # Find the branch that the comment was made in.
       - name: (PR comment) Get PR branch
         if: ${{ github.event_name == 'issue_comment' }}
         uses: xt0rted/pull-request-comment-branch@v1
         id: comment-branch
 
-      # Indicate in the PR's CI pane that this job is running.
       - name: (PR comment) Set latest commit status as pending
         if: ${{ github.event_name == 'issue_comment' }}
         uses: myrotvorets/set-commit-status-action@1.1.6
@@ -61,14 +78,12 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           status: pending
 
-      # Checkout the branch, using the PR ref.
       - name: (PR comment) Checkout PR branch
         if: ${{ github.event_name == 'issue_comment' }}
         uses: actions/checkout@v3
         with:
           ref: ${{ steps.comment-branch.outputs.head_ref }}
 
-      # Checkout the default branch otherwise.
       - name: Checkout branch
         if: ${{ github.event_name != 'issue_comment' }}
         uses: actions/checkout@v3
@@ -92,7 +107,6 @@ jobs:
       #     name: e2e-test-deb-package
       #     path: target/artifacts/*
 
-      # Indicate in the PR's CI pane that this job is failed, if needed
       - name: (PR comment) Set latest commit status as 'failure'
         uses: myrotvorets/set-commit-status-action@1.1.6
         if: failure() && github.event_name == 'issue_comment'
@@ -115,6 +129,14 @@ jobs:
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
+      - name: Validate issue comment
+        if: github.event_name == 'issue_comment'
+        uses: tspascoal/get-user-teams-membership@v2
+        with:
+          username: ${{ github.actor }}
+          team: 'Vector'
+          GITHUB_TOKEN: ${{ secrets.GH_PAT_ORG }}
+
       - uses: actions/github-script@v6.4.1
         id: set-matrix
         with:
@@ -173,30 +195,25 @@ jobs:
       matrix: ${{ fromJson(needs.compute-k8s-test-plan.outputs.matrix) }}
       fail-fast: false
     steps:
-      # For PR comment trigger, extra steps are required to associate the workflow with the PR.
-
-      # Find the branch that the comment was made in.
       - name: (PR comment) Get PR branch
         if: ${{ github.event_name == 'issue_comment' }}
         uses: xt0rted/pull-request-comment-branch@v1
         id: comment-branch
 
-      # Checkout the branch, using the PR ref.
       - name: (PR comment) Checkout PR branch
         if: ${{ github.event_name == 'issue_comment' }}
         uses: actions/checkout@v3
         with:
           ref: ${{ steps.comment-branch.outputs.head_ref }}
 
-      # Checkout the default branch otherwise.
       - name: Checkout branch
         if: ${{ github.event_name != 'issue_comment' }}
         uses: actions/checkout@v3
 
-      # - uses: actions/download-artifact@v3
-      #   with:
-      #     name: e2e-test-deb-package
-      #     path: target/artifacts
+      - uses: actions/download-artifact@v3
+        with:
+          name: e2e-test-deb-package
+          path: target/artifacts
 
       # - name: Setup Minikube
       #   run: scripts/ci-setup-minikube.sh
@@ -211,8 +228,7 @@ jobs:
       #     SKIP_PACKAGE_DEB: "true"
       #     CARGO_INCREMENTAL: 0
 
-      # Indicate in the PR's CI pane that this job is complete
-      - name: (PR comment) Set latest commit status as failure if needed
+      - name: (PR comment) Set latest commit status as failure
         uses: myrotvorets/set-commit-status-action@1.1.6
         if: failure() && github.event_name == 'issue_comment'
         with:
@@ -225,11 +241,19 @@ jobs:
     runs-on: ubuntu-latest
     needs: test-e2e-kubernetes
     if: |
-      always() &&
-        (github.event_name != 'issue_comment' || (github.event.issue.pull_request && contains(github.event.comment.body, '/ci-run-k8s-tests')))
+      always() && (github.event_name != 'issue_comment' || (github.event.issue.pull_request
+        && (contains(github.event.comment.body, '/ci-run-k8s') || contains(github.event.comment.body, '/ci-run-all'))))
     env:
       FAILED: ${{ contains(needs.*.result, 'failure') }}
     steps:
+      - name: Validate issue comment
+        if: github.event_name == 'issue_comment'
+        uses: tspascoal/get-user-teams-membership@v2
+        with:
+          username: ${{ github.actor }}
+          team: 'Vector'
+          GITHUB_TOKEN: ${{ secrets.GH_PAT_ORG }}
+
       - name: (PR comment) Get PR branch
         if: success() && github.event_name == 'issue_comment'
         uses: xt0rted/pull-request-comment-branch@v1
