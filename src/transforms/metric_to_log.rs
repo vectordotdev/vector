@@ -64,7 +64,7 @@ pub struct MetricToLogConfig {
 }
 
 impl MetricToLogConfig {
-    pub fn build(&self, context: &TransformContext) -> MetricToLog {
+    pub fn build_transform(&self, context: &TransformContext) -> MetricToLog {
         MetricToLog::new(
             self.host_tag.as_deref(),
             self.timezone.unwrap_or_else(|| context.globals.timezone()),
@@ -90,7 +90,7 @@ impl GenerateConfig for MetricToLogConfig {
 #[typetag::serde(name = "metric_to_log")]
 impl TransformConfig for MetricToLogConfig {
     async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
-        Ok(Transform::function(self.build(context)))
+        Ok(Transform::function(self.build_transform(context)))
     }
 
     fn input(&self) -> Input {

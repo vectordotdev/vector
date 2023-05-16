@@ -155,7 +155,7 @@ impl SinkConfig for HumioMetricsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let transform = self
             .transform
-            .build(&TransformContext::new_with_globals(cx.globals.clone()));
+            .build_transform(&TransformContext::new_with_globals(cx.globals.clone()));
 
         let sink = HumioLogsConfig {
             token: self.token.clone(),
