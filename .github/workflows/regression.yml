@@ -1,8 +1,8 @@
 # Regression Detection Suite
 #
 # This workflow runs under the following conditions:
-#    - in the merge queue if any source files changed.
-#    - on demand in a PR, by either of the following comments:
+#    - in the merge queue if any source files were modified, added or deleted.
+#    - on demand by a PR comment matching either of:
 #      - '/ci-run-regression'
 #      - '/ci-run-all'
 #      (the comment issuer must be a member of the Vector GH team)
@@ -26,10 +26,9 @@
 name: Regression Detection Suite
 
 on:
-  issue_comment:
-    types: [created]
   merge_group:
     types: [checks_requested]
+  workflow_call:
   # Don't want to run this on each PR commit, but because GH doesn't allow specifying different required checks
   # for pull request and merge queue, we need to "run" it in pull request, but in the jobs we will just auto pass.
   pull_request:
@@ -40,54 +39,72 @@ concurrency:
 
 jobs:
 
-  # Only run this workflow if files changed in areas that could possibly introduce a regression, or by valid comment
+  # Only run this workflow if files changed in areas that could possibly introduce a regression
   should-run:
     runs-on: ubuntu-latest
-    if: github.event_name != 'issue_comment' || (github.event.issue.pull_request
-        && (contains(github.event.comment.body, '/ci-run-regression') || contains(github.event.comment.body, '/ci-run-all')))
+    if: github.event_name != 'pull_request'
     outputs:
-      source_changed: ${{ steps.filter.outputs.source }}
+      source_changed: ${{ steps.filter.outputs.SOURCE_CHANGED }}
       comment_valid: ${{ steps.comment.outputs.isTeamMember }}
     steps:
     - uses: actions/checkout@v3
 
-    - name: Determine if source code changed
-      id: filter
+    - name: Collect file changes
+      id: changes
       if: github.event_name == 'merge_group'
       uses: dorny/paths-filter@v2
       with:
         base: ${{ github.event.merge_group.base_ref }}
         ref: ${{ github.event.merge_group.head_ref }}
+        list-files: shell
         filters: |
-          source:
-            - ".cargo/**"
-            - "benches/**"
-            - "lib/**"
-            - "proto/**"
-            - "scripts/**"
-            - "src/**"
-            - "tests/**"
-            - "build.rs"
-            - "Cargo.lock"
-            - "Cargo.toml"
-            - "Makefile"
-            - "rust-toolchain.toml"
-            - "vdev/**"
+          all_changed:
+            - added|deleted|modified: "**"
+          ignore:
+            - "distribution/**"
+            - "rust-doc/**"
+            - "docs/**"
+            - "rfcs/**"
+            - "testing/**"
+            - "tilt/**"
+            - "website/**"
+            - "*.md"
+            - "Tiltfile"
+            - "netlify.toml"
+            - "NOTICE"
+            - "LICENSE-3rdparty.csv"
+            - "LICENSE"
 
-    - name: Validate issue comment
-      id: comment
-      if: github.event_name == 'issue_comment'
-      uses: tspascoal/get-user-teams-membership@v2
-      with:
-        username: ${{ github.actor }}
-        team: 'Vector'
-        GITHUB_TOKEN: ${{ secrets.GH_PAT_ORG }}
+    # This step allows us to conservatively run the tests if we added a new
+    # file or directory for source code, but forgot to add it to this workflow.
+    # Instead, we may unecessarily run the test on new file or dir additions that
+    # wouldn't likely introduce regressions.
+    - name: Determine if should not run due to irrelevant file changes
+      id: filter
+      if: github.event_name == 'merge_group'
+      env:
+        ALL: ${{ steps.changes.outputs.all_changed_files }}
+        IGNORE: ${{ steps.changes.outputs.ignore_files }}
+      run: |
+        echo "ALL='${{ env.ALL }}'"
+        echo "IGNORE='${{ env.IGNORE }}'"
+        export SOURCE_CHANGED=$(comm -2 -3 <(printf "%s\n" "${{ env.ALL }}") <(printf "%s\n" "${{ env.IGNORE }}"))
+        echo "SOURCE_CHANGED='${SOURCE_CHANGED}'"
+
+        if [ "${SOURCE_CHANGED}" == "" ]; then
+          export SOURCE_CHANGED="false"
+        else
+          export SOURCE_CHANGED="true"
+        fi
+
+        echo "SOURCE_CHANGED='${SOURCE_CHANGED}'"
+        echo "SOURCE_CHANGED=${SOURCE_CHANGED}" >> $GITHUB_OUTPUT
 
   compute-metadata:
     name: Compute metadata
     runs-on: ubuntu-22.04
     needs: should-run
-    if: needs.should-run.outputs.source_changed == 'true' || needs.should-run.outputs.comment_valid == 'true'
+    if: github.event_name != 'merge_group' || needs.should-run.outputs.source_changed == 'true'
     outputs:
       pr-number: ${{ steps.pr-metadata-merge-queue.outputs.PR_NUMBER || steps.pr-metadata-comment.outputs.PR_NUMBER }}
       baseline-sha: ${{ steps.pr-metadata-merge-queue.outputs.BASELINE_SHA || steps.pr-metadata-comment.outputs.BASELINE_SHA }}
@@ -222,6 +239,7 @@ jobs:
         with:
           sha: ${{ steps.pr-metadata-comment.outputs.COMPARISON_SHA }}
           token: ${{ secrets.GITHUB_TOKEN }}
+          context: Regression Detection Suite
           status: pending
   ##
   ## BUILD
@@ -720,12 +738,12 @@ jobs:
             -f context='Regression Detection Suite / analyze-experiment' \
             -f target_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
+  # This job always runs- if an issue_comment triggered it, we need to update the check status in the PR,
+  # and if a pull_request triggered it, we need to flag the check status as a success.
   regression-detection-suite:
     name: Regression Detection Suite
     runs-on: ubuntu-latest
-    if: |
-      always() &&
-        (github.event_name != 'issue_comment' || (github.event.issue.pull_request && contains(github.event.comment.body, '/ci-run-regression')))
+    if: always()
     needs:
       - compute-metadata
       - build-baseline
@@ -750,14 +768,16 @@ jobs:
         with:
           sha: ${{ steps.compute-metadata.outputs.comparison-sha }}
           token: ${{ secrets.GITHUB_TOKEN }}
+          context: Regression Detection Suite
           status: 'failure'
 
       - name: (PR comment) Submit PR result as success
         if: github.event_name == 'issue_comment' && env.FAILED != 'true'
         uses: myrotvorets/set-commit-status-action@1.1.6
         with:
-          sha: ${{ steps.compute-metadata.outputs.comparison-sha }}
+          sha: ${{ steps.comment-branch.outputs.head_sha }}
           token: ${{ secrets.GITHUB_TOKEN }}
+          context: Regression Detection Suite
           status: 'success'
 
       - name: exit
