@@ -38,3 +38,4 @@ jobs:
         with:
           fail_on_error: true
           files: '["website/public/"]'
+          filter_mode: nofilter
