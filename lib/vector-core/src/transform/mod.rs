@@ -23,8 +23,17 @@ pub mod runtime_transform;
 /// While function transforms can be run out of order, or concurrently, task
 /// transforms act as a coordination or barrier point.
 pub enum Transform {
-    Function(Box<dyn FunctionTransform>),
+    // Store function transforms as SyncTransform internally to reduce the variants we need to
+    // worry about actually running. We retain the separate variant to maintain the knowledge that
+    // this transform will not write to multiple outputs.
+    //
+    // TODO: This is a bit silly in the current state because we can't actually take advantage of
+    // that knowledge, so we should come up with a more principled idea of which traits are for
+    // defining components and which are for actually running them. All we're getting right now is a
+    // solution to the previous double-boxing problem.
+    Function(Box<dyn SyncTransform>),
     Synchronous(Box<dyn SyncTransform>),
+    Tick(Box<dyn TickTransform>, tokio::time::Duration),
     Task(Box<dyn TaskTransform<EventArray>>),
 }
 
@@ -48,6 +57,10 @@ impl Transform {
     /// considered a bug and will cause a panic.
     pub fn synchronous(v: impl SyncTransform + 'static) -> Self {
         Transform::Synchronous(Box::new(v))
+    }
+
+    pub fn tick(v: impl TickTransform + 'static, interval: tokio::time::Duration) -> Self {
+        Transform::Tick(Box::new(v), interval)
     }
 
     /// Create a new task transform.
@@ -163,15 +176,23 @@ where
     }
 }
 
-// TODO: this is a bit ugly when we already have the above impl
-impl SyncTransform for Box<dyn FunctionTransform> {
-    fn transform(&mut self, event: Event, output: &mut TransformOutputsBuf) {
-        FunctionTransform::transform(
-            self.as_mut(),
-            output.primary_buffer.as_mut().expect("no default output"),
-            event,
-        );
+// Like [`SyncTransform`] but with the additional ability to be called on an interval independent of
+// the arrival of new input events.
+pub trait TickTransform: Send + Sync {
+    // Called on the provided interval
+    fn tick(&mut self, output: &mut TransformOutputsBuf);
+
+    // Called when an event is received
+    fn transform(&mut self, event: Event, output: &mut TransformOutputsBuf);
+
+    fn transform_all(&mut self, events: EventArray, output: &mut TransformOutputsBuf) {
+        for event in events.into_events() {
+            self.transform(event, output);
+        }
     }
+
+    // Called at the end of the input stream
+    fn finish(&mut self, output: &mut TransformOutputsBuf);
 }
 
 struct TransformOutput {
@@ -295,6 +316,14 @@ impl TransformOutputsBuf {
         Self {
             primary_buffer,
             named_buffers,
+        }
+    }
+
+    /// Convenience method for testing simple transforms
+    pub fn new_with_primary() -> Self {
+        Self {
+            primary_buffer: Some(OutputBuffer::with_capacity(64)),
+            named_buffers: Default::default(),
         }
     }
 

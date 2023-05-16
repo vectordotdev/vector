@@ -1,11 +1,5 @@
-use std::{
-    collections::{hash_map::Entry, HashMap},
-    pin::Pin,
-    time::Duration,
-};
+use std::collections::{hash_map::Entry, HashMap};
 
-use async_stream::stream;
-use futures::{Stream, StreamExt};
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
 
@@ -14,7 +8,7 @@ use crate::{
     event::{metric, Event, EventMetadata},
     internal_events::{AggregateEventRecorded, AggregateFlushed, AggregateUpdateFailed},
     schema,
-    transforms::{TaskTransform, Transform},
+    transforms::{TickTransform, Transform, TransformOutputsBuf},
 };
 
 /// Configuration for the `aggregate` transform.
@@ -39,7 +33,10 @@ impl_generate_config_from_default!(AggregateConfig);
 #[typetag::serde(name = "aggregate")]
 impl TransformConfig for AggregateConfig {
     async fn build(&self, _context: &TransformContext) -> crate::Result<Transform> {
-        Aggregate::new(self).map(Transform::event_task)
+        Ok(Transform::tick(
+            Aggregate::default(),
+            tokio::time::Duration::from_millis(self.interval_ms),
+        ))
     }
 
     fn input(&self) -> Input {
@@ -58,20 +55,12 @@ impl TransformConfig for AggregateConfig {
 
 type MetricEntry = (metric::MetricData, EventMetadata);
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Aggregate {
-    interval: Duration,
     map: HashMap<metric::MetricSeries, MetricEntry>,
 }
 
 impl Aggregate {
-    pub fn new(config: &AggregateConfig) -> crate::Result<Self> {
-        Ok(Self {
-            interval: Duration::from_millis(config.interval_ms),
-            map: Default::default(),
-        })
-    }
-
     fn record(&mut self, event: Event) {
         let (series, data, metadata) = event.into_metric().into_parts();
 
@@ -100,7 +89,7 @@ impl Aggregate {
         emit!(AggregateEventRecorded);
     }
 
-    fn flush_into(&mut self, output: &mut Vec<Event>) {
+    fn flush_into(&mut self, output: &mut TransformOutputsBuf) {
         let map = std::mem::take(&mut self.map);
         for (series, entry) in map.into_iter() {
             let metric = metric::Metric::from_parts(series, entry.0, entry.1);
@@ -111,39 +100,17 @@ impl Aggregate {
     }
 }
 
-impl TaskTransform<Event> for Aggregate {
-    fn transform(
-        mut self: Box<Self>,
-        mut input_rx: Pin<Box<dyn Stream<Item = Event> + Send>>,
-    ) -> Pin<Box<dyn Stream<Item = Event> + Send>>
-    where
-        Self: 'static,
-    {
-        let mut flush_stream = tokio::time::interval(self.interval);
+impl TickTransform for Aggregate {
+    fn tick(&mut self, output: &mut TransformOutputsBuf) {
+        self.flush_into(output);
+    }
 
-        Box::pin(stream! {
-            let mut output = Vec::new();
-            let mut done = false;
-            while !done {
-                tokio::select! {
-                    _ = flush_stream.tick() => {
-                        self.flush_into(&mut output);
-                    },
-                    maybe_event = input_rx.next() => {
-                        match maybe_event {
-                            None => {
-                                self.flush_into(&mut output);
-                                done = true;
-                            }
-                            Some(event) => self.record(event),
-                        }
-                    }
-                };
-                for event in output.drain(..) {
-                    yield event;
-                }
-            }
-        })
+    fn transform(&mut self, event: Event, _output: &mut TransformOutputsBuf) {
+        self.record(event);
+    }
+
+    fn finish(&mut self, output: &mut TransformOutputsBuf) {
+        self.flush_into(output);
     }
 }
 
@@ -151,7 +118,7 @@ impl TaskTransform<Event> for Aggregate {
 mod tests {
     use std::{collections::BTreeSet, sync::Arc, task::Poll};
 
-    use futures::stream;
+    use futures::StreamExt;
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
 
@@ -177,10 +144,7 @@ mod tests {
 
     #[test]
     fn incremental() {
-        let mut agg = Aggregate::new(&AggregateConfig {
-            interval_ms: 1000_u64,
-        })
-        .unwrap();
+        let mut agg = Aggregate::default();
 
         let counter_a_1 = make_metric(
             "counter_a",
@@ -200,29 +164,29 @@ mod tests {
 
         // Single item, just stored regardless of kind
         agg.record(counter_a_1.clone());
-        let mut out = vec![];
+        let mut out = TransformOutputsBuf::new_with_primary();
         // We should flush 1 item counter_a_1
         agg.flush_into(&mut out);
         assert_eq!(1, out.len());
-        assert_eq!(&counter_a_1, &out[0]);
+        assert_eq!(&counter_a_1, &out.take_primary().into_events().next().unwrap());
 
         // A subsequent flush doesn't send out anything
-        out.clear();
+        let mut out = TransformOutputsBuf::new_with_primary();
         agg.flush_into(&mut out);
         assert_eq!(0, out.len());
 
         // One more just to make sure that we don't re-see from the other buffer
-        out.clear();
+        let mut out = TransformOutputsBuf::new_with_primary();
         agg.flush_into(&mut out);
         assert_eq!(0, out.len());
 
         // Two increments with the same series, should sum into 1
         agg.record(counter_a_1.clone());
         agg.record(counter_a_2);
-        out.clear();
+        let mut out = TransformOutputsBuf::new_with_primary();
         agg.flush_into(&mut out);
         assert_eq!(1, out.len());
-        assert_eq!(&counter_a_summed, &out[0]);
+        assert_eq!(&counter_a_summed, &out.take_primary().into_events().next().unwrap());
 
         let counter_b_1 = make_metric(
             "counter_b",
@@ -232,11 +196,11 @@ mod tests {
         // Two increments with the different series, should get each back as-is
         agg.record(counter_a_1.clone());
         agg.record(counter_b_1.clone());
-        out.clear();
+        let mut out = TransformOutputsBuf::new_with_primary();
         agg.flush_into(&mut out);
         assert_eq!(2, out.len());
         // B/c we don't know the order they'll come back
-        for event in out {
+        for event in out.take_primary().into_events() {
             match event.as_metric().series().name.name.as_str() {
                 "counter_a" => assert_eq!(counter_a_1, event),
                 "counter_b" => assert_eq!(counter_b_1, event),
@@ -247,10 +211,7 @@ mod tests {
 
     #[test]
     fn absolute() {
-        let mut agg = Aggregate::new(&AggregateConfig {
-            interval_ms: 1000_u64,
-        })
-        .unwrap();
+        let mut agg = Aggregate::default();
 
         let gauge_a_1 = make_metric(
             "gauge_a",
@@ -265,29 +226,29 @@ mod tests {
 
         // Single item, just stored regardless of kind
         agg.record(gauge_a_1.clone());
-        let mut out = vec![];
+        let mut out = TransformOutputsBuf::new_with_primary();
         // We should flush 1 item gauge_a_1
         agg.flush_into(&mut out);
         assert_eq!(1, out.len());
-        assert_eq!(&gauge_a_1, &out[0]);
+        assert_eq!(&gauge_a_1, &out.take_primary().into_events().next().unwrap());
 
         // A subsequent flush doesn't send out anything
-        out.clear();
+        let mut out = TransformOutputsBuf::new_with_primary();
         agg.flush_into(&mut out);
         assert_eq!(0, out.len());
 
         // One more just to make sure that we don't re-see from the other buffer
-        out.clear();
+        let mut out = TransformOutputsBuf::new_with_primary();
         agg.flush_into(&mut out);
         assert_eq!(0, out.len());
 
         // Two absolutes with the same series, should get the 2nd (last) back.
         agg.record(gauge_a_1.clone());
         agg.record(gauge_a_2.clone());
-        out.clear();
+        let mut out = TransformOutputsBuf::new_with_primary();
         agg.flush_into(&mut out);
         assert_eq!(1, out.len());
-        assert_eq!(&gauge_a_2, &out[0]);
+        assert_eq!(&gauge_a_2, &out.take_primary().into_events().next().unwrap());
 
         let gauge_b_1 = make_metric(
             "gauge_b",
@@ -297,11 +258,11 @@ mod tests {
         // Two increments with the different series, should get each back as-is
         agg.record(gauge_a_1.clone());
         agg.record(gauge_b_1.clone());
-        out.clear();
+        let mut out = TransformOutputsBuf::new_with_primary();
         agg.flush_into(&mut out);
         assert_eq!(2, out.len());
         // B/c we don't know the order they'll come back
-        for event in out {
+        for event in out.take_primary().into_events() {
             match event.as_metric().series().name.name.as_str() {
                 "gauge_a" => assert_eq!(gauge_a_1, event),
                 "gauge_b" => assert_eq!(gauge_b_1, event),
@@ -312,10 +273,7 @@ mod tests {
 
     #[test]
     fn conflicting_value_type() {
-        let mut agg = Aggregate::new(&AggregateConfig {
-            interval_ms: 1000_u64,
-        })
-        .unwrap();
+        let mut agg = Aggregate::default();
 
         let counter = make_metric(
             "the-thing",
@@ -346,11 +304,11 @@ mod tests {
         agg.record(set.clone());
         // Then a set union would be a noop
         agg.record(set.clone());
-        let mut out = vec![];
+        let mut out = TransformOutputsBuf::new_with_primary();
         // We should flush 1 item counter
         agg.flush_into(&mut out);
         assert_eq!(1, out.len());
-        assert_eq!(&set, &out[0]);
+        assert_eq!(&set, &out.take_primary().into_events().next().unwrap());
 
         // Start out with an set
         agg.record(set.clone());
@@ -360,19 +318,16 @@ mod tests {
         agg.record(counter.clone());
         // Send another counter will "add"
         agg.record(counter);
-        let mut out = vec![];
+        let mut out = TransformOutputsBuf::new_with_primary();
         // We should flush 1 item counter
         agg.flush_into(&mut out);
         assert_eq!(1, out.len());
-        assert_eq!(&summed, &out[0]);
+        assert_eq!(&summed, &out.take_primary().into_events().next().unwrap());
     }
 
     #[test]
     fn conflicting_kinds() {
-        let mut agg = Aggregate::new(&AggregateConfig {
-            interval_ms: 1000_u64,
-        })
-        .unwrap();
+        let mut agg = Aggregate::default();
 
         let incremental = make_metric(
             "the-thing",
@@ -400,11 +355,11 @@ mod tests {
         agg.record(absolute.clone());
         // Then another absolute will replace it normally
         agg.record(absolute.clone());
-        let mut out = vec![];
+        let mut out = TransformOutputsBuf::new_with_primary();
         // We should flush 1 item incremental
         agg.flush_into(&mut out);
         assert_eq!(1, out.len());
-        assert_eq!(&absolute, &out[0]);
+        assert_eq!(&absolute, &out.take_primary().into_events().next().unwrap());
 
         // Start out with an absolute
         agg.record(absolute.clone());
@@ -414,26 +369,16 @@ mod tests {
         agg.record(incremental.clone());
         // Send another incremental will "add"
         agg.record(incremental);
-        let mut out = vec![];
+        let mut out = TransformOutputsBuf::new_with_primary();
         // We should flush 1 item incremental
         agg.flush_into(&mut out);
         assert_eq!(1, out.len());
-        assert_eq!(&summed, &out[0]);
+        assert_eq!(&summed, &out.take_primary().into_events().next().unwrap());
     }
 
     #[tokio::test]
     async fn transform_shutdown() {
-        let agg = toml::from_str::<AggregateConfig>(
-            r#"
-interval_ms = 999999
-"#,
-        )
-        .unwrap()
-        .build(&TransformContext::default())
-        .await
-        .unwrap();
-
-        let agg = agg.into_task();
+        let mut agg = Aggregate::default();
 
         let counter_a_1 = make_metric(
             "counter_a",
@@ -462,25 +407,21 @@ interval_ms = 999999
         );
         let inputs = vec![counter_a_1, counter_a_2, gauge_a_1, gauge_a_2.clone()];
 
-        // Queue up some events to be consumed & recorded
-        let in_stream = Box::pin(stream::iter(inputs));
-        // Kick off the transform process which should consume & record them
-        let mut out_stream = agg.transform_events(in_stream);
+        let mut out = TransformOutputsBuf::new_with_primary();
+        for event in inputs {
+            agg.transform(event, &mut out);
+        }
+        agg.finish(&mut out);
 
-        // B/c the input stream has ended we will have gone through the `input_rx.next() => None`
-        // part of the loop and do the shutting down final flush immediately. We'll already be able
-        // to read our expected bits on the output.
-        let mut count = 0_u8;
-        while let Some(event) = out_stream.next().await {
-            count += 1;
+        // There were only 2
+        assert_eq!(2, out.len());
+        for event in out.drain() {
             match event.as_metric().series().name.name.as_str() {
                 "counter_a" => assert_eq!(counter_a_summed, event),
                 "gauge_a" => assert_eq!(gauge_a_2, event),
                 _ => panic!("Unexpected metric name in aggregate output"),
             };
         }
-        // There were only 2
-        assert_eq!(2, count);
     }
 
     #[tokio::test]
@@ -532,7 +473,7 @@ interval_ms = 999999
             // We won't have flushed yet b/c the interval hasn't elapsed, so no outputs
             assert_eq!(Poll::Pending, futures::poll!(out.next()));
             // Now fast forward time enough that our flush should trigger.
-            tokio::time::advance(Duration::from_secs(11)).await;
+            tokio::time::advance(tokio::time::Duration::from_secs(11)).await;
             // We should have had an interval fire now and our output aggregate events should be
             // available.
             let mut count = 0_u8;

@@ -31,8 +31,8 @@ pub mod tag_cardinality_limit;
 pub mod throttle;
 
 pub use vector_core::transform::{
-    FunctionTransform, OutputBuffer, SyncTransform, TaskTransform, Transform, TransformOutputs,
-    TransformOutputsBuf,
+    FunctionTransform, OutputBuffer, SyncTransform, TaskTransform, TickTransform, Transform,
+    TransformOutputs, TransformOutputsBuf,
 };
 
 #[derive(Debug, Snafu)]
