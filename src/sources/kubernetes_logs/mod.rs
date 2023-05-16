@@ -293,7 +293,7 @@ impl SourceConfig for Config {
                 .run(cx.out, cx.shutdown, log_namespace)
                 .map(|result| {
                     result.map_err(|error| {
-                        error!(message = "Source future failed.", %error);
+                        error!(message = "Source future failed!", %error);
                     })
                 }),
         ))
