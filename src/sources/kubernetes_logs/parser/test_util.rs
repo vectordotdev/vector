@@ -9,7 +9,7 @@ use vrl::value::{value, Value};
 use crate::{
     event::{Event, LogEvent},
     sources::kubernetes_logs::Config,
-    transforms::{OutputBuffer, FunctionTransform},
+    transforms::{FunctionTransform, OutputBuffer},
 };
 
 /// Build a log event for test purposes.
