@@ -36,33 +36,58 @@ jobs:
     if: github.event_name != 'issue_comment' || (github.event.issue.pull_request
         && (contains(github.event.comment.body, '/ci-run-regression') || contains(github.event.comment.body, '/ci-run-all')))
     outputs:
-      source_changed: ${{ steps.filter.outputs.source }}
+      source_changed: ${{ steps.filter.outputs.SOURCE_CHANGED }}
       comment_valid: ${{ steps.comment.outputs.isTeamMember }}
     steps:
     - uses: actions/checkout@v3
 
-    - name: Determine if source code changed
-      id: filter
+    - name: Collect file changes
+      id: changes
       if: github.event_name == 'merge_group'
       uses: dorny/paths-filter@v2
       with:
         base: ${{ github.event.merge_group.base_ref }}
         ref: ${{ github.event.merge_group.head_ref }}
+        list-files: shell
         filters: |
-          source:
-            - ".cargo/**"
-            - "benches/**"
-            - "lib/**"
-            - "proto/**"
-            - "scripts/**"
-            - "src/**"
-            - "tests/**"
-            - "build.rs"
-            - "Cargo.lock"
-            - "Cargo.toml"
-            - "Makefile"
-            - "rust-toolchain.toml"
-            - "vdev/**"
+          all_changed:
+            - "**"
+          ignore:
+            - "distribution/**"
+            - "rust-doc/**"
+            - "rfcs/**"
+            - "testing/**"
+            - "tilt/**"
+            - "website/**"
+            - "*.md"
+            - "Tiltfile"
+            - "netlify.toml"
+            - "NOTICE"
+            - "LICENSE-3rdparty.csv"
+            - "LICENSE"
+
+    # This step allows us to conservatively run the tests if we added a new
+    # file or directory for source code, but forgot to add it to this workflow.
+    # Instead, we may unecessarily run the test on new file or dir additions that
+    # wouldn't likely introduce regressions.
+    - name: Determine if should not run due to irrelevant file changes
+      id: filter
+      if: github.event_name == 'merge_group'
+      env:
+        ALL: ${{ steps.changes.outputs.all_changed_files }}
+        IGNORE: ${{ steps.changes.outputs.ignore_files }}
+      run: |
+        echo "${{ env.ALL }}"
+        echo "${{ env.IGNORE }}"
+        export SOURCE_CHANGED=$(comm -2 -3 <(printf "%s\n" "${{ env.ALL }}") <(printf "%s\n" "${{ env.IGNORE }}"))
+        echo "${SOURCE_CHANGED}"
+
+        if [ -z "${SOURCE_CHANGED}" ]; then
+          export SOURCE_CHANGED="true"
+        else
+          export SOURCE_CHANGED="false"
+
+        echo "SOURCE_CHANGED=${SOURCE_CHANGED}" >> $GITHUB_OUTPUT
 
     - name: Validate issue comment
       id: comment
