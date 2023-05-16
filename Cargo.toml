@@ -254,7 +254,7 @@ futures-util = { version = "0.3.28", default-features = false }
 glob = { version = "0.3.1", default-features = false }
 governor = { version = "0.5.1", default-features = false, features = ["dashmap", "jitter", "std"], optional = true }
 grok = { version = "2.0.0", default-features = false, optional = true }
-h2 = { version = "0.3.16", default-features = false, optional = true }
+h2 = { version = "0.3.19", default-features = false, optional = true }
 hash_hasher = { version = "2.0.0", default-features = false }
 hashbrown = { version = "0.13.2", default-features = false, optional = true, features = ["ahash"] }
 headers = { version = "0.3.8", default-features = false }
@@ -267,7 +267,7 @@ hyper-proxy = { version = "0.9.1", default-features = false, features = ["openss
 indexmap = { version = "~1.9.3", default-features = false, features = ["serde"] }
 infer = { version = "0.13.0", default-features = false, optional = true}
 indoc = { version = "2.0.1", default-features = false }
-inventory = { version = "0.3.5", default-features = false }
+inventory = { version = "0.3.6", default-features = false }
 k8s-openapi = { version = "0.18.0", default-features = false, features = ["api", "v1_26"], optional = true }
 kube = { version = "0.82.0", default-features = false, features = ["client", "openssl-tls", "runtime"], optional = true }
 listenfd = { version = "1.0.1", default-features = false, optional = true }
@@ -306,7 +306,7 @@ strip-ansi-escapes = { version = "0.1.1", default-features = false }
 syslog = { version = "6.1.0", default-features = false, optional = true }
 tikv-jemallocator = { version = "0.5.0", default-features = false, optional = true }
 tokio-postgres = { version = "0.7.7", default-features = false, features = ["runtime", "with-chrono-0_4"], optional = true }
-tokio-tungstenite = {version = "0.18.0", default-features = false, features = ["connect"], optional = true}
+tokio-tungstenite = {version = "0.19.0", default-features = false, features = ["connect"], optional = true}
 toml = { version = "0.7.3", default-features = false, features = ["parse", "display"] }
 tonic = { version = "0.9", optional = true, default-features = false, features = ["transport", "codegen", "prost", "tls", "tls-roots", "gzip"] }
 trust-dns-proto = { version = "0.22.0", default-features = false, features = ["dnssec"], optional = true }

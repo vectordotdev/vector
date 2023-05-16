@@ -40,34 +40,6 @@ impl Transform {
         Transform::Function(Box::new(v))
     }
 
-    /// Mutably borrow the inner transform as a function transform.
-    ///
-    /// # Panics
-    ///
-    /// If the transform is not a [`FunctionTransform`] this will panic.
-    pub fn as_function(&mut self) -> &mut Box<dyn FunctionTransform> {
-        match self {
-            Transform::Function(t) => t,
-            _ => panic!(
-                "Called `Transform::as_function` on something that was not a function variant."
-            ),
-        }
-    }
-
-    /// Transmute the inner transform into a function transform.
-    ///
-    /// # Panics
-    ///
-    /// If the transform is not a [`FunctionTransform`] this will panic.
-    pub fn into_function(self) -> Box<dyn FunctionTransform> {
-        match self {
-            Transform::Function(t) => t,
-            _ => panic!(
-                "Called `Transform::into_function` on something that was not a function variant."
-            ),
-        }
-    }
-
     /// Create a new synchronous transform.
     ///
     /// This is a broader trait than the simple [`FunctionTransform`] in that it allows transforms
@@ -102,20 +74,6 @@ impl Transform {
     /// TODO
     pub fn event_task(v: impl TaskTransform<Event> + 'static) -> Self {
         Transform::Task(Box::new(WrapEventTask(v)))
-    }
-
-    /// Mutably borrow the inner transform as a task transform.
-    ///
-    /// # Panics
-    ///
-    /// If the transform is a [`FunctionTransform`] this will panic.
-    pub fn as_task(&mut self) -> &mut Box<dyn TaskTransform<EventArray>> {
-        match self {
-            Transform::Task(t) => t,
-            _ => {
-                panic!("Called `Transform::as_task` on something that was not a task variant.")
-            }
-        }
     }
 
     /// Transmute the inner transform into a task transform.
