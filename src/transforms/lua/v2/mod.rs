@@ -470,7 +470,7 @@ mod tests {
     use crate::{
         event::{
             metric::{Metric, MetricKind, MetricValue},
-            Event, LogEvent, Value,
+            Event, LogEvent, TraceEvent, Value,
         },
         test_util::trace_init,
     };
@@ -969,6 +969,32 @@ mod tests {
                     out.lock().await.recv().await.unwrap().as_metric(),
                     &expected
                 );
+            },
+        )
+        .await;
+    }
+
+    #[tokio::test]
+    async fn lua_trace() {
+        trace_init();
+        run_transform(
+            r#"
+            version = "2"
+                hooks.process = """function (event, emit)
+                event.trace.env = "production"
+                emit(event)
+            end
+            """
+            "#,
+            |tx, out| async move {
+                let trace = TraceEvent::default();
+
+                let mut expected = trace.clone();
+                expected.insert("env", "production");
+
+                tx.send(trace.into()).await.unwrap();
+
+                assert_eq!(out.lock().await.recv().await.unwrap().as_trace(), &expected);
             },
         )
         .await;
