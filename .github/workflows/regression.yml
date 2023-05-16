@@ -1,8 +1,8 @@
 # Regression Detection Suite
 #
 # This workflow runs under the following conditions:
-#    - in the merge queue if any source files changed.
-#    - on demand in a PR, by either of the following comments:
+#    - in the merge queue if any source files were modified, added or deleted.
+#    - on demand by a  PR comment matching either of:
 #      - '/ci-run-regression'
 #      - '/ci-run-all'
 #      (the comment issuer must be a member of the Vector GH team)
