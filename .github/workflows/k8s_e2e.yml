@@ -22,7 +22,7 @@ on:
     # At midnight UTC Tue-Sat
     #- cron: '0 0 * * 2-6'
     # TODO temporary to test
-    - cron: '35 18 * * *'
+    - cron: '51 19 * * *'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.number || github.event.issue.id || github.event.merge_group.base_sha || github.event.schedule || github.sha }}
