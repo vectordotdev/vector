@@ -678,7 +678,6 @@ liblogging
 librdkafka
 libvector
 libxxhash
-LICENSE-3rdparty.csv
 linting
 listenfd
 litstr
@@ -1015,6 +1014,7 @@ rawconfig
 rawstring
 rbaz
 rdkafka
+rdparty
 rdr
 readnone
 rebuffer
