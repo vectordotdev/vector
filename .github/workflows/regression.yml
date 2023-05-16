@@ -26,8 +26,6 @@
 name: Regression Detection Suite
 
 on:
-  issue_comment:
-    types: [created]
   merge_group:
     types: [checks_requested]
   workflow_call:
@@ -41,11 +39,10 @@ concurrency:
 
 jobs:
 
-  # Only run this workflow if files changed in areas that could possibly introduce a regression, or by valid comment
+  # Only run this workflow if files changed in areas that could possibly introduce a regression
   should-run:
     runs-on: ubuntu-latest
-    if: github.event_name != 'issue_comment' || (github.event.issue.pull_request
-        && (contains(github.event.comment.body, '/ci-run-regression') || contains(github.event.comment.body, '/ci-run-all')))
+    if: github.event_name != 'pull_request'
     outputs:
       source_changed: ${{ steps.filter.outputs.SOURCE_CHANGED }}
       comment_valid: ${{ steps.comment.outputs.isTeamMember }}
@@ -100,20 +97,12 @@ jobs:
 
         echo "SOURCE_CHANGED=${SOURCE_CHANGED}" >> $GITHUB_OUTPUT
 
-    - name: Validate issue comment
-      id: comment
-      if: github.event_name == 'issue_comment'
-      uses: tspascoal/get-user-teams-membership@v2
-      with:
-        username: ${{ github.actor }}
-        team: 'Vector'
-        GITHUB_TOKEN: ${{ secrets.GH_PAT_ORG }}
 
   compute-metadata:
     name: Compute metadata
     runs-on: ubuntu-22.04
     needs: should-run
-    if: needs.should-run.outputs.source_changed == 'true' || needs.should-run.outputs.comment_valid == 'true'
+    if: github.event_name != 'merge_group' || needs.should-run.outputs.source_changed == 'true'
     outputs:
       pr-number: ${{ steps.pr-metadata-merge-queue.outputs.PR_NUMBER || steps.pr-metadata-comment.outputs.PR_NUMBER }}
       baseline-sha: ${{ steps.pr-metadata-merge-queue.outputs.BASELINE_SHA || steps.pr-metadata-comment.outputs.BASELINE_SHA }}
@@ -746,12 +735,12 @@ jobs:
             -f context='Regression Detection Suite / analyze-experiment' \
             -f target_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
+  # This job always runs- if an issue_comment triggered it, we need to update the check status in the PR,
+  # and if a pull_request triggered it, we need to flag the check status as a success.
   regression-detection-suite:
     name: Regression Detection Suite
     runs-on: ubuntu-latest
-    if: |
-      always() &&
-        (github.event_name != 'issue_comment' || (github.event.issue.pull_request && contains(github.event.comment.body, '/ci-run-regression')))
+    if: always()
     needs:
       - compute-metadata
       - build-baseline
