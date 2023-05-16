@@ -169,7 +169,7 @@ jobs:
             ]
 
             // Run all versions if triggered by nightly schedule. Otherwise only run latest.
-            const run_all = context.github.event_name == "schedule";
+            const run_all = context.eventName == "schedule";
             const filter_targets = array => array.filter(val => run_all || val.is_essential)
 
             const matrix = {
