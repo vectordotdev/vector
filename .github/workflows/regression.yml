@@ -18,8 +18,9 @@ name: Regression Detection Suite
 on:
   issue_comment:
     types: [created]
-  # merge_group:
-  #   types: [checks_requested]
+  merge_group:
+    types: [checks_requested]
+  workflow_call:
   # Don't want to run this on each PR commit, but because GH doesn't allow specifying different required checks
   # for pull request and merge queue, we need to "run" it in pull request, but in the jobs we will just auto pass.
   pull_request:
