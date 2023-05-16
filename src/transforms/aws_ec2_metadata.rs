@@ -723,6 +723,7 @@ mod integration_tests {
         transforms::test::create_topology,
     };
     use std::collections::BTreeMap;
+    use vector_common::assert_event_data_eq;
     use vrl::value::Value;
     use warp::Filter;
 
@@ -851,7 +852,7 @@ mod integration_tests {
             tx.send(log.into()).await.unwrap();
 
             let event = out.recv().await.unwrap();
-            assert_eq!(event.into_log(), expected_log);
+            assert_event_data_eq!(event.into_log(), expected_log);
 
             drop(tx);
             topology.stop().await;
@@ -952,7 +953,7 @@ mod integration_tests {
             tx.send(metric.into()).await.unwrap();
 
             let event = out.recv().await.unwrap();
-            assert_eq!(event.into_metric(), expected_metric);
+            assert_event_data_eq!(event.into_metric(), expected_metric);
 
             drop(tx);
             topology.stop().await;
@@ -997,7 +998,7 @@ mod integration_tests {
             tx.send(log.into()).await.unwrap();
 
             let event = out.recv().await.unwrap();
-            assert_eq!(event.into_log(), expected_log);
+            assert_event_data_eq!(event.into_log(), expected_log);
 
             drop(tx);
             topology.stop().await;
@@ -1041,7 +1042,7 @@ mod integration_tests {
             tx.send(metric.into()).await.unwrap();
 
             let event = out.recv().await.unwrap();
-            assert_eq!(event.into_metric(), expected_metric);
+            assert_event_data_eq!(event.into_metric(), expected_metric);
 
             drop(tx);
             topology.stop().await;

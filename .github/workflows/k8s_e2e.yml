@@ -57,6 +57,7 @@ jobs:
       CARGO_PROFILE_RELEASE_CODEGEN_UNITS: 256
       CARGO_INCREMENTAL: 0
     steps:
+<<<<<<< HEAD
       - name: Validate issue comment
         if: github.event_name == 'issue_comment'
         uses: tspascoal/get-user-teams-membership@v2
@@ -87,8 +88,6 @@ jobs:
       - name: Checkout branch
         if: ${{ github.event_name != 'issue_comment' }}
         uses: actions/checkout@v3
-
-      - run: make ci-sweep
 
       - uses: actions/cache@v3
         with:
