@@ -77,7 +77,7 @@ jobs:
 
     # This step allows us to conservatively run the tests if we added a new
     # file or directory for source code, but forgot to add it to this workflow.
-    # Instead, we may unecessarily run the test on new file or dir additions that
+    # Instead, we may unnecessarily run the test on new file or dir additions that
     # wouldn't likely introduce regressions.
     - name: Determine if should not run due to irrelevant file changes
       id: filter
