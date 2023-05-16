@@ -33,7 +33,7 @@ once_cell = { version = "1.17", default-features = false }
 ordered-float = { version = "3.7.0", default-features = false }
 openssl = { version = "0.10.52", default-features = false, features = ["vendored"] }
 parking_lot = { version = "0.12.1", default-features = false }
-pin-project = { version = "1.0.12", default-features = false }
+pin-project = { version = "1.1.0", default-features = false }
 proptest = { version = "1.1", optional = true }
 prost-types = { version = "0.11", default-features = false }
 prost = { version = "0.11", default-features = false, features = ["std"] }
@@ -45,7 +45,7 @@ serde_json = { version = "1.0.96", default-features = false }
 serde_with = { version = "2.3.2", default-features = false, features = ["std", "macros"] }
 smallvec = { version = "1", default-features = false, features = ["serde", "const_generics"] }
 snafu = { version = "0.7.4", default-features = false }
-socket2 = { version = "0.5.2", default-features = false }
+socket2 = { version = "0.5.3", default-features = false }
 tokio = { version = "1.28.1", default-features = false, features = ["net"] }
 tokio-openssl = { version = "0.6.3", default-features = false }
 tokio-stream = { version = "0.1", default-features = false, features = ["time"], optional = true }
@@ -68,7 +68,7 @@ vector-config-macros = { path = "../vector-config-macros" }
 vrl = { git = "https://github.com/vectordotdev/vrl", rev = "v0.3.0" }
 
 [target.'cfg(target_os = "macos")'.dependencies]
-security-framework = "2.8.2"
+security-framework = "2.9.0"
 
 [target.'cfg(windows)'.dependencies]
 schannel = "0.1.21"

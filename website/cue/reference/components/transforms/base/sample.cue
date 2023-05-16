@@ -12,7 +12,7 @@ base: components: transforms: sample: configuration: {
 			sampled.
 
 			Each unique value for the key creates a bucket of related events to be sampled together
-			and the rate is applied to the buckets themselves to sample `1/N` buckets. Overall rate
+			and the rate is applied to the buckets themselves to sample `1/N` buckets.  The overall rate
 			of sampling may differ from the configured one if values in the field are not uniformly
 			distributed. If left unspecified, or if the event doesn’t have `key_field`, then the
 			event is sampled independently.
