@@ -38,7 +38,7 @@
 
 ## Setup
 
-We're super excited to have you interested in working on Vector! Before you start you should pick how you want to develop.
+We're super excited to have you interested in working on Vector!! Before you start you should pick how you want to develop.
 
 For small or first-time contributions, we recommend the Docker method. Prefer to do it yourself? That's fine too!
 
