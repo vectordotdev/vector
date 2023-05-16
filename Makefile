@@ -635,19 +635,6 @@ generate-component-docs: ## Generate per-component Cue docs from the configurati
 signoff: ## Signsoff all previous commits since branch creation
 	scripts/signoff.sh
 
-ifeq (${CI}, true)
-.PHONY: ci-sweep
-ci-sweep: ## Sweep up the CI to try to get more disk space.
-	@echo "Preparing the CI for build by sweeping up disk space a bit..."
-	df -h
-	sudo apt-get --purge autoremove --yes
-	sudo apt-get clean
-	sudo rm -rf "/opt/*" "/usr/local/*"
-	sudo rm -rf "/usr/local/share/boost" && sudo rm -rf "${AGENT_TOOLSDIRECTORY}"
-	docker system prune --force
-	df -h
-endif
-
 .PHONY: version
 version: ## Get the current Vector version
 	@cargo vdev version
