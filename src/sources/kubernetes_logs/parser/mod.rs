@@ -107,7 +107,7 @@ mod tests {
     fn test_parsing_valid_vector_namespace() {
         trace_init();
         test_util::test_parser(
-            || Transform::function(Parser::new(LogNamespace::Vector)),
+            || Parser::new(LogNamespace::Vector),
             |bytes| Event::Log(LogEvent::from(value!(bytes))),
             valid_cases(LogNamespace::Vector),
         );
