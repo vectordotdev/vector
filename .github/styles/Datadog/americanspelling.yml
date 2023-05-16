@@ -10,8 +10,8 @@ tokens:
   - '(?:\w+)lour'
   - '(?:\w+)lyse'
 exceptions:
- [advertise, advise, appraise, apprise, arise, chastise, circumcise, clockwise, 
+ [advertise, advise, appraise, apprise, arise, chastise, circumcise, clockwise,
  comprise, compromise, concise, counterclockwise, demise, despise, devise, disguise,
- enterprise, excise, exercise, expertise, franchise, imprecise, improvise, incise, 
- likewise, merchandise, otherwise, paradise, praise, precise, premise, promise, 
+ enterprise, excise, exercise, expertise, franchise, imprecise, improvise, incise,
+ likewise, merchandise, otherwise, paradise, praise, precise, premise, promise,
  revise, rise, supervise, surmise, surprise, televise, wise]
