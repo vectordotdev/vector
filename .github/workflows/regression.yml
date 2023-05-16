@@ -63,6 +63,7 @@ jobs:
           ignore:
             - "distribution/**"
             - "rust-doc/**"
+            - "docs/**"
             - "rfcs/**"
             - "testing/**"
             - "tilt/**"
@@ -85,18 +86,19 @@ jobs:
         ALL: ${{ steps.changes.outputs.all_changed_files }}
         IGNORE: ${{ steps.changes.outputs.ignore_files }}
       run: |
-        echo "${{ env.ALL }}"
-        echo "${{ env.IGNORE }}"
+        echo "ALL='${{ env.ALL }}''"
+        echo "IGNORE='${{ env.IGNORE }}'"
         export SOURCE_CHANGED=$(comm -2 -3 <(printf "%s\n" "${{ env.ALL }}") <(printf "%s\n" "${{ env.IGNORE }}"))
-        echo "${SOURCE_CHANGED}"
+        echo "SOURCE_CHANGED='${SOURCE_CHANGED}'"
 
         if [ -z "${SOURCE_CHANGED}" ]; then
           export SOURCE_CHANGED="true"
         else
           export SOURCE_CHANGED="false"
+        fi
 
+        echo "SOURCE_CHANGED='${SOURCE_CHANGED}'"
         echo "SOURCE_CHANGED=${SOURCE_CHANGED}" >> $GITHUB_OUTPUT
-
 
   compute-metadata:
     name: Compute metadata
