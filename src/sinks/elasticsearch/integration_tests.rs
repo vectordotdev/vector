@@ -262,6 +262,7 @@ async fn auto_version_aws() {
         auth: Some(ElasticsearchAuth::Aws(AwsAuthentication::Default {
             load_timeout_secs: Some(5),
             imds: ImdsAuthentication::default(),
+            region: None,
         })),
         endpoints: vec![aws_server()],
         aws: Some(RegionOrEndpoint::with_region(String::from("localstack"))),
@@ -346,6 +347,7 @@ async fn insert_events_on_aws() {
             auth: Some(ElasticsearchAuth::Aws(AwsAuthentication::Default {
                 load_timeout_secs: Some(5),
                 imds: ImdsAuthentication::default(),
+                region: None,
             })),
             endpoints: vec![aws_server()],
             aws: Some(RegionOrEndpoint::with_region(String::from("localstack"))),
@@ -368,6 +370,7 @@ async fn insert_events_on_aws_with_compression() {
             auth: Some(ElasticsearchAuth::Aws(AwsAuthentication::Default {
                 load_timeout_secs: Some(5),
                 imds: ImdsAuthentication::default(),
+                region: None,
             })),
             endpoints: vec![aws_server()],
             aws: Some(RegionOrEndpoint::with_region(String::from("localstack"))),
