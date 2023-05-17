@@ -5144,7 +5144,7 @@ dependencies = [
  "libc",
  "log",
  "memchr",
- "nkeys",
+ "nkeys 0.2.0",
  "nuid",
  "once_cell",
  "parking_lot",
@@ -5242,6 +5242,21 @@ name = "nkeys"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0e66a7cd1358277b2a6f77078e70aea7315ff2f20db969cc61153103ec162594"
+dependencies = [
+ "byteorder",
+ "data-encoding",
+ "ed25519-dalek",
+ "getrandom 0.2.9",
+ "log",
+ "rand 0.8.5",
+ "signatory",
+]
+
+[[package]]
+name = "nkeys"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c2d151f6ece2f3d1077f6c779268de2516653d8344ddde65addd785cce764fe5"
 dependencies = [
  "byteorder",
  "data-encoding",
@@ -9263,7 +9278,7 @@ dependencies = [
  "mongodb",
  "nats",
  "nix 0.26.2",
- "nkeys",
+ "nkeys 0.3.0",
  "nom",
  "notify",
  "num-format",
