@@ -22,6 +22,10 @@ bench = false
 name = "integration"
 path = "tests/integration/lib.rs"
 
+[[test]]
+name = "e2e"
+path = "tests/e2e/mod.rs"
+
 [[bin]]
 name = "graphql-schema"
 path = "src/api/schema/gen.rs"
@@ -816,6 +820,12 @@ webhdfs-integration-tests = ["sinks-webhdfs"]
 disable-resolv-conf = []
 shutdown-tests = ["api", "sinks-blackhole", "sinks-console", "sinks-prometheus", "sources", "transforms-lua", "transforms-remap", "unix"]
 cli-tests = ["sinks-blackhole", "sinks-socket", "sources-demo_logs", "sources-file"]
+
+e2e-tests-datadog = [
+  "sources-datadog_agent",
+  "sinks-datadog_logs"
+]
+
 vector-api-tests = [
   "sources-demo_logs",
   "transforms-remap",

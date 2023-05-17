@@ -1,0 +1,33 @@
+version: '3'
+
+services:
+  datadog-agent:
+    image: docker.io/datadog/agent:${CONFIG_VERSION}
+    environment:
+    - DD_API_KEY=${TEST_DATADOG_API_KEY:?TEST_DATADOG_API_KEY required}
+    - DD_DD_URL=http://fakeintake-agent:80
+    - DD_USE_DOGSTATSD=false
+    - DD_HOSTNAME=datadog-agent
+    - DD_PROCESS_AGENT_ENABLED=false
+    - DD_APM_ENABLED=false
+    - DD_METRICS_ENABLED=false
+    - DD_LOGS_ENABLED=true
+    - DD_CONTAINER_EXCLUDE="name:.*"
+  datadog-agent-vector:
+    #image: datadog-agent-vector-t1:latest
+    image: docker.io/datadog/agent:${CONFIG_VERSION}
+    environment:
+    - DD_API_KEY=${TEST_DATADOG_API_KEY:?TEST_DATADOG_API_KEY required}
+    - DD_HOSTNAME=datadog-agent-vector
+    - DD_PROCESS_AGENT_ENABLED=false
+    - DD_METRICS_ENABLED=false
+    - DD_LOGS_ENABLED=true
+    - DD_CONTAINER_EXCLUDE="name:.*"
+  fakeintake-agent:
+    image: docker.io/datadog/fakeintake:${CONFIG_VERSION}
+  fakeintake-agent-vector:
+    image: docker.io/datadog/fakeintake:${CONFIG_VERSION}
+
+networks:
+  default:
+    name: ${VECTOR_NETWORK}

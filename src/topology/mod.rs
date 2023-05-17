@@ -27,7 +27,7 @@ use std::{
 
 pub use controller::{ReloadOutcome, SharedTopologyController, TopologyController};
 use futures::{Future, FutureExt};
-pub(super) use running::RunningTopology;
+pub use running::RunningTopology;
 use tokio::sync::{mpsc, watch};
 use vector_buffers::topology::channel::{BufferReceiverStream, BufferSender};
 
