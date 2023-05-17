@@ -350,7 +350,7 @@ where
                         .block_on(checkpoint_task_handle)
                         .expect("checkpoint task has panicked");
                     if let Err(error) = checkpointer.write_checkpoints() {
-                        error!(?error, "Error writing checkpoints before shutdown");
+                        error!(?error, "Error writing checkpoints before shutdown.");
                     }
                     return Ok(Shutdown);
                 }

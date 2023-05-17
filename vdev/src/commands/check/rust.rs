@@ -1,6 +1,6 @@
 use anyhow::Result;
 
-use crate::{app, util::ChainArgs as _};
+use crate::app;
 
 /// Check the Rust code for errors
 #[derive(clap::Args, Debug)]
@@ -21,24 +21,34 @@ impl Cli {
         } else {
             &features
         };
-        let tool = if self.clippy { "clippy" } else { "check" };
-        let args = if self.clippy {
-            vec!["--", "-D", "warnings"]
+        if self.clippy {
+            app::exec(
+                "cargo",
+                [
+                    "dylint",
+                    "--all",
+                    "--workspace",
+                    "--",
+                    // "--all-targets", BROKEN
+                    "--no-default-features",
+                    "--features",
+                    features,
+                ],
+                true,
+            )
         } else {
-            Vec::default()
-        };
-        app::exec(
-            "cargo",
-            [
-                tool,
-                "--workspace",
-                "--all-targets",
-                "--no-default-features",
-                "--features",
-                features,
-            ]
-            .chain_args(args),
-            true,
-        )
+            app::exec(
+                "cargo",
+                [
+                    "check",
+                    "--workspace",
+                    "--all-targets",
+                    "--no-default-features",
+                    "--features",
+                    features,
+                ],
+                true,
+            )
+        }
     }
 }

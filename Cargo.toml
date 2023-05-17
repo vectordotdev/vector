@@ -111,7 +111,13 @@ members = [
   "lib/vector-vrl/functions",
   "lib/vector-vrl/tests",
   "lib/vector-vrl/web-playground",
+  "lints/misformatted_tracing_message",
   "vdev",
+]
+
+[workspace.metadata.dylint]
+libraries = [
+    { path = "lints/*" },
 ]
 
 [dependencies]

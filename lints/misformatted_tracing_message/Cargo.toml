@@ -1,0 +1,21 @@
+[package]
+name = "misformatted_tracing_message"
+version = "0.1.0"
+authors = ["authors go here"]
+description = "description goes here"
+edition = "2021"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+clippy_utils = { git = "https://github.com/rust-lang/rust-clippy", rev = "f16bfa478f131b2ec2ad9742f88dc6a9beea52b7" }
+dylint_linting = "2.1.8"
+if_chain = "1.0.2"
+
+[dev-dependencies]
+dylint_testing = "2.1.8"
+
+[package.metadata.rust-analyzer]
+rustc_private = true
