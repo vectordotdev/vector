@@ -20,7 +20,7 @@ directories = "5.0.1"
 # remove this when stabilized https://doc.rust-lang.org/stable/std/path/fn.absolute.html
 dunce = "1.0.4"
 glob = { version = "0.3.1", default-features = false }
-hashlink = { version = "0.8.1", features = ["serde_impl"] }
+hashlink = { version = "0.8.2", features = ["serde_impl"] }
 hex = "0.4.3"
 indicatif = { version = "0.17.3", features = ["improved_unicode"] }
 itertools = "0.10.5"
