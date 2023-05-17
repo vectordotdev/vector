@@ -144,7 +144,12 @@ jobs:
     env:
       FAILED: ${{ contains(needs.*.result, 'failure') }}
     steps:
+      - name: exit fail
+        if: github.event_name == 'merge_group'
+        run: exit 1
+
       - name: exit
+        if: github.event_name != 'merge_group'
         run: |
           echo "failed=${{ env.FAILED }}"
           if [[ "$FAILED" == "true" ]] ; then
