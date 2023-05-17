@@ -37,20 +37,21 @@ from.
 
 ### User Experience
 
-Global config options will be provided allowing the name of the `service` tag and the
-`source` tag to be specified. For example:
+Global config options will be provided to indicate that the `service` tag and the
+`source` tag should be sent. For example:
 
 ```yaml
 telemetry:
   tags:
-    service: theservice
-    source: theinput
+    service: true
+    source_id: true
 ```
 
 This will cause Vector to emit a metric like (note the last two tags):
 
-```statds
-vector.component_sent_event_bytes_total:123|c|#component_id:out,component_kind:sink,component_name:out,component_type:console,host:machine,theservice:somekindofservice,theinput:stdin
+```prometheus
+vector_component_sent_event_bytes_total{component_id="out",component_kind="sink",component_name="out",component_type="console"
+                                        ,host="machine",service="potato",source_id="stdin"} 123
 ```
 
 The default will be to not emit these tags.
@@ -59,18 +60,21 @@ The default will be to not emit these tags.
 
 #### Metric tags
 
-**service** - to attach the service, we need to add a new meaning to Vector - 
-              `service`. Any sources that receive data that could potentially 
-              be considered a service will need to indicate which field means 
-              `service`. This work has largely already been done with the 
+**service** - to attach the service, we need to add a new meaning to Vector -
+              `service`. Any sources that receive data that could potentially
+              be considered a service will need to indicate which field means
+              `service`. This work has largely already been done with the
               LogNamespacing work, so it will be trivial to add this new field.
+              Not all sources will be able to specify a specific field to
+              indicate the `service`. In time it will be possible for this to
+              be accomplished through `VRL`.
 
-**source** - A new field will be added to the [Event metadata][event_metadata] - 
-             `Arc<OutputId>` that will indicate the source of the event. 
-             `OutputId` will need to be serializable so it can be stored in the
-             disk buffer. If the event is loaded from the buffer and it is pointing
-             to a source that no longer exists, given that it is just an identifier
-             it won't cause any issues.
+**source_id** - A new field will be added to the [Event metadata][event_metadata] -
+                `Arc<OutputId>` that will indicate the source of the event.
+                `OutputId` will need to be serializable so it can be stored in
+                the disk buffer. Since this field is just an identifier, it can
+                still be used even if the source no longer exists when the event
+                is consumed by a sink.
 
 We will need to do an audit of all components to ensure the
 bytes emitted for the `component_received_event_bytes_total` and
@@ -83,10 +87,18 @@ These tags will be given the name that was configured in [User Experience]
 Transforms `reduce` and `aggregate` combine multiple events together. In this
 case the `source` and `service` of the first event will be taken.
 
-If there is no `source` specified (the event was created by the `lua` transform)
-- a source of `-` will be emitted.
+If there is no `source` a source of `-` will be emitted. The only way this can
+happen is if the event was created by the `lua` transform.
 
 If there is no `service` available, a service of `-` will be emitted.
+
+Emitting a `-` rather than not emitting anything at all makes it clear that
+there was no value rather than it just having been forgotten and ensures it
+is clear that the metric represents no `service` or `source` rather than the
+aggregate value across all  services.
+
+The [Component Spec][component_spec] will need updating to indicate these tags
+will need including.
 
 #### `component_received_event_bytes_total`
 
@@ -124,6 +136,13 @@ pub struct JsonSize(usize);
 
 The `EventsSent` metric will only accept this type.
 
+### Registered metrics
+
+It is currently not possible to have dynamic tags with preregistered metrics.
+
+We will need to introduce a registered event caching layer that will register
+and cache new events keyed on the tags that are sent to it.
+
 ## Rationale
 
 The ability to visualize data flowing through Vector will allow users to ascertain
@@ -134,9 +153,6 @@ optimise their configurations to make the best use of Vector's features.
 
 The additional tags being added to the metrics will increase the cardinality of
 those metrics if they are enabled.
-
-We will lose the ability to preregister the metrics since the tags will need to be
-dynamic. This will cause a noticable, but likely negligible performance loss.
 
 ## Prior Art
 
@@ -160,14 +176,16 @@ Incremental steps to execute this change. These will be converted to issues afte
 
 - [ ] Add the `source` field to the Event metadata to indicate the source the event has come from.
 - [ ] Update the Volume event metrics to take a `JsonSize` value. Use the compiler to ensure all metrics
-      emitted use this.
+      emitted use this. The `EstimatedJsonEncodedSizeOf` trait will be updated return a `JsonSize`.
 - [ ] Add the Service meaning. Update any sources that potentially create a service to point the meaning
       to the relevant field.
+- [ ] Introduce an event caching layer that caches registered events based on the tags sent to it.
 - [ ] Update the emitted events to accept the new tags - taking the `telemetry` configuration options
       into account.
 
 ## Future Improvements
 
+- Logs emitted by Vector should also be tagged with `source_id` and `service`.
 
 [component_spec]: https://github.com/vectordotdev/vector/blob/master/docs/specs/component.md#componenteventssent
 [source_sender]: https://github.com/vectordotdev/vector/blob/master/src/source_sender/mod.rs#L265-L268
