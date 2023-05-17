@@ -74,7 +74,8 @@ async fn firehose_put_records() {
     let config = ElasticsearchConfig {
         auth: Some(ElasticsearchAuth::Aws(AwsAuthentication::Default {
             load_timeout_secs: Some(5),
-            ..Default::default()
+            imds: ImdsAuthentication::default(),
+            region: None,
         })),
         endpoints: vec![elasticsearch_address()],
         bulk: BulkConfig {
