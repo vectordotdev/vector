@@ -535,9 +535,10 @@ impl TcpSourceAcker for FluentAcker {
 
         let mut buf = Vec::new();
         let mut ser = Serializer::new(&mut buf);
+        let mut ack_map = HashMap::new();
 
         for chunk in self.chunks {
-            let mut ack_map = HashMap::new();
+            ack_map.clear();
             if let TcpSourceAck::Ack = ack {
                 ack_map.insert("ack", chunk);
             };
