@@ -168,7 +168,10 @@ mod tests {
         // We should flush 1 item counter_a_1
         agg.flush_into(&mut out);
         assert_eq!(1, out.len());
-        assert_eq!(&counter_a_1, &out.take_primary().into_events().next().unwrap());
+        assert_eq!(
+            &counter_a_1,
+            &out.take_primary().into_events().next().unwrap()
+        );
 
         // A subsequent flush doesn't send out anything
         let mut out = TransformOutputsBuf::new_with_primary();
@@ -186,7 +189,10 @@ mod tests {
         let mut out = TransformOutputsBuf::new_with_primary();
         agg.flush_into(&mut out);
         assert_eq!(1, out.len());
-        assert_eq!(&counter_a_summed, &out.take_primary().into_events().next().unwrap());
+        assert_eq!(
+            &counter_a_summed,
+            &out.take_primary().into_events().next().unwrap()
+        );
 
         let counter_b_1 = make_metric(
             "counter_b",
@@ -230,7 +236,10 @@ mod tests {
         // We should flush 1 item gauge_a_1
         agg.flush_into(&mut out);
         assert_eq!(1, out.len());
-        assert_eq!(&gauge_a_1, &out.take_primary().into_events().next().unwrap());
+        assert_eq!(
+            &gauge_a_1,
+            &out.take_primary().into_events().next().unwrap()
+        );
 
         // A subsequent flush doesn't send out anything
         let mut out = TransformOutputsBuf::new_with_primary();
@@ -248,7 +257,10 @@ mod tests {
         let mut out = TransformOutputsBuf::new_with_primary();
         agg.flush_into(&mut out);
         assert_eq!(1, out.len());
-        assert_eq!(&gauge_a_2, &out.take_primary().into_events().next().unwrap());
+        assert_eq!(
+            &gauge_a_2,
+            &out.take_primary().into_events().next().unwrap()
+        );
 
         let gauge_b_1 = make_metric(
             "gauge_b",

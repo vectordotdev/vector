@@ -1,7 +1,7 @@
 use std::{num::NonZeroU32, time::Duration};
 
 use dashmap::DashMap;
-use governor::{clock, state::InMemoryState, Quota, RateLimiter, middleware::NoOpMiddleware};
+use governor::{clock, middleware::NoOpMiddleware, state::InMemoryState, Quota, RateLimiter};
 use serde_with::serde_as;
 use snafu::Snafu;
 use vector_config::configurable_component;
@@ -73,7 +73,8 @@ impl TransformConfig for ThrottleConfig {
 
 pub struct Throttle<C: clock::Clock<Instant = I>, I: clock::Reference> {
     key_field: Option<Template>,
-    limiter: RateLimiter<Option<String>, DashMap<Option<String>, InMemoryState>, C, NoOpMiddleware<I>>,
+    limiter:
+        RateLimiter<Option<String>, DashMap<Option<String>, InMemoryState>, C, NoOpMiddleware<I>>,
     exclude: Option<Condition>,
 }
 
@@ -203,7 +204,8 @@ window_secs = 5
         )
         .unwrap();
 
-        let mut throttle = Throttle::new(&config, &TransformContext::default(), clock.clone()).unwrap();
+        let mut throttle =
+            Throttle::new(&config, &TransformContext::default(), clock.clone()).unwrap();
 
         let mut out = TransformOutputsBuf::new_with_primary();
         throttle.transform(LogEvent::default().into(), &mut out);
@@ -245,7 +247,8 @@ exists(.special)
         )
         .unwrap();
 
-        let mut throttle = Throttle::new(&config, &TransformContext::default(), clock.clone()) .unwrap();
+        let mut throttle =
+            Throttle::new(&config, &TransformContext::default(), clock.clone()).unwrap();
 
         let mut out = TransformOutputsBuf::new_with_primary();
 
@@ -293,7 +296,7 @@ key_field = "{{ bucket }}"
         )
         .unwrap();
 
-        let mut throttle = Throttle::new(&config, &TransformContext::default(), clock.clone()) .unwrap();
+        let mut throttle = Throttle::new(&config, &TransformContext::default(), clock).unwrap();
 
         let mut out = TransformOutputsBuf::new_with_primary();
 

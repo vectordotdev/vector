@@ -148,7 +148,10 @@ impl TransformConfig for DedupeConfig {
         // TODO: we're only using tick here because `FunctionTransform` requires `Clone`. As we
         // refine the model to better differentiate function-style vs concurrent (which is what
         // needs `Clone`), this can go away and we can use the more appropriate trait.
-        Ok(Transform::tick(Dedupe::new(self.clone()), tokio::time::Duration::from_secs(60)))
+        Ok(Transform::tick(
+            Dedupe::new(self.clone()),
+            tokio::time::Duration::from_secs(60),
+        ))
     }
 
     fn input(&self) -> Input {
