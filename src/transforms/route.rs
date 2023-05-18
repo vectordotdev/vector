@@ -1,5 +1,5 @@
 use indexmap::IndexMap;
-use vector_config::configurable_component;
+use vector_config::{configurable_component, constraints::*};
 use vector_core::config::{clone_input_definitions, LogNamespace};
 use vector_core::transform::SyncTransform;
 
@@ -126,6 +126,14 @@ impl TransformConfig for RouteConfig {
 
     fn enable_concurrency(&self) -> bool {
         true
+    }
+}
+
+impl Constrainable for RouteConfig {
+    fn constraints<'a>(path: &'a InstancePath<'a>) -> Constraints<'a> {
+        let mut constraints = Constraints::from_path(path);
+        constraints.add("outputs", |path| Computed::derived(path.push("route"), DeriveOp::Keys));
+        constraints
     }
 }
 

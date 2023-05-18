@@ -11,7 +11,7 @@ use http::{
 use hyper::Body;
 use indexmap::IndexMap;
 use tokio_util::codec::Encoder as _;
-use vector_config::configurable_component;
+use vector_config::{configurable_component, constraints::*};
 
 use crate::{
     codecs::{Encoder, EncodingConfigWithFraming, SinkType, Transformer},
@@ -263,6 +263,58 @@ impl SinkConfig for HttpSinkConfig {
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
+    }
+}
+
+pub struct HttpSinkConfigConstrainable;
+
+impl HttpSinkConfigConstrainable {
+    pub fn inputs() -> ConstraintTransformer<HttpSinkConfig, Input> {
+        /*
+            perhaps the more straightforward thing is that we end up creating per-usage
+            types that simulate the builder-esque patterns of `Computed`, such as like...
+
+            struct InputConstraints {
+                // ..
+            }
+
+            impl InputConstraints {
+
+
+                pub fn as_input(&self) -> Input { .. }
+            }
+
+            impl SinkConfig for HttpSinkConfig {
+                fn inputs(&self) -> InputConstraints {
+                    InputConstraints::from_encoding(self.encoding.config())
+                }
+            }
+
+
+         */
+
+
+        ConstraintTransformer::new(
+            // This goes from `&HttpSinkConfig` to `Inputs` using the exact same code from the
+            // method body of `HttpSinkConfig's impl of the `inputs` method on the `SinkConfig`
+            // trait.
+            //
+            // We can pretend that the output is `Input::all()`, which is, conceptually, the sum of
+            // `Input::log()`, `Input::traces()`, and `Input::metrics()`.
+            |actual: &HttpSinkConfig| std::borrow::Cow::Owned(Input::new(actual.encoding.config().1.input_type())),
+
+            // But what goes here? How do we generate the mapping to get us from an input of, say,
+            // `{ "encoding": { "codec": "json" } }` to an output of (just making this up):
+            // `["logs", "traces", "metrics"]`?
+            |_json_value| { std::borrow::Cow::Owned(serde_json::Value::Null) },
+        )
+    }
+}
+
+impl Constrainable for HttpSinkConfig {
+    fn constraints<'a>(path: &'a InstancePath<'a>) -> Constraints<'a> {
+        let constraints = Constraints::from_path(path);
+        constraints
     }
 }
 

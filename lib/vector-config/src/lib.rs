@@ -114,7 +114,7 @@ pub use serde_json;
 pub mod component;
 mod configurable;
 pub use self::configurable::{Configurable, ConfigurableRef, ToValue};
-mod constraints;
+pub mod constraints;
 mod errors;
 pub use self::errors::{BoundDirection, GenerateError};
 mod external;
