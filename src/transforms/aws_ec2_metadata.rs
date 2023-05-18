@@ -1,8 +1,8 @@
-use std::{collections::HashSet, error, fmt, future::ready, pin::Pin, sync::Arc};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::{collections::HashSet, error, fmt, sync::Arc};
 
 use arc_swap::ArcSwap;
 use bytes::Bytes;
-use futures::{Stream, StreamExt};
 use http::{uri::PathAndQuery, Request, StatusCode, Uri};
 use hyper::{body::to_bytes as body_to_bytes, Body};
 use lookup::lookup_v2::{OptionalTargetPath, OwnedSegment};
@@ -25,7 +25,7 @@ use crate::{
     http::HttpClient,
     internal_events::{AwsEc2MetadataRefreshError, AwsEc2MetadataRefreshSuccessful},
     schema,
-    transforms::{TaskTransform, Transform},
+    transforms::{TickTransform, Transform, TransformOutputsBuf},
 };
 
 const ACCOUNT_ID_KEY: &str = "account-id";
@@ -164,6 +164,7 @@ const fn default_required() -> bool {
 #[derive(Clone, Debug)]
 pub struct Ec2MetadataTransform {
     state: Arc<ArcSwap<Vec<(MetadataKey, Bytes)>>>,
+    done: Arc<AtomicBool>,
 }
 
 #[derive(Debug, Clone)]
@@ -197,6 +198,7 @@ impl_generate_config_from_default!(Ec2Metadata);
 impl TransformConfig for Ec2Metadata {
     async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
         let state = Arc::new(ArcSwap::new(Arc::new(vec![])));
+        let done = Arc::new(AtomicBool::new(false));
 
         let keys = Keys::new(self.namespace.clone());
         let host = Uri::from_maybe_shared(self.endpoint.clone()).unwrap();
@@ -214,6 +216,7 @@ impl TransformConfig for Ec2Metadata {
             host,
             keys,
             Arc::clone(&state),
+            Arc::clone(&done),
             refresh_interval,
             refresh_timeout,
             fields,
@@ -237,7 +240,14 @@ impl TransformConfig for Ec2Metadata {
             .instrument(info_span!("aws_ec2_metadata: worker").or_current()),
         );
 
-        Ok(Transform::event_task(Ec2MetadataTransform { state }))
+        // TODO: Tick isn't a perfect match here (it'd be cool if we could refresh on `tick`, but
+        // that's not async and we don't want to block processing), but it does give us simple
+        // `FunctionTransform`-like semantics without requiring `Clone`. As we refine the transform
+        // types this can become something more specific.
+        Ok(Transform::tick(
+            Ec2MetadataTransform { state, done },
+            tokio::time::Duration::from_secs(60),
+        ))
     }
 
     fn input(&self) -> Input {
@@ -290,16 +300,15 @@ impl TransformConfig for Ec2Metadata {
     }
 }
 
-impl TaskTransform<Event> for Ec2MetadataTransform {
-    fn transform(
-        self: Box<Self>,
-        task: Pin<Box<dyn Stream<Item = Event> + Send>>,
-    ) -> Pin<Box<dyn Stream<Item = Event> + Send>>
-    where
-        Self: 'static,
-    {
-        let mut inner = self;
-        Box::pin(task.filter_map(move |event| ready(Some(inner.transform_one(event)))))
+impl TickTransform for Ec2MetadataTransform {
+    fn transform(&mut self, event: Event, output: &mut TransformOutputsBuf) {
+        output.push(self.transform_one(event))
+    }
+
+    fn tick(&mut self, _output: &mut TransformOutputsBuf) {}
+
+    fn finish(&mut self, _output: &mut TransformOutputsBuf) {
+        self.done.store(true, Ordering::Relaxed);
     }
 }
 
@@ -330,6 +339,7 @@ struct MetadataClient {
     token: Option<(Bytes, Instant)>,
     keys: Keys,
     state: Arc<ArcSwap<Vec<(MetadataKey, Bytes)>>>,
+    done: Arc<AtomicBool>,
     refresh_interval: Duration,
     refresh_timeout: Duration,
     fields: HashSet<String>,
@@ -357,6 +367,7 @@ impl MetadataClient {
         host: Uri,
         keys: Keys,
         state: Arc<ArcSwap<Vec<(MetadataKey, Bytes)>>>,
+        done: Arc<AtomicBool>,
         refresh_interval: Duration,
         refresh_timeout: Duration,
         fields: Vec<String>,
@@ -368,6 +379,7 @@ impl MetadataClient {
             token: None,
             keys,
             state,
+            done,
             refresh_interval,
             refresh_timeout,
             fields: fields.into_iter().collect(),
@@ -376,7 +388,7 @@ impl MetadataClient {
     }
 
     async fn run(&mut self) {
-        loop {
+        while !self.done.load(Ordering::Relaxed) {
             match self.refresh_metadata().await {
                 Ok(_) => {
                     emit!(AwsEc2MetadataRefreshSuccessful);
