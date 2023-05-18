@@ -21,10 +21,7 @@ use k8s_paths_provider::K8sPathsProvider;
 use kube::{
     api::Api,
     config::{self, KubeConfigOptions},
-    runtime::{
-        reflector::{self},
-        watcher, WatchStreamExt,
-    },
+    runtime::{reflector, watcher, WatchStreamExt},
     Client, Config as ClientConfig,
 };
 use lifecycle::Lifecycle;
