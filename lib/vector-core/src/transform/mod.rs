@@ -111,7 +111,7 @@ impl Transform {
 ///
 /// * It is an illegal invariant to implement `FunctionTransform` for a
 ///   `TaskTransform` or vice versa.
-pub trait FunctionTransform: Send + dyn_clone::DynClone + Sync {
+pub trait FunctionTransform: Send + dyn_clone::DynClone {
     fn transform(&mut self, output: &mut OutputBuffer, event: Event);
 }
 
@@ -151,7 +151,7 @@ pub trait TaskTransform<T: EventContainer + 'static>: Send + 'static {
 /// multiple outputs. Those outputs must be known in advanced and returned via
 /// `TransformConfig::outputs`. Attempting to send to any output not registered in advance is
 /// considered a bug and will cause a panic.
-pub trait SyncTransform: Send + dyn_clone::DynClone + Sync {
+pub trait SyncTransform: Send + dyn_clone::DynClone {
     fn transform(&mut self, event: Event, output: &mut TransformOutputsBuf);
 
     fn transform_all(&mut self, events: EventArray, output: &mut TransformOutputsBuf) {
@@ -178,7 +178,7 @@ where
 
 // Like [`SyncTransform`] but with the additional ability to be called on an interval independent of
 // the arrival of new input events.
-pub trait TickTransform: Send  {
+pub trait TickTransform: Send {
     // Called on the provided interval
     fn tick(&mut self, output: &mut TransformOutputsBuf);
 

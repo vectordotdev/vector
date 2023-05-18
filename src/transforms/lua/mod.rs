@@ -96,6 +96,12 @@ impl TransformConfig for LuaConfig {
         }
     }
 
+    // This is a stateful transform, so don't allow it to run concurrently even if that's
+    // technically possible with the current transform trait design.
+    fn enable_concurrency(&self) -> bool {
+        false
+    }
+
     fn input(&self) -> Input {
         match self {
             LuaConfig::V1(v1) => v1.config.input(),
