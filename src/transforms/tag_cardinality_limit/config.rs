@@ -103,9 +103,13 @@ impl GenerateConfig for TagCardinalityLimitConfig {
 #[typetag::serde(name = "tag_cardinality_limit")]
 impl TransformConfig for TagCardinalityLimitConfig {
     async fn build(&self, _context: &TransformContext) -> crate::Result<Transform> {
-        Ok(Transform::event_task(TagCardinalityLimit::new(
-            self.clone(),
-        )))
+        // TODO: we're only using tick here because `FunctionTransform` requires `Clone`. As we
+        // refine the model to better differentiate function-style vs concurrent (which is what
+        // needs `Clone`), this can go away and we can use the more appropriate trait.
+        Ok(Transform::tick(
+            TagCardinalityLimit::new(self.clone()),
+            tokio::time::Duration::from_secs(60),
+        ))
     }
 
     fn input(&self) -> Input {
