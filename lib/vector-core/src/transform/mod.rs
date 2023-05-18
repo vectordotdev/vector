@@ -178,7 +178,7 @@ where
 
 // Like [`SyncTransform`] but with the additional ability to be called on an interval independent of
 // the arrival of new input events.
-pub trait TickTransform: Send + Sync {
+pub trait TickTransform: Send  {
     // Called on the provided interval
     fn tick(&mut self, output: &mut TransformOutputsBuf);
 
