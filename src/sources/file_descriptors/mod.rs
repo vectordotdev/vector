@@ -13,7 +13,6 @@ use lookup::{
     owned_value_path, path, OwnedValuePath,
 };
 use tokio_util::{codec::FramedRead, io::StreamReader};
-use value::Kind;
 use vector_common::internal_event::{
     ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol,
 };
@@ -23,6 +22,7 @@ use vector_core::{
     event::Event,
     EstimatedJsonEncodedSizeOf,
 };
+use vrl::value::Kind;
 
 use crate::{
     codecs::{Decoder, DecodingConfig},

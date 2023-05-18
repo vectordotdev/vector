@@ -3,13 +3,13 @@ use codecs::BytesDeserializerConfig;
 use futures::{stream, StreamExt};
 use lookup::lookup_v2::OptionalValuePath;
 use lookup::{owned_value_path, path, OwnedValuePath};
-use value::Kind;
 use vector_config::configurable_component;
 use vector_core::config::log_schema;
 use vector_core::{
     config::{LegacyKey, LogNamespace},
     schema::Definition,
 };
+use vrl::value::Kind;
 
 use crate::{
     config::{DataType, SourceConfig, SourceContext, SourceOutput},
@@ -204,8 +204,8 @@ mod tests {
     use futures::Stream;
     use lookup::OwnedTargetPath;
     use tokio::time::{sleep, Duration};
-    use value::kind::Collection;
     use vector_core::event::Value;
+    use vrl::value::kind::Collection;
 
     use super::*;
     use crate::{

@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use lookup::OwnedTargetPath;
-use value::Kind;
+use vrl::value::Kind;
 
 use crate::config::LogNamespace;
 

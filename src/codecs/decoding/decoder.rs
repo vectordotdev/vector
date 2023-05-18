@@ -15,9 +15,12 @@ use crate::{
 /// messages.
 #[derive(Clone)]
 pub struct Decoder {
-    framer: Framer,
-    deserializer: Deserializer,
-    log_namespace: LogNamespace,
+    /// The framer being used.
+    pub framer: Framer,
+    /// The deserializer being used.
+    pub deserializer: Deserializer,
+    /// The `log_namespace` being used.
+    pub log_namespace: LogNamespace,
 }
 
 impl Default for Decoder {
@@ -61,16 +64,19 @@ impl Decoder {
             Error::FramingError(error)
         })?;
 
-        let frame = match frame {
-            Some(frame) => frame,
-            _ => return Ok(None),
-        };
+        frame
+            .map(|frame| self.deserializer_parse(frame))
+            .transpose()
+    }
 
+    /// Parses a frame using the included deserializer, and handles any errors by logging.
+    pub fn deserializer_parse(&self, frame: Bytes) -> Result<(SmallVec<[Event; 1]>, usize), Error> {
         let byte_size = frame.len();
+
         // Parse structured events from the byte frame.
         self.deserializer
             .parse(frame, self.log_namespace)
-            .map(|events| Some((events, byte_size)))
+            .map(|events| (events, byte_size))
             .map_err(|error| {
                 emit!(DecoderDeserializeError { error: &error });
                 Error::ParsingError(error)
@@ -103,7 +109,7 @@ mod tests {
     };
     use futures::{stream, StreamExt};
     use tokio_util::{codec::FramedRead, io::StreamReader};
-    use value::Value;
+    use vrl::value::Value;
 
     #[tokio::test]
     async fn framed_read_recover_from_error() {

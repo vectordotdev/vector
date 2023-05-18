@@ -221,10 +221,10 @@ pub async fn updater(mut event_rx: EventRx) -> StateRx {
                     }
                 }
                 EventType::ComponentAdded(c) => {
-                    let _ = state.components.insert(c.key.clone(), c);
+                    _ = state.components.insert(c.key.clone(), c);
                 }
                 EventType::ComponentRemoved(key) => {
-                    let _ = state.components.remove(&key);
+                    _ = state.components.remove(&key);
                 }
                 EventType::ConnectionUpdated(status) => {
                     state.connection_status = status;
@@ -232,7 +232,7 @@ pub async fn updater(mut event_rx: EventRx) -> StateRx {
             }
 
             // Send updated map to listeners
-            let _ = tx.send(state.clone()).await;
+            _ = tx.send(state.clone()).await;
         }
     });
 

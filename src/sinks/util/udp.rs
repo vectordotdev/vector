@@ -246,7 +246,7 @@ impl Service<BytesMut> for UdpService {
         Box::pin(async move {
             // TODO: Add reconnect support as TCP/Unix?
             let result = udp_send(&mut socket, &msg).await.context(SendSnafu);
-            let _ = sender.send(socket);
+            _ = sender.send(socket);
 
             if result.is_ok() {
                 // NOTE: This is obviously not happening before things like compression, etc, so it's currently a

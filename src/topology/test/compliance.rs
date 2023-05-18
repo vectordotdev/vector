@@ -1,5 +1,10 @@
+use std::sync::Arc;
+
 use tokio::sync::oneshot::{channel, Receiver};
-use vector_core::event::{Event, EventArray, EventContainer, LogEvent};
+use vector_core::{
+    config::OutputId,
+    event::{Event, EventArray, EventContainer, LogEvent},
+};
 
 use crate::{
     config::{unit_test::UnitTestSourceConfig, ConfigBuilder},
@@ -44,7 +49,7 @@ async fn create_topology(
 #[tokio::test]
 async fn test_function_transform_single_event() {
     assert_transform_compliance(async {
-        let original_event = Event::Log(LogEvent::from("function transform being tested"));
+        let mut original_event = Event::Log(LogEvent::from("function transform being tested"));
 
         let (topology, rx) = create_topology(original_event.clone(), TransformType::Function).await;
         topology.stop().await;
@@ -52,6 +57,8 @@ async fn test_function_transform_single_event() {
         let events = rx.await.expect("must get back event from rx");
         let mut events = events.into_events().collect::<Vec<_>>();
         assert_eq!(events.len(), 1);
+
+        original_event.set_source_id(Arc::new(OutputId::from("in")));
 
         let event = events.remove(0);
         assert_eq!(original_event, event);
@@ -62,7 +69,7 @@ async fn test_function_transform_single_event() {
 #[tokio::test]
 async fn test_sync_transform_single_event() {
     assert_transform_compliance(async {
-        let original_event = Event::Log(LogEvent::from("function transform being tested"));
+        let mut original_event = Event::Log(LogEvent::from("function transform being tested"));
 
         let (topology, rx) =
             create_topology(original_event.clone(), TransformType::Synchronous).await;
@@ -71,6 +78,8 @@ async fn test_sync_transform_single_event() {
         let events = rx.await.expect("must get back event from rx");
         let mut events = events.into_events().collect::<Vec<_>>();
         assert_eq!(events.len(), 1);
+
+        original_event.set_source_id(Arc::new(OutputId::from("in")));
 
         let event = events.remove(0);
         assert_eq!(original_event, event);
@@ -81,7 +90,7 @@ async fn test_sync_transform_single_event() {
 #[tokio::test]
 async fn test_task_transform_single_event() {
     assert_transform_compliance(async {
-        let original_event = Event::Log(LogEvent::from("function transform being tested"));
+        let mut original_event = Event::Log(LogEvent::from("function transform being tested"));
 
         let (topology, rx) = create_topology(original_event.clone(), TransformType::Task).await;
         topology.stop().await;
@@ -89,6 +98,8 @@ async fn test_task_transform_single_event() {
         let events = rx.await.expect("must get back event from rx");
         let mut events = events.into_events().collect::<Vec<_>>();
         assert_eq!(events.len(), 1);
+
+        original_event.set_source_id(Arc::new(OutputId::from("in")));
 
         let event = events.remove(0);
         assert_eq!(original_event, event);

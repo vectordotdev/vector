@@ -5,12 +5,12 @@ use bytes::Bytes;
 use chrono::{DateTime, Duration, Utc};
 use futures::stream;
 use lookup::owned_value_path;
-use value::{kind::Collection, Kind};
 use vector_common::encode_logfmt;
 use vector_core::{
     config::LogNamespace,
     event::{BatchNotifier, BatchStatus, Event, LogEvent},
 };
+use vrl::value::{kind::Collection, Kind};
 
 use super::config::{LokiConfig, OutOfOrderAction};
 use crate::{

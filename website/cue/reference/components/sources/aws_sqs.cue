@@ -29,7 +29,7 @@ components: sources: aws_sqs: components._aws & {
 		commonly_used: true
 		deployment_roles: ["aggregator"]
 		delivery:      "at_least_once"
-		development:   "beta"
+		development:   "stable"
 		egress_method: "stream"
 		stateful:      false
 	}

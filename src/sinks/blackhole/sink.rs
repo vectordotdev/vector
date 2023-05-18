@@ -89,8 +89,8 @@ impl StreamSink<EventArray> for BlackholeSink {
 
             let message_len = events.estimated_json_encoded_size_of();
 
-            let _ = self.total_events.fetch_add(events.len(), Ordering::AcqRel);
-            let _ = self
+            _ = self.total_events.fetch_add(events.len(), Ordering::AcqRel);
+            _ = self
                 .total_raw_bytes
                 .fetch_add(message_len, Ordering::AcqRel);
 
@@ -99,7 +99,7 @@ impl StreamSink<EventArray> for BlackholeSink {
         }
 
         // Notify the reporting task to shutdown.
-        let _ = shutdown.send(());
+        _ = shutdown.send(());
 
         Ok(())
     }

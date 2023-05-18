@@ -15,7 +15,6 @@ use serde::Serialize;
 use serde_json::{de::Read as JsonRead, Deserializer, Value as JsonValue};
 use snafu::Snafu;
 use tracing::Span;
-use value::{kind::Collection, Kind};
 use vector_common::internal_event::{CountByteSize, InternalEventHandle as _, Registered};
 use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
@@ -24,6 +23,7 @@ use vector_core::{
     event::BatchNotifier,
     EstimatedJsonEncodedSizeOf,
 };
+use vrl::value::{kind::Collection, Kind};
 use warp::{filters::BoxedFilter, path, reject::Rejection, reply::Response, Filter, Reply};
 
 use self::{
@@ -2169,7 +2169,7 @@ mod tests {
         .unwrap();
         assert_eq!("Success", event_res.text.as_str());
         assert_eq!(0, event_res.code);
-        let _ = collect_n(source, 1).await;
+        _ = collect_n(source, 1).await;
 
         let ack_message = serde_json::to_string(&HecAckStatusRequest {
             acks: vec![event_res.ack_id],
@@ -2214,7 +2214,7 @@ mod tests {
         .unwrap();
         assert_eq!("Success", event_res.text.as_str());
         assert_eq!(0, event_res.code);
-        let _ = collect_n(source, 1).await;
+        _ = collect_n(source, 1).await;
 
         let ack_message = serde_json::to_string(&HecAckStatusRequest {
             acks: vec![event_res.ack_id],
@@ -2257,7 +2257,7 @@ mod tests {
         .json::<HecAckEventResponse>()
         .await
         .unwrap();
-        let _ = collect_n(source, 1).await;
+        _ = collect_n(source, 1).await;
 
         let ack_message = serde_json::to_string(&HecAckStatusRequest {
             acks: vec![event_res.ack_id],
@@ -2363,7 +2363,7 @@ mod tests {
         .json::<HecAckEventResponse>()
         .await
         .unwrap();
-        let _ = collect_n(source, 11).await;
+        _ = collect_n(source, 11).await;
 
         let ack_message_dropped = serde_json::to_string(&HecAckStatusRequest {
             acks: (0..10).collect::<Vec<u64>>(),

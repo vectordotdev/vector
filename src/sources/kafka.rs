@@ -24,13 +24,13 @@ use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::FramedRead;
 
-use value::{kind::Collection, Kind};
 use vector_common::finalizer::OrderedFinalizer;
 use vector_config::configurable_component;
 use vector_core::{
     config::{LegacyKey, LogNamespace},
     EstimatedJsonEncodedSizeOf,
 };
+use vrl::value::{kind::Collection, Kind};
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
@@ -392,6 +392,7 @@ async fn kafka_source(
 
     loop {
         tokio::select! {
+            biased;
             _ = &mut shutdown => break,
             entry = ack_stream.next() => if let Some((status, entry)) = entry {
                 if status == BatchStatus::Delivered {
@@ -424,7 +425,7 @@ async fn kafka_source(
     if let Ok(current_assignment) = consumer.assignment() {
         // not logging on error because it will error if there are no offsets stored for a partition,
         // and this is best-effort cleanup anyway
-        let _ = consumer.commit(&current_assignment, CommitMode::Sync);
+        _ = consumer.commit(&current_assignment, CommitMode::Sync);
     }
     Ok(())
 }
@@ -912,6 +913,7 @@ mod integration_test {
     use tokio::time::sleep;
     use vector_buffers::topology::channel::BufferReceiver;
     use vector_core::event::EventStatus;
+    use vrl::value::value;
 
     use super::{test::*, *};
     use crate::{
@@ -1066,7 +1068,7 @@ mod integration_test {
 
                 assert_eq!(
                     meta.get(path!("vector", "source_type")).unwrap(),
-                    &vrl::value!(KafkaSourceConfig::NAME)
+                    &value!(KafkaSourceConfig::NAME)
                 );
                 assert!(meta
                     .get(path!("vector", "ingest_timestamp"))
@@ -1075,20 +1077,20 @@ mod integration_test {
 
                 assert_eq!(
                     event.as_log().value(),
-                    &vrl::value!(format!("{} {:03}", TEXT, i))
+                    &value!(format!("{} {:03}", TEXT, i))
                 );
                 assert_eq!(
                     meta.get(path!("kafka", "message_key")).unwrap(),
-                    &vrl::value!(format!("{} {}", KEY, i))
+                    &value!(format!("{} {}", KEY, i))
                 );
 
                 assert_eq!(
                     meta.get(path!("kafka", "timestamp")).unwrap(),
-                    &vrl::value!(now.trunc_subsecs(3))
+                    &value!(now.trunc_subsecs(3))
                 );
                 assert_eq!(
                     meta.get(path!("kafka", "topic")).unwrap(),
-                    &vrl::value!(topic.clone())
+                    &value!(topic.clone())
                 );
                 assert!(meta.get(path!("kafka", "partition")).unwrap().is_integer(),);
                 assert!(meta.get(path!("kafka", "offset")).unwrap().is_integer(),);

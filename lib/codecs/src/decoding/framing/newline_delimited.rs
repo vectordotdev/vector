@@ -34,7 +34,7 @@ pub struct NewlineDelimitedDecoderOptions {
     /// consider setting the maximum length to a reasonably large value as a safety net. This
     /// ensures that processing is not actually unbounded.
     #[serde(skip_serializing_if = "vector_core::serde::skip_serializing_if_default")]
-    max_length: Option<usize>,
+    pub max_length: Option<usize>,
 }
 
 impl NewlineDelimitedDecoderOptions {

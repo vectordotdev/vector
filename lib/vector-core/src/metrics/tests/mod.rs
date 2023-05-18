@@ -6,7 +6,7 @@ use crate::event::Event;
 #[ignore]
 #[test]
 fn test_labels_injection() {
-    let _ = super::init();
+    _ = super::init();
 
     let span = span!(
         Level::ERROR,
@@ -46,7 +46,7 @@ fn test_labels_injection() {
 
 #[test]
 fn test_cardinality_metric() {
-    let _ = super::init();
+    _ = super::init();
 
     let capture_value = || {
         let metric = super::Controller::get()

@@ -117,6 +117,7 @@ mod tests {
     };
     use futures::StreamExt;
     use lookup::path;
+    use vrl::value::value;
 
     #[test]
     fn generate_config() {
@@ -180,10 +181,10 @@ mod tests {
             let log = event.as_log();
             let meta = log.metadata().value();
 
-            assert_eq!(&vrl::value!("hello world"), log.value());
+            assert_eq!(&value!("hello world"), log.value());
             assert_eq!(
                 meta.get(path!("vector", "source_type")).unwrap(),
-                &vrl::value!("stdin")
+                &value!("stdin")
             );
             assert!(meta
                 .get(path!("vector", "ingest_timestamp"))
@@ -194,7 +195,7 @@ mod tests {
             let event = event.unwrap();
             let log = event.as_log();
 
-            assert_eq!(&vrl::value!("hello world again"), log.value());
+            assert_eq!(&value!("hello world again"), log.value());
 
             let event = stream.next().await;
             assert!(event.is_none());

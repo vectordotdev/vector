@@ -22,6 +22,7 @@ use vector_core::{
     config::{LegacyKey, LogNamespace, SourceAcknowledgementsConfig},
     EstimatedJsonEncodedSizeOf,
 };
+use vrl::value::Value;
 
 use self::request_limiter::RequestLimiter;
 use super::SocketListenAddr;
@@ -143,7 +144,7 @@ where
 
             let tripwire = cx.shutdown.clone();
             let tripwire = async move {
-                let _ = tripwire.await;
+                _ = tripwire.await;
                 sleep(shutdown_timeout_secs).await;
             }
             .shared();
@@ -363,7 +364,7 @@ async fn handle_stream<T>(
 
 
                         if let Some(certificate_metadata) = &certificate_metadata {
-                            let mut metadata: BTreeMap<String, value::Value> = BTreeMap::new();
+                            let mut metadata: BTreeMap<String, Value> = BTreeMap::new();
                             metadata.insert("subject".to_string(), certificate_metadata.subject().into());
                             for event in &mut events {
                                 let log = event.as_mut_log();

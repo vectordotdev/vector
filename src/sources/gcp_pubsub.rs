@@ -20,13 +20,13 @@ use tonic::{
     transport::{Certificate, ClientTlsConfig, Endpoint, Identity},
     Code, Request, Status,
 };
-use value::{kind::Collection, Kind};
 use vector_common::internal_event::{
     ByteSize, BytesReceived, EventsReceived, InternalEventHandle as _, Protocol, Registered,
 };
 use vector_common::{byte_size_of::ByteSizeOf, finalizer::UnorderedFinalizer};
 use vector_config::configurable_component;
 use vector_core::config::{LegacyKey, LogNamespace};
+use vrl::value::{kind::Collection, Kind};
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
@@ -61,6 +61,8 @@ type Finalizer = UnorderedFinalizer<Vec<String>>;
 // objects, which causes a clippy ding on this block. We don't
 // directly control the generated code, so allow this lint here.
 #[allow(clippy::clone_on_ref_ptr)]
+// https://github.com/hyperium/tonic/issues/1350
+#[allow(clippy::missing_const_for_fn)]
 #[allow(warnings)]
 mod proto {
     include!(concat!(env!("OUT_DIR"), "/google.pubsub.v1.rs"));
@@ -839,7 +841,7 @@ mod integration_tests {
     use once_cell::sync::Lazy;
     use serde_json::{json, Value};
     use tokio::time::{Duration, Instant};
-    use value::btreemap;
+    use vrl::value::btreemap;
 
     use super::*;
     use crate::config::{ComponentKey, ProxyConfig};

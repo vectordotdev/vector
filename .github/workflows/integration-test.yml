@@ -89,10 +89,9 @@ jobs:
           - test: 'shutdown'
           - test: 'splunk'
           - test: 'webhdfs'
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v3
-      - run: make ci-sweep
       - run: sudo npm -g install @datadog/datadog-ci
       - run: make test-integration-${{ matrix.test }}
         env:

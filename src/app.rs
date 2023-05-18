@@ -129,7 +129,7 @@ impl ApplicationConfig {
                 }
                 Err(e) => {
                     error!("An error occurred that Vector couldn't handle: {}.", e);
-                    let _ = self.graceful_crash_sender.send(());
+                    _ = self.graceful_crash_sender.send(());
                     None
                 }
             }
@@ -154,7 +154,7 @@ impl Application {
     pub fn prepare() -> Result<(Runtime, Self), ExitCode> {
         let opts = Opts::get_matches().map_err(|error| {
             // Printing to stdout/err can itself fail; ignore it.
-            let _ = error.print();
+            _ = error.print();
             exitcode::USAGE
         })?;
 

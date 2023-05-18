@@ -14,9 +14,9 @@ use serde_with::serde_as;
 use snafu::ResultExt as _;
 use tokio::time::{sleep, Duration, Instant};
 use tracing::Instrument;
-use value::Kind;
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
+use vrl::value::Kind;
 
 use crate::config::OutputId;
 use crate::{
@@ -246,6 +246,7 @@ impl TransformConfig for Ec2Metadata {
 
     fn outputs(
         &self,
+        _: enrichment::TableRegistry,
         input_definitions: &[(OutputId, schema::Definition)],
         _: LogNamespace,
     ) -> Vec<TransformOutput> {
@@ -722,7 +723,8 @@ mod integration_tests {
         transforms::test::create_topology,
     };
     use std::collections::BTreeMap;
-    use value::Value;
+    use vector_common::assert_event_data_eq;
+    use vrl::value::Value;
     use warp::Filter;
 
     fn ec2_metadata_address() -> String {
@@ -850,7 +852,7 @@ mod integration_tests {
             tx.send(log.into()).await.unwrap();
 
             let event = out.recv().await.unwrap();
-            assert_eq!(event.into_log(), expected_log);
+            assert_event_data_eq!(event.into_log(), expected_log);
 
             drop(tx);
             topology.stop().await;
@@ -951,7 +953,7 @@ mod integration_tests {
             tx.send(metric.into()).await.unwrap();
 
             let event = out.recv().await.unwrap();
-            assert_eq!(event.into_metric(), expected_metric);
+            assert_event_data_eq!(event.into_metric(), expected_metric);
 
             drop(tx);
             topology.stop().await;
@@ -996,7 +998,7 @@ mod integration_tests {
             tx.send(log.into()).await.unwrap();
 
             let event = out.recv().await.unwrap();
-            assert_eq!(event.into_log(), expected_log);
+            assert_event_data_eq!(event.into_log(), expected_log);
 
             drop(tx);
             topology.stop().await;
@@ -1040,7 +1042,7 @@ mod integration_tests {
             tx.send(metric.into()).await.unwrap();
 
             let event = out.recv().await.unwrap();
-            assert_eq!(event.into_metric(), expected_metric);
+            assert_event_data_eq!(event.into_metric(), expected_metric);
 
             drop(tx);
             topology.stop().await;

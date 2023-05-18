@@ -255,7 +255,7 @@ impl MetricCollector for StringCollector {
         result.push_str(name);
         result.push_str(suffix);
         Self::encode_tags(result, tags, extra);
-        let _ = match timestamp_millis {
+        _ = match timestamp_millis {
             None => writeln!(result, " {}", value),
             Some(timestamp) => writeln!(result, " {} {}", value, timestamp),
         };

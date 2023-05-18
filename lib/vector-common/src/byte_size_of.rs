@@ -7,7 +7,7 @@ use bytes::{Bytes, BytesMut};
 use chrono::{DateTime, Utc};
 use serde_json::{value::RawValue, Value as JsonValue};
 use smallvec::SmallVec;
-use value::Value;
+use vrl::value::Value;
 
 pub trait ByteSizeOf {
     /// Returns the in-memory size of this type

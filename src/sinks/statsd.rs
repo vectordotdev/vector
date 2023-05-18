@@ -105,7 +105,7 @@ fn default_address() -> SocketAddr {
 
 impl GenerateConfig for StatsdSinkConfig {
     fn generate_config() -> toml::Value {
-        toml::Value::try_from(&Self {
+        toml::Value::try_from(Self {
             default_namespace: None,
             mode: Mode::Udp(StatsdUdpConfig {
                 batch: Default::default(),

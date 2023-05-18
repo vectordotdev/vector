@@ -14,8 +14,8 @@ dashmap = { version = "5.2.0", default-features = false }
 [dev-dependencies]
 criterion = "0.4"
 tracing = "0.1.34"
-mock_instant = { version = "0.2" }
-tracing-subscriber = { version = "0.3.16", default-features = false, features = ["env-filter", "fmt"] }
+mock_instant = { version = "0.3" }
+tracing-subscriber = { version = "0.3.17", default-features = false, features = ["env-filter", "fmt"] }
 
 [[bench]]
 name = "limit"

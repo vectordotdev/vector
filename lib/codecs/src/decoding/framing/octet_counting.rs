@@ -38,7 +38,7 @@ impl OctetCountingDecoderConfig {
 pub struct OctetCountingDecoderOptions {
     /// The maximum length of the byte buffer.
     #[serde(skip_serializing_if = "vector_core::serde::skip_serializing_if_default")]
-    max_length: Option<usize>,
+    pub max_length: Option<usize>,
 }
 
 /// Codec using the `Octet Counting` format as specified in
@@ -406,7 +406,7 @@ mod tests {
         let mut buffer = BytesMut::with_capacity(32);
 
         buffer.put(&b"32thisshouldbelongerthanthmaxframeasizewhichmeansthesyslogparserwillnotbeabletodecodeit"[..]);
-        let _ = decoder.decode(&mut buffer);
+        _ = decoder.decode(&mut buffer);
 
         assert_eq!(decoder.octet_decoding, Some(State::DiscardingToEol));
         buffer.put(&b"wemustcontinuetodiscard\n32 something valid"[..]);

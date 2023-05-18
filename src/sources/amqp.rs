@@ -24,7 +24,6 @@ use lookup::{lookup_v2::OptionalValuePath, metadata_path, owned_value_path, path
 use snafu::Snafu;
 use std::{io::Cursor, pin::Pin};
 use tokio_util::codec::FramedRead;
-use value::Kind;
 use vector_common::{
     finalizer::UnorderedFinalizer,
     internal_event::{CountByteSize, EventsReceived, InternalEventHandle as _},
@@ -35,6 +34,7 @@ use vector_core::{
     event::Event,
     EstimatedJsonEncodedSizeOf,
 };
+use vrl::value::Kind;
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -495,8 +495,8 @@ async fn handle_ack(status: BatchStatus, entry: FinalizerEntry) {
 #[cfg(test)]
 pub mod test {
     use lookup::OwnedTargetPath;
-    use value::kind::Collection;
     use vector_core::schema::Definition;
+    use vrl::value::kind::Collection;
 
     use super::*;
 

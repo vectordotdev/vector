@@ -6,13 +6,13 @@ use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 use std::collections::BTreeMap;
 use syslog_loose::{IncompleteDate, Message, ProcId, Protocol};
-use value::{kind::Collection, Kind};
 use vector_core::config::{LegacyKey, LogNamespace};
 use vector_core::{
     config::{log_schema, DataType},
     event::{Event, LogEvent, Value},
     schema,
 };
+use vrl::value::{kind::Collection, Kind};
 
 use super::Deserializer;
 

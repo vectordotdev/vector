@@ -4,9 +4,9 @@ use bytes::Bytes;
 use futures::{FutureExt, SinkExt};
 use http::{Request, StatusCode, Uri};
 use serde_json::json;
-use value::Kind;
 use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
+use vrl::value::{Kind, Value};
 
 use crate::{
     codecs::Transformer,
@@ -251,7 +251,7 @@ impl HttpEventEncoder<PartitionInnerBuffer<serde_json::Value, PartitionKey>> for
             .and_then(|path| log.remove(path.as_str()))
             .unwrap_or_else(|| String::from("").into());
 
-        let timestamp: value::Value = log
+        let timestamp: Value = log
             .timestamp_path()
             .and_then(|path| log.remove(path.as_str()))
             .unwrap_or_else(|| chrono::Utc::now().into());
@@ -471,7 +471,7 @@ mod tests {
         .unwrap();
 
         // Make sure we can build the config
-        let _ = config.build(cx.clone()).await.unwrap();
+        _ = config.build(cx.clone()).await.unwrap();
 
         let addr = next_addr();
         // Swap out the host so we can force send it

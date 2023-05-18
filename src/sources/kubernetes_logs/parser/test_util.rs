@@ -3,13 +3,13 @@ use similar_asserts::assert_eq;
 
 use chrono::{DateTime, Utc};
 use lookup::{event_path, metadata_path};
-use value::Value;
 use vector_core::{config::LogNamespace, event};
+use vrl::value::{value, Value};
 
 use crate::{
     event::{Event, LogEvent},
     sources::kubernetes_logs::Config,
-    transforms::{OutputBuffer, Transform},
+    transforms::{FunctionTransform, OutputBuffer},
 };
 
 /// Build a log event for test purposes.
@@ -29,7 +29,7 @@ pub fn make_log_event(
 
     let log = match log_namespace {
         LogNamespace::Vector => {
-            let mut log = LogEvent::from(vrl::value!(message));
+            let mut log = LogEvent::from(value!(message));
             log.insert(metadata_path!(Config::NAME, "timestamp"), timestamp);
             log.insert(metadata_path!(Config::NAME, "stream"), stream);
             if is_partial {
@@ -58,15 +58,15 @@ pub fn make_log_event(
 /// Shared logic for testing parsers.
 ///
 /// Takes a parser builder and a list of test cases.
-pub fn test_parser<B, L, S>(builder: B, loader: L, cases: Vec<(S, Vec<Event>)>)
+pub fn test_parser<B, L, S, F>(builder: B, loader: L, cases: Vec<(S, Vec<Event>)>)
 where
-    B: Fn() -> Transform,
+    B: Fn() -> F,
+    F: FunctionTransform,
     L: Fn(S) -> Event,
 {
     for (message, expected) in cases {
         let input = loader(message);
         let mut parser = (builder)();
-        let parser = parser.as_function();
         let mut output = OutputBuffer::default();
         parser.transform(&mut output, input);
 

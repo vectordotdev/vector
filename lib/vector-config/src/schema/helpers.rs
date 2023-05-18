@@ -12,7 +12,10 @@ use crate::{
     num::ConfigurableNumber, Configurable, ConfigurableRef, GenerateError, Metadata, ToValue,
 };
 
-use super::visitors::{DisallowUnevaluatedPropertiesVisitor, InlineSingleUseReferencesVisitor};
+use super::visitors::{
+    DisallowUnevaluatedPropertiesVisitor, GenerateHumanFriendlyNameVisitor,
+    InlineSingleUseReferencesVisitor,
+};
 
 /// Applies metadata to the given schema.
 ///
@@ -483,6 +486,7 @@ pub fn default_schema_settings() -> SchemaSettings {
     SchemaSettings::new()
         .with_visitor(InlineSingleUseReferencesVisitor::from_settings)
         .with_visitor(DisallowUnevaluatedPropertiesVisitor::from_settings)
+        .with_visitor(GenerateHumanFriendlyNameVisitor::from_settings)
 }
 
 pub fn generate_root_schema<T>() -> Result<RootSchema, GenerateError>

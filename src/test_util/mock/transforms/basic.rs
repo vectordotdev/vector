@@ -1,7 +1,6 @@
 use std::collections::BTreeSet;
 
 use async_trait::async_trait;
-use value::Value;
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
 use vector_core::{
@@ -13,6 +12,7 @@ use vector_core::{
     schema,
     transform::{FunctionTransform, OutputBuffer, Transform},
 };
+use vrl::value::Value;
 
 use crate::config::{OutputId, TransformConfig, TransformContext};
 
@@ -51,6 +51,7 @@ impl TransformConfig for BasicTransformConfig {
 
     fn outputs(
         &self,
+        _: enrichment::TableRegistry,
         definitions: &[(OutputId, schema::Definition)],
         _: LogNamespace,
     ) -> Vec<TransformOutput> {

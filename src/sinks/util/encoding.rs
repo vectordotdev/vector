@@ -128,8 +128,8 @@ mod tests {
         CharacterDelimitedEncoder, JsonSerializerConfig, NewlineDelimitedEncoder,
         TextSerializerConfig,
     };
-    use value::Value;
     use vector_core::event::LogEvent;
+    use vrl::value::Value;
 
     use super::*;
 

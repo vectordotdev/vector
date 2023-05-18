@@ -14,10 +14,11 @@ use crate::{
         mock::{
             basic_sink, basic_sink_failing_healthcheck, basic_sink_with_data, basic_source,
             basic_source_with_data, basic_source_with_event_counter, basic_transform,
+            error_definition_transform,
         },
         start_topology, trace_init,
     },
-    topology,
+    topology::{self, builder},
 };
 use futures::{future, stream, StreamExt};
 use tokio::{
@@ -25,6 +26,7 @@ use tokio::{
     time::{sleep, Duration},
 };
 use vector_buffers::{BufferConfig, BufferType, WhenFull};
+use vector_core::config::OutputId;
 
 mod backpressure;
 mod compliance;
@@ -139,12 +141,14 @@ async fn topology_source_and_sink() {
 
     let (topology, _) = start_topology(config.build().unwrap(), false).await;
 
-    let event = Event::Log(LogEvent::from("this"));
+    let mut event = Event::Log(LogEvent::from("this"));
     in1.send_event(event.clone()).await.unwrap();
 
     topology.stop().await;
 
     let res = out1.flat_map(into_event_stream).collect::<Vec<_>>().await;
+
+    event.set_source_id(Arc::new(OutputId::from("in1")));
 
     assert_eq!(vec![event], res);
 }
@@ -164,8 +168,8 @@ async fn topology_multiple_sources() {
 
     let (topology, _) = start_topology(config.build().unwrap(), false).await;
 
-    let event1 = Event::Log(LogEvent::from("this"));
-    let event2 = Event::Log(LogEvent::from("that"));
+    let mut event1 = Event::Log(LogEvent::from("this"));
+    let mut event2 = Event::Log(LogEvent::from("that"));
 
     in1.send_event(event1.clone()).await.unwrap();
 
@@ -176,6 +180,9 @@ async fn topology_multiple_sources() {
     let out_event2 = out1.next().await;
 
     topology.stop().await;
+
+    event1.set_source_id(Arc::new(OutputId::from("in1")));
+    event2.set_source_id(Arc::new(OutputId::from("in2")));
 
     assert_eq!(out_event1, Some(event1.into()));
     assert_eq!(out_event2, Some(event2.into()));
@@ -198,7 +205,7 @@ async fn topology_multiple_sinks() {
     let (topology, _) = start_topology(config.build().unwrap(), false).await;
 
     // Send an event into source #1:
-    let event = Event::Log(LogEvent::from("this"));
+    let mut event = Event::Log(LogEvent::from("this"));
     in1.send_event(event.clone()).await.unwrap();
 
     // Drop the inputs to the two sources, which will ensure they drain all items and stop
@@ -210,6 +217,7 @@ async fn topology_multiple_sinks() {
     let res2 = out2.flat_map(into_event_stream).collect::<Vec<_>>().await;
 
     // We should see that both sinks got the exact same event:
+    event.set_source_id(Arc::new(OutputId::from("in1")));
     let expected = vec![event];
     assert_eq!(expected, res1);
     assert_eq!(expected, res2);
@@ -270,7 +278,7 @@ async fn topology_remove_one_source() {
         .unwrap());
 
     // Send an event into both source #1 and source #2:
-    let event1 = Event::Log(LogEvent::from("this"));
+    let mut event1 = Event::Log(LogEvent::from("this"));
     let event2 = Event::Log(LogEvent::from("that"));
     let h_out1 = tokio::spawn(out1.flat_map(into_event_stream).collect::<Vec<_>>());
 
@@ -282,6 +290,8 @@ async fn topology_remove_one_source() {
     drop(in1);
     drop(in2);
     topology.stop().await;
+
+    event1.set_source_id(Arc::new(OutputId::from("in1")));
 
     let res = h_out1.await.unwrap();
     assert_eq!(vec![event1], res);
@@ -311,7 +321,7 @@ async fn topology_remove_one_sink() {
         .await
         .unwrap());
 
-    let event = Event::Log(LogEvent::from("this"));
+    let mut event = Event::Log(LogEvent::from("this"));
 
     in1.send_event(event.clone()).await.unwrap();
 
@@ -319,6 +329,8 @@ async fn topology_remove_one_sink() {
 
     let res1 = out1.flat_map(into_event_stream).collect::<Vec<_>>().await;
     let res2 = out2.flat_map(into_event_stream).collect::<Vec<_>>().await;
+
+    event.set_source_id(Arc::new(OutputId::from("in1")));
 
     assert_eq!(vec![event], res1);
     assert_eq!(Vec::<Event>::new(), res2);
@@ -408,7 +420,7 @@ async fn topology_swap_source() {
 
     // Send an event into both source #1 and source #2:
     let event1 = Event::Log(LogEvent::from("this"));
-    let event2 = Event::Log(LogEvent::from("that"));
+    let mut event2 = Event::Log(LogEvent::from("that"));
 
     let h_out1 = tokio::spawn(out1.flat_map(into_event_stream).collect::<Vec<_>>());
     let h_out2 = tokio::spawn(out2.flat_map(into_event_stream).collect::<Vec<_>>());
@@ -428,6 +440,8 @@ async fn topology_swap_source() {
     // the sink at `out1` was initially connected to -- does not send to either sink #1 or sink #2,
     // as we've removed it from the topology prior to the sends.
     assert_eq!(Vec::<Event>::new(), res1);
+
+    event2.set_source_id(Arc::new(OutputId::from("in2")));
     assert_eq!(vec![event2], res2);
 }
 
@@ -517,7 +531,7 @@ async fn topology_swap_sink() {
         .unwrap());
 
     // Send an event into both source #1 and source #2:
-    let event1 = Event::Log(LogEvent::from("this"));
+    let mut event1 = Event::Log(LogEvent::from("this"));
     let event2 = Event::Log(LogEvent::from("that"));
 
     let h_out1 = tokio::spawn(out1.flat_map(into_event_stream).collect::<Vec<_>>());
@@ -538,6 +552,8 @@ async fn topology_swap_sink() {
     // that source #1 was not rebuilt, so the item sent to source #1 was the item that got sent to
     // the new sink, which _was_ rebuilt:
     assert_eq!(Vec::<Event>::new(), res1);
+
+    event1.set_source_id(Arc::new(OutputId::from("in1")));
     assert_eq!(vec![event1], res2);
 }
 
@@ -633,8 +649,8 @@ async fn topology_rebuild_connected() {
         .await
         .unwrap());
 
-    let event1 = Event::Log(LogEvent::from("this"));
-    let event2 = Event::Log(LogEvent::from("that"));
+    let mut event1 = Event::Log(LogEvent::from("this"));
+    let mut event2 = Event::Log(LogEvent::from("that"));
     let h_out1 = tokio::spawn(out1.flat_map(into_event_stream).collect::<Vec<_>>());
     in1.send_event(event1.clone()).await.unwrap();
     in1.send_event(event2.clone()).await.unwrap();
@@ -643,6 +659,10 @@ async fn topology_rebuild_connected() {
     topology.stop().await;
 
     let res = h_out1.await.unwrap();
+
+    event1.set_source_id(Arc::new(OutputId::from("in1")));
+    event2.set_source_id(Arc::new(OutputId::from("in1")));
+
     assert_eq!(vec![event1, event2], res);
 }
 
@@ -679,7 +699,7 @@ async fn topology_rebuild_connected_transform() {
         .await
         .unwrap());
 
-    let event = Event::Log(LogEvent::from("this"));
+    let mut event = Event::Log(LogEvent::from("this"));
     let h_out1 = tokio::spawn(out1.flat_map(into_event_stream).collect::<Vec<_>>());
     let h_out2 = tokio::spawn(out2.flat_map(into_event_stream).collect::<Vec<_>>());
 
@@ -693,6 +713,9 @@ async fn topology_rebuild_connected_transform() {
     let res1 = h_out1.await.unwrap();
     let res2 = h_out2.await.unwrap();
     assert_eq!(Vec::<Event>::new(), res1);
+
+    event.set_source_id(Arc::new(OutputId::from("in1")));
+
     assert_eq!(vec![event], res2);
 }
 
@@ -817,4 +840,68 @@ async fn topology_disk_buffer_flushes_on_idle() {
     // make sure there are no unexpected stragglers
     let rest = out1.collect::<Vec<_>>().await;
     assert_eq!(rest, vec![]);
+}
+
+#[tokio::test]
+async fn topology_transform_error_definition() {
+    trace_init();
+
+    let mut config = Config::builder();
+
+    config.add_source("in", basic_source().1);
+    config.add_transform("transform", &["in"], error_definition_transform());
+    config.add_sink("sink", &["transform"], basic_sink(10).1);
+
+    let config = config.build().unwrap();
+    let diff = ConfigDiff::initial(&config);
+    let errors = match builder::build_pieces(&config, &diff, HashMap::new()).await {
+        Ok(_) => panic!("build pieces should not succeed"),
+        Err(err) => err,
+    };
+
+    assert_eq!(
+        r#"Transform "transform": It all went horribly wrong"#,
+        errors[0]
+    );
+}
+
+#[tokio::test]
+async fn source_metadata_reaches_sink() {
+    trace_init();
+
+    let (mut in1, source1) = basic_source();
+    let (mut in2, source2) = basic_source();
+    let (mut out1, sink1) = basic_sink(10);
+
+    let mut config = Config::builder();
+    config.add_source("in1", source1);
+    config.add_source("in2", source2);
+    config.add_transform("transform", &["in1", "in2"], basic_transform("", 0.0));
+    config.add_sink("out1", &["transform"], sink1);
+
+    let (topology, _) = start_topology(config.build().unwrap(), false).await;
+
+    let event1 = Event::Log(LogEvent::from("this"));
+    let event2 = Event::Log(LogEvent::from("that"));
+
+    in1.send_event(event1.clone()).await.unwrap();
+
+    let out_event1 = out1.next().await.unwrap();
+    let out_event1 = out_event1.iter_events().next().unwrap();
+
+    in2.send_event(event2.clone()).await.unwrap();
+
+    let out_event2 = out1.next().await.unwrap();
+    let out_event2 = out_event2.iter_events().next().unwrap();
+
+    topology.stop().await;
+
+    assert_eq!(
+        out_event1.into_log().metadata().source_id().unwrap(),
+        &OutputId::from("in1")
+    );
+    assert_eq!(
+        out_event2.into_log().metadata().source_id().unwrap(),
+        &OutputId::from("in2")
+    );
 }

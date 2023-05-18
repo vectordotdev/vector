@@ -11,19 +11,19 @@ use codecs::MetricTagValues;
 use lookup::lookup_v2::{parse_value_path, ValuePath};
 use lookup::{metadata_path, owned_value_path, path, OwnedTargetPath, PathPrefix};
 use snafu::{ResultExt, Snafu};
-use value::Kind;
 use vector_common::TimeZone;
 use vector_config::configurable_component;
 use vector_core::compile_vrl;
 use vector_core::config::LogNamespace;
 use vector_core::schema::Definition;
 use vector_vrl_functions::set_semantic_meaning::MeaningList;
-use vrl::prelude::state::TypeState;
-use vrl::{
-    diagnostic::{Formatter, Note},
-    prelude::{DiagnosticMessage, ExpressionError},
-    CompileConfig, Program, Runtime, Terminate, VrlRuntime,
-};
+use vrl::compiler::runtime::{Runtime, Terminate};
+use vrl::compiler::state::ExternalEnv;
+use vrl::compiler::{CompileConfig, ExpressionError, Function, Program, TypeState, VrlRuntime};
+use vrl::diagnostic::{DiagnosticMessage, Formatter, Note};
+use vrl::value::kind::merge::{CollisionStrategy, Strategy};
+use vrl::value::kind::Collection;
+use vrl::value::{Kind, Value};
 
 use crate::config::OutputId;
 use crate::{
@@ -141,12 +141,7 @@ impl RemapConfig {
         &self,
         enrichment_tables: enrichment::TableRegistry,
         merged_schema_definition: schema::Definition,
-    ) -> Result<(
-        vrl::Program,
-        String,
-        Vec<Box<dyn vrl::Function>>,
-        CompileConfig,
-    )> {
+    ) -> Result<(Program, String, Vec<Box<dyn Function>>, CompileConfig)> {
         let source = match (&self.source, &self.file) {
             (Some(source), None) => source.to_owned(),
             (None, Some(path)) => {
@@ -162,13 +157,13 @@ impl RemapConfig {
             _ => return Err(Box::new(BuildError::SourceAndOrFile)),
         };
 
-        let mut functions = vrl_stdlib::all();
+        let mut functions = vrl::stdlib::all();
         functions.append(&mut enrichment::vrl_functions());
         functions.append(&mut vector_vrl_functions::all());
 
         let state = TypeState {
             local: Default::default(),
-            external: vrl::state::ExternalEnv::new_with_kind(
+            external: ExternalEnv::new_with_kind(
                 merged_schema_definition.event_kind().clone(),
                 merged_schema_definition.metadata_kind().clone(),
             ),
@@ -226,6 +221,7 @@ impl TransformConfig for RemapConfig {
 
     fn outputs(
         &self,
+        enrichment_tables: enrichment::TableRegistry,
         input_definitions: &[(OutputId, schema::Definition)],
         _: LogNamespace,
     ) -> Vec<TransformOutput> {
@@ -239,7 +235,7 @@ impl TransformConfig for RemapConfig {
         // transform. We ignore any compilation errors, as those are caught by the transform build
         // step.
         let compiled = self
-            .compile_vrl_program(enrichment::TableRegistry::default(), merged_definition)
+            .compile_vrl_program(enrichment_tables, merged_definition)
             .map(|(program, _, _, external_context)| {
                 (
                     program.final_type_state(),
@@ -339,8 +335,14 @@ impl TransformConfig for RemapConfig {
                 );
             }
 
-            default_definitions.insert(output_id.clone(), default_definition);
-            dropped_definitions.insert(output_id.clone(), dropped_definition);
+            default_definitions.insert(
+                output_id.clone(),
+                move_field_definitions_into_message(merge_array_definitions(default_definition)),
+            );
+            dropped_definitions.insert(
+                output_id.clone(),
+                move_field_definitions_into_message(merge_array_definitions(dropped_definition)),
+            );
         }
 
         let default_output = TransformOutput::new(DataType::all(), default_definitions);
@@ -383,7 +385,7 @@ pub trait VrlRunner {
         target: &mut VrlTarget,
         program: &Program,
         timezone: &TimeZone,
-    ) -> std::result::Result<value::Value, Terminate>;
+    ) -> std::result::Result<Value, Terminate>;
 }
 
 #[derive(Debug)]
@@ -405,7 +407,7 @@ impl VrlRunner for AstRunner {
         target: &mut VrlTarget,
         program: &Program,
         timezone: &TimeZone,
-    ) -> std::result::Result<value::Value, Terminate> {
+    ) -> std::result::Result<Value, Terminate> {
         let result = self.runtime.resolve(target, program, timezone);
         self.runtime.clear();
         result
@@ -540,7 +542,7 @@ where
         }
     }
 
-    fn run_vrl(&mut self, target: &mut VrlTarget) -> std::result::Result<value::Value, Terminate> {
+    fn run_vrl(&mut self, target: &mut VrlTarget) -> std::result::Result<Value, Terminate> {
         self.runner.run(target, &self.program, &self.timezone)
     }
 }
@@ -650,6 +652,58 @@ fn push_dropped(
     output.push_named(DROPPED, event)
 }
 
+/// If the VRL returns a value that is not an array (see [`merge_array_definitions`]),
+/// or an object, that data is moved into the `message` field.
+fn move_field_definitions_into_message(mut definition: schema::Definition) -> schema::Definition {
+    let mut message = definition.event_kind().clone();
+    message.remove_object();
+    message.remove_array();
+
+    if !message.is_never() {
+        // We need to add the given message type to a field called `message`
+        // in the event.
+        let message = Kind::object(Collection::from(BTreeMap::from([(
+            log_schema().message_key().into(),
+            message,
+        )])));
+
+        definition.event_kind_mut().remove_bytes();
+        definition.event_kind_mut().remove_integer();
+        definition.event_kind_mut().remove_float();
+        definition.event_kind_mut().remove_boolean();
+        definition.event_kind_mut().remove_timestamp();
+        definition.event_kind_mut().remove_regex();
+        definition.event_kind_mut().remove_null();
+
+        *definition.event_kind_mut() = definition.event_kind().union(message);
+    }
+
+    definition
+}
+
+/// If the transform returns an array, the elements of this array will be separated
+/// out into it's individual elements and passed downstream.
+///
+/// The potential types that the transform can output are any of the arrays
+/// elements or any non-array elements that are within the definition. All these
+/// definitions need to be merged together.
+fn merge_array_definitions(mut definition: schema::Definition) -> schema::Definition {
+    if let Some(array) = definition.event_kind().as_array() {
+        let array_kinds = array.reduced_kind();
+
+        let kind = definition.event_kind_mut();
+        kind.remove_array();
+        kind.merge(
+            array_kinds,
+            Strategy {
+                collisions: CollisionStrategy::Union,
+            },
+        );
+    }
+
+    definition
+}
+
 #[derive(Debug, Snafu)]
 pub enum BuildError {
     #[snafu(display("must provide exactly one of `source` or `file` configuration"))]
@@ -663,11 +717,14 @@ pub enum BuildError {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
+    use std::collections::{HashMap, HashSet};
 
     use indoc::{formatdoc, indoc};
-    use value::btreemap;
     use vector_core::{config::GlobalOptions, event::EventMetadata, metric_tags};
+    use vrl::value::{
+        btreemap,
+        kind::{Collection, Index},
+    };
 
     use super::*;
     use crate::{
@@ -1446,6 +1503,7 @@ mod tests {
 
         assert_eq!(
             conf.outputs(
+                enrichment::TableRegistry::default(),
                 &[(
                     "test".into(),
                     schema::Definition::new_with_default_metadata(
@@ -1590,5 +1648,424 @@ mod tests {
             assert_eq!(out.recv().await, None);
         })
         .await
+    }
+
+    #[test]
+    fn test_field_definitions_in_message() {
+        let definition =
+            schema::Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Legacy]);
+        assert_eq!(
+            schema::Definition::new_with_default_metadata(
+                Kind::object(BTreeMap::from([("message".into(), Kind::bytes())])),
+                [LogNamespace::Legacy]
+            ),
+            move_field_definitions_into_message(definition)
+        );
+
+        // Test when a message field already exists.
+        let definition = schema::Definition::new_with_default_metadata(
+            Kind::object(BTreeMap::from([("message".into(), Kind::integer())])).or_bytes(),
+            [LogNamespace::Legacy],
+        );
+        assert_eq!(
+            schema::Definition::new_with_default_metadata(
+                Kind::object(BTreeMap::from([(
+                    "message".into(),
+                    Kind::bytes().or_integer()
+                )])),
+                [LogNamespace::Legacy]
+            ),
+            move_field_definitions_into_message(definition)
+        )
+    }
+
+    #[test]
+    fn test_merged_array_definitions_simple() {
+        // Test merging the array definitions where the schema definition
+        // is simple, containing only one possible type in the array.
+        let object: BTreeMap<vrl::value::kind::Field, Kind> = [
+            ("carrot".into(), Kind::bytes()),
+            ("potato".into(), Kind::integer()),
+        ]
+        .into();
+
+        let kind = Kind::array(Collection::from_unknown(Kind::object(object)));
+
+        let definition =
+            schema::Definition::new_with_default_metadata(kind, [LogNamespace::Legacy]);
+
+        let kind = Kind::object(BTreeMap::from([
+            ("carrot".into(), Kind::bytes()),
+            ("potato".into(), Kind::integer()),
+        ]));
+
+        let wanted = schema::Definition::new_with_default_metadata(kind, [LogNamespace::Legacy]);
+        let merged = merge_array_definitions(definition);
+
+        assert_eq!(wanted, merged);
+    }
+
+    #[test]
+    fn test_merged_array_definitions_complex() {
+        // Test merging the array definitions where the schema definition
+        // is fairly complex containing multiple different possible types.
+        let object: BTreeMap<vrl::value::kind::Field, Kind> = [
+            ("carrot".into(), Kind::bytes()),
+            ("potato".into(), Kind::integer()),
+        ]
+        .into();
+
+        let array: BTreeMap<Index, Kind> = [
+            (Index::from(0), Kind::integer()),
+            (Index::from(1), Kind::boolean()),
+            (
+                Index::from(2),
+                Kind::object(BTreeMap::from([("peas".into(), Kind::bytes())])),
+            ),
+        ]
+        .into();
+
+        let mut kind = Kind::bytes();
+        kind.add_object(object);
+        kind.add_array(array);
+
+        let definition =
+            schema::Definition::new_with_default_metadata(kind, [LogNamespace::Legacy]);
+
+        let mut kind = Kind::bytes();
+        kind.add_integer();
+        kind.add_boolean();
+        kind.add_object(BTreeMap::from([
+            ("carrot".into(), Kind::bytes().or_undefined()),
+            ("potato".into(), Kind::integer().or_undefined()),
+            ("peas".into(), Kind::bytes().or_undefined()),
+        ]));
+
+        let wanted = schema::Definition::new_with_default_metadata(kind, [LogNamespace::Legacy]);
+        let merged = merge_array_definitions(definition);
+
+        assert_eq!(wanted, merged);
+    }
+
+    #[test]
+    fn test_combined_transforms_simple() {
+        // Make sure that when getting the definitions from one transform and
+        // passing them to another the correct definition is still produced.
+
+        // Transform 1 sets a simple value.
+        let transform1 = RemapConfig {
+            source: Some(r#".thing = "potato""#.to_string()),
+            ..Default::default()
+        };
+
+        let transform2 = RemapConfig {
+            source: Some(".thang = .thing".to_string()),
+            ..Default::default()
+        };
+
+        let enrichment_tables = enrichment::TableRegistry::default();
+
+        let outputs1 = transform1.outputs(
+            enrichment_tables.clone(),
+            &[("in".into(), schema::Definition::default_legacy_namespace())],
+            LogNamespace::Legacy,
+        );
+
+        assert_eq!(
+            vec![TransformOutput::new(
+                DataType::all(),
+                // The `never` definition should have been passed on to the end.
+                [(
+                    "in".into(),
+                    Definition::default_legacy_namespace().with_event_field(
+                        &owned_value_path!("thing"),
+                        Kind::bytes(),
+                        None
+                    ),
+                )]
+                .into()
+            )],
+            outputs1
+        );
+
+        let outputs2 = transform2.outputs(
+            enrichment_tables,
+            &[(
+                "in1".into(),
+                outputs1[0].schema_definitions(true)[&"in".into()].clone(),
+            )],
+            LogNamespace::Legacy,
+        );
+
+        assert_eq!(
+            vec![TransformOutput::new(
+                DataType::all(),
+                [(
+                    "in1".into(),
+                    Definition::default_legacy_namespace()
+                        .with_event_field(&owned_value_path!("thing"), Kind::bytes(), None)
+                        .with_event_field(&owned_value_path!("thang"), Kind::bytes(), None),
+                )]
+                .into(),
+            )],
+            outputs2
+        );
+    }
+
+    #[test]
+    fn test_combined_transforms_unnest() {
+        // Make sure that when getting the definitions from one transform and
+        // passing them to another the correct definition is still produced.
+
+        // Transform 1 sets a simple value.
+        let transform1 = RemapConfig {
+            source: Some(
+                indoc! {
+                r#"
+                .thing = [{"cabbage": 32}, {"parsnips": 45}]
+                . = unnest(.thing)
+                "#
+                }
+                .to_string(),
+            ),
+            ..Default::default()
+        };
+
+        let transform2 = RemapConfig {
+            source: Some(r#".thang = .thing.cabbage || "beetroot""#.to_string()),
+            ..Default::default()
+        };
+
+        let enrichment_tables = enrichment::TableRegistry::default();
+
+        let outputs1 = transform1.outputs(
+            enrichment_tables.clone(),
+            &[(
+                "in".into(),
+                schema::Definition::new_with_default_metadata(
+                    Kind::any_object(),
+                    [LogNamespace::Legacy],
+                ),
+            )],
+            LogNamespace::Legacy,
+        );
+
+        assert_eq!(
+            vec![TransformOutput::new(
+                DataType::all(),
+                [(
+                    "in".into(),
+                    Definition::new_with_default_metadata(
+                        Kind::any_object(),
+                        [LogNamespace::Legacy]
+                    )
+                    .with_event_field(
+                        &owned_value_path!("thing"),
+                        Kind::object(Collection::from(BTreeMap::from([
+                            ("cabbage".into(), Kind::integer().or_undefined(),),
+                            ("parsnips".into(), Kind::integer().or_undefined(),)
+                        ]))),
+                        None
+                    ),
+                )]
+                .into(),
+            )],
+            outputs1
+        );
+
+        let outputs2 = transform2.outputs(
+            enrichment_tables,
+            &[(
+                "in1".into(),
+                outputs1[0].schema_definitions(true)[&"in".into()].clone(),
+            )],
+            LogNamespace::Legacy,
+        );
+
+        assert_eq!(
+            vec![TransformOutput::new(
+                DataType::all(),
+                [(
+                    "in1".into(),
+                    Definition::default_legacy_namespace()
+                        .with_event_field(
+                            &owned_value_path!("thing"),
+                            Kind::object(Collection::from(BTreeMap::from([
+                                ("cabbage".into(), Kind::integer().or_undefined(),),
+                                ("parsnips".into(), Kind::integer().or_undefined(),)
+                            ]))),
+                            None
+                        )
+                        .with_event_field(
+                            &owned_value_path!("thang"),
+                            Kind::integer().or_null(),
+                            None
+                        ),
+                )]
+                .into(),
+            )],
+            outputs2
+        );
+    }
+
+    #[test]
+    fn test_transform_abort() {
+        // An abort should not change the typedef.
+
+        let transform1 = RemapConfig {
+            source: Some(r#"abort"#.to_string()),
+            ..Default::default()
+        };
+
+        let enrichment_tables = enrichment::TableRegistry::default();
+
+        let outputs1 = transform1.outputs(
+            enrichment_tables,
+            &[(
+                "in".into(),
+                schema::Definition::new_with_default_metadata(
+                    Kind::any_object(),
+                    [LogNamespace::Legacy],
+                ),
+            )],
+            LogNamespace::Legacy,
+        );
+
+        assert_eq!(
+            vec![TransformOutput::new(
+                DataType::all(),
+                [(
+                    "in".into(),
+                    Definition::new_with_default_metadata(
+                        Kind::any_object(),
+                        [LogNamespace::Legacy]
+                    ),
+                )]
+                .into(),
+            )],
+            outputs1
+        );
+    }
+
+    #[test]
+    fn test_error_outputs() {
+        // Even if we fail to compile the VRL it should still output
+        // the correct ports. This may change if we separate the
+        // `outputs` function into one returning outputs and a separate
+        // returning schema definitions.
+        let transform1 = RemapConfig {
+            // This enrichment table does not exist.
+            source: Some(r#". |= get_enrichment_table_record("carrot", {"id": .id})"#.to_string()),
+            reroute_dropped: true,
+            ..Default::default()
+        };
+
+        let enrichment_tables = enrichment::TableRegistry::default();
+
+        let outputs1 = transform1.outputs(
+            enrichment_tables,
+            &[(
+                "in".into(),
+                schema::Definition::new_with_default_metadata(
+                    Kind::any_object(),
+                    [LogNamespace::Legacy],
+                ),
+            )],
+            LogNamespace::Legacy,
+        );
+
+        assert_eq!(
+            HashSet::from([None, Some("dropped".to_string())]),
+            outputs1
+                .into_iter()
+                .map(|output| output.port)
+                .collect::<HashSet<_>>()
+        );
+    }
+
+    #[test]
+    fn test_non_object_events() {
+        let transform1 = RemapConfig {
+            // This enrichment table does not exist.
+            source: Some(r#". = "fish" "#.to_string()),
+            ..Default::default()
+        };
+
+        let enrichment_tables = enrichment::TableRegistry::default();
+
+        let outputs1 = transform1.outputs(
+            enrichment_tables,
+            &[(
+                "in".into(),
+                schema::Definition::new_with_default_metadata(
+                    Kind::any_object(),
+                    [LogNamespace::Legacy],
+                ),
+            )],
+            LogNamespace::Legacy,
+        );
+
+        let wanted = schema::Definition::new_with_default_metadata(
+            Kind::object(Collection::from_unknown(Kind::undefined())),
+            [LogNamespace::Legacy],
+        )
+        .with_event_field(&owned_value_path!("message"), Kind::bytes(), None);
+
+        assert_eq!(
+            HashMap::from([(OutputId::from("in"), wanted)]),
+            outputs1[0].schema_definitions(true),
+        );
+    }
+
+    #[test]
+    fn test_array_and_non_object_events() {
+        let transform1 = RemapConfig {
+            source: Some(
+                indoc! {r#"
+                    if .lizard == true {
+                        .thing = [{"cabbage": 42}];
+                        . = unnest(.thing)
+                    } else {
+                      . = "fish"
+                    }
+                    "#}
+                .to_string(),
+            ),
+            ..Default::default()
+        };
+
+        let enrichment_tables = enrichment::TableRegistry::default();
+
+        let outputs1 = transform1.outputs(
+            enrichment_tables,
+            &[(
+                "in".into(),
+                schema::Definition::new_with_default_metadata(
+                    Kind::any_object(),
+                    [LogNamespace::Legacy],
+                ),
+            )],
+            LogNamespace::Legacy,
+        );
+
+        let wanted = schema::Definition::new_with_default_metadata(
+            Kind::any_object(),
+            [LogNamespace::Legacy],
+        )
+        .with_event_field(&owned_value_path!("message"), Kind::any(), None)
+        .with_event_field(
+            &owned_value_path!("thing"),
+            Kind::object(Collection::from(BTreeMap::from([(
+                "cabbage".into(),
+                Kind::integer(),
+            )])))
+            .or_undefined(),
+            None,
+        );
+
+        assert_eq!(
+            HashMap::from([(OutputId::from("in"), wanted)]),
+            outputs1[0].schema_definitions(true),
+        );
     }
 }

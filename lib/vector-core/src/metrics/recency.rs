@@ -48,11 +48,11 @@
 //! not, and thus whether it should actually be deleted.
 
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
-use metrics::{Counter, CounterFn, Gauge, GaugeFn, HistogramFn};
+use metrics::{atomics::AtomicU64, Counter, CounterFn, Gauge, GaugeFn, HistogramFn};
 use metrics_util::{
     registry::{Registry, Storage},
     Hashable, MetricKind, MetricKindMask,
@@ -110,7 +110,7 @@ impl<T> Generational<T> {
         F: Fn(&T) -> V,
     {
         let result = f(&self.inner);
-        let _ = self.gen.fetch_add(1, Ordering::AcqRel);
+        _ = self.gen.fetch_add(1, Ordering::AcqRel);
         result
     }
 }

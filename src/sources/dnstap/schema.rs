@@ -1,7 +1,7 @@
 use lookup::{owned_value_path, OwnedValuePath};
 use std::collections::BTreeMap;
-use value::btreemap;
-use value::{
+use vrl::value::btreemap;
+use vrl::value::{
     kind::{Collection, Field},
     Kind,
 };

@@ -25,6 +25,7 @@ Vector team member will find this document useful.
     - [Flakey tests](#flakey-tests)
       - [Test harness](#test-harness)
   - [Deprecations](#deprecations)
+  - [Dependencies](#dependencies)
 - [Next steps](#next-steps)
 - [Legal](#legal)
   - [Contributor License Agreement](#contributor-license-agreement)
@@ -183,6 +184,13 @@ any pull request with:
 ### Deprecations
 
 When deprecating functionality in Vector, see [DEPRECATION.md](DEPRECATION.md).
+
+### Dependencies
+
+When adding, modifying, or removing a dependency in Vector you may find that you need to update the
+inventory of third-party licenses maintained in `LICENSE-3rdparty.csv`. This file is generated using
+[rust-license-tool](https://github.com/DataDog/rust-license-tool.git) and can be updated using
+`cargo vdev build licenses`.
 
 ## Next steps
 

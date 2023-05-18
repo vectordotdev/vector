@@ -4,7 +4,6 @@ use futures::{pin_mut, stream, Stream, StreamExt};
 use lookup::{lookup_v2::OptionalValuePath, owned_value_path};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::FramedRead;
-use value::Kind;
 use vector_common::internal_event::{
     ByteSize, BytesReceived, CountByteSize, EventsReceived, InternalEventHandle as _, Protocol,
 };
@@ -13,6 +12,7 @@ use vector_core::{
     config::{LegacyKey, LogNamespace},
     EstimatedJsonEncodedSizeOf,
 };
+use vrl::value::Kind;
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
@@ -275,8 +275,8 @@ mod tests {
     #![allow(clippy::print_stdout)] //tests
 
     use lookup::{owned_value_path, OwnedTargetPath};
-    use value::{kind::Collection, Kind};
     use vector_core::schema::Definition;
+    use vrl::value::{kind::Collection, Kind};
 
     use super::*;
 

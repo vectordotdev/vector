@@ -12,7 +12,7 @@ components: sources: postgresql_metrics: {
 		commonly_used: false
 		delivery:      "at_least_once"
 		deployment_roles: ["daemon", "sidecar"]
-		development:   "beta"
+		development:   "stable"
 		egress_method: "batch"
 		stateful:      false
 	}

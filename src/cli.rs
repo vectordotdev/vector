@@ -237,8 +237,7 @@ pub enum SubCommand {
     Service(service::Opts),
 
     /// Vector Remap Language CLI
-    #[cfg(feature = "vrl-cli")]
-    Vrl(vrl_cli::Opts),
+    Vrl(vrl::cli::Opts),
 }
 
 impl SubCommand {
@@ -261,11 +260,10 @@ impl SubCommand {
             #[cfg(feature = "api-client")]
             Self::Top(t) => top::cmd(t).await,
             Self::Validate(v) => validate::validate(v, color).await,
-            #[cfg(feature = "vrl-cli")]
             Self::Vrl(s) => {
-                let mut functions = vrl_stdlib::all();
+                let mut functions = vrl::stdlib::all();
                 functions.extend(vector_vrl_functions::all());
-                vrl_cli::cmd::cmd(s, functions)
+                vrl::cli::cmd::cmd(s, functions)
             }
         }
     }

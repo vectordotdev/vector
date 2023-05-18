@@ -187,7 +187,7 @@ impl DatabendService {
             Some(self.file_format_options.clone()),
             Some(self.copy_options.clone()),
         );
-        let _ = self.client.query(req).await?;
+        _ = self.client.query(req).await?;
         Ok(())
     }
 }

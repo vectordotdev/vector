@@ -353,7 +353,7 @@ impl StreamSink<Event> for WebSocketSink {
                 .await
                 .is_ok()
             {
-                let _ = ws_sink.close().await;
+                _ = ws_sink.close().await;
             }
         }
 

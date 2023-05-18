@@ -68,7 +68,7 @@ impl StreamSink<EventArray> for OneshotSink {
             .next()
             .await
             .expect("must always get an item in oneshot sink");
-        let _ = tx.send(events);
+        _ = tx.send(events);
 
         Ok(())
     }
