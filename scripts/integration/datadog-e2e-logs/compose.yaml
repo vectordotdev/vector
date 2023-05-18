@@ -5,24 +5,29 @@ services:
     image: docker.io/datadog/agent:${CONFIG_VERSION}
     environment:
     - DD_API_KEY=${TEST_DATADOG_API_KEY:?TEST_DATADOG_API_KEY required}
-    - DD_DD_URL=http://fakeintake-agent:80
     - DD_USE_DOGSTATSD=false
     - DD_HOSTNAME=datadog-agent
-    - DD_PROCESS_AGENT_ENABLED=false
-    - DD_APM_ENABLED=false
-    - DD_METRICS_ENABLED=false
     - DD_LOGS_ENABLED=true
+    - DD_LOGS_CONFIG_DD_URL=fakeintake-agent:80
+    - DD_SKIP_SSL_VALIDATION=true
+    - DD_ENABLE_PAYLOADS_EVENTS=false
+    - DD_ENABLE_PAYLOADS_SERVICE_CHECKS=false
     - DD_CONTAINER_EXCLUDE="name:.*"
+    volumes:
+    - ../../../tests/data/e2e/datadog/logs/agent_only/logs.conf.d:/conf.d:ro
+    - ../../../tests/data/e2e/datadog/logs/custom_log.log:/var/log/a_custom_log.log
   datadog-agent-vector:
-    #image: datadog-agent-vector-t1:latest
     image: docker.io/datadog/agent:${CONFIG_VERSION}
     environment:
     - DD_API_KEY=${TEST_DATADOG_API_KEY:?TEST_DATADOG_API_KEY required}
     - DD_HOSTNAME=datadog-agent-vector
-    - DD_PROCESS_AGENT_ENABLED=false
-    - DD_METRICS_ENABLED=false
     - DD_LOGS_ENABLED=true
+    - DD_ENABLE_PAYLOADS_EVENTS=false
+    - DD_ENABLE_PAYLOADS_SERVICE_CHECKS=false
     - DD_CONTAINER_EXCLUDE="name:.*"
+    volumes:
+    - ../../../tests/data/e2e/datadog/logs/agent_vector/logs.conf.d:/conf.d:ro
+    - ../../../tests/data/e2e/datadog/logs/custom_log.log:/var/log/a_custom_log.log
   fakeintake-agent:
     image: docker.io/datadog/fakeintake:${CONFIG_VERSION}
   fakeintake-agent-vector:
