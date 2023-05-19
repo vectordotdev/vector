@@ -405,8 +405,12 @@ impl IngestorProcess {
     }
 
     async fn handle_sqs_message(&mut self, message: Message) -> Result<(), ProcessingError> {
-        let s3_event: SqsEvent = serde_json::from_str(message.body.unwrap_or_default().as_ref())
-            .context(InvalidSqsMessageSnafu {
+        let sqs_body = message.body.unwrap_or_default();
+        let sqs_body = serde_json::from_str::<SnsNotification>(sqs_body.as_ref())
+            .map(|notification| notification.message)
+            .unwrap_or(sqs_body);
+        let s3_event: SqsEvent =
+            serde_json::from_str(sqs_body.as_ref()).context(InvalidSqsMessageSnafu {
                 message_id: message
                     .message_id
                     .clone()
@@ -713,6 +717,13 @@ fn handle_single_log(
     };
 }
 
+// https://docs.aws.amazon.com/sns/latest/dg/sns-sqs-as-subscriber.html
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct SnsNotification {
+    pub message: String,
+}
+
 // https://docs.aws.amazon.com/AmazonS3/latest/userguide/how-to-enable-disable-notification-intro.html
 #[derive(Clone, Debug, Deserialize)]
 #[serde(untagged)]
@@ -934,6 +945,31 @@ fn test_s3_testevent() {
      }"#,
     )
     .unwrap();
+
+    assert_eq!(value.service, "Amazon S3".to_string());
+    assert_eq!(value.bucket, "bucketname".to_string());
+    assert_eq!(value.event.kind, "s3".to_string());
+    assert_eq!(value.event.name, "TestEvent".to_string());
+}
+
+#[test]
+fn test_s3_sns_testevent() {
+    let sns_value: SnsNotification = serde_json::from_str(
+        r#"{
+        "Type" : "Notification",
+        "MessageId" : "63a3f6b6-d533-4a47-aef9-fcf5cf758c76",
+        "TopicArn" : "arn:aws:sns:us-west-2:123456789012:MyTopic",
+        "Subject" : "Testing publish to subscribed queues",
+        "Message" : "{\"Bucket\":\"bucketname\",\"Event\":\"s3:TestEvent\",\"HostId\":\"8cLeGAmw098X5cv4Zkwcmo8vvZa3eH3eKxsPzbB9wrR+YstdA6Knx4Ip8EXAMPLE\",\"RequestId\":\"5582815E1AEA5ADF\",\"Service\":\"Amazon S3\",\"Time\":\"2014-10-13T15:57:02.089Z\"}",
+        "Timestamp" : "2012-03-29T05:12:16.901Z",
+        "SignatureVersion" : "1",
+        "Signature" : "EXAMPLEnTrFPa3...",
+        "SigningCertURL" : "https://sns.us-west-2.amazonaws.com/SimpleNotificationService-f3ecfb7224c7233fe7bb5f59f96de52f.pem",
+        "UnsubscribeURL" : "https://sns.us-west-2.amazonaws.com/?Action=Unsubscribe&SubscriptionArn=arn:aws:sns:us-west-2:123456789012:MyTopic:c7fe3a54-ab0e-4ec2-88e0-db410a0f2bee"
+     }"#,
+    ).unwrap();
+
+    let value: S3TestEvent = serde_json::from_str(sns_value.message.as_ref()).unwrap();
 
     assert_eq!(value.service, "Amazon S3".to_string());
     assert_eq!(value.bucket, "bucketname".to_string());
