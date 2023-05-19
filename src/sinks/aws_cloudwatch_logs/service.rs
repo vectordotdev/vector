@@ -22,7 +22,7 @@ use tower::{
     timeout::Timeout,
     Service, ServiceBuilder, ServiceExt,
 };
-use vector_common::request_metadata::MetaDescriptive;
+use vector_common::{json_size::JsonSize, request_metadata::MetaDescriptive};
 use vector_core::{internal_event::CountByteSize, stream::DriverResponse};
 
 use crate::{
@@ -99,7 +99,7 @@ impl From<SdkError<DescribeLogStreamsError>> for CloudwatchError {
 #[derive(Debug)]
 pub struct CloudwatchResponse {
     events_count: usize,
-    events_byte_size: usize,
+    events_byte_size: JsonSize,
 }
 
 impl crate::sinks::util::sink::Response for CloudwatchResponse {
@@ -158,7 +158,7 @@ impl Service<BatchCloudwatchRequest> for CloudwatchLogsPartitionSvc {
 
     fn call(&mut self, req: BatchCloudwatchRequest) -> Self::Future {
         let events_count = req.get_metadata().event_count();
-        let events_byte_size = req.get_metadata().events_byte_size();
+        let events_byte_size = req.get_metadata().events_estimated_json_encoded_byte_size();
 
         let key = req.key;
         let events = req

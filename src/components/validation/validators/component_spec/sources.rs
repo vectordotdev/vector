@@ -1,6 +1,7 @@
 use std::fmt::{Display, Formatter};
 
 use bytes::BytesMut;
+use vector_common::json_size::JsonSize;
 use vector_core::event::{Event, MetricKind};
 use vector_core::EstimatedJsonEncodedSizeOf;
 
@@ -163,7 +164,7 @@ fn validate_component_received_event_bytes_total(
         }
     }
 
-    let expected_bytes = inputs.iter().fold(0, |acc, i| {
+    let expected_bytes = inputs.iter().fold(JsonSize::new(0), |acc, i| {
         if let TestEvent::Passthrough(_) = i {
             let size = vec![i.clone().into_event()].estimated_json_encoded_size_of();
             return acc + size;
@@ -179,7 +180,7 @@ fn validate_component_received_event_bytes_total(
         expected_bytes,
     );
 
-    if metric_bytes != expected_bytes as f64 {
+    if JsonSize::new(metric_bytes as usize) != expected_bytes {
         errs.push(format!(
             "{}: expected {} bytes, but received {}",
             SourceMetrics::EventsReceivedBytes,
@@ -367,7 +368,7 @@ fn validate_component_sent_event_bytes_total(
         }
     }
 
-    let mut expected_bytes = 0;
+    let mut expected_bytes = JsonSize::zero();
     for e in outputs {
         expected_bytes += vec![e].estimated_json_encoded_size_of();
     }
@@ -379,7 +380,7 @@ fn validate_component_sent_event_bytes_total(
         expected_bytes,
     );
 
-    if metric_bytes != expected_bytes as f64 {
+    if JsonSize::new(metric_bytes as usize) != expected_bytes {
         errs.push(format!(
             "{}: expected {} bytes, but received {}.",
             SourceMetrics::SentEventBytesTotal,

@@ -19,7 +19,7 @@ pub use r#ref::{EventMutRef, EventRef};
 use serde::{Deserialize, Serialize};
 pub use trace::TraceEvent;
 use vector_buffers::EventCount;
-use vector_common::{finalization, EventDataEq};
+use vector_common::{finalization, json_size::JsonSize, EventDataEq};
 pub use vrl::value::Value;
 #[cfg(feature = "vrl")]
 pub use vrl_target::{TargetEvents, VrlTarget};
@@ -65,7 +65,7 @@ impl ByteSizeOf for Event {
 }
 
 impl EstimatedJsonEncodedSizeOf for Event {
-    fn estimated_json_encoded_size_of(&self) -> usize {
+    fn estimated_json_encoded_size_of(&self) -> JsonSize {
         match self {
             Event::Log(log_event) => log_event.estimated_json_encoded_size_of(),
             Event::Metric(metric_event) => metric_event.estimated_json_encoded_size_of(),

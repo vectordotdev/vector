@@ -41,7 +41,7 @@ crate::registered_event!(
 
         self.events.increment(count as u64);
         self.events_out.increment(count as u64);
-        self.event_bytes.increment(byte_size as u64);
+        self.event_bytes.increment(byte_size.size() as u64);
     }
 );
 

@@ -16,6 +16,8 @@ pub use events_sent::{EventsSent, DEFAULT_OUTPUT};
 pub use prelude::{error_stage, error_type};
 pub use service::{CallError, PollReadyError};
 
+use crate::json_size::JsonSize;
+
 pub trait InternalEvent: Sized {
     fn emit(self);
 
@@ -108,7 +110,7 @@ pub struct Count(pub usize);
 
 /// Holds the tuple `(count_of_events, size_of_events_in_bytes)`.
 #[derive(Clone, Copy)]
-pub struct CountByteSize(pub usize, pub usize);
+pub struct CountByteSize(pub usize, pub JsonSize);
 
 // Wrapper types used to hold parameters for registering events
 

@@ -7,7 +7,7 @@ use aws_smithy_client::SdkError;
 use aws_types::region::Region;
 use futures::future::BoxFuture;
 use tower::Service;
-use vector_common::request_metadata::MetaDescriptive;
+use vector_common::{json_size::JsonSize, request_metadata::MetaDescriptive};
 use vector_core::{internal_event::CountByteSize, stream::DriverResponse};
 
 use super::{
@@ -41,7 +41,7 @@ where
 
 pub struct KinesisResponse {
     count: usize,
-    events_byte_size: usize,
+    events_byte_size: JsonSize,
 }
 
 impl DriverResponse for KinesisResponse {
@@ -72,7 +72,9 @@ where
 
     // Emission of internal events for errors and dropped events is handled upstream by the caller.
     fn call(&mut self, requests: BatchKinesisRequest<R>) -> Self::Future {
-        let events_byte_size = requests.get_metadata().events_byte_size();
+        let events_byte_size = requests
+            .get_metadata()
+            .events_estimated_json_encoded_byte_size();
         let count = requests.get_metadata().event_count();
 
         let records = requests

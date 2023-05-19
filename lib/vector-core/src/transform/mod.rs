@@ -4,6 +4,7 @@ use futures::{Stream, StreamExt};
 use vector_common::internal_event::{
     self, register, CountByteSize, EventsSent, InternalEventHandle as _, Registered, DEFAULT_OUTPUT,
 };
+use vector_common::json_size::JsonSize;
 use vector_common::EventDataEq;
 
 use crate::{
@@ -247,7 +248,7 @@ impl TransformOutputs {
         if let Some(primary) = self.primary_output.as_mut() {
             let count = buf.primary_buffer.as_ref().map_or(0, OutputBuffer::len);
             let byte_size = buf.primary_buffer.as_ref().map_or(
-                0,
+                JsonSize::new(0),
                 EstimatedJsonEncodedSizeOf::estimated_json_encoded_size_of,
             );
             buf.primary_buffer
@@ -487,7 +488,7 @@ impl EventDataEq<Vec<Event>> for OutputBuffer {
 }
 
 impl EstimatedJsonEncodedSizeOf for OutputBuffer {
-    fn estimated_json_encoded_size_of(&self) -> usize {
+    fn estimated_json_encoded_size_of(&self) -> JsonSize {
         self.0
             .iter()
             .map(EstimatedJsonEncodedSizeOf::estimated_json_encoded_size_of)
