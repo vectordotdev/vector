@@ -146,9 +146,9 @@ kubectl apply -k .
 
 ### Vector Operator
 
-The [Vector Operator](https://github.com/kaasops/vector-operator) is community supported resource. The operator deploys and configures a Vector Agent daemonset on every node to collect container and application logs from the node file system.
+The [Vector Operator](https://github.com/kaasops/vector-operator) is community supported resource. The operator deploys and configures a Vector Agent as a DaemonSet on every Node to collect container and application logs from the Node's file system.
 
-To start using it, you can read the [documentation](https://github.com/kaasops/vector-operator/tree/main/docs).
+For additional information, see the [documentation](https://github.com/kaasops/vector-operator/tree/main/docs).
 
 ## Deployment
 
