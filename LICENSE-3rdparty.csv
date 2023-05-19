@@ -523,7 +523,7 @@ tokio-postgres,https://github.com/sfackler/rust-postgres,MIT OR Apache-2.0,Steve
 tokio-rustls,https://github.com/tokio-rs/tls,MIT OR Apache-2.0,quininer kel <quininer@live.com>
 tokio-tungstenite,https://github.com/snapview/tokio-tungstenite,MIT,"Daniel Abramov <dabramov@snapview.de>, Alexey Galakhov <agalakhov@snapview.de>"
 toml,https://github.com/toml-rs/toml,MIT OR Apache-2.0,Alex Crichton <alex@alexcrichton.com>
-toml_edit,https://github.com/ordian/toml_edit,MIT OR Apache-2.0,"Andronik Ordian <write@reusable.software>, Ed Page <eopage@gmail.com>"
+toml_edit,https://github.com/toml-rs/toml,MIT OR Apache-2.0,"Andronik Ordian <write@reusable.software>, Ed Page <eopage@gmail.com>"
 tonic,https://github.com/hyperium/tonic,MIT,Lucio Franco <luciofranco14@gmail.com>
 tower,https://github.com/tower-rs/tower,MIT,Tower Maintainers <team@tower-rs.com>
 tower-http,https://github.com/tower-rs/tower-http,MIT,Tower Maintainers <team@tower-rs.com>
