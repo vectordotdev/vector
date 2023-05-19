@@ -7354,7 +7354,7 @@ version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a78072b550e5c20bc4a9d1384be28809cbdb7b25b2b4707ddc6d908b7e6de3bf"
 dependencies = [
- "toml 0.7.3",
+ "toml 0.7.4",
 ]
 
 [[package]]
@@ -7475,9 +7475,9 @@ dependencies = [
 
 [[package]]
 name = "serde_spanned"
-version = "0.6.1"
+version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0efd8caf556a6cebd3b285caf480045fcc1ac04f6bd786b09a6f11af30c4fcf4"
+checksum = "93107647184f6027e3b7dcb2e11034cf95ffa1e3a682c67951963ac69c1c007d"
 dependencies = [
  "serde",
 ]
@@ -8479,9 +8479,9 @@ dependencies = [
 
 [[package]]
 name = "toml"
-version = "0.7.3"
+version = "0.7.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b403acf6f2bb0859c93c7f0d967cb4a75a7ac552100f9322faf64dc047669b21"
+checksum = "d6135d499e69981f9ff0ef2167955a5333c35e36f6937d382974566b3d5b94ec"
 dependencies = [
  "serde",
  "serde_spanned",
@@ -8491,18 +8491,18 @@ dependencies = [
 
 [[package]]
 name = "toml_datetime"
-version = "0.6.1"
+version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3ab8ed2edee10b50132aed5f331333428b011c99402b5a534154ed15746f9622"
+checksum = "5a76a9312f5ba4c2dec6b9161fdf25d87ad8a09256ccea5a556fef03c706a10f"
 dependencies = [
  "serde",
 ]
 
 [[package]]
 name = "toml_edit"
-version = "0.19.6"
+version = "0.19.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "08de71aa0d6e348f070457f85af8bd566e2bc452156a423ddf22861b3a953fae"
+checksum = "92d964908cec0d030b812013af25a0e57fddfadb1e066ecc6681d86253129d4f"
 dependencies = [
  "indexmap",
  "serde",
@@ -9183,7 +9183,7 @@ dependencies = [
  "serde_yaml 0.9.21",
  "sha2 0.10.6",
  "tempfile",
- "toml 0.7.3",
+ "toml 0.7.4",
 ]
 
 [[package]]
@@ -9352,7 +9352,7 @@ dependencies = [
  "tokio-test",
  "tokio-tungstenite 0.19.0",
  "tokio-util",
- "toml 0.7.3",
+ "toml 0.7.4",
  "tonic",
  "tonic-build",
  "tower",
@@ -9500,7 +9500,7 @@ dependencies = [
  "serde_json",
  "serde_with 2.3.2",
  "snafu",
- "toml 0.7.3",
+ "toml 0.7.4",
  "tracing 0.1.37",
  "url",
  "vector-config-common",
@@ -9601,7 +9601,7 @@ dependencies = [
  "tokio-stream",
  "tokio-test",
  "tokio-util",
- "toml 0.7.3",
+ "toml 0.7.4",
  "tonic",
  "tower",
  "tracing 0.1.37",
@@ -10356,9 +10356,9 @@ checksum = "1a515f5799fe4961cb532f983ce2b23082366b898e52ffbce459c86f67c8378a"
 
 [[package]]
 name = "winnow"
-version = "0.3.5"
+version = "0.4.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ee7b2c67f962bf5042bfd8b6a916178df33a26eec343ae064cb8e069f638fa6f"
+checksum = "61de7bac303dc551fe038e2b3cef0f571087a47571ea6e79a87692ac99b99699"
 dependencies = [
  "memchr",
 ]
