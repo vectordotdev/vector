@@ -1,6 +1,6 @@
 ---
 title: Fluent
-description: Collect logs from a [Fluentd](https://fluentd.org) or [Fluent Bit](https://fluentbit.io) agent
+description: Collect logs from a [Fluentd](https://www.fluentd.org) or [Fluent Bit](https://fluentbit.io) agent
 kind: source
 layout: component
 tags: ["fluentd", "fluent", "component", "source", "logs"]
