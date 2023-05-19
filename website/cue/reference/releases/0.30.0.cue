@@ -176,7 +176,9 @@ releases: "0.30.0": {
 			type: "fix"
 			scopes: ["observability"]
 			description: """
-				Vector's internal logs were updated to use "suppress" rather than "rate-limit" in the hopes that it makes it clearer that it is only Vector's log output that is being suppressed, rather than data processing being throttled.
+				Vector's internal logs were updated to use "suppress" rather than "rate-limit" in
+				the hopes that it makes it clearer that it is only Vector's log output that is being
+				suppressed, rather than data processing being throttled.
 				"""
 			pr_numbers: [17394]
 		},
