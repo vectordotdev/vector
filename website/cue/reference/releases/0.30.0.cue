@@ -109,7 +109,7 @@ releases: "0.30.0": {
 			scopes: ["docker_logs source"]
 			description: """
 				The `docker_logs` source now supports usage of the `tcp://` scheme for the `host`
-				option. The connectino is the same as-if the `http://` scheme was used.
+				option. The connection is the same as-if the `http://` scheme was used.
 				"""
 			contributors: ["OrangeFlag"]
 			pr_numbers: [17124]
