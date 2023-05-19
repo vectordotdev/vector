@@ -15,6 +15,7 @@
 # /ci-run-unit-windows        : runs Unit - Windows
 # /ci-run-environment         : runs Environment Suite
 # /ci-run-install             : runs Update install.sh Suite
+# /ci-run-regression          : runs Regression Detection Suite
 
 name: Comment Trigger
 
