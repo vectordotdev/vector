@@ -4,8 +4,6 @@ use std::{
     ops::{Add, AddAssign, Sub},
 };
 
-// TODO I would prefer not to have Default derived.. but RequestMetadata needs it.
-//      check to see if we can remove Default from there.
 /// A newtype for the Json size of an event.
 /// Used to emit the `component_received_event_bytes_total` and
 /// `component_sent_event_bytes_total` metrics.
