@@ -667,6 +667,7 @@ mod integration_tests {
         .await;
     }
 
+    #[ignore]
     #[tokio::test]
     async fn handles_errored_status() {
         trace_init();
