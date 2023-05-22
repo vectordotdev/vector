@@ -1,0 +1,23 @@
+api_key: deadbeef
+
+logs_enabled: true
+
+connection_reset_interval: 5
+
+logs_config:
+  sender_recovery_reset: true
+
+vector:
+  logs:
+    enabled: true
+    url: "http://runner:8181"
+    #url: "http://0.0.0.0:8181"
+    #url: "http://runner:8081"
+
+#intervals:
+#  process_realtime: 1
+
+use_dogstatsd: false
+log_level: 'debug'
+
+log_file: './agent.log'

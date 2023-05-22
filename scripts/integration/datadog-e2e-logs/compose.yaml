@@ -1,3 +1,4 @@
+#version: '2.4'
 version: '3'
 
 services:
@@ -5,33 +6,57 @@ services:
     image: docker.io/datadog/agent:${CONFIG_VERSION}
     environment:
     - DD_API_KEY=${TEST_DATADOG_API_KEY:?TEST_DATADOG_API_KEY required}
-    - DD_USE_DOGSTATSD=false
+    #- DD_USE_DOGSTATSD=false
     - DD_HOSTNAME=datadog-agent
-    - DD_LOGS_ENABLED=true
-    - DD_LOGS_CONFIG_DD_URL=fakeintake-agent:80
-    - DD_SKIP_SSL_VALIDATION=true
+    #- DD_LOGS_ENABLED=true
+    #- DD_LOGS_CONFIG_DD_URL=fakeintake-agent:80
+    #- DD_LOGS_CONFIG_NO_SSL=true
+    #- DD_LOGS_CONFIG_FORCE_USE_HTTP=true
     - DD_ENABLE_PAYLOADS_EVENTS=false
     - DD_ENABLE_PAYLOADS_SERVICE_CHECKS=false
     - DD_CONTAINER_EXCLUDE="name:.*"
     volumes:
+    # The Agent config file
+    - ../../../tests/data/e2e/datadog/logs/agent_only/datadog.yaml:/etc/datadog-agent/datadog.yaml
+    # The custom logs check
     - ../../../tests/data/e2e/datadog/logs/agent_only/logs.conf.d:/conf.d:ro
+    # The custom log to tail
     - ../../../tests/data/e2e/datadog/logs/custom_log.log:/var/log/a_custom_log.log
   datadog-agent-vector:
     image: docker.io/datadog/agent:${CONFIG_VERSION}
+    # depends_on:
+    #   waitforit:
+    #     condition: service_healthy
     environment:
     - DD_API_KEY=${TEST_DATADOG_API_KEY:?TEST_DATADOG_API_KEY required}
     - DD_HOSTNAME=datadog-agent-vector
-    - DD_LOGS_ENABLED=true
+    #- DD_LOGS_ENABLED=true
     - DD_ENABLE_PAYLOADS_EVENTS=false
     - DD_ENABLE_PAYLOADS_SERVICE_CHECKS=false
     - DD_CONTAINER_EXCLUDE="name:.*"
+    #- VECTOR_URL="http://runner:8081"
     volumes:
+    # The Agent config file
+    - ../../../tests/data/e2e/datadog/logs/agent_vector/datadog.yaml:/etc/datadog-agent/datadog.yaml
+    # The custom logs check
     - ../../../tests/data/e2e/datadog/logs/agent_vector/logs.conf.d:/conf.d:ro
+    # The custom log to tail
     - ../../../tests/data/e2e/datadog/logs/custom_log.log:/var/log/a_custom_log.log
   fakeintake-agent:
     image: docker.io/datadog/fakeintake:${CONFIG_VERSION}
   fakeintake-agent-vector:
     image: docker.io/datadog/fakeintake:${CONFIG_VERSION}
+  # waitforit:
+  #   image: docker.io/debian:buster-slim
+  #   command: tail -f /dev/null
+  #   healthcheck:
+  #     test: curl -f http://runner:8181 || exit 1
+  #     #test: ["CMD", "curl", "-f", "http://runner:8181", "||", "exit", "1"]
+  #     interval: 15s
+  #     timeout: 10s
+  #     retries: 10
+
+      #test: ["CMD-SHELL", "curl --fail http://runner:8181 || exit 1"]
 
 networks:
   default:

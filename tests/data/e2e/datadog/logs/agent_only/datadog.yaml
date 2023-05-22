@@ -1,0 +1,14 @@
+api_key: deadbeef
+
+logs_enabled: true
+
+logs_config:
+  logs_dd_url: fakeintake-agent:80
+  logs_no_ssl: true
+  force_use_http: true
+
+#intervals:
+#  process_realtime: 1
+
+use_dogstatsd: false
+#log_level: 'debug'

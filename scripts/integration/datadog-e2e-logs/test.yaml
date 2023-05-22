@@ -9,7 +9,6 @@ runner:
     FAKE_INTAKE_AGENT_ENDPOINT: 'http://fakeintake-agent:80'
     FAKE_INTAKE_VECTOR_ENDPOINT: 'http://fakeintake-agent-vector:80'
     #TEST_LOG: ${TEST_LOG}
-      #TEST_DATADOG_API_KEY:
 
 matrix:
   version: [latest]
