@@ -146,21 +146,6 @@ jobs:
       #     path: "/tmp/vector-config-schema.json"
       #   if: success() || failure()
 
-  foo:
-    name: Foo
-    runs-on: ubuntu-latest
-    needs: changes
-    steps:
-      - run: exit 0
-
-  bar:
-    name: Bar
-    runs-on: ubuntu-latest
-    if: ${{ needs.foo.nothing != 'something' }} && failure()
-    needs: foo
-    steps:
-      - run: exit 1
-
   all-checks:
     name: Test Suite
     runs-on: ubuntu-20.04
@@ -168,8 +153,7 @@ jobs:
       - checks
       - test-vrl
       - test-linux
-      - foo
-      - bar
     steps:
       - name: validate
         run: echo "OK"
+
