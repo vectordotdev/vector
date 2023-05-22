@@ -667,6 +667,9 @@ mod integration_tests {
         .await;
     }
 
+    // TODO: re-enable this after figuring out why it is so flakey in CI
+    //       https://github.com/vectordotdev/vector/issues/17456
+    #[ignore]
     #[tokio::test]
     async fn handles_errored_status() {
         trace_init();

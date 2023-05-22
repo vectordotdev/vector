@@ -1,0 +1,21 @@
+name: Check minimum supported Rust version
+
+on:
+  workflow_call:
+
+env:
+  RUST_BACKTRACE: full
+  CI: true
+  PROFILE: debug
+  # observing issues fetching boringssl via HTTPS in the OSX build, seeing if this helps
+  # can be removed when we switch back to the upstream openssl-sys crate
+  CARGO_NET_GIT_FETCH_WITH_CLI: true
+
+jobs:
+  check-msrv:
+    runs-on: [ubuntu-20.04]
+    steps:
+      - uses: actions/checkout@v3
+      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: cargo install cargo-msrv --version 0.15.1
+      - run: cargo msrv verify

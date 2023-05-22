@@ -392,6 +392,7 @@ async fn kafka_source(
 
     loop {
         tokio::select! {
+            biased;
             _ = &mut shutdown => break,
             entry = ack_stream.next() => if let Some((status, entry)) = entry {
                 if status == BatchStatus::Delivered {

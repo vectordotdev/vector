@@ -1,0 +1,28 @@
+[overrides]
+"backon" = { origin = "https://github.com/Xuanwo/backon" }
+"bollard-stubs" = { origin = "https://github.com/fussybeaver/bollard" }
+"openssl-macros" = { origin = "https://github.com/sfackler/rust-openssl" }
+"serde_nanos" = { origin = "https://github.com/caspervonb/serde_nanos" }
+
+# These can go away once Vector starts using a release of the VRL crate with a
+# library field set up.
+"vrl" = { license = "MPL-2.0" }
+"vrl-compiler" = { license = "MPL-2.0" }
+"vrl-core" = { license = "MPL-2.0" }
+"vrl-diagnostic" = { license = "MPL-2.0" }
+"vrl-parser" = { license = "MPL-2.0" }
+"vrl-tests" = { license = "MPL-2.0" }
+
+# `ring` has a custom license that is mostly "ISC-style" but parts of it also fall under OpenSSL licensing.
+"ring-0.16.20" = { license = "ISC AND Custom" }
+
+# `rustls-webpki` doesn't specify their license in the metadata, but the file contains the ISC terms.
+"rustls-webpki-0.100.1" = { license = "ISC" }
+
+# `webpki` doesn't specify their license in the metadata, but the file contains the ISC terms.
+"webpki-0.21.4" = { license = "ISC" }
+"webpki-0.22.0" = { license = "ISC" }
+
+# `zerocopy` et al don't specify their licenses in the metadata, but the file contains the 2-clause BSD terms.
+"zerocopy-0.6.1" = { license = "BSD-2-Clause" }
+"zerocopy-derive-0.3.2" = { license = "BSD-2-Clause" }

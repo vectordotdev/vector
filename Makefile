@@ -417,7 +417,7 @@ check: ## Run prerequisite code checks
 check-all: ## Check everything
 check-all: check-fmt check-clippy check-docs
 check-all: check-version check-examples check-component-features
-check-all: check-scripts check-deny check-component-docs
+check-all: check-scripts check-deny check-component-docs check-licenses
 
 .PHONY: check-component-features
 check-component-features: ## Check that all component features are setup properly
@@ -434,6 +434,10 @@ check-docs: ## Check that all /docs file are valid
 .PHONY: check-fmt
 check-fmt: ## Check that all files are formatted properly
 	${MAYBE_ENVIRONMENT_EXEC} cargo vdev check fmt
+
+.PHONY: check-licenses
+check-licenses: ## Check that the 3rd-party license file is up to date
+	${MAYBE_ENVIRONMENT_EXEC} cargo vdev check licenses
 
 .PHONY: check-markdown
 check-markdown: ## Check that markdown is styled properly
@@ -630,19 +634,6 @@ generate-component-docs: ## Generate per-component Cue docs from the configurati
 .PHONY: signoff
 signoff: ## Signsoff all previous commits since branch creation
 	scripts/signoff.sh
-
-ifeq (${CI}, true)
-.PHONY: ci-sweep
-ci-sweep: ## Sweep up the CI to try to get more disk space.
-	@echo "Preparing the CI for build by sweeping up disk space a bit..."
-	df -h
-	sudo apt-get --purge autoremove --yes
-	sudo apt-get clean
-	sudo rm -rf "/opt/*" "/usr/local/*"
-	sudo rm -rf "/usr/local/share/boost" && sudo rm -rf "${AGENT_TOOLSDIRECTORY}"
-	docker system prune --force
-	df -h
-endif
 
 .PHONY: version
 version: ## Get the current Vector version

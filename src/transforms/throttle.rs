@@ -33,11 +33,9 @@ pub struct ThrottleConfig {
     #[serde_as(as = "serde_with::DurationSeconds<f64>")]
     window_secs: Duration,
 
-    /// The name of the log field whose value is hashed to determine if the event should be
-    /// rate limited.
+    /// The value to group events into separate buckets to be rate limited independently.
     ///
-    /// Each unique key creates a bucket of related events to be rate limited separately. If
-    /// left unspecified, or if the event doesn't have `key_field`, then the event is not rate
+    /// If left unspecified, or if the event doesn't have `key_field`, then the event is not rate
     /// limited separately.
     #[configurable(metadata(docs::examples = "{{ message }}", docs::examples = "{{ hostname }}",))]
     key_field: Option<Template>,

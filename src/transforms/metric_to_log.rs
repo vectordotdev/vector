@@ -63,6 +63,17 @@ pub struct MetricToLogConfig {
     pub metric_tag_values: MetricTagValues,
 }
 
+impl MetricToLogConfig {
+    pub fn build_transform(&self, context: &TransformContext) -> MetricToLog {
+        MetricToLog::new(
+            self.host_tag.as_deref(),
+            self.timezone.unwrap_or_else(|| context.globals.timezone()),
+            context.log_namespace(self.log_namespace),
+            self.metric_tag_values,
+        )
+    }
+}
+
 impl GenerateConfig for MetricToLogConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
@@ -79,12 +90,7 @@ impl GenerateConfig for MetricToLogConfig {
 #[typetag::serde(name = "metric_to_log")]
 impl TransformConfig for MetricToLogConfig {
     async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
-        Ok(Transform::function(MetricToLog::new(
-            self.host_tag.as_deref(),
-            self.timezone.unwrap_or_else(|| context.globals.timezone()),
-            context.log_namespace(self.log_namespace),
-            self.metric_tag_values,
-        )))
+        Ok(Transform::function(self.build_transform(context)))
     }
 
     fn input(&self) -> Input {
@@ -332,6 +338,8 @@ impl FunctionTransform for MetricToLog {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+
     use chrono::{offset::TimeZone, DateTime, Timelike, Utc};
     use futures::executor::block_on;
     use proptest::prelude::*;
@@ -401,7 +409,8 @@ mod tests {
         )
         .with_tags(Some(tags()))
         .with_timestamp(Some(ts()));
-        let metadata = counter.metadata().clone();
+        let mut metadata = counter.metadata().clone();
+        metadata.set_source_id(Arc::new(OutputId::from("in")));
 
         let log = do_transform(counter).await.unwrap();
         let collected: Vec<_> = log.all_fields().unwrap().collect();
@@ -428,7 +437,8 @@ mod tests {
             MetricValue::Gauge { value: 1.0 },
         )
         .with_timestamp(Some(ts()));
-        let metadata = gauge.metadata().clone();
+        let mut metadata = gauge.metadata().clone();
+        metadata.set_source_id(Arc::new(OutputId::from("in")));
 
         let log = do_transform(gauge).await.unwrap();
         let collected: Vec<_> = log.all_fields().unwrap().collect();
@@ -455,7 +465,8 @@ mod tests {
             },
         )
         .with_timestamp(Some(ts()));
-        let metadata = set.metadata().clone();
+        let mut metadata = set.metadata().clone();
+        metadata.set_source_id(Arc::new(OutputId::from("in")));
 
         let log = do_transform(set).await.unwrap();
         let collected: Vec<_> = log.all_fields().unwrap().collect();
@@ -484,7 +495,8 @@ mod tests {
             },
         )
         .with_timestamp(Some(ts()));
-        let metadata = distro.metadata().clone();
+        let mut metadata = distro.metadata().clone();
+        metadata.set_source_id(Arc::new(OutputId::from("in")));
 
         let log = do_transform(distro).await.unwrap();
         let collected: Vec<_> = log.all_fields().unwrap().collect();
@@ -532,7 +544,8 @@ mod tests {
             },
         )
         .with_timestamp(Some(ts()));
-        let metadata = histo.metadata().clone();
+        let mut metadata = histo.metadata().clone();
+        metadata.set_source_id(Arc::new(OutputId::from("in")));
 
         let log = do_transform(histo).await.unwrap();
         let collected: Vec<_> = log.all_fields().unwrap().collect();
@@ -578,7 +591,8 @@ mod tests {
             },
         )
         .with_timestamp(Some(ts()));
-        let metadata = summary.metadata().clone();
+        let mut metadata = summary.metadata().clone();
+        metadata.set_source_id(Arc::new(OutputId::from("in")));
 
         let log = do_transform(summary).await.unwrap();
         let collected: Vec<_> = log.all_fields().unwrap().collect();
@@ -668,10 +682,7 @@ mod tests {
             metric_tag_values,
             ..Default::default()
         }
-        .build(&TransformContext::default())
-        .await
-        .unwrap()
-        .into_function()
+        .build_transform(&TransformContext::default())
         .transform(&mut output, counter.into());
 
         assert_eq!(output.len(), 1);
