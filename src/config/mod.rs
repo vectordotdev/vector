@@ -20,6 +20,7 @@ use crate::{conditions, event::Metric, secrets::SecretBackends, serde::OneOrMany
 pub mod api;
 mod builder;
 mod cmd;
+mod constraints;
 mod compiler;
 mod diff;
 mod enrichment_table;

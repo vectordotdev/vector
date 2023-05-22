@@ -1,0 +1,47 @@
+{
+	// Use IntelliSense to learn about possible attributes.
+	// Hover to view descriptions of existing attributes.
+	// For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+	"version": "0.2.0",
+	"configurations": [
+		{
+			"name": "Debug Generate Component Docs",
+			"type": "Ruby",
+			"request": "launch",
+      "cwd": "${workspaceRoot}",
+			"program": "scripts/generate-component-docs.rb",
+      "args": ["/tmp/vector-config-schema.json"],
+      "env": {
+        "LOG_LEVEL": "debug"
+      }
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"name": "Vector Test / tracking-allocator debug",
+			"program": "${workspaceFolder}/target/debug/vector",
+			"args": [
+        "--allocation-tracing",
+        "--config", "/home/toby/testing/allocation-tracking/vector.toml"
+      ],
+      "stdio": "/home/toby/testing/allocation-tracking/10k-log-lines",
+			"cwd": "${workspaceFolder}"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"name": "Debug",
+			"program": "${workspaceFolder}/<your program>",
+			"args": [],
+			"cwd": "${workspaceFolder}"
+		},
+    {
+			"type": "lldb",
+			"request": "launch",
+			"name": "Debug generate-schema Subcommand",
+			"program": "${workspaceFolder}/target/debug/vector",
+			"args": ["generate-schema"],
+			"cwd": "${workspaceFolder}"
+		}
+	]
+}

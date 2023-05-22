@@ -312,9 +312,8 @@ impl HttpSinkConfigConstrainable {
 }
 
 impl Constrainable for HttpSinkConfig {
-    fn constraints<'a>(path: &'a InstancePath<'a>) -> Constraints<'a> {
-        let constraints = Constraints::from_path(path);
-        constraints
+    fn constraints(path: InstancePath) -> Constraints {
+        Constraints::from_path(path)
     }
 }
 

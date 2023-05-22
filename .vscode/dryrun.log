@@ -1,0 +1,16 @@
+make --dry-run --always-make --keep-going --print-directory
+make: Entering directory '/home/toby/src/vector'
+ 
+printf -- "\033[36m                                      __   __  __\033[0m\n"
+printf -- "\033[36m                                      \ \ / / / /\033[0m\n"
+printf -- "\033[36m                                       \ V / / / \033[0m\n"
+printf -- "\033[36m                                        \_/  \/  \033[0m\n"
+printf -- "\n"
+printf -- "                                      V E C T O R\n"
+printf -- "\n"
+printf -- "---------------------------------------------------------------------------------------\n"
+printf -- "Want to use \033[0;33m\`docker\`\033[0m or \033[0;33m\`podman\`\033[0m? See \033[0;33m\`ENVIRONMENT=true\`\033[0m commands. (Default \033[0;33m\`CONTAINER_TOOL=docker\`\033[0m)\n"
+printf -- "\n"
+awk 'BEGIN {FS = ":.*##"; printf "Usage: make \033[36m<target>\033[0m\n"} /^[a-zA-Z0-9_-]+:.*?##/ { printf "  \033[36m%-46s\033[0m %s\n", $1, $2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($0, 5) } ' Makefile
+make: Leaving directory '/home/toby/src/vector'
+ 

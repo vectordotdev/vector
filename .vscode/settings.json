@@ -1,0 +1,7 @@
+{
+	"rust-analyzer.server.extraEnv": {
+		"CARGO_TARGET_DIR": "/home/toby/src/vector/target/check"
+	},
+	"git.ignoreLimitWarning": true,
+	"rust-analyzer.showUnlinkedFileNotification": false
+}

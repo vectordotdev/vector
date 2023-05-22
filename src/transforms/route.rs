@@ -131,9 +131,12 @@ impl TransformConfig for RouteConfig {
 }
 
 impl Constrainable for RouteConfig {
-    fn constraints<'a>(path: &'a InstancePath<'a>) -> Constraints<'a> {
+    fn constraints(path: InstancePath) -> Constraints {
         let mut constraints = Constraints::from_path(path);
-        constraints.add("outputs", |path| Computed::derived(path.push("route"), DeriveOp::Keys));
+        constraints.add("outputs", |path| Computed::flatten(Computed::array([
+            Computed::derived(path.push("route"), DeriveOp::Keys),
+            Computed::fixed(UNMATCHED_ROUTE)
+        ])));
         constraints
     }
 }

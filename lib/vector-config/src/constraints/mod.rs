@@ -11,7 +11,7 @@ mod path;
 pub use self::path::InstancePath;
 
 pub trait Constrainable {
-    fn constraints<'a>(path: &'a InstancePath<'a>) -> Constraints<'a> {
+    fn constraints(path: InstancePath) -> Constraints {
         Constraints::from_path(path)
     }
 }
