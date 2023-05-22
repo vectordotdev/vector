@@ -11,7 +11,7 @@ releases: "0.30.0": {
 		a refresh of the component statuses in the docs following the [stability
 		guarantees](/docs/about/under-the-hood/guarantees/#stability-guarantees).
 
-		Be sure to check out the [upgrade guide](/highlights/2023-05-23-0-30-0-upgrade-guide) for
+		Be sure to check out the [upgrade guide](/highlights/2023-05-22-0-30-0-upgrade-guide) for
 		breaking changes in this release.
 		"""
 
@@ -88,7 +88,7 @@ releases: "0.30.0": {
 			description: """
 				The deprecated `max_length` option of the `socket` source was removed. Please see
 				the [upgrade
-				guide](/highlights/2023-05-23-0-30-0-upgrade-guide#socket-source-max-length) for
+				guide](/highlights/2023-05-22-0-30-0-upgrade-guide#socket-source-max-length) for
 				more details.
 				"""
 			breaking: true
