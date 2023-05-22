@@ -224,7 +224,7 @@ jobs:
             - "src/sinks/aws_s3/**"
             - "src/sinks/aws_sqs/**"
             - "src/sinks/util/**"
-            - "src/transforms/aws_**"
+            - "src/transforms/aws*"
           axiom:
             - "src/sinks/axiom.rs"
             - "src/sinks/util/**"
