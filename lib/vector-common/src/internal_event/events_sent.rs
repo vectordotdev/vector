@@ -32,10 +32,10 @@ crate::registered_event!(
 
         match &self.output {
             Some(output) => {
-                trace!(message = "Events sent.", count = %count, byte_size = %byte_size, output = %output);
+                trace!(message = "Events sent.", count = %count, byte_size = %byte_size.size(), output = %output);
             }
             None => {
-                trace!(message = "Events sent.", count = %count, byte_size = %byte_size);
+                trace!(message = "Events sent.", count = %count, byte_size = %byte_size.size());
             }
         }
 
