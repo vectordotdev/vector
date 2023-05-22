@@ -284,7 +284,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "86d6b683edf8d1119fe420a94f8a7e389239666aa72e65495d91c00462510151"
 dependencies = [
  "anstyle 1.0.0",
- "bstr 1.4.0",
+ "bstr 1.5.0",
  "doc-comment",
  "predicates",
  "predicates-core",
@@ -1624,9 +1624,9 @@ dependencies = [
 
 [[package]]
 name = "bstr"
-version = "1.4.0"
+version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c3d4260bcc2e8fc9df1eac4919a720effeb63a3f0952f5bf4944adfa18897f09"
+checksum = "a246e68bb43f6cd9db24bea052a53e40405417c5fb372e3d1a8a7f770a564ef5"
 dependencies = [
  "memchr",
  "once_cell",
@@ -3162,7 +3162,7 @@ dependencies = [
 name = "file-source"
 version = "0.1.0"
 dependencies = [
- "bstr 1.4.0",
+ "bstr 1.5.0",
  "bytes 1.4.0",
  "chrono",
  "crc",
