@@ -1369,9 +1369,9 @@ checksum = "0ea22880d78093b0cbe17c89f64a7d457941e65759157ec6cb31a31d652b05e5"
 
 [[package]]
 name = "base64"
-version = "0.21.0"
+version = "0.21.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a4a4ddaa51a5bc52a6948f74c06d20aaaddb71924eab79b8c97a8c556e942d6a"
+checksum = "3f1e31e207a6b8fb791a38ea3105e6cb541f55e4d029902d3039a4ad07cc4105"
 
 [[package]]
 name = "base64-simd"
@@ -1503,7 +1503,7 @@ version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "af254ed2da4936ef73309e9597180558821cb16ae9bba4cb24ce6b612d8d80ed"
 dependencies = [
- "base64 0.21.0",
+ "base64 0.21.1",
  "bollard-stubs",
  "bytes 1.4.0",
  "chrono",
@@ -4408,7 +4408,7 @@ version = "0.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cd990069640f9db34b3b0f7a1afc62a05ffaa3be9b66aa3c313f58346df7f788"
 dependencies = [
- "base64 0.21.0",
+ "base64 0.21.1",
  "bytes 1.4.0",
  "chrono",
  "http",
@@ -5583,7 +5583,7 @@ dependencies = [
  "async-compat",
  "async-trait",
  "backon",
- "base64 0.21.0",
+ "base64 0.21.1",
  "bytes 1.4.0",
  "chrono",
  "flagset",
@@ -6831,7 +6831,7 @@ version = "0.11.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cde824a14b7c14f85caff81225f411faacc04a2013f41670f41443742b1c1c55"
 dependencies = [
- "base64 0.21.0",
+ "base64 0.21.1",
  "bytes 1.4.0",
  "encoding_rs",
  "futures-core",
@@ -8520,7 +8520,7 @@ dependencies = [
  "async-stream",
  "async-trait",
  "axum",
- "base64 0.21.0",
+ "base64 0.21.1",
  "bytes 1.4.0",
  "flate2",
  "futures-core",
@@ -9227,7 +9227,7 @@ dependencies = [
  "azure_identity",
  "azure_storage",
  "azure_storage_blobs",
- "base64 0.21.0",
+ "base64 0.21.1",
  "bloom",
  "bollard",
  "bytes 1.4.0",
@@ -9544,7 +9544,7 @@ version = "0.1.0"
 dependencies = [
  "async-graphql",
  "async-trait",
- "base64 0.21.0",
+ "base64 0.21.1",
  "bitmask-enum",
  "bytes 1.4.0",
  "chrono",
@@ -9809,7 +9809,7 @@ source = "git+https://github.com/vectordotdev/vrl?rev=v0.3.0#113005bcee6cd7b5ea0
 dependencies = [
  "aes",
  "base16",
- "base64 0.21.0",
+ "base64 0.21.1",
  "bytes 1.4.0",
  "cbc",
  "cfb-mode",
@@ -10380,7 +10380,7 @@ checksum = "bd7b0b5b253ebc0240d6aac6dd671c495c467420577bf634d3064ae7e6fa2b4c"
 dependencies = [
  "assert-json-diff",
  "async-trait",
- "base64 0.21.0",
+ "base64 0.21.1",
  "deadpool",
  "futures 0.3.28",
  "futures-timer",
