@@ -548,7 +548,7 @@ jobs:
   publish-github:
     name: Publish to GitHub
     # We only publish to GitHub for versioned releases, not nightlies.
-    if: ${{ inputs.channel == 'release' }}
+    if: inputs.channel == 'release'
     runs-on: ubuntu-20.04
     needs:
       - generate-publish-metadata
@@ -618,7 +618,7 @@ jobs:
   publish-homebrew:
     name: Publish to Homebrew
     # We only publish to Homebrew for versioned releases, not nightlies.
-    if: ${{ inputs.channel == 'release' }}
+    if: inputs.channel == 'release'
     runs-on: ubuntu-20.04
     needs:
       - generate-publish-metadata
@@ -638,7 +638,7 @@ jobs:
   publish-cloudsmith:
     name: Publish to Cloudsmith
     # We only publish to CloudSmith for versioned releases, not nightlies.
-    if: ${{ inputs.channel == 'release' }}
+    if:  inputs.channel == 'release'
     runs-on: ubuntu-20.04
     needs:
       - generate-publish-metadata
@@ -751,7 +751,7 @@ jobs:
 
   publish-failure:
     name: Send Publish Failure Notification
-    if: ${{ inputs.channel != 'custom' }} && failure()
+    if: failure() && inputs.channel != 'custom'
     runs-on: ubuntu-20.04
     needs:
       - generate-publish-metadata
