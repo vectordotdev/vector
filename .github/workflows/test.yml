@@ -4,16 +4,10 @@ on:
   pull_request:
   merge_group:
     types: [checks_requested]
-  push:
-    branches:
-      - master
 
 concurrency:
-  # For pull requests, cancel running workflows, for master, run all
-  #
-  # `github.event.number` exists for pull requests, otherwise fall back to SHA
-  # for master
-  group: ${{ github.workflow }}-${{ github.event.number || github.sha }}
+  # `github.event.number` exists for pull requests, otherwise fall back to SHA for merge queue
+  group: ${{ github.workflow }}-${{ github.event.number || github.event.merge_group.base_sha }}
   cancel-in-progress: true
 
 env:
@@ -33,63 +27,11 @@ env:
 
 jobs:
   changes:
-      runs-on: ubuntu-20.04
-      # Set job outputs to values from filter step
-      outputs:
-        source: ${{ steps.filter.outputs.source }}
-        dependencies: ${{ steps.filter.outputs.dependencies }}
-        internal_events: ${{ steps.filter.outputs.internal_events }}
-        cue: ${{ steps.filter.outputs.cue }}
-        component_docs: ${{ steps.filter.outputs.component_docs }}
-        markdown: ${{ steps.filter.outputs.markdown }}
-      steps:
-      - uses: actions/checkout@v3
-      - uses: dorny/paths-filter@v2
-        id: filter
-        with:
-          filters: |
-            source:
-              - ".github/workflows/test.yml"
-              - ".cargo/**"
-              - "benches/**"
-              - "lib/**"
-              - "proto/**"
-              - "scripts/**"
-              - "src/**"
-              - "tests/**"
-              - "build.rs"
-              - "Cargo.lock"
-              - "Cargo.toml"
-              - "Makefile"
-              - "rust-toolchain.toml"
-              - "vdev/**"
-            deny:
-              - 'deny.toml'
-              - "vdev/**"
-            dependencies:
-              - ".cargo/**"
-              - 'Cargo.toml'
-              - 'Cargo.lock'
-              - 'rust-toolchain.toml'
-              - '.github/workflows/pr.yml'
-              - 'Makefile'
-              - 'scripts/cross/**'
-              - "vdev/**"
-            cue:
-              - 'website/cue/**'
-              - "vdev"
-            component_docs:
-              - 'scripts/generate-component-docs.rb'
-              - "vdev/**"
-            markdown:
-              - '**/**.md'
-              - "vdev/**"
-            internal_events:
-              - 'src/internal_events/**'
-              - "vdev/**"
-            docker:
-              - 'distribution/docker/**'
-              - "vdev/**"
+    uses: ./.github/workflows/changes.yml
+    secrets: inherit
+    with:
+      base_ref: ${{ github.event.merge_group.base_ref || github.event.pull_request.base.ref }}
+      head_ref: ${{ github.event.merge_group.head_ref || github.event.pull_request.head.ref }}
 
   # Remove this once https://github.com/vectordotdev/vector/issues/3771 is closed.
   # Then, modify the `cross-linux` job to run `test` instead of `build`.
@@ -123,153 +65,6 @@ jobs:
         run: scripts/upload-test-results.sh
         if: always()
 
-  test-cli:
-    name: CLI - Linux
-    runs-on: [linux, ubuntu-20.04-8core]
-    needs: changes
-    env:
-      CARGO_INCREMENTAL: 0
-    if: ${{ needs.changes.outputs.source == 'true' }}
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/cache@v3
-        name: Cache Cargo registry + index
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-
-      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - run: bash scripts/environment/prepare.sh
-      - run: echo "::add-matcher::.github/matchers/rust.json"
-      - run: make test-cli
-      - name: Upload test results
-        run: scripts/upload-test-results.sh
-        if: always()
-
-  test-misc:
-    name: Miscellaneous - Linux
-    runs-on: [linux, ubuntu-20.04-8core]
-    needs: changes
-    env:
-      CARGO_INCREMENTAL: 0
-    if: ${{ needs.changes.outputs.source == 'true' }}
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/cache@v3
-        name: Cache Cargo registry + index
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-
-      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - run: bash scripts/environment/prepare.sh
-      - run: echo "::add-matcher::.github/matchers/rust.json"
-      - run: make test-behavior
-      - run: make check-examples
-      - run: make test-docs
-
-  cross-linux:
-    name: Cross - ${{ matrix.target }}
-    runs-on: [linux, ubuntu-20.04-8core]
-    needs: changes
-    env:
-      CARGO_INCREMENTAL: 0
-    strategy:
-      matrix:
-        target:
-          - x86_64-unknown-linux-gnu
-          - x86_64-unknown-linux-musl
-          - aarch64-unknown-linux-gnu
-          - aarch64-unknown-linux-musl
-          - armv7-unknown-linux-gnueabihf
-          - armv7-unknown-linux-musleabihf
-
-    # We run cross checks when dependencies change to ensure they still build.
-    # This helps us avoid adopting dependencies that aren't compatible with other architectures.
-    if: ${{ needs.changes.outputs.dependencies == 'true' }}
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/cache@v3
-        name: Cache Cargo registry + index
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-
-      - run: echo "::add-matcher::.github/matchers/rust.json"
-      - run: 'cargo install cross --version 0.2.4 --force --locked'
-      # Why is this build, not check? Because we need to make sure the linking phase works.
-      # aarch64 and musl in particular are notoriously hard to link.
-      # While it may be tempting to slot a `check` in here for quickness, please don't.
-      - run: make cross-build-${{ matrix.target }}
-      - uses: actions/upload-artifact@v3
-        with:
-          name: "vector-debug-${{ matrix.target }}"
-          path: "./target/${{ matrix.target }}/debug/vector"
-
-  cross-linux-check:
-    if: ${{ needs.changes.outputs.dependencies == 'true' }}
-    runs-on: ubuntu-20.04
-    name: Cross - Linux
-    needs: cross-linux
-    steps:
-      - name: Check cross matrix status
-        if: ${{ needs.cross-linux.result != 'success' }}
-        run: exit 1
-
-  test-mac:
-    name: Unit - Mac
-    # Full CI suites for this platform were only recently introduced.
-    # Some failures are permitted until we can properly correct them.
-    continue-on-error: true
-    runs-on: macos-11
-    needs: changes
-    env:
-      CARGO_INCREMENTAL: 0
-    if: ${{ needs.changes.outputs.source == 'true' }}
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/cache@v3
-        name: Cache Cargo registry + index
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-
-      - run: bash scripts/environment/bootstrap-macos-10.sh
-      - run: bash scripts/environment/prepare.sh
-      - run: echo "::add-matcher::.github/matchers/rust.json"
-      - run: make test
-      - run: make test-behavior
-
-  test-windows:
-    name: Unit - Windows
-    runs-on: [windows, windows-2019-8core]
-    needs: changes
-    if: ${{ needs.changes.outputs.source == 'true' }}
-    steps:
-      - uses: actions/checkout@v3
-      - run: .\scripts\environment\bootstrap-windows-2019.ps1
-      - run: make test
-
   test-vrl:
     name: VRL - Linux
     continue-on-error: true
@@ -281,29 +76,6 @@ jobs:
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: cargo vdev test-vrl
-
-  check-component-features:
-    name: Component Features - Linux
-    runs-on: [linux, ubuntu-20.04-8core]
-    needs: changes
-    if: ${{ needs.changes.outputs.source == 'true' }}
-    steps:
-      - uses: actions/checkout@v3
-      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - run: bash scripts/environment/prepare.sh
-      - run: echo "::add-matcher::.github/matchers/rust.json"
-      - run: make check-component-features
-
-  check-msrv:
-    name: Check minimum supported Rust version
-    runs-on: [linux, ubuntu-20.04-8core]
-    needs: changes
-    if: ${{ needs.changes.outputs.source == 'true' }}
-    steps:
-      - uses: actions/checkout@v3
-      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - run: cargo install cargo-msrv --version 0.15.1
-      - run: cargo msrv verify
 
   checks:
     name: Checks
@@ -367,24 +139,14 @@ jobs:
           path: "/tmp/vector-config-schema.json"
         if: success() || failure()
 
-  master-failure:
-    name: master-failure
-    if: failure() && github.ref == 'refs/heads/master'
-    needs:
-      - changes
-      - cross-linux
-      - test-misc
-      - test-linux
-      - test-mac
-      - test-windows
-      - test-vrl
-      - check-component-features
-      - checks
+  all-checks:
+    name: Test Suite
     runs-on: ubuntu-20.04
+    needs:
+      - checks
+      - test-vrl
+      - test-linux
     steps:
-    - name: Discord notification
-      env:
-        DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
-      uses: Ilshidur/action-discord@0.3.2
-      with:
-        args: "Master tests failed: <https://github.com/${{github.repository}}/actions/runs/${{github.run_id}}>"
+      - name: validate
+        run: echo "OK"
+

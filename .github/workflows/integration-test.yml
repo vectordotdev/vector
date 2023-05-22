@@ -1,34 +1,28 @@
-name: Integration Test Suite
+# This workflow is used to run an integration test.
+# The most common use case is that it is triggered by another workflow,
+# such as the Master Merge Queue Suite, or the Integration Comment.
+#
+# It can also be triggered on manual dispatch in CI however.
+# In that use case, an input for the test name needs to be provided.
+# TODO: check if the input is "all" , and run all, without a timeout?
+
+name: Integration Test
 
 on:
+  workflow_call:
+    inputs:
+      if:
+         required: false
+         type: boolean
+      test_name:
+        required: true
+        type: string
   workflow_dispatch:
-  push:
-    branches:
-      - master
-    paths:
-      - ".github/workflows/integration-test.yml"
-      - ".cargo/**"
-      - "benches/**"
-      - "lib/**"
-      - "proto/**"
-      - "scripts/**"
-      - "src/**"
-      - "tests/**"
-      - "build.rs"
-      - "Cargo.lock"
-      - "Cargo.toml"
-      - "Makefile"
-      - "rust-toolchain"
-  pull_request:
-    types: [opened, synchronize, reopened, labeled]
-
-concurrency:
-  # For pull requests, cancel running workflows, for master, run all
-  #
-  # `github.event.number` exists for pull requests, otherwise fall back to SHA
-  # for master
-  group: ${{ github.workflow }}-${{ github.event.number || github.sha }}
-  cancel-in-progress: true
+    inputs:
+      test_name:
+        description: "Which integration to test."
+        required: true
+        type: string
 
 env:
   AWS_ACCESS_KEY_ID: "dummy"
@@ -46,85 +40,36 @@ env:
 
 jobs:
   test-integration:
-    name: Integration - Linux, ${{ matrix.test }}
     runs-on: [linux, ubuntu-20.04-8core]
-    if: |
-      !github.event.pull_request
-        || contains(github.event.pull_request.labels.*.name, 'ci-condition: integration tests enable')
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - test: 'amqp'
-          - test: 'appsignal'
-          - test: 'aws'
-          - test: 'axiom'
-          - test: 'azure'
-          - test: 'clickhouse'
-          - test: 'databend'
-          - test: 'datadog-agent'
-          - test: 'datadog-logs'
-          - test: 'datadog-metrics'
-          - test: 'datadog-traces'
-          - test: 'dnstap'
-          - test: 'docker-logs'
-          - test: 'elasticsearch'
-          - test: 'eventstoredb'
-          - test: 'fluent'
-          - test: 'gcp'
-          - test: 'humio'
-          - test: 'http-client'
-          - test: 'influxdb'
-          - test: 'kafka'
-          - test: 'logstash'
-          - test: 'loki'
-          - test: 'mongodb'
-          - test: 'nats'
-          - test: 'nginx'
-          - test: 'opentelemetry'
-          - test: 'postgres'
-          - test: 'prometheus'
-          - test: 'pulsar'
-          - test: 'redis'
-          - test: 'shutdown'
-          - test: 'splunk'
-          - test: 'webhdfs'
     timeout-minutes: 30
+    if: inputs.if || github.event_name == 'workflow_dispatch'
     steps:
-      - uses: actions/checkout@v3
+      - name: (PR comment) Get PR branch
+        if: ${{ github.event_name == 'issue_comment' }}
+        uses: xt0rted/pull-request-comment-branch@v1
+        id: comment-branch
+
+      - name: (PR comment) Checkout PR branch
+        if: ${{ github.event_name == 'issue_comment' }}
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ steps.comment-branch.outputs.head_ref }}
+
+      - name: Checkout branch
+        if: ${{ github.event_name != 'issue_comment' }}
+        uses: actions/checkout@v3
+
       - run: sudo npm -g install @datadog/datadog-ci
-      - run: make test-integration-${{ matrix.test }}
+
+      - run: make test-integration-${{ inputs.test_name }}
         env:
           TEST_DATADOG_API_KEY: ${{ secrets.CI_TEST_DATADOG_API_KEY }}
-          SPLUNK_VERSION: ${{ matrix.env.SPLUNK_VERSION }}
+
       - name: Upload test results
         run: scripts/upload-test-results.sh
         if: always()
-      - run: make test-integration-${{ matrix.test }}-cleanup
+
+      - run: make test-integration-${{ inputs.test_name }}-cleanup
         if: ${{ always() }}
         env:
           TEST_DATADOG_API_KEY: ${{ secrets.CI_TEST_DATADOG_API_KEY }}
-          SPLUNK_VERSION: ${{ matrix.env.SPLUNK_VERSION }}
-
-  test-integration-check:
-    name: test-integration-check
-    runs-on: ubuntu-20.04
-    needs:
-      - test-integration
-    steps:
-      - name: validate
-        run: echo "OK"
-
-  master-failure:
-    name: master-failure
-    if: failure() && github.ref == 'refs/heads/master'
-    needs:
-      - test-integration-check
-    runs-on: ubuntu-20.04
-    steps:
-    - name: Discord notification
-      env:
-        DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
-      uses: Ilshidur/action-discord@0.3.2
-      with:
-        args: "Master integration tests failed: <https://github.com/${{github.repository}}/actions/runs/${{github.run_id}}>"
