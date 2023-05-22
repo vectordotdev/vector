@@ -6,8 +6,9 @@ use futures::{stream::BoxStream, SinkExt, StreamExt};
 use snafu::{ResultExt, Snafu};
 use tokio::{net::UnixStream, time::sleep};
 use tokio_util::codec::Encoder;
+use vector_common::json_size::JsonSize;
 use vector_config::configurable_component;
-use vector_core::ByteSizeOf;
+use vector_core::{ByteSizeOf, EstimatedJsonEncodedSizeOf};
 
 use crate::{
     codecs::Transformer,
@@ -151,6 +152,7 @@ where
         let mut input = input
             .map(|mut event| {
                 let byte_size = event.size_of();
+                let json_byte_size = event.estimated_json_encoded_size_of();
 
                 transformer.transform(&mut event);
 
@@ -164,9 +166,10 @@ where
                         item,
                         finalizers,
                         byte_size,
+                        json_byte_size,
                     }
                 } else {
-                    EncodedEvent::new(Bytes::new(), 0)
+                    EncodedEvent::new(Bytes::new(), 0, JsonSize::zero())
                 }
             })
             .peekable();

@@ -3,7 +3,7 @@ use std::num::NonZeroUsize;
 use vector_buffers::EventCount;
 use vector_core::{ByteSizeOf, EstimatedJsonEncodedSizeOf};
 
-use vector_common::request_metadata::RequestMetadata;
+use vector_common::{json_size::JsonSize, request_metadata::RequestMetadata};
 
 use super::request_builder::EncodeResult;
 
@@ -11,7 +11,7 @@ use super::request_builder::EncodeResult;
 pub struct RequestMetadataBuilder {
     event_count: usize,
     events_byte_size: usize,
-    events_estimated_json_encoded_byte_size: usize,
+    events_estimated_json_encoded_byte_size: JsonSize,
 }
 
 impl RequestMetadataBuilder {
@@ -29,7 +29,7 @@ impl RequestMetadataBuilder {
     pub const fn new(
         event_count: usize,
         events_byte_size: usize,
-        events_estimated_json_encoded_byte_size: usize,
+        events_estimated_json_encoded_byte_size: JsonSize,
     ) -> Self {
         Self {
             event_count,
@@ -38,9 +38,15 @@ impl RequestMetadataBuilder {
         }
     }
 
-    pub fn increment(&mut self, event_count: usize, events_byte_size: usize) {
+    pub fn increment(
+        &mut self,
+        event_count: usize,
+        events_byte_size: usize,
+        json_byte_size: JsonSize,
+    ) {
         self.event_count += event_count;
         self.events_byte_size += events_byte_size;
+        self.events_estimated_json_encoded_byte_size += json_byte_size;
     }
 
     pub fn with_request_size(&self, size: NonZeroUsize) -> RequestMetadata {

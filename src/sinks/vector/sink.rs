@@ -4,6 +4,7 @@ use async_trait::async_trait;
 use futures::{stream::BoxStream, StreamExt};
 use prost::Message;
 use tower::Service;
+use vector_common::json_size::JsonSize;
 use vector_core::{
     stream::{BatcherSettings, DriverResponse},
     ByteSizeOf,
@@ -62,7 +63,7 @@ where
                 let builder = RequestMetadataBuilder::new(
                     event_collection.events.len(),
                     event_collection.events_byte_size,
-                    event_collection.events_byte_size, // this is fine as it isn't being used
+                    JsonSize::new(event_collection.events_byte_size), // this is fine as it isn't being used
                 );
 
                 let encoded_events = proto_vector::PushEventsRequest {

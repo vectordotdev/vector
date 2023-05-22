@@ -9,7 +9,10 @@ use http::{Request, StatusCode, Uri};
 use hyper::Body;
 use snafu::ResultExt;
 use tower::Service;
-use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
+use vector_common::{
+    json_size::JsonSize,
+    request_metadata::{MetaDescriptive, RequestMetadata},
+};
 use vector_core::{
     event::{EventFinalizers, EventStatus, Finalizable},
     internal_event::CountByteSize,
@@ -91,7 +94,7 @@ pub struct TraceApiResponse {
     status_code: StatusCode,
     body: Bytes,
     batch_size: usize,
-    byte_size: usize,
+    byte_size: JsonSize,
     uncompressed_size: usize,
 }
 
@@ -146,7 +149,9 @@ impl Service<TraceApiRequest> for TraceApiService {
         let client = self.client.clone();
 
         Box::pin(async move {
-            let byte_size = request.get_metadata().events_byte_size();
+            let byte_size = request
+                .get_metadata()
+                .events_estimated_json_encoded_byte_size();
             let batch_size = request.get_metadata().event_count();
             let uncompressed_size = request.uncompressed_size;
             let http_request = request.into_http_request().context(BuildRequestSnafu)?;

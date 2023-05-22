@@ -19,13 +19,14 @@ use tower::Service;
 use tracing::Instrument;
 use vector_common::{
     finalization::{EventStatus, Finalizable},
+    json_size::JsonSize,
     request_metadata::{MetaDescriptive, RequestMetadata},
 };
 use vector_core::{
     internal_event::CountByteSize,
     sink::StreamSink,
     stream::{BatcherSettings, DriverResponse},
-    ByteSizeOf,
+    EstimatedJsonEncodedSizeOf,
 };
 
 use crate::{
@@ -168,7 +169,7 @@ impl Finalizable for OpenDalRequest {
 pub struct OpenDalMetadata {
     pub partition_key: String,
     pub count: usize,
-    pub byte_size: usize,
+    pub byte_size: JsonSize,
     pub finalizers: EventFinalizers,
 }
 
@@ -204,7 +205,7 @@ impl RequestBuilder<(String, Vec<Event>)> for OpenDalRequestBuilder {
         let opendal_metadata = OpenDalMetadata {
             partition_key,
             count: events.len(),
-            byte_size: events.size_of(),
+            byte_size: events.estimated_json_encoded_size_of(),
             finalizers,
         };
 
@@ -237,7 +238,7 @@ impl RequestBuilder<(String, Vec<Event>)> for OpenDalRequestBuilder {
 #[derive(Debug)]
 pub struct OpenDalResponse {
     pub count: usize,
-    pub events_byte_size: usize,
+    pub events_byte_size: JsonSize,
     pub byte_size: usize,
 }
 

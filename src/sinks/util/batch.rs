@@ -3,6 +3,7 @@ use std::{marker::PhantomData, num::NonZeroUsize, time::Duration};
 use derivative::Derivative;
 use serde_with::serde_as;
 use snafu::Snafu;
+use vector_common::json_size::JsonSize;
 use vector_config::configurable_component;
 use vector_core::stream::BatcherSettings;
 
@@ -362,6 +363,7 @@ pub struct EncodedBatch<I> {
     pub finalizers: EventFinalizers,
     pub count: usize,
     pub byte_size: usize,
+    pub json_byte_size: JsonSize,
 }
 
 /// This is a batch construct that stores an set of event finalizers alongside the batch itself.
@@ -374,6 +376,7 @@ pub struct FinalizersBatch<B> {
     // could be smaller due to aggregated items (ie metrics).
     count: usize,
     byte_size: usize,
+    json_byte_size: JsonSize,
 }
 
 impl<B: Batch> From<B> for FinalizersBatch<B> {
@@ -383,6 +386,7 @@ impl<B: Batch> From<B> for FinalizersBatch<B> {
             finalizers: Default::default(),
             count: 0,
             byte_size: 0,
+            json_byte_size: JsonSize::zero(),
         }
     }
 }
@@ -402,18 +406,21 @@ impl<B: Batch> Batch for FinalizersBatch<B> {
             item,
             finalizers,
             byte_size,
+            json_byte_size,
         } = item;
         match self.inner.push(item) {
             PushResult::Ok(full) => {
                 self.finalizers.merge(finalizers);
                 self.count += 1;
                 self.byte_size += byte_size;
+                self.json_byte_size += json_byte_size;
                 PushResult::Ok(full)
             }
             PushResult::Overflow(item) => PushResult::Overflow(EncodedEvent {
                 item,
                 finalizers,
                 byte_size,
+                json_byte_size,
             }),
         }
     }
@@ -428,6 +435,7 @@ impl<B: Batch> Batch for FinalizersBatch<B> {
             finalizers: Default::default(),
             count: 0,
             byte_size: 0,
+            json_byte_size: JsonSize::zero(),
         }
     }
 
@@ -437,6 +445,7 @@ impl<B: Batch> Batch for FinalizersBatch<B> {
             finalizers: self.finalizers,
             count: self.count,
             byte_size: self.byte_size,
+            json_byte_size: self.json_byte_size,
         }
     }
 

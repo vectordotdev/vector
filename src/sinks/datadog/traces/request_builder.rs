@@ -8,7 +8,7 @@ use std::{
 use bytes::Bytes;
 use prost::Message;
 use snafu::Snafu;
-use vector_common::request_metadata::RequestMetadata;
+use vector_common::{json_size::JsonSize, request_metadata::RequestMetadata};
 use vector_core::event::{EventFinalizers, Finalizable};
 
 use super::{
@@ -142,7 +142,8 @@ impl IncrementalRequestBuilder<(PartitionKey, Vec<Event>)> for DatadogTracesRequ
                             let builder = RequestMetadataBuilder::new(
                                 n,
                                 uncompressed_size,
-                                uncompressed_size,
+                                // TODO - this is wrong
+                                JsonSize::new(uncompressed_size),
                             );
                             let bytes_len = NonZeroUsize::new(bytes.len())
                                 .expect("payload should never be zero length");

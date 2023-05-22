@@ -11,7 +11,7 @@ use tokio_util::codec::Encoder;
 use tower::{Service, ServiceBuilder};
 
 use vector_config::configurable_component;
-use vector_core::ByteSizeOf;
+use vector_core::{ByteSizeOf, EstimatedJsonEncodedSizeOf};
 
 #[cfg(unix)]
 use crate::sinks::util::unix::UnixSinkConfig;
@@ -145,12 +145,14 @@ impl SinkConfig for StatsdSinkConfig {
                 .with_flat_map(move |event: Event| {
                     stream::iter({
                         let byte_size = event.size_of();
+                        let json_byte_size = event.estimated_json_encoded_size_of();
+
                         let mut bytes = BytesMut::new();
 
                         // Errors are handled by `Encoder`.
                         encoder
                             .encode(event, &mut bytes)
-                            .map(|_| Ok(EncodedEvent::new(bytes, byte_size)))
+                            .map(|_| Ok(EncodedEvent::new(bytes, byte_size, json_byte_size)))
                     })
                 });
 

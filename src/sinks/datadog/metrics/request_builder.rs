@@ -2,7 +2,7 @@ use bytes::Bytes;
 use serde_json::error::Category;
 use snafu::Snafu;
 use std::{num::NonZeroUsize, sync::Arc};
-use vector_common::request_metadata::RequestMetadata;
+use vector_common::{json_size::JsonSize, request_metadata::RequestMetadata};
 use vector_core::event::{EventFinalizers, Finalizable, Metric};
 
 use super::{
@@ -219,7 +219,9 @@ impl IncrementalRequestBuilder<((Option<Arc<str>>, DatadogMetricsEndpoint), Vec<
                         let builder = RequestMetadataBuilder::new(
                             metrics.len(),
                             raw_bytes_written,
-                            raw_bytes_written,
+                            // TODO: This is wrong. We need to write the estimated json size here rather than
+                            // the actual compressed bytes written.
+                            JsonSize::new(raw_bytes_written),
                         );
                         let bytes_len = NonZeroUsize::new(payload.len())
                             .expect("payload should never be zero length");
@@ -336,8 +338,12 @@ fn encode_now_or_never(
                 finalizers,
                 raw_bytes: raw_bytes_written,
             };
-            let builder =
-                RequestMetadataBuilder::new(metrics_len, raw_bytes_written, raw_bytes_written);
+            let builder = RequestMetadataBuilder::new(
+                metrics_len,
+                raw_bytes_written,
+                // TODO - this is wrong.
+                JsonSize::new(raw_bytes_written),
+            );
             let bytes_len =
                 NonZeroUsize::new(payload.len()).expect("payload should never be zero length");
             let request_metadata = builder.with_request_size(bytes_len);

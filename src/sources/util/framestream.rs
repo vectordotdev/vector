@@ -157,9 +157,11 @@ impl FrameStreamReader {
         } else {
             //data frame
             if self.state.control_state == ControlState::ReadingData {
+                // TODO: This is wrong. We need to get the event to emit the json size.
+                // This will need emitting somewhere completely different.
                 emit!(SocketEventsReceived {
                     mode: SocketMode::Unix,
-                    byte_size: frame.len(),
+                    byte_size: frame.len().into(),
                     count: 1
                 });
                 Some(frame) //return data frame

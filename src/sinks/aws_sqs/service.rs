@@ -68,4 +68,8 @@ impl DriverResponse for SendMessageResponse {
     fn events_sent(&self) -> CountByteSize {
         CountByteSize(1, self.json_byte_size)
     }
+
+    fn bytes_sent(&self) -> Option<usize> {
+        Some(self.byte_size)
+    }
 }
