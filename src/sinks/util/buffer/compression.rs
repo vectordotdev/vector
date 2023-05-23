@@ -193,20 +193,17 @@ impl<'de> de::Deserialize<'de> for Compression {
                     )),
                 }?;
 
-                match compression.compression_level() {
-                    CompressionLevel::Val(level) => {
-                        let max_level = compression.max_compression_level_val();
-                        if level > max_level {
-                            let msg = std::format!(
-                                "invalid value `{}`, expected value in range [0, {}]",
-                                level,
-                                max_level
-                            );
-                            return Err(de::Error::custom(msg));
-                        }
+                if let CompressionLevel::Val(level) = compression.compression_level() {
+                    let max_level = compression.max_compression_level_val();
+                    if level > max_level {
+                        let msg = std::format!(
+                            "invalid value `{}`, expected value in range [0, {}]",
+                            level,
+                            max_level
+                        );
+                        return Err(de::Error::custom(msg));
                     }
-                    _ => {}
-                };
+                }
 
                 Ok(compression)
             }
@@ -409,7 +406,7 @@ impl<'de> de::Deserialize<'de> for CompressionLevel {
             type Value = CompressionLevel;
 
             fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
-                f.write_str("number or string")
+                f.write_str("unsigned number or string")
             }
 
             fn visit_str<E>(self, s: &str) -> Result<Self::Value, E>
@@ -428,16 +425,6 @@ impl<'de> de::Deserialize<'de> for CompressionLevel {
                         ))
                     }
                 }
-            }
-
-            fn visit_i64<E>(self, v: i64) -> Result<Self::Value, E>
-            where
-                E: de::Error,
-            {
-                Err(de::Error::invalid_value(
-                    de::Unexpected::Other(&v.to_string()),
-                    &"for zstd: [0, 21]; for gzip, zlib: [0, 9]",
-                ))
             }
 
             fn visit_u64<E>(self, v: u64) -> Result<Self::Value, E>
@@ -558,7 +545,7 @@ mod test {
             ),
             (
                 r#"{"algorithm": "gzip", "level": -1}"#,
-                r#"invalid value: -1, expected for zstd: [0, 21]; for gzip, zlib: [0, 9] at line 1 column 33"#,
+                r#"invalid type: integer `-1`, expected unsigned number or string at line 1 column 33"#,
             ),
             (
                 r#"{"algorithm": "gzip", "level": "good"}"#,
@@ -566,7 +553,7 @@ mod test {
             ),
             (
                 r#"{"algorithm": "gzip", "level": {}}"#,
-                r#"invalid type: map, expected number or string at line 1 column 33"#,
+                r#"invalid type: map, expected unsigned number or string at line 1 column 33"#,
             ),
             (
                 r#"{"algorithm": "gzip", "level": "default", "key": 42}"#,

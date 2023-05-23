@@ -12,7 +12,15 @@ impl From<CompressionLevel> for ZstdCompressionLevel {
             CompressionLevel::Default => zstd::DEFAULT_COMPRESSION_LEVEL,
             CompressionLevel::Best => 21,
             CompressionLevel::Fast => 1,
-            CompressionLevel::Val(v) => v as i32,
+            CompressionLevel::Val(v) => {
+                if v < 1 {
+                    1
+                } else if v > 21 {
+                    21
+                } else {
+                    v as i32
+                }
+            }
         };
         ZstdCompressionLevel(val)
     }
@@ -45,6 +53,7 @@ impl<W: io::Write> ZstdEncoder<W> {
 
 impl<W: io::Write> io::Write for ZstdEncoder<W> {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        #[allow(clippy::disallowed_methods)] // Caller handles the result of `write`.
         self.inner.write(buf)
     }
 
