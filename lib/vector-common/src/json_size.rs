@@ -52,25 +52,30 @@ impl From<usize> for JsonSize {
 
 impl JsonSize {
     /// Create a new instance with the specified size.
+    #[must_use]
     pub const fn new(size: usize) -> Self {
         Self(size)
     }
 
     /// Create a new instance with size 0.
+    #[must_use]
     pub const fn zero() -> Self {
         Self(0)
     }
 
     /// Returns the contained size.
+    #[must_use]
     pub fn size(&self) -> usize {
         self.0
     }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[allow(clippy::module_name_repetitions)]
 pub struct NonZeroJsonSize(JsonSize);
 
 impl NonZeroJsonSize {
+    #[must_use]
     pub fn new(size: JsonSize) -> Option<Self> {
         if size.0 == 0 {
             None
