@@ -27,7 +27,7 @@ jobs:
 
       - name: (PR comment) Set latest commit status as pending
         if: ${{ github.event_name == 'issue_comment' }}
-        uses: myrotvorets/set-commit-status-action@1.1.6
+        uses: myrotvorets/set-commit-status-action@v1.1.7
         with:
           sha: ${{ steps.comment-branch.outputs.head_sha }}
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -68,7 +68,7 @@ jobs:
           path: "./target/${{ matrix.target }}/debug/vector"
 
       - name: (PR comment) Set latest commit status as failed
-        uses: myrotvorets/set-commit-status-action@1.1.6
+        uses: myrotvorets/set-commit-status-action@v1.1.7
         if: failure() && github.event_name == 'issue_comment'
         with:
           sha: ${{ steps.comment-branch.outputs.head_sha }}
@@ -94,7 +94,7 @@ jobs:
         id: comment-branch
 
       - name: (PR comment) Submit PR result as success
-        uses: myrotvorets/set-commit-status-action@1.1.6
+        uses: myrotvorets/set-commit-status-action@v1.1.7
         with:
           sha: ${{ steps.comment-branch.outputs.head_sha }}
           token: ${{ secrets.GITHUB_TOKEN }}

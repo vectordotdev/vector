@@ -77,7 +77,7 @@ jobs:
 
       - name: (PR comment) Set latest commit status as pending
         if: ${{ github.event_name == 'issue_comment' }}
-        uses: myrotvorets/set-commit-status-action@1.1.6
+        uses: myrotvorets/set-commit-status-action@v1.1.7
         with:
           sha: ${{ steps.comment-branch.outputs.head_sha }}
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -111,7 +111,7 @@ jobs:
           path: target/artifacts/*
 
       - name: (PR comment) Set latest commit status as 'failure'
-        uses: myrotvorets/set-commit-status-action@1.1.6
+        uses: myrotvorets/set-commit-status-action@v1.1.7
         if: failure() && github.event_name == 'issue_comment'
         with:
           sha: ${{ steps.comment-branch.outputs.head_sha }}
@@ -229,7 +229,7 @@ jobs:
           CARGO_INCREMENTAL: 0
 
       - name: (PR comment) Set latest commit status as failure
-        uses: myrotvorets/set-commit-status-action@1.1.6
+        uses: myrotvorets/set-commit-status-action@v1.1.7
         if: failure() && github.event_name == 'issue_comment'
         with:
           sha: ${{ steps.comment-branch.outputs.head_sha }}
@@ -261,7 +261,7 @@ jobs:
 
       - name: (PR comment) Submit PR result as success
         if: success() && github.event_name == 'issue_comment'
-        uses: myrotvorets/set-commit-status-action@1.1.6
+        uses: myrotvorets/set-commit-status-action@v1.1.7
         with:
           sha: ${{ steps.comment-branch.outputs.head_sha }}
           token: ${{ secrets.GITHUB_TOKEN }}
