@@ -1152,7 +1152,7 @@ mod test {
 
             // Shutdown the source, and make sure we've got all the messages we sent in.
             shutdown
-                .shutdown_all(Instant::now() + Duration::from_millis(100))
+                .shutdown_all(Some(Instant::now() + Duration::from_millis(100)))
                 .await;
             shutdown_complete.await;
 
@@ -1229,7 +1229,7 @@ mod test {
             sleep(Duration::from_secs(1)).await;
 
             shutdown
-                .shutdown_all(Instant::now() + Duration::from_millis(100))
+                .shutdown_all(Some(Instant::now() + Duration::from_millis(100)))
                 .await;
             shutdown_complete.await;
 
@@ -1306,7 +1306,7 @@ mod test {
 
             // Shutdown the source, and make sure we've got all the messages we sent in.
             shutdown
-                .shutdown_all(Instant::now() + Duration::from_millis(100))
+                .shutdown_all(Some(Instant::now() + Duration::from_millis(100)))
                 .await;
             shutdown_complete.await;
 

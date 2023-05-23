@@ -486,7 +486,7 @@ mod test {
         // everything that was in up without having to know the exact count.
         sleep(Duration::from_millis(250)).await;
         shutdown
-            .shutdown_all(Instant::now() + Duration::from_millis(100))
+            .shutdown_all(Some(Instant::now() + Duration::from_millis(100)))
             .await;
 
         // Read all the events into a `MetricState`, which handles normalizing metrics and tracking
@@ -578,7 +578,7 @@ mod test {
         // everything that was in up without having to know the exact count.
         sleep(Duration::from_millis(250)).await;
         shutdown
-            .shutdown_all(Instant::now() + Duration::from_millis(100))
+            .shutdown_all(Some(Instant::now() + Duration::from_millis(100)))
             .await;
     }
 }
