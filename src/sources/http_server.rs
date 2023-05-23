@@ -447,7 +447,7 @@ impl HttpSource for SimpleHttpSource {
                     // handling is needed here
                     return Err(ErrorMessage::new(
                         StatusCode::BAD_REQUEST,
-                        format!("Failed decoding body: {}", error),
+                        format!("Failed decoding body! {}", error),
                     ));
                 }
             }
