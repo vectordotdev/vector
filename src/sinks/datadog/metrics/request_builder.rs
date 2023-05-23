@@ -2,7 +2,7 @@ use bytes::Bytes;
 use serde_json::error::Category;
 use snafu::Snafu;
 use std::{num::NonZeroUsize, sync::Arc};
-use vector_common::{json_size::JsonSize, request_metadata::RequestMetadata};
+use vector_common::request_metadata::RequestMetadata;
 use vector_core::{
     event::{EventFinalizers, Finalizable, Metric},
     EstimatedJsonEncodedSizeOf,

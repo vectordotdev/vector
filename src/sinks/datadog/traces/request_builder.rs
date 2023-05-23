@@ -8,7 +8,7 @@ use std::{
 use bytes::Bytes;
 use prost::Message;
 use snafu::Snafu;
-use vector_common::{json_size::JsonSize, request_metadata::RequestMetadata};
+use vector_common::request_metadata::RequestMetadata;
 use vector_core::{
     event::{EventFinalizers, Finalizable},
     EstimatedJsonEncodedSizeOf,
