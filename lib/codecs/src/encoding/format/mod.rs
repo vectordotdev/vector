@@ -10,12 +10,14 @@ mod json;
 mod logfmt;
 mod native;
 mod native_json;
+mod parquet;
 mod raw_message;
 mod text;
 
 use std::fmt::Debug;
 
 pub use self::csv::{CsvSerializer, CsvSerializerConfig};
+pub use self::parquet::{ParquetSerializer, ParquetSerializerConfig, ParquetSerializerOptions};
 pub use avro::{AvroSerializer, AvroSerializerConfig, AvroSerializerOptions};
 use dyn_clone::DynClone;
 pub use gelf::{GelfSerializer, GelfSerializerConfig};

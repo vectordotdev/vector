@@ -1,14 +1,12 @@
-use std::io;
+use std::{io, sync::Arc};
 
 use bytes::Bytes;
 use chrono::Utc;
-use codecs::encoding::Framer;
 use uuid::Uuid;
 use vector_common::request_metadata::RequestMetadata;
 use vector_core::event::Finalizable;
 
 use crate::{
-    codecs::{Encoder, Transformer},
     event::Event,
     sinks::{
         s3_common::{
@@ -17,8 +15,8 @@ use crate::{
             service::{S3Metadata, S3Request},
         },
         util::{
-            metadata::RequestMetadataBuilder, request_builder::EncodeResult, Compression,
-            RequestBuilder,
+            encoding::Encoder, metadata::RequestMetadataBuilder, request_builder::EncodeResult,
+            Compression, RequestBuilder,
         },
     },
 };
@@ -30,14 +28,14 @@ pub struct S3RequestOptions {
     pub filename_append_uuid: bool,
     pub filename_extension: Option<String>,
     pub api_options: S3Options,
-    pub encoder: (Transformer, Encoder<Framer>),
+    pub encoder: Arc<dyn Encoder<Vec<Event>> + Send + Sync>,
     pub compression: Compression,
 }
 
 impl RequestBuilder<(S3PartitionKey, Vec<Event>)> for S3RequestOptions {
     type Metadata = S3Metadata;
     type Events = Vec<Event>;
-    type Encoder = (Transformer, Encoder<Framer>);
+    type Encoder = Arc<dyn Encoder<Vec<Event>> + Send + Sync>;
     type Payload = Bytes;
     type Request = S3Request;
     type Error = io::Error; // TODO: this is ugly.
