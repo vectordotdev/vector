@@ -47,6 +47,7 @@ pub struct AvroSerializerOptions {
     #[configurable(metadata(
         docs::examples = r#"{ "type": "record", "name": "log", "fields": [{ "name": "message", "type": "string" }] }"#
     ))]
+    #[configurable(metadata(docs::human_name = "Schema JSON"))]
     pub schema: String,
 }
 
