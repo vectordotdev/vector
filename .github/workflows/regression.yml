@@ -61,6 +61,8 @@ jobs:
           all_changed:
             - added|deleted|modified: "**"
           ignore:
+            - "./.github/**"
+            - "./.gitignore"
             - "distribution/**"
             - "rust-doc/**"
             - "docs/**"
