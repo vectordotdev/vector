@@ -108,7 +108,7 @@ pub struct ByteSize(pub usize);
 #[derive(Clone, Copy)]
 pub struct Count(pub usize);
 
-/// Holds the tuple `(count_of_events, size_of_events_in_bytes)`.
+/// Holds the tuple `(count_of_events, estimated_json_size_of_events)`.
 #[derive(Clone, Copy)]
 pub struct CountByteSize(pub usize, pub JsonSize);
 

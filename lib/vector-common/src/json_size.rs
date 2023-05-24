@@ -4,7 +4,7 @@ use std::{
     ops::{Add, AddAssign, Sub},
 };
 
-/// A newtype for the Json size of an event.
+/// A newtype for the JSON size of an event.
 /// Used to emit the `component_received_event_bytes_total` and
 /// `component_sent_event_bytes_total` metrics.
 #[derive(Clone, Copy, Default, Debug, PartialEq, Eq, PartialOrd, Ord)]
