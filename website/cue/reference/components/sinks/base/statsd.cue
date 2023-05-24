@@ -31,7 +31,7 @@ base: components: sinks: statsd: configuration: {
 		description: """
 			The address to connect to.
 
-			Both IP addresses and hostnames/fully-qualified domain names are accepted formats.
+			Both IP addresses and hostnames/fully qualified domain names (FQDNs) are accepted formats.
 
 			The address _must_ include a port.
 			"""
@@ -226,10 +226,13 @@ base: components: sinks: statsd: configuration: {
 	unix_mode: {
 		description:   "The Unix socket mode to use."
 		relevant_when: "mode = \"unix\""
-		required:      true
-		type: string: enum: {
-			Datagram: "Datagram-oriented (`SOCK_DGRAM`)."
-			Stream:   "Stream-oriented (`SOCK_STREAM`)."
+		required:      false
+		type: string: {
+			default: "Stream"
+			enum: {
+				Datagram: "Datagram-oriented (`SOCK_DGRAM`)."
+				Stream:   "Stream-oriented (`SOCK_STREAM`)."
+			}
 		}
 	}
 }

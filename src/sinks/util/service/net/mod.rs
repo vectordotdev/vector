@@ -48,9 +48,14 @@ use vector_config::configurable_component;
 use vector_core::tls::{MaybeTlsStream, TlsError};
 
 /// Hostname and port tuple.
+///
+/// Both IP addresses and hostnames/fully qualified domain names (FQDNs) are accepted formats.
+///
+/// The address _must_ include a port.
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(try_from = "String", into = "String")]
+#[configurable(title = "The address to connect to.")]
 #[configurable(metadata(docs::examples = "92.12.333.224:5000"))]
 #[configurable(metadata(docs::examples = "somehost:5000"))]
 struct HostAndPort {

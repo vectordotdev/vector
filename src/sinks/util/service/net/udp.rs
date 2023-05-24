@@ -13,11 +13,7 @@ use super::{net_error::*, ConnectorType, HostAndPort, NetError, NetworkConnector
 #[configurable_component]
 #[derive(Clone, Debug)]
 pub struct UdpConnectorConfig {
-    /// The address to connect to.
-    ///
-    /// Both IP addresses and hostnames/fully-qualified domain names are accepted formats.
-    ///
-    /// The address _must_ include a port.
+    #[configurable(derived)]
     address: HostAndPort,
 
     /// The size of the socket's send buffer.
