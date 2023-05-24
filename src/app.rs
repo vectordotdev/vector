@@ -66,6 +66,7 @@ impl ApplicationConfig {
             &config_paths,
             opts.watch_config,
             opts.require_healthy,
+            opts.graceful_shutdown_duration,
             signal_handler,
         )
         .await?;
@@ -410,6 +411,7 @@ pub async fn load_configs(
     config_paths: &[ConfigPath],
     watch_config: bool,
     require_healthy: Option<bool>,
+    graceful_shutdown_duration: i64,
     signal_handler: &mut SignalHandler,
 ) -> Result<Config, ExitCode> {
     let config_paths = config::process_paths(config_paths).ok_or(exitcode::CONFIG)?;
@@ -440,6 +442,7 @@ pub async fn load_configs(
         info!("Health checks are disabled.");
     }
     config.healthchecks.set_require_healthy(require_healthy);
+    config.global.graceful_shutdown_duration = graceful_shutdown_duration;
 
     Ok(config)
 }

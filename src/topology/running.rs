@@ -17,7 +17,6 @@ use vector_common::trigger::DisabledTrigger;
 
 use super::{TapOutput, TapResource};
 use crate::{
-    cli::Opts,
     config::{ComponentKey, Config, ConfigDiff, HealthcheckOptions, Inputs, OutputId, Resource},
     event::EventArray,
     shutdown::SourceShutdownCoordinator,
@@ -56,7 +55,6 @@ impl RunningTopology {
             inputs_tap_metadata: HashMap::new(),
             outputs: HashMap::new(),
             outputs_tap_metadata: HashMap::new(),
-            config,
             shutdown_coordinator: SourceShutdownCoordinator::default(),
             detach_triggers: HashMap::new(),
             source_tasks: HashMap::new(),
@@ -64,22 +62,11 @@ impl RunningTopology {
             abort_tx,
             watch: watch::channel(TapResource::default()),
             running: Arc::new(AtomicBool::new(true)),
-            graceful_shutdown_duration: {
-                if let Ok(opts) = Opts::get_matches().map_err(|error| {
-                    // Printing to stdout/err can itself fail; ignore it.
-                    _ = error.print();
-                    error!("could not access flags while instantiating RunningTopology");
-                    ()
-                }) {
-                    match opts.root.graceful_shutdown_duration {
-                        -1 => None,
-                        seconds => Some(Duration::from_secs(seconds as u64)), // clap validator makes sure value is >= -1
-                    }
-                } else {
-                    // TODO should this be unreachable!() since the opts have already been validated?
-                    Some(Duration::from_secs(60))
-                }
+            graceful_shutdown_duration: match config.global.graceful_shutdown_duration {
+                -1 => None,
+                seconds => Some(Duration::from_secs(seconds as u64)), // clap validator makes sure value is >= -1
             },
+            config,
         }
     }
 
