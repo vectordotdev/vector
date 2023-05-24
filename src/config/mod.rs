@@ -48,7 +48,8 @@ pub use format::{Format, FormatHint};
 pub use id::{ComponentKey, Inputs};
 pub use loading::{
     load, load_builder_from_paths, load_from_paths, load_from_paths_with_provider_and_secrets,
-    load_from_str, load_source_from_paths, merge_path_lists, process_paths, CONFIG_PATHS,
+    load_from_str, load_source_from_paths, merge_path_lists, process_paths, COLLECTOR,
+    CONFIG_PATHS,
 };
 pub use provider::ProviderConfig;
 pub use secret::SecretBackend;
@@ -59,6 +60,7 @@ pub use transform::{
 };
 pub use unit_test::{build_unit_tests, build_unit_tests_main, UnitTestResult};
 pub use validation::warnings;
+pub use vars::{interpolate, ENVIRONMENT_VARIABLE_INTERPOLATION_REGEX};
 pub use vector_core::config::{
     init_log_schema, log_schema, proxy::ProxyConfig, LogSchema, OutputId,
 };
