@@ -34,9 +34,11 @@ env:
   # can be removed when we switch back to the upstream openssl-sys crate
   CARGO_NET_GIT_FETCH_WITH_CLI: true
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.event.issue_comment.issue.id }}-${{ github.event.comment.body }}
-  cancel-in-progress: true
+# TODO: temporarily disabling concurrency groups at request of GitHub Support, to see if it resolves
+#       the issue we are having.
+#concurrency:
+#  group: ${{ github.workflow }}-${{ github.event.issue_comment.issue.id }}-${{ github.event.comment.body }}
+#  cancel-in-progress: true
 
 jobs:
   validate:
