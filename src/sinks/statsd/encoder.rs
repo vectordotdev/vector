@@ -1,4 +1,4 @@
-use std::{fmt::Display, io::Write};
+use std::{fmt::Display, io::{self, Write}};
 
 use bytes::{BufMut, BytesMut};
 use tokio_util::codec::Encoder;
@@ -9,8 +9,23 @@ use crate::{
     sinks::util::{buffer::metrics::compress_distribution, encode_namespace},
 };
 
+/// Error type for errors that can never happen, but for use with `Encoder`.
+///
+/// For the StatsD encoder, the encoding operation is infallible. However, as `Encoder<T>` requires
+/// that the associated error type can be created by `From<io::Error>`, we can't simply use
+/// `Infallible`. This type exists to bridge that gap, acting as a marker type for "we emit no
+/// errors" while supporting the trait bounds on `Encoder<T>::Error`.
+#[derive(Debug)]
+pub struct InfallibleIo;
+
+impl From<io::Error> for InfallibleIo {
+    fn from(_: io::Error) -> Self {
+        Self
+    }
+}
+
 #[derive(Debug, Clone)]
-pub struct StatsdEncoder {
+pub(super) struct StatsdEncoder {
     default_namespace: Option<String>,
 }
 
@@ -22,7 +37,7 @@ impl StatsdEncoder {
 }
 
 impl<'a> Encoder<&'a Metric> for StatsdEncoder {
-    type Error = codecs::encoding::Error;
+    type Error = InfallibleIo;
 
     fn encode(&mut self, metric: &'a Metric, buf: &mut BytesMut) -> Result<(), Self::Error> {
         let namespace = metric.namespace().or(self.default_namespace.as_deref());
@@ -132,6 +147,7 @@ fn encode_and_write_single_event<V: Display>(
 
     writeln!(&mut writer).unwrap();
 }
+
 #[cfg(test)]
 mod tests {
     use vector_core::{

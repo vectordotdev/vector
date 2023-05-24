@@ -108,7 +108,7 @@ impl IncrementalRequestBuilder<Vec<Metric>> for StatsdRequestBuilder {
                     self.encode_buf.clear();
                     self.encoder
                         .encode(&metric, &mut self.encode_buf)
-                        .expect("should not fail to encode metric REMOVE ME AFTER TESTING");
+                        .expect("encoding is infallible");
                 }
 
                 let request_buf_len = request_buf.len();
