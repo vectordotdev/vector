@@ -136,7 +136,6 @@ crossterm,https://github.com/crossterm-rs/crossterm,MIT,T. Post
 crossterm_winapi,https://github.com/crossterm-rs/crossterm-winapi,MIT,T. Post
 crypto-common,https://github.com/RustCrypto/traits,MIT OR Apache-2.0,RustCrypto Developers
 csv,https://github.com/BurntSushi/rust-csv,Unlicense OR MIT,Andrew Gallant <jamslam@gmail.com>
-ctor,https://github.com/mmastrac/rust-ctor,Apache-2.0 OR MIT,Matt Mastracci <matthew@mastracci.com>
 ctr,https://github.com/RustCrypto/block-modes,MIT OR Apache-2.0,RustCrypto Developers
 cty,https://github.com/japaric/cty,MIT OR Apache-2.0,Jorge Aparicio <jorge@japaric.io>
 curve25519-dalek,https://github.com/dalek-cryptography/curve25519-dalek,BSD-3-Clause,"Isis Lovecruft <isis@patternsinthevoid.net>, Henry de Valence <hdevalence@hdevalence.ca>"
@@ -235,6 +234,7 @@ hyper,https://github.com/hyperium/hyper,MIT,Sean McArthur <sean@seanmonstar.com>
 hyper-openssl,https://github.com/sfackler/hyper-openssl,MIT OR Apache-2.0,Steven Fackler <sfackler@gmail.com>
 hyper-proxy,https://github.com/tafia/hyper-proxy,MIT,Johann Tuffe <tafia973@gmail.com>
 hyper-rustls,https://github.com/ctz/hyper-rustls,Apache-2.0 OR ISC OR MIT,Joseph Birr-Pixton <jpixton@gmail.com>
+hyper-rustls,https://github.com/ctz/hyper-rustls,Apache-2.0 OR ISC OR MIT,The hyper-rustls Authors
 hyper-timeout,https://github.com/hjr3/hyper-timeout,MIT OR Apache-2.0,Herman J. Radtke III <herman@hermanradtke.com>
 hyper-tls,https://github.com/hyperium/hyper-tls,MIT OR Apache-2.0,Sean McArthur <sean@seanmonstar.com>
 hyperlocal,https://github.com/softprops/hyperlocal,MIT,softprops <d.tangren@gmail.com>
@@ -523,7 +523,7 @@ tokio-postgres,https://github.com/sfackler/rust-postgres,MIT OR Apache-2.0,Steve
 tokio-rustls,https://github.com/tokio-rs/tls,MIT OR Apache-2.0,quininer kel <quininer@live.com>
 tokio-tungstenite,https://github.com/snapview/tokio-tungstenite,MIT,"Daniel Abramov <dabramov@snapview.de>, Alexey Galakhov <agalakhov@snapview.de>"
 toml,https://github.com/toml-rs/toml,MIT OR Apache-2.0,Alex Crichton <alex@alexcrichton.com>
-toml_edit,https://github.com/ordian/toml_edit,MIT OR Apache-2.0,"Andronik Ordian <write@reusable.software>, Ed Page <eopage@gmail.com>"
+toml_edit,https://github.com/toml-rs/toml,MIT OR Apache-2.0,"Andronik Ordian <write@reusable.software>, Ed Page <eopage@gmail.com>"
 tonic,https://github.com/hyperium/tonic,MIT,Lucio Franco <luciofranco14@gmail.com>
 tower,https://github.com/tower-rs/tower,MIT,Tower Maintainers <team@tower-rs.com>
 tower-http,https://github.com/tower-rs/tower-http,MIT,Tower Maintainers <team@tower-rs.com>

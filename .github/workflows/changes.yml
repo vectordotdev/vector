@@ -1,0 +1,340 @@
+# This workflow identifies changes between the base and the head ref, for use in
+# other workflows to decide if they should be executed.
+
+name: Identify Changes
+
+on:
+  workflow_call:
+    # These inputs allow the filter action to be able to access the correct refs for
+    # comparison in changes detection, it is required as this is called from the
+    # merge_group context.
+    inputs:
+      base_ref:
+        required: true
+        type: string
+      head_ref:
+        required: true
+        type: string
+    outputs:
+      source:
+        value: ${{ jobs.changes.outputs.source }}
+      dependencies:
+        value: ${{ jobs.changes.outputs.dependencies }}
+      internal_events:
+        value: ${{ jobs.changes.outputs.internal_events }}
+      cue:
+        value: ${{ jobs.changes.outputs.cue }}
+      component_docs:
+        value: ${{ jobs.changes.outputs.component_docs }}
+      markdown:
+        value: ${{ jobs.changes.outputs.markdown }}
+      install:
+        value: ${{ jobs.changes.outputs.install }}
+      k8s:
+        value: ${{ jobs.changes.outputs.k8s }}
+      all-int:
+        value: ${{ jobs.changes.outputs.all-int }}
+      amqp:
+        value: ${{ jobs.changes.outputs.amqp }}
+      appsignal:
+        value: ${{ jobs.changes.outputs.appsignal }}
+      aws:
+        value: ${{ jobs.changes.outputs.aws }}
+      axiom:
+        value: ${{ jobs.changes.outputs.axiom }}
+      azure:
+        value: ${{ jobs.changes.outputs.azure }}
+      clickhouse:
+        value: ${{ jobs.changes.outputs.clickhouse }}
+      databend:
+        value: ${{ jobs.changes.outputs.databend }}
+      datadog:
+        value: ${{ jobs.changes.outputs.datadog }}
+      dnstap:
+        value: ${{ jobs.changes.outputs.dnstap }}
+      docker-logs:
+        value: ${{ jobs.changes.outputs.docker-logs }}
+      elasticsearch:
+        value: ${{ jobs.changes.outputs.elasticsearch }}
+      eventstoredb:
+        value: ${{ jobs.changes.outputs.eventstoredb }}
+      fluent:
+        value: ${{ jobs.changes.outputs.fluent }}
+      gcp:
+        value: ${{ jobs.changes.outputs.gcp }}
+      humio:
+        value: ${{ jobs.changes.outputs.humio }}
+      http-client:
+        value: ${{ jobs.changes.outputs.http-client }}
+      influxdb:
+        value: ${{ jobs.changes.outputs.influxdb }}
+      kafka:
+        value: ${{ jobs.changes.outputs.kafka }}
+      logstash:
+        value: ${{ jobs.changes.outputs.logstash }}
+      loki:
+        value: ${{ jobs.changes.outputs.loki }}
+      mongodb:
+        value: ${{ jobs.changes.outputs.mongodb }}
+      nats:
+        value: ${{ jobs.changes.outputs.nats }}
+      nginx:
+        value: ${{ jobs.changes.outputs.nginx }}
+      opentelemetry:
+        value: ${{ jobs.changes.outputs.opentelemetry }}
+      postgres:
+        value: ${{ jobs.changes.outputs.postgres }}
+      prometheus:
+        value: ${{ jobs.changes.outputs.prometheus }}
+      pulsar:
+        value: ${{ jobs.changes.outputs.pulsar }}
+      redis:
+        value: ${{ jobs.changes.outputs.redis }}
+      splunk:
+        value: ${{ jobs.changes.outputs.splunk }}
+      webhdfs:
+        value: ${{ jobs.changes.outputs.webhdfs }}
+
+jobs:
+  changes:
+    runs-on: ubuntu-20.04
+    # Set job outputs to values from filter step
+    outputs:
+      # General source code
+      source: ${{ steps.filter.outputs.source }}
+      dependencies: ${{ steps.filter.outputs.dependencies }}
+      internal_events: ${{ steps.filter.outputs.internal_events }}
+      cue: ${{ steps.filter.outputs.cue }}
+      component_docs: ${{ steps.filter.outputs.component_docs }}
+      markdown: ${{ steps.filter.outputs.markdown }}
+      install: ${{ steps.filter.outputs.install }}
+      # K8s
+      k8s: ${{ steps.filter.outputs.k8s }}
+      # Integrations
+      all-int: ${{ steps.filter.outputs.all-int }}
+      amqp: ${{ steps.filter.outputs.amqp }}
+      appsignal: ${{ steps.filter.outputs.appsignal}}
+      aws: ${{ steps.filter.outputs.aws }}
+      axiom: ${{ steps.filter.outputs.axiom }}
+      azure: ${{ steps.filter.outputs.azure }}
+      clickhouse: ${{ steps.filter.outputs.clickhouse }}
+      databend: ${{ steps.filter.outputs.databend }}
+      datadog: ${{ steps.filter.outputs.datadog }}
+      dnstap: ${{ steps.filter.outputs.dnstap }}
+      docker-logs: ${{ steps.filter.outputs.docker-logs }}
+      elasticsearch: ${{ steps.filter.outputs.elasticsearch }}
+      eventstoredb: ${{ steps.filter.outputs.eventstoredb }}
+      fluent: ${{ steps.filter.outputs.fluent }}
+      gcp: ${{ steps.filter.outputs.gcp }}
+      humio: ${{ steps.filter.outputs.humio }}
+      http-client: ${{ steps.filter.outputs.http-client }}
+      influxdb: ${{ steps.filter.outputs.influxdb }}
+      kafka: ${{ steps.filter.outputs.kafka }}
+      logstash: ${{ steps.filter.outputs.logstash }}
+      loki: ${{ steps.filter.outputs.loki }}
+      mongodb: ${{ steps.filter.outputs.mongodb }}
+      nats: ${{ steps.filter.outputs.nats }}
+      nginx: ${{ steps.filter.outputs.nginx }}
+      opentelemetry: ${{ steps.filter.outputs.opentelemetry }}
+      postgres: ${{ steps.filter.outputs.postgres }}
+      prometheus: ${{ steps.filter.outputs.prometheus }}
+      pulsar: ${{ steps.filter.outputs.pulsar }}
+      redis: ${{ steps.filter.outputs.redis }}
+      splunk: ${{ steps.filter.outputs.splunk }}
+      webhdfs: ${{ steps.filter.outputs.webhdfs }}
+    steps:
+    - uses: actions/checkout@v3
+
+    - uses: dorny/paths-filter@v2
+      id: filter
+      with:
+        base: ${{ inputs.base_ref }}
+        ref: ${{ inputs.head_ref }}
+        filters: |
+          source:
+            - ".github/workflows/test.yml"
+            - ".cargo/**"
+            - "benches/**"
+            - "lib/**"
+            - "proto/**"
+            - "scripts/**"
+            - "src/**"
+            - "tests/**"
+            - "build.rs"
+            - "Cargo.lock"
+            - "Cargo.toml"
+            - "Makefile"
+            - "rust-toolchain.toml"
+            - "vdev/**"
+          deny:
+            - 'deny.toml'
+            - "vdev/**"
+          dependencies:
+            - ".cargo/**"
+            - 'Cargo.toml'
+            - 'Cargo.lock'
+            - 'rust-toolchain.toml'
+            - '.github/workflows/pr.yml'
+            - 'Makefile'
+            - 'scripts/cross/**'
+            - "vdev/**"
+          cue:
+            - 'website/cue/**'
+            - "vdev"
+          component_docs:
+            - 'scripts/generate-component-docs.rb'
+            - "vdev/**"
+          markdown:
+            - '**/**.md'
+            - "vdev/**"
+          internal_events:
+            - 'src/internal_events/**'
+            - "vdev/**"
+          docker:
+            - 'distribution/docker/**'
+            - "vdev/**"
+          install:
+            - ".github/workflows/install-sh.yml"
+            - "distribution/install.sh"
+          k8s:
+            - "src/sources/kubernetes_logs/**"
+          all-int:
+            - "lib/vector-core/**"
+          amqp:
+            - "src/amqp.rs"
+            - "src/internal_events/amqp.rs"
+            - "src/sinks/amqp/**"
+            - "src/sources/amqp.rs"
+            - "src/sources/util/**"
+            - "src/sinks/util/**"
+          appsignal:
+            - "src/sinks/appsignal/**"
+            - "src/sinks/util/**"
+          aws:
+            - "src/aws/**"
+            - "src/internal_events/aws*"
+            - "src/sources/aws_ecs_metrics/**"
+            - "src/sources/aws_kinesis_firehose/**"
+            - "src/sources/aws_s3/**"
+            - "src/sources/aws_sqs/**"
+            - "src/sources/util/**"
+            - "src/sinks/aws_cloudwatch_logs/**"
+            - "src/sinks/aws_cloudwatch_metrics/**"
+            - "src/sinks/aws_kinesis/**"
+            - "src/sinks/aws_s3/**"
+            - "src/sinks/aws_sqs/**"
+            - "src/sinks/util/**"
+            - "src/transforms/aws*"
+          axiom:
+            - "src/sinks/axiom.rs"
+            - "src/sinks/util/**"
+          azure:
+            - "src/sinks/azure_**"
+            - "src/sinks/util/**"
+          clickhouse:
+            - "src/sinks/clickhouse/**"
+            - "src/sinks/util/**"
+          databend:
+            - "src/sinks/databend/**"
+            - "src/sinks/util/**"
+          datadog:
+            - "src/common/datadog.rs"
+            - "src/internal_events/datadog_*"
+            - "src/sources/datadog_agent/**"
+            - "src/sinks/datadog/**"
+            - "src/sinks/datadog_archives.rs"
+            - "src/sinks/util/**"
+          docker-logs:
+            - "src/docker.rs"
+            - "src/internal_events/docker_logs.rs"
+            - "src/sources/docker_logs/**"
+            - "src/sources/util/**"
+          elasticsearch:
+            - "src/sinks/elasticsearch/**"
+            - "src/sinks/util/**"
+          eventstoredb:
+            - "src/internal_events/eventstoredb_metrics.rs"
+            - "src/sources/eventstoredb_metrics/**"
+            - "src/sources/util/**"
+          fluent:
+            - "src/internal_events/fluent.rs"
+            - "src/sources/fluent/**"
+            - "src/sources/util/**"
+          gcp:
+            - "src/internal_events/gcp_pubsub.rs"
+            - "src/sources/gcp_pubsub.rs"
+            - "src/sources/util/**"
+            - "src/sinks/gcp/**"
+            - "src/sinks/util/**"
+            - "src/gcp.rs"
+          humio:
+            - "src/sinks/humio/**"
+            - "src/sinks/util/**"
+          http-client:
+            - "src/sinks/http-client/**"
+          influxdb:
+            - "src/internal_events/influxdb.rs"
+            - "src/sinks/influxdb/**"
+            - "src/sinks/util/**"
+          kafka:
+            - "src/internal_events/kafka.rs"
+            - "src/sinks/kafka/**"
+            - "src/sinks/util/**"
+            - "src/sources/kafka.rs"
+            - "src/sources/util/**"
+            - "src/kafka.rs"
+          logstash:
+            - "src/sources/logstash.rs"
+            - "src/sources/util/**"
+          loki:
+            - "src/internal_events/loki.rs"
+            - "src/sinks/loki/**"
+            - "src/sinks/util/**"
+          mongodb:
+            - "src/internal_events/mongodb_metrics.rs"
+            - "src/sources/mongodb_metrics/**"
+            - "src/sources/util/**"
+          nats:
+            - "src/internal_events/nats.rs"
+            - "src/sources/nats.rs"
+            - "src/sources/util/**"
+            - "src/sinks/nats.rs"
+            - "src/sinks/util/**"
+            - "src/nats.rs"
+          nginx:
+            - "src/internal_events/nginx_metrics.rs"
+            - "src/sources/nginx_metrics/**"
+            - "src/sources/util/**"
+          opentelemetry:
+            - "src/sources/opentelemetry/**"
+            - "src/sources/util/**"
+          postgres:
+            - "src/internal_events/postgresql_metrics.rs"
+            - "src/sources/postgresql_metrics.rs"
+            - "src/sources/util/**"
+          prometheus:
+            - "src/internal_events/prometheus.rs"
+            - "src/sources/prometheus/**"
+            - "src/sources/util/**"
+            - "src/sinks/prometheus/**"
+            - "src/sinks/util/**"
+          pulsar:
+            - "src/internal_events/pulsar.rs"
+            - "src/sinks/pulsar/**"
+            - "src/sinks/util/**"
+          redis:
+            - "src/internal_events/redis.rs"
+            - "src/sources/redis/**"
+            - "src/sources/util/**"
+            - "src/sinks/redis.rs"
+            - "src/sinks/util/**"
+          splunk:
+            - "src/internal_events/splunk_hec.rs"
+            - "src/sources/splunk_hec/**"
+            - "src/sources/util/**"
+            - "src/sinks/splunk_hec/**"
+            - "src/sinks/util/**"
+          webhdfs:
+            - "src/sinks/webhdfs/**"
+            - "src/sinks/util/**"
+

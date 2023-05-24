@@ -1,0 +1,175 @@
+# Integration Test Comment
+#
+# This workflow runs one or more integration tests triggered by a comment in a PR.
+# The comment include '/ci-run-integration'.
+# Then, any if the integration names will trigger that specific integration.
+# 'all' will trigger every integration to run.
+# The order does not matter and can be anywhere inside the comment body.
+#
+# Examples:
+#
+# 1. Run a single integration test:
+#
+#     /ci-run-integration amqp
+#
+# 2. Run three specific integration tests:
+#
+#     /ci-run-integration dnstap redis amqp
+#
+# 3. Run all integration tests:
+#
+#     /ci-run-integration all
+
+name: Integration Test Comment
+
+on:
+  issue_comment:
+    types: [created]
+
+env:
+  AWS_ACCESS_KEY_ID: "dummy"
+  AWS_SECRET_ACCESS_KEY: "dummy"
+  AXIOM_TOKEN: ${{ secrets.AXIOM_TOKEN }}
+  TEST_APPSIGNAL_PUSH_API_KEY: ${{ secrets.TEST_APPSIGNAL_PUSH_API_KEY }}
+  CONTAINER_TOOL: "docker"
+  DD_ENV: "ci"
+  DD_API_KEY: ${{ secrets.DD_API_KEY }}
+  RUST_BACKTRACE: full
+  TEST_LOG: vector=debug
+  VERBOSE: true
+  CI: true
+  PROFILE: debug
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.issue.id }}
+  cancel-in-progress: true
+
+jobs:
+  prep-pr:
+    name: (PR comment) Signal pending to PR
+    runs-on: ubuntu-latest
+    if: contains(github.event.comment.body, '/ci-run-integration') || contains(github.event.comment.body, '/ci-run-all')
+    steps:
+      - name: Validate issue comment
+        if: github.event_name == 'issue_comment'
+        uses: tspascoal/get-user-teams-membership@v2
+        with:
+          username: ${{ github.actor }}
+          team: 'Vector'
+          GITHUB_TOKEN: ${{ secrets.GH_PAT_ORG }}
+
+      - name: (PR comment) Get PR branch
+        uses: xt0rted/pull-request-comment-branch@v2
+        id: comment-branch
+
+      - name: (PR comment) Set latest commit status as pending
+        uses: myrotvorets/set-commit-status-action@v1.1.7
+        with:
+          sha: ${{ steps.comment-branch.outputs.head_sha }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          status: pending
+
+  test-integration:
+    uses: ./.github/workflows/integration-test.yml
+    with:
+      if: ${{ matrix.run.if }}
+      test_name: ${{ matrix.run.test_name }}
+    needs: prep-pr
+    secrets: inherit
+    strategy:
+      fail-fast: false
+      matrix:
+        run:
+          - test_name: 'amqp'
+            if: ${{ contains(github.event.comment.body, 'amqp') || contains(github.event.comment.body, 'all') }}
+          - test_name: 'appsignal'
+            if: ${{ contains(github.event.comment.body, 'appsignal') || contains(github.event.comment.body, 'all') }}
+          - test_name: 'aws'
+            if: ${{ contains(github.event.comment.body, 'aws') || contains(github.event.comment.body, 'all') }}
+          - test_name: 'axiom'
+            if: ${{ contains(github.event.comment.body, 'axiom') || contains(github.event.comment.body, 'all') }}
+          - test_name: 'azure'
+            if: ${{ contains(github.event.comment.body, 'azure') || contains(github.event.comment.body, 'all') }}
+          - test_name: 'clickhouse'
+            if: ${{ contains(github.event.comment.body, 'clickhouse') || contains(github.event.comment.body, 'all') }}
+          - test_name: 'databend'
+            if: ${{ contains(github.event.comment.body, 'databend') || contains(github.event.comment.body, 'all') }}
+          - test_name: 'datadog-agent'
+            if: ${{ contains(github.event.comment.body, 'datadog') || contains(github.event.comment.body, 'all') }}
+          - test_name: 'datadog-logs'
+            if: ${{ contains(github.event.comment.body, 'datadog') || contains(github.event.comment.body, 'all') }}
+          - test_name: 'datadog-metrics'
+            if: ${{ contains(github.event.comment.body, 'datadog') || contains(github.event.comment.body, 'all') }}
+          - test_name: 'datadog-traces'
+            if: ${{ contains(github.event.comment.body, 'datadog') || contains(github.event.comment.body, 'all') }}
+          - test_name: 'dnstap'
+            if: ${{ contains(github.event.comment.body, 'dnstap') || contains(github.event.comment.body, 'all') }}
+          - test_name: 'docker-logs'
+            if: ${{ contains(github.event.comment.body, 'docker-logs') || contains(github.event.comment.body, 'all') }}
+          - test_name: 'elasticsearch'
+            if: ${{ contains(github.event.comment.body, 'elasticsearch') || contains(github.event.comment.body, 'all') }}
+          - test_name: 'eventstoredb'
+            if: ${{ contains(github.event.comment.body, 'eventstoredb') || contains(github.event.comment.body, 'all') }}
+          - test_name: 'fluent'
+            if: ${{ contains(github.event.comment.body, 'fluent') || contains(github.event.comment.body, 'all') }}
+          - test_name: 'gcp'
+            if: ${{ contains(github.event.comment.body, 'gcp') || contains(github.event.comment.body, 'all') }}
+          - test_name: 'humio'
+            if: ${{ contains(github.event.comment.body, 'humio') || contains(github.event.comment.body, 'all') }}
+          - test_name: 'http-client'
+            if: ${{ contains(github.event.comment.body, 'http-client') || contains(github.event.comment.body, 'all') }}
+          - test_name: 'influxdb'
+            if: ${{ contains(github.event.comment.body, 'influxdb') || contains(github.event.comment.body, 'all') }}
+          - test_name: 'kafka'
+            if: ${{ contains(github.event.comment.body, 'kafka') || contains(github.event.comment.body, 'all') }}
+          - test_name: 'logstash'
+            if: ${{ contains(github.event.comment.body, 'logstash') || contains(github.event.comment.body, 'all') }}
+          - test_name: 'loki'
+            if: ${{ contains(github.event.comment.body, 'loki') || contains(github.event.comment.body, 'all') }}
+          - test_name: 'mongodb'
+            if: ${{ contains(github.event.comment.body, 'mongodb') || contains(github.event.comment.body, 'all') }}
+          - test_name: 'nats'
+            if: ${{ contains(github.event.comment.body, 'nats') || contains(github.event.comment.body, 'all') }}
+          - test_name: 'nginx'
+            if: ${{ contains(github.event.comment.body, 'nginx') || contains(github.event.comment.body, 'all') }}
+          - test_name: 'opentelemetry'
+            if: ${{ contains(github.event.comment.body, 'opentelemetry') || contains(github.event.comment.body, 'all') }}
+          - test_name: 'postgres'
+            if: ${{ contains(github.event.comment.body, 'postgres') || contains(github.event.comment.body, 'all') }}
+          - test_name: 'prometheus'
+            if: ${{ contains(github.event.comment.body, 'prometheus') || contains(github.event.comment.body, 'all') }}
+          - test_name: 'pulsar'
+            if: ${{ contains(github.event.comment.body, 'pulsar') || contains(github.event.comment.body, 'all') }}
+          - test_name: 'redis'
+            if: ${{ contains(github.event.comment.body, 'redis') || contains(github.event.comment.body, 'all') }}
+          - test_name: 'shutdown'
+            if: ${{ contains(github.event.comment.body, 'shutdown') || contains(github.event.comment.body, 'all') }}
+          - test_name: 'splunk'
+            if: ${{ contains(github.event.comment.body, 'splunk') || contains(github.event.comment.body, 'all') }}
+          - test_name: 'webhdfs'
+            if: ${{ contains(github.event.comment.body, 'webhdfs') || contains(github.event.comment.body, 'all') }}
+
+  update-pr-status:
+    name: Signal result to PR
+    runs-on: ubuntu-latest
+    needs: test-integration
+    if: always() && (contains(github.event.comment.body, '/ci-run-integration') || contains(github.event.comment.body, '/ci-run-all'))
+    steps:
+      - name: Validate issue comment
+        if: github.event_name == 'issue_comment'
+        uses: tspascoal/get-user-teams-membership@v2
+        with:
+          username: ${{ github.actor }}
+          team: 'Vector'
+          GITHUB_TOKEN: ${{ secrets.GH_PAT_ORG }}
+
+      - name: (PR comment) Get PR branch
+        uses: xt0rted/pull-request-comment-branch@v2
+        id: comment-branch
+
+      - name: (PR comment) Submit PR result as ${{ needs.test-integration.result }}
+        uses: myrotvorets/set-commit-status-action@v1.1.7
+        with:
+          sha: ${{ steps.comment-branch.outputs.head_sha }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          status: ${{ needs.test-integration.result }}

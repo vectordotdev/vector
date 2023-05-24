@@ -83,6 +83,7 @@ pub struct S3SinkConfig {
     /// This ensures there are no name collisions, and can be useful in high-volume workloads where
     /// object keys must be unique.
     #[serde(default = "crate::serde::default_true")]
+    #[configurable(metadata(docs::human_name = "Append UUID to Filename"))]
     pub filename_append_uuid: bool,
 
     /// The filename extension to use in the object key.

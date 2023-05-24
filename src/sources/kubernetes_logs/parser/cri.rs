@@ -188,7 +188,7 @@ pub mod tests {
     use bytes::Bytes;
 
     use super::{super::test_util, *};
-    use crate::{event::LogEvent, test_util::trace_init, transforms::Transform};
+    use crate::{event::LogEvent, test_util::trace_init};
     use vrl::value::value;
 
     fn make_long_string(base: &str, len: usize) -> String {
@@ -286,7 +286,7 @@ pub mod tests {
     fn test_parsing_valid_vector_namespace() {
         trace_init();
         test_util::test_parser(
-            || Transform::function(Cri::new(LogNamespace::Vector)),
+            || Cri::new(LogNamespace::Vector),
             |bytes| Event::Log(LogEvent::from(value!(bytes))),
             valid_cases(LogNamespace::Vector),
         );
@@ -296,7 +296,7 @@ pub mod tests {
     fn test_parsing_valid_legacy_namespace() {
         trace_init();
         test_util::test_parser(
-            || Transform::function(Cri::new(LogNamespace::Legacy)),
+            || Cri::new(LogNamespace::Legacy),
             |bytes| Event::Log(LogEvent::from(bytes)),
             valid_cases(LogNamespace::Legacy),
         );

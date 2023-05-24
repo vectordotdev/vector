@@ -1,0 +1,102 @@
+name: Cross
+
+on:
+  workflow_call:
+
+jobs:
+  cross-linux:
+    name: Cross - ${{ matrix.target }}
+    runs-on: [linux, ubuntu-20.04-8core]
+    env:
+      CARGO_INCREMENTAL: 0
+    strategy:
+      matrix:
+        target:
+          - x86_64-unknown-linux-gnu
+          - x86_64-unknown-linux-musl
+          - aarch64-unknown-linux-gnu
+          - aarch64-unknown-linux-musl
+          - armv7-unknown-linux-gnueabihf
+          - armv7-unknown-linux-musleabihf
+    steps:
+
+      - name: (PR comment) Get PR branch
+        if: ${{ github.event_name == 'issue_comment' }}
+        uses: xt0rted/pull-request-comment-branch@v2
+        id: comment-branch
+
+      - name: (PR comment) Set latest commit status as pending
+        if: ${{ github.event_name == 'issue_comment' }}
+        uses: myrotvorets/set-commit-status-action@v1.1.7
+        with:
+          sha: ${{ steps.comment-branch.outputs.head_sha }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          context: Cross
+          status: pending
+
+      - name: (PR comment) Checkout PR branch
+        if: ${{ github.event_name == 'issue_comment' }}
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ steps.comment-branch.outputs.head_ref }}
+
+      - name: Checkout branch
+        if: ${{ github.event_name != 'issue_comment' }}
+        uses: actions/checkout@v3
+
+      - uses: actions/cache@v3
+        name: Cache Cargo registry + index
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - run: echo "::add-matcher::.github/matchers/rust.json"
+      - run: 'cargo install cross --version 0.2.4 --force --locked'
+      # Why is this build, not check? Because we need to make sure the linking phase works.
+      # aarch64 and musl in particular are notoriously hard to link.
+      # While it may be tempting to slot a `check` in here for quickness, please don't.
+      - run: make cross-build-${{ matrix.target }}
+      - uses: actions/upload-artifact@v3
+        with:
+          name: "vector-debug-${{ matrix.target }}"
+          path: "./target/${{ matrix.target }}/debug/vector"
+
+      - name: (PR comment) Set latest commit status as failed
+        uses: myrotvorets/set-commit-status-action@v1.1.7
+        if: failure() && github.event_name == 'issue_comment'
+        with:
+          sha: ${{ steps.comment-branch.outputs.head_sha }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          context: Cross
+          status: 'failure'
+
+  update-pr-status:
+    name: (PR comment) Signal result to PR
+    runs-on: ubuntu-20.04
+    needs: cross-linux
+    if: needs.cross-linux.result == 'success' && github.event_name == 'issue_comment'
+    steps:
+      - name: Validate issue comment
+        uses: tspascoal/get-user-teams-membership@v2
+        with:
+          username: ${{ github.actor }}
+          team: 'Vector'
+          GITHUB_TOKEN: ${{ secrets.GH_PAT_ORG }}
+
+      - name: (PR comment) Get PR branch
+        uses: xt0rted/pull-request-comment-branch@v2
+        id: comment-branch
+
+      - name: (PR comment) Submit PR result as success
+        uses: myrotvorets/set-commit-status-action@v1.1.7
+        with:
+          sha: ${{ steps.comment-branch.outputs.head_sha }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          context: Cross
+          status: 'success'
