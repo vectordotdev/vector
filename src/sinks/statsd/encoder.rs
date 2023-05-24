@@ -1,4 +1,7 @@
-use std::{fmt::Display, io::{self, Write}};
+use std::{
+    fmt::Display,
+    io::{self, Write},
+};
 
 use bytes::{BufMut, BytesMut};
 use tokio_util::codec::Encoder;
