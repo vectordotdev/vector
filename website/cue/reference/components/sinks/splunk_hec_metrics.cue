@@ -6,7 +6,7 @@ components: sinks: splunk_hec_metrics: {
 	classes: {
 		commonly_used: false
 		delivery:      "at_least_once"
-		development:   "beta"
+		development:   "stable"
 		egress_method: "batch"
 		service_providers: ["Splunk"]
 		stateful: false

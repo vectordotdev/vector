@@ -9,6 +9,7 @@ use crate::{
     },
 };
 use bytes::Bytes;
+use lapin::BasicProperties;
 use std::io;
 use vector_common::{
     finalization::{EventFinalizers, Finalizable},
@@ -20,6 +21,7 @@ use super::{encoder::AmqpEncoder, service::AmqpRequest, sink::AmqpEvent};
 pub(super) struct AmqpMetadata {
     exchange: String,
     routing_key: String,
+    properties: BasicProperties,
     finalizers: EventFinalizers,
 }
 
@@ -55,6 +57,7 @@ impl RequestBuilder<AmqpEvent> for AmqpRequestBuilder {
         let metadata = AmqpMetadata {
             exchange: input.exchange,
             routing_key: input.routing_key,
+            properties: input.properties,
             finalizers: input.event.take_finalizers(),
         };
 
@@ -72,6 +75,7 @@ impl RequestBuilder<AmqpEvent> for AmqpRequestBuilder {
             body,
             amqp_metadata.exchange,
             amqp_metadata.routing_key,
+            amqp_metadata.properties,
             amqp_metadata.finalizers,
             metadata,
         )

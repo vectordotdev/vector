@@ -16,15 +16,16 @@ use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
 use tokio::{sync::oneshot, task::spawn_blocking};
 use tracing::{Instrument, Span};
-use value::Kind;
 use vector_common::finalizer::OrderedFinalizer;
 use vector_config::configurable_component;
 use vector_core::config::{LegacyKey, LogNamespace};
+use vrl::value::Kind;
 
 use super::util::{EncodingConfig, MultilineConfig};
 use crate::{
     config::{
-        log_schema, DataType, Output, SourceAcknowledgementsConfig, SourceConfig, SourceContext,
+        log_schema, DataType, SourceAcknowledgementsConfig, SourceConfig, SourceContext,
+        SourceOutput,
     },
     encoding_transcode::{Decoder, Encoder},
     event::{BatchNotifier, BatchStatus, LogEvent},
@@ -431,7 +432,7 @@ impl SourceConfig for FileConfig {
         ))
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         let file_key = self.file_key.clone().path.map(LegacyKey::Overwrite);
         let host_key = self.host_key.clone().path.map(LegacyKey::Overwrite);
 
@@ -466,7 +467,7 @@ impl SourceConfig for FileConfig {
                 None,
             );
 
-        vec![Output::default(DataType::Log).with_schema_definition(schema_definition)]
+        vec![SourceOutput::new_logs(DataType::Log, schema_definition)]
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -806,8 +807,8 @@ mod tests {
     use similar_asserts::assert_eq;
     use tempfile::tempdir;
     use tokio::time::{sleep, timeout, Duration};
-    use value::kind::Collection;
     use vector_core::schema::Definition;
+    use vrl::value::kind::Collection;
 
     use super::*;
     use crate::{
@@ -817,6 +818,7 @@ mod tests {
         sources::file,
         test_util::components::{assert_source_compliance, FILE_SOURCE_TAGS},
     };
+    use vrl::value::value;
 
     #[test]
     fn generate_config() {
@@ -943,62 +945,70 @@ mod tests {
 
     #[test]
     fn output_schema_definition_vector_namespace() {
-        let definition = FileConfig::default().outputs(LogNamespace::Vector)[0]
-            .clone()
-            .log_schema_definition
-            .unwrap();
+        let definitions = FileConfig::default()
+            .outputs(LogNamespace::Vector)
+            .remove(0)
+            .schema_definition(true);
 
         assert_eq!(
-            definition,
-            Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
-                .with_meaning(OwnedTargetPath::event_root(), "message")
-                .with_metadata_field(
-                    &owned_value_path!("vector", "source_type"),
-                    Kind::bytes(),
-                    None
-                )
-                .with_metadata_field(
-                    &owned_value_path!("vector", "ingest_timestamp"),
-                    Kind::timestamp(),
-                    None
-                )
-                .with_metadata_field(
-                    &owned_value_path!("file", "host"),
-                    Kind::bytes().or_undefined(),
-                    Some("host")
-                )
-                .with_metadata_field(&owned_value_path!("file", "offset"), Kind::integer(), None)
-                .with_metadata_field(&owned_value_path!("file", "path"), Kind::bytes(), None)
+            definitions,
+            Some(
+                Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
+                    .with_meaning(OwnedTargetPath::event_root(), "message")
+                    .with_metadata_field(
+                        &owned_value_path!("vector", "source_type"),
+                        Kind::bytes(),
+                        None
+                    )
+                    .with_metadata_field(
+                        &owned_value_path!("vector", "ingest_timestamp"),
+                        Kind::timestamp(),
+                        None
+                    )
+                    .with_metadata_field(
+                        &owned_value_path!("file", "host"),
+                        Kind::bytes().or_undefined(),
+                        Some("host")
+                    )
+                    .with_metadata_field(
+                        &owned_value_path!("file", "offset"),
+                        Kind::integer(),
+                        None
+                    )
+                    .with_metadata_field(&owned_value_path!("file", "path"), Kind::bytes(), None)
+            )
         )
     }
 
     #[test]
     fn output_schema_definition_legacy_namespace() {
-        let definition = FileConfig::default().outputs(LogNamespace::Legacy)[0]
-            .clone()
-            .log_schema_definition
-            .unwrap();
+        let definitions = FileConfig::default()
+            .outputs(LogNamespace::Legacy)
+            .remove(0)
+            .schema_definition(true);
 
         assert_eq!(
-            definition,
-            Definition::new_with_default_metadata(
-                Kind::object(Collection::empty()),
-                [LogNamespace::Legacy]
+            definitions,
+            Some(
+                Definition::new_with_default_metadata(
+                    Kind::object(Collection::empty()),
+                    [LogNamespace::Legacy]
+                )
+                .with_event_field(
+                    &owned_value_path!("message"),
+                    Kind::bytes(),
+                    Some("message")
+                )
+                .with_event_field(&owned_value_path!("source_type"), Kind::bytes(), None)
+                .with_event_field(&owned_value_path!("timestamp"), Kind::timestamp(), None)
+                .with_event_field(
+                    &owned_value_path!("host"),
+                    Kind::bytes().or_undefined(),
+                    Some("host")
+                )
+                .with_event_field(&owned_value_path!("offset"), Kind::undefined(), None)
+                .with_event_field(&owned_value_path!("file"), Kind::bytes(), None)
             )
-            .with_event_field(
-                &owned_value_path!("message"),
-                Kind::bytes(),
-                Some("message")
-            )
-            .with_event_field(&owned_value_path!("source_type"), Kind::bytes(), None)
-            .with_event_field(&owned_value_path!("timestamp"), Kind::timestamp(), None)
-            .with_event_field(
-                &owned_value_path!("host"),
-                Kind::bytes().or_undefined(),
-                Some("host")
-            )
-            .with_event_field(&owned_value_path!("offset"), Kind::undefined(), None)
-            .with_event_field(&owned_value_path!("file"), Kind::bytes(), None)
         )
     }
 
@@ -1060,14 +1070,14 @@ mod tests {
         };
         let log = create_event(line, offset, file, &meta, LogNamespace::Vector);
 
-        assert_eq!(log.value(), &vrl::value!("hello world"));
+        assert_eq!(log.value(), &value!("hello world"));
 
         assert_eq!(
             log.metadata()
                 .value()
                 .get(path!("vector", "source_type"))
                 .unwrap(),
-            &vrl::value!("file")
+            &value!("file")
         );
         assert!(log
             .metadata()
@@ -1081,21 +1091,21 @@ mod tests {
                 .value()
                 .get(path!(FileConfig::NAME, "host"))
                 .unwrap(),
-            &vrl::value!("Some.Machine")
+            &value!("Some.Machine")
         );
         assert_eq!(
             log.metadata()
                 .value()
                 .get(path!(FileConfig::NAME, "offset"))
                 .unwrap(),
-            &vrl::value!(0)
+            &value!(0)
         );
         assert_eq!(
             log.metadata()
                 .value()
                 .get(path!(FileConfig::NAME, "path"))
                 .unwrap(),
-            &vrl::value!("some_file.rs")
+            &value!("some_file.rs")
         );
     }
 

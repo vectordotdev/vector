@@ -11,19 +11,20 @@ use codecs::{
 use http::{StatusCode, Uri};
 use lookup::{lookup_v2::OptionalValuePath, owned_value_path, path};
 use tokio_util::codec::Decoder as _;
-use value::{kind::Collection, Kind};
 use vector_config::configurable_component;
 use vector_core::{
     config::{DataType, LegacyKey, LogNamespace},
     schema::Definition,
 };
+use vrl::value::{kind::Collection, Kind};
 use warp::http::{HeaderMap, HeaderValue};
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
     components::validation::*,
     config::{
-        GenerateConfig, Output, Resource, SourceAcknowledgementsConfig, SourceConfig, SourceContext,
+        GenerateConfig, Resource, SourceAcknowledgementsConfig, SourceConfig, SourceContext,
+        SourceOutput,
     },
     event::{Event, Value},
     register_validatable_component,
@@ -54,7 +55,7 @@ impl SourceConfig for HttpConfig {
         self.0.build(cx).await
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         self.0.outputs(global_log_namespace)
     }
 
@@ -335,20 +336,20 @@ impl SourceConfig for SimpleHttpConfig {
         )
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         // There is a global and per-source `log_namespace` config.
         // The source config overrides the global setting and is merged here.
         let log_namespace = global_log_namespace.merge(self.log_namespace);
 
         let schema_definition = self.schema_definition(log_namespace);
 
-        vec![Output::default(
+        vec![SourceOutput::new_logs(
             self.decoding
                 .as_ref()
                 .map(|d| d.output_type())
                 .unwrap_or(DataType::Log),
-        )
-        .with_schema_definition(schema_definition)]
+            schema_definition,
+        )]
     }
 
     fn resources(&self) -> Vec<Resource> {
@@ -462,11 +463,11 @@ mod tests {
     use lookup::{event_path, owned_value_path, OwnedTargetPath};
     use std::str::FromStr;
     use std::{collections::BTreeMap, io::Write, net::SocketAddr};
-    use value::kind::Collection;
-    use value::Kind;
     use vector_core::config::LogNamespace;
     use vector_core::event::LogEvent;
     use vector_core::schema::Definition;
+    use vrl::value::kind::Collection;
+    use vrl::value::Kind;
 
     use codecs::{
         decoding::{DeserializerConfig, FramingConfig},
@@ -1315,10 +1316,10 @@ mod tests {
             ..Default::default()
         };
 
-        let definition = config.outputs(LogNamespace::Vector)[0]
-            .clone()
-            .log_schema_definition
-            .unwrap();
+        let definitions = config
+            .outputs(LogNamespace::Vector)
+            .remove(0)
+            .schema_definition(true);
 
         let expected_definition =
             Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
@@ -1349,17 +1350,17 @@ mod tests {
                     None,
                 );
 
-        assert_eq!(definition, expected_definition)
+        assert_eq!(definitions, Some(expected_definition))
     }
 
     #[test]
     fn output_schema_definition_legacy_namespace() {
         let config = SimpleHttpConfig::default();
 
-        let definition = config.outputs(LogNamespace::Legacy)[0]
-            .clone()
-            .log_schema_definition
-            .unwrap();
+        let definitions = config
+            .outputs(LogNamespace::Legacy)
+            .remove(0)
+            .schema_definition(true);
 
         let expected_definition = Definition::new_with_default_metadata(
             Kind::object(Collection::empty()),
@@ -1375,7 +1376,7 @@ mod tests {
         .with_event_field(&owned_value_path!("path"), Kind::bytes(), None)
         .unknown_fields(Kind::bytes());
 
-        assert_eq!(definition, expected_definition)
+        assert_eq!(definitions, Some(expected_definition))
     }
 
     #[test]

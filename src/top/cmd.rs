@@ -71,7 +71,7 @@ pub async fn cmd(opts: &super::Opts) -> exitcode::ExitCode {
                     continue;
                 }
             };
-            let _ = tx.send(EventType::InitializeState(state)).await;
+            _ = tx.send(EventType::InitializeState(state)).await;
 
             let subscription_client = match connect_subscription_client(ws_url.clone()).await {
                 Ok(c) => c,
@@ -85,21 +85,21 @@ pub async fn cmd(opts: &super::Opts) -> exitcode::ExitCode {
             let finished =
                 metrics::subscribe(subscription_client, tx.clone(), opts_clone.interval as i64);
 
-            let _ = tx
+            _ = tx
                 .send(EventType::ConnectionUpdated(ConnectionStatus::Connected))
                 .await;
             // Tasks spawned in metrics::subscribe finish when the subscription
             // streams have completed. Currently, subscription streams only
             // complete when the underlying web socket connection to the GraphQL
             // server drops.
-            let _ = join_all(finished).await;
-            let _ = tx
+            _ = join_all(finished).await;
+            _ = tx
                 .send(EventType::ConnectionUpdated(
                     ConnectionStatus::Disconnected(RECONNECT_DELAY),
                 ))
                 .await;
             if opts_clone.no_reconnect {
-                let _ = shutdown_tx.send(());
+                _ = shutdown_tx.send(());
                 break;
             }
         }

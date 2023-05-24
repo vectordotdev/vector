@@ -163,7 +163,7 @@ impl HecAckClient {
         let mut removed_count = 0.0;
         for ack_id in ack_ids {
             if let Some((_, ack_event_status_sender)) = self.acks.remove(ack_id) {
-                let _ = ack_event_status_sender.send(EventStatus::Delivered);
+                _ = ack_event_status_sender.send(EventStatus::Delivered);
                 removed_count += 1.0;
                 debug!(message = "Finalized ack id.", ?ack_id);
             }
@@ -198,7 +198,7 @@ impl HecAckClient {
         let mut removed_count = 0.0;
         for ack_id in expired_ack_ids {
             if let Some((_, ack_event_status_sender)) = self.acks.remove(&ack_id) {
-                let _ = ack_event_status_sender.send(status);
+                _ = ack_event_status_sender.send(status);
                 removed_count += 1.0;
             }
         }
@@ -328,7 +328,7 @@ mod tests {
     fn test_get_ack_query_body() {
         let mut ack_client = get_ack_client(1);
         let ack_ids = (0..100).collect::<Vec<u64>>();
-        let _ = populate_ack_client(&mut ack_client, &ack_ids);
+        _ = populate_ack_client(&mut ack_client, &ack_ids);
         let expected_ack_body = HecAckStatusRequest { acks: ack_ids };
 
         let mut ack_request_body = ack_client.get_ack_query_body();
@@ -340,7 +340,7 @@ mod tests {
     fn test_decrement_retries() {
         let mut ack_client = get_ack_client(1);
         let ack_ids = (0..100).collect::<Vec<u64>>();
-        let _ = populate_ack_client(&mut ack_client, &ack_ids);
+        _ = populate_ack_client(&mut ack_client, &ack_ids);
 
         let mut ack_request_body = ack_client.get_ack_query_body();
         ack_request_body.acks.sort_unstable();

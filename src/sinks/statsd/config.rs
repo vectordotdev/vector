@@ -107,7 +107,7 @@ impl GenerateConfig for StatsdSinkConfig {
     fn generate_config() -> toml::Value {
         let address = default_address();
 
-        toml::Value::try_from(&Self {
+        toml::Value::try_from(Self {
             default_namespace: None,
             mode: Mode::Udp(UdpConnectorConfig::from_address(
                 address.ip().to_string(),

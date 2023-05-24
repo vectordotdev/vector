@@ -10,7 +10,7 @@ use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
 
 use crate::{
-    config::{DataType, Input, Output, TransformConfig, TransformContext},
+    config::{DataType, Input, OutputId, TransformConfig, TransformContext, TransformOutput},
     event::{metric, Event, EventMetadata},
     internal_events::{AggregateEventRecorded, AggregateFlushed, AggregateUpdateFailed},
     schema,
@@ -46,8 +46,13 @@ impl TransformConfig for AggregateConfig {
         Input::metric()
     }
 
-    fn outputs(&self, _: &schema::Definition, _: LogNamespace) -> Vec<Output> {
-        vec![Output::default(DataType::Metric)]
+    fn outputs(
+        &self,
+        _: enrichment::TableRegistry,
+        _: &[(OutputId, schema::Definition)],
+        _: LogNamespace,
+    ) -> Vec<TransformOutput> {
+        vec![TransformOutput::new(DataType::Metric, HashMap::new())]
     }
 }
 
@@ -144,7 +149,7 @@ impl TaskTransform<Event> for Aggregate {
 
 #[cfg(test)]
 mod tests {
-    use std::{collections::BTreeSet, task::Poll};
+    use std::{collections::BTreeSet, sync::Arc, task::Poll};
 
     use futures::stream;
     use tokio::sync::mpsc;
@@ -167,7 +172,7 @@ mod tests {
         kind: metric::MetricKind,
         value: metric::MetricValue,
     ) -> Event {
-        Event::Metric(Metric::new(name, kind, value))
+        Event::Metric(Metric::new(name, kind, value)).with_source_id(Arc::new(OutputId::from("in")))
     }
 
     #[test]

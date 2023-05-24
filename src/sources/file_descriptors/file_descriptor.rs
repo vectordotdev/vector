@@ -8,7 +8,7 @@ use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
 
 use crate::{
-    config::{GenerateConfig, Output, Resource, SourceConfig, SourceContext},
+    config::{GenerateConfig, Resource, SourceConfig, SourceContext, SourceOutput},
     serde::default_decoding,
 };
 /// Configuration for the `file_descriptor` source.
@@ -83,7 +83,7 @@ impl SourceConfig for FileDescriptorSourceConfig {
         self.source(pipe, cx.shutdown, cx.out, log_namespace)
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         let log_namespace = global_log_namespace.merge(self.log_namespace);
 
         outputs(log_namespace, &self.host_key, &self.decoding, Self::NAME)
@@ -112,6 +112,7 @@ mod tests {
         SourceSender,
     };
     use futures::StreamExt;
+    use vrl::value::value;
 
     #[test]
     fn generate_config() {
@@ -189,10 +190,10 @@ mod tests {
             let log = event.as_log();
             let meta = log.metadata().value();
 
-            assert_eq!(&vrl::value!("hello world"), log.value());
+            assert_eq!(&value!("hello world"), log.value());
             assert_eq!(
                 meta.get(path!("vector", "source_type")).unwrap(),
-                &vrl::value!("file_descriptor")
+                &value!("file_descriptor")
             );
             assert!(meta
                 .get(path!("vector", "ingest_timestamp"))
@@ -203,7 +204,7 @@ mod tests {
             let event = event.unwrap();
             let log = event.as_log();
 
-            assert_eq!(&vrl::value!("hello world again"), log.value());
+            assert_eq!(&value!("hello world again"), log.value());
 
             let event = stream.next().await;
             assert!(event.is_none());

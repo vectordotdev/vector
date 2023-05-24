@@ -1,14 +1,5 @@
 use std::collections::BTreeMap;
-
-use value::{kind::Collection, Kind, Value};
-use vrl::prelude::FunctionExpression;
-use vrl::state::TypeState;
-use vrl::{
-    function::{ArgumentList, Compiled, Example, FunctionCompileContext, Parameter},
-    prelude::{expression, DiagnosticMessage, Resolved, Result, TypeDef, VrlValueConvert},
-    value::kind,
-    Context, Expression, Function,
-};
+use vrl::prelude::*;
 
 use crate::{
     vrl_util::{self, add_index, evaluate_condition},
@@ -29,7 +20,7 @@ fn get_enrichment_table_record(
                 .iter()
                 .map(|value| Ok(value.try_bytes_utf8_lossy()?.to_string()))
                 .collect::<std::result::Result<Vec<_>, _>>(),
-            value => Err(vrl::value::Error::Expected {
+            value => Err(ValueError::Expected {
                 got: value.kind(),
                 expected: Kind::array(Collection::any()),
             }),
@@ -162,7 +153,7 @@ impl FunctionExpression for GetEnrichmentTableRecordFn {
                 let value = value.resolve(ctx)?;
                 evaluate_condition(key, value)
             })
-            .collect::<Result<Vec<Condition>>>()?;
+            .collect::<ExpressionResult<Vec<Condition>>>()?;
 
         let select = self
             .select
@@ -192,9 +183,10 @@ impl FunctionExpression for GetEnrichmentTableRecordFn {
 
 #[cfg(test)]
 mod tests {
-    use value::Secrets;
     use vector_common::TimeZone;
-    use vrl::TargetValue;
+    use vrl::compiler::state::RuntimeState;
+    use vrl::compiler::TargetValue;
+    use vrl::value::Secrets;
 
     use super::*;
     use crate::test_util::get_table_registry;
@@ -218,16 +210,16 @@ mod tests {
         let object: Value = BTreeMap::new().into();
         let mut target = TargetValue {
             value: object,
-            metadata: vrl::value!({}),
+            metadata: value!({}),
             secrets: Secrets::new(),
         };
-        let mut runtime_state = vrl::state::Runtime::default();
+        let mut runtime_state = RuntimeState::default();
         let mut ctx = Context::new(&mut target, &mut runtime_state, &tz);
 
         registry.finish_load();
 
         let got = func.resolve(&mut ctx);
 
-        assert_eq!(Ok(vrl::value! ({ "field": "result" })), got);
+        assert_eq!(Ok(value! ({ "field": "result" })), got);
     }
 }

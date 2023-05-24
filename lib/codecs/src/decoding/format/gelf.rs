@@ -4,8 +4,6 @@ use lookup::{event_path, owned_value_path, PathPrefix};
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 use std::collections::HashMap;
-use value::kind::Collection;
-use value::Kind;
 use vector_core::config::LogNamespace;
 use vector_core::{
     config::{log_schema, DataType},
@@ -13,6 +11,8 @@ use vector_core::{
     event::LogEvent,
     schema,
 };
+use vrl::value::kind::Collection;
+use vrl::value::{Kind, Value};
 
 use super::Deserializer;
 use crate::{gelf_fields::*, VALID_FIELD_REGEX};
@@ -124,9 +124,7 @@ impl GelfDeserializer {
         if let Some(line) = parsed.line {
             log.insert(
                 LINE,
-                value::Value::Float(
-                    ordered_float::NotNan::new(line).expect("JSON doesn't allow NaNs"),
-                ),
+                Value::Float(ordered_float::NotNan::new(line).expect("JSON doesn't allow NaNs")),
             );
         }
         if let Some(file) = &parsed.file {
@@ -156,7 +154,7 @@ impl GelfDeserializer {
 
                 // per GELF spec, Additional field values must be either strings or numbers
                 if val.is_string() || val.is_number() {
-                    let vector_val: value::Value = val.into();
+                    let vector_val: Value = val.into();
                     log.insert(event_path!(key.as_str()), vector_val);
                 } else {
                     let type_ = match val {
@@ -216,8 +214,8 @@ mod tests {
     use serde_json::json;
     use similar_asserts::assert_eq;
     use smallvec::SmallVec;
-    use value::Value;
     use vector_core::{config::log_schema, event::Event};
+    use vrl::value::Value;
 
     fn deserialize_gelf_input(
         input: &serde_json::Value,

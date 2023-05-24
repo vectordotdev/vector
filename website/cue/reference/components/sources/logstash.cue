@@ -9,7 +9,7 @@ components: sources: logstash: {
 		commonly_used: true
 		delivery:      "best_effort"
 		deployment_roles: ["sidecar", "aggregator"]
-		development:   "beta"
+		development:   "stable"
 		egress_method: "stream"
 		stateful:      false
 	}

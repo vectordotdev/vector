@@ -303,5 +303,5 @@ async fn shutdown() {
     assert!(shutdown_success);
 
     // Ensure source actually shut down successfully.
-    let _ = source_handle.await.unwrap();
+    _ = source_handle.await.unwrap();
 }

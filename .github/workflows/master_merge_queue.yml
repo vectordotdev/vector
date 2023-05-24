@@ -1,0 +1,153 @@
+# Master Merge Queue Test Suite
+#
+# This workflow orchestrates a collection of workflows that are required for the merge queue check.
+#
+# Most of the workflows that are jobs within this one, are able to be run on demand
+# by issuing a PR comment with the respective command to trigger said workflow.
+#
+# The design of this workflow relies on the first real job "changes" to detect file
+# changes against the base, and each downstream workflow after that will only be
+# called if the files for that area have changed.
+#
+
+name: Master Merge Queue Test Suite
+
+on:
+  # Only want to run this on merge queue, but because GH doesn't allow specifying different required checks
+  # for pull request and merge queue, we need to "run" it in pull request, but in the jobs we will just auto pass.
+  pull_request:
+  merge_group:
+    types: [checks_requested]
+
+concurrency:
+  # `github.event.number` exists for pull requests, otherwise fall back to SHA for merge queue
+  group: ${{ github.workflow }}-${{ github.event.number || github.event.merge_group.base_sha }}
+  cancel-in-progress: true
+
+env:
+  AWS_ACCESS_KEY_ID: "dummy"
+  AWS_SECRET_ACCESS_KEY: "dummy"
+  CONTAINER_TOOL: "docker"
+  DD_ENV: "ci"
+  DD_API_KEY: ${{ secrets.DD_API_KEY }}
+  RUST_BACKTRACE: full
+  TEST_LOG: vector=debug
+  VERBOSE: true
+  CI: true
+  PROFILE: debug
+  # observing issues fetching boringssl via HTTPS in the OSX build, seeing if this helps
+  # can be removed when we switch back to the upstream openssl-sys crate
+  CARGO_NET_GIT_FETCH_WITH_CLI: true
+
+jobs:
+  # This is the entry job which is required for all the actual tests in this workflow.
+  # If we don't run this job (such as in a pull request), then by consequence all downstream
+  # test jobs are not run. This allows us to not have to check for merge group in each job.
+  changes:
+    if: ${{ github.event_name == 'merge_group' }}
+    uses: ./.github/workflows/changes.yml
+    with:
+      base_ref: ${{ github.event.merge_group.base_ref }}
+      head_ref: ${{ github.event.merge_group.head_ref }}
+    secrets: inherit
+
+  test-cli:
+    if: needs.changes.outputs.source == 'true'
+    uses: ./.github/workflows/cli.yml
+    needs: changes
+    secrets: inherit
+
+  test-misc:
+    if: needs.changes.outputs.source == 'true'
+    uses: ./.github/workflows/misc.yml
+    needs: changes
+    secrets: inherit
+
+  test-environment:
+    uses: ./.github/workflows/environment.yml
+    needs: changes
+    secrets: inherit
+
+  check-msrv:
+    if: needs.changes.outputs.source == 'true'
+    uses: ./.github/workflows/msrv.yml
+    needs: changes
+    secrets: inherit
+
+  check-component-features:
+    if: needs.changes.outputs.source == 'true'
+    uses: ./.github/workflows/component_features.yml
+    needs: changes
+    secrets: inherit
+
+  cross-linux:
+    # We run cross checks when dependencies change to ensure they still build.
+    # This helps us avoid adopting dependencies that aren't compatible with other architectures.
+    if: needs.changes.outputs.dependencies == 'true'
+    uses: ./.github/workflows/cross.yml
+    needs: changes
+    secrets: inherit
+
+  unit-mac:
+    if: needs.changes.outputs.source == 'true'
+    uses: ./.github/workflows/unit_mac.yml
+    needs: changes
+    secrets: inherit
+
+  unit-windows:
+    if: needs.changes.outputs.source == 'true'
+    uses: ./.github/workflows/unit_windows.yml
+    needs: changes
+    secrets: inherit
+
+  install-sh:
+    if: needs.changes.outputs.install == 'true'
+    uses: ./.github/workflows/install-sh.yml
+    needs: changes
+    secrets: inherit
+
+  # TODO: in a followup PR, run the regression workflow here, as a single reusable workflow.
+  #
+  # NOTE: This design of passing in the pr-number to the Regression workflow requires that the merge queue
+  # be configured contain a maximum of one PR per execution. This is so that the regression report generated
+  # by the workflow can be posted as a comment to the PR.
+  # At a later time, we may want to revisit this in order to allow multiple PRs to be included in a merge
+  # queue execution. At such time, the logic of uploading of the report will need to change to account for
+  # multiple PRs.
+  # regression:
+  #   if: needs.changes.outputs.source == 'true'
+  #   uses: ./.github/workflows/regression.yml
+  #   with:
+  #     pr_number: ${{ needs.changes.outputs.pr-number }}
+  #     base_sha: ${{ github.event.merge_group.base_sha }}
+  #     head_sha: ${{ github.event.merge_group.head_sha }}
+  #   needs: changes
+  #   secrets: inherit
+
+  master-merge-queue-check:
+    name: Master Merge Queue Suite
+    # Always run this so that pull_request triggers are marked as success.
+    if: always()
+    runs-on: ubuntu-20.04
+    needs:
+      - changes
+      - test-cli
+      - test-misc
+      - test-environment
+      - check-msrv
+      - check-component-features
+      - cross-linux
+      - unit-mac
+      - unit-windows
+      - install-sh
+    env:
+      FAILED: ${{ contains(needs.*.result, 'failure') }}
+    steps:
+      - name: exit
+        run: |
+          echo "failed=${{ env.FAILED }}"
+          if [[ "$FAILED" == "true" ]] ; then
+            exit 1
+          else
+            exit 0
+          fi

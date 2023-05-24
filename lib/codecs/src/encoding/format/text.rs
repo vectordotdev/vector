@@ -1,11 +1,11 @@
 use bytes::{BufMut, BytesMut};
 use tokio_util::codec::Encoder;
-use value::Kind;
 use vector_core::{
     config::{log_schema, DataType},
     event::Event,
     schema,
 };
+use vrl::value::Kind;
 
 use crate::MetricTagValues;
 

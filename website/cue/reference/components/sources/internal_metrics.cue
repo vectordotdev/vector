@@ -12,7 +12,7 @@ components: sources: internal_metrics: {
 		commonly_used: true
 		delivery:      "at_least_once"
 		deployment_roles: ["aggregator", "daemon", "sidecar"]
-		development:   "beta"
+		development:   "stable"
 		egress_method: "batch"
 		stateful:      false
 	}

@@ -130,11 +130,11 @@ impl<'a> InternalEvent for HttpDecompressError<'a> {
     }
 }
 
-pub struct HttpInternalError {
-    pub message: &'static str,
+pub struct HttpInternalError<'a> {
+    pub message: &'a str,
 }
 
-impl InternalEvent for HttpInternalError {
+impl<'a> InternalEvent for HttpInternalError<'a> {
     fn emit(self) {
         error!(
             message = %self.message,

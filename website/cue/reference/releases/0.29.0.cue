@@ -27,6 +27,13 @@ releases: "0.29.0": {
 		hope this makes it easier to add Vector sinks in the future.
 		"""
 
+	known_issues: [
+		"""
+			Certain configurations containing a chain of at least two `remap` transforms no
+			longer result in a panic at startup. Fixed in 0.29.1.
+			""",
+	]
+
 	changelog: [
 		{
 			type: "feat"

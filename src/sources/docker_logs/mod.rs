@@ -21,16 +21,16 @@ use once_cell::sync::Lazy;
 use serde_with::serde_as;
 use tokio::sync::mpsc;
 use tracing_futures::Instrument;
-use value::{kind::Collection, Kind};
 use vector_common::internal_event::{
     ByteSize, BytesReceived, InternalEventHandle as _, Protocol, Registered,
 };
 use vector_config::configurable_component;
 use vector_core::config::{LegacyKey, LogNamespace};
+use vrl::value::{kind::Collection, Kind};
 
 use super::util::MultilineConfig;
 use crate::{
-    config::{log_schema, DataType, Output, SourceConfig, SourceContext},
+    config::{log_schema, DataType, SourceConfig, SourceContext, SourceOutput},
     docker::{docker, DockerTlsConfig},
     event::{self, merge_state::LogEventMergeState, EstimatedJsonEncodedSizeOf, LogEvent, Value},
     internal_events::{
@@ -272,7 +272,7 @@ impl SourceConfig for DockerLogsConfig {
         }))
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         let host_key = self.host_key.clone().path.map(LegacyKey::Overwrite);
 
         let schema_definition = BytesDeserializerConfig
@@ -351,7 +351,7 @@ impl SourceConfig for DockerLogsConfig {
                 None,
             );
 
-        vec![Output::default(DataType::Log).with_schema_definition(schema_definition)]
+        vec![SourceOutput::new_logs(DataType::Log, schema_definition)]
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -839,7 +839,7 @@ impl EventStreamBuilder {
     fn finish(self, result: Result<ContainerLogInfo, (ContainerId, ErrorPersistence)>) {
         // This can legally fail when shutting down, and any other
         // reason should have been logged in the main future.
-        let _ = self.main_send.send(result);
+        _ = self.main_send.send(result);
     }
 }
 

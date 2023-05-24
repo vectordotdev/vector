@@ -23,7 +23,9 @@ use vector_core::config::{LegacyKey, LogNamespace};
 use crate::sources::util::build_unix_stream_source;
 use crate::{
     codecs::Decoder,
-    config::{log_schema, DataType, GenerateConfig, Output, Resource, SourceConfig, SourceContext},
+    config::{
+        log_schema, DataType, GenerateConfig, Resource, SourceConfig, SourceContext, SourceOutput,
+    },
     event::Event,
     internal_events::StreamClosedError,
     internal_events::{SocketBindError, SocketMode, SocketReceiveError},
@@ -239,13 +241,13 @@ impl SourceConfig for SyslogConfig {
         }
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         let log_namespace = global_log_namespace.merge(self.log_namespace);
         let schema_definition = SyslogDeserializerConfig::from_source(SyslogConfig::NAME)
             .schema_definition(log_namespace)
             .with_standard_vector_source_metadata();
 
-        vec![Output::default(DataType::Log).with_schema_definition(schema_definition)]
+        vec![SourceOutput::new_logs(DataType::Log, schema_definition)]
     }
 
     fn resources(&self) -> Vec<Resource> {
@@ -451,9 +453,9 @@ mod test {
     use serde::Deserialize;
     use tokio::time::{sleep, Duration, Instant};
     use tokio_util::codec::BytesCodec;
-    use value::{kind::Collection, Kind, Value};
     use vector_common::assert_event_data_eq;
     use vector_core::{config::ComponentKey, schema::Definition};
+    use vrl::value::{kind::Collection, Kind, Value};
 
     use super::*;
     use crate::{
@@ -497,10 +499,10 @@ mod test {
             ..Default::default()
         };
 
-        let definition = config.outputs(LogNamespace::Vector)[0]
-            .clone()
-            .log_schema_definition
-            .unwrap();
+        let definitions = config
+            .outputs(LogNamespace::Vector)
+            .remove(0)
+            .schema_definition(true);
 
         let expected_definition =
             Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
@@ -573,17 +575,17 @@ mod test {
                     None,
                 );
 
-        assert_eq!(definition, expected_definition);
+        assert_eq!(definitions, Some(expected_definition));
     }
 
     #[test]
     fn output_schema_definition_legacy_namespace() {
         let config = SyslogConfig::default();
 
-        let definition = config.outputs(LogNamespace::Legacy)[0]
-            .clone()
-            .log_schema_definition
-            .unwrap();
+        let definitions = config
+            .outputs(LogNamespace::Legacy)
+            .remove(0)
+            .schema_definition(true);
 
         let expected_definition = Definition::new_with_default_metadata(
             Kind::object(Collection::empty()),
@@ -642,7 +644,7 @@ mod test {
         .unknown_fields(Kind::object(Collection::from_unknown(Kind::bytes())))
         .with_standard_vector_source_metadata();
 
-        assert_eq!(definition, expected_definition);
+        assert_eq!(definitions, Some(expected_definition));
     }
 
     #[test]
@@ -828,10 +830,17 @@ mod test {
             expected.insert("version", 1);
             expected.insert("appname", "root");
             expected.insert("procid", 8449);
+            expected.insert("source_ip", "192.168.0.254");
         }
 
         assert_event_data_eq!(
-            event_from_bytes("host", None, raw.into(), LogNamespace::Legacy).unwrap(),
+            event_from_bytes(
+                "host",
+                Some(Bytes::from("192.168.0.254")),
+                raw.into(),
+                LogNamespace::Legacy
+            )
+            .unwrap(),
             expected
         );
     }
@@ -864,9 +873,16 @@ mod test {
             expected.insert("version", 1);
             expected.insert("appname", "root");
             expected.insert("procid", 8449);
+            expected.insert("source_ip", "192.168.0.254");
         }
 
-        let event = event_from_bytes("host", None, raw.into(), LogNamespace::Legacy).unwrap();
+        let event = event_from_bytes(
+            "host",
+            Some(Bytes::from("192.168.0.254")),
+            raw.into(),
+            LogNamespace::Legacy,
+        )
+        .unwrap();
         assert_event_data_eq!(event, expected);
 
         let raw = format!(
@@ -874,7 +890,13 @@ mod test {
             r#"[incorrect x=]"#, msg
         );
 
-        let event = event_from_bytes("host", None, raw.into(), LogNamespace::Legacy).unwrap();
+        let event = event_from_bytes(
+            "host",
+            Some(Bytes::from("192.168.0.254")),
+            raw.into(),
+            LogNamespace::Legacy,
+        )
+        .unwrap();
         assert_event_data_eq!(event, expected);
     }
 
@@ -957,7 +979,13 @@ mod test {
     fn syslog_ng_default_network() {
         let msg = "i am foobar";
         let raw = format!(r#"<13>Feb 13 20:07:26 74794bfb6795 root[8539]: {}"#, msg);
-        let event = event_from_bytes("host", None, raw.into(), LogNamespace::Legacy).unwrap();
+        let event = event_from_bytes(
+            "host",
+            Some(Bytes::from("192.168.0.254")),
+            raw.into(),
+            LogNamespace::Legacy,
+        )
+        .unwrap();
 
         let mut expected = Event::Log(LogEvent::from(msg));
         {
@@ -985,6 +1013,7 @@ mod test {
             expected.insert("facility", "user");
             expected.insert("appname", "root");
             expected.insert("procid", 8539);
+            expected.insert("source_ip", "192.168.0.254");
         }
 
         assert_event_data_eq!(event, expected);
@@ -997,7 +1026,13 @@ mod test {
             r#"<190>Feb 13 21:31:56 74794bfb6795 liblogging-stdlog:  [origin software="rsyslogd" swVersion="8.24.0" x-pid="8979" x-info="http://www.rsyslog.com"] {}"#,
             msg
         );
-        let event = event_from_bytes("host", None, raw.into(), LogNamespace::Legacy).unwrap();
+        let event = event_from_bytes(
+            "host",
+            Some(Bytes::from("192.168.0.254")),
+            raw.into(),
+            LogNamespace::Legacy,
+        )
+        .unwrap();
 
         let mut expected = Event::Log(LogEvent::from(msg));
         {
@@ -1025,6 +1060,7 @@ mod test {
             expected.insert("appname", "liblogging-stdlog");
             expected.insert("origin.software", "rsyslogd");
             expected.insert("origin.swVersion", "8.24.0");
+            expected.insert("source_ip", "192.168.0.254");
             expected.insert(event_path!("origin", "x-pid"), "8979");
             expected.insert(event_path!("origin", "x-info"), "http://www.rsyslog.com");
         }
@@ -1359,7 +1395,6 @@ mod test {
         fn from(e: Event) -> Self {
             let (value, _) = e.into_log().into_parts();
             let mut fields = value.into_object().unwrap();
-            fields.remove("source_ip");
 
             Self {
                 msgid: fields.remove("msgid").map(value_to_string).unwrap(),

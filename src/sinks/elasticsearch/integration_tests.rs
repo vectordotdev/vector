@@ -224,7 +224,7 @@ async fn auto_version_http() {
         batch: batch_settings(),
         ..Default::default()
     };
-    let _ = ElasticsearchCommon::parse_single(&config)
+    _ = ElasticsearchCommon::parse_single(&config)
         .await
         .expect("Config error");
 }
@@ -249,7 +249,7 @@ async fn auto_version_https() {
         batch: batch_settings(),
         ..Default::default()
     };
-    let _ = ElasticsearchCommon::parse_single(&config)
+    _ = ElasticsearchCommon::parse_single(&config)
         .await
         .expect("Config error");
 }
@@ -262,6 +262,7 @@ async fn auto_version_aws() {
         auth: Some(ElasticsearchAuth::Aws(AwsAuthentication::Default {
             load_timeout_secs: Some(5),
             imds: ImdsAuthentication::default(),
+            region: None,
         })),
         endpoints: vec![aws_server()],
         aws: Some(RegionOrEndpoint::with_region(String::from("localstack"))),
@@ -270,7 +271,7 @@ async fn auto_version_aws() {
         ..Default::default()
     };
 
-    let _ = ElasticsearchCommon::parse_single(&config)
+    _ = ElasticsearchCommon::parse_single(&config)
         .await
         .expect("Config error");
 }
@@ -346,6 +347,7 @@ async fn insert_events_on_aws() {
             auth: Some(ElasticsearchAuth::Aws(AwsAuthentication::Default {
                 load_timeout_secs: Some(5),
                 imds: ImdsAuthentication::default(),
+                region: None,
             })),
             endpoints: vec![aws_server()],
             aws: Some(RegionOrEndpoint::with_region(String::from("localstack"))),
@@ -368,6 +370,7 @@ async fn insert_events_on_aws_with_compression() {
             auth: Some(ElasticsearchAuth::Aws(AwsAuthentication::Default {
                 load_timeout_secs: Some(5),
                 imds: ImdsAuthentication::default(),
+                region: None,
             })),
             endpoints: vec![aws_server()],
             aws: Some(RegionOrEndpoint::with_region(String::from("localstack"))),
@@ -669,7 +672,7 @@ async fn run_insert_tests_with_multiple_endpoints(config: &ElasticsearchConfig) 
 
     // make sure writes are all visible
     for common in commons {
-        let _ = flush(common).await;
+        _ = flush(common).await;
     }
 
     let client = create_http_client();

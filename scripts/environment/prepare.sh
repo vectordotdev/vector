@@ -17,6 +17,9 @@ fi
 if ! cargo deny --version >& /dev/null ; then
   rustup run stable cargo install cargo-deny --force --locked
 fi
+if ! rust-license-tool --help >& /dev/null ; then
+  cargo install --git https://github.com/DataDog/rust-license-tool
+fi
 
 cd scripts
 bundle install

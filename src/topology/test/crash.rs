@@ -90,7 +90,7 @@ async fn test_source_panic() {
     let input_lines = random_lines(100).take(num_lines).collect::<Vec<_>>();
     send_lines(in_addr, input_lines.clone()).await.unwrap();
     sleep(Duration::from_secs(1)).await;
-    let _ = std::panic::take_hook();
+    _ = std::panic::take_hook();
 
     // Our panic source should have panicked, but since the sink was also pulling from the other source, it should have
     // still been able to get all the events it sent.
@@ -191,7 +191,7 @@ async fn test_sink_panic() {
 
     // Our panic sink should have panicked, but the other sink should have still been able to finish processing as it was not
     // directly attached.
-    let _ = std::panic::take_hook();
+    _ = std::panic::take_hook();
     assert!(UnboundedReceiverStream::new(crash).next().await.is_some());
     topology.stop().await;
 

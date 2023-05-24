@@ -23,7 +23,7 @@ async fn component_added(client: Arc<SubscriptionClient>, tx: state::EventTx) {
         if let Some(d) = res.data {
             let c = d.component_added;
             let key = ComponentKey::from(c.component_id);
-            let _ = tx
+            _ = tx
                 .send(state::EventType::ComponentAdded(state::ComponentRow {
                     key,
                     kind: c.on.to_string(),
@@ -54,7 +54,7 @@ async fn allocated_bytes(client: Arc<SubscriptionClient>, tx: state::EventTx, in
     while let Some(Some(res)) = stream.next().await {
         if let Some(d) = res.data {
             let c = d.component_allocated_bytes;
-            let _ = tx
+            _ = tx
                 .send(state::EventType::AllocatedBytes(
                     c.into_iter()
                         .map(|c| {
@@ -79,7 +79,7 @@ async fn component_removed(client: Arc<SubscriptionClient>, tx: state::EventTx) 
         if let Some(d) = res.data {
             let c = d.component_removed;
             let id = ComponentKey::from(c.component_id.as_str());
-            let _ = tx.send(state::EventType::ComponentRemoved(id)).await;
+            _ = tx.send(state::EventType::ComponentRemoved(id)).await;
         }
     }
 }
@@ -96,7 +96,7 @@ async fn received_events_totals(
     while let Some(Some(res)) = stream.next().await {
         if let Some(d) = res.data {
             let c = d.component_received_events_totals;
-            let _ = tx
+            _ = tx
                 .send(state::EventType::ReceivedEventsTotals(
                     c.into_iter()
                         .map(|c| {
@@ -124,7 +124,7 @@ async fn received_events_throughputs(
     while let Some(Some(res)) = stream.next().await {
         if let Some(d) = res.data {
             let c = d.component_received_events_throughputs;
-            let _ = tx
+            _ = tx
                 .send(state::EventType::ReceivedEventsThroughputs(
                     interval,
                     c.into_iter()
@@ -144,7 +144,7 @@ async fn sent_events_totals(client: Arc<SubscriptionClient>, tx: state::EventTx,
     while let Some(Some(res)) = stream.next().await {
         if let Some(d) = res.data {
             let c = d.component_sent_events_totals;
-            let _ = tx
+            _ = tx
                 .send(state::EventType::SentEventsTotals(
                     c.into_iter()
                         .map(|c| SentEventsMetric {
@@ -171,7 +171,7 @@ async fn sent_events_throughputs(
     while let Some(Some(res)) = stream.next().await {
         if let Some(d) = res.data {
             let c = d.component_sent_events_throughputs;
-            let _ = tx
+            _ = tx
                 .send(state::EventType::SentEventsThroughputs(
                     interval,
                     c.into_iter()
@@ -199,7 +199,7 @@ async fn processed_bytes_totals(
     while let Some(Some(res)) = stream.next().await {
         if let Some(d) = res.data {
             let c = d.component_processed_bytes_totals;
-            let _ = tx
+            _ = tx
                 .send(state::EventType::ProcessedBytesTotals(
                     c.into_iter()
                         .map(|c| {
@@ -227,7 +227,7 @@ async fn processed_bytes_throughputs(
     while let Some(Some(res)) = stream.next().await {
         if let Some(d) = res.data {
             let c = d.component_processed_bytes_throughputs;
-            let _ = tx
+            _ = tx
                 .send(state::EventType::ProcessedBytesThroughputs(
                     interval,
                     c.into_iter()
@@ -247,7 +247,7 @@ async fn errors_totals(client: Arc<SubscriptionClient>, tx: state::EventTx, inte
     while let Some(Some(res)) = stream.next().await {
         if let Some(d) = res.data {
             let c = d.component_errors_totals;
-            let _ = tx
+            _ = tx
                 .send(state::EventType::ErrorsTotals(
                     c.into_iter()
                         .map(|c| {

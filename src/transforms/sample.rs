@@ -3,7 +3,10 @@ use vector_core::config::LogNamespace;
 
 use crate::{
     conditions::{AnyCondition, Condition},
-    config::{DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext},
+    config::{
+        DataType, GenerateConfig, Input, OutputId, TransformConfig, TransformContext,
+        TransformOutput,
+    },
     event::Event,
     internal_events::SampleEventDiscarded,
     schema,
@@ -24,12 +27,17 @@ pub struct SampleConfig {
     /// dropped.
     pub rate: u64,
 
-    /// The name of the log field whose value is hashed to determine if the event should be
-    /// passed.
+    /// The name of the field whose value is hashed to determine if the event should be
+    /// sampled.
     ///
-    /// Consistently samples the same events. Actual rate of sampling may differ from the configured
-    /// one if values in the field are not uniformly distributed. If left unspecified, or if the
-    /// event doesn't have `key_field`, then events are count rated.
+    /// Each unique value for the key creates a bucket of related events to be sampled together
+    /// and the rate is applied to the buckets themselves to sample `1/N` buckets.  The overall rate
+    /// of sampling may differ from the configured one if values in the field are not uniformly
+    /// distributed. If left unspecified, or if the event doesn’t have `key_field`, then the
+    /// event is sampled independently.
+    ///
+    /// This can be useful to, for example, ensure that all logs for a given transaction are
+    /// sampled together, but that overall `1/N` transactions are sampled.
     #[configurable(metadata(docs::examples = "message",))]
     pub key_field: Option<String>,
 
@@ -66,9 +74,19 @@ impl TransformConfig for SampleConfig {
         Input::new(DataType::Log | DataType::Trace)
     }
 
-    fn outputs(&self, merged_definition: &schema::Definition, _: LogNamespace) -> Vec<Output> {
-        vec![Output::default(DataType::Log | DataType::Trace)
-            .with_schema_definition(merged_definition.clone())]
+    fn outputs(
+        &self,
+        _: enrichment::TableRegistry,
+        input_definitions: &[(OutputId, schema::Definition)],
+        _: LogNamespace,
+    ) -> Vec<TransformOutput> {
+        vec![TransformOutput::new(
+            DataType::Log | DataType::Trace,
+            input_definitions
+                .iter()
+                .map(|(output, definition)| (output.clone(), definition.clone()))
+                .collect(),
+        )]
     }
 }
 

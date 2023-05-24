@@ -129,7 +129,7 @@ where
         let (sender, receiver) = channel();
 
         // Signal the stats thread task to flush remaining payloads and shutdown.
-        let _ = self.shutdown.send(sender);
+        _ = self.shutdown.send(sender);
 
         // The stats flushing thread has until the component shutdown grace period to end
         // gracefully. Otherwise the sink + stats flushing thread will be killed and an error

@@ -13,20 +13,20 @@ use lookup::{
     owned_value_path, path, OwnedValuePath,
 };
 use tokio_util::{codec::FramedRead, io::StreamReader};
-use value::Kind;
 use vector_common::internal_event::{
     ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol,
 };
 use vector_config::NamedComponent;
 use vector_core::{
-    config::{LegacyKey, LogNamespace, Output},
+    config::{LegacyKey, LogNamespace},
     event::Event,
     EstimatedJsonEncodedSizeOf,
 };
+use vrl::value::Kind;
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
-    config::log_schema,
+    config::{log_schema, SourceOutput},
     internal_events::{EventsReceived, FileDescriptorReadError, StreamClosedError},
     shutdown::ShutdownSignal,
     SourceSender,
@@ -210,7 +210,7 @@ fn outputs(
     host_key: &Option<OptionalValuePath>,
     decoding: &DeserializerConfig,
     source_name: &'static str,
-) -> Vec<Output> {
+) -> Vec<SourceOutput> {
     let legacy_host_key = Some(LegacyKey::InsertIfEmpty(
         host_key.clone().and_then(|k| k.path).unwrap_or_else(|| {
             parse_value_path(log_schema().host_key()).expect("log_schema.host_key to be valid path")
@@ -228,5 +228,8 @@ fn outputs(
         )
         .with_standard_vector_source_metadata();
 
-    vec![Output::default(decoding.output_type()).with_schema_definition(schema_definition)]
+    vec![SourceOutput::new_logs(
+        decoding.output_type(),
+        schema_definition,
+    )]
 }

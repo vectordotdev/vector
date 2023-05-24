@@ -706,9 +706,9 @@ mod tests {
     fn get_compressed_empty_series_payload() -> Bytes {
         let mut compressor = get_compressor();
 
-        let _ = write_payload_header(DatadogMetricsEndpoint::Series, &mut compressor)
+        _ = write_payload_header(DatadogMetricsEndpoint::Series, &mut compressor)
             .expect("should not fail");
-        let _ = write_payload_footer(DatadogMetricsEndpoint::Series, &mut compressor)
+        _ = write_payload_footer(DatadogMetricsEndpoint::Series, &mut compressor)
             .expect("should not fail");
 
         compressor.finish().expect("should not fail").freeze()
@@ -1001,7 +1001,7 @@ mod tests {
                 compressed_limit,
             );
             if let Ok(mut encoder) = result {
-                let _ = encoder.try_encode(metric);
+                _ = encoder.try_encode(metric);
 
                 if let Ok((payload, _processed, _raw_bytes)) = encoder.finish() {
                     prop_assert!(payload.len() <= compressed_limit);

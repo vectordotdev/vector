@@ -593,7 +593,7 @@ impl<T> Future for CountReceiver<T> {
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = self.get_mut();
         if let Some(trigger) = this.trigger.take() {
-            let _ = trigger.send(());
+            _ = trigger.send(());
         }
 
         let result = ready!(this.handle.poll_unpin(cx));

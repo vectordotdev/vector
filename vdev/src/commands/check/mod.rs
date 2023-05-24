@@ -7,6 +7,7 @@ crate::cli_subcommands! {
     events,
     mod examples,
     mod fmt,
+    mod licenses,
     mod markdown,
     mod rust,
     mod scripts,

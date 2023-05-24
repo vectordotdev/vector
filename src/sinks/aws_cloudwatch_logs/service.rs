@@ -24,7 +24,6 @@ use tower::{
 };
 use vector_common::request_metadata::MetaDescriptive;
 use vector_core::{internal_event::CountByteSize, stream::DriverResponse};
-use vrl::prelude::fmt::Debug;
 
 use crate::{
     event::EventStatus,

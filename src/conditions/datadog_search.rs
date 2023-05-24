@@ -1,15 +1,15 @@
 use std::borrow::Cow;
 
 use bytes::Bytes;
-use datadog_filter::{
+use vector_config::configurable_component;
+use vector_core::event::{Event, LogEvent, Value};
+use vrl::datadog_filter::{
     build_matcher,
     regex::{wildcard_regex, word_regex},
     Filter, Matcher, Resolver, Run,
 };
-use datadog_search_syntax::parse;
-use datadog_search_syntax::{Comparison, ComparisonValue, Field};
-use vector_config::configurable_component;
-use vector_core::event::{Event, LogEvent, Value};
+use vrl::datadog_search_syntax::parse;
+use vrl::datadog_search_syntax::{Comparison, ComparisonValue, Field};
 
 use crate::conditions::{Condition, Conditional, ConditionalConfig};
 
@@ -312,10 +312,10 @@ where
 
 #[cfg(test)]
 mod test {
-    use datadog_filter::{build_matcher, Filter, Resolver};
-    use datadog_search_syntax::parse;
     use serde_json::json;
     use vector_core::event::Event;
+    use vrl::datadog_filter::{build_matcher, Filter, Resolver};
+    use vrl::datadog_search_syntax::parse;
 
     use super::*;
     use crate::log_event;
