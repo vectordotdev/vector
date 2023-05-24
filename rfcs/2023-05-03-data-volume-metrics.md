@@ -100,6 +100,13 @@ aggregate value across all  services.
 The [Component Spec][component_spec] will need updating to indicate these tags
 will need including.
 
+**Performace** - There is going to be a performance hit when emitting these metrics.
+Currently for each batch a simple event is emitted containing the count and size
+of the entire batch. With this change it will be necessary to scan the entire
+batch to obtain the count of source, service combinations of events before emitting
+the counts. This will involve additional allocations to maintain the counts as well
+as the O(1) scan.
+
 #### `component_received_event_bytes_total`
 
 This metric is emitted by the framework [here][source_sender], so it looks like
@@ -140,8 +147,40 @@ The `EventsSent` metric will only accept this type.
 
 It is currently not possible to have dynamic tags with preregistered metrics.
 
+Preregistering these metrics are essential to ensure that they don't expire.
+
+The current mechanism to expire metrics is to check if a handle to the given
+metric is being held. If it isn't, and nothing has updated that metric in
+the last cycle - the metric is dropped. If a metric is dropped, the next time
+that event is emitted with those tags, the count starts at zero again.
+
 We will need to introduce a registered event caching layer that will register
 and cache new events keyed on the tags that are sent to it.
+
+Currently a registered metrics is stored in a `Registered<EventSent>`.
+
+We will need a new struct that can wrap this that will be generic over a tuple of
+the tags for each event and the event - `Cached<(String, String), EventSent>`.
+This struct will maintain a BTreeMap of tags -> `Registered`. In pseudo rust:
+
+```rust
+struct Registered<Tags, Event> {
+  cache: BTreemap<Tags, Registered<Event>>,
+  register: Fn(Tags) -> Registered<Event>,
+}
+
+impl<Tags, Event> Registered<Tags, Event> {
+  fn emit(&mut self, tags: Tags, value: Event) -> {
+    if Some(event) = self.cache.get(tags) {
+      event.emit(value);
+    } else {
+      let event = self.register(tags);
+      event.emit(value);
+      self.cache.insert(tags, event);
+    }
+  }
+}
+```
 
 ## Rationale
 
@@ -186,6 +225,10 @@ Incremental steps to execute this change. These will be converted to issues afte
 ## Future Improvements
 
 - Logs emitted by Vector should also be tagged with `source_id` and `service`.
+- This rfc proposes storing the source and service as strings. This incurs a cost since scanning each
+  event to get the counts of events by source and service will involve multiple string comparisons. A
+  future optimization could be to hash the combination of these values at the source into a single
+  integer.
 
 [component_spec]: https://github.com/vectordotdev/vector/blob/master/docs/specs/component.md#componenteventssent
 [source_sender]: https://github.com/vectordotdev/vector/blob/master/src/source_sender/mod.rs#L265-L268
