@@ -100,7 +100,7 @@ aggregate value across all  services.
 The [Component Spec][component_spec] will need updating to indicate these tags
 will need including.
 
-**Performace** - There is going to be a performance hit when emitting these metrics.
+**Performance** - There is going to be a performance hit when emitting these metrics.
 Currently for each batch a simple event is emitted containing the count and size
 of the entire batch. With this change it will be necessary to scan the entire
 batch to obtain the count of source, service combinations of events before emitting
