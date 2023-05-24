@@ -103,6 +103,7 @@ pub struct Config {
     pub enrichment_tables: IndexMap<ComponentKey, EnrichmentTableOuter>,
     tests: Vec<TestDefinition>,
     secret: IndexMap<ComponentKey, SecretBackends>,
+    pub graceful_shutdown_duration: i64,
 }
 
 impl Config {

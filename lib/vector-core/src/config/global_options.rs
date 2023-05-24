@@ -115,12 +115,6 @@ pub struct GlobalOptions {
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     pub expire_metrics_secs: Option<f64>,
-
-    /// The amount of time, in seconds, that Vector waits for internal processes to stop gracefully
-    /// after a SIGINT or SIGTERM is received. Default is 60 seconds. Set to -1 to never force
-    /// shutdown after SIGINT/SIGTERM received.
-    #[serde(default)]
-    pub graceful_shutdown_duration: i64,
 }
 
 impl GlobalOptions {
@@ -233,7 +227,6 @@ impl GlobalOptions {
                 proxy: self.proxy.merge(&with.proxy),
                 expire_metrics: self.expire_metrics.or(with.expire_metrics),
                 expire_metrics_secs: self.expire_metrics_secs.or(with.expire_metrics_secs),
-                graceful_shutdown_duration: self.graceful_shutdown_duration,
             })
         } else {
             Err(errors)

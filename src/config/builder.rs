@@ -78,6 +78,11 @@ pub struct ConfigBuilder {
     /// All configured secrets backends.
     #[serde(default)]
     pub secret: IndexMap<ComponentKey, SecretBackends>,
+
+    /// Set the duration in seconds to wait for graceful shutdown after SIGINT or SIGTERM are received.
+    /// After the duration has passed, Vector will force shutdown. Default value is 60 seconds. If set
+    /// to -1, Vector will never force shutdown.
+    pub graceful_shutdown_duration: i64,
 }
 
 #[cfg(feature = "enterprise")]
@@ -195,6 +200,7 @@ impl From<Config> for ConfigBuilder {
             transforms,
             tests,
             secret,
+            graceful_shutdown_duration,
             hash: _,
         } = config;
 
@@ -225,6 +231,7 @@ impl From<Config> for ConfigBuilder {
             provider: None,
             tests,
             secret,
+            graceful_shutdown_duration,
         }
     }
 }

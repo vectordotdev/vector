@@ -442,7 +442,7 @@ pub async fn load_configs(
         info!("Health checks are disabled.");
     }
     config.healthchecks.set_require_healthy(require_healthy);
-    config.global.graceful_shutdown_duration = graceful_shutdown_duration;
+    config.graceful_shutdown_duration = graceful_shutdown_duration;
 
     Ok(config)
 }
