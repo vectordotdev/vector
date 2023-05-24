@@ -5,6 +5,7 @@ use codecs::{
 };
 use fakedata::logs::*;
 use futures::StreamExt;
+use lookup::{owned_value_path, path};
 use rand::seq::SliceRandom;
 use serde_with::serde_as;
 use snafu::Snafu;
@@ -15,7 +16,11 @@ use vector_common::internal_event::{
     ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol,
 };
 use vector_config::configurable_component;
-use vector_core::{config::LogNamespace, EstimatedJsonEncodedSizeOf};
+use vector_core::{
+    config::{LegacyKey, LogNamespace},
+    EstimatedJsonEncodedSizeOf,
+};
+use vrl::value::Kind;
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
@@ -249,6 +254,13 @@ async fn demo_logs_source(
                             DemoLogsConfig::NAME,
                             now,
                         );
+                        log_namespace.insert_source_metadata(
+                            "service",
+                            log,
+                            Some(LegacyKey::InsertIfEmpty(path!("service"))),
+                            path!("service"),
+                            "vector",
+                        );
 
                         event
                     });
@@ -300,7 +312,14 @@ impl SourceConfig for DemoLogsConfig {
         let schema_definition = self
             .decoding
             .schema_definition(log_namespace)
-            .with_standard_vector_source_metadata();
+            .with_standard_vector_source_metadata()
+            .with_source_metadata(
+                DemoLogsConfig::NAME,
+                Some(LegacyKey::InsertIfEmpty(owned_value_path!("service"))),
+                &owned_value_path!("service"),
+                Kind::bytes(),
+                Some("service"),
+            );
 
         vec![SourceOutput::new_logs(
             self.decoding.output_type(),
