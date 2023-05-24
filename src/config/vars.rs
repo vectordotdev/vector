@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use once_cell::sync::Lazy;
 use regex::{Captures, Regex};
 
 // Environment variable names can have any characters from the Portable Character Set other
@@ -9,10 +10,15 @@ use regex::{Captures, Regex};
 // variable names when they come from a Java properties file.
 //
 // https://pubs.opengroup.org/onlinepubs/000095399/basedefs/xbd_chap08.html
-pub const ENVIRONMENT_VARIABLE_INTERPOLATION_PATTERN: &str = r"(?x)
-    \$\$|
-    \$([[:word:].]+)|
-    \$\{([[:word:].]+)(?:(:?-|:?\?)([^}]*))?\}";
+pub static ENVIRONMENT_VARIABLE_INTERPOLATION_REGEX: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(
+        r"(?x)
+        \$\$|
+        \$([[:word:].]+)|
+        \$\{([[:word:].]+)(?:(:?-|:?\?)([^}]*))?\}",
+    )
+    .unwrap()
+});
 
 /// (result, warnings)
 pub fn interpolate(
@@ -22,9 +28,7 @@ pub fn interpolate(
     let mut errors = Vec::new();
     let mut warnings = Vec::new();
 
-    let re = Regex::new(ENVIRONMENT_VARIABLE_INTERPOLATION_PATTERN).unwrap();
-
-    let interpolated = re
+    let interpolated = ENVIRONMENT_VARIABLE_INTERPOLATION_REGEX
         .replace_all(input, |caps: &Captures<'_>| {
             let flags = caps.get(3).map(|m| m.as_str()).unwrap_or_default();
             let def_or_err = caps.get(4).map(|m| m.as_str()).unwrap_or_default();
