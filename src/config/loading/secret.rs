@@ -26,8 +26,8 @@ use crate::{
 // - "SECRET[backend..secret.name]" will match and capture "backend" and ".secret.name"
 // - "SECRET[secret_name]" will not match
 // - "SECRET[.secret.name]" will not match
-static COLLECTOR: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"SECRET\[([[:word:]]+)\.([[:word:].]+)\]").unwrap());
+pub const SECRET_BACKEND_PATTERN: &str = r"SECRET\[([[:word:]]+)\.([[:word:].]+)\]";
+static COLLECTOR: Lazy<Regex> = Lazy::new(|| Regex::new(SECRET_BACKEND_PATTERN).unwrap());
 
 /// Helper type for specifically deserializing secrets backends.
 #[derive(Debug, Default, Deserialize, Serialize)]
