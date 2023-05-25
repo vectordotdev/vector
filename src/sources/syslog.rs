@@ -549,7 +549,7 @@ mod test {
                 .with_metadata_field(
                     &owned_value_path!("syslog", "appname"),
                     Kind::bytes().or_undefined(),
-                    None,
+                    Some("service"),
                 )
                 .with_metadata_field(
                     &owned_value_path!("syslog", "msgid"),
@@ -628,7 +628,7 @@ mod test {
         .with_event_field(
             &owned_value_path!("appname"),
             Kind::bytes().or_undefined(),
-            None,
+            Some("service"),
         )
         .with_event_field(
             &owned_value_path!("msgid"),

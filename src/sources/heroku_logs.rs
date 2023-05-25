@@ -107,7 +107,7 @@ impl LogplexConfig {
                 Some(LegacyKey::InsertIfEmpty(owned_value_path!("app_name"))),
                 &owned_value_path!("app_name"),
                 Kind::bytes(),
-                None,
+                Some("service"),
             )
             .with_source_metadata(
                 LogplexConfig::NAME,
@@ -694,7 +694,7 @@ mod tests {
                 .with_metadata_field(
                     &owned_value_path!(LogplexConfig::NAME, "app_name"),
                     Kind::bytes(),
-                    None,
+                    Some("service"),
                 )
                 .with_metadata_field(
                     &owned_value_path!(LogplexConfig::NAME, "proc_id"),
@@ -731,7 +731,11 @@ mod tests {
         .with_event_field(&owned_value_path!("source_type"), Kind::bytes(), None)
         .with_event_field(&owned_value_path!("timestamp"), Kind::timestamp(), None)
         .with_event_field(&owned_value_path!("host"), Kind::bytes(), Some("host"))
-        .with_event_field(&owned_value_path!("app_name"), Kind::bytes(), None)
+        .with_event_field(
+            &owned_value_path!("app_name"),
+            Kind::bytes(),
+            Some("service"),
+        )
         .with_event_field(&owned_value_path!("proc_id"), Kind::bytes(), None)
         .unknown_fields(Kind::bytes());
 

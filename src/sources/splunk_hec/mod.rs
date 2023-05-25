@@ -226,7 +226,7 @@ impl SourceConfig for SplunkConfig {
             Some(LegacyKey::Overwrite(owned_value_path!(SOURCE))),
             &owned_value_path!("source"),
             Kind::bytes(),
-            None,
+            Some("service"),
         )
         // Not to be confused with `source_type`.
         .with_source_metadata(
@@ -2475,7 +2475,7 @@ mod tests {
         .with_metadata_field(
             &owned_value_path!("splunk_hec", "source"),
             Kind::bytes(),
-            None,
+            Some("service"),
         )
         .with_metadata_field(
             &owned_value_path!("splunk_hec", "channel"),
@@ -2519,7 +2519,11 @@ mod tests {
         .with_event_field(&owned_value_path!("source_type"), Kind::bytes(), None)
         .with_event_field(&owned_value_path!("splunk_channel"), Kind::bytes(), None)
         .with_event_field(&owned_value_path!("splunk_index"), Kind::bytes(), None)
-        .with_event_field(&owned_value_path!("splunk_source"), Kind::bytes(), None)
+        .with_event_field(
+            &owned_value_path!("splunk_source"),
+            Kind::bytes(),
+            Some("service"),
+        )
         .with_event_field(&owned_value_path!("splunk_sourcetype"), Kind::bytes(), None)
         .with_event_field(&owned_value_path!("timestamp"), Kind::timestamp(), None);
 
