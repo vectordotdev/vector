@@ -160,16 +160,16 @@ and cache new events keyed on the tags that are sent to it.
 Currently a registered metrics is stored in a `Registered<EventSent>`.
 
 We will need a new struct that can wrap this that will be generic over a tuple of
-the tags for each event and the event - `Cached<(String, String), EventSent>`.
+the tags for each event and the event - eg. `Cached<(String, String), EventSent>`.
 This struct will maintain a BTreeMap of tags -> `Registered`. In pseudo rust:
 
 ```rust
-struct Registered<Tags, Event> {
+struct Cached<Tags, Event> {
   cache: BTreemap<Tags, Registered<Event>>,
   register: Fn(Tags) -> Registered<Event>,
 }
 
-impl<Tags, Event> Registered<Tags, Event> {
+impl<Tags, Event> Cached<Tags, Event> {
   fn emit(&mut self, tags: Tags, value: Event) -> {
     if Some(event) = self.cache.get(tags) {
       event.emit(value);
