@@ -7,13 +7,13 @@ use std::pin::Pin;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::task::{Context, Poll};
-use std::time::{Duration, SystemTime};
+use std::time::SystemTime;
 
 pub use auth::{AwsAuthentication, ImdsAuthentication};
 use aws_config::meta::region::ProvideRegion;
 use aws_sigv4::http_request::{SignableRequest, SigningSettings};
 use aws_sigv4::SigningParams;
-use aws_smithy_async::rt::sleep::{AsyncSleep, Sleep};
+use aws_smithy_async::rt::sleep::TokioSleep;
 use aws_smithy_client::bounds::SmithyMiddleware;
 use aws_smithy_client::erase::{DynConnector, DynMiddleware};
 use aws_smithy_client::{Builder, SdkError};
@@ -114,7 +114,7 @@ pub async fn create_smithy_client<T: ClientBuilder>(
     let mut client_builder = Builder::new()
         .connector(connector)
         .middleware(middleware)
-        .sleep_impl(Arc::new(TokioSleep));
+        .sleep_impl(Arc::new(TokioSleep::new()));
     client_builder.set_retry_config(Some(retry_config.into()));
 
     Ok(client_builder.build())
@@ -188,15 +188,6 @@ pub async fn sign_request(
     signing_instructions.apply_to_request(request);
 
     Ok(())
-}
-
-#[derive(Debug)]
-pub struct TokioSleep;
-
-impl AsyncSleep for TokioSleep {
-    fn sleep(&self, duration: Duration) -> Sleep {
-        Sleep::new(tokio::time::sleep(duration))
-    }
 }
 
 /// Layer for capturing the payload size for AWS API client requests and emitting internal telemetry.
