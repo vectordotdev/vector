@@ -381,7 +381,7 @@ impl util::http::HttpSink for HttpSink {
 
                 let buffer = BytesMut::new();
                 let mut w = GzEncoder::new(buffer.writer(), level.as_flate2());
-                w.write_all(&body).expect("Writing to Vec can't fail");
+                w.write_all(&body).expect("Writing to Vec can't fail!");
                 body = w.finish().expect("Writing to Vec can't fail").into_inner();
             }
             Compression::Zlib(level) => {
