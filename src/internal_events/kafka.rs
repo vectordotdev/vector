@@ -112,24 +112,6 @@ impl InternalEvent for KafkaReadError {
 }
 
 #[derive(Debug)]
-pub struct KafkaPauseResumeError {
-    pub error: rdkafka::error::KafkaError,
-}
-
-impl InternalEvent for KafkaPauseResumeError {
-    fn emit(self) {
-        error!(
-            message = "Failed to pause or resume consumer.",
-            error = %self.error,
-            error_code = "pause_resume_consumer",
-            error_type = error_type::COMMAND_FAILED,
-            stage = error_stage::RECEIVING,
-            internal_log_rate_limit = true,
-        )
-    }
-}
-
-#[derive(Debug)]
 pub struct KafkaStatisticsReceived<'a> {
     pub statistics: &'a rdkafka::Statistics,
     pub expose_lag_metrics: bool,

@@ -1,5 +1,5 @@
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::{BTreeMap, HashMap, HashSet},
     io::Cursor,
     sync::{
         mpsc::{sync_channel, SyncSender},
@@ -20,18 +20,18 @@ use lookup::{lookup_v2::OptionalValuePath, owned_value_path, path, OwnedValuePat
 use once_cell::sync::OnceCell;
 use rdkafka::{
     consumer::{CommitMode, Consumer, ConsumerContext, Rebalance, StreamConsumer},
+    error::KafkaError,
     message::{BorrowedMessage, Headers as _, Message},
-    ClientConfig, ClientContext, Statistics, types::RDKafkaErrorCode, error::KafkaError,
+    types::RDKafkaErrorCode,
+    ClientConfig, ClientContext, Statistics,
 };
 use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
 use tokio::{
     runtime::Handle,
-    sync::mpsc::{self, UnboundedReceiver, UnboundedSender},
+    sync::mpsc::{self, Receiver, Sender, UnboundedReceiver, UnboundedSender},
     task::JoinHandle,
-    time::Instant,
 };
-use tokio_stream::StreamMap;
 use tokio_util::codec::FramedRead;
 
 use vector_common::{finalization::BatchStatusReceiver, finalizer::OrderedFinalizer};
@@ -50,8 +50,8 @@ use crate::{
     },
     event::{BatchNotifier, BatchStatus, Event, Value},
     internal_events::{
-        KafkaBytesReceived, KafkaEventsReceived, KafkaOffsetUpdateError, KafkaPauseResumeError,
-        KafkaReadError, StreamClosedError,
+        KafkaBytesReceived, KafkaEventsReceived, KafkaOffsetUpdateError, KafkaReadError,
+        StreamClosedError,
     },
     kafka,
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
@@ -428,18 +428,12 @@ async fn kafka_source(
 
     if let Some(ack_task) = ack_task {
         _ = tokio::join!(msg_task, ack_task);
-        // _ = tokio::join!(ack_task);
     } else {
         _ = tokio::join!(msg_task);
     }
 
-    // Since commits are async internally, we try one last sync commit inside the interval
-    // in case there have been acks.
-    if let Ok(current_assignment) = consumer.assignment() {
-        // not logging on error because it will error if there are no offsets stored for a partition,
-        // and this is best-effort cleanup anyway
-        _ = consumer.commit(&current_assignment, CommitMode::Sync);
-    }
+    consumer.context().commit_consumer_state();
+
     Ok(())
 }
 
@@ -462,80 +456,233 @@ fn handle_acks(
         }
     }
 
-    tokio::spawn(async move {
-        let mut ack_streams: StreamMap<TopicPartition, AckStream> = StreamMap::new();
-        let mut draining_acks: StreamMap<TopicPartition, AckStream> = StreamMap::new();
+    async fn revoke_timeout(t: Duration) {
+        tokio::time::sleep(t).await;
+    }
 
-        let mut shutting_down = false;
-        let drain_deadline = tokio::time::sleep(max_drain_ms);
-        tokio::pin!(drain_deadline);
+    // Wrap acks for each partition in this enum, so that we can let the receiver
+    // know when it has seen the last one for the current assignment of this partition
+    enum ForwardedAck {
+        Entry(BatchStatus, FinalizerEntry),
+        Drained(TopicPartition, i64),
+    }
+
+    struct KafkaPartitionState {
+        /// The sender for ack forwarding tasks to use
+        ack_tx: Option<Sender<ForwardedAck>>,
+
+        /// Tasks forwarding acknowledgement entries for each partition to a main channel.
+        /// There will be one task per assigned partition, and this allows us, during rebalances,
+        /// to precisely manage when acks for any revoked partitions are complete
+        ack_forwarders: tokio::task::JoinSet<TopicPartition>,
+
+        /// Abort handles for each forwarding task, indexed by the (topic, partition) pair. This
+        /// allows for precise task cancellation when a partition is revoked but acks can't be processed
+        /// before a timeout; only pending acks for revoked partitions will be cancelled/dropped.
+        abort_handles: HashMap<TopicPartition, tokio::task::AbortHandle>,
+
+        /// The Set of partitions expected to drain during a shutdown or rebalance that revokes partitions
+        expect_drain: HashSet<TopicPartition>,
+
+        /// The set of partitions we have observed and stored the final acknowledgement for. Ack streams
+        /// can complete before we get a rebalance callback, so "observed complete" (based on seeing the end of the stream)
+        /// and "expect to complete" (based on seeing a rebalance callback with revoked partition info) are tracked separately.
+        observed_drain: HashSet<TopicPartition>,
+    }
+    impl KafkaPartitionState {
+        fn new() -> (Self, Receiver<ForwardedAck>) {
+            let (ack_tx, all_acks) = mpsc::channel(16); // arbitrary size 16
+            let state = KafkaPartitionState {
+                ack_tx: Some(ack_tx),
+                ack_forwarders: tokio::task::JoinSet::new(),
+                abort_handles: HashMap::new(),
+                expect_drain: HashSet::new(),
+                observed_drain: HashSet::new(),
+            };
+            (state, all_acks)
+        }
+        pub fn assign_partition(&mut self, tp: TopicPartition, acks: AckStream) {
+            if let Some(ref ack_tx) = self.ack_tx {
+                self.abort_handles.insert(
+                    tp.clone(),
+                    self.ack_forwarders
+                        .spawn(forward_acks(tp, acks, ack_tx.clone())),
+                );
+            }
+        }
+        pub fn revoke_partition(&mut self, tp: TopicPartition) {
+            self.expect_drain.insert(tp);
+        }
+
+        pub fn forwarder_complete(&mut self, tp: &TopicPartition) {
+            self.abort_handles.remove(tp);
+        }
+        pub fn has_forwarders(&self) -> bool {
+            !self.ack_forwarders.is_empty()
+        }
+        pub fn abort_pending_forwarders(&mut self) {
+            for tp in self.expect_drain.drain() {
+                // If the handle isn't here anymore (None case) it just means the task already completed
+                if let Some(handle) = self.abort_handles.remove(&tp) {
+                    handle.abort();
+                }
+            }
+        }
+        pub fn observed_last_ack(&mut self, tp: TopicPartition) {
+            self.observed_drain.insert(tp);
+        }
+
+        pub fn is_drain_complete(&self) -> bool {
+            self.observed_drain == self.expect_drain
+        }
+
+        pub fn clear(&mut self) {
+            self.expect_drain.clear();
+            self.observed_drain.clear();
+        }
+
+        pub fn close(&mut self) {
+            let _ = self.ack_tx.take();
+        }
+    }
+
+    async fn forward_acks(
+        tp: TopicPartition,
+        mut acks: AckStream,
+        forward_to: mpsc::Sender<ForwardedAck>,
+    ) -> TopicPartition {
+        let mut last_offset = -1;
+        while let Some((status, entry)) = acks.next().await {
+            last_offset = entry.offset;
+            if let Err(e) = forward_to.send(ForwardedAck::Entry(status, entry)).await {
+                warn!("Error sending to main ack task: {}", e);
+            }
+        }
+        let _ = forward_to
+            .send(ForwardedAck::Drained(tp.clone(), last_offset))
+            .await;
+        tp
+    }
+
+    tokio::spawn(async move {
+        /*
+        Ok how does this work and where are the nuances in here?
+        We have:
+        - the consumer task: a task talking to Kafka, reading messages and getting rebalance notifications, etc.
+            - Finalizer entries are added to partition-specific channels from this task
+            - During rebalances, send notifications about assigned/revoked partitions
+            - When a partition is revoked, or the client is shutting down, close the
+              finalizer channels so they can be drained by the ack task. Wait on a channel coordinating with
+              the acknowledgement task to avoid proceeding with rebalance before pending offsets are written
+          Nuance: the kafka task runs blocking code in the rebalance callbacks, so must live
+          on a separate thread from acknowledgement handling, otherwise everything deadlocks
+
+        - the acknowledgement task:
+            - Nuance: rebalancing may revoke a subset of our partitions, depending on the strategy-- to handle this correctly
+              we use a finalizer stream per partition
+            - When a partition is assigned, spawn a task dedicated to reading the finalizer channel. Tasks and channels
+              perform significantly better than a tokio StreamMap when dealing with more than a few partitions.
+            - As finalizers become ready, forward them to the main ack task to be stored.
+            - When a finalizer channel closes, the final message in the forwarding channel
+              is a marker indicating the partition is drained. Nuance: acks for the partition
+              are considered drained when this marker is _processed by the main ack task_, not
+              when the forwarding task ends
+              Additional nuance: finalizer channels can end before we even get a rebalance notification!
+            - During a rebalance, we track expected and observed drain markers, as well as a timeout.
+              As soon as the expected partition streams are drained, or the timeout is reached, signal back
+              to the consumer task to proceed with rebalancing.
+              In the case of a timeout, drop any remaining acks on revoked partitions.
+            - Rebalance bookkeeping is done by the ForwardedAck enum and KafkaPartitionState struct.
+
+        */
+
+        let mut drain_deadline = tokio::spawn(revoke_timeout(max_drain_ms));
+        let (mut partition_state, mut all_acks) = KafkaPartitionState::new();
 
         loop {
-            let has_acks = !draining_acks.is_empty() || !ack_streams.is_empty();
-            let next_ack = if drain_signal.is_some() {
-                draining_acks.next()
-            } else {
-                ack_streams.next()
-            };
-
             tokio::select! {
-                entry = next_ack, if has_acks || drain_signal.is_some() => match entry {
-                    Some((_key, (delivery_status, entry))) => {
-                        handle_ack(&consumer, delivery_status, entry);
-                        if let Some(ref signal) = drain_signal {
-                            _ = signal.send(());
+                Some(callback) = callbacks.recv() => match callback {
+                    KafkaCallback::PartitionsAssigned(mut assigned_streams) => {
+                        for (tp, acks) in assigned_streams.drain(0..) {
+                            partition_state.assign_partition(tp, acks);
                         }
                     },
-                    // Nothing left in the acknowledgement stream; check for exit conditions
-                    None => match drain_signal.take() {
-                        Some(signal) => {
-                            if let Err(e) = signal.send(()) {
-                                warn!("Error signaling client task: {:?}", e);
-                            }
-                        },
-                        None if shutting_down => {
-                            break
-                        },
-                        None => {
-                            // ack stream is empty, but we're not shutting down or rebalancing (probably starting up, or just finished a rebalance)
+                    KafkaCallback::PartitionsRevoked(mut revoked_partitions, drain) => {
+                        drain_deadline = tokio::spawn(revoke_timeout(max_drain_ms));
+
+                        for tp in revoked_partitions.drain(0..) {
+                            partition_state.revoke_partition(tp);
                         }
-                    }
+
+                        if partition_state.is_drain_complete() {
+                            partition_state.clear();
+                            drop(drain);
+                        } else if drain_signal.replace(drain).is_some() {
+                            unreachable!("Concurrent rebalance callbacks should not be possible.");
+                        }
+                    },
+                    KafkaCallback::ShuttingDown(drain) => {
+                        // Shutting down is just like a full assignment revoke, but we also close the ack senders and callback
+                        // channels, since we don't expect additional assignments or rebalances
+                        if let Ok(tpl) = consumer.assignment() {
+                            tpl.elements()
+                              .iter()
+                              .for_each(|el| {
+                                partition_state.revoke_partition((el.topic().into(), el.partition()));
+                            });
+                        }
+
+                        drain_deadline = tokio::spawn(revoke_timeout(max_drain_ms));
+                        if partition_state.is_drain_complete() {
+                            partition_state.clear();
+                            drop(drain);
+                        } else if drain_signal.replace(drain).is_some() {
+                            unreachable!("Shutdown callback happened somehow during an ongoing rebalance...?")
+                        }
+
+                        // No new partitions will be assigned, so drop our handle to the ack sender and close the callback channel
+                        partition_state.close();
+                        callbacks.close();
+                    },
+                },
+
+                // As partition-specific sender tasks complete (revoked partitions
+                // during a rebalance, shutdown, or eof during tests), handle the results here
+                Some(Ok(finished_partition)) = partition_state.ack_forwarders.join_next(), if partition_state.has_forwarders() => {
+                    partition_state.forwarder_complete(&finished_partition);
                 },
 
                 _ = &mut drain_deadline, if drain_signal.is_some() => {
                     debug!("Acknowledgement drain deadline reached. Dropping any pending ack streams for revoked partitions.");
-                    draining_acks.clear();
+                    partition_state.abort_pending_forwarders();
+                    partition_state.clear();
+
                     if let Err(e) = drain_signal.take().unwrap().send(()) {
                         warn!("Error sending to drain signal: {}.", e);
                     }
                 },
 
-                callback = callbacks.recv() => match callback {
-                    Some(KafkaCallback::ShuttingDown) => {
-                        shutting_down = true;
-                    },
-                    Some(KafkaCallback::PartitionsAssigned(mut assigned_streams)) => {
-                        for (tp, acks) in assigned_streams.drain(0..) {
-                            ack_streams.insert(tp, acks);
-                        }
-                    },
-                    Some(KafkaCallback::PartitionsRevoked(revoked_partitions, drain)) => {
-                        drain_deadline.as_mut().reset(Instant::now() + max_drain_ms);
-                        if drain_signal.replace(drain).is_some() {
-                            unreachable!("Concurrent rebalance callbacks should not be possible.");
+                Some(entry) = all_acks.recv() => match entry {
+                    ForwardedAck::Drained(tp, _offset) => {
+                        partition_state.observed_last_ack(tp);
+
+                        if drain_signal.is_some() {
+                            _ = drain_signal.as_ref().map(|sig| _ = sig.send(()) );
                         }
 
-                        for tp in revoked_partitions.iter() {
-                            // Move streams for partitions being revoked to the
-                            // draining_acks map to prioritize processing them.
-                            // If the stream has already been drained and
-                            // removed from the StreamMap internally, remove will return None
-                            if let Some(acks) = ack_streams.remove(tp) {
-                                draining_acks.insert(tp.clone(), acks);
-                            }
+                        if partition_state.is_drain_complete() {
+                            partition_state.clear();
+                            drain_signal.take();
                         }
                     },
-                    None => {},
+                    ForwardedAck::Entry(delivery_status, entry) => {
+                        handle_ack(&consumer, delivery_status, entry);
+                    },
+                },
+
+                // acks and callbacks are all done
+                else => {
+                    break
                 }
             }
         }
@@ -564,7 +711,6 @@ fn handle_messages(
                 tokio::select! {
                     _ = &mut shutdown => {
                         consumer.context().shutdown();
-
                         done = true
                     },
                     message = stream.next() => match message {
@@ -572,19 +718,19 @@ fn handle_messages(
                         Some(Err(error)) => match error {
                             #[cfg(test)]
                             rdkafka::error::KafkaError::PartitionEOF(partition) if eof => {
-                                // Optionally exit on partition EOF. This is used in tests to collect events
-                                // when the precise number of events is not known (e.g. restarting the source after
-                                // shutdown or a consumer rebalance). Note that the client should set "enable.partition.eof"
-                                // to true, or the client won't get this notification
-                                // Note also: this assumes a single topic is being consumed, since PartitionEOF
-                                // does not include the topic name
-                                // Note also (also): we use a Set to track which partitions have reached EOF; due to
-                                // rebalances we might get notified about an EOF partition more than once
+                                // NB this is not production ready EOF detection! Hence cfg(test) on this branch
+                                // Used only in tests when we can be certain only one topic is being consumed,
+                                // and new messages are not written after EOF is seen
+                                // Also: RdKafka only tells us the partition, so
+                                // we are assuming single-topic consumers when using this.
+                                // Also also: due to rebalances, we might get notified about an EOF partition
+                                // more than once, so we use a Set to exit once we've seen EOF on all currently-assigned partitions
                                 eof_partitions.insert(partition);
                                 if let Ok(assignment) = consumer.assignment() {
-                                    if eof_partitions.len() == assignment.count() {
+                                    // All currently assigned partitions have reached EOF
+                                    if assignment.elements().iter().all(|tp| eof_partitions.contains(&tp.partition())) {
                                         consumer.context().shutdown();
-                                        done = true
+                                        done = true;
                                     }
                                 }
                             },
@@ -830,7 +976,7 @@ impl ReceivedMessage {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq, Hash)]
 struct FinalizerEntry {
     topic: String,
     partition: i32,
@@ -904,13 +1050,14 @@ type AckStream = BoxStream<'static, (BatchStatus, FinalizerEntry)>;
 enum KafkaCallback {
     PartitionsAssigned(Vec<(TopicPartition, AckStream)>),
     PartitionsRevoked(Vec<TopicPartition>, SyncSender<()>),
-    ShuttingDown,
+    ShuttingDown(SyncSender<()>),
 }
 
 #[derive(Default)]
 struct KafkaSourceContext {
     acknowledgements: bool,
     stats: kafka::KafkaStatisticsContext,
+
     /// A callback channel used to coordinate between the main consumer task and the acknowledgement task
     callbacks: OnceCell<UnboundedSender<KafkaCallback>>,
 
@@ -943,22 +1090,17 @@ impl KafkaSourceContext {
     }
 
     pub fn shutdown(&self) {
-        if let Some(w) = self.consumer.get() {
-            if let Some(consumer) = w.upgrade() {
-                if let Ok(topics) = consumer.subscription() {
-                    if let Err(error) = consumer.pause(&topics) {
-                        emit!(KafkaPauseResumeError { error });
-                    }
-                }
-            }
-        }
-
         if let Ok(mut fin) = self.finalizers.write() {
             fin.clear();
         }
 
         if let Some(tx) = self.callbacks.get() {
-            let _ = tx.send(KafkaCallback::ShuttingDown);
+            let (send, rendezvous) = sync_channel(0);
+            if let Ok(_) = tx.send(KafkaCallback::ShuttingDown(send)) {
+                while rendezvous.recv().is_ok() {
+                    self.commit_consumer_state();
+                }
+            }
         }
     }
 
@@ -990,11 +1132,10 @@ impl KafkaSourceContext {
         if let Some(w) = self.consumer.get() {
             if let Some(consumer) = w.upgrade() {
                 match consumer.commit_consumer_state(CommitMode::Sync) {
-                    Ok(_) => {},
-                    Err(KafkaError::ConsumerCommit(RDKafkaErrorCode::NoOffset)) => {
-                        trace!("No offsets to commit.");
-                    },
-                    Err(error) => emit!(KafkaOffsetUpdateError { error })
+                    Ok(_) | Err(KafkaError::ConsumerCommit(RDKafkaErrorCode::NoOffset)) => {
+                        /* Success, or nothing to do \0/ */
+                    }
+                    Err(error) => emit!(KafkaOffsetUpdateError { error }),
                 }
             }
         }
@@ -1014,7 +1155,7 @@ impl ConsumerContext for KafkaSourceContext {
                 Rebalance::Assign(tpl) => {
                     // Partitions are being assigned to this consumer!
                     // 1. Create a finalizer set for the new partitions
-                    // 2. `self` keeps a reference to the sender (entry point for pending acks) for the finalizer set
+                    // 2. `self` keeps a reference to the sender - this is the entry point for pending acks on this partition
                     // 3. Hand a reference to the receiver stream to the acknowledgement task via callback channel
                     let ack_streams: Vec<(TopicPartition, AckStream)> = tpl
                         .elements()
@@ -1022,6 +1163,7 @@ impl ConsumerContext for KafkaSourceContext {
                         .filter_map(|el| self.add_finalizerset((el.topic().into(), el.partition())))
                         .collect();
 
+                    trace!("Partition(s) assigned: {}", ack_streams.len());
                     if !ack_streams.is_empty() {
                         let _ = tx.send(KafkaCallback::PartitionsAssigned(ack_streams));
                     }
@@ -1042,12 +1184,18 @@ impl ConsumerContext for KafkaSourceContext {
                         })
                         .collect();
 
+                    trace!("Partition(s) revoked: {}", revoked.len());
                     if !revoked.is_empty() {
                         let (send, rendezvous) = sync_channel(0);
                         match tx.send(KafkaCallback::PartitionsRevoked(revoked, send)) {
-                            // The ack task will signal on this channel when it has drained the
-                            // revoked partitions (or when it times out, to prevent the consumer being kicked from the group)
-                            Ok(_) => while rendezvous.recv().is_ok() { }
+                            // The ack task will signal on this channel when it has drained a revoked partition
+                            // and will close the channel when it has drained all revoked partitions,
+                            // or when it times out, to prevent the consumer being kicked from the group.
+                            Ok(_) => {
+                                while rendezvous.recv().is_ok() {
+                                    self.commit_consumer_state();
+                                }
+                            }
                             // If the ack task has already hung up, that implies we're exiting,
                             // and acks are already drained (or at least, no more will be processed)
                             _ => (),
@@ -1083,7 +1231,7 @@ mod test {
         format!("{}:{}", kafka_host(), kafka_port())
     }
 
-    fn kafka_max_bytes() -> String {
+    pub fn kafka_max_bytes() -> String {
         std::env::var("KAFKA_MAX_BYTES").unwrap_or_else(|_| "1024".into())
     }
 
@@ -1096,12 +1244,8 @@ mod test {
         topic: &str,
         group: &str,
         log_namespace: LogNamespace,
+        librdkafka_options: Option<HashMap<String, String>>,
     ) -> KafkaSourceConfig {
-        let mut kafka_options = HashMap::new();
-        kafka_options.insert("enable.partition.eof".into(), "true".into());
-        // Fetch in small batches
-        kafka_options.insert("fetch.message.max.bytes".into(), kafka_max_bytes().into());
-
         KafkaSourceConfig {
             bootstrap_servers: kafka_address(),
             topics: vec![topic.into()],
@@ -1109,7 +1253,7 @@ mod test {
             auto_offset_reset: "beginning".into(),
             session_timeout_ms: Duration::from_millis(6000),
             commit_interval_ms: Duration::from_millis(1),
-            librdkafka_options: Some(kafka_options),
+            librdkafka_options: librdkafka_options,
             key_field: default_key_field(),
             topic_key: default_topic_key(),
             partition_key: default_partition_key(),
@@ -1124,7 +1268,7 @@ mod test {
 
     #[test]
     fn test_output_schema_definition_vector_namespace() {
-        let definitions = make_config("topic", "group", LogNamespace::Vector)
+        let definitions = make_config("topic", "group", LogNamespace::Vector, None)
             .outputs(LogNamespace::Vector)
             .remove(0)
             .schema_definition(true);
@@ -1172,7 +1316,7 @@ mod test {
 
     #[test]
     fn test_output_schema_definition_legacy_namespace() {
-        let definitions = make_config("topic", "group", LogNamespace::Legacy)
+        let definitions = make_config("topic", "group", LogNamespace::Legacy, None)
             .outputs(LogNamespace::Legacy)
             .remove(0)
             .schema_definition(true);
@@ -1208,7 +1352,7 @@ mod test {
 
     #[tokio::test]
     async fn consumer_create_ok() {
-        let config = make_config("topic", "group", LogNamespace::Legacy);
+        let config = make_config("topic", "group", LogNamespace::Legacy, None);
         assert!(create_consumer(&config, true).is_ok());
     }
 
@@ -1216,7 +1360,7 @@ mod test {
     async fn consumer_create_incorrect_auto_offset_reset() {
         let config = KafkaSourceConfig {
             auto_offset_reset: "incorrect-auto-offset-reset".to_string(),
-            ..make_config("topic", "group", LogNamespace::Legacy)
+            ..make_config("topic", "group", LogNamespace::Legacy, None)
         };
         assert!(create_consumer(&config, true).is_err());
     }
@@ -1368,7 +1512,7 @@ mod integration_test {
 
         let topic = format!("test-topic-{}", random_string(10));
         let group_id = format!("test-group-{}", random_string(10));
-        let config = make_config(&topic, &group_id, log_namespace);
+        let config = make_config(&topic, &group_id, log_namespace, None);
 
         let now = send_events(topic.clone(), 1, 10).await;
 
@@ -1460,7 +1604,7 @@ mod integration_test {
     fn make_rand_config() -> (String, String, KafkaSourceConfig) {
         let topic = format!("test-topic-{}", random_string(10));
         let group_id = format!("test-group-{}", random_string(10));
-        let config = make_config(&topic, &group_id, LogNamespace::Legacy);
+        let config = make_config(&topic, &group_id, LogNamespace::Legacy, None);
         (topic, group_id, config)
     }
 
@@ -1660,8 +1804,12 @@ mod integration_test {
 
         // 2. Run the kafka source to read some of the events
         // 3. Send a shutdown signal (at some point before all events are read)
+        let mut opts = HashMap::new();
+        // Set options to get partition EOF notifications, and fetch data in small/configurable size chunks
+        opts.insert("enable.partition.eof".into(), "true".into());
+        opts.insert("fetch.message.max.bytes".into(), kafka_max_bytes().into());
         let events1 = {
-            let config = make_config(&topic, &group_id, LogNamespace::Legacy);
+            let config = make_config(&topic, &group_id, LogNamespace::Legacy, Some(opts.clone()));
             let (tx, rx) = SourceSender::new_test_errors(|_| false);
             let (trigger_shutdown, shutdown_done) =
                 spawn_kafka(tx, config, true, false, LogNamespace::Legacy);
@@ -1682,7 +1830,7 @@ mod integration_test {
 
         // 4. Run the kafka source again to finish reading the events
         let events2 = {
-            let config = make_config(&topic, &group_id, LogNamespace::Legacy);
+            let config = make_config(&topic, &group_id, LogNamespace::Legacy, Some(opts));
             let (tx, rx) = SourceSender::new_test_errors(|_| false);
             let (trigger_shutdown, shutdown_done) =
                 spawn_kafka(tx, config, true, true, LogNamespace::Legacy);
@@ -1709,8 +1857,7 @@ mod integration_test {
         assert_eq!(total, expect_count);
     }
 
-    #[tokio::test]
-    async fn drains_acknowledgements_during_rebalance() {
+    async fn consume_with_rebalance(rebalance_strategy: String) {
         // 1. Send N events (if running against a pre-populated kafka topic, use send_count=0 and expect_count=expected number of messages; otherwise just set send_count)
         let send_count: usize = std::env::var("KAFKA_SEND_COUNT")
             .unwrap_or_else(|_| "100".into())
@@ -1726,14 +1873,34 @@ mod integration_test {
             .expect("Number of milliseconds before shutting down first consumer.");
 
         let (topic, group_id, _) = send_to_test_topic(2, send_count).await;
-        debug!("Consumer group.id: {}", &group_id);
+        println!("Topic: {}", &topic);
+        println!("Consumer group.id: {}", &group_id);
 
         // 2. Run the kafka source to read some of the events
         // 3. Start 2nd & 3rd consumers using the same group.id, triggering rebalance events
-        let config1 = make_config(&topic, &group_id, LogNamespace::Legacy);
-        let config2 = make_config(&topic, &group_id, LogNamespace::Legacy);
-        let config3 = make_config(&topic, &group_id, LogNamespace::Legacy);
-        let config4 = make_config(&topic, &group_id, LogNamespace::Legacy);
+        let mut kafka_options = HashMap::new();
+        kafka_options.insert("enable.partition.eof".into(), "true".into());
+        kafka_options.insert("fetch.message.max.bytes".into(), kafka_max_bytes().into());
+        kafka_options.insert("partition.assignment.strategy".into(), rebalance_strategy);
+        let config1 = make_config(
+            &topic,
+            &group_id,
+            LogNamespace::Legacy,
+            Some(kafka_options.clone()),
+        );
+        let config2 = make_config(
+            &topic,
+            &group_id,
+            LogNamespace::Legacy,
+            Some(kafka_options.clone()),
+        );
+        let config3 = make_config(
+            &topic,
+            &group_id,
+            LogNamespace::Legacy,
+            Some(kafka_options.clone()),
+        );
+        let config4 = make_config(&topic, &group_id, LogNamespace::Legacy, Some(kafka_options));
 
         let (events1, events2, events3) = tokio::join!(
             async move {
@@ -1762,12 +1929,13 @@ mod integration_test {
         );
 
         let unconsumed = async move {
-                let (tx, rx) = SourceSender::new_test_errors(|_| false);
-                let (_trigger_shutdown, _shutdown_done) =
-                    spawn_kafka(tx, config4, true, true, LogNamespace::Legacy);
+            let (tx, rx) = SourceSender::new_test_errors(|_| false);
+            let (_trigger_shutdown, _shutdown_done) =
+                spawn_kafka(tx, config4, true, true, LogNamespace::Legacy);
 
-                rx.collect::<Vec<Event>>().await
-        }.await;
+            rx.collect::<Vec<Event>>().await
+        }
+        .await;
 
         debug!(
             "First consumer read {} of {} messages.",
@@ -1804,9 +1972,23 @@ mod integration_test {
             "Third batch of events is non-zero (decrease delay or increase KAFKA_SEND_COUNT?) "
         );
         assert_eq!(
-            unconsumed.len(), 0, "The first set of consumer should consume and ack all messages."
+            unconsumed.len(),
+            0,
+            "The first set of consumer should consume and ack all messages."
         );
         assert_eq!(total, expect_count);
+    }
+
+    #[tokio::test]
+    async fn drains_acknowledgements_during_rebalance_default_assignments() {
+        // the default, eager rebalance strategies generally result in more revocations
+        consume_with_rebalance("range,roundrobin".into()).await;
+    }
+    #[tokio::test]
+    async fn drains_acknowledgements_during_rebalance_sticky_assignments() {
+        // Cooperative rebalance strategies generally result in fewer revokes,
+        // as only reassigned partitions are revoked
+        consume_with_rebalance("cooperative-sticky".into()).await;
     }
 
     fn map_logs(events: EventArray) -> impl Iterator<Item = String> {
