@@ -6,13 +6,18 @@ mod events_sent;
 mod prelude;
 pub mod service;
 
+use std::{
+    collections::BTreeMap,
+    sync::{Arc, RwLock},
+};
+
 pub use metrics::SharedString;
 
 pub use bytes_received::BytesReceived;
 pub use bytes_sent::BytesSent;
 pub use component_events_dropped::{ComponentEventsDropped, INTENTIONAL, UNINTENTIONAL};
 pub use events_received::EventsReceived;
-pub use events_sent::{EventsSent, DEFAULT_OUTPUT};
+pub use events_sent::{EventsSent, TaggedEventsSent, DEFAULT_OUTPUT};
 pub use prelude::{error_stage, error_type};
 pub use service::{CallError, PollReadyError};
 
@@ -217,4 +222,35 @@ macro_rules! registered_event {
             }
         }
     };
+}
+
+#[derive(Clone)]
+pub struct Cached<Tags, Event, Register> {
+    cache: Arc<RwLock<BTreeMap<Tags, Event>>>,
+    register: Register,
+}
+
+impl<Tags, Event, Register, Data> Cached<Tags, Event, Register>
+where
+    Data: Sized,
+    Register: Fn(&Tags) -> Event,
+    Event: InternalEventHandle<Data = Data>,
+    Tags: Ord + Clone,
+{
+    pub fn new(register: Register) -> Self {
+        Self {
+            cache: Arc::new(RwLock::new(BTreeMap::new())),
+            register,
+        }
+    }
+
+    pub fn emit(&self, tags: &Tags, value: Data) {
+        if let Some(event) = self.cache.read().unwrap().get(tags) {
+            event.emit(value);
+        } else {
+            let event = (self.register)(tags);
+            event.emit(value);
+            self.cache.write().unwrap().insert(tags.clone(), event);
+        }
+    }
 }

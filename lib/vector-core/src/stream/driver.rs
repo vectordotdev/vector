@@ -5,8 +5,8 @@ use tokio::{pin, select};
 use tower::Service;
 use tracing::Instrument;
 use vector_common::internal_event::{
-    register, ByteSize, BytesSent, CallError, CountByteSize, EventsSent, InternalEventHandle as _,
-    Output, PollReadyError, Registered, SharedString,
+    register, ByteSize, BytesSent, Cached, CallError, CountByteSize, InternalEventHandle as _,
+    Output, PollReadyError, Registered, SharedString, TaggedEventsSent,
 };
 use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
 
@@ -99,7 +99,13 @@ where
         pin!(batched_input);
 
         let bytes_sent = protocol.map(|protocol| register(BytesSent { protocol }));
-        let events_sent = register(EventsSent::from(Output(None)));
+        let events_sent = Cached::new(|tags: &(String, String)| {
+            register(TaggedEventsSent::new(
+                tags.0.clone(),
+                tags.1.clone(),
+                Output(None),
+            ))
+        });
 
         loop {
             // Core behavior of the loop:
@@ -198,14 +204,16 @@ where
         Ok(())
     }
 
-    fn handle_response(
+    fn handle_response<T>(
         result: Result<Svc::Response, Svc::Error>,
         request_id: usize,
         finalizers: EventFinalizers,
         metadata: &RequestMetadata,
         bytes_sent: &Option<Registered<BytesSent>>,
-        events_sent: &Registered<EventsSent>,
-    ) {
+        events_sent: &Cached<(String, String), Registered<TaggedEventsSent>, T>,
+    ) where
+        T: Fn(&(String, String)) -> Registered<TaggedEventsSent>,
+    {
         match result {
             Err(error) => {
                 Self::emit_call_error(Some(error), request_id, metadata.event_count());
@@ -220,7 +228,10 @@ where
                             bytes_sent.emit(ByteSize(byte_size));
                         }
                     }
-                    events_sent.emit(response.events_sent());
+                    events_sent.emit(
+                        &("zork".to_string(), "zoog".to_string()),
+                        response.events_sent(),
+                    );
                 // This condition occurs specifically when the `HttpBatchService::call()` is called *within* the `Service::call()`
                 } else if response.event_status() == EventStatus::Rejected {
                     Self::emit_call_error(None, request_id, metadata.event_count());
