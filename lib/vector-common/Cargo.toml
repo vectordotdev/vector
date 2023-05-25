@@ -62,7 +62,7 @@ snafu = { version = "0.7", optional = true }
 stream-cancel = { version = "0.8.1", default-features = false }
 tokio = { version = "1.28.1", default-features = false, features = ["macros", "time"] }
 tracing = { version = "0.1.34", default-features = false }
-vrl = { git = "https://github.com/vectordotdev/vrl", rev = "v0.3.0", default-features = false, features = ["value", "core", "compiler"] }
+vrl = { version = "0.4.0", default-features = false, features = ["value", "core", "compiler"] }
 vector-config = { path = "../vector-config" }
 vector-config-common = { path = "../vector-config-common" }
 vector-config-macros = { path = "../vector-config-macros" }

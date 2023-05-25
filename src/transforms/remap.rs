@@ -721,10 +721,8 @@ mod tests {
 
     use indoc::{formatdoc, indoc};
     use vector_core::{config::GlobalOptions, event::EventMetadata, metric_tags};
-    use vrl::value::{
-        btreemap,
-        kind::{Collection, Index},
-    };
+    use vrl::btreemap;
+    use vrl::value::kind::{Collection, Index};
 
     use super::*;
     use crate::{

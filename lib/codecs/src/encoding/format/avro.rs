@@ -82,7 +82,7 @@ mod tests {
     use bytes::BytesMut;
     use indoc::indoc;
     use vector_core::event::{LogEvent, Value};
-    use vrl::value::btreemap;
+    use vrl::btreemap;
 
     use super::*;
 
