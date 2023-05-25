@@ -161,11 +161,14 @@ Currently a registered metrics is stored in a `Registered<EventSent>`.
 
 We will need a new struct that can wrap this that will be generic over a tuple of
 the tags for each event and the event - eg. `Cached<(String, String), EventSent>`.
-This struct will maintain a BTreeMap of tags -> `Registered`. In pseudo rust:
+This struct will maintain a BTreeMap of tags -> `Registered`. Since this will
+need to be shared across threads, the cache will need to be stored in an `RwLock`.
+
+In pseudo rust:
 
 ```rust
 struct Cached<Tags, Event> {
-  cache: BTreemap<Tags, Registered<Event>>,
+  cache: Arc<RwLock<BTreemap<Tags, Registered<Event>>>,
   register: Fn(Tags) -> Registered<Event>,
 }
 
