@@ -10,7 +10,7 @@ use vector_common::internal_event::{
 #[derive(Debug)]
 pub struct StatsdInvalidMetricError<'a> {
     pub value: &'a MetricValue,
-    pub kind: &'a MetricKind,
+    pub kind: MetricKind,
 }
 
 impl<'a> InternalEvent for StatsdInvalidMetricError<'a> {

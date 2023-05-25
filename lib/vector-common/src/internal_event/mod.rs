@@ -131,6 +131,12 @@ impl From<&'static str> for Protocol {
     }
 }
 
+impl From<Protocol> for SharedString {
+    fn from(value: Protocol) -> Self {
+        value.0
+    }
+}
+
 /// Macro to take care of some of the repetitive boilerplate in implementing a registered event. See
 /// the other events in this module for examples of how to use this.
 ///

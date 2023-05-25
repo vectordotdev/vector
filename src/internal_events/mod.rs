@@ -253,18 +253,7 @@ pub(crate) use self::statsd_sink::*;
 pub(crate) use self::tag_cardinality_limit::*;
 #[cfg(feature = "transforms-throttle")]
 pub(crate) use self::throttle::*;
-#[cfg(all(
-    any(
-        feature = "sinks-socket",
-        feature = "sinks-statsd",
-        feature = "sources-dnstap",
-        feature = "sources-metrics",
-        feature = "sources-statsd",
-        feature = "sources-syslog",
-        feature = "sources-socket"
-    ),
-    unix
-))]
+#[cfg(unix)]
 pub(crate) use self::unix::*;
 #[cfg(feature = "sinks-websocket")]
 pub(crate) use self::websocket::*;

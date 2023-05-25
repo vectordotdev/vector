@@ -29,11 +29,12 @@ use crate::{
     event::Event,
     internal_events::StreamClosedError,
     internal_events::{SocketBindError, SocketMode, SocketReceiveError},
+    net,
     shutdown::ShutdownSignal,
     sources::util::net::{try_bind_udp_socket, SocketListenAddr, TcpNullAcker, TcpSource},
     tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsSettings, TlsSourceConfig},
-    udp, SourceSender,
+    SourceSender,
 };
 
 /// Configuration for the `syslog` source.
@@ -318,7 +319,7 @@ pub fn udp(
         })?;
 
         if let Some(receive_buffer_bytes) = receive_buffer_bytes {
-            if let Err(error) = udp::set_receive_buffer_size(&socket, receive_buffer_bytes) {
+            if let Err(error) = net::set_receive_buffer_size(&socket, receive_buffer_bytes) {
                 warn!(message = "Failed configuring receive buffer size on UDP socket.", %error);
             }
         }
