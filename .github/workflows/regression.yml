@@ -34,7 +34,7 @@ on:
   pull_request:
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.issue.id || github.event.merge_group.base_sha || github.sha }}
+  group: ${{ github.workflow }}-${{ github.event.issue.id || github.event.merge_group.head_sha || github.sha }}
   cancel-in-progress: true
 
 jobs:
@@ -47,7 +47,7 @@ jobs:
       source_changed: ${{ steps.filter.outputs.SOURCE_CHANGED }}
       comment_valid: ${{ steps.comment.outputs.isTeamMember }}
     steps:
-    - run: sleep 90 # give us time to build up the queue
+    - run: sleep 120 # give us time to build up the queue
 
     - uses: actions/checkout@v3
 
