@@ -47,7 +47,7 @@ jobs:
       source_changed: ${{ steps.filter.outputs.SOURCE_CHANGED }}
       comment_valid: ${{ steps.comment.outputs.isTeamMember }}
     steps:
-    - run: sleep 120 # give us time to build up the queue
+    - run: sleep 60 # give us time to build up the queue
 
     - uses: actions/checkout@v3
 
