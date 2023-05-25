@@ -16,7 +16,8 @@ use vector_core::{
 use crate::sinks::util::SinkBuilderExt;
 
 use super::{
-    normalizer::StatsdNormalizer, request_builder::StatsdRequestBuilder, service::StatsdRequest,
+    batch::StatsdBatchSizer, normalizer::StatsdNormalizer, request_builder::StatsdRequestBuilder,
+    service::StatsdRequest,
 };
 
 pub(crate) struct StatsdSink<S> {
@@ -57,7 +58,10 @@ where
             // other metric types in type-specific ways i.e. incremental gauge updates use a
             // different syntax, etc.
             .normalized_with_default::<StatsdNormalizer>()
-            .batched(self.batch_settings.into_byte_size_config())
+            .batched(
+                self.batch_settings
+                    .into_item_size_config(StatsdBatchSizer::default()),
+            )
             // We build our requests "incrementally", which means that for a single batch of
             // metrics, we might generate N requests to represent all of the metrics in the batch.
             //

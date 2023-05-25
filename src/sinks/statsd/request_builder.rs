@@ -115,6 +115,9 @@ impl IncrementalRequestBuilder<Vec<Metric>> for StatsdRequestBuilder {
                 if request_buf_len != 0
                     && (request_buf_len + self.encode_buf.len() > self.request_max_size)
                 {
+                    // The metric, as encoded, would cause us to exceed our maximum request size, so
+                    // store it off to the side and finalize the current request.
+                    pending = Some(metric);
                     break;
                 }
 
