@@ -805,7 +805,8 @@ mod tests {
 
             assert_eq!(receiver.try_recv(), Ok(BatchStatus::Rejected));
 
-            let output_lines = get_received(rx, |_| unreachable!("There should be no lines")).await;
+            let output_lines =
+                get_received(rx, |_| unreachable!("There should be no lines!")).await;
             assert!(output_lines.is_empty());
         })
         .await;
