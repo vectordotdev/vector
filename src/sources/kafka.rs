@@ -464,7 +464,7 @@ fn handle_acks(
     // know when it has seen the last one for the current assignment of this partition
     enum ForwardedAck {
         Entry(BatchStatus, FinalizerEntry),
-        Drained(TopicPartition, i64),
+        Drained(TopicPartition),
     }
 
     struct KafkaPartitionState {
@@ -551,15 +551,13 @@ fn handle_acks(
         mut acks: AckStream,
         forward_to: mpsc::Sender<ForwardedAck>,
     ) -> TopicPartition {
-        let mut last_offset = -1;
         while let Some((status, entry)) = acks.next().await {
-            last_offset = entry.offset;
             if let Err(e) = forward_to.send(ForwardedAck::Entry(status, entry)).await {
                 warn!("Error sending to main ack task: {}", e);
             }
         }
         let _ = forward_to
-            .send(ForwardedAck::Drained(tp.clone(), last_offset))
+            .send(ForwardedAck::Drained(tp.clone()))
             .await;
         tp
     }
@@ -663,7 +661,7 @@ fn handle_acks(
                 },
 
                 Some(entry) = all_acks.recv() => match entry {
-                    ForwardedAck::Drained(tp, _offset) => {
+                    ForwardedAck::Drained(tp) => {
                         partition_state.observed_last_ack(tp);
 
                         if drain_signal.is_some() {
@@ -1096,7 +1094,7 @@ impl KafkaSourceContext {
 
         if let Some(tx) = self.callbacks.get() {
             let (send, rendezvous) = sync_channel(0);
-            if let Ok(_) = tx.send(KafkaCallback::ShuttingDown(send)) {
+            if tx.send(KafkaCallback::ShuttingDown(send)).is_ok() {
                 while rendezvous.recv().is_ok() {
                     self.commit_consumer_state();
                 }
@@ -1187,18 +1185,15 @@ impl ConsumerContext for KafkaSourceContext {
                     trace!("Partition(s) revoked: {}", revoked.len());
                     if !revoked.is_empty() {
                         let (send, rendezvous) = sync_channel(0);
-                        match tx.send(KafkaCallback::PartitionsRevoked(revoked, send)) {
-                            // The ack task will signal on this channel when it has drained a revoked partition
-                            // and will close the channel when it has drained all revoked partitions,
-                            // or when it times out, to prevent the consumer being kicked from the group.
-                            Ok(_) => {
-                                while rendezvous.recv().is_ok() {
-                                    self.commit_consumer_state();
-                                }
+                        // The ack task will signal on this channel when it has drained a revoked partition
+                        // and will close the channel when it has drained all revoked partitions,
+                        // or when it times out, to prevent the consumer being kicked from the group.
+                        // This send will return Err if the ack task has already exited; in that case we
+                        // proceed without waiting
+                        if tx.send(KafkaCallback::PartitionsRevoked(revoked, send)).is_ok() {
+                            while rendezvous.recv().is_ok() {
+                                self.commit_consumer_state();
                             }
-                            // If the ack task has already hung up, that implies we're exiting,
-                            // and acks are already drained (or at least, no more will be processed)
-                            _ => (),
                         }
 
                         self.commit_consumer_state();
