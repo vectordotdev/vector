@@ -273,7 +273,7 @@ impl ValidatableComponent for HttpSinkConfig {
 
         let config = Self {
             uri: UriSerde::from_str("http://127.0.0.1:9000/endpoint")
-                .expect("should never fail to parse"),
+                .expect("should never fail to parse!!"),
             method: HttpMethod::Post,
             encoding: EncodingConfigWithFraming::new(
                 None,
