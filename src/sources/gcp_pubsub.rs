@@ -163,6 +163,7 @@ pub struct PubsubConfig {
     /// are all busy and so open a new stream.
     #[serde(default = "default_poll_time")]
     #[serde_as(as = "serde_with::DurationSeconds<f64>")]
+    #[configurable(metadata(docs::human_name = "Poll Time"))]
     pub poll_time_seconds: Duration,
 
     /// The acknowledgement deadline, in seconds, to use for this stream.
@@ -170,6 +171,7 @@ pub struct PubsubConfig {
     /// Messages that are not acknowledged when this deadline expires may be retransmitted.
     #[serde(default = "default_ack_deadline")]
     #[serde_as(as = "serde_with::DurationSeconds<u64>")]
+    #[configurable(metadata(docs::human_name = "Acknowledgement Deadline"))]
     pub ack_deadline_secs: Duration,
 
     /// The acknowledgement deadline, in seconds, to use for this stream.
@@ -183,6 +185,7 @@ pub struct PubsubConfig {
     /// The amount of time, in seconds, to wait between retry attempts after an error.
     #[serde(default = "default_retry_delay")]
     #[serde_as(as = "serde_with::DurationSeconds<f64>")]
+    #[configurable(metadata(docs::human_name = "Retry Delay"))]
     pub retry_delay_secs: Duration,
 
     /// The amount of time, in seconds, to wait between retry attempts after an error.
@@ -196,6 +199,7 @@ pub struct PubsubConfig {
     /// `60`, you may see periodic errors sent from the server.
     #[serde(default = "default_keepalive")]
     #[serde_as(as = "serde_with::DurationSeconds<f64>")]
+    #[configurable(metadata(docs::human_name = "Keepalive"))]
     pub keepalive_secs: Duration,
 
     /// The namespace to use for logs. This overrides the global setting.
