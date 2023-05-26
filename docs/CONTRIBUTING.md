@@ -67,6 +67,13 @@ To merge a new source, sink, or transform, you need to:
 see some [example of instrumentation in existing integrations](https://github.com/vectordotdev/vector/tree/master/src/internal_events).
 - [ ] Add documentation. You can see [examples in the `docs` directory](https://github.com/vectordotdev/vector/blob/master/docs).
 
+When adding new integration tests, the following changes are needed in the github workflows:
+
+- in `.github/workflows/integration.yml`, add another entry in the matrix definition for the new integration.
+- in `.github/workflows/integration-comment.yml`, add another entry in the matrix definition for the new integration.
+- in `.github/workflows/changes.yml`, add a new filter definition for files changed, and update the `changes` job
+outputs to reference the filter, and finally update the outputs of `workflow_call` to include the new filter.
+
 ## Workflow
 
 ### Git Branches

@@ -112,7 +112,7 @@ mod tests {
         SourceSender,
     };
     use futures::StreamExt;
-    use vrl::value::value;
+    use vrl::value;
 
     #[test]
     fn generate_config() {

@@ -114,7 +114,8 @@ _All components_ MUST emit a `ComponentEventsReceived` event that represents
 the reception of Vector events from an upstream component.
 
 - Emission
-  - MUST emit immediately after creating or receiving Vector events.
+  - MUST emit immediately after creating or receiving Vector events, before modification or metadata
+    is added.
 - Properties
   - `count` - The count of Vector events.
   - `byte_size` - The estimated JSON byte size of all events received.
@@ -130,9 +131,11 @@ the reception of Vector events from an upstream component.
 
 #### ComponentBytesReceived
 
-*Sources* MUST emit a `ComponentBytesReceived` event immediately after receiving, decompressing
-and filtering bytes from the upstream source and before the creation of a Vector event.
+*Sources* MUST emit a `ComponentBytesReceived` event that represent the reception of bytes.
 
+- Emission
+  - MUST emit immediately after receiving, decompressing and filtering bytes from the upstream
+    source and before the creation of a Vector event.
 - Properties
   - `byte_size`
     - For UDP, TCP, and Unix protocols, the total number of bytes received from
@@ -155,13 +158,13 @@ and filtering bytes from the upstream source and before the creation of a Vector
 
 #### ComponentBytesSent
 
-*Sinks* that send events downstream, MUST emit a `ComponentBytesSent` event immediately after
-sending bytes to the downstream target, if the transmission was successful. The reported bytes MUST
-be before compression.
+*Sinks* MUST emit a `ComponentBytesReceived` event that represent the transmission of bytes.
 
-Note that for sinks that simply expose data, but don't delete the data after
-sending it, like the `prometheus_exporter` sink, SHOULD NOT publish this metric.
-
+- Emission
+  - MUST emit a `ComponentBytesSent` event immediately after sending bytes to the downstream target,
+    if the transmission was successful. The reported bytes MUST be before compression.
+  - Note that sinks that simply expose data, but don't delete the data after sending it, like the
+    `prometheus_exporter` sink, SHOULD NOT emit this metric.
 - Properties
   - `byte_size`
     - For UDP, TCP, and Unix protocols, the total number of bytes placed on the

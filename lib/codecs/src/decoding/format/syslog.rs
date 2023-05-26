@@ -71,7 +71,11 @@ impl SyslogDeserializerConfig {
                     )
                     .optional_field(&owned_value_path!("facility"), Kind::bytes(), None)
                     .optional_field(&owned_value_path!("version"), Kind::integer(), None)
-                    .optional_field(&owned_value_path!("appname"), Kind::bytes(), None)
+                    .optional_field(
+                        &owned_value_path!("appname"),
+                        Kind::bytes(),
+                        Some("service"),
+                    )
                     .optional_field(&owned_value_path!("msgid"), Kind::bytes(), None)
                     .optional_field(
                         &owned_value_path!("procid"),
@@ -112,7 +116,11 @@ impl SyslogDeserializerConfig {
                 )
                 .optional_field(&owned_value_path!("facility"), Kind::bytes(), None)
                 .optional_field(&owned_value_path!("version"), Kind::integer(), None)
-                .optional_field(&owned_value_path!("appname"), Kind::bytes(), None)
+                .optional_field(
+                    &owned_value_path!("appname"),
+                    Kind::bytes(),
+                    Some("service"),
+                )
                 .optional_field(&owned_value_path!("msgid"), Kind::bytes(), None)
                 .optional_field(
                     &owned_value_path!("procid"),
@@ -172,7 +180,7 @@ impl SyslogDeserializerConfig {
                         None,
                         &owned_value_path!("appname"),
                         Kind::bytes().or_undefined(),
-                        None,
+                        Some("service"),
                     )
                     .with_source_metadata(
                         source,

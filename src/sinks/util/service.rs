@@ -35,6 +35,7 @@ use crate::{
 mod concurrency;
 mod health;
 mod map;
+pub mod net;
 
 pub type Svc<S, L> = RateLimit<AdaptiveConcurrencyLimit<Retry<FixedRetryPolicy<L>, Timeout<S>>, L>>;
 pub type TowerBatchedSink<S, B, RL> = BatchSink<Svc<S, RL>, B>;

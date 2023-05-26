@@ -1,0 +1,53 @@
+name: Unit - Windows
+
+on:
+  workflow_call:
+
+jobs:
+
+  test-windows:
+    runs-on: [windows, windows-2019-8core]
+    steps:
+      - name: Validate issue comment
+        if: github.event_name == 'issue_comment'
+        uses: tspascoal/get-user-teams-membership@v2
+        with:
+          username: ${{ github.actor }}
+          team: 'Vector'
+          GITHUB_TOKEN: ${{ secrets.GH_PAT_ORG }}
+
+      - name: (PR comment) Get PR branch
+        if: ${{ github.event_name == 'issue_comment' }}
+        uses: xt0rted/pull-request-comment-branch@v2
+        id: comment-branch
+
+      - name: (PR comment) Set latest commit status as pending
+        if: ${{ github.event_name == 'issue_comment' }}
+        uses: myrotvorets/set-commit-status-action@v1.1.7
+        with:
+          sha: ${{ steps.comment-branch.outputs.head_sha }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          context: Unit - Windows
+          status: pending
+
+      - name: (PR comment) Checkout PR branch
+        if: ${{ github.event_name == 'issue_comment' }}
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ steps.comment-branch.outputs.head_ref }}
+
+      - name: Checkout branch
+        if: ${{ github.event_name != 'issue_comment' }}
+        uses: actions/checkout@v3
+
+      - run: .\scripts\environment\bootstrap-windows-2019.ps1
+      - run: make test
+
+      - name: (PR comment) Set latest commit status as ${{ job.status }}
+        uses: myrotvorets/set-commit-status-action@v1.1.7
+        if: always() && github.event_name == 'issue_comment'
+        with:
+          sha: ${{ steps.comment-branch.outputs.head_sha }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          context: Unit - Windows
+          status: ${{ job.status }}

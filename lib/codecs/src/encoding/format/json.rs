@@ -91,7 +91,7 @@ mod tests {
     use chrono::{TimeZone, Timelike, Utc};
     use vector_core::event::{LogEvent, Metric, MetricKind, MetricValue, StatisticKind, Value};
     use vector_core::metric_tags;
-    use vrl::value::btreemap;
+    use vrl::btreemap;
 
     use super::*;
 

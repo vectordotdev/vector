@@ -48,7 +48,7 @@ static WELL_KNOWN_ACRONYMS: Lazy<HashSet<String>> = Lazy::new(|| {
         "api", "amqp", "aws", "ec2", "ecs", "gcp", "hec", "http", "https", "nats", "nginx", "s3",
         "sqs", "tls", "ssl", "otel", "gelf", "csv", "json", "rfc3339", "lz4", "us", "eu", "bsd",
         "vrl", "tcp", "udp", "id", "uuid", "kms", "uri", "url", "acp", "uid", "ip", "pid",
-        "ndjson", "ewma", "rtt", "cpu", "acl",
+        "ndjson", "ewma", "rtt", "cpu", "acl", "imds", "acl", "alpn",
     ];
 
     acronyms.iter().map(|s| s.to_lowercase()).collect()
