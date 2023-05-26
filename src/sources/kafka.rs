@@ -1402,7 +1402,6 @@ mod integration_test {
         std::env::var("KAFKA_MAX_BYTES").unwrap_or_else(|_| "1024".into())
     }
 
-
     fn client_config<T: FromClientConfig>(group: Option<&str>) -> T {
         let mut client = ClientConfig::new();
         client.set("bootstrap.servers", kafka_address());
