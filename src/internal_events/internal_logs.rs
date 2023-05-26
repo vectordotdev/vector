@@ -29,7 +29,7 @@ impl InternalEvent for InternalLogsEventsReceived {
         counter!("component_received_events_total", self.count as u64);
         counter!(
             "component_received_event_bytes_total",
-            self.byte_size.size() as u64
+            self.byte_size.get() as u64
         );
     }
 }

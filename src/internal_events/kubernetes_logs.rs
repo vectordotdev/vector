@@ -35,14 +35,14 @@ impl InternalEvent for KubernetesLogsEventsReceived<'_> {
                 let pod_namespace = pod_info.namespace;
 
                 counter!("component_received_events_total", 1, "pod_name" => pod_name.clone(), "pod_namespace" => pod_namespace.clone());
-                counter!("component_received_event_bytes_total", self.byte_size.size() as u64, "pod_name" => pod_name.clone(), "pod_namespace" => pod_namespace.clone());
+                counter!("component_received_event_bytes_total", self.byte_size.get() as u64, "pod_name" => pod_name.clone(), "pod_namespace" => pod_namespace.clone());
                 counter!("events_in_total", 1, "pod_name" => pod_name, "pod_namespace" => pod_namespace);
             }
             None => {
                 counter!("component_received_events_total", 1);
                 counter!(
                     "component_received_event_bytes_total",
-                    self.byte_size.size() as u64
+                    self.byte_size.get() as u64
                 );
                 counter!("events_in_total", 1);
             }

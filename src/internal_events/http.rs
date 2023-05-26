@@ -57,7 +57,7 @@ impl InternalEvent for HttpEventsReceived<'_> {
         );
         counter!(
             "component_received_event_bytes_total",
-            self.byte_size.size() as u64,
+            self.byte_size.get() as u64,
             "http_path" => self.http_path.to_string(),
             "protocol" => self.protocol,
         );

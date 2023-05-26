@@ -65,7 +65,7 @@ impl JsonSize {
 
     /// Returns the contained size.
     #[must_use]
-    pub fn size(&self) -> usize {
+    pub fn get(&self) -> usize {
         self.0
     }
 }

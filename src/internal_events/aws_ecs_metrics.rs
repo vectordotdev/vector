@@ -30,7 +30,7 @@ impl<'a> InternalEvent for AwsEcsMetricsEventsReceived<'a> {
             "endpoint" => self.endpoint.to_string(),
         );
         counter!(
-            "component_received_event_bytes_total", self.byte_size.size() as u64,
+            "component_received_event_bytes_total", self.byte_size.get() as u64,
             "endpoint" => self.endpoint.to_string(),
         );
         // deprecated

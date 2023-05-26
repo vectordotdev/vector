@@ -228,9 +228,10 @@ impl EstimatedJsonEncodedSizeOf for u8 {
         let v = *self;
 
         // 0 ..= 255
-        if        v <  10 { 1.into()
-        } else if v < 100 { 2.into()
-        } else            { 3.into() }
+        if        v <  10 { 1
+        } else if v < 100 { 2
+        } else            { 3 }
+        .into()
     }
 }
 
@@ -240,12 +241,13 @@ impl EstimatedJsonEncodedSizeOf for i8 {
         let v = *self;
 
         // -128 ..= 127
-        if        v < -99 { 4.into()
-        } else if v <  -9 { 3.into()
-        } else if v <   0 { 2.into()
-        } else if v <  10 { 1.into()
-        } else if v < 100 { 2.into()
-        } else            { 3.into() }
+        if        v < -99 { 4
+        } else if v <  -9 { 3
+        } else if v <   0 { 2
+        } else if v <  10 { 1
+        } else if v < 100 { 2
+        } else            { 3 }
+        .into()
     }
 }
 
@@ -255,11 +257,12 @@ impl EstimatedJsonEncodedSizeOf for u16 {
         let v = *self;
 
         // 0 ..= 65_535
-        if        v <     10 { 1.into()
-        } else if v <    100 { 2.into()
-        } else if v <  1_000 { 3.into()
-        } else if v < 10_000 { 4.into()
-        } else               { 5.into() }
+        if        v <     10 { 1
+        } else if v <    100 { 2
+        } else if v <  1_000 { 3
+        } else if v < 10_000 { 4
+        } else               { 5 }
+        .into()
     }
 }
 
@@ -269,16 +272,17 @@ impl EstimatedJsonEncodedSizeOf for i16 {
         let v = *self;
 
         // -32_768 ..= 32_767
-        if        v < -9_999 { 6.into()
-        } else if v <   -999 { 5.into()
-        } else if v <    -99 { 4.into()
-        } else if v <     -9 { 3.into()
-        } else if v <      0 { 2.into()
-        } else if v <     10 { 1.into()
-        } else if v <    100 { 2.into()
-        } else if v <  1_000 { 3.into()
-        } else if v < 10_000 { 4.into()
-        } else               { 5.into() }
+        if        v < -9_999 { 6
+        } else if v <   -999 { 5
+        } else if v <    -99 { 4
+        } else if v <     -9 { 3
+        } else if v <      0 { 2
+        } else if v <     10 { 1
+        } else if v <    100 { 2
+        } else if v <  1_000 { 3
+        } else if v < 10_000 { 4
+        } else               { 5 }
+        .into()
     }
 }
 
@@ -288,16 +292,17 @@ impl EstimatedJsonEncodedSizeOf for u32 {
         let v = *self;
 
         // 0 ..= 4_294_967_295
-        if        v <            10 { 1.into()
-        } else if v <           100 { 2.into()
-        } else if v <         1_000 { 3.into()
-        } else if v <        10_000 { 4.into()
-        } else if v <       100_000 { 5.into()
-        } else if v <     1_000_000 { 6.into()
-        } else if v <    10_000_000 { 7.into()
-        } else if v <   100_000_000 { 8.into()
-        } else if v < 1_000_000_000 { 9.into()
-        } else                      { 10.into() }
+        if        v <            10 { 1
+        } else if v <           100 { 2
+        } else if v <         1_000 { 3
+        } else if v <        10_000 { 4
+        } else if v <       100_000 { 5
+        } else if v <     1_000_000 { 6
+        } else if v <    10_000_000 { 7
+        } else if v <   100_000_000 { 8
+        } else if v < 1_000_000_000 { 9
+        } else                      { 10 }
+        .into()
     }
 }
 
@@ -307,26 +312,27 @@ impl EstimatedJsonEncodedSizeOf for i32 {
         let v = *self;
 
         // -2_147_483_648 ..= 2_147_483_647
-        if        v <  -999_999_999 { 11.into()
-        } else if v <   -99_999_999 { 10.into()
-        } else if v <    -9_999_999 {  9.into()
-        } else if v <      -999_999 {  8.into()
-        } else if v <       -99_999 {  7.into()
-        } else if v <        -9_999 {  6.into()
-        } else if v <          -999 {  5.into()
-        } else if v <           -99 {  4.into()
-        } else if v <            -9 {  3.into()
-        } else if v <             0 {  2.into()
-        } else if v <            10 {  1.into()
-        } else if v <           100 {  2.into()
-        } else if v <         1_000 {  3.into()
-        } else if v <        10_000 {  4.into()
-        } else if v <       100_000 {  5.into()
-        } else if v <     1_000_000 {  6.into()
-        } else if v <    10_000_000 {  7.into()
-        } else if v <   100_000_000 {  8.into()
-        } else if v < 1_000_000_000 {  9.into()
-        } else                      { 10.into() }
+        if        v <  -999_999_999 { 11
+        } else if v <   -99_999_999 { 10
+        } else if v <    -9_999_999 {  9
+        } else if v <      -999_999 {  8
+        } else if v <       -99_999 {  7
+        } else if v <        -9_999 {  6
+        } else if v <          -999 {  5
+        } else if v <           -99 {  4
+        } else if v <            -9 {  3
+        } else if v <             0 {  2
+        } else if v <            10 {  1
+        } else if v <           100 {  2
+        } else if v <         1_000 {  3
+        } else if v <        10_000 {  4
+        } else if v <       100_000 {  5
+        } else if v <     1_000_000 {  6
+        } else if v <    10_000_000 {  7
+        } else if v <   100_000_000 {  8
+        } else if v < 1_000_000_000 {  9
+        } else                      { 10 }
+        .into()
     }
 }
 
@@ -336,26 +342,27 @@ impl EstimatedJsonEncodedSizeOf for u64 {
         let v = *self;
 
         // 0 ..= 18_446_744_073_709_551_615
-        if        v <                         10 {  1.into()
-        } else if v <                        100 {  2.into()
-        } else if v <                      1_000 {  3.into()
-        } else if v <                     10_000 {  4.into()
-        } else if v <                    100_000 {  5.into()
-        } else if v <                  1_000_000 {  6.into()
-        } else if v <                 10_000_000 {  7.into()
-        } else if v <                100_000_000 {  8.into()
-        } else if v <              1_000_000_000 {  9.into()
-        } else if v <             10_000_000_000 { 10.into()
-        } else if v <            100_000_000_000 { 11.into()
-        } else if v <          1_000_000_000_000 { 12.into()
-        } else if v <         10_000_000_000_000 { 13.into()
-        } else if v <        100_000_000_000_000 { 14.into()
-        } else if v <      1_000_000_000_000_000 { 15.into()
-        } else if v <     10_000_000_000_000_000 { 16.into()
-        } else if v <    100_000_000_000_000_000 { 17.into()
-        } else if v <  1_000_000_000_000_000_000 { 18.into()
-        } else if v < 10_000_000_000_000_000_000 { 19.into()
-        } else                                   { 20.into() }
+        if        v <                         10 {  1
+        } else if v <                        100 {  2
+        } else if v <                      1_000 {  3
+        } else if v <                     10_000 {  4
+        } else if v <                    100_000 {  5
+        } else if v <                  1_000_000 {  6
+        } else if v <                 10_000_000 {  7
+        } else if v <                100_000_000 {  8
+        } else if v <              1_000_000_000 {  9
+        } else if v <             10_000_000_000 { 10
+        } else if v <            100_000_000_000 { 11
+        } else if v <          1_000_000_000_000 { 12
+        } else if v <         10_000_000_000_000 { 13
+        } else if v <        100_000_000_000_000 { 14
+        } else if v <      1_000_000_000_000_000 { 15
+        } else if v <     10_000_000_000_000_000 { 16
+        } else if v <    100_000_000_000_000_000 { 17
+        } else if v <  1_000_000_000_000_000_000 { 18
+        } else if v < 10_000_000_000_000_000_000 { 19
+        } else                                   { 20 }
+        .into()
     }
 }
 
@@ -365,44 +372,45 @@ impl EstimatedJsonEncodedSizeOf for i64 {
         let v = *self;
 
         // -9_223_372_036_854_775_808 ..= 9_223_372_036_854_775_807
-        if        v <  -999_999_999_999_999_999 { 20.into()
-        } else if v <   -99_999_999_999_999_999 { 19.into()
-        } else if v <    -9_999_999_999_999_999 { 18.into()
-        } else if v <      -999_999_999_999_999 { 17.into()
-        } else if v <       -99_999_999_999_999 { 16.into()
-        } else if v <        -9_999_999_999_999 { 15.into()
-        } else if v <          -999_999_999_999 { 14.into()
-        } else if v <           -99_999_999_999 { 13.into()
-        } else if v <            -9_999_999_999 { 12.into()
-        } else if v <              -999_999_999 { 11.into()
-        } else if v <               -99_999_999 { 10.into()
-        } else if v <                -9_999_999 {  9.into()
-        } else if v <                  -999_999 {  8.into()
-        } else if v <                   -99_999 {  7.into()
-        } else if v <                    -9_999 {  6.into()
-        } else if v <                      -999 {  5.into()
-        } else if v <                       -99 {  4.into()
-        } else if v <                        -9 {  3.into()
-        } else if v <                         0 {  2.into()
-        } else if v <                        10 {  1.into()
-        } else if v <                       100 {  2.into()
-        } else if v <                     1_000 {  3.into()
-        } else if v <                    10_000 {  4.into()
-        } else if v <                   100_000 {  5.into()
-        } else if v <                 1_000_000 {  6.into()
-        } else if v <                10_000_000 {  7.into()
-        } else if v <               100_000_000 {  8.into()
-        } else if v <             1_000_000_000 {  9.into()
-        } else if v <            10_000_000_000 { 10.into()
-        } else if v <           100_000_000_000 { 11.into()
-        } else if v <         1_000_000_000_000 { 12.into()
-        } else if v <        10_000_000_000_000 { 13.into()
-        } else if v <       100_000_000_000_000 { 14.into()
-        } else if v <     1_000_000_000_000_000 { 15.into()
-        } else if v <    10_000_000_000_000_000 { 16.into()
-        } else if v <   100_000_000_000_000_000 { 17.into()
-        } else if v < 1_000_000_000_000_000_000 { 18.into()
-        } else                                  { 19.into() }
+        if        v <  -999_999_999_999_999_999 { 20
+        } else if v <   -99_999_999_999_999_999 { 19
+        } else if v <    -9_999_999_999_999_999 { 18
+        } else if v <      -999_999_999_999_999 { 17
+        } else if v <       -99_999_999_999_999 { 16
+        } else if v <        -9_999_999_999_999 { 15
+        } else if v <          -999_999_999_999 { 14
+        } else if v <           -99_999_999_999 { 13
+        } else if v <            -9_999_999_999 { 12
+        } else if v <              -999_999_999 { 11
+        } else if v <               -99_999_999 { 10
+        } else if v <                -9_999_999 {  9
+        } else if v <                  -999_999 {  8
+        } else if v <                   -99_999 {  7
+        } else if v <                    -9_999 {  6
+        } else if v <                      -999 {  5
+        } else if v <                       -99 {  4
+        } else if v <                        -9 {  3
+        } else if v <                         0 {  2
+        } else if v <                        10 {  1
+        } else if v <                       100 {  2
+        } else if v <                     1_000 {  3
+        } else if v <                    10_000 {  4
+        } else if v <                   100_000 {  5
+        } else if v <                 1_000_000 {  6
+        } else if v <                10_000_000 {  7
+        } else if v <               100_000_000 {  8
+        } else if v <             1_000_000_000 {  9
+        } else if v <            10_000_000_000 { 10
+        } else if v <           100_000_000_000 { 11
+        } else if v <         1_000_000_000_000 { 12
+        } else if v <        10_000_000_000_000 { 13
+        } else if v <       100_000_000_000_000 { 14
+        } else if v <     1_000_000_000_000_000 { 15
+        } else if v <    10_000_000_000_000_000 { 16
+        } else if v <   100_000_000_000_000_000 { 17
+        } else if v < 1_000_000_000_000_000_000 { 18
+        } else                                  { 19 }
+        .into()
     }
 }
 

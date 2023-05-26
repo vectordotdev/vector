@@ -27,7 +27,7 @@ impl InternalEvent for HttpClientEventsReceived {
             "uri" => self.url.clone(),
         );
         counter!(
-            "component_received_event_bytes_total", self.byte_size.size() as u64,
+            "component_received_event_bytes_total", self.byte_size.get() as u64,
             "uri" => self.url.clone(),
         );
         // deprecated

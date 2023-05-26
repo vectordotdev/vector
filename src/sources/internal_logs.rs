@@ -156,7 +156,7 @@ async fn run(
     // infinite loop since it receives all such logs.
     while let Some(mut log) = rx.next().await {
         // TODO: Should this actually be in memory size?
-        let byte_size = log.estimated_json_encoded_size_of().size();
+        let byte_size = log.estimated_json_encoded_size_of().get();
         let json_byte_size = log.estimated_json_encoded_size_of();
         // This event doesn't emit any log
         emit!(InternalLogsBytesReceived { byte_size });

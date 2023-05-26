@@ -53,7 +53,7 @@ impl<'a> InternalEvent for KafkaEventsReceived<'a> {
         counter!("component_received_events_total", self.count as u64, "topic" => self.topic.to_string(), "partition" => self.partition.to_string());
         counter!(
             "component_received_event_bytes_total",
-            self.byte_size.size() as u64,
+            self.byte_size.get() as u64,
             "topic" => self.topic.to_string(),
             "partition" => self.partition.to_string(),
         );

@@ -23,7 +23,7 @@ impl InternalEvent for ExecEventsReceived<'_> {
         trace!(
             message = "Events received.",
             count = self.count,
-            byte_size = self.byte_size.size(),
+            byte_size = self.byte_size.get(),
             command = %self.command,
         );
         counter!(
@@ -31,7 +31,7 @@ impl InternalEvent for ExecEventsReceived<'_> {
             "command" => self.command.to_owned(),
         );
         counter!(
-            "component_received_event_bytes_total", self.byte_size.size() as u64,
+            "component_received_event_bytes_total", self.byte_size.get() as u64,
             "command" => self.command.to_owned(),
         );
         // deprecated

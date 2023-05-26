@@ -19,7 +19,7 @@ impl<'a> InternalEvent for MongoDbMetricsEventsReceived<'a> {
         trace!(
             message = "Events received.",
             count = self.count,
-            byte_size = self.byte_size.size(),
+            byte_size = self.byte_size.get(),
             endpoint = self.endpoint,
         );
         counter!(
@@ -27,7 +27,7 @@ impl<'a> InternalEvent for MongoDbMetricsEventsReceived<'a> {
             "endpoint" => self.endpoint.to_owned(),
         );
         counter!(
-            "component_received_event_bytes_total", self.byte_size.size() as u64,
+            "component_received_event_bytes_total", self.byte_size.get() as u64,
             "endpoint" => self.endpoint.to_owned(),
         );
         // deprecated
