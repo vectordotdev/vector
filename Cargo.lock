@@ -9124,7 +9124,7 @@ dependencies = [
  "aws-smithy-client",
  "aws-smithy-http 0.51.0",
  "aws-smithy-http-tower 0.54.4",
- "aws-smithy-types 0.51.0",
+ "aws-smithy-types 0.55.3",
  "aws-types",
  "axum",
  "azure_core",
