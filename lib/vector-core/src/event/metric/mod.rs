@@ -430,7 +430,7 @@ impl Display for Metric {
     ///
     /// example:
     /// ```text
-    /// 2020-08-12T20:23:37.248661343Z vector_processed_bytes_total{component_kind="sink",component_type="blackhole"} = 6391
+    /// 2020-08-12T20:23:37.248661343Z vector_received_bytes_total{component_kind="sink",component_type="blackhole"} = 6391
     /// ```
     fn fmt(&self, fmt: &mut Formatter<'_>) -> Result<(), fmt::Error> {
         if let Some(timestamp) = &self.data.time.timestamp {

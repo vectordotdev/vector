@@ -57,8 +57,6 @@ components: sinks: console: {
 	}
 
 	telemetry: metrics: {
-		processed_bytes_total:   components.sources.internal_metrics.output.metrics.processed_bytes_total
-		processed_events_total:  components.sources.internal_metrics.output.metrics.processed_events_total
 		processing_errors_total: components.sources.internal_metrics.output.metrics.processing_errors_total
 	}
 }

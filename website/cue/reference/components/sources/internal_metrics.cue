@@ -380,38 +380,6 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
-		events_in_total: {
-			description:       """
-				The number of events accepted by this component either from tagged
-				origins like file and uri, or cumulatively from other origins.
-				This metric is deprecated and will be removed in a future version.
-				Use [`component_received_events_total`](\(urls.vector_sources)/internal_metrics/#component_received_events_total) instead.
-				"""
-			type:              "counter"
-			default_namespace: "vector"
-			tags:              component_received_events_total.tags
-		}
-		events_out_total: {
-			description:       """
-				The total number of events emitted by this component.
-				This metric is deprecated and will be removed in a future version.
-				Use [`component_sent_events_total`](\(urls.vector_sources)/internal_metrics/#component_sent_events_total) instead.
-				"""
-			type:              "counter"
-			default_namespace: "vector"
-			tags:              _component_tags & {output: _output}
-		}
-		processed_events_total: {
-			description:       """
-				The total number of events processed by this component.
-				This metric is deprecated in place of using
-				[`component_received_events_total`](\(urls.vector_sources)/internal_metrics/#component_received_events_total) and
-				[`component_sent_events_total`](\(urls.vector_sources)/internal_metrics/#component_sent_events_total) metrics.
-				"""
-			type:              "counter"
-			default_namespace: "vector"
-			tags:              _component_tags
-		}
 		buffer_byte_size: {
 			description:       "The number of bytes current in the buffer."
 			type:              "gauge"
@@ -850,38 +818,6 @@ components: sources: internal_metrics: {
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              _internal_metrics_tags
-		}
-		processed_bytes_total: {
-			description:       "The number of bytes processed by the component."
-			type:              "counter"
-			default_namespace: "vector"
-			tags:              _component_tags & {
-				file: {
-					description: "The file from which the bytes originate."
-					required:    false
-				}
-				uri: {
-					description: "The sanitized URI from which the bytes originate."
-					required:    false
-				}
-				container_name: {
-					description: "The name of the container from which the bytes originate."
-					required:    false
-				}
-				pod_name: {
-					description: "The name of the pod from which the bytes originate."
-					required:    false
-				}
-				peer_addr: {
-					description: "The IP from which the bytes originate."
-					required:    false
-				}
-				peer_path: {
-					description: "The pathname from which the bytes originate."
-					required:    false
-				}
-				mode: _mode
-			}
 		}
 		processing_errors_total: {
 			description:       "The total number of processing errors encountered by this component. This metric is deprecated in favor of `component_errors_total`."

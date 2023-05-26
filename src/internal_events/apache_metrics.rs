@@ -24,10 +24,6 @@ impl<'a> InternalEvent for ApacheMetricsEventsReceived<'a> {
             "component_received_event_bytes_total", self.byte_size as u64,
             "endpoint" => self.endpoint.to_owned(),
         );
-        counter!(
-            "events_in_total", self.count as u64,
-            "uri" => self.endpoint.to_owned(),
-        );
     }
 }
 

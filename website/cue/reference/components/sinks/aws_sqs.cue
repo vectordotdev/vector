@@ -98,8 +98,6 @@ components: sinks: aws_sqs: components._aws & {
 		component_sent_events_total:      components.sources.internal_metrics.output.metrics.component_sent_events_total
 		component_sent_event_bytes_total: components.sources.internal_metrics.output.metrics.component_sent_event_bytes_total
 		events_discarded_total:           components.sources.internal_metrics.output.metrics.events_discarded_total
-		processed_bytes_total:            components.sources.internal_metrics.output.metrics.processed_bytes_total
-		processed_events_total:           components.sources.internal_metrics.output.metrics.processed_events_total
 		processing_errors_total:          components.sources.internal_metrics.output.metrics.processing_errors_total
 	}
 }

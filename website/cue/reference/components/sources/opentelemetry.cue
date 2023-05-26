@@ -136,7 +136,7 @@ components: sources: opentelemetry: {
 				severity_number: {
 					description: """
 						Numerical value of the severity.
-						
+
 						Smaller numerical values correspond to less severe events (such as debug events), larger numerical values correspond to more severe events (such as errors and critical events).
 						"""
 					required: false
@@ -168,7 +168,7 @@ components: sources: opentelemetry: {
 				timestamp: {
 					description: """
 						The UTC Datetime when the event occurred. If this value is unset, or `0`, it will be set to the `observed_timestamp` field.
-						
+
 						This field is converted from the `time_unix_nano` Protobuf field.
 						"""
 					required: true
@@ -177,7 +177,7 @@ components: sources: opentelemetry: {
 				observed_timestamp: {
 					description: """
 						The UTC Datetime when the event was observed by the collection system. If this value is unset, or `0`, it will be set to the current time.
-						
+
 						This field is converted from the `observed_time_unix_nano` Protobuf field.
 						"""
 					required: true
@@ -200,7 +200,6 @@ components: sources: opentelemetry: {
 		component_received_bytes_total:       components.sources.internal_metrics.output.metrics.component_received_bytes_total
 		component_received_events_total:      components.sources.internal_metrics.output.metrics.component_received_events_total
 		component_received_event_bytes_total: components.sources.internal_metrics.output.metrics.component_received_event_bytes_total
-		events_in_total:                      components.sources.internal_metrics.output.metrics.events_in_total
 	}
 
 	how_it_works: {

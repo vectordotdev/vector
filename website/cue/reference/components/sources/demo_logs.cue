@@ -62,6 +62,5 @@ components: sources: demo_logs: {
 		component_received_bytes_total:       components.sources.internal_metrics.output.metrics.component_received_bytes_total
 		component_received_events_total:      components.sources.internal_metrics.output.metrics.component_received_events_total
 		component_received_event_bytes_total: components.sources.internal_metrics.output.metrics.component_received_event_bytes_total
-		processed_events_total:               components.sources.internal_metrics.output.metrics.processed_events_total
 	}
 }

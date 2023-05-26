@@ -308,10 +308,7 @@ components: sources: logstash: {
 		connection_errors_total:          components.sources.internal_metrics.output.metrics.connection_errors_total
 		connection_send_ack_errors_total: components.sources.internal_metrics.output.metrics.connection_send_ack_errors_total
 		decode_errors_total:              components.sources.internal_metrics.output.metrics.decode_errors_total
-		events_in_total:                  components.sources.internal_metrics.output.metrics.events_in_total
 		open_connections:                 components.sources.internal_metrics.output.metrics.open_connections
-		processed_bytes_total:            components.sources.internal_metrics.output.metrics.processed_bytes_total
-		processed_events_total:           components.sources.internal_metrics.output.metrics.processed_events_total
 		component_received_bytes_total:   components.sources.internal_metrics.output.metrics.component_received_bytes_total
 		component_received_events_total:  components.sources.internal_metrics.output.metrics.component_received_events_total
 	}

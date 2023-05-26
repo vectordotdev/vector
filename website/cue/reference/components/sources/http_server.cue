@@ -182,7 +182,6 @@ components: sources: http_server: {
 		component_received_bytes_total:       components.sources.internal_metrics.output.metrics.component_received_bytes_total
 		component_received_events_total:      components.sources.internal_metrics.output.metrics.component_received_events_total
 		component_received_event_bytes_total: components.sources.internal_metrics.output.metrics.component_received_event_bytes_total
-		events_in_total:                      components.sources.internal_metrics.output.metrics.events_in_total
 		http_bad_requests_total:              components.sources.internal_metrics.output.metrics.http_bad_requests_total
 		parse_errors_total:                   components.sources.internal_metrics.output.metrics.parse_errors_total
 		component_received_events_total:      components.sources.internal_metrics.output.metrics.component_received_events_total

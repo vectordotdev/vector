@@ -465,7 +465,6 @@ components: sources: kubernetes_logs: {
 	}
 
 	telemetry: metrics: {
-		events_in_total:                        components.sources.internal_metrics.output.metrics.events_in_total
 		k8s_format_picker_edge_cases_total:     components.sources.internal_metrics.output.metrics.k8s_format_picker_edge_cases_total
 		k8s_docker_format_parse_failures_total: components.sources.internal_metrics.output.metrics.k8s_docker_format_parse_failures_total
 		k8s_event_annotation_failures_total:    components.sources.internal_metrics.output.metrics.k8s_event_annotation_failures_total
@@ -478,8 +477,6 @@ components: sources: kubernetes_logs: {
 		k8s_watch_stream_failed_total:          components.sources.internal_metrics.output.metrics.k8s_watch_stream_failed_total
 		k8s_watch_stream_items_obtained_total:  components.sources.internal_metrics.output.metrics.k8s_watch_stream_items_obtained_total
 		k8s_watcher_http_error_total:           components.sources.internal_metrics.output.metrics.k8s_watcher_http_error_total
-		processed_bytes_total:                  components.sources.internal_metrics.output.metrics.processed_bytes_total
-		processed_events_total:                 components.sources.internal_metrics.output.metrics.processed_events_total
 		component_discarded_events_total:       components.sources.internal_metrics.output.metrics.component_discarded_events_total
 		component_errors_total:                 components.sources.internal_metrics.output.metrics.component_errors_total
 		component_received_bytes_total:         components.sources.internal_metrics.output.metrics.component_received_bytes_total
