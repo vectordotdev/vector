@@ -26,7 +26,7 @@ pub struct AggregateConfig {
     ///
     /// During this time frame, metrics with the same series data (name, namespace, tags, and so on) are aggregated.
     #[serde(default = "default_interval_ms")]
-    #[configurable(metadata(docs::human_name = "Interval Time Frame"))]
+    #[configurable(metadata(docs::human_name = "Flush Interval"))]
     pub interval_ms: u64,
 }
 

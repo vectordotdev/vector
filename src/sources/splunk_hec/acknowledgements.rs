@@ -38,7 +38,7 @@ pub struct HecAcknowledgementsConfig {
     /// The maximum number of Splunk HEC channels clients can use with this source.
     ///
     /// Minimum of `1`.
-    #[configurable(metadata(docs::human_name = "Max Number of  Acknowledgement Channels"))]
+    #[configurable(metadata(docs::human_name = "Max Number of Acknowledgement Channels"))]
     pub max_number_of_ack_channels: NonZeroU64,
 
     /// The maximum number of acknowledgement statuses pending query for a single channel.

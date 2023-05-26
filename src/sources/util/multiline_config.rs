@@ -18,7 +18,6 @@ pub struct MultilineConfig {
     #[configurable(metadata(docs::examples = "\\\\$"))]
     #[configurable(metadata(docs::examples = "^(INFO|ERROR) "))]
     #[configurable(metadata(docs::examples = ";$"))]
-    #[configurable(metadata(docs::human_name = "Timeout"))]
     pub start_pattern: String,
 
     /// Regular expression pattern that is used to determine whether or not more lines should be read.

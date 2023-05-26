@@ -108,7 +108,6 @@ pub struct KafkaSourceConfig {
     #[configurable(metadata(docs::advanced))]
     #[serde(default = "default_session_timeout_ms")]
     #[configurable(metadata(docs::human_name = "Session Timeout"))]
-
     session_timeout_ms: Duration,
 
     /// Timeout for network requests.

@@ -117,7 +117,7 @@ pub struct RemapConfig {
     ///
     /// [vrl_docs_abort]: https://vector.dev/docs/reference/vrl/expressions/#abort
     #[serde(default = "crate::serde::default_true")]
-    #[configurable(metadata(docs::human_name = "Drop on Error"))]
+    #[configurable(metadata(docs::human_name = "Drop on Abort"))]
     pub drop_on_abort: bool,
 
     /// Reroutes dropped events to a named output instead of halting processing on them.
@@ -130,7 +130,7 @@ pub struct RemapConfig {
     /// to a specially-named output, `dropped`. The original event is annotated with additional
     /// fields describing why the event was dropped.
     #[serde(default = "crate::serde::default_false")]
-    #[configurable(metadata(docs::human_name = "Drop on Abort"))]
+    #[configurable(metadata(docs::human_name = "Drop on Error"))]
     pub reroute_dropped: bool,
 
     #[configurable(derived, metadata(docs::hidden))]
