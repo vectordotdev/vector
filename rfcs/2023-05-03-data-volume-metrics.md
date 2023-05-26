@@ -224,6 +224,8 @@ Incremental steps to execute this change. These will be converted to issues afte
 - [ ] Introduce an event caching layer that caches registered events based on the tags sent to it.
 - [ ] Update the emitted events to accept the new tags - taking the `telemetry` configuration options
       into account.
+- [ ] There is going to be a hit on performance with these changes. Add benchmarking to help us understand
+      how much the impact will be.
 
 ## Future Improvements
 
