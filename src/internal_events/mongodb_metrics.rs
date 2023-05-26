@@ -12,6 +12,7 @@ pub struct MongoDbMetricsEventsReceived<'a> {
 }
 
 impl<'a> InternalEvent for MongoDbMetricsEventsReceived<'a> {
+    // ## skip check-duplicate-events ##
     fn emit(self) {
         trace!(
             message = "Events received.",
