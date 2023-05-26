@@ -162,7 +162,7 @@ aws-sdk-s3 = { version = "0.21.0", default-features = false, features = ["native
 aws-sdk-sqs = { version = "0.21.0", default-features = false, features = ["native-tls"], optional = true }
 aws-sdk-cloudwatch = { version = "0.21.0", default-features = false, features = ["native-tls"], optional = true }
 aws-sdk-cloudwatchlogs = { version = "0.21.0", default-features = false, features = ["native-tls"], optional = true }
-aws-sdk-elasticsearch = {version = "0.21.0", default-features = false, features = ["native-tls"], optional = true }
+aws-sdk-elasticsearch = {version = "0.28.0", default-features = false, features = ["native-tls"], optional = true }
 aws-sdk-firehose = { version = "0.21.0", default-features = false, features = ["native-tls"], optional = true }
 aws-sdk-kinesis = { version = "0.21.0", default-features = false, features = ["native-tls"], optional = true }
 aws-types = { version = "0.51.0", default-features = false, features = ["hardcoded-credentials"], optional = true }
