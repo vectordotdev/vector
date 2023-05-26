@@ -556,9 +556,7 @@ fn handle_acks(
                 warn!("Error sending to main ack task: {}", e);
             }
         }
-        let _ = forward_to
-            .send(ForwardedAck::Drained(tp.clone()))
-            .await;
+        let _ = forward_to.send(ForwardedAck::Drained(tp.clone())).await;
         tp
     }
 
@@ -1190,7 +1188,10 @@ impl ConsumerContext for KafkaSourceContext {
                         // or when it times out, to prevent the consumer being kicked from the group.
                         // This send will return Err if the ack task has already exited; in that case we
                         // proceed without waiting
-                        if tx.send(KafkaCallback::PartitionsRevoked(revoked, send)).is_ok() {
+                        if tx
+                            .send(KafkaCallback::PartitionsRevoked(revoked, send))
+                            .is_ok()
+                        {
                             while rendezvous.recv().is_ok() {
                                 self.commit_consumer_state();
                             }
@@ -1224,10 +1225,6 @@ mod test {
 
     pub fn kafka_address() -> String {
         format!("{}:{}", kafka_host(), kafka_port())
-    }
-
-    pub fn kafka_max_bytes() -> String {
-        std::env::var("KAFKA_MAX_BYTES").unwrap_or_else(|_| "1024".into())
     }
 
     #[test]
@@ -1401,6 +1398,10 @@ mod integration_test {
         std::env::var("KAFKA_TEST_TOPIC")
             .unwrap_or_else(|_| format!("test-topic-{}", random_string(10)).into())
     }
+    fn kafka_max_bytes() -> String {
+        std::env::var("KAFKA_MAX_BYTES").unwrap_or_else(|_| "1024".into())
+    }
+
 
     fn client_config<T: FromClientConfig>(group: Option<&str>) -> T {
         let mut client = ClientConfig::new();
