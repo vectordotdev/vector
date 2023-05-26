@@ -38,6 +38,8 @@ pub struct KafkaRequestMetadata {
 
 pub struct KafkaResponse {
     event_byte_size: usize,
+    source: Option<String>,
+    service: Option<String>,
 }
 
 impl DriverResponse for KafkaResponse {
@@ -47,6 +49,14 @@ impl DriverResponse for KafkaResponse {
 
     fn events_sent(&self) -> CountByteSize {
         CountByteSize(1, self.event_byte_size)
+    }
+
+    fn source_tag(&self) -> Option<&str> {
+        self.source.map(|s| s.as_str())
+    }
+
+    fn service_tag(&self) -> Option<&str> {
+        self.service.map(|s| s.as_str())
     }
 }
 

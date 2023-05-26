@@ -20,6 +20,14 @@ pub trait DriverResponse {
     fn event_status(&self) -> EventStatus;
     fn events_sent(&self) -> CountByteSize;
 
+    fn source_tag(&self) -> Option<&str> {
+        None
+    }
+
+    fn service_tag(&self) -> Option<&str> {
+        None
+    }
+
     /// Return the number of bytes that were sent in the request that returned this response.
     // TODO, remove the default implementation once all sinks have
     // implemented this function.
@@ -99,7 +107,7 @@ where
         pin!(batched_input);
 
         let bytes_sent = protocol.map(|protocol| register(BytesSent { protocol }));
-        let events_sent = Cached::new(|tags: &(String, String)| {
+        let events_sent = Cached::new(|tags: &(Option<String>, Option<String>)| {
             register(TaggedEventsSent::new(
                 tags.0.clone(),
                 tags.1.clone(),
@@ -210,9 +218,9 @@ where
         finalizers: EventFinalizers,
         metadata: &RequestMetadata,
         bytes_sent: &Option<Registered<BytesSent>>,
-        events_sent: &Cached<(String, String), Registered<TaggedEventsSent>, T>,
+        events_sent: &Cached<(Option<String>, Option<String>), Registered<TaggedEventsSent>, T>,
     ) where
-        T: Fn(&(String, String)) -> Registered<TaggedEventsSent>,
+        T: Fn(&(Option<String>, Option<String>)) -> Registered<TaggedEventsSent>,
     {
         match result {
             Err(error) => {
@@ -228,10 +236,9 @@ where
                             bytes_sent.emit(ByteSize(byte_size));
                         }
                     }
-                    events_sent.emit(
-                        &("zork".to_string(), "zoog".to_string()),
-                        response.events_sent(),
-                    );
+                    let service = response.service_tag().map(|service| service.to_string());
+                    let source = response.source_tag().map(|source| source.to_string());
+                    events_sent.emit(&(source, service), response.events_sent());
                 // This condition occurs specifically when the `HttpBatchService::call()` is called *within* the `Service::call()`
                 } else if response.event_status() == EventStatus::Rejected {
                     Self::emit_call_error(None, request_id, metadata.event_count());

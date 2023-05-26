@@ -1,14 +1,15 @@
+use std::collections::HashMap;
 use std::ops::Add;
 
 /// Metadata for batch requests.
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct RequestMetadata {
     /// Number of events represented by this batch request.
     event_count: usize,
     /// Size, in bytes, of the in-memory representation of all events in this batch request.
     events_byte_size: usize,
     /// Size, in bytes, of the estimated JSON-encoded representation of all events in this batch request.
-    events_estimated_json_encoded_byte_size: usize,
+    events_estimated_json_encoded_byte_size: HashMap<(String, String), usize>,
     /// Uncompressed size, in bytes, of the encoded events in this batch request.
     request_encoded_size: usize,
     /// On-the-wire size, in bytes, of the batch request itself after compression, etc.

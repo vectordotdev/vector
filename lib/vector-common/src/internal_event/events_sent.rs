@@ -54,13 +54,17 @@ impl From<Output> for EventsSent {
 crate::registered_event!(
     TaggedEventsSent {
         output: Option<SharedString>,
-        source: String,
-        service: String,
+        source: Option<String>,
+        service: Option<String>,
     } => {
         events: Counter = if let Some(output) = &self.output {
-            register_counter!("component_sent_events_total", "output" => output.clone(), "source" => self.source.clone(), "service" => self.service.clone())
+            register_counter!("component_sent_events_total", "output" => output.clone(),
+                "source" => self.source.clone().unwrap_or("-".to_string()),
+                "service" => self.service.clone().unwrap_or("-".to_string()))
         } else {
-            register_counter!("component_sent_events_total", "source" => self.source.clone(), "service" => self.service.clone())
+            register_counter!("component_sent_events_total",
+                "source" => self.source.clone().unwrap_or("-".to_string()),
+                "service" => self.service.clone().unwrap_or("-".to_string()))
         },
         events_out: Counter = if let Some(output) = &self.output {
             register_counter!("events_out_total", "output" => output.clone())
@@ -68,9 +72,14 @@ crate::registered_event!(
             register_counter!("events_out_total")
         },
         event_bytes: Counter = if let Some(output) = &self.output {
-            register_counter!("component_sent_event_bytes_total", "output" => output.clone(), "source" => self.source.clone(), "service" => self.service.clone())
+            register_counter!("component_sent_event_bytes_total",
+                "output" => output.clone(),
+                "source" => self.source.clone().unwrap_or("-".to_string()),
+                "service" => self.service.clone().unwrap_or("-".to_string()))
         } else {
-            register_counter!("component_sent_event_bytes_total", "source" => self.source.clone(), "service" => self.service.clone())
+            register_counter!("component_sent_event_bytes_total",
+                "source" => self.source.clone().unwrap_or("-".to_string()),
+                "service" => self.service.clone().unwrap_or("-".to_string()))
         },
         output: Option<SharedString> = self.output,
     }
@@ -95,11 +104,11 @@ crate::registered_event!(
 
 impl TaggedEventsSent {
     #[must_use]
-    pub fn new(source: String, service: String, output: Output) -> Self {
+    pub fn new(source: Option<String>, service: Option<String>, output: Output) -> Self {
         Self {
             output: output.0,
-            source,
-            service,
+            source: source.map(|source| source.to_string()),
+            service: service.map(|service| service.to_string()),
         }
     }
 }
