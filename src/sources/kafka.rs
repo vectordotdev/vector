@@ -123,7 +123,7 @@ pub struct KafkaSourceConfig {
     #[configurable(metadata(docs::examples = 50, docs::examples = 100))]
     #[configurable(metadata(docs::advanced))]
     #[serde(default = "default_fetch_wait_max_ms")]
-    #[configurable(metadata(docs::human_name = "Fetch Wait Max"))]
+    #[configurable(metadata(docs::human_name = "Max Fetch Wait Time"))]
     fetch_wait_max_ms: Duration,
 
     /// The frequency that the consumer offsets are committed (written) to offset storage.

@@ -68,7 +68,6 @@ pub struct OpentelemetryConfig {
 #[configurable(metadata(docs::examples = "example_grpc_config()"))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
-#[configurable(metadata(docs::human_name = "gRPC"))]
 struct GrpcConfig {
     /// The socket address to listen for connections on.
     ///
