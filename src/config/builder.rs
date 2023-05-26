@@ -79,9 +79,12 @@ pub struct ConfigBuilder {
     #[serde(default)]
     pub secret: IndexMap<ComponentKey, SecretBackends>,
 
-    /// Set the duration in seconds to wait for graceful shutdown after SIGINT or SIGTERM are received.
+    /// The duration in seconds to wait for graceful shutdown after SIGINT or SIGTERM are received.
     /// After the duration has passed, Vector will force shutdown. Default value is 60 seconds. If set
-    /// to -1, Vector will never force shutdown.
+    /// to -1, Vector will never force shutdown. This value can be set using a
+    /// [cli arg](crate::cli::RootOpts::graceful_shutdown_duration).
+    #[serde(default, skip)]
+    #[doc(hidden)]
     pub graceful_shutdown_duration: i64,
 }
 
