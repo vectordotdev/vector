@@ -245,11 +245,15 @@ where
     }
 
     pub fn emit(&self, tags: &Tags, value: Data) {
-        if let Some(event) = self.cache.read().unwrap().get(tags) {
+        let read = self.cache.read().unwrap();
+        if let Some(event) = read.get(tags) {
             event.emit(value);
         } else {
             let event = (self.register)(tags);
             event.emit(value);
+
+            // Ensure the read lock is dropped so we can write.
+            drop(read);
             self.cache.write().unwrap().insert(tags.clone(), event);
         }
     }
