@@ -1102,7 +1102,7 @@ mod tests {
                     type = "filter"
                     inputs = ["internal_metrics"]
                     condition = """
-                        .name == "processed_bytes_total"
+                        .name == "component_received_bytes_total"
                     """
 
                 [sinks.out]
@@ -1133,7 +1133,7 @@ mod tests {
                     type = "filter"
                     inputs = ["internal_metrics"]
                     condition = """
-                        .name == "processed_bytes_total"
+                        .name == "component_received_bytes_total"
                     """
 
                 [sinks.out]

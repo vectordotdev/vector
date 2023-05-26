@@ -27,11 +27,6 @@ impl InternalEvent for DockerLogsEventsReceived<'_> {
             "component_received_event_bytes_total", self.byte_size as u64,
             "container_name" => self.container_name.to_owned()
         );
-        // deprecated
-        counter!(
-            "events_in_total", 1,
-            "container_name" => self.container_name.to_owned()
-        );
     }
 }
 

@@ -78,11 +78,8 @@ components: sinks: websocket: {
 		connection_failed_total:          components.sources.internal_metrics.output.metrics.connection_failed_total
 		connection_shutdown_total:        components.sources.internal_metrics.output.metrics.connection_shutdown_total
 		connection_errors_total:          components.sources.internal_metrics.output.metrics.connection_errors_total
-		events_in_total:                  components.sources.internal_metrics.output.metrics.events_in_total
-		events_out_total:                 components.sources.internal_metrics.output.metrics.events_out_total
 		component_sent_bytes_total:       components.sources.internal_metrics.output.metrics.component_sent_bytes_total
 		component_sent_events_total:      components.sources.internal_metrics.output.metrics.component_sent_events_total
-		events_out_total:                 components.sources.internal_metrics.output.metrics.events_out_total
 		component_sent_event_bytes_total: components.sources.internal_metrics.output.metrics.component_sent_event_bytes_total
 	}
 }

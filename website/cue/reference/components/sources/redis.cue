@@ -97,10 +97,6 @@ components: sources: redis: {
 	}
 
 	telemetry: metrics: {
-		events_in_total:         components.sources.internal_metrics.output.metrics.events_in_total
-		events_out_total:        components.sources.internal_metrics.output.metrics.events_out_total
-		processed_bytes_total:   components.sources.internal_metrics.output.metrics.processed_bytes_total
-		processed_bytes_total:   components.sources.internal_metrics.output.metrics.processed_bytes_total
 		processing_errors_total: components.sources.internal_metrics.output.metrics.processing_errors_total
 	}
 }

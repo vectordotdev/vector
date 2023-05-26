@@ -46,7 +46,5 @@ components: sinks: blackhole: {
 	}
 
 	telemetry: metrics: {
-		processed_bytes_total:  components.sources.internal_metrics.output.metrics.processed_bytes_total
-		processed_events_total: components.sources.internal_metrics.output.metrics.processed_events_total
 	}
 }

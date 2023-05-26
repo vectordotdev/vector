@@ -58,7 +58,6 @@ impl InternalEvent for HttpEventsReceived<'_> {
             "http_path" => self.http_path.to_string(),
             "protocol" => self.protocol,
         );
-        counter!("events_in_total", self.count as u64);
     }
 }
 

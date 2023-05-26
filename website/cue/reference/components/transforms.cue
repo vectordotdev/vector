@@ -13,8 +13,6 @@ components: transforms: [Name=string]: {
 	configuration: base.components.transforms.configuration
 
 	telemetry: metrics: {
-		events_in_total:                      components.sources.internal_metrics.output.metrics.events_in_total
-		events_out_total:                     components.sources.internal_metrics.output.metrics.events_out_total
 		component_received_events_count:      components.sources.internal_metrics.output.metrics.component_received_events_count
 		component_received_events_total:      components.sources.internal_metrics.output.metrics.component_received_events_total
 		component_received_event_bytes_total: components.sources.internal_metrics.output.metrics.component_received_event_bytes_total

@@ -54,8 +54,6 @@ impl<'a> InternalEvent for KafkaEventsReceived<'a> {
             "topic" => self.topic.to_string(),
             "partition" => self.partition.to_string(),
         );
-        // deprecated
-        counter!("events_in_total", self.count as u64);
     }
 }
 
