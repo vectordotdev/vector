@@ -3,6 +3,7 @@
 
 #![deny(missing_docs)]
 
+mod avro;
 mod bytes;
 mod gelf;
 mod json;
@@ -12,6 +13,7 @@ mod native_json;
 mod syslog;
 
 use ::bytes::Bytes;
+pub use avro::{AvroDeserializer, AvroDeserializerConfig, AvroDeserializerOptions};
 use dyn_clone::DynClone;
 pub use gelf::{GelfDeserializer, GelfDeserializerConfig};
 pub use json::{JsonDeserializer, JsonDeserializerConfig};

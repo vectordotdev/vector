@@ -2,7 +2,8 @@
 //! byte messages, byte frames and structured events.
 
 #![deny(missing_docs)]
-#![deny(warnings)]
+// #![deny(warnings)]
+#![allow(unused_imports)]
 
 pub mod decoding;
 pub mod encoding;

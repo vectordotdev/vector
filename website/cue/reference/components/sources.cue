@@ -212,6 +212,11 @@ components: sources: [Name=string]: {
 											[vector_native_json]: https://github.com/vectordotdev/vector/blob/master/lib/codecs/tests/data/native_encoding/schema.cue
 											[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
 											"""
+										avro: """
+											Decodes the raw bytes as an [Apache Avro][apache_avro] record.
+
+											[apache_avro]: https://avro.apache.org/
+											"""
 									}
 								}
 							}

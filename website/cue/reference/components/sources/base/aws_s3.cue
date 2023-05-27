@@ -180,6 +180,11 @@ base: components: sources: aws_s3: configuration: {
 						[rfc3164]: https://www.ietf.org/rfc/rfc3164.txt
 						[rfc5424]: https://www.ietf.org/rfc/rfc5424.txt
 						"""
+					avro: """
+						Decodes the raw bytes as an [Apache Avro][apache_avro] record.
+
+						[apache_avro]: https://avro.apache.org/
+						"""
 				}
 			}
 		}
