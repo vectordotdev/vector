@@ -121,6 +121,11 @@ base: components: sinks: splunk_hec_logs: configuration: {
 
 					[zlib]: https://zlib.net/
 					"""
+				zstd: """
+					[Zstandard][zstd] compression.
+
+					[zstd]: https://facebook.github.io/zstd/
+					"""
 			}
 		}
 	}
