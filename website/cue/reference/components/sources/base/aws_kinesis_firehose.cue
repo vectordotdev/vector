@@ -59,6 +59,11 @@ base: components: sources: aws_kinesis_firehose: configuration: {
 				type: string: {
 					default: "bytes"
 					enum: {
+						avro: """
+															Decodes the raw bytes as an [Apache Avro][apache_avro] record.
+
+															[apache_avro]: https://avro.apache.org/
+															"""
 						bytes: "Uses the raw bytes as-is."
 						gelf: """
 															Decodes the raw bytes as a [GELF][gelf] message.

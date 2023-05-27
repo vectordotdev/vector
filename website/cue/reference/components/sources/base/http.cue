@@ -55,6 +55,11 @@ base: components: sources: http: configuration: {
 				description: "The codec to use for decoding events."
 				required:    true
 				type: string: enum: {
+					avro: """
+						Decodes the raw bytes as an [Apache Avro][apache_avro] record.
+
+						[apache_avro]: https://avro.apache.org/
+						"""
 					bytes: "Uses the raw bytes as-is."
 					gelf: """
 						Decodes the raw bytes as a [GELF][gelf] message.
