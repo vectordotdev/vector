@@ -83,8 +83,6 @@ components: sinks: vector: {
 		component_sent_bytes_total:       components.sources.internal_metrics.output.metrics.component_sent_bytes_total
 		component_sent_events_total:      components.sources.internal_metrics.output.metrics.component_sent_events_total
 		component_sent_event_bytes_total: components.sources.internal_metrics.output.metrics.component_sent_event_bytes_total
-		processed_bytes_total:            components.sources.internal_metrics.output.metrics.processed_bytes_total
-		processed_events_total:           components.sources.internal_metrics.output.metrics.processed_events_total
 		protobuf_decode_errors_total:     components.sources.internal_metrics.output.metrics.protobuf_decode_errors_total
 	}
 }

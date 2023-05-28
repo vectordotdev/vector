@@ -15,6 +15,7 @@ pub struct MongoDbMetricsEventsReceived<'a> {
 }
 
 impl<'a> InternalEvent for MongoDbMetricsEventsReceived<'a> {
+    // ## skip check-duplicate-events ##
     fn emit(self) {
         trace!(
             message = "Events received.",
@@ -28,11 +29,6 @@ impl<'a> InternalEvent for MongoDbMetricsEventsReceived<'a> {
         );
         counter!(
             "component_received_event_bytes_total", self.byte_size.get() as u64,
-            "endpoint" => self.endpoint.to_owned(),
-        );
-        // deprecated
-        counter!(
-            "events_in_total", self.count as u64,
             "endpoint" => self.endpoint.to_owned(),
         );
     }

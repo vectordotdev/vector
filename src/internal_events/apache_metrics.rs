@@ -17,6 +17,7 @@ pub struct ApacheMetricsEventsReceived<'a> {
 }
 
 impl<'a> InternalEvent for ApacheMetricsEventsReceived<'a> {
+    // ## skip check-duplicate-events ##
     fn emit(self) {
         trace!(message = "Events received.", count = %self.count, byte_size = %self.byte_size, endpoint = %self.endpoint);
         counter!(
@@ -26,10 +27,6 @@ impl<'a> InternalEvent for ApacheMetricsEventsReceived<'a> {
         counter!(
             "component_received_event_bytes_total", self.byte_size.get() as u64,
             "endpoint" => self.endpoint.to_owned(),
-        );
-        counter!(
-            "events_in_total", self.count as u64,
-            "uri" => self.endpoint.to_owned(),
         );
     }
 }

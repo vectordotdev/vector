@@ -1,7 +1,7 @@
 package metadata
 
 components: sinks: gcp_stackdriver_metrics: {
-	title: "GCP Cloud Monitoring (formerly Stackdrive) Metrics"
+	title: "GCP Cloud Monitoring (formerly Stackdriver) Metrics"
 
 	classes: {
 		commonly_used: true
@@ -108,6 +108,5 @@ components: sinks: gcp_stackdriver_metrics: {
 		component_sent_bytes_total:       components.sources.internal_metrics.output.metrics.component_sent_bytes_total
 		component_sent_events_total:      components.sources.internal_metrics.output.metrics.component_sent_events_total
 		component_sent_event_bytes_total: components.sources.internal_metrics.output.metrics.component_sent_event_bytes_total
-		events_out_total:                 components.sources.internal_metrics.output.metrics.events_out_total
 	}
 }

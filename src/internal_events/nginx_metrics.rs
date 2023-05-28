@@ -30,11 +30,6 @@ impl<'a> InternalEvent for NginxMetricsEventsReceived<'a> {
             "component_received_event_bytes_total", self.byte_size.get() as u64,
             "endpoint" => self.endpoint.to_owned(),
         );
-        // deprecated
-        counter!(
-            "events_in_total", self.count as u64,
-            "endpoint" => self.endpoint.to_owned(),
-        );
     }
 }
 

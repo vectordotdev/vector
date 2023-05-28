@@ -1,10 +1,11 @@
-use std::{
-    collections::{BTreeMap, HashMap},
-    fmt::Display,
-};
+use std::collections::{BTreeMap, HashMap};
 
+use chrono::{DateTime, Local};
 use tokio::sync::mpsc;
-use tui::style::{Color, Style};
+use tui::{
+    style::{Color, Style},
+    text::Span,
+};
 use vector_core::internal_event::DEFAULT_OUTPUT;
 
 use crate::config::ComponentKey;
@@ -21,16 +22,19 @@ pub struct SentEventsMetric {
 #[derive(Debug)]
 pub enum EventType {
     InitializeState(State),
+    ReceivedBytesTotals(Vec<IdentifiedMetric>),
+    /// Interval + identified metric
+    ReceivedBytesThroughputs(i64, Vec<IdentifiedMetric>),
     ReceivedEventsTotals(Vec<IdentifiedMetric>),
     /// Interval in ms + identified metric
     ReceivedEventsThroughputs(i64, Vec<IdentifiedMetric>),
+    SentBytesTotals(Vec<IdentifiedMetric>),
+    /// Interval + identified metric
+    SentBytesThroughputs(i64, Vec<IdentifiedMetric>),
     // Identified overall metric + output-specific metrics
     SentEventsTotals(Vec<SentEventsMetric>),
     /// Interval in ms + identified overall metric + output-specific metrics
     SentEventsThroughputs(i64, Vec<SentEventsMetric>),
-    ProcessedBytesTotals(Vec<IdentifiedMetric>),
-    /// Interval + identified metric
-    ProcessedBytesThroughputs(i64, Vec<IdentifiedMetric>),
     ErrorsTotals(Vec<IdentifiedMetric>),
     #[cfg(feature = "allocation-tracing")]
     AllocatedBytes(Vec<IdentifiedMetric>),
@@ -47,30 +51,24 @@ pub enum ConnectionStatus {
     // reconnect attempts
     Disconnected(u64),
     // Connection is working
-    Connected,
+    Connected(DateTime<Local>),
 }
 
 impl ConnectionStatus {
-    /// Color styling to apply depending on the connection status
-    pub fn style(&self) -> Style {
+    pub fn as_ui_spans(&self) -> Vec<Span> {
         match self {
-            ConnectionStatus::Pending => Style::default().fg(Color::Yellow),
-            ConnectionStatus::Disconnected(_) => Style::default().fg(Color::Red),
-            ConnectionStatus::Connected => Style::default().fg(Color::Green),
-        }
-    }
-}
-
-impl Display for ConnectionStatus {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            ConnectionStatus::Pending => write!(f, "Initializing connection"),
-            ConnectionStatus::Disconnected(delay) => write!(
-                f,
-                "Disconnected: reconnecting every {} seconds",
-                delay / 1000
-            ),
-            ConnectionStatus::Connected => write!(f, "Connected"),
+            Self::Pending => vec![Span::styled(
+                "Connecting...",
+                Style::default().fg(Color::Yellow),
+            )],
+            Self::Disconnected(delay) => vec![
+                Span::styled("Disconnected", Style::default().fg(Color::Red)),
+                Span::from(format!(" (reconnecting every {} seconds)", delay / 1000)),
+            ],
+            Self::Connected(since) => vec![
+                Span::styled("Connected", Style::default().fg(Color::Green)),
+                Span::from(format!(" (since {})", since.format("%F %r %Z"))),
+            ],
         }
     }
 }
@@ -114,10 +112,12 @@ pub struct ComponentRow {
     pub kind: String,
     pub component_type: String,
     pub outputs: HashMap<String, OutputMetrics>,
-    pub processed_bytes_total: i64,
-    pub processed_bytes_throughput_sec: i64,
+    pub received_bytes_total: i64,
+    pub received_bytes_throughput_sec: i64,
     pub received_events_total: i64,
     pub received_events_throughput_sec: i64,
+    pub sent_bytes_total: i64,
+    pub sent_bytes_throughput_sec: i64,
     pub sent_events_total: i64,
     pub sent_events_throughput_sec: i64,
     #[cfg(feature = "allocation-tracing")]
@@ -147,6 +147,21 @@ pub async fn updater(mut event_rx: EventRx) -> StateRx {
                 EventType::InitializeState(new_state) => {
                     state = new_state;
                 }
+                EventType::ReceivedBytesTotals(rows) => {
+                    for (key, v) in rows {
+                        if let Some(r) = state.components.get_mut(&key) {
+                            r.received_bytes_total = v;
+                        }
+                    }
+                }
+                EventType::ReceivedBytesThroughputs(interval, rows) => {
+                    for (key, v) in rows {
+                        if let Some(r) = state.components.get_mut(&key) {
+                            r.received_bytes_throughput_sec =
+                                (v as f64 * (1000.0 / interval as f64)) as i64;
+                        }
+                    }
+                }
                 EventType::ReceivedEventsTotals(rows) => {
                     for (key, v) in rows {
                         if let Some(r) = state.components.get_mut(&key) {
@@ -158,6 +173,21 @@ pub async fn updater(mut event_rx: EventRx) -> StateRx {
                     for (key, v) in rows {
                         if let Some(r) = state.components.get_mut(&key) {
                             r.received_events_throughput_sec =
+                                (v as f64 * (1000.0 / interval as f64)) as i64;
+                        }
+                    }
+                }
+                EventType::SentBytesTotals(rows) => {
+                    for (key, v) in rows {
+                        if let Some(r) = state.components.get_mut(&key) {
+                            r.sent_bytes_total = v;
+                        }
+                    }
+                }
+                EventType::SentBytesThroughputs(interval, rows) => {
+                    for (key, v) in rows {
+                        if let Some(r) = state.components.get_mut(&key) {
+                            r.sent_bytes_throughput_sec =
                                 (v as f64 * (1000.0 / interval as f64)) as i64;
                         }
                     }
@@ -187,21 +217,6 @@ pub async fn updater(mut event_rx: EventRx) -> StateRx {
                                     .or_insert_with(OutputMetrics::default)
                                     .sent_events_throughput_sec = throughput;
                             }
-                        }
-                    }
-                }
-                EventType::ProcessedBytesTotals(rows) => {
-                    for (key, v) in rows {
-                        if let Some(r) = state.components.get_mut(&key) {
-                            r.processed_bytes_total = v;
-                        }
-                    }
-                }
-                EventType::ProcessedBytesThroughputs(interval, rows) => {
-                    for (key, v) in rows {
-                        if let Some(r) = state.components.get_mut(&key) {
-                            r.processed_bytes_throughput_sec =
-                                (v as f64 * (1000.0 / interval as f64)) as i64;
                         }
                     }
                 }
