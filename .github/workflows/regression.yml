@@ -34,7 +34,7 @@ on:
   pull_request:
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.issue.id || github.event.merge_group.base_sha || github.sha }}
+  group: ${{ github.workflow }}-${{ github.event.merge_group.head_sha || github.sha }}
   cancel-in-progress: true
 
 jobs:
