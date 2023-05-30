@@ -44,7 +44,4 @@ components: sinks: blackhole: {
 		}
 		traces: true
 	}
-
-	telemetry: metrics: {
-	}
 }

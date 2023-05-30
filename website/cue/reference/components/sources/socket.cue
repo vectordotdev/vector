@@ -118,10 +118,5 @@ components: sources: socket: {
 		connection_send_errors_total:         components.sources.internal_metrics.output.metrics.connection_send_errors_total
 		connection_send_ack_errors_total:     components.sources.internal_metrics.output.metrics.connection_send_ack_errors_total
 		connection_shutdown_total:            components.sources.internal_metrics.output.metrics.connection_shutdown_total
-		component_discarded_events_total:     components.sources.internal_metrics.output.metrics.component_discarded_events_total
-		component_errors_total:               components.sources.internal_metrics.output.metrics.component_errors_total
-		component_received_bytes_total:       components.sources.internal_metrics.output.metrics.component_received_bytes_total
-		component_received_event_bytes_total: components.sources.internal_metrics.output.metrics.component_received_event_bytes_total
-		component_received_events_total:      components.sources.internal_metrics.output.metrics.component_received_events_total
 	}
 }

@@ -423,10 +423,6 @@ components: sources: file: {
 	}
 
 	telemetry: metrics: {
-		component_errors_total:               components.sources.internal_metrics.output.metrics.component_errors_total
-		component_received_bytes_total:       components.sources.internal_metrics.output.metrics.component_received_bytes_total
-		component_received_events_total:      components.sources.internal_metrics.output.metrics.component_received_events_total
-		component_received_event_bytes_total: components.sources.internal_metrics.output.metrics.component_received_event_bytes_total
 		checkpoint_write_errors_total:        components.sources.internal_metrics.output.metrics.checkpoint_write_errors_total
 		checkpoints_total:                    components.sources.internal_metrics.output.metrics.checkpoints_total
 		checksum_errors_total:                components.sources.internal_metrics.output.metrics.checksum_errors_total

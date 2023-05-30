@@ -477,10 +477,5 @@ components: sources: kubernetes_logs: {
 		k8s_watch_stream_failed_total:          components.sources.internal_metrics.output.metrics.k8s_watch_stream_failed_total
 		k8s_watch_stream_items_obtained_total:  components.sources.internal_metrics.output.metrics.k8s_watch_stream_items_obtained_total
 		k8s_watcher_http_error_total:           components.sources.internal_metrics.output.metrics.k8s_watcher_http_error_total
-		component_discarded_events_total:       components.sources.internal_metrics.output.metrics.component_discarded_events_total
-		component_errors_total:                 components.sources.internal_metrics.output.metrics.component_errors_total
-		component_received_bytes_total:         components.sources.internal_metrics.output.metrics.component_received_bytes_total
-		component_received_event_bytes_total:   components.sources.internal_metrics.output.metrics.component_received_event_bytes_total
-		component_received_events_total:        components.sources.internal_metrics.output.metrics.component_received_events_total
 	}
 }

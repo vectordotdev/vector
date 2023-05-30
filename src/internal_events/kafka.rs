@@ -104,8 +104,6 @@ impl InternalEvent for KafkaReadError {
             "error_type" => error_type::READER_FAILED,
             "stage" => error_stage::RECEIVING,
         );
-        // deprecated
-        counter!("events_failed_total", 1);
     }
 }
 

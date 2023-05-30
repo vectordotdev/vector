@@ -42,8 +42,6 @@ impl InternalEvent for ParserMatchError<'_> {
             "error_type" => error_type::CONDITION_FAILED,
             "stage" => error_stage::PROCESSING,
         );
-        // deprecated
-        counter!("processing_errors_total", 1, "error_type" => "failed_match");
     }
 }
 
@@ -75,8 +73,6 @@ impl<const DROP_EVENT: bool> InternalEvent for ParserMissingFieldError<'_, DROP_
             "stage" => error_stage::PROCESSING,
             "field" => self.field.to_string(),
         );
-        // deprecated
-        counter!("processing_errors_total", 1, "error_type" => "missing_field");
 
         if DROP_EVENT {
             emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
@@ -108,8 +104,6 @@ impl<'a> InternalEvent for ParserConversionError<'a> {
             "stage" => error_stage::PROCESSING,
             "name" => self.name.to_string(),
         );
-        // deprecated
-        counter!("processing_errors_total", 1, "error_type" => "type_conversion_failed");
     }
 }
 
