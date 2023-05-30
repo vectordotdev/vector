@@ -31,7 +31,7 @@ mlua = { version = "0.8.9", default-features = false, features = ["lua54", "send
 no-proxy = { version  = "0.3.2", default-features = false, features = ["serialize"] }
 once_cell = { version = "1.17", default-features = false }
 ordered-float = { version = "3.7.0", default-features = false }
-openssl = { version = "0.10.52", default-features = false, features = ["vendored"] }
+openssl = { version = "0.10.53", default-features = false, features = ["vendored"] }
 parking_lot = { version = "0.12.1", default-features = false }
 pin-project = { version = "1.1.0", default-features = false }
 proptest = { version = "1.2", optional = true }
