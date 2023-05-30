@@ -10,7 +10,7 @@ use http::{
 use hyper::Body;
 use snafu::ResultExt;
 use tower::Service;
-use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
+use vector_common::request_metadata::{MetaDescriptive, RequestCountByteSize, RequestMetadata};
 use vector_core::{
     event::{EventFinalizers, EventStatus, Finalizable},
     internal_event::CountByteSize,
@@ -112,8 +112,8 @@ impl Finalizable for DatadogMetricsRequest {
 }
 
 impl MetaDescriptive for DatadogMetricsRequest {
-    fn get_metadata(&self) -> RequestMetadata {
-        self.metadata
+    fn get_metadata(&self) -> &RequestMetadata {
+        &self.metadata
     }
 }
 
@@ -138,8 +138,8 @@ impl DriverResponse for DatadogMetricsResponse {
         }
     }
 
-    fn events_sent(&self) -> CountByteSize {
-        CountByteSize(self.batch_size, self.byte_size)
+    fn events_sent(&self) -> RequestCountByteSize {
+        CountByteSize(self.batch_size, self.byte_size).into()
     }
 
     fn bytes_sent(&self) -> Option<usize> {

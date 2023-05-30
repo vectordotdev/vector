@@ -8,6 +8,7 @@ pub mod service;
 
 use std::{
     collections::BTreeMap,
+    ops::{Add, AddAssign},
     sync::{Arc, RwLock},
 };
 
@@ -112,8 +113,23 @@ pub struct ByteSize(pub usize);
 pub struct Count(pub usize);
 
 /// Holds the tuple `(count_of_events, size_of_events_in_bytes)`.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct CountByteSize(pub usize, pub usize);
+
+impl AddAssign for CountByteSize {
+    fn add_assign(&mut self, rhs: Self) {
+        self.0 += rhs.0;
+        self.1 += rhs.1;
+    }
+}
+
+impl Add<CountByteSize> for CountByteSize {
+    type Output = CountByteSize;
+
+    fn add(self, rhs: CountByteSize) -> Self::Output {
+        CountByteSize(self.0 + rhs.0, self.1 + rhs.1)
+    }
+}
 
 // Wrapper types used to hold parameters for registering events
 

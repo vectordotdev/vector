@@ -154,7 +154,7 @@ impl Finalizable for SendMessageEntry {
 }
 
 impl MetaDescriptive for SendMessageEntry {
-    fn get_metadata(&self) -> RequestMetadata {
-        self.metadata
+    fn get_metadata(&self) -> &RequestMetadata {
+        &self.metadata
     }
 }

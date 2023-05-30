@@ -11,7 +11,7 @@ use futures::future::BoxFuture;
 use md5::Digest;
 use tower::Service;
 use tracing::Instrument;
-use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
+use vector_common::request_metadata::{MetaDescriptive, RequestCountByteSize, RequestMetadata};
 use vector_core::{
     event::{EventFinalizers, EventStatus, Finalizable},
     internal_event::CountByteSize,
@@ -38,8 +38,8 @@ impl Finalizable for S3Request {
 }
 
 impl MetaDescriptive for S3Request {
-    fn get_metadata(&self) -> RequestMetadata {
-        self.request_metadata
+    fn get_metadata(&self) -> &RequestMetadata {
+        &self.request_metadata
     }
 }
 
@@ -61,8 +61,8 @@ impl DriverResponse for S3Response {
         EventStatus::Delivered
     }
 
-    fn events_sent(&self) -> CountByteSize {
-        CountByteSize(self.count, self.events_byte_size)
+    fn events_sent(&self) -> RequestCountByteSize {
+        CountByteSize(self.count, self.events_byte_size).into()
     }
 }
 

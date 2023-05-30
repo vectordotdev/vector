@@ -9,11 +9,9 @@ use rdkafka::{
     util::Timeout,
 };
 use tower::Service;
-use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
+use vector_common::request_metadata::{MetaDescriptive, RequestCountByteSize, RequestMetadata};
 use vector_core::{
-    internal_event::{
-        ByteSize, BytesSent, CountByteSize, InternalEventHandle as _, Protocol, Registered,
-    },
+    internal_event::{ByteSize, BytesSent, InternalEventHandle as _, Protocol, Registered},
     stream::DriverResponse,
 };
 
@@ -37,9 +35,7 @@ pub struct KafkaRequestMetadata {
 }
 
 pub struct KafkaResponse {
-    event_byte_size: usize,
-    source: Option<String>,
-    service: Option<String>,
+    event_byte_size: RequestCountByteSize,
 }
 
 impl DriverResponse for KafkaResponse {
@@ -47,16 +43,8 @@ impl DriverResponse for KafkaResponse {
         EventStatus::Delivered
     }
 
-    fn events_sent(&self) -> CountByteSize {
-        CountByteSize(1, self.event_byte_size)
-    }
-
-    fn source_tag(&self) -> Option<&str> {
-        self.source.map(|s| s.as_str())
-    }
-
-    fn service_tag(&self) -> Option<&str> {
-        self.service.map(|s| s.as_str())
+    fn events_sent(&self) -> RequestCountByteSize {
+        self.event_byte_size.clone()
     }
 }
 
@@ -67,8 +55,8 @@ impl Finalizable for KafkaRequest {
 }
 
 impl MetaDescriptive for KafkaRequest {
-    fn get_metadata(&self) -> RequestMetadata {
-        self.request_metadata
+    fn get_metadata(&self) -> &RequestMetadata {
+        &self.request_metadata
     }
 }
 
@@ -100,7 +88,10 @@ impl Service<KafkaRequest> for KafkaService {
         let this = self.clone();
 
         Box::pin(async move {
-            let event_byte_size = request.get_metadata().events_byte_size();
+            let event_byte_size = request
+                .get_metadata()
+                .events_estimated_json_encoded_byte_size()
+                .clone();
 
             let mut record =
                 FutureRecord::to(&request.metadata.topic).payload(request.body.as_ref());

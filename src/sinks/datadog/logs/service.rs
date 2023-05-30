@@ -14,7 +14,7 @@ use hyper::Body;
 use indexmap::IndexMap;
 use tower::Service;
 use tracing::Instrument;
-use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
+use vector_common::request_metadata::{MetaDescriptive, RequestCountByteSize, RequestMetadata};
 use vector_core::{
     event::{EventFinalizers, EventStatus, Finalizable},
     internal_event::CountByteSize,
@@ -56,8 +56,8 @@ impl Finalizable for LogApiRequest {
 }
 
 impl MetaDescriptive for LogApiRequest {
-    fn get_metadata(&self) -> RequestMetadata {
-        self.metadata
+    fn get_metadata(&self) -> &RequestMetadata {
+        &self.metadata
     }
 }
 
@@ -74,8 +74,8 @@ impl DriverResponse for LogApiResponse {
         self.event_status
     }
 
-    fn events_sent(&self) -> CountByteSize {
-        CountByteSize(self.count, self.events_byte_size)
+    fn events_sent(&self) -> RequestCountByteSize {
+        CountByteSize(self.count, self.events_byte_size).into()
     }
 
     fn bytes_sent(&self) -> Option<usize> {

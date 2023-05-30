@@ -7,7 +7,7 @@ use aws_smithy_client::SdkError;
 use aws_types::region::Region;
 use futures::future::BoxFuture;
 use tower::Service;
-use vector_common::request_metadata::MetaDescriptive;
+use vector_common::request_metadata::{MetaDescriptive, RequestCountByteSize};
 use vector_core::{internal_event::CountByteSize, stream::DriverResponse};
 
 use super::{
@@ -49,8 +49,8 @@ impl DriverResponse for KinesisResponse {
         EventStatus::Delivered
     }
 
-    fn events_sent(&self) -> CountByteSize {
-        CountByteSize(self.count, self.events_byte_size)
+    fn events_sent(&self) -> RequestCountByteSize {
+        CountByteSize(self.count, self.events_byte_size).into()
     }
 }
 

@@ -40,7 +40,7 @@ impl Finalizable for HecRequest {
 }
 
 impl MetaDescriptive for HecRequest {
-    fn get_metadata(&self) -> RequestMetadata {
-        self.metadata
+    fn get_metadata(&self) -> &RequestMetadata {
+        &self.metadata
     }
 }

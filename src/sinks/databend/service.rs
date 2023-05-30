@@ -10,7 +10,7 @@ use snafu::Snafu;
 use tower::Service;
 use vector_common::finalization::{EventFinalizers, EventStatus, Finalizable};
 use vector_common::internal_event::CountByteSize;
-use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
+use vector_common::request_metadata::{MetaDescriptive, RequestCountByteSize, RequestMetadata};
 use vector_core::stream::DriverResponse;
 
 use crate::{internal_events::EndpointBytesSent, sinks::util::retries::RetryLogic};
@@ -67,8 +67,8 @@ impl Finalizable for DatabendRequest {
 }
 
 impl MetaDescriptive for DatabendRequest {
-    fn get_metadata(&self) -> RequestMetadata {
-        self.metadata
+    fn get_metadata(&self) -> &RequestMetadata {
+        &self.metadata
     }
 }
 
@@ -82,11 +82,12 @@ impl DriverResponse for DatabendResponse {
         EventStatus::Delivered
     }
 
-    fn events_sent(&self) -> CountByteSize {
+    fn events_sent(&self) -> RequestCountByteSize {
         CountByteSize(
             self.metadata.event_count(),
             self.metadata.events_byte_size(),
         )
+        .into()
     }
 
     fn bytes_sent(&self) -> Option<usize> {
@@ -205,7 +206,7 @@ impl Service<DatabendRequest> for DatabendService {
         let service = self.clone();
 
         let future = async move {
-            let metadata = request.get_metadata();
+            let metadata = request.get_metadata().clone();
             let stage_location = service.new_stage_location();
             let protocol = service.client.get_protocol();
             let endpoint = service.client.get_host();

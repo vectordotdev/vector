@@ -11,7 +11,7 @@ use futures::future::BoxFuture;
 use http::{Response, Uri};
 use hyper::{service::Service, Body, Request};
 use tower::ServiceExt;
-use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
+use vector_common::request_metadata::{MetaDescriptive, RequestCountByteSize, RequestMetadata};
 use vector_core::{internal_event::CountByteSize, stream::DriverResponse, ByteSizeOf};
 
 use crate::sinks::elasticsearch::sign_request;
@@ -54,8 +54,8 @@ impl Finalizable for ElasticsearchRequest {
 }
 
 impl MetaDescriptive for ElasticsearchRequest {
-    fn get_metadata(&self) -> RequestMetadata {
-        self.metadata
+    fn get_metadata(&self) -> &RequestMetadata {
+        &self.metadata
     }
 }
 
@@ -154,8 +154,8 @@ impl DriverResponse for ElasticsearchResponse {
         self.event_status
     }
 
-    fn events_sent(&self) -> CountByteSize {
-        CountByteSize(self.batch_size, self.events_byte_size)
+    fn events_sent(&self) -> RequestCountByteSize {
+        CountByteSize(self.batch_size, self.events_byte_size).into()
     }
 }
 

@@ -1,3 +1,4 @@
+use vector_common::request_metadata::RequestCountByteSize;
 use vector_core::internal_event::CountByteSize;
 use vector_core::{event::EventStatus, stream::DriverResponse};
 
@@ -18,7 +19,7 @@ impl DriverResponse for HecResponse {
         self.event_status
     }
 
-    fn events_sent(&self) -> CountByteSize {
-        CountByteSize(self.events_count, self.events_byte_size)
+    fn events_sent(&self) -> RequestCountByteSize {
+        CountByteSize(self.events_count, self.events_byte_size).into()
     }
 }

@@ -8,7 +8,7 @@ use hyper_proxy::ProxyConnector;
 use prost::Message;
 use tonic::{body::BoxBody, IntoRequest};
 use tower::Service;
-use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
+use vector_common::request_metadata::{MetaDescriptive, RequestCountByteSize, RequestMetadata};
 use vector_core::{internal_event::CountByteSize, stream::DriverResponse};
 
 use super::VectorSinkError;
@@ -37,8 +37,8 @@ impl DriverResponse for VectorResponse {
         EventStatus::Delivered
     }
 
-    fn events_sent(&self) -> CountByteSize {
-        CountByteSize(self.events_count, self.events_byte_size)
+    fn events_sent(&self) -> RequestCountByteSize {
+        CountByteSize(self.events_count, self.events_byte_size).into()
     }
 }
 
@@ -56,8 +56,8 @@ impl Finalizable for VectorRequest {
 }
 
 impl MetaDescriptive for VectorRequest {
-    fn get_metadata(&self) -> RequestMetadata {
-        self.metadata
+    fn get_metadata(&self) -> &RequestMetadata {
+        &self.metadata
     }
 }
 

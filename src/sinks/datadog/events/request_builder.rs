@@ -42,8 +42,8 @@ impl ElementCount for DatadogEventsRequest {
 }
 
 impl MetaDescriptive for DatadogEventsRequest {
-    fn get_metadata(&self) -> RequestMetadata {
-        self.request_metadata
+    fn get_metadata(&self) -> &RequestMetadata {
+        &self.request_metadata
     }
 }
 

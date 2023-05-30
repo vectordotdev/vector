@@ -6,10 +6,9 @@ use http::StatusCode;
 use snafu::Snafu;
 use tower::Service;
 use tracing::Instrument;
-use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
+use vector_common::request_metadata::{MetaDescriptive, RequestCountByteSize, RequestMetadata};
 use vector_core::{
     event::{EventFinalizers, EventStatus, Finalizable},
-    internal_event::CountByteSize,
     stream::DriverResponse,
 };
 
@@ -57,11 +56,10 @@ impl DriverResponse for LokiResponse {
         EventStatus::Delivered
     }
 
-    fn events_sent(&self) -> CountByteSize {
-        CountByteSize(
-            self.metadata.event_count(),
-            self.metadata.events_estimated_json_encoded_byte_size(),
-        )
+    fn events_sent(&self) -> RequestCountByteSize {
+        self.metadata
+            .events_estimated_json_encoded_byte_size()
+            .clone()
     }
 
     fn bytes_sent(&self) -> Option<usize> {
@@ -85,8 +83,8 @@ impl Finalizable for LokiRequest {
 }
 
 impl MetaDescriptive for LokiRequest {
-    fn get_metadata(&self) -> RequestMetadata {
-        self.metadata
+    fn get_metadata(&self) -> &RequestMetadata {
+        &self.metadata
     }
 }
 
@@ -127,7 +125,7 @@ impl Service<LokiRequest> for LokiService {
         };
         let mut req = http::Request::post(&self.endpoint.uri).header("Content-Type", content_type);
 
-        let metadata = request.get_metadata();
+        let metadata = request.get_metadata().clone();
 
         if let Some(tenant_id) = request.tenant_id {
             req = req.header("X-Scope-OrgID", tenant_id);

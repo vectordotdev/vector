@@ -14,7 +14,7 @@ use vector_core::stream::DriverResponse;
 use crate::event::{EventFinalizers, EventStatus, Finalizable};
 use crate::internal_events::PulsarSendingError;
 use crate::sinks::pulsar::request_builder::PulsarMetadata;
-use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
+use vector_common::request_metadata::{MetaDescriptive, RequestCountByteSize, RequestMetadata};
 
 #[derive(Clone)]
 pub(super) struct PulsarRequest {
@@ -32,8 +32,8 @@ impl DriverResponse for PulsarResponse {
         EventStatus::Delivered
     }
 
-    fn events_sent(&self) -> CountByteSize {
-        CountByteSize(1, self.event_byte_size)
+    fn events_sent(&self) -> RequestCountByteSize {
+        CountByteSize(1, self.event_byte_size).into()
     }
 
     fn bytes_sent(&self) -> Option<usize> {
@@ -48,8 +48,8 @@ impl Finalizable for PulsarRequest {
 }
 
 impl MetaDescriptive for PulsarRequest {
-    fn get_metadata(&self) -> RequestMetadata {
-        self.request_metadata
+    fn get_metadata(&self) -> &RequestMetadata {
+        &self.request_metadata
     }
 }
 

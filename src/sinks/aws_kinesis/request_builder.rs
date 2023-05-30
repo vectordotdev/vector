@@ -53,8 +53,8 @@ impl<R> MetaDescriptive for KinesisRequest<R>
 where
     R: Record,
 {
-    fn get_metadata(&self) -> RequestMetadata {
-        self.metadata
+    fn get_metadata(&self) -> &RequestMetadata {
+        &self.metadata
     }
 }
 

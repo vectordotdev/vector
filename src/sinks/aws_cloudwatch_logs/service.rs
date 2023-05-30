@@ -22,7 +22,7 @@ use tower::{
     timeout::Timeout,
     Service, ServiceBuilder, ServiceExt,
 };
-use vector_common::request_metadata::MetaDescriptive;
+use vector_common::request_metadata::{MetaDescriptive, RequestCountByteSize};
 use vector_core::{internal_event::CountByteSize, stream::DriverResponse};
 
 use crate::{
@@ -117,8 +117,8 @@ impl DriverResponse for CloudwatchResponse {
         EventStatus::Delivered
     }
 
-    fn events_sent(&self) -> CountByteSize {
-        CountByteSize(self.events_count, self.events_byte_size)
+    fn events_sent(&self) -> RequestCountByteSize {
+        CountByteSize(self.events_count, self.events_byte_size).into()
     }
 }
 

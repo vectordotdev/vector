@@ -19,7 +19,7 @@ use tower::Service;
 use tracing::Instrument;
 use vector_common::{
     finalization::{EventStatus, Finalizable},
-    request_metadata::{MetaDescriptive, RequestMetadata},
+    request_metadata::{MetaDescriptive, RequestCountByteSize, RequestMetadata},
 };
 use vector_core::{
     internal_event::CountByteSize,
@@ -152,8 +152,8 @@ pub struct OpenDalRequest {
 }
 
 impl MetaDescriptive for OpenDalRequest {
-    fn get_metadata(&self) -> RequestMetadata {
-        self.request_metadata
+    fn get_metadata(&self) -> &RequestMetadata {
+        &self.request_metadata
     }
 }
 
@@ -246,8 +246,8 @@ impl DriverResponse for OpenDalResponse {
         EventStatus::Delivered
     }
 
-    fn events_sent(&self) -> CountByteSize {
-        CountByteSize(self.count, self.events_byte_size)
+    fn events_sent(&self) -> RequestCountByteSize {
+        CountByteSize(self.count, self.events_byte_size).into()
     }
 
     fn bytes_sent(&self) -> Option<usize> {

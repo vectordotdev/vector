@@ -8,7 +8,7 @@ use bytes::Bytes;
 use futures::FutureExt;
 use http::StatusCode;
 use snafu::Snafu;
-use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
+use vector_common::request_metadata::{MetaDescriptive, RequestCountByteSize, RequestMetadata};
 use vector_core::{internal_event::CountByteSize, stream::DriverResponse};
 
 use crate::{
@@ -32,8 +32,8 @@ impl Finalizable for AzureBlobRequest {
 }
 
 impl MetaDescriptive for AzureBlobRequest {
-    fn get_metadata(&self) -> RequestMetadata {
-        self.request_metadata
+    fn get_metadata(&self) -> &RequestMetadata {
+        &self.request_metadata
     }
 }
 
@@ -71,8 +71,8 @@ impl DriverResponse for AzureBlobResponse {
         EventStatus::Delivered
     }
 
-    fn events_sent(&self) -> CountByteSize {
-        CountByteSize(self.count, self.events_byte_size)
+    fn events_sent(&self) -> RequestCountByteSize {
+        CountByteSize(self.count, self.events_byte_size).into()
     }
 
     fn bytes_sent(&self) -> Option<usize> {

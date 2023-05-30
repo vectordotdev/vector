@@ -4,6 +4,7 @@ use aws_sdk_sqs::{error::SendMessageError, types::SdkError, Client as SqsClient}
 use futures::{future::BoxFuture, TryFutureExt};
 use tower::Service;
 use tracing::Instrument;
+use vector_common::request_metadata::RequestCountByteSize;
 use vector_core::{
     event::EventStatus, internal_event::CountByteSize, stream::DriverResponse, ByteSizeOf,
 };
@@ -60,7 +61,7 @@ impl DriverResponse for SendMessageResponse {
         EventStatus::Delivered
     }
 
-    fn events_sent(&self) -> CountByteSize {
-        CountByteSize(1, self.byte_size)
+    fn events_sent(&self) -> RequestCountByteSize {
+        CountByteSize(1, self.byte_size).into()
     }
 }

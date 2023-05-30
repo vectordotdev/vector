@@ -5,10 +5,10 @@ use tokio::{pin, select};
 use tower::Service;
 use tracing::Instrument;
 use vector_common::internal_event::{
-    register, ByteSize, BytesSent, Cached, CallError, CountByteSize, InternalEventHandle as _,
-    Output, PollReadyError, Registered, SharedString, TaggedEventsSent,
+    register, ByteSize, BytesSent, Cached, CallError, InternalEventHandle as _, Output,
+    PollReadyError, Registered, SharedString, TaggedEventsSent,
 };
-use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
+use vector_common::request_metadata::{MetaDescriptive, RequestCountByteSize, RequestMetadata};
 
 use super::FuturesUnorderedCount;
 use crate::{
@@ -18,15 +18,7 @@ use crate::{
 
 pub trait DriverResponse {
     fn event_status(&self) -> EventStatus;
-    fn events_sent(&self) -> CountByteSize;
-
-    fn source_tag(&self) -> Option<&str> {
-        None
-    }
-
-    fn service_tag(&self) -> Option<&str> {
-        None
-    }
+    fn events_sent(&self) -> RequestCountByteSize;
 
     /// Return the number of bytes that were sent in the request that returned this response.
     // TODO, remove the default implementation once all sinks have
@@ -182,7 +174,8 @@ where
                         let bytes_sent = bytes_sent.clone();
                         let events_sent = events_sent.clone();
 
-                        let metadata = req.get_metadata();
+                        // TODO This clone is bad.
+                        let metadata = req.get_metadata().clone();
 
                         let fut = svc.call(req)
                             .err_into()
@@ -236,9 +229,9 @@ where
                             bytes_sent.emit(ByteSize(byte_size));
                         }
                     }
-                    let service = response.service_tag().map(|service| service.to_string());
-                    let source = response.source_tag().map(|source| source.to_string());
-                    events_sent.emit(&(source, service), response.events_sent());
+                    for (tags, size) in response.events_sent().sizes() {
+                        events_sent.emit(tags, *size);
+                    }
                 // This condition occurs specifically when the `HttpBatchService::call()` is called *within* the `Service::call()`
                 } else if response.event_status() == EventStatus::Rejected {
                     Self::emit_call_error(None, request_id, metadata.event_count());
@@ -281,7 +274,7 @@ mod tests {
     use tower::Service;
     use vector_common::{
         finalization::{BatchNotifier, EventFinalizer, EventFinalizers, EventStatus, Finalizable},
-        request_metadata::RequestMetadata,
+        request_metadata::{RequestCountByteSize, RequestMetadata},
     };
     use vector_common::{internal_event::CountByteSize, request_metadata::MetaDescriptive};
 
@@ -315,8 +308,8 @@ mod tests {
     }
 
     impl MetaDescriptive for DelayRequest {
-        fn get_metadata(&self) -> RequestMetadata {
-            self.2
+        fn get_metadata(&self) -> &RequestMetadata {
+            &self.2
         }
     }
 
@@ -327,8 +320,8 @@ mod tests {
             EventStatus::Delivered
         }
 
-        fn events_sent(&self) -> CountByteSize {
-            CountByteSize(1, 1)
+        fn events_sent(&self) -> RequestCountByteSize {
+            CountByteSize(1, 1).into()
         }
     }
 
