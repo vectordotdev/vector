@@ -4,15 +4,6 @@
 "openssl-macros" = { origin = "https://github.com/sfackler/rust-openssl" }
 "serde_nanos" = { origin = "https://github.com/caspervonb/serde_nanos" }
 
-# These can go away once Vector starts using a release of the VRL crate with a
-# library field set up.
-"vrl" = { license = "MPL-2.0" }
-"vrl-compiler" = { license = "MPL-2.0" }
-"vrl-core" = { license = "MPL-2.0" }
-"vrl-diagnostic" = { license = "MPL-2.0" }
-"vrl-parser" = { license = "MPL-2.0" }
-"vrl-tests" = { license = "MPL-2.0" }
-
 # `ring` has a custom license that is mostly "ISC-style" but parts of it also fall under OpenSSL licensing.
 "ring-0.16.20" = { license = "ISC AND Custom" }
 
