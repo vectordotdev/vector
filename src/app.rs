@@ -1,5 +1,5 @@
 #![allow(missing_docs)]
-use std::{collections::HashMap, num::NonZeroUsize, path::PathBuf};
+use std::{collections::HashMap, num::NonZeroUsize, path::PathBuf, time::Duration};
 
 use exitcode::ExitCode;
 use futures::StreamExt;
@@ -62,11 +62,17 @@ impl ApplicationConfig {
     ) -> Result<Self, ExitCode> {
         let config_paths = opts.config_paths_with_formats();
 
+        let graceful_shutdown_duration = if opts.no_forced_shutdown {
+            None
+        } else {
+            Some(Duration::from_secs(opts.graceful_shutdown_duration))
+        };
+
         let config = load_configs(
             &config_paths,
             opts.watch_config,
             opts.require_healthy,
-            opts.graceful_shutdown_duration,
+            graceful_shutdown_duration,
             signal_handler,
         )
         .await?;
@@ -411,7 +417,7 @@ pub async fn load_configs(
     config_paths: &[ConfigPath],
     watch_config: bool,
     require_healthy: Option<bool>,
-    graceful_shutdown_duration: i64,
+    graceful_shutdown_duration: Option<Duration>,
     signal_handler: &mut SignalHandler,
 ) -> Result<Config, ExitCode> {
     let config_paths = config::process_paths(config_paths).ok_or(exitcode::CONFIG)?;

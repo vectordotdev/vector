@@ -62,10 +62,7 @@ impl RunningTopology {
             abort_tx,
             watch: watch::channel(TapResource::default()),
             running: Arc::new(AtomicBool::new(true)),
-            graceful_shutdown_duration: match config.graceful_shutdown_duration {
-                -1 => None,
-                seconds => Some(Duration::from_secs(seconds as u64)), // clap validator makes sure value is >= -1
-            },
+            graceful_shutdown_duration: config.graceful_shutdown_duration,
             config,
         }
     }

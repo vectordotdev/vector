@@ -160,10 +160,24 @@ pub struct RootOpts {
     pub internal_log_rate_limit: u64,
 
     /// Set the duration in seconds to wait for graceful shutdown after SIGINT or SIGTERM are received.
-    /// After the duration has passed, Vector will force shutdown. Default value is 60 seconds. If set
-    /// to -1, Vector will never force shutdown.
-    #[arg(long, default_value = "60", env = "VECTOR_GRACEFUL_SHUTDOWN_DURATION", value_parser = clap::value_parser!(i64).range(-1..))]
-    pub graceful_shutdown_duration: i64,
+    /// After the duration has passed, Vector will force shutdown.
+    #[arg(
+        long,
+        default_value = "60",
+        env = "VECTOR_GRACEFUL_SHUTDOWN_DURATION",
+        group = "graceful-shutdown-duration"
+    )]
+    pub graceful_shutdown_duration: u64,
+
+    /// Never time out while waiting for graceful shutdown after SIGINT or SIGTERM received. This is useful
+    /// when you would like for Vector to attempt to send data until terminated by a SIGKILL.
+    #[arg(
+        long,
+        default_value = "false",
+        env = "VECTOR_NO_FORCED_SHUTDOWN",
+        group = "graceful-shutdown-duration"
+    )]
+    pub no_forced_shutdown: bool,
 
     /// Set runtime allocation tracing
     #[cfg(feature = "allocation-tracing")]
