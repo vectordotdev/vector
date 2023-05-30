@@ -77,11 +77,7 @@ pub struct NonZeroJsonSize(JsonSize);
 impl NonZeroJsonSize {
     #[must_use]
     pub fn new(size: JsonSize) -> Option<Self> {
-        if size.0 == 0 {
-            None
-        } else {
-            Some(NonZeroJsonSize(size))
-        }
+        (size.0 > 0).then_some(NonZeroJsonSize(size))
     }
 }
 
