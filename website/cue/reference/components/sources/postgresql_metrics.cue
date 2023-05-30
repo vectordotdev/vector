@@ -69,9 +69,9 @@ components: sources: postgresql_metrics: {
 	}
 
 	telemetry: metrics: {
-		collect_completed_total:              components.sources.internal_metrics.output.metrics.collect_completed_total
-		collect_duration_seconds:             components.sources.internal_metrics.output.metrics.collect_duration_seconds
-		request_errors_total:                 components.sources.internal_metrics.output.metrics.request_errors_total
+		collect_completed_total:  components.sources.internal_metrics.output.metrics.collect_completed_total
+		collect_duration_seconds: components.sources.internal_metrics.output.metrics.collect_duration_seconds
+		request_errors_total:     components.sources.internal_metrics.output.metrics.request_errors_total
 	}
 
 	output: metrics: {

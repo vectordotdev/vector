@@ -205,7 +205,7 @@ components: sources: syslog: {
 	}
 
 	telemetry: metrics: {
-		connection_read_errors_total:    components.sources.internal_metrics.output.metrics.connection_read_errors_total
-		utf8_convert_errors_total:       components.sources.internal_metrics.output.metrics.utf8_convert_errors_total
+		connection_read_errors_total: components.sources.internal_metrics.output.metrics.connection_read_errors_total
+		utf8_convert_errors_total:    components.sources.internal_metrics.output.metrics.utf8_convert_errors_total
 	}
 }

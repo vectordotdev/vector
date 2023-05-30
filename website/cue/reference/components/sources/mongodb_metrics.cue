@@ -722,9 +722,9 @@ components: sources: mongodb_metrics: {
 	}
 
 	telemetry: metrics: {
-		collect_completed_total:          components.sources.internal_metrics.output.metrics.collect_completed_total
-		collect_duration_seconds:         components.sources.internal_metrics.output.metrics.collect_duration_seconds
-		parse_errors_total:               components.sources.internal_metrics.output.metrics.parse_errors_total
-		request_errors_total:             components.sources.internal_metrics.output.metrics.request_errors_total
+		collect_completed_total:  components.sources.internal_metrics.output.metrics.collect_completed_total
+		collect_duration_seconds: components.sources.internal_metrics.output.metrics.collect_duration_seconds
+		parse_errors_total:       components.sources.internal_metrics.output.metrics.parse_errors_total
+		request_errors_total:     components.sources.internal_metrics.output.metrics.request_errors_total
 	}
 }

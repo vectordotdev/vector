@@ -79,8 +79,8 @@ components: sources: statsd: {
 	}
 
 	telemetry: metrics: {
-		connection_errors_total:              components.sources.internal_metrics.output.metrics.connection_errors_total
-		invalid_record_total:                 components.sources.internal_metrics.output.metrics.invalid_record_total
-		invalid_record_bytes_total:           components.sources.internal_metrics.output.metrics.invalid_record_bytes_total
+		connection_errors_total:    components.sources.internal_metrics.output.metrics.connection_errors_total
+		invalid_record_total:       components.sources.internal_metrics.output.metrics.invalid_record_total
+		invalid_record_bytes_total: components.sources.internal_metrics.output.metrics.invalid_record_bytes_total
 	}
 }

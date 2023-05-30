@@ -126,7 +126,7 @@ components: sources: exec: {
 	}
 
 	telemetry: metrics: {
-		command_executed_total:               components.sources.internal_metrics.output.metrics.command_executed_total
-		command_execution_duration_seconds:   components.sources.internal_metrics.output.metrics.command_execution_duration_seconds
+		command_executed_total:             components.sources.internal_metrics.output.metrics.command_executed_total
+		command_execution_duration_seconds: components.sources.internal_metrics.output.metrics.command_execution_duration_seconds
 	}
 }
