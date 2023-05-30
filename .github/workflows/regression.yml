@@ -129,6 +129,12 @@ jobs:
 
       - uses: actions/checkout@v3
 
+      - name: Checkout PR branch (issue_comment)
+        if: github.event_name == 'issue_comment'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh pr checkout ${{ github.event.issue.number }}
+
       # If triggered by issue comment, the event payload doesn't directly contain the head and base sha from the PR.
       # But, we can retrieve this info from some commands.
       - name: Get PR metadata (issue_comment)
@@ -139,8 +145,6 @@ jobs:
         run: |
           export PR_NUMBER=${{ github.event.issue.number }}
           echo "PR_NUMBER=${PR_NUMBER}" >> $GITHUB_OUTPUT
-
-          gh pr checkout ${PR_NUMBER}
 
           export BASELINE_SHA=$(git merge-base --fork-point master)
           echo "BASELINE_SHA=${BASELINE_SHA}" >> $GITHUB_OUTPUT
@@ -768,7 +772,7 @@ jobs:
         if: github.event_name == 'issue_comment' && env.FAILED == 'true'
         uses: myrotvorets/set-commit-status-action@v1.1.7
         with:
-          sha: ${{ steps.compute-metadata.outputs.comparison-sha }}
+          sha: ${{ steps.comment-branch.outputs.head_sha }}
           token: ${{ secrets.GITHUB_TOKEN }}
           context: Regression Detection Suite
           status: 'failure'
