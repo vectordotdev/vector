@@ -62,11 +62,11 @@ impl ApplicationConfig {
     ) -> Result<Self, ExitCode> {
         let config_paths = opts.config_paths_with_formats();
 
-        let graceful_shutdown_duration = if opts.no_forced_shutdown {
+        let graceful_shutdown_duration = if opts.no_graceful_shutdown_limit {
             None
         } else {
             Some(Duration::from_secs(u64::from(
-                opts.graceful_shutdown_duration,
+                opts.graceful_shutdown_limit_secs,
             )))
         };
 

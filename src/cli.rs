@@ -164,21 +164,21 @@ pub struct RootOpts {
     #[arg(
         long,
         default_value = "60",
-        env = "VECTOR_GRACEFUL_SHUTDOWN_DURATION",
-        group = "graceful-shutdown-duration"
+        env = "VECTOR_GRACEFUL_SHUTDOWN_LIMIT_SECS",
+        group = "graceful-shutdown-limit"
     )]
-    pub graceful_shutdown_duration: NonZeroU64,
+    pub graceful_shutdown_limit_secs: NonZeroU64,
 
     /// Never time out while waiting for graceful shutdown after SIGINT or SIGTERM received. This is useful
     /// when you would like for Vector to attempt to send data until terminated by a SIGKILL. Overrides/cannot
-    /// be set with --graceful-shutdown-duration.
+    /// be set with --graceful-shutdown-limit-secs.
     #[arg(
         long,
         default_value = "false",
-        env = "VECTOR_NO_FORCED_SHUTDOWN",
-        group = "graceful-shutdown-duration"
+        env = "VECTOR_NO_GRACEFUL_SHUTDOWN_LIMIT",
+        group = "graceful-shutdown-limit"
     )]
-    pub no_forced_shutdown: bool,
+    pub no_graceful_shutdown_limit: bool,
 
     /// Set runtime allocation tracing
     #[cfg(feature = "allocation-tracing")]
