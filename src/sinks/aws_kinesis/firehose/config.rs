@@ -190,7 +190,7 @@ impl RetryLogic for KinesisRetryLogic {
     fn should_retry_response(&self, response: &Self::Response) -> RetryAction {
         if self.retry_partial && response.failure_count > 0 {
             let msg = format!("partial error count {}", response.failure_count);
-            return RetryAction::Retry(msg.into());
+            RetryAction::Retry(msg.into())
         } else {
             RetryAction::Successful
         }

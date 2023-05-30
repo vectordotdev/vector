@@ -54,7 +54,7 @@ impl SendRecord for KinesisFirehoseClient {
         records: Vec<Self::T>,
         stream_name: String,
     ) -> Result<KinesisResponse, SdkError<Self::E>> {
-        let rec_count = records.len().clone();
+        let rec_count = records.len();
 
         self.client
             .put_record_batch()

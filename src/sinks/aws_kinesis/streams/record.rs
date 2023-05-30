@@ -1,11 +1,10 @@
-use crate::sinks::aws_kinesis::KinesisResponse;
 use aws_sdk_kinesis::output::PutRecordsOutput;
 use aws_sdk_kinesis::types::{Blob, SdkError};
 use bytes::Bytes;
 use tracing::Instrument;
 use crate::{sinks::prelude::*};
 
-use super::{KinesisClient, KinesisError, KinesisRecord, Record, SendRecord};
+use super::{KinesisClient, KinesisError, KinesisResponse, KinesisRecord, Record, SendRecord};
 
 #[derive(Clone)]
 pub struct KinesisStreamRecord {
@@ -70,14 +69,7 @@ impl SendRecord for KinesisStreamClient {
         records: Vec<Self::T>,
         stream_name: String,
     ) -> Result<KinesisResponse, SdkError<Self::E>> {
-        let rec_count = records.len().clone();  
-        // let total_byte_size: usize = records.iter().map(|record| record.len()).sum(); 
-        // let total_byte_size: usize = records.iter().map(|record| record.data().len()).sum();
-        // let total_byte_size: usize = records.iter().map(|record| {
-        //     record.data().unwrap_or_else(|| &Bytes::new()).len()
-        // }).sum();
-       
-
+        let rec_count = records.len();
         self.client
             .put_records()
             .set_records(Some(records))
