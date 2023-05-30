@@ -170,7 +170,8 @@ pub struct RootOpts {
     pub graceful_shutdown_duration: NonZeroU64,
 
     /// Never time out while waiting for graceful shutdown after SIGINT or SIGTERM received. This is useful
-    /// when you would like for Vector to attempt to send data until terminated by a SIGKILL.
+    /// when you would like for Vector to attempt to send data until terminated by a SIGKILL. Overrides/cannot
+    /// be set with --graceful-shutdown-duration.
     #[arg(
         long,
         default_value = "false",
