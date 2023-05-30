@@ -128,10 +128,9 @@ components: sources: nginx_metrics: {
 	}
 
 	telemetry: metrics: {
-		collect_completed_total:         components.sources.internal_metrics.output.metrics.collect_completed_total
-		collect_duration_seconds:        components.sources.internal_metrics.output.metrics.collect_duration_seconds
-		http_request_errors_total:       components.sources.internal_metrics.output.metrics.http_request_errors_total
-		parse_errors_total:              components.sources.internal_metrics.output.metrics.parse_errors_total
-		component_received_events_total: components.sources.internal_metrics.output.metrics.component_received_events_total
+		collect_completed_total:   components.sources.internal_metrics.output.metrics.collect_completed_total
+		collect_duration_seconds:  components.sources.internal_metrics.output.metrics.collect_duration_seconds
+		http_request_errors_total: components.sources.internal_metrics.output.metrics.http_request_errors_total
+		parse_errors_total:        components.sources.internal_metrics.output.metrics.parse_errors_total
 	}
 }

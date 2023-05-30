@@ -177,8 +177,6 @@ components: sources: fluent: {
 	}
 
 	telemetry: metrics: {
-		decode_errors_total:             components.sources.internal_metrics.output.metrics.decode_errors_total
-		component_received_bytes_total:  components.sources.internal_metrics.output.metrics.component_received_bytes_total
-		component_received_events_total: components.sources.internal_metrics.output.metrics.component_received_events_total
+		decode_errors_total: components.sources.internal_metrics.output.metrics.decode_errors_total
 	}
 }

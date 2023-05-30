@@ -82,13 +82,8 @@ components: sinks: splunk_hec_logs: {
 	}
 
 	telemetry: metrics: {
-		component_discarded_events_total: components.sources.internal_metrics.output.metrics.component_discarded_events_total
-		component_errors_total:           components.sources.internal_metrics.output.metrics.component_errors_total
-		component_sent_bytes_total:       components.sources.internal_metrics.output.metrics.component_sent_bytes_total
-		component_sent_events_total:      components.sources.internal_metrics.output.metrics.component_sent_events_total
-		component_sent_event_bytes_total: components.sources.internal_metrics.output.metrics.component_sent_event_bytes_total
-		http_request_errors_total:        components.sources.internal_metrics.output.metrics.http_request_errors_total
-		requests_received_total:          components.sources.internal_metrics.output.metrics.requests_received_total
+		http_request_errors_total: components.sources.internal_metrics.output.metrics.http_request_errors_total
+		requests_received_total:   components.sources.internal_metrics.output.metrics.requests_received_total
 	}
 
 	how_it_works: sinks._splunk_hec.how_it_works

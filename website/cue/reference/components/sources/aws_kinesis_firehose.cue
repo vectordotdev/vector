@@ -187,13 +187,6 @@ components: sources: aws_kinesis_firehose: {
 	}
 
 	telemetry: metrics: {
-		component_errors_total:                components.sources.internal_metrics.output.metrics.component_errors_total
-		component_discarded_events_total:      components.sources.internal_metrics.output.metrics.component_discarded_events_total
-		component_sent_events_total:           components.sources.internal_metrics.output.metrics.component_sent_events_total
-		component_sent_event_bytes_total:      components.sources.internal_metrics.output.metrics.component_sent_event_bytes_total
-		component_received_bytes_total:        components.sources.internal_metrics.output.metrics.component_received_bytes_total
-		component_received_events_total:       components.sources.internal_metrics.output.metrics.component_received_events_total
-		component_received_event_bytes_total:  components.sources.internal_metrics.output.metrics.component_received_event_bytes_total
 		request_read_errors_total:             components.sources.internal_metrics.output.metrics.request_read_errors_total
 		requests_received_total:               components.sources.internal_metrics.output.metrics.requests_received_total
 		request_automatic_decode_errors_total: components.sources.internal_metrics.output.metrics.request_automatic_decode_errors_total

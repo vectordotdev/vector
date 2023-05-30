@@ -75,8 +75,6 @@ components: sinks: redis: {
 	}
 
 	telemetry: metrics: {
-		component_sent_events_total:      components.sources.internal_metrics.output.metrics.component_sent_events_total
-		component_sent_event_bytes_total: components.sources.internal_metrics.output.metrics.component_sent_event_bytes_total
-		send_errors_total:                components.sources.internal_metrics.output.metrics.send_errors_total
+		send_errors_total: components.sources.internal_metrics.output.metrics.send_errors_total
 	}
 }

@@ -79,13 +79,8 @@ components: sources: statsd: {
 	}
 
 	telemetry: metrics: {
-		connection_errors_total:              components.sources.internal_metrics.output.metrics.connection_errors_total
-		invalid_record_total:                 components.sources.internal_metrics.output.metrics.invalid_record_total
-		invalid_record_bytes_total:           components.sources.internal_metrics.output.metrics.invalid_record_bytes_total
-		component_discarded_events_total:     components.sources.internal_metrics.output.metrics.component_discarded_events_total
-		component_errors_total:               components.sources.internal_metrics.output.metrics.component_errors_total
-		component_received_bytes_total:       components.sources.internal_metrics.output.metrics.component_received_bytes_total
-		component_received_events_total:      components.sources.internal_metrics.output.metrics.component_received_events_total
-		component_received_event_bytes_total: components.sources.internal_metrics.output.metrics.component_received_event_bytes_total
+		connection_errors_total:    components.sources.internal_metrics.output.metrics.connection_errors_total
+		invalid_record_total:       components.sources.internal_metrics.output.metrics.invalid_record_total
+		invalid_record_bytes_total: components.sources.internal_metrics.output.metrics.invalid_record_bytes_total
 	}
 }

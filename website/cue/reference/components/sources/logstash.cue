@@ -309,7 +309,5 @@ components: sources: logstash: {
 		connection_send_ack_errors_total: components.sources.internal_metrics.output.metrics.connection_send_ack_errors_total
 		decode_errors_total:              components.sources.internal_metrics.output.metrics.decode_errors_total
 		open_connections:                 components.sources.internal_metrics.output.metrics.open_connections
-		component_received_bytes_total:   components.sources.internal_metrics.output.metrics.component_received_bytes_total
-		component_received_events_total:  components.sources.internal_metrics.output.metrics.component_received_events_total
 	}
 }

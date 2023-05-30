@@ -84,13 +84,9 @@ components: sources: prometheus_remote_write: {
 	}
 
 	telemetry: metrics: {
-		component_errors_total:               components.sources.internal_metrics.output.metrics.component_errors_total
-		component_received_bytes_total:       components.sources.internal_metrics.output.metrics.component_received_bytes_total
-		component_received_events_total:      components.sources.internal_metrics.output.metrics.component_received_events_total
-		component_received_event_bytes_total: components.sources.internal_metrics.output.metrics.component_received_event_bytes_total
-		parse_errors_total:                   components.sources.internal_metrics.output.metrics.parse_errors_total
-		requests_completed_total:             components.sources.internal_metrics.output.metrics.requests_completed_total
-		requests_received_total:              components.sources.internal_metrics.output.metrics.requests_received_total
-		request_duration_seconds:             components.sources.internal_metrics.output.metrics.request_duration_seconds
+		parse_errors_total:       components.sources.internal_metrics.output.metrics.parse_errors_total
+		requests_completed_total: components.sources.internal_metrics.output.metrics.requests_completed_total
+		requests_received_total:  components.sources.internal_metrics.output.metrics.requests_received_total
+		request_duration_seconds: components.sources.internal_metrics.output.metrics.request_duration_seconds
 	}
 }

@@ -79,7 +79,6 @@ components: sources: amqp: {
 
 	telemetry: metrics: {
 		consumer_offset_updates_failed_total: components.sources.internal_metrics.output.metrics.consumer_offset_updates_failed_total
-		events_failed_total:                  components.sources.internal_metrics.output.metrics.events_failed_total
 	}
 
 	how_it_works: components._amqp.how_it_works
