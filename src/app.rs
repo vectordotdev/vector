@@ -65,7 +65,9 @@ impl ApplicationConfig {
         let graceful_shutdown_duration = if opts.no_forced_shutdown {
             None
         } else {
-            Some(Duration::from_secs(opts.graceful_shutdown_duration))
+            Some(Duration::from_secs(u64::from(
+                opts.graceful_shutdown_duration,
+            )))
         };
 
         let config = load_configs(

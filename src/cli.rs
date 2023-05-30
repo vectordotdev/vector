@@ -1,5 +1,5 @@
 #![allow(missing_docs)]
-use std::path::PathBuf;
+use std::{num::NonZeroU64, path::PathBuf};
 
 use clap::{ArgAction, CommandFactory, FromArgMatches, Parser};
 
@@ -167,7 +167,7 @@ pub struct RootOpts {
         env = "VECTOR_GRACEFUL_SHUTDOWN_DURATION",
         group = "graceful-shutdown-duration"
     )]
-    pub graceful_shutdown_duration: u64,
+    pub graceful_shutdown_duration: NonZeroU64,
 
     /// Never time out while waiting for graceful shutdown after SIGINT or SIGTERM received. This is useful
     /// when you would like for Vector to attempt to send data until terminated by a SIGKILL.
