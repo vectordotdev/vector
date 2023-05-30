@@ -22,7 +22,7 @@ tokio = { version = "1.28.2", default-features = false, features = ["macros", "r
 tokio-stream = { version = "0.1.14", default-features = false, features = ["sync"] }
 
 # GraphQL
-graphql_client = { version = "0.12.0", default-features = false, features = ["graphql_query_derive"] }
+graphql_client = { version = "0.13.0", default-features = false, features = ["graphql_query_derive"] }
 
 # HTTP / WebSockets
 reqwest = { version = "0.11.18", default-features = false, features = ["json"] }
