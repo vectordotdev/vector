@@ -1,6 +1,6 @@
 use crate::emit;
 use metrics::counter;
-use vector_common::internal_event::error_stage;
+use vector_common::internal_event::{error_stage, error_type};
 use vector_core::internal_event::{ComponentEventsDropped, InternalEvent, INTENTIONAL};
 
 #[derive(Debug)]
@@ -8,9 +8,18 @@ pub struct LokiEventUnlabeledError;
 
 impl InternalEvent for LokiEventUnlabeledError {
     fn emit(self) {
+        error!(
+            message = "Event had no labels. Adding default `agent` label.",
+            error_code = "unlabeled_event",
+            error_type = error_type::CONDITION_FAILED,
+            stage = error_stage::PROCESSING,
+            internal_log_rate_limit = true,
+        );
+
         counter!(
             "component_errors_total", 1,
-            "error_type" => "unlabeled_event",
+            "error_code" => "unlabeled_event",
+            "error_type" => error_type::CONDITION_FAILED,
             "stage" => error_stage::PROCESSING,
         );
     }
@@ -23,14 +32,25 @@ pub struct LokiOutOfOrderEventDroppedError {
 
 impl InternalEvent for LokiOutOfOrderEventDroppedError {
     fn emit(self) {
+        let reason = "Dropping out-of-order event(s).";
+
+        error!(
+            message = reason,
+            error_code = "out_of_order",
+            error_type = error_type::CONDITION_FAILED,
+            stage = error_stage::PROCESSING,
+            internal_log_rate_limit = true,
+        );
+
         emit!(ComponentEventsDropped::<INTENTIONAL> {
             count: self.count,
-            reason: "out_of_order",
+            reason,
         });
 
         counter!(
             "component_errors_total", 1,
-            "error_type" => "out_of_order",
+            "error_code" => "out_of_order",
+            "error_type" => error_type::CONDITION_FAILED,
             "stage" => error_stage::PROCESSING,
         );
     }
