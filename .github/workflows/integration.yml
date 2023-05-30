@@ -121,9 +121,11 @@ jobs:
           - test_name: 'webhdfs'
             if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.webhdfs == 'true' }}
 
+  # This is a required status check, so it always needs to run if prior jobs failed, in order to mark the status correctly.
   integration:
     name: Integration Test Suite
     runs-on: ubuntu-latest
+    if: always()
     needs:
       - integration-matrix
     env:
