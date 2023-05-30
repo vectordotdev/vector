@@ -139,14 +139,23 @@ jobs:
           path: "/tmp/vector-config-schema.json"
         if: success() || failure()
 
+  # This is a required status check, so it always needs to run if prior jobs failed, in order to mark the status correctly.
   all-checks:
     name: Test Suite
     runs-on: ubuntu-20.04
+    if: always()
     needs:
       - checks
       - test-vrl
       - test-linux
+    env:
+      FAILED: ${{ contains(needs.*.result, 'failure') }}
     steps:
-      - name: validate
-        run: echo "OK"
+      - run: |
+          echo "failed=${{ env.FAILED }}"
+          if [[ "$FAILED" == "true" ]] ; then
+            exit 1
+          else
+            exit 0
+          fi
 
