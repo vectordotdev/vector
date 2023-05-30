@@ -21,7 +21,7 @@ impl Sub for JsonSize {
 
     #[inline]
     fn sub(mut self, rhs: Self) -> Self::Output {
-        self.0 = self.0 - rhs.0;
+        self.0 -= rhs.0;
         self
     }
 }
@@ -31,7 +31,7 @@ impl Add for JsonSize {
 
     #[inline]
     fn add(mut self, rhs: Self) -> Self::Output {
-        self.0 = self.0 + rhs.0;
+        self.0 += rhs.0;
         self
     }
 }
