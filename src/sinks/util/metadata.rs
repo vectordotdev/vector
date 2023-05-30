@@ -4,8 +4,9 @@ use vector_buffers::EventCount;
 use vector_core::{ByteSizeOf, EstimatedJsonEncodedSizeOf};
 
 use vector_common::{
-    internal_event::CountByteSize, request_metadata::RequestCountByteSize,
+    internal_event::CountByteSize,
     request_metadata::RequestMetadata,
+    request_metadata::{GetEventCountTags, RequestCountByteSize},
 };
 
 use super::request_builder::EncodeResult;
@@ -33,18 +34,13 @@ impl RequestMetadataBuilder {
         }
     }
 
-    pub fn from_event(event: &vector_core::event::Event) -> Self {
+    pub fn from_event<E>(event: &E) -> Self
+    where
+        E: ByteSizeOf + GetEventCountTags + EstimatedJsonEncodedSizeOf,
+    {
         let mut size = RequestCountByteSize::default();
 
-        let source = event.metadata().source_id().map(|id| id.to_string());
-        let service = if let vector_core::event::Event::Log(log) = event {
-            log.get_by_meaning("service")
-                .map(|service| service.to_string())
-        } else {
-            None
-        };
-
-        size.add_event(source, service, event.estimated_json_encoded_size_of());
+        size.add_event(event, event.estimated_json_encoded_size_of());
 
         Self {
             event_count: 1,

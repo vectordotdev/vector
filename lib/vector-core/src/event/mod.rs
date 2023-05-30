@@ -19,7 +19,11 @@ pub use r#ref::{EventMutRef, EventRef};
 use serde::{Deserialize, Serialize};
 pub use trace::TraceEvent;
 use vector_buffers::EventCount;
-use vector_common::{finalization, EventDataEq};
+use vector_common::{
+    finalization,
+    request_metadata::{EventCountTags, GetEventCountTags},
+    EventDataEq,
+};
 pub use vrl::value::Value;
 #[cfg(feature = "vrl")]
 pub use vrl_target::{TargetEvents, VrlTarget};
@@ -87,6 +91,20 @@ impl Finalizable for Event {
             Event::Metric(metric) => metric.take_finalizers(),
             Event::Trace(trace_event) => trace_event.take_finalizers(),
         }
+    }
+}
+
+impl GetEventCountTags for Event {
+    fn get_tags(&self) -> EventCountTags {
+        let source = self.metadata().source_id().map(|id| id.to_string());
+        let service = if let Event::Log(log) = self {
+            log.get_by_meaning("service")
+                .map(|service| service.to_string())
+        } else {
+            None
+        };
+
+        (source, service)
     }
 }
 

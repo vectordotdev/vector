@@ -3,23 +3,30 @@ use std::ops::Add;
 
 use crate::internal_event::CountByteSize;
 
-pub type SourceService = (Option<String>, Option<String>);
+pub type EventCountTags = (Option<String>, Option<String>);
+
+pub trait GetEventCountTags {
+    fn get_tags(&self) -> EventCountTags;
+}
 
 /// Struct that keeps track of the estimated json size of a given
 /// batch of events by source and service.
 #[derive(Clone, Debug, Default)]
 pub struct RequestCountByteSize {
-    sizes: HashMap<SourceService, CountByteSize>,
+    sizes: HashMap<EventCountTags, CountByteSize>,
 }
 
 impl RequestCountByteSize {
-    pub fn sizes(&self) -> &HashMap<SourceService, CountByteSize> {
+    pub fn sizes(&self) -> &HashMap<EventCountTags, CountByteSize> {
         &self.sizes
     }
 
-    pub fn add_event(&mut self, source: Option<String>, service: Option<String>, json_size: usize) {
+    pub fn add_event<E>(&mut self, event: &E, json_size: usize)
+    where
+        E: GetEventCountTags,
+    {
         let size = CountByteSize(1, json_size);
-        let tags = (source, service);
+        let tags = event.get_tags();
 
         match self.sizes.get_mut(&tags) {
             Some(current) => {
