@@ -131,6 +131,16 @@ jobs:
 
       # If triggered by issue comment, the event payload doesn't directly contain the head and base sha from the PR.
       # But, we can retrieve this info from some commands.
+      - name: Checkout PR branch (issue_comment)
+        id: pr-metadata-comment
+        if: github.event_name == 'issue_comment'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh pr checkout ${{ github.event.issue.number }}
+
+      # If triggered by issue comment, the event payload doesn't directly contain the head and base sha from the PR.
+      # But, we can retrieve this info from some commands.
       - name: Get PR metadata (issue_comment)
         id: pr-metadata-comment
         if: github.event_name == 'issue_comment'
@@ -139,8 +149,6 @@ jobs:
         run: |
           export PR_NUMBER=${{ github.event.issue.number }}
           echo "PR_NUMBER=${PR_NUMBER}" >> $GITHUB_OUTPUT
-
-          gh pr checkout ${PR_NUMBER}
 
           export BASELINE_SHA=$(git merge-base master HEAD)
           echo "BASELINE_SHA=${BASELINE_SHA}" >> $GITHUB_OUTPUT
