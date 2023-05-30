@@ -301,10 +301,10 @@ impl SourceShutdownCoordinator {
     ) -> impl Future<Output = bool> {
         async move {
             let fut = shutdown_complete_tripwire.then(tripwire_handler);
-            if deadline.is_some() {
+            if let Some(deadline) = deadline {
                 // Call `shutdown_force_trigger.disable()` on drop.
                 let shutdown_force_trigger = DisabledTrigger::new(shutdown_force_trigger);
-                if timeout_at(deadline.unwrap(), fut).await.is_ok() {
+                if timeout_at(deadline, fut).await.is_ok() {
                     shutdown_force_trigger.into_inner().disable();
                     true
                 } else {

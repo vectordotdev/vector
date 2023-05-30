@@ -130,13 +130,13 @@ impl RunningTopology {
             .graceful_shutdown_duration
             .map(|grace_period| Instant::now() + grace_period);
 
-        let timeout = if deadline.is_some() {
+        let timeout = if let Some(deadline) = deadline {
             // If we reach the deadline, this future will print out which components
             // won't gracefully shutdown since we will start to forcefully shutdown
             // the sources.
             let mut check_handles2 = check_handles.clone();
             Box::pin(async move {
-                sleep_until(deadline.unwrap()).await;
+                sleep_until(deadline).await;
                 // Remove all tasks that have shutdown.
                 check_handles2.retain(|_key, handles| {
                     retain(handles, |handle| handle.peek().is_none());
