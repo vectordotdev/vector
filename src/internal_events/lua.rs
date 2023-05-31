@@ -43,8 +43,6 @@ impl InternalEvent for LuaScriptError {
             count: 1,
             reason: "Error in lua script.",
         });
-        // deprecated
-        counter!("processing_errors_total", 1);
     }
 }
 
@@ -70,12 +68,6 @@ impl InternalEvent for LuaBuildError {
             "error_type" => error_type::SCRIPT_FAILED,
             "stage" => error_stage:: PROCESSING,
         );
-        emit!(ComponentEventsDropped::<UNINTENTIONAL> {
-            count: 1,
-            reason: "Error in lua build.",
-        });
-        // deprecated
-        counter!("processing_errors_total", 1);
 
         emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason })
     }

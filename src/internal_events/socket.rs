@@ -13,7 +13,7 @@ pub enum SocketMode {
 }
 
 impl SocketMode {
-    const fn as_str(self) -> &'static str {
+    pub const fn as_str(self) -> &'static str {
         match self {
             Self::Tcp => "tcp",
             Self::Udp => "udp",
@@ -60,8 +60,6 @@ impl InternalEvent for SocketEventsReceived {
         );
         counter!("component_received_events_total", self.count as u64, "mode" => mode);
         counter!("component_received_event_bytes_total", self.byte_size as u64, "mode" => mode);
-        // deprecated
-        counter!("events_in_total", self.count as u64, "mode" => mode);
     }
 }
 

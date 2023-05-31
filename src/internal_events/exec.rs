@@ -33,11 +33,6 @@ impl InternalEvent for ExecEventsReceived<'_> {
             "component_received_event_bytes_total", self.byte_size as u64,
             "command" => self.command.to_owned(),
         );
-        // deprecated
-        counter!(
-            "events_in_total", self.count as u64,
-            "command" => self.command.to_owned(),
-        );
     }
 }
 
@@ -65,13 +60,6 @@ impl InternalEvent for ExecFailedError<'_> {
             "error_code" => io_error_code(&self.error),
             "stage" => error_stage::RECEIVING,
         );
-        // deprecated
-        counter!(
-            "processing_errors_total", 1,
-            "command" => self.command.to_owned(),
-            "error_type" => error_type::COMMAND_FAILED,
-            "stage" => error_stage::RECEIVING,
-        );
     }
 }
 
@@ -95,13 +83,6 @@ impl InternalEvent for ExecTimeoutError<'_> {
         );
         counter!(
             "component_errors_total", 1,
-            "command" => self.command.to_owned(),
-            "error_type" => error_type::TIMED_OUT,
-            "stage" => error_stage::RECEIVING,
-        );
-        // deprecated
-        counter!(
-            "processing_errors_total", 1,
             "command" => self.command.to_owned(),
             "error_type" => error_type::TIMED_OUT,
             "stage" => error_stage::RECEIVING,
@@ -213,14 +194,6 @@ impl InternalEvent for ExecFailedToSignalChildError<'_> {
             "component_errors_total", 1,
             "command" => format!("{:?}", self.command.as_std()),
             "error_code" => self.error.to_error_code(),
-            "error_type" => error_type::COMMAND_FAILED,
-            "stage" => error_stage::RECEIVING,
-        );
-        // deprecated
-        counter!(
-            "processing_errors_total", 1,
-            "command_code" => format!("{:?}", self.command.as_std()),
-            "error" => self.error.to_error_code(),
             "error_type" => error_type::COMMAND_FAILED,
             "stage" => error_stage::RECEIVING,
         );

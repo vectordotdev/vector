@@ -21,7 +21,7 @@ on:
 
 concurrency:
   # `github.event.number` exists for pull requests, otherwise fall back to SHA for merge queue
-  group: ${{ github.workflow }}-${{ github.event.number || github.event.merge_group.base_sha }}
+  group: ${{ github.workflow }}-${{ github.event.number || github.event.merge_group.head_sha }}
   cancel-in-progress: true
 
 env:
@@ -105,24 +105,6 @@ jobs:
     uses: ./.github/workflows/install-sh.yml
     needs: changes
     secrets: inherit
-
-  # TODO: in a followup PR, run the regression workflow here, as a single reusable workflow.
-  #
-  # NOTE: This design of passing in the pr-number to the Regression workflow requires that the merge queue
-  # be configured contain a maximum of one PR per execution. This is so that the regression report generated
-  # by the workflow can be posted as a comment to the PR.
-  # At a later time, we may want to revisit this in order to allow multiple PRs to be included in a merge
-  # queue execution. At such time, the logic of uploading of the report will need to change to account for
-  # multiple PRs.
-  # regression:
-  #   if: needs.changes.outputs.source == 'true'
-  #   uses: ./.github/workflows/regression.yml
-  #   with:
-  #     pr_number: ${{ needs.changes.outputs.pr-number }}
-  #     base_sha: ${{ github.event.merge_group.base_sha }}
-  #     head_sha: ${{ github.event.merge_group.head_sha }}
-  #   needs: changes
-  #   secrets: inherit
 
   master-merge-queue-check:
     name: Master Merge Queue Suite

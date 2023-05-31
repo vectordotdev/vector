@@ -126,10 +126,6 @@ mod source {
                 file = %self.file
             );
             counter!(
-                "events_in_total", self.count as u64,
-                "file" => self.file.to_owned(),
-            );
-            counter!(
                 "component_received_events_total", self.count as u64,
                 "file" => self.file.to_owned(),
             );

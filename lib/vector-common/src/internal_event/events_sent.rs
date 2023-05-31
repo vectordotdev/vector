@@ -14,11 +14,6 @@ crate::registered_event!(
         } else {
             register_counter!("component_sent_events_total")
         },
-        events_out: Counter = if let Some(output) = &self.output {
-            register_counter!("events_out_total", "output" => output.clone())
-        } else {
-            register_counter!("events_out_total")
-        },
         event_bytes: Counter = if let Some(output) = &self.output {
             register_counter!("component_sent_event_bytes_total", "output" => output.clone())
         } else {
@@ -40,7 +35,6 @@ crate::registered_event!(
         }
 
         self.events.increment(count as u64);
-        self.events_out.increment(count as u64);
         self.event_bytes.increment(byte_size as u64);
     }
 );

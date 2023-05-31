@@ -833,9 +833,9 @@ mod test {
     use indexmap::IndexMap;
     use tokio::time::sleep;
     use vector_core::config::proxy::ProxyConfig;
+    use vrl::btreemap;
     use vrl::compiler::state::ExternalEnv;
     use vrl::compiler::{compile, compile_with_external, CompileConfig};
-    use vrl::value::btreemap;
     use vrl::value::kind::Collection;
     use vrl::value::Kind;
     use wiremock::{matchers, Mock, MockServer, ResponseTemplate};

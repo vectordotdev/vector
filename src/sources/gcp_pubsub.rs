@@ -841,7 +841,7 @@ mod integration_tests {
     use once_cell::sync::Lazy;
     use serde_json::{json, Value};
     use tokio::time::{Duration, Instant};
-    use vrl::value::btreemap;
+    use vrl::btreemap;
 
     use super::*;
     use crate::config::{ComponentKey, ProxyConfig};

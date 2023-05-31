@@ -27,10 +27,11 @@ use crate::{
         EventsReceived, SocketBindError, SocketBytesReceived, SocketMode, SocketReceiveError,
         StreamClosedError,
     },
+    net,
     shutdown::ShutdownSignal,
     tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsSettings, TlsSourceConfig},
-    udp, SourceSender,
+    SourceSender,
 };
 
 pub mod parser;
@@ -273,7 +274,7 @@ async fn statsd_udp(
         .await?;
 
     if let Some(receive_buffer_bytes) = config.receive_buffer_bytes {
-        if let Err(error) = udp::set_receive_buffer_size(&socket, receive_buffer_bytes) {
+        if let Err(error) = net::set_receive_buffer_size(&socket, receive_buffer_bytes) {
             warn!(message = "Failed configuring receive buffer size on UDP socket.", %error);
         }
     }
