@@ -67,11 +67,13 @@ impl RequestMetadataBuilder {
 
     pub fn track_event<E>(&mut self, event: E)
     where
-        E: ByteSizeOf + EstimatedJsonEncodedSizeOf,
+        E: ByteSizeOf + GetEventCountTags + EstimatedJsonEncodedSizeOf,
     {
         self.event_count += 1;
         self.events_byte_size += event.size_of();
-        self.events_estimated_json_encoded_byte_size += event.estimated_json_encoded_size_of();
+        let json_size = event.estimated_json_encoded_size_of();
+        self.events_estimated_json_encoded_byte_size
+            .add_event(&event, json_size);
     }
 
     pub fn with_request_size(&self, size: NonZeroUsize) -> RequestMetadata {
