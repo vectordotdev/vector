@@ -11,12 +11,12 @@ const NULL_SIZE: JsonSize = JsonSize::new(4);
 const TRUE_SIZE: JsonSize = JsonSize::new(4);
 const FALSE_SIZE: JsonSize = JsonSize::new(5);
 
-const BRACKETS_SIZE: JsonSize = JsonSize::new(2);
-const BRACES_SIZE: JsonSize = JsonSize::new(2);
+const BRACKETS_SIZE: usize = 2;
+const BRACES_SIZE: usize = 2;
 
-const QUOTES_SIZE: JsonSize = JsonSize::new(2);
-const COMMA_SIZE: JsonSize = JsonSize::new(1);
-const COLON_SIZE: JsonSize = JsonSize::new(1);
+const QUOTES_SIZE: usize = 2;
+const COMMA_SIZE: usize = 1;
+const COLON_SIZE: usize = 1;
 
 const EPOCH_RFC3339_0: &str = "1970-01-01T00:00:00Z";
 const EPOCH_RFC3339_3: &str = "1970-01-01T00:00:00.000Z";
@@ -90,7 +90,7 @@ impl EstimatedJsonEncodedSizeOf for Value {
 /// be calculated exactly without a noticable performance penalty.
 impl EstimatedJsonEncodedSizeOf for str {
     fn estimated_json_encoded_size_of(&self) -> JsonSize {
-        QUOTES_SIZE + self.len().into()
+        JsonSize::new(QUOTES_SIZE + self.len())
     }
 }
 
@@ -102,7 +102,7 @@ impl EstimatedJsonEncodedSizeOf for String {
 
 impl EstimatedJsonEncodedSizeOf for Bytes {
     fn estimated_json_encoded_size_of(&self) -> JsonSize {
-        QUOTES_SIZE + self.len().into()
+        JsonSize::new(QUOTES_SIZE + self.len())
     }
 }
 
@@ -143,17 +143,17 @@ where
 {
     fn estimated_json_encoded_size_of(&self) -> JsonSize {
         let size = self.iter().fold(BRACES_SIZE, |acc, (k, v)| {
-            acc + k.as_ref().estimated_json_encoded_size_of()
+            acc + k.as_ref().estimated_json_encoded_size_of().get()
                 + COLON_SIZE
-                + v.estimated_json_encoded_size_of()
+                + v.estimated_json_encoded_size_of().get()
                 + COMMA_SIZE
         });
 
-        if size > BRACES_SIZE {
+        JsonSize::new(if size > BRACES_SIZE {
             size - COMMA_SIZE
         } else {
             size
-        }
+        })
     }
 }
 
@@ -167,17 +167,17 @@ where
 {
     fn estimated_json_encoded_size_of(&self) -> JsonSize {
         let size = self.iter().fold(BRACES_SIZE, |acc, (k, v)| {
-            acc + k.as_ref().estimated_json_encoded_size_of()
+            acc + k.as_ref().estimated_json_encoded_size_of().get()
                 + COLON_SIZE
-                + v.estimated_json_encoded_size_of()
+                + v.estimated_json_encoded_size_of().get()
                 + COMMA_SIZE
         });
 
-        if size > BRACES_SIZE {
+        JsonSize::new(if size > BRACES_SIZE {
             size - COMMA_SIZE
         } else {
             size
-        }
+        })
     }
 }
 
@@ -187,14 +187,14 @@ where
 {
     fn estimated_json_encoded_size_of(&self) -> JsonSize {
         let size = self.iter().fold(BRACKETS_SIZE, |acc, v| {
-            acc + COMMA_SIZE + v.estimated_json_encoded_size_of()
+            acc + COMMA_SIZE + v.estimated_json_encoded_size_of().get()
         });
 
-        if size > BRACKETS_SIZE {
+        JsonSize::new(if size > BRACKETS_SIZE {
             size - COMMA_SIZE
         } else {
             size
-        }
+        })
     }
 }
 
@@ -218,7 +218,7 @@ impl EstimatedJsonEncodedSizeOf for DateTime<Utc> {
             EPOCH_RFC3339_9
         };
 
-        QUOTES_SIZE + epoch.len().into()
+        JsonSize::new(QUOTES_SIZE + epoch.len())
     }
 }
 
@@ -228,10 +228,11 @@ impl EstimatedJsonEncodedSizeOf for u8 {
         let v = *self;
 
         // 0 ..= 255
-        if        v <  10 { 1
-        } else if v < 100 { 2
-        } else            { 3 }
-        .into()
+        JsonSize::new(
+            if        v <  10 { 1
+            } else if v < 100 { 2
+            } else            { 3 }
+        )
     }
 }
 
@@ -241,13 +242,14 @@ impl EstimatedJsonEncodedSizeOf for i8 {
         let v = *self;
 
         // -128 ..= 127
-        if        v < -99 { 4
-        } else if v <  -9 { 3
-        } else if v <   0 { 2
-        } else if v <  10 { 1
-        } else if v < 100 { 2
-        } else            { 3 }
-        .into()
+        JsonSize::new(
+            if        v < -99 { 4
+            } else if v <  -9 { 3
+            } else if v <   0 { 2
+            } else if v <  10 { 1
+            } else if v < 100 { 2
+            } else            { 3 }
+        )
     }
 }
 
@@ -257,12 +259,13 @@ impl EstimatedJsonEncodedSizeOf for u16 {
         let v = *self;
 
         // 0 ..= 65_535
-        if        v <     10 { 1
-        } else if v <    100 { 2
-        } else if v <  1_000 { 3
-        } else if v < 10_000 { 4
-        } else               { 5 }
-        .into()
+        JsonSize::new(
+            if        v <     10 { 1
+            } else if v <    100 { 2
+            } else if v <  1_000 { 3
+            } else if v < 10_000 { 4
+            } else               { 5 }
+        )
     }
 }
 
@@ -272,17 +275,18 @@ impl EstimatedJsonEncodedSizeOf for i16 {
         let v = *self;
 
         // -32_768 ..= 32_767
-        if        v < -9_999 { 6
-        } else if v <   -999 { 5
-        } else if v <    -99 { 4
-        } else if v <     -9 { 3
-        } else if v <      0 { 2
-        } else if v <     10 { 1
-        } else if v <    100 { 2
-        } else if v <  1_000 { 3
-        } else if v < 10_000 { 4
-        } else               { 5 }
-        .into()
+        JsonSize::new(
+            if        v < -9_999 { 6
+            } else if v <   -999 { 5
+            } else if v <    -99 { 4
+            } else if v <     -9 { 3
+            } else if v <      0 { 2
+            } else if v <     10 { 1
+            } else if v <    100 { 2
+            } else if v <  1_000 { 3
+            } else if v < 10_000 { 4
+            } else               { 5 }
+        )
     }
 }
 
@@ -292,17 +296,18 @@ impl EstimatedJsonEncodedSizeOf for u32 {
         let v = *self;
 
         // 0 ..= 4_294_967_295
-        if        v <            10 { 1
-        } else if v <           100 { 2
-        } else if v <         1_000 { 3
-        } else if v <        10_000 { 4
-        } else if v <       100_000 { 5
-        } else if v <     1_000_000 { 6
-        } else if v <    10_000_000 { 7
-        } else if v <   100_000_000 { 8
-        } else if v < 1_000_000_000 { 9
-        } else                      { 10 }
-        .into()
+        JsonSize::new(
+            if        v <            10 { 1
+            } else if v <           100 { 2
+            } else if v <         1_000 { 3
+            } else if v <        10_000 { 4
+            } else if v <       100_000 { 5
+            } else if v <     1_000_000 { 6
+            } else if v <    10_000_000 { 7
+            } else if v <   100_000_000 { 8
+            } else if v < 1_000_000_000 { 9
+            } else                      { 10 }
+        )
     }
 }
 
@@ -312,27 +317,28 @@ impl EstimatedJsonEncodedSizeOf for i32 {
         let v = *self;
 
         // -2_147_483_648 ..= 2_147_483_647
-        if        v <  -999_999_999 { 11
-        } else if v <   -99_999_999 { 10
-        } else if v <    -9_999_999 {  9
-        } else if v <      -999_999 {  8
-        } else if v <       -99_999 {  7
-        } else if v <        -9_999 {  6
-        } else if v <          -999 {  5
-        } else if v <           -99 {  4
-        } else if v <            -9 {  3
-        } else if v <             0 {  2
-        } else if v <            10 {  1
-        } else if v <           100 {  2
-        } else if v <         1_000 {  3
-        } else if v <        10_000 {  4
-        } else if v <       100_000 {  5
-        } else if v <     1_000_000 {  6
-        } else if v <    10_000_000 {  7
-        } else if v <   100_000_000 {  8
-        } else if v < 1_000_000_000 {  9
-        } else                      { 10 }
-        .into()
+        JsonSize::new(
+            if        v <  -999_999_999 { 11
+            } else if v <   -99_999_999 { 10
+            } else if v <    -9_999_999 {  9
+            } else if v <      -999_999 {  8
+            } else if v <       -99_999 {  7
+            } else if v <        -9_999 {  6
+            } else if v <          -999 {  5
+            } else if v <           -99 {  4
+            } else if v <            -9 {  3
+            } else if v <             0 {  2
+            } else if v <            10 {  1
+            } else if v <           100 {  2
+            } else if v <         1_000 {  3
+            } else if v <        10_000 {  4
+            } else if v <       100_000 {  5
+            } else if v <     1_000_000 {  6
+            } else if v <    10_000_000 {  7
+            } else if v <   100_000_000 {  8
+            } else if v < 1_000_000_000 {  9
+            } else                      { 10 }
+        )
     }
 }
 
@@ -342,27 +348,28 @@ impl EstimatedJsonEncodedSizeOf for u64 {
         let v = *self;
 
         // 0 ..= 18_446_744_073_709_551_615
-        if        v <                         10 {  1
-        } else if v <                        100 {  2
-        } else if v <                      1_000 {  3
-        } else if v <                     10_000 {  4
-        } else if v <                    100_000 {  5
-        } else if v <                  1_000_000 {  6
-        } else if v <                 10_000_000 {  7
-        } else if v <                100_000_000 {  8
-        } else if v <              1_000_000_000 {  9
-        } else if v <             10_000_000_000 { 10
-        } else if v <            100_000_000_000 { 11
-        } else if v <          1_000_000_000_000 { 12
-        } else if v <         10_000_000_000_000 { 13
-        } else if v <        100_000_000_000_000 { 14
-        } else if v <      1_000_000_000_000_000 { 15
-        } else if v <     10_000_000_000_000_000 { 16
-        } else if v <    100_000_000_000_000_000 { 17
-        } else if v <  1_000_000_000_000_000_000 { 18
-        } else if v < 10_000_000_000_000_000_000 { 19
-        } else                                   { 20 }
-        .into()
+        JsonSize::new(
+            if        v <                         10 {  1
+            } else if v <                        100 {  2
+            } else if v <                      1_000 {  3
+            } else if v <                     10_000 {  4
+            } else if v <                    100_000 {  5
+            } else if v <                  1_000_000 {  6
+            } else if v <                 10_000_000 {  7
+            } else if v <                100_000_000 {  8
+            } else if v <              1_000_000_000 {  9
+            } else if v <             10_000_000_000 { 10
+            } else if v <            100_000_000_000 { 11
+            } else if v <          1_000_000_000_000 { 12
+            } else if v <         10_000_000_000_000 { 13
+            } else if v <        100_000_000_000_000 { 14
+            } else if v <      1_000_000_000_000_000 { 15
+            } else if v <     10_000_000_000_000_000 { 16
+            } else if v <    100_000_000_000_000_000 { 17
+            } else if v <  1_000_000_000_000_000_000 { 18
+            } else if v < 10_000_000_000_000_000_000 { 19
+            } else                                   { 20 }
+        )
     }
 }
 
@@ -372,45 +379,46 @@ impl EstimatedJsonEncodedSizeOf for i64 {
         let v = *self;
 
         // -9_223_372_036_854_775_808 ..= 9_223_372_036_854_775_807
-        if        v <  -999_999_999_999_999_999 { 20
-        } else if v <   -99_999_999_999_999_999 { 19
-        } else if v <    -9_999_999_999_999_999 { 18
-        } else if v <      -999_999_999_999_999 { 17
-        } else if v <       -99_999_999_999_999 { 16
-        } else if v <        -9_999_999_999_999 { 15
-        } else if v <          -999_999_999_999 { 14
-        } else if v <           -99_999_999_999 { 13
-        } else if v <            -9_999_999_999 { 12
-        } else if v <              -999_999_999 { 11
-        } else if v <               -99_999_999 { 10
-        } else if v <                -9_999_999 {  9
-        } else if v <                  -999_999 {  8
-        } else if v <                   -99_999 {  7
-        } else if v <                    -9_999 {  6
-        } else if v <                      -999 {  5
-        } else if v <                       -99 {  4
-        } else if v <                        -9 {  3
-        } else if v <                         0 {  2
-        } else if v <                        10 {  1
-        } else if v <                       100 {  2
-        } else if v <                     1_000 {  3
-        } else if v <                    10_000 {  4
-        } else if v <                   100_000 {  5
-        } else if v <                 1_000_000 {  6
-        } else if v <                10_000_000 {  7
-        } else if v <               100_000_000 {  8
-        } else if v <             1_000_000_000 {  9
-        } else if v <            10_000_000_000 { 10
-        } else if v <           100_000_000_000 { 11
-        } else if v <         1_000_000_000_000 { 12
-        } else if v <        10_000_000_000_000 { 13
-        } else if v <       100_000_000_000_000 { 14
-        } else if v <     1_000_000_000_000_000 { 15
-        } else if v <    10_000_000_000_000_000 { 16
-        } else if v <   100_000_000_000_000_000 { 17
-        } else if v < 1_000_000_000_000_000_000 { 18
-        } else                                  { 19 }
-        .into()
+        JsonSize::new(
+            if        v <  -999_999_999_999_999_999 { 20
+            } else if v <   -99_999_999_999_999_999 { 19
+            } else if v <    -9_999_999_999_999_999 { 18
+            } else if v <      -999_999_999_999_999 { 17
+            } else if v <       -99_999_999_999_999 { 16
+            } else if v <        -9_999_999_999_999 { 15
+            } else if v <          -999_999_999_999 { 14
+            } else if v <           -99_999_999_999 { 13
+            } else if v <            -9_999_999_999 { 12
+            } else if v <              -999_999_999 { 11
+            } else if v <               -99_999_999 { 10
+            } else if v <                -9_999_999 {  9
+            } else if v <                  -999_999 {  8
+            } else if v <                   -99_999 {  7
+            } else if v <                    -9_999 {  6
+            } else if v <                      -999 {  5
+            } else if v <                       -99 {  4
+            } else if v <                        -9 {  3
+            } else if v <                         0 {  2
+            } else if v <                        10 {  1
+            } else if v <                       100 {  2
+            } else if v <                     1_000 {  3
+            } else if v <                    10_000 {  4
+            } else if v <                   100_000 {  5
+            } else if v <                 1_000_000 {  6
+            } else if v <                10_000_000 {  7
+            } else if v <               100_000_000 {  8
+            } else if v <             1_000_000_000 {  9
+            } else if v <            10_000_000_000 { 10
+            } else if v <           100_000_000_000 { 11
+            } else if v <         1_000_000_000_000 { 12
+            } else if v <        10_000_000_000_000 { 13
+            } else if v <       100_000_000_000_000 { 14
+            } else if v <     1_000_000_000_000_000 { 15
+            } else if v <    10_000_000_000_000_000 { 16
+            } else if v <   100_000_000_000_000_000 { 17
+            } else if v < 1_000_000_000_000_000_000 { 18
+            } else                                  { 19 }
+        )
     }
 }
 

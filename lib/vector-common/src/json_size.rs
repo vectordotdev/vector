@@ -46,7 +46,12 @@ impl AddAssign for JsonSize {
 impl Sum for JsonSize {
     #[inline]
     fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
-        iter.fold(JsonSize::zero(), |a, b| a + b)
+        let mut accum = 0;
+        for val in iter {
+            accum += val.get();
+        }
+
+        JsonSize::new(accum)
     }
 }
 
