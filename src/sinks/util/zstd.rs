@@ -12,15 +12,7 @@ impl From<CompressionLevel> for ZstdCompressionLevel {
             CompressionLevel::Default => zstd::DEFAULT_COMPRESSION_LEVEL,
             CompressionLevel::Best => 21,
             CompressionLevel::Fast => 1,
-            CompressionLevel::Val(v) => {
-                if v < 1 {
-                    1
-                } else if v > 21 {
-                    21
-                } else {
-                    v as i32
-                }
-            }
+            CompressionLevel::Val(v) => v.clamp(1, 21) as i32
         };
         ZstdCompressionLevel(val)
     }
