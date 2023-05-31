@@ -238,7 +238,7 @@ bloom = { version = "0.3.2", default-features = false, optional = true }
 bollard = { version = "0.14.0", default-features = false, features = ["ssl", "chrono"], optional = true }
 bytes = { version = "1.4.0", default-features = false, features = ["serde"] }
 bytesize = { version = "1.2.0", default-features = false }
-chrono = { version = "0.4.24", default-features = false, features = ["serde"] }
+chrono = { version = "0.4.26", default-features = false, features = ["serde"] }
 cidr-utils = { version = "0.5.10", default-features = false }
 clap = { version = "4.1.14", default-features = false, features = ["derive", "error-context", "env", "help", "std", "string", "usage", "wrap_help"] }
 colored = { version = "2.0.0", default-features = false }
@@ -363,7 +363,7 @@ zstd = { version = "0.12.3", default-features = false }
 [patch.crates-io]
 # Removes dependency on `time` v0.1
 # https://github.com/chronotope/chrono/pull/578
-chrono = { git = "https://github.com/vectordotdev/chrono.git", tag = "v0.4.24-no-default-time-1" }
+chrono = { git = "https://github.com/vectordotdev/chrono.git", tag = "v0.4.26-no-default-time-1" }
 # The upgrade for `tokio-util` >= 0.6.9 is blocked on https://github.com/vectordotdev/vector/issues/11257.
 tokio-util = { git = "https://github.com/vectordotdev/tokio", branch = "tokio-util-0.7.4-framed-read-continue-on-error" }
 nix = { git = "https://github.com/vectordotdev/nix.git", branch = "memfd/gnu/musl" }
