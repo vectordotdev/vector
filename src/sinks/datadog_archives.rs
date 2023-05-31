@@ -31,7 +31,7 @@ use vector_config::{configurable_component, NamedComponent};
 use vector_core::{
     config::AcknowledgementsConfig,
     event::{Event, EventFinalizers, Finalizable},
-    schema, ByteSizeOf,
+    schema, EstimatedJsonEncodedSizeOf,
 };
 use vrl::value::Kind;
 
@@ -816,7 +816,7 @@ impl RequestBuilder<(String, Vec<Event>)> for DatadogAzureRequestBuilder {
         let metadata = AzureBlobMetadata {
             partition_key,
             count: events.len(),
-            byte_size: events.size_of(),
+            byte_size: events.estimated_json_encoded_size_of(),
             finalizers,
         };
         let builder = RequestMetadataBuilder::from_events(&events);

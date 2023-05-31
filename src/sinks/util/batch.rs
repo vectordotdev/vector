@@ -362,6 +362,7 @@ pub struct EncodedBatch<I> {
     pub finalizers: EventFinalizers,
     pub count: usize,
     pub byte_size: usize,
+    pub json_byte_size: usize,
 }
 
 /// This is a batch construct that stores an set of event finalizers alongside the batch itself.
@@ -374,6 +375,7 @@ pub struct FinalizersBatch<B> {
     // could be smaller due to aggregated items (ie metrics).
     count: usize,
     byte_size: usize,
+    json_byte_size: usize,
 }
 
 impl<B: Batch> From<B> for FinalizersBatch<B> {
@@ -383,6 +385,7 @@ impl<B: Batch> From<B> for FinalizersBatch<B> {
             finalizers: Default::default(),
             count: 0,
             byte_size: 0,
+            json_byte_size: 0,
         }
     }
 }
@@ -402,18 +405,21 @@ impl<B: Batch> Batch for FinalizersBatch<B> {
             item,
             finalizers,
             byte_size,
+            json_byte_size,
         } = item;
         match self.inner.push(item) {
             PushResult::Ok(full) => {
                 self.finalizers.merge(finalizers);
                 self.count += 1;
                 self.byte_size += byte_size;
+                self.json_byte_size += json_byte_size;
                 PushResult::Ok(full)
             }
             PushResult::Overflow(item) => PushResult::Overflow(EncodedEvent {
                 item,
                 finalizers,
                 byte_size,
+                json_byte_size,
             }),
         }
     }
@@ -428,6 +434,7 @@ impl<B: Batch> Batch for FinalizersBatch<B> {
             finalizers: Default::default(),
             count: 0,
             byte_size: 0,
+            json_byte_size: 0,
         }
     }
 
@@ -437,6 +444,7 @@ impl<B: Batch> Batch for FinalizersBatch<B> {
             finalizers: self.finalizers,
             count: self.count,
             byte_size: self.byte_size,
+            json_byte_size: self.json_byte_size,
         }
     }
 

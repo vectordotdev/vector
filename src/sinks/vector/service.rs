@@ -104,7 +104,9 @@ impl Service<VectorRequest> for VectorService {
         let mut service = self.clone();
         let byte_size = list.request.encoded_len();
         let events_count = list.get_metadata().event_count();
-        let events_byte_size = list.get_metadata().events_byte_size();
+        let events_byte_size = list
+            .get_metadata()
+            .events_estimated_json_encoded_byte_size();
 
         let future = async move {
             service

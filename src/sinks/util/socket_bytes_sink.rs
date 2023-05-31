@@ -129,7 +129,7 @@ where
         let pinned = self.project();
         pinned.state.finalizers.push(item.finalizers);
         pinned.state.events_total += 1;
-        pinned.state.event_bytes += item.byte_size;
+        pinned.state.event_bytes += item.json_byte_size;
         pinned.state.bytes_total += item.item.len();
 
         let result = pinned.inner.start_send(item.item);

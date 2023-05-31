@@ -426,7 +426,8 @@ where
             items,
             finalizers,
             count,
-            byte_size,
+            json_byte_size,
+            ..
         } = batch;
 
         let (tx, rx) = oneshot::channel();
@@ -449,7 +450,7 @@ where
                 finalizers.update_status(status);
                 match status {
                     EventStatus::Delivered => {
-                        events_sent.emit(CountByteSize(count, byte_size));
+                        events_sent.emit(CountByteSize(count, json_byte_size));
                         // TODO: Emit a BytesSent event here too
                     }
                     EventStatus::Rejected => {
@@ -621,6 +622,7 @@ mod tests {
             EncodedEvent {
                 item,
                 finalizers,
+                json_byte_size: 0,
                 byte_size: 0,
             }
         }
@@ -770,7 +772,7 @@ mod tests {
 
         buffered
             .sink_map_err(drop)
-            .send_all(&mut stream::iter(0..22).map(|item| Ok(EncodedEvent::new(item, 0))))
+            .send_all(&mut stream::iter(0..22).map(|item| Ok(EncodedEvent::new(item, 0, 0))))
             .await
             .unwrap();
 
@@ -806,7 +808,7 @@ mod tests {
             Poll::Ready(Ok(()))
         ));
         assert!(matches!(
-            buffered.start_send_unpin(EncodedEvent::new(0, 0)),
+            buffered.start_send_unpin(EncodedEvent::new(0, 0, 0)),
             Ok(())
         ));
         assert!(matches!(
@@ -814,7 +816,7 @@ mod tests {
             Poll::Ready(Ok(()))
         ));
         assert!(matches!(
-            buffered.start_send_unpin(EncodedEvent::new(1, 0)),
+            buffered.start_send_unpin(EncodedEvent::new(1, 0, 0)),
             Ok(())
         ));
 
@@ -845,7 +847,7 @@ mod tests {
             Poll::Ready(Ok(()))
         ));
         assert!(matches!(
-            buffered.start_send_unpin(EncodedEvent::new(0, 0)),
+            buffered.start_send_unpin(EncodedEvent::new(0, 0, 0)),
             Ok(())
         ));
         assert!(matches!(
@@ -853,7 +855,7 @@ mod tests {
             Poll::Ready(Ok(()))
         ));
         assert!(matches!(
-            buffered.start_send_unpin(EncodedEvent::new(1, 0)),
+            buffered.start_send_unpin(EncodedEvent::new(1, 0, 0)),
             Ok(())
         ));
 
@@ -887,7 +889,7 @@ mod tests {
         let sink = PartitionBatchSink::new(svc, VecBuffer::new(batch_settings.size), TIMEOUT);
 
         sink.sink_map_err(drop)
-            .send_all(&mut stream::iter(0..22).map(|item| Ok(EncodedEvent::new(item, 0))))
+            .send_all(&mut stream::iter(0..22).map(|item| Ok(EncodedEvent::new(item, 0, 0))))
             .await
             .unwrap();
 
@@ -920,7 +922,7 @@ mod tests {
 
         let input = vec![Partitions::A, Partitions::B];
         sink.sink_map_err(drop)
-            .send_all(&mut stream::iter(input).map(|item| Ok(EncodedEvent::new(item, 0))))
+            .send_all(&mut stream::iter(input).map(|item| Ok(EncodedEvent::new(item, 0, 0))))
             .await
             .unwrap();
 
@@ -947,7 +949,7 @@ mod tests {
 
         let input = vec![Partitions::A, Partitions::B, Partitions::A, Partitions::B];
         sink.sink_map_err(drop)
-            .send_all(&mut stream::iter(input).map(|item| Ok(EncodedEvent::new(item, 0))))
+            .send_all(&mut stream::iter(input).map(|item| Ok(EncodedEvent::new(item, 0, 0))))
             .await
             .unwrap();
 
@@ -984,7 +986,7 @@ mod tests {
             Poll::Ready(Ok(()))
         ));
         assert!(matches!(
-            sink.start_send_unpin(EncodedEvent::new(1, 0)),
+            sink.start_send_unpin(EncodedEvent::new(1, 0, 0)),
             Ok(())
         ));
         assert!(matches!(sink.poll_flush_unpin(&mut cx), Poll::Pending));
@@ -1024,6 +1026,7 @@ mod tests {
                 finalizers,
                 count: items,
                 byte_size: 1,
+                json_byte_size: 1,
             }
         };
 
@@ -1085,7 +1088,7 @@ mod tests {
 
         let input = (0..20).map(|i| (0, i)).chain((0..20).map(|i| (1, i)));
         sink.sink_map_err(drop)
-            .send_all(&mut stream::iter(input).map(|item| Ok(EncodedEvent::new(item, 0))))
+            .send_all(&mut stream::iter(input).map(|item| Ok(EncodedEvent::new(item, 0, 0))))
             .await
             .unwrap();
 

@@ -90,7 +90,7 @@ impl Service<DatadogEventsRequest> for DatadogEventsService {
 
         Box::pin(async move {
             http_service.ready().await?;
-            let event_byte_size = req.get_metadata().events_byte_size();
+            let event_byte_size = req.get_metadata().events_estimated_json_encoded_byte_size();
             let http_response = http_service.call(req).await?;
             let event_status = if http_response.is_successful() {
                 EventStatus::Delivered

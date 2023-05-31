@@ -114,7 +114,7 @@ where
         let ack_slot = self.current_ack_slot.take();
 
         let events_count = req.get_metadata().event_count();
-        let events_byte_size = req.get_metadata().events_byte_size();
+        let events_byte_size = req.get_metadata().events_estimated_json_encoded_byte_size();
         let response = self.inner.call(req);
 
         Box::pin(async move {

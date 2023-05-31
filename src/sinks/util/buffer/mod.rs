@@ -179,7 +179,7 @@ mod test {
 
         buffered
             .sink_map_err(drop)
-            .send_all(&mut stream::iter(input).map(|item| Ok(EncodedEvent::new(item, 0))))
+            .send_all(&mut stream::iter(input).map(|item| Ok(EncodedEvent::new(item, 0, 0))))
             .await
             .unwrap();
 

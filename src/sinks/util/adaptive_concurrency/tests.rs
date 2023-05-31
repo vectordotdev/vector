@@ -184,7 +184,7 @@ impl SinkConfig for TestConfig {
                 VecBuffer::new(batch_settings.size),
                 batch_settings.timeout,
             )
-            .with_flat_map(|event| stream::iter(Some(Ok(EncodedEvent::new(event, 0)))))
+            .with_flat_map(|event| stream::iter(Some(Ok(EncodedEvent::new(event, 0, 0)))))
             .sink_map_err(|error| panic!("Fatal test sink error: {}", error));
         let healthcheck = future::ok(()).boxed();
 

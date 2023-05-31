@@ -25,7 +25,7 @@ use vector_core::{
     internal_event::CountByteSize,
     sink::StreamSink,
     stream::{BatcherSettings, DriverResponse},
-    ByteSizeOf,
+    EstimatedJsonEncodedSizeOf,
 };
 
 use crate::{
@@ -204,7 +204,7 @@ impl RequestBuilder<(String, Vec<Event>)> for OpenDalRequestBuilder {
         let opendal_metadata = OpenDalMetadata {
             partition_key,
             count: events.len(),
-            byte_size: events.size_of(),
+            byte_size: events.estimated_json_encoded_size_of(),
             finalizers,
         };
 

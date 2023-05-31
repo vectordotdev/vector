@@ -63,16 +63,18 @@ pub struct EncodedEvent<I> {
     pub item: I,
     pub finalizers: EventFinalizers,
     pub byte_size: usize,
+    pub json_byte_size: usize,
 }
 
 impl<I> EncodedEvent<I> {
     /// Create a trivial input with no metadata. This method will be
     /// removed when all sinks are converted.
-    pub fn new(item: I, byte_size: usize) -> Self {
+    pub fn new(item: I, byte_size: usize, json_byte_size: usize) -> Self {
         Self {
             item,
             finalizers: Default::default(),
             byte_size,
+            json_byte_size,
         }
     }
 
@@ -89,6 +91,7 @@ impl<I> EncodedEvent<I> {
             item: I::from(that.item),
             finalizers: that.finalizers,
             byte_size: that.byte_size,
+            json_byte_size: that.json_byte_size,
         }
     }
 
@@ -98,6 +101,7 @@ impl<I> EncodedEvent<I> {
             item: doit(self.item),
             finalizers: self.finalizers,
             byte_size: self.byte_size,
+            json_byte_size: self.json_byte_size,
         }
     }
 }

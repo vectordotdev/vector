@@ -15,6 +15,7 @@ use vector_common::{
     finalization::{EventFinalizers, Finalizable},
     request_metadata::RequestMetadata,
 };
+use vector_core::EstimatedJsonEncodedSizeOf;
 
 use super::{encoder::AmqpEncoder, service::AmqpRequest, sink::AmqpEvent};
 
@@ -23,6 +24,7 @@ pub(super) struct AmqpMetadata {
     routing_key: String,
     properties: BasicProperties,
     finalizers: EventFinalizers,
+    event_json_size: usize,
 }
 
 /// Build the request to send to `AMQP` by using the encoder to convert it into
@@ -59,6 +61,7 @@ impl RequestBuilder<AmqpEvent> for AmqpRequestBuilder {
             routing_key: input.routing_key,
             properties: input.properties,
             finalizers: input.event.take_finalizers(),
+            event_json_size: input.event.estimated_json_encoded_size_of(),
         };
 
         (metadata, builder, input.event)
@@ -78,6 +81,7 @@ impl RequestBuilder<AmqpEvent> for AmqpRequestBuilder {
             amqp_metadata.properties,
             amqp_metadata.finalizers,
             metadata,
+            amqp_metadata.event_json_size,
         )
     }
 }

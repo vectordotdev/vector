@@ -90,7 +90,9 @@ impl Service<KafkaRequest> for KafkaService {
         let this = self.clone();
 
         Box::pin(async move {
-            let event_byte_size = request.get_metadata().events_byte_size();
+            let event_byte_size = request
+                .get_metadata()
+                .events_estimated_json_encoded_byte_size();
 
             let mut record =
                 FutureRecord::to(&request.metadata.topic).payload(request.body.as_ref());

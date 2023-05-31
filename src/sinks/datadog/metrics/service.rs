@@ -182,7 +182,9 @@ impl Service<DatadogMetricsRequest> for DatadogMetricsService {
         let api_key = self.api_key.clone();
 
         Box::pin(async move {
-            let byte_size = request.get_metadata().events_byte_size();
+            let byte_size = request
+                .get_metadata()
+                .events_estimated_json_encoded_byte_size();
             let batch_size = request.get_metadata().event_count();
             let raw_byte_size = request.raw_bytes;
 

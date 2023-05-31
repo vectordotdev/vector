@@ -26,6 +26,7 @@ pub(super) struct AmqpRequest {
     properties: BasicProperties,
     finalizers: EventFinalizers,
     metadata: RequestMetadata,
+    event_json_size: usize,
 }
 
 impl AmqpRequest {
@@ -36,6 +37,7 @@ impl AmqpRequest {
         properties: BasicProperties,
         finalizers: EventFinalizers,
         metadata: RequestMetadata,
+        event_json_size: usize,
     ) -> Self {
         Self {
             body,
@@ -44,6 +46,7 @@ impl AmqpRequest {
             properties,
             finalizers,
             metadata,
+            event_json_size,
         }
     }
 }
@@ -63,6 +66,7 @@ impl MetaDescriptive for AmqpRequest {
 /// A successful response from `AMQP`.
 pub(super) struct AmqpResponse {
     byte_size: usize,
+    json_size: usize,
 }
 
 impl DriverResponse for AmqpResponse {
@@ -71,7 +75,7 @@ impl DriverResponse for AmqpResponse {
     }
 
     fn events_sent(&self) -> CountByteSize {
-        CountByteSize(1, self.byte_size)
+        CountByteSize(1, self.json_size)
     }
 
     fn bytes_sent(&self) -> Option<usize> {
@@ -128,14 +132,14 @@ impl Service<AmqpRequest> for AmqpService {
                 Ok(result) => match result.await {
                     Ok(lapin::publisher_confirm::Confirmation::Nack(_)) => {
                         warn!("Received Negative Acknowledgement from AMQP server.");
-                        Ok(AmqpResponse { byte_size })
+                        Ok(AmqpResponse {json_size: req.event_json_size, byte_size })
                     }
                     Err(error) => {
                         // TODO: In due course the caller could emit these on error.
                         emit!(AmqpAcknowledgementError { error: &error });
                         Err(AmqpError::AmqpAcknowledgementFailed { error })
                     }
-                    Ok(_) => Ok(AmqpResponse { byte_size }),
+                    Ok(_) => Ok(AmqpResponse { json_size: req.event_json_size, byte_size }),
                 },
                 Err(error) => {
                     // TODO: In due course the caller could emit these on error.

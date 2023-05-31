@@ -10,7 +10,7 @@ use prost::Message;
 use snafu::{ResultExt, Snafu};
 use tower::Service;
 use vector_config::configurable_component;
-use vector_core::ByteSizeOf;
+use vector_core::{ByteSizeOf, EstimatedJsonEncodedSizeOf};
 
 use super::collector::{self, MetricCollector as _};
 use crate::{
@@ -200,6 +200,8 @@ impl SinkConfig for RemoteWriteConfig {
                 .partition_sink(HttpRetryLogic, service, buffer, batch.timeout)
                 .with_flat_map(move |event: Event| {
                     let byte_size = event.size_of();
+                    let json_size = event.estimated_json_encoded_size_of();
+
                     stream::iter(normalizer.normalize(event.into_metric()).map(|event| {
                         let tenant_id = tenant_id.as_ref().and_then(|template| {
                             template
@@ -217,6 +219,7 @@ impl SinkConfig for RemoteWriteConfig {
                         Ok(EncodedEvent::new(
                             PartitionInnerBuffer::new(event, key),
                             byte_size,
+                            json_size,
                         ))
                     }))
                 })

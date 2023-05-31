@@ -137,7 +137,9 @@ impl Service<LogApiRequest> for LogApiService {
         };
 
         let count = request.get_metadata().event_count();
-        let events_byte_size = request.get_metadata().events_byte_size();
+        let events_byte_size = request
+            .get_metadata()
+            .events_estimated_json_encoded_byte_size();
         let raw_byte_size = request.uncompressed_size;
 
         let mut http_request = http_request.header(CONTENT_LENGTH, request.body.len());
