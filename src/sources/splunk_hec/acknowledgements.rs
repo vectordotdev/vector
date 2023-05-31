@@ -46,7 +46,9 @@ pub struct HecAcknowledgementsConfig {
     /// Equivalent to the `max_number_of_acked_requests_pending_query_per_ack_channel` Splunk HEC setting.
     ///
     /// Minimum of `1`.
-    #[configurable(metadata(docs::human_name = "Max Number of Pending Acknowledgements Per Channel"))]
+    #[configurable(metadata(
+        docs::human_name = "Max Number of Pending Acknowledgements Per Channel"
+    ))]
     pub max_pending_acks_per_channel: NonZeroU64,
 
     /// Whether or not to remove channels after idling for `max_idle_time` seconds.
