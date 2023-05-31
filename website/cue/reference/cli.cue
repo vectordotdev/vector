@@ -169,6 +169,17 @@ cli: {
 			type:        "integer"
 			env_var:     "VECTOR_INTERNAL_LOG_RATE_LIMIT"
 		}
+		"graceful_shutdown_limit_secs": {
+			type:        "integer"
+			description: env_vars.VECTOR_GRACEFUL_SHUTDOWN_LIMIT_SECS.description
+			default:     env_vars.VECTOR_GRACEFUL_SHUTDOWN_LIMIT_SECS.type.string.default
+			env_var:     "VECTOR_GRACEFUL_SHUTDOWN_LIMIT_SECS"
+		}
+		"no-graceful-shutdown-limit": {
+			description: env_vars.VECTOR_NO_GRACEFUL_SHUTDOWN_LIMIT.description
+			default:     env_vars.VECTOR_NO_GRACEFUL_SHUTDOWN_LIMIT.type.string.default
+			env_var:     "VECTOR_NO_GRACEFUL_SHUTDOWN_LIMIT"
+		}
 	}
 
 	options: _core_options
@@ -602,6 +613,17 @@ cli: {
 				default: 10
 				unit:    null
 			}
+		}
+		VECTOR_GRACEFUL_SHUTDOWN_LIMIT_SECS: {
+			description: "Set the duration in seconds to wait for graceful shutdown after SIGINT or SIGTERM are received. After the duration has passed, Vector will force shutdown. To never force shutdown, use `--no-graceful-shutdown-limit`."
+			type: uint: {
+				default: 60
+				unit:    "seconds"
+			}
+		}
+		VECTOR_NO_GRACEFUL_SHUTDOWN_LIMIT: {
+			description: "Never time out while waiting for graceful shutdown after SIGINT or SIGTERM received. This is useful when you would like for Vector to attempt to send data until terminated by a SIGKILL. Overrides/cannot be set with `--graceful-shutdown-limit-secs`."
+			type: bool: default: false
 		}
 	}
 
