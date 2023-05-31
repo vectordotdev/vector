@@ -61,6 +61,7 @@ pub struct FileSinkConfig {
     #[serde_as(as = "serde_with::DurationSeconds<u64>")]
     #[serde(rename = "idle_timeout_secs")]
     #[configurable(metadata(docs::examples = 600))]
+    #[configurable(metadata(docs::human_name = "Idle Timeout"))]
     pub idle_timeout: Duration,
 
     #[serde(flatten)]
