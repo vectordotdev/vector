@@ -11,7 +11,10 @@ use std::{
 };
 
 use chrono::{DateTime, Utc};
-use vector_common::EventDataEq;
+use vector_common::{
+    request_metadata::{EventCountTags, GetEventCountTags},
+    EventDataEq,
+};
 use vector_config::configurable_component;
 
 use crate::{
@@ -473,6 +476,15 @@ impl EstimatedJsonEncodedSizeOf for Metric {
 impl Finalizable for Metric {
     fn take_finalizers(&mut self) -> EventFinalizers {
         self.metadata.take_finalizers()
+    }
+}
+
+impl GetEventCountTags for Metric {
+    fn get_tags(&self) -> EventCountTags {
+        let source = self.metadata().source_id().map(|output| output.to_string());
+        // Metrics do not contain a service field.
+
+        (source, None)
     }
 }
 

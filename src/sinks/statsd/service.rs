@@ -5,7 +5,7 @@ use tower::Service;
 use vector_common::{
     finalization::{EventFinalizers, EventStatus, Finalizable},
     internal_event::CountByteSize,
-    request_metadata::{MetaDescriptive, RequestMetadata},
+    request_metadata::{MetaDescriptive, RequestCountByteSize, RequestMetadata},
 };
 use vector_core::stream::DriverResponse;
 
@@ -24,8 +24,8 @@ impl Finalizable for StatsdRequest {
 }
 
 impl MetaDescriptive for StatsdRequest {
-    fn get_metadata(&self) -> RequestMetadata {
-        self.metadata
+    fn get_metadata(&self) -> &RequestMetadata {
+        &self.metadata
     }
 }
 
@@ -46,11 +46,12 @@ impl DriverResponse for StatsdResponse {
         EventStatus::Delivered
     }
 
-    fn events_sent(&self) -> CountByteSize {
+    fn events_sent(&self) -> RequestCountByteSize {
         CountByteSize(
             self.metadata.event_count(),
             self.metadata.events_byte_size(),
         )
+        .into()
     }
 
     fn bytes_sent(&self) -> Option<usize> {
