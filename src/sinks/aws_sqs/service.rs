@@ -4,6 +4,7 @@ use aws_sdk_sqs::{error::SendMessageError, types::SdkError, Client as SqsClient}
 use futures::{future::BoxFuture, TryFutureExt};
 use tower::Service;
 use tracing::Instrument;
+use vector_common::json_size::JsonSize;
 use vector_core::{
     event::EventStatus, internal_event::CountByteSize, stream::DriverResponse, ByteSizeOf,
 };
@@ -44,7 +45,10 @@ impl Service<SendMessageEntry> for SqsService {
                 .set_message_deduplication_id(entry.message_deduplication_id)
                 .queue_url(entry.queue_url)
                 .send()
-                .map_ok(|_| SendMessageResponse { byte_size })
+                .map_ok(|_| SendMessageResponse {
+                    byte_size,
+                    json_byte_size: entry.metadata.events_estimated_json_encoded_byte_size(),
+                })
                 .instrument(info_span!("request").or_current())
                 .await
         })
@@ -53,6 +57,7 @@ impl Service<SendMessageEntry> for SqsService {
 
 pub(crate) struct SendMessageResponse {
     byte_size: usize,
+    json_byte_size: JsonSize,
 }
 
 impl DriverResponse for SendMessageResponse {
@@ -61,6 +66,10 @@ impl DriverResponse for SendMessageResponse {
     }
 
     fn events_sent(&self) -> CountByteSize {
-        CountByteSize(1, self.byte_size)
+        CountByteSize(1, self.json_byte_size)
+    }
+
+    fn bytes_sent(&self) -> Option<usize> {
+        Some(self.byte_size)
     }
 }

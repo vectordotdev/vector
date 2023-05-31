@@ -18,6 +18,6 @@ crate::registered_event!(
         #[allow(clippy::cast_precision_loss)]
         self.events_count.record(count as f64);
         self.events.increment(count as u64);
-        self.event_bytes.increment(byte_size as u64);
+        self.event_bytes.increment(byte_size.get() as u64);
     }
 );

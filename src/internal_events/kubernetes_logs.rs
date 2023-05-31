@@ -3,14 +3,15 @@ use vector_core::internal_event::InternalEvent;
 
 use crate::emit;
 use crate::event::Event;
-use vector_common::internal_event::{
-    error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL,
+use vector_common::{
+    internal_event::{error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL},
+    json_size::JsonSize,
 };
 
 #[derive(Debug)]
 pub struct KubernetesLogsEventsReceived<'a> {
     pub file: &'a str,
-    pub byte_size: usize,
+    pub byte_size: JsonSize,
     pub pod_info: Option<KubernetesLogsPodInfo>,
 }
 
@@ -34,13 +35,13 @@ impl InternalEvent for KubernetesLogsEventsReceived<'_> {
                 let pod_namespace = pod_info.namespace;
 
                 counter!("component_received_events_total", 1, "pod_name" => pod_name.clone(), "pod_namespace" => pod_namespace.clone());
-                counter!("component_received_event_bytes_total", self.byte_size as u64, "pod_name" => pod_name, "pod_namespace" => pod_namespace);
+                counter!("component_received_event_bytes_total", self.byte_size.get() as u64, "pod_name" => pod_name, "pod_namespace" => pod_namespace);
             }
             None => {
                 counter!("component_received_events_total", 1);
                 counter!(
                     "component_received_event_bytes_total",
-                    self.byte_size as u64
+                    self.byte_size.get() as u64
                 );
             }
         }

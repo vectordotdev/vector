@@ -18,7 +18,10 @@ use tokio::{sync::oneshot, task::spawn_blocking};
 use tracing::{Instrument, Span};
 use vector_common::finalizer::OrderedFinalizer;
 use vector_config::configurable_component;
-use vector_core::config::{LegacyKey, LogNamespace};
+use vector_core::{
+    config::{LegacyKey, LogNamespace},
+    EstimatedJsonEncodedSizeOf,
+};
 use vrl::value::Kind;
 
 use super::util::{EncodingConfig, MultilineConfig};
@@ -739,12 +742,6 @@ fn create_event(
     meta: &EventMetadata,
     log_namespace: LogNamespace,
 ) -> LogEvent {
-    emit!(FileEventsReceived {
-        count: 1,
-        file,
-        byte_size: line.len(),
-    });
-
     let deserializer = BytesDeserializer::new();
     let mut event = deserializer.parse_single(line, log_namespace);
 
@@ -790,6 +787,12 @@ fn create_event(
         path!("path"),
         file,
     );
+
+    emit!(FileEventsReceived {
+        count: 1,
+        file,
+        byte_size: event.estimated_json_encoded_size_of(),
+    });
 
     event
 }

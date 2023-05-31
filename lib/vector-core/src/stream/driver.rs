@@ -263,6 +263,7 @@ mod tests {
     use tower::Service;
     use vector_common::{
         finalization::{BatchNotifier, EventFinalizer, EventFinalizers, EventStatus, Finalizable},
+        json_size::JsonSize,
         request_metadata::RequestMetadata,
     };
     use vector_common::{internal_event::CountByteSize, request_metadata::MetaDescriptive};
@@ -310,7 +311,7 @@ mod tests {
         }
 
         fn events_sent(&self) -> CountByteSize {
-            CountByteSize(1, 1)
+            CountByteSize(1, JsonSize::new(1))
         }
     }
 

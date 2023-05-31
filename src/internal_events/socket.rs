@@ -1,5 +1,8 @@
 use metrics::counter;
-use vector_common::internal_event::{error_stage, error_type};
+use vector_common::{
+    internal_event::{error_stage, error_type},
+    json_size::JsonSize,
+};
 use vector_core::internal_event::{ComponentEventsDropped, InternalEvent, UNINTENTIONAL};
 
 use crate::emit;
@@ -45,7 +48,7 @@ impl InternalEvent for SocketBytesReceived {
 #[derive(Debug)]
 pub struct SocketEventsReceived {
     pub mode: SocketMode,
-    pub byte_size: usize,
+    pub byte_size: JsonSize,
     pub count: usize,
 }
 
@@ -55,11 +58,11 @@ impl InternalEvent for SocketEventsReceived {
         trace!(
             message = "Events received.",
             count = self.count,
-            byte_size = self.byte_size,
+            byte_size = self.byte_size.get(),
             %mode,
         );
         counter!("component_received_events_total", self.count as u64, "mode" => mode);
-        counter!("component_received_event_bytes_total", self.byte_size as u64, "mode" => mode);
+        counter!("component_received_event_bytes_total", self.byte_size.get() as u64, "mode" => mode);
     }
 }
 
@@ -88,14 +91,14 @@ impl InternalEvent for SocketBytesSent {
 pub struct SocketEventsSent {
     pub mode: SocketMode,
     pub count: u64,
-    pub byte_size: usize,
+    pub byte_size: JsonSize,
 }
 
 impl InternalEvent for SocketEventsSent {
     fn emit(self) {
-        trace!(message = "Events sent.", count = %self.count, byte_size = %self.byte_size);
+        trace!(message = "Events sent.", count = %self.count, byte_size = %self.byte_size.get());
         counter!("component_sent_events_total", self.count, "mode" => self.mode.as_str());
-        counter!("component_sent_event_bytes_total", self.byte_size as u64, "mode" => self.mode.as_str());
+        counter!("component_sent_event_bytes_total", self.byte_size.get() as u64, "mode" => self.mode.as_str());
     }
 }
 

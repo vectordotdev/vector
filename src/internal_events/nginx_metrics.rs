@@ -2,11 +2,14 @@ use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
 use crate::sources::nginx_metrics::parser::ParseError;
-use vector_common::internal_event::{error_stage, error_type};
+use vector_common::{
+    internal_event::{error_stage, error_type},
+    json_size::JsonSize,
+};
 
 #[derive(Debug)]
 pub struct NginxMetricsEventsReceived<'a> {
-    pub byte_size: usize,
+    pub byte_size: JsonSize,
     pub count: usize,
     pub endpoint: &'a str,
 }
@@ -24,7 +27,7 @@ impl<'a> InternalEvent for NginxMetricsEventsReceived<'a> {
             "endpoint" => self.endpoint.to_owned(),
         );
         counter!(
-            "component_received_event_bytes_total", self.byte_size as u64,
+            "component_received_event_bytes_total", self.byte_size.get() as u64,
             "endpoint" => self.endpoint.to_owned(),
         );
     }

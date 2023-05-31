@@ -11,7 +11,10 @@ use futures::future::BoxFuture;
 use http::{Response, Uri};
 use hyper::{service::Service, Body, Request};
 use tower::ServiceExt;
-use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
+use vector_common::{
+    json_size::JsonSize,
+    request_metadata::{MetaDescriptive, RequestMetadata},
+};
 use vector_core::{internal_event::CountByteSize, stream::DriverResponse, ByteSizeOf};
 
 use crate::sinks::elasticsearch::sign_request;
@@ -31,7 +34,7 @@ pub struct ElasticsearchRequest {
     pub payload: Bytes,
     pub finalizers: EventFinalizers,
     pub batch_size: usize,
-    pub events_byte_size: usize,
+    pub events_byte_size: JsonSize,
     pub metadata: RequestMetadata,
 }
 
@@ -146,7 +149,7 @@ pub struct ElasticsearchResponse {
     pub http_response: Response<Bytes>,
     pub event_status: EventStatus,
     pub batch_size: usize,
-    pub events_byte_size: usize,
+    pub events_byte_size: JsonSize,
 }
 
 impl DriverResponse for ElasticsearchResponse {

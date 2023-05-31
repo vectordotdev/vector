@@ -1,5 +1,7 @@
 use std::ops::Add;
 
+use crate::json_size::JsonSize;
+
 /// Metadata for batch requests.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct RequestMetadata {
@@ -8,7 +10,7 @@ pub struct RequestMetadata {
     /// Size, in bytes, of the in-memory representation of all events in this batch request.
     events_byte_size: usize,
     /// Size, in bytes, of the estimated JSON-encoded representation of all events in this batch request.
-    events_estimated_json_encoded_byte_size: usize,
+    events_estimated_json_encoded_byte_size: JsonSize,
     /// Uncompressed size, in bytes, of the encoded events in this batch request.
     request_encoded_size: usize,
     /// On-the-wire size, in bytes, of the batch request itself after compression, etc.
@@ -25,7 +27,7 @@ impl RequestMetadata {
         events_byte_size: usize,
         request_encoded_size: usize,
         request_wire_size: usize,
-        events_estimated_json_encoded_byte_size: usize,
+        events_estimated_json_encoded_byte_size: JsonSize,
     ) -> Self {
         Self {
             event_count,
@@ -47,7 +49,7 @@ impl RequestMetadata {
     }
 
     #[must_use]
-    pub const fn events_estimated_json_encoded_byte_size(&self) -> usize {
+    pub const fn events_estimated_json_encoded_byte_size(&self) -> JsonSize {
         self.events_estimated_json_encoded_byte_size
     }
 
@@ -64,7 +66,7 @@ impl RequestMetadata {
     /// Constructs a `RequestMetadata` by summation of the "batch" of `RequestMetadata` provided.
     #[must_use]
     pub fn from_batch<T: IntoIterator<Item = RequestMetadata>>(metadata_iter: T) -> Self {
-        let mut metadata_sum = RequestMetadata::new(0, 0, 0, 0, 0);
+        let mut metadata_sum = RequestMetadata::new(0, 0, 0, 0, JsonSize::zero());
 
         for metadata in metadata_iter {
             metadata_sum = metadata_sum + &metadata;

@@ -6,6 +6,7 @@ use crate::emit;
 
 #[cfg(any(feature = "sources-file", feature = "sources-kubernetes_logs"))]
 pub use self::source::*;
+
 use vector_common::internal_event::{error_stage, error_type};
 
 #[derive(Debug)]
@@ -86,7 +87,10 @@ mod source {
 
     use super::{FileOpen, InternalEvent};
     use crate::emit;
-    use vector_common::internal_event::{error_stage, error_type};
+    use vector_common::{
+        internal_event::{error_stage, error_type},
+        json_size::JsonSize,
+    };
 
     #[derive(Debug)]
     pub struct FileBytesReceived<'a> {
@@ -114,7 +118,7 @@ mod source {
     pub struct FileEventsReceived<'a> {
         pub count: usize,
         pub file: &'a str,
-        pub byte_size: usize,
+        pub byte_size: JsonSize,
     }
 
     impl InternalEvent for FileEventsReceived<'_> {
@@ -130,7 +134,7 @@ mod source {
                 "file" => self.file.to_owned(),
             );
             counter!(
-                "component_received_event_bytes_total", self.byte_size as u64,
+                "component_received_event_bytes_total", self.byte_size.get() as u64,
                 "file" => self.file.to_owned(),
             );
         }

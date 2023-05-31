@@ -3,6 +3,7 @@ use std::{collections::HashMap, io};
 use bytes::Bytes;
 use serde::{ser::SerializeSeq, Serialize};
 use vector_buffers::EventCount;
+use vector_common::json_size::JsonSize;
 use vector_core::{
     event::{EventFinalizers, Finalizable},
     ByteSizeOf, EstimatedJsonEncodedSizeOf,
@@ -140,10 +141,10 @@ impl ByteSizeOf for LokiEvent {
 
 /// This implementation approximates the `Serialize` implementation below, without any allocations.
 impl EstimatedJsonEncodedSizeOf for LokiEvent {
-    fn estimated_json_encoded_size_of(&self) -> usize {
-        static BRACKETS_SIZE: usize = 2;
-        static COLON_SIZE: usize = 1;
-        static QUOTES_SIZE: usize = 2;
+    fn estimated_json_encoded_size_of(&self) -> JsonSize {
+        static BRACKETS_SIZE: JsonSize = JsonSize::new(2);
+        static COLON_SIZE: JsonSize = JsonSize::new(1);
+        static QUOTES_SIZE: JsonSize = JsonSize::new(2);
 
         BRACKETS_SIZE
             + QUOTES_SIZE
@@ -185,7 +186,7 @@ impl ByteSizeOf for LokiRecord {
 }
 
 impl EstimatedJsonEncodedSizeOf for LokiRecord {
-    fn estimated_json_encoded_size_of(&self) -> usize {
+    fn estimated_json_encoded_size_of(&self) -> JsonSize {
         self.event.estimated_json_encoded_size_of()
     }
 }

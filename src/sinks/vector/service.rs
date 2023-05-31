@@ -8,7 +8,10 @@ use hyper_proxy::ProxyConnector;
 use prost::Message;
 use tonic::{body::BoxBody, IntoRequest};
 use tower::Service;
-use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
+use vector_common::{
+    json_size::JsonSize,
+    request_metadata::{MetaDescriptive, RequestMetadata},
+};
 use vector_core::{internal_event::CountByteSize, stream::DriverResponse};
 
 use super::VectorSinkError;
@@ -29,7 +32,7 @@ pub struct VectorService {
 
 pub struct VectorResponse {
     events_count: usize,
-    events_byte_size: usize,
+    events_byte_size: JsonSize,
 }
 
 impl DriverResponse for VectorResponse {
@@ -104,7 +107,9 @@ impl Service<VectorRequest> for VectorService {
         let mut service = self.clone();
         let byte_size = list.request.encoded_len();
         let events_count = list.get_metadata().event_count();
-        let events_byte_size = list.get_metadata().events_byte_size();
+        let events_byte_size = list
+            .get_metadata()
+            .events_estimated_json_encoded_byte_size();
 
         let future = async move {
             service

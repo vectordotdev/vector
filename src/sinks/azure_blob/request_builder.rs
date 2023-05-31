@@ -3,7 +3,7 @@ use chrono::Utc;
 use codecs::encoding::Framer;
 use uuid::Uuid;
 use vector_common::request_metadata::RequestMetadata;
-use vector_core::ByteSizeOf;
+use vector_core::EstimatedJsonEncodedSizeOf;
 
 use crate::{
     codecs::{Encoder, Transformer},
@@ -51,7 +51,7 @@ impl RequestBuilder<(String, Vec<Event>)> for AzureBlobRequestOptions {
         let azure_metadata = AzureBlobMetadata {
             partition_key,
             count: events.len(),
-            byte_size: events.size_of(),
+            byte_size: events.estimated_json_encoded_size_of(),
             finalizers,
         };
 

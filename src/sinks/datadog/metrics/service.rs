@@ -10,7 +10,10 @@ use http::{
 use hyper::Body;
 use snafu::ResultExt;
 use tower::Service;
-use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
+use vector_common::{
+    json_size::JsonSize,
+    request_metadata::{MetaDescriptive, RequestMetadata},
+};
 use vector_core::{
     event::{EventFinalizers, EventStatus, Finalizable},
     internal_event::CountByteSize,
@@ -123,7 +126,7 @@ pub struct DatadogMetricsResponse {
     status_code: StatusCode,
     body: Bytes,
     batch_size: usize,
-    byte_size: usize,
+    byte_size: JsonSize,
     raw_byte_size: usize,
 }
 
@@ -182,7 +185,9 @@ impl Service<DatadogMetricsRequest> for DatadogMetricsService {
         let api_key = self.api_key.clone();
 
         Box::pin(async move {
-            let byte_size = request.get_metadata().events_byte_size();
+            let byte_size = request
+                .get_metadata()
+                .events_estimated_json_encoded_byte_size();
             let batch_size = request.get_metadata().event_count();
             let raw_byte_size = request.raw_bytes;
 

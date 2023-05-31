@@ -438,6 +438,7 @@ mod tests {
 
     use futures::{future, stream, FutureExt, SinkExt, StreamExt};
     use tokio::time::Duration;
+    use vector_common::json_size::JsonSize;
 
     use super::*;
     use crate::sinks::util::{
@@ -520,7 +521,10 @@ mod tests {
 
         let input = (0..20).map(|i| PartitionInnerBuffer::new(i, 0));
         sink.sink_map_err(drop)
-            .send_all(&mut stream::iter(input).map(|item| Ok(EncodedEvent::new(item, 0))))
+            .send_all(
+                &mut stream::iter(input)
+                    .map(|item| Ok(EncodedEvent::new(item, 0, JsonSize::zero()))),
+            )
             .await
             .unwrap();
 

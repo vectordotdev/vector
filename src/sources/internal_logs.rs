@@ -155,12 +155,14 @@ async fn run(
     // any logs that don't break the loop, as that could cause an
     // infinite loop since it receives all such logs.
     while let Some(mut log) = rx.next().await {
-        let byte_size = log.estimated_json_encoded_size_of();
+        // TODO: Should this actually be in memory size?
+        let byte_size = log.estimated_json_encoded_size_of().get();
+        let json_byte_size = log.estimated_json_encoded_size_of();
         // This event doesn't emit any log
         emit!(InternalLogsBytesReceived { byte_size });
         emit!(InternalLogsEventsReceived {
             count: 1,
-            byte_size,
+            byte_size: json_byte_size,
         });
 
         if let Ok(hostname) = &hostname {

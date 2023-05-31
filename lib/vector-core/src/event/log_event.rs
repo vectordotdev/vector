@@ -14,7 +14,10 @@ use crossbeam_utils::atomic::AtomicCell;
 use lookup::lookup_v2::TargetPath;
 use lookup::PathPrefix;
 use serde::{Deserialize, Serialize, Serializer};
-use vector_common::EventDataEq;
+use vector_common::{
+    json_size::{JsonSize, NonZeroJsonSize},
+    EventDataEq,
+};
 
 use super::{
     estimated_json_encoded_size_of::EstimatedJsonEncodedSizeOf,
@@ -36,7 +39,7 @@ struct Inner {
     size_cache: AtomicCell<Option<NonZeroUsize>>,
 
     #[serde(skip)]
-    json_encoded_size_cache: AtomicCell<Option<NonZeroUsize>>,
+    json_encoded_size_cache: AtomicCell<Option<NonZeroJsonSize>>,
 }
 
 impl Inner {
@@ -73,12 +76,12 @@ impl ByteSizeOf for Inner {
 }
 
 impl EstimatedJsonEncodedSizeOf for Inner {
-    fn estimated_json_encoded_size_of(&self) -> usize {
+    fn estimated_json_encoded_size_of(&self) -> JsonSize {
         self.json_encoded_size_cache
             .load()
             .unwrap_or_else(|| {
                 let size = self.fields.estimated_json_encoded_size_of();
-                let size = NonZeroUsize::new(size).expect("Size cannot be zero");
+                let size = NonZeroJsonSize::new(size).expect("Size cannot be zero");
 
                 self.json_encoded_size_cache.store(Some(size));
                 size
@@ -204,7 +207,7 @@ impl Finalizable for LogEvent {
 }
 
 impl EstimatedJsonEncodedSizeOf for LogEvent {
-    fn estimated_json_encoded_size_of(&self) -> usize {
+    fn estimated_json_encoded_size_of(&self) -> JsonSize {
         self.inner.estimated_json_encoded_size_of()
     }
 }

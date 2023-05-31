@@ -3,7 +3,10 @@ use serde_json::error::Category;
 use snafu::Snafu;
 use std::{num::NonZeroUsize, sync::Arc};
 use vector_common::request_metadata::RequestMetadata;
-use vector_core::event::{EventFinalizers, Finalizable, Metric};
+use vector_core::{
+    event::{EventFinalizers, Finalizable, Metric},
+    EstimatedJsonEncodedSizeOf,
+};
 
 use super::{
     config::{DatadogMetricsEndpoint, DatadogMetricsEndpointConfiguration},
@@ -209,6 +212,7 @@ impl IncrementalRequestBuilder<((Option<Arc<str>>, DatadogMetricsEndpoint), Vec<
             if n > 0 {
                 match encoder.finish() {
                     Ok((payload, mut metrics, raw_bytes_written)) => {
+                        let json_size = metrics.estimated_json_encoded_size_of();
                         let finalizers = metrics.take_finalizers();
                         let metadata = DDMetricsMetadata {
                             api_key: api_key.as_ref().map(Arc::clone),
@@ -219,7 +223,7 @@ impl IncrementalRequestBuilder<((Option<Arc<str>>, DatadogMetricsEndpoint), Vec<
                         let builder = RequestMetadataBuilder::new(
                             metrics.len(),
                             raw_bytes_written,
-                            raw_bytes_written,
+                            json_size,
                         );
                         let bytes_len = NonZeroUsize::new(payload.len())
                             .expect("payload should never be zero length");
@@ -329,6 +333,7 @@ fn encode_now_or_never(
     encoder
         .finish()
         .map(|(payload, mut processed, raw_bytes_written)| {
+            let json_size = processed.estimated_json_encoded_size_of();
             let finalizers = processed.take_finalizers();
             let ddmetrics_metadata = DDMetricsMetadata {
                 api_key,
@@ -336,8 +341,7 @@ fn encode_now_or_never(
                 finalizers,
                 raw_bytes: raw_bytes_written,
             };
-            let builder =
-                RequestMetadataBuilder::new(metrics_len, raw_bytes_written, raw_bytes_written);
+            let builder = RequestMetadataBuilder::new(metrics_len, raw_bytes_written, json_size);
             let bytes_len =
                 NonZeroUsize::new(payload.len()).expect("payload should never be zero length");
             let request_metadata = builder.with_request_size(bytes_len);
