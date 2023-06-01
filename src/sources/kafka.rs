@@ -107,6 +107,7 @@ pub struct KafkaSourceConfig {
     #[configurable(metadata(docs::examples = 5000, docs::examples = 10000))]
     #[configurable(metadata(docs::advanced))]
     #[serde(default = "default_session_timeout_ms")]
+    #[configurable(metadata(docs::human_name = "Session Timeout"))]
     session_timeout_ms: Duration,
 
     /// Timeout for network requests.
@@ -114,6 +115,7 @@ pub struct KafkaSourceConfig {
     #[configurable(metadata(docs::examples = 30000, docs::examples = 60000))]
     #[configurable(metadata(docs::advanced))]
     #[serde(default = "default_socket_timeout_ms")]
+    #[configurable(metadata(docs::human_name = "Socket Timeout"))]
     socket_timeout_ms: Duration,
 
     /// Maximum time the broker may wait to fill the response.
@@ -121,12 +123,14 @@ pub struct KafkaSourceConfig {
     #[configurable(metadata(docs::examples = 50, docs::examples = 100))]
     #[configurable(metadata(docs::advanced))]
     #[serde(default = "default_fetch_wait_max_ms")]
+    #[configurable(metadata(docs::human_name = "Max Fetch Wait Time"))]
     fetch_wait_max_ms: Duration,
 
     /// The frequency that the consumer offsets are committed (written) to offset storage.
     #[serde_as(as = "serde_with::DurationMilliSeconds<u64>")]
     #[serde(default = "default_commit_interval_ms")]
     #[configurable(metadata(docs::examples = 5000, docs::examples = 10000))]
+    #[configurable(metadata(docs::human_name = "Commit Interval"))]
     commit_interval_ms: Duration,
 
     /// Overrides the name of the log field used to add the message key to each event.

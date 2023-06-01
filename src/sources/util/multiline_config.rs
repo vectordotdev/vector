@@ -41,6 +41,7 @@ pub struct MultilineConfig {
     #[serde_as(as = "serde_with::DurationMilliSeconds<u64>")]
     #[configurable(metadata(docs::examples = 1000))]
     #[configurable(metadata(docs::examples = 600000))]
+    #[configurable(metadata(docs::human_name = "Timeout"))]
     pub timeout_ms: Duration,
 }
 

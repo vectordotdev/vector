@@ -57,6 +57,7 @@ pub struct PrometheusScrapeConfig {
     #[serde(default = "default_interval")]
     #[serde_as(as = "serde_with::DurationSeconds<u64>")]
     #[serde(rename = "scrape_interval_secs")]
+    #[configurable(metadata(docs::human_name = "Scrape Interval"))]
     interval: Duration,
 
     /// The tag name added to each event representing the scraped instance's `host:port`.

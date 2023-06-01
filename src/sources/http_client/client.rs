@@ -55,6 +55,7 @@ pub struct HttpClientConfig {
     #[serde(default = "default_interval")]
     #[serde_as(as = "serde_with::DurationSeconds<u64>")]
     #[serde(rename = "scrape_interval_secs")]
+    #[configurable(metadata(docs::human_name = "Scrape Interval"))]
     pub interval: Duration,
 
     /// Custom parameters for the HTTP request query string.
