@@ -126,6 +126,7 @@ pub struct PrometheusExporterConfig {
     #[serde(default = "default_flush_period_secs")]
     #[serde_as(as = "serde_with::DurationSeconds<u64>")]
     #[configurable(metadata(docs::advanced))]
+    #[configurable(metadata(docs::human_name = "Flush Interval"))]
     pub flush_period_secs: Duration,
 
     /// Suppresses timestamps on the Prometheus output.

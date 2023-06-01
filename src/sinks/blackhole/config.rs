@@ -26,6 +26,7 @@ pub struct BlackholeConfig {
     #[derivative(Default(value = "default_print_interval_secs()"))]
     #[serde(default = "default_print_interval_secs")]
     #[serde_as(as = "serde_with::DurationSeconds<u64>")]
+    #[configurable(metadata(docs::human_name = "Print Interval"))]
     #[configurable(metadata(docs::examples = 10))]
     pub print_interval_secs: Duration,
 

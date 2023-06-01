@@ -114,6 +114,7 @@ where
     /// The maximum age of a batch before it is flushed.
     #[serde(default = "default_timeout::<D>")]
     #[configurable(metadata(docs::type_unit = "seconds"))]
+    #[configurable(metadata(docs::human_name = "Timeout"))]
     pub timeout_secs: Option<f64>,
 
     #[serde(skip)]
