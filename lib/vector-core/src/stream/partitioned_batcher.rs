@@ -310,6 +310,9 @@ where
     #[pin]
     /// The stream this `Batcher` wraps
     stream: Fuse<St>,
+    /// Whether the internal team has been exhausted. Used to avoid re-calling `poll_next`,
+    /// which is not recommended in the [Stream docs](futures::stream::Stream::poll_next).
+    inner_stream_exhausted: bool,
 }
 
 impl<St, Prt> PartitionedBatcher<St, Prt, ExpirationQueue<Prt::Key>>
@@ -328,6 +331,7 @@ where
             timer: ExpirationQueue::new(settings.timeout),
             partitioner,
             stream: stream.fuse(),
+            inner_stream_exhausted: false,
         }
     }
 }
@@ -355,6 +359,7 @@ where
             timer,
             partitioner,
             stream: stream.fuse(),
+            inner_stream_exhausted: false,
         }
     }
 }
@@ -377,8 +382,15 @@ where
         let mut this = self.project();
         loop {
             if !this.closed_batches.is_empty() {
+                // A batch is ready to be sent. Return the batch immediately; don't bother polling the underlying stream.
                 return Poll::Ready(this.closed_batches.pop());
             }
+            if *this.inner_stream_exhausted {
+                // The internal stream is exhausted and there are no remaining closed batches. Tell the consumer we're exhausted.
+                return Poll::Ready(None);
+            }
+
+            // Poll the internal stream until exhaustion, placing its outputs into batches.
             match this.stream.as_mut().poll_next(cx) {
                 Poll::Pending => match this.timer.poll_expired(cx) {
                     // Unlike normal streams, `DelayQueue` can return `None`
@@ -400,6 +412,7 @@ where
                     // entries. If we had any batches to hand over, we have to
                     // continue looping so the caller can drain them all before
                     // we finish.
+                    *this.inner_stream_exhausted = true;
                     if !this.batches.is_empty() {
                         this.timer.clear();
                         this.closed_batches.extend(
