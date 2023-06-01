@@ -1,0 +1,62 @@
+name: Miscellaneous - Linux
+
+on:
+  workflow_call:
+
+jobs:
+  test-misc:
+    runs-on: [linux, ubuntu-20.04-8core]
+    env:
+      CARGO_INCREMENTAL: 0
+    steps:
+      - name: (PR comment) Get PR branch
+        if: ${{ github.event_name == 'issue_comment' }}
+        uses: xt0rted/pull-request-comment-branch@v2
+        id: comment-branch
+
+      - name: (PR comment) Set latest commit status as pending
+        if: ${{ github.event_name == 'issue_comment' }}
+        uses: myrotvorets/set-commit-status-action@v1.1.7
+        with:
+          sha: ${{ steps.comment-branch.outputs.head_sha }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          context: Miscellaneous - Linux
+          status: pending
+
+      - name: (PR comment) Checkout PR branch
+        if: ${{ github.event_name == 'issue_comment' }}
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ steps.comment-branch.outputs.head_ref }}
+
+      - name: Checkout branch
+        if: ${{ github.event_name != 'issue_comment' }}
+        uses: actions/checkout@v3
+
+      - uses: actions/cache@v3
+        name: Cache Cargo registry + index
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: bash scripts/environment/prepare.sh
+      - run: echo "::add-matcher::.github/matchers/rust.json"
+      - run: make test-behavior
+      - run: make check-examples
+      - run: make test-docs
+
+      - name: (PR comment) Set latest commit status as ${{ job.status }}
+        uses: myrotvorets/set-commit-status-action@v1.1.7
+        if: always() && github.event_name == 'issue_comment'
+        with:
+          sha: ${{ steps.comment-branch.outputs.head_sha }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          context: Miscellaneous - Linux
+          status: ${{ job.status }}

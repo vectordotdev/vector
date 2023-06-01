@@ -161,6 +161,7 @@ mod test {
     use bytes::{Buf, BytesMut};
     use futures::{future, stream, SinkExt, StreamExt};
     use tokio::time::Duration;
+    use vector_common::json_size::JsonSize;
 
     use super::{Buffer, Compression};
     use crate::sinks::util::{BatchSettings, BatchSink, EncodedEvent};
@@ -195,7 +196,10 @@ mod test {
 
         buffered
             .sink_map_err(drop)
-            .send_all(&mut stream::iter(input).map(|item| Ok(EncodedEvent::new(item, 0))))
+            .send_all(
+                &mut stream::iter(input)
+                    .map(|item| Ok(EncodedEvent::new(item, 0, JsonSize::zero()))),
+            )
             .await
             .unwrap();
 

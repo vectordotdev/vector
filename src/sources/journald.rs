@@ -1108,7 +1108,7 @@ mod tests {
 
             sleep(Duration::from_millis(100)).await;
             shutdown
-                .shutdown_all(Instant::now() + Duration::from_secs(1))
+                .shutdown_all(Some(Instant::now() + Duration::from_secs(1)))
                 .await;
 
             timeout(Duration::from_secs(1), rx.collect()).await.unwrap()

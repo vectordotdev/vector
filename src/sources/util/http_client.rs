@@ -15,6 +15,7 @@ use hyper::{Body, Request};
 use std::time::{Duration, Instant};
 use std::{collections::HashMap, future::ready};
 use tokio_stream::wrappers::IntervalStream;
+use vector_common::json_size::JsonSize;
 
 use crate::{
     http::{Auth, HttpClient},
@@ -187,7 +188,7 @@ pub(crate) async fn call<
                                     // HttpClientEventsReceived event, we should
                                     // emit 0 when there aren't any usable
                                     // metrics.
-                                    0
+                                    JsonSize::zero()
                                 } else {
                                     events.estimated_json_encoded_size_of()
                                 };

@@ -25,6 +25,7 @@ Vector team member will find this document useful.
     - [Flakey tests](#flakey-tests)
       - [Test harness](#test-harness)
   - [Deprecations](#deprecations)
+  - [Dependencies](#dependencies)
 - [Next steps](#next-steps)
 - [Legal](#legal)
   - [Contributor License Agreement](#contributor-license-agreement)
@@ -65,6 +66,13 @@ To merge a new source, sink, or transform, you need to:
 - [ ] Add instrumentation so folks using your integration can get insight into how it's working and performing. You can
 see some [example of instrumentation in existing integrations](https://github.com/vectordotdev/vector/tree/master/src/internal_events).
 - [ ] Add documentation. You can see [examples in the `docs` directory](https://github.com/vectordotdev/vector/blob/master/docs).
+
+When adding new integration tests, the following changes are needed in the github workflows:
+
+- in `.github/workflows/integration.yml`, add another entry in the matrix definition for the new integration.
+- in `.github/workflows/integration-comment.yml`, add another entry in the matrix definition for the new integration.
+- in `.github/workflows/changes.yml`, add a new filter definition for files changed, and update the `changes` job
+outputs to reference the filter, and finally update the outputs of `workflow_call` to include the new filter.
 
 ## Workflow
 
@@ -183,6 +191,13 @@ any pull request with:
 ### Deprecations
 
 When deprecating functionality in Vector, see [DEPRECATION.md](DEPRECATION.md).
+
+### Dependencies
+
+When adding, modifying, or removing a dependency in Vector you may find that you need to update the
+inventory of third-party licenses maintained in `LICENSE-3rdparty.csv`. This file is generated using
+[rust-license-tool](https://github.com/DataDog/rust-license-tool.git) and can be updated using
+`cargo vdev build licenses`.
 
 ## Next steps
 

@@ -29,12 +29,14 @@ async fn component_added(client: Arc<SubscriptionClient>, tx: state::EventTx) {
                     kind: c.on.to_string(),
                     component_type: c.component_type,
                     outputs: HashMap::new(),
+                    received_bytes_total: 0,
+                    received_bytes_throughput_sec: 0,
                     received_events_total: 0,
                     received_events_throughput_sec: 0,
+                    sent_bytes_total: 0,
+                    sent_bytes_throughput_sec: 0,
                     sent_events_total: 0,
                     sent_events_throughput_sec: 0,
-                    processed_bytes_total: 0,
-                    processed_bytes_throughput_sec: 0,
                     #[cfg(feature = "allocation-tracing")]
                     allocated_bytes: 0,
                     errors: 0,
@@ -84,6 +86,54 @@ async fn component_removed(client: Arc<SubscriptionClient>, tx: state::EventTx) 
     }
 }
 
+async fn received_bytes_totals(client: Arc<SubscriptionClient>, tx: state::EventTx, interval: i64) {
+    tokio::pin! {
+        let stream = client.component_received_bytes_totals_subscription(interval);
+    };
+
+    while let Some(Some(res)) = stream.next().await {
+        if let Some(d) = res.data {
+            let c = d.component_received_bytes_totals;
+            _ = tx
+                .send(state::EventType::ReceivedBytesTotals(
+                    c.into_iter()
+                        .map(|c| {
+                            (
+                                ComponentKey::from(c.component_id.as_str()),
+                                c.metric.received_bytes_total as i64,
+                            )
+                        })
+                        .collect(),
+                ))
+                .await;
+        }
+    }
+}
+
+async fn received_bytes_throughputs(
+    client: Arc<SubscriptionClient>,
+    tx: state::EventTx,
+    interval: i64,
+) {
+    tokio::pin! {
+        let stream = client.component_received_bytes_throughputs_subscription(interval);
+    };
+
+    while let Some(Some(res)) = stream.next().await {
+        if let Some(d) = res.data {
+            let c = d.component_received_bytes_throughputs;
+            _ = tx
+                .send(state::EventType::ReceivedBytesThroughputs(
+                    interval,
+                    c.into_iter()
+                        .map(|c| (ComponentKey::from(c.component_id.as_str()), c.throughput))
+                        .collect(),
+                ))
+                .await;
+        }
+    }
+}
+
 async fn received_events_totals(
     client: Arc<SubscriptionClient>,
     tx: state::EventTx,
@@ -126,6 +176,54 @@ async fn received_events_throughputs(
             let c = d.component_received_events_throughputs;
             _ = tx
                 .send(state::EventType::ReceivedEventsThroughputs(
+                    interval,
+                    c.into_iter()
+                        .map(|c| (ComponentKey::from(c.component_id.as_str()), c.throughput))
+                        .collect(),
+                ))
+                .await;
+        }
+    }
+}
+
+async fn sent_bytes_totals(client: Arc<SubscriptionClient>, tx: state::EventTx, interval: i64) {
+    tokio::pin! {
+        let stream = client.component_sent_bytes_totals_subscription(interval);
+    };
+
+    while let Some(Some(res)) = stream.next().await {
+        if let Some(d) = res.data {
+            let c = d.component_sent_bytes_totals;
+            _ = tx
+                .send(state::EventType::SentBytesTotals(
+                    c.into_iter()
+                        .map(|c| {
+                            (
+                                ComponentKey::from(c.component_id.as_str()),
+                                c.metric.sent_bytes_total as i64,
+                            )
+                        })
+                        .collect(),
+                ))
+                .await;
+        }
+    }
+}
+
+async fn sent_bytes_throughputs(
+    client: Arc<SubscriptionClient>,
+    tx: state::EventTx,
+    interval: i64,
+) {
+    tokio::pin! {
+        let stream = client.component_sent_bytes_throughputs_subscription(interval);
+    };
+
+    while let Some(Some(res)) = stream.next().await {
+        if let Some(d) = res.data {
+            let c = d.component_sent_bytes_throughputs;
+            _ = tx
+                .send(state::EventType::SentBytesThroughputs(
                     interval,
                     c.into_iter()
                         .map(|c| (ComponentKey::from(c.component_id.as_str()), c.throughput))
@@ -187,58 +285,6 @@ async fn sent_events_throughputs(
     }
 }
 
-async fn processed_bytes_totals(
-    client: Arc<SubscriptionClient>,
-    tx: state::EventTx,
-    interval: i64,
-) {
-    tokio::pin! {
-        let stream = client.component_processed_bytes_totals_subscription(interval);
-    };
-
-    while let Some(Some(res)) = stream.next().await {
-        if let Some(d) = res.data {
-            let c = d.component_processed_bytes_totals;
-            _ = tx
-                .send(state::EventType::ProcessedBytesTotals(
-                    c.into_iter()
-                        .map(|c| {
-                            (
-                                ComponentKey::from(c.component_id.as_str()),
-                                c.metric.processed_bytes_total as i64,
-                            )
-                        })
-                        .collect(),
-                ))
-                .await;
-        }
-    }
-}
-
-async fn processed_bytes_throughputs(
-    client: Arc<SubscriptionClient>,
-    tx: state::EventTx,
-    interval: i64,
-) {
-    tokio::pin! {
-        let stream = client.component_processed_bytes_throughputs_subscription(interval);
-    };
-
-    while let Some(Some(res)) = stream.next().await {
-        if let Some(d) = res.data {
-            let c = d.component_processed_bytes_throughputs;
-            _ = tx
-                .send(state::EventType::ProcessedBytesThroughputs(
-                    interval,
-                    c.into_iter()
-                        .map(|c| (ComponentKey::from(c.component_id.as_str()), c.throughput))
-                        .collect(),
-                ))
-                .await;
-        }
-    }
-}
-
 async fn errors_totals(client: Arc<SubscriptionClient>, tx: state::EventTx, interval: i64) {
     tokio::pin! {
         let stream = client.component_errors_totals_subscription(interval);
@@ -275,6 +321,16 @@ pub fn subscribe(
     vec![
         tokio::spawn(component_added(Arc::clone(&client), tx.clone())),
         tokio::spawn(component_removed(Arc::clone(&client), tx.clone())),
+        tokio::spawn(received_bytes_totals(
+            Arc::clone(&client),
+            tx.clone(),
+            interval,
+        )),
+        tokio::spawn(received_bytes_throughputs(
+            Arc::clone(&client),
+            tx.clone(),
+            interval,
+        )),
         tokio::spawn(received_events_totals(
             Arc::clone(&client),
             tx.clone(),
@@ -285,22 +341,18 @@ pub fn subscribe(
             tx.clone(),
             interval,
         )),
+        tokio::spawn(sent_bytes_totals(Arc::clone(&client), tx.clone(), interval)),
+        tokio::spawn(sent_bytes_throughputs(
+            Arc::clone(&client),
+            tx.clone(),
+            interval,
+        )),
         tokio::spawn(sent_events_totals(
             Arc::clone(&client),
             tx.clone(),
             interval,
         )),
         tokio::spawn(sent_events_throughputs(
-            Arc::clone(&client),
-            tx.clone(),
-            interval,
-        )),
-        tokio::spawn(processed_bytes_totals(
-            Arc::clone(&client),
-            tx.clone(),
-            interval,
-        )),
-        tokio::spawn(processed_bytes_throughputs(
             Arc::clone(&client),
             tx.clone(),
             interval,
@@ -326,36 +378,34 @@ pub async fn init_components(client: &Client) -> Result<state::State, ()> {
         .components
         .edges
         .into_iter()
-        .flat_map(|d| {
-            d.into_iter().filter_map(|edge| {
-                let d = edge?.node;
-                let key = ComponentKey::from(d.component_id);
-                Some((
-                    key.clone(),
-                    state::ComponentRow {
-                        key,
-                        kind: d.on.to_string(),
-                        component_type: d.component_type,
-                        outputs: d
-                            .on
-                            .outputs()
-                            .into_iter()
-                            .map(|(id, sent_events_total)| {
-                                (id, OutputMetrics::from(sent_events_total))
-                            })
-                            .collect(),
-                        received_events_total: d.on.received_events_total(),
-                        received_events_throughput_sec: 0,
-                        sent_events_total: d.on.sent_events_total(),
-                        sent_events_throughput_sec: 0,
-                        processed_bytes_total: d.on.processed_bytes_total(),
-                        processed_bytes_throughput_sec: 0,
-                        #[cfg(feature = "allocation-tracing")]
-                        allocated_bytes: 0,
-                        errors: 0,
-                    },
-                ))
-            })
+        .flat_map(|edge| {
+            let d = edge.node;
+            let key = ComponentKey::from(d.component_id);
+            Some((
+                key.clone(),
+                state::ComponentRow {
+                    key,
+                    kind: d.on.to_string(),
+                    component_type: d.component_type,
+                    outputs: d
+                        .on
+                        .outputs()
+                        .into_iter()
+                        .map(|(id, sent_events_total)| (id, OutputMetrics::from(sent_events_total)))
+                        .collect(),
+                    received_bytes_total: d.on.received_bytes_total(),
+                    received_bytes_throughput_sec: 0,
+                    received_events_total: d.on.received_events_total(),
+                    received_events_throughput_sec: 0,
+                    sent_bytes_total: d.on.sent_bytes_total(),
+                    sent_bytes_throughput_sec: 0,
+                    sent_events_total: d.on.sent_events_total(),
+                    sent_events_throughput_sec: 0,
+                    #[cfg(feature = "allocation-tracing")]
+                    allocated_bytes: 0,
+                    errors: 0,
+                },
+            ))
         })
         .collect::<BTreeMap<_, _>>();
 

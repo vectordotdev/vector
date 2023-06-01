@@ -1,10 +1,11 @@
+use vector_common::json_size::JsonSize;
 use vector_core::internal_event::CountByteSize;
 use vector_core::{event::EventStatus, stream::DriverResponse};
 
 pub struct HecResponse {
     pub event_status: EventStatus,
     pub events_count: usize,
-    pub events_byte_size: usize,
+    pub events_byte_size: JsonSize,
 }
 
 impl AsRef<EventStatus> for HecResponse {

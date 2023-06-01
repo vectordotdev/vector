@@ -14,7 +14,7 @@ use crate::{
     template::Template,
 };
 use vector_buffers::EventCount;
-use vector_common::byte_size_of::ByteSizeOf;
+use vector_common::{byte_size_of::ByteSizeOf, json_size::JsonSize};
 use vector_core::{
     event::{EstimatedJsonEncodedSizeOf, LogEvent},
     sink::StreamSink,
@@ -76,7 +76,7 @@ impl ByteSizeOf for PulsarEvent {
 }
 
 impl EstimatedJsonEncodedSizeOf for PulsarEvent {
-    fn estimated_json_encoded_size_of(&self) -> usize {
+    fn estimated_json_encoded_size_of(&self) -> JsonSize {
         self.event.estimated_json_encoded_size_of()
     }
 }

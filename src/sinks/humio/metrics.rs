@@ -6,7 +6,7 @@ use indoc::indoc;
 use lookup::lookup_v2::OptionalValuePath;
 use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
-use vector_core::{sink::StreamSink, transform::Transform};
+use vector_core::sink::StreamSink;
 
 use super::{
     host_key,
@@ -14,8 +14,7 @@ use super::{
 };
 use crate::{
     config::{
-        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, TransformConfig,
-        TransformContext,
+        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, TransformContext,
     },
     event::{Event, EventArray, EventContainer},
     sinks::{
@@ -25,7 +24,10 @@ use crate::{
     },
     template::Template,
     tls::TlsConfig,
-    transforms::{metric_to_log::MetricToLogConfig, OutputBuffer},
+    transforms::{
+        metric_to_log::{MetricToLog, MetricToLogConfig},
+        FunctionTransform, OutputBuffer,
+    },
 };
 
 /// Configuration for the `humio_metrics` sink.
@@ -153,9 +155,7 @@ impl SinkConfig for HumioMetricsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let transform = self
             .transform
-            .clone()
-            .build(&TransformContext::new_with_globals(cx.globals.clone()))
-            .await?;
+            .build_transform(&TransformContext::new_with_globals(cx.globals.clone()));
 
         let sink = HumioLogsConfig {
             token: self.token.clone(),
@@ -199,7 +199,7 @@ impl SinkConfig for HumioMetricsConfig {
 
 pub struct HumioMetricsSink {
     inner: VectorSink,
-    transform: Transform,
+    transform: MetricToLog,
 }
 
 #[async_trait]
@@ -210,7 +210,7 @@ impl StreamSink<EventArray> for HumioMetricsSink {
             .run(input.map(move |events| {
                 let mut buf = OutputBuffer::with_capacity(events.len());
                 for event in events.into_events() {
-                    transform.as_function().transform(&mut buf, event);
+                    transform.transform(&mut buf, event);
                 }
                 // Awkward but necessary for the `EventArray` type
                 let events = buf.into_events().map(Event::into_log).collect::<Vec<_>>();

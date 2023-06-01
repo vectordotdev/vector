@@ -32,7 +32,7 @@ components: sources: redis: {
 		commonly_used: false
 		delivery:      "best_effort"
 		deployment_roles: ["aggregator"]
-		development:   "beta"
+		development:   "stable"
 		egress_method: "stream"
 		stateful:      false
 	}
@@ -94,13 +94,5 @@ components: sources: redis: {
 				API.
 				"""
 		}
-	}
-
-	telemetry: metrics: {
-		events_in_total:         components.sources.internal_metrics.output.metrics.events_in_total
-		events_out_total:        components.sources.internal_metrics.output.metrics.events_out_total
-		processed_bytes_total:   components.sources.internal_metrics.output.metrics.processed_bytes_total
-		processed_bytes_total:   components.sources.internal_metrics.output.metrics.processed_bytes_total
-		processing_errors_total: components.sources.internal_metrics.output.metrics.processing_errors_total
 	}
 }

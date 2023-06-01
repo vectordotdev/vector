@@ -1,6 +1,0 @@
-subscription ComponentProcessedBytesThroughputsSubscription($interval: Int!) {
-    componentProcessedBytesThroughputs(interval: $interval) {
-        componentId
-        throughput
-    }
-}

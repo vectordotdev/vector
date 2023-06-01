@@ -58,6 +58,7 @@ pub struct AwsSqsConfig {
     #[serde(default = "default_visibility_timeout_secs")]
     #[derivative(Default(value = "default_visibility_timeout_secs()"))]
     #[configurable(metadata(docs::type_unit = "seconds"))]
+    #[configurable(metadata(docs::human_name = "Visibility Timeout"))]
     pub(super) visibility_timeout_secs: u32,
 
     /// Whether to delete the message once it is processed.

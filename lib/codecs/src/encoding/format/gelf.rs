@@ -241,7 +241,7 @@ mod tests {
     use super::*;
     use chrono::{DateTime, NaiveDateTime, Utc};
     use vector_core::event::{Event, EventMetadata};
-    use vrl::value::btreemap;
+    use vrl::btreemap;
     use vrl::value::Value;
 
     fn do_serialize(

@@ -5,6 +5,7 @@ use std::{
     hash::Hash,
     net::SocketAddr,
     path::PathBuf,
+    time::Duration,
 };
 
 use indexmap::IndexMap;
@@ -48,7 +49,8 @@ pub use format::{Format, FormatHint};
 pub use id::{ComponentKey, Inputs};
 pub use loading::{
     load, load_builder_from_paths, load_from_paths, load_from_paths_with_provider_and_secrets,
-    load_from_str, load_source_from_paths, merge_path_lists, process_paths, CONFIG_PATHS,
+    load_from_str, load_source_from_paths, merge_path_lists, process_paths, COLLECTOR,
+    CONFIG_PATHS,
 };
 pub use provider::ProviderConfig;
 pub use secret::SecretBackend;
@@ -59,6 +61,7 @@ pub use transform::{
 };
 pub use unit_test::{build_unit_tests, build_unit_tests_main, UnitTestResult};
 pub use validation::warnings;
+pub use vars::{interpolate, ENVIRONMENT_VARIABLE_INTERPOLATION_REGEX};
 pub use vector_core::config::{
     init_log_schema, log_schema, proxy::ProxyConfig, LogSchema, OutputId,
 };
@@ -103,6 +106,7 @@ pub struct Config {
     pub enrichment_tables: IndexMap<ComponentKey, EnrichmentTableOuter>,
     tests: Vec<TestDefinition>,
     secret: IndexMap<ComponentKey, SecretBackends>,
+    pub graceful_shutdown_duration: Option<Duration>,
 }
 
 impl Config {
@@ -1100,7 +1104,7 @@ mod tests {
                     type = "filter"
                     inputs = ["internal_metrics"]
                     condition = """
-                        .name == "processed_bytes_total"
+                        .name == "component_received_bytes_total"
                     """
 
                 [sinks.out]
@@ -1131,7 +1135,7 @@ mod tests {
                     type = "filter"
                     inputs = ["internal_metrics"]
                     condition = """
-                        .name == "processed_bytes_total"
+                        .name == "component_received_bytes_total"
                     """
 
                 [sinks.out]

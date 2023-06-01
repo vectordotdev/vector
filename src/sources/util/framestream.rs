@@ -28,9 +28,7 @@ use tracing::{field, Instrument};
 
 use crate::{
     event::Event,
-    internal_events::{
-        SocketEventsReceived, SocketMode, UnixSocketError, UnixSocketFileDeleteError,
-    },
+    internal_events::{UnixSocketError, UnixSocketFileDeleteError},
     shutdown::ShutdownSignal,
     sources::Source,
     SourceSender,
@@ -157,11 +155,6 @@ impl FrameStreamReader {
         } else {
             //data frame
             if self.state.control_state == ControlState::ReadingData {
-                emit!(SocketEventsReceived {
-                    mode: SocketMode::Unix,
-                    byte_size: frame.len(),
-                    count: 1
-                });
                 Some(frame) //return data frame
             } else {
                 error!(

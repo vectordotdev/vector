@@ -4,6 +4,7 @@ use futures::{Stream, StreamExt};
 use vector_common::internal_event::{
     self, register, CountByteSize, EventsSent, InternalEventHandle as _, Registered, DEFAULT_OUTPUT,
 };
+use vector_common::json_size::JsonSize;
 use vector_common::EventDataEq;
 
 use crate::{
@@ -40,34 +41,6 @@ impl Transform {
         Transform::Function(Box::new(v))
     }
 
-    /// Mutably borrow the inner transform as a function transform.
-    ///
-    /// # Panics
-    ///
-    /// If the transform is not a [`FunctionTransform`] this will panic.
-    pub fn as_function(&mut self) -> &mut Box<dyn FunctionTransform> {
-        match self {
-            Transform::Function(t) => t,
-            _ => panic!(
-                "Called `Transform::as_function` on something that was not a function variant."
-            ),
-        }
-    }
-
-    /// Transmute the inner transform into a function transform.
-    ///
-    /// # Panics
-    ///
-    /// If the transform is not a [`FunctionTransform`] this will panic.
-    pub fn into_function(self) -> Box<dyn FunctionTransform> {
-        match self {
-            Transform::Function(t) => t,
-            _ => panic!(
-                "Called `Transform::into_function` on something that was not a function variant."
-            ),
-        }
-    }
-
     /// Create a new synchronous transform.
     ///
     /// This is a broader trait than the simple [`FunctionTransform`] in that it allows transforms
@@ -102,20 +75,6 @@ impl Transform {
     /// TODO
     pub fn event_task(v: impl TaskTransform<Event> + 'static) -> Self {
         Transform::Task(Box::new(WrapEventTask(v)))
-    }
-
-    /// Mutably borrow the inner transform as a task transform.
-    ///
-    /// # Panics
-    ///
-    /// If the transform is a [`FunctionTransform`] this will panic.
-    pub fn as_task(&mut self) -> &mut Box<dyn TaskTransform<EventArray>> {
-        match self {
-            Transform::Task(t) => t,
-            _ => {
-                panic!("Called `Transform::as_task` on something that was not a task variant.")
-            }
-        }
     }
 
     /// Transmute the inner transform into a task transform.
@@ -289,7 +248,7 @@ impl TransformOutputs {
         if let Some(primary) = self.primary_output.as_mut() {
             let count = buf.primary_buffer.as_ref().map_or(0, OutputBuffer::len);
             let byte_size = buf.primary_buffer.as_ref().map_or(
-                0,
+                JsonSize::new(0),
                 EstimatedJsonEncodedSizeOf::estimated_json_encoded_size_of,
             );
             buf.primary_buffer
@@ -529,7 +488,7 @@ impl EventDataEq<Vec<Event>> for OutputBuffer {
 }
 
 impl EstimatedJsonEncodedSizeOf for OutputBuffer {
-    fn estimated_json_encoded_size_of(&self) -> usize {
+    fn estimated_json_encoded_size_of(&self) -> JsonSize {
         self.0
             .iter()
             .map(EstimatedJsonEncodedSizeOf::estimated_json_encoded_size_of)

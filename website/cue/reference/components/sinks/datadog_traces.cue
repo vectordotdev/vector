@@ -4,7 +4,8 @@ components: sinks: datadog_traces: {
 	title: "Datadog Traces"
 
 	classes: sinks._datadog.classes & {
-		stateful: true
+		stateful:    true
+		development: "beta"
 	}
 
 	features: {
@@ -73,12 +74,5 @@ components: sinks: datadog_traces: {
 		logs:    false
 		metrics: null
 		traces:  true
-	}
-
-	telemetry: metrics: {
-		component_discarded_events_total: components.sources.internal_metrics.output.metrics.component_discarded_events_total
-		component_errors_total:           components.sources.internal_metrics.output.metrics.component_errors_total
-		component_sent_events_total:      components.sources.internal_metrics.output.metrics.component_sent_events_total
-		component_sent_event_bytes_total: components.sources.internal_metrics.output.metrics.component_sent_event_bytes_total
 	}
 }

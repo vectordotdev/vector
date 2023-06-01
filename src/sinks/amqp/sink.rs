@@ -12,6 +12,7 @@ use serde::Serialize;
 use std::sync::Arc;
 use tower::ServiceBuilder;
 use vector_buffers::EventCount;
+use vector_common::json_size::JsonSize;
 use vector_core::{sink::StreamSink, ByteSizeOf, EstimatedJsonEncodedSizeOf};
 
 use super::{
@@ -49,7 +50,7 @@ impl ByteSizeOf for AmqpEvent {
 }
 
 impl EstimatedJsonEncodedSizeOf for AmqpEvent {
-    fn estimated_json_encoded_size_of(&self) -> usize {
+    fn estimated_json_encoded_size_of(&self) -> JsonSize {
         self.event.estimated_json_encoded_size_of()
     }
 }

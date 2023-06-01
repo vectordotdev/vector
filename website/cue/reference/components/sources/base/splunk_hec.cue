@@ -9,7 +9,7 @@ base: components: sources: splunk_hec: configuration: {
 				description: """
 					Whether or not to remove channels after idling for `max_idle_time` seconds.
 
-					A channel is idling if it is not used for sending data or querying ack statuses.
+					A channel is idling if it is not used for sending data or querying acknowledgement statuses.
 					"""
 				required: false
 				type: bool: default: false
@@ -41,7 +41,7 @@ base: components: sources: splunk_hec: configuration: {
 			}
 			max_pending_acks: {
 				description: """
-					The maximum number of ack statuses pending query across all channels.
+					The maximum number of acknowledgement statuses pending query across all channels.
 
 					Equivalent to the `max_number_of_acked_requests_pending_query` Splunk HEC setting.
 
@@ -52,7 +52,7 @@ base: components: sources: splunk_hec: configuration: {
 			}
 			max_pending_acks_per_channel: {
 				description: """
-					The maximum number of ack statuses pending query for a single channel.
+					The maximum number of acknowledgement statuses pending query for a single channel.
 
 					Equivalent to the `max_number_of_acked_requests_pending_query_per_ack_channel` Splunk HEC setting.
 

@@ -104,10 +104,25 @@ fn format_metric(total: i64, throughput: i64, human_metrics: bool) -> String {
     }
 }
 
+fn format_metric_bytes(total: i64, throughput: i64, human_metrics: bool) -> String {
+    match total {
+        0 => "N/A".to_string(),
+        v => format!(
+            "{} ({}/s)",
+            if human_metrics {
+                v.human_format_bytes()
+            } else {
+                v.thousands_format()
+            },
+            throughput.human_format_bytes()
+        ),
+    }
+}
+
 const NUM_COLUMNS: usize = if is_allocation_tracking_enabled() {
-    9
+    10
 } else {
-    8
+    9
 };
 
 static HEADER: [&str; NUM_COLUMNS] = [
@@ -116,11 +131,12 @@ static HEADER: [&str; NUM_COLUMNS] = [
     "Kind",
     "Type",
     "Events In",
+    "Bytes In",
     "Events Out",
-    "Bytes",
+    "Bytes Out",
     "Errors",
     #[cfg(feature = "allocation-tracing")]
-    "Mem Usage Bytes",
+    "Memory Used",
 ];
 
 struct Widgets<'a> {
@@ -152,15 +168,17 @@ impl<'a> Widgets<'a> {
         area: Rect,
         connection_status: &ConnectionStatus,
     ) {
-        let text = vec![Spans::from(vec![
+        let mut text = vec![
             Span::from(self.url_string),
             Span::styled(
                 format!(" | Sampling @ {}ms", self.opts.interval.thousands_format()),
                 Style::default().fg(Color::Gray),
             ),
             Span::from(" | "),
-            Span::styled(connection_status.to_string(), connection_status.style()),
-        ])];
+        ];
+        text.extend(connection_status.as_ui_spans());
+
+        let text = vec![Spans::from(text)];
 
         let block = Block::default().borders(Borders::ALL).title(Span::styled(
             "Vector",
@@ -201,14 +219,19 @@ impl<'a> Widgets<'a> {
                     r.received_events_throughput_sec,
                     self.opts.human_metrics,
                 ),
+                format_metric_bytes(
+                    r.received_bytes_total,
+                    r.received_bytes_throughput_sec,
+                    self.opts.human_metrics,
+                ),
                 format_metric(
                     r.sent_events_total,
                     r.sent_events_throughput_sec,
                     self.opts.human_metrics,
                 ),
-                format_metric(
-                    r.processed_bytes_total,
-                    r.processed_bytes_throughput_sec,
+                format_metric_bytes(
+                    r.sent_bytes_total,
+                    r.sent_bytes_throughput_sec,
                     self.opts.human_metrics,
                 ),
                 if self.opts.human_metrics {
@@ -217,7 +240,7 @@ impl<'a> Widgets<'a> {
                     r.errors.thousands_format()
                 },
                 #[cfg(feature = "allocation-tracing")]
-                r.allocated_bytes.human_format(),
+                r.allocated_bytes.human_format_bytes(),
             ];
 
             data.extend_from_slice(&formatted_metrics);
@@ -248,26 +271,28 @@ impl<'a> Widgets<'a> {
             .column_spacing(2)
             .widths(if is_allocation_tracking_enabled() {
                 &[
-                    Constraint::Percentage(15), // ID
-                    Constraint::Percentage(6),  // Output
-                    Constraint::Percentage(8),  // Kind
-                    Constraint::Percentage(10), // Type
+                    Constraint::Percentage(13), // ID
+                    Constraint::Percentage(8),  // Output
+                    Constraint::Percentage(4),  // Kind
+                    Constraint::Percentage(9),  // Type
                     Constraint::Percentage(10), // Events In
+                    Constraint::Percentage(12), // Bytes In
                     Constraint::Percentage(10), // Events Out
-                    Constraint::Percentage(10), // Bytes
-                    Constraint::Percentage(5),  // Errors
-                    Constraint::Percentage(16), // Allocated Bytes
+                    Constraint::Percentage(12), // Bytes Out
+                    Constraint::Percentage(8),  // Errors
+                    Constraint::Percentage(14), // Allocated Bytes
                 ]
             } else {
                 &[
-                    Constraint::Percentage(15), // ID
-                    Constraint::Percentage(15), // Output
-                    Constraint::Percentage(10), // Kind
-                    Constraint::Percentage(10), // Type
-                    Constraint::Percentage(10), // Events In
-                    Constraint::Percentage(10), // Events Out
-                    Constraint::Percentage(10), // Bytes
-                    Constraint::Percentage(10), // Errors
+                    Constraint::Percentage(13), // ID
+                    Constraint::Percentage(12), // Output
+                    Constraint::Percentage(9),  // Kind
+                    Constraint::Percentage(6),  // Type
+                    Constraint::Percentage(12), // Events In
+                    Constraint::Percentage(14), // Bytes In
+                    Constraint::Percentage(12), // Events Out
+                    Constraint::Percentage(14), // Bytes Out
+                    Constraint::Percentage(8),  // Errors
                 ]
             });
         f.render_widget(w, area);

@@ -12,7 +12,7 @@ use similar_asserts::assert_eq;
 use std::collections::BTreeMap;
 use tonic::Request;
 use vector_core::config::LogNamespace;
-use vrl::value::value;
+use vrl::value;
 
 use crate::{
     config::{SourceConfig, SourceContext},

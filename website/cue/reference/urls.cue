@@ -586,7 +586,6 @@ urls: {
 	vector_remap_transform:                     "/docs/reference/configuration/transforms/remap/"
 	vector_remap_transform_multiple:            "/docs/reference/configuration/transforms/remap/#emitting-multiple-log-events"
 	vector_repo:                                "\(github)/vectordotdev/vector"
-	vector_roadmap:                             "https://roadmap.vector.dev"
 	vector_roles:                               "/docs/setup/deployment/roles"
 	vector_route_transform:                     "/docs/reference/configuration/transforms/route"
 	vector_rpm_source_files:                    "\(vector_repo)/tree/master/distribution/rpm"

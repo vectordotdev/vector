@@ -12,7 +12,7 @@ set -u
 
 # If PACKAGE_ROOT is unset or empty, default it.
 PACKAGE_ROOT="${PACKAGE_ROOT:-"https://packages.timber.io/vector"}"
-VECTOR_VERSION="0.29.1"
+VECTOR_VERSION="0.30.0"
 _divider="--------------------------------------------------------------------------------"
 _prompt=">>>"
 _indent="   "
@@ -139,6 +139,7 @@ install_from_archive() {
     assert_nz "$_arch" "arch"
 
     local _archive_arch=""
+
     case "$_arch" in
         x86_64-apple-darwin)
             _archive_arch=$_arch
@@ -152,13 +153,13 @@ install_from_archive() {
         aarch64-*linux*)
             _archive_arch="aarch64-unknown-linux-musl"
             ;;
-	    armv7-*linux*-gnu)
+        armv7-*linux*-gnueabihf)
             _archive_arch="armv7-unknown-linux-gnueabihf"
             ;;
-	    armv7-*linux*-musl)
+        armv7-*linux*-musleabihf)
             _archive_arch="armv7-unknown-linux-musleabihf"
             ;;
-        *)
+          *)
             err "unsupported arch: $_arch"
             ;;
     esac

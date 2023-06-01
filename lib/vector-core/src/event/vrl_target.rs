@@ -588,7 +588,7 @@ mod test {
     use chrono::{offset::TimeZone, Utc};
     use lookup::owned_value_path;
     use similar_asserts::assert_eq;
-    use vrl::value::btreemap;
+    use vrl::btreemap;
 
     use super::super::MetricValue;
     use super::*;
@@ -858,7 +858,7 @@ mod test {
 
     #[test]
     fn log_into_events() {
-        use vrl::value::btreemap;
+        use vrl::btreemap;
 
         let cases = vec![
             (

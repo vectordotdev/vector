@@ -1,8 +1,8 @@
-# Executes various builds of vector to time the results in order to track build times.
+# Executes various builds of vector to time the results in order to track compilation times.
 #
 # This workflow is unrelated to the Regression workflow.
 
-name: Baseline Timings
+name: Compilation Timings
 
 on:
   workflow_dispatch:

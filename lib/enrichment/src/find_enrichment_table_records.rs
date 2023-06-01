@@ -194,6 +194,7 @@ mod tests {
     use vector_common::TimeZone;
     use vrl::compiler::state::RuntimeState;
     use vrl::compiler::TargetValue;
+    use vrl::value;
     use vrl::value::Secrets;
 
     use super::*;
