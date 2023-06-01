@@ -90,7 +90,7 @@ impl RequestBuilder<Event> for DatadogEventsRequestBuilder {
     }
 
     fn split_input(&self, event: Event) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
-        let builder = RequestMetadataBuilder::from_events(&event);
+        let builder = RequestMetadataBuilder::from_event(&event);
 
         let mut log = event.into_log();
         let metadata = Metadata {

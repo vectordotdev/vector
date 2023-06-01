@@ -19,18 +19,24 @@ pub struct RequestMetadataBuilder {
 }
 
 impl RequestMetadataBuilder {
-    pub fn from_events<E>(events: E) -> Self
+    pub fn from_events<E>(events: &[E]) -> Self
     where
-        E: ByteSizeOf + EventCount + EstimatedJsonEncodedSizeOf,
+        E: ByteSizeOf + EventCount + GetEventCountTags + EstimatedJsonEncodedSizeOf,
     {
+        let mut size = RequestCountByteSize::default();
+        let mut event_count = 0;
+        let mut events_byte_size = 0;
+
+        for event in events {
+            event_count += 1;
+            events_byte_size += event.size_of();
+            size.add_event(event, event.estimated_json_encoded_size_of());
+        }
+
         Self {
-            event_count: events.event_count(),
-            events_byte_size: events.size_of(),
-            events_estimated_json_encoded_byte_size: CountByteSize(
-                events.event_count(),
-                events.estimated_json_encoded_size_of(),
-            )
-            .into(),
+            event_count,
+            events_byte_size,
+            events_estimated_json_encoded_byte_size: size,
         }
     }
 

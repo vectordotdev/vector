@@ -282,7 +282,8 @@ impl EventEncoder {
 
         self.transformer.transform(&mut event);
         let mut bytes = BytesMut::new();
-        self.encoder.encode(event, &mut bytes).ok();
+        // TODO this is all wrong?
+        self.encoder.encode(event.clone(), &mut bytes).ok();
 
         // If no labels are provided we set our own default
         // `{agent="vector"}` label. This can happen if the only
@@ -296,6 +297,7 @@ impl EventEncoder {
 
         Some(LokiRecord {
             labels,
+            original_event: event,
             event: LokiEvent {
                 timestamp,
                 event: bytes.freeze(),

@@ -32,8 +32,8 @@ impl DriverResponse for PulsarResponse {
         EventStatus::Delivered
     }
 
-    fn events_sent(&self) -> RequestCountByteSize {
-        self.event_byte_size.clone()
+    fn events_sent(&self) -> &RequestCountByteSize {
+        &self.event_byte_size
     }
 
     fn bytes_sent(&self) -> Option<usize> {

@@ -18,7 +18,7 @@ impl DriverResponse for HecResponse {
         self.event_status
     }
 
-    fn events_sent(&self) -> RequestCountByteSize {
-        self.events_byte_size.clone()
+    fn events_sent(&self) -> &RequestCountByteSize {
+        &self.events_byte_size
     }
 }

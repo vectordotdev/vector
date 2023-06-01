@@ -48,8 +48,8 @@ impl DriverResponse for KinesisResponse {
         EventStatus::Delivered
     }
 
-    fn events_sent(&self) -> RequestCountByteSize {
-        self.events_byte_size.clone()
+    fn events_sent(&self) -> &RequestCountByteSize {
+        &self.events_byte_size
     }
 }
 

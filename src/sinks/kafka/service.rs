@@ -43,8 +43,8 @@ impl DriverResponse for KafkaResponse {
         EventStatus::Delivered
     }
 
-    fn events_sent(&self) -> RequestCountByteSize {
-        self.event_byte_size.clone()
+    fn events_sent(&self) -> &RequestCountByteSize {
+        &self.event_byte_size
     }
 }
 
@@ -89,9 +89,8 @@ impl Service<KafkaRequest> for KafkaService {
 
         Box::pin(async move {
             let event_byte_size = request
-                .get_metadata()
-                .events_estimated_json_encoded_byte_size()
-                .clone();
+                .request_metadata
+                .into_events_estimated_json_encoded_byte_size();
 
             let mut record =
                 FutureRecord::to(&request.metadata.topic).payload(request.body.as_ref());

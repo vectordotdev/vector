@@ -66,8 +66,8 @@ impl DriverResponse for SendMessageResponse {
         EventStatus::Delivered
     }
 
-    fn events_sent(&self) -> RequestCountByteSize {
-        self.json_byte_size.clone()
+    fn events_sent(&self) -> &RequestCountByteSize {
+        &self.json_byte_size
     }
 
     fn bytes_sent(&self) -> Option<usize> {

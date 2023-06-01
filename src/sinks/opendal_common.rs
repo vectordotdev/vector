@@ -23,7 +23,6 @@ use vector_common::{
     request_metadata::{MetaDescriptive, RequestCountByteSize, RequestMetadata},
 };
 use vector_core::{
-    internal_event::CountByteSize,
     sink::StreamSink,
     stream::{BatcherSettings, DriverResponse},
     EstimatedJsonEncodedSizeOf,
@@ -237,8 +236,7 @@ impl RequestBuilder<(String, Vec<Event>)> for OpenDalRequestBuilder {
 /// OpenDalResponse is the response returned by OpenDAL services.
 #[derive(Debug)]
 pub struct OpenDalResponse {
-    pub count: usize,
-    pub events_byte_size: JsonSize,
+    pub events_byte_size: RequestCountByteSize,
     pub byte_size: usize,
 }
 
@@ -247,8 +245,8 @@ impl DriverResponse for OpenDalResponse {
         EventStatus::Delivered
     }
 
-    fn events_sent(&self) -> RequestCountByteSize {
-        CountByteSize(self.count, self.events_byte_size).into()
+    fn events_sent(&self) -> &RequestCountByteSize {
+        &self.events_byte_size
     }
 
     fn bytes_sent(&self) -> Option<usize> {
@@ -277,8 +275,9 @@ impl Service<OpenDalRequest> for OpenDalService {
                 .in_current_span()
                 .await;
             result.map(|_| OpenDalResponse {
-                count: request.metadata.count,
-                events_byte_size: request.metadata.byte_size,
+                events_byte_size: request
+                    .request_metadata
+                    .into_events_estimated_json_encoded_byte_size(),
                 byte_size,
             })
         })

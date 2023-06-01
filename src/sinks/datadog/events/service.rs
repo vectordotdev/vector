@@ -31,8 +31,8 @@ impl DriverResponse for DatadogEventsResponse {
         self.event_status
     }
 
-    fn events_sent(&self) -> RequestCountByteSize {
-        self.event_byte_size.clone()
+    fn events_sent(&self) -> &RequestCountByteSize {
+        &self.event_byte_size
     }
 
     fn bytes_sent(&self) -> Option<usize> {

@@ -93,7 +93,7 @@ impl RequestBuilder<Event> for SqsRequestBuilder {
             None => None,
         };
 
-        let builder = RequestMetadataBuilder::from_events(&event);
+        let builder = RequestMetadataBuilder::from_event(&event);
 
         let sqs_metadata = SqsMetadata {
             finalizers: event.take_finalizers(),

@@ -11,9 +11,7 @@ use lapin::{options::ConfirmSelectOptions, BasicProperties};
 use serde::Serialize;
 use std::sync::Arc;
 use tower::ServiceBuilder;
-use vector_buffers::EventCount;
-use vector_common::json_size::JsonSize;
-use vector_core::{sink::StreamSink, ByteSizeOf, EstimatedJsonEncodedSizeOf};
+use vector_core::sink::StreamSink;
 
 use super::{
     config::{AmqpPropertiesConfig, AmqpSinkConfig},
@@ -34,25 +32,6 @@ pub(super) struct AmqpEvent {
     pub(super) exchange: String,
     pub(super) routing_key: String,
     pub(super) properties: BasicProperties,
-}
-
-impl EventCount for AmqpEvent {
-    fn event_count(&self) -> usize {
-        // An AmqpEvent represents one event.
-        1
-    }
-}
-
-impl ByteSizeOf for AmqpEvent {
-    fn allocated_bytes(&self) -> usize {
-        self.event.size_of()
-    }
-}
-
-impl EstimatedJsonEncodedSizeOf for AmqpEvent {
-    fn estimated_json_encoded_size_of(&self) -> JsonSize {
-        self.event.estimated_json_encoded_size_of()
-    }
 }
 
 pub(super) struct AmqpSink {

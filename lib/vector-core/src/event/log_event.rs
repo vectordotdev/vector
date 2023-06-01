@@ -16,6 +16,7 @@ use lookup::PathPrefix;
 use serde::{Deserialize, Serialize, Serializer};
 use vector_common::{
     json_size::{JsonSize, NonZeroJsonSize},
+    request_metadata::{EventCountTags, GetEventCountTags},
     EventDataEq,
 };
 
@@ -209,6 +210,17 @@ impl Finalizable for LogEvent {
 impl EstimatedJsonEncodedSizeOf for LogEvent {
     fn estimated_json_encoded_size_of(&self) -> JsonSize {
         self.inner.estimated_json_encoded_size_of()
+    }
+}
+
+impl GetEventCountTags for LogEvent {
+    fn get_tags(&self) -> EventCountTags {
+        let source = self.metadata().source_id().map(|id| id.to_string());
+        let service = self
+            .get_by_meaning("service")
+            .map(|service| service.to_string());
+
+        (source, service)
     }
 }
 

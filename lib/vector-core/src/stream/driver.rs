@@ -18,8 +18,7 @@ use crate::{
 
 pub trait DriverResponse {
     fn event_status(&self) -> EventStatus;
-    // TODO This should be a reference to avoid the clone.
-    fn events_sent(&self) -> RequestCountByteSize;
+    fn events_sent(&self) -> &RequestCountByteSize;
 
     /// Return the number of bytes that were sent in the request that returned this response.
     // TODO, remove the default implementation once all sinks have
@@ -315,15 +314,25 @@ mod tests {
         }
     }
 
-    struct DelayResponse;
+    struct DelayResponse {
+        events_sent: RequestCountByteSize,
+    }
+
+    impl DelayResponse {
+        fn new() -> Self {
+            Self {
+                events_sent: CountByteSize(1, JsonSize::new(1)).into(),
+            }
+        }
+    }
 
     impl DriverResponse for DelayResponse {
         fn event_status(&self) -> EventStatus {
             EventStatus::Delivered
         }
 
-        fn events_sent(&self) -> RequestCountByteSize {
-            CountByteSize(1, JsonSize::new(1)).into()
+        fn events_sent(&self) -> &RequestCountByteSize {
+            &self.events_sent
         }
     }
 
@@ -408,7 +417,7 @@ mod tests {
                 drop(permit);
                 drop(req);
 
-                Ok(DelayResponse)
+                Ok(DelayResponse::new())
             })
         }
     }
