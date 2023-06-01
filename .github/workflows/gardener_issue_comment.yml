@@ -45,7 +45,7 @@ jobs:
           fi
 
           current_status="$(gh api graphql -f query='
-            query($node_id: ID!) {
+            query {
               node(id: $item_id) {
                 ... on ProjectV2Item {
                   fieldValueByName(name: "Status") {
