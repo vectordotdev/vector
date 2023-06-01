@@ -5,10 +5,10 @@ on:
 
 jobs:
   move-to-backlog:
-    name: Move done issues back to Gardener project board backlog
+    name: Move issues back to Gardener project board Triage
     runs-on: ubuntu-latest
     steps:
-      - name: Move issue back to backlog if status is Done
+      - name: Move issue back to Triage if status is Blocked/Waiting
         run: |
           # ids fetched from https://docs.github.com/en/graphql/overview/explorer
           project_id="PVT_kwDOAQFeYs4AAsTr" # Gardener
@@ -26,7 +26,7 @@ jobs:
                   }
                 }
             }' -f project_id="$project_id" -f content_id="$issue_id" -q '.data.addProjectV2ItemById.item.id'
-          ")
+          )"
 
           current_status="$(gh api graphql -f query='
             query($node_id: ID!) {
@@ -40,9 +40,9 @@ jobs:
                 }
               }
             }'
-          ") -f item_id="$item_id" -q '.data.node.fieldValueByName.name'
+          )" -f item_id="$item_id" -q '.data.node.fieldValueByName.name'
 
-          if [[ "$current_status" = "Done" ]] ; then
+          if [[ "$current_status" = "Blocked / Waiting" ]] ; then
             echo "Moving issue from Done to Backlog"
             gh api graphql -f query='
               mutation($project_id: ID!, $item_id: ID!, $field_id: ID!, $option_id: String) {
