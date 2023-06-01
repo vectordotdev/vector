@@ -55,7 +55,7 @@ jobs:
                   }
                 }
               }
-            }' -f item_id="$item_id" -q '.data.node.fieldValueByName.name'
+            }' -f item_id="$item_id"
           )"
 
           echo "Current issue status is: $current_status"
