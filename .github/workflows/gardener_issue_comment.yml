@@ -12,7 +12,7 @@ jobs:
     steps:
       - name: Move issue back to Triage if status is Blocked/Waiting
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_PAT_PROJECTS }}
         run: |
           # ids fetched from https://docs.github.com/en/graphql/overview/explorer
           # project_id="PVT_kwDOAQFeYs4AAsTr" # Gardener
