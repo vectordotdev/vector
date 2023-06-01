@@ -151,6 +151,7 @@ pub struct DockerLogsConfig {
     /// The amount of time to wait before retrying after an error.
     #[serde_as(as = "serde_with::DurationSeconds<u64>")]
     #[serde(default = "default_retry_backoff_secs")]
+    #[configurable(metadata(docs::human_name = "Retry Backoff"))]
     retry_backoff_secs: Duration,
 
     /// Multiline aggregation configuration.

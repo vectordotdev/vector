@@ -152,6 +152,7 @@ pub struct JournaldConfig {
     /// permissions to this directory.
     #[serde(default)]
     #[configurable(metadata(docs::examples = "/var/lib/vector"))]
+    #[configurable(metadata(docs::human_name = "Data Directory"))]
     pub data_dir: Option<PathBuf>,
 
     /// The systemd journal is read in batches, and a checkpoint is set at the end of each batch.

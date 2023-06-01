@@ -66,6 +66,7 @@ pub struct Config {
     /// The maximum amount of time to wait for the next additional line, in milliseconds.
     ///
     /// Once this timeout is reached, the buffered message is guaranteed to be flushed, even if incomplete.
+    #[configurable(metadata(docs::human_name = "Timeout"))]
     pub timeout: Duration,
 }
 

@@ -45,6 +45,7 @@ pub struct AwsSqsConfig {
     #[serde(default = "default_poll_secs")]
     #[derivative(Default(value = "default_poll_secs()"))]
     #[configurable(metadata(docs::type_unit = "seconds"))]
+    #[configurable(metadata(docs::human_name = "Poll Wait Time"))]
     pub poll_secs: u32,
 
     /// The visibility timeout to use for messages, in seconds.
