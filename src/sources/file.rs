@@ -214,7 +214,7 @@ pub struct FileConfig {
     #[serde(default)]
     pub oldest_first: bool,
 
-    /// Timeout, in seconds, from reaching `EOF` after which the file is removed from the filesystem, unless new data is written in the meantime.
+    /// After reaching EOF, the number of seconds to wait before removing the file, unless new data is written.
     ///
     /// If not specified, files are not removed.
     #[serde(alias = "remove_after", default)]
