@@ -35,9 +35,13 @@ jobs:
             }' -f project_id="$project_id" -f content_id="$issue_id" -q '.data.addProjectV2ItemById.item.id'
           )"
 
+          echo "item_id: $item_id"
+
           if [ -z "$item_id" ] ; then
             echo "Issue not found in Gardener board"
             exit 0
+          else
+            echo "Found issue on Gardener board"
           fi
 
           current_status="$(gh api graphql -f query='
@@ -54,7 +58,7 @@ jobs:
             }' -f item_id="$item_id" -q '.data.node.fieldValueByName.name'
           )"
 
-          if [[ "$current_status" = "Blocked / Waiting" ]] ; then
+          if [[ "$current_status" == "Blocked / Waiting" ]] ; then
             echo "Moving issue from Blocked / Waiting to Triage"
             gh api graphql -f query='
               mutation($project_id: ID!, $item_id: ID!, $field_id: ID!, $option_id: String) {
