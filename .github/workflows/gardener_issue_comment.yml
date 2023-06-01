@@ -45,7 +45,7 @@ jobs:
           fi
 
           current_status="$(gh api graphql -f query='
-            query {
+            query($item_id: ID!) {
               node(id: $item_id) {
                 ... on ProjectV2Item {
                   fieldValueByName(name: "Status") {
@@ -54,8 +54,8 @@ jobs:
                     }
                   }
                 }
-              } -f item_id="$item_id"
-            }' 
+              }
+            }' -f item_id="$item_id"
           )"
 
           echo "Current issue status is: $current_status"
