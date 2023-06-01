@@ -222,7 +222,7 @@ pub struct FileConfig {
     #[configurable(metadata(docs::examples = 0))]
     #[configurable(metadata(docs::examples = 5))]
     #[configurable(metadata(docs::examples = 60))]
-    #[configurable(metadata(docs::human_name = "Remove After"))]
+    #[configurable(metadata(docs::human_name = "Wait Time Before Removing File"))]
     pub remove_after_secs: Option<u64>,
 
     /// String sequence used to separate one file line from another.
