@@ -290,10 +290,11 @@ fn encode_event(
     transformer.transform(&mut event);
 
     let mut bytes = BytesMut::new();
-    let byte_size = bytes.len();
 
     // Errors are handled by `Encoder`.
     encoder.encode(event, &mut bytes).ok()?;
+
+    let byte_size = bytes.len();
     let value = bytes.freeze();
 
     let event = EncodedEvent::new(RedisKvEntry { key, value }, byte_size, event_byte_size);
