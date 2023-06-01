@@ -11,7 +11,7 @@ use warp::http::HeaderMap;
 ))]
 use super::error::ErrorMessage;
 
-/// HTTP basic authentication configuration.
+/// HTTP Basic authentication configuration.
 #[configurable_component]
 #[derive(Clone, Debug)]
 pub struct HttpSourceAuthConfig {

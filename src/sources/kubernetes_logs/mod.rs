@@ -168,7 +168,7 @@ pub struct Config {
     #[serde(default)]
     #[configurable(metadata(docs::type_unit = "seconds"))]
     #[configurable(metadata(docs::examples = 600))]
-    #[configurable(metadata(docs::human_name = "Ignore Older Files"))]
+    #[configurable(metadata(docs::human_name = "Ignore Files Older Than"))]
     ignore_older_secs: Option<u64>,
 
     /// Max amount of bytes to read from a single file before switching over
