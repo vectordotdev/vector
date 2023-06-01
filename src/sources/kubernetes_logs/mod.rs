@@ -158,7 +158,6 @@ pub struct Config {
 
     /// A list of glob patterns to exclude from reading the files.
     #[configurable(metadata(docs::examples = "**/exclude/**"))]
-
     exclude_paths_glob_patterns: Vec<PathBuf>,
 
     #[configurable(derived)]
