@@ -109,6 +109,10 @@ cli: {
 			description: env_vars.VECTOR_WATCH_CONFIG.description
 			env_var:     "VECTOR_WATCH_CONFIG"
 		}
+		"no-graceful-shutdown-limit": {
+			description: env_vars.VECTOR_NO_GRACEFUL_SHUTDOWN_LIMIT.description
+			env_var:     "VECTOR_NO_GRACEFUL_SHUTDOWN_LIMIT"
+		}
 	}
 
 	_core_config_options: {
@@ -139,6 +143,12 @@ cli: {
 			type:        "string"
 			env_var:     "VECTOR_CONFIG_YAML"
 		}
+		"graceful-shutdown-limit-secs": {
+			description: env_vars.VECTOR_GRACEFUL_SHUTDOWN_LIMIT_SECS.description
+			default:     env_vars.VECTOR_GRACEFUL_SHUTDOWN_LIMIT_SECS.type.uint.default
+			env_var:     "VECTOR_GRACEFUL_SHUTDOWN_LIMIT_SECS"
+			type:        "integer"
+		}
 	}
 
 	// Reusable options
@@ -168,17 +178,6 @@ cli: {
 			default:     env_vars.VECTOR_INTERNAL_LOG_RATE_LIMIT.type.uint.default
 			type:        "integer"
 			env_var:     "VECTOR_INTERNAL_LOG_RATE_LIMIT"
-		}
-		"graceful_shutdown_limit_secs": {
-			type:        "integer"
-			description: env_vars.VECTOR_GRACEFUL_SHUTDOWN_LIMIT_SECS.description
-			default:     env_vars.VECTOR_GRACEFUL_SHUTDOWN_LIMIT_SECS.type.string.default
-			env_var:     "VECTOR_GRACEFUL_SHUTDOWN_LIMIT_SECS"
-		}
-		"no-graceful-shutdown-limit": {
-			description: env_vars.VECTOR_NO_GRACEFUL_SHUTDOWN_LIMIT.description
-			default:     env_vars.VECTOR_NO_GRACEFUL_SHUTDOWN_LIMIT.type.string.default
-			env_var:     "VECTOR_NO_GRACEFUL_SHUTDOWN_LIMIT"
 		}
 	}
 
