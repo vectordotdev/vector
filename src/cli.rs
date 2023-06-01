@@ -159,8 +159,9 @@ pub struct RootOpts {
     )]
     pub internal_log_rate_limit: u64,
 
-    /// Set the duration in seconds to wait for graceful shutdown after SIGINT or SIGTERM are received.
-    /// After the duration has passed, Vector will force shutdown.
+    /// Set the duration in seconds to wait for graceful shutdown after SIGINT or SIGTERM are
+    /// received. After the duration has passed, Vector will force shutdown. To never force
+    /// shutdown, use `--no-graceful-shutdown-limit`.
     #[arg(
         long,
         default_value = "60",
@@ -169,9 +170,9 @@ pub struct RootOpts {
     )]
     pub graceful_shutdown_limit_secs: NonZeroU64,
 
-    /// Never time out while waiting for graceful shutdown after SIGINT or SIGTERM received. This is useful
-    /// when you would like for Vector to attempt to send data until terminated by a SIGKILL. Overrides/cannot
-    /// be set with --graceful-shutdown-limit-secs.
+    /// Never time out while waiting for graceful shutdown after SIGINT or SIGTERM received.
+    /// This is useful when you would like for Vector to attempt to send data until terminated
+    /// by a SIGKILL. Overrides/cannot be set with `--graceful-shutdown-limit-secs`.
     #[arg(
         long,
         default_value = "false",
