@@ -58,6 +58,8 @@ jobs:
             }' -f item_id="$item_id" -q '.data.node.fieldValueByName.name'
           )"
 
+          echo "Current issue status is: $current_status"
+
           if [[ "$current_status" == "Blocked / Waiting" ]] ; then
             echo "Moving issue from Blocked / Waiting to Triage"
             gh api graphql -f query='
