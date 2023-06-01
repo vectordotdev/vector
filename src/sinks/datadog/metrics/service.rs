@@ -13,7 +13,6 @@ use tower::Service;
 use vector_common::request_metadata::{MetaDescriptive, RequestCountByteSize, RequestMetadata};
 use vector_core::{
     event::{EventFinalizers, EventStatus, Finalizable},
-    internal_event::CountByteSize,
     stream::DriverResponse,
 };
 
@@ -115,6 +114,10 @@ impl MetaDescriptive for DatadogMetricsRequest {
     fn get_metadata(&self) -> &RequestMetadata {
         &self.metadata
     }
+
+    fn take_metadata(&mut self) -> RequestMetadata {
+        std::mem::take(&mut self.metadata)
+    }
 }
 
 // Generalized wrapper around the raw response from Hyper.
@@ -122,8 +125,7 @@ impl MetaDescriptive for DatadogMetricsRequest {
 pub struct DatadogMetricsResponse {
     status_code: StatusCode,
     body: Bytes,
-    batch_size: usize,
-    byte_size: usize,
+    byte_size: RequestCountByteSize,
     raw_byte_size: usize,
 }
 
@@ -139,7 +141,7 @@ impl DriverResponse for DatadogMetricsResponse {
     }
 
     fn events_sent(&self) -> RequestCountByteSize {
-        CountByteSize(self.batch_size, self.byte_size).into()
+        self.byte_size.clone()
     }
 
     fn bytes_sent(&self) -> Option<usize> {
@@ -177,13 +179,13 @@ impl Service<DatadogMetricsRequest> for DatadogMetricsService {
     }
 
     // Emission of Error internal event is handled upstream by the caller
-    fn call(&mut self, request: DatadogMetricsRequest) -> Self::Future {
+    fn call(&mut self, mut request: DatadogMetricsRequest) -> Self::Future {
         let client = self.client.clone();
         let api_key = self.api_key.clone();
 
         Box::pin(async move {
-            let byte_size = request.get_metadata().events_byte_size();
-            let batch_size = request.get_metadata().event_count();
+            let metadata = request.take_metadata();
+            let byte_size = metadata.into_events_estimated_json_encoded_byte_size();
             let raw_byte_size = request.raw_bytes;
 
             let request = request
@@ -203,7 +205,6 @@ impl Service<DatadogMetricsRequest> for DatadogMetricsService {
             Ok(DatadogMetricsResponse {
                 status_code: parts.status,
                 body,
-                batch_size,
                 byte_size,
                 raw_byte_size,
             })

@@ -3,7 +3,10 @@ use std::error::Error;
 use metrics::{counter, histogram};
 use vector_core::internal_event::InternalEvent;
 
-use vector_common::internal_event::{error_stage, error_type};
+use vector_common::{
+    internal_event::{error_stage, error_type},
+    json_size::JsonSize,
+};
 
 #[derive(Debug)]
 pub struct HttpBytesReceived<'a> {
@@ -31,7 +34,7 @@ impl InternalEvent for HttpBytesReceived<'_> {
 #[derive(Debug)]
 pub struct HttpEventsReceived<'a> {
     pub count: usize,
-    pub byte_size: usize,
+    pub byte_size: JsonSize,
     pub http_path: &'a str,
     pub protocol: &'static str,
 }
@@ -54,7 +57,7 @@ impl InternalEvent for HttpEventsReceived<'_> {
         );
         counter!(
             "component_received_event_bytes_total",
-            self.byte_size as u64,
+            self.byte_size.get() as u64,
             "http_path" => self.http_path.to_string(),
             "protocol" => self.protocol,
         );

@@ -5,8 +5,8 @@ use vector_core::{ByteSizeOf, EstimatedJsonEncodedSizeOf};
 
 use vector_common::{
     internal_event::CountByteSize,
-    request_metadata::RequestMetadata,
-    request_metadata::{GetEventCountTags, RequestCountByteSize},
+    json_size::JsonSize,
+    request_metadata::{GetEventCountTags, RequestCountByteSize, RequestMetadata},
 };
 
 use super::request_builder::EncodeResult;
@@ -52,7 +52,7 @@ impl RequestMetadataBuilder {
     pub fn new(
         event_count: usize,
         events_byte_size: usize,
-        events_estimated_json_encoded_byte_size: usize,
+        events_estimated_json_encoded_byte_size: JsonSize,
     ) -> Self {
         Self {
             event_count,

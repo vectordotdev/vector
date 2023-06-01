@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::ops::Add;
 
 use crate::internal_event::CountByteSize;
+use crate::json_size::JsonSize;
 
 pub type EventCountTags = (Option<String>, Option<String>);
 
@@ -21,7 +22,7 @@ impl RequestCountByteSize {
         &self.sizes
     }
 
-    pub fn add_event<E>(&mut self, event: &E, json_size: usize)
+    pub fn add_event<E>(&mut self, event: &E, json_size: JsonSize)
     where
         E: GetEventCountTags,
     {
@@ -116,6 +117,13 @@ impl RequestMetadata {
         &self.events_estimated_json_encoded_byte_size
     }
 
+    /// Consumes the object and returns the byte size of the request grouped by
+    /// the tags (source and service).
+    #[must_use]
+    pub fn into_events_estimated_json_encoded_byte_size(self) -> RequestCountByteSize {
+        self.events_estimated_json_encoded_byte_size
+    }
+
     #[must_use]
     pub const fn request_encoded_size(&self) -> usize {
         self.request_encoded_size
@@ -158,4 +166,11 @@ impl<'a> Add<&'a RequestMetadata> for RequestMetadata {
 pub trait MetaDescriptive {
     /// Returns the `RequestMetadata` associated with this object.
     fn get_metadata(&self) -> &RequestMetadata;
+
+    /// Returns the owned `RequestMetadata`.
+    /// TODO Remove the default implementation because this is a
+    /// terrible way to do it.
+    fn take_metadata(&mut self) -> RequestMetadata {
+        self.get_metadata().clone()
+    }
 }

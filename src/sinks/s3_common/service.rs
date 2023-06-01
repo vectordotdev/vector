@@ -14,7 +14,6 @@ use tracing::Instrument;
 use vector_common::request_metadata::{MetaDescriptive, RequestCountByteSize, RequestMetadata};
 use vector_core::{
     event::{EventFinalizers, EventStatus, Finalizable},
-    internal_event::CountByteSize,
     stream::DriverResponse,
 };
 
@@ -41,6 +40,10 @@ impl MetaDescriptive for S3Request {
     fn get_metadata(&self) -> &RequestMetadata {
         &self.request_metadata
     }
+
+    fn take_metadata(&mut self) -> RequestMetadata {
+        std::mem::take(&mut self.request_metadata)
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -52,8 +55,7 @@ pub struct S3Metadata {
 
 #[derive(Debug)]
 pub struct S3Response {
-    count: usize,
-    events_byte_size: usize,
+    events_byte_size: RequestCountByteSize,
 }
 
 impl DriverResponse for S3Response {
@@ -62,7 +64,7 @@ impl DriverResponse for S3Response {
     }
 
     fn events_sent(&self) -> RequestCountByteSize {
-        CountByteSize(self.count, self.events_byte_size).into()
+        self.events_byte_size.clone()
     }
 }
 
@@ -99,9 +101,6 @@ impl Service<S3Request> for S3Service {
 
     // Emission of internal events for errors and dropped events is handled upstream by the caller.
     fn call(&mut self, request: S3Request) -> Self::Future {
-        let count = request.get_metadata().event_count();
-        let events_byte_size = request.get_metadata().events_byte_size();
-
         let options = request.options;
 
         let content_encoding = request.content_encoding;
@@ -121,6 +120,10 @@ impl Service<S3Request> for S3Service {
             }
             tagging.finish()
         });
+
+        let events_byte_size = request
+            .request_metadata
+            .into_events_estimated_json_encoded_byte_size();
 
         let client = self.client.clone();
 
@@ -145,10 +148,7 @@ impl Service<S3Request> for S3Service {
 
             let result = request.send().in_current_span().await;
 
-            result.map(|_| S3Response {
-                count,
-                events_byte_size,
-            })
+            result.map(|_| S3Response { events_byte_size })
         })
     }
 }

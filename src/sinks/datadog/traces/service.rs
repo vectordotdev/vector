@@ -12,7 +12,6 @@ use tower::Service;
 use vector_common::request_metadata::{MetaDescriptive, RequestCountByteSize, RequestMetadata};
 use vector_core::{
     event::{EventFinalizers, EventStatus, Finalizable},
-    internal_event::CountByteSize,
     stream::DriverResponse,
 };
 
@@ -90,8 +89,7 @@ impl MetaDescriptive for TraceApiRequest {
 pub struct TraceApiResponse {
     status_code: StatusCode,
     body: Bytes,
-    batch_size: usize,
-    byte_size: usize,
+    byte_size: RequestCountByteSize,
     uncompressed_size: usize,
 }
 
@@ -107,7 +105,7 @@ impl DriverResponse for TraceApiResponse {
     }
 
     fn events_sent(&self) -> RequestCountByteSize {
-        CountByteSize(self.batch_size, self.byte_size).into()
+        self.byte_size.clone()
     }
 
     fn bytes_sent(&self) -> Option<usize> {
@@ -142,12 +140,12 @@ impl Service<TraceApiRequest> for TraceApiService {
     }
 
     // Emission of Error internal event is handled upstream by the caller
-    fn call(&mut self, request: TraceApiRequest) -> Self::Future {
+    fn call(&mut self, mut request: TraceApiRequest) -> Self::Future {
         let client = self.client.clone();
 
         Box::pin(async move {
-            let byte_size = request.get_metadata().events_byte_size();
-            let batch_size = request.get_metadata().event_count();
+            let metadata = request.take_metadata();
+            let byte_size = metadata.into_events_estimated_json_encoded_byte_size();
             let uncompressed_size = request.uncompressed_size;
             let http_request = request.into_http_request().context(BuildRequestSnafu)?;
 
@@ -161,7 +159,6 @@ impl Service<TraceApiRequest> for TraceApiService {
             Ok(TraceApiResponse {
                 status_code: parts.status,
                 body,
-                batch_size,
                 byte_size,
                 uncompressed_size,
             })

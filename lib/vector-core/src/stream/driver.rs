@@ -18,6 +18,7 @@ use crate::{
 
 pub trait DriverResponse {
     fn event_status(&self) -> EventStatus;
+    // TODO This should be a reference to avoid the clone.
     fn events_sent(&self) -> RequestCountByteSize;
 
     /// Return the number of bytes that were sent in the request that returned this response.
@@ -274,6 +275,7 @@ mod tests {
     use tower::Service;
     use vector_common::{
         finalization::{BatchNotifier, EventFinalizer, EventFinalizers, EventStatus, Finalizable},
+        json_size::JsonSize,
         request_metadata::{RequestCountByteSize, RequestMetadata},
     };
     use vector_common::{internal_event::CountByteSize, request_metadata::MetaDescriptive};
@@ -321,7 +323,7 @@ mod tests {
         }
 
         fn events_sent(&self) -> RequestCountByteSize {
-            CountByteSize(1, 1).into()
+            CountByteSize(1, JsonSize::new(1)).into()
         }
     }
 

@@ -8,7 +8,7 @@ use aws_types::region::Region;
 use futures::future::BoxFuture;
 use tower::Service;
 use vector_common::request_metadata::{MetaDescriptive, RequestCountByteSize};
-use vector_core::{internal_event::CountByteSize, stream::DriverResponse};
+use vector_core::stream::DriverResponse;
 
 use super::{
     record::{Record, SendRecord},
@@ -40,8 +40,7 @@ where
 }
 
 pub struct KinesisResponse {
-    count: usize,
-    events_byte_size: usize,
+    events_byte_size: RequestCountByteSize,
 }
 
 impl DriverResponse for KinesisResponse {
@@ -50,7 +49,7 @@ impl DriverResponse for KinesisResponse {
     }
 
     fn events_sent(&self) -> RequestCountByteSize {
-        CountByteSize(self.count, self.events_byte_size).into()
+        self.events_byte_size.clone()
     }
 }
 
@@ -71,9 +70,9 @@ where
     }
 
     // Emission of internal events for errors and dropped events is handled upstream by the caller.
-    fn call(&mut self, requests: BatchKinesisRequest<R>) -> Self::Future {
-        let events_byte_size = requests.get_metadata().events_byte_size();
-        let count = requests.get_metadata().event_count();
+    fn call(&mut self, mut requests: BatchKinesisRequest<R>) -> Self::Future {
+        let metadata = requests.take_metadata();
+        let events_byte_size = metadata.into_events_estimated_json_encoded_byte_size();
 
         let records = requests
             .events
@@ -92,10 +91,7 @@ where
                 return Err(e);
             }
 
-            Ok(KinesisResponse {
-                count,
-                events_byte_size,
-            })
+            Ok(KinesisResponse { events_byte_size })
         })
     }
 }

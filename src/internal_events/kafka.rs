@@ -1,7 +1,10 @@
 use metrics::{counter, gauge};
 use vector_core::{internal_event::InternalEvent, update_counter};
 
-use vector_common::internal_event::{error_stage, error_type};
+use vector_common::{
+    internal_event::{error_stage, error_type},
+    json_size::JsonSize,
+};
 
 #[derive(Debug)]
 pub struct KafkaBytesReceived<'a> {
@@ -32,7 +35,7 @@ impl<'a> InternalEvent for KafkaBytesReceived<'a> {
 
 #[derive(Debug)]
 pub struct KafkaEventsReceived<'a> {
-    pub byte_size: usize,
+    pub byte_size: JsonSize,
     pub count: usize,
     pub topic: &'a str,
     pub partition: i32,
@@ -50,7 +53,7 @@ impl<'a> InternalEvent for KafkaEventsReceived<'a> {
         counter!("component_received_events_total", self.count as u64, "topic" => self.topic.to_string(), "partition" => self.partition.to_string());
         counter!(
             "component_received_event_bytes_total",
-            self.byte_size as u64,
+            self.byte_size.get() as u64,
             "topic" => self.topic.to_string(),
             "partition" => self.partition.to_string(),
         );

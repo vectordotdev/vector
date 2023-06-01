@@ -9,7 +9,7 @@ use http::Request;
 use hyper::Body;
 use tower::{Service, ServiceExt};
 use vector_common::request_metadata::{MetaDescriptive, RequestCountByteSize};
-use vector_core::{internal_event::CountByteSize, stream::DriverResponse};
+use vector_core::stream::DriverResponse;
 
 use crate::{
     event::EventStatus,
@@ -23,7 +23,7 @@ use crate::{
 pub struct DatadogEventsResponse {
     pub(self) event_status: EventStatus,
     pub http_status: http::StatusCode,
-    pub event_byte_size: usize,
+    pub event_byte_size: RequestCountByteSize,
 }
 
 impl DriverResponse for DatadogEventsResponse {
@@ -32,7 +32,7 @@ impl DriverResponse for DatadogEventsResponse {
     }
 
     fn events_sent(&self) -> RequestCountByteSize {
-        CountByteSize(1, self.event_byte_size).into()
+        self.event_byte_size.clone()
     }
 
     fn bytes_sent(&self) -> Option<usize> {
@@ -85,12 +85,13 @@ impl Service<DatadogEventsRequest> for DatadogEventsService {
     }
 
     // Emission of Error internal event is handled upstream by the caller
-    fn call(&mut self, req: DatadogEventsRequest) -> Self::Future {
+    fn call(&mut self, mut req: DatadogEventsRequest) -> Self::Future {
         let mut http_service = self.batch_http_service.clone();
 
         Box::pin(async move {
+            let metadata = req.take_metadata();
             http_service.ready().await?;
-            let event_byte_size = req.get_metadata().events_byte_size();
+            let event_byte_size = metadata.into_events_estimated_json_encoded_byte_size();
             let http_response = http_service.call(req).await?;
             let event_status = if http_response.is_successful() {
                 EventStatus::Delivered

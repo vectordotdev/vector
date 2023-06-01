@@ -1,14 +1,17 @@
 use std::borrow::Cow;
 
 use metrics::counter;
-use vector_common::internal_event::{error_stage, error_type};
+use vector_common::{
+    internal_event::{error_stage, error_type},
+    json_size::JsonSize,
+};
 use vector_core::internal_event::InternalEvent;
 
 use super::prelude::{http_error_code, hyper_error_code};
 
 #[derive(Debug)]
 pub struct AwsEcsMetricsEventsReceived<'a> {
-    pub byte_size: usize,
+    pub byte_size: JsonSize,
     pub count: usize,
     pub endpoint: &'a str,
 }
@@ -27,7 +30,7 @@ impl<'a> InternalEvent for AwsEcsMetricsEventsReceived<'a> {
             "endpoint" => self.endpoint.to_string(),
         );
         counter!(
-            "component_received_event_bytes_total", self.byte_size as u64,
+            "component_received_event_bytes_total", self.byte_size.get() as u64,
             "endpoint" => self.endpoint.to_string(),
         );
     }

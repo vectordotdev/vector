@@ -5,9 +5,7 @@ use futures::{future::BoxFuture, TryFutureExt};
 use tower::Service;
 use tracing::Instrument;
 use vector_common::request_metadata::RequestCountByteSize;
-use vector_core::{
-    event::EventStatus, internal_event::CountByteSize, stream::DriverResponse, ByteSizeOf,
-};
+use vector_core::{event::EventStatus, stream::DriverResponse, ByteSizeOf};
 
 use super::request_builder::SendMessageEntry;
 
@@ -45,7 +43,13 @@ impl Service<SendMessageEntry> for SqsService {
                 .set_message_deduplication_id(entry.message_deduplication_id)
                 .queue_url(entry.queue_url)
                 .send()
-                .map_ok(|_| SendMessageResponse { byte_size })
+                .map_ok(|_| SendMessageResponse {
+                    byte_size,
+                    json_byte_size: entry
+                        .metadata
+                        .events_estimated_json_encoded_byte_size()
+                        .clone(),
+                })
                 .instrument(info_span!("request").or_current())
                 .await
         })
@@ -54,6 +58,7 @@ impl Service<SendMessageEntry> for SqsService {
 
 pub(crate) struct SendMessageResponse {
     byte_size: usize,
+    json_byte_size: RequestCountByteSize,
 }
 
 impl DriverResponse for SendMessageResponse {
@@ -62,6 +67,10 @@ impl DriverResponse for SendMessageResponse {
     }
 
     fn events_sent(&self) -> RequestCountByteSize {
-        CountByteSize(1, self.byte_size).into()
+        self.json_byte_size.clone()
+    }
+
+    fn bytes_sent(&self) -> Option<usize> {
+        Some(self.byte_size)
     }
 }

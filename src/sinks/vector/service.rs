@@ -9,7 +9,7 @@ use prost::Message;
 use tonic::{body::BoxBody, IntoRequest};
 use tower::Service;
 use vector_common::request_metadata::{MetaDescriptive, RequestCountByteSize, RequestMetadata};
-use vector_core::{internal_event::CountByteSize, stream::DriverResponse};
+use vector_core::stream::DriverResponse;
 
 use super::VectorSinkError;
 use crate::{
@@ -28,8 +28,7 @@ pub struct VectorService {
 }
 
 pub struct VectorResponse {
-    events_count: usize,
-    events_byte_size: usize,
+    events_byte_size: RequestCountByteSize,
 }
 
 impl DriverResponse for VectorResponse {
@@ -38,7 +37,7 @@ impl DriverResponse for VectorResponse {
     }
 
     fn events_sent(&self) -> RequestCountByteSize {
-        CountByteSize(self.events_count, self.events_byte_size).into()
+        self.events_byte_size.clone()
     }
 }
 
@@ -100,11 +99,11 @@ impl Service<VectorRequest> for VectorService {
     }
 
     // Emission of internal events for errors and dropped events is handled upstream by the caller.
-    fn call(&mut self, list: VectorRequest) -> Self::Future {
+    fn call(&mut self, mut list: VectorRequest) -> Self::Future {
         let mut service = self.clone();
         let byte_size = list.request.encoded_len();
-        let events_count = list.get_metadata().event_count();
-        let events_byte_size = list.get_metadata().events_byte_size();
+        let metadata = list.take_metadata();
+        let events_byte_size = metadata.into_events_estimated_json_encoded_byte_size();
 
         let future = async move {
             service
@@ -116,10 +115,7 @@ impl Service<VectorRequest> for VectorService {
                         protocol: &service.protocol,
                         endpoint: &service.endpoint,
                     });
-                    VectorResponse {
-                        events_count,
-                        events_byte_size,
-                    }
+                    VectorResponse { events_byte_size }
                 })
                 .map_err(|source| VectorSinkError::Request { source }.into())
                 .await

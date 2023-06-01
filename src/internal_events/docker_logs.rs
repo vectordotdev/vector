@@ -1,12 +1,15 @@
 use bollard::errors::Error;
 use chrono::ParseError;
 use metrics::counter;
-use vector_common::internal_event::{error_stage, error_type};
+use vector_common::{
+    internal_event::{error_stage, error_type},
+    json_size::JsonSize,
+};
 use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
 pub struct DockerLogsEventsReceived<'a> {
-    pub byte_size: usize,
+    pub byte_size: JsonSize,
     pub container_id: &'a str,
     pub container_name: &'a str,
 }
@@ -24,7 +27,7 @@ impl InternalEvent for DockerLogsEventsReceived<'_> {
             "container_name" => self.container_name.to_owned()
         );
         counter!(
-            "component_received_event_bytes_total", self.byte_size as u64,
+            "component_received_event_bytes_total", self.byte_size.get() as u64,
             "container_name" => self.container_name.to_owned()
         );
     }

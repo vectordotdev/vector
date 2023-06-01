@@ -9,7 +9,6 @@ use rand_distr::Alphanumeric;
 use snafu::Snafu;
 use tower::Service;
 use vector_common::finalization::{EventFinalizers, EventStatus, Finalizable};
-use vector_common::internal_event::CountByteSize;
 use vector_common::request_metadata::{MetaDescriptive, RequestCountByteSize, RequestMetadata};
 use vector_core::stream::DriverResponse;
 
@@ -83,11 +82,9 @@ impl DriverResponse for DatabendResponse {
     }
 
     fn events_sent(&self) -> RequestCountByteSize {
-        CountByteSize(
-            self.metadata.event_count(),
-            self.metadata.events_byte_size(),
-        )
-        .into()
+        self.metadata
+            .events_estimated_json_encoded_byte_size()
+            .clone()
     }
 
     fn bytes_sent(&self) -> Option<usize> {

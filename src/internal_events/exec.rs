@@ -3,8 +3,9 @@ use std::time::Duration;
 use crate::emit;
 use metrics::{counter, histogram};
 use tokio::time::error::Elapsed;
-use vector_common::internal_event::{
-    error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL,
+use vector_common::{
+    internal_event::{error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL},
+    json_size::JsonSize,
 };
 use vector_core::internal_event::InternalEvent;
 
@@ -14,7 +15,7 @@ use super::prelude::io_error_code;
 pub struct ExecEventsReceived<'a> {
     pub count: usize,
     pub command: &'a str,
-    pub byte_size: usize,
+    pub byte_size: JsonSize,
 }
 
 impl InternalEvent for ExecEventsReceived<'_> {
@@ -22,7 +23,7 @@ impl InternalEvent for ExecEventsReceived<'_> {
         trace!(
             message = "Events received.",
             count = self.count,
-            byte_size = self.byte_size,
+            byte_size = self.byte_size.get(),
             command = %self.command,
         );
         counter!(
@@ -30,7 +31,7 @@ impl InternalEvent for ExecEventsReceived<'_> {
             "command" => self.command.to_owned(),
         );
         counter!(
-            "component_received_event_bytes_total", self.byte_size as u64,
+            "component_received_event_bytes_total", self.byte_size.get() as u64,
             "command" => self.command.to_owned(),
         );
     }
