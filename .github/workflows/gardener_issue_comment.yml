@@ -58,6 +58,8 @@ jobs:
             }' -f item_id="$item_id"
           )"
 
+          current_status=$(echo $current_status | jq '.["data"]["node"]["fieldValueByName"]["name"]')
+
           echo "Current issue status is: $current_status"
 
           if [[ "$current_status" == "Blocked / Waiting" ]] ; then
