@@ -1,5 +1,5 @@
 #![allow(missing_docs)]
-use std::{collections::HashMap, num::NonZeroUsize, path::PathBuf};
+use std::{collections::HashMap, num::NonZeroUsize, path::PathBuf, time::Duration};
 
 use exitcode::ExitCode;
 use futures::StreamExt;
@@ -62,10 +62,14 @@ impl ApplicationConfig {
     ) -> Result<Self, ExitCode> {
         let config_paths = opts.config_paths_with_formats();
 
+        let graceful_shutdown_duration = (!opts.no_graceful_shutdown_limit)
+            .then(|| Duration::from_secs(u64::from(opts.graceful_shutdown_limit_secs)));
+
         let config = load_configs(
             &config_paths,
             opts.watch_config,
             opts.require_healthy,
+            graceful_shutdown_duration,
             signal_handler,
         )
         .await?;
@@ -410,6 +414,7 @@ pub async fn load_configs(
     config_paths: &[ConfigPath],
     watch_config: bool,
     require_healthy: Option<bool>,
+    graceful_shutdown_duration: Option<Duration>,
     signal_handler: &mut SignalHandler,
 ) -> Result<Config, ExitCode> {
     let config_paths = config::process_paths(config_paths).ok_or(exitcode::CONFIG)?;
@@ -440,6 +445,7 @@ pub async fn load_configs(
         info!("Health checks are disabled.");
     }
     config.healthchecks.set_require_healthy(require_healthy);
+    config.graceful_shutdown_duration = graceful_shutdown_duration;
 
     Ok(config)
 }
