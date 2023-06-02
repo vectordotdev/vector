@@ -14,6 +14,7 @@ use vector_core::event::metric::{Bucket, MetricSketch, Quantile, Sample};
 use vector_core::event::{Event, Metric, MetricValue};
 use vector_core::metrics::AgentDDSketch;
 use vector_core::ByteSizeOf;
+use vector_core::EstimatedJsonEncodedSizeOf;
 
 use super::GreptimeDBConfig;
 use crate::sinks::util::buffer::metrics::MetricNormalize;
@@ -100,9 +101,10 @@ impl GreptimeDBService {
             .with_flat_map(move |event: Event| {
                 stream::iter({
                     let byte_size = event.size_of();
+                    let json_size = event.estimated_json_encoded_size_of();
                     normalizer
                         .normalize(event.into_metric())
-                        .map(|metric| Ok(EncodedEvent::new(metric, byte_size)))
+                        .map(|metric| Ok(EncodedEvent::new(metric, byte_size, json_size)))
                 })
             })
             .sink_map_err(|e| error!(message = "Fatal greptimedb sink error.", %e));
@@ -516,7 +518,7 @@ mod integration_tests {
     fn create_event(i: i32) -> Event {
         Event::Metric(
             Metric::new(
-                format!("my_counter"),
+                "my_counter".to_owned(),
                 MetricKind::Incremental,
                 MetricValue::Counter { value: i as f64 },
             )
