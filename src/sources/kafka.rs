@@ -1,7 +1,7 @@
 use std::{
     collections::{BTreeMap, HashMap},
     io::Cursor,
-    sync::Arc,
+    sync::{Arc, OnceLock},
     time::Duration,
 };
 
@@ -14,7 +14,6 @@ use codecs::{
 };
 use futures::{Stream, StreamExt};
 use lookup::{lookup_v2::OptionalValuePath, owned_value_path, path, OwnedValuePath};
-use once_cell::sync::OnceCell;
 use rdkafka::{
     consumer::{CommitMode, Consumer, ConsumerContext, Rebalance, StreamConsumer},
     message::{BorrowedMessage, Headers as _, Message},
@@ -724,7 +723,7 @@ fn create_consumer(config: &KafkaSourceConfig) -> crate::Result<StreamConsumer<C
 #[derive(Default)]
 struct CustomContext {
     stats: kafka::KafkaStatisticsContext,
-    finalizer: OnceCell<Arc<OrderedFinalizer<FinalizerEntry>>>,
+    finalizer: OnceLock<Arc<OrderedFinalizer<FinalizerEntry>>>,
 }
 
 impl CustomContext {

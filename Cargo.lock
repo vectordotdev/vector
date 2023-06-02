@@ -9397,7 +9397,6 @@ dependencies = [
  "inventory",
  "no-proxy",
  "num-traits",
- "once_cell",
  "serde",
  "serde_json",
  "serde_with 2.3.2",
