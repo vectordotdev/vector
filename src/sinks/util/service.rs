@@ -357,7 +357,6 @@ impl TowerRequestSettings {
         S::Future: Send + 'static,
     {
         let policy = self.retry_policy(retry_logic.clone());
-        let settings = self.clone();
 
         // Build services
         let open = OpenGauge::new();
@@ -368,16 +367,14 @@ impl TowerRequestSettings {
                 // Build individual service
                 ServiceBuilder::new()
                     .layer(AdaptiveConcurrencyLimitLayer::new(
-                        settings.concurrency,
-                        settings.adaptive_concurrency,
+                        self.concurrency,
+                        self.adaptive_concurrency,
                         retry_logic.clone(),
                     ))
                     .service(
                         health_config.build(
                             health_logic.clone(),
-                            ServiceBuilder::new()
-                                .timeout(settings.timeout)
-                                .service(inner),
+                            ServiceBuilder::new().timeout(self.timeout).service(inner),
                             open.clone(),
                             endpoint,
                         ), // NOTE: there is a version conflict for crate `tracing` between `tracing_tower` crate
