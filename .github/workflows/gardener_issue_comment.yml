@@ -63,12 +63,12 @@ jobs:
             }' -f item_id="$item_id"
           )"
 
-          current_status=$(echo $current_status | jq -c '.["data"]["node"]["fieldValueByName"]["name"]')
+          current_status=$(echo $current_status | jq -c -r '.["data"]["node"]["fieldValueByName"]["name"]')
 
-          echo "Current issue status is: $current_status"
+          echo "Current issue status is: '${current_status}'"
 
-          if [[ $current_status == "Blocked / Waiting" ]] ; then
-            echo "Moving issue from Blocked / Waiting to Triage"
+          if [ "$current_status" = "Blocked / Waiting" ] ; then
+            echo "Moving issue from 'Blocked / Waiting' to 'Triage'"
             gh api graphql -f query='
               mutation($project_id: ID!, $item_id: ID!, $field_id: ID!, $option_id: String) {
                 updateProjectV2ItemFieldValue(
@@ -86,6 +86,8 @@ jobs:
                   }
                 }
               }' -f project_id="$project_id" -f item_id="$item_id" -f field_id="$status_field_id" -f option_id="$backlog_option_id"
+
+              echo "Move completed."
           else
-            echo "Issue is in $current_status, not moving."
+            echo "Issue is in '${current_status}', not moving."
           fi
