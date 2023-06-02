@@ -9,10 +9,12 @@ interpreted as described in [RFC 2119].
 - [Introduction](#introduction)
 - [Scope](#scope)
 - [Terminology](#terminology)
+  - [Flag](#flag)
   - [Entity](#entity)
   - [Option](#option)
 - [Schema](#schema)
   - [Naming](#naming)
+    - [Flag naming](#flag-naming)
     - [Entity naming](#entity-naming)
     - [Option naming](#option-naming)
   - [Types](#types)
@@ -37,6 +39,10 @@ relevant specifications, such as the [component specification].
 
 ## Terminology
 
+### Flag
+
+"Flag" refers to a CLI flag provided when running Vector.
+
 ### Entity
 
 "Entity" refers to a Vector concept used to model Vector's processing graph.
@@ -52,6 +58,16 @@ under entities and also used to define global Vector behavior.
 ## Schema
 
 ### Naming
+
+#### Flag naming
+
+- MUST only contain ASCII alphanumeric, lowercase, and hyphens
+- MUST be in kebab-case format when multiple words are used (e.g., `config-dir`)
+- For flags that take a value, but are also able to be "disabled", they SHOULD NOT use a sentinel
+  value. Instead they SHOULD have a second flag added prefixed with `no-` and SHOULD leave off any
+  unit suffixes. For example, to disable `--graceful-shutdown-limit-secs`,
+  a `--no-graceful-shutdown` flag was added. Vector MUST NOT allow both the flag and its negative to
+  be specified at the same time.
 
 #### Entity naming
 
