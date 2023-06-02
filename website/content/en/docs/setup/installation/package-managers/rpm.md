@@ -12,7 +12,7 @@ RPM Package Manager is a free and open source package management system for inst
 sudo rpm -i https://packages.timber.io/vector/{{< version >}}/vector-{{< version >}}-1.{arch}.rpm
 ```
 
-Make sure to replace `{arch}` with one of the following:
+Make sUre to replace `{arch}` with one of the following:
 
 * `x86_64`
 * `aarch64`
