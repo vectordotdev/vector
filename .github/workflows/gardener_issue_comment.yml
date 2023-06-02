@@ -86,8 +86,6 @@ jobs:
                   }
                 }
               }' -f project_id="$project_id" -f item_id="$item_id" -f field_id="$status_field_id" -f option_id="$triage_option_id"
-
-              echo "Move completed."
           else
             echo "Issue is in '${current_status}', not moving."
           fi
