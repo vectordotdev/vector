@@ -1,3 +1,8 @@
+# Gardener Issue Comment
+#
+# This workflow moves GH issues from the Gardener board's "Blocked / Waiting" column
+# to the "Triage", so that the Gardener can assess the issue in light of new information.
+
 name: Gardener Issue Comment
 
 on:
@@ -58,7 +63,7 @@ jobs:
             }' -f item_id="$item_id"
           )"
 
-          current_status=$(echo $current_status | jq '.["data"]["node"]["fieldValueByName"]["name"]')
+          current_status=$(echo $current_status | jq -c '.["data"]["node"]["fieldValueByName"]["name"]')
 
           echo "Current issue status is: $current_status"
 
