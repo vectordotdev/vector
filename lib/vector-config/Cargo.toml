@@ -18,7 +18,6 @@ indexmap = { version = "1.9", default-features = false }
 inventory = { version = "0.3" }
 no-proxy = { version  = "0.3.1", default-features = false, features = ["serialize"] }
 num-traits = { version = "0.2.15", default-features = false }
-once_cell = { version = "1", default-features = false }
 serde = { version = "1.0", default-features = false }
 serde_json = { version = "1.0", default-features = false, features = ["std"] }
 serde_with = { version = "2.3.2", default-features = false, features = ["std"] }
