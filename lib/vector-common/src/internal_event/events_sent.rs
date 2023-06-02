@@ -1,7 +1,7 @@
 use metrics::{register_counter, Counter};
 use tracing::trace;
 
-use super::{CountByteSize, Output, SharedString};
+use super::{CountByteSize, Output, RegisterEvent, SharedString};
 
 pub const DEFAULT_OUTPUT: &str = "_default";
 
@@ -95,6 +95,19 @@ crate::registered_event!(
         self.event_bytes.increment(byte_size.get() as u64);
     }
 );
+
+/// TODO: This can probably become a part of the previous macro.
+impl RegisterEvent<(Option<String>, Option<String>), TaggedEventsSent> for TaggedEventsSent {
+    fn register(
+        tags: &(Option<String>, Option<String>),
+    ) -> <TaggedEventsSent as super::RegisterInternalEvent>::Handle {
+        super::register(TaggedEventsSent::new(
+            tags.0.clone(),
+            tags.1.clone(),
+            Output(None),
+        ))
+    }
+}
 
 impl TaggedEventsSent {
     #[must_use]

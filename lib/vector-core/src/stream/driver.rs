@@ -5,8 +5,8 @@ use tokio::{pin, select};
 use tower::Service;
 use tracing::Instrument;
 use vector_common::internal_event::{
-    register, ByteSize, BytesSent, Cached, CallError, InternalEventHandle as _, Output,
-    PollReadyError, Registered, SharedString, TaggedEventsSent,
+    register, ByteSize, BytesSent, Cached, CallError, InternalEventHandle as _, PollReadyError,
+    Registered, SharedString, TaggedEventsSent,
 };
 use vector_common::request_metadata::{MetaDescriptive, RequestCountByteSize, RequestMetadata};
 
@@ -99,13 +99,7 @@ where
         pin!(batched_input);
 
         let bytes_sent = protocol.map(|protocol| register(BytesSent { protocol }));
-        let events_sent = Cached::new(|tags: &(Option<String>, Option<String>)| {
-            register(TaggedEventsSent::new(
-                tags.0.clone(),
-                tags.1.clone(),
-                Output(None),
-            ))
-        });
+        let events_sent = Cached::new();
 
         loop {
             // Core behavior of the loop:
@@ -205,16 +199,14 @@ where
         Ok(())
     }
 
-    fn handle_response<T>(
+    fn handle_response(
         result: Result<Svc::Response, Svc::Error>,
         request_id: usize,
         finalizers: EventFinalizers,
         metadata: &RequestMetadata,
         bytes_sent: &Option<Registered<BytesSent>>,
-        events_sent: &Cached<(Option<String>, Option<String>), Registered<TaggedEventsSent>, T>,
-    ) where
-        T: Fn(&(Option<String>, Option<String>)) -> Registered<TaggedEventsSent>,
-    {
+        events_sent: &Cached<(Option<String>, Option<String>), TaggedEventsSent>,
+    ) {
         match result {
             Err(error) => {
                 Self::emit_call_error(Some(error), request_id, metadata.event_count());

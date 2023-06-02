@@ -248,23 +248,38 @@ macro_rules! registered_event {
     };
 }
 
-#[derive(Clone)]
-pub struct Cached<Tags, Event, Register> {
-    cache: Arc<RwLock<BTreeMap<Tags, Event>>>,
-    register: Register,
+pub trait RegisterEvent<Tags, Event>
+where
+    Event: RegisterInternalEvent,
+{
+    fn register(tags: &Tags) -> <Event as RegisterInternalEvent>::Handle;
 }
 
-impl<Tags, Event, Register, Data> Cached<Tags, Event, Register>
+pub struct Cached<Tags, Event: RegisterInternalEvent> {
+    cache: Arc<RwLock<BTreeMap<Tags, <Event as RegisterInternalEvent>::Handle>>>,
+}
+
+/// Deriving `Clone` for `Cached` doesn't work since the `Event` type is not clone,
+/// we can happily implement our own `clone` however since we are just cloning
+/// the `Arc`.
+impl<Tags, Event: RegisterInternalEvent> Clone for Cached<Tags, Event> {
+    fn clone(&self) -> Self {
+        Self {
+            cache: Arc::clone(&self.cache),
+        }
+    }
+}
+
+impl<Tags, Event, EventHandle, Data> Cached<Tags, Event>
 where
     Data: Sized,
-    Register: Fn(&Tags) -> Event,
-    Event: InternalEventHandle<Data = Data>,
+    EventHandle: InternalEventHandle<Data = Data>,
     Tags: Ord + Clone,
+    Event: RegisterInternalEvent<Handle = EventHandle> + RegisterEvent<Tags, Event>,
 {
-    pub fn new(register: Register) -> Self {
+    pub fn new() -> Self {
         Self {
             cache: Arc::new(RwLock::new(BTreeMap::new())),
-            register,
         }
     }
 
@@ -273,7 +288,7 @@ where
         if let Some(event) = read.get(tags) {
             event.emit(value);
         } else {
-            let event = (self.register)(tags);
+            let event = <Event as RegisterEvent<Tags, Event>>::register(tags);
             event.emit(value);
 
             // Ensure the read lock is dropped so we can write.
