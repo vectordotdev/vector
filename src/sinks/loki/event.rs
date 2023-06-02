@@ -139,21 +139,6 @@ impl ByteSizeOf for LokiEvent {
     }
 }
 
-/// This implementation approximates the `Serialize` implementation below, without any allocations.
-impl EstimatedJsonEncodedSizeOf for LokiEvent {
-    fn estimated_json_encoded_size_of(&self) -> JsonSize {
-        static BRACKETS_SIZE: JsonSize = JsonSize::new(2);
-        static COLON_SIZE: JsonSize = JsonSize::new(1);
-        static QUOTES_SIZE: JsonSize = JsonSize::new(2);
-
-        BRACKETS_SIZE
-            + QUOTES_SIZE
-            + self.timestamp.estimated_json_encoded_size_of()
-            + COLON_SIZE
-            + self.event.estimated_json_encoded_size_of()
-    }
-}
-
 impl Serialize for LokiEvent {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -172,6 +157,7 @@ pub struct LokiRecord {
     pub partition: PartitionKey,
     pub labels: Labels,
     pub event: LokiEvent,
+    pub json_byte_size: JsonSize,
     pub finalizers: EventFinalizers,
 }
 
@@ -187,7 +173,7 @@ impl ByteSizeOf for LokiRecord {
 
 impl EstimatedJsonEncodedSizeOf for LokiRecord {
     fn estimated_json_encoded_size_of(&self) -> JsonSize {
-        self.event.estimated_json_encoded_size_of()
+        self.json_byte_size
     }
 }
 
