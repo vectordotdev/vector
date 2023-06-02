@@ -2,7 +2,7 @@ package metadata
 
 base: components: sources: exec: configuration: {
 	command: {
-		description: "The command to be run, plus any arguments required."
+		description: "The command to run, plus any arguments required."
 		required:    true
 		type: array: items: type: string: examples: ["echo", "Hello World!"]
 	}

@@ -26,7 +26,7 @@ use crate::{
     SourceSender,
 };
 
-/// Marker type for the version two of the configuration for the `vector` source.
+/// Marker type for version two of the configuration for the `vector` source.
 #[configurable_component]
 #[derive(Clone, Debug)]
 enum VectorConfigVersion {

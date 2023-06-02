@@ -93,6 +93,7 @@ pub struct HostMetricsConfig {
     /// The interval between metric gathering, in seconds.
     #[serde_as(as = "serde_with::DurationSeconds<u64>")]
     #[serde(default = "default_scrape_interval")]
+    #[configurable(metadata(docs::human_name = "Scrape Interval"))]
     pub scrape_interval_secs: Duration,
 
     /// The list of host metric collector services to use.
@@ -136,7 +137,7 @@ pub struct HostMetricsConfig {
 pub struct CGroupsConfig {
     /// The number of levels of the cgroups hierarchy for which to report metrics.
     ///
-    /// A value of `1` means just the root or named cgroup.
+    /// A value of `1` means the root or named cgroup.
     #[derivative(Default(value = "default_levels()"))]
     #[serde(default = "default_levels")]
     #[configurable(metadata(docs::examples = 1))]
@@ -157,6 +158,7 @@ pub struct CGroupsConfig {
     /// Base cgroup directory, for testing use only
     #[serde(skip_serializing)]
     #[configurable(metadata(docs::hidden))]
+    #[configurable(metadata(docs::human_name = "Base Directory"))]
     base_dir: Option<PathBuf>,
 }
 
