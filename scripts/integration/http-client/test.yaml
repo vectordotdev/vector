@@ -9,4 +9,4 @@ env:
   DUFS_HTTPS_ADDRESS: https://dufs-https:5000
 
 matrix:
-  version: [latest]
+  version: ["v0.34.1"]
