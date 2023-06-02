@@ -64,7 +64,8 @@ under entities and also used to define global Vector behavior.
 - MUST only contain ASCII alphanumeric, lowercase, and underscores
 - MUST be in snake case format when multiple words are used (e.g., `timeout_seconds`)
 - SHOULD use nouns, not verbs, as names (e.g., `fingerprint` instead of `fingerprinting`)
-- MUST suffix options with their _full_ unit name (e.g., `_seconds`, `_bytes`, etc.)
+- MUST suffix options with their _full_ unit name (e.g., `_megabytes` rather than `_mb`) or the
+  following abbreviations for time units: `_secs`, `_ms`, `_ns`.
 - SHOULD consistent with units within the same scope. (e.g., don't mix seconds and milliseconds)
 - MUST NOT repeat the name space in the option name (e.g., `fingerprint.bytes` instead of `fingerprint.fingerprint_bytes`)
 
