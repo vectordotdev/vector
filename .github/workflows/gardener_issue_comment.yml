@@ -85,7 +85,7 @@ jobs:
                     id
                   }
                 }
-              }' -f project_id="$project_id" -f item_id="$item_id" -f field_id="$status_field_id" -f option_id="$backlog_option_id"
+              }' -f project_id="$project_id" -f item_id="$item_id" -f field_id="$status_field_id" -f option_id="$triage_option_id"
 
               echo "Move completed."
           else
