@@ -18,6 +18,7 @@ amqps
 amz
 amzn
 anchore
+andreasheine
 androideabi
 andy
 ansicpg
@@ -789,7 +790,9 @@ onlyone
 ooba
 oobar
 ook
+opc
 opcounters
+opcua
 openstring
 opinsights
 oplog
@@ -936,6 +939,7 @@ samehost
 samenet
 samerole
 sameuser
+sampleserver
 sandboxed
 sandboxing
 sccache

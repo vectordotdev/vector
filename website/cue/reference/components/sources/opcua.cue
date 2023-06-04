@@ -39,7 +39,7 @@ components: sources: opcua: {
 		platform_name: null
 	}
 
-	configuration: base.components.oopcua.opcua.configuration
+	configuration: base.components.opcua.opcua.configuration
 
 	telemetry: metrics: {
 		events_in_total:                      components.sources.internal_metrics.output.metrics.events_in_total
