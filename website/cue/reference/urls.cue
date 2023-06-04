@@ -377,6 +377,8 @@ urls: {
 	nix:                                        "https://nixos.org/nix/"
 	nixos:                                      "https://nixos.org/"
 	nixpkgs_9682:                               "\(github)/NixOS/nixpkgs/issues/9682"
+	opcua:                                      "https://opcfoundation.org/"
+	opcua_rs:                                   "\(github)/locka99/opcua"
 	openssl:                                    "https://www.openssl.org/"
 	opentelemetry:                              "https://opentelemetry.io"
 	opentelemetry_protocol:                     "\(opentelemetry)/docs/reference/specification/protocol/otlp/"

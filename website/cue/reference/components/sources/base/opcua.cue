@@ -36,8 +36,7 @@ base: components: sources: opcua: configuration: {
 			without verifying it. This is insecure, but may be useful for testing.
 			"""
 		required: false
-		type: boolean: examples: [true]
-		default: false
+		type: bool: {}
 	}
 	create_sample_keypair: {
 		description: """
@@ -48,8 +47,7 @@ base: components: sources: opcua: configuration: {
 			for testing.
 			"""
 		required: false
-		type: boolean: examples: [true]
-		default: false
+		type: bool: {}
 	}
 	node_ids: {
 		description: """
@@ -57,7 +55,7 @@ base: components: sources: opcua: configuration: {
 			"""
 		required: true
 		type: array: items: {
-			type: object: properties: {
+			type: object: options: {
 				node_id: {
 					description: """
 						The node ID to subscribe to.

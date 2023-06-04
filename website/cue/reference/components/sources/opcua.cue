@@ -39,16 +39,7 @@ components: sources: opcua: {
 		platform_name: null
 	}
 
-	configuration: base.components.opcua.opcua.configuration
-
-	telemetry: metrics: {
-		events_in_total:                      components.sources.internal_metrics.output.metrics.events_in_total
-		processed_bytes_total:                components.sources.internal_metrics.output.metrics.processed_bytes_total
-		processed_events_total:               components.sources.internal_metrics.output.metrics.processed_events_total
-		component_received_bytes_total:       components.sources.internal_metrics.output.metrics.component_received_bytes_total
-		component_received_events_total:      components.sources.internal_metrics.output.metrics.component_received_events_total
-		component_received_event_bytes_total: components.sources.internal_metrics.output.metrics.component_received_event_bytes_total
-	}
+	configuration: base.components.sources.opcua.configuration
 
 	how_it_works: components._opcua.how_it_works
 }

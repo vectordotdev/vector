@@ -3,7 +3,7 @@ package metadata
 components: _opcua: {
 	features: {
 		collect: from: {
-			service: services.nats
+			service: services.opcua
 			interface: {
 				socket: {
 					api: {
@@ -11,7 +11,9 @@ components: _opcua: {
 						url:   urls.opcua
 					}
 					direction: "incoming",
-					url: "opc.tcp://localhost:4840"
+					protocols: ["tcp"],
+					port: 4840,
+					ssl: "optional"
 				}
 			}
 		}
@@ -24,7 +26,7 @@ components: _opcua: {
 	}
 
 	how_it_works: {
-		nats_rs: {
+		opcua_rs: {
 			title: "opcua.rs"
 			body:  """
 				The `opcua` source uses [`opcua.rs`](\(urls.opcua_rs)) under the hood.
