@@ -117,6 +117,7 @@ pub enum AwsAuthentication {
         /// Relevant when the default credentials chain or `assume_role` is used.
         #[configurable(metadata(docs::type_unit = "seconds"))]
         #[configurable(metadata(docs::examples = 30))]
+        #[configurable(metadata(docs::human_name = "Load Timeout"))]
         load_timeout_secs: Option<u64>,
 
         /// Configuration for authenticating with AWS through IMDS.
@@ -141,6 +142,7 @@ pub enum AwsAuthentication {
         /// Relevant when the default credentials chain or `assume_role` is used.
         #[configurable(metadata(docs::type_unit = "seconds"))]
         #[configurable(metadata(docs::examples = 30))]
+        #[configurable(metadata(docs::human_name = "Load Timeout"))]
         load_timeout_secs: Option<u64>,
 
         /// Configuration for authenticating with AWS through IMDS.

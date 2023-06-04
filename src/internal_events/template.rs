@@ -33,18 +33,11 @@ impl<'a> InternalEvent for TemplateRenderingError<'a> {
             "stage" => error_stage::PROCESSING,
         );
 
-        // deprecated
-        counter!("processing_errors_total", 1,
-            "error_type" => "render_error");
-
         if self.drop_event {
             emit!(ComponentEventsDropped::<UNINTENTIONAL> {
                 count: 1,
                 reason: "Failed to render template.",
             });
-
-            // deprecated
-            counter!("events_discarded_total", 1);
         }
     }
 }

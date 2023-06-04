@@ -74,7 +74,7 @@ pub struct SplunkConfig {
     #[configurable(deprecated = "This option has been deprecated, use `valid_tokens` instead.")]
     token: Option<SensitiveString>,
 
-    /// Optional list of valid authorization tokens.
+    /// A list of valid authorization tokens.
     ///
     /// If supplied, incoming requests must supply one of these tokens in the `Authorization` header, just as a client
     /// would if it was communicating with the Splunk HEC endpoint directly.
@@ -226,7 +226,7 @@ impl SourceConfig for SplunkConfig {
             Some(LegacyKey::Overwrite(owned_value_path!(SOURCE))),
             &owned_value_path!("source"),
             Kind::bytes(),
-            None,
+            Some("service"),
         )
         // Not to be confused with `source_type`.
         .with_source_metadata(
@@ -2475,7 +2475,7 @@ mod tests {
         .with_metadata_field(
             &owned_value_path!("splunk_hec", "source"),
             Kind::bytes(),
-            None,
+            Some("service"),
         )
         .with_metadata_field(
             &owned_value_path!("splunk_hec", "channel"),
@@ -2519,7 +2519,11 @@ mod tests {
         .with_event_field(&owned_value_path!("source_type"), Kind::bytes(), None)
         .with_event_field(&owned_value_path!("splunk_channel"), Kind::bytes(), None)
         .with_event_field(&owned_value_path!("splunk_index"), Kind::bytes(), None)
-        .with_event_field(&owned_value_path!("splunk_source"), Kind::bytes(), None)
+        .with_event_field(
+            &owned_value_path!("splunk_source"),
+            Kind::bytes(),
+            Some("service"),
+        )
         .with_event_field(&owned_value_path!("splunk_sourcetype"), Kind::bytes(), None)
         .with_event_field(&owned_value_path!("timestamp"), Kind::timestamp(), None);
 

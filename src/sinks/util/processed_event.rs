@@ -1,4 +1,5 @@
 use serde::Serialize;
+use vector_common::json_size::JsonSize;
 use vector_core::{
     event::{EventFinalizers, Finalizable, LogEvent, MaybeAsLogMut},
     ByteSizeOf, EstimatedJsonEncodedSizeOf,
@@ -44,7 +45,7 @@ impl<E, M> EstimatedJsonEncodedSizeOf for ProcessedEvent<E, M>
 where
     E: EstimatedJsonEncodedSizeOf,
 {
-    fn estimated_json_encoded_size_of(&self) -> usize {
+    fn estimated_json_encoded_size_of(&self) -> JsonSize {
         self.event.estimated_json_encoded_size_of()
     }
 }

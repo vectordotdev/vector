@@ -39,7 +39,7 @@ pub struct LuaConfigV1 {
     config: v1::LuaConfig,
 }
 
-/// Marker type for the version two of the configuration for the `lua` transform.
+/// Marker type for version two of the configuration for the `lua` transform.
 #[configurable_component]
 #[derive(Clone, Debug)]
 enum V2 {

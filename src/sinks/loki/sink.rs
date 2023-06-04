@@ -12,7 +12,7 @@ use vector_core::{
     partition::Partitioner,
     sink::StreamSink,
     stream::BatcherSettings,
-    ByteSizeOf,
+    ByteSizeOf, EstimatedJsonEncodedSizeOf,
 };
 
 use super::{
@@ -29,7 +29,7 @@ use crate::{
     codecs::{Encoder, Transformer},
     http::{get_http_scheme_from_uri, HttpClient},
     internal_events::{
-        LokiEventUnlabeled, LokiOutOfOrderEventDropped, LokiOutOfOrderEventRewritten,
+        LokiEventUnlabeledError, LokiOutOfOrderEventDroppedError, LokiOutOfOrderEventRewritten,
         SinkRequestBuildError, TemplateRenderingError,
     },
     sinks::util::{
@@ -268,6 +268,7 @@ impl EventEncoder {
     pub(super) fn encode_event(&mut self, mut event: Event) -> Option<LokiRecord> {
         let tenant_id = self.key_partitioner.partition(&event);
         let finalizers = event.take_finalizers();
+        let json_byte_size = event.estimated_json_encoded_size_of();
         let mut labels = self.build_labels(&event);
         self.remove_label_fields(&mut event);
 
@@ -288,7 +289,7 @@ impl EventEncoder {
         // `{agent="vector"}` label. This can happen if the only
         // label is a templatable one but the event doesn't match.
         if labels.is_empty() {
-            emit!(LokiEventUnlabeled);
+            emit!(LokiEventUnlabeledError);
             labels = vec![("agent".to_string(), "vector".to_string())]
         }
 
@@ -302,6 +303,7 @@ impl EventEncoder {
             },
             partition,
             finalizers,
+            json_byte_size,
         })
     }
 }
@@ -486,7 +488,7 @@ impl LokiSink {
                     }
                     Some((partition, result))
                 } else {
-                    emit!(LokiOutOfOrderEventDropped { count: batch.len() });
+                    emit!(LokiOutOfOrderEventDroppedError { count: batch.len() });
                     None
                 }
             })

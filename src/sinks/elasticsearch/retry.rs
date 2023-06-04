@@ -160,6 +160,7 @@ mod tests {
     use bytes::Bytes;
     use http::Response;
     use similar_asserts::assert_eq;
+    use vector_common::json_size::JsonSize;
 
     use super::*;
     use crate::event::EventStatus;
@@ -179,7 +180,7 @@ mod tests {
                 http_response: response,
                 event_status: EventStatus::Rejected,
                 batch_size: 1,
-                events_byte_size: 1,
+                events_byte_size: JsonSize::new(1),
             }),
             RetryAction::DontRetry(_)
         ));
@@ -200,7 +201,7 @@ mod tests {
                 http_response: response,
                 event_status: EventStatus::Errored,
                 batch_size: 1,
-                events_byte_size: 1,
+                events_byte_size: JsonSize::new(1),
             }),
             RetryAction::Retry(_)
         ));

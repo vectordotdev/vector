@@ -11,7 +11,10 @@ use futures::future::BoxFuture;
 use md5::Digest;
 use tower::Service;
 use tracing::Instrument;
-use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
+use vector_common::{
+    json_size::JsonSize,
+    request_metadata::{MetaDescriptive, RequestMetadata},
+};
 use vector_core::{
     event::{EventFinalizers, EventStatus, Finalizable},
     internal_event::CountByteSize,
@@ -53,7 +56,7 @@ pub struct S3Metadata {
 #[derive(Debug)]
 pub struct S3Response {
     count: usize,
-    events_byte_size: usize,
+    events_byte_size: JsonSize,
 }
 
 impl DriverResponse for S3Response {
@@ -100,7 +103,9 @@ impl Service<S3Request> for S3Service {
     // Emission of internal events for errors and dropped events is handled upstream by the caller.
     fn call(&mut self, request: S3Request) -> Self::Future {
         let count = request.get_metadata().event_count();
-        let events_byte_size = request.get_metadata().events_byte_size();
+        let events_byte_size = request
+            .get_metadata()
+            .events_estimated_json_encoded_byte_size();
 
         let options = request.options;
 

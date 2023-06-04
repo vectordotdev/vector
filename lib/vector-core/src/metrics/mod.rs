@@ -161,28 +161,6 @@ impl Controller {
 
         let mut metrics = self.recorder.with_registry(Registry::visit_metrics);
 
-        // Add aliases for deprecated metrics
-        for i in 0..metrics.len() {
-            let metric = &metrics[i];
-            match metric.name() {
-                "component_sent_events_total" => {
-                    let alias = metric.clone().with_name("processed_events_total");
-                    metrics.push(alias);
-                }
-                "component_sent_bytes_total" if metric.tag_matches("component_kind", "sink") => {
-                    let alias = metric.clone().with_name("processed_bytes_total");
-                    metrics.push(alias);
-                }
-                "component_received_bytes_total"
-                    if metric.tag_matches("component_kind", "source") =>
-                {
-                    let alias = metric.clone().with_name("processed_bytes_total");
-                    metrics.push(alias);
-                }
-                _ => {}
-            }
-        }
-
         #[allow(clippy::cast_precision_loss)]
         let value = (metrics.len() + 2) as f64;
         metrics.push(Metric::from_metric_kv(

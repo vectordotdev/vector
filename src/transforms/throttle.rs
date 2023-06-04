@@ -31,6 +31,7 @@ pub struct ThrottleConfig {
 
     /// The time window in which the configured `threshold` is applied, in seconds.
     #[serde_as(as = "serde_with::DurationSeconds<f64>")]
+    #[configurable(metadata(docs::human_name = "Time Window"))]
     window_secs: Duration,
 
     /// The value to group events into separate buckets to be rate limited independently.

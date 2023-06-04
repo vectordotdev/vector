@@ -14,7 +14,10 @@ use vector_core::stream::DriverResponse;
 use crate::event::{EventFinalizers, EventStatus, Finalizable};
 use crate::internal_events::PulsarSendingError;
 use crate::sinks::pulsar::request_builder::PulsarMetadata;
-use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
+use vector_common::{
+    json_size::JsonSize,
+    request_metadata::{MetaDescriptive, RequestMetadata},
+};
 
 #[derive(Clone)]
 pub(super) struct PulsarRequest {
@@ -24,7 +27,8 @@ pub(super) struct PulsarRequest {
 }
 
 pub struct PulsarResponse {
-    event_byte_size: usize,
+    byte_size: usize,
+    event_byte_size: JsonSize,
 }
 
 impl DriverResponse for PulsarResponse {
@@ -37,7 +41,7 @@ impl DriverResponse for PulsarResponse {
     }
 
     fn bytes_sent(&self) -> Option<usize> {
-        Some(self.event_byte_size)
+        Some(self.byte_size)
     }
 }
 
@@ -102,6 +106,7 @@ impl<Exe: Executor> Service<PulsarRequest> for PulsarService<Exe> {
 
         Box::pin(async move {
             let body = request.body.clone();
+            let byte_size = request.body.len();
 
             let mut properties = HashMap::new();
             if let Some(props) = request.metadata.properties {
@@ -134,7 +139,10 @@ impl<Exe: Executor> Service<PulsarRequest> for PulsarService<Exe> {
             match fut {
                 Ok(resp) => match resp.await {
                     Ok(_) => Ok(PulsarResponse {
-                        event_byte_size: request.request_metadata.events_byte_size(),
+                        byte_size,
+                        event_byte_size: request
+                            .request_metadata
+                            .events_estimated_json_encoded_byte_size(),
                     }),
                     Err(e) => {
                         emit!(PulsarSendingError {

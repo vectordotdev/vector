@@ -207,7 +207,7 @@ enum NormalizationError {
 pub mod tests {
     use super::{super::test_util, *};
     use crate::test_util::trace_init;
-    use vrl::value::value;
+    use vrl::value;
 
     fn make_long_string(base: &str, len: usize) -> String {
         base.chars().cycle().take(len).collect()

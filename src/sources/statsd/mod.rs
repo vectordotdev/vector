@@ -27,10 +27,11 @@ use crate::{
         EventsReceived, SocketBindError, SocketBytesReceived, SocketMode, SocketReceiveError,
         StreamClosedError,
     },
+    net,
     shutdown::ShutdownSignal,
     tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsSettings, TlsSourceConfig},
-    udp, SourceSender,
+    SourceSender,
 };
 
 pub mod parser;
@@ -98,6 +99,7 @@ pub struct TcpConfig {
     /// The timeout before a connection is forcefully closed during shutdown.
     #[serde(default = "default_shutdown_timeout_secs")]
     #[serde_as(as = "serde_with::DurationSeconds<u64>")]
+    #[configurable(metadata(docs::human_name = "Shutdown Timeout"))]
     shutdown_timeout_secs: Duration,
 
     /// The size of the receive buffer used for each connection.
@@ -273,7 +275,7 @@ async fn statsd_udp(
         .await?;
 
     if let Some(receive_buffer_bytes) = config.receive_buffer_bytes {
-        if let Err(error) = udp::set_receive_buffer_size(&socket, receive_buffer_bytes) {
+        if let Err(error) = net::set_receive_buffer_size(&socket, receive_buffer_bytes) {
             warn!(message = "Failed configuring receive buffer size on UDP socket.", %error);
         }
     }
@@ -486,7 +488,7 @@ mod test {
         // everything that was in up without having to know the exact count.
         sleep(Duration::from_millis(250)).await;
         shutdown
-            .shutdown_all(Instant::now() + Duration::from_millis(100))
+            .shutdown_all(Some(Instant::now() + Duration::from_millis(100)))
             .await;
 
         // Read all the events into a `MetricState`, which handles normalizing metrics and tracking
@@ -578,7 +580,7 @@ mod test {
         // everything that was in up without having to know the exact count.
         sleep(Duration::from_millis(250)).await;
         shutdown
-            .shutdown_all(Instant::now() + Duration::from_millis(100))
+            .shutdown_all(Some(Instant::now() + Duration::from_millis(100)))
             .await;
     }
 }

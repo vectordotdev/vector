@@ -7,7 +7,7 @@ use tower::Service;
 use vector_config::configurable_component;
 use vector_core::{
     event::metric::{MetricSketch, MetricTags, Quantile},
-    ByteSizeOf,
+    ByteSizeOf, EstimatedJsonEncodedSizeOf,
 };
 
 use crate::{
@@ -184,9 +184,11 @@ impl InfluxDbSvc {
             .with_flat_map(move |event: Event| {
                 stream::iter({
                     let byte_size = event.size_of();
+                    let json_size = event.estimated_json_encoded_size_of();
+
                     normalizer
                         .normalize(event.into_metric())
-                        .map(|metric| Ok(EncodedEvent::new(metric, byte_size)))
+                        .map(|metric| Ok(EncodedEvent::new(metric, byte_size, json_size)))
                 })
             })
             .sink_map_err(|error| error!(message = "Fatal influxdb sink error.", %error));

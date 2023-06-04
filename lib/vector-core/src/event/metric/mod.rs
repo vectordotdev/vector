@@ -11,7 +11,7 @@ use std::{
 };
 
 use chrono::{DateTime, Utc};
-use vector_common::EventDataEq;
+use vector_common::{json_size::JsonSize, EventDataEq};
 use vector_config::configurable_component;
 
 use crate::{
@@ -430,7 +430,7 @@ impl Display for Metric {
     ///
     /// example:
     /// ```text
-    /// 2020-08-12T20:23:37.248661343Z vector_processed_bytes_total{component_kind="sink",component_type="blackhole"} = 6391
+    /// 2020-08-12T20:23:37.248661343Z vector_received_bytes_total{component_kind="sink",component_type="blackhole"} = 6391
     /// ```
     fn fmt(&self, fmt: &mut Formatter<'_>) -> Result<(), fmt::Error> {
         if let Some(timestamp) = &self.data.time.timestamp {
@@ -463,10 +463,10 @@ impl ByteSizeOf for Metric {
 }
 
 impl EstimatedJsonEncodedSizeOf for Metric {
-    fn estimated_json_encoded_size_of(&self) -> usize {
+    fn estimated_json_encoded_size_of(&self) -> JsonSize {
         // TODO: For now we're using the in-memory representation of the metric, but we'll convert
         // this to actually calculate the JSON encoded size in the near future.
-        self.size_of()
+        self.size_of().into()
     }
 }
 

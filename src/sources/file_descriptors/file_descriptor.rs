@@ -38,6 +38,7 @@ pub struct FileDescriptorSourceConfig {
 
     /// The file descriptor number to read from.
     #[configurable(metadata(docs::examples = 10))]
+    #[configurable(metadata(docs::human_name = "File Descriptor Number"))]
     pub fd: u32,
 
     /// The namespace to use for logs. This overrides the global setting.
@@ -112,7 +113,7 @@ mod tests {
         SourceSender,
     };
     use futures::StreamExt;
-    use vrl::value::value;
+    use vrl::value;
 
     #[test]
     fn generate_config() {

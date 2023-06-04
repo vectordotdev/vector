@@ -5,7 +5,7 @@ base: components: sources: aws_kinesis_firehose: configuration: {
 		deprecated:         true
 		deprecated_message: "This option has been deprecated, use `access_keys` instead."
 		description: """
-			An optional access key to authenticate requests against.
+			An access key to authenticate requests against.
 
 			AWS Kinesis Firehose can be configured to pass along a user-configurable access key with each request. If
 			configured, `access_key` should be set to the same value. Otherwise, all requests are allowed.
@@ -15,7 +15,7 @@ base: components: sources: aws_kinesis_firehose: configuration: {
 	}
 	access_keys: {
 		description: """
-			An optional list of access keys to authenticate requests against.
+			A list of access keys to authenticate requests against.
 
 			AWS Kinesis Firehose can be configured to pass along a user-configurable access key with each request. If
 			configured, `access_keys` should be set to the same value. Otherwise, all requests are allowed.

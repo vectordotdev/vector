@@ -13,10 +13,12 @@
 #![deny(unused_comparisons)]
 
 #[cfg(feature = "btreemap")]
-pub use vrl::value::btreemap;
+pub use vrl::btreemap;
 
 #[cfg(feature = "byte_size_of")]
 pub mod byte_size_of;
+
+pub mod json_size;
 
 pub mod config;
 

@@ -1,5 +1,6 @@
 use std::time::Duration;
 
+use chrono::Local;
 use futures_util::future::join_all;
 use tokio::sync::oneshot;
 use url::Url;
@@ -86,7 +87,9 @@ pub async fn cmd(opts: &super::Opts) -> exitcode::ExitCode {
                 metrics::subscribe(subscription_client, tx.clone(), opts_clone.interval as i64);
 
             _ = tx
-                .send(EventType::ConnectionUpdated(ConnectionStatus::Connected))
+                .send(EventType::ConnectionUpdated(ConnectionStatus::Connected(
+                    Local::now(),
+                )))
                 .await;
             // Tasks spawned in metrics::subscribe finish when the subscription
             // streams have completed. Currently, subscription streams only

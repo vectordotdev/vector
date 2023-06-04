@@ -252,6 +252,51 @@ async fn s3_gzip() {
     assert_eq!(lines, response_lines);
 }
 
+#[tokio::test]
+async fn s3_zstd() {
+    // Here, we're creating a bunch of events, approximately 3000, while setting our batch size
+    // to 1000, and using zstd compression.  We test to ensure that all of the keys we end up
+    // writing represent the sum total of the lines: we expect 3 batches, each of which should
+    // have 1000 lines.
+    let cx = SinkContext::new_test();
+
+    let bucket = uuid::Uuid::new_v4().to_string();
+
+    create_bucket(&bucket, false).await;
+
+    let batch_size = 1_000;
+    let batch_multiplier = 3;
+    let config = S3SinkConfig {
+        compression: Compression::zstd_default(),
+        filename_time_format: "%s%f".into(),
+        ..config(&bucket, batch_size)
+    };
+
+    let prefix = config.key_prefix.clone();
+    let service = config.create_service(&cx.globals.proxy).await.unwrap();
+    let sink = config.build_processor(service).unwrap();
+
+    let (lines, events, receiver) = make_events_batch(100, batch_size * batch_multiplier);
+    run_and_assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
+    assert_eq!(receiver.await, BatchStatus::Delivered);
+
+    let keys = get_keys(&bucket, prefix).await;
+    assert_eq!(keys.len(), batch_multiplier);
+
+    let mut response_lines: Vec<String> = Vec::new();
+    let mut key_stream = stream::iter(keys);
+    while let Some(key) = key_stream.next().await {
+        assert!(key.ends_with(".log.zst"));
+
+        let obj = get_object(&bucket, key).await;
+        assert_eq!(obj.content_encoding, Some("zstd".to_string()));
+
+        response_lines.append(&mut get_zstd_lines(obj).await);
+    }
+
+    assert_eq!(lines, response_lines);
+}
+
 // NOTE: this test doesn't actually validate anything because localstack
 // doesn't enforce the required Content-MD5 header on the request for
 // buckets with object lock enabled
@@ -478,6 +523,13 @@ async fn get_lines(obj: GetObjectOutput) -> Vec<String> {
 async fn get_gzipped_lines(obj: GetObjectOutput) -> Vec<String> {
     let body = get_object_output_body(obj).await;
     let buf_read = BufReader::new(MultiGzDecoder::new(body));
+    buf_read.lines().map(|l| l.unwrap()).collect()
+}
+
+async fn get_zstd_lines(obj: GetObjectOutput) -> Vec<String> {
+    let body = get_object_output_body(obj).await;
+    let decoder = zstd::Decoder::new(body).expect("zstd decoder initialization failed");
+    let buf_read = BufReader::new(decoder);
     buf_read.lines().map(|l| l.unwrap()).collect()
 }
 

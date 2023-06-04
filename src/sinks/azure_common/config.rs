@@ -8,7 +8,10 @@ use bytes::Bytes;
 use futures::FutureExt;
 use http::StatusCode;
 use snafu::Snafu;
-use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
+use vector_common::{
+    json_size::JsonSize,
+    request_metadata::{MetaDescriptive, RequestMetadata},
+};
 use vector_core::{internal_event::CountByteSize, stream::DriverResponse};
 
 use crate::{
@@ -41,7 +44,7 @@ impl MetaDescriptive for AzureBlobRequest {
 pub struct AzureBlobMetadata {
     pub partition_key: String,
     pub count: usize,
-    pub byte_size: usize,
+    pub byte_size: JsonSize,
     pub finalizers: EventFinalizers,
 }
 
@@ -62,7 +65,7 @@ impl RetryLogic for AzureBlobRetryLogic {
 pub struct AzureBlobResponse {
     pub inner: PutBlockBlobResponse,
     pub count: usize,
-    pub events_byte_size: usize,
+    pub events_byte_size: JsonSize,
     pub byte_size: usize,
 }
 
