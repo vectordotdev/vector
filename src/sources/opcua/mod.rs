@@ -311,12 +311,9 @@ mod tests {
 mod integration_tests {
     use tokio::time::{Instant, timeout};
     use vector_common::config::ComponentKey;
-    // use crate::components::validation::ComponentType::Source;
     use crate::test_util::collect_n;
-    // use vector_common::finalization::EventStatus;
     use crate::test_util::components::{
         assert_source_compliance,
-        // run_and_assert_source_compliance,
         SOURCE_TAGS};
     use super::*;
 
