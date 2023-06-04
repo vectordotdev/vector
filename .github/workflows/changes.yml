@@ -207,9 +207,11 @@ jobs:
             - "src/sources/amqp.rs"
             - "src/sources/util/**"
             - "src/sinks/util/**"
+            - "scripts/integration/amqp/**"
           appsignal:
             - "src/sinks/appsignal/**"
             - "src/sinks/util/**"
+            - "scripts/integration/appsignal/**"
           aws:
             - "src/aws/**"
             - "src/internal_events/aws*"
@@ -225,18 +227,23 @@ jobs:
             - "src/sinks/aws_sqs/**"
             - "src/sinks/util/**"
             - "src/transforms/aws*"
+            - "scripts/integration/aws/**"
           axiom:
             - "src/sinks/axiom.rs"
             - "src/sinks/util/**"
+            - "scripts/integration/axiom/**"
           azure:
             - "src/sinks/azure_**"
             - "src/sinks/util/**"
+            - "scripts/integration/azure/**"
           clickhouse:
             - "src/sinks/clickhouse/**"
             - "src/sinks/util/**"
+            - "scripts/integration/clickhouse/**"
           databend:
             - "src/sinks/databend/**"
             - "src/sinks/util/**"
+            - "scripts/integration/databend/**"
           datadog:
             - "src/common/datadog.rs"
             - "src/internal_events/datadog_*"
@@ -244,22 +251,34 @@ jobs:
             - "src/sinks/datadog/**"
             - "src/sinks/datadog_archives.rs"
             - "src/sinks/util/**"
+            - "scripts/integration/datadog-agent/**"
+            - "scripts/integration/datadog-logs/**"
+            - "scripts/integration/datadog-metrics/**"
+            - "scripts/integration/datadog-traces/**"
+          dnstap:
+            - "src/internal_events/dnstap.rs"
+            - "src/sources/dnstap/**"
+            - "scripts/integration/dnstap/**"
           docker-logs:
             - "src/docker.rs"
             - "src/internal_events/docker_logs.rs"
             - "src/sources/docker_logs/**"
             - "src/sources/util/**"
+            - "scripts/integration/docker-logs/**"
           elasticsearch:
             - "src/sinks/elasticsearch/**"
             - "src/sinks/util/**"
+            - "scripts/integration/elasticsearch/**"
           eventstoredb:
             - "src/internal_events/eventstoredb_metrics.rs"
             - "src/sources/eventstoredb_metrics/**"
             - "src/sources/util/**"
+            - "scripts/integration/eventstoredb/**"
           fluent:
             - "src/internal_events/fluent.rs"
             - "src/sources/fluent/**"
             - "src/sources/util/**"
+            - "scripts/integration/fluent/**"
           gcp:
             - "src/internal_events/gcp_pubsub.rs"
             - "src/sources/gcp_pubsub.rs"
@@ -267,15 +286,21 @@ jobs:
             - "src/sinks/gcp/**"
             - "src/sinks/util/**"
             - "src/gcp.rs"
+            - "scripts/integration/gcp/**"
+            - "scripts/integration/chronicle/**"
           humio:
             - "src/sinks/humio/**"
             - "src/sinks/util/**"
+            - "scripts/integration/humio/**"
           http-client:
             - "src/sinks/http-client/**"
+            - "src/sinks/util/**"
+            - "scripts/integration/http-client/**"
           influxdb:
             - "src/internal_events/influxdb.rs"
             - "src/sinks/influxdb/**"
             - "src/sinks/util/**"
+            - "scripts/integration/influxdb/**"
           kafka:
             - "src/internal_events/kafka.rs"
             - "src/sinks/kafka/**"
@@ -283,17 +308,21 @@ jobs:
             - "src/sources/kafka.rs"
             - "src/sources/util/**"
             - "src/kafka.rs"
+            - "scripts/integration/kafka/**"
           logstash:
             - "src/sources/logstash.rs"
             - "src/sources/util/**"
+            - "scripts/integration/logstash/**"
           loki:
             - "src/internal_events/loki.rs"
             - "src/sinks/loki/**"
             - "src/sinks/util/**"
+            - "scripts/integration/loki/**"
           mongodb:
             - "src/internal_events/mongodb_metrics.rs"
             - "src/sources/mongodb_metrics/**"
             - "src/sources/util/**"
+            - "scripts/integration/mongodb/**"
           nats:
             - "src/internal_events/nats.rs"
             - "src/sources/nats.rs"
@@ -301,40 +330,49 @@ jobs:
             - "src/sinks/nats.rs"
             - "src/sinks/util/**"
             - "src/nats.rs"
+            - "scripts/integration/nats/**"
           nginx:
             - "src/internal_events/nginx_metrics.rs"
             - "src/sources/nginx_metrics/**"
             - "src/sources/util/**"
+            - "scripts/integration/nginx/**"
           opentelemetry:
             - "src/sources/opentelemetry/**"
             - "src/sources/util/**"
+            - "scripts/integration/opentelemetry/**"
           postgres:
             - "src/internal_events/postgresql_metrics.rs"
             - "src/sources/postgresql_metrics.rs"
             - "src/sources/util/**"
+            - "scripts/integration/postgres/**"
           prometheus:
             - "src/internal_events/prometheus.rs"
             - "src/sources/prometheus/**"
             - "src/sources/util/**"
             - "src/sinks/prometheus/**"
             - "src/sinks/util/**"
+            - "scripts/integration/prometheus/**"
           pulsar:
             - "src/internal_events/pulsar.rs"
             - "src/sinks/pulsar/**"
             - "src/sinks/util/**"
+            - "scripts/integration/pulsar/**"
           redis:
             - "src/internal_events/redis.rs"
             - "src/sources/redis/**"
             - "src/sources/util/**"
             - "src/sinks/redis.rs"
             - "src/sinks/util/**"
+            - "scripts/integration/redis/**"
           splunk:
             - "src/internal_events/splunk_hec.rs"
             - "src/sources/splunk_hec/**"
             - "src/sources/util/**"
             - "src/sinks/splunk_hec/**"
             - "src/sinks/util/**"
+            - "scripts/integration/splunk/**"
           webhdfs:
             - "src/sinks/webhdfs/**"
             - "src/sinks/util/**"
+            - "scripts/integration/webhdfs/**"
 
