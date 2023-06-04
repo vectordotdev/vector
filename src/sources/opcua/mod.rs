@@ -357,7 +357,7 @@ mod integration_tests {
 
             tokio::task::yield_now().await;
 
-            shutdown.shutdown_all(Instant::now()).await;
+            shutdown.shutdown_all(Some(Instant::now())).await;
 
             return events;
         }).await;

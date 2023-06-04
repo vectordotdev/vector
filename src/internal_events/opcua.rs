@@ -1,10 +1,11 @@
 #[cfg(feature = "sources-opcua")]
 use metrics::counter;
+use vector_common::json_size::JsonSize;
 use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
 pub struct OpcUaBytesReceived {
-    pub byte_size: usize,
+    pub byte_size: JsonSize,
     pub protocol: &'static str,
 }
 
@@ -17,7 +18,7 @@ impl InternalEvent for OpcUaBytesReceived {
             );
         counter!(
                 "component_received_bytes_total",
-                self.byte_size as u64,
+                self.byte_size.get() as u64,
                 "protocol" => self.protocol,
             );
     }
