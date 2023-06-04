@@ -247,9 +247,6 @@ fn subscribe_to_variables(node_ids: Vec<NodeIdConfig>, session: Arc<RwLock<Sessi
         TimestampsToReturn::Both,
         &monitored_node_ids,
     ).expect("Failed to create monitored items");
-    // if Err() {
-    //     panic!("ERROR: Failed to create a monitored item");
-    // }
 
     tokio::spawn(async move {
         let sleep = sleep(tokio::time::Duration::from_secs(1));
