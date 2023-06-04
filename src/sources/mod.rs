@@ -80,6 +80,8 @@ pub mod statsd;
 pub mod syslog;
 #[cfg(feature = "sources-vector")]
 pub mod vector;
+#[cfg(feature = "sources-opcua")]
+pub mod opcua;
 
 pub mod util;
 

@@ -1,0 +1,10 @@
+version: '3'
+
+services:
+  opcua:
+    image: ghcr.io/andreasheine/sampleserver-node-opcua:main
+    ports:
+      - 4840:4840
+    environment:
+      - PORT=4840
+      - IP=127.0.0.1

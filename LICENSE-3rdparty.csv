@@ -314,6 +314,7 @@ mongodb,https://github.com/mongodb/mongo-rust-driver,Apache-2.0,"Saghm Rossi <sa
 multer,https://github.com/rousan/multer-rs,MIT,Rousan Ali <hello@rousan.io>
 native-tls,https://github.com/sfackler/rust-native-tls,MIT OR Apache-2.0,Steven Fackler <sfackler@gmail.com>
 nats,https://github.com/nats-io/nats.rs,Apache-2.0,"Derek Collison <derek@nats.io>, Tyler Neely <tyler@nats.io>, Stjepan Glavina <stjepan@nats.io>"
+opcua,https://github.com/locka99/opcua,MPL-2.0,locka99
 ndk-context,https://github.com/rust-windowing/android-ndk-rs,MIT OR Apache-2.0,The Rust Windowing contributors
 nibble_vec,https://github.com/michaelsproul/rust_nibble_vec,MIT,Michael Sproul <micsproul@gmail.com>
 nix,https://github.com/nix-rust/nix,MIT,The nix-rust Project Developers
