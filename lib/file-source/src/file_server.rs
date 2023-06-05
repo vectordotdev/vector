@@ -237,6 +237,25 @@ where
                     continue;
                 }
 
+                // Add a check here to open the path again and verify whether it's mapped to the same file_id
+                let current_file_id = self.fingerprinter.get_fingerprint_or_log_error(
+                    &watcher.path,
+                    &mut fingerprint_buffer,
+                    &mut known_small_files,
+                    &self.emitter,
+                );
+
+                if let Some(current_file_id) = current_file_id {
+                    // If the current fingerprint does not match the file_id stored in fp_map, 
+                    // it means the file has been rotated (replaced, renamed, or deleted) since the last time it was read.
+                    if current_file_id != file_id {
+                        // The file_id has changed, so mark the watcher as dead
+                        watcher.set_dead();
+                        // The dead watcher will be removed from fp_map in the fp_map.retain(...) call later
+                        continue;
+                    }
+                }
+                
                 let start = time::Instant::now();
                 let mut bytes_read: usize = 0;
                 while let Ok(Some(line)) = watcher.read_line() {
