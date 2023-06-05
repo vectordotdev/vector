@@ -1,17 +1,8 @@
 //! Configuration functionality for the `AMQP` sink.
-use crate::{
-    amqp::AmqpConfig,
-    codecs::EncodingConfig,
-    config::{DataType, GenerateConfig, Input, SinkConfig, SinkContext},
-    sinks::{Healthcheck, VectorSink},
-    template::Template,
-};
+use crate::{amqp::AmqpConfig, sinks::prelude::*};
 use codecs::TextSerializerConfig;
-use futures::FutureExt;
 use lapin::{types::ShortString, BasicProperties};
 use std::sync::Arc;
-use vector_config::configurable_component;
-use vector_core::config::AcknowledgementsConfig;
 
 use super::sink::AmqpSink;
 

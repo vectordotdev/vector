@@ -5,16 +5,13 @@ use std::{
 
 use aws_smithy_client::SdkError;
 use aws_types::region::Region;
-use futures::future::BoxFuture;
-use tower::Service;
-use vector_common::{json_size::JsonSize, request_metadata::MetaDescriptive};
-use vector_core::{internal_event::CountByteSize, stream::DriverResponse};
+use vector_core::internal_event::CountByteSize;
 
 use super::{
     record::{Record, SendRecord},
     sink::BatchKinesisRequest,
 };
-use crate::event::EventStatus;
+use crate::{event::EventStatus, sinks::prelude::*};
 
 pub struct KinesisService<C, T, E> {
     pub client: C,

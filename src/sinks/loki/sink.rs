@@ -1,44 +1,25 @@
 use std::{collections::HashMap, num::NonZeroUsize};
 
 use bytes::{Bytes, BytesMut};
-use futures::{stream::BoxStream, StreamExt};
 use once_cell::sync::Lazy;
 use regex::Regex;
 use snafu::Snafu;
 use tokio_util::codec::Encoder as _;
-use vector_common::request_metadata::RequestMetadata;
-use vector_core::{
-    event::{Event, EventFinalizers, Finalizable, Value},
-    partition::Partitioner,
-    sink::StreamSink,
-    stream::BatcherSettings,
-    ByteSizeOf, EstimatedJsonEncodedSizeOf,
-};
 
 use super::{
     config::{LokiConfig, OutOfOrderAction},
     event::{LokiBatchEncoder, LokiEvent, LokiRecord, PartitionKey},
     service::{LokiRequest, LokiRetryLogic, LokiService},
 };
+use crate::sinks::loki::config::{CompressionConfigAdapter, ExtendedCompression};
 use crate::sinks::loki::event::LokiBatchEncoding;
-use crate::sinks::{
-    loki::config::{CompressionConfigAdapter, ExtendedCompression},
-    util::metadata::RequestMetadataBuilder,
-};
 use crate::{
-    codecs::{Encoder, Transformer},
     http::{get_http_scheme_from_uri, HttpClient},
     internal_events::{
         LokiEventUnlabeledError, LokiOutOfOrderEventDroppedError, LokiOutOfOrderEventRewritten,
-        SinkRequestBuildError, TemplateRenderingError,
+        SinkRequestBuildError,
     },
-    sinks::util::{
-        builder::SinkBuilderExt,
-        request_builder::EncodeResult,
-        service::{ServiceBuilderExt, Svc},
-        Compression, RequestBuilder,
-    },
-    template::Template,
+    sinks::prelude::*,
 };
 
 #[derive(Clone)]

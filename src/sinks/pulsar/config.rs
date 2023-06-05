@@ -1,12 +1,9 @@
 use crate::{
-    codecs::EncodingConfig,
-    config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     schema,
     sinks::{
+        prelude::*,
         pulsar::sink::{healthcheck, PulsarSink},
-        Healthcheck, VectorSink,
     },
-    template::Template,
 };
 use codecs::{encoding::SerializerConfig, TextSerializerConfig};
 use futures_util::FutureExt;
@@ -21,7 +18,6 @@ use pulsar::{
 use pulsar::{error::AuthenticationError, OperationRetryOptions};
 use snafu::ResultExt;
 use vector_common::sensitive_string::SensitiveString;
-use vector_config::configurable_component;
 use vector_core::config::DataType;
 use vrl::value::Kind;
 

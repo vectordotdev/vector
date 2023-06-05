@@ -1,13 +1,9 @@
 use std::{collections::HashMap, io};
 
+use crate::sinks::prelude::*;
 use bytes::Bytes;
 use serde::{ser::SerializeSeq, Serialize};
 use vector_buffers::EventCount;
-use vector_common::json_size::JsonSize;
-use vector_core::{
-    event::{EventFinalizers, Finalizable},
-    ByteSizeOf, EstimatedJsonEncodedSizeOf,
-};
 
 use crate::sinks::util::encoding::{write_all, Encoder};
 
