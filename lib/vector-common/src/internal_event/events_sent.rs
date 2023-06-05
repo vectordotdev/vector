@@ -114,8 +114,8 @@ impl TaggedEventsSent {
     pub fn new(source: Option<String>, service: Option<String>, output: Output) -> Self {
         Self {
             output: output.0,
-            source: source.map(|source| source.to_string()),
-            service: service.map(|service| service.to_string()),
+            source,
+            service,
         }
     }
 }

@@ -215,10 +215,8 @@ impl EstimatedJsonEncodedSizeOf for LogEvent {
 
 impl GetEventCountTags for LogEvent {
     fn get_tags(&self) -> EventCountTags {
-        let source = self.metadata().source_id().map(|id| id.to_string());
-        let service = self
-            .get_by_meaning("service")
-            .map(|service| service.to_string());
+        let source = self.metadata().source_id().map(ToString::to_string);
+        let service = self.get_by_meaning("service").map(ToString::to_string);
 
         (source, service)
     }

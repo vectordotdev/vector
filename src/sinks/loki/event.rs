@@ -8,7 +8,7 @@ use vector_common::{
     request_metadata::{EventCountTags, GetEventCountTags},
 };
 use vector_core::{
-    event::{Event, EventFinalizers, Finalizable},
+    event::{EventFinalizers, Finalizable},
     ByteSizeOf, EstimatedJsonEncodedSizeOf,
 };
 
@@ -195,7 +195,8 @@ impl Finalizable for LokiRecord {
 
 impl GetEventCountTags for LokiRecord {
     fn get_tags(&self) -> EventCountTags {
-        self.original_event.get_tags()
+        todo!()
+        // self.original_event.get_tags()
     }
 }
 

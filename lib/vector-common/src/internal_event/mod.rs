@@ -270,6 +270,18 @@ impl<Tags, Event: RegisterInternalEvent> Clone for Cached<Tags, Event> {
     }
 }
 
+impl<Tags, Event, EventHandle, Data> Default for Cached<Tags, Event>
+where
+    Data: Sized,
+    EventHandle: InternalEventHandle<Data = Data>,
+    Tags: Ord + Clone,
+    Event: RegisterInternalEvent<Handle = EventHandle> + RegisterEvent<Tags, Event>,
+{
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<Tags, Event, EventHandle, Data> Cached<Tags, Event>
 where
     Data: Sized,
@@ -277,12 +289,20 @@ where
     Tags: Ord + Clone,
     Event: RegisterInternalEvent<Handle = EventHandle> + RegisterEvent<Tags, Event>,
 {
+    #[must_use]
     pub fn new() -> Self {
         Self {
-            cache: Arc::new(RwLock::new(BTreeMap::new())),
+            cache: Arc::default(),
         }
     }
 
+    /// Emits the event with the given tags.
+    /// It will register the event and store in the cache if this has not already
+    /// been done.
+    ///
+    /// # Panics
+    ///
+    /// This will panic if the lock is poisoned.
     pub fn emit(&self, tags: &Tags, value: Data) {
         let read = self.cache.read().unwrap();
         if let Some(event) = read.get(tags) {

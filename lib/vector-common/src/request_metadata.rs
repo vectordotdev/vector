@@ -18,6 +18,7 @@ pub struct RequestCountByteSize {
 }
 
 impl RequestCountByteSize {
+    #[must_use]
     pub fn sizes(&self) -> &HashMap<EventCountTags, CountByteSize> {
         &self.sizes
     }
@@ -54,7 +55,7 @@ impl<'a> Add<&'a RequestCountByteSize> for RequestCountByteSize {
 
     fn add(mut self, other: &'a Self::Output) -> Self::Output {
         for (key, value) in &other.sizes {
-            match self.sizes.get_mut(&key) {
+            match self.sizes.get_mut(key) {
                 Some(size) => *size += *value,
                 None => {
                     self.sizes.insert(key.clone(), *value);
@@ -137,7 +138,7 @@ impl RequestMetadata {
     /// Constructs a `RequestMetadata` by summation of the "batch" of `RequestMetadata` provided.
     #[must_use]
     pub fn from_batch<T: IntoIterator<Item = RequestMetadata>>(metadata_iter: T) -> Self {
-        let mut metadata_sum = RequestMetadata::new(0, 0, 0, 0, Default::default());
+        let mut metadata_sum = RequestMetadata::new(0, 0, 0, 0, RequestCountByteSize::default());
 
         for metadata in metadata_iter {
             metadata_sum = metadata_sum + &metadata;

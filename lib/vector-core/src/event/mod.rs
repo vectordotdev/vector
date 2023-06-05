@@ -97,10 +97,9 @@ impl Finalizable for Event {
 
 impl GetEventCountTags for Event {
     fn get_tags(&self) -> EventCountTags {
-        let source = self.metadata().source_id().map(|id| id.to_string());
+        let source = self.metadata().source_id().map(ToString::to_string);
         let service = if let Event::Log(log) = self {
-            log.get_by_meaning("service")
-                .map(|service| service.to_string())
+            log.get_by_meaning("service").map(ToString::to_string)
         } else {
             None
         };

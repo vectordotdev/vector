@@ -82,7 +82,7 @@ impl DriverResponse for DatabendResponse {
     }
 
     fn events_sent(&self) -> &RequestCountByteSize {
-        &self.metadata.events_estimated_json_encoded_byte_size()
+        self.metadata.events_estimated_json_encoded_byte_size()
     }
 
     fn bytes_sent(&self) -> Option<usize> {

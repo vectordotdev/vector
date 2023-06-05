@@ -298,7 +298,6 @@ impl EventEncoder {
 
         Some(LokiRecord {
             labels,
-            original_event: event,
             event: LokiEvent {
                 timestamp,
                 event: bytes.freeze(),

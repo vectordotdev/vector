@@ -482,7 +482,7 @@ impl Finalizable for Metric {
 
 impl GetEventCountTags for Metric {
     fn get_tags(&self) -> EventCountTags {
-        let source = self.metadata().source_id().map(|output| output.to_string());
+        let source = self.metadata().source_id().map(ToString::to_string);
         // Metrics do not contain a service field.
 
         (source, None)
