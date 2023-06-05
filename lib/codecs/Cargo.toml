@@ -17,7 +17,7 @@ memchr = { version = "2", default-features = false }
 once_cell = { version = "1.18", default-features = false }
 ordered-float = { version = "3.7.0", default-features = false }
 prost = { version = "0.11.8", default-features = false, features = ["std"] }
-regex = { version = "1.8.3", default-features = false, features = ["std", "perf"] }
+regex = { version = "1.8.4", default-features = false, features = ["std", "perf"] }
 serde = { version = "1", default-features = false, features = ["derive"] }
 serde_json = { version = "1", default-features = false }
 smallvec = { version = "1", default-features = false, features = ["union"] }
