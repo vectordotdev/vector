@@ -1,5 +1,6 @@
-use std::{fs::File, io::BufReader, path::Path, sync::OnceLock};
+use std::{fs::File, io::BufReader, path::Path};
 
+use once_cell::sync::OnceCell;
 use serde_json::Value;
 use snafu::Snafu;
 use vector_config_common::{
@@ -414,8 +415,8 @@ impl<'a> QueryableSchema for SimpleSchema<'a> {
 }
 
 fn schema_to_simple_schema(schema: &Schema) -> SimpleSchema<'_> {
-    static TRUE_SCHEMA_OBJECT: OnceLock<SchemaObject> = OnceLock::new();
-    static FALSE_SCHEMA_OBJECT: OnceLock<SchemaObject> = OnceLock::new();
+    static TRUE_SCHEMA_OBJECT: OnceCell<SchemaObject> = OnceCell::new();
+    static FALSE_SCHEMA_OBJECT: OnceCell<SchemaObject> = OnceCell::new();
 
     let schema_object = match schema {
         Schema::Bool(bool) => {

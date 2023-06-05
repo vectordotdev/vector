@@ -1,9 +1,10 @@
 use std::sync::{atomic::Ordering, Arc, RwLock};
-use std::{cell::OnceCell, time::Duration};
+use std::time::Duration;
 
 use chrono::Utc;
 use metrics::{Counter, Gauge, Histogram, Key, KeyName, Recorder, SharedString, Unit};
 use metrics_util::{registry::Registry as MetricsRegistry, MetricKindMask};
+use once_cell::unsync::OnceCell;
 use quanta::Clock;
 
 use super::recency::{GenerationalStorage, Recency};

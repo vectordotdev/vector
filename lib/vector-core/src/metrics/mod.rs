@@ -4,12 +4,13 @@ mod recency;
 mod recorder;
 mod storage;
 
-use std::{sync::OnceLock, time::Duration};
+use std::time::Duration;
 
 use chrono::Utc;
 use metrics::Key;
 use metrics_tracing_context::TracingContextLayer;
 use metrics_util::layers::Layer;
+use once_cell::sync::OnceCell;
 use snafu::Snafu;
 
 pub use self::ddsketch::{AgentDDSketch, BinMap, Config};
@@ -28,7 +29,7 @@ pub enum Error {
     TimeoutMustBePositive { timeout: f64 },
 }
 
-static CONTROLLER: OnceLock<Controller> = OnceLock::new();
+static CONTROLLER: OnceCell<Controller> = OnceCell::new();
 
 // Cardinality counter parameters, expose the internal metrics registry
 // cardinality. Useful for the end users to help understand the characteristics
