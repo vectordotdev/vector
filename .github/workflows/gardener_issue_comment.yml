@@ -1,0 +1,89 @@
+# Gardener Issue Comment
+#
+# This workflow moves GH issues from the Gardener board's "Blocked / Waiting" column
+# to the "Triage", so that the Gardener can assess the issue in light of new information.
+
+name: Gardener Issue Comment
+
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  move-to-backlog:
+    name: Move issues back to Gardener project board Triage
+    runs-on: ubuntu-latest
+    if: contains(github.event.issue.url, 'issues')
+    steps:
+      - name: Move issue back to Triage if status is Blocked/Waiting
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT_PROJECTS }}
+        run: |
+          issue_id=${{ github.event.issue.node_id }}
+
+          # IDs fetched from https://docs.github.com/en/graphql/overview/explorer
+          project_id="PVT_kwDOAQFeYs4AAsTr" # Gardener
+          status_field_id="PVTF_lADOAQFeYs4AAsTrzgAXRuU" # Status
+          triage_option_id="f75ad846"
+
+          # ensures that the issue is already on board but also seems to be the only way to fetch
+          # the item id
+          item_id="$(gh api graphql -f query='
+            mutation($project_id: ID!, $content_id: ID!) {
+                addProjectV2ItemById(input: {projectId: $project_id, contentId: $content_id}) {
+                  item {
+                    id
+                  }
+                }
+            }' -f project_id="$project_id" -f content_id="$issue_id" -q '.data.addProjectV2ItemById.item.id'
+          )"
+
+          echo "item_id: $item_id"
+
+          if [ -z "$item_id" ] ; then
+            echo "Issue not found in Gardener board"
+            exit 0
+          else
+            echo "Found issue on Gardener board"
+          fi
+
+          current_status="$(gh api graphql -f query='
+            query($item_id: ID!) {
+              node(id: $item_id) {
+                ... on ProjectV2Item {
+                  fieldValueByName(name: "Status") {
+                    ... on ProjectV2ItemFieldSingleSelectValue {
+                      name
+                    }
+                  }
+                }
+              }
+            }' -f item_id="$item_id"
+          )"
+
+          current_status=$(echo $current_status | jq -c -r '.["data"]["node"]["fieldValueByName"]["name"]')
+
+          echo "Current issue status is: '${current_status}'"
+
+          if [ "$current_status" = "Blocked / Waiting" ] ; then
+            echo "Moving issue from 'Blocked / Waiting' to 'Triage'"
+            gh api graphql -f query='
+              mutation($project_id: ID!, $item_id: ID!, $field_id: ID!, $option_id: String) {
+                updateProjectV2ItemFieldValue(
+                  input: {
+                    projectId: $project_id
+                    itemId: $item_id
+                    fieldId: $field_id
+                    value: {
+                      singleSelectOptionId: $option_id
+                    }
+                  }
+                ) {
+                  projectV2Item {
+                    id
+                  }
+                }
+              }' -f project_id="$project_id" -f item_id="$item_id" -f field_id="$status_field_id" -f option_id="$triage_option_id"
+          else
+            echo "Issue is in '${current_status}', not moving."
+          fi
