@@ -6,7 +6,7 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 use snafu::Snafu;
 use tokio_util::codec::Encoder as _;
-use vector_common::request_metadata::RequestMetadata;
+use vector_common::request_metadata::{GetEventCountTags, RequestMetadata};
 use vector_core::{
     event::{Event, EventFinalizers, Finalizable, Value},
     partition::Partitioner,
@@ -281,10 +281,11 @@ impl EventEncoder {
             event.as_mut_log().remove_timestamp();
         }
 
+        let event_count_tags = event.get_tags();
+
         self.transformer.transform(&mut event);
         let mut bytes = BytesMut::new();
-        // TODO this is all wrong?
-        self.encoder.encode(event.clone(), &mut bytes).ok();
+        self.encoder.encode(event, &mut bytes).ok();
 
         // If no labels are provided we set our own default
         // `{agent="vector"}` label. This can happen if the only
@@ -305,6 +306,7 @@ impl EventEncoder {
             partition,
             finalizers,
             json_byte_size,
+            event_count_tags,
         })
     }
 }

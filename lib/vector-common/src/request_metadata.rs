@@ -4,6 +4,7 @@ use std::ops::Add;
 use crate::internal_event::CountByteSize;
 use crate::json_size::JsonSize;
 
+/// (Source, Service)
 pub type EventCountTags = (Option<String>, Option<String>);
 
 pub trait GetEventCountTags {
