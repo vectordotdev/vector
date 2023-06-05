@@ -140,9 +140,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          echo "::set-output name=BRANCH::$(
-            git branch --show-current
-          )"
+          export BRANCH=$(git branch --show-current)
+          echo "BRANCH=${BRANCH}"
+          echo "BRANCH=${BRANCH}" >> $GITHUB_OUTPUT
 
       - name: Checkout PR branch (issue_comment)
         if: github.event_name == 'issue_comment'
