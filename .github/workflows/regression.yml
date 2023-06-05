@@ -126,9 +126,13 @@ jobs:
       smp-version: ${{ steps.experimental-meta.outputs.SMP_CRATE_VERSION }}
       lading-version: ${{ steps.experimental-meta.outputs.LADING_VERSION }}
     steps:
-      - name: Checkout branch (merge queue)
-        if: github.event_name != 'issue_comment'
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v3
+
+      - name: Find PR branch name (issue_comment)
+        if: github.event_name == 'issue_comment'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh pr checkout ${{ github.event.issue.number }}
 
       - name: Find PR branch name (issue_comment)
         id: get-pr-branch-name
@@ -136,7 +140,6 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh pr checkout ${{ github.event.issue.number }}
           echo "::set-output name=BRANCH::$(
             git branch --show-current
           )"
