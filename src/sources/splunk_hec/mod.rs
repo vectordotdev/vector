@@ -74,7 +74,7 @@ pub struct SplunkConfig {
     #[configurable(deprecated = "This option has been deprecated, use `valid_tokens` instead.")]
     token: Option<SensitiveString>,
 
-    /// Optional list of valid authorization tokens.
+    /// A list of valid authorization tokens.
     ///
     /// If supplied, incoming requests must supply one of these tokens in the `Authorization` header, just as a client
     /// would if it was communicating with the Splunk HEC endpoint directly.

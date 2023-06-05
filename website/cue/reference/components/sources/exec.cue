@@ -117,7 +117,8 @@ components: sources: exec: {
 
 				On *nix platforms, Vector will issue a SIGTERM to the child process, allowing it to
 				gracefully shutdown, and the source will continue reading until the process exits or
-				Vector's shutdown grace period expires.
+				Vector's shutdown grace period expires. The duration of the grace period can be
+				configured using `--graceful-shutdown-limit-secs`.
 
 				On Windows, the subprocess will be issued a SIGKILL and terminate abruptly. In the
 				future we hope to support graceful shutdown of Windows processes as well.

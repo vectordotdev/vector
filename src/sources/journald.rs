@@ -152,6 +152,7 @@ pub struct JournaldConfig {
     /// permissions to this directory.
     #[serde(default)]
     #[configurable(metadata(docs::examples = "/var/lib/vector"))]
+    #[configurable(metadata(docs::human_name = "Data Directory"))]
     pub data_dir: Option<PathBuf>,
 
     /// The systemd journal is read in batches, and a checkpoint is set at the end of each batch.
@@ -1108,7 +1109,7 @@ mod tests {
 
             sleep(Duration::from_millis(100)).await;
             shutdown
-                .shutdown_all(Instant::now() + Duration::from_secs(1))
+                .shutdown_all(Some(Instant::now() + Duration::from_secs(1)))
                 .await;
 
             timeout(Duration::from_secs(1), rx.collect()).await.unwrap()

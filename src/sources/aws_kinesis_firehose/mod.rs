@@ -37,7 +37,7 @@ pub struct AwsKinesisFirehoseConfig {
     #[configurable(metadata(docs::examples = "localhost:443"))]
     address: SocketAddr,
 
-    /// An optional access key to authenticate requests against.
+    /// An access key to authenticate requests against.
     ///
     /// AWS Kinesis Firehose can be configured to pass along a user-configurable access key with each request. If
     /// configured, `access_key` should be set to the same value. Otherwise, all requests are allowed.
@@ -45,7 +45,7 @@ pub struct AwsKinesisFirehoseConfig {
     #[configurable(metadata(docs::examples = "A94A8FE5CCB19BA61C4C08"))]
     access_key: Option<SensitiveString>,
 
-    /// An optional list of access keys to authenticate requests against.
+    /// A list of access keys to authenticate requests against.
     ///
     /// AWS Kinesis Firehose can be configured to pass along a user-configurable access key with each request. If
     /// configured, `access_keys` should be set to the same value. Otherwise, all requests are allowed.

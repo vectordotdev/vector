@@ -97,7 +97,7 @@ base: components: sources: http: configuration: {
 		description: """
 			The expected encoding of received data.
 
-			Note: For `json` and `ndjson` encodings, the fields of the JSON objects are output as separate fields.
+			For `json` and `ndjson` encodings, the fields of the JSON objects are output as separate fields.
 			"""
 		required: false
 		type: string: enum: {

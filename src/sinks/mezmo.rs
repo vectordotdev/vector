@@ -82,10 +82,12 @@ pub struct MezmoConfig {
 
     /// The MAC address that is attached to each batch of events.
     #[configurable(metadata(docs::examples = "my-mac-address"))]
+    #[configurable(metadata(docs::human_name = "MAC Address"))]
     mac: Option<String>,
 
     /// The IP address that is attached to each batch of events.
     #[configurable(metadata(docs::examples = "0.0.0.0"))]
+    #[configurable(metadata(docs::human_name = "IP Address"))]
     ip: Option<String>,
 
     /// The tags that are attached to each batch of events.

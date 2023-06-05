@@ -1,6 +1,6 @@
 #[cfg(feature = "enterprise")]
 use std::collections::BTreeMap;
-use std::path::Path;
+use std::{path::Path, time::Duration};
 
 use indexmap::IndexMap;
 #[cfg(feature = "enterprise")]
@@ -78,6 +78,13 @@ pub struct ConfigBuilder {
     /// All configured secrets backends.
     #[serde(default)]
     pub secret: IndexMap<ComponentKey, SecretBackends>,
+
+    /// The duration in seconds to wait for graceful shutdown after SIGINT or SIGTERM are received.
+    /// After the duration has passed, Vector will force shutdown. Default value is 60 seconds. This
+    /// value can be set using a [cli arg](crate::cli::RootOpts::graceful_shutdown_limit_secs).
+    #[serde(default, skip)]
+    #[doc(hidden)]
+    pub graceful_shutdown_duration: Option<Duration>,
 }
 
 #[cfg(feature = "enterprise")]
@@ -195,6 +202,7 @@ impl From<Config> for ConfigBuilder {
             transforms,
             tests,
             secret,
+            graceful_shutdown_duration,
             hash: _,
         } = config;
 
@@ -225,6 +233,7 @@ impl From<Config> for ConfigBuilder {
             provider: None,
             tests,
             secret,
+            graceful_shutdown_duration,
         }
     }
 }

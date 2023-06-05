@@ -102,16 +102,19 @@ pub struct TowerRequestConfig {
     /// create orphaned requests, pile on retries, and result in duplicate data downstream.
     #[configurable(metadata(docs::type_unit = "seconds"))]
     #[serde(default = "default_timeout_secs")]
+    #[configurable(metadata(docs::human_name = "Timeout"))]
     pub timeout_secs: Option<u64>,
 
     /// The time window used for the `rate_limit_num` option.
     #[configurable(metadata(docs::type_unit = "seconds"))]
     #[serde(default = "default_rate_limit_duration_secs")]
+    #[configurable(metadata(docs::human_name = "Rate Limit Duration"))]
     pub rate_limit_duration_secs: Option<u64>,
 
     /// The maximum number of requests allowed within the `rate_limit_duration_secs` time window.
     #[configurable(metadata(docs::type_unit = "requests"))]
     #[serde(default = "default_rate_limit_num")]
+    #[configurable(metadata(docs::human_name = "Rate Limit Number"))]
     pub rate_limit_num: Option<u64>,
 
     /// The maximum number of retries to make for failed requests.
@@ -124,6 +127,7 @@ pub struct TowerRequestConfig {
     /// The maximum amount of time to wait between retries.
     #[configurable(metadata(docs::type_unit = "seconds"))]
     #[serde(default = "default_retry_max_duration_secs")]
+    #[configurable(metadata(docs::human_name = "Max Retry Duration"))]
     pub retry_max_duration_secs: Option<u64>,
 
     /// The amount of time to wait before attempting the first retry for a failed request.
@@ -131,6 +135,7 @@ pub struct TowerRequestConfig {
     /// After the first retry has failed, the fibonacci sequence is used to select future backoffs.
     #[configurable(metadata(docs::type_unit = "seconds"))]
     #[serde(default = "default_retry_initial_backoff_secs")]
+    #[configurable(metadata(docs::human_name = "Retry Initial Backoff"))]
     pub retry_initial_backoff_secs: Option<u64>,
 
     #[configurable(derived)]

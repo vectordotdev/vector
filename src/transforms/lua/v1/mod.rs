@@ -21,7 +21,7 @@ enum BuildError {
     InvalidLua { source: mlua::Error },
 }
 
-/// Configuration for the version one of the `lua` transform.
+/// Configuration for version one of the `lua` transform.
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]

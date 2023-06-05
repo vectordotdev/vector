@@ -41,7 +41,7 @@ impl NoProxyInterceptor {
 ///
 /// Configure to proxy traffic through an HTTP(S) proxy when making external requests.
 ///
-/// Similar to common proxy configuration convention, users can set different proxies
+/// Similar to common proxy configuration convention, you can set different proxies
 /// to use based on the type of traffic being proxied, as well as set specific hosts that
 /// should not be proxied.
 #[configurable_component]
