@@ -1,22 +1,15 @@
 use std::task::{Context, Poll};
 
 use bytes::Bytes;
-use futures::future::BoxFuture;
 use http::StatusCode;
 use snafu::Snafu;
-use tower::Service;
 use tracing::Instrument;
-use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
-use vector_core::{
-    event::{EventFinalizers, EventStatus, Finalizable},
-    internal_event::CountByteSize,
-    stream::DriverResponse,
-};
+use vector_core::internal_event::CountByteSize;
 
 use crate::sinks::loki::config::{CompressionConfigAdapter, ExtendedCompression};
 use crate::{
     http::{Auth, HttpClient},
-    sinks::util::{retries::RetryLogic, UriSerde},
+    sinks::{prelude::*, util::UriSerde},
 };
 
 #[derive(Clone)]

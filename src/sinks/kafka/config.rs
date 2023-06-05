@@ -5,20 +5,15 @@ use futures::FutureExt;
 use rdkafka::ClientConfig;
 use serde_with::serde_as;
 use vector_config::configurable_component;
-use vector_core::schema::Requirement;
 use vrl::value::Kind;
 
 use crate::{
-    codecs::EncodingConfig,
-    config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext},
     kafka::{KafkaAuthConfig, KafkaCompression},
     serde::json::to_string,
     sinks::{
         kafka::sink::{healthcheck, KafkaSink},
-        util::{BatchConfig, NoDefaultsBatchSettings},
-        Healthcheck, VectorSink,
+        prelude::*,
     },
-    template::Template,
 };
 
 pub(crate) const QUEUED_MIN_MESSAGES: u64 = 100000;

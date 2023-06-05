@@ -1,29 +1,17 @@
 use std::task::{Context, Poll};
 
 use bytes::Bytes;
-use futures::future::BoxFuture;
 use rdkafka::{
     error::KafkaError,
     message::OwnedHeaders,
     producer::{FutureProducer, FutureRecord},
     util::Timeout,
 };
-use tower::Service;
-use vector_common::{
-    json_size::JsonSize,
-    request_metadata::{MetaDescriptive, RequestMetadata},
-};
-use vector_core::{
-    internal_event::{
-        ByteSize, BytesSent, CountByteSize, InternalEventHandle as _, Protocol, Registered,
-    },
-    stream::DriverResponse,
+use vector_core::internal_event::{
+    ByteSize, BytesSent, CountByteSize, InternalEventHandle as _, Protocol, Registered,
 };
 
-use crate::{
-    event::{EventFinalizers, EventStatus, Finalizable},
-    kafka::KafkaStatisticsContext,
-};
+use crate::{kafka::KafkaStatisticsContext, sinks::prelude::*};
 
 pub struct KafkaRequest {
     pub body: Bytes,

@@ -1,8 +1,5 @@
 //! Encoding for the `AMQP` sink.
-use crate::{
-    event::Event,
-    sinks::util::encoding::{write_all, Encoder},
-};
+use crate::sinks::prelude::*;
 use bytes::BytesMut;
 use std::io;
 use tokio_util::codec::Encoder as _;
@@ -13,7 +10,7 @@ pub(super) struct AmqpEncoder {
     pub(super) transformer: crate::codecs::Transformer,
 }
 
-impl Encoder<Event> for AmqpEncoder {
+impl encoding::Encoder<Event> for AmqpEncoder {
     fn encode_input(&self, mut input: Event, writer: &mut dyn io::Write) -> io::Result<usize> {
         let mut body = BytesMut::new();
         self.transformer.transform(&mut input);

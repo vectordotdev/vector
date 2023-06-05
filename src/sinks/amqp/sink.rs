@@ -1,19 +1,9 @@
 //! The sink for the `AMQP` sink that wires together the main stream that takes the
 //! event and sends it to `AMQP`.
-use crate::{
-    codecs::Transformer, event::Event, internal_events::TemplateRenderingError,
-    sinks::util::builder::SinkBuilderExt, template::Template,
-};
-use async_trait::async_trait;
-use futures::StreamExt;
-use futures_util::stream::BoxStream;
+use crate::sinks::prelude::*;
 use lapin::{options::ConfirmSelectOptions, BasicProperties};
 use serde::Serialize;
 use std::sync::Arc;
-use tower::ServiceBuilder;
-use vector_buffers::EventCount;
-use vector_common::json_size::JsonSize;
-use vector_core::{sink::StreamSink, ByteSizeOf, EstimatedJsonEncodedSizeOf};
 
 use super::{
     config::{AmqpPropertiesConfig, AmqpSinkConfig},
