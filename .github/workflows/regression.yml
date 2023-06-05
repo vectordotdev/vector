@@ -126,15 +126,16 @@ jobs:
       smp-version: ${{ steps.experimental-meta.outputs.SMP_CRATE_VERSION }}
       lading-version: ${{ steps.experimental-meta.outputs.LADING_VERSION }}
     steps:
+
       - uses: actions/checkout@v3
 
-      - name: Find PR branch name (issue_comment)
+      - name: Checkout PR (issue_comment)
         if: github.event_name == 'issue_comment'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: gh pr checkout ${{ github.event.issue.number }}
 
-      - name: Find PR branch name (issue_comment)
+      - name: Get PR branch name (issue_comment)
         id: get-pr-branch-name
         if: github.event_name == 'issue_comment'
         env:
@@ -184,6 +185,21 @@ jobs:
           echo "comparison sha is: ${COMPARISON_SHA}"
           echo "comparison tag is: ${COMPARISON_TAG}"
 
+          if [ "${BASELINE_SHA}" = "" ] ; then
+            echo "BASELINE_SHA not found, exiting."
+            exit 1
+          fi
+
+          if [ "${COMPARISON_SHA}" = "" ] ; then
+            echo "COMPARISON_SHA not found, exiting."
+            exit 1
+          fi
+
+          if [ "${PR_NUMBER}" = "" ] ; then
+            echo "PR_NUMBER not found, exiting."
+            exit 1
+          fi
+
       # If triggered by merge queue, the PR number is not available in the payload. While we restrict the number of PRs in the
       # queue to 1, we can get the PR number by parsing the merge queue temp branch's ref.
       - name: Get PR metadata (merge queue)
@@ -212,6 +228,21 @@ jobs:
 
           echo "comparison sha is: ${COMPARISON_SHA}"
           echo "comparison tag is: ${COMPARISON_TAG}"
+
+          if [ "${BASELINE_SHA}" = "" ] ; then
+            echo "BASELINE_SHA not found, exiting."
+            exit 1
+          fi
+
+          if [ "${COMPARISON_SHA}" = "" ] ; then
+            echo "COMPARISON_SHA not found, exiting."
+            exit 1
+          fi
+
+          if [ "${PR_NUMBER}" = "" ] ; then
+            echo "PR_NUMBER not found, exiting."
+            exit 1
+          fi
 
       - name: Setup experimental metadata
         id: experimental-meta
