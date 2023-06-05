@@ -1,7 +1,7 @@
 //! Prelude module for sinks which will re-export the symbols that most
 //! stream based sinks are likely to use.
 
-pub(crate) use crate::{
+pub use crate::{
     codecs::{Encoder, EncodingConfig, Transformer},
     config::{DataType, GenerateConfig, SinkConfig, SinkContext},
     event::{Event, LogEvent},
@@ -22,18 +22,18 @@ pub(crate) use crate::{
     template::{Template, TemplateParseError},
     tls::TlsConfig,
 };
-pub(crate) use async_trait::async_trait;
-pub(crate) use futures::{future, future::BoxFuture, stream::BoxStream, FutureExt, StreamExt};
-pub(crate) use tower::{Service, ServiceBuilder};
-pub(crate) use vector_buffers::EventCount;
-pub(crate) use vector_common::{
+pub use async_trait::async_trait;
+pub use futures::{future, future::BoxFuture, stream::BoxStream, FutureExt, StreamExt};
+pub use tower::{Service, ServiceBuilder};
+pub use vector_buffers::EventCount;
+pub use vector_common::{
     finalization::{EventFinalizers, EventStatus, Finalizable},
     internal_event::CountByteSize,
     json_size::JsonSize,
     request_metadata::{MetaDescriptive, RequestMetadata},
 };
-pub(crate) use vector_config::configurable_component;
-pub(crate) use vector_core::{
+pub use vector_config::configurable_component;
+pub use vector_core::{
     config::{AcknowledgementsConfig, Input},
     event::Value,
     partition::Partitioner,
