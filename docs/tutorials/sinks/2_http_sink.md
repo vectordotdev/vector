@@ -15,20 +15,8 @@ use crate::{
     sinks::prelude::*,
     http::HttpClient,
     internal_events::SinkRequestBuildError,
-    sinks::util::{
-        metadata::RequestMetadataBuilder,
-        request_builder::EncodeResult,
-        Compression, RequestBuilder, SinkBuilderExt,
-    },
 };
 use bytes::Bytes;
-use futures::{future::BoxFuture};
-use vector_common::{
-    request_metadata::{MetaDescriptive, RequestMetadata},
-};
-use vector_core::{
-    tls::TlsSettings,
-};
 ```
 
 # Configuration
