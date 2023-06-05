@@ -29,7 +29,7 @@ metrics-tracing-context = { version = "0.14.0", default-features = false }
 metrics-util = { version = "0.15.0", default-features = false, features = ["registry"] }
 mlua = { version = "0.8.9", default-features = false, features = ["lua54", "send", "vendored"], optional = true }
 no-proxy = { version  = "0.3.2", default-features = false, features = ["serialize"] }
-once_cell = { version = "1.17", default-features = false }
+once_cell = { version = "1.18", default-features = false }
 ordered-float = { version = "3.7.0", default-features = false }
 openssl = { version = "0.10.54", default-features = false, features = ["vendored"] }
 parking_lot = { version = "0.12.1", default-features = false }
