@@ -181,7 +181,7 @@ azure_storage = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev =
 azure_storage_blobs = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "b4544d4920fa3064eb921340054cd9cc130b7664", default-features = false, optional = true }
 
 # OpenDAL
-opendal = {version = "0.36", default-features = false, features = ["native-tls", "services-webhdfs"], optional = true}
+opendal = {version = "0.37", default-features = false, features = ["native-tls", "services-webhdfs"], optional = true}
 
 # Tower
 tower = { version = "0.4.13", default-features = false, features = ["buffer", "limit", "retry", "timeout", "util", "balance", "discover"] }
