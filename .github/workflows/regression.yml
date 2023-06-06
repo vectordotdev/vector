@@ -129,11 +129,30 @@ jobs:
 
       - uses: actions/checkout@v3
 
-      - name: Checkout PR branch (issue_comment)
+      - name: Checkout PR (issue_comment)
         if: github.event_name == 'issue_comment'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: gh pr checkout ${{ github.event.issue.number }}
+
+      - name: Get PR branch name (issue_comment)
+        id: get-pr-branch-name
+        if: github.event_name == 'issue_comment'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          export BRANCH=$(git branch --show-current)
+          echo "BRANCH=${BRANCH}"
+          echo "BRANCH=${BRANCH}" >> $GITHUB_OUTPUT
+
+      - name: Checkout PR branch (issue_comment)
+        if: github.event_name == 'issue_comment'
+        uses: actions/checkout@v3
+        with:
+          # TODO: this can be done more elegantly in a follow-up by using a depth value and
+          #       increasing it until the merge-base is found.
+          fetch-depth: 500
+          ref: "${{ steps.get-pr-branch-name.outputs.BRANCH }}"
 
       # If triggered by issue comment, the event payload doesn't directly contain the head and base sha from the PR.
       # But, we can retrieve this info from some commands.
@@ -166,6 +185,21 @@ jobs:
           echo "comparison sha is: ${COMPARISON_SHA}"
           echo "comparison tag is: ${COMPARISON_TAG}"
 
+          if [ "${BASELINE_SHA}" = "" ] ; then
+            echo "BASELINE_SHA not found, exiting."
+            exit 1
+          fi
+
+          if [ "${COMPARISON_SHA}" = "" ] ; then
+            echo "COMPARISON_SHA not found, exiting."
+            exit 1
+          fi
+
+          if [ "${PR_NUMBER}" = "" ] ; then
+            echo "PR_NUMBER not found, exiting."
+            exit 1
+          fi
+
       # If triggered by merge queue, the PR number is not available in the payload. While we restrict the number of PRs in the
       # queue to 1, we can get the PR number by parsing the merge queue temp branch's ref.
       - name: Get PR metadata (merge queue)
@@ -194,6 +228,21 @@ jobs:
 
           echo "comparison sha is: ${COMPARISON_SHA}"
           echo "comparison tag is: ${COMPARISON_TAG}"
+
+          if [ "${BASELINE_SHA}" = "" ] ; then
+            echo "BASELINE_SHA not found, exiting."
+            exit 1
+          fi
+
+          if [ "${COMPARISON_SHA}" = "" ] ; then
+            echo "COMPARISON_SHA not found, exiting."
+            exit 1
+          fi
+
+          if [ "${PR_NUMBER}" = "" ] ; then
+            echo "PR_NUMBER not found, exiting."
+            exit 1
+          fi
 
       - name: Setup experimental metadata
         id: experimental-meta
