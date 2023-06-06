@@ -158,7 +158,7 @@ the reception of Vector events from an upstream component.
 
 #### ComponentBytesSent
 
-*Sinks* MUST emit a `ComponentBytesReceived` event that represent the transmission of bytes.
+*Sinks* MUST emit a `ComponentBytesSent` event that represent the transmission of bytes.
 
 - Emission
   - MUST emit a `ComponentBytesSent` event immediately after sending bytes to the downstream target,
