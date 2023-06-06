@@ -28,7 +28,7 @@ use crate::sinks::util::{EncodedEvent, TowerRequestConfig};
 use crate::sinks::VectorSink;
 
 #[derive(Debug)]
-pub struct GreptimeBatchOutput(Vec<u32>);
+pub struct GreptimeBatchOutput(u32);
 
 impl Response for GreptimeBatchOutput {}
 
@@ -124,16 +124,15 @@ impl Service<Vec<Metric>> for GreptimeDBService {
 
     // Convert vector metrics into GreptimeDB format and send them in batch
     fn call(&mut self, items: Vec<Metric>) -> Self::Future {
-        let requests = items.into_iter().map(metric_to_insert_request);
+        let requests = items
+            .into_iter()
+            .map(metric_to_insert_request)
+            .collect::<Vec<InsertRequest>>();
         let client = Arc::clone(&self.client);
 
         Box::pin(async move {
-            let mut outputs = Vec::with_capacity(requests.len());
-            for request in requests {
-                let result = client.insert(request).await?;
-                outputs.push(result);
-            }
-            Ok(GreptimeBatchOutput(outputs))
+            let result = client.insert(requests).await?;
+            Ok(GreptimeBatchOutput(result))
         })
     }
 }

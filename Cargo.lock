@@ -4444,7 +4444,7 @@ dependencies = [
 [[package]]
 name = "greptime-proto"
 version = "0.1.0"
-source = "git+https://github.com/GreptimeTeam/greptime-proto.git?rev=ff0a47b6462bf196cbcd01b589c5dddfa6bfbc45#ff0a47b6462bf196cbcd01b589c5dddfa6bfbc45"
+source = "git+https://github.com/GreptimeTeam/greptime-proto.git?tag=0.2.1#4398d20c56d5f7939cc2960789cb1fa7dd18e6fe"
 dependencies = [
  "prost",
  "serde",
@@ -4456,7 +4456,7 @@ dependencies = [
 [[package]]
 name = "greptimedb-client-rust"
 version = "0.1.0"
-source = "git+https://github.com/GreptimeTeam/greptimedb-client-rust.git?rev=2b5d575fd4aaff2955b20e59e752e1eba71c4b75#2b5d575fd4aaff2955b20e59e752e1eba71c4b75"
+source = "git+https://github.com/GreptimeTeam/greptimedb-client-rust.git?rev=48121652b8e6dfb95abefcf342808a4e78d024b4#48121652b8e6dfb95abefcf342808a4e78d024b4"
 dependencies = [
  "dashmap",
  "enum_dispatch",
