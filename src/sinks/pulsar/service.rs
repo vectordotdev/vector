@@ -3,17 +3,12 @@ use std::sync::Arc;
 use std::task::{Context, Poll};
 
 use bytes::Bytes;
-use futures::future::BoxFuture;
 use pulsar::producer::Message;
 use pulsar::{Error as PulsarError, Executor, MultiTopicProducer, ProducerOptions, Pulsar};
 use tokio::sync::Mutex;
-use tower::Service;
-use vector_common::request_metadata::{MetaDescriptive, RequestCountByteSize, RequestMetadata};
-use vector_core::stream::DriverResponse;
 
-use crate::event::{EventFinalizers, EventStatus, Finalizable};
 use crate::internal_events::PulsarSendingError;
-use crate::sinks::pulsar::request_builder::PulsarMetadata;
+use crate::sinks::{prelude::*, pulsar::request_builder::PulsarMetadata};
 
 #[derive(Clone)]
 pub(super) struct PulsarRequest {

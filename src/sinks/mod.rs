@@ -3,6 +3,7 @@ use enum_dispatch::enum_dispatch;
 use futures::future::BoxFuture;
 use snafu::Snafu;
 
+pub mod prelude;
 pub mod util;
 
 #[cfg(feature = "sinks-amqp")]

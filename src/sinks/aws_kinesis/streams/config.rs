@@ -148,8 +148,7 @@ impl SinkConfig for KinesisStreamsSinkConfig {
             self.partition_key_field.clone(),
             batch_settings,
             KinesisStreamClient { client },
-        )
-        .await?;
+        )?;
 
         Ok((sink, healthcheck))
     }

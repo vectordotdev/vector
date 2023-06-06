@@ -1,20 +1,10 @@
 //! Request builder for the `AMQP` sink.
 //! Responsible for taking the event (which includes rendered template values) and turning
 //! it into the raw bytes and other data needed to send the request to `AMQP`.
-use crate::{
-    event::Event,
-    sinks::util::{
-        metadata::RequestMetadataBuilder, request_builder::EncodeResult, Compression,
-        RequestBuilder,
-    },
-};
+use crate::sinks::prelude::*;
 use bytes::Bytes;
 use lapin::BasicProperties;
 use std::io;
-use vector_common::{
-    finalization::{EventFinalizers, Finalizable},
-    request_metadata::RequestMetadata,
-};
 
 use super::{encoder::AmqpEncoder, service::AmqpRequest, sink::AmqpEvent};
 

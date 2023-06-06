@@ -22,16 +22,7 @@ Provide some module level comments to explain what the sink does.
 Let's setup all the imports we will need for the tutorial:
 
 ```rust
-use super::Healthcheck;
-use crate::config::{GenerateConfig, SinkConfig, SinkContext};
-use futures::{stream::BoxStream, StreamExt};
-use vector_common::finalization::{EventStatus, Finalizable};
-use vector_config::configurable_component;
-use vector_core::{
-    config::{AcknowledgementsConfig, Input},
-    event::Event,
-    sink::{StreamSink, VectorSink},
-};
+use crate::prelude::*;
 ```
 
 # Configuration

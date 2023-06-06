@@ -1,21 +1,12 @@
 use std::collections::HashMap;
 
-use futures::future::FutureExt;
-use vector_config::configurable_component;
 use vrl::value::Kind;
 
 use super::{healthcheck::healthcheck, sink::LokiSink};
 use crate::{
-    codecs::EncodingConfig,
-    config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext},
     http::{Auth, HttpClient, MaybeAuth},
     schema,
-    sinks::{
-        util::{BatchConfig, Compression, SinkBatchSettings, TowerRequestConfig, UriSerde},
-        VectorSink,
-    },
-    template::Template,
-    tls::{TlsConfig, TlsSettings},
+    sinks::{prelude::*, util::UriSerde},
 };
 
 /// Loki-specific compression.

@@ -1,19 +1,13 @@
 use std::marker::PhantomData;
 
-use tower::ServiceBuilder;
-use vector_config::configurable_component;
-use vector_core::{
-    config::{DataType, Input},
-    sink::VectorSink,
-    stream::BatcherSettings,
-};
+use vector_core::stream::BatcherSettings;
 
 use crate::{
     aws::{AwsAuthentication, RegionOrEndpoint},
-    codecs::{Encoder, EncodingConfig},
-    config::AcknowledgementsConfig,
-    sinks::util::{retries::RetryLogic, Compression, ServiceBuilderExt, TowerRequestConfig},
-    tls::TlsConfig,
+    sinks::{
+        prelude::*,
+        util::{retries::RetryLogic, TowerRequestConfig},
+    },
 };
 
 use super::{
@@ -78,7 +72,7 @@ impl KinesisSinkBaseConfig {
 }
 
 /// Builds an aws_kinesis sink.
-pub async fn build_sink<C, R, RR, E, RT>(
+pub fn build_sink<C, R, RR, E, RT>(
     config: &KinesisSinkBaseConfig,
     partition_key_field: Option<String>,
     batch_settings: BatcherSettings,

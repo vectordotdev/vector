@@ -12,32 +12,11 @@ To start, update our imports to the following:
 use std::task::Poll;
 
 use crate::{
-    config::{GenerateConfig, SinkConfig, SinkContext},
+    sinks::prelude::*,
     http::HttpClient,
     internal_events::SinkRequestBuildError,
-    sinks::util::{
-        encoding::{write_all, Encoder},
-        metadata::RequestMetadataBuilder,
-        request_builder::EncodeResult,
-        Compression, RequestBuilder, SinkBuilderExt,
-    },
-    sinks::Healthcheck,
 };
 use bytes::Bytes;
-use futures::{future::BoxFuture, stream::BoxStream, StreamExt};
-use vector_common::{
-    finalization::{EventFinalizers, EventStatus, Finalizable},
-    internal_event::CountByteSize,
-    request_metadata::{MetaDescriptive, RequestMetadata},
-};
-use vector_config::configurable_component;
-use vector_core::{
-    config::{AcknowledgementsConfig, Input},
-    event::Event,
-    sink::{StreamSink, VectorSink},
-    stream::DriverResponse,
-    tls::TlsSettings,
-};
 ```
 
 # Configuration

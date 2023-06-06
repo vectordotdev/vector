@@ -1,24 +1,11 @@
 use async_trait::async_trait;
 use bytes::Bytes;
-use futures::{stream::BoxStream, StreamExt};
 use pulsar::{Error as PulsarError, Pulsar, TokioExecutor};
 use serde::Serialize;
 use snafu::Snafu;
 use std::collections::HashMap;
-use tower::ServiceBuilder;
 
-use crate::{
-    codecs::{Encoder, Transformer},
-    event::Event,
-    sinks::util::SinkBuilderExt,
-    template::Template,
-};
-use vector_buffers::EventCount;
-use vector_common::{byte_size_of::ByteSizeOf, json_size::JsonSize};
-use vector_core::{
-    event::{EstimatedJsonEncodedSizeOf, LogEvent},
-    sink::StreamSink,
-};
+use crate::sinks::prelude::*;
 
 use super::{
     config::PulsarSinkConfig, encoder::PulsarEncoder, request_builder::PulsarRequestBuilder,

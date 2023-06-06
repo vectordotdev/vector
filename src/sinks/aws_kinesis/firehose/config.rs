@@ -141,8 +141,7 @@ impl SinkConfig for KinesisFirehoseSinkConfig {
             None,
             batch_settings,
             KinesisFirehoseClient { client },
-        )
-        .await?;
+        )?;
 
         Ok((sink, healthcheck))
     }
