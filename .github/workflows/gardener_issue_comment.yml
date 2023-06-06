@@ -17,7 +17,7 @@ jobs:
     steps:
       - name: Move issue back to Triage if status is Blocked/Waiting
         env:
-          GH_TOKEN: ${{ secrets.GH_PAT_PROJECTS }}
+          GH_TOKEN: ${{ secrets.GH_PROJECT_PAT }}
         run: |
           issue_id=${{ github.event.issue.node_id }}
 
