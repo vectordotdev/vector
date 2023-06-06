@@ -97,7 +97,7 @@ crate::registered_event!(
 );
 
 /// TODO: This can probably become a part of the previous macro.
-impl RegisterEvent<(Option<String>, Option<String>), TaggedEventsSent> for TaggedEventsSent {
+impl RegisterEvent<(Option<String>, Option<String>)> for TaggedEventsSent {
     fn register(
         tags: &(Option<String>, Option<String>),
     ) -> <TaggedEventsSent as super::RegisterInternalEvent>::Handle {

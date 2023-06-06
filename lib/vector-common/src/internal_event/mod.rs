@@ -248,11 +248,8 @@ macro_rules! registered_event {
     };
 }
 
-pub trait RegisterEvent<Tags, Event>
-where
-    Event: RegisterInternalEvent,
-{
-    fn register(tags: &Tags) -> <Event as RegisterInternalEvent>::Handle;
+pub trait RegisterEvent<Tags>: RegisterInternalEvent {
+    fn register(tags: &Tags) -> <Self as RegisterInternalEvent>::Handle;
 }
 
 pub struct Cached<Tags, Event: RegisterInternalEvent> {
@@ -275,7 +272,7 @@ where
     Data: Sized,
     EventHandle: InternalEventHandle<Data = Data>,
     Tags: Ord + Clone,
-    Event: RegisterInternalEvent<Handle = EventHandle> + RegisterEvent<Tags, Event>,
+    Event: RegisterInternalEvent<Handle = EventHandle> + RegisterEvent<Tags>,
 {
     fn default() -> Self {
         Self::new()
@@ -287,7 +284,7 @@ where
     Data: Sized,
     EventHandle: InternalEventHandle<Data = Data>,
     Tags: Ord + Clone,
-    Event: RegisterInternalEvent<Handle = EventHandle> + RegisterEvent<Tags, Event>,
+    Event: RegisterInternalEvent<Handle = EventHandle> + RegisterEvent<Tags>,
 {
     #[must_use]
     pub fn new() -> Self {
@@ -308,7 +305,7 @@ where
         if let Some(event) = read.get(tags) {
             event.emit(value);
         } else {
-            let event = <Event as RegisterEvent<Tags, Event>>::register(tags);
+            let event = <Event as RegisterEvent<Tags>>::register(tags);
             event.emit(value);
 
             // Ensure the read lock is dropped so we can write.
