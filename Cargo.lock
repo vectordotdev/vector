@@ -1561,7 +1561,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "822462c1e7b17b31961798a6874b36daea6818e99e0cb7d3b7b0fa3c477751c3"
 dependencies = [
  "borsh-derive",
- "hashbrown 0.13.2",
+ "hashbrown 0.12.3",
 ]
 
 [[package]]
@@ -3602,6 +3602,15 @@ name = "hashbrown"
 version = "0.13.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "43a3c133739dddd0d2990f9a4bdf8eb4b21ef50e4851ca85ab661199821d510e"
+dependencies = [
+ "ahash 0.8.2",
+]
+
+[[package]]
+name = "hashbrown"
+version = "0.14.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2c6201b9ff9fd90a5a3bac2e56a830d0caa509576f0e503818ee82c181b3437a"
 dependencies = [
  "ahash 0.8.2",
 ]
@@ -9154,7 +9163,7 @@ dependencies = [
  "grok",
  "h2",
  "hash_hasher",
- "hashbrown 0.13.2",
+ "hashbrown 0.14.0",
  "headers",
  "heim",
  "hex",
