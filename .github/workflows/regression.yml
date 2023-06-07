@@ -128,32 +128,6 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - name: Find PR branch name (issue_comment)
-        if: github.event_name == 'issue_comment'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh pr checkout ${{ github.event.issue.number }}
-
-      - name: Find PR branch name (issue_comment)
-        id: get-pr-branch-name
-        if: github.event_name == 'issue_comment'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          export BRANCH=$(git branch --show-current)
-          echo "BRANCH=${BRANCH}"
-          echo "BRANCH=${BRANCH}" >> $GITHUB_OUTPUT
-
-      - name: Checkout PR branch (issue_comment)
-        if: github.event_name == 'issue_comment'
-        uses: actions/checkout@v3
-        with:
-          # TODO: this can be done more elegantly in a follow-up by using a depth value and
-          #       increasing it until the merge-base is found.
-          fetch-depth: 500
-          ref: "${{ steps.get-pr-branch-name.outputs.BRANCH }}"
-
-
       # If triggered by issue comment, the event payload doesn't directly contain the head and base sha from the PR.
       # But, we can retrieve this info from some commands.
       - name: Get PR metadata (issue_comment)
@@ -164,6 +138,13 @@ jobs:
         run: |
           export PR_NUMBER=${{ github.event.issue.number }}
           echo "PR_NUMBER=${PR_NUMBER}" >> $GITHUB_OUTPUT
+
+          gh pr checkout ${{ github.event.issue.number }}
+
+          export BRANCH=$(git branch --show-current)
+          echo "BRANCH=${BRANCH}"
+
+          git remote set-branches --add origin ${BRANCH}
 
           export BASELINE_SHA=$(git merge-base origin/master HEAD)
           echo "BASELINE_SHA=${BASELINE_SHA}" >> $GITHUB_OUTPUT
