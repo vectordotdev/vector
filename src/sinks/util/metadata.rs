@@ -1,7 +1,7 @@
 use std::num::NonZeroUsize;
 
 use vector_buffers::EventCount;
-use vector_core::{ByteSizeOf, EstimatedJsonEncodedSizeOf};
+use vector_core::{config, ByteSizeOf, EstimatedJsonEncodedSizeOf};
 
 use vector_common::{
     internal_event::CountByteSize,
@@ -23,7 +23,12 @@ impl RequestMetadataBuilder {
     where
         E: ByteSizeOf + EventCount + GetEventCountTags + EstimatedJsonEncodedSizeOf,
     {
-        let mut size = RequestCountByteSize::default();
+        let mut size = if config::telemetry().has_tags() {
+            RequestCountByteSize::new_tagged()
+        } else {
+            RequestCountByteSize::new_untagged()
+        };
+
         let mut event_count = 0;
         let mut events_byte_size = 0;
 
@@ -44,7 +49,11 @@ impl RequestMetadataBuilder {
     where
         E: ByteSizeOf + GetEventCountTags + EstimatedJsonEncodedSizeOf,
     {
-        let mut size = RequestCountByteSize::default();
+        let mut size = if config::telemetry().has_tags() {
+            RequestCountByteSize::new_tagged()
+        } else {
+            RequestCountByteSize::new_untagged()
+        };
 
         size.add_event(event, event.estimated_json_encoded_size_of());
 

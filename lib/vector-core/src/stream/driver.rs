@@ -221,9 +221,15 @@ where
                             bytes_sent.emit(ByteSize(byte_size));
                         }
                     }
-                    for (tags, size) in response.events_sent().sizes() {
-                        events_sent.emit(tags, *size);
+
+                    if let Some(sizes) = response.events_sent().sizes() {
+                        for (tags, size) in sizes {
+                            events_sent.emit(tags, *size);
+                        }
+                    } else if let Some(size) = response.events_sent().size() {
+                        events_sent.emit(&(None, None), size);
                     }
+
                 // This condition occurs specifically when the `HttpBatchService::call()` is called *within* the `Service::call()`
                 } else if response.event_status() == EventStatus::Rejected {
                     Self::emit_call_error(None, request_id, metadata.event_count());

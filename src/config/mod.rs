@@ -63,7 +63,7 @@ pub use unit_test::{build_unit_tests, build_unit_tests_main, UnitTestResult};
 pub use validation::warnings;
 pub use vars::{interpolate, ENVIRONMENT_VARIABLE_INTERPOLATION_REGEX};
 pub use vector_core::config::{
-    init_log_schema, log_schema, proxy::ProxyConfig, LogSchema, OutputId,
+    init_log_schema, init_telemetry, log_schema, proxy::ProxyConfig, telemetry, LogSchema, OutputId,
 };
 
 #[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq)]
