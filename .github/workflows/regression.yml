@@ -131,14 +131,14 @@ jobs:
       - name: Find PR branch name (issue_comment)
         if: github.event_name == 'issue_comment'
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: gh pr checkout ${{ github.event.issue.number }}
 
       - name: Find PR branch name (issue_comment)
         id: get-pr-branch-name
         if: github.event_name == 'issue_comment'
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           export BRANCH=$(git branch --show-current)
           echo "BRANCH=${BRANCH}"
