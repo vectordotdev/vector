@@ -346,7 +346,7 @@ azure_storage = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev =
 base64 = "0.21.2"
 criterion = { version = "0.5.1", features = ["html_reports", "async_tokio"] }
 itertools = { version = "0.10.5", default-features = false }
-libc = "0.2.144"
+libc = "0.2.146"
 similar-asserts = "1.4.2"
 proptest = "1.2"
 quickcheck = "1.0.3"
