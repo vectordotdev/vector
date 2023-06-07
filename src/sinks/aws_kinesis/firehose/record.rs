@@ -55,7 +55,9 @@ impl SendRecord for KinesisFirehoseClient {
         stream_name: String,
     ) -> Result<KinesisResponse, SdkError<Self::E>> {
         let rec_count = records.len();
-
+        let total_size = records.iter().fold(0, |acc, record| {
+            acc + record.data().unwrap_or(&Blob::new(vec![])).as_ref().len()
+        });
         self.client
             .put_record_batch()
             .set_records(Some(records))
@@ -66,7 +68,7 @@ impl SendRecord for KinesisFirehoseClient {
             .map(|output: PutRecordBatchOutput| KinesisResponse {
                 count: rec_count,
                 failure_count: output.failed_put_count().unwrap_or(0) as usize,
-                events_byte_size: JsonSize::zero(),
+                events_byte_size: JsonSize::new(total_size),
             })
     }
 }
