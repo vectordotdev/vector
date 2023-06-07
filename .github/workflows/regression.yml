@@ -165,7 +165,7 @@ jobs:
           export PR_NUMBER=${{ github.event.issue.number }}
           echo "PR_NUMBER=${PR_NUMBER}" >> $GITHUB_OUTPUT
 
-          export BASELINE_SHA=$(git merge-base --fork-point master)
+          export BASELINE_SHA=$(git merge-base master HEAD)
           echo "BASELINE_SHA=${BASELINE_SHA}" >> $GITHUB_OUTPUT
 
           export COMPARISON_SHA=$(git rev-parse HEAD)
