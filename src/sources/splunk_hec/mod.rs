@@ -119,7 +119,7 @@ impl Default for SplunkConfig {
 }
 
 fn default_socket_address() -> SocketAddr {
-    SocketAddr::new(Ipv4Addr::new(0, 0, 0, 0).into(), 8088)
+    SocketAddr::new(Ipv4Addr::UNSPECIFIED.into(), 8088)
 }
 
 #[async_trait::async_trait]

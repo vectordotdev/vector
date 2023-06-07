@@ -349,10 +349,7 @@ const fn default_simple_source_timeout() -> Duration {
 }
 
 fn default_simple_source_listen_addr() -> SocketListenAddr {
-    SocketListenAddr::SocketAddr(SocketAddr::V4(SocketAddrV4::new(
-        Ipv4Addr::new(127, 0, 0, 1),
-        9200,
-    )))
+    SocketListenAddr::SocketAddr(SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::LOCALHOST, 9200)))
 }
 
 /// A sink for sending events to the `simple` service.

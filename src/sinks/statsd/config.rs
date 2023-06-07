@@ -100,7 +100,7 @@ impl Mode {
 }
 
 const fn default_address() -> SocketAddr {
-    SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8125)
+    SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 8125)
 }
 
 impl GenerateConfig for StatsdSinkConfig {

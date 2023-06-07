@@ -133,7 +133,7 @@ impl GenerateConfig for StatsdConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self::Udp(UdpConfig::from_address(
             SocketListenAddr::SocketAddr(SocketAddr::V4(SocketAddrV4::new(
-                Ipv4Addr::new(127, 0, 0, 1),
+                Ipv4Addr::LOCALHOST,
                 8125,
             ))),
         )))

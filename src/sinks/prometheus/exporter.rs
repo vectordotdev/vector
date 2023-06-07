@@ -165,7 +165,7 @@ impl Default for PrometheusExporterConfig {
 }
 
 const fn default_address() -> SocketAddr {
-    SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), 9598)
+    SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), 9598)
 }
 
 const fn default_distributions_as_summaries() -> bool {

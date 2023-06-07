@@ -38,7 +38,7 @@ const fn default_enabled() -> bool {
 /// `vector top`  will use it to determine which to connect to by default, if no URL
 /// override is provided.
 pub fn default_address() -> Option<SocketAddr> {
-    Some(SocketAddr::new(Ipv4Addr::new(127, 0, 0, 1).into(), 8686))
+    Some(SocketAddr::new(Ipv4Addr::LOCALHOST.into(), 8686))
 }
 
 const fn default_playground() -> bool {
@@ -99,7 +99,7 @@ fn bool_merge() {
 
 #[test]
 fn bind_merge() {
-    let address = SocketAddr::new(Ipv4Addr::new(127, 0, 0, 1).into(), 9000);
+    let address = SocketAddr::new(Ipv4Addr::LOCALHOST.into(), 9000);
     let mut a = Options {
         enabled: true,
         address: Some(address),
@@ -121,12 +121,12 @@ fn bind_merge() {
 #[test]
 fn bind_conflict() {
     let mut a = Options {
-        address: Some(SocketAddr::new(Ipv4Addr::new(127, 0, 0, 1).into(), 9000)),
+        address: Some(SocketAddr::new(Ipv4Addr::LOCALHOST.into(), 9000)),
         ..Options::default()
     };
 
     let b = Options {
-        address: Some(SocketAddr::new(Ipv4Addr::new(127, 0, 0, 1).into(), 9001)),
+        address: Some(SocketAddr::new(Ipv4Addr::LOCALHOST.into(), 9001)),
         ..Options::default()
     };
 
