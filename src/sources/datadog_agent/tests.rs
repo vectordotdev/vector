@@ -1595,7 +1595,9 @@ fn test_config_outputs() {
         (
             "json / single output",
             TestCase {
-                decoding: DeserializerConfig::Json,
+                decoding: DeserializerConfig::Json {
+                    json: Default::default(),
+                },
                 multiple_outputs: false,
                 want: HashMap::from([(
                     None,
@@ -1620,7 +1622,9 @@ fn test_config_outputs() {
         (
             "json / multiple output",
             TestCase {
-                decoding: DeserializerConfig::Json,
+                decoding: DeserializerConfig::Json {
+                    json: Default::default(),
+                },
                 multiple_outputs: true,
                 want: HashMap::from([
                     (
