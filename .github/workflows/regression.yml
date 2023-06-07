@@ -185,6 +185,22 @@ jobs:
           echo "comparison sha is: ${COMPARISON_SHA}"
           echo "comparison tag is: ${COMPARISON_TAG}"
 
+          if [ "${BASELINE_SHA}" = "" ] ; then
+            echo "BASELINE_SHA not found, exiting."
+            exit 1
+          fi
+
+          if [ "${COMPARISON_SHA}" = "" ] ; then
+            echo "COMPARISON_SHA not found, exiting."
+            exit 1
+          fi
+
+          if [ "${PR_NUMBER}" = "" ] ; then
+            echo "PR_NUMBER not found, exiting."
+            exit 1
+          fi
+
+
       # If triggered by merge queue, the PR number is not available in the payload. While we restrict the number of PRs in the
       # queue to 1, we can get the PR number by parsing the merge queue temp branch's ref.
       - name: Get PR metadata (merge queue)
@@ -213,6 +229,21 @@ jobs:
 
           echo "comparison sha is: ${COMPARISON_SHA}"
           echo "comparison tag is: ${COMPARISON_TAG}"
+
+          if [ "${BASELINE_SHA}" = "" ] ; then
+            echo "BASELINE_SHA not found, exiting."
+            exit 1
+          fi
+
+          if [ "${COMPARISON_SHA}" = "" ] ; then
+            echo "COMPARISON_SHA not found, exiting."
+            exit 1
+          fi
+
+          if [ "${PR_NUMBER}" = "" ] ; then
+            echo "PR_NUMBER not found, exiting."
+            exit 1
+          fi
 
       - name: Setup experimental metadata
         id: experimental-meta
