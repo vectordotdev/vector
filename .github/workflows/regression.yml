@@ -146,7 +146,7 @@ jobs:
 
           git remote set-branches --add origin ${BRANCH}
 
-          export BASELINE_SHA=$(git merge-base origin/master HEAD)
+          export BASELINE_SHA=$(git merge-base master HEAD)
           echo "BASELINE_SHA=${BASELINE_SHA}" >> $GITHUB_OUTPUT
 
           export COMPARISON_SHA=$(git rev-parse HEAD)
