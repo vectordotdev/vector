@@ -12,6 +12,7 @@ use std::{
 
 use chrono::{DateTime, Utc};
 use vector_common::{
+    internal_event::OptionalTag,
     json_size::JsonSize,
     request_metadata::{EventCountTags, GetEventCountTags},
     EventDataEq,
@@ -19,6 +20,7 @@ use vector_common::{
 use vector_config::configurable_component;
 
 use crate::{
+    config::telemetry,
     event::{
         estimated_json_encoded_size_of::EstimatedJsonEncodedSizeOf, BatchNotifier, EventFinalizer,
         EventFinalizers, EventMetadata, Finalizable,
@@ -482,10 +484,23 @@ impl Finalizable for Metric {
 
 impl GetEventCountTags for Metric {
     fn get_tags(&self) -> EventCountTags {
-        let source = self.metadata().source_id().map(ToString::to_string);
-        // Metrics do not contain a service field.
+        let source = if telemetry().tags().source() {
+            self.metadata().source_id().map(ToString::to_string).into()
+        } else {
+            OptionalTag::Ignored
+        };
 
-        (source, None)
+        // Currently there is no way to specify a tag that means the service,
+        // so we will be hardcoding it to "service".
+        let service = if telemetry().tags().service() {
+            self.tags()
+                .and_then(|tags| tags.get("service").map(ToString::to_string))
+                .into()
+        } else {
+            OptionalTag::Ignored
+        };
+
+        (source, service)
     }
 }
 

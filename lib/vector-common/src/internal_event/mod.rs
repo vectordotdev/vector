@@ -18,7 +18,7 @@ pub use bytes_received::BytesReceived;
 pub use bytes_sent::BytesSent;
 pub use component_events_dropped::{ComponentEventsDropped, INTENTIONAL, UNINTENTIONAL};
 pub use events_received::EventsReceived;
-pub use events_sent::{EventsSent, TaggedEventsSent, DEFAULT_OUTPUT};
+pub use events_sent::{EventsSent, OptionalTag, TaggedEventsSent, DEFAULT_OUTPUT};
 pub use prelude::{error_stage, error_type};
 pub use service::{CallError, PollReadyError};
 

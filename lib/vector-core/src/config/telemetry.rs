@@ -49,6 +49,10 @@ impl Telemetry {
     pub fn has_tags(&self) -> bool {
         self.tags.service || self.tags.source
     }
+
+    pub fn tags(&self) -> &Tags {
+        &self.tags
+    }
 }
 
 /// Configures whether to emit certain tags

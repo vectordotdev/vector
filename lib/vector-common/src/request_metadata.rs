@@ -1,11 +1,11 @@
 use std::collections::HashMap;
 use std::ops::Add;
 
-use crate::internal_event::CountByteSize;
+use crate::internal_event::{CountByteSize, OptionalTag};
 use crate::json_size::JsonSize;
 
 /// (Source, Service)
-pub type EventCountTags = (Option<String>, Option<String>);
+pub type EventCountTags = (OptionalTag, OptionalTag);
 
 pub trait GetEventCountTags {
     fn get_tags(&self) -> EventCountTags;
@@ -111,36 +111,40 @@ impl<'a> Add<&'a RequestCountByteSize> for RequestCountByteSize {
 
                 Self::Tagged { sizes: sizesa }
             }
-            (
-                RequestCountByteSize::Tagged { mut sizes },
-                RequestCountByteSize::Untagged { size },
-            ) => {
-                match sizes.get_mut(&(None, None)) {
-                    Some(sizea) => *sizea += *size,
-                    None => {
-                        sizes.insert((None, None), *size);
-                    }
-                }
+            // (
+            //     RequestCountByteSize::Tagged { mut sizes },
+            //     RequestCountByteSize::Untagged { size },
+            // ) => {
+            //     // TODO - work this out
+            //     panic!("DONT DO THIS!!!");
+            //     // match sizes.get_mut(&(None, None)) {
+            //     //     Some(sizea) => *sizea += *size,
+            //     //     None => {
+            //     //         sizes.insert((None, None), *size);
+            //     //     }
+            //     // }
 
-                Self::Tagged { sizes }
-            }
-            (RequestCountByteSize::Untagged { size }, RequestCountByteSize::Tagged { sizes }) => {
-                let mut sizes = sizes.clone();
-                match sizes.get_mut(&(None, None)) {
-                    Some(sizea) => *sizea += size,
-                    None => {
-                        sizes.insert((None, None), size);
-                    }
-                }
+            //     // Self::Tagged { sizes }
+            // }
+            // (RequestCountByteSize::Untagged { size }, RequestCountByteSize::Tagged { sizes }) => {
+            //     panic!("DONT DO THIS!!!");
+            //     // let mut sizes = sizes.clone();
+            //     // match sizes.get_mut(&(None, None)) {
+            //     //     Some(sizea) => *sizea += size,
+            //     //     None => {
+            //     //         sizes.insert((None, None), size);
+            //     //     }
+            //     // }
 
-                Self::Tagged { sizes }
-            }
+            //     // Self::Tagged { sizes }
+            // }
             (
                 RequestCountByteSize::Untagged { size: sizea },
                 RequestCountByteSize::Untagged { size: sizeb },
             ) => RequestCountByteSize::Untagged {
                 size: sizea + *sizeb,
             },
+            _ => panic!("DONT"),
         }
     }
 }

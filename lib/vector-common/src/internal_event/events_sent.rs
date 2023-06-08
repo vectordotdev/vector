@@ -45,35 +45,58 @@ impl From<Output> for EventsSent {
     }
 }
 
+/// The user can configure whether a tag should be emitted. If they configure it to
+/// be emitted, but the value doesn't exist - we should emit the tag but with a value
+/// of `-`.
+#[derive(Clone, Debug, PartialEq, PartialOrd, Eq, Ord, Hash)]
+pub enum OptionalTag {
+    Ignored,
+    Specified(Option<String>),
+}
+
+impl From<Option<String>> for OptionalTag {
+    fn from(value: Option<String>) -> Self {
+        Self::Specified(value)
+    }
+}
+
+fn make_tags(
+    output: &Option<SharedString>,
+    source: &OptionalTag,
+    service: &OptionalTag,
+) -> Vec<(&'static str, String)> {
+    let mut tags = Vec::new();
+    if let Some(output) = &output {
+        tags.push(("output", output.to_string()));
+    }
+
+    if let OptionalTag::Specified(tag) = source {
+        tags.push(("source", tag.clone().unwrap_or("-".to_string())));
+    }
+
+    if let OptionalTag::Specified(tag) = service {
+        tags.push(("service", tag.clone().unwrap_or("-".to_string())));
+    }
+
+    tags
+}
+
 crate::registered_event!(
     TaggedEventsSent {
         output: Option<SharedString>,
-        source: Option<String>,
-        service: Option<String>,
+        source: OptionalTag,
+        service: OptionalTag,
     } => {
-        events: Counter = if let Some(output) = &self.output {
-            register_counter!("component_sent_events_total", "output" => output.clone(),
-                "source" => self.source.clone().unwrap_or("-".to_string()),
-                "service" => self.service.clone().unwrap_or("-".to_string()))
-        } else {
-            register_counter!("component_sent_events_total",
-                "source" => self.source.clone().unwrap_or("-".to_string()),
-                "service" => self.service.clone().unwrap_or("-".to_string()))
+        events: Counter = {
+            register_counter!("component_sent_events_total", &make_tags(&self.output, &self.source, &self.service))
         },
         events_out: Counter = if let Some(output) = &self.output {
             register_counter!("events_out_total", "output" => output.clone())
         } else {
             register_counter!("events_out_total")
         },
-        event_bytes: Counter = if let Some(output) = &self.output {
-            register_counter!("component_sent_event_bytes_total",
-                "output" => output.clone(),
-                "source" => self.source.clone().unwrap_or("-".to_string()),
-                "service" => self.service.clone().unwrap_or("-".to_string()))
-        } else {
-            register_counter!("component_sent_event_bytes_total",
-                "source" => self.source.clone().unwrap_or("-".to_string()),
-                "service" => self.service.clone().unwrap_or("-".to_string()))
+        event_bytes: Counter = {
+            register_counter!("component_sent_event_bytes_total", &make_tags(&self.output, &self.source, &self.service))
         },
         output: Option<SharedString> = self.output,
     }
@@ -97,9 +120,9 @@ crate::registered_event!(
 );
 
 /// TODO: This can probably become a part of the previous macro.
-impl RegisterEvent<(Option<String>, Option<String>)> for TaggedEventsSent {
+impl RegisterEvent<(OptionalTag, OptionalTag)> for TaggedEventsSent {
     fn register(
-        tags: &(Option<String>, Option<String>),
+        tags: &(OptionalTag, OptionalTag),
     ) -> <TaggedEventsSent as super::RegisterInternalEvent>::Handle {
         super::register(TaggedEventsSent::new(
             tags.0.clone(),
@@ -111,7 +134,7 @@ impl RegisterEvent<(Option<String>, Option<String>)> for TaggedEventsSent {
 
 impl TaggedEventsSent {
     #[must_use]
-    pub fn new(source: Option<String>, service: Option<String>, output: Output) -> Self {
+    pub fn new(source: OptionalTag, service: OptionalTag, output: Output) -> Self {
         Self {
             output: output.0,
             source,
