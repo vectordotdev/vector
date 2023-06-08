@@ -30,6 +30,7 @@ impl_generate_config_from_default!(ErrorSinkConfig);
 #[async_trait]
 impl SinkConfig for ErrorSinkConfig {
     async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+        #[allow(deprecated)]
         Ok((VectorSink::from_event_sink(ErrorSink), ok(()).boxed()))
     }
 

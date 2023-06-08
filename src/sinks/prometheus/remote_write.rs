@@ -261,6 +261,7 @@ impl SinkConfig for RemoteWriteConfig {
                 )
         };
 
+        #[allow(deprecated)]
         Ok((sinks::VectorSink::from_event_sink(sink), healthcheck))
     }
 

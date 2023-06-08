@@ -30,6 +30,7 @@ impl_generate_config_from_default!(PanicSinkConfig);
 #[async_trait]
 impl SinkConfig for PanicSinkConfig {
     async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+        #[allow(deprecated)]
         Ok((VectorSink::from_event_sink(PanicSink), ok(()).boxed()))
     }
 

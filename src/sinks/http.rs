@@ -251,6 +251,7 @@ impl SinkConfig for HttpSinkConfig {
         )
         .sink_map_err(|error| error!(message = "Fatal HTTP sink error.", %error));
 
+        #[allow(deprecated)]
         let sink = super::VectorSink::from_event_sink(sink);
 
         Ok((sink, healthcheck))

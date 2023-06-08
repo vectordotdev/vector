@@ -47,6 +47,7 @@ pub(crate) async fn build_http_sink(
 
     let healthcheck = healthcheck(client, config).boxed();
 
+    #[allow(deprecated)]
     Ok((VectorSink::from_event_sink(sink), healthcheck))
 }
 
