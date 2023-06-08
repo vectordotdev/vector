@@ -115,7 +115,7 @@ pub struct ByteSize(pub usize);
 pub struct Count(pub usize);
 
 /// Holds the tuple `(count_of_events, estimated_json_size_of_events)`.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct CountByteSize(pub usize, pub JsonSize);
 
 impl AddAssign for CountByteSize {

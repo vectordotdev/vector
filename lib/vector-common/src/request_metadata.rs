@@ -7,20 +7,24 @@ use crate::json_size::JsonSize;
 /// (Source, Service)
 pub type EventCountTags = (OptionalTag, OptionalTag);
 
+/// Must be implemented by events to get the tags that will be attached to
+/// the `component_sent_event_*` emitted metrics.
 pub trait GetEventCountTags {
     fn get_tags(&self) -> EventCountTags;
 }
 
-/// Struct that keeps track of the estimated json size of a given
-/// batch of events by source and service.
+/// Keeps track of the estimated json size of a given batch of events by
+/// source and service.
 #[derive(Clone, Debug)]
 pub enum RequestCountByteSize {
+    /// When we need to keep track of the events by certain tags we use this
+    /// variant.
     Tagged {
         sizes: HashMap<EventCountTags, CountByteSize>,
     },
-    Untagged {
-        size: CountByteSize,
-    },
+    /// If we don't need to track the events by certain tags we can use
+    /// this variant to avoid allocating a `HashMap`,
+    Untagged { size: CountByteSize },
 }
 
 impl Default for RequestCountByteSize {
@@ -32,18 +36,26 @@ impl Default for RequestCountByteSize {
 }
 
 impl RequestCountByteSize {
+    /// Creates a new Tagged variant for when we need to track events by
+    /// certain tags.
+    #[must_use]
     pub fn new_tagged() -> Self {
         Self::Tagged {
-            sizes: Default::default(),
+            sizes: HashMap::new(),
         }
     }
 
+    /// Creates a new Tagged variant for when we do not need to track events by
+    /// tags.
+    #[must_use]
     pub fn new_untagged() -> Self {
         Self::Untagged {
             size: CountByteSize(0, JsonSize::zero()),
         }
     }
 
+    /// Returns a `HashMap` of tags => event counts for when we are tracking by tags.
+    /// Returns `None` if we are not tracking by tags.
     #[must_use]
     pub fn sizes(&self) -> Option<&HashMap<EventCountTags, CountByteSize>> {
         match self {
@@ -52,6 +64,7 @@ impl RequestCountByteSize {
         }
     }
 
+    /// Returns a single count for when we are not tracking by tags.
     #[must_use]
     pub fn size(&self) -> Option<CountByteSize> {
         match self {
@@ -60,6 +73,7 @@ impl RequestCountByteSize {
         }
     }
 
+    /// Adds the given estimated json size of the event to current count.
     pub fn add_event<E>(&mut self, event: &E, json_size: JsonSize)
     where
         E: GetEventCountTags,
@@ -97,54 +111,57 @@ impl<'a> Add<&'a RequestCountByteSize> for RequestCountByteSize {
     fn add(self, other: &'a Self::Output) -> Self::Output {
         match (self, other) {
             (
-                RequestCountByteSize::Tagged { sizes: mut sizesa },
-                RequestCountByteSize::Tagged { sizes: sizesb },
+                RequestCountByteSize::Tagged { sizes: mut us },
+                RequestCountByteSize::Tagged { sizes: them },
             ) => {
-                for (key, value) in sizesb {
-                    match sizesa.get_mut(key) {
+                for (key, value) in them {
+                    match us.get_mut(key) {
                         Some(size) => *size += *value,
                         None => {
-                            sizesa.insert(key.clone(), *value);
+                            us.insert(key.clone(), *value);
                         }
                     }
                 }
 
-                Self::Tagged { sizes: sizesa }
+                Self::Tagged { sizes: us }
             }
-            // (
-            //     RequestCountByteSize::Tagged { mut sizes },
-            //     RequestCountByteSize::Untagged { size },
-            // ) => {
-            //     // TODO - work this out
-            //     panic!("DONT DO THIS!!!");
-            //     // match sizes.get_mut(&(None, None)) {
-            //     //     Some(sizea) => *sizea += *size,
-            //     //     None => {
-            //     //         sizes.insert((None, None), *size);
-            //     //     }
-            //     // }
 
-            //     // Self::Tagged { sizes }
-            // }
-            // (RequestCountByteSize::Untagged { size }, RequestCountByteSize::Tagged { sizes }) => {
-            //     panic!("DONT DO THIS!!!");
-            //     // let mut sizes = sizes.clone();
-            //     // match sizes.get_mut(&(None, None)) {
-            //     //     Some(sizea) => *sizea += size,
-            //     //     None => {
-            //     //         sizes.insert((None, None), size);
-            //     //     }
-            //     // }
-
-            //     // Self::Tagged { sizes }
-            // }
             (
-                RequestCountByteSize::Untagged { size: sizea },
-                RequestCountByteSize::Untagged { size: sizeb },
-            ) => RequestCountByteSize::Untagged {
-                size: sizea + *sizeb,
-            },
-            _ => panic!("DONT"),
+                RequestCountByteSize::Untagged { size: us },
+                RequestCountByteSize::Untagged { size: them },
+            ) => RequestCountByteSize::Untagged { size: us + *them },
+
+            // The following two scenarios shouldn't really occur in practice, but are provided for completeness.
+            (
+                RequestCountByteSize::Tagged { mut sizes },
+                RequestCountByteSize::Untagged { size },
+            ) => {
+                match sizes.get_mut(&(OptionalTag::Specified(None), OptionalTag::Specified(None))) {
+                    Some(empty_size) => *empty_size += *size,
+                    None => {
+                        sizes.insert(
+                            (OptionalTag::Specified(None), OptionalTag::Specified(None)),
+                            *size,
+                        );
+                    }
+                }
+
+                Self::Tagged { sizes }
+            }
+            (RequestCountByteSize::Untagged { size }, RequestCountByteSize::Tagged { sizes }) => {
+                let mut sizes = sizes.clone();
+                match sizes.get_mut(&(OptionalTag::Specified(None), OptionalTag::Specified(None))) {
+                    Some(empty_size) => *empty_size += size,
+                    None => {
+                        sizes.insert(
+                            (OptionalTag::Specified(None), OptionalTag::Specified(None)),
+                            size,
+                        );
+                    }
+                }
+
+                Self::Tagged { sizes }
+            }
         }
     }
 }
@@ -166,7 +183,6 @@ pub struct RequestMetadata {
     request_wire_size: usize,
 }
 
-// TODO: Make this struct the object which emits the actual internal telemetry i.e. events sent, bytes sent, etc.
 impl RequestMetadata {
     #[must_use]
     pub fn new(
@@ -255,5 +271,90 @@ pub trait MetaDescriptive {
     /// terrible way to do it.
     fn take_metadata(&mut self) -> RequestMetadata {
         self.get_metadata().clone()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    struct DummyEvent {
+        source: OptionalTag,
+        service: OptionalTag,
+    }
+
+    impl GetEventCountTags for DummyEvent {
+        fn get_tags(&self) -> EventCountTags {
+            (self.source.clone(), self.service.clone())
+        }
+    }
+
+    #[test]
+    fn add_request_count_bytesize_event_untagged() {
+        let mut bytesize = RequestCountByteSize::new_untagged();
+        let event = DummyEvent {
+            source: Some("carrot".to_string()).into(),
+            service: Some("cabbage".to_string()).into(),
+        };
+
+        bytesize.add_event(&event, JsonSize::new(42));
+
+        let event = DummyEvent {
+            source: Some("pea".to_string()).into(),
+            service: Some("potato".to_string()).into(),
+        };
+
+        bytesize.add_event(&event, JsonSize::new(36));
+
+        assert_eq!(Some(CountByteSize(2, JsonSize::new(78))), bytesize.size());
+        assert_eq!(None, bytesize.sizes());
+    }
+
+    #[test]
+    fn add_request_count_bytesize_event_tagged() {
+        let mut bytesize = RequestCountByteSize::new_tagged();
+        let event = DummyEvent {
+            source: OptionalTag::Ignored,
+            service: Some("cabbage".to_string()).into(),
+        };
+
+        bytesize.add_event(&event, JsonSize::new(42));
+
+        let event = DummyEvent {
+            source: OptionalTag::Ignored,
+            service: Some("cabbage".to_string()).into(),
+        };
+
+        bytesize.add_event(&event, JsonSize::new(36));
+
+        let event = DummyEvent {
+            source: OptionalTag::Ignored,
+            service: Some("tomato".to_string()).into(),
+        };
+
+        bytesize.add_event(&event, JsonSize::new(23));
+
+        assert_eq!(None, bytesize.size());
+        let mut sizes = bytesize
+            .sizes()
+            .unwrap()
+            .clone()
+            .into_iter()
+            .collect::<Vec<_>>();
+        sizes.sort();
+
+        assert_eq!(
+            vec![
+                (
+                    (OptionalTag::Ignored, Some("cabbage".to_string()).into()),
+                    CountByteSize(2, JsonSize::new(78))
+                ),
+                (
+                    (OptionalTag::Ignored, Some("tomato".to_string()).into()),
+                    CountByteSize(1, JsonSize::new(23))
+                ),
+            ],
+            sizes
+        );
     }
 }
