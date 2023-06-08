@@ -224,6 +224,9 @@ fn new_client(
     });
 
     let mut proxy = ProxyConnector::new(https).unwrap();
+    // Make proxy connector aware of user TLS settings by setting the TLS connector:
+    let proxy_tls = tls_connector_builder(tls_settings)?.build();
+    proxy.set_tls(Some(proxy_tls));
     proxy_config.configure(&mut proxy)?;
 
     Ok(hyper::Client::builder().http2_only(true).build(proxy))
