@@ -246,7 +246,10 @@ pub enum DeserializerConfig {
     /// [json]: https://www.json.org/
     Json {
         /// Options for the JSON deserializer.
-        #[serde(skip_serializing_if = "vector_core::serde::skip_serializing_if_default")]
+        #[serde(
+            default,
+            skip_serializing_if = "vector_core::serde::skip_serializing_if_default"
+        )]
         json: JsonDeserializerOptions,
     },
 

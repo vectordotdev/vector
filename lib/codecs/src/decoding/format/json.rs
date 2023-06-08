@@ -111,9 +111,7 @@ impl JsonDeserializer {
 
     /// Creates a new `JsonDeserializer` with the given lossy option.
     pub fn new_with_lossy(lossy: bool) -> Self {
-        Self {
-            lossy
-        }
+        Self { lossy }
     }
 }
 
@@ -132,7 +130,8 @@ impl Deserializer for JsonDeserializer {
         let json: serde_json::Value = match self.lossy {
             true => serde_json::from_str(&String::from_utf8_lossy(&bytes)),
             false => serde_json::from_slice(&bytes),
-        }.map_err(|error| format!("Error parsing JSON: {:?}", error))?;
+        }
+        .map_err(|error| format!("Error parsing JSON: {:?}", error))?;
 
         // If the root is an Array, split it into multiple events
         let mut events = match json {
@@ -288,14 +287,14 @@ mod tests {
             }
 
             assert_eq!(events.next(), None);
-        } 
+        }
     }
 
     #[test]
     fn deserialize_non_lossy_error_invalid_utf8() {
         let input = Bytes::from(b"{ \"foo\": \"Hello \xF0\x90\x80World\" }".as_slice());
         let deserializer = JsonDeserializer::new_with_lossy(false);
-        
+
         for namespace in [LogNamespace::Legacy, LogNamespace::Vector] {
             assert!(deserializer.parse(input.clone(), namespace).is_err());
         }
