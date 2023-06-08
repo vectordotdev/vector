@@ -211,7 +211,7 @@ lapin = { version = "2.2.1", default-features = false, features = ["native-tls"]
 
 # API
 async-graphql = { version = "5.0.10", default-features = false, optional = true, features = ["chrono"] }
-async-graphql-warp = { version = "5.0.9", default-features = false, optional = true }
+async-graphql-warp = { version = "5.0.10", default-features = false, optional = true }
 itertools = { version = "0.10.5", default-features = false, optional = true }
 
 # API client
