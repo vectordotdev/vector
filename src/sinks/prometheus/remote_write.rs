@@ -1,3 +1,4 @@
+use std::io::Read;
 use std::sync::Arc;
 use std::task;
 
@@ -123,9 +124,39 @@ pub struct RemoteWriteConfig {
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     pub acknowledgements: AcknowledgementsConfig,
+
+    #[configurable(derived)]
+    #[configurable(metadata(docs::advanced))]
+    #[serde(default)]
+    pub compression: Compression,
 }
 
 impl_generate_config_from_default!(RemoteWriteConfig);
+
+/// Supported compression types for Prometheus Remote Write.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Derivative)]
+#[derivative(Default)]
+#[serde(rename_all = "lowercase")]
+pub enum Compression {
+    /// Snappy.
+    #[derivative(Default)]
+    Snappy,
+
+    /// Gzip.
+    Gzip,
+
+    /// Zstandard.
+    Zstd,
+}
+
+const fn convert_compression_to_content_encoding(compression: Compression) -> &'static str {
+    match compression {
+        Compression::Snappy => "snappy",
+        Compression::Gzip => "gzip",
+        Compression::Zstd => "zstd",
+    }
+}
 
 #[async_trait::async_trait]
 impl SinkConfig for RemoteWriteConfig {
@@ -181,6 +212,7 @@ impl SinkConfig for RemoteWriteConfig {
             aws_region,
             credentials_provider,
             http_auth,
+            compression: self.compression,
         });
 
         let healthcheck = healthcheck(client.clone(), Arc::clone(&http_request_builder)).boxed();
@@ -190,6 +222,7 @@ impl SinkConfig for RemoteWriteConfig {
             buckets,
             quantiles,
             http_request_builder,
+            compression: self.compression,
         };
 
         let sink = {
@@ -277,6 +310,7 @@ struct RemoteWriteService {
     buckets: Vec<f64>,
     quantiles: Vec<f64>,
     http_request_builder: Arc<HttpRequestBuilder>,
+    compression: Compression,
 }
 
 impl RemoteWriteService {
@@ -312,7 +346,7 @@ impl Service<PartitionInnerBuffer<Vec<Metric>, PartitionKey>> for RemoteWriteSer
     fn call(&mut self, buffer: PartitionInnerBuffer<Vec<Metric>, PartitionKey>) -> Self::Future {
         let (events, key) = buffer.into_parts();
         let body = self.encode_events(events);
-        let body = snap_block(body);
+        let body = compress_block(self.compression, body);
 
         let client = self.client.clone();
         let request_builder = Arc::clone(&self.http_request_builder);
@@ -344,6 +378,7 @@ pub struct HttpRequestBuilder {
     pub aws_region: Option<Region>,
     pub http_auth: Option<Auth>,
     pub credentials_provider: Option<SharedCredentialsProvider>,
+    pub compression: Compression,
 }
 
 impl HttpRequestBuilder {
@@ -353,11 +388,13 @@ impl HttpRequestBuilder {
         body: Vec<u8>,
         tenant_id: Option<String>,
     ) -> Result<Request<hyper::Body>, crate::Error> {
+        let content_encoding = convert_compression_to_content_encoding(self.compression);
+
         let mut builder = http::Request::builder()
             .method(method)
             .uri(self.endpoint.clone())
             .header("X-Prometheus-Remote-Write-Version", "0.1.0")
-            .header("Content-Encoding", "snappy")
+            .header("Content-Encoding", content_encoding)
             .header("Content-Type", "application/x-protobuf");
 
         if let Some(tenant_id) = &tenant_id {
@@ -380,10 +417,22 @@ impl HttpRequestBuilder {
     }
 }
 
-fn snap_block(data: Bytes) -> Vec<u8> {
-    snap::raw::Encoder::new()
-        .compress_vec(&data)
-        .expect("Out of memory")
+fn compress_block(compression: Compression, data: Bytes) -> Vec<u8> {
+    match compression {
+        Compression::Snappy => snap::raw::Encoder::new()
+            .compress_vec(&data)
+            .expect("snap compression failed, please report"),
+        Compression::Gzip => {
+            let mut buf = Vec::new();
+            flate2::read::GzEncoder::new(data.as_ref(), flate2::Compression::default())
+                .read_to_end(&mut buf)
+                .expect("gzip compression failed, please report");
+            buf
+        }
+        Compression::Zstd => {
+            zstd::encode_all(data.as_ref(), 0).expect("zstd compression failed, please report")
+        }
+    }
 }
 
 async fn sign_request(
