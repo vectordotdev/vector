@@ -117,7 +117,7 @@ pub fn next_addr() -> SocketAddr {
 }
 
 pub fn next_addr_v6() -> SocketAddr {
-    next_addr_for_ip(IpAddr::V6(Ipv6Addr::UNSPECIFIED))
+    next_addr_for_ip(IpAddr::V6(Ipv6Addr::LOCALHOST))
 }
 
 pub fn trace_init() {
