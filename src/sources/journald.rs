@@ -174,6 +174,16 @@ pub struct JournaldConfig {
     #[serde(default)]
     pub journal_directory: Option<PathBuf>,
 
+    /// The [journal namespace][journal-namespace].
+    ///
+    /// This value is passed to `journalctl` through the [`--namespace` option][journalctl-namespace-option].
+    /// If not set, `journalctl` uses the default namespace.
+    ///
+    /// [journal-namespace]: https://www.freedesktop.org/software/systemd/man/systemd-journald.service.html#Journal%20Namespaces
+    /// [journalctl-namespace-option]: https://www.freedesktop.org/software/systemd/man/journalctl.html#--namespace=NAMESPACE
+    #[serde(default)]
+    pub journal_namespace: Option<String>,
+
     #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: SourceAcknowledgementsConfig,
@@ -290,6 +300,7 @@ impl Default for JournaldConfig {
             batch_size: default_batch_size(),
             journalctl_path: None,
             journal_directory: None,
+            journal_namespace: None,
             acknowledgements: Default::default(),
             remap_priority: false,
             log_namespace: None,
@@ -341,6 +352,7 @@ impl SourceConfig for JournaldConfig {
         let starter = StartJournalctl::new(
             journalctl_path,
             self.journal_directory.clone(),
+            self.journal_namespace.clone(),
             self.current_boot_only,
             self.since_now,
         );
@@ -610,6 +622,7 @@ type JournalStream = BoxStream<'static, Result<Bytes, BoxedFramingError>>;
 struct StartJournalctl {
     path: PathBuf,
     journal_dir: Option<PathBuf>,
+    journal_namespace: Option<String>,
     current_boot_only: bool,
     since_now: bool,
 }
@@ -618,12 +631,14 @@ impl StartJournalctl {
     const fn new(
         path: PathBuf,
         journal_dir: Option<PathBuf>,
+        journal_namespace: Option<String>,
         current_boot_only: bool,
         since_now: bool,
     ) -> Self {
         Self {
             path,
             journal_dir,
+            journal_namespace,
             current_boot_only,
             since_now,
         }
@@ -639,6 +654,10 @@ impl StartJournalctl {
 
         if let Some(dir) = &self.journal_dir {
             command.arg(format!("--directory={}", dir.display()));
+        }
+
+        if let Some(namespace) = &self.journal_namespace {
+            command.arg(format!("--namespace={}", namespace));
         }
 
         if self.current_boot_only {
@@ -1400,30 +1419,56 @@ mod tests {
         let path = PathBuf::from("journalctl");
 
         let journal_dir = None;
+        let journal_namespace = None;
         let current_boot_only = false;
         let cursor = None;
         let since_now = false;
 
-        let command = create_command(&path, journal_dir, current_boot_only, since_now, cursor);
+        let command = create_command(
+            &path,
+            journal_dir,
+            journal_namespace,
+            current_boot_only,
+            since_now,
+            cursor,
+        );
         let cmd_line = format!("{:?}", command);
         assert!(!cmd_line.contains("--directory="));
+        assert!(!cmd_line.contains("--namespace="));
         assert!(!cmd_line.contains("--boot"));
         assert!(cmd_line.contains("--since=2000-01-01"));
 
-        let since_now = true;
         let journal_dir = None;
+        let journal_namespace = None;
+        let since_now = true;
 
-        let command = create_command(&path, journal_dir, current_boot_only, since_now, cursor);
+        let command = create_command(
+            &path,
+            journal_dir,
+            journal_namespace,
+            current_boot_only,
+            since_now,
+            cursor,
+        );
         let cmd_line = format!("{:?}", command);
         assert!(cmd_line.contains("--since=now"));
 
         let journal_dir = Some(PathBuf::from("/tmp/journal-dir"));
+        let journal_namespace = Some(String::from("my_namespace"));
         let current_boot_only = true;
         let cursor = Some("2021-01-01");
 
-        let command = create_command(&path, journal_dir, current_boot_only, since_now, cursor);
+        let command = create_command(
+            &path,
+            journal_dir,
+            journal_namespace,
+            current_boot_only,
+            since_now,
+            cursor,
+        );
         let cmd_line = format!("{:?}", command);
         assert!(cmd_line.contains("--directory=/tmp/journal-dir"));
+        assert!(cmd_line.contains("--namespace=my_namespace"));
         assert!(cmd_line.contains("--boot"));
         assert!(cmd_line.contains("--after-cursor="));
     }
@@ -1431,12 +1476,19 @@ mod tests {
     fn create_command(
         path: &Path,
         journal_dir: Option<PathBuf>,
+        journal_namespace: Option<String>,
         current_boot_only: bool,
         since_now: bool,
         cursor: Option<&str>,
     ) -> Command {
-        StartJournalctl::new(path.into(), journal_dir, current_boot_only, since_now)
-            .make_command(cursor)
+        StartJournalctl::new(
+            path.into(),
+            journal_dir,
+            journal_namespace,
+            current_boot_only,
+            since_now,
+        )
+        .make_command(cursor)
     }
 
     fn message(event: &Event) -> Value {
