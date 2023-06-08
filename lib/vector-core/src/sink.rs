@@ -61,6 +61,9 @@ impl VectorSink {
     }
 
     /// Converts an event sink into a `VectorSink`
+    ///
+    /// Deprecated in favor of `VectorSink::from_event_streamsink`.
+    #[deprecated]
     pub fn from_event_sink(sink: impl Sink<Event, Error = ()> + Send + Unpin + 'static) -> Self {
         VectorSink::Sink(Box::new(EventSink::new(sink)))
     }

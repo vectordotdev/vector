@@ -126,6 +126,7 @@ impl SinkConfig for StackdriverConfig {
             |error| error!(message = "Fatal gcp_stackdriver_metrics sink error.", %error),
         );
 
+        #[allow(deprecated)]
         Ok((VectorSink::from_event_sink(sink), healthcheck))
     }
 

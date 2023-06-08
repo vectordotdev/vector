@@ -108,6 +108,7 @@ impl SinkConfig for HoneycombConfig {
 
         let healthcheck = healthcheck(self.clone(), client).boxed();
 
+        #[allow(deprecated)]
         Ok((super::VectorSink::from_event_sink(sink), healthcheck))
     }
 
