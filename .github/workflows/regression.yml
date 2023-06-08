@@ -143,9 +143,6 @@ jobs:
 
           gh pr checkout ${{ github.event.issue.number }}
 
-          export BRANCH=$(git branch --show-current)
-          echo "BRANCH=${BRANCH}"
-
           export BASELINE_SHA=$(git merge-base master HEAD)
           echo "BASELINE_SHA=${BASELINE_SHA}" >> $GITHUB_OUTPUT
 
