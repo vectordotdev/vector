@@ -27,7 +27,7 @@ pub struct JsonDeserializerConfig {
     pub json: JsonDeserializerOptions,
 }
 
-/// Options for building a `JsonDeserializer`.
+/// JSON-specific decoding options.
 #[configurable_component]
 #[derive(Debug, Clone, PartialEq, Eq, Derivative)]
 #[derivative(Default)]
@@ -35,6 +35,8 @@ pub struct JsonDeserializerOptions {
     /// Determines whether or not to replace invalid UTF-8 sequences instead of returning an error.
     ///
     /// When true, invalid UTF-8 sequences are replaced with the [`U+FFFD REPLACEMENT CHARACTER`][U+FFFD].
+    ///
+    /// [U+FFFD]: https://en.wikipedia.org/wiki/Specials_(Unicode_block)#Replacement_character
     #[serde(
         default = "default_lossy",
         skip_serializing_if = "vector_core::serde::skip_serializing_if_default"
