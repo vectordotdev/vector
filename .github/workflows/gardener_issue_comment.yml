@@ -24,7 +24,7 @@ jobs:
           # IDs fetched from https://docs.github.com/en/graphql/overview/explorer
           project_id="PVT_kwDOAQFeYs4AAsTr" # Gardener
           status_field_id="PVTF_lADOAQFeYs4AAsTrzgAXRuU" # Status
-          triage_option_id="f75ad846"
+          triage_option_id="2a08fafa"
 
           # ensures that the issue is already on board but also seems to be the only way to fetch
           # the item id
