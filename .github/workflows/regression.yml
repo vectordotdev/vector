@@ -146,8 +146,6 @@ jobs:
           export BRANCH=$(git branch --show-current)
           echo "BRANCH=${BRANCH}"
 
-          git remote set-branches --add origin ${BRANCH}
-
           export BASELINE_SHA=$(git merge-base master HEAD)
           echo "BASELINE_SHA=${BASELINE_SHA}" >> $GITHUB_OUTPUT
 
