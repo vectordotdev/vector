@@ -45,7 +45,7 @@ pub struct JsonDeserializerOptions {
     lossy: bool,
 }
 
-fn default_lossy() -> bool {
+const fn default_lossy() -> bool {
     true
 }
 
@@ -87,12 +87,7 @@ impl JsonDeserializerConfig {
 
 impl JsonDeserializerConfig {
     /// Creates a new `JsonDeserializerConfig`.
-    pub fn new() -> Self {
-        Default::default()
-    }
-
-    /// Creates a new `JsonDeserializerConfig` with the given options.
-    pub fn new_with_options(options: JsonDeserializerOptions) -> Self {
+    pub fn new(options: JsonDeserializerOptions) -> Self {
         Self { json: options }
     }
 }
@@ -107,12 +102,7 @@ pub struct JsonDeserializer {
 
 impl JsonDeserializer {
     /// Creates a new `JsonDeserializer`.
-    pub fn new() -> Self {
-        Default::default()
-    }
-
-    /// Creates a new `JsonDeserializer` with the given lossy option.
-    pub fn new_with_lossy(lossy: bool) -> Self {
+    pub fn new(lossy: bool) -> Self {
         Self { lossy }
     }
 }
@@ -183,7 +173,7 @@ mod tests {
     #[test]
     fn deserialize_json() {
         let input = Bytes::from(r#"{ "foo": 123 }"#);
-        let deserializer = JsonDeserializer::new();
+        let deserializer = JsonDeserializer::default();
 
         for namespace in [LogNamespace::Legacy, LogNamespace::Vector] {
             let events = deserializer.parse(input.clone(), namespace).unwrap();
@@ -210,7 +200,7 @@ mod tests {
     #[test]
     fn deserialize_json_array() {
         let input = Bytes::from(r#"[{ "foo": 123 }, { "bar": 456 }]"#);
-        let deserializer = JsonDeserializer::new();
+        let deserializer = JsonDeserializer::default();
         for namespace in [LogNamespace::Legacy, LogNamespace::Vector] {
             let events = deserializer.parse(input.clone(), namespace).unwrap();
             let mut events = events.into_iter();
@@ -247,7 +237,7 @@ mod tests {
     #[test]
     fn deserialize_skip_empty() {
         let input = Bytes::from("");
-        let deserializer = JsonDeserializer::new();
+        let deserializer = JsonDeserializer::default();
 
         for namespace in [LogNamespace::Legacy, LogNamespace::Vector] {
             let events = deserializer.parse(input.clone(), namespace).unwrap();
@@ -258,7 +248,7 @@ mod tests {
     #[test]
     fn deserialize_error_invalid_json() {
         let input = Bytes::from("{ foo");
-        let deserializer = JsonDeserializer::new();
+        let deserializer = JsonDeserializer::default();
 
         for namespace in [LogNamespace::Legacy, LogNamespace::Vector] {
             assert!(deserializer.parse(input.clone(), namespace).is_err());
@@ -268,7 +258,7 @@ mod tests {
     #[test]
     fn deserialize_lossy_replace_invalid_utf8() {
         let input = Bytes::from(b"{ \"foo\": \"Hello \xF0\x90\x80World\" }".as_slice());
-        let deserializer = JsonDeserializer::new();
+        let deserializer = JsonDeserializer::new(true);
 
         for namespace in [LogNamespace::Legacy, LogNamespace::Vector] {
             let events = deserializer.parse(input.clone(), namespace).unwrap();
@@ -295,7 +285,7 @@ mod tests {
     #[test]
     fn deserialize_non_lossy_error_invalid_utf8() {
         let input = Bytes::from(b"{ \"foo\": \"Hello \xF0\x90\x80World\" }".as_slice());
-        let deserializer = JsonDeserializer::new_with_lossy(false);
+        let deserializer = JsonDeserializer::new(false);
 
         for namespace in [LogNamespace::Legacy, LogNamespace::Vector] {
             assert!(deserializer.parse(input.clone(), namespace).is_err());

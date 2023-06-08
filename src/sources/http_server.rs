@@ -202,11 +202,11 @@ impl SimpleHttpConfig {
                 ),
                 Encoding::Json => (
                     BytesDecoderConfig::new().into(),
-                    JsonDeserializerConfig::new().into(),
+                    JsonDeserializerConfig::default().into(),
                 ),
                 Encoding::Ndjson => (
                     NewlineDelimitedDecoderConfig::new().into(),
-                    JsonDeserializerConfig::new().into(),
+                    JsonDeserializerConfig::default().into(),
                 ),
                 Encoding::Binary => (
                     BytesDecoderConfig::new().into(),
@@ -762,7 +762,7 @@ mod tests {
                 EventStatus::Delivered,
                 true,
                 None,
-                Some(JsonDeserializerConfig::new().into()),
+                Some(JsonDeserializerConfig::default().into()),
             )
             .await;
 
@@ -812,7 +812,7 @@ mod tests {
                 EventStatus::Delivered,
                 true,
                 None,
-                Some(JsonDeserializerConfig::new().into()),
+                Some(JsonDeserializerConfig::default().into()),
             )
             .await;
 
@@ -855,7 +855,7 @@ mod tests {
                 EventStatus::Delivered,
                 true,
                 None,
-                Some(JsonDeserializerConfig::new().into()),
+                Some(JsonDeserializerConfig::default().into()),
             )
             .await;
 
@@ -904,7 +904,7 @@ mod tests {
                 EventStatus::Delivered,
                 true,
                 None,
-                Some(JsonDeserializerConfig::new().into()),
+                Some(JsonDeserializerConfig::default().into()),
             )
             .await;
 
@@ -988,7 +988,7 @@ mod tests {
                 EventStatus::Delivered,
                 true,
                 None,
-                Some(JsonDeserializerConfig::new().into()),
+                Some(JsonDeserializerConfig::default().into()),
             )
             .await;
 
@@ -1029,7 +1029,7 @@ mod tests {
                 EventStatus::Delivered,
                 true,
                 None,
-                Some(JsonDeserializerConfig::new().into()),
+                Some(JsonDeserializerConfig::default().into()),
             )
             .await;
 
@@ -1108,7 +1108,7 @@ mod tests {
                 EventStatus::Delivered,
                 true,
                 None,
-                Some(JsonDeserializerConfig::new().into()),
+                Some(JsonDeserializerConfig::default().into()),
             )
             .await;
 
@@ -1152,7 +1152,7 @@ mod tests {
                 EventStatus::Delivered,
                 true,
                 None,
-                Some(JsonDeserializerConfig::new().into()),
+                Some(JsonDeserializerConfig::default().into()),
             )
             .await;
 
@@ -1221,7 +1221,7 @@ mod tests {
             EventStatus::Delivered,
             true,
             None,
-            Some(JsonDeserializerConfig::new().into()),
+            Some(JsonDeserializerConfig::default().into()),
         )
         .await;
 

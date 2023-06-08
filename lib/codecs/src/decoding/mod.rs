@@ -316,7 +316,7 @@ impl DeserializerConfig {
         match self {
             DeserializerConfig::Bytes => Deserializer::Bytes(BytesDeserializerConfig.build()),
             DeserializerConfig::Json { json } => {
-                Deserializer::Json(JsonDeserializerConfig::new_with_options(json.clone()).build())
+                Deserializer::Json(JsonDeserializerConfig::new(json.clone()).build())
             }
             #[cfg(feature = "syslog")]
             DeserializerConfig::Syslog => {
@@ -352,7 +352,7 @@ impl DeserializerConfig {
         match self {
             DeserializerConfig::Bytes => BytesDeserializerConfig.output_type(),
             DeserializerConfig::Json { json } => {
-                JsonDeserializerConfig::new_with_options(json.clone()).output_type()
+                JsonDeserializerConfig::new(json.clone()).output_type()
             }
             #[cfg(feature = "syslog")]
             DeserializerConfig::Syslog => SyslogDeserializerConfig::default().output_type(),
@@ -367,8 +367,7 @@ impl DeserializerConfig {
         match self {
             DeserializerConfig::Bytes => BytesDeserializerConfig.schema_definition(log_namespace),
             DeserializerConfig::Json { json } => {
-                JsonDeserializerConfig::new_with_options(json.clone())
-                    .schema_definition(log_namespace)
+                JsonDeserializerConfig::new(json.clone()).schema_definition(log_namespace)
             }
             #[cfg(feature = "syslog")]
             DeserializerConfig::Syslog => {
