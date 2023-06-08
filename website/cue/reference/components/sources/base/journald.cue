@@ -126,6 +126,19 @@ base: components: sources: journald: configuration: {
 		required: false
 		type: string: {}
 	}
+	journal_namespace: {
+		description: """
+			The [journal namespace][journal-namespace].
+
+			This value is passed to `journalctl` through the [`--namespace` option][journalctl-namespace-option].
+			If not set, `journalctl` uses the default namespace.
+
+			[journal-namespace]: https://www.freedesktop.org/software/systemd/man/systemd-journald.service.html#Journal%20Namespaces
+			[journalctl-namespace-option]: https://www.freedesktop.org/software/systemd/man/journalctl.html#--namespace=NAMESPACE
+			"""
+		required: false
+		type: string: {}
+	}
 	journalctl_path: {
 		description: """
 			The full path of the `journalctl` executable.
