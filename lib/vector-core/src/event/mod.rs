@@ -5,10 +5,7 @@ use std::{
     sync::Arc,
 };
 
-use crate::{
-    config::{telemetry, OutputId},
-    ByteSizeOf,
-};
+use crate::{config::OutputId, ByteSizeOf};
 pub use array::{into_event_stream, EventArray, EventContainer, LogArray, MetricArray, TraceArray};
 pub use estimated_json_encoded_size_of::EstimatedJsonEncodedSizeOf;
 pub use finalization::{
@@ -24,7 +21,6 @@ pub use trace::TraceEvent;
 use vector_buffers::EventCount;
 use vector_common::{
     finalization,
-    internal_event::OptionalTag,
     json_size::JsonSize,
     request_metadata::{EventCountTags, GetEventCountTags},
     EventDataEq,
@@ -101,25 +97,11 @@ impl Finalizable for Event {
 
 impl GetEventCountTags for Event {
     fn get_tags(&self) -> EventCountTags {
-        let source = if telemetry().tags().source() {
-            self.metadata().source_id().map(ToString::to_string).into()
-        } else {
-            OptionalTag::Ignored
-        };
-
-        let service = if telemetry().tags().service() {
-            if let Event::Log(log) = self {
-                log.get_by_meaning("service")
-                    .map(ToString::to_string)
-                    .into()
-            } else {
-                OptionalTag::Specified(None)
-            }
-        } else {
-            OptionalTag::Ignored
-        };
-
-        (source, service)
+        match self {
+            Event::Log(log) => log.get_tags(),
+            Event::Metric(metric) => metric.get_tags(),
+            Event::Trace(trace) => trace.get_tags(),
+        }
     }
 }
 
