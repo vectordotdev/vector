@@ -251,7 +251,6 @@ impl Encoder<Vec<Event>> for ParquetSerializer {
 }
 
 struct Column<'a, T, F: Fn(&Value) -> Result<T, ParquetSerializerError>> {
-    column: &'a ColumnDescriptor,
     levels: Vec<&'a Type>,
     extract: F,
     values: Vec<T>,
@@ -300,7 +299,6 @@ impl<'a, T, F: Fn(&Value) -> Result<T, ParquetSerializerError>> Column<'a, T, F>
         };
 
         Self {
-            column,
             levels,
             extract,
             values: Vec::new(),
@@ -336,78 +334,57 @@ impl<'a, T, F: Fn(&Value) -> Result<T, ParquetSerializerError>> Column<'a, T, F>
         level: usize,
     ) -> Result<(), ParquetSerializerError> {
         if let Some(part) = self.levels.get(level) {
-            match value {
-                Value::Object(object) => {
-                    if let Some(value) = object.get(part.name()) {
-                        let info = part.get_basic_info();
-                        if info.has_repetition() && info.repetition() == Repetition::REPEATED {
-                            self.extract_flat(
-                                value,
-                                start_rep_level,
-                                rep_level + 1,
-                                def_level + 1,
-                                level + 1,
-                            )
-                        } else {
-                            self.extract_value(
-                                value,
-                                start_rep_level,
-                                rep_level,
-                                if part.is_optional() {
-                                    def_level + 1
-                                } else {
-                                    def_level
-                                },
-                                level + 1,
-                            )
-                        }
-                    } else if part.is_optional() {
-                        self.push_value(None, start_rep_level, def_level);
-                        Ok(())
-                    } else {
-                        // Illegal null, error
-                        Err(ParquetSerializerError::MissingField {
-                            field: self.path(level),
-                        })
-                    }
-                }
-                Value::Null => {
-                    if part.is_optional() {
-                        self.push_value(None, start_rep_level, def_level);
-                        Ok(())
-                    } else {
-                        // Illegal null, error
-                        Err(ParquetSerializerError::MissingField {
-                            field: self.path(level),
-                        })
-                    }
-                }
+            let sub = match value {
+                Value::Object(object) => object.get(part.name()),
+                Value::Null => None,
                 // Invalid type, error
-                value => Err(ParquetSerializerError::InvalidValueType {
-                    field: self.path(level),
-                    actual_type: value.kind_str().to_string(),
-                    expected_type: "object".to_string(),
-                }),
-            }
-        } else {
-            match value {
-                Value::Null => {
-                    if self.column.self_type().is_optional() {
-                        self.push_value(None, start_rep_level, def_level);
-                        Ok(())
-                    } else {
-                        // Illegal null, error
-                        Err(ParquetSerializerError::MissingField {
-                            field: self.path(level),
-                        })
-                    }
-                }
                 value => {
-                    let value = (self.extract)(value)?;
-                    self.push_value(Some(value), start_rep_level, def_level);
+                    return Err(ParquetSerializerError::InvalidValueType {
+                        field: self.path(level),
+                        actual_type: value.kind_str().to_string(),
+                        expected_type: "object".to_string(),
+                    })
+                }
+            };
+
+            match sub {
+                Some(Value::Null) | None if part.is_optional() => {
+                    self.push_value(None, start_rep_level, def_level);
                     Ok(())
                 }
+                // Illegal null, error
+                Some(Value::Null) | None => Err(ParquetSerializerError::MissingField {
+                    field: self.path(level),
+                }),
+                Some(value) => {
+                    let info = part.get_basic_info();
+                    if info.has_repetition() && info.repetition() == Repetition::REPEATED {
+                        self.extract_flat(
+                            value,
+                            start_rep_level,
+                            rep_level + 1,
+                            def_level + 1,
+                            level + 1,
+                        )
+                    } else {
+                        self.extract_value(
+                            value,
+                            start_rep_level,
+                            rep_level,
+                            if part.is_optional() {
+                                def_level + 1
+                            } else {
+                                def_level
+                            },
+                            level + 1,
+                        )
+                    }
+                }
             }
+        } else {
+            let value = (self.extract)(value)?;
+            self.push_value(Some(value), start_rep_level, def_level);
+            Ok(())
         }
     }
 
@@ -511,13 +488,13 @@ mod tests {
             .unwrap();
 
         assert_eq!(level, count);
-        if expect_def_levels.is_some() {
-            assert_eq!(def_levels, expect_def_levels.unwrap());
-        }
+        assert_eq!(&values[..read], expect_values);
         if expect_rep_levels.is_some() {
             assert_eq!(rep_levels, expect_rep_levels.unwrap());
         }
-        assert_eq!(&values[..read], expect_values);
+        if expect_def_levels.is_some() {
+            assert_eq!(def_levels, expect_def_levels.unwrap());
+        }
     }
 
     #[test]
@@ -659,5 +636,63 @@ mod tests {
         }
 
         assert_eq!(visited.len(), 7);
+    }
+
+    #[test]
+    fn test_value_null() {
+        let message_type = r#"
+            message test {
+                optional group geo{
+                    optional binary city_name (UTF8);  
+                }            
+            }
+            "#;
+
+        let events = vec![
+            log_event! {
+                "geo.city_name" => "hello",
+            },
+            log_event! {
+                "geo.city_name" => Value::Null,
+            },
+        ];
+
+        let schema = Arc::new(parse_message_type(message_type).unwrap());
+        let mut encoder = ParquetSerializer::new(schema);
+
+        let mut buffer = BytesMut::new();
+        encoder.encode(events, &mut buffer).unwrap();
+
+        let reader = SerializedFileReader::new(buffer.freeze()).unwrap();
+
+        let parquet_metadata = reader.metadata();
+        assert_eq!(parquet_metadata.num_row_groups(), 1);
+
+        let row_group_reader = reader.get_row_group(0).unwrap();
+        assert_eq!(row_group_reader.num_columns(), 1);
+
+        let metadata = row_group_reader.metadata();
+        let mut visited = HashSet::new();
+        for (i, column) in metadata.columns().iter().enumerate() {
+            match column.column_path().string().as_str() {
+                "geo.city_name" => {
+                    assert!(visited.insert("geo.city_name"));
+                    let reader = match row_group_reader.get_column_reader(i).unwrap() {
+                        ColumnReader::ByteArrayColumnReader(r) => r,
+                        _ => panic!("Wrong column type"),
+                    };
+                    assert_column(
+                        2,
+                        &[Bytes::from("hello").into()],
+                        None,
+                        Some(&[2, 1]),
+                        reader,
+                    );
+                }
+                _ => panic!("Unexpected column"),
+            }
+        }
+
+        assert_eq!(visited.len(), 1);
     }
 }
