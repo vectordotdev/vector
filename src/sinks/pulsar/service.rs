@@ -46,6 +46,10 @@ impl MetaDescriptive for PulsarRequest {
     fn get_metadata(&self) -> &RequestMetadata {
         &self.request_metadata
     }
+
+    fn take_metadata(&mut self) -> RequestMetadata {
+        std::mem::take(&mut self.request_metadata)
+    }
 }
 
 pub struct PulsarService<Exe: Executor> {

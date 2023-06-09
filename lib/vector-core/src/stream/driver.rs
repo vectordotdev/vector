@@ -168,8 +168,7 @@ where
                         let bytes_sent = bytes_sent.clone();
                         let events_sent = events_sent.clone();
 
-                        // TODO This clone is bad.
-                        let metadata = req.get_metadata().clone();
+                        let metadata = req.take_metadata();
 
                         let fut = svc.call(req)
                             .err_into()
@@ -309,6 +308,10 @@ mod tests {
     impl MetaDescriptive for DelayRequest {
         fn get_metadata(&self) -> &RequestMetadata {
             &self.2
+        }
+
+        fn take_metadata(&mut self) -> RequestMetadata {
+            std::mem::take(&mut self.2)
         }
     }
 

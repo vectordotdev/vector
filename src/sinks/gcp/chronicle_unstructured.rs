@@ -285,6 +285,10 @@ impl MetaDescriptive for ChronicleRequest {
     fn get_metadata(&self) -> &RequestMetadata {
         &self.metadata
     }
+
+    fn take_metadata(&mut self) -> RequestMetadata {
+        std::mem::take(&mut self.metadata)
+    }
 }
 
 #[derive(Clone, Debug)]

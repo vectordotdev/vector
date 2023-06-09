@@ -267,11 +267,8 @@ pub trait MetaDescriptive {
     fn get_metadata(&self) -> &RequestMetadata;
 
     /// Returns the owned `RequestMetadata`.
-    /// TODO Remove the default implementation because this is a
-    /// terrible way to do it.
-    fn take_metadata(&mut self) -> RequestMetadata {
-        self.get_metadata().clone()
-    }
+    /// This function should only be called once.
+    fn take_metadata(&mut self) -> RequestMetadata;
 }
 
 #[cfg(test)]

@@ -155,6 +155,10 @@ impl MetaDescriptive for OpenDalRequest {
     fn get_metadata(&self) -> &RequestMetadata {
         &self.request_metadata
     }
+
+    fn take_metadata(&mut self) -> RequestMetadata {
+        std::mem::take(&mut self.request_metadata)
+    }
 }
 
 impl Finalizable for OpenDalRequest {

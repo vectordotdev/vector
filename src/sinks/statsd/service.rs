@@ -26,6 +26,10 @@ impl MetaDescriptive for StatsdRequest {
     fn get_metadata(&self) -> &RequestMetadata {
         &self.metadata
     }
+
+    fn take_metadata(&mut self) -> RequestMetadata {
+        std::mem::take(&mut self.metadata)
+    }
 }
 
 // Placeholder response to shuttle request metadata for StatsD requests.

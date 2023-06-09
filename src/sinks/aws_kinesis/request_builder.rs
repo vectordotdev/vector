@@ -56,6 +56,10 @@ where
     fn get_metadata(&self) -> &RequestMetadata {
         &self.metadata
     }
+
+    fn take_metadata(&mut self) -> RequestMetadata {
+        std::mem::take(&mut self.metadata)
+    }
 }
 
 impl<R> ByteSizeOf for KinesisRequest<R>
