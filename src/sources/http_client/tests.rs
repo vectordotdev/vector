@@ -78,7 +78,9 @@ async fn json_decoding_newline_delimited() {
         endpoint: format!("http://{}/endpoint", in_addr),
         interval: INTERVAL,
         query: HashMap::new(),
-        decoding: DeserializerConfig::Json,
+        decoding: DeserializerConfig::Json {
+            json: Default::default(),
+        },
         framing: FramingConfig::NewlineDelimited {
             newline_delimited: NewlineDelimitedDecoderOptions::default(),
         },
@@ -108,7 +110,9 @@ async fn json_decoding_character_delimited() {
         endpoint: format!("http://{}/endpoint", in_addr),
         interval: INTERVAL,
         query: HashMap::new(),
-        decoding: DeserializerConfig::Json,
+        decoding: DeserializerConfig::Json {
+            json: Default::default(),
+        },
         framing: FramingConfig::CharacterDelimited {
             character_delimited: CharacterDelimitedDecoderOptions {
                 delimiter: b',',
@@ -146,7 +150,9 @@ async fn request_query_applied() {
                 vec!["val1".to_string(), "val2".to_string()],
             ),
         ]),
-        decoding: DeserializerConfig::Json,
+        decoding: DeserializerConfig::Json {
+            json: Default::default(),
+        },
         framing: default_framing_message_based(),
         headers: HashMap::new(),
         method: HttpMethod::Get,
