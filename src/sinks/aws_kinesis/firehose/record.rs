@@ -1,11 +1,11 @@
-use crate::sinks::aws_kinesis::KinesisResponse;
 use aws_sdk_firehose::output::PutRecordBatchOutput;
 use aws_sdk_firehose::types::{Blob, SdkError};
 use bytes::Bytes;
 use tracing::Instrument;
-use crate::{sinks::prelude::*};
 
-use super::{KinesisClient, KinesisError, KinesisRecord, Record, SendRecord};
+use crate::sinks::prelude::*;
+
+use super::{KinesisClient, KinesisError, KinesisRecord, KinesisResponse, Record, SendRecord};
 
 #[derive(Clone)]
 pub struct KinesisFirehoseRecord {

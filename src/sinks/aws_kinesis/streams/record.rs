@@ -2,7 +2,8 @@ use aws_sdk_kinesis::output::PutRecordsOutput;
 use aws_sdk_kinesis::types::{Blob, SdkError};
 use bytes::Bytes;
 use tracing::Instrument;
-use crate::{sinks::prelude::*};
+
+use crate::sinks::prelude::*;
 
 use super::{KinesisClient, KinesisError, KinesisResponse, KinesisRecord, Record, SendRecord};
 

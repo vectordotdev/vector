@@ -1,8 +1,8 @@
-use crate::sinks::aws_kinesis::KinesisResponse;
 use async_trait::async_trait;
 use aws_smithy_client::SdkError;
 use bytes::Bytes;
 
+use super::KinesisResponse;
 /// An AWS Kinesis record type primarily to store the underlying aws crates' actual record `T`, and
 /// to abstract the encoded length calculation.
 pub trait Record {
