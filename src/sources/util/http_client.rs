@@ -160,7 +160,7 @@ pub(crate) async fn call<
             client
                 .send(request)
                 .map_err(Error::from)
-                .and_then(|response| async move {
+                .and_then(|response| Box::pin(async move {
                     let (header, body) = response.into_parts();
                     let body = hyper::body::to_bytes(body).await?;
                     emit!(EndpointBytesReceived {
@@ -169,7 +169,7 @@ pub(crate) async fn call<
                         endpoint: endpoint.as_str(),
                     });
                     Ok((header, body))
-                })
+                }))
                 .into_stream()
                 .filter_map(move |response| {
                     ready(match response {
@@ -225,7 +225,7 @@ pub(crate) async fn call<
                 })
                 .flatten()
         })
-        .flatten()
+        .flatten_unordered(None)
         .boxed();
 
     match out.send_event_stream(&mut stream).await {
