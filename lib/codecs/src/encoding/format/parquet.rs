@@ -695,4 +695,73 @@ mod tests {
 
         assert_eq!(visited.len(), 1);
     }
+
+    #[test]
+    fn test_repeated() {
+        let message_type = r#"
+            message test {
+                repeated group answer {
+                    optional binary name (UTF8);
+                    optional INT64 ttl;
+                }           
+            }
+            "#;
+
+        let events = vec![log_event! {
+            "answer" => vec![
+            btreemap! {
+                "name" => "test1",
+                "ttl" => 0,
+            }, btreemap! {
+                "name" => "test2",
+                "ttl" => 3600,
+            }]
+        }];
+
+        let schema = Arc::new(parse_message_type(message_type).unwrap());
+        let mut encoder = ParquetSerializer::new(schema);
+
+        let mut buffer = BytesMut::new();
+        encoder.encode(events, &mut buffer).unwrap();
+
+        let reader = SerializedFileReader::new(buffer.freeze()).unwrap();
+
+        let parquet_metadata = reader.metadata();
+        assert_eq!(parquet_metadata.num_row_groups(), 1);
+
+        let row_group_reader = reader.get_row_group(0).unwrap();
+        assert_eq!(row_group_reader.num_columns(), 2);
+
+        let metadata = row_group_reader.metadata();
+        let mut visited = HashSet::new();
+        for (i, column) in metadata.columns().iter().enumerate() {
+            match column.column_path().string().as_str() {
+                "answer.name" => {
+                    assert!(visited.insert("answer.name"));
+                    let reader = match row_group_reader.get_column_reader(i).unwrap() {
+                        ColumnReader::ByteArrayColumnReader(r) => r,
+                        _ => panic!("Wrong column type"),
+                    };
+                    assert_column(
+                        2,
+                        &[Bytes::from("test1").into(), Bytes::from("test2").into()],
+                        Some(&[0, 1]),
+                        Some(&[2, 2]),
+                        reader,
+                    );
+                }
+                "answer.ttl" => {
+                    assert!(visited.insert("answer.ttl"));
+                    let reader = match row_group_reader.get_column_reader(i).unwrap() {
+                        ColumnReader::Int64ColumnReader(r) => r,
+                        _ => panic!("Wrong column type"),
+                    };
+                    assert_column(2, &[0, 3600], Some(&[0, 1]), Some(&[2, 2]), reader);
+                }
+                _ => panic!("Unexpected column"),
+            }
+        }
+
+        assert_eq!(visited.len(), 2);
+    }
 }
