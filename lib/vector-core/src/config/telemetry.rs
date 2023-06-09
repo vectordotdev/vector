@@ -4,8 +4,8 @@ use vector_config::configurable_component;
 static TELEMETRY: OnceCell<Telemetry> = OnceCell::new();
 static TELEMETRY_DEFAULT: Lazy<Telemetry> = Lazy::new(Telemetry::default);
 
-/// Loads the telemetry options from configurations and sets the global otpions.
-///  Once this is done, configurations can be correctly loaded using configured
+/// Loads the telemetry options from configurations and sets the global options.
+/// Once this is done, configurations can be correctly loaded using configured
 /// log schema defaults.
 ///
 /// # Errors
@@ -38,8 +38,6 @@ pub struct Telemetry {
 
 impl Telemetry {
     /// Merge two `Telemetry` instances together.
-    /// This can't error because the settings are simple boolens
-    /// so it isn't really pollible to cause them to conflict.
     pub fn merge(&mut self, other: &Telemetry) {
         self.tags.service = self.tags.service || other.tags.service;
         self.tags.source = self.tags.source || other.tags.source;
