@@ -7,7 +7,9 @@ publish = false
 
 [dependencies]
 arc-swap = { version = "1.6.0", default-features = false }
-dyn-clone = { version = "1.0.11", default-features = false }
 chrono = { version = "0.4.19", default-features = false }
-vector-common = { path = "../vector-common", default-features = false, features = [ "btreemap", "conversion", "serde" ] }
-vrl = { version = "0.4.0", default-features = false, features = ["diagnostic"] }
+dyn-clone = { version = "1.0.11", default-features = false }
+vrl = { version = "0.4.0", default-features = false, features = [
+  "compiler",
+  "diagnostic",
+] }
