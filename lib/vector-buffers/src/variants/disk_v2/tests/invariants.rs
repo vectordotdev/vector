@@ -839,7 +839,7 @@ async fn reader_writer_positions_aligned_through_multiple_files_and_records() {
 
         async move {
             // Create our buffer with an arbitrarily low maximum data file size. We'll use this to
-            // cntrol how many records make it into a given data file. Just another way to ernsure
+            // control how many records make it into a given data file. Just another way to ensure
             // we're testing the position logic with multiple writes to one data file, one write to
             // a data file, etc.
             let (mut writer, mut reader, ledger) =
