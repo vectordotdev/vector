@@ -1,24 +1,24 @@
 mod bytes_received;
 mod bytes_sent;
+mod cached_event;
 pub mod component_events_dropped;
 mod events_received;
 mod events_sent;
+mod optional_tag;
 mod prelude;
 pub mod service;
 
-use std::{
-    collections::BTreeMap,
-    ops::{Add, AddAssign},
-    sync::{Arc, RwLock},
-};
+use std::ops::{Add, AddAssign};
 
 pub use metrics::SharedString;
 
 pub use bytes_received::BytesReceived;
 pub use bytes_sent::BytesSent;
+pub use cached_event::{CachedEvent, RegisterEvent};
 pub use component_events_dropped::{ComponentEventsDropped, INTENTIONAL, UNINTENTIONAL};
 pub use events_received::EventsReceived;
-pub use events_sent::{EventsSent, OptionalTag, TaggedEventsSent, DEFAULT_OUTPUT};
+pub use events_sent::{EventsSent, TaggedEventsSent, DEFAULT_OUTPUT};
+pub use optional_tag::OptionalTag;
 pub use prelude::{error_stage, error_type};
 pub use service::{CallError, PollReadyError};
 
@@ -217,6 +217,9 @@ macro_rules! registered_event {
 
         fn emit(&$slf:ident, $data_name:ident: $data:ident)
             $emit_body:block
+
+        $(fn register($tags_name:ident: &$tags:ty)
+            $register_body:block)?
     ) => {
         paste::paste!{
             #[derive(Clone)]
@@ -244,73 +247,15 @@ macro_rules! registered_event {
                 fn emit(&$slf, $data_name: $data)
                     $emit_body
             }
+
+            $(impl $crate::internal_event::cached_event::RegisterEvent<$tags> for TaggedEventsSent {
+                fn register(
+                    $tags_name: &$tags,
+                ) -> <TaggedEventsSent as super::RegisterInternalEvent>::Handle {
+                    $register_body
+                }
+            })?
+
         }
     };
-}
-
-pub trait RegisterEvent<Tags>: RegisterInternalEvent {
-    fn register(tags: &Tags) -> <Self as RegisterInternalEvent>::Handle;
-}
-
-pub struct Cached<Tags, Event: RegisterInternalEvent> {
-    cache: Arc<RwLock<BTreeMap<Tags, <Event as RegisterInternalEvent>::Handle>>>,
-}
-
-/// Deriving `Clone` for `Cached` doesn't work since the `Event` type is not clone,
-/// we can happily implement our own `clone` however since we are just cloning
-/// the `Arc`.
-impl<Tags, Event: RegisterInternalEvent> Clone for Cached<Tags, Event> {
-    fn clone(&self) -> Self {
-        Self {
-            cache: Arc::clone(&self.cache),
-        }
-    }
-}
-
-impl<Tags, Event, EventHandle, Data> Default for Cached<Tags, Event>
-where
-    Data: Sized,
-    EventHandle: InternalEventHandle<Data = Data>,
-    Tags: Ord + Clone,
-    Event: RegisterInternalEvent<Handle = EventHandle> + RegisterEvent<Tags>,
-{
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl<Tags, Event, EventHandle, Data> Cached<Tags, Event>
-where
-    Data: Sized,
-    EventHandle: InternalEventHandle<Data = Data>,
-    Tags: Ord + Clone,
-    Event: RegisterInternalEvent<Handle = EventHandle> + RegisterEvent<Tags>,
-{
-    #[must_use]
-    pub fn new() -> Self {
-        Self {
-            cache: Arc::default(),
-        }
-    }
-
-    /// Emits the event with the given tags.
-    /// It will register the event and store in the cache if this has not already
-    /// been done.
-    ///
-    /// # Panics
-    ///
-    /// This will panic if the lock is poisoned.
-    pub fn emit(&self, tags: &Tags, value: Data) {
-        let read = self.cache.read().unwrap();
-        if let Some(event) = read.get(tags) {
-            event.emit(value);
-        } else {
-            let event = <Event as RegisterEvent<Tags>>::register(tags);
-            event.emit(value);
-
-            // Ensure the read lock is dropped so we can write.
-            drop(read);
-            self.cache.write().unwrap().insert(tags.clone(), event);
-        }
-    }
 }

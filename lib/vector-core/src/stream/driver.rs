@@ -5,7 +5,7 @@ use tokio::{pin, select};
 use tower::Service;
 use tracing::Instrument;
 use vector_common::internal_event::{
-    register, ByteSize, BytesSent, Cached, CallError, InternalEventHandle as _, OptionalTag,
+    register, ByteSize, BytesSent, CachedEvent, CallError, InternalEventHandle as _, OptionalTag,
     PollReadyError, Registered, SharedString, TaggedEventsSent,
 };
 use vector_common::request_metadata::{MetaDescriptive, RequestCountByteSize, RequestMetadata};
@@ -99,7 +99,7 @@ where
         pin!(batched_input);
 
         let bytes_sent = protocol.map(|protocol| register(BytesSent { protocol }));
-        let events_sent = Cached::new();
+        let events_sent = CachedEvent::new();
 
         loop {
             // Core behavior of the loop:
@@ -205,7 +205,7 @@ where
         finalizers: EventFinalizers,
         metadata: &RequestMetadata,
         bytes_sent: &Option<Registered<BytesSent>>,
-        events_sent: &Cached<(OptionalTag, OptionalTag), TaggedEventsSent>,
+        events_sent: &CachedEvent<(OptionalTag, OptionalTag), TaggedEventsSent>,
     ) {
         match result {
             Err(error) => {

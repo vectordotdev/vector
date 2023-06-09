@@ -1,7 +1,7 @@
 use metrics::{register_counter, Counter};
 use tracing::trace;
 
-use super::{CountByteSize, Output, RegisterEvent, SharedString};
+use super::{CountByteSize, OptionalTag, Output, SharedString};
 
 pub const DEFAULT_OUTPUT: &str = "_default";
 
@@ -45,21 +45,7 @@ impl From<Output> for EventsSent {
     }
 }
 
-/// The user can configure whether a tag should be emitted. If they configure it to
-/// be emitted, but the value doesn't exist - we should emit the tag but with a value
-/// of `-`.
-#[derive(Clone, Debug, PartialEq, PartialOrd, Eq, Ord, Hash)]
-pub enum OptionalTag {
-    Ignored,
-    Specified(Option<String>),
-}
-
-impl From<Option<String>> for OptionalTag {
-    fn from(value: Option<String>) -> Self {
-        Self::Specified(value)
-    }
-}
-
+/// Makes a list of the tags to use with the events sent event.
 fn make_tags(
     output: &Option<SharedString>,
     source: &OptionalTag,
@@ -117,20 +103,28 @@ crate::registered_event!(
         self.events_out.increment(count as u64);
         self.event_bytes.increment(byte_size.get() as u64);
     }
-);
 
-/// TODO: This can probably become a part of the previous macro.
-impl RegisterEvent<(OptionalTag, OptionalTag)> for TaggedEventsSent {
-    fn register(
-        tags: &(OptionalTag, OptionalTag),
-    ) -> <TaggedEventsSent as super::RegisterInternalEvent>::Handle {
+    fn register(tags: &(OptionalTag, OptionalTag)) {
         super::register(TaggedEventsSent::new(
             tags.0.clone(),
             tags.1.clone(),
             Output(None),
         ))
     }
-}
+);
+
+/// TODO: This can probably become a part of the previous macro.
+// impl RegisterEvent<(OptionalTag, OptionalTag)> for TaggedEventsSent {
+//     fn register(
+//         tags: &(OptionalTag, OptionalTag),
+//     ) -> <TaggedEventsSent as super::RegisterInternalEvent>::Handle {
+//         super::register(TaggedEventsSent::new(
+//             tags.0.clone(),
+//             tags.1.clone(),
+//             Output(None),
+//         ))
+//     }
+// }
 
 impl TaggedEventsSent {
     #[must_use]
