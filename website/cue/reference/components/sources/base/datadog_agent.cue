@@ -34,48 +34,66 @@ base: components: sources: datadog_agent: configuration: {
 	decoding: {
 		description: "Configures how events are decoded from raw bytes."
 		required:    false
-		type: object: options: codec: {
-			description: "The codec to use for decoding events."
-			required:    false
-			type: string: {
-				default: "bytes"
-				enum: {
-					bytes: "Uses the raw bytes as-is."
-					gelf: """
-						Decodes the raw bytes as a [GELF][gelf] message.
+		type: object: options: {
+			codec: {
+				description: "The codec to use for decoding events."
+				required:    false
+				type: string: {
+					default: "bytes"
+					enum: {
+						bytes: "Uses the raw bytes as-is."
+						gelf: """
+															Decodes the raw bytes as a [GELF][gelf] message.
 
-						[gelf]: https://docs.graylog.org/docs/gelf
+															[gelf]: https://docs.graylog.org/docs/gelf
+															"""
+						json: """
+															Decodes the raw bytes as [JSON][json].
+
+															[json]: https://www.json.org/
+															"""
+						native: """
+															Decodes the raw bytes as Vector’s [native Protocol Buffers format][vector_native_protobuf].
+
+															This codec is **[experimental][experimental]**.
+
+															[vector_native_protobuf]: https://github.com/vectordotdev/vector/blob/master/lib/vector-core/proto/event.proto
+															[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
+															"""
+						native_json: """
+															Decodes the raw bytes as Vector’s [native JSON format][vector_native_json].
+
+															This codec is **[experimental][experimental]**.
+
+															[vector_native_json]: https://github.com/vectordotdev/vector/blob/master/lib/codecs/tests/data/native_encoding/schema.cue
+															[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
+															"""
+						syslog: """
+															Decodes the raw bytes as a Syslog message.
+
+															Decodes either as the [RFC 3164][rfc3164]-style format ("old" style) or the
+															[RFC 5424][rfc5424]-style format ("new" style, includes structured data).
+
+															[rfc3164]: https://www.ietf.org/rfc/rfc3164.txt
+															[rfc5424]: https://www.ietf.org/rfc/rfc5424.txt
+															"""
+					}
+				}
+			}
+			json: {
+				description:   "Options for the JSON deserializer."
+				relevant_when: "codec = \"json\""
+				required:      false
+				type: object: options: lossy: {
+					description: """
+						Determines whether or not to replace invalid UTF-8 sequences instead of returning an error.
+
+						When true, invalid UTF-8 sequences are replaced with the [`U+FFFD REPLACEMENT CHARACTER`][U+FFFD].
+
+						[U+FFFD]: https://en.wikipedia.org/wiki/Specials_(Unicode_block)#Replacement_character
 						"""
-					json: """
-						Decodes the raw bytes as [JSON][json].
-
-						[json]: https://www.json.org/
-						"""
-					native: """
-						Decodes the raw bytes as Vector’s [native Protocol Buffers format][vector_native_protobuf].
-
-						This codec is **[experimental][experimental]**.
-
-						[vector_native_protobuf]: https://github.com/vectordotdev/vector/blob/master/lib/vector-core/proto/event.proto
-						[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
-						"""
-					native_json: """
-						Decodes the raw bytes as Vector’s [native JSON format][vector_native_json].
-
-						This codec is **[experimental][experimental]**.
-
-						[vector_native_json]: https://github.com/vectordotdev/vector/blob/master/lib/codecs/tests/data/native_encoding/schema.cue
-						[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
-						"""
-					syslog: """
-						Decodes the raw bytes as a Syslog message.
-
-						Decodes either as the [RFC 3164][rfc3164]-style format ("old" style) or the
-						[RFC 5424][rfc5424]-style format ("new" style, includes structured data).
-
-						[rfc3164]: https://www.ietf.org/rfc/rfc3164.txt
-						[rfc5424]: https://www.ietf.org/rfc/rfc5424.txt
-						"""
+					required: false
+					type: bool: default: true
 				}
 			}
 		}

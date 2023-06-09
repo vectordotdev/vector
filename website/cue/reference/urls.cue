@@ -412,6 +412,7 @@ urls: {
 	prometheus_remote_integrations:             "https://prometheus.io/docs/operating/integrations/#remote-endpoints-and-storage"
 	prometheus_remote_write:                    "https://prometheus.io/docs/prometheus/latest/configuration/configuration/#remote_write"
 	prometheus_remote_write_protocol:           "https://docs.google.com/document/d/1LPhVRSFkGNSuU1fBd81ulhsCPR4hkSZyyBj1SZ8fWOM/edit#heading=h.n0d0vphea3fe"
+	prometheus_remote_write_spec:               "https://prometheus.io/docs/concepts/remote_write_spec/#protocol"
 	protobuf:                                   "https://developers.google.com/protocol-buffers"
 	pulsar:                                     "https://pulsar.apache.org/"
 	pulsar_protocol:                            "https://pulsar.apache.org/docs/en/develop-binary-protocol/"

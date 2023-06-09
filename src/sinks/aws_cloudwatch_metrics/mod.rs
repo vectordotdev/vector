@@ -252,6 +252,7 @@ impl CloudWatchMetricsSvc {
                 })
             });
 
+        #[allow(deprecated)]
         Ok(VectorSink::from_event_sink(sink))
     }
 

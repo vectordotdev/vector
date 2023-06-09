@@ -194,6 +194,7 @@ impl SematextMetricsService {
             })
             .sink_map_err(|error| error!(message = "Fatal sematext metrics sink error.", %error));
 
+        #[allow(deprecated)]
         Ok(VectorSink::from_event_sink(sink))
     }
 }

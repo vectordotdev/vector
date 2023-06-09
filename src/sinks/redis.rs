@@ -235,6 +235,7 @@ impl RedisSinkConfig {
             })
             .sink_map_err(|error| error!(message = "Sink failed to flush.", %error));
 
+        #[allow(deprecated)]
         Ok(super::VectorSink::from_event_sink(sink))
     }
 

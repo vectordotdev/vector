@@ -126,14 +126,9 @@ jobs:
       smp-version: ${{ steps.experimental-meta.outputs.SMP_CRATE_VERSION }}
       lading-version: ${{ steps.experimental-meta.outputs.LADING_VERSION }}
     steps:
-
       - uses: actions/checkout@v3
-
-      - name: Checkout PR branch (issue_comment)
-        if: github.event_name == 'issue_comment'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh pr checkout ${{ github.event.issue.number }}
+        with:
+          fetch-depth: 1000
 
       # If triggered by issue comment, the event payload doesn't directly contain the head and base sha from the PR.
       # But, we can retrieve this info from some commands.
@@ -146,7 +141,9 @@ jobs:
           export PR_NUMBER=${{ github.event.issue.number }}
           echo "PR_NUMBER=${PR_NUMBER}" >> $GITHUB_OUTPUT
 
-          export BASELINE_SHA=$(git merge-base --fork-point master)
+          gh pr checkout ${{ github.event.issue.number }}
+
+          export BASELINE_SHA=$(git merge-base master HEAD)
           echo "BASELINE_SHA=${BASELINE_SHA}" >> $GITHUB_OUTPUT
 
           export COMPARISON_SHA=$(git rev-parse HEAD)
@@ -165,6 +162,21 @@ jobs:
 
           echo "comparison sha is: ${COMPARISON_SHA}"
           echo "comparison tag is: ${COMPARISON_TAG}"
+
+          if [ "${BASELINE_SHA}" = "" ] ; then
+            echo "BASELINE_SHA not found, exiting."
+            exit 1
+          fi
+
+          if [ "${COMPARISON_SHA}" = "" ] ; then
+            echo "COMPARISON_SHA not found, exiting."
+            exit 1
+          fi
+
+          if [ "${PR_NUMBER}" = "" ] ; then
+            echo "PR_NUMBER not found, exiting."
+            exit 1
+          fi
 
       # If triggered by merge queue, the PR number is not available in the payload. While we restrict the number of PRs in the
       # queue to 1, we can get the PR number by parsing the merge queue temp branch's ref.
@@ -194,6 +206,21 @@ jobs:
 
           echo "comparison sha is: ${COMPARISON_SHA}"
           echo "comparison tag is: ${COMPARISON_TAG}"
+
+          if [ "${BASELINE_SHA}" = "" ] ; then
+            echo "BASELINE_SHA not found, exiting."
+            exit 1
+          fi
+
+          if [ "${COMPARISON_SHA}" = "" ] ; then
+            echo "COMPARISON_SHA not found, exiting."
+            exit 1
+          fi
+
+          if [ "${PR_NUMBER}" = "" ] ; then
+            echo "PR_NUMBER not found, exiting."
+            exit 1
+          fi
 
       - name: Setup experimental metadata
         id: experimental-meta
@@ -268,10 +295,10 @@ jobs:
 
       - name: Set up Docker Buildx
         id: buildx
-        uses: docker/setup-buildx-action@v2.5.0
+        uses: docker/setup-buildx-action@v2.6.0
 
       - name: Build 'vector' target image
-        uses: docker/build-push-action@v4.0.0
+        uses: docker/build-push-action@v4.1.0
         with:
           context: baseline-vector/
           cache-from: type=gha
@@ -305,10 +332,10 @@ jobs:
 
       - name: Set up Docker Buildx
         id: buildx
-        uses: docker/setup-buildx-action@v2.5.0
+        uses: docker/setup-buildx-action@v2.6.0
 
       - name: Build 'vector' target image
-        uses: docker/build-push-action@v4.0.0
+        uses: docker/build-push-action@v4.1.0
         with:
           context: comparison-vector/
           cache-from: type=gha

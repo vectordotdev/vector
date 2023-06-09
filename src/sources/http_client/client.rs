@@ -235,7 +235,9 @@ impl ValidatableComponent for HttpClientConfig {
         let config = Self {
             endpoint: uri.to_string(),
             interval: Duration::from_secs(1),
-            decoding: DeserializerConfig::Json,
+            decoding: DeserializerConfig::Json {
+                json: Default::default(),
+            },
             ..Default::default()
         };
 

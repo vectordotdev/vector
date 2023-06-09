@@ -141,7 +141,7 @@ fn deserializer_config_to_serializer(config: &DeserializerConfig) -> encoding::S
         // "bytes" can be a top-level field and we aren't implicitly decoding everything into the
         // `message` field... but it's close enough for now.
         DeserializerConfig::Bytes => SerializerConfig::Text(TextSerializerConfig::default()),
-        DeserializerConfig::Json => SerializerConfig::Json(JsonSerializerConfig::default()),
+        DeserializerConfig::Json { .. } => SerializerConfig::Json(JsonSerializerConfig::default()),
         // TODO: We need to create an Avro serializer because, certainly, for any source decoding
         // the data as Avro, we can't possibly send anything else without the source just
         // immediately barfing.
@@ -184,7 +184,9 @@ fn serializer_config_to_deserializer(config: &SerializerConfig) -> decoding::Des
         SerializerConfig::Avro { .. } => todo!(),
         SerializerConfig::Csv { .. } => todo!(),
         SerializerConfig::Gelf => DeserializerConfig::Gelf,
-        SerializerConfig::Json(_) => DeserializerConfig::Json,
+        SerializerConfig::Json(_) => DeserializerConfig::Json {
+            json: Default::default(),
+        },
         SerializerConfig::Logfmt => todo!(),
         SerializerConfig::Native => DeserializerConfig::Native,
         SerializerConfig::NativeJson => DeserializerConfig::NativeJson,

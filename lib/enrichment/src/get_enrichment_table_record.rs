@@ -183,7 +183,7 @@ impl FunctionExpression for GetEnrichmentTableRecordFn {
 
 #[cfg(test)]
 mod tests {
-    use vector_common::TimeZone;
+    use vrl::compiler::prelude::TimeZone;
     use vrl::compiler::state::RuntimeState;
     use vrl::compiler::TargetValue;
     use vrl::value;

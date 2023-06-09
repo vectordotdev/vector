@@ -302,6 +302,7 @@ impl SinkConfig for UnitTestStreamSinkConfig {
         let sink = self.sink.lock().await.take().unwrap();
         let healthcheck = future::ok(()).boxed();
 
+        #[allow(deprecated)]
         Ok((VectorSink::from_event_sink(sink), healthcheck))
     }
 

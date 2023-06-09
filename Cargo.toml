@@ -181,13 +181,13 @@ azure_storage = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev =
 azure_storage_blobs = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "b4544d4920fa3064eb921340054cd9cc130b7664", default-features = false, optional = true }
 
 # OpenDAL
-opendal = {version = "0.36", default-features = false, features = ["native-tls", "services-webhdfs"], optional = true}
+opendal = {version = "0.37", default-features = false, features = ["native-tls", "services-webhdfs"], optional = true}
 
 # Tower
 tower = { version = "0.4.13", default-features = false, features = ["buffer", "limit", "retry", "timeout", "util", "balance", "discover"] }
 tower-http = { version = "0.4.0", default-features = false, features = ["decompression-gzip"]}
 # Serde
-serde = { version = "1.0.163", default-features = false, features = ["derive"] }
+serde = { version = "1.0.164", default-features = false, features = ["derive"] }
 serde-toml-merge = { version = "0.3.0", default-features = false }
 serde_bytes = { version = "0.11.9", default-features = false, features = ["std"], optional = true }
 serde_json = { version = "1.0.96", default-features = false, features = ["raw_value"] }
@@ -210,8 +210,8 @@ smpl_jwt = { version = "0.7.1", default-features = false, optional = true }
 lapin = { version = "2.2.1", default-features = false, features = ["native-tls"], optional = true }
 
 # API
-async-graphql = { version = "5.0.9", default-features = false, optional = true, features = ["chrono"] }
-async-graphql-warp = { version = "5.0.9", default-features = false, optional = true }
+async-graphql = { version = "5.0.10", default-features = false, optional = true, features = ["chrono"] }
+async-graphql-warp = { version = "5.0.10", default-features = false, optional = true }
 itertools = { version = "0.10.5", default-features = false, optional = true }
 
 # API client
@@ -256,7 +256,7 @@ governor = { version = "0.5.1", default-features = false, features = ["dashmap",
 grok = { version = "2.0.0", default-features = false, optional = true }
 h2 = { version = "0.3.19", default-features = false, optional = true }
 hash_hasher = { version = "2.0.0", default-features = false }
-hashbrown = { version = "0.13.2", default-features = false, optional = true, features = ["ahash"] }
+hashbrown = { version = "0.14.0", default-features = false, optional = true, features = ["ahash"] }
 headers = { version = "0.3.8", default-features = false }
 hostname = { version = "0.3.1", default-features = false }
 http = { version = "0.2.9", default-features = false }
@@ -311,7 +311,7 @@ toml = { version = "0.7.4", default-features = false, features = ["parse", "disp
 tonic = { version = "0.9", optional = true, default-features = false, features = ["transport", "codegen", "prost", "tls", "tls-roots", "gzip"] }
 trust-dns-proto = { version = "0.22.0", default-features = false, features = ["dnssec"], optional = true }
 typetag = { version = "0.2.8", default-features = false }
-url = { version = "2.3.1", default-features = false, features = ["serde"] }
+url = { version = "2.4.0", default-features = false, features = ["serde"] }
 uuid = { version = "1", default-features = false, features = ["serde", "v4"] }
 warp = { version = "0.3.5", default-features = false }
 zstd = { version = "0.12.3", default-features = false }
@@ -346,18 +346,18 @@ azure_storage = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev =
 base64 = "0.21.2"
 criterion = { version = "0.5.1", features = ["html_reports", "async_tokio"] }
 itertools = { version = "0.10.5", default-features = false }
-libc = "0.2.144"
+libc = "0.2.146"
 similar-asserts = "1.4.2"
 proptest = "1.2"
 quickcheck = "1.0.3"
 reqwest = { version = "0.11", features = ["json"] }
-tempfile = "3.5.0"
+tempfile = "3.6.0"
 test-generator = "0.3.1"
 tokio-test = "0.4.2"
 tokio = { version = "1.28.2", features = ["test-util"] }
 tower-test = "0.4.0"
 vector-core = { path = "lib/vector-core", default-features = false, features = ["vrl", "test"] }
-wiremock = "0.5.18"
+wiremock = "0.5.19"
 zstd = { version = "0.12.3", default-features = false }
 
 [patch.crates-io]
