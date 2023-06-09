@@ -248,7 +248,7 @@ macro_rules! registered_event {
                     $emit_body
             }
 
-            $(impl $crate::internal_event::cached_event::RegisterEvent<$tags> for TaggedEventsSent {
+            $(impl $crate::internal_event::cached_event::RegisterEvent<$tags> for $event {
                 fn register(
                     $tags_name: &$tags,
                 ) -> <TaggedEventsSent as super::RegisterInternalEvent>::Handle {
