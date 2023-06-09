@@ -1,3 +1,5 @@
+mod diagnostic;
+
 use crate::config::schema;
 use futures_util::{stream, FutureExt, StreamExt, TryFutureExt, TryStreamExt};
 use heim::{disk::Partition, units::information::byte};
