@@ -2904,7 +2904,6 @@ dependencies = [
  "arc-swap",
  "chrono",
  "dyn-clone",
- "vector-common",
  "vrl",
 ]
 
