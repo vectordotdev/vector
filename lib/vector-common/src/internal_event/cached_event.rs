@@ -14,14 +14,20 @@ use super::{InternalEventHandle, RegisterInternalEvent};
 /// `CachedEvent` is used to maintain a store of these registered metrics. When a
 /// new event is emitted for a previously unseen set of tags an event is registered
 /// and stored in the cache.
-pub struct CachedEvent<Tags, Event: RegisterInternalEvent> {
-    cache: Arc<RwLock<BTreeMap<Tags, <Event as RegisterInternalEvent>::Handle>>>,
+pub struct CachedEvent<Event: RegisterEvent> {
+    cache: Arc<
+        RwLock<BTreeMap<<Event as RegisterEvent>::Tags, <Event as RegisterInternalEvent>::Handle>>,
+    >,
 }
 
 /// This trait must be implemented by events that emit dynamic tags. `register` must
 /// be implemented to register an event based on the set of tags passed.
-pub trait RegisterEvent<Tags>: RegisterInternalEvent {
-    fn register(tags: &Tags) -> <Self as RegisterInternalEvent>::Handle;
+pub trait RegisterEvent: RegisterInternalEvent {
+    /// The type that will contain the data necessary to extract the tags
+    /// that will be used when registering the event.
+    type Tags;
+
+    fn register(tags: &Self::Tags) -> <Self as RegisterInternalEvent>::Handle;
 }
 
 /// Deriving `Clone` for `Cached` doesn't work since the `Event` type is not clone,
@@ -29,7 +35,7 @@ pub trait RegisterEvent<Tags>: RegisterInternalEvent {
 /// the `Arc`.
 /// Worth noting that this is a cheap clone since the cache itself is stored behind
 /// an `Arc`.
-impl<Tags, Event: RegisterInternalEvent> Clone for CachedEvent<Tags, Event> {
+impl<Event: RegisterEvent> Clone for CachedEvent<Event> {
     fn clone(&self) -> Self {
         Self {
             cache: Arc::clone(&self.cache),
@@ -37,24 +43,24 @@ impl<Tags, Event: RegisterInternalEvent> Clone for CachedEvent<Tags, Event> {
     }
 }
 
-impl<Tags, Event, EventHandle, Data> Default for CachedEvent<Tags, Event>
+impl<Event, EventHandle, Data, Tags> Default for CachedEvent<Event>
 where
     Data: Sized,
     EventHandle: InternalEventHandle<Data = Data>,
     Tags: Ord + Clone,
-    Event: RegisterInternalEvent<Handle = EventHandle> + RegisterEvent<Tags>,
+    Event: RegisterInternalEvent<Handle = EventHandle> + RegisterEvent<Tags = Tags>,
 {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<Tags, Event, EventHandle, Data> CachedEvent<Tags, Event>
+impl<Event, EventHandle, Data, Tags> CachedEvent<Event>
 where
     Data: Sized,
     EventHandle: InternalEventHandle<Data = Data>,
     Tags: Ord + Clone,
-    Event: RegisterInternalEvent<Handle = EventHandle> + RegisterEvent<Tags>,
+    Event: RegisterInternalEvent<Handle = EventHandle> + RegisterEvent<Tags = Tags>,
 {
     #[must_use]
     pub fn new() -> Self {
@@ -75,7 +81,7 @@ where
         if let Some(event) = read.get(tags) {
             event.emit(value);
         } else {
-            let event = <Event as RegisterEvent<Tags>>::register(tags);
+            let event = <Event as RegisterEvent>::register(tags);
             event.emit(value);
 
             // Ensure the read lock is dropped so we can write.
