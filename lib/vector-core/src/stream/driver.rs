@@ -8,7 +8,7 @@ use vector_common::internal_event::{
     register, ByteSize, BytesSent, CachedEvent, CallError, InternalEventHandle as _, OptionalTag,
     PollReadyError, Registered, SharedString, TaggedEventsSent,
 };
-use vector_common::request_metadata::{MetaDescriptive, RequestCountByteSize, RequestMetadata};
+use vector_common::request_metadata::{MetaDescriptive, RequestCountByteSize};
 
 use super::FuturesUnorderedCount;
 use crate::{
@@ -167,8 +167,7 @@ where
                         let finalizers = req.take_finalizers();
                         let bytes_sent = bytes_sent.clone();
                         let events_sent = events_sent.clone();
-
-                        let metadata = req.take_metadata();
+                        let event_count = req.get_metadata().event_count();
 
                         let fut = svc.call(req)
                             .err_into()
@@ -176,7 +175,7 @@ where
                                 result,
                                 request_id,
                                 finalizers,
-                                &metadata,
+                                event_count,
                                 &bytes_sent,
                                 &events_sent,
                             ))
@@ -202,13 +201,13 @@ where
         result: Result<Svc::Response, Svc::Error>,
         request_id: usize,
         finalizers: EventFinalizers,
-        metadata: &RequestMetadata,
+        event_count: usize,
         bytes_sent: &Option<Registered<BytesSent>>,
         events_sent: &CachedEvent<(OptionalTag, OptionalTag), TaggedEventsSent>,
     ) {
         match result {
             Err(error) => {
-                Self::emit_call_error(Some(error), request_id, metadata.event_count());
+                Self::emit_call_error(Some(error), request_id, event_count);
                 finalizers.update_status(EventStatus::Rejected);
             }
             Ok(response) => {
@@ -231,7 +230,7 @@ where
 
                 // This condition occurs specifically when the `HttpBatchService::call()` is called *within* the `Service::call()`
                 } else if response.event_status() == EventStatus::Rejected {
-                    Self::emit_call_error(None, request_id, metadata.event_count());
+                    Self::emit_call_error(None, request_id, event_count);
                     finalizers.update_status(EventStatus::Rejected);
                 }
             }

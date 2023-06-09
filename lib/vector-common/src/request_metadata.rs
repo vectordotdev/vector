@@ -267,7 +267,9 @@ pub trait MetaDescriptive {
     fn get_metadata(&self) -> &RequestMetadata;
 
     /// Returns the owned `RequestMetadata`.
-    /// This function should only be called once.
+    /// It is *very* important that this function is not called more than once for each
+    /// instance since it is likely that by taking the metadata it will replace the
+    /// current values with default metadata.
     fn take_metadata(&mut self) -> RequestMetadata;
 }
 
