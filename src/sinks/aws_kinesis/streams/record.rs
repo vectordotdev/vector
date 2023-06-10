@@ -72,7 +72,7 @@ impl SendRecord for KinesisStreamClient {
     ) -> Result<KinesisResponse, SdkError<Self::E>> {
         let rec_count = records.len();
         let total_size = records.iter().fold(0, |acc, record| {
-            acc + record.data().unwrap_or(&Blob::new(vec![])).as_ref().len()
+            acc + record.data().map(|v| v.as_ref().len()).unwrap_or_default()
         });
         self.client
             .put_records()

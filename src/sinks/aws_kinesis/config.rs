@@ -53,8 +53,6 @@ pub struct KinesisSinkBaseConfig {
     pub auth: AwsAuthentication,
 
     /// Whether or not to retry successful requests containing partial failures.
-    ///
-    /// Note: this can cause duplicates in Firehose.
     #[serde(default)]
     #[configurable(metadata(docs::advanced))]
     pub request_retry_partial: bool,
