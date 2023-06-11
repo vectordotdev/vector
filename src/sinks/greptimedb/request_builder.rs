@@ -1,141 +1,11 @@
-use std::sync::Arc;
-use std::task::Poll;
-
 use chrono::Utc;
-use futures::stream;
-use futures::SinkExt;
-use futures_util::future::BoxFuture;
-use greptimedb_client::api::v1::auth_header::AuthScheme;
 use greptimedb_client::api::v1::column::*;
 use greptimedb_client::api::v1::*;
-use greptimedb_client::{Client, Database, Error as GreptimeError, DEFAULT_SCHEMA_NAME};
-use tower::Service;
 use vector_core::event::metric::{Bucket, MetricSketch, Quantile, Sample};
-use vector_core::event::{Event, Metric, MetricValue};
+use vector_core::event::{Metric, MetricValue};
 use vector_core::metrics::AgentDDSketch;
-use vector_core::ByteSizeOf;
-use vector_core::EstimatedJsonEncodedSizeOf;
 
-use super::GreptimeDBConfig;
-use crate::sinks::util::buffer::metrics::MetricNormalize;
-use crate::sinks::util::buffer::metrics::MetricNormalizer;
-use crate::sinks::util::buffer::metrics::MetricSet;
-use crate::sinks::util::buffer::metrics::MetricsBuffer;
-use crate::sinks::util::retries::RetryLogic;
-use crate::sinks::util::sink::Response;
 use crate::sinks::util::statistic::DistributionStatistic;
-use crate::sinks::util::{EncodedEvent, TowerRequestConfig};
-use crate::sinks::VectorSink;
-
-#[derive(Debug)]
-pub struct GreptimeBatchOutput(u32);
-
-impl Response for GreptimeBatchOutput {}
-
-#[derive(Clone)]
-struct GreptimeDBRetryLogic;
-
-impl RetryLogic for GreptimeDBRetryLogic {
-    type Error = GreptimeError;
-    type Response = GreptimeBatchOutput;
-
-    fn is_retriable_error(&self, _error: &Self::Error) -> bool {
-        true
-    }
-}
-
-#[derive(Clone, Debug, Default)]
-struct GreptimeDBMetricNormalize;
-
-impl MetricNormalize for GreptimeDBMetricNormalize {
-    fn normalize(&mut self, state: &mut MetricSet, metric: Metric) -> Option<Metric> {
-        match (metric.kind(), &metric.value()) {
-            (_, MetricValue::Counter { .. }) => state.make_absolute(metric),
-            (_, MetricValue::Gauge { .. }) => state.make_absolute(metric),
-            // All others are left as-is
-            _ => Some(metric),
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct GreptimeDBService {
-    /// the client that connects to greptimedb
-    client: Arc<Database>,
-}
-
-impl GreptimeDBService {
-    pub fn new_sink(config: &GreptimeDBConfig) -> crate::Result<VectorSink> {
-        let grpc_client = Client::with_urls(vec![&config.endpoint]);
-        let mut client = Database::new_with_dbname(
-            config.dbname.as_deref().unwrap_or(DEFAULT_SCHEMA_NAME),
-            grpc_client,
-        );
-
-        if let (Some(username), Some(password)) = (&config.username, &config.password) {
-            client.set_auth(AuthScheme::Basic(Basic {
-                username: username.to_owned(),
-                password: password.clone().into(),
-            }))
-        }
-
-        let batch = config.batch.into_batch_settings()?;
-        let request = config.request.unwrap_with(&TowerRequestConfig {
-            retry_attempts: Some(1),
-            ..Default::default()
-        });
-
-        let greptime_service = GreptimeDBService {
-            client: Arc::new(client),
-        };
-
-        let mut normalizer = MetricNormalizer::<GreptimeDBMetricNormalize>::default();
-
-        let sink = request
-            .batch_sink(
-                GreptimeDBRetryLogic,
-                greptime_service,
-                MetricsBuffer::new(batch.size),
-                batch.timeout,
-            )
-            .with_flat_map(move |event: Event| {
-                stream::iter({
-                    let byte_size = event.size_of();
-                    let json_size = event.estimated_json_encoded_size_of();
-                    normalizer
-                        .normalize(event.into_metric())
-                        .map(|metric| Ok(EncodedEvent::new(metric, byte_size, json_size)))
-                })
-            })
-            .sink_map_err(|e| error!(message = "Fatal greptimedb sink error.", %e));
-
-        Ok(VectorSink::from_event_sink(sink))
-    }
-}
-
-impl Service<Vec<Metric>> for GreptimeDBService {
-    type Response = GreptimeBatchOutput;
-    type Error = GreptimeError;
-    type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
-
-    fn poll_ready(&mut self, _cx: &mut std::task::Context) -> Poll<Result<(), Self::Error>> {
-        Poll::Ready(Ok(()))
-    }
-
-    // Convert vector metrics into GreptimeDB format and send them in batch
-    fn call(&mut self, items: Vec<Metric>) -> Self::Future {
-        let requests = items
-            .into_iter()
-            .map(metric_to_insert_request)
-            .collect::<Vec<InsertRequest>>();
-        let client = Arc::clone(&self.client);
-
-        Box::pin(async move {
-            let result = client.insert(requests).await?;
-            Ok(GreptimeBatchOutput(result))
-        })
-    }
-}
 
 fn f64_field(name: &str, value: f64) -> Column {
     Column {
@@ -176,7 +46,7 @@ fn tag_column(name: &str, value: &str) -> Column {
     }
 }
 
-fn metric_to_insert_request(metric: Metric) -> InsertRequest {
+pub(super) fn metric_to_insert_request(metric: Metric) -> InsertRequest {
     let ns = metric.namespace();
     let metric_name = metric.name();
     let table_name = if let Some(ns) = ns {
@@ -242,7 +112,9 @@ fn metric_to_insert_request(metric: Metric) -> InsertRequest {
 }
 
 fn encode_distribution(samples: &[Sample], columns: &mut Vec<Column>) {
-    if let Some(stats) = DistributionStatistic::from_samples(samples, &[0.75, 0.90, 0.95, 0.99]) {
+    if let Some(stats) =
+        DistributionStatistic::from_samples(samples, &[0.5, 0.75, 0.90, 0.95, 0.99])
+    {
         columns.push(f64_field("min", stats.min));
         columns.push(f64_field("max", stats.max));
         columns.push(f64_field("median", stats.median));
@@ -394,7 +266,7 @@ mod tests {
             },
         );
         let insert = metric_to_insert_request(metric);
-        assert_eq!(insert.columns.len(), 11);
+        assert_eq!(insert.columns.len(), 12);
 
         assert_eq!(get_column(&insert.columns, "max"), 3.0);
         assert_eq!(get_column(&insert.columns, "min"), 1.0);
@@ -402,6 +274,7 @@ mod tests {
         assert_eq!(get_column(&insert.columns, "avg"), 2.0);
         assert_eq!(get_column(&insert.columns, "sum"), 16.0);
         assert_eq!(get_column(&insert.columns, "count"), 8.0);
+        assert_eq!(get_column(&insert.columns, "p50"), 2.0);
         assert_eq!(get_column(&insert.columns, "p75"), 2.0);
         assert_eq!(get_column(&insert.columns, "p90"), 3.0);
         assert_eq!(get_column(&insert.columns, "p95"), 3.0);
@@ -449,84 +322,5 @@ mod tests {
         assert_eq!(get_column(&insert.columns, "p99"), 3.0);
         assert_eq!(get_column(&insert.columns, "count"), 6.0);
         assert_eq!(get_column(&insert.columns, "sum"), 12.0);
-    }
-}
-
-#[cfg(feature = "greptimedb-integration-tests")]
-#[cfg(test)]
-mod integration_tests {
-    use vector_core::event::MetricKind;
-    use vector_core::metric_tags;
-
-    use crate::sinks::util::test::load_sink;
-    use crate::{
-        config::{SinkConfig, SinkContext},
-        test_util::{
-            components::{run_and_assert_sink_compliance, SINK_TAGS},
-            trace_init,
-        },
-    };
-
-    use super::*;
-
-    #[tokio::test]
-    async fn test_greptimedb_sink() {
-        trace_init();
-        let cfg = format!(
-            r#"endpoint= "{}"
-"#,
-            std::env::var("GREPTIMEDB_ENDPOINT").unwrap_or_else(|_| "localhost:4001".to_owned())
-        );
-
-        let (config, _) = load_sink::<GreptimeDBConfig>(&cfg).unwrap();
-        let (sink, _hc) = config.build(SinkContext::new_test()).await.unwrap();
-
-        let events: Vec<_> = (0..10).map(create_event).collect();
-        run_and_assert_sink_compliance(sink, stream::iter(events), &SINK_TAGS).await;
-
-        let query_client = query_client();
-        let query_response = query_client
-            .get(&format!(
-                "{}/v1/sql",
-                std::env::var("GREPTIMEDB_HTTP")
-                    .unwrap_or_else(|_| "http://localhost:4000".to_owned())
-            ))
-            .query(&[("sql", "SELECT region, value FROM ns_my_counter")])
-            .send()
-            .await
-            .unwrap()
-            .text()
-            .await
-            .expect("Fetch json from greptimedb failed");
-        let result: serde_json::Value = serde_json::from_str(&query_response)
-            .expect("Invalid json returned from greptimedb query");
-        assert_eq!(
-            result
-                .pointer("/output/0/records/rows")
-                .and_then(|v| v.as_array())
-                .expect("Error getting greptimedb response array")
-                .len(),
-            10
-        )
-    }
-
-    fn query_client() -> reqwest::Client {
-        reqwest::Client::builder().build().unwrap()
-    }
-
-    fn create_event(i: i32) -> Event {
-        Event::Metric(
-            Metric::new(
-                "my_counter".to_owned(),
-                MetricKind::Incremental,
-                MetricValue::Counter { value: i as f64 },
-            )
-            .with_namespace(Some("ns"))
-            .with_tags(Some(metric_tags!(
-                "region" => "us-west-1",
-                "production" => "true",
-            )))
-            .with_timestamp(Some(Utc::now())),
-        )
     }
 }

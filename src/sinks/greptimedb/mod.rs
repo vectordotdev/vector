@@ -11,7 +11,12 @@ use crate::sinks::{Healthcheck, VectorSink};
 
 use super::util::TowerRequestConfig;
 
-mod client;
+mod batch;
+#[cfg(all(test, feature = "greptimedb-integration-tests"))]
+mod integration_tests;
+mod request_builder;
+mod service;
+mod sink;
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct GreptimeDBDefaultBatchSettings;
@@ -68,9 +73,14 @@ impl_generate_config_from_default!(GreptimeDBConfig);
 #[async_trait::async_trait]
 impl SinkConfig for GreptimeDBConfig {
     async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let sink = client::GreptimeDBService::new_sink(self)?;
+        let service = service::GreptimeDBService::new(self);
+        let sink = sink::GreptimeDBSink {
+            service,
+            batch_settings: self.batch.into_batcher_settings()?,
+        };
+
         let healthcheck = healthcheck(self)?;
-        Ok((sink, healthcheck))
+        Ok((VectorSink::from_event_streamsink(sink), healthcheck))
     }
 
     fn input(&self) -> Input {
