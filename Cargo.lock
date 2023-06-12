@@ -9579,7 +9579,6 @@ dependencies = [
  "opendal",
  "openssl",
  "openssl-probe",
- "openssl-src",
  "opentelemetry-proto",
  "ordered-float 3.7.0",
  "paste",
@@ -10684,3 +10683,8 @@ dependencies = [
  "libc",
  "pkg-config",
 ]
+
+[[patch.unused]]
+name = "openssl-sys"
+version = "0.9.88"
+source = "git+https://github.com/vectordotdev/rust-openssl.git?tag=openssl-sys-v0.9.88+3.0.0#c20d6c72fdc78e70b2a608719a261bc31002dab7"
