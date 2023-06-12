@@ -8,10 +8,11 @@ use vector_core::stream::BatcherSettings;
 
 use crate::sinks::util::buffer::metrics::MetricNormalize;
 use crate::sinks::util::buffer::metrics::MetricSet;
+use crate::sinks::util::service::Svc;
 use crate::sinks::util::SinkBuilderExt;
 
 use super::batch::GreptimeDBBatchSizer;
-use super::service::{GreptimeDBRequest, GreptimeDBService};
+use super::service::{GreptimeDBRequest, GreptimeDBRetryLogic, GreptimeDBService};
 
 #[derive(Clone, Debug, Default)]
 pub struct GreptimeDBMetricNormalize;
@@ -28,7 +29,7 @@ impl MetricNormalize for GreptimeDBMetricNormalize {
 }
 
 pub struct GreptimeDBSink {
-    pub(super) service: GreptimeDBService,
+    pub(super) service: Svc<GreptimeDBService, GreptimeDBRetryLogic>,
     pub(super) batch_settings: BatcherSettings,
 }
 
@@ -43,6 +44,7 @@ impl GreptimeDBSink {
             )
             .map(GreptimeDBRequest::from_metrics)
             .into_driver(self.service)
+            .protocol("grpc")
             .run()
             .await
     }

@@ -1,4 +1,6 @@
-use vector_core::event::MetricKind;
+use chrono::{DateTime, Duration, Utc};
+use futures::stream;
+use vector_core::event::{Event, Metric, MetricKind, MetricValue};
 use vector_core::metric_tags;
 
 use crate::sinks::util::test::load_sink;
@@ -10,7 +12,7 @@ use crate::{
     },
 };
 
-use super::*;
+use super::GreptimeDBConfig;
 
 #[tokio::test]
 async fn test_greptimedb_sink() {
@@ -24,10 +26,23 @@ async fn test_greptimedb_sink() {
     let (config, _) = load_sink::<GreptimeDBConfig>(&cfg).unwrap();
     let (sink, _hc) = config.build(SinkContext::new_test()).await.unwrap();
 
-    let events: Vec<_> = (0..10).map(create_event).collect();
+    let query_client = query_client();
+
+    // Drop the table and data inside
+    let _ = query_client
+        .get(&format!(
+            "{}/v1/sql",
+            std::env::var("GREPTIMEDB_HTTP").unwrap_or_else(|_| "http://localhost:4000".to_owned())
+        ))
+        .query(&[("sql", "DROP TABLE ns_my_counter")])
+        .send()
+        .await
+        .unwrap();
+
+    let base_time = Utc::now();
+    let events: Vec<_> = (0..10).map(|idx| create_event(idx, base_time)).collect();
     run_and_assert_sink_compliance(sink, stream::iter(events), &SINK_TAGS).await;
 
-    let query_client = query_client();
     let query_response = query_client
         .get(&format!(
             "{}/v1/sql",
@@ -56,7 +71,7 @@ fn query_client() -> reqwest::Client {
     reqwest::Client::builder().build().unwrap()
 }
 
-fn create_event(i: i32) -> Event {
+fn create_event(i: i32, base_time: DateTime<Utc>) -> Event {
     Event::Metric(
         Metric::new(
             "my_counter".to_owned(),
@@ -68,6 +83,6 @@ fn create_event(i: i32) -> Event {
             "region" => "us-west-1",
             "production" => "true",
         )))
-        .with_timestamp(Some(Utc::now())),
+        .with_timestamp(Some(base_time + Duration::seconds(i as i64))),
     )
 }
