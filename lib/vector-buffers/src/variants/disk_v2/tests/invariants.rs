@@ -863,7 +863,10 @@ async fn reader_writer_positions_aligned_through_multiple_files_and_records() {
                 );
 
                 let record = MultiEventRecord::new(*record_size);
-                assert_eq!(record.event_count() as u32, *record_size);
+                assert_eq!(
+                    record.event_count(),
+                    usize::try_from(*record_size).unwrap_or(usize::MAX)
+                );
 
                 writer
                     .write_record(record)
