@@ -205,6 +205,7 @@ fn serializer_config_to_deserializer(
             })
         }
         SerializerConfig::RawMessage | SerializerConfig::Text(_) => DeserializerConfig::Bytes,
+        SerializerConfig::Syslog(_) => todo!(),
     };
 
     deserializer_config.build()
