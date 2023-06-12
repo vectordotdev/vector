@@ -1,5 +1,6 @@
 use futures_util::FutureExt;
 use greptimedb_client::Client;
+use tower::ServiceBuilder;
 use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
 use vector_core::config::{AcknowledgementsConfig, Input};
@@ -9,6 +10,9 @@ use crate::config::{SinkConfig, SinkContext};
 use crate::sinks::util::{BatchConfig, SinkBatchSettings};
 use crate::sinks::{Healthcheck, VectorSink};
 
+use self::service::GreptimeDBRetryLogic;
+
+use super::prelude::ServiceBuilderExt;
 use super::util::TowerRequestConfig;
 
 mod batch;
@@ -73,7 +77,10 @@ impl_generate_config_from_default!(GreptimeDBConfig);
 #[async_trait::async_trait]
 impl SinkConfig for GreptimeDBConfig {
     async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let service = service::GreptimeDBService::new(self);
+        let request_settings = self.request.unwrap_with(&TowerRequestConfig::default());
+        let service = ServiceBuilder::new()
+            .settings(request_settings, GreptimeDBRetryLogic)
+            .service(service::GreptimeDBService::new(self));
         let sink = sink::GreptimeDBSink {
             service,
             batch_settings: self.batch.into_batcher_settings()?,

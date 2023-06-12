@@ -14,12 +14,26 @@ use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
 use vector_core::event::Metric;
 use vector_core::stream::DriverResponse;
 
+use crate::sinks::prelude::RetryLogic;
 use crate::sinks::util::metadata::RequestMetadataBuilder;
 
 use super::batch::GreptimeDBBatchSizer;
 use super::request_builder::metric_to_insert_request;
 use super::GreptimeDBConfig;
 
+#[derive(Clone, Default)]
+pub(super) struct GreptimeDBRetryLogic;
+
+impl RetryLogic for GreptimeDBRetryLogic {
+    type Response = GreptimeDBBatchOutput;
+    type Error = GreptimeError;
+
+    fn is_retriable_error(&self, _error: &Self::Error) -> bool {
+        true
+    }
+}
+
+#[derive(Clone)]
 pub(super) struct GreptimeDBRequest {
     items: Vec<InsertRequest>,
     finalizers: EventFinalizers,
