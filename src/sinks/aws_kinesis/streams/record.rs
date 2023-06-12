@@ -5,7 +5,7 @@ use tracing::Instrument;
 
 use crate::sinks::prelude::*;
 
-use super::{KinesisClient, KinesisError, KinesisResponse, KinesisRecord, Record, SendRecord};
+use super::{KinesisClient, KinesisError, KinesisRecord, KinesisResponse, Record, SendRecord};
 
 #[derive(Clone)]
 pub struct KinesisStreamRecord {
