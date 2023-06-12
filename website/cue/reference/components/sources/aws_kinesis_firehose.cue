@@ -58,9 +58,7 @@ components: sources: aws_kinesis_firehose: {
 		platform_name: null
 	}
 
-	configuration: base.components.sources.aws_kinesis_firehose.configuration & {
-		request_retry_partial: warnings: ["This can cause duplicates in Firehose."]
-	}
+	configuration: base.components.sources.aws_kinesis_firehose.configuration
 
 	output: logs: {
 		line: {
