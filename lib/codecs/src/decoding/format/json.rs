@@ -4,7 +4,6 @@ use bytes::Bytes;
 use chrono::Utc;
 use derivative::Derivative;
 use lookup::PathPrefix;
-use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 use vector_config::configurable_component;
 use vector_core::{
@@ -14,42 +13,27 @@ use vector_core::{
 };
 use vrl::value::Kind;
 
-use super::Deserializer;
+use super::{default_lossy, Deserializer};
 
 /// Config used to build a `JsonDeserializer`.
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[configurable_component]
+#[derive(Debug, Clone, PartialEq, Eq, Derivative)]
+#[derivative(Default)]
 pub struct JsonDeserializerConfig {
     #[serde(
         default,
         skip_serializing_if = "vector_core::serde::skip_serializing_if_default"
     )]
-    /// Options for the JSON deserializer.
+    /// JSON-specific decoding options.
     pub json: JsonDeserializerOptions,
 }
 
-/// JSON-specific decoding options.
-#[configurable_component]
-#[derive(Debug, Clone, PartialEq, Eq, Derivative)]
-#[derivative(Default)]
-pub struct JsonDeserializerOptions {
-    /// Determines whether or not to replace invalid UTF-8 sequences instead of returning an error.
-    ///
-    /// When true, invalid UTF-8 sequences are replaced with the [`U+FFFD REPLACEMENT CHARACTER`][U+FFFD].
-    ///
-    /// [U+FFFD]: https://en.wikipedia.org/wiki/Specials_(Unicode_block)#Replacement_character
-    #[serde(
-        default = "default_lossy",
-        skip_serializing_if = "vector_core::serde::skip_serializing_if_default"
-    )]
-    #[derivative(Default(value = "default_lossy()"))]
-    lossy: bool,
-}
-
-const fn default_lossy() -> bool {
-    true
-}
-
 impl JsonDeserializerConfig {
+    /// Creates a new `JsonDeserializerConfig`.
+    pub fn new(options: JsonDeserializerOptions) -> Self {
+        Self { json: options }
+    }
+
     /// Build the `JsonDeserializer` from this configuration.
     pub fn build(&self) -> JsonDeserializer {
         Into::<JsonDeserializer>::into(self)
@@ -85,11 +69,22 @@ impl JsonDeserializerConfig {
     }
 }
 
-impl JsonDeserializerConfig {
-    /// Creates a new `JsonDeserializerConfig`.
-    pub fn new(options: JsonDeserializerOptions) -> Self {
-        Self { json: options }
-    }
+/// JSON-specific decoding options.
+#[configurable_component]
+#[derive(Debug, Clone, PartialEq, Eq, Derivative)]
+#[derivative(Default)]
+pub struct JsonDeserializerOptions {
+    /// Determines whether or not to replace invalid UTF-8 sequences instead of failing.
+    ///
+    /// When true, invalid UTF-8 sequences are replaced with the [`U+FFFD REPLACEMENT CHARACTER`][U+FFFD].
+    ///
+    /// [U+FFFD]: https://en.wikipedia.org/wiki/Specials_(Unicode_block)#Replacement_character
+    #[serde(
+        default = "default_lossy",
+        skip_serializing_if = "vector_core::serde::skip_serializing_if_default"
+    )]
+    #[derivative(Default(value = "default_lossy()"))]
+    pub lossy: bool,
 }
 
 /// Deserializer that builds `Event`s from a byte frame containing JSON.

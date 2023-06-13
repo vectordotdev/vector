@@ -1666,7 +1666,9 @@ fn test_config_outputs() {
         (
             "syslog / single output",
             TestCase {
-                decoding: DeserializerConfig::Syslog,
+                decoding: DeserializerConfig::Syslog {
+                    syslog: Default::default(),
+                },
                 multiple_outputs: false,
                 want: HashMap::from([(
                     None,
@@ -1741,7 +1743,9 @@ fn test_config_outputs() {
         (
             "syslog / multiple output",
             TestCase {
-                decoding: DeserializerConfig::Syslog,
+                decoding: DeserializerConfig::Syslog {
+                    syslog: Default::default(),
+                },
                 multiple_outputs: true,
                 want: HashMap::from([
                     (

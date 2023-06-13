@@ -1,9 +1,11 @@
 use bytes::Bytes;
 use chrono::{DateTime, NaiveDateTime, Utc};
+use derivative::Derivative;
 use lookup::{event_path, owned_value_path, PathPrefix};
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 use std::collections::HashMap;
+use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
 use vector_core::{
     config::{log_schema, DataType},
@@ -14,7 +16,7 @@ use vector_core::{
 use vrl::value::kind::Collection;
 use vrl::value::{Kind, Value};
 
-use super::Deserializer;
+use super::{default_lossy, Deserializer};
 use crate::{gelf_fields::*, VALID_FIELD_REGEX};
 
 /// On GELF decoding behavior:
@@ -25,12 +27,26 @@ use crate::{gelf_fields::*, VALID_FIELD_REGEX};
 
 /// Config used to build a `GelfDeserializer`.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
-pub struct GelfDeserializerConfig;
+pub struct GelfDeserializerConfig {
+    #[serde(
+        default,
+        skip_serializing_if = "vector_core::serde::skip_serializing_if_default"
+    )]
+    /// GELF-specific decoding options.
+    pub gelf: GelfDeserializerOptions,
+}
 
 impl GelfDeserializerConfig {
+    /// Creates a new `GelfDeserializerConfig`.
+    pub fn new(options: GelfDeserializerOptions) -> Self {
+        Self { gelf: options }
+    }
+
     /// Build the `GelfDeserializer` from this configuration.
     pub fn build(&self) -> GelfDeserializer {
-        GelfDeserializer::default()
+        GelfDeserializer {
+            lossy: self.gelf.lossy,
+        }
     }
 
     /// Return the type of event built by this deserializer.
@@ -60,21 +76,36 @@ impl GelfDeserializerConfig {
     }
 }
 
-/// Deserializer that builds an `Event` from a byte frame containing a GELF log
-/// message.
-#[derive(Debug, Clone)]
-pub struct GelfDeserializer;
+/// GELF-specific decoding options.
+#[configurable_component]
+#[derive(Debug, Clone, PartialEq, Eq, Derivative)]
+#[derivative(Default)]
+pub struct GelfDeserializerOptions {
+    /// Determines whether or not to replace invalid UTF-8 sequences instead of failing.
+    ///
+    /// When true, invalid UTF-8 sequences are replaced with the [`U+FFFD REPLACEMENT CHARACTER`][U+FFFD].
+    ///
+    /// [U+FFFD]: https://en.wikipedia.org/wiki/Specials_(Unicode_block)#Replacement_character
+    #[serde(
+        default = "default_lossy",
+        skip_serializing_if = "vector_core::serde::skip_serializing_if_default"
+    )]
+    #[derivative(Default(value = "default_lossy()"))]
+    pub lossy: bool,
+}
 
-impl Default for GelfDeserializer {
-    fn default() -> Self {
-        Self::new()
-    }
+/// Deserializer that builds an `Event` from a byte frame containing a GELF log message.
+#[derive(Debug, Clone, Derivative)]
+#[derivative(Default)]
+pub struct GelfDeserializer {
+    #[derivative(Default(value = "default_lossy()"))]
+    lossy: bool,
 }
 
 impl GelfDeserializer {
-    /// Create a new GelfDeserializer
-    pub fn new() -> GelfDeserializer {
-        GelfDeserializer
+    /// Create a new `GelfDeserializer`.
+    pub fn new(lossy: bool) -> GelfDeserializer {
+        GelfDeserializer { lossy }
     }
 
     /// Builds a LogEvent from the parsed GelfMessage.
@@ -195,10 +226,10 @@ impl Deserializer for GelfDeserializer {
         bytes: Bytes,
         _log_namespace: LogNamespace,
     ) -> vector_common::Result<SmallVec<[Event; 1]>> {
-        let line = std::str::from_utf8(&bytes)?;
-        let line = line.trim();
-
-        let parsed: GelfMessage = serde_json::from_str(line)?;
+        let parsed: GelfMessage = match self.lossy {
+            true => serde_json::from_str(&String::from_utf8_lossy(&bytes)),
+            false => serde_json::from_slice(&bytes),
+        }?;
         let event = self.message_to_event(&parsed)?;
 
         Ok(smallvec![event])
@@ -220,7 +251,7 @@ mod tests {
     fn deserialize_gelf_input(
         input: &serde_json::Value,
     ) -> vector_common::Result<SmallVec<[Event; 1]>> {
-        let config = GelfDeserializerConfig;
+        let config = GelfDeserializerConfig::default();
         let deserializer = config.build();
         let buffer = Bytes::from(serde_json::to_vec(&input).unwrap());
         deserializer.parse(buffer, LogNamespace::Legacy)
