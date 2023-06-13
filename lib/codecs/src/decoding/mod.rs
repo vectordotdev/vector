@@ -297,7 +297,7 @@ pub enum DeserializerConfig {
     ///
     /// [gelf]: https://docs.graylog.org/docs/gelf
     Gelf {
-        /// Gelf-specific decoding options.
+        /// GELF-specific decoding options.
         #[serde(
             default,
             skip_serializing_if = "vector_core::serde::skip_serializing_if_default"

@@ -96,7 +96,7 @@ base: components: sources: amqp: configuration: {
 				}
 			}
 			gelf: {
-				description:   "Gelf-specific decoding options."
+				description:   "GELF-specific decoding options."
 				relevant_when: "codec = \"gelf\""
 				required:      false
 				type: object: options: lossy: {

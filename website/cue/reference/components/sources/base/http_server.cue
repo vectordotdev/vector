@@ -94,7 +94,7 @@ base: components: sources: http_server: configuration: {
 				}
 			}
 			gelf: {
-				description:   "Gelf-specific decoding options."
+				description:   "GELF-specific decoding options."
 				relevant_when: "codec = \"gelf\""
 				required:      false
 				type: object: options: lossy: {
