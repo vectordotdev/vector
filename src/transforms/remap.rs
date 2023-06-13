@@ -718,6 +718,7 @@ pub enum BuildError {
 #[cfg(test)]
 mod tests {
     use std::collections::{HashMap, HashSet};
+    use std::sync::Arc;
 
     use indoc::{formatdoc, indoc};
     use vector_core::{config::GlobalOptions, event::EventMetadata, metric_tags};

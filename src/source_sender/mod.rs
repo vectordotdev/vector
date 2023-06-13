@@ -117,7 +117,12 @@ impl SourceSender {
     #[cfg(test)]
     pub fn new_test_sender_with_buffer(n: usize) -> (Self, LimitedReceiver<EventArray>) {
         let lag_time = Some(register_histogram!(LAG_TIME_NAME));
-        let (inner, rx) = Inner::new_with_buffer(n, DEFAULT_OUTPUT.to_owned(), lag_time, None);
+        let output_id = OutputId {
+            component: "test".to_string().into(),
+            port: None,
+        };
+        let (inner, rx) =
+            Inner::new_with_buffer(n, DEFAULT_OUTPUT.to_owned(), lag_time, None, output_id);
         (
             Self {
                 inner: Some(inner),
@@ -185,7 +190,11 @@ impl SourceSender {
     ) -> impl Stream<Item = EventArray> + Unpin {
         // The lag_time parameter here will need to be filled in if this function is ever used for
         // non-test situations.
-        let (inner, recv) = Inner::new_with_buffer(100, name.clone(), None);
+        let output_id = OutputId {
+            component: "test".to_string().into(),
+            port: Some(name.clone()),
+        };
+        let (inner, recv) = Inner::new_with_buffer(100, name.clone(), None, None, output_id);
         let recv = recv.into_stream().map(move |mut events| {
             events.iter_events_mut().for_each(|mut event| {
                 let metadata = event.metadata_mut();
@@ -301,7 +310,9 @@ impl Inner {
             if let Some(log_definition) = &self.log_definition {
                 event.metadata_mut().set_schema_definition(log_definition);
             }
-            event.metadata_mut().set_parent_id(self.output_id.clone());
+            event
+                .metadata_mut()
+                .set_parent_id(Arc::clone(&self.output_id));
         });
 
         let byte_size = events.estimated_json_encoded_size_of();

@@ -330,7 +330,7 @@ impl TransformOutputsBuf {
         .push(event);
     }
 
-    #[cfg(test)]
+    #[cfg(any(feature = "test", test))]
     pub fn drain(&mut self) -> impl Iterator<Item = Event> + '_ {
         self.primary_buffer
             .as_mut()
@@ -338,7 +338,7 @@ impl TransformOutputsBuf {
             .drain()
     }
 
-    #[cfg(test)]
+    #[cfg(any(feature = "test", test))]
     pub fn drain_named(&mut self, name: &str) -> impl Iterator<Item = Event> + '_ {
         self.named_buffers
             .get_mut(name)
@@ -346,12 +346,12 @@ impl TransformOutputsBuf {
             .drain()
     }
 
-    #[cfg(test)]
+    #[cfg(any(feature = "test", test))]
     pub fn take_primary(&mut self) -> OutputBuffer {
         std::mem::take(self.primary_buffer.as_mut().expect("no default output"))
     }
 
-    #[cfg(test)]
+    #[cfg(any(feature = "test", test))]
     pub fn take_all_named(&mut self) -> HashMap<String, OutputBuffer> {
         std::mem::take(&mut self.named_buffers)
     }
@@ -406,7 +406,6 @@ impl OutputBuffer {
         }
     }
 
-    #[cfg(test)]
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
@@ -427,7 +426,7 @@ impl OutputBuffer {
         })
     }
 
-    #[cfg(test)]
+    #[cfg(any(feature = "test", test))]
     pub fn drain(&mut self) -> impl Iterator<Item = Event> + '_ {
         self.0.drain(..).flat_map(EventArray::into_events)
     }
