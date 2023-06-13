@@ -255,7 +255,7 @@ async fn demo_logs_source(
                             now,
                         );
                         log_namespace.insert_source_metadata(
-                            "service",
+                            DemoLogsConfig::NAME,
                             log,
                             Some(LegacyKey::InsertIfEmpty(path!("service"))),
                             path!("service"),
