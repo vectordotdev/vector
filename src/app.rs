@@ -1,5 +1,8 @@
 #![allow(missing_docs)]
-use std::{collections::HashMap, num::NonZeroUsize, path::PathBuf, time::Duration};
+use std::{
+    collections::HashMap, num::NonZeroUsize, path::PathBuf, process::ExitCode as Exit,
+    time::Duration,
+};
 
 use exitcode::ExitCode;
 use futures::StreamExt;
@@ -145,10 +148,10 @@ impl ApplicationConfig {
 }
 
 impl Application {
-    pub fn run() {
+    pub fn run() -> Exit {
         let (runtime, app) = Self::prepare_start().unwrap_or_else(|code| std::process::exit(code));
 
-        runtime.block_on(app.run());
+        runtime.block_on(app.run())
     }
 
     pub fn prepare_start() -> Result<(Runtime, StartedApplication), ExitCode> {
@@ -242,7 +245,7 @@ pub struct StartedApplication {
 }
 
 impl StartedApplication {
-    pub async fn run(self) {
+    pub async fn run(self) -> Exit {
         self.main().await.shutdown().await
     }
 
@@ -317,7 +320,7 @@ pub struct FinishedApplication {
 }
 
 impl FinishedApplication {
-    pub async fn shutdown(self) {
+    pub async fn shutdown(self) -> Exit {
         let FinishedApplication {
             signal,
             mut signal_rx,
@@ -335,11 +338,12 @@ impl FinishedApplication {
             SignalTo::Shutdown => {
                 emit!(VectorStopped);
                 tokio::select! {
-                    _ = topology_controller.stop() => (), // Graceful shutdown finished
+                    _ = topology_controller.stop() => Exit::SUCCESS, // Graceful shutdown finished
                     _ = signal_rx.recv() => {
                         // It is highly unlikely that this event will exit from topology.
                         emit!(VectorQuit);
                         // Dropping the shutdown future will immediately shut the server down
+                        Exit::FAILURE
                     }
                 }
             }
@@ -347,6 +351,7 @@ impl FinishedApplication {
                 // It is highly unlikely that this event will exit from topology.
                 emit!(VectorQuit);
                 drop(topology_controller);
+                Exit::FAILURE
             }
             _ => unreachable!(),
         }
