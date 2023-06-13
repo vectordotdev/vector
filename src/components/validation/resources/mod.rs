@@ -146,10 +146,10 @@ fn deserializer_config_to_serializer(config: &DeserializerConfig) -> encoding::S
         // the data as Avro, we can't possibly send anything else without the source just
         // immediately barfing.
         #[cfg(feature = "sources-syslog")]
-        DeserializerConfig::Syslog => SerializerConfig::Logfmt,
+        DeserializerConfig::Syslog { .. } => SerializerConfig::Logfmt,
         DeserializerConfig::Native => SerializerConfig::Native,
-        DeserializerConfig::NativeJson => SerializerConfig::NativeJson,
-        DeserializerConfig::Gelf => SerializerConfig::Gelf,
+        DeserializerConfig::NativeJson { .. } => SerializerConfig::NativeJson,
+        DeserializerConfig::Gelf { .. } => SerializerConfig::Gelf,
     };
 
     serializer_config
@@ -183,13 +183,17 @@ fn serializer_config_to_deserializer(config: &SerializerConfig) -> decoding::Des
     let deserializer_config = match config {
         SerializerConfig::Avro { .. } => todo!(),
         SerializerConfig::Csv { .. } => todo!(),
-        SerializerConfig::Gelf => DeserializerConfig::Gelf,
+        SerializerConfig::Gelf => DeserializerConfig::Gelf {
+            gelf: Default::default(),
+        },
         SerializerConfig::Json(_) => DeserializerConfig::Json {
             json: Default::default(),
         },
         SerializerConfig::Logfmt => todo!(),
         SerializerConfig::Native => DeserializerConfig::Native,
-        SerializerConfig::NativeJson => DeserializerConfig::NativeJson,
+        SerializerConfig::NativeJson => DeserializerConfig::NativeJson {
+            native_json: Default::default(),
+        },
         SerializerConfig::RawMessage | SerializerConfig::Text(_) => DeserializerConfig::Bytes,
     };
 

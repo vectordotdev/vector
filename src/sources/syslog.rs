@@ -6,7 +6,7 @@ use bytes::Bytes;
 use chrono::Utc;
 use codecs::{
     decoding::{Deserializer, Framer},
-    BytesDecoder, OctetCountingDecoder, SyslogDeserializer, SyslogDeserializerConfig,
+    BytesDecoder, OctetCountingDecoder, SyslogDeserializerConfig,
 };
 use futures::StreamExt;
 use listenfd::ListenFd;
@@ -224,9 +224,9 @@ impl SourceConfig for SyslogConfig {
                     Framer::OctetCounting(OctetCountingDecoder::new_with_max_length(
                         self.max_length,
                     )),
-                    Deserializer::Syslog(SyslogDeserializer {
-                        source: Some(SyslogConfig::NAME),
-                    }),
+                    Deserializer::Syslog(
+                        SyslogDeserializerConfig::from_source(SyslogConfig::NAME).build(),
+                    ),
                 );
 
                 build_unix_stream_source(
@@ -280,9 +280,7 @@ impl TcpSource for SyslogTcpSource {
     fn decoder(&self) -> Self::Decoder {
         Decoder::new(
             Framer::OctetCounting(OctetCountingDecoder::new_with_max_length(self.max_length)),
-            Deserializer::Syslog(SyslogDeserializer {
-                source: Some(SyslogConfig::NAME),
-            }),
+            Deserializer::Syslog(SyslogDeserializerConfig::from_source(SyslogConfig::NAME).build()),
         )
     }
 
@@ -334,9 +332,9 @@ pub fn udp(
             socket,
             Decoder::new(
                 Framer::Bytes(BytesDecoder::new()),
-                Deserializer::Syslog(SyslogDeserializer {
-                    source: Some(SyslogConfig::NAME),
-                }),
+                Deserializer::Syslog(
+                    SyslogDeserializerConfig::from_source(SyslogConfig::NAME).build(),
+                ),
             ),
         )
         .take_until(shutdown)
@@ -474,9 +472,7 @@ mod test {
         bytes: Bytes,
         log_namespace: LogNamespace,
     ) -> Option<Event> {
-        let parser = SyslogDeserializer {
-            source: Some(SyslogConfig::NAME),
-        };
+        let parser = SyslogDeserializerConfig::from_source(SyslogConfig::NAME).build();
         let mut events = parser.parse(bytes, LogNamespace::Legacy).ok()?;
         handle_events(
             &mut events,

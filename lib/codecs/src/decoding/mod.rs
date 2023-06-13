@@ -9,12 +9,12 @@ use bytes::{Bytes, BytesMut};
 pub use error::StreamDecodingError;
 pub use format::{
     BoxedDeserializer, BytesDeserializer, BytesDeserializerConfig, GelfDeserializer,
-    GelfDeserializerConfig, JsonDeserializer, JsonDeserializerConfig, JsonDeserializerOptions,
-    NativeDeserializer, NativeDeserializerConfig, NativeJsonDeserializer,
-    NativeJsonDeserializerConfig,
+    GelfDeserializerConfig, GelfDeserializerOptions, JsonDeserializer, JsonDeserializerConfig,
+    JsonDeserializerOptions, NativeDeserializer, NativeDeserializerConfig, NativeJsonDeserializer,
+    NativeJsonDeserializerConfig, NativeJsonDeserializerOptions,
 };
 #[cfg(feature = "syslog")]
-pub use format::{SyslogDeserializer, SyslogDeserializerConfig};
+pub use format::{SyslogDeserializer, SyslogDeserializerConfig, SyslogDeserializerOptions};
 pub use framing::{
     BoxedFramer, BoxedFramingError, BytesDecoder, BytesDecoderConfig, CharacterDelimitedDecoder,
     CharacterDelimitedDecoderConfig, CharacterDelimitedDecoderOptions, FramingError,
@@ -245,7 +245,7 @@ pub enum DeserializerConfig {
     ///
     /// [json]: https://www.json.org/
     Json {
-        /// Options for the JSON deserializer.
+        /// JSON-specific decoding options.
         #[serde(
             default,
             skip_serializing_if = "vector_core::serde::skip_serializing_if_default"
@@ -261,7 +261,14 @@ pub enum DeserializerConfig {
     ///
     /// [rfc3164]: https://www.ietf.org/rfc/rfc3164.txt
     /// [rfc5424]: https://www.ietf.org/rfc/rfc5424.txt
-    Syslog,
+    Syslog {
+        /// Syslog-specific decoding options.
+        #[serde(
+            default,
+            skip_serializing_if = "vector_core::serde::skip_serializing_if_default"
+        )]
+        syslog: SyslogDeserializerOptions,
+    },
 
     /// Decodes the raw bytes as Vector’s [native Protocol Buffers format][vector_native_protobuf].
     ///
@@ -277,12 +284,26 @@ pub enum DeserializerConfig {
     ///
     /// [vector_native_json]: https://github.com/vectordotdev/vector/blob/master/lib/codecs/tests/data/native_encoding/schema.cue
     /// [experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
-    NativeJson,
+    NativeJson {
+        /// Vector's native JSON-specific decoding options.
+        #[serde(
+            default,
+            skip_serializing_if = "vector_core::serde::skip_serializing_if_default"
+        )]
+        native_json: NativeJsonDeserializerOptions,
+    },
 
     /// Decodes the raw bytes as a [GELF][gelf] message.
     ///
     /// [gelf]: https://docs.graylog.org/docs/gelf
-    Gelf,
+    Gelf {
+        /// GELF-specific decoding options.
+        #[serde(
+            default,
+            skip_serializing_if = "vector_core::serde::skip_serializing_if_default"
+        )]
+        gelf: GelfDeserializerOptions,
+    },
 }
 
 impl From<BytesDeserializerConfig> for DeserializerConfig {
@@ -299,14 +320,16 @@ impl From<JsonDeserializerConfig> for DeserializerConfig {
 
 #[cfg(feature = "syslog")]
 impl From<SyslogDeserializerConfig> for DeserializerConfig {
-    fn from(_: SyslogDeserializerConfig) -> Self {
-        Self::Syslog
+    fn from(config: SyslogDeserializerConfig) -> Self {
+        Self::Syslog {
+            syslog: config.syslog,
+        }
     }
 }
 
 impl From<GelfDeserializerConfig> for DeserializerConfig {
-    fn from(_: GelfDeserializerConfig) -> Self {
-        Self::Gelf
+    fn from(config: GelfDeserializerConfig) -> Self {
+        Self::Gelf { gelf: config.gelf }
     }
 }
 
@@ -319,14 +342,16 @@ impl DeserializerConfig {
                 Deserializer::Json(JsonDeserializerConfig::new(json.clone()).build())
             }
             #[cfg(feature = "syslog")]
-            DeserializerConfig::Syslog => {
-                Deserializer::Syslog(SyslogDeserializerConfig::default().build())
+            DeserializerConfig::Syslog { syslog } => {
+                Deserializer::Syslog(SyslogDeserializerConfig::new(syslog.clone()).build())
             }
             DeserializerConfig::Native => Deserializer::Native(NativeDeserializerConfig.build()),
-            DeserializerConfig::NativeJson => {
-                Deserializer::NativeJson(NativeJsonDeserializerConfig.build())
+            DeserializerConfig::NativeJson { native_json } => Deserializer::NativeJson(
+                NativeJsonDeserializerConfig::new(native_json.clone()).build(),
+            ),
+            DeserializerConfig::Gelf { gelf } => {
+                Deserializer::Gelf(GelfDeserializerConfig::new(gelf.clone()).build())
             }
-            DeserializerConfig::Gelf => Deserializer::Gelf(GelfDeserializerConfig.build()),
         }
     }
 
@@ -336,12 +361,12 @@ impl DeserializerConfig {
             DeserializerConfig::Native => FramingConfig::LengthDelimited,
             DeserializerConfig::Bytes
             | DeserializerConfig::Json { .. }
-            | DeserializerConfig::Gelf
-            | DeserializerConfig::NativeJson => FramingConfig::NewlineDelimited {
+            | DeserializerConfig::Gelf { .. }
+            | DeserializerConfig::NativeJson { .. } => FramingConfig::NewlineDelimited {
                 newline_delimited: Default::default(),
             },
             #[cfg(feature = "syslog")]
-            DeserializerConfig::Syslog => FramingConfig::NewlineDelimited {
+            DeserializerConfig::Syslog { .. } => FramingConfig::NewlineDelimited {
                 newline_delimited: Default::default(),
             },
         }
@@ -355,10 +380,16 @@ impl DeserializerConfig {
                 JsonDeserializerConfig::new(json.clone()).output_type()
             }
             #[cfg(feature = "syslog")]
-            DeserializerConfig::Syslog => SyslogDeserializerConfig::default().output_type(),
+            DeserializerConfig::Syslog { syslog } => {
+                SyslogDeserializerConfig::new(syslog.clone()).output_type()
+            }
             DeserializerConfig::Native => NativeDeserializerConfig.output_type(),
-            DeserializerConfig::NativeJson => NativeJsonDeserializerConfig.output_type(),
-            DeserializerConfig::Gelf => GelfDeserializerConfig.output_type(),
+            DeserializerConfig::NativeJson { native_json } => {
+                NativeJsonDeserializerConfig::new(native_json.clone()).output_type()
+            }
+            DeserializerConfig::Gelf { gelf } => {
+                GelfDeserializerConfig::new(gelf.clone()).output_type()
+            }
         }
     }
 
@@ -370,14 +401,17 @@ impl DeserializerConfig {
                 JsonDeserializerConfig::new(json.clone()).schema_definition(log_namespace)
             }
             #[cfg(feature = "syslog")]
-            DeserializerConfig::Syslog => {
-                SyslogDeserializerConfig::default().schema_definition(log_namespace)
+            DeserializerConfig::Syslog { syslog } => {
+                SyslogDeserializerConfig::new(syslog.clone()).schema_definition(log_namespace)
             }
             DeserializerConfig::Native => NativeDeserializerConfig.schema_definition(log_namespace),
-            DeserializerConfig::NativeJson => {
-                NativeJsonDeserializerConfig.schema_definition(log_namespace)
+            DeserializerConfig::NativeJson { native_json } => {
+                NativeJsonDeserializerConfig::new(native_json.clone())
+                    .schema_definition(log_namespace)
             }
-            DeserializerConfig::Gelf => GelfDeserializerConfig.schema_definition(log_namespace),
+            DeserializerConfig::Gelf { gelf } => {
+                GelfDeserializerConfig::new(gelf.clone()).schema_definition(log_namespace)
+            }
         }
     }
 
@@ -385,13 +419,13 @@ impl DeserializerConfig {
     pub const fn content_type(&self, framer: &FramingConfig) -> &'static str {
         match (&self, framer) {
             (
-                DeserializerConfig::Json { .. } | DeserializerConfig::NativeJson,
+                DeserializerConfig::Json { .. } | DeserializerConfig::NativeJson { .. },
                 FramingConfig::NewlineDelimited { .. },
             ) => "application/x-ndjson",
             (
-                DeserializerConfig::Gelf
+                DeserializerConfig::Gelf { .. }
                 | DeserializerConfig::Json { .. }
-                | DeserializerConfig::NativeJson,
+                | DeserializerConfig::NativeJson { .. },
                 FramingConfig::CharacterDelimited {
                     character_delimited:
                         CharacterDelimitedDecoderOptions {
@@ -403,13 +437,13 @@ impl DeserializerConfig {
             (DeserializerConfig::Native, _) => "application/octet-stream",
             (
                 DeserializerConfig::Json { .. }
-                | DeserializerConfig::NativeJson
+                | DeserializerConfig::NativeJson { .. }
                 | DeserializerConfig::Bytes
-                | DeserializerConfig::Gelf,
+                | DeserializerConfig::Gelf { .. },
                 _,
             ) => "text/plain",
             #[cfg(feature = "syslog")]
-            (DeserializerConfig::Syslog, _) => "text/plain",
+            (DeserializerConfig::Syslog { .. }, _) => "text/plain",
         }
     }
 }

@@ -122,7 +122,9 @@ async fn collected_metrics_native_json() {
         endpoint: format!("{}/metrics/native.json", dufs_address()),
         interval: INTERVAL,
         query: HashMap::new(),
-        decoding: DeserializerConfig::NativeJson,
+        decoding: DeserializerConfig::NativeJson {
+            native_json: Default::default(),
+        },
         framing: default_framing_message_based(),
         headers: HashMap::new(),
         method: HttpMethod::Get,
@@ -151,7 +153,9 @@ async fn collected_trace_native_json() {
         endpoint: format!("{}/traces/native.json", dufs_address()),
         interval: INTERVAL,
         query: HashMap::new(),
-        decoding: DeserializerConfig::NativeJson,
+        decoding: DeserializerConfig::NativeJson {
+            native_json: Default::default(),
+        },
         framing: default_framing_message_based(),
         headers: HashMap::new(),
         method: HttpMethod::Get,

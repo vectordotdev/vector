@@ -1,11 +1,14 @@
 use bytes::Bytes;
 use chrono::{DateTime, Datelike, Utc};
+use derivative::Derivative;
 use lookup::lookup_v2::parse_value_path;
 use lookup::{event_path, owned_value_path, OwnedTargetPath, OwnedValuePath, PathPrefix};
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
+use std::borrow::Cow;
 use std::collections::BTreeMap;
 use syslog_loose::{IncompleteDate, Message, ProcId, Protocol};
+use vector_config::configurable_component;
 use vector_core::config::{LegacyKey, LogNamespace};
 use vector_core::{
     config::{log_schema, DataType},
@@ -14,25 +17,39 @@ use vector_core::{
 };
 use vrl::value::{kind::Collection, Kind};
 
-use super::Deserializer;
+use super::{default_lossy, Deserializer};
 
 /// Config used to build a `SyslogDeserializer`.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct SyslogDeserializerConfig {
     source: Option<&'static str>,
+    /// Syslog-specific decoding options.
+    pub syslog: SyslogDeserializerOptions,
 }
 
 impl SyslogDeserializerConfig {
+    /// Creates a new `SyslogDeserializerConfig`.
+    pub fn new(options: SyslogDeserializerOptions) -> Self {
+        Self {
+            source: None,
+            syslog: options,
+        }
+    }
+
     /// Create the `SyslogDeserializer` from the given source name.
     pub fn from_source(source: &'static str) -> Self {
         Self {
             source: Some(source),
+            ..Default::default()
         }
     }
 
     /// Build the `SyslogDeserializer` from this configuration.
     pub const fn build(&self) -> SyslogDeserializer {
-        SyslogDeserializer { source: None }
+        SyslogDeserializer {
+            source: self.source,
+            lossy: self.syslog.lossy,
+        }
     }
 
     /// Return the type of event build by this deserializer.
@@ -218,14 +235,35 @@ impl SyslogDeserializerConfig {
     }
 }
 
+/// Syslog-specific decoding options.
+#[configurable_component]
+#[derive(Debug, Clone, PartialEq, Eq, Derivative)]
+#[derivative(Default)]
+pub struct SyslogDeserializerOptions {
+    /// Determines whether or not to replace invalid UTF-8 sequences instead of failing.
+    ///
+    /// When true, invalid UTF-8 sequences are replaced with the [`U+FFFD REPLACEMENT CHARACTER`][U+FFFD].
+    ///
+    /// [U+FFFD]: https://en.wikipedia.org/wiki/Specials_(Unicode_block)#Replacement_character
+    #[serde(
+        default = "default_lossy",
+        skip_serializing_if = "vector_core::serde::skip_serializing_if_default"
+    )]
+    #[derivative(Default(value = "default_lossy()"))]
+    pub lossy: bool,
+}
+
 /// Deserializer that builds an `Event` from a byte frame containing a syslog
 /// message.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Derivative)]
+#[derivative(Default)]
 pub struct SyslogDeserializer {
     /// The syslog source needs it's own syslog deserializer separate from the
     /// syslog codec since it needs to handle the structured of the decoded data
     /// differently when using the Vector lognamespace.
     pub source: Option<&'static str>,
+    #[derivative(Default(value = "default_lossy()"))]
+    lossy: bool,
 }
 
 impl Deserializer for SyslogDeserializer {
@@ -234,7 +272,10 @@ impl Deserializer for SyslogDeserializer {
         bytes: Bytes,
         log_namespace: LogNamespace,
     ) -> vector_common::Result<SmallVec<[Event; 1]>> {
-        let line = std::str::from_utf8(&bytes)?;
+        let line: Cow<str> = match self.lossy {
+            true => String::from_utf8_lossy(&bytes),
+            false => Cow::from(std::str::from_utf8(&bytes)?),
+        };
         let line = line.trim();
         let parsed = syslog_loose::parse_message_with_year_exact(line, resolve_year)?;
 
@@ -449,7 +490,7 @@ mod tests {
 
         let input =
             Bytes::from("<34>1 2003-10-11T22:14:15.003Z mymachine.example.com su - ID47 - MSG");
-        let deserializer = SyslogDeserializer { source: None };
+        let deserializer = SyslogDeserializer::default();
 
         let events = deserializer.parse(input, LogNamespace::Legacy).unwrap();
         assert_eq!(events.len(), 1);
@@ -465,7 +506,7 @@ mod tests {
 
         let input =
             Bytes::from("<34>1 2003-10-11T22:14:15.003Z mymachine.example.com su - ID47 - MSG");
-        let deserializer = SyslogDeserializer { source: None };
+        let deserializer = SyslogDeserializer::default();
 
         let events = deserializer.parse(input, LogNamespace::Vector).unwrap();
         assert_eq!(events.len(), 1);
