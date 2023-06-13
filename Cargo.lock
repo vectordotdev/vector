@@ -3615,16 +3615,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "hashlink"
-version = "0.8.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0761a1b9491c4f2e3d66aa0f62d0fba0af9a0e2852e4d48ea506632a4b56e6aa"
-dependencies = [
- "hashbrown 0.13.2",
- "serde",
-]
-
-[[package]]
 name = "hdrhistogram"
 version = "7.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9071,8 +9061,8 @@ dependencies = [
  "directories 5.0.1",
  "dunce",
  "glob",
- "hashlink",
  "hex",
+ "indexmap",
  "indicatif",
  "itertools",
  "log",
