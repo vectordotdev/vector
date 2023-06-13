@@ -201,7 +201,7 @@ pub struct TransformOutput {
     /// enabled, at least one definition  should be output. If the transform
     /// has multiple connected sources, it is possible to have multiple output
     /// definitions - one for each input.
-    log_schema_definitions: HashMap<OutputId, schema::Definition>,
+    pub log_schema_definitions: HashMap<OutputId, schema::Definition>,
 }
 
 impl TransformOutput {

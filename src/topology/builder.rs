@@ -243,7 +243,7 @@ impl<'a> Builder<'a> {
             let mut schema_definitions = HashMap::with_capacity(source_outputs.len());
 
             for output in source_outputs.into_iter() {
-                let mut rx = builder.add_source_output(output.clone());
+                let mut rx = builder.add_source_output(output.clone(), key.clone());
 
                 let (mut fanout, control) = Fanout::new();
                 let source = Arc::new(OutputId {

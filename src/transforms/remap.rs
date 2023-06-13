@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::sync::Arc;
+// use std::sync::Arc;
 use std::{
     collections::BTreeMap,
     fs::File,
@@ -376,8 +376,8 @@ where
     drop_on_error: bool,
     drop_on_abort: bool,
     reroute_dropped: bool,
-    default_schema_definition: Arc<schema::Definition>,
-    dropped_schema_definition: Arc<schema::Definition>,
+    // default_schema_definition: Arc<schema::Definition>,
+    // dropped_schema_definition: Arc<schema::Definition>,
     runner: Runner,
     metric_tag_values: MetricTagValues,
 }
@@ -444,27 +444,27 @@ where
         program: Program,
         runner: Runner,
     ) -> crate::Result<Self> {
-        let default_schema_definition = context
-            .schema_definitions
-            .get(&None)
-            .expect("default schema required")
-            // TODO we can now have multiple possible definitions.
-            // This is going to need to be updated to store these possible definitions and then
-            // choose the correct one based on the input the event has come from.
-            .iter()
-            .map(|(_output, definition)| definition.clone())
-            .next()
-            .unwrap_or_else(Definition::any);
-
-        let dropped_schema_definition = context
-            .schema_definitions
-            .get(&Some(DROPPED.to_owned()))
-            .or_else(|| context.schema_definitions.get(&None))
-            .expect("dropped schema required")
-            .iter()
-            .map(|(_output, definition)| definition.clone())
-            .next()
-            .unwrap_or_else(Definition::any);
+        // let default_schema_definition = context
+        //     .schema_definitions
+        //     .get(&None)
+        //     .expect("default schema required")
+        //     // TODO we can now have multiple possible definitions.
+        //     // This is going to need to be updated to store these possible definitions and then
+        //     // choose the correct one based on the input the event has come from.
+        //     .iter()
+        //     .map(|(_output, definition)| definition.clone())
+        //     .next()
+        //     .unwrap_or_else(Definition::any);
+        //
+        // let dropped_schema_definition = context
+        //     .schema_definitions
+        //     .get(&Some(DROPPED.to_owned()))
+        //     .or_else(|| context.schema_definitions.get(&None))
+        //     .expect("dropped schema required")
+        //     .iter()
+        //     .map(|(_output, definition)| definition.clone())
+        //     .next()
+        //     .unwrap_or_else(Definition::any);
 
         Ok(Remap {
             component_key: context.key.clone(),
@@ -475,8 +475,8 @@ where
             drop_on_error: config.drop_on_error,
             drop_on_abort: config.drop_on_abort,
             reroute_dropped: config.reroute_dropped,
-            default_schema_definition: Arc::new(default_schema_definition),
-            dropped_schema_definition: Arc::new(dropped_schema_definition),
+            // default_schema_definition: Arc::new(default_schema_definition),
+            // dropped_schema_definition: Arc::new(dropped_schema_definition),
             runner,
             metric_tag_values: config.metric_tag_values,
         })
@@ -587,13 +587,11 @@ where
 
         match result {
             Ok(_) => match target.into_events() {
-                TargetEvents::One(event) => {
-                    push_default(event, output, &self.default_schema_definition)
+                TargetEvents::One(event) => push_default(event, output),
+                TargetEvents::Logs(events) => events.for_each(|event| push_default(event, output)),
+                TargetEvents::Traces(events) => {
+                    events.for_each(|event| push_default(event, output))
                 }
-                TargetEvents::Logs(events) => events
-                    .for_each(|event| push_default(event, output, &self.default_schema_definition)),
-                TargetEvents::Traces(events) => events
-                    .for_each(|event| push_default(event, output, &self.default_schema_definition)),
             },
             Err(reason) => {
                 let (reason, error, drop) = match reason {
@@ -617,12 +615,12 @@ where
                 if !drop {
                     let event = original_event.expect("event will be set");
 
-                    push_default(event, output, &self.default_schema_definition);
+                    push_default(event, output);
                 } else if self.reroute_dropped {
                     let mut event = original_event.expect("event will be set");
 
                     self.annotate_dropped(&mut event, reason, error);
-                    push_dropped(event, output, &self.dropped_schema_definition);
+                    push_dropped(event, output);
                 }
             }
         }
@@ -631,28 +629,27 @@ where
 
 #[inline]
 fn push_default(
-    mut event: Event,
+    event: Event,
     output: &mut TransformOutputsBuf,
-    schema_definition: &Arc<schema::Definition>,
+    // schema_definition: &Arc<schema::Definition>,
 ) {
-    event
-        .metadata_mut()
-        .set_schema_definition(schema_definition);
+    // event
+    //     .metadata_mut()
+    //     .set_schema_definition(schema_definition);
 
-    output.push(event)
+    output.push(None, event)
 }
 
 #[inline]
 fn push_dropped(
-    mut event: Event,
+    event: Event,
     output: &mut TransformOutputsBuf,
-    schema_definition: &Arc<schema::Definition>,
+    // schema_definition: &Arc<schema::Definition>,
 ) {
-    event
-        .metadata_mut()
-        .set_schema_definition(schema_definition);
-
-    output.push_named(DROPPED, event)
+    // event
+    //     .metadata_mut()
+    //     .set_schema_definition(schema_definition);
+    output.push(Some(DROPPED), event);
 }
 
 /// If the VRL returns a value that is not an array (see [`merge_array_definitions`]),

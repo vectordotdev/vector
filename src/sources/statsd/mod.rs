@@ -453,7 +453,7 @@ mod test {
         // packet we send has a lot of metrics per packet.  We could technically count them all up
         // and have a more accurate number here, but honestly, who cares?  This is big enough.
         let component_key = ComponentKey::from("statsd");
-        let (tx, rx) = SourceSender::new_with_buffer(4096);
+        let (tx, rx) = SourceSender::new_test_sender_with_buffer(4096);
         let (source_ctx, shutdown) = SourceContext::new_shutdown(&component_key, tx);
         let sink = statsd_config
             .build(source_ctx)
@@ -547,7 +547,7 @@ mod test {
         // packet we send has a lot of metrics per packet.  We could technically count them all up
         // and have a more accurate number here, but honestly, who cares?  This is big enough.
         let component_key = ComponentKey::from("statsd");
-        let (tx, _rx) = SourceSender::new_with_buffer(4096);
+        let (tx, _rx) = SourceSender::new_test_sender_with_buffer(4096);
         let (source_ctx, shutdown) = SourceContext::new_shutdown(&component_key, tx);
         let sink = statsd_config
             .build(source_ctx)
