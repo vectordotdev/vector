@@ -26,13 +26,14 @@ use crate::{gelf_fields::*, VALID_FIELD_REGEX};
 ///   of vector will still work with the new relaxed decoding.
 
 /// Config used to build a `GelfDeserializer`.
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[configurable_component]
+#[derive(Debug, Clone, Default)]
 pub struct GelfDeserializerConfig {
+    /// GELF-specific decoding options.
     #[serde(
         default,
         skip_serializing_if = "vector_core::serde::skip_serializing_if_default"
     )]
-    /// GELF-specific decoding options.
     pub gelf: GelfDeserializerOptions,
 }
 

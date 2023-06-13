@@ -3,7 +3,6 @@ use chrono::{DateTime, Datelike, Utc};
 use derivative::Derivative;
 use lookup::lookup_v2::parse_value_path;
 use lookup::{event_path, owned_value_path, OwnedTargetPath, OwnedValuePath, PathPrefix};
-use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 use std::borrow::Cow;
 use std::collections::BTreeMap;
@@ -20,10 +19,17 @@ use vrl::value::{kind::Collection, Kind};
 use super::{default_lossy, Deserializer};
 
 /// Config used to build a `SyslogDeserializer`.
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[configurable_component]
+#[derive(Debug, Clone, Default)]
 pub struct SyslogDeserializerConfig {
+    #[serde(skip)]
     source: Option<&'static str>,
+
     /// Syslog-specific decoding options.
+    #[serde(
+        default,
+        skip_serializing_if = "vector_core::serde::skip_serializing_if_default"
+    )]
     pub syslog: SyslogDeserializerOptions,
 }
 

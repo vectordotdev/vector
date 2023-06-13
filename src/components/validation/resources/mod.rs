@@ -2,7 +2,7 @@ mod event;
 mod http;
 
 use codecs::{
-    decoding::{self, DeserializerConfig, NewlineDelimitedDecoderOptions},
+    decoding::{self, DeserializerConfig},
     encoding::{
         self, Framer, FramingConfig, JsonSerializerConfig, SerializerConfig, TextSerializerConfig,
     },
@@ -160,20 +160,18 @@ fn deserializer_config_to_serializer(config: &DeserializerConfig) -> encoding::S
 fn decoder_framing_to_encoding_framer(framing: &decoding::FramingConfig) -> encoding::Framer {
     let framing_config = match framing {
         decoding::FramingConfig::Bytes => encoding::FramingConfig::Bytes,
-        decoding::FramingConfig::CharacterDelimited {
-            character_delimited,
-        } => encoding::FramingConfig::CharacterDelimited {
-            character_delimited: encoding::CharacterDelimitedEncoderOptions {
-                delimiter: character_delimited.delimiter,
-            },
-        },
-        decoding::FramingConfig::LengthDelimited => encoding::FramingConfig::LengthDelimited,
-        decoding::FramingConfig::NewlineDelimited { .. } => {
-            encoding::FramingConfig::NewlineDelimited
+        decoding::FramingConfig::CharacterDelimited(config) => {
+            encoding::FramingConfig::CharacterDelimited(encoding::CharacterDelimitedEncoderConfig {
+                character_delimited: encoding::CharacterDelimitedEncoderOptions {
+                    delimiter: config.character_delimited.delimiter,
+                },
+            })
         }
+        decoding::FramingConfig::LengthDelimited => encoding::FramingConfig::LengthDelimited,
+        decoding::FramingConfig::NewlineDelimited(_) => encoding::FramingConfig::NewlineDelimited,
         // TODO: There's no equivalent octet counting framer for encoding... although
         // there's no particular reason that would make it hard to write.
-        decoding::FramingConfig::OctetCounting { .. } => todo!(),
+        decoding::FramingConfig::OctetCounting(_) => todo!(),
     };
 
     framing_config.build()
@@ -183,17 +181,11 @@ fn serializer_config_to_deserializer(config: &SerializerConfig) -> decoding::Des
     let deserializer_config = match config {
         SerializerConfig::Avro { .. } => todo!(),
         SerializerConfig::Csv { .. } => todo!(),
-        SerializerConfig::Gelf => DeserializerConfig::Gelf {
-            gelf: Default::default(),
-        },
-        SerializerConfig::Json(_) => DeserializerConfig::Json {
-            json: Default::default(),
-        },
+        SerializerConfig::Gelf => DeserializerConfig::Gelf(Default::default()),
+        SerializerConfig::Json(_) => DeserializerConfig::Json(Default::default()),
         SerializerConfig::Logfmt => todo!(),
         SerializerConfig::Native => DeserializerConfig::Native,
-        SerializerConfig::NativeJson => DeserializerConfig::NativeJson {
-            native_json: Default::default(),
-        },
+        SerializerConfig::NativeJson => DeserializerConfig::NativeJson(Default::default()),
         SerializerConfig::RawMessage | SerializerConfig::Text(_) => DeserializerConfig::Bytes,
     };
 
@@ -203,18 +195,18 @@ fn serializer_config_to_deserializer(config: &SerializerConfig) -> decoding::Des
 fn encoder_framing_to_decoding_framer(framing: encoding::FramingConfig) -> decoding::Framer {
     let framing_config = match framing {
         encoding::FramingConfig::Bytes => decoding::FramingConfig::Bytes,
-        encoding::FramingConfig::CharacterDelimited {
-            character_delimited,
-        } => decoding::FramingConfig::CharacterDelimited {
-            character_delimited: decoding::CharacterDelimitedDecoderOptions {
-                delimiter: character_delimited.delimiter,
-                max_length: None,
-            },
-        },
+        encoding::FramingConfig::CharacterDelimited(config) => {
+            decoding::FramingConfig::CharacterDelimited(decoding::CharacterDelimitedDecoderConfig {
+                character_delimited: decoding::CharacterDelimitedDecoderOptions {
+                    delimiter: config.character_delimited.delimiter,
+                    max_length: None,
+                },
+            })
+        }
         encoding::FramingConfig::LengthDelimited => decoding::FramingConfig::LengthDelimited,
-        encoding::FramingConfig::NewlineDelimited => decoding::FramingConfig::NewlineDelimited {
-            newline_delimited: NewlineDelimitedDecoderOptions::default(),
-        },
+        encoding::FramingConfig::NewlineDelimited => {
+            decoding::FramingConfig::NewlineDelimited(Default::default())
+        }
     };
 
     framing_config.build()

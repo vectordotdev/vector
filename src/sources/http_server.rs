@@ -256,9 +256,7 @@ impl_generate_config_from_default!(SimpleHttpConfig);
 impl ValidatableComponent for SimpleHttpConfig {
     fn validation_configuration() -> ValidationConfiguration {
         let config = Self {
-            decoding: Some(DeserializerConfig::Json {
-                json: Default::default(),
-            }),
+            decoding: Some(DeserializerConfig::Json(Default::default())),
             ..Default::default()
         };
 

@@ -1595,9 +1595,7 @@ fn test_config_outputs() {
         (
             "json / single output",
             TestCase {
-                decoding: DeserializerConfig::Json {
-                    json: Default::default(),
-                },
+                decoding: DeserializerConfig::Json(Default::default()),
                 multiple_outputs: false,
                 want: HashMap::from([(
                     None,
@@ -1622,9 +1620,7 @@ fn test_config_outputs() {
         (
             "json / multiple output",
             TestCase {
-                decoding: DeserializerConfig::Json {
-                    json: Default::default(),
-                },
+                decoding: DeserializerConfig::Json(Default::default()),
                 multiple_outputs: true,
                 want: HashMap::from([
                     (
@@ -1666,9 +1662,7 @@ fn test_config_outputs() {
         (
             "syslog / single output",
             TestCase {
-                decoding: DeserializerConfig::Syslog {
-                    syslog: Default::default(),
-                },
+                decoding: DeserializerConfig::Syslog(Default::default()),
                 multiple_outputs: false,
                 want: HashMap::from([(
                     None,
@@ -1743,9 +1737,7 @@ fn test_config_outputs() {
         (
             "syslog / multiple output",
             TestCase {
-                decoding: DeserializerConfig::Syslog {
-                    syslog: Default::default(),
-                },
+                decoding: DeserializerConfig::Syslog(Default::default()),
                 multiple_outputs: true,
                 want: HashMap::from([
                     (
