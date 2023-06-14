@@ -40,6 +40,7 @@ pub struct EventMetadata {
 
     /// An identifier for a globally registered schema definition which provides information about
     /// the event shape (type information, and semantic meaning of fields).
+    /// This definition is only currently valid for logs, and shouldn't be used for other event types.
     ///
     /// TODO(Jean): must not skip serialization to track schemas across restarts.
     #[serde(default = "default_schema_definition", skip)]
