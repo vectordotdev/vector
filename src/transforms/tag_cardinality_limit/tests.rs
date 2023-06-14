@@ -4,6 +4,8 @@ use vector_core::config::OutputId;
 use vector_core::metric_tags;
 
 use super::*;
+use crate::config::schema::Definition;
+use crate::config::LogNamespace;
 use crate::event::metric::TagValue;
 use crate::event::{metric, Event, Metric, MetricTags};
 use crate::test_util::components::assert_transform_compliance;
@@ -13,6 +15,7 @@ use crate::transforms::tag_cardinality_limit::config::{
 use crate::transforms::test::create_topology;
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
+use vrl::compiler::prelude::Kind;
 
 #[test]
 fn generate_config() {
@@ -134,6 +137,21 @@ async fn drop_tag(config: TagCardinalityLimitConfig) {
         event1.set_source_id(Arc::new(OutputId::from("in")));
         event2.set_source_id(Arc::new(OutputId::from("in")));
         event3.set_source_id(Arc::new(OutputId::from("in")));
+
+        event1.set_parent_id(Arc::new(OutputId::from("transform")));
+        event2.set_parent_id(Arc::new(OutputId::from("transform")));
+        event3.set_parent_id(Arc::new(OutputId::from("transform")));
+
+        // definitions aren't valid for metrics yet, it's just set to the default (anything).
+        event1.metadata_mut().set_schema_definition(&Arc::new(
+            Definition::new_with_default_metadata(Kind::any(), [LogNamespace::Legacy]),
+        ));
+        event2
+            .metadata_mut()
+            .set_schema_definition(&Arc::new(Definition::any()));
+        event3
+            .metadata_mut()
+            .set_schema_definition(&Arc::new(Definition::any()));
 
         assert_eq!(new_event1, Some(event1));
         assert_eq!(new_event2, Some(event2));
