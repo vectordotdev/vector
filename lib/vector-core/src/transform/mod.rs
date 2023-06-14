@@ -8,8 +8,9 @@ use vector_common::internal_event::{
 use vector_common::json_size::JsonSize;
 use vector_common::EventDataEq;
 
-use crate::config::OutputId;
+use crate::config::{ComponentKey, OutputId};
 use crate::event::EventMutRef;
+use crate::schema::Definition;
 use crate::{
     config,
     event::{
@@ -182,6 +183,7 @@ struct TransformOutput {
     fanout: Fanout,
     events_sent: Registered<EventsSent>,
     log_schema_definitions: HashMap<OutputId, Arc<schema::Definition>>,
+    output_id: Arc<OutputId>,
 }
 
 pub struct TransformOutputs {
@@ -193,6 +195,7 @@ pub struct TransformOutputs {
 impl TransformOutputs {
     pub fn new(
         outputs_in: Vec<config::TransformOutput>,
+        component_key: ComponentKey,
     ) -> (Self, HashMap<Option<String>, fanout::ControlChannel>) {
         let outputs_spec = outputs_in.clone();
         let mut primary_output = None;
@@ -216,6 +219,10 @@ impl TransformOutputs {
                             DEFAULT_OUTPUT.into(),
                         )))),
                         log_schema_definitions,
+                        output_id: Arc::new(OutputId {
+                            component: component_key.clone(),
+                            port: None,
+                        }),
                     });
                     controls.insert(None, control);
                 }
@@ -228,6 +235,10 @@ impl TransformOutputs {
                                 name.clone().into(),
                             )))),
                             log_schema_definitions,
+                            output_id: Arc::new(OutputId {
+                                component: component_key.clone(),
+                                port: Some(name.clone()),
+                            }),
                         },
                     );
                     controls.insert(Some(name.clone()), control);
@@ -273,16 +284,12 @@ impl TransformOutputs {
         buf: &mut OutputBuffer,
         output: &mut TransformOutput,
     ) -> Result<(), Box<dyn error::Error + Send + Sync>> {
-        // update schema definitions for log events
         for event in buf.events_mut() {
-            if let EventMutRef::Log(log) = event {
-                if let Some(parent_component_id) = log.metadata_mut().parent_id() {
-                    if let Some(definition) = output.log_schema_definitions.get(parent_component_id)
-                    {
-                        log.metadata_mut().set_schema_definition(definition);
-                    }
-                }
-            }
+            update_runtime_schema_definition(
+                event,
+                &output.output_id,
+                &output.log_schema_definitions,
+            );
         }
         let count = buf.len();
         let byte_size = buf.estimated_json_encoded_size_of();
@@ -290,6 +297,24 @@ impl TransformOutputs {
         output.events_sent.emit(CountByteSize(count, byte_size));
         Ok(())
     }
+}
+
+pub fn update_runtime_schema_definition(
+    // The event that will be updated
+    mut event: EventMutRef,
+    // The output_id that the current even is being sent to (will be used as the new parent_id)
+    output_id: &Arc<OutputId>,
+    // A mapping of parent OutputId's to definitions, that will be used to lookup the new runtime definition of the event
+    log_schema_definitions: &HashMap<OutputId, Arc<Definition>>,
+) {
+    if let EventMutRef::Log(log) = &mut event {
+        if let Some(parent_component_id) = log.metadata_mut().parent_id() {
+            if let Some(definition) = log_schema_definitions.get(parent_component_id) {
+                log.metadata_mut().set_schema_definition(definition);
+            }
+        }
+    }
+    event.metadata_mut().set_parent_id(Arc::clone(&output_id))
 }
 
 #[derive(Debug, Clone)]

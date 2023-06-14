@@ -21,6 +21,7 @@ use vector_common::internal_event::{
 };
 use vector_config::NamedComponent;
 use vector_core::config::LogNamespace;
+use vector_core::transform::update_runtime_schema_definition;
 use vector_core::{
     buffers::{
         topology::{
@@ -736,6 +737,7 @@ fn build_transform(
             node.input_details.data_type(),
             node.typetag,
             &node.key,
+            &node.outputs,
         ),
     }
 }
@@ -745,7 +747,7 @@ fn build_sync_transform(
     node: TransformNode,
     input_rx: BufferReceiver<EventArray>,
 ) -> (Task, HashMap<OutputId, fanout::ControlChannel>) {
-    let (outputs, controls) = TransformOutputs::new(node.outputs);
+    let (outputs, controls) = TransformOutputs::new(node.outputs, node.key.clone());
 
     let runner = Runner::new(t, input_rx, node.input_details.data_type(), outputs);
     let transform = if node.enable_concurrency {
@@ -927,6 +929,7 @@ fn build_task_transform(
     input_type: DataType,
     typetag: &str,
     key: &ComponentKey,
+    outputs: &Vec<TransformOutput>,
 ) -> (Task, HashMap<OutputId, fanout::ControlChannel>) {
     let (mut fanout, control) = Fanout::new();
 
@@ -942,8 +945,28 @@ fn build_task_transform(
             ))
         });
     let events_sent = register!(EventsSent::from(internal_event::Output(None)));
+    let output_id = Arc::new(OutputId {
+        component: key.clone(),
+        port: None,
+    });
+    let schema_definition_map = outputs
+        .iter()
+        .find(|x| x.port.is_none())
+        .expect("output for default port required for task transforms")
+        .log_schema_definitions
+        .clone()
+        .into_iter()
+        .map(|(key, value)| (key, Arc::new(value)))
+        .collect();
+
     let stream = t
         .transform(Box::pin(filtered))
+        .map(move |mut events| {
+            for event in events.iter_events_mut() {
+                update_runtime_schema_definition(event, &output_id, &schema_definition_map);
+            }
+            events
+        })
         .inspect(move |events: &EventArray| {
             events_sent.emit(CountByteSize(
                 events.len(),

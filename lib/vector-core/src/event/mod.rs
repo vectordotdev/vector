@@ -293,6 +293,11 @@ impl Event {
         self.metadata_mut().set_source_id(source_id);
     }
 
+    /// Sets the `parent_id` in the event metadata to the provided value.
+    pub fn set_parent_id(&mut self, parent_id: Arc<OutputId>) {
+        self.metadata_mut().set_parent_id(parent_id);
+    }
+
     /// Sets the `source_id` in the event metadata to the provided value.
     #[must_use]
     pub fn with_source_id(mut self, source_id: Arc<OutputId>) -> Self {
