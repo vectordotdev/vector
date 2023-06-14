@@ -413,7 +413,29 @@ async fn s3_flush_on_exhaustion() {
     let bucket = uuid::Uuid::new_v4().to_string();
     create_bucket(&bucket, false).await;
 
-    let config = config(&bucket, 10); // batch size is ten
+    // batch size of ten events, timeout of ten seconds
+    let config = {
+        let mut batch = BatchConfig::default();
+        batch.max_events = Some(10);
+        batch.timeout_secs = Some(10.0);
+
+        S3SinkConfig {
+            bucket: bucket.to_string(),
+            key_prefix: random_string(10) + "/date=%F",
+            filename_time_format: default_filename_time_format(),
+            filename_append_uuid: true,
+            filename_extension: None,
+            options: S3Options::default(),
+            region: RegionOrEndpoint::with_both("minio", s3_address()),
+            encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
+            compression: Compression::None,
+            batch,
+            request: TowerRequestConfig::default(),
+            tls: Default::default(),
+            auth: Default::default(),
+            acknowledgements: Default::default(),
+        }
+    };
     let prefix = config.key_prefix.clone();
     let service = config.create_service(&cx.globals.proxy).await.unwrap();
     let sink = config.build_processor(service).unwrap();
@@ -435,8 +457,15 @@ async fn s3_flush_on_exhaustion() {
 
     // Here, we validate that the s3 sink flushes when its source stream is exhausted
     // by giving it a number of inputs less than the batch size, verifying that the
-    // outputs for the in-flight batch are flushed.
-    run_and_assert_sink_compliance(sink, stream::iter(events), &AWS_SINK_TAGS).await;
+    // outputs for the in-flight batch are flushed. By timing out in 3 seconds with a
+    // flush period of ten seconds, we verify that the flush is triggered *at stream
+    // completion* and not because of periodic flushing.
+    assert!(tokio::time::timeout(
+        Duration::from_secs(3),
+        run_and_assert_sink_compliance(sink, stream::iter(events), &AWS_SINK_TAGS)
+    )
+    .await
+    .is_ok());
 
     let keys = get_keys(&bucket, prefix).await;
     assert_eq!(keys.len(), 1);
