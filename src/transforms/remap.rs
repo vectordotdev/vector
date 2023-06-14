@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-// use std::sync::Arc;
 use std::{
     collections::BTreeMap,
     fs::File,
@@ -376,8 +375,6 @@ where
     drop_on_error: bool,
     drop_on_abort: bool,
     reroute_dropped: bool,
-    // default_schema_definition: Arc<schema::Definition>,
-    // dropped_schema_definition: Arc<schema::Definition>,
     runner: Runner,
     metric_tag_values: MetricTagValues,
 }
@@ -444,28 +441,6 @@ where
         program: Program,
         runner: Runner,
     ) -> crate::Result<Self> {
-        // let default_schema_definition = context
-        //     .schema_definitions
-        //     .get(&None)
-        //     .expect("default schema required")
-        //     // TODO we can now have multiple possible definitions.
-        //     // This is going to need to be updated to store these possible definitions and then
-        //     // choose the correct one based on the input the event has come from.
-        //     .iter()
-        //     .map(|(_output, definition)| definition.clone())
-        //     .next()
-        //     .unwrap_or_else(Definition::any);
-        //
-        // let dropped_schema_definition = context
-        //     .schema_definitions
-        //     .get(&Some(DROPPED.to_owned()))
-        //     .or_else(|| context.schema_definitions.get(&None))
-        //     .expect("dropped schema required")
-        //     .iter()
-        //     .map(|(_output, definition)| definition.clone())
-        //     .next()
-        //     .unwrap_or_else(Definition::any);
-
         Ok(Remap {
             component_key: context.key.clone(),
             program,
@@ -628,27 +603,12 @@ where
 }
 
 #[inline]
-fn push_default(
-    event: Event,
-    output: &mut TransformOutputsBuf,
-    // schema_definition: &Arc<schema::Definition>,
-) {
-    // event
-    //     .metadata_mut()
-    //     .set_schema_definition(schema_definition);
-
+fn push_default(event: Event, output: &mut TransformOutputsBuf) {
     output.push(None, event)
 }
 
 #[inline]
-fn push_dropped(
-    event: Event,
-    output: &mut TransformOutputsBuf,
-    // schema_definition: &Arc<schema::Definition>,
-) {
-    // event
-    //     .metadata_mut()
-    //     .set_schema_definition(schema_definition);
+fn push_dropped(event: Event, output: &mut TransformOutputsBuf) {
     output.push(Some(DROPPED), event);
 }
 
