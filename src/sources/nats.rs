@@ -238,8 +238,8 @@ async fn nats_source(
                         event
                     });
 
-                    out.send_batch(events).await.map_err(|error| {
-                        emit!(StreamClosedError { error, count });
+                    out.send_batch(events).await.map_err(|_| {
+                        emit!(StreamClosedError { count });
                     })?;
                 }
                 Err(error) => {

@@ -659,9 +659,9 @@ pub fn file_source(
                 Ok(()) => {
                     debug!("Finished sending.");
                 }
-                Err(error) => {
+                Err(_) => {
                     let (count, _) = messages.size_hint();
-                    emit!(StreamClosedError { error, count });
+                    emit!(StreamClosedError { count });
                 }
             }
         });

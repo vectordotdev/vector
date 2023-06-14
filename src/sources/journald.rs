@@ -606,8 +606,8 @@ impl<'a> Batch<'a> {
                         finalizer.finalize(cursor, self.receiver).await;
                     }
                 }
-                Err(error) => {
-                    emit!(StreamClosedError { error, count });
+                Err(_) => {
+                    emit!(StreamClosedError { count });
                     // `out` channel is closed, don't restart journalctl.
                     self.exiting = Some(false);
                 }
