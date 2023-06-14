@@ -269,8 +269,8 @@ pub(super) fn udp(
 
                                 tokio::select!{
                                     result = out.send_batch(events) => {
-                                        if let Err(error) = result {
-                                            emit!(StreamClosedError { error, count });
+                                        if result.is_err() {
+                                            emit!(StreamClosedError { count });
                                             return Ok(())
                                         }
                                     }

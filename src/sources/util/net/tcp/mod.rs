@@ -405,8 +405,8 @@ async fn handle_stream<T>(
                                     break;
                                 }
                             }
-                            Err(error) => {
-                                emit!(StreamClosedError { error, count });
+                            Err(_) => {
+                                emit!(StreamClosedError { count });
                                 break;
                             }
                         }

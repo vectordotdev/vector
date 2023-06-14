@@ -122,12 +122,10 @@ async fn handle_request(
             let receiver = BatchNotifier::maybe_apply_to(acknowledgements, &mut events);
             let count = events.len();
 
-            out.send_batch_named(output, events)
-                .await
-                .map_err(move |error| {
-                    emit!(StreamClosedError { error, count });
-                    warp::reject::custom(ApiError::ServerShutdown)
-                })?;
+            out.send_batch_named(output, events).await.map_err(|_| {
+                emit!(StreamClosedError { count });
+                warp::reject::custom(ApiError::ServerShutdown)
+            })?;
 
             match receiver {
                 None => Ok(protobuf(ExportLogsServiceResponse {}).into_response()),

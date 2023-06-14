@@ -180,7 +180,7 @@ impl SqsSource {
                         }
                     }
                 }
-                Err(error) => emit!(StreamClosedError { error, count }),
+                Err(_) => emit!(StreamClosedError { count }),
             }
         }
     }
