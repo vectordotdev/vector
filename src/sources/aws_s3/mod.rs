@@ -3,7 +3,7 @@ use std::{convert::TryInto, io::ErrorKind};
 use async_compression::tokio::bufread;
 use aws_sdk_s3::types::ByteStream;
 use codecs::decoding::{DeserializerConfig, FramingConfig, NewlineDelimitedDecoderOptions};
-use codecs::BytesDeserializerConfig;
+use codecs::{BytesDeserializerConfig, NewlineDelimitedDecoderConfig};
 use futures::{stream, stream::StreamExt, TryStreamExt};
 use lookup::owned_value_path;
 use snafu::Snafu;
@@ -133,9 +133,9 @@ pub struct AwsS3Config {
 
 const fn default_framing() -> FramingConfig {
     // This is used for backwards compatibility. It used to be the only (hardcoded) option.
-    FramingConfig::NewlineDelimited {
+    FramingConfig::NewlineDelimited(NewlineDelimitedDecoderConfig {
         newline_delimited: NewlineDelimitedDecoderOptions { max_length: None },
-    }
+    })
 }
 
 impl_generate_config_from_default!(AwsS3Config);

@@ -61,10 +61,7 @@ pub enum FramingConfig {
     Bytes,
 
     /// Event data is delimited by a single ASCII (7-bit) character.
-    CharacterDelimited {
-        /// Options for the character delimited encoder.
-        character_delimited: CharacterDelimitedEncoderOptions,
-    },
+    CharacterDelimited(CharacterDelimitedEncoderConfig),
 
     /// Event data is prefixed with its length in bytes.
     ///
@@ -83,9 +80,7 @@ impl From<BytesEncoderConfig> for FramingConfig {
 
 impl From<CharacterDelimitedEncoderConfig> for FramingConfig {
     fn from(config: CharacterDelimitedEncoderConfig) -> Self {
-        Self::CharacterDelimited {
-            character_delimited: config.character_delimited,
-        }
+        Self::CharacterDelimited(config)
     }
 }
 
@@ -106,14 +101,7 @@ impl FramingConfig {
     pub fn build(&self) -> Framer {
         match self {
             FramingConfig::Bytes => Framer::Bytes(BytesEncoderConfig.build()),
-            FramingConfig::CharacterDelimited {
-                character_delimited,
-            } => Framer::CharacterDelimited(
-                CharacterDelimitedEncoderConfig {
-                    character_delimited: character_delimited.clone(),
-                }
-                .build(),
-            ),
+            FramingConfig::CharacterDelimited(config) => Framer::CharacterDelimited(config.build()),
             FramingConfig::LengthDelimited => {
                 Framer::LengthDelimited(LengthDelimitedEncoderConfig.build())
             }
@@ -201,10 +189,7 @@ pub enum SerializerConfig {
     ///
     /// This codec must be configured with fields to encode.
     ///
-    Csv(
-        /// Options for the CSV encoder.
-        CsvSerializerConfig,
-    ),
+    Csv(CsvSerializerConfig),
 
     /// Encodes an event as a [GELF][gelf] message.
     ///
@@ -214,10 +199,7 @@ pub enum SerializerConfig {
     /// Encodes an event as [JSON][json].
     ///
     /// [json]: https://www.json.org/
-    Json(
-        /// Encoding options specific to the text serializer.
-        JsonSerializerConfig,
-    ),
+    Json(JsonSerializerConfig),
 
     /// Encodes an event as a [logfmt][logfmt] message.
     ///
@@ -257,10 +239,7 @@ pub enum SerializerConfig {
     /// Be careful if you are modifying your log events (for example, by using a `remap`
     /// transform) and removing the message field while doing additional parsing on it, as this
     /// could lead to the encoding emitting empty strings for the given event.
-    Text(
-        /// Encoding options specific to the text serializer.
-        TextSerializerConfig,
-    ),
+    Text(TextSerializerConfig),
 }
 
 impl From<AvroSerializerConfig> for SerializerConfig {

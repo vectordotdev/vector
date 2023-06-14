@@ -1,6 +1,5 @@
 use bytes::Bytes;
 use derivative::Derivative;
-use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 use vector_config::configurable_component;
 use vector_core::{config::DataType, event::Event, schema};
@@ -11,9 +10,14 @@ use super::{default_lossy, Deserializer};
 use vector_core::config::LogNamespace;
 
 /// Config used to build a `NativeJsonDeserializer`.
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[configurable_component]
+#[derive(Debug, Clone, Default)]
 pub struct NativeJsonDeserializerConfig {
     /// Vector's native JSON-specific decoding options.
+    #[serde(
+        default,
+        skip_serializing_if = "vector_core::serde::skip_serializing_if_default"
+    )]
     pub native_json: NativeJsonDeserializerOptions,
 }
 
