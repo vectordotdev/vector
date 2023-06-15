@@ -9408,7 +9408,6 @@ version = "0.1.0"
 dependencies = [
  "convert_case 0.6.0",
  "darling 0.13.4",
- "indexmap",
  "once_cell",
  "proc-macro2 1.0.60",
  "quote 1.0.28",
