@@ -31,7 +31,7 @@ pub use vector_common::{
     internal_event::CountByteSize,
     json_size::JsonSize,
     request_metadata::{
-        EventCountTags, GetEventCountTags, MetaDescriptive, RequestCountByteSize, RequestMetadata,
+        EventCountTags, GetEventCountTags, GroupedCountByteSize, MetaDescriptive, RequestMetadata,
     },
 };
 pub use vector_config::configurable_component;

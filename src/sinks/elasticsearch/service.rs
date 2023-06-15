@@ -13,7 +13,7 @@ use hyper::{service::Service, Body, Request};
 use tower::ServiceExt;
 use vector_common::{
     json_size::JsonSize,
-    request_metadata::{MetaDescriptive, RequestCountByteSize, RequestMetadata},
+    request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata},
 };
 use vector_core::{stream::DriverResponse, ByteSizeOf};
 
@@ -153,7 +153,7 @@ pub struct ElasticsearchResponse {
     pub http_response: Response<Bytes>,
     pub event_status: EventStatus,
     pub batch_size: usize,
-    pub events_byte_size: RequestCountByteSize,
+    pub events_byte_size: GroupedCountByteSize,
 }
 
 impl DriverResponse for ElasticsearchResponse {
@@ -161,7 +161,7 @@ impl DriverResponse for ElasticsearchResponse {
         self.event_status
     }
 
-    fn events_sent(&self) -> &RequestCountByteSize {
+    fn events_sent(&self) -> &GroupedCountByteSize {
         &self.events_byte_size
     }
 }

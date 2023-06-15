@@ -19,7 +19,7 @@ pub(super) struct PulsarRequest {
 
 pub struct PulsarResponse {
     byte_size: usize,
-    event_byte_size: RequestCountByteSize,
+    event_byte_size: GroupedCountByteSize,
 }
 
 impl DriverResponse for PulsarResponse {
@@ -27,7 +27,7 @@ impl DriverResponse for PulsarResponse {
         EventStatus::Delivered
     }
 
-    fn events_sent(&self) -> &RequestCountByteSize {
+    fn events_sent(&self) -> &GroupedCountByteSize {
         &self.event_byte_size
     }
 

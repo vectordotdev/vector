@@ -28,7 +28,7 @@ pub struct KafkaRequestMetadata {
 }
 
 pub struct KafkaResponse {
-    event_byte_size: RequestCountByteSize,
+    event_byte_size: GroupedCountByteSize,
 }
 
 impl DriverResponse for KafkaResponse {
@@ -36,7 +36,7 @@ impl DriverResponse for KafkaResponse {
         EventStatus::Delivered
     }
 
-    fn events_sent(&self) -> &RequestCountByteSize {
+    fn events_sent(&self) -> &GroupedCountByteSize {
         &self.event_byte_size
     }
 }

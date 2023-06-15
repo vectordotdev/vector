@@ -6,7 +6,7 @@ use vector_core::{config, ByteSizeOf, EstimatedJsonEncodedSizeOf};
 use vector_common::{
     internal_event::CountByteSize,
     json_size::JsonSize,
-    request_metadata::{GetEventCountTags, RequestCountByteSize, RequestMetadata},
+    request_metadata::{GetEventCountTags, GroupedCountByteSize, RequestMetadata},
 };
 
 use super::request_builder::EncodeResult;
@@ -15,7 +15,7 @@ use super::request_builder::EncodeResult;
 pub struct RequestMetadataBuilder {
     event_count: usize,
     events_byte_size: usize,
-    events_estimated_json_encoded_byte_size: RequestCountByteSize,
+    events_estimated_json_encoded_byte_size: GroupedCountByteSize,
 }
 
 impl RequestMetadataBuilder {
@@ -23,11 +23,7 @@ impl RequestMetadataBuilder {
     where
         E: ByteSizeOf + EventCount + GetEventCountTags + EstimatedJsonEncodedSizeOf,
     {
-        let mut size = if config::telemetry().has_tags() {
-            RequestCountByteSize::new_tagged()
-        } else {
-            RequestCountByteSize::new_untagged()
-        };
+        let mut size = config::telemetry().create_request_count_byte_size();
 
         let mut event_count = 0;
         let mut events_byte_size = 0;
@@ -50,9 +46,9 @@ impl RequestMetadataBuilder {
         E: ByteSizeOf + GetEventCountTags + EstimatedJsonEncodedSizeOf,
     {
         let mut size = if config::telemetry().has_tags() {
-            RequestCountByteSize::new_tagged()
+            GroupedCountByteSize::new_tagged()
         } else {
-            RequestCountByteSize::new_untagged()
+            GroupedCountByteSize::new_untagged()
         };
 
         size.add_event(event, event.estimated_json_encoded_size_of());

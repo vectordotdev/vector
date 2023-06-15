@@ -24,7 +24,7 @@ use tower::{
 };
 use vector_common::{
     finalization::EventStatus,
-    request_metadata::{MetaDescriptive, RequestCountByteSize},
+    request_metadata::{GroupedCountByteSize, MetaDescriptive},
 };
 use vector_core::stream::DriverResponse;
 
@@ -96,7 +96,7 @@ impl From<SdkError<DescribeLogStreamsError>> for CloudwatchError {
 
 #[derive(Debug)]
 pub struct CloudwatchResponse {
-    events_byte_size: RequestCountByteSize,
+    events_byte_size: GroupedCountByteSize,
 }
 
 impl crate::sinks::util::sink::Response for CloudwatchResponse {
@@ -114,7 +114,7 @@ impl DriverResponse for CloudwatchResponse {
         EventStatus::Delivered
     }
 
-    fn events_sent(&self) -> &RequestCountByteSize {
+    fn events_sent(&self) -> &GroupedCountByteSize {
         &self.events_byte_size
     }
 }

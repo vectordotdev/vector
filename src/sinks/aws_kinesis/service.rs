@@ -36,7 +36,7 @@ where
 }
 
 pub struct KinesisResponse {
-    events_byte_size: RequestCountByteSize,
+    events_byte_size: GroupedCountByteSize,
 }
 
 impl DriverResponse for KinesisResponse {
@@ -44,7 +44,7 @@ impl DriverResponse for KinesisResponse {
         EventStatus::Delivered
     }
 
-    fn events_sent(&self) -> &RequestCountByteSize {
+    fn events_sent(&self) -> &GroupedCountByteSize {
         &self.events_byte_size
     }
 }

@@ -1,6 +1,8 @@
 use metrics::{register_counter, Counter};
 use tracing::trace;
 
+use crate::request_metadata::EventCountTags;
+
 use super::{CountByteSize, OptionalTag, Output, SharedString};
 
 pub const DEFAULT_OUTPUT: &str = "_default";
@@ -67,7 +69,6 @@ crate::registered_event!(
         events: Counter = {
             register_counter!("component_sent_events_total", &make_tags(&self.source, &self.service))
         },
-        events_out: Counter = register_counter!("events_out_total") ,
         event_bytes: Counter = {
             register_counter!("component_sent_event_bytes_total", &make_tags(&self.source, &self.service))
         },
@@ -78,21 +79,22 @@ crate::registered_event!(
         trace!(message = "Events sent.", count = %count, byte_size = %byte_size);
 
         self.events.increment(count as u64);
-        self.events_out.increment(count as u64);
         self.event_bytes.increment(byte_size.get() as u64);
     }
 
-    fn register(tags: &(OptionalTag, OptionalTag)) {
+    fn register(tags: &EventCountTags) {
         super::register(TaggedEventsSent::new(
-            tags.0.clone(),
-            tags.1.clone(),
+            tags.clone(),
         ))
     }
 );
 
 impl TaggedEventsSent {
     #[must_use]
-    pub fn new(source: OptionalTag, service: OptionalTag) -> Self {
-        Self { source, service }
+    pub fn new(tags: EventCountTags) -> Self {
+        Self {
+            source: tags.source,
+            service: tags.service,
+        }
     }
 }

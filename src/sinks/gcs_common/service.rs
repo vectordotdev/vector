@@ -8,7 +8,7 @@ use http::{
 };
 use hyper::Body;
 use tower::Service;
-use vector_common::request_metadata::{MetaDescriptive, RequestCountByteSize, RequestMetadata};
+use vector_common::request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata};
 use vector_core::stream::DriverResponse;
 
 use crate::{
@@ -88,7 +88,7 @@ impl DriverResponse for GcsResponse {
         }
     }
 
-    fn events_sent(&self) -> &RequestCountByteSize {
+    fn events_sent(&self) -> &GroupedCountByteSize {
         self.metadata.events_estimated_json_encoded_byte_size()
     }
 

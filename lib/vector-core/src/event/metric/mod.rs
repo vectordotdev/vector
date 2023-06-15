@@ -484,7 +484,7 @@ impl Finalizable for Metric {
 
 impl GetEventCountTags for Metric {
     fn get_tags(&self) -> EventCountTags {
-        let source = if telemetry().tags().source() {
+        let source = if telemetry().tags().emit_source {
             self.metadata().source_id().map(ToString::to_string).into()
         } else {
             OptionalTag::Ignored
@@ -492,7 +492,7 @@ impl GetEventCountTags for Metric {
 
         // Currently there is no way to specify a tag that means the service,
         // so we will be hardcoding it to "service".
-        let service = if telemetry().tags().service() {
+        let service = if telemetry().tags().emit_service {
             self.tags()
                 .and_then(|tags| tags.get("service").map(ToString::to_string))
                 .into()
@@ -500,7 +500,7 @@ impl GetEventCountTags for Metric {
             OptionalTag::Ignored
         };
 
-        (source, service)
+        EventCountTags { source, service }
     }
 }
 

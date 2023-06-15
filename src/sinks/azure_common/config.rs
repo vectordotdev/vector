@@ -10,7 +10,7 @@ use http::StatusCode;
 use snafu::Snafu;
 use vector_common::{
     json_size::JsonSize,
-    request_metadata::{MetaDescriptive, RequestCountByteSize, RequestMetadata},
+    request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata},
 };
 use vector_core::stream::DriverResponse;
 
@@ -68,7 +68,7 @@ impl RetryLogic for AzureBlobRetryLogic {
 #[derive(Debug)]
 pub struct AzureBlobResponse {
     pub inner: PutBlockBlobResponse,
-    pub events_byte_size: RequestCountByteSize,
+    pub events_byte_size: GroupedCountByteSize,
     pub byte_size: usize,
 }
 
@@ -77,7 +77,7 @@ impl DriverResponse for AzureBlobResponse {
         EventStatus::Delivered
     }
 
-    fn events_sent(&self) -> &RequestCountByteSize {
+    fn events_sent(&self) -> &GroupedCountByteSize {
         &self.events_byte_size
     }
 

@@ -9,7 +9,7 @@ use http::{Request, StatusCode, Uri};
 use hyper::Body;
 use snafu::ResultExt;
 use tower::Service;
-use vector_common::request_metadata::{MetaDescriptive, RequestCountByteSize, RequestMetadata};
+use vector_common::request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata};
 use vector_core::{
     event::{EventFinalizers, EventStatus, Finalizable},
     stream::DriverResponse,
@@ -93,7 +93,7 @@ impl MetaDescriptive for TraceApiRequest {
 pub struct TraceApiResponse {
     status_code: StatusCode,
     body: Bytes,
-    byte_size: RequestCountByteSize,
+    byte_size: GroupedCountByteSize,
     uncompressed_size: usize,
 }
 
@@ -108,7 +108,7 @@ impl DriverResponse for TraceApiResponse {
         }
     }
 
-    fn events_sent(&self) -> &RequestCountByteSize {
+    fn events_sent(&self) -> &GroupedCountByteSize {
         &self.byte_size
     }
 

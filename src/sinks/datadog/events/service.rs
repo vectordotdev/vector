@@ -8,7 +8,7 @@ use futures::{
 use http::Request;
 use hyper::Body;
 use tower::{Service, ServiceExt};
-use vector_common::request_metadata::{MetaDescriptive, RequestCountByteSize};
+use vector_common::request_metadata::{GroupedCountByteSize, MetaDescriptive};
 use vector_core::stream::DriverResponse;
 
 use crate::{
@@ -23,7 +23,7 @@ use crate::{
 pub struct DatadogEventsResponse {
     pub(self) event_status: EventStatus,
     pub http_status: http::StatusCode,
-    pub event_byte_size: RequestCountByteSize,
+    pub event_byte_size: GroupedCountByteSize,
 }
 
 impl DriverResponse for DatadogEventsResponse {
@@ -31,7 +31,7 @@ impl DriverResponse for DatadogEventsResponse {
         self.event_status
     }
 
-    fn events_sent(&self) -> &RequestCountByteSize {
+    fn events_sent(&self) -> &GroupedCountByteSize {
         &self.event_byte_size
     }
 

@@ -63,7 +63,7 @@ impl MetaDescriptive for AmqpRequest {
 /// A successful response from `AMQP`.
 pub(super) struct AmqpResponse {
     byte_size: usize,
-    json_size: RequestCountByteSize,
+    json_size: GroupedCountByteSize,
 }
 
 impl DriverResponse for AmqpResponse {
@@ -71,7 +71,7 @@ impl DriverResponse for AmqpResponse {
         EventStatus::Delivered
     }
 
-    fn events_sent(&self) -> &RequestCountByteSize {
+    fn events_sent(&self) -> &GroupedCountByteSize {
         &self.json_size
     }
 

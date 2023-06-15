@@ -14,7 +14,7 @@ pub use metrics::SharedString;
 
 pub use bytes_received::BytesReceived;
 pub use bytes_sent::BytesSent;
-pub use cached_event::{CachedEvent, RegisterEvent};
+pub use cached_event::{RegisterTaggedInternalEvent, RegisteredEventCache};
 pub use component_events_dropped::{ComponentEventsDropped, INTENTIONAL, UNINTENTIONAL};
 pub use events_received::EventsReceived;
 pub use events_sent::{EventsSent, TaggedEventsSent, DEFAULT_OUTPUT};
@@ -248,7 +248,7 @@ macro_rules! registered_event {
                     $emit_body
             }
 
-            $(impl $crate::internal_event::cached_event::RegisterEvent for $event {
+            $(impl $crate::internal_event::cached_event::RegisterTaggedInternalEvent for $event {
                 type Tags = $tags;
 
                 fn register(

@@ -20,7 +20,7 @@ use tracing::Instrument;
 use vector_common::{
     finalization::{EventStatus, Finalizable},
     json_size::JsonSize,
-    request_metadata::{MetaDescriptive, RequestCountByteSize, RequestMetadata},
+    request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata},
 };
 use vector_core::{
     sink::StreamSink,
@@ -240,7 +240,7 @@ impl RequestBuilder<(String, Vec<Event>)> for OpenDalRequestBuilder {
 /// OpenDalResponse is the response returned by OpenDAL services.
 #[derive(Debug)]
 pub struct OpenDalResponse {
-    pub events_byte_size: RequestCountByteSize,
+    pub events_byte_size: GroupedCountByteSize,
     pub byte_size: usize,
 }
 
@@ -249,7 +249,7 @@ impl DriverResponse for OpenDalResponse {
         EventStatus::Delivered
     }
 
-    fn events_sent(&self) -> &RequestCountByteSize {
+    fn events_sent(&self) -> &GroupedCountByteSize {
         &self.events_byte_size
     }
 

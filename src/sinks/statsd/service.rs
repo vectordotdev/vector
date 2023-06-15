@@ -4,7 +4,7 @@ use futures_util::future::BoxFuture;
 use tower::Service;
 use vector_common::{
     finalization::{EventFinalizers, EventStatus, Finalizable},
-    request_metadata::{MetaDescriptive, RequestCountByteSize, RequestMetadata},
+    request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata},
 };
 use vector_core::stream::DriverResponse;
 
@@ -49,7 +49,7 @@ impl DriverResponse for StatsdResponse {
         EventStatus::Delivered
     }
 
-    fn events_sent(&self) -> &RequestCountByteSize {
+    fn events_sent(&self) -> &GroupedCountByteSize {
         self.metadata.events_estimated_json_encoded_byte_size()
     }
 

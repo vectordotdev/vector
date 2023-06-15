@@ -216,13 +216,13 @@ impl EstimatedJsonEncodedSizeOf for LogEvent {
 
 impl GetEventCountTags for LogEvent {
     fn get_tags(&self) -> EventCountTags {
-        let source = if telemetry().tags().source() {
+        let source = if telemetry().tags().emit_source {
             self.metadata().source_id().map(ToString::to_string).into()
         } else {
             OptionalTag::Ignored
         };
 
-        let service = if telemetry().tags().service() {
+        let service = if telemetry().tags().emit_service {
             self.get_by_meaning("service")
                 .map(ToString::to_string)
                 .into()
@@ -230,7 +230,7 @@ impl GetEventCountTags for LogEvent {
             OptionalTag::Ignored
         };
 
-        (source, service)
+        EventCountTags { source, service }
     }
 }
 

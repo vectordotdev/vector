@@ -2,7 +2,10 @@ use std::{io, io::Write};
 
 use serde::Serialize;
 use vector_buffers::EventCount;
-use vector_common::{json_size::JsonSize, request_metadata::GetEventCountTags};
+use vector_common::{
+    json_size::JsonSize,
+    request_metadata::{EventCountTags, GetEventCountTags},
+};
 use vector_core::{event::Event, ByteSizeOf, EstimatedJsonEncodedSizeOf};
 
 use crate::{
@@ -48,7 +51,7 @@ impl EventCount for ProcessedEvent {
 }
 
 impl GetEventCountTags for ProcessedEvent {
-    fn get_tags(&self) -> vector_common::request_metadata::EventCountTags {
+    fn get_tags(&self) -> EventCountTags {
         self.log.get_tags()
     }
 }

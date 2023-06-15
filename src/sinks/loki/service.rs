@@ -49,7 +49,7 @@ impl DriverResponse for LokiResponse {
         EventStatus::Delivered
     }
 
-    fn events_sent(&self) -> &RequestCountByteSize {
+    fn events_sent(&self) -> &GroupedCountByteSize {
         self.metadata.events_estimated_json_encoded_byte_size()
     }
 

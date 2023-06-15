@@ -1,11 +1,28 @@
 use std::collections::HashMap;
 use std::ops::Add;
 
-use crate::internal_event::{CountByteSize, OptionalTag};
+use crate::internal_event::{
+    CountByteSize, InternalEventHandle, OptionalTag, RegisterTaggedInternalEvent,
+    RegisteredEventCache,
+};
 use crate::json_size::JsonSize;
 
 /// (Source, Service)
-pub type EventCountTags = (OptionalTag, OptionalTag);
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct EventCountTags {
+    pub source: OptionalTag,
+    pub service: OptionalTag,
+}
+
+impl EventCountTags {
+    #[must_use]
+    pub fn new_empty() -> Self {
+        Self {
+            source: OptionalTag::Specified(None),
+            service: OptionalTag::Specified(None),
+        }
+    }
+}
 
 /// Must be implemented by events to get the tags that will be attached to
 /// the `component_sent_event_*` emitted metrics.
@@ -16,7 +33,7 @@ pub trait GetEventCountTags {
 /// Keeps track of the estimated json size of a given batch of events by
 /// source and service.
 #[derive(Clone, Debug)]
-pub enum RequestCountByteSize {
+pub enum GroupedCountByteSize {
     /// When we need to keep track of the events by certain tags we use this
     /// variant.
     Tagged {
@@ -27,7 +44,7 @@ pub enum RequestCountByteSize {
     Untagged { size: CountByteSize },
 }
 
-impl Default for RequestCountByteSize {
+impl Default for GroupedCountByteSize {
     fn default() -> Self {
         Self::Untagged {
             size: CountByteSize(0, JsonSize::zero()),
@@ -35,7 +52,7 @@ impl Default for RequestCountByteSize {
     }
 }
 
-impl RequestCountByteSize {
+impl GroupedCountByteSize {
     /// Creates a new Tagged variant for when we need to track events by
     /// certain tags.
     #[must_use]
@@ -57,19 +74,21 @@ impl RequestCountByteSize {
     /// Returns a `HashMap` of tags => event counts for when we are tracking by tags.
     /// Returns `None` if we are not tracking by tags.
     #[must_use]
+    #[cfg(test)]
     pub fn sizes(&self) -> Option<&HashMap<EventCountTags, CountByteSize>> {
         match self {
-            RequestCountByteSize::Tagged { sizes } => Some(sizes),
-            RequestCountByteSize::Untagged { .. } => None,
+            Self::Tagged { sizes } => Some(sizes),
+            Self::Untagged { .. } => None,
         }
     }
 
     /// Returns a single count for when we are not tracking by tags.
     #[must_use]
-    pub fn size(&self) -> Option<CountByteSize> {
+    #[cfg(test)]
+    fn size(&self) -> Option<CountByteSize> {
         match self {
-            RequestCountByteSize::Tagged { .. } => None,
-            RequestCountByteSize::Untagged { size } => Some(*size),
+            Self::Tagged { .. } => None,
+            Self::Untagged { size } => Some(*size),
         }
     }
 
@@ -79,7 +98,7 @@ impl RequestCountByteSize {
         E: GetEventCountTags,
     {
         match self {
-            RequestCountByteSize::Tagged { sizes } => {
+            Self::Tagged { sizes } => {
                 let size = CountByteSize(1, json_size);
                 let tags = event.get_tags();
 
@@ -92,28 +111,43 @@ impl RequestCountByteSize {
                     }
                 }
             }
-            RequestCountByteSize::Untagged { size } => {
+            Self::Untagged { size } => {
                 *size += CountByteSize(1, json_size);
+            }
+        }
+    }
+
+    /// Emits our counts to a `RegisteredEvent` cached event.
+    pub fn emit_event<T, H>(&self, event_cache: &RegisteredEventCache<T>)
+    where
+        T: RegisterTaggedInternalEvent<Tags = EventCountTags, Handle = H>,
+        H: InternalEventHandle<Data = CountByteSize>,
+    {
+        match self {
+            GroupedCountByteSize::Tagged { sizes } => {
+                for (tags, size) in sizes {
+                    event_cache.emit(tags, *size);
+                }
+            }
+            GroupedCountByteSize::Untagged { size } => {
+                event_cache.emit(&EventCountTags::new_empty(), *size)
             }
         }
     }
 }
 
-impl From<CountByteSize> for RequestCountByteSize {
+impl From<CountByteSize> for GroupedCountByteSize {
     fn from(value: CountByteSize) -> Self {
         Self::Untagged { size: value }
     }
 }
 
-impl<'a> Add<&'a RequestCountByteSize> for RequestCountByteSize {
-    type Output = RequestCountByteSize;
+impl<'a> Add<&'a GroupedCountByteSize> for GroupedCountByteSize {
+    type Output = GroupedCountByteSize;
 
     fn add(self, other: &'a Self::Output) -> Self::Output {
         match (self, other) {
-            (
-                RequestCountByteSize::Tagged { sizes: mut us },
-                RequestCountByteSize::Tagged { sizes: them },
-            ) => {
+            (Self::Tagged { sizes: mut us }, Self::Tagged { sizes: them }) => {
                 for (key, value) in them {
                     match us.get_mut(key) {
                         Some(size) => *size += *value,
@@ -126,37 +160,27 @@ impl<'a> Add<&'a RequestCountByteSize> for RequestCountByteSize {
                 Self::Tagged { sizes: us }
             }
 
-            (
-                RequestCountByteSize::Untagged { size: us },
-                RequestCountByteSize::Untagged { size: them },
-            ) => RequestCountByteSize::Untagged { size: us + *them },
+            (Self::Untagged { size: us }, Self::Untagged { size: them }) => {
+                Self::Untagged { size: us + *them }
+            }
 
             // The following two scenarios shouldn't really occur in practice, but are provided for completeness.
-            (
-                RequestCountByteSize::Tagged { mut sizes },
-                RequestCountByteSize::Untagged { size },
-            ) => {
-                match sizes.get_mut(&(OptionalTag::Specified(None), OptionalTag::Specified(None))) {
+            (Self::Tagged { mut sizes }, Self::Untagged { size }) => {
+                match sizes.get_mut(&EventCountTags::new_empty()) {
                     Some(empty_size) => *empty_size += *size,
                     None => {
-                        sizes.insert(
-                            (OptionalTag::Specified(None), OptionalTag::Specified(None)),
-                            *size,
-                        );
+                        sizes.insert(EventCountTags::new_empty(), *size);
                     }
                 }
 
                 Self::Tagged { sizes }
             }
-            (RequestCountByteSize::Untagged { size }, RequestCountByteSize::Tagged { sizes }) => {
+            (Self::Untagged { size }, Self::Tagged { sizes }) => {
                 let mut sizes = sizes.clone();
-                match sizes.get_mut(&(OptionalTag::Specified(None), OptionalTag::Specified(None))) {
+                match sizes.get_mut(&EventCountTags::new_empty()) {
                     Some(empty_size) => *empty_size += size,
                     None => {
-                        sizes.insert(
-                            (OptionalTag::Specified(None), OptionalTag::Specified(None)),
-                            size,
-                        );
+                        sizes.insert(EventCountTags::new_empty(), size);
                     }
                 }
 
@@ -174,7 +198,7 @@ pub struct RequestMetadata {
     /// Size, in bytes, of the in-memory representation of all events in this batch request.
     events_byte_size: usize,
     /// Size, in bytes, of the estimated JSON-encoded representation of all events in this batch request.
-    events_estimated_json_encoded_byte_size: RequestCountByteSize,
+    events_estimated_json_encoded_byte_size: GroupedCountByteSize,
     /// Uncompressed size, in bytes, of the encoded events in this batch request.
     request_encoded_size: usize,
     /// On-the-wire size, in bytes, of the batch request itself after compression, etc.
@@ -190,7 +214,7 @@ impl RequestMetadata {
         events_byte_size: usize,
         request_encoded_size: usize,
         request_wire_size: usize,
-        events_estimated_json_encoded_byte_size: RequestCountByteSize,
+        events_estimated_json_encoded_byte_size: GroupedCountByteSize,
     ) -> Self {
         Self {
             event_count,
@@ -212,14 +236,14 @@ impl RequestMetadata {
     }
 
     #[must_use]
-    pub fn events_estimated_json_encoded_byte_size(&self) -> &RequestCountByteSize {
+    pub fn events_estimated_json_encoded_byte_size(&self) -> &GroupedCountByteSize {
         &self.events_estimated_json_encoded_byte_size
     }
 
     /// Consumes the object and returns the byte size of the request grouped by
     /// the tags (source and service).
     #[must_use]
-    pub fn into_events_estimated_json_encoded_byte_size(self) -> RequestCountByteSize {
+    pub fn into_events_estimated_json_encoded_byte_size(self) -> GroupedCountByteSize {
         self.events_estimated_json_encoded_byte_size
     }
 
@@ -236,7 +260,7 @@ impl RequestMetadata {
     /// Constructs a `RequestMetadata` by summation of the "batch" of `RequestMetadata` provided.
     #[must_use]
     pub fn from_batch<T: IntoIterator<Item = RequestMetadata>>(metadata_iter: T) -> Self {
-        let mut metadata_sum = RequestMetadata::new(0, 0, 0, 0, RequestCountByteSize::default());
+        let mut metadata_sum = RequestMetadata::new(0, 0, 0, 0, GroupedCountByteSize::default());
 
         for metadata in metadata_iter {
             metadata_sum = metadata_sum + &metadata;
@@ -284,13 +308,16 @@ mod tests {
 
     impl GetEventCountTags for DummyEvent {
         fn get_tags(&self) -> EventCountTags {
-            (self.source.clone(), self.service.clone())
+            EventCountTags {
+                source: self.source.clone(),
+                service: self.service.clone(),
+            }
         }
     }
 
     #[test]
     fn add_request_count_bytesize_event_untagged() {
-        let mut bytesize = RequestCountByteSize::new_untagged();
+        let mut bytesize = GroupedCountByteSize::new_untagged();
         let event = DummyEvent {
             source: Some("carrot".to_string()).into(),
             service: Some("cabbage".to_string()).into(),
@@ -311,7 +338,7 @@ mod tests {
 
     #[test]
     fn add_request_count_bytesize_event_tagged() {
-        let mut bytesize = RequestCountByteSize::new_tagged();
+        let mut bytesize = GroupedCountByteSize::new_tagged();
         let event = DummyEvent {
             source: OptionalTag::Ignored,
             service: Some("cabbage".to_string()).into(),
@@ -345,11 +372,17 @@ mod tests {
         assert_eq!(
             vec![
                 (
-                    (OptionalTag::Ignored, Some("cabbage".to_string()).into()),
+                    EventCountTags {
+                        source: OptionalTag::Ignored,
+                        service: Some("cabbage".to_string()).into()
+                    },
                     CountByteSize(2, JsonSize::new(78))
                 ),
                 (
-                    (OptionalTag::Ignored, Some("tomato".to_string()).into()),
+                    EventCountTags {
+                        source: OptionalTag::Ignored,
+                        service: Some("tomato".to_string()).into()
+                    },
                     CountByteSize(1, JsonSize::new(23))
                 ),
             ],

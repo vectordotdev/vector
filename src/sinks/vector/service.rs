@@ -8,7 +8,7 @@ use hyper_proxy::ProxyConnector;
 use prost::Message;
 use tonic::{body::BoxBody, IntoRequest};
 use tower::Service;
-use vector_common::request_metadata::{MetaDescriptive, RequestCountByteSize, RequestMetadata};
+use vector_common::request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata};
 use vector_core::stream::DriverResponse;
 
 use super::VectorSinkError;
@@ -28,7 +28,7 @@ pub struct VectorService {
 }
 
 pub struct VectorResponse {
-    events_byte_size: RequestCountByteSize,
+    events_byte_size: GroupedCountByteSize,
 }
 
 impl DriverResponse for VectorResponse {
@@ -36,7 +36,7 @@ impl DriverResponse for VectorResponse {
         EventStatus::Delivered
     }
 
-    fn events_sent(&self) -> &RequestCountByteSize {
+    fn events_sent(&self) -> &GroupedCountByteSize {
         &self.events_byte_size
     }
 }

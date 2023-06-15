@@ -13,7 +13,7 @@ use http::{
 use hyper::Body;
 use tower::Service;
 use tracing::Instrument;
-use vector_common::request_metadata::{MetaDescriptive, RequestCountByteSize, RequestMetadata};
+use vector_common::request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata};
 use vector_core::{
     event::{EventFinalizers, EventStatus, Finalizable},
     stream::DriverResponse,
@@ -58,7 +58,7 @@ impl DriverResponse for NewRelicApiResponse {
         self.event_status
     }
 
-    fn events_sent(&self) -> &RequestCountByteSize {
+    fn events_sent(&self) -> &GroupedCountByteSize {
         self.metadata.events_estimated_json_encoded_byte_size()
     }
 

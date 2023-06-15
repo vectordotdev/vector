@@ -1,4 +1,5 @@
 use once_cell::sync::{Lazy, OnceCell};
+use vector_common::request_metadata::GroupedCountByteSize;
 use vector_config::configurable_component;
 
 static TELEMETRY: OnceCell<Telemetry> = OnceCell::new();
@@ -39,17 +40,26 @@ pub struct Telemetry {
 impl Telemetry {
     /// Merge two `Telemetry` instances together.
     pub fn merge(&mut self, other: &Telemetry) {
-        self.tags.service = self.tags.service || other.tags.service;
-        self.tags.source = self.tags.source || other.tags.source;
+        self.tags.emit_service = self.tags.emit_service || other.tags.emit_service;
+        self.tags.emit_source = self.tags.emit_source || other.tags.emit_source;
     }
 
     /// Returns true if any of the tag options are true.
     pub fn has_tags(&self) -> bool {
-        self.tags.service || self.tags.source
+        self.tags.emit_service || self.tags.emit_source
     }
 
     pub fn tags(&self) -> &Tags {
         &self.tags
+    }
+
+    /// The variant of `GroupedCountByteSize`
+    pub fn create_request_count_byte_size(&self) -> GroupedCountByteSize {
+        if self.has_tags() {
+            GroupedCountByteSize::new_tagged()
+        } else {
+            GroupedCountByteSize::new_untagged()
+        }
     }
 }
 
@@ -58,27 +68,15 @@ impl Telemetry {
 #[derive(Clone, Debug, Eq, PartialEq, Default)]
 #[serde(default)]
 pub struct Tags {
-    /// Emit the service tag.
-    service: bool,
-
-    /// Emit the source tag.
-    source: bool,
-}
-
-impl Tags {
-    /// Returns true if the `service` tag should be emitted
+    /// True if the `service` tag should be emitted
     /// in the `component_received_*` and `component_sent_*`
     /// telemetry.
-    pub fn service(&self) -> bool {
-        self.service
-    }
+    pub emit_service: bool,
 
-    /// Returns true if the `source` tag should be emitted
+    /// True if the `source` tag should be emitted
     /// in the `component_received_*` and `component_sent_*`
     /// telemetry.
-    pub fn source(&self) -> bool {
-        self.source
-    }
+    pub emit_source: bool,
 }
 
 #[cfg(test)]
@@ -88,7 +86,7 @@ mod test {
     #[test]
     fn partial_telemetry() {
         let toml = r#"
-            source = true
+            emit_source = true
         "#;
         toml::from_str::<Telemetry>(toml).unwrap();
     }

@@ -14,7 +14,7 @@ use hyper::Body;
 use indexmap::IndexMap;
 use tower::Service;
 use tracing::Instrument;
-use vector_common::request_metadata::{MetaDescriptive, RequestCountByteSize, RequestMetadata};
+use vector_common::request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata};
 use vector_core::{
     event::{EventFinalizers, EventStatus, Finalizable},
     stream::DriverResponse,
@@ -67,7 +67,7 @@ impl MetaDescriptive for LogApiRequest {
 #[derive(Debug)]
 pub struct LogApiResponse {
     event_status: EventStatus,
-    events_byte_size: RequestCountByteSize,
+    events_byte_size: GroupedCountByteSize,
     raw_byte_size: usize,
 }
 
@@ -76,7 +76,7 @@ impl DriverResponse for LogApiResponse {
         self.event_status
     }
 
-    fn events_sent(&self) -> &RequestCountByteSize {
+    fn events_sent(&self) -> &GroupedCountByteSize {
         &self.events_byte_size
     }
 
