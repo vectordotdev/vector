@@ -155,8 +155,10 @@ mod tests {
     use futures::stream;
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
+    use vrl::value::Kind;
 
     use super::*;
+    use crate::schema::Definition;
     use crate::{
         event::{metric, Event, Metric},
         test_util::components::assert_transform_compliance,
@@ -173,7 +175,13 @@ mod tests {
         kind: metric::MetricKind,
         value: metric::MetricValue,
     ) -> Event {
-        Event::Metric(Metric::new(name, kind, value)).with_source_id(Arc::new(OutputId::from("in")))
+        let mut event = Event::Metric(Metric::new(name, kind, value))
+            .with_source_id(Arc::new(OutputId::from("in")))
+            .with_parent_id(Arc::new(OutputId::from("transform")));
+        event.metadata_mut().set_schema_definition(&Arc::new(
+            Definition::new_with_default_metadata(Kind::any_object(), [LogNamespace::Legacy]),
+        ));
+        event
     }
 
     #[test]

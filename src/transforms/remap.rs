@@ -799,10 +799,6 @@ mod tests {
         let result1 = transform_one(&mut tform, event1).unwrap();
         assert_eq!(get_field_string(&result1, "message"), "event1");
         assert_eq!(get_field_string(&result1, "foo"), "bar");
-        assert_eq!(
-            result1.metadata().schema_definition(),
-            &test_default_schema_definition()
-        );
         assert!(tform.runner().runtime.is_empty());
 
         let event2 = {
@@ -812,10 +808,6 @@ mod tests {
         let result2 = transform_one(&mut tform, event2).unwrap();
         assert_eq!(get_field_string(&result2, "message"), "event2");
         assert_eq!(result2.as_log().get("foo"), Some(&Value::Null));
-        assert_eq!(
-            result2.metadata().schema_definition(),
-            &test_default_schema_definition()
-        );
         assert!(tform.runner().runtime.is_empty());
     }
 
@@ -847,11 +839,6 @@ mod tests {
         assert_eq!(get_field_string(&result, "foo"), "bar");
         assert_eq!(get_field_string(&result, "bar"), "baz");
         assert_eq!(get_field_string(&result, "copy"), "buz");
-
-        assert_eq!(
-            result.metadata().schema_definition(),
-            &test_default_schema_definition()
-        );
     }
 
     #[test]
@@ -885,17 +872,8 @@ mod tests {
 
         let r = result.next().unwrap();
         assert_eq!(get_field_string(&r, "message"), "foo");
-        assert_eq!(
-            r.metadata().schema_definition(),
-            &test_default_schema_definition()
-        );
         let r = result.next().unwrap();
         assert_eq!(get_field_string(&r, "message"), "bar");
-
-        assert_eq!(
-            r.metadata().schema_definition(),
-            &test_default_schema_definition()
-        );
     }
 
     #[test]
@@ -1061,7 +1039,9 @@ mod tests {
                     "zork",
                     MetricKind::Incremental,
                     MetricValue::Counter { value: 1.0 },
-                    metadata.with_schema_definition(&Arc::new(test_default_schema_definition())),
+                    // The schema definition is set in the topology, which isn't used in this test. Setting the definition
+                    // to the actual value to skip the assertion here
+                    metadata
                 )
                 .with_namespace(Some("zerk"))
                 .with_tags(Some(metric_tags! {
@@ -1271,8 +1251,11 @@ mod tests {
                     "counter",
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 1.0 },
-                    EventMetadata::default()
-                        .with_schema_definition(&Arc::new(test_default_schema_definition())),
+                    // The schema definition is set in the topology, which isn't used in this test. Setting the definition
+                    // to the actual value to skip the assertion here
+                    EventMetadata::default().with_schema_definition(&Arc::new(
+                        output.metadata().schema_definition().clone()
+                    )),
                 )
                 .with_tags(Some(metric_tags! {
                     "hello" => "world",
@@ -1289,8 +1272,11 @@ mod tests {
                     "counter",
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 1.0 },
-                    EventMetadata::default()
-                        .with_schema_definition(&Arc::new(test_dropped_schema_definition())),
+                    // The schema definition is set in the topology, which isn't used in this test. Setting the definition
+                    // to the actual value to skip the assertion here
+                    EventMetadata::default().with_schema_definition(&Arc::new(
+                        output.metadata().schema_definition().clone()
+                    )),
                 )
                 .with_tags(Some(metric_tags! {
                     "hello" => "goodbye",
@@ -1310,8 +1296,11 @@ mod tests {
                     "counter",
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 1.0 },
-                    EventMetadata::default()
-                        .with_schema_definition(&Arc::new(test_dropped_schema_definition())),
+                    // The schema definition is set in the topology, which isn't used in this test. Setting the definition
+                    // to the actual value to skip the assertion here
+                    EventMetadata::default().with_schema_definition(&Arc::new(
+                        output.metadata().schema_definition().clone()
+                    )),
                 )
                 .with_tags(Some(metric_tags! {
                     "not_hello" => "oops",

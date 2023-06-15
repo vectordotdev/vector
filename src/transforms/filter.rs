@@ -103,6 +103,7 @@ mod test {
     use vector_core::event::{Metric, MetricKind, MetricValue};
 
     use super::*;
+    use crate::config::schema::Definition;
     use crate::{
         conditions::ConditionConfig,
         event::{Event, LogEvent},
@@ -128,6 +129,10 @@ mod test {
             tx.send(log.clone()).await.unwrap();
 
             log.set_source_id(Arc::new(OutputId::from("in")));
+            log.set_parent_id(Arc::new(OutputId::from("transform")));
+            log.metadata_mut()
+                .set_schema_definition(&Arc::new(Definition::default_legacy_namespace()));
+
             assert_eq!(out.recv().await.unwrap(), log);
 
             let metric = Event::from(Metric::new(

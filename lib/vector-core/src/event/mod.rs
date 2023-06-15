@@ -304,6 +304,13 @@ impl Event {
         self.metadata_mut().set_source_id(source_id);
         self
     }
+
+    /// Sets the `source_id` in the event metadata to the provided value.
+    #[must_use]
+    pub fn with_parent_id(mut self, parent_id: Arc<OutputId>) -> Self {
+        self.metadata_mut().set_parent_id(parent_id);
+        self
+    }
 }
 
 impl EventDataEq for Event {

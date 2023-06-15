@@ -91,6 +91,16 @@ async fn drop_event(config: TagCardinalityLimitConfig) {
         event1.set_source_id(Arc::new(OutputId::from("in")));
         event2.set_source_id(Arc::new(OutputId::from("in")));
 
+        event1.set_parent_id(Arc::new(OutputId::from("transform")));
+        event2.set_parent_id(Arc::new(OutputId::from("transform")));
+
+        event1.metadata_mut().set_schema_definition(&Arc::new(
+            Definition::new_with_default_metadata(Kind::any_object(), [LogNamespace::Legacy]),
+        ));
+        event2.metadata_mut().set_schema_definition(&Arc::new(
+            Definition::new_with_default_metadata(Kind::any_object(), [LogNamespace::Legacy]),
+        ));
+
         assert_eq!(new_event1, Some(event1));
         assert_eq!(new_event2, Some(event2));
         // Third value rejected since value_limit is 2.
@@ -142,16 +152,15 @@ async fn drop_tag(config: TagCardinalityLimitConfig) {
         event2.set_parent_id(Arc::new(OutputId::from("transform")));
         event3.set_parent_id(Arc::new(OutputId::from("transform")));
 
-        // definitions aren't valid for metrics yet, it's just set to the default (anything).
         event1.metadata_mut().set_schema_definition(&Arc::new(
-            Definition::new_with_default_metadata(Kind::any(), [LogNamespace::Legacy]),
+            Definition::new_with_default_metadata(Kind::any_object(), [LogNamespace::Legacy]),
         ));
-        event2
-            .metadata_mut()
-            .set_schema_definition(&Arc::new(Definition::any()));
-        event3
-            .metadata_mut()
-            .set_schema_definition(&Arc::new(Definition::any()));
+        event2.metadata_mut().set_schema_definition(&Arc::new(
+            Definition::new_with_default_metadata(Kind::any_object(), [LogNamespace::Legacy]),
+        ));
+        event3.metadata_mut().set_schema_definition(&Arc::new(
+            Definition::new_with_default_metadata(Kind::any_object(), [LogNamespace::Legacy]),
+        ));
 
         assert_eq!(new_event1, Some(event1));
         assert_eq!(new_event2, Some(event2));
@@ -225,6 +234,21 @@ async fn drop_tag_multi_value(config: TagCardinalityLimitConfig) {
         event2.set_source_id(Arc::new(OutputId::from("in")));
         event3.set_source_id(Arc::new(OutputId::from("in")));
 
+        event1.set_parent_id(Arc::new(OutputId::from("transform")));
+        event2.set_parent_id(Arc::new(OutputId::from("transform")));
+        event3.set_parent_id(Arc::new(OutputId::from("transform")));
+
+        // definitions aren't valid for metrics yet, it's just set to the default (anything).
+        event1.metadata_mut().set_schema_definition(&Arc::new(
+            Definition::new_with_default_metadata(Kind::any_object(), [LogNamespace::Legacy]),
+        ));
+        event2.metadata_mut().set_schema_definition(&Arc::new(
+            Definition::new_with_default_metadata(Kind::any_object(), [LogNamespace::Legacy]),
+        ));
+        event3.metadata_mut().set_schema_definition(&Arc::new(
+            Definition::new_with_default_metadata(Kind::any_object(), [LogNamespace::Legacy]),
+        ));
+
         drop(tx);
         topology.stop().await;
 
@@ -274,6 +298,21 @@ async fn separate_value_limit_per_tag(config: TagCardinalityLimitConfig) {
         event1.set_source_id(Arc::new(OutputId::from("in")));
         event2.set_source_id(Arc::new(OutputId::from("in")));
         event3.set_source_id(Arc::new(OutputId::from("in")));
+
+        event1.set_parent_id(Arc::new(OutputId::from("transform")));
+        event2.set_parent_id(Arc::new(OutputId::from("transform")));
+        event3.set_parent_id(Arc::new(OutputId::from("transform")));
+
+        // definitions aren't valid for metrics yet, it's just set to the default (anything).
+        event1.metadata_mut().set_schema_definition(&Arc::new(
+            Definition::new_with_default_metadata(Kind::any_object(), [LogNamespace::Legacy]),
+        ));
+        event2.metadata_mut().set_schema_definition(&Arc::new(
+            Definition::new_with_default_metadata(Kind::any_object(), [LogNamespace::Legacy]),
+        ));
+        event3.metadata_mut().set_schema_definition(&Arc::new(
+            Definition::new_with_default_metadata(Kind::any_object(), [LogNamespace::Legacy]),
+        ));
 
         assert_eq!(new_event1, Some(event1));
         assert_eq!(new_event2, Some(event2));
