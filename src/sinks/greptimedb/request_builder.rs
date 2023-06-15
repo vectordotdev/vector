@@ -72,9 +72,9 @@ pub(super) fn metric_to_insert_request(metric: Metric) -> InsertRequest {
 
     // fields
     match metric.value() {
-        MetricValue::Counter { value } => columns.push(f64_field("value", *value)),
-        MetricValue::Gauge { value } => columns.push(f64_field("value", *value)),
-        MetricValue::Set { values } => columns.push(f64_field("value", values.len() as f64)),
+        MetricValue::Counter { value } => columns.push(f64_field("val", *value)),
+        MetricValue::Gauge { value } => columns.push(f64_field("val", *value)),
+        MetricValue::Set { values } => columns.push(f64_field("val", values.len() as f64)),
         MetricValue::Distribution { samples, .. } => {
             encode_distribution(samples, &mut columns);
         }
@@ -214,9 +214,9 @@ mod tests {
             .collect::<Vec<&str>>();
         assert!(column_names.contains(&"ts"));
         assert!(column_names.contains(&"host"));
-        assert!(column_names.contains(&"value"));
+        assert!(column_names.contains(&"val"));
 
-        assert_eq!(get_column(&insert.columns, "value"), 1.1);
+        assert_eq!(get_column(&insert.columns, "val"), 1.1);
 
         let metric2 = Metric::new(
             "load1",
@@ -237,7 +237,7 @@ mod tests {
         let insert = metric_to_insert_request(metric);
         assert_eq!(insert.columns.len(), 2);
 
-        assert_eq!(get_column(&insert.columns, "value"), 1.1);
+        assert_eq!(get_column(&insert.columns, "val"), 1.1);
     }
 
     #[test]
@@ -252,7 +252,7 @@ mod tests {
         let insert = metric_to_insert_request(metric);
         assert_eq!(insert.columns.len(), 2);
 
-        assert_eq!(get_column(&insert.columns, "value"), 2.0);
+        assert_eq!(get_column(&insert.columns, "val"), 2.0);
     }
 
     #[test]

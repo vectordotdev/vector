@@ -48,7 +48,7 @@ async fn test_greptimedb_sink() {
             "{}/v1/sql",
             std::env::var("GREPTIMEDB_HTTP").unwrap_or_else(|_| "http://localhost:4000".to_owned())
         ))
-        .query(&[("sql", "SELECT region, value FROM ns_my_counter")])
+        .query(&[("sql", "SELECT region, val FROM ns_my_counter")])
         .send()
         .await
         .unwrap()
