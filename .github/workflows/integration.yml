@@ -39,7 +39,7 @@ jobs:
     secrets: inherit
 
   integration-tests:
-    name: Integration Test Suite
+    name: Integration Tests
     runs-on: ubuntu-latest
     needs: changes
     timeout-minutes: 45
