@@ -772,13 +772,6 @@ jobs:
   #           -f context='Regression Detection Suite / analyze-experiment' \
   #           -f target_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
-  fail:
-    name: fail
-    runs-on: ubuntu-latest
-    needs:
-      - compute-metadata
-    steps:
-      - run: exit 1
 
   # This job always runs- if an issue_comment triggered it, we need to update the check status in the PR,
   # and if a pull_request triggered it, we need to flag the check status as a success.
@@ -788,7 +781,6 @@ jobs:
     if: always()
     needs:
       - compute-metadata
-      - fail
       # - build-baseline
       # - build-comparison
       # - confirm-valid-credentials

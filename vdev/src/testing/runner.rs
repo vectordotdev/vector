@@ -63,8 +63,6 @@ pub fn full_runner_available() -> Result<bool> {
         &format!("vector-test-runner-{}", get_rust_version()),
     ]);
 
-    // example output for positive case:
-    //
     // $ docker image ls vector-test-runner-1.69.0
     // REPOSITORY                  TAG       IMAGE ID       CREATED       SIZE
     // vector-test-runner-1.69.0   latest    7e5e70a96428   13 days ago   1.76GB
