@@ -58,7 +58,6 @@ jobs:
         run: cargo vdev -v int test -a amqp ; cargo vdev -v int stop amqp
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.appsignal == 'true' }}
-        env:
         run: cargo vdev -v int test -a appsignal ; cargo vdev -v int stop appsignal
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.aws == 'true' }}
