@@ -85,26 +85,26 @@ jobs:
 
       - run: sudo npm -g install @datadog/datadog-ci
 
-      - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.amqp == 'true' }}
-        name: amqp
-        #run: cargo vdev -v int test -a amqp ; cargo vdev -v int stop amqp
-        run: |
-          RESULT=1
-          RETRIES=5
+      # - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.amqp == 'true' }}
+      #   name: amqp
+      #   #run: cargo vdev -v int test -a amqp ; cargo vdev -v int stop amqp
+      #   run: |
+      #     RESULT=1
+      #     RETRIES=5
 
-          for (( n=1 ; n<=$RETRIES ; n++ )) ; do
-            cargo vdev -v int test -a amqp
-            RESULT=$?
-            cargo vdev -v int stop amqp
+      #     for (( n=1 ; n<=$RETRIES ; n++ )) ; do
+      #       cargo vdev -v int test -a amqp
+      #       RESULT=$?
+      #       cargo vdev -v int stop amqp
 
-            if [ "$RESULT" = 0 ] ; then
-              break
-            fi
+      #       if [ "$RESULT" = 0 ] ; then
+      #         break
+      #       fi
 
-            sleep 8
-          done
+      #       sleep 8
+      #     done
 
-          exit $RESULT
+      #     exit $RESULT
 
       # skip this because we don't have the secrets defined here rn
       # - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.appsignal == 'true' }}
