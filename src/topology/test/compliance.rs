@@ -6,6 +6,7 @@ use vector_core::{
     event::{Event, EventArray, EventContainer, LogEvent},
 };
 
+use crate::config::schema::Definition;
 use crate::{
     config::{unit_test::UnitTestSourceConfig, ConfigBuilder},
     test_util::{
@@ -59,6 +60,10 @@ async fn test_function_transform_single_event() {
         assert_eq!(events.len(), 1);
 
         original_event.set_source_id(Arc::new(OutputId::from("in")));
+        original_event.set_parent_id(Arc::new(OutputId::from("transform")));
+        original_event
+            .metadata_mut()
+            .set_schema_definition(&Arc::new(Definition::default_legacy_namespace()));
 
         let event = events.remove(0);
         assert_eq!(original_event, event);
@@ -80,6 +85,10 @@ async fn test_sync_transform_single_event() {
         assert_eq!(events.len(), 1);
 
         original_event.set_source_id(Arc::new(OutputId::from("in")));
+        original_event.set_parent_id(Arc::new(OutputId::from("transform")));
+        original_event
+            .metadata_mut()
+            .set_schema_definition(&Arc::new(Definition::default_legacy_namespace()));
 
         let event = events.remove(0);
         assert_eq!(original_event, event);
@@ -100,6 +109,10 @@ async fn test_task_transform_single_event() {
         assert_eq!(events.len(), 1);
 
         original_event.set_source_id(Arc::new(OutputId::from("in")));
+        original_event.set_parent_id(Arc::new(OutputId::from("transform")));
+        original_event
+            .metadata_mut()
+            .set_schema_definition(&Arc::new(Definition::default_legacy_namespace()));
 
         let event = events.remove(0);
         assert_eq!(original_event, event);

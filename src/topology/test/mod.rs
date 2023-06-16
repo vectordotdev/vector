@@ -7,6 +7,7 @@ use std::{
     },
 };
 
+use crate::schema::Definition;
 use crate::{
     config::{Config, ConfigDiff, SinkOuter},
     event::{into_event_stream, Event, EventArray, EventContainer, LogEvent},
@@ -149,6 +150,10 @@ async fn topology_source_and_sink() {
     let res = out1.flat_map(into_event_stream).collect::<Vec<_>>().await;
 
     event.set_source_id(Arc::new(OutputId::from("in1")));
+    event.set_parent_id(Arc::new(OutputId::from("test")));
+    event
+        .metadata_mut()
+        .set_schema_definition(&Arc::new(Definition::default_legacy_namespace()));
 
     assert_eq!(vec![event], res);
 }
@@ -184,6 +189,16 @@ async fn topology_multiple_sources() {
     event1.set_source_id(Arc::new(OutputId::from("in1")));
     event2.set_source_id(Arc::new(OutputId::from("in2")));
 
+    event1.set_parent_id(Arc::new(OutputId::from("test")));
+    event1
+        .metadata_mut()
+        .set_schema_definition(&Arc::new(Definition::default_legacy_namespace()));
+
+    event2.set_parent_id(Arc::new(OutputId::from("test")));
+    event2
+        .metadata_mut()
+        .set_schema_definition(&Arc::new(Definition::default_legacy_namespace()));
+
     assert_eq!(out_event1, Some(event1.into()));
     assert_eq!(out_event2, Some(event2.into()));
 }
@@ -218,6 +233,12 @@ async fn topology_multiple_sinks() {
 
     // We should see that both sinks got the exact same event:
     event.set_source_id(Arc::new(OutputId::from("in1")));
+
+    event.set_parent_id(Arc::new(OutputId::from("test")));
+    event
+        .metadata_mut()
+        .set_schema_definition(&Arc::new(Definition::default_legacy_namespace()));
+
     let expected = vec![event];
     assert_eq!(expected, res1);
     assert_eq!(expected, res2);
@@ -293,6 +314,11 @@ async fn topology_remove_one_source() {
 
     event1.set_source_id(Arc::new(OutputId::from("in1")));
 
+    event1.set_parent_id(Arc::new(OutputId::from("test")));
+    event1
+        .metadata_mut()
+        .set_schema_definition(&Arc::new(Definition::default_legacy_namespace()));
+
     let res = h_out1.await.unwrap();
     assert_eq!(vec![event1], res);
 }
@@ -331,6 +357,11 @@ async fn topology_remove_one_sink() {
     let res2 = out2.flat_map(into_event_stream).collect::<Vec<_>>().await;
 
     event.set_source_id(Arc::new(OutputId::from("in1")));
+
+    event.set_parent_id(Arc::new(OutputId::from("test")));
+    event
+        .metadata_mut()
+        .set_schema_definition(&Arc::new(Definition::default_legacy_namespace()));
 
     assert_eq!(vec![event], res1);
     assert_eq!(Vec::<Event>::new(), res2);
@@ -442,6 +473,10 @@ async fn topology_swap_source() {
     assert_eq!(Vec::<Event>::new(), res1);
 
     event2.set_source_id(Arc::new(OutputId::from("in2")));
+    event2.set_parent_id(Arc::new(OutputId::from("test")));
+    event2
+        .metadata_mut()
+        .set_schema_definition(&Arc::new(Definition::default_legacy_namespace()));
     assert_eq!(vec![event2], res2);
 }
 
@@ -554,6 +589,10 @@ async fn topology_swap_sink() {
     assert_eq!(Vec::<Event>::new(), res1);
 
     event1.set_source_id(Arc::new(OutputId::from("in1")));
+    event1.set_parent_id(Arc::new(OutputId::from("test")));
+    event1
+        .metadata_mut()
+        .set_schema_definition(&Arc::new(Definition::default_legacy_namespace()));
     assert_eq!(vec![event1], res2);
 }
 
@@ -663,6 +702,15 @@ async fn topology_rebuild_connected() {
     event1.set_source_id(Arc::new(OutputId::from("in1")));
     event2.set_source_id(Arc::new(OutputId::from("in1")));
 
+    event1.set_parent_id(Arc::new(OutputId::from("test")));
+    event2.set_parent_id(Arc::new(OutputId::from("test")));
+    event1
+        .metadata_mut()
+        .set_schema_definition(&Arc::new(Definition::default_legacy_namespace()));
+    event2
+        .metadata_mut()
+        .set_schema_definition(&Arc::new(Definition::default_legacy_namespace()));
+
     assert_eq!(vec![event1, event2], res);
 }
 
@@ -715,6 +763,10 @@ async fn topology_rebuild_connected_transform() {
     assert_eq!(Vec::<Event>::new(), res1);
 
     event.set_source_id(Arc::new(OutputId::from("in1")));
+    event.set_parent_id(Arc::new(OutputId::from("test")));
+    event
+        .metadata_mut()
+        .set_schema_definition(&Arc::new(Definition::default_legacy_namespace()));
 
     assert_eq!(vec![event], res2);
 }
