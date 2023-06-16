@@ -83,8 +83,6 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - run: make ci-sweep
-
       - run: sudo npm -g install @datadog/datadog-ci
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.amqp == 'true' }}
