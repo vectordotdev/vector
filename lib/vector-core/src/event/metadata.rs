@@ -196,10 +196,6 @@ impl EventMetadata {
     pub fn merge(&mut self, other: Self) {
         self.finalizers.merge(other.finalizers);
         self.secrets.merge(other.secrets);
-
-        if self.parent_id.is_none() {
-            self.parent_id = other.parent_id;
-        }
     }
 
     /// Update the finalizer(s) status.

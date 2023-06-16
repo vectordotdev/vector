@@ -313,6 +313,13 @@ pub fn update_runtime_schema_definition(
             if let Some(definition) = log_schema_definitions.get(parent_component_id) {
                 log.metadata_mut().set_schema_definition(definition);
             }
+        } else {
+            // there is no parent defined. That means this ven originated from a component that
+            // isn't able to track the source, such as `reduce` or `lua`. In these cases, all of the
+            // schema definitions _must_ be the same, so the first one is picked
+            if let Some(definition) = log_schema_definitions.values().next() {
+                log.metadata_mut().set_schema_definition(definition);
+            }
         }
     }
     event.metadata_mut().set_parent_id(Arc::clone(output_id));
