@@ -771,7 +771,6 @@ jobs:
   #           -f context='Regression Detection Suite / analyze-experiment' \
   #           -f target_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
-
   # This job always runs- if an issue_comment triggered it, we need to update the check status in the PR,
   # and if a pull_request triggered it, we need to flag the check status as a success.
   regression-detection-suite:
@@ -805,24 +804,19 @@ jobs:
           context: Regression Detection Suite
           status: 'failure'
 
-      - name: Set up Docker Buildx
-        id: buildx
-        uses: docker/setup-buildx-action@v2.7.0
-
-      - name: Build 'vector' target image
-        uses: docker/build-push-action@v4.1.1
+      - name: (PR comment) Submit PR result as success
+        if: github.event_name == 'issue_comment' && env.FAILED != 'true'
+        uses: myrotvorets/set-commit-status-action@1.1.6
         with:
-          context: baseline-vector/
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          file: regression/Dockerfile
-          builder: ${{ steps.buildx.outputs.name }}
-          outputs: type=docker,dest=${{ runner.temp }}/baseline-image.tar
-          tags: |
-            vector:${{ needs.compute-metadata.outputs.baseline-tag }}
+          sha: ${{ steps.comment-branch.outputs.head_sha }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          context: Regression Detection Suite
+          status: 'success'
 
-      - name: Upload image as artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: baseline-image
-          path: "${{ runner.temp }}/baseline-image.tar"
+      - name: exit
+        run: |
+          echo "failed=${{ env.FAILED }}"
+          if [[ "$FAILED" == "true" ]] ; then
+            exit 1
+          else
+            exit 0
