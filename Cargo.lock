@@ -9269,6 +9269,7 @@ dependencies = [
  "vector-config",
  "vector-config-common",
  "vector-config-macros",
+ "vector-config-regex",
  "vector-core",
  "vector-lookup",
  "vector-vrl-functions",
@@ -9430,6 +9431,10 @@ dependencies = [
  "vector-config",
  "vector-config-common",
 ]
+
+[[package]]
+name = "vector-config-regex"
+version = "0.1.0"
 
 [[package]]
 name = "vector-core"

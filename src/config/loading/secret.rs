@@ -27,7 +27,7 @@ use crate::{
 // - "SECRET[secret_name]" will not match
 // - "SECRET[.secret.name]" will not match
 pub static COLLECTOR: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"SECRET\[([[:word:]]+)\.([[:word:].]+)\]").unwrap());
+    Lazy::new(|| Regex::new(vector_config_regex::SECRET_COLLECTOR_REGEX).unwrap());
 
 /// Helper type for specifically deserializing secrets backends.
 #[derive(Debug, Default, Deserialize, Serialize)]

@@ -11,13 +11,7 @@ use regex::{Captures, Regex};
 //
 // https://pubs.opengroup.org/onlinepubs/000095399/basedefs/xbd_chap08.html
 pub static ENVIRONMENT_VARIABLE_INTERPOLATION_REGEX: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(
-        r"(?x)
-        \$\$|
-        \$([[:word:].]+)|
-        \$\{([[:word:].]+)(?:(:?-|:?\?)([^}]*))?\}",
-    )
-    .unwrap()
+    Regex::new(vector_config_regex::ENVIRONMENT_VARIABLE_INTERPOLATION_REGEX).unwrap()
 });
 
 /// (result, warnings)
