@@ -1,6 +1,5 @@
 use std::path::PathBuf;
 
-use bytes::Bytes;
 use chrono::Utc;
 use codecs::decoding::{DeserializerConfig, FramingConfig};
 use lookup::{lookup_v2::OptionalValuePath, path};
@@ -14,6 +13,7 @@ use crate::{
     serde::default_decoding,
     sources::{
         util::{build_unix_datagram_source, build_unix_stream_source},
+        util::unix::UnixSocketMetadata,
         Source,
     },
     SourceSender,
@@ -93,7 +93,7 @@ impl UnixConfig {
 fn handle_events(
     events: &mut [Event],
     host_key: &OptionalValuePath,
-    received_from: Option<Bytes>,
+    socket_metadata: &UnixSocketMetadata,
     log_namespace: LogNamespace,
 ) {
     let now = Utc::now();
@@ -103,17 +103,15 @@ fn handle_events(
 
         log_namespace.insert_standard_vector_source_metadata(log, SocketConfig::NAME, now);
 
-        if let Some(ref host) = received_from {
-            let legacy_host_key = host_key.clone().path;
+        let legacy_host_key = host_key.clone().path;
 
-            log_namespace.insert_source_metadata(
-                SocketConfig::NAME,
-                log,
-                legacy_host_key.as_ref().map(LegacyKey::InsertIfEmpty),
-                path!("host"),
-                host.clone(),
-            );
-        }
+        log_namespace.insert_source_metadata(
+            SocketConfig::NAME,
+            log,
+            legacy_host_key.as_ref().map(LegacyKey::InsertIfEmpty),
+            path!("host"),
+            socket_metadata.peer_path_or_default().clone(),
+        );
     }
 }
 
@@ -139,8 +137,8 @@ pub(super) fn unix_datagram(
         config.socket_file_mode,
         max_length,
         decoder,
-        move |events, received_from| {
-            handle_events(events, &config.host_key, received_from, log_namespace)
+        move |events, socket_metadata| {
+            handle_events(events, &config.host_key, socket_metadata, log_namespace)
         },
         shutdown,
         out,
@@ -158,8 +156,8 @@ pub(super) fn unix_stream(
         config.path,
         config.socket_file_mode,
         decoder,
-        move |events, received_from| {
-            handle_events(events, &config.host_key, received_from, log_namespace)
+        move |events, socket_metadata| {
+            handle_events(events, &config.host_key, socket_metadata, log_namespace)
         },
         shutdown,
         out,

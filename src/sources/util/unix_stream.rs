@@ -1,6 +1,5 @@
 use std::{fs::remove_file, path::PathBuf, time::Duration};
 
-use bytes::Bytes;
 use codecs::StreamDecodingError;
 use futures::{FutureExt, StreamExt};
 use tokio::{
@@ -25,7 +24,7 @@ use crate::{
     },
     shutdown::ShutdownSignal,
     sources::util::change_socket_permissions,
-    sources::util::unix::UNNAMED_SOCKET_HOST,
+    sources::util::unix::UnixSocketMetadata,
     sources::Source,
     SourceSender,
 };
@@ -38,7 +37,7 @@ pub fn build_unix_stream_source(
     listen_path: PathBuf,
     socket_file_mode: Option<u32>,
     decoder: Decoder,
-    handle_events: impl Fn(&mut [Event], Option<Bytes>) + Clone + Send + Sync + 'static,
+    handle_events: impl Fn(&mut [Event], &UnixSocketMetadata) + Clone + Send + Sync + 'static,
     shutdown: ShutdownSignal,
     out: SourceSender,
 ) -> crate::Result<Source> {
@@ -71,24 +70,12 @@ pub fn build_unix_stream_source(
 
             let listen_path = listen_path.clone();
 
-            let span = info_span!("connection");
+            let socket_metadata = get_socket_metadata(&socket);
 
-            let received_from: Bytes = socket
-                .peer_addr()
-                .ok()
-                .and_then(|addr| {
-                    addr.as_pathname().map(|e| e.to_owned()).map({
-                        |path| {
-                            span.record("peer_path", &field::debug(&path));
-                            path.to_string_lossy().into_owned().into()
-                        }
-                    })
-                })
-                // In most cases, we'll be connecting to this socket from
-                // an unnamed socket (a socket not bound to a
-                // file). Instead of a filename, we'll surface a specific
-                // host value.
-                .unwrap_or_else(|| UNNAMED_SOCKET_HOST.into());
+            let span = info_span!("connection");
+            if let Some(peer_path) = socket_metadata.peer_path.as_ref() {
+                span.record("peer_path", field::debug(peer_path));
+            }
 
             let handle_events = handle_events.clone();
 
@@ -115,7 +102,7 @@ pub fn build_unix_stream_source(
                                     count: events.len(),
                                 });
 
-                                handle_events(&mut events, Some(received_from.clone()));
+                                handle_events(&mut events, &socket_metadata);
 
                                 let count = events.len();
                                 if (out.send_batch(events).await).is_err() {
@@ -161,4 +148,31 @@ pub fn build_unix_stream_source(
 
         Ok(())
     }))
+}
+
+// This method gets all the metadata we can about the socket. It unconditionally returns
+// a UnixSocketMetadata object containing everything we found out about it through various
+// system calls (which could be nothing - each of the _fields_ in UnixSocketMetadata is
+// an Optional).
+fn get_socket_metadata(socket: &tokio::net::UnixStream) -> UnixSocketMetadata {
+    // First thing to try - use getpeername(2) to see if the associated socket has a name.
+    let peer_path = socket
+        .peer_addr()
+        .map_err(|error| {
+            // Log & throw error away
+            debug!(message = "getpeername(2) failed.", %error);
+            ()
+        })
+        .ok()
+        .and_then(|addr| {
+            addr.as_pathname().map(|p| { p.to_owned() })
+        })
+        .map(|path| -> String {
+            path.to_string_lossy().into()
+        });
+
+
+    UnixSocketMetadata{
+        peer_path: peer_path,
+    }
 }

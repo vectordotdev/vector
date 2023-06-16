@@ -19,3 +19,21 @@ pub fn change_socket_permissions(path: &Path, perms: Option<u32>) -> crate::Resu
     }
     Ok(())
 }
+
+/// This structure defines the various kinds of metadata we can
+/// collect off a connected unix-domain socket and expose as source fields.
+pub struct UnixSocketMetadata {
+    /// The peer address of the socket, as returned from getpeername(2). This
+    /// will usually not be set (unless the connecting peer has explicitly
+    /// bound their socket to a path).
+    pub peer_path: Option<String>,
+}
+
+impl UnixSocketMetadata {
+    pub fn peer_path_or_default(&self) -> &str {
+        match &self.peer_path {
+            Some(path) => &path,
+            None => UNNAMED_SOCKET_HOST,
+        }
+    }
+}

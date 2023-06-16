@@ -233,7 +233,13 @@ impl SourceConfig for SyslogConfig {
                     path,
                     socket_file_mode,
                     decoder,
-                    move |events, host| handle_events(events, &host_key, host, log_namespace),
+                    move |events, socket_metadata| {
+                        // handle_events expects to own its default hostname, so we must copy.
+                        let default_hostname = Some(
+                            Bytes::copy_from_slice(socket_metadata.peer_path_or_default().as_bytes())
+                        );
+                        handle_events(events, &host_key, default_hostname, log_namespace)
+                    },
                     cx.shutdown,
                     cx.out,
                 )

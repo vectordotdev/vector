@@ -1,6 +1,6 @@
 use std::{fs::remove_file, path::PathBuf};
 
-use bytes::{Bytes, BytesMut};
+use bytes::BytesMut;
 use codecs::StreamDecodingError;
 use futures::StreamExt;
 use tokio::net::UnixDatagram;
@@ -18,7 +18,7 @@ use crate::{
     },
     shutdown::ShutdownSignal,
     sources::util::change_socket_permissions,
-    sources::util::unix::UNNAMED_SOCKET_HOST,
+    sources::util::unix::UnixSocketMetadata,
     sources::Source,
     SourceSender,
 };
@@ -32,7 +32,7 @@ pub fn build_unix_datagram_source(
     socket_file_mode: Option<u32>,
     max_length: usize,
     decoder: Decoder,
-    handle_events: impl Fn(&mut [Event], Option<Bytes>) + Clone + Send + Sync + 'static,
+    handle_events: impl Fn(&mut [Event], &UnixSocketMetadata) + Clone + Send + Sync + 'static,
     shutdown: ShutdownSignal,
     out: SourceSender,
 ) -> crate::Result<Source> {
@@ -62,7 +62,7 @@ async fn listen(
     max_length: usize,
     decoder: Decoder,
     mut shutdown: ShutdownSignal,
-    handle_events: impl Fn(&mut [Event], Option<Bytes>) + Clone + Send + Sync + 'static,
+    handle_events: impl Fn(&mut [Event], &UnixSocketMetadata) + Clone + Send + Sync + 'static,
     mut out: SourceSender,
 ) -> Result<(), ()> {
     let mut buf = BytesMut::with_capacity(max_length);
@@ -79,22 +79,9 @@ async fn listen(
                     })
                 })?;
 
+                let socket_metadata = get_socket_metadata(&socket, &address);
                 let span = info_span!("datagram");
-                let received_from = if !address.is_unnamed() {
-                    let path = address.as_pathname().map(|e| e.to_owned()).map(|path| {
-                        span.record("peer_path", &field::debug(&path));
-                        path
-                    });
-
-                    path.map(|p| p.to_string_lossy().into_owned().into())
-                } else {
-                    // In most cases, we'll be connecting to this
-                    // socket from an unnamed socket (a socket not
-                    // bound to a file). Instead of a filename, we'll
-                    // surface a specific host value.
-                    span.record("peer_path", &field::debug(UNNAMED_SOCKET_HOST));
-                    Some(UNNAMED_SOCKET_HOST.into())
-                };
+                span.record("peer_path", &field::debug(socket_metadata.peer_path_or_default()));
 
                 bytes_received.emit(ByteSize(byte_size));
 
@@ -111,7 +98,7 @@ async fn listen(
                                 count: events.len()
                             });
 
-                            handle_events(&mut events, received_from.clone());
+                            handle_events(&mut events, &socket_metadata);
 
                             let count = events.len();
                             if (out.send_batch(events).await).is_err() {
@@ -134,4 +121,17 @@ async fn listen(
             _ = &mut shutdown => return Ok(()),
         }
     }
+}
+
+fn get_socket_metadata(_socket: &tokio::net::UnixDatagram, peer_addr: &tokio::net::unix::SocketAddr) -> UnixSocketMetadata {
+    let peer_path = if !peer_addr.is_unnamed() {
+        peer_addr
+            .as_pathname()
+            .map(|p| { p.to_owned() })
+            .map(|p| { p.to_string_lossy().into_owned().into() })
+    } else {
+        None
+    };
+
+    UnixSocketMetadata { peer_path }
 }
