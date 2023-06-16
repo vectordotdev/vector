@@ -20,6 +20,9 @@ env:
   CONTAINER_TOOL: "docker"
   DD_ENV: "ci"
   DD_API_KEY: ${{ secrets.DD_API_KEY }}
+  TEST_DATADOG_API_KEY: ${{ secrets.CI_TEST_DATADOG_API_KEY }}
+  TEST_APPSIGNAL_PUSH_API_KEY: ${{ secrets.TEST_APPSIGNAL_PUSH_API_KEY }}
+  AXIOM_TOKEN: ${{ secrets.AXIOM_TOKEN }}
   RUST_BACKTRACE: full
   TEST_LOG: vector=debug
   VERBOSE: true
@@ -56,15 +59,12 @@ jobs:
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.appsignal == 'true' }}
         env:
-          TEST_APPSIGNAL_PUSH_API_KEY: ${{ secrets.TEST_APPSIGNAL_PUSH_API_KEY }}
         run: cargo vdev -v int test -a appsignal ; cargo vdev -v int stop appsignal
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.aws == 'true' }}
         run: cargo vdev -v int test -a aws ; cargo vdev -v int stop aws
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.axiom == 'true' }}
-        env:
-          AXIOM_TOKEN: ${{ secrets.AXIOM_TOKEN }}
         run: cargo vdev -v int test -a axiom ; cargo vdev -v int stop axiom
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.azure == 'true' }}
@@ -77,8 +77,6 @@ jobs:
         run: cargo vdev -v int test -a databend ; cargo vdev -v int stop databend
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.datadog == 'true' }}
-        env:
-          TEST_DATADOG_API_KEY: ${{ secrets.CI_TEST_DATADOG_API_KEY }}
         run: |
           cargo vdev -v int test -a datadog-agent   ; cargo vdev -v int stop datadog-agent
           cargo vdev -v int test -a datadog-logs    ; cargo vdev -v int stop datadog-logs
