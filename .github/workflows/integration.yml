@@ -1,5 +1,3 @@
-# Integration Test Suite
-#
 # This workflow runs the integration tests. If the workflow is triggered in the merge queue, all integration tests
 # are run. If the workflow is triggered in a PR commit, then the files changed in the PR are evaluated to determine
 # if any integration tests will run.
@@ -13,7 +11,7 @@ on:
 
 concurrency:
   # `github.event.number` exists for pull requests, otherwise fall back to SHA for merge queue
-  group: ${{ github.workflow }}-${{ github.event.number || github.event.merge_group.head_sha }}
+  group: ${{ github.workflow }}-${{ github.event.number || github.event.merge_group.base_sha }}
   cancel-in-progress: true
 
 env:
@@ -22,6 +20,9 @@ env:
   CONTAINER_TOOL: "docker"
   DD_ENV: "ci"
   DD_API_KEY: ${{ secrets.DD_API_KEY }}
+  TEST_DATADOG_API_KEY: ${{ secrets.CI_TEST_DATADOG_API_KEY }}
+  TEST_APPSIGNAL_PUSH_API_KEY: ${{ secrets.TEST_APPSIGNAL_PUSH_API_KEY }}
+  AXIOM_TOKEN: ${{ secrets.AXIOM_TOKEN }}
   RUST_BACKTRACE: full
   TEST_LOG: vector=debug
   VERBOSE: true
@@ -40,94 +41,204 @@ jobs:
       head_ref: ${{ github.event.pull_request.head.ref  }}
     secrets: inherit
 
-  # Calls the Integration Test workflow for each integration that was detected to have files changed that impact it.
-  integration-matrix:
-    uses: ./.github/workflows/integration-test.yml
-    with:
-      if: ${{ matrix.run.if }}
-      test_name: ${{ matrix.run.test_name }}
-    secrets: inherit
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
     needs: changes
-    strategy:
-      fail-fast: false
-      matrix:
-        run:
-          - test_name: 'amqp'
-            if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.amqp == 'true' }}
-          - test_name: 'appsignal'
-            if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.appsignal == 'true' }}
-          - test_name: 'aws'
-            if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.aws == 'true' }}
-          - test_name: 'axiom'
-            if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.axiom == 'true' }}
-          - test_name: 'azure'
-            if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.azure == 'true' }}
-          - test_name: 'clickhouse'
-            if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.clickhouse == 'true' }}
-          - test_name: 'databend'
-            if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.databend == 'true' }}
-          - test_name: 'datadog-agent'
-            if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.datadog == 'true' }}
-          - test_name: 'datadog-logs'
-            if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.datadog == 'true' }}
-          - test_name: 'datadog-metrics'
-            if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.datadog == 'true' }}
-          - test_name: 'datadog-traces'
-            if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.datadog == 'true' }}
-          - test_name: 'dnstap'
-            if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.dnstap == 'true' }}
-          - test_name: 'docker-logs'
-            if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.docker-logs == 'true' }}
-          - test_name: 'elasticsearch'
-            if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.elasticsearch == 'true' }}
-          - test_name: 'eventstoredb'
-            if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.eventstoredb == 'true' }}
-          - test_name: 'fluent'
-            if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.fluent == 'true' }}
-          - test_name: 'gcp'
-            if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.gcp == 'true' }}
-          - test_name: 'humio'
-            if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.humio == 'true' }}
-          - test_name: 'http-client'
-            if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.http-client == 'true' }}
-          - test_name: 'influxdb'
-            if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.influxdb == 'true' }}
-          - test_name: 'kafka'
-            if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.kafka == 'true' }}
-          - test_name: 'logstash'
-            if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.logstash == 'true' }}
-          - test_name: 'loki'
-            if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.loki == 'true' }}
-          - test_name: 'mongodb'
-            if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.mongodb == 'true' }}
-          - test_name: 'nats'
-            if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.nats == 'true' }}
-          - test_name: 'nginx'
-            if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.nginx == 'true' }}
-          - test_name: 'opentelemetry'
-            if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.opentelemetry == 'true' }}
-          - test_name: 'postgres'
-            if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.postgres == 'true' }}
-          - test_name: 'prometheus'
-            if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.prometheus == 'true' }}
-          - test_name: 'pulsar'
-            if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.pulsar == 'true' }}
-          - test_name: 'redis'
-            if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.redis == 'true' }}
-          - test_name: 'shutdown'
-            if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' }}
-          - test_name: 'splunk'
-            if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.splunk == 'true' }}
-          - test_name: 'webhdfs'
-            if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.webhdfs == 'true' }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v3
 
-  # This is a required status check, so it always needs to run if prior jobs failed, in order to mark the status correctly.
-  integration:
+       # TODO don't do these steps if no changes and not merge group
+      - run: make ci-sweep
+
+      - run: sudo npm -g install @datadog/datadog-ci
+
+      - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.amqp == 'true' }}
+        run: cargo vdev -v int test -a amqp ; cargo vdev -v int stop amqp
+
+      - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.appsignal == 'true' }}
+        run: cargo vdev -v int test -a appsignal ; cargo vdev -v int stop appsignal
+
+      - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.aws == 'true' }}
+        run: cargo vdev -v int test -a aws ; cargo vdev -v int stop aws
+
+      - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.axiom == 'true' }}
+        run: cargo vdev -v int test -a axiom ; cargo vdev -v int stop axiom
+
+      - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.azure == 'true' }}
+        run: cargo vdev -v int test -a azure ; cargo vdev -v int stop azure
+
+      - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.clickhouse == 'true' }}
+        run: cargo vdev -v int test -a clickhouse ; cargo vdev -v int stop clickhouse
+
+      - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.databend == 'true' }}
+        run: cargo vdev -v int test -a databend ; cargo vdev -v int stop databend
+
+      - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.datadog == 'true' }}
+        run: |
+          cargo vdev -v int test -a datadog-agent   ; cargo vdev -v int stop datadog-agent
+          cargo vdev -v int test -a datadog-logs    ; cargo vdev -v int stop datadog-logs
+          cargo vdev -v int test -a datadog-metrics ; cargo vdev -v int stop datadog-metrics
+          cargo vdev -v int test -a datadog-traces  ; cargo vdev -v int stop datadog-traces
+
+      - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.dnstap == 'true' }}
+        run: cargo vdev -v int test -a dnstap ; cargo vdev -v int stop dnstap
+
+      - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.docker-logs == 'true' }}
+        run: cargo vdev -v int test -a docker-logs ; cargo vdev -v int stop docker-logs
+
+      - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.elasticsearch == 'true' }}
+        run: cargo vdev -v int test -a elasticsearch ; cargo vdev -v int stop elasticsearch
+
+      - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.eventstoredb == 'true' }}
+        run: cargo vdev -v int test -a eventstoredb ; cargo vdev -v int stop eventstoredb
+
+      - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.fluent == 'true' }}
+        run: cargo vdev -v int test -a fluent ; cargo vdev -v int stop fluent
+
+      - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.gcp == 'true' }}
+        run: cargo vdev -v int test -a gcp ; cargo vdev -v int stop gcp
+
+      - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.humio == 'true' }}
+        run: cargo vdev -v int test -a humio ; cargo vdev -v int stop humio
+
+      - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.http-client == 'true' }}
+        run: cargo vdev -v int test -a http-client ; cargo vdev -v int stop http-client
+
+      - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.influxdb == 'true' }}
+        run: cargo vdev -v int test -a influxdb ; cargo vdev -v int stop influxdb
+
+      - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.kafka == 'true' }}
+        run: cargo vdev -v int test -a kafka ; cargo vdev -v int stop kafka
+
+      - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.logstash == 'true' }}
+        run: cargo vdev -v int test -a logstash ; cargo vdev -v int stop logstash
+
+      - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.loki == 'true' }}
+        run: cargo vdev -v int test -a loki ; cargo vdev -v int stop loki
+
+      - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.mongodb == 'true' }}
+        run: cargo vdev -v int test -a mongodb ; cargo vdev -v int stop mongodb
+
+      - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.nats == 'true' }}
+        run: cargo vdev -v int test -a nats ; cargo vdev -v int stop nats
+
+      - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.nginx == 'true' }}
+        run: cargo vdev -v int test -a nginx ; cargo vdev -v int stop nginx
+
+      - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.opentelemetry == 'true' }}
+        run: cargo vdev -v int test -a opentelemetry ; cargo vdev -v int stop opentelemetry
+
+      - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.postgres == 'true' }}
+        run: cargo vdev -v int test -a postgres ; cargo vdev -v int stop postgres
+
+      - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.prometheus == 'true' }}
+        run: cargo vdev -v int test -a prometheus ; cargo vdev -v int stop prometheus
+
+      - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.pulsar == 'true' }}
+        run: cargo vdev -v int test -a pulsar ; cargo vdev -v int stop pulsar
+
+      - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.redis == 'true' }}
+        run: cargo vdev -v int test -a redis ; cargo vdev -v int stop redis
+
+      - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' }}
+        run: cargo vdev -v int test -a shutdown ; cargo vdev -v int stop shutdown
+
+      - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.splunk == 'true' }}
+        run: cargo vdev -v int test -a splunk ; cargo vdev -v int stop splunk
+
+      - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.webhdfs == 'true' }}
+        run: cargo vdev -v int test -a webhdfs ; cargo vdev -v int stop webhdfs
+
+
+  # Calls the Integration Test workflow for each integration that was detected to have files changed that impact it.
+  # integration-matrix:
+  #   uses: ./.github/workflows/integration-test.yml
+  #   with:
+  #     if: ${{ matrix.run.if }}
+  #     test_name: ${{ matrix.run.test_name }}
+  #   needs: changes
+  #   secrets: inherit
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #       run:
+  #         - test_name: 'amqp'
+  #           if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.amqp == 'true' }}
+  #         - test_name: 'appsignal'
+  #           if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.appsignal == 'true' }}
+  #         - test_name: 'aws'
+  #           if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.aws == 'true' }}
+  #         - test_name: 'axiom'
+  #           if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.axiom == 'true' }}
+  #         - test_name: 'azure'
+  #           if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.azure == 'true' }}
+  #         - test_name: 'clickhouse'
+  #           if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.clickhouse == 'true' }}
+  #         - test_name: 'databend'
+  #           if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.databend == 'true' }}
+  #         - test_name: 'datadog-agent'
+  #           if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.datadog == 'true' }}
+  #         - test_name: 'datadog-logs'
+  #           if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.datadog == 'true' }}
+  #         - test_name: 'datadog-metrics'
+  #           if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.datadog == 'true' }}
+  #         - test_name: 'datadog-traces'
+  #           if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.datadog == 'true' }}
+  #         - test_name: 'dnstap'
+  #           if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.dnstap == 'true' }}
+  #         - test_name: 'docker-logs'
+  #           if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.docker-logs == 'true' }}
+  #         - test_name: 'elasticsearch'
+  #           if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.elasticsearch == 'true' }}
+  #         - test_name: 'eventstoredb'
+  #           if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.eventstoredb == 'true' }}
+  #         - test_name: 'fluent'
+  #           if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.fluent == 'true' }}
+  #         - test_name: 'gcp'
+  #           if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.gcp == 'true' }}
+  #         - test_name: 'humio'
+  #           if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.humio == 'true' }}
+  #         - test_name: 'http-client'
+  #           if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.http-client == 'true' }}
+  #         - test_name: 'influxdb'
+  #           if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.influxdb == 'true' }}
+  #         - test_name: 'kafka'
+  #           if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.kafka == 'true' }}
+  #         - test_name: 'logstash'
+  #           if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.logstash == 'true' }}
+  #         - test_name: 'loki'
+  #           if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.loki == 'true' }}
+  #         - test_name: 'mongodb'
+  #           if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.mongodb == 'true' }}
+  #         - test_name: 'nats'
+  #           if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.nats == 'true' }}
+  #         - test_name: 'nginx'
+  #           if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.nginx == 'true' }}
+  #         - test_name: 'opentelemetry'
+  #           if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.opentelemetry == 'true' }}
+  #         - test_name: 'postgres'
+  #           if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.postgres == 'true' }}
+  #         - test_name: 'prometheus'
+  #           if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.prometheus == 'true' }}
+  #         - test_name: 'pulsar'
+  #           if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.pulsar == 'true' }}
+  #         - test_name: 'redis'
+  #           if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.redis == 'true' }}
+  #         - test_name: 'shutdown'
+  #           if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' }}
+  #         - test_name: 'splunk'
+  #           if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.splunk == 'true' }}
+  #         - test_name: 'webhdfs'
+  #           if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.webhdfs == 'true' }}
+
+  integration-test-suite:
     name: Integration Test Suite
     runs-on: ubuntu-latest
     if: always()
     needs:
-      - integration-matrix
+      - integration-tests
     env:
       FAILED: ${{ contains(needs.*.result, 'failure') }}
     steps:

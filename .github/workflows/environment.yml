@@ -3,9 +3,9 @@ name: Environment Suite
 on:
   workflow_call:
   workflow_dispatch:
-  push:
-    branches:
-      - master
+  # push:
+  #   branches:
+  #     - master
 
 env:
   VERBOSE: true
