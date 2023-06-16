@@ -13,7 +13,7 @@ use crate::{
     serde::default_decoding,
     sources::{
         util::{build_unix_datagram_source, build_unix_stream_source},
-        util::unix::UnixSocketMetadata,
+        util::unix::{UnixSocketMetadata,UnixSocketMetadataCollectTypes},
         Source,
     },
     SourceSender,
@@ -86,6 +86,12 @@ impl UnixConfig {
     pub const fn host_key(&self) -> &OptionalValuePath {
         &self.host_key
     }
+
+    pub fn socket_collect_metadata(&self) -> UnixSocketMetadataCollectTypes {
+        let mut types = UnixSocketMetadataCollectTypes::default();
+        types.peer_path = self.host_key.path.is_some();
+        types
+    }
 }
 
 /// Function to pass to `build_unix_*_source`, specific to the basic unix source
@@ -122,6 +128,7 @@ pub(super) fn unix_datagram(
     out: SourceSender,
     log_namespace: LogNamespace,
 ) -> crate::Result<Source> {
+    let collect_metadata = config.socket_collect_metadata();
     let max_length = config
         .framing
         .and_then(|framing| match framing {
@@ -135,6 +142,7 @@ pub(super) fn unix_datagram(
     build_unix_datagram_source(
         config.path,
         config.socket_file_mode,
+        collect_metadata,
         max_length,
         decoder,
         move |events, socket_metadata| {
@@ -152,9 +160,11 @@ pub(super) fn unix_stream(
     out: SourceSender,
     log_namespace: LogNamespace,
 ) -> crate::Result<Source> {
+    let collect_metadata = config.socket_collect_metadata();
     build_unix_stream_source(
         config.path,
         config.socket_file_mode,
+        collect_metadata,
         decoder,
         move |events, socket_metadata| {
             handle_events(events, &config.host_key, socket_metadata, log_namespace)

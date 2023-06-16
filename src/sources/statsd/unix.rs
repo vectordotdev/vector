@@ -11,6 +11,7 @@ use crate::{
     codecs::Decoder,
     shutdown::ShutdownSignal,
     sources::{util::build_unix_stream_source, Source},
+    sources::util::unix::UnixSocketMetadataCollectTypes,
     SourceSender,
 };
 
@@ -38,6 +39,7 @@ pub fn statsd_unix(
     build_unix_stream_source(
         config.path,
         None,
+        UnixSocketMetadataCollectTypes::default(),
         decoder,
         |_events, _host| {},
         shutdown,

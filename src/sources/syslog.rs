@@ -32,6 +32,7 @@ use crate::{
     net,
     shutdown::ShutdownSignal,
     sources::util::net::{try_bind_udp_socket, SocketListenAddr, TcpNullAcker, TcpSource},
+    sources::util::unix::UnixSocketMetadataCollectTypes,
     tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsSettings, TlsSourceConfig},
     SourceSender,
@@ -229,9 +230,14 @@ impl SourceConfig for SyslogConfig {
                     ),
                 );
 
+                let mut collect_metadata = UnixSocketMetadataCollectTypes::default();
+                // the peer_path is used as the default hostname for the record, so we must collect it.
+                collect_metadata.peer_path = true;
+
                 build_unix_stream_source(
                     path,
                     socket_file_mode,
+                    collect_metadata,
                     decoder,
                     move |events, socket_metadata| {
                         // handle_events expects to own its default hostname, so we must copy.

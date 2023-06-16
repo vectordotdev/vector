@@ -18,7 +18,7 @@ use crate::{
     },
     shutdown::ShutdownSignal,
     sources::util::change_socket_permissions,
-    sources::util::unix::UnixSocketMetadata,
+    sources::util::unix::{UnixSocketMetadata,UnixSocketMetadataCollectTypes},
     sources::Source,
     SourceSender,
 };
@@ -30,6 +30,7 @@ use crate::{
 pub fn build_unix_datagram_source(
     listen_path: PathBuf,
     socket_file_mode: Option<u32>,
+    collect_metadata: UnixSocketMetadataCollectTypes,
     max_length: usize,
     decoder: Decoder,
     handle_events: impl Fn(&mut [Event], &UnixSocketMetadata) + Clone + Send + Sync + 'static,
@@ -43,7 +44,7 @@ pub fn build_unix_datagram_source(
         change_socket_permissions(&listen_path, socket_file_mode)
             .expect("Failed to set socket permissions");
 
-        let result = listen(socket, max_length, decoder, shutdown, handle_events, out).await;
+        let result = listen(socket, collect_metadata, max_length, decoder, shutdown, handle_events, out).await;
 
         // Delete socket file.
         if let Err(error) = remove_file(&listen_path) {
@@ -59,6 +60,7 @@ pub fn build_unix_datagram_source(
 
 async fn listen(
     socket: UnixDatagram,
+    collect_metadata: UnixSocketMetadataCollectTypes,
     max_length: usize,
     decoder: Decoder,
     mut shutdown: ShutdownSignal,
@@ -79,7 +81,7 @@ async fn listen(
                     })
                 })?;
 
-                let socket_metadata = get_socket_metadata(&socket, &address);
+                let socket_metadata = get_socket_metadata(&socket, &address, collect_metadata);
                 let span = info_span!("datagram");
                 span.record("peer_path", &field::debug(socket_metadata.peer_path_or_default()));
 
@@ -123,12 +125,20 @@ async fn listen(
     }
 }
 
-fn get_socket_metadata(_socket: &tokio::net::UnixDatagram, peer_addr: &tokio::net::unix::SocketAddr) -> UnixSocketMetadata {
-    let peer_path = if !peer_addr.is_unnamed() {
-        peer_addr
-            .as_pathname()
-            .map(|p| { p.to_owned() })
-            .map(|p| { p.to_string_lossy().into_owned().into() })
+fn get_socket_metadata(
+    _socket: &tokio::net::UnixDatagram,
+    peer_addr: &tokio::net::unix::SocketAddr,
+    collect_metadata: UnixSocketMetadataCollectTypes,
+) -> UnixSocketMetadata {
+    let peer_path = if collect_metadata.peer_path {
+        if !peer_addr.is_unnamed() {
+            peer_addr
+                .as_pathname()
+                .map(|p| { p.to_owned() })
+                .map(|p| { p.to_string_lossy().into_owned().into() })
+        } else {
+            None
+        }
     } else {
         None
     };

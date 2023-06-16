@@ -20,6 +20,18 @@ pub fn change_socket_permissions(path: &Path, perms: Option<u32>) -> crate::Resu
     Ok(())
 }
 
+/// This is a structure which represents what kind of metadata should be
+/// _collected_ by unix_stream.rs & unix_datagram.rs. I would do this with
+/// some kind of flags structure, but Rust doesn't have one, so I guess a
+/// struct-of-bools works.
+#[derive(Default, Copy, Clone, Debug)]
+pub struct UnixSocketMetadataCollectTypes {
+    /// Use getpeername(2) (on stream sockets) or read the struct sockaddr
+    /// argument from recvfrom(2) (on datagram sockets) to get the bound name
+    /// of the other half of the socket.
+    pub peer_path: bool,
+}
+
 /// This structure defines the various kinds of metadata we can
 /// collect off a connected unix-domain socket and expose as source fields.
 pub struct UnixSocketMetadata {

@@ -24,7 +24,7 @@ use crate::{
     },
     shutdown::ShutdownSignal,
     sources::util::change_socket_permissions,
-    sources::util::unix::UnixSocketMetadata,
+    sources::util::unix::{UnixSocketMetadata,UnixSocketMetadataCollectTypes},
     sources::Source,
     SourceSender,
 };
@@ -36,6 +36,7 @@ use crate::{
 pub fn build_unix_stream_source(
     listen_path: PathBuf,
     socket_file_mode: Option<u32>,
+    collect_metadata: UnixSocketMetadataCollectTypes,
     decoder: Decoder,
     handle_events: impl Fn(&mut [Event], &UnixSocketMetadata) + Clone + Send + Sync + 'static,
     shutdown: ShutdownSignal,
@@ -70,7 +71,7 @@ pub fn build_unix_stream_source(
 
             let listen_path = listen_path.clone();
 
-            let socket_metadata = get_socket_metadata(&socket);
+            let socket_metadata = get_socket_metadata(&socket, collect_metadata);
 
             let span = info_span!("connection");
             span.record("peer_path", field::debug(socket_metadata.peer_path_or_default()));
@@ -152,25 +153,31 @@ pub fn build_unix_stream_source(
 // a UnixSocketMetadata object containing everything we found out about it through various
 // system calls (which could be nothing - each of the _fields_ in UnixSocketMetadata is
 // an Optional).
-fn get_socket_metadata(socket: &tokio::net::UnixStream) -> UnixSocketMetadata {
+fn get_socket_metadata(
+    socket: &tokio::net::UnixStream,
+    collect_metadata: UnixSocketMetadataCollectTypes,
+) -> UnixSocketMetadata {
     // First thing to try - use getpeername(2) to see if the associated socket has a name.
-    let peer_path = socket
-        .peer_addr()
-        .map_err(|error| {
-            // Log & throw error away
-            debug!(message = "getpeername(2) failed.", %error);
-            ()
-        })
-        .ok()
-        .and_then(|addr| {
-            addr.as_pathname().map(|p| { p.to_owned() })
-        })
-        .map(|path| -> String {
-            path.to_string_lossy().into()
-        });
-
+    let peer_path = if collect_metadata.peer_path {
+        socket
+            .peer_addr()
+            .map_err(|error| {
+                // Log & throw error away
+                debug!(message = "failed to get socket peer address.", %error);
+                ()
+            })
+            .ok()
+            .and_then(|addr| {
+                addr.as_pathname().map(|p| { p.to_owned() })
+            })
+            .map(|path| -> String {
+                path.to_string_lossy().into()
+            })
+    } else {
+        None
+    };
 
     UnixSocketMetadata{
-        peer_path: peer_path,
+        peer_path,
     }
 }
