@@ -73,9 +73,7 @@ pub fn build_unix_stream_source(
             let socket_metadata = get_socket_metadata(&socket);
 
             let span = info_span!("connection");
-            if let Some(peer_path) = socket_metadata.peer_path.as_ref() {
-                span.record("peer_path", field::debug(peer_path));
-            }
+            span.record("peer_path", field::debug(socket_metadata.peer_path_or_default()));
 
             let handle_events = handle_events.clone();
 
