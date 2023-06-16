@@ -195,7 +195,7 @@ pub struct TransformOutputs {
 impl TransformOutputs {
     pub fn new(
         outputs_in: Vec<config::TransformOutput>,
-        component_key: ComponentKey,
+        component_key: &ComponentKey,
     ) -> (Self, HashMap<Option<String>, fanout::ControlChannel>) {
         let outputs_spec = outputs_in.clone();
         let mut primary_output = None;
@@ -299,6 +299,7 @@ impl TransformOutputs {
     }
 }
 
+#[allow(clippy::implicit_hasher)]
 pub fn update_runtime_schema_definition(
     // The event that will be updated
     mut event: EventMutRef,
@@ -314,7 +315,7 @@ pub fn update_runtime_schema_definition(
             }
         }
     }
-    event.metadata_mut().set_parent_id(Arc::clone(&output_id))
+    event.metadata_mut().set_parent_id(Arc::clone(output_id));
 }
 
 #[derive(Debug, Clone)]
