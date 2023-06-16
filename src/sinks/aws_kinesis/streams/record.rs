@@ -1,8 +1,11 @@
+use aws_sdk_kinesis::output::PutRecordsOutput;
 use aws_sdk_kinesis::types::{Blob, SdkError};
 use bytes::Bytes;
 use tracing::Instrument;
 
-use super::{KinesisClient, KinesisError, KinesisRecord, Record, SendRecord};
+use crate::sinks::prelude::*;
+
+use super::{KinesisClient, KinesisError, KinesisRecord, KinesisResponse, Record, SendRecord};
 
 #[derive(Clone)]
 pub struct KinesisStreamRecord {
@@ -62,7 +65,15 @@ impl SendRecord for KinesisStreamClient {
     type T = KinesisRecord;
     type E = KinesisError;
 
-    async fn send(&self, records: Vec<Self::T>, stream_name: String) -> Option<SdkError<Self::E>> {
+    async fn send(
+        &self,
+        records: Vec<Self::T>,
+        stream_name: String,
+    ) -> Result<KinesisResponse, SdkError<Self::E>> {
+        let rec_count = records.len();
+        let total_size = records.iter().fold(0, |acc, record| {
+            acc + record.data().map(|v| v.as_ref().len()).unwrap_or_default()
+        });
         self.client
             .put_records()
             .set_records(Some(records))
@@ -70,6 +81,10 @@ impl SendRecord for KinesisStreamClient {
             .send()
             .instrument(info_span!("request").or_current())
             .await
-            .err()
+            .map(|output: PutRecordsOutput| KinesisResponse {
+                count: rec_count,
+                failure_count: output.failed_record_count().unwrap_or(0) as usize,
+                events_byte_size: JsonSize::new(total_size),
+            })
     }
 }
