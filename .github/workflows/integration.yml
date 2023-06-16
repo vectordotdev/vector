@@ -86,6 +86,7 @@ jobs:
       - run: sudo npm -g install @datadog/datadog-ci
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.amqp == 'true' }}
+        name: amqp
         #run: cargo vdev -v int test -a amqp ; cargo vdev -v int stop amqp
         run: |
           RESULT=1
@@ -105,14 +106,16 @@ jobs:
 
           exit $RESULT
 
-      - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.appsignal == 'true' }}
-        run: cargo vdev -v int test -a appsignal ; cargo vdev -v int stop appsignal
+      # skip this because we don't have the secrets defined here rn
+      # - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.appsignal == 'true' }}
+      #   run: cargo vdev -v int test -a appsignal ; cargo vdev -v int stop appsignal
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.aws == 'true' }}
         run: cargo vdev -v int test -a aws ; cargo vdev -v int stop aws
 
-      - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.axiom == 'true' }}
-        run: cargo vdev -v int test -a axiom ; cargo vdev -v int stop axiom
+      # skip this because we don't have the secrets defined here rn
+      # - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.axiom == 'true' }}
+      #   run: cargo vdev -v int test -a axiom ; cargo vdev -v int stop axiom
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.azure == 'true' }}
         run: cargo vdev -v int test -a azure ; cargo vdev -v int stop azure
@@ -123,12 +126,13 @@ jobs:
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.databend == 'true' }}
         run: cargo vdev -v int test -a databend ; cargo vdev -v int stop databend
 
-      - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.datadog == 'true' }}
-        run: |
-          cargo vdev -v int test -a datadog-agent   ; cargo vdev -v int stop datadog-agent
-          cargo vdev -v int test -a datadog-logs    ; cargo vdev -v int stop datadog-logs
-          cargo vdev -v int test -a datadog-metrics ; cargo vdev -v int stop datadog-metrics
-          cargo vdev -v int test -a datadog-traces  ; cargo vdev -v int stop datadog-traces
+      # skip this because we don't have the secrets defined here rn
+      # - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.datadog == 'true' }}
+      #   run: |
+      #     cargo vdev -v int test -a datadog-agent   ; cargo vdev -v int stop datadog-agent
+      #     cargo vdev -v int test -a datadog-logs    ; cargo vdev -v int stop datadog-logs
+      #     cargo vdev -v int test -a datadog-metrics ; cargo vdev -v int stop datadog-metrics
+      #     cargo vdev -v int test -a datadog-traces  ; cargo vdev -v int stop datadog-traces
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.dnstap == 'true' }}
         run: cargo vdev -v int test -a dnstap ; cargo vdev -v int stop dnstap
