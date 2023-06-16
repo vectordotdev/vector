@@ -10,7 +10,8 @@ use vector_config_common::attributes::CustomAttribute;
 use vector_config_common::schema::{SchemaGenerator, SchemaObject};
 use vector_core::{
     config::{
-        AcknowledgementsConfig, GlobalOptions, LogNamespace, Output, SourceAcknowledgementsConfig,
+        AcknowledgementsConfig, GlobalOptions, LogNamespace, SourceAcknowledgementsConfig,
+        SourceOutput,
     },
     source::Source,
 };
@@ -89,7 +90,7 @@ pub trait SourceConfig: DynClone + NamedComponent + core::fmt::Debug + Send + Sy
     async fn build(&self, cx: SourceContext) -> crate::Result<Source>;
 
     /// Gets the list of outputs exposed by this source.
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output>;
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput>;
 
     /// Gets the list of resources, if any, used by this source.
     ///
@@ -130,8 +131,8 @@ pub struct SourceContext {
 
     /// Tracks the schema IDs assigned to schemas exposed by the source.
     ///
-    /// Given a source can expose multiple [`Output`] channels, the ID is tied to the identifier of
-    /// that `Output`.
+    /// Given a source can expose multiple [`SourceOutput`] channels, the ID is tied to the identifier of
+    /// that `SourceOutput`.
     pub schema_definitions: HashMap<Option<String>, schema::Definition>,
 }
 

@@ -14,7 +14,7 @@ use codecs::{
 use lookup::{lookup_v2::parse_value_path, owned_value_path, path};
 use smallvec::SmallVec;
 use tokio_util::codec::Decoder as _;
-use value::{kind::Collection, Kind};
+use vrl::value::{kind::Collection, Kind};
 use warp::http::{HeaderMap, StatusCode};
 
 use vector_config::configurable_component;
@@ -26,8 +26,8 @@ use vector_core::{
 use crate::{
     codecs::{Decoder, DecodingConfig},
     config::{
-        log_schema, GenerateConfig, Output, Resource, SourceAcknowledgementsConfig, SourceConfig,
-        SourceContext,
+        log_schema, GenerateConfig, Resource, SourceAcknowledgementsConfig, SourceConfig,
+        SourceContext, SourceOutput,
     },
     event::{Event, LogEvent},
     internal_events::{HerokuLogplexRequestReadError, HerokuLogplexRequestReceived},
@@ -107,7 +107,7 @@ impl LogplexConfig {
                 Some(LegacyKey::InsertIfEmpty(owned_value_path!("app_name"))),
                 &owned_value_path!("app_name"),
                 Kind::bytes(),
-                None,
+                Some("service"),
             )
             .with_source_metadata(
                 LogplexConfig::NAME,
@@ -182,11 +182,14 @@ impl SourceConfig for LogplexConfig {
         )
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         // There is a global and per-source `log_namespace` config.
         // The source config overrides the global setting and is merged here.
         let schema_def = self.schema_definition(global_log_namespace.merge(self.log_namespace));
-        vec![Output::default(self.decoding.output_type()).with_schema_definition(schema_def)]
+        vec![SourceOutput::new_logs(
+            self.decoding.output_type(),
+            schema_def,
+        )]
     }
 
     fn resources(&self) -> Vec<Resource> {
@@ -404,12 +407,12 @@ mod tests {
     use futures::Stream;
     use lookup::{owned_value_path, OwnedTargetPath};
     use similar_asserts::assert_eq;
-    use value::{kind::Collection, Kind};
     use vector_core::{
         config::LogNamespace,
         event::{Event, EventStatus, Value},
         schema::Definition,
     };
+    use vrl::value::{kind::Collection, Kind};
 
     use super::{HttpSourceAuthConfig, LogplexConfig};
     use crate::{
@@ -660,10 +663,10 @@ mod tests {
             ..Default::default()
         };
 
-        let definition = config.outputs(LogNamespace::Vector)[0]
-            .clone()
-            .log_schema_definition
-            .unwrap();
+        let definitions = config
+            .outputs(LogNamespace::Vector)
+            .remove(0)
+            .schema_definition(true);
 
         let expected_definition =
             Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
@@ -691,7 +694,7 @@ mod tests {
                 .with_metadata_field(
                     &owned_value_path!(LogplexConfig::NAME, "app_name"),
                     Kind::bytes(),
-                    None,
+                    Some("service"),
                 )
                 .with_metadata_field(
                     &owned_value_path!(LogplexConfig::NAME, "proc_id"),
@@ -704,17 +707,17 @@ mod tests {
                     None,
                 );
 
-        assert_eq!(definition, expected_definition)
+        assert_eq!(definitions, Some(expected_definition))
     }
 
     #[test]
     fn output_schema_definition_legacy_namespace() {
         let config = LogplexConfig::default();
 
-        let definition = config.outputs(LogNamespace::Legacy)[0]
-            .clone()
-            .log_schema_definition
-            .unwrap();
+        let definitions = config
+            .outputs(LogNamespace::Legacy)
+            .remove(0)
+            .schema_definition(true);
 
         let expected_definition = Definition::new_with_default_metadata(
             Kind::object(Collection::empty()),
@@ -728,10 +731,14 @@ mod tests {
         .with_event_field(&owned_value_path!("source_type"), Kind::bytes(), None)
         .with_event_field(&owned_value_path!("timestamp"), Kind::timestamp(), None)
         .with_event_field(&owned_value_path!("host"), Kind::bytes(), Some("host"))
-        .with_event_field(&owned_value_path!("app_name"), Kind::bytes(), None)
+        .with_event_field(
+            &owned_value_path!("app_name"),
+            Kind::bytes(),
+            Some("service"),
+        )
         .with_event_field(&owned_value_path!("proc_id"), Kind::bytes(), None)
         .unknown_fields(Kind::bytes());
 
-        assert_eq!(definition, expected_definition)
+        assert_eq!(definitions, Some(expected_definition))
     }
 }

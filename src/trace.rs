@@ -28,7 +28,7 @@ use tracing_subscriber::{
     Layer,
 };
 pub use tracing_tower::{InstrumentableService, InstrumentedService};
-use value::Value;
+use vrl::value::Value;
 
 use crate::event::LogEvent;
 

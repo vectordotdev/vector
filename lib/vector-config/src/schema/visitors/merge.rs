@@ -95,7 +95,7 @@ impl Mergeable for serde_json::Map<String, Value> {
 
 impl<K, V> Mergeable for Map<K, V>
 where
-    K: std::hash::Hash + Eq + Clone,
+    K: Clone + Eq + Ord,
     V: Clone + Mergeable,
 {
     fn merge(&mut self, other: &Self) {
@@ -261,7 +261,7 @@ where
 
 fn merge_map<K, V>(destination: &mut Map<K, V>, source: &Map<K, V>)
 where
-    K: std::hash::Hash + Eq + Clone,
+    K: Clone + Eq + Ord,
     V: Clone + Mergeable,
 {
     destination.merge(source);

@@ -136,6 +136,7 @@ impl SinkConfig for AppsignalSinkConfig {
         )
         .boxed();
 
+        #[allow(deprecated)]
         Ok((super::VectorSink::from_event_sink(sink), healthcheck))
     }
 

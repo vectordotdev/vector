@@ -1,22 +1,13 @@
 use std::{borrow::Cow, fmt::Debug, marker::PhantomData, num::NonZeroUsize};
 
-use async_trait::async_trait;
-use futures::{future, stream::BoxStream, StreamExt};
 use rand::random;
-use tower::Service;
-use vector_common::{
-    finalization::{EventFinalizers, Finalizable},
-    request_metadata::{MetaDescriptive, RequestMetadata},
-};
-use vector_core::{
-    partition::Partitioner,
-    stream::{BatcherSettings, DriverResponse},
-};
 
 use crate::{
-    event::{Event, LogEvent},
     internal_events::{AwsKinesisStreamNoPartitionKeyError, SinkRequestBuildError},
-    sinks::util::{processed_event::ProcessedEvent, SinkBuilderExt, StreamSink},
+    sinks::{
+        prelude::*,
+        util::{processed_event::ProcessedEvent, StreamSink},
+    },
 };
 
 use super::{

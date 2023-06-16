@@ -17,16 +17,14 @@ jobs:
     steps:
       - name: Move issue back to Triage if status is Blocked/Waiting
         env:
-          GH_TOKEN: ${{ secrets.GH_PAT_PROJECTS }}
+          GH_TOKEN: ${{ secrets.GH_PROJECT_PAT }}
         run: |
-          # ids fetched from https://docs.github.com/en/graphql/overview/explorer
-          # project_id="PVT_kwDOAQFeYs4AAsTr" # Gardener
-          project_id="PVT_kwDOAQFeYs4ARAY4"  # Test Board
           issue_id=${{ github.event.issue.node_id }}
-          # status_field_id="PVTSSF_lADOAQFeYs4AAsTrzgAXRuU" # Status
-          status_field_id="PVTF_lADOAQFeYs4ARAY4zgK28ZI" # Status (Test Board)
-          #backlog_option_id="f75ad846" # Backlog
-          triage_option_id="f75ad846"
+
+          # IDs fetched from https://docs.github.com/en/graphql/overview/explorer
+          project_id="PVT_kwDOAQFeYs4AAsTr" # Gardener
+          status_field_id="PVTF_lADOAQFeYs4AAsTrzgAXRuU" # Status
+          triage_option_id="2a08fafa"
 
           # ensures that the issue is already on board but also seems to be the only way to fetch
           # the item id

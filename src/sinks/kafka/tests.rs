@@ -29,10 +29,8 @@ mod integration_test {
                 sink::KafkaSink,
                 *,
             },
-            util::{BatchConfig, NoDefaultsBatchSettings},
-            VectorSink,
+            prelude::*,
         },
-        template::Template,
         test_util::{
             components::{assert_sink_compliance, SINK_TAGS},
             random_lines_with_stream, random_string, wait_for,

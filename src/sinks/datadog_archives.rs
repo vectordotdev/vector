@@ -26,14 +26,14 @@ use rand::{thread_rng, Rng};
 use snafu::Snafu;
 use tower::ServiceBuilder;
 use uuid::Uuid;
-use value::Kind;
 use vector_common::request_metadata::RequestMetadata;
 use vector_config::{configurable_component, NamedComponent};
 use vector_core::{
     config::AcknowledgementsConfig,
     event::{Event, EventFinalizers, Finalizable},
-    schema, ByteSizeOf,
+    schema, EstimatedJsonEncodedSizeOf,
 };
+use vrl::value::Kind;
 
 use crate::{
     aws::{AwsAuthentication, RegionOrEndpoint},
@@ -816,7 +816,7 @@ impl RequestBuilder<(String, Vec<Event>)> for DatadogAzureRequestBuilder {
         let metadata = AzureBlobMetadata {
             partition_key,
             count: events.len(),
-            byte_size: events.size_of(),
+            byte_size: events.estimated_json_encoded_size_of(),
             finalizers,
         };
         let builder = RequestMetadataBuilder::from_events(&events);

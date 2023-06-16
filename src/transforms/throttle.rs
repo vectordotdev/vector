@@ -6,11 +6,11 @@ use governor::{clock, Quota, RateLimiter};
 use serde_with::serde_as;
 use snafu::Snafu;
 use vector_config::configurable_component;
-use vector_core::config::LogNamespace;
+use vector_core::config::{clone_input_definitions, LogNamespace};
 
 use crate::{
     conditions::{AnyCondition, Condition},
-    config::{DataType, Input, Output, TransformConfig, TransformContext},
+    config::{DataType, Input, OutputId, TransformConfig, TransformContext, TransformOutput},
     event::Event,
     internal_events::{TemplateRenderingError, ThrottleEventDiscarded},
     schema,
@@ -31,13 +31,12 @@ pub struct ThrottleConfig {
 
     /// The time window in which the configured `threshold` is applied, in seconds.
     #[serde_as(as = "serde_with::DurationSeconds<f64>")]
+    #[configurable(metadata(docs::human_name = "Time Window"))]
     window_secs: Duration,
 
-    /// The name of the log field whose value is hashed to determine if the event should be
-    /// rate limited.
+    /// The value to group events into separate buckets to be rate limited independently.
     ///
-    /// Each unique key creates a bucket of related events to be rate limited separately. If
-    /// left unspecified, or if the event doesn't have `key_field`, then the event is not rate
+    /// If left unspecified, or if the event doesn't have `key_field`, then the event is not rate
     /// limited separately.
     #[configurable(metadata(docs::examples = "{{ message }}", docs::examples = "{{ hostname }}",))]
     key_field: Option<Template>,
@@ -59,9 +58,17 @@ impl TransformConfig for ThrottleConfig {
         Input::log()
     }
 
-    fn outputs(&self, merged_definition: &schema::Definition, _: LogNamespace) -> Vec<Output> {
+    fn outputs(
+        &self,
+        _: enrichment::TableRegistry,
+        input_definitions: &[(OutputId, schema::Definition)],
+        _: LogNamespace,
+    ) -> Vec<TransformOutput> {
         // The event is not modified, so the definition is passed through as-is
-        vec![Output::default(DataType::Log).with_schema_definition(merged_definition.clone())]
+        vec![TransformOutput::new(
+            DataType::Log,
+            clone_input_definitions(input_definitions),
+        )]
     }
 }
 

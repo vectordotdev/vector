@@ -15,6 +15,7 @@
 # /ci-run-unit-windows        : runs Unit - Windows
 # /ci-run-environment         : runs Environment Suite
 # /ci-run-install             : runs Update install.sh Suite
+# /ci-run-regression          : runs Regression Detection Suite
 
 name: Comment Trigger
 
@@ -33,9 +34,13 @@ env:
   # can be removed when we switch back to the upstream openssl-sys crate
   CARGO_NET_GIT_FETCH_WITH_CLI: true
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.event.issue_comment.issue.id }}-${{ github.event.comment.body }}
-  cancel-in-progress: true
+# The below concurrency group settings would let us cancel in progress runs that were triggered with the
+# same comment on a given PR, which could save on time consuming runs.
+# But GH does not currently support the github.event.comment.body as part of the concurrency name, this
+# appears to be due to the potential length of it.
+#concurrency:
+#  group: ${{ github.workflow }}-${{ github.event.issue.id }}-${{ github.event.comment.body }}
+#  cancel-in-progress: true
 
 jobs:
   validate:

@@ -2,7 +2,6 @@ use std::io;
 
 use bytes::{Buf, Bytes, BytesMut};
 use derivative::Derivative;
-use serde::{Deserialize, Serialize};
 use tokio_util::codec::{LinesCodec, LinesCodecError};
 use tracing::trace;
 use vector_config::configurable_component;
@@ -10,7 +9,8 @@ use vector_config::configurable_component;
 use super::BoxedFramingError;
 
 /// Config used to build a `OctetCountingDecoder`.
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[configurable_component]
+#[derive(Debug, Clone, Default)]
 pub struct OctetCountingDecoderConfig {
     #[serde(
         default,

@@ -1,4 +1,5 @@
 use metrics::counter;
+use vector_common::json_size::JsonSize;
 use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
@@ -18,7 +19,7 @@ impl InternalEvent for InternalLogsBytesReceived {
 
 #[derive(Debug)]
 pub struct InternalLogsEventsReceived {
-    pub byte_size: usize,
+    pub byte_size: JsonSize,
     pub count: usize,
 }
 
@@ -28,7 +29,7 @@ impl InternalEvent for InternalLogsEventsReceived {
         counter!("component_received_events_total", self.count as u64);
         counter!(
             "component_received_event_bytes_total",
-            self.byte_size as u64
+            self.byte_size.get() as u64
         );
     }
 }

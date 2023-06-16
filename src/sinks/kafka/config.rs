@@ -4,21 +4,16 @@ use codecs::JsonSerializerConfig;
 use futures::FutureExt;
 use rdkafka::ClientConfig;
 use serde_with::serde_as;
-use value::Kind;
 use vector_config::configurable_component;
-use vector_core::schema::Requirement;
+use vrl::value::Kind;
 
 use crate::{
-    codecs::EncodingConfig,
-    config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext},
     kafka::{KafkaAuthConfig, KafkaCompression},
     serde::json::to_string,
     sinks::{
         kafka::sink::{healthcheck, KafkaSink},
-        util::{BatchConfig, NoDefaultsBatchSettings},
-        Healthcheck, VectorSink,
+        prelude::*,
     },
-    template::Template,
 };
 
 pub(crate) const QUEUED_MIN_MESSAGES: u64 = 100000;
@@ -80,12 +75,14 @@ pub struct KafkaSinkConfig {
     #[serde(default = "default_socket_timeout_ms")]
     #[configurable(metadata(docs::examples = 30000, docs::examples = 60000))]
     #[configurable(metadata(docs::advanced))]
+    #[configurable(metadata(docs::human_name = "Socket Timeout"))]
     pub socket_timeout_ms: Duration,
 
     /// Local message timeout, in milliseconds.
     #[serde_as(as = "serde_with::DurationMilliSeconds<u64>")]
     #[configurable(metadata(docs::examples = 150000, docs::examples = 450000))]
     #[serde(default = "default_message_timeout_ms")]
+    #[configurable(metadata(docs::human_name = "Message Timeout"))]
     #[configurable(metadata(docs::advanced))]
     pub message_timeout_ms: Duration,
 

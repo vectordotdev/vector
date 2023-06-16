@@ -1,7 +1,7 @@
 use bytes::{BufMut, BytesMut};
 use syslog::{Facility, Formatter3164, LogFormat, Severity};
-use value::Kind;
 use vector_config::configurable_component;
+use vrl::value::Kind;
 
 use crate::{
     codecs::{Encoder, EncodingConfig, Transformer},

@@ -57,6 +57,7 @@ async fn firehose_put_records() {
         tls: None,
         auth: Default::default(),
         acknowledgements: Default::default(),
+        request_retry_partial: Default::default(),
     };
 
     let config = KinesisFirehoseSinkConfig { batch, base };
@@ -75,6 +76,7 @@ async fn firehose_put_records() {
         auth: Some(ElasticsearchAuth::Aws(AwsAuthentication::Default {
             load_timeout_secs: Some(5),
             imds: ImdsAuthentication::default(),
+            region: None,
         })),
         endpoints: vec![elasticsearch_address()],
         bulk: BulkConfig {

@@ -3,16 +3,16 @@ use codecs::BytesDeserializerConfig;
 use futures::{stream, StreamExt};
 use lookup::lookup_v2::OptionalValuePath;
 use lookup::{owned_value_path, path, OwnedValuePath};
-use value::Kind;
 use vector_config::configurable_component;
 use vector_core::config::log_schema;
 use vector_core::{
     config::{LegacyKey, LogNamespace},
     schema::Definition,
 };
+use vrl::value::Kind;
 
 use crate::{
-    config::{DataType, Output, SourceConfig, SourceContext},
+    config::{DataType, SourceConfig, SourceContext, SourceOutput},
     event::{EstimatedJsonEncodedSizeOf, Event},
     internal_events::{InternalLogsBytesReceived, InternalLogsEventsReceived, StreamClosedError},
     shutdown::ShutdownSignal,
@@ -121,11 +121,11 @@ impl SourceConfig for InternalLogsConfig {
         )))
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         let schema_definition =
             self.schema_definition(global_log_namespace.merge(self.log_namespace));
 
-        vec![Output::default(DataType::Log).with_schema_definition(schema_definition)]
+        vec![SourceOutput::new_logs(DataType::Log, schema_definition)]
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -155,12 +155,14 @@ async fn run(
     // any logs that don't break the loop, as that could cause an
     // infinite loop since it receives all such logs.
     while let Some(mut log) = rx.next().await {
-        let byte_size = log.estimated_json_encoded_size_of();
+        // TODO: Should this actually be in memory size?
+        let byte_size = log.estimated_json_encoded_size_of().get();
+        let json_byte_size = log.estimated_json_encoded_size_of();
         // This event doesn't emit any log
         emit!(InternalLogsBytesReceived { byte_size });
         emit!(InternalLogsEventsReceived {
             count: 1,
-            byte_size,
+            byte_size: json_byte_size,
         });
 
         if let Ok(hostname) = &hostname {
@@ -189,9 +191,9 @@ async fn run(
             Utc::now(),
         );
 
-        if let Err(error) = out.send_event(Event::from(log)).await {
+        if (out.send_event(Event::from(log)).await).is_err() {
             // this wont trigger any infinite loop considering it stops the component
-            emit!(StreamClosedError { error, count: 1 });
+            emit!(StreamClosedError { count: 1 });
             return Err(());
         }
     }
@@ -204,8 +206,8 @@ mod tests {
     use futures::Stream;
     use lookup::OwnedTargetPath;
     use tokio::time::{sleep, Duration};
-    use value::kind::Collection;
     use vector_core::event::Value;
+    use vrl::value::kind::Collection;
 
     use super::*;
     use crate::{
@@ -339,10 +341,10 @@ mod tests {
     fn output_schema_definition_vector_namespace() {
         let config = InternalLogsConfig::default();
 
-        let definition = config.outputs(LogNamespace::Vector)[0]
-            .clone()
-            .log_schema_definition
-            .unwrap();
+        let definitions = config
+            .outputs(LogNamespace::Vector)
+            .remove(0)
+            .schema_definition(true);
 
         let expected_definition =
             Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
@@ -368,7 +370,7 @@ mod tests {
                     Some("host"),
                 );
 
-        assert_eq!(definition, expected_definition)
+        assert_eq!(definitions, Some(expected_definition))
     }
 
     #[test]
@@ -379,10 +381,10 @@ mod tests {
 
         config.pid_key = OptionalValuePath::from(owned_value_path!(pid_key));
 
-        let definition = config.outputs(LogNamespace::Legacy)[0]
-            .clone()
-            .log_schema_definition
-            .unwrap();
+        let definitions = config
+            .outputs(LogNamespace::Legacy)
+            .remove(0)
+            .schema_definition(true);
 
         let expected_definition = Definition::new_with_default_metadata(
             Kind::object(Collection::empty()),
@@ -402,6 +404,6 @@ mod tests {
             Some("host"),
         );
 
-        assert_eq!(definition, expected_definition)
+        assert_eq!(definitions, Some(expected_definition))
     }
 }

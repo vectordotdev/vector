@@ -8,7 +8,7 @@ use futures::{
 use http::Request;
 use hyper::Body;
 use tower::{Service, ServiceExt};
-use vector_common::request_metadata::MetaDescriptive;
+use vector_common::{json_size::JsonSize, request_metadata::MetaDescriptive};
 use vector_core::{internal_event::CountByteSize, stream::DriverResponse};
 
 use crate::{
@@ -23,7 +23,7 @@ use crate::{
 pub struct DatadogEventsResponse {
     pub(self) event_status: EventStatus,
     pub http_status: http::StatusCode,
-    pub event_byte_size: usize,
+    pub event_byte_size: JsonSize,
 }
 
 impl DriverResponse for DatadogEventsResponse {
@@ -90,7 +90,7 @@ impl Service<DatadogEventsRequest> for DatadogEventsService {
 
         Box::pin(async move {
             http_service.ready().await?;
-            let event_byte_size = req.get_metadata().events_byte_size();
+            let event_byte_size = req.get_metadata().events_estimated_json_encoded_byte_size();
             let http_response = http_service.call(req).await?;
             let event_status = if http_response.is_successful() {
                 EventStatus::Delivered

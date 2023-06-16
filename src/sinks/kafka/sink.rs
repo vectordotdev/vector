@@ -1,5 +1,4 @@
-use async_trait::async_trait;
-use futures::{future, stream::BoxStream, StreamExt};
+use futures::future;
 use rdkafka::{
     consumer::{BaseConsumer, Consumer},
     error::KafkaError,
@@ -12,17 +11,11 @@ use tower::limit::ConcurrencyLimit;
 
 use super::config::{KafkaRole, KafkaSinkConfig};
 use crate::{
-    codecs::{Encoder, Transformer},
-    event::{Event, LogEvent},
     kafka::KafkaStatisticsContext,
-    sinks::{
-        kafka::{
-            config::QUEUED_MIN_MESSAGES, request_builder::KafkaRequestBuilder,
-            service::KafkaService,
-        },
-        util::{builder::SinkBuilderExt, StreamSink},
+    sinks::kafka::{
+        config::QUEUED_MIN_MESSAGES, request_builder::KafkaRequestBuilder, service::KafkaService,
     },
-    template::{Template, TemplateParseError},
+    sinks::prelude::*,
 };
 
 #[derive(Debug, Snafu)]

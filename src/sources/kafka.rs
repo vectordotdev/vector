@@ -24,18 +24,19 @@ use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::FramedRead;
 
-use value::{kind::Collection, Kind};
 use vector_common::finalizer::OrderedFinalizer;
 use vector_config::configurable_component;
 use vector_core::{
     config::{LegacyKey, LogNamespace},
     EstimatedJsonEncodedSizeOf,
 };
+use vrl::value::{kind::Collection, Kind};
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
     config::{
-        log_schema, LogSchema, Output, SourceAcknowledgementsConfig, SourceConfig, SourceContext,
+        log_schema, LogSchema, SourceAcknowledgementsConfig, SourceConfig, SourceContext,
+        SourceOutput,
     },
     event::{BatchNotifier, BatchStatus, Event, Value},
     internal_events::{
@@ -106,6 +107,7 @@ pub struct KafkaSourceConfig {
     #[configurable(metadata(docs::examples = 5000, docs::examples = 10000))]
     #[configurable(metadata(docs::advanced))]
     #[serde(default = "default_session_timeout_ms")]
+    #[configurable(metadata(docs::human_name = "Session Timeout"))]
     session_timeout_ms: Duration,
 
     /// Timeout for network requests.
@@ -113,6 +115,7 @@ pub struct KafkaSourceConfig {
     #[configurable(metadata(docs::examples = 30000, docs::examples = 60000))]
     #[configurable(metadata(docs::advanced))]
     #[serde(default = "default_socket_timeout_ms")]
+    #[configurable(metadata(docs::human_name = "Socket Timeout"))]
     socket_timeout_ms: Duration,
 
     /// Maximum time the broker may wait to fill the response.
@@ -120,12 +123,14 @@ pub struct KafkaSourceConfig {
     #[configurable(metadata(docs::examples = 50, docs::examples = 100))]
     #[configurable(metadata(docs::advanced))]
     #[serde(default = "default_fetch_wait_max_ms")]
+    #[configurable(metadata(docs::human_name = "Max Fetch Wait Time"))]
     fetch_wait_max_ms: Duration,
 
     /// The frequency that the consumer offsets are committed (written) to offset storage.
     #[serde_as(as = "serde_with::DurationMilliSeconds<u64>")]
     #[serde(default = "default_commit_interval_ms")]
     #[configurable(metadata(docs::examples = 5000, docs::examples = 10000))]
+    #[configurable(metadata(docs::human_name = "Commit Interval"))]
     commit_interval_ms: Duration,
 
     /// Overrides the name of the log field used to add the message key to each event.
@@ -304,7 +309,7 @@ impl SourceConfig for KafkaSourceConfig {
         )))
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         let log_namespace = global_log_namespace.merge(self.log_namespace);
         let keys = self.keys();
 
@@ -355,7 +360,10 @@ impl SourceConfig for KafkaSourceConfig {
                 None,
             );
 
-        vec![Output::default(self.decoding.output_type()).with_schema_definition(schema_definition)]
+        vec![SourceOutput::new_logs(
+            self.decoding.output_type(),
+            schema_definition,
+        )]
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -388,6 +396,7 @@ async fn kafka_source(
 
     loop {
         tokio::select! {
+            biased;
             _ = &mut shutdown => break,
             entry = ack_stream.next() => if let Some((status, entry)) = entry {
                 if status == BatchStatus::Delivered {
@@ -440,8 +449,8 @@ async fn parse_message(
                 let (batch, receiver) = BatchNotifier::new_with_receiver();
                 let mut stream = stream.map(|event| event.with_batch_notifier(&batch));
                 match out.send_event_stream(&mut stream).await {
-                    Err(error) => {
-                        emit!(StreamClosedError { error, count });
+                    Err(_) => {
+                        emit!(StreamClosedError { count });
                     }
                     Ok(_) => {
                         // Drop stream to avoid borrowing `msg`: "[...] borrow might be used
@@ -452,8 +461,8 @@ async fn parse_message(
                 }
             }
             None => match out.send_event_stream(&mut stream).await {
-                Err(error) => {
-                    emit!(StreamClosedError { error, count });
+                Err(_) => {
+                    emit!(StreamClosedError { count });
                 }
                 Ok(_) => {
                     if let Err(error) =
@@ -789,83 +798,85 @@ mod test {
 
     #[test]
     fn test_output_schema_definition_vector_namespace() {
-        let definition = make_config("topic", "group", LogNamespace::Vector)
-            .outputs(LogNamespace::Vector)[0]
-            .clone()
-            .log_schema_definition
-            .unwrap();
+        let definitions = make_config("topic", "group", LogNamespace::Vector)
+            .outputs(LogNamespace::Vector)
+            .remove(0)
+            .schema_definition(true);
 
         assert_eq!(
-            definition,
-            Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
-                .with_meaning(OwnedTargetPath::event_root(), "message")
-                .with_metadata_field(
-                    &owned_value_path!("kafka", "timestamp"),
-                    Kind::timestamp(),
-                    Some("timestamp")
-                )
-                .with_metadata_field(
-                    &owned_value_path!("kafka", "message_key"),
-                    Kind::bytes(),
-                    None
-                )
-                .with_metadata_field(&owned_value_path!("kafka", "topic"), Kind::bytes(), None)
-                .with_metadata_field(
-                    &owned_value_path!("kafka", "partition"),
-                    Kind::bytes(),
-                    None
-                )
-                .with_metadata_field(&owned_value_path!("kafka", "offset"), Kind::bytes(), None)
-                .with_metadata_field(
-                    &owned_value_path!("kafka", "headers"),
-                    Kind::object(Collection::empty().with_unknown(Kind::bytes())),
-                    None
-                )
-                .with_metadata_field(
-                    &owned_value_path!("vector", "ingest_timestamp"),
-                    Kind::timestamp(),
-                    None
-                )
-                .with_metadata_field(
-                    &owned_value_path!("vector", "source_type"),
-                    Kind::bytes(),
-                    None
-                )
+            definitions,
+            Some(
+                Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
+                    .with_meaning(OwnedTargetPath::event_root(), "message")
+                    .with_metadata_field(
+                        &owned_value_path!("kafka", "timestamp"),
+                        Kind::timestamp(),
+                        Some("timestamp")
+                    )
+                    .with_metadata_field(
+                        &owned_value_path!("kafka", "message_key"),
+                        Kind::bytes(),
+                        None
+                    )
+                    .with_metadata_field(&owned_value_path!("kafka", "topic"), Kind::bytes(), None)
+                    .with_metadata_field(
+                        &owned_value_path!("kafka", "partition"),
+                        Kind::bytes(),
+                        None
+                    )
+                    .with_metadata_field(&owned_value_path!("kafka", "offset"), Kind::bytes(), None)
+                    .with_metadata_field(
+                        &owned_value_path!("kafka", "headers"),
+                        Kind::object(Collection::empty().with_unknown(Kind::bytes())),
+                        None
+                    )
+                    .with_metadata_field(
+                        &owned_value_path!("vector", "ingest_timestamp"),
+                        Kind::timestamp(),
+                        None
+                    )
+                    .with_metadata_field(
+                        &owned_value_path!("vector", "source_type"),
+                        Kind::bytes(),
+                        None
+                    )
+            )
         )
     }
 
     #[test]
     fn test_output_schema_definition_legacy_namespace() {
-        let definition = make_config("topic", "group", LogNamespace::Legacy)
-            .outputs(LogNamespace::Legacy)[0]
-            .clone()
-            .log_schema_definition
-            .unwrap();
+        let definitions = make_config("topic", "group", LogNamespace::Legacy)
+            .outputs(LogNamespace::Legacy)
+            .remove(0)
+            .schema_definition(true);
 
         assert_eq!(
-            definition,
-            Definition::new_with_default_metadata(Kind::json(), [LogNamespace::Legacy])
-                .unknown_fields(Kind::undefined())
-                .with_event_field(
-                    &owned_value_path!("message"),
-                    Kind::bytes(),
-                    Some("message")
-                )
-                .with_event_field(
-                    &owned_value_path!("timestamp"),
-                    Kind::timestamp(),
-                    Some("timestamp")
-                )
-                .with_event_field(&owned_value_path!("message_key"), Kind::bytes(), None)
-                .with_event_field(&owned_value_path!("topic"), Kind::bytes(), None)
-                .with_event_field(&owned_value_path!("partition"), Kind::bytes(), None)
-                .with_event_field(&owned_value_path!("offset"), Kind::bytes(), None)
-                .with_event_field(
-                    &owned_value_path!("headers"),
-                    Kind::object(Collection::empty().with_unknown(Kind::bytes())),
-                    None
-                )
-                .with_event_field(&owned_value_path!("source_type"), Kind::bytes(), None)
+            definitions,
+            Some(
+                Definition::new_with_default_metadata(Kind::json(), [LogNamespace::Legacy])
+                    .unknown_fields(Kind::undefined())
+                    .with_event_field(
+                        &owned_value_path!("message"),
+                        Kind::bytes(),
+                        Some("message")
+                    )
+                    .with_event_field(
+                        &owned_value_path!("timestamp"),
+                        Kind::timestamp(),
+                        Some("timestamp")
+                    )
+                    .with_event_field(&owned_value_path!("message_key"), Kind::bytes(), None)
+                    .with_event_field(&owned_value_path!("topic"), Kind::bytes(), None)
+                    .with_event_field(&owned_value_path!("partition"), Kind::bytes(), None)
+                    .with_event_field(&owned_value_path!("offset"), Kind::bytes(), None)
+                    .with_event_field(
+                        &owned_value_path!("headers"),
+                        Kind::object(Collection::empty().with_unknown(Kind::bytes())),
+                        None
+                    )
+                    .with_event_field(&owned_value_path!("source_type"), Kind::bytes(), None)
+            )
         )
     }
 
@@ -906,6 +917,7 @@ mod integration_test {
     use tokio::time::sleep;
     use vector_buffers::topology::channel::BufferReceiver;
     use vector_core::event::EventStatus;
+    use vrl::value;
 
     use super::{test::*, *};
     use crate::{
@@ -1060,7 +1072,7 @@ mod integration_test {
 
                 assert_eq!(
                     meta.get(path!("vector", "source_type")).unwrap(),
-                    &vrl::value!(KafkaSourceConfig::NAME)
+                    &value!(KafkaSourceConfig::NAME)
                 );
                 assert!(meta
                     .get(path!("vector", "ingest_timestamp"))
@@ -1069,20 +1081,20 @@ mod integration_test {
 
                 assert_eq!(
                     event.as_log().value(),
-                    &vrl::value!(format!("{} {:03}", TEXT, i))
+                    &value!(format!("{} {:03}", TEXT, i))
                 );
                 assert_eq!(
                     meta.get(path!("kafka", "message_key")).unwrap(),
-                    &vrl::value!(format!("{} {}", KEY, i))
+                    &value!(format!("{} {}", KEY, i))
                 );
 
                 assert_eq!(
                     meta.get(path!("kafka", "timestamp")).unwrap(),
-                    &vrl::value!(now.trunc_subsecs(3))
+                    &value!(now.trunc_subsecs(3))
                 );
                 assert_eq!(
                     meta.get(path!("kafka", "topic")).unwrap(),
-                    &vrl::value!(topic.clone())
+                    &value!(topic.clone())
                 );
                 assert!(meta.get(path!("kafka", "partition")).unwrap().is_integer(),);
                 assert!(meta.get(path!("kafka", "offset")).unwrap().is_integer(),);

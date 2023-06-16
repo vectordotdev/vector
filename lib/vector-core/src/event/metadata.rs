@@ -4,11 +4,11 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
-use value::{Kind, Secrets, Value};
 use vector_common::EventDataEq;
+use vrl::value::{Kind, Secrets, Value};
 
 use super::{BatchNotifier, EventFinalizer, EventFinalizers, EventStatus};
-use crate::config::LogNamespace;
+use crate::config::{LogNamespace, OutputId};
 use crate::{schema, ByteSizeOf};
 
 const DATADOG_API_KEY: &str = "datadog_api_key";
@@ -28,6 +28,9 @@ pub struct EventMetadata {
 
     #[serde(default, skip)]
     finalizers: EventFinalizers,
+
+    /// The id of the source
+    source_id: Option<Arc<OutputId>>,
 
     /// An identifier for a globally registered schema definition which provides information about
     /// the event shape (type information, and semantic meaning of fields).
@@ -70,6 +73,17 @@ impl EventMetadata {
         &mut self.secrets
     }
 
+    /// Returns a reference to the metadata source.
+    #[must_use]
+    pub fn source_id(&self) -> Option<&OutputId> {
+        self.source_id.as_deref()
+    }
+
+    /// Sets the `source_id` in the metadata to the provided value.
+    pub fn set_source_id(&mut self, source_id: Arc<OutputId>) {
+        self.source_id = Some(source_id);
+    }
+
     /// Return the datadog API key, if it exists
     pub fn datadog_api_key(&self) -> Option<Arc<str>> {
         self.secrets.get(DATADOG_API_KEY).cloned()
@@ -98,6 +112,7 @@ impl Default for EventMetadata {
             secrets: Secrets::new(),
             finalizers: Default::default(),
             schema_definition: default_schema_definition(),
+            source_id: None,
         }
     }
 }

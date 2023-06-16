@@ -20,7 +20,7 @@ use vector_core::{
     event::BatchNotifier,
     EstimatedJsonEncodedSizeOf,
 };
-use vrl::SecretTarget;
+use vrl::compiler::SecretTarget;
 use warp::reject;
 
 use super::{
@@ -145,10 +145,7 @@ pub(super) async fn firehose(
 
                     let count = events.len();
                     if let Err(error) = context.out.send_batch(events).await {
-                        emit!(StreamClosedError {
-                            error: error.clone(),
-                            count,
-                        });
+                        emit!(StreamClosedError { count });
                         let error = RequestError::ShuttingDown {
                             request_id: request_id.clone(),
                             source: error,

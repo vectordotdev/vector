@@ -5,14 +5,15 @@ use std::{
     hash::Hash,
     net::SocketAddr,
     path::PathBuf,
+    time::Duration,
 };
 
 use indexmap::IndexMap;
 pub use vector_config::component::{GenerateConfig, SinkDescription, TransformDescription};
 use vector_config::configurable_component;
 pub use vector_core::config::{
-    AcknowledgementsConfig, DataType, GlobalOptions, Input, LogNamespace, Output,
-    SourceAcknowledgementsConfig,
+    AcknowledgementsConfig, DataType, GlobalOptions, Input, LogNamespace,
+    SourceAcknowledgementsConfig, SourceOutput, TransformOutput,
 };
 
 use crate::{conditions, event::Metric, secrets::SecretBackends, serde::OneOrMany};
@@ -45,19 +46,25 @@ pub use cmd::{cmd, Opts};
 pub use diff::ConfigDiff;
 pub use enrichment_table::{EnrichmentTableConfig, EnrichmentTableOuter};
 pub use format::{Format, FormatHint};
-pub use id::{ComponentKey, Inputs, OutputId};
+pub use id::{ComponentKey, Inputs};
 pub use loading::{
     load, load_builder_from_paths, load_from_paths, load_from_paths_with_provider_and_secrets,
-    load_from_str, load_source_from_paths, merge_path_lists, process_paths, CONFIG_PATHS,
+    load_from_str, load_source_from_paths, merge_path_lists, process_paths, COLLECTOR,
+    CONFIG_PATHS,
 };
 pub use provider::ProviderConfig;
 pub use secret::SecretBackend;
 pub use sink::{SinkConfig, SinkContext, SinkHealthcheckOptions, SinkOuter};
 pub use source::{BoxedSource, SourceConfig, SourceContext, SourceOuter};
-pub use transform::{BoxedTransform, TransformConfig, TransformContext, TransformOuter};
+pub use transform::{
+    get_transform_output_ids, BoxedTransform, TransformConfig, TransformContext, TransformOuter,
+};
 pub use unit_test::{build_unit_tests, build_unit_tests_main, UnitTestResult};
 pub use validation::warnings;
-pub use vector_core::config::{init_log_schema, log_schema, proxy::ProxyConfig, LogSchema};
+pub use vars::{interpolate, ENVIRONMENT_VARIABLE_INTERPOLATION_REGEX};
+pub use vector_core::config::{
+    init_log_schema, log_schema, proxy::ProxyConfig, LogSchema, OutputId,
+};
 
 #[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq)]
 pub enum ConfigPath {
@@ -99,6 +106,7 @@ pub struct Config {
     pub enrichment_tables: IndexMap<ComponentKey, EnrichmentTableOuter>,
     tests: Vec<TestDefinition>,
     secret: IndexMap<ComponentKey, SecretBackends>,
+    pub graceful_shutdown_duration: Option<Duration>,
 }
 
 impl Config {
@@ -1096,7 +1104,7 @@ mod tests {
                     type = "filter"
                     inputs = ["internal_metrics"]
                     condition = """
-                        .name == "processed_bytes_total"
+                        .name == "component_received_bytes_total"
                     """
 
                 [sinks.out]
@@ -1127,7 +1135,7 @@ mod tests {
                     type = "filter"
                     inputs = ["internal_metrics"]
                     condition = """
-                        .name == "processed_bytes_total"
+                        .name == "component_received_bytes_total"
                     """
 
                 [sinks.out]
@@ -1306,6 +1314,7 @@ mod resource_tests {
     proptest! {
         #[test]
         fn valid(addr: IpAddr, port1 in specport(), port2 in specport()) {
+            prop_assume!(port1 != port2);
             let components = vec![
                 ("sink_0", vec![tcp(addr, 0)]),
                 ("sink_1", vec![tcp(addr, port1)]),

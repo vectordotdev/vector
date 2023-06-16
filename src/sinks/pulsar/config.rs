@@ -1,12 +1,9 @@
 use crate::{
-    codecs::EncodingConfig,
-    config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     schema,
     sinks::{
+        prelude::*,
         pulsar::sink::{healthcheck, PulsarSink},
-        Healthcheck, VectorSink,
     },
-    template::Template,
 };
 use codecs::{encoding::SerializerConfig, TextSerializerConfig};
 use futures_util::FutureExt;
@@ -20,10 +17,9 @@ use pulsar::{
 };
 use pulsar::{error::AuthenticationError, OperationRetryOptions};
 use snafu::ResultExt;
-use value::Kind;
 use vector_common::sensitive_string::SensitiveString;
-use vector_config::configurable_component;
 use vector_core::config::DataType;
+use vrl::value::Kind;
 
 /// Configuration for the `pulsar` sink.
 #[configurable_component(sink("pulsar"))]
@@ -87,13 +83,17 @@ pub struct PulsarSinkConfig {
 #[configurable_component]
 #[derive(Clone, Copy, Debug, Default)]
 pub(crate) struct PulsarBatchConfig {
-    /// The maximum size of a batch before it is flushed.
+    /// The maximum amount of events in a batch before it is flushed.
     ///
     /// Note this is an unsigned 32 bit integer which is a smaller capacity than
     /// many of the other sink batch settings.
     #[configurable(metadata(docs::type_unit = "events"))]
     #[configurable(metadata(docs::examples = 1000))]
     pub max_events: Option<u32>,
+
+    /// The maximum size of a batch before it is flushed.
+    #[configurable(metadata(docs::type_unit = "bytes"))]
+    pub max_bytes: Option<usize>,
 }
 
 /// Authentication configuration.
@@ -235,6 +235,7 @@ impl PulsarSinkConfig {
             metadata: Default::default(),
             schema: None,
             batch_size: self.batch.max_events,
+            batch_byte_size: self.batch.max_bytes,
             compression: None,
         };
 

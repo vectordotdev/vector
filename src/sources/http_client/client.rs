@@ -33,7 +33,7 @@ use codecs::{
 };
 use vector_config::configurable_component;
 use vector_core::{
-    config::{log_schema, LogNamespace, Output},
+    config::{log_schema, LogNamespace, SourceOutput},
     event::Event,
 };
 
@@ -55,6 +55,7 @@ pub struct HttpClientConfig {
     #[serde(default = "default_interval")]
     #[serde_as(as = "serde_with::DurationSeconds<u64>")]
     #[serde(rename = "scrape_interval_secs")]
+    #[configurable(metadata(docs::human_name = "Scrape Interval"))]
     pub interval: Duration,
 
     /// Custom parameters for the HTTP request query string.
@@ -206,7 +207,7 @@ impl SourceConfig for HttpClientConfig {
         Ok(call(inputs, context, cx.out, self.method).boxed())
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         // There is a global and per-source `log_namespace` config. The source config overrides the global setting,
         // and is merged here.
         let log_namespace = global_log_namespace.merge(self.log_namespace);
@@ -216,7 +217,10 @@ impl SourceConfig for HttpClientConfig {
             .schema_definition(log_namespace)
             .with_standard_vector_source_metadata();
 
-        vec![Output::default(self.decoding.output_type()).with_schema_definition(schema_definition)]
+        vec![SourceOutput::new_logs(
+            self.decoding.output_type(),
+            schema_definition,
+        )]
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -231,7 +235,7 @@ impl ValidatableComponent for HttpClientConfig {
         let config = Self {
             endpoint: uri.to_string(),
             interval: Duration::from_secs(1),
-            decoding: DeserializerConfig::Json,
+            decoding: DeserializerConfig::Json(Default::default()),
             ..Default::default()
         };
 
@@ -303,8 +307,7 @@ impl http_client::HttpClientContext for HttpClientContext {
     fn on_response(&mut self, _url: &Uri, _header: &Parts, body: &Bytes) -> Option<Vec<Event>> {
         // get the body into a byte array
         let mut buf = BytesMut::new();
-        let body = String::from_utf8_lossy(body);
-        buf.extend_from_slice(body.as_bytes());
+        buf.extend_from_slice(body);
 
         let events = self.decode_events(&mut buf);
 

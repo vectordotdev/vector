@@ -47,6 +47,7 @@ pub struct AvroSerializerOptions {
     #[configurable(metadata(
         docs::examples = r#"{ "type": "record", "name": "log", "fields": [{ "name": "message", "type": "string" }] }"#
     ))]
+    #[configurable(metadata(docs::human_name = "Schema JSON"))]
     pub schema: String,
 }
 
@@ -80,8 +81,8 @@ impl Encoder<Event> for AvroSerializer {
 mod tests {
     use bytes::BytesMut;
     use indoc::indoc;
-    use value::btreemap;
     use vector_core::event::{LogEvent, Value};
+    use vrl::btreemap;
 
     use super::*;
 

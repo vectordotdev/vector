@@ -41,49 +41,35 @@ env:
 jobs:
   test-integration:
     runs-on: [linux, ubuntu-20.04-8core]
-    if: inputs.if || github.event_name == 'workflow_dispatch'
     timeout-minutes: 30
+    if: inputs.if || github.event_name == 'workflow_dispatch'
     steps:
-      # For PR comment trigger, extra steps are required to associate the workflow with the PR.
-
-      # Find the branch that the comment was made in.
       - name: (PR comment) Get PR branch
         if: ${{ github.event_name == 'issue_comment' }}
-        uses: xt0rted/pull-request-comment-branch@v1
+        uses: xt0rted/pull-request-comment-branch@v2
         id: comment-branch
 
-      # Checkout the branch, using the PR ref.
       - name: (PR comment) Checkout PR branch
         if: ${{ github.event_name == 'issue_comment' }}
         uses: actions/checkout@v3
         with:
           ref: ${{ steps.comment-branch.outputs.head_ref }}
 
-      # Checkout the default branch otherwise.
       - name: Checkout branch
         if: ${{ github.event_name != 'issue_comment' }}
         uses: actions/checkout@v3
 
-      - name: mock
-        run: echo "${{ inputs.test_name }}"
+      - run: sudo npm -g install @datadog/datadog-ci
 
-      # - run: make ci-sweep
+      - run: make test-integration-${{ inputs.test_name }}
+        env:
+          TEST_DATADOG_API_KEY: ${{ secrets.CI_TEST_DATADOG_API_KEY }}
 
-      # - run: sudo npm -g install @datadog/datadog-ci
+      - name: Upload test results
+        run: scripts/upload-test-results.sh
+        if: always()
 
-      # - run: make test-integration-${{ inputs.test_name }}
-      #   env:
-      #     TEST_DATADOG_API_KEY: ${{ secrets.CI_TEST_DATADOG_API_KEY }}
-      #     # TODO: It looks like this used to be used but isn't anymore
-      #     #SPLUNK_VERSION: ${{ matrix.env.SPLUNK_VERSION }}
-
-      # - name: Upload test results
-      #   run: scripts/upload-test-results.sh
-      #   if: always()
-
-      # - run: make test-integration-${{ inputs.test_name }}-cleanup
-      #   if: ${{ always() }}
-      #   env:
-      #     TEST_DATADOG_API_KEY: ${{ secrets.CI_TEST_DATADOG_API_KEY }}
-      #     # TODO: It looks like this used to be used but isn't anymore
-      #     #SPLUNK_VERSION: ${{ matrix.env.SPLUNK_VERSION }}
+      - run: make test-integration-${{ inputs.test_name }}-cleanup
+        if: ${{ always() }}
+        env:
+          TEST_DATADOG_API_KEY: ${{ secrets.CI_TEST_DATADOG_API_KEY }}

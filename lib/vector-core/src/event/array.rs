@@ -2,19 +2,22 @@
 //! This module contains the definitions and wrapper types for handling
 //! arrays of type `Event`, in the various forms they may appear.
 
-use std::{iter, slice, vec};
+use std::{iter, slice, sync::Arc, vec};
 
 use futures::{stream, Stream};
 #[cfg(test)]
 use quickcheck::{Arbitrary, Gen};
 use vector_buffers::EventCount;
-use vector_common::finalization::{AddBatchNotifier, BatchNotifier, EventFinalizers, Finalizable};
+use vector_common::{
+    finalization::{AddBatchNotifier, BatchNotifier, EventFinalizers, Finalizable},
+    json_size::JsonSize,
+};
 
 use super::{
     EstimatedJsonEncodedSizeOf, Event, EventDataEq, EventFinalizer, EventMutRef, EventRef,
     LogEvent, Metric, TraceEvent,
 };
-use crate::ByteSizeOf;
+use crate::{config::OutputId, ByteSizeOf};
 
 /// The type alias for an array of `LogEvent` elements.
 pub type LogArray = Vec<LogEvent>;
@@ -138,6 +141,27 @@ pub enum EventArray {
 }
 
 impl EventArray {
+    /// Sets the `OutputId` in the metadata for all the events in this array.
+    pub fn set_output_id(&mut self, output_id: &Arc<OutputId>) {
+        match self {
+            EventArray::Logs(logs) => {
+                for log in logs {
+                    log.metadata_mut().set_source_id(Arc::clone(output_id));
+                }
+            }
+            EventArray::Metrics(metrics) => {
+                for metric in metrics {
+                    metric.metadata_mut().set_source_id(Arc::clone(output_id));
+                }
+            }
+            EventArray::Traces(traces) => {
+                for trace in traces {
+                    trace.metadata_mut().set_source_id(Arc::clone(output_id));
+                }
+            }
+        }
+    }
+
     /// Iterate over references to this array's events.
     pub fn iter_events(&self) -> impl Iterator<Item = EventRef> {
         match self {
@@ -232,7 +256,7 @@ impl ByteSizeOf for EventArray {
 }
 
 impl EstimatedJsonEncodedSizeOf for EventArray {
-    fn estimated_json_encoded_size_of(&self) -> usize {
+    fn estimated_json_encoded_size_of(&self) -> JsonSize {
         match self {
             Self::Logs(v) => v.estimated_json_encoded_size_of(),
             Self::Traces(v) => v.estimated_json_encoded_size_of(),

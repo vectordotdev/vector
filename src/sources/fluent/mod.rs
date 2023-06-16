@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::io::{self, Read};
 use std::net::SocketAddr;
 use std::time::Duration;
@@ -9,21 +10,21 @@ use codecs::{BytesDeserializerConfig, StreamDecodingError};
 use flate2::read::MultiGzDecoder;
 use lookup::lookup_v2::parse_value_path;
 use lookup::{metadata_path, owned_value_path, path, OwnedValuePath, PathPrefix};
-use rmp_serde::{decode, Deserializer};
-use serde::Deserialize;
+use rmp_serde::{decode, Deserializer, Serializer};
+use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 use tokio_util::codec::Decoder;
-use value::kind::Collection;
-use value::{Kind, Value};
 use vector_config::configurable_component;
 use vector_core::config::{LegacyKey, LogNamespace};
 use vector_core::schema::Definition;
+use vrl::value::kind::Collection;
+use vrl::value::{Kind, Value};
 
 use super::util::net::{SocketListenAddr, TcpSource, TcpSourceAck, TcpSourceAcker};
 use crate::{
     config::{
-        log_schema, DataType, GenerateConfig, Output, Resource, SourceAcknowledgementsConfig,
-        SourceConfig, SourceContext,
+        log_schema, DataType, GenerateConfig, Resource, SourceAcknowledgementsConfig, SourceConfig,
+        SourceContext, SourceOutput,
     },
     event::{Event, LogEvent},
     internal_events::{FluentMessageDecodeError, FluentMessageReceived},
@@ -114,11 +115,11 @@ impl SourceConfig for FluentConfig {
         )
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         let log_namespace = global_log_namespace.merge(self.log_namespace);
         let schema_definition = self.schema_definition(log_namespace);
 
-        vec![Output::default(DataType::Log).with_schema_definition(schema_definition)]
+        vec![SourceOutput::new_logs(DataType::Log, schema_definition)]
     }
 
     fn resources(&self) -> Vec<Resource> {
@@ -532,15 +533,18 @@ impl TcpSourceAcker for FluentAcker {
             return None;
         }
 
-        let mut acks = String::new();
+        let mut buf = Vec::new();
+        let mut ser = Serializer::new(&mut buf);
+        let mut ack_map = HashMap::new();
+
         for chunk in self.chunks {
-            let ack = match ack {
-                TcpSourceAck::Ack => format!(r#"{{"ack": "{}"}}"#, chunk),
-                _ => String::from("{}"),
+            ack_map.clear();
+            if let TcpSourceAck::Ack = ack {
+                ack_map.insert("ack", chunk);
             };
-            acks.push_str(&ack);
+            ack_map.serialize(&mut ser).unwrap();
         }
-        Some(acks.into())
+        Some(buf.into())
     }
 }
 
@@ -635,9 +639,9 @@ mod tests {
         time::{error::Elapsed, timeout, Duration},
     };
     use tokio_util::codec::Decoder;
-    use value::kind::Collection;
     use vector_common::assert_event_data_eq;
     use vector_core::{event::Value, schema::Definition};
+    use vrl::value::kind::Collection;
 
     use super::{message::FluentMessageOptions, *};
     use crate::{
@@ -861,7 +865,8 @@ mod tests {
     async fn ack_delivered_with_chunk() {
         let (result, output) = check_acknowledgements(EventStatus::Delivered, true).await;
         assert_eq!(result.unwrap().unwrap(), output.len());
-        assert!(output.starts_with(b"{\"ack\":"));
+        let expected: Vec<u8> = vec![0x81, 0xa3, 0x61, 0x63]; // { "ack": ...
+        assert_eq!(output[..expected.len()], expected);
     }
 
     #[tokio::test]
@@ -875,7 +880,8 @@ mod tests {
     async fn ack_failed_with_chunk() {
         let (result, output) = check_acknowledgements(EventStatus::Rejected, true).await;
         assert_eq!(result.unwrap().unwrap(), output.len());
-        assert_eq!(output, &b"{}"[..]);
+        let expected: Vec<u8> = vec![0x80]; // { }
+        assert_eq!(output, expected);
     }
 
     async fn check_acknowledgements(
@@ -960,10 +966,10 @@ mod tests {
             log_namespace: Some(true),
         };
 
-        let definition = config.outputs(LogNamespace::Vector)[0]
-            .clone()
-            .log_schema_definition
-            .unwrap();
+        let definitions = config
+            .outputs(LogNamespace::Vector)
+            .remove(0)
+            .schema_definition(true);
 
         let expected_definition =
             Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
@@ -1000,7 +1006,7 @@ mod tests {
                     None,
                 );
 
-        assert_eq!(definition, expected_definition)
+        assert_eq!(definitions, Some(expected_definition))
     }
 
     #[test]
@@ -1015,10 +1021,10 @@ mod tests {
             log_namespace: None,
         };
 
-        let definition = config.outputs(LogNamespace::Legacy)[0]
-            .clone()
-            .log_schema_definition
-            .unwrap();
+        let definitions = config
+            .outputs(LogNamespace::Legacy)
+            .remove(0)
+            .schema_definition(true);
 
         let expected_definition = Definition::new_with_default_metadata(
             Kind::object(Collection::empty()),
@@ -1035,7 +1041,7 @@ mod tests {
         .with_event_field(&owned_value_path!("host"), Kind::bytes(), Some("host"))
         .unknown_fields(Kind::bytes());
 
-        assert_eq!(definition, expected_definition)
+        assert_eq!(definitions, Some(expected_definition))
     }
 }
 

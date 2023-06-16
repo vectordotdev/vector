@@ -12,7 +12,7 @@ use vector_core::{config::LogNamespace, event::Event};
 use super::parser;
 use crate::sources::util::http::HttpMethod;
 use crate::{
-    config::{self, GenerateConfig, Output, SourceConfig, SourceContext},
+    config::{GenerateConfig, SourceConfig, SourceContext, SourceOutput},
     http::Auth,
     internal_events::PrometheusParseError,
     sources::{
@@ -57,6 +57,7 @@ pub struct PrometheusScrapeConfig {
     #[serde(default = "default_interval")]
     #[serde_as(as = "serde_with::DurationSeconds<u64>")]
     #[serde(rename = "scrape_interval_secs")]
+    #[configurable(metadata(docs::human_name = "Scrape Interval"))]
     interval: Duration,
 
     /// The tag name added to each event representing the scraped instance's `host:port`.
@@ -156,8 +157,8 @@ impl SourceConfig for PrometheusScrapeConfig {
         Ok(call(inputs, builder, cx.out, HttpMethod::Get).boxed())
     }
 
-    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
-        vec![Output::default(config::DataType::Metric)]
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
+        vec![SourceOutput::new_metrics()]
     }
 
     fn can_acknowledge(&self) -> bool {

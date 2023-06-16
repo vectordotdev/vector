@@ -1,5 +1,9 @@
 #[cfg(feature = "vrl")]
 use std::convert::TryFrom;
+
+#[cfg(feature = "vrl")]
+use vrl::compiler::value::VrlValueConvert;
+
 use std::{
     convert::AsRef,
     fmt::{self, Display, Formatter},
@@ -7,10 +11,8 @@ use std::{
 };
 
 use chrono::{DateTime, Utc};
-use vector_common::EventDataEq;
+use vector_common::{json_size::JsonSize, EventDataEq};
 use vector_config::configurable_component;
-#[cfg(feature = "vrl")]
-use vrl_lib::prelude::VrlValueConvert;
 
 use crate::{
     event::{
@@ -428,7 +430,7 @@ impl Display for Metric {
     ///
     /// example:
     /// ```text
-    /// 2020-08-12T20:23:37.248661343Z vector_processed_bytes_total{component_kind="sink",component_type="blackhole"} = 6391
+    /// 2020-08-12T20:23:37.248661343Z vector_received_bytes_total{component_kind="sink",component_type="blackhole"} = 6391
     /// ```
     fn fmt(&self, fmt: &mut Formatter<'_>) -> Result<(), fmt::Error> {
         if let Some(timestamp) = &self.data.time.timestamp {
@@ -461,10 +463,10 @@ impl ByteSizeOf for Metric {
 }
 
 impl EstimatedJsonEncodedSizeOf for Metric {
-    fn estimated_json_encoded_size_of(&self) -> usize {
+    fn estimated_json_encoded_size_of(&self) -> JsonSize {
         // TODO: For now we're using the in-memory representation of the metric, but we'll convert
         // this to actually calculate the JSON encoded size in the near future.
-        self.size_of()
+        self.size_of().into()
     }
 }
 
@@ -495,10 +497,10 @@ pub enum MetricKind {
 }
 
 #[cfg(feature = "vrl")]
-impl TryFrom<::value::Value> for MetricKind {
+impl TryFrom<vrl::value::Value> for MetricKind {
     type Error = String;
 
-    fn try_from(value: ::value::Value) -> Result<Self, Self::Error> {
+    fn try_from(value: vrl::value::Value) -> Result<Self, Self::Error> {
         let value = value.try_bytes().map_err(|e| e.to_string())?;
         match std::str::from_utf8(&value).map_err(|e| e.to_string())? {
             "incremental" => Ok(Self::Incremental),
@@ -511,7 +513,7 @@ impl TryFrom<::value::Value> for MetricKind {
 }
 
 #[cfg(feature = "vrl")]
-impl From<MetricKind> for ::value::Value {
+impl From<MetricKind> for vrl::value::Value {
     fn from(kind: MetricKind) -> Self {
         match kind {
             MetricKind::Incremental => "incremental".into(),

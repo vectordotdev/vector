@@ -119,6 +119,13 @@ where
                     // Drop all the existing status receivers and start over.
                     status_receivers = S::default();
                 },
+                // Prefer to remove finalizers than to add new finalizers to prevent unbounded
+                // growth under load.
+                finished = status_receivers.next(), if !status_receivers.is_empty() => match finished {
+                    Some((status, entry)) => yield (status, entry),
+                    // The `is_empty` guard above prevents this from being reachable.
+                    None => unreachable!(),
+                },
                 // Only poll for new entries until shutdown is flagged.
                 new_entry = new_entries.recv() => match new_entry {
                     Some((receiver, entry)) => {
@@ -129,11 +136,6 @@ where
                     }
                     // The end of the new entry channel signals shutdown
                     None => break,
-                },
-                finished = status_receivers.next(), if !status_receivers.is_empty() => match finished {
-                    Some((status, entry)) => yield (status, entry),
-                    // The `is_empty` guard above prevents this from being reachable.
-                    None => unreachable!(),
                 },
             }
         }

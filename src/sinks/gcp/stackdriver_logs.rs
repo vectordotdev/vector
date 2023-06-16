@@ -6,8 +6,8 @@ use http::{Request, Uri};
 use hyper::Body;
 use serde_json::{json, map};
 use snafu::Snafu;
-use value::Kind;
 use vector_config::configurable_component;
+use vrl::value::Kind;
 
 use crate::{
     codecs::Transformer,
@@ -237,6 +237,7 @@ impl SinkConfig for StackdriverConfig {
         )
         .sink_map_err(|error| error!(message = "Fatal gcp_stackdriver_logs sink error.", %error));
 
+        #[allow(deprecated)]
         Ok((VectorSink::from_event_sink(sink), healthcheck))
     }
 

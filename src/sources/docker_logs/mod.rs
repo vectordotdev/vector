@@ -21,16 +21,16 @@ use once_cell::sync::Lazy;
 use serde_with::serde_as;
 use tokio::sync::mpsc;
 use tracing_futures::Instrument;
-use value::{kind::Collection, Kind};
 use vector_common::internal_event::{
     ByteSize, BytesReceived, InternalEventHandle as _, Protocol, Registered,
 };
 use vector_config::configurable_component;
 use vector_core::config::{LegacyKey, LogNamespace};
+use vrl::value::{kind::Collection, Kind};
 
 use super::util::MultilineConfig;
 use crate::{
-    config::{log_schema, DataType, Output, SourceConfig, SourceContext},
+    config::{log_schema, DataType, SourceConfig, SourceContext, SourceOutput},
     docker::{docker, DockerTlsConfig},
     event::{self, merge_state::LogEventMergeState, EstimatedJsonEncodedSizeOf, LogEvent, Value},
     internal_events::{
@@ -151,6 +151,7 @@ pub struct DockerLogsConfig {
     /// The amount of time to wait before retrying after an error.
     #[serde_as(as = "serde_with::DurationSeconds<u64>")]
     #[serde(default = "default_retry_backoff_secs")]
+    #[configurable(metadata(docs::human_name = "Retry Backoff"))]
     retry_backoff_secs: Duration,
 
     /// Multiline aggregation configuration.
@@ -272,7 +273,7 @@ impl SourceConfig for DockerLogsConfig {
         }))
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         let host_key = self.host_key.clone().path.map(LegacyKey::Overwrite);
 
         let schema_definition = BytesDeserializerConfig
@@ -351,7 +352,7 @@ impl SourceConfig for DockerLogsConfig {
                 None,
             );
 
-        vec![Output::default(DataType::Log).with_schema_definition(schema_definition)]
+        vec![SourceOutput::new_logs(DataType::Log, schema_definition)]
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -813,13 +814,10 @@ impl EventStreamBuilder {
         let result = {
             let mut stream = events_stream
                 .map(move |event| add_hostname(event, &host_key, &hostname, self.log_namespace));
-            self.out
-                .send_event_stream(&mut stream)
-                .await
-                .map_err(|error| {
-                    let (count, _) = stream.size_hint();
-                    emit!(StreamClosedError { error, count });
-                })
+            self.out.send_event_stream(&mut stream).await.map_err(|_| {
+                let (count, _) = stream.size_hint();
+                emit!(StreamClosedError { count });
+            })
         };
 
         // End of stream

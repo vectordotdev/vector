@@ -2,71 +2,45 @@ name: Component Features - Linux
 
 on:
   workflow_call:
-  issue_comment:
-    types: [created]
-
-env:
-  AWS_ACCESS_KEY_ID: "dummy"
-  AWS_SECRET_ACCESS_KEY: "dummy"
-  CONTAINER_TOOL: "docker"
-  DD_ENV: "ci"
-  DD_API_KEY: ${{ secrets.DD_API_KEY }}
-  RUST_BACKTRACE: full
-  TEST_LOG: vector=debug
-  VERBOSE: true
-  CI: true
-  PROFILE: debug
-  # observing issues fetching boringssl via HTTPS in the OSX build, seeing if this helps
-  # can be removed when we switch back to the upstream openssl-sys crate
-  CARGO_NET_GIT_FETCH_WITH_CLI: true
 
 jobs:
   check-component-features:
     runs-on: [linux, ubuntu-20.04-8core]
-    if: github.event_name != 'issue_comment' || (github.event.issue.pull_request && contains(github.event.comment.body, '/ci-deploy-component-features'))
     steps:
-      # For PR comment trigger, extra steps are required to associate the workflow with the PR.
-
-      # Find the branch that the comment was made in.
       - name: (PR comment) Get PR branch
         if: ${{ github.event_name == 'issue_comment' }}
-        uses: xt0rted/pull-request-comment-branch@v1
+        uses: xt0rted/pull-request-comment-branch@v2
         id: comment-branch
 
-      # Indicate in the PR's CI pane that this job is running.
       - name: (PR comment) Set latest commit status as pending
-        uses: myrotvorets/set-commit-status-action@master
+        uses: myrotvorets/set-commit-status-action@v1.1.7
         if: ${{ github.event_name == 'issue_comment' }}
         with:
           sha: ${{ steps.comment-branch.outputs.head_sha }}
           token: ${{ secrets.GITHUB_TOKEN }}
+          context: Component Features - Linux
           status: pending
 
-      # Checkout the branch, using the PR ref.
       - name: (PR comment) Checkout PR branch
         if: ${{ github.event_name == 'issue_comment' }}
         uses: actions/checkout@v3
         with:
           ref: ${{ steps.comment-branch.outputs.head_ref }}
 
-      # Checkout the default branch otherwise.
       - name: Checkout branch
         if: ${{ github.event_name != 'issue_comment' }}
         uses: actions/checkout@v3
 
-      - name: mock
-        run: echo "OK"
+      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: bash scripts/environment/prepare.sh
+      - run: echo "::add-matcher::.github/matchers/rust.json"
+      - run: make check-component-features
 
-      # - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      # - run: bash scripts/environment/prepare.sh
-      # - run: echo "::add-matcher::.github/matchers/rust.json"
-      # - run: make check-component-features
-
-      # Indicate in the PR's CI pane that this job is complete
       - name: (PR comment) Set latest commit status as ${{ job.status }}
-        uses: myrotvorets/set-commit-status-action@master
+        uses: myrotvorets/set-commit-status-action@v1.1.7
         if: always() && github.event_name == 'issue_comment'
         with:
           sha: ${{ steps.comment-branch.outputs.head_sha }}
           token: ${{ secrets.GITHUB_TOKEN }}
+          context: Component Features - Linux
           status: ${{ job.status }}

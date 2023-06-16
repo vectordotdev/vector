@@ -14,12 +14,13 @@ use serde_with::serde_as;
 use snafu::ResultExt as _;
 use tokio::time::{sleep, Duration, Instant};
 use tracing::Instrument;
-use value::Kind;
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
+use vrl::value::Kind;
 
+use crate::config::OutputId;
 use crate::{
-    config::{DataType, Input, Output, ProxyConfig, TransformConfig, TransformContext},
+    config::{DataType, Input, ProxyConfig, TransformConfig, TransformContext, TransformOutput},
     event::Event,
     http::HttpClient,
     internal_events::{AwsEc2MetadataRefreshError, AwsEc2MetadataRefreshSuccessful},
@@ -243,7 +244,12 @@ impl TransformConfig for Ec2Metadata {
         Input::new(DataType::Metric | DataType::Log)
     }
 
-    fn outputs(&self, merged_definition: &schema::Definition, _: LogNamespace) -> Vec<Output> {
+    fn outputs(
+        &self,
+        _: enrichment::TableRegistry,
+        input_definitions: &[(OutputId, schema::Definition)],
+        _: LogNamespace,
+    ) -> Vec<TransformOutput> {
         let added_keys = Keys::new(self.namespace.clone());
 
         let paths = [
@@ -263,15 +269,24 @@ impl TransformConfig for Ec2Metadata {
             &added_keys.tags_key.log_path,
         ];
 
-        let mut schema_definition = merged_definition.clone();
+        let schema_definition = input_definitions
+            .iter()
+            .map(|(output, definition)| {
+                let mut schema_definition = definition.clone();
 
-        for path in paths {
-            schema_definition =
-                schema_definition.with_field(path, Kind::bytes().or_undefined(), None);
-        }
+                for path in paths {
+                    schema_definition =
+                        schema_definition.with_field(path, Kind::bytes().or_undefined(), None);
+                }
 
-        vec![Output::default(DataType::Metric | DataType::Log)
-            .with_schema_definition(schema_definition)]
+                (output.clone(), schema_definition)
+            })
+            .collect();
+
+        vec![TransformOutput::new(
+            DataType::Metric | DataType::Log,
+            schema_definition,
+        )]
     }
 }
 
@@ -708,7 +723,8 @@ mod integration_tests {
         transforms::test::create_topology,
     };
     use std::collections::BTreeMap;
-    use value::Value;
+    use vector_common::assert_event_data_eq;
+    use vrl::value::Value;
     use warp::Filter;
 
     fn ec2_metadata_address() -> String {
@@ -836,7 +852,7 @@ mod integration_tests {
             tx.send(log.into()).await.unwrap();
 
             let event = out.recv().await.unwrap();
-            assert_eq!(event.into_log(), expected_log);
+            assert_event_data_eq!(event.into_log(), expected_log);
 
             drop(tx);
             topology.stop().await;
@@ -937,7 +953,7 @@ mod integration_tests {
             tx.send(metric.into()).await.unwrap();
 
             let event = out.recv().await.unwrap();
-            assert_eq!(event.into_metric(), expected_metric);
+            assert_event_data_eq!(event.into_metric(), expected_metric);
 
             drop(tx);
             topology.stop().await;
@@ -982,7 +998,7 @@ mod integration_tests {
             tx.send(log.into()).await.unwrap();
 
             let event = out.recv().await.unwrap();
-            assert_eq!(event.into_log(), expected_log);
+            assert_event_data_eq!(event.into_log(), expected_log);
 
             drop(tx);
             topology.stop().await;
@@ -1026,7 +1042,7 @@ mod integration_tests {
             tx.send(metric.into()).await.unwrap();
 
             let event = out.recv().await.unwrap();
-            assert_eq!(event.into_metric(), expected_metric);
+            assert_event_data_eq!(event.into_metric(), expected_metric);
 
             drop(tx);
             topology.stop().await;

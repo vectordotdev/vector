@@ -1,26 +1,17 @@
 use std::task::{Context, Poll};
 
 use bytes::Bytes;
-use futures::future::BoxFuture;
 use rdkafka::{
     error::KafkaError,
     message::OwnedHeaders,
     producer::{FutureProducer, FutureRecord},
     util::Timeout,
 };
-use tower::Service;
-use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
-use vector_core::{
-    internal_event::{
-        ByteSize, BytesSent, CountByteSize, InternalEventHandle as _, Protocol, Registered,
-    },
-    stream::DriverResponse,
+use vector_core::internal_event::{
+    ByteSize, BytesSent, CountByteSize, InternalEventHandle as _, Protocol, Registered,
 };
 
-use crate::{
-    event::{EventFinalizers, EventStatus, Finalizable},
-    kafka::KafkaStatisticsContext,
-};
+use crate::{kafka::KafkaStatisticsContext, sinks::prelude::*};
 
 pub struct KafkaRequest {
     pub body: Bytes,
@@ -37,7 +28,7 @@ pub struct KafkaRequestMetadata {
 }
 
 pub struct KafkaResponse {
-    event_byte_size: usize,
+    event_byte_size: JsonSize,
 }
 
 impl DriverResponse for KafkaResponse {
@@ -90,7 +81,9 @@ impl Service<KafkaRequest> for KafkaService {
         let this = self.clone();
 
         Box::pin(async move {
-            let event_byte_size = request.get_metadata().events_byte_size();
+            let event_byte_size = request
+                .get_metadata()
+                .events_estimated_json_encoded_byte_size();
 
             let mut record =
                 FutureRecord::to(&request.metadata.topic).payload(request.body.as_ref());

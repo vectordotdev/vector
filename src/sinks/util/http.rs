@@ -20,7 +20,7 @@ use snafu::{ResultExt, Snafu};
 use tower::{Service, ServiceBuilder};
 use tower_http::decompression::DecompressionLayer;
 use vector_config::configurable_component;
-use vector_core::ByteSizeOf;
+use vector_core::{ByteSizeOf, EstimatedJsonEncodedSizeOf};
 
 use super::{
     retries::{RetryAction, RetryLogic},
@@ -172,12 +172,14 @@ where
 
     fn start_send(mut self: Pin<&mut Self>, mut event: Event) -> Result<(), Self::Error> {
         let byte_size = event.size_of();
+        let json_byte_size = event.estimated_json_encoded_size_of();
         let finalizers = event.metadata_mut().take_finalizers();
         if let Some(item) = self.encoder.encode_event(event) {
             *self.project().slot = Some(EncodedEvent {
                 item,
                 finalizers,
                 byte_size,
+                json_byte_size,
             });
         }
 
@@ -323,11 +325,14 @@ where
     fn start_send(mut self: Pin<&mut Self>, mut event: Event) -> Result<(), Self::Error> {
         let finalizers = event.metadata_mut().take_finalizers();
         let byte_size = event.size_of();
+        let json_byte_size = event.estimated_json_encoded_size_of();
+
         if let Some(item) = self.encoder.encode_event(event) {
             *self.project().slot = Some(EncodedEvent {
                 item,
                 finalizers,
                 byte_size,
+                json_byte_size,
             });
         }
 

@@ -144,7 +144,7 @@ base: components: sources: file: configuration: {
 	}
 	glob_minimum_cooldown_ms: {
 		description: """
-			Delay between file discovery calls.
+			The delay between file discovery calls.
 
 			This controls the interval at which files are searched. A higher value results in greater
 			chances of some short-lived files being missed between searches, but a lower value increases
@@ -336,7 +336,7 @@ base: components: sources: file: configuration: {
 	}
 	remove_after_secs: {
 		description: """
-			Timeout from reaching `EOF` after which the file is removed from the filesystem, unless new data is written in the meantime.
+			After reaching EOF, the number of seconds to wait before removing the file, unless new data is written.
 
 			If not specified, files are not removed.
 			"""

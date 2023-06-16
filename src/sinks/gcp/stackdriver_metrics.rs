@@ -108,6 +108,7 @@ impl SinkConfig for StackdriverConfig {
         let client = HttpClient::new(tls_settings, cx.proxy())?;
         let batch_settings = self.batch.into_batch_settings()?;
 
+        auth.spawn_regenerate_token();
         let sink = HttpEventSink {
             config: self.clone(),
             started,
@@ -125,6 +126,7 @@ impl SinkConfig for StackdriverConfig {
             |error| error!(message = "Fatal gcp_stackdriver_metrics sink error.", %error),
         );
 
+        #[allow(deprecated)]
         Ok((VectorSink::from_event_sink(sink), healthcheck))
     }
 

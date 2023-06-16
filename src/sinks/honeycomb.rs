@@ -2,9 +2,9 @@ use bytes::Bytes;
 use futures::{FutureExt, SinkExt};
 use http::{Request, StatusCode, Uri};
 use serde_json::json;
-use value::Kind;
 use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
+use vrl::value::Kind;
 
 use crate::{
     codecs::Transformer,
@@ -108,6 +108,7 @@ impl SinkConfig for HoneycombConfig {
 
         let healthcheck = healthcheck(self.clone(), client).boxed();
 
+        #[allow(deprecated)]
         Ok((super::VectorSink::from_event_sink(sink), healthcheck))
     }
 

@@ -4,9 +4,9 @@ use bytes::Bytes;
 use futures::{FutureExt, SinkExt};
 use http::{Request, StatusCode, Uri};
 use serde_json::json;
-use value::Kind;
 use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
+use vrl::value::{Kind, Value};
 
 use crate::{
     codecs::Transformer,
@@ -82,10 +82,12 @@ pub struct MezmoConfig {
 
     /// The MAC address that is attached to each batch of events.
     #[configurable(metadata(docs::examples = "my-mac-address"))]
+    #[configurable(metadata(docs::human_name = "MAC Address"))]
     mac: Option<String>,
 
     /// The IP address that is attached to each batch of events.
     #[configurable(metadata(docs::examples = "0.0.0.0"))]
+    #[configurable(metadata(docs::human_name = "IP Address"))]
     ip: Option<String>,
 
     /// The tags that are attached to each batch of events.
@@ -173,6 +175,7 @@ impl SinkConfig for MezmoConfig {
 
         let healthcheck = healthcheck(self.clone(), client).boxed();
 
+        #[allow(deprecated)]
         Ok((super::VectorSink::from_event_sink(sink), healthcheck))
     }
 
@@ -251,7 +254,7 @@ impl HttpEventEncoder<PartitionInnerBuffer<serde_json::Value, PartitionKey>> for
             .and_then(|path| log.remove(path.as_str()))
             .unwrap_or_else(|| String::from("").into());
 
-        let timestamp: value::Value = log
+        let timestamp: Value = log
             .timestamp_path()
             .and_then(|path| log.remove(path.as_str()))
             .unwrap_or_else(|| chrono::Utc::now().into());

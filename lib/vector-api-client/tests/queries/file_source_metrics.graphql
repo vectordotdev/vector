@@ -11,9 +11,6 @@ query FileSourceMetricsQuery($after: String, $before: String, $first: Int, $last
                             edges {
                                 node {
                                     name
-                                    processedEventsTotal {
-                                        processedEventsTotal
-                                    }
                                     receivedEventsTotal {
                                         receivedEventsTotal
                                     }

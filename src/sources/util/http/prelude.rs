@@ -165,7 +165,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                 } else {
                     //other internal error - will return 500 internal server error
                     emit!(HttpInternalError {
-                        message: "Internal error."
+                        message: &format!("Internal error: {:?}", r)
                     });
                     Err(r)
                 }
@@ -213,10 +213,10 @@ async fn handle_request(
 
             let count = events.len();
             out.send_batch(events)
-                .map_err(move |error: crate::source_sender::ClosedError| {
+                .map_err(|_| {
                     // can only fail if receiving end disconnected, so we are shutting down,
                     // probably not gracefully.
-                    emit!(StreamClosedError { error, count });
+                    emit!(StreamClosedError { count });
                     warp::reject::custom(RejectShuttingDown)
                 })
                 .and_then(|_| handle_batch_status(receiver))

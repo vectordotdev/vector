@@ -13,20 +13,20 @@ use lookup::{
     owned_value_path, path, OwnedValuePath,
 };
 use tokio_util::{codec::FramedRead, io::StreamReader};
-use value::Kind;
 use vector_common::internal_event::{
     ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol,
 };
 use vector_config::NamedComponent;
 use vector_core::{
-    config::{LegacyKey, LogNamespace, Output},
+    config::{LegacyKey, LogNamespace},
     event::Event,
     EstimatedJsonEncodedSizeOf,
 };
+use vrl::value::Kind;
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
-    config::log_schema,
+    config::{log_schema, SourceOutput},
     internal_events::{EventsReceived, FileDescriptorReadError, StreamClosedError},
     shutdown::ShutdownSignal,
     SourceSender,
@@ -144,7 +144,7 @@ async fn process_stream(
                     bytes_received.emit(ByteSize(byte_size));
                     events_received.emit(CountByteSize(
                          events.len(),
-                        events.estimated_json_encoded_size_of(),
+                         events.estimated_json_encoded_size_of(),
                     ));
 
                     let now = Utc::now();
@@ -195,9 +195,9 @@ async fn process_stream(
             debug!("Finished sending.");
             Ok(())
         }
-        Err(error) => {
+        Err(_) => {
             let (count, _) = stream.size_hint();
-            emit!(StreamClosedError { error, count });
+            emit!(StreamClosedError { count });
             Err(())
         }
     }
@@ -210,7 +210,7 @@ fn outputs(
     host_key: &Option<OptionalValuePath>,
     decoding: &DeserializerConfig,
     source_name: &'static str,
-) -> Vec<Output> {
+) -> Vec<SourceOutput> {
     let legacy_host_key = Some(LegacyKey::InsertIfEmpty(
         host_key.clone().and_then(|k| k.path).unwrap_or_else(|| {
             parse_value_path(log_schema().host_key()).expect("log_schema.host_key to be valid path")
@@ -228,5 +228,8 @@ fn outputs(
         )
         .with_standard_vector_source_metadata();
 
-    vec![Output::default(decoding.output_type()).with_schema_definition(schema_definition)]
+    vec![SourceOutput::new_logs(
+        decoding.output_type(),
+        schema_definition,
+    )]
 }

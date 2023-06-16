@@ -5,6 +5,7 @@ use codecs::{
 };
 use fakedata::logs::*;
 use futures::StreamExt;
+use lookup::{owned_value_path, path};
 use rand::seq::SliceRandom;
 use serde_with::serde_as;
 use snafu::Snafu;
@@ -15,11 +16,15 @@ use vector_common::internal_event::{
     ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol,
 };
 use vector_config::configurable_component;
-use vector_core::{config::LogNamespace, EstimatedJsonEncodedSizeOf};
+use vector_core::{
+    config::{LegacyKey, LogNamespace},
+    EstimatedJsonEncodedSizeOf,
+};
+use vrl::value::Kind;
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
-    config::{Output, SourceConfig, SourceContext},
+    config::{SourceConfig, SourceContext, SourceOutput},
     internal_events::{DemoLogsEventProcessed, EventsReceived, StreamClosedError},
     serde::{default_decoding, default_framing_message_based},
     shutdown::ShutdownSignal,
@@ -249,11 +254,18 @@ async fn demo_logs_source(
                             DemoLogsConfig::NAME,
                             now,
                         );
+                        log_namespace.insert_source_metadata(
+                            DemoLogsConfig::NAME,
+                            log,
+                            Some(LegacyKey::InsertIfEmpty(path!("service"))),
+                            path!("service"),
+                            "vector",
+                        );
 
                         event
                     });
-                    out.send_batch(events).await.map_err(|error| {
-                        emit!(StreamClosedError { error, count });
+                    out.send_batch(events).await.map_err(|_| {
+                        emit!(StreamClosedError { count });
                     })?;
                 }
                 Err(error) => {
@@ -292,7 +304,7 @@ impl SourceConfig for DemoLogsConfig {
         )))
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         // There is a global and per-source `log_namespace` config. The source config overrides the global setting,
         // and is merged here.
         let log_namespace = global_log_namespace.merge(self.log_namespace);
@@ -300,9 +312,19 @@ impl SourceConfig for DemoLogsConfig {
         let schema_definition = self
             .decoding
             .schema_definition(log_namespace)
-            .with_standard_vector_source_metadata();
+            .with_standard_vector_source_metadata()
+            .with_source_metadata(
+                DemoLogsConfig::NAME,
+                Some(LegacyKey::InsertIfEmpty(owned_value_path!("service"))),
+                &owned_value_path!("service"),
+                Kind::bytes(),
+                Some("service"),
+            );
 
-        vec![Output::default(self.decoding.output_type()).with_schema_definition(schema_definition)]
+        vec![SourceOutput::new_logs(
+            self.decoding.output_type(),
+            schema_definition,
+        )]
     }
 
     fn can_acknowledge(&self) -> bool {

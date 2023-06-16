@@ -6,7 +6,7 @@ components: sinks: honeycomb: {
 	classes: {
 		commonly_used: false
 		delivery:      "at_least_once"
-		development:   "beta"
+		development:   "stable"
 		egress_method: "batch"
 		service_providers: ["Honeycomb"]
 		stateful: false
@@ -76,12 +76,5 @@ components: sinks: honeycomb: {
 				curl option and use the key provided with the curl example.
 				"""
 		}
-	}
-
-	telemetry: metrics: {
-		component_sent_bytes_total:       components.sources.internal_metrics.output.metrics.component_sent_bytes_total
-		component_sent_events_total:      components.sources.internal_metrics.output.metrics.component_sent_events_total
-		component_sent_event_bytes_total: components.sources.internal_metrics.output.metrics.component_sent_event_bytes_total
-		events_out_total:                 components.sources.internal_metrics.output.metrics.events_out_total
 	}
 }

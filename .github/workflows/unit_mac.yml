@@ -2,23 +2,6 @@ name: Unit - Mac
 
 on:
   workflow_call:
-  issue_comment:
-    types: [created]
-
-env:
-  AWS_ACCESS_KEY_ID: "dummy"
-  AWS_SECRET_ACCESS_KEY: "dummy"
-  CONTAINER_TOOL: "docker"
-  DD_ENV: "ci"
-  DD_API_KEY: ${{ secrets.DD_API_KEY }}
-  RUST_BACKTRACE: full
-  TEST_LOG: vector=debug
-  VERBOSE: true
-  CI: true
-  PROFILE: debug
-  # observing issues fetching boringssl via HTTPS in the OSX build, seeing if this helps
-  # can be removed when we switch back to the upstream openssl-sys crate
-  CARGO_NET_GIT_FETCH_WITH_CLI: true
 
 jobs:
   unit-mac:
@@ -28,63 +11,55 @@ jobs:
     runs-on: macos-11
     env:
       CARGO_INCREMENTAL: 0
-    if: github.event_name != 'issue_comment' || (github.event.issue.pull_request && contains(github.event.comment.body, '/ci-deploy-unit-mac'))
     steps:
-      # For PR comment trigger, extra steps are required to associate the workflow with the PR.
 
-      # Find the branch that the comment was made in.
       - name: (PR comment) Get PR branch
         if: ${{ github.event_name == 'issue_comment' }}
-        uses: xt0rted/pull-request-comment-branch@v1
+        uses: xt0rted/pull-request-comment-branch@v2
         id: comment-branch
 
-      # Indicate in the PR's CI pane that this job is running.
       - name: (PR comment) Set latest commit status as pending
         if: ${{ github.event_name == 'issue_comment' }}
-        uses: myrotvorets/set-commit-status-action@master
+        uses: myrotvorets/set-commit-status-action@v1.1.7
         with:
           sha: ${{ steps.comment-branch.outputs.head_sha }}
           token: ${{ secrets.GITHUB_TOKEN }}
+          context: Unit - Mac
           status: pending
 
-      # Checkout the branch, using the PR ref.
       - name: (PR comment) Checkout PR branch
         if: ${{ github.event_name == 'issue_comment' }}
         uses: actions/checkout@v3
         with:
           ref: ${{ steps.comment-branch.outputs.head_ref }}
 
-      # Checkout the default branch otherwise.
       - name: Checkout branch
         if: ${{ github.event_name != 'issue_comment' }}
         uses: actions/checkout@v3
 
-      - name: mock
-        run: echo "OK"
+      - uses: actions/cache@v3
+        name: Cache Cargo registry + index
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
 
-      # - uses: actions/cache@v3
-      #   name: Cache Cargo registry + index
-      #   with:
-      #     path: |
-      #       ~/.cargo/bin/
-      #       ~/.cargo/registry/index/
-      #       ~/.cargo/registry/cache/
-      #       ~/.cargo/git/db/
-      #     key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      #     restore-keys: |
-      #       ${{ runner.os }}-cargo-
+      - run: bash scripts/environment/bootstrap-macos-10.sh
+      - run: bash scripts/environment/prepare.sh
+      - run: echo "::add-matcher::.github/matchers/rust.json"
+      - run: make test
+      - run: make test-behavior
 
-      # - run: bash scripts/environment/bootstrap-macos-10.sh
-      # - run: bash scripts/environment/prepare.sh
-      # - run: echo "::add-matcher::.github/matchers/rust.json"
-      # - run: make test
-      # - run: make test-behavior
-
-      # Indicate in the PR's CI pane that this job is complete
       - name: (PR comment) Set latest commit status as ${{ job.status }}
-        uses: myrotvorets/set-commit-status-action@master
+        uses: myrotvorets/set-commit-status-action@v1.1.7
         if: always() && github.event_name == 'issue_comment'
         with:
           sha: ${{ steps.comment-branch.outputs.head_sha }}
           token: ${{ secrets.GITHUB_TOKEN }}
+          context: Unit - Mac
           status: ${{ job.status }}

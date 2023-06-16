@@ -14,7 +14,10 @@ use hyper::Body;
 use indexmap::IndexMap;
 use tower::Service;
 use tracing::Instrument;
-use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
+use vector_common::{
+    json_size::JsonSize,
+    request_metadata::{MetaDescriptive, RequestMetadata},
+};
 use vector_core::{
     event::{EventFinalizers, EventStatus, Finalizable},
     internal_event::CountByteSize,
@@ -65,7 +68,7 @@ impl MetaDescriptive for LogApiRequest {
 pub struct LogApiResponse {
     event_status: EventStatus,
     count: usize,
-    events_byte_size: usize,
+    events_byte_size: JsonSize,
     raw_byte_size: usize,
 }
 
@@ -137,7 +140,9 @@ impl Service<LogApiRequest> for LogApiService {
         };
 
         let count = request.get_metadata().event_count();
-        let events_byte_size = request.get_metadata().events_byte_size();
+        let events_byte_size = request
+            .get_metadata()
+            .events_estimated_json_encoded_byte_size();
         let raw_byte_size = request.uncompressed_size;
 
         let mut http_request = http_request.header(CONTENT_LENGTH, request.body.len());

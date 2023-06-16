@@ -100,7 +100,7 @@ fn get_processed_event_timestamp(
 
 fn get_processed_event() -> HecProcessedEvent {
     get_processed_event_timestamp(
-        Some(value::Value::Timestamp(
+        Some(vrl::value::Value::Timestamp(
             Utc.timestamp_nanos(1638366107111456123),
         )),
         config_timestamp_key().path,
@@ -274,8 +274,10 @@ fn splunk_encode_log_event_json_timestamps() {
     assert_eq!(hec_data.time, None);
 
     // timestamp_key is provided but timestamp is not valid type
-    hec_data =
-        get_hec_data_for_timestamp_test(Some(value::Value::Integer(0)), Some(timestamp.clone()));
+    hec_data = get_hec_data_for_timestamp_test(
+        Some(vrl::value::Value::Integer(0)),
+        Some(timestamp.clone()),
+    );
     assert_eq!(hec_data.time, None);
 
     // timestamp_key is provided but no timestamp in the event

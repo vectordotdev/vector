@@ -5,8 +5,8 @@ use crate::template::Template;
 use bytes::Bytes;
 use lookup::lookup_v2::OptionalTargetPath;
 use std::collections::HashMap;
-use value::Value;
 use vector_core::event::Event;
+use vrl::value::Value;
 
 /// Transforms an event into a Pulsar event by rendering the required template fields.
 /// Returns None if there is an error whilst rendering.
