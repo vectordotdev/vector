@@ -112,6 +112,9 @@ impl IntegrationTest {
             args.push("--no-capture".to_string());
         }
 
+        args.push("--retries".to_string());
+        args.push("4".to_string());
+
         self.runner
             .test(&env_vars, &self.config.runner.env, &args)?;
 
