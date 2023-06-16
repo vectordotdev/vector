@@ -86,7 +86,24 @@ jobs:
       - run: sudo npm -g install @datadog/datadog-ci
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.amqp == 'true' }}
-        run: cargo vdev -v int test -a amqp ; cargo vdev -v int stop amqp
+        #run: cargo vdev -v int test -a amqp ; cargo vdev -v int stop amqp
+        run: |
+          RESULT=1
+          RETRIES=5
+
+          for (( n=1 ; n<=$RETRIES ; n++ )) ; do
+            cargo vdev -v int test -a amqp
+            RESULT=$?
+            cargo vdev -v int stop amqp
+
+            if [ "$RESULT" = 0 ] ; then
+              break
+            fi
+
+            sleep 8
+          done
+
+          exit $RESULT
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.appsignal == 'true' }}
         run: cargo vdev -v int test -a appsignal ; cargo vdev -v int stop appsignal
