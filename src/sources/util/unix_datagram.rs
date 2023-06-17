@@ -18,7 +18,7 @@ use crate::{
     },
     shutdown::ShutdownSignal,
     sources::util::change_socket_permissions,
-    sources::util::unix::{UnixSocketMetadata,UnixSocketMetadataCollectTypes},
+    sources::util::unix::{UnixSocketMetadata,UnixSocketMetadataCollectTypes, get_socket_inode},
     sources::Source,
     SourceSender,
 };
@@ -71,6 +71,7 @@ async fn listen(
     let bytes_received = register!(BytesReceived::from(Protocol::UNIX));
     loop {
         buf.resize(max_length, 0);
+        let initial_socket_metadata = get_socket_metadata(&socket, collect_metadata).await;
         tokio::select! {
             recv = socket.recv_from(&mut buf) => {
                 let (byte_size, address) = recv.map_err(|error| {
@@ -81,7 +82,8 @@ async fn listen(
                     })
                 })?;
 
-                let socket_metadata = get_socket_metadata(&socket, &address, collect_metadata);
+                let mut socket_metadata = initial_socket_metadata.clone();
+                add_peer_data_to_socket_metadata(&mut socket_metadata, &address, collect_metadata);
                 let span = info_span!("datagram");
                 span.record("peer_path", &field::debug(socket_metadata.peer_path_or_default()));
 
@@ -125,12 +127,34 @@ async fn listen(
     }
 }
 
-fn get_socket_metadata(
-    _socket: &tokio::net::UnixDatagram,
-    peer_addr: &tokio::net::unix::SocketAddr,
+async fn get_socket_metadata(
+    socket: &tokio::net::UnixDatagram,
     collect_metadata: UnixSocketMetadataCollectTypes,
 ) -> UnixSocketMetadata {
-    let peer_path = if collect_metadata.peer_path {
+    let socket_inode = if collect_metadata.socket_inode {
+        match get_socket_inode(socket).await {
+            Err(error) => {
+                debug!(message = "failed to get socket inode with fstat(2).", %error);
+                None
+            },
+            Ok(inode) => Some(inode),
+        }
+    } else {
+        None
+    };
+
+    UnixSocketMetadata {
+        peer_path: None, // Added later when a peer sends a message
+        socket_inode,
+    }
+}
+
+fn add_peer_data_to_socket_metadata(
+    metadata: &mut UnixSocketMetadata,
+    peer_addr: &tokio::net::unix::SocketAddr,
+    collect_metadata: UnixSocketMetadataCollectTypes,
+) {
+    metadata.peer_path = if collect_metadata.peer_path {
         if !peer_addr.is_unnamed() {
             peer_addr
                 .as_pathname()
@@ -141,7 +165,5 @@ fn get_socket_metadata(
         }
     } else {
         None
-    };
-
-    UnixSocketMetadata { peer_path }
+    }
 }

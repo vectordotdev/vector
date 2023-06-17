@@ -65,6 +65,24 @@ pub struct UnixConfig {
     #[serde(default)]
     #[configurable(metadata(docs::hidden))]
     pub log_namespace: Option<bool>,
+
+    /// If set, output events will contain the device & inode number of the
+    /// socket under this key. For stream sockets, this will be a unique
+    /// identifier of each incoming connection; for datagram sockets, this
+    /// will be the same value for every incoming message (but can uniquely
+    /// identify this source).
+    ///
+    /// The key will be set with an object containing `"dev"` and `"ino"` keys
+    /// representing the device & inode number of the socket.
+    ///
+    /// By default, this key is not emitted. Set to `""` to explicitly suppress
+    /// this key.
+    #[serde(default = "default_inode_key")]
+    pub inode_key: OptionalValuePath,
+}
+
+fn default_inode_key() -> OptionalValuePath {
+    OptionalValuePath::none()
 }
 
 impl UnixConfig {
@@ -76,6 +94,7 @@ impl UnixConfig {
             framing: None,
             decoding: default_decoding(),
             log_namespace: None,
+            inode_key: default_inode_key(),
         }
     }
 
@@ -87,9 +106,10 @@ impl UnixConfig {
         &self.host_key
     }
 
-    pub fn socket_collect_metadata(&self) -> UnixSocketMetadataCollectTypes {
+    fn socket_collect_metadata(&self) -> UnixSocketMetadataCollectTypes {
         let mut types = UnixSocketMetadataCollectTypes::default();
         types.peer_path = self.host_key.path.is_some();
+        types.socket_inode = self.inode_key.path.is_some();
         types
     }
 }
@@ -99,6 +119,7 @@ impl UnixConfig {
 fn handle_events(
     events: &mut [Event],
     host_key: &OptionalValuePath,
+    inode_key: &OptionalValuePath,
     socket_metadata: &UnixSocketMetadata,
     log_namespace: LogNamespace,
 ) {
@@ -110,13 +131,21 @@ fn handle_events(
         log_namespace.insert_standard_vector_source_metadata(log, SocketConfig::NAME, now);
 
         let legacy_host_key = host_key.clone().path;
-
         log_namespace.insert_source_metadata(
             SocketConfig::NAME,
             log,
             legacy_host_key.as_ref().map(LegacyKey::InsertIfEmpty),
             path!("host"),
             socket_metadata.peer_path_or_default().clone(),
+        );
+
+        let legacy_inode_key = inode_key.clone().path;
+        log_namespace.insert_source_metadata(
+            SocketConfig::NAME,
+            log,
+            legacy_inode_key.as_ref().map(LegacyKey::InsertIfEmpty),
+            path!("inode"),
+            socket_metadata.socket_inode,
         );
     }
 }
@@ -146,7 +175,7 @@ pub(super) fn unix_datagram(
         max_length,
         decoder,
         move |events, socket_metadata| {
-            handle_events(events, &config.host_key, socket_metadata, log_namespace)
+            handle_events(events, &config.host_key, &config.inode_key, socket_metadata, log_namespace)
         },
         shutdown,
         out,
@@ -167,7 +196,7 @@ pub(super) fn unix_stream(
         collect_metadata,
         decoder,
         move |events, socket_metadata| {
-            handle_events(events, &config.host_key, socket_metadata, log_namespace)
+            handle_events(events, &config.host_key, &config.inode_key, socket_metadata, log_namespace)
         },
         shutdown,
         out,

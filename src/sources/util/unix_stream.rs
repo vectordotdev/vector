@@ -1,4 +1,8 @@
-use std::{fs::remove_file, path::PathBuf, time::Duration};
+use std::{
+    fs::remove_file,
+    path::PathBuf,
+    time::Duration,
+};
 
 use codecs::StreamDecodingError;
 use futures::{FutureExt, StreamExt};
@@ -24,7 +28,7 @@ use crate::{
     },
     shutdown::ShutdownSignal,
     sources::util::change_socket_permissions,
-    sources::util::unix::{UnixSocketMetadata,UnixSocketMetadataCollectTypes},
+    sources::util::unix::{UnixSocketMetadata,UnixSocketMetadataCollectTypes, get_socket_inode},
     sources::Source,
     SourceSender,
 };
@@ -71,7 +75,7 @@ pub fn build_unix_stream_source(
 
             let listen_path = listen_path.clone();
 
-            let socket_metadata = get_socket_metadata(&socket, collect_metadata);
+            let socket_metadata = get_socket_metadata(&socket, collect_metadata).await;
 
             let span = info_span!("connection");
             span.record("peer_path", field::debug(socket_metadata.peer_path_or_default()));
@@ -153,7 +157,7 @@ pub fn build_unix_stream_source(
 // a UnixSocketMetadata object containing everything we found out about it through various
 // system calls (which could be nothing - each of the _fields_ in UnixSocketMetadata is
 // an Optional).
-fn get_socket_metadata(
+async fn get_socket_metadata(
     socket: &tokio::net::UnixStream,
     collect_metadata: UnixSocketMetadataCollectTypes,
 ) -> UnixSocketMetadata {
@@ -177,7 +181,21 @@ fn get_socket_metadata(
         None
     };
 
+    // Try using fstat(2) to get the socket inode number
+    let socket_inode = if collect_metadata.socket_inode {
+        match get_socket_inode(socket).await {
+            Err(error) => {
+                debug!(message = "failed to get socket inode.", %error);
+                None
+            },
+            Ok(inode) => Some(inode),
+        }
+    } else {
+        None
+    };
+
     UnixSocketMetadata{
         peer_path,
+        socket_inode,
     }
 }

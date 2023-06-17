@@ -1210,6 +1210,7 @@ mod test {
         if use_vector_namespace {
             config.log_namespace = Some(true);
         }
+        config.inode_key = "inode".to_string().try_into().unwrap();
 
         let mode = if stream {
             Mode::UnixStream(config)
@@ -1614,6 +1615,40 @@ mod test {
                 }
                 Err(_) => ready(false),
             }
+        })
+        .await;
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn unix_stream_inode_number() {
+        assert_source_compliance(&SOCKET_HIGH_CARDINALITY_PUSH_SOURCE_TAGS, async {
+            let (_, rx) = unix_message("foo", true, false).await;
+            let events = collect_n(rx, 1).await;
+            let inode_number = events[0]
+                .as_log()["inode"]
+                .as_object().unwrap()
+                .get("ino").unwrap()
+                .as_integer().unwrap();
+            // There's no convenient way to get the inode number from inside the test; the best
+            // validation we can do, really, is that a number came out and it looks legit.
+            assert!(inode_number > 0);
+        })
+        .await;
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn unix_datagram_inode_number() {
+        assert_source_compliance(&SOCKET_HIGH_CARDINALITY_PUSH_SOURCE_TAGS, async {
+            let (_, rx) = unix_message("foo", false, false).await;
+            let events = collect_n(rx, 1).await;
+            let inode_number = events[0]
+                .as_log()["inode"]
+                .as_object().unwrap()
+                .get("ino").unwrap()
+                .as_integer().unwrap();
+            assert!(inode_number > 0);
         })
         .await;
     }
