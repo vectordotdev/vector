@@ -85,6 +85,7 @@ jobs:
 
       - run: sudo npm -g install @datadog/datadog-ci
 
+      # skip this because super flaky
       # - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.amqp == 'true' }}
       #   name: amqp
       #   #run: cargo vdev -v int test -a amqp ; cargo vdev -v int stop amqp
@@ -123,8 +124,9 @@ jobs:
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.clickhouse == 'true' }}
         run: cargo vdev -v int start clickhouse ; sleep 5 ; cargo vdev -v int test -a clickhouse ; cargo vdev -v int stop clickhouse ; sleep 5
 
-      - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.databend == 'true' }}
-        run: cargo vdev -v int start databend ; sleep 5 ; cargo vdev -v int test -a databend ; cargo vdev -v int stop databend ; sleep 5
+      # skip this because we don't have the secrets defined here rn
+      # - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.databend == 'true' }}
+      #   run: cargo vdev -v int start databend ; sleep 5 ; cargo vdev -v int test -a databend ; cargo vdev -v int stop databend ; sleep 5
 
       # skip this because we don't have the secrets defined here rn
       # - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.datadog == 'true' }}
@@ -140,8 +142,9 @@ jobs:
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.docker-logs == 'true' }}
         run: cargo vdev -v int start docker-logs ; sleep 5 ; cargo vdev -v int test -a docker-logs ; cargo vdev -v int stop docker-logs ; sleep 5
 
-      - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.elasticsearch == 'true' }}
-        run: cargo vdev -v int start elasticsearch ; sleep 5 ; cargo vdev -v int test -a elasticsearch ; cargo vdev -v int stop elasticsearch ; sleep 5
+      # skip this because we don't have the secrets defined here rn
+      # - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.elasticsearch == 'true' }}
+      #   run: cargo vdev -v int start elasticsearch ; sleep 5 ; cargo vdev -v int test -a elasticsearch ; cargo vdev -v int stop elasticsearch ; sleep 5
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.eventstoredb == 'true' }}
         run: cargo vdev -v int start eventstoredb ; sleep 5 ; cargo vdev -v int test -a eventstoredb ; cargo vdev -v int stop eventstoredb ; sleep 5
