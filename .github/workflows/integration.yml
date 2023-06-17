@@ -111,97 +111,97 @@ jobs:
       #   run: cargo vdev -v int test -a appsignal ; cargo vdev -v int stop appsignal
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.aws == 'true' }}
-        run: cargo vdev -v int test -a aws ; cargo vdev -v int stop aws
+        run: cargo vdev -v int start aws ; sleep 5 ; cargo vdev -v int test -a aws ; cargo vdev -v int stop aws ; sleep 5
 
       # skip this because we don't have the secrets defined here rn
       # - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.axiom == 'true' }}
       #   run: cargo vdev -v int test -a axiom ; cargo vdev -v int stop axiom
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.azure == 'true' }}
-        run: cargo vdev -v int test -a azure ; cargo vdev -v int stop azure
+        run: cargo vdev -v int start azure ; sleep 5 ; cargo vdev -v int test -a azure ; cargo vdev -v int stop azure ; sleep 5
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.clickhouse == 'true' }}
-        run: cargo vdev -v int test -a clickhouse ; cargo vdev -v int stop clickhouse
+        run: cargo vdev -v int start clickhouse ; sleep 5 ; cargo vdev -v int test -a clickhouse ; cargo vdev -v int stop clickhouse ; sleep 5
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.databend == 'true' }}
-        run: cargo vdev -v int test -a databend ; cargo vdev -v int stop databend
+        run: cargo vdev -v int start databend ; sleep 5 ; cargo vdev -v int test -a databend ; cargo vdev -v int stop databend ; sleep 5
 
       # skip this because we don't have the secrets defined here rn
       # - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.datadog == 'true' }}
-      #   run: |
+      #   cargo vdev -v int start aws ; sleep 5 ; run: |
       #     cargo vdev -v int test -a datadog-agent   ; cargo vdev -v int stop datadog-agent
       #     cargo vdev -v int test -a datadog-logs    ; cargo vdev -v int stop datadog-logs
       #     cargo vdev -v int test -a datadog-metrics ; cargo vdev -v int stop datadog-metrics
       #     cargo vdev -v int test -a datadog-traces  ; cargo vdev -v int stop datadog-traces
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.dnstap == 'true' }}
-        run: cargo vdev -v int test -a dnstap ; cargo vdev -v int stop dnstap
+        run: cargo vdev -v int start dnstap ; sleep 5 ; cargo vdev -v int test -a dnstap ; cargo vdev -v int stop dnstap ; sleep 5
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.docker-logs == 'true' }}
-        run: cargo vdev -v int test -a docker-logs ; cargo vdev -v int stop docker-logs
+        run: cargo vdev -v int start docker-logs ; sleep 5 ; cargo vdev -v int test -a docker-logs ; cargo vdev -v int stop docker-logs ; sleep 5
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.elasticsearch == 'true' }}
-        run: cargo vdev -v int test -a elasticsearch ; cargo vdev -v int stop elasticsearch
+        run: cargo vdev -v int start elasticsearch ; sleep 5 ; cargo vdev -v int test -a elasticsearch ; cargo vdev -v int stop elasticsearch ; sleep 5
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.eventstoredb == 'true' }}
-        run: cargo vdev -v int test -a eventstoredb ; cargo vdev -v int stop eventstoredb
+        run: cargo vdev -v int start eventstoredb ; sleep 5 ; cargo vdev -v int test -a eventstoredb ; cargo vdev -v int stop eventstoredb ; sleep 5
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.fluent == 'true' }}
-        run: cargo vdev -v int test -a fluent ; cargo vdev -v int stop fluent
+        run: cargo vdev -v int start fluent ; sleep 5 ; cargo vdev -v int test -a fluent ; cargo vdev -v int stop fluent ; sleep 5
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.gcp == 'true' }}
-        run: cargo vdev -v int test -a gcp ; cargo vdev -v int stop gcp
+        run: cargo vdev -v int start gcp ; sleep 5 ; cargo vdev -v int test -a gcp ; cargo vdev -v int stop gcp ; sleep 5
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.humio == 'true' }}
-        run: cargo vdev -v int test -a humio ; cargo vdev -v int stop humio
+        run: cargo vdev -v int start humio ; sleep 5 ; cargo vdev -v int test -a humio ; cargo vdev -v int stop humio ; sleep 5
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.http-client == 'true' }}
-        run: cargo vdev -v int test -a http-client ; cargo vdev -v int stop http-client
+        run: cargo vdev -v int start http-client ; sleep 5 ; cargo vdev -v int test -a http-client ; cargo vdev -v int stop http-client ; sleep 5
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.influxdb == 'true' }}
-        run: cargo vdev -v int test -a influxdb ; cargo vdev -v int stop influxdb
+        run: cargo vdev -v int start influxdb ; sleep 5 ; cargo vdev -v int test -a influxdb ; cargo vdev -v int stop influxdb ; sleep 5
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.kafka == 'true' }}
-        run: cargo vdev -v int test -a kafka ; cargo vdev -v int stop kafka
+        run: cargo vdev -v int start kafka ; sleep 5 ; cargo vdev -v int test -a kafka ; cargo vdev -v int stop kafka ; sleep 5
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.logstash == 'true' }}
-        run: cargo vdev -v int test -a logstash ; cargo vdev -v int stop logstash
+        run: cargo vdev -v int start logstash ; sleep 5 ; cargo vdev -v int test -a logstash ; cargo vdev -v int stop logstash ; sleep 5
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.loki == 'true' }}
-        run: cargo vdev -v int test -a loki ; cargo vdev -v int stop loki
+        run: cargo vdev -v int start loki ; sleep 5 ; cargo vdev -v int test -a loki ; cargo vdev -v int stop loki ; sleep 5
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.mongodb == 'true' }}
-        run: cargo vdev -v int test -a mongodb ; cargo vdev -v int stop mongodb
+        run: cargo vdev -v int start mongodb ; sleep 5 ; cargo vdev -v int test -a mongodb ; cargo vdev -v int stop mongodb ; sleep 5
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.nats == 'true' }}
-        run: cargo vdev -v int test -a nats ; cargo vdev -v int stop nats
+        run: cargo vdev -v int start nats ; sleep 5 ; cargo vdev -v int test -a nats ; cargo vdev -v int stop nats ; sleep 5
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.nginx == 'true' }}
-        run: cargo vdev -v int test -a nginx ; cargo vdev -v int stop nginx
+        run: cargo vdev -v int start nginx ; sleep 5 ; cargo vdev -v int test -a nginx ; cargo vdev -v int stop nginx ; sleep 5
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.opentelemetry == 'true' }}
-        run: cargo vdev -v int test -a opentelemetry ; cargo vdev -v int stop opentelemetry
+        run: cargo vdev -v int start opentelemetry ; sleep 5 ; cargo vdev -v int test -a opentelemetry ; cargo vdev -v int stop opentelemetry ; sleep 5
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.postgres == 'true' }}
-        run: cargo vdev -v int test -a postgres ; cargo vdev -v int stop postgres
+        run: cargo vdev -v int start postgres ; sleep 5 ; cargo vdev -v int test -a postgres ; cargo vdev -v int stop postgres ; sleep 5
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.prometheus == 'true' }}
-        run: cargo vdev -v int test -a prometheus ; cargo vdev -v int stop prometheus
+        run: cargo vdev -v int start prometheus ; sleep 5 ; cargo vdev -v int test -a prometheus ; cargo vdev -v int stop prometheus ; sleep 5
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.pulsar == 'true' }}
-        run: cargo vdev -v int test -a pulsar ; cargo vdev -v int stop pulsar
+        run: cargo vdev -v int start pulsar ; sleep 5 ; cargo vdev -v int test -a pulsar ; cargo vdev -v int stop pulsar ; sleep 5
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.redis == 'true' }}
-        run: cargo vdev -v int test -a redis ; cargo vdev -v int stop redis
+        run: cargo vdev -v int start redis ; sleep 5 ; cargo vdev -v int test -a redis ; cargo vdev -v int stop redis ; sleep 5
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' }}
-        run: cargo vdev -v int test -a shutdown ; cargo vdev -v int stop shutdown
+        run: cargo vdev -v int start shutdown ; sleep 5 ; cargo vdev -v int test -a shutdown ; cargo vdev -v int stop shutdown ; sleep 5
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.splunk == 'true' }}
-        run: cargo vdev -v int test -a splunk ; cargo vdev -v int stop splunk
+        run: cargo vdev -v int start splunk ; sleep 5 ; cargo vdev -v int test -a splunk ; cargo vdev -v int stop splunk ; sleep 5
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.webhdfs == 'true' }}
-        run: cargo vdev -v int test -a webhdfs ; cargo vdev -v int stop webhdfs
+        run: cargo vdev -v int start webhdfs ; sleep 5 ; cargo vdev -v int test -a webhdfs ; cargo vdev -v int stop webhdfs ; sleep 5
 
 
   # Calls the Integration Test workflow for each integration that was detected to have files changed that impact it.
