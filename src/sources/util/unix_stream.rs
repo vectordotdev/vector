@@ -194,8 +194,25 @@ async fn get_socket_metadata(
         None
     };
 
+    // Try getsockopt(2) SO_PEERCRED or LOCAL_PEERCRED etc as appropriate
+    // for platform. This gives us the credentials of the process that _connected_
+    // to the socket, which may not be the process writing to it (because the fd
+    // can be inherited by a child or passed to a different process)
+    let peer_creds = if collect_metadata.peer_creds {
+        match socket.peer_cred() {
+            Err(error) => {
+                debug!(message = "failed to get socket peer credentials.", %error);
+                None
+            },
+            Ok(creds) => Some(creds.into()),
+        }
+    } else {
+        None
+    };
+
     UnixSocketMetadata{
         peer_path,
         socket_inode,
+        peer_creds,
     }
 }

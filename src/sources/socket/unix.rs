@@ -79,9 +79,40 @@ pub struct UnixConfig {
     /// this key.
     #[serde(default = "default_inode_key")]
     pub inode_key: OptionalValuePath,
+
+    /// If set, on a stream socket, output events will contain information about
+    /// the UID/GID/PID of the process which connected to the socket. Note that
+    /// this information is subject to some race conditions and is not available
+    /// in all circumstances:
+    ///
+    /// * If a process exits after connecting, and passes the socket on to a different
+    ///   process, (e.g. a child), the pid might now refer to a different process
+    ///   (or, on some platforms, might not be returned at all)
+    /// * If a process connects to this socket source, writes data, and immediately
+    ///   disconnects, it's possible Vector won't query the peer credentials before
+    ///   the other process disconnects; in this case, the data won't be available
+    ///   on some platforms.
+    ///
+    /// Vector configurations should be prepared for this information to be absent,
+    /// incorrect, or only partially present; it's a best-guess only.
+    ///
+    /// Peer credential information cannot currently be collected for datagram sockets,
+    /// and setting this key will simply produce a null object.
+    ///
+    /// The key will be set with an object containing `"uid"`, `"gid"`, and `"pid"`
+    /// keys, or `null` if the information was not available.
+    ///
+    /// By default, this key is not emitted. Set to `""` to explicitly suppress
+    /// this key.
+    #[serde(default = "default_credentials_key")]
+    pub credentials_key: OptionalValuePath
 }
 
 fn default_inode_key() -> OptionalValuePath {
+    OptionalValuePath::none()
+}
+
+fn default_credentials_key() -> OptionalValuePath {
     OptionalValuePath::none()
 }
 
@@ -95,6 +126,7 @@ impl UnixConfig {
             decoding: default_decoding(),
             log_namespace: None,
             inode_key: default_inode_key(),
+            credentials_key: default_credentials_key(),
         }
     }
 
@@ -110,6 +142,7 @@ impl UnixConfig {
         let mut types = UnixSocketMetadataCollectTypes::default();
         types.peer_path = self.host_key.path.is_some();
         types.socket_inode = self.inode_key.path.is_some();
+        types.peer_creds = self.credentials_key.path.is_some();
         types
     }
 }
@@ -120,6 +153,7 @@ fn handle_events(
     events: &mut [Event],
     host_key: &OptionalValuePath,
     inode_key: &OptionalValuePath,
+    credentials_key: &OptionalValuePath,
     socket_metadata: &UnixSocketMetadata,
     log_namespace: LogNamespace,
 ) {
@@ -147,6 +181,15 @@ fn handle_events(
             path!("inode"),
             socket_metadata.socket_inode,
         );
+
+        let legacy_credentials_key = credentials_key.clone().path;
+        log_namespace.insert_source_metadata(
+            SocketConfig::NAME,
+            log,
+            legacy_credentials_key.as_ref().map(LegacyKey::InsertIfEmpty),
+            path!("credentials"),
+            socket_metadata.peer_creds,
+        )
     }
 }
 
@@ -175,7 +218,8 @@ pub(super) fn unix_datagram(
         max_length,
         decoder,
         move |events, socket_metadata| {
-            handle_events(events, &config.host_key, &config.inode_key, socket_metadata, log_namespace)
+            handle_events(events, &config.host_key, &config.inode_key, &config.credentials_key,
+                 socket_metadata, log_namespace)
         },
         shutdown,
         out,
@@ -196,7 +240,8 @@ pub(super) fn unix_stream(
         collect_metadata,
         decoder,
         move |events, socket_metadata| {
-            handle_events(events, &config.host_key, &config.inode_key, socket_metadata, log_namespace)
+            handle_events(events, &config.host_key, &config.inode_key, &config.credentials_key,
+                socket_metadata, log_namespace)
         },
         shutdown,
         out,

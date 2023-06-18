@@ -146,6 +146,14 @@ async fn get_socket_metadata(
     UnixSocketMetadata {
         peer_path: None, // Added later when a peer sends a message
         socket_inode,
+        // We can't implement peer_creds for datagram sockets, unfortunately, because of
+        // missing support in Rust std for ancillary messages. On many platforms, one can
+        // call something like getsockopt(SO_PASSCRED or LOCAL_CREDS) to ask that all
+        // datagrams get an associated ancillary message containing the peer credentials.
+        // Unfortunately, Rust std doesn't have a way of reading ancillary messages from
+        // sockets yet (see https://github.com/rust-lang/rust/issues/76915) and so tokio
+        // doesn't have this either.
+        peer_creds: None,
     }
 }
 

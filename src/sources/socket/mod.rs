@@ -323,6 +323,7 @@ mod test {
     use approx::assert_relative_eq;
     use std::{
         collections::{BTreeMap, HashMap},
+        convert::Into,
         net::{SocketAddr, UdpSocket},
         sync::{
             atomic::{AtomicBool, Ordering},
@@ -1211,6 +1212,7 @@ mod test {
             config.log_namespace = Some(true);
         }
         config.inode_key = "inode".to_string().try_into().unwrap();
+        config.credentials_key = "credentials".to_string().try_into().unwrap();
 
         let mode = if stream {
             Mode::UnixStream(config)
@@ -1621,10 +1623,15 @@ mod test {
 
     #[cfg(unix)]
     #[tokio::test]
-    async fn unix_stream_inode_number() {
+    async fn unix_stream_extra_meta() {
         assert_source_compliance(&SOCKET_HIGH_CARDINALITY_PUSH_SOURCE_TAGS, async {
-            let (_, rx) = unix_message("foo", true, false).await;
+            // Send a _very big_ message, so that it's guaranteed that the sending socket
+            // had to block because of a full buffer, and thus that the receiving socket
+            // got a chance to get the peer credentials before the sending side closed.
+            let one_mb_of_x = std::iter::repeat("x").take(1024 * 1024).collect::<String>();
+            let (_, rx) = unix_message(&one_mb_of_x, true, false).await;
             let events = collect_n(rx, 1).await;
+
             let inode_number = events[0]
                 .as_log()["inode"]
                 .as_object().unwrap()
@@ -1633,6 +1640,16 @@ mod test {
             // There's no convenient way to get the inode number from inside the test; the best
             // validation we can do, really, is that a number came out and it looks legit.
             assert!(inode_number > 0);
+
+            let pid = events[0]
+                .as_log()["credentials"]
+                .as_object().unwrap()
+                .get("pid").unwrap()
+                .as_integer().unwrap();
+            assert_eq!(pid, Into::<i64>::into(std::process::id()));
+
+            // We can't test uid/gid without the libc crate; we need to call libc::geteuid &
+            // libc::getegid, but we don't link against libc on all Unix targets.
         })
         .await;
     }

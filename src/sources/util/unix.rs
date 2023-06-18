@@ -10,7 +10,10 @@ use std::{
     panic::resume_unwind,
     path::Path,
 };
-use tokio::task::spawn_blocking;
+use tokio::{
+    net::unix::{uid_t, gid_t, pid_t, UCred},
+    task::spawn_blocking,
+};
 use vrl::value::Value;
 use crate::internal_events::UnixSocketFileDeleteError;
 
@@ -46,6 +49,10 @@ pub struct UnixSocketMetadataCollectTypes {
     /// stream socket mode). Ignored in datagram socket mode (it would simply
     /// return the same inode/dev every time, for the listener socket)
     pub socket_inode: bool,
+
+    /// Use getsockopt(2) SO_PEERCRED or LOCAL_PEERCRED etc to query the creds
+    /// of the process that opened the socket
+    pub peer_creds: bool,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -66,6 +73,43 @@ impl Into<Value> for SocketInode {
     }
 }
 
+// This is more or less a copy of "struct UCred", but we need to
+// implement Into<Value> for it, and we can't do that to struct UCred itself.
+// in this crate.
+#[derive(Copy, Clone, Debug)]
+pub struct SocketCredentials {
+    // These uid_t/gid_t/pid_t types are from tokio::net::unix. Really, we should
+    // use the libc ones, but the libc crate is not actually declared as a dependency
+    // in Cargo.toml on all platforms.
+    pub uid: uid_t,
+    pub gid: gid_t,
+    pub pid: Option<pid_t>
+}
+
+impl Into<Value> for SocketCredentials {
+    fn into(self) -> Value {
+        let mut map = BTreeMap::new();
+        map.insert("uid".to_string(), Value::Integer(self.uid.into()));
+        map.insert("gid".to_string(), Value::Integer(self.gid.into()));
+        let pid_val = match self.pid {
+            Some(pid) => Value::Integer(pid.into()),
+            None => Value::Null,
+        };
+        map.insert("pid".to_string(), pid_val);
+        Value::Object(map)
+    }
+}
+
+impl From<UCred> for SocketCredentials {
+    fn from(other: UCred) -> Self {
+        Self {
+            uid: other.uid(),
+            gid: other.gid(),
+            pid: other.pid().clone(),
+        }
+    }
+}
+
 /// This structure defines the various kinds of metadata we can
 /// collect off a connected unix-domain socket and expose as source fields.
 #[derive(Clone, Debug)]
@@ -78,6 +122,13 @@ pub struct UnixSocketMetadata {
     /// The inode/device of the socket, as collected from fstat(2). This only
     /// makes sense for stream sockets, not datagram ones.
     pub socket_inode: Option<SocketInode>,
+
+    /// The peer credentials of the process which connected to the socket,
+    /// reported by getsockopt(2) SO_PEERCRED/LOCAL_PEERCRED/etc. This may not
+    /// be the same as the process currently writing to the socket, because
+    /// the socket could have been passed down to a child process or sent
+    /// to a different process.
+    pub peer_creds: Option<SocketCredentials>,
 }
 
 impl UnixSocketMetadata {
