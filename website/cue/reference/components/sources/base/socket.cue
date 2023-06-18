@@ -18,6 +18,37 @@ base: components: sources: socket: configuration: {
 		required:      false
 		type: uint: unit: "connections"
 	}
+	credentials_key: {
+		description: """
+			If set, on a stream socket, output events will contain information about
+			the UID/GID/PID of the process which connected to the socket. Note that
+			this information is subject to some race conditions and is not available
+			in all circumstances:
+
+			* If a process exits after connecting, and passes the socket on to a different
+			  process, (e.g. a child), the pid might now refer to a different process
+			  (or, on some platforms, might not be returned at all)
+			* If a process connects to this socket source, writes data, and immediately
+			  disconnects, it's possible Vector won't query the peer credentials before
+			  the other process disconnects; in this case, the data won't be available
+			  on some platforms.
+
+			Vector configurations should be prepared for this information to be absent,
+			incorrect, or only partially present; it's a best-guess only.
+
+			Peer credential information cannot currently be collected for datagram sockets,
+			and setting this key will simply produce a null object.
+
+			The key will be set with an object containing `"uid"`, `"gid"`, and `"pid"`
+			keys, or `null` if the information was not available.
+
+			By default, this key is not emitted. Set to `""` to explicitly suppress
+			this key.
+			"""
+		required: false
+		relevant_when: "mode = \"unix_datagram\" or mode = \"unix_stream\""
+		type: string: default: ""
+	}
 	decoding: {
 		description: "Configures how events are decoded from raw bytes."
 		required:    false
@@ -235,6 +266,24 @@ base: components: sources: socket: configuration: {
 			"""
 		required: false
 		type: string: default: "host"
+	}
+	inode_key: {
+		description: """
+			If set, output events will contain the device & inode number of the
+			socket under this key. For stream sockets, this will be a unique
+			identifier of each incoming connection; for datagram sockets, this
+			will be the same value for every incoming message (but can uniquely
+			identify this source).
+
+			The key will be set with an object containing `"dev"` and `"ino"` keys
+			representing the device & inode number of the socket.
+
+			By default, this key is not emitted. Set to `""` to explicitly suppress
+			this key.
+			"""
+		required: false
+		relevant_when: "mode = \"unix_datagram\" or mode = \"unix_stream\""
+		type: string: default: ""
 	}
 	keepalive: {
 		description:   "TCP keepalive settings for socket-based components."
