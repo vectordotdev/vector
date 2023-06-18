@@ -37,7 +37,7 @@ pub fn change_socket_permissions(path: &Path, perms: Option<u32>) -> crate::Resu
 /// This is a structure which represents what kind of metadata should be
 /// _collected_ by unix_stream.rs & unix_datagram.rs. I would do this with
 /// some kind of flags structure, but Rust doesn't have one, so I guess a
-/// struct-of-bools works.
+/// struct-of-booleans works.
 #[derive(Default, Copy, Clone, Debug)]
 pub struct UnixSocketMetadataCollectTypes {
     /// Use getpeername(2) (on stream sockets) or read the struct sockaddr
@@ -143,7 +143,7 @@ impl UnixSocketMetadata {
 
 /// Collects the device & inode number for a socket.
 pub async fn get_socket_inode<T : AsRawFd>(socket: &T) -> Result<SocketInode, Box<dyn std::error::Error>> {
-    // Get the socket file descriptor. This is the actual intgeger in use by the socket,
+    // Get the socket file descriptor. This is the actual integer in use by the socket,
     // not a dup(2) of it.
     let socket_fd = socket.as_raw_fd();
 
@@ -196,7 +196,7 @@ impl FromRawFd for NonClosingFile {
 
 impl Drop for NonClosingFile {
     fn drop(&mut self) {
-        // Saftey: we must never use self.file again. It's OK, we won't,
+        // Safety: we must never use self.file again. It's OK, we won't,
         // we only get dropped once.
         unsafe { ManuallyDrop::take(&mut self.file) }.into_raw_fd();
     }

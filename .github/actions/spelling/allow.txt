@@ -377,6 +377,7 @@ opentelemetry
 oss
 pacman
 pantech
+PASSCRED
 papertrail
 papertrailapp
 petabytes
