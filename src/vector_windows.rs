@@ -17,6 +17,7 @@ const SERVICE_NAME: &str = "vector";
 const SERVICE_TYPE: ServiceType = ServiceType::OWN_PROCESS;
 
 const NO_ERROR: u32 = 0;
+const ERROR: u32 = 121;
 
 pub mod service_control {
     use std::{ffi::OsString, fmt, fmt::Formatter, time::Duration};
@@ -398,14 +399,21 @@ fn run_service(_arguments: Vec<OsString>) -> Result<()> {
                 process_id: None,
             })?;
 
-            runtime.block_on(app.run());
+            let program_completion_status = runtime.block_on(app.run());
 
             // Tell the system that service has stopped.
             status_handle.set_service_status(ServiceStatus {
                 service_type: SERVICE_TYPE,
                 current_state: ServiceState::Stopped,
                 controls_accepted: ServiceControlAccept::empty(),
-                exit_code: ServiceExitCode::Win32(NO_ERROR),
+                exit_code: {
+                    if program_completion_status.id() == 0 {
+                        ServiceExitCode::Win32(NO_ERROR)
+                    } else {
+                        // we could not gracefully shut down in time, likely due to timeout.
+                        ServiceExitCode::Win32(ERROR)
+                    }
+                },
                 checkpoint: 0,
                 wait_hint: Duration::default(),
                 process_id: None,
