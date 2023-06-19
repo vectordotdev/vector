@@ -14,6 +14,7 @@ pub use metrics::SharedString;
 
 pub use bytes_received::BytesReceived;
 pub use bytes_sent::BytesSent;
+#[allow(clippy::module_name_repetitions)]
 pub use cached_event::{RegisterTaggedInternalEvent, RegisteredEventCache};
 pub use component_events_dropped::{ComponentEventsDropped, INTENTIONAL, UNINTENTIONAL};
 pub use events_received::EventsReceived;

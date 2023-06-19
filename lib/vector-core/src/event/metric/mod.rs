@@ -485,7 +485,7 @@ impl Finalizable for Metric {
 impl GetEventCountTags for Metric {
     fn get_tags(&self) -> EventCountTags {
         let source = if telemetry().tags().emit_source {
-            self.metadata().source_id().map(ToString::to_string).into()
+            self.metadata().source_id().cloned().into()
         } else {
             OptionalTag::Ignored
         };

@@ -346,6 +346,7 @@ mod tests {
     use similar_asserts::assert_eq;
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
+    use vector_common::config::ComponentKey;
     use vector_core::metric_tags;
 
     use super::*;
@@ -410,7 +411,7 @@ mod tests {
         .with_tags(Some(tags()))
         .with_timestamp(Some(ts()));
         let mut metadata = counter.metadata().clone();
-        metadata.set_source_id(Arc::new(OutputId::from("in")));
+        metadata.set_source_id(Arc::new(ComponentKey::from("in")));
 
         let log = do_transform(counter).await.unwrap();
         let collected: Vec<_> = log.all_fields().unwrap().collect();
@@ -438,7 +439,7 @@ mod tests {
         )
         .with_timestamp(Some(ts()));
         let mut metadata = gauge.metadata().clone();
-        metadata.set_source_id(Arc::new(OutputId::from("in")));
+        metadata.set_source_id(Arc::new(ComponentKey::from("in")));
 
         let log = do_transform(gauge).await.unwrap();
         let collected: Vec<_> = log.all_fields().unwrap().collect();
@@ -466,7 +467,7 @@ mod tests {
         )
         .with_timestamp(Some(ts()));
         let mut metadata = set.metadata().clone();
-        metadata.set_source_id(Arc::new(OutputId::from("in")));
+        metadata.set_source_id(Arc::new(ComponentKey::from("in")));
 
         let log = do_transform(set).await.unwrap();
         let collected: Vec<_> = log.all_fields().unwrap().collect();
@@ -496,7 +497,7 @@ mod tests {
         )
         .with_timestamp(Some(ts()));
         let mut metadata = distro.metadata().clone();
-        metadata.set_source_id(Arc::new(OutputId::from("in")));
+        metadata.set_source_id(Arc::new(ComponentKey::from("in")));
 
         let log = do_transform(distro).await.unwrap();
         let collected: Vec<_> = log.all_fields().unwrap().collect();
@@ -545,7 +546,7 @@ mod tests {
         )
         .with_timestamp(Some(ts()));
         let mut metadata = histo.metadata().clone();
-        metadata.set_source_id(Arc::new(OutputId::from("in")));
+        metadata.set_source_id(Arc::new(ComponentKey::from("in")));
 
         let log = do_transform(histo).await.unwrap();
         let collected: Vec<_> = log.all_fields().unwrap().collect();
@@ -592,7 +593,7 @@ mod tests {
         )
         .with_timestamp(Some(ts()));
         let mut metadata = summary.metadata().clone();
-        metadata.set_source_id(Arc::new(OutputId::from("in")));
+        metadata.set_source_id(Arc::new(ComponentKey::from("in")));
 
         let log = do_transform(summary).await.unwrap();
         let collected: Vec<_> = log.all_fields().unwrap().collect();

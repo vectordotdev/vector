@@ -2,13 +2,13 @@
 /// be emitted, but the value doesn't exist - we should emit the tag but with a value
 /// of `-`.
 #[derive(Clone, Debug, PartialEq, PartialOrd, Eq, Ord, Hash)]
-pub enum OptionalTag {
+pub enum OptionalTag<T> {
     Ignored,
-    Specified(Option<String>),
+    Specified(Option<T>),
 }
 
-impl From<Option<String>> for OptionalTag {
-    fn from(value: Option<String>) -> Self {
+impl<T> From<Option<T>> for OptionalTag<T> {
+    fn from(value: Option<T>) -> Self {
         Self::Specified(value)
     }
 }

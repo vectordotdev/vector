@@ -5,7 +5,7 @@ use std::{
     sync::Arc,
 };
 
-use crate::{config::OutputId, ByteSizeOf};
+use crate::ByteSizeOf;
 pub use array::{into_event_stream, EventArray, EventContainer, LogArray, MetricArray, TraceArray};
 pub use estimated_json_encoded_size_of::EstimatedJsonEncodedSizeOf;
 pub use finalization::{
@@ -20,6 +20,7 @@ use serde::{Deserialize, Serialize};
 pub use trace::TraceEvent;
 use vector_buffers::EventCount;
 use vector_common::{
+    config::ComponentKey,
     finalization,
     json_size::JsonSize,
     request_metadata::{EventCountTags, GetEventCountTags},
@@ -299,18 +300,18 @@ impl Event {
 
     /// Returns a reference to the event metadata source.
     #[must_use]
-    pub fn source_id(&self) -> Option<&OutputId> {
+    pub fn source_id(&self) -> Option<&Arc<ComponentKey>> {
         self.metadata().source_id()
     }
 
     /// Sets the `source_id` in the event metadata to the provided value.
-    pub fn set_source_id(&mut self, source_id: Arc<OutputId>) {
+    pub fn set_source_id(&mut self, source_id: Arc<ComponentKey>) {
         self.metadata_mut().set_source_id(source_id);
     }
 
     /// Sets the `source_id` in the event metadata to the provided value.
     #[must_use]
-    pub fn with_source_id(mut self, source_id: Arc<OutputId>) -> Self {
+    pub fn with_source_id(mut self, source_id: Arc<ComponentKey>) -> Self {
         self.metadata_mut().set_source_id(source_id);
         self
     }

@@ -1,17 +1,20 @@
-use std::collections::HashMap;
 use std::ops::Add;
+use std::{collections::HashMap, sync::Arc};
 
-use crate::internal_event::{
-    CountByteSize, InternalEventHandle, OptionalTag, RegisterTaggedInternalEvent,
-    RegisteredEventCache,
+use crate::{
+    config::ComponentKey,
+    internal_event::{
+        CountByteSize, InternalEventHandle, OptionalTag, RegisterTaggedInternalEvent,
+        RegisteredEventCache,
+    },
+    json_size::JsonSize,
 };
-use crate::json_size::JsonSize;
 
-/// (Source, Service)
+/// Tags that are used to group the events within a batch for emitting telemetry.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct EventCountTags {
-    pub source: OptionalTag,
-    pub service: OptionalTag,
+    pub source: OptionalTag<Arc<ComponentKey>>,
+    pub service: OptionalTag<String>,
 }
 
 impl EventCountTags {
@@ -130,7 +133,7 @@ impl GroupedCountByteSize {
                 }
             }
             GroupedCountByteSize::Untagged { size } => {
-                event_cache.emit(&EventCountTags::new_empty(), *size)
+                event_cache.emit(&EventCountTags::new_empty(), *size);
             }
         }
     }
@@ -302,8 +305,8 @@ mod tests {
     use super::*;
 
     struct DummyEvent {
-        source: OptionalTag,
-        service: OptionalTag,
+        source: OptionalTag<Arc<ComponentKey>>,
+        service: OptionalTag<String>,
     }
 
     impl GetEventCountTags for DummyEvent {
@@ -319,14 +322,14 @@ mod tests {
     fn add_request_count_bytesize_event_untagged() {
         let mut bytesize = GroupedCountByteSize::new_untagged();
         let event = DummyEvent {
-            source: Some("carrot".to_string()).into(),
+            source: Some(Arc::new(ComponentKey::from("carrot"))).into(),
             service: Some("cabbage".to_string()).into(),
         };
 
         bytesize.add_event(&event, JsonSize::new(42));
 
         let event = DummyEvent {
-            source: Some("pea".to_string()).into(),
+            source: Some(Arc::new(ComponentKey::from("pea"))).into(),
             service: Some("potato".to_string()).into(),
         };
 

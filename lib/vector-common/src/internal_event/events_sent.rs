@@ -1,7 +1,9 @@
+use std::sync::Arc;
+
 use metrics::{register_counter, Counter};
 use tracing::trace;
 
-use crate::request_metadata::EventCountTags;
+use crate::{config::ComponentKey, request_metadata::EventCountTags};
 
 use super::{CountByteSize, OptionalTag, Output, SharedString};
 
@@ -48,10 +50,17 @@ impl From<Output> for EventsSent {
 }
 
 /// Makes a list of the tags to use with the events sent event.
-fn make_tags(source: &OptionalTag, service: &OptionalTag) -> Vec<(&'static str, String)> {
+fn make_tags(
+    source: &OptionalTag<Arc<ComponentKey>>,
+    service: &OptionalTag<String>,
+) -> Vec<(&'static str, String)> {
     let mut tags = Vec::new();
     if let OptionalTag::Specified(tag) = source {
-        tags.push(("source", tag.clone().unwrap_or("-".to_string())));
+        tags.push((
+            "source",
+            tag.as_ref()
+                .map_or_else(|| "-".to_string(), |tag| tag.id().to_string()),
+        ));
     }
 
     if let OptionalTag::Specified(tag) = service {
@@ -63,8 +72,8 @@ fn make_tags(source: &OptionalTag, service: &OptionalTag) -> Vec<(&'static str, 
 
 crate::registered_event!(
     TaggedEventsSent {
-        source: OptionalTag,
-        service: OptionalTag,
+        source: OptionalTag<Arc<ComponentKey>>,
+        service: OptionalTag<String>,
     } => {
         events: Counter = {
             register_counter!("component_sent_events_total", &make_tags(&self.source, &self.service))

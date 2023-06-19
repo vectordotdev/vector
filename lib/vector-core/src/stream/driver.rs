@@ -220,7 +220,7 @@ where
                         }
                     }
 
-                    response.events_sent().emit_event(&events_sent);
+                    response.events_sent().emit_event(events_sent);
 
                 // This condition occurs specifically when the `HttpBatchService::call()` is called *within* the `Service::call()`
                 } else if response.event_status() == EventStatus::Rejected {
