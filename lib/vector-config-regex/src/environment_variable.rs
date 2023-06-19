@@ -16,6 +16,4 @@ pub const RAW_REGEX: &str = r"(?x)
 \$\{([[:word:].]+)(?:(:?-|:?\?)([^}]*))?\}";
 
 #[cfg(feature = "regex")]
-pub static REGEX: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(RAW_REGEX).unwrap()
-});
+pub static REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(RAW_REGEX).unwrap());

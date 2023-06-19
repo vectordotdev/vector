@@ -97,18 +97,20 @@ impl Loader<SecretBackendLoader> for SecretBackendLoader {
 }
 
 fn collect_secret_keys(input: &str, keys: &mut HashMap<String, HashSet<String>>) {
-    vector_config_regex::secret::REGEX.captures_iter(input).for_each(|cap| {
-        if let (Some(backend), Some(key)) = (cap.get(1), cap.get(2)) {
-            if let Some(keys) = keys.get_mut(backend.as_str()) {
-                keys.insert(key.as_str().to_string());
-            } else {
-                keys.insert(
-                    backend.as_str().to_string(),
-                    HashSet::from_iter(std::iter::once(key.as_str().to_string())),
-                );
+    vector_config_regex::secret::REGEX
+        .captures_iter(input)
+        .for_each(|cap| {
+            if let (Some(backend), Some(key)) = (cap.get(1), cap.get(2)) {
+                if let Some(keys) = keys.get_mut(backend.as_str()) {
+                    keys.insert(key.as_str().to_string());
+                } else {
+                    keys.insert(
+                        backend.as_str().to_string(),
+                        HashSet::from_iter(std::iter::once(key.as_str().to_string())),
+                    );
+                }
             }
-        }
-    });
+        });
 }
 
 pub fn interpolate(input: &str, secrets: &HashMap<String, String>) -> Result<String, Vec<String>> {
