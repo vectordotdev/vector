@@ -45,7 +45,7 @@ enum FinishError {
 }
 
 /// Configuration for the `appsignal` sink.
-#[configurable_component(sink("appsignal"))]
+#[configurable_component(sink("appsignal", "Send events to AppSignal."))]
 #[derive(Clone, Debug, Default)]
 pub struct AppsignalSinkConfig {
     /// The URI for the AppSignal API to send data to.
@@ -106,6 +106,7 @@ impl SinkBatchSettings for AppsignalDefaultBatchSettings {
 impl_generate_config_from_default!(AppsignalSinkConfig);
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "appsignal")]
 impl SinkConfig for AppsignalSinkConfig {
     async fn build(
         &self,

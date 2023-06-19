@@ -36,7 +36,10 @@ impl AmqpPropertiesConfig {
 /// Configuration for the `amqp` sink.
 ///
 /// Supports AMQP version 0.9.1
-#[configurable_component(sink("amqp"))]
+#[configurable_component(sink(
+    "amqp",
+    "Send events to AMQP 0.9.1 compatible brokers like RabbitMQ."
+))]
 #[derive(Clone, Debug)]
 pub struct AmqpSinkConfig {
     /// The exchange to publish messages to.
@@ -89,6 +92,7 @@ impl GenerateConfig for AmqpSinkConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "amqp")]
 impl SinkConfig for AmqpSinkConfig {
     async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let sink = AmqpSink::new(self.clone()).await?;

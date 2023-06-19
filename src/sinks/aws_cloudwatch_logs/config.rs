@@ -49,7 +49,10 @@ impl ClientBuilder for CloudwatchLogsClientBuilder {
 }
 
 /// Configuration for the `aws_cloudwatch_logs` sink.
-#[configurable_component(sink("aws_cloudwatch_logs"))]
+#[configurable_component(sink(
+    "aws_cloudwatch_logs",
+    "Publish log events to AWS CloudWatch Logs."
+))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct CloudwatchLogsSinkConfig {
@@ -161,6 +164,7 @@ impl CloudwatchLogsSinkConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "aws_cloudwatch_logs")]
 impl SinkConfig for CloudwatchLogsSinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let batcher_settings = self.batch.into_batcher_settings()?;

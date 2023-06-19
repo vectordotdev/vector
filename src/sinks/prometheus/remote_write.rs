@@ -53,7 +53,10 @@ enum Errors {
 }
 
 /// Configuration for the `prometheus_remote_write` sink.
-#[configurable_component(sink("prometheus_remote_write"))]
+#[configurable_component(sink(
+    "prometheus_remote_write",
+    "Deliver metric data to a Prometheus remote write endpoint."
+))]
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct RemoteWriteConfig {
@@ -159,6 +162,7 @@ const fn convert_compression_to_content_encoding(compression: Compression) -> &'
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "prometheus_remote_write")]
 impl SinkConfig for RemoteWriteConfig {
     async fn build(
         &self,

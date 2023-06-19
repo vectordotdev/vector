@@ -27,5 +27,3 @@ mod tests;
 mod config;
 mod service;
 mod sink;
-
-pub(crate) use config::DatadogLogsConfig;

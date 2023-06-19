@@ -36,7 +36,10 @@ impl SinkBatchSettings for StackdriverMetricsDefaultBatchSettings {
 }
 
 /// Configuration for the `gcp_stackdriver_metrics` sink.
-#[configurable_component(sink("gcp_stackdriver_metrics"))]
+#[configurable_component(sink(
+    "gcp_stackdriver_metrics",
+    "Deliver metrics to GCP's Cloud Monitoring system."
+))]
 #[derive(Clone, Debug, Default)]
 pub struct StackdriverConfig {
     #[serde(skip, default = "default_endpoint")]
@@ -93,6 +96,7 @@ fn default_endpoint() -> String {
 impl_generate_config_from_default!(StackdriverConfig);
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "gcp_stackdriver_metrics")]
 impl SinkConfig for StackdriverConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let auth = self.auth.build(Scope::MonitoringWrite).await?;

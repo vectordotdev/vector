@@ -49,7 +49,10 @@ pub enum GcsHealthcheckError {
 }
 
 /// Configuration for the `gcp_cloud_storage` sink.
-#[configurable_component(sink("gcp_cloud_storage"))]
+#[configurable_component(sink(
+    "gcp_cloud_storage",
+    "Store observability events in GCP Cloud Storage."
+))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct GcsSinkConfig {
@@ -201,6 +204,7 @@ impl GenerateConfig for GcsSinkConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "gcp_cloud_storage")]
 impl SinkConfig for GcsSinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let auth = self.auth.build(Scope::DevStorageReadWrite).await?;
