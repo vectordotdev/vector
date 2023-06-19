@@ -17,3 +17,5 @@ pub(crate) mod sqs;
 
 #[cfg(any(feature = "sources-aws_s3", feature = "sinks-aws_s3"))]
 pub(crate) mod s3;
+
+pub mod websocket;

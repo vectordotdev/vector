@@ -6,12 +6,10 @@ use vector_config::configurable_component;
 
 use crate::{
     codecs::EncodingConfig,
+    common::websocket::{ConnectSnafu, WebSocketConnector, WebSocketError},
     config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     http::Auth,
-    sinks::{
-        websocket::sink::{ConnectSnafu, WebSocketConnector, WebSocketError, WebSocketSink},
-        Healthcheck, VectorSink,
-    },
+    sinks::{websocket::sink::WebSocketSink, Healthcheck, VectorSink},
     tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
 
