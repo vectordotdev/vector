@@ -61,7 +61,8 @@ pub use transform::{
 };
 pub use unit_test::{build_unit_tests, build_unit_tests_main, UnitTestResult};
 pub use validation::warnings;
-pub use vars::{interpolate, ENVIRONMENT_VARIABLE_INTERPOLATION_REGEX};
+pub use vector_config_regex::environment_variable::REGEX as ENVIRONMENT_VARIABLE_INTERPOLATION_REGEX;
+pub use vars::interpolate;
 pub use vector_core::config::{
     init_log_schema, log_schema, proxy::ProxyConfig, LogSchema, OutputId,
 };

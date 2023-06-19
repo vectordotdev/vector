@@ -1,18 +1,8 @@
 use std::collections::HashMap;
 
-use once_cell::sync::Lazy;
-use regex::{Captures, Regex};
+use regex::Captures;
 
-// Environment variable names can have any characters from the Portable Character Set other
-// than NUL.  However, for Vector's interpolation, we are closer to what a shell supports which
-// is solely of uppercase letters, digits, and the '_' (that is, the `[:word:]` regex class).
-// In addition to these characters, we allow `.` as this commonly appears in environment
-// variable names when they come from a Java properties file.
-//
-// https://pubs.opengroup.org/onlinepubs/000095399/basedefs/xbd_chap08.html
-pub static ENVIRONMENT_VARIABLE_INTERPOLATION_REGEX: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(vector_config_regex::ENVIRONMENT_VARIABLE_INTERPOLATION_REGEX).unwrap()
-});
+use vector_config_regex::environment_variable::REGEX;
 
 /// (result, warnings)
 pub fn interpolate(
@@ -22,7 +12,7 @@ pub fn interpolate(
     let mut errors = Vec::new();
     let mut warnings = Vec::new();
 
-    let interpolated = ENVIRONMENT_VARIABLE_INTERPOLATION_REGEX
+    let interpolated = REGEX
         .replace_all(input, |caps: &Captures<'_>| {
             let flags = caps.get(3).map(|m| m.as_str()).unwrap_or_default();
             let def_or_err = caps.get(4).map(|m| m.as_str()).unwrap_or_default();

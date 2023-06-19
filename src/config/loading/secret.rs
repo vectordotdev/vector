@@ -4,8 +4,7 @@ use std::{
 };
 
 use indexmap::IndexMap;
-use once_cell::sync::Lazy;
-use regex::{Captures, Regex};
+use regex::Captures;
 use serde::{Deserialize, Serialize};
 use toml::value::Table;
 use vector_common::config::ComponentKey;
@@ -18,16 +17,6 @@ use crate::{
     secrets::SecretBackends,
     signal,
 };
-
-// The following regex aims to extract a pair of strings, the first being the secret backend name
-// and the second being the secret key. Here are some matching & non-matching examples:
-// - "SECRET[backend.secret_name]" will match and capture "backend" and "secret_name"
-// - "SECRET[backend.secret.name]" will match and capture "backend" and "secret.name"
-// - "SECRET[backend..secret.name]" will match and capture "backend" and ".secret.name"
-// - "SECRET[secret_name]" will not match
-// - "SECRET[.secret.name]" will not match
-pub static COLLECTOR: Lazy<Regex> =
-    Lazy::new(|| Regex::new(vector_config_regex::SECRET_COLLECTOR_REGEX).unwrap());
 
 /// Helper type for specifically deserializing secrets backends.
 #[derive(Debug, Default, Deserialize, Serialize)]
@@ -108,7 +97,7 @@ impl Loader<SecretBackendLoader> for SecretBackendLoader {
 }
 
 fn collect_secret_keys(input: &str, keys: &mut HashMap<String, HashSet<String>>) {
-    COLLECTOR.captures_iter(input).for_each(|cap| {
+    vector_config_regex::secret::REGEX.captures_iter(input).for_each(|cap| {
         if let (Some(backend), Some(key)) = (cap.get(1), cap.get(2)) {
             if let Some(keys) = keys.get_mut(backend.as_str()) {
                 keys.insert(key.as_str().to_string());
@@ -124,7 +113,7 @@ fn collect_secret_keys(input: &str, keys: &mut HashMap<String, HashSet<String>>)
 
 pub fn interpolate(input: &str, secrets: &HashMap<String, String>) -> Result<String, Vec<String>> {
     let mut errors = Vec::<String>::new();
-    let output = COLLECTOR
+    let output = vector_config_regex::secret::REGEX
         .replace_all(input, |caps: &Captures<'_>| {
             caps.get(1)
                 .and_then(|b| caps.get(2).map(|k| (b, k)))

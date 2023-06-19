@@ -19,6 +19,7 @@ pub use loader::*;
 pub use secret::*;
 pub use source::*;
 use vector_config::NamedComponent;
+pub use vector_config_regex::secret::REGEX as COLLECTOR;
 
 use super::{
     builder::ConfigBuilder, format, validation, vars, Config, ConfigPath, Format, FormatHint,
