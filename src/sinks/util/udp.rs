@@ -19,6 +19,7 @@ use vector_core::EstimatedJsonEncodedSizeOf;
 use super::SinkBuildError;
 use crate::{
     codecs::Transformer,
+    common::backoff::ExponentialBackoff,
     dns,
     event::{Event, EventStatus, Finalizable},
     internal_events::{
@@ -26,10 +27,7 @@ use crate::{
         UdpSocketConnectionEstablished, UdpSocketOutgoingConnectionError,
     },
     net,
-    sinks::{
-        util::{retries::ExponentialBackoff, StreamSink},
-        Healthcheck, VectorSink,
-    },
+    sinks::{util::StreamSink, Healthcheck, VectorSink},
 };
 
 #[derive(Debug, Snafu)]

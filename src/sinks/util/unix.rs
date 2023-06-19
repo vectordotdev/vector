@@ -12,6 +12,7 @@ use vector_core::{ByteSizeOf, EstimatedJsonEncodedSizeOf};
 
 use crate::{
     codecs::Transformer,
+    common::backoff::ExponentialBackoff,
     event::{Event, Finalizable},
     internal_events::{
         ConnectionOpen, OpenGauge, SocketMode, UnixSocketConnectionEstablished,
@@ -20,7 +21,6 @@ use crate::{
     sink::VecSinkExt,
     sinks::{
         util::{
-            retries::ExponentialBackoff,
             socket_bytes_sink::{BytesSink, ShutdownCheck},
             EncodedEvent, StreamSink,
         },

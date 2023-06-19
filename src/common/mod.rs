@@ -19,3 +19,5 @@ pub(crate) mod sqs;
 pub(crate) mod s3;
 
 pub mod websocket;
+
+pub(crate) mod backoff;

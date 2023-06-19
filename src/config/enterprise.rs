@@ -21,6 +21,7 @@ use super::{
     SourceOuter, TransformOuter,
 };
 use crate::{
+    common::backoff::ExponentialBackoff,
     common::datadog::{get_api_base_endpoint, get_base_domain_region, Region},
     conditions::AnyCondition,
     http::{HttpClient, HttpError},
@@ -29,7 +30,7 @@ use crate::{
             default_site, logs::DatadogLogsConfig, metrics::DatadogMetricsConfig,
             DatadogCommonConfig,
         },
-        util::{http::RequestConfig, retries::ExponentialBackoff},
+        util::http::RequestConfig,
     },
     sources::{
         host_metrics::{Collector, HostMetricsConfig},

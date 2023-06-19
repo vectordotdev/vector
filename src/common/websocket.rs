@@ -15,10 +15,10 @@ use tokio_tungstenite::{
 };
 
 use crate::{
+    common::backoff::ExponentialBackoff,
     dns,
     http::Auth,
     internal_events::{WsConnectionEstablished, WsConnectionFailedError},
-    sinks::util::retries::ExponentialBackoff,
     tls::{MaybeTlsSettings, MaybeTlsStream, TlsError},
 };
 

@@ -18,9 +18,9 @@ use tower::Service;
 use vector_config::configurable_component;
 
 use crate::{
+    common::backoff::ExponentialBackoff,
     emit,
     internal_events::{EndpointsActive, OpenGauge, OpenToken},
-    sinks::util::retries::ExponentialBackoff,
 };
 
 const RETRY_MAX_DURATION_SECONDS_DEFAULT: u64 = 3_600;
