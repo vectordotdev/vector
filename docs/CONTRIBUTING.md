@@ -56,18 +56,40 @@ Vector team member will find this document useful.
 
 ### New sources, sinks, and transforms
 
-If you're contributing a new source, sink, or transform to Vector, thank you that's way cool! There's a few steps you
-need to think about if you want to make sure we can merge your contribution. We're here to help you along with these steps,
-but they are a blocker to getting a new integration released.
+If you're thinking of contributing a new source, sink, or transform to Vector, thank you that's way cool! The answers to
+the below questions are required for each newly proposed component and depending on the answers, we may elect to not
+include the proposed component. If you're having trouble with any of the questions, we're available to help you.
 
-To merge a new source, sink, or transform, you need to:
+**Prior to beginning work on a new source or sink if a GitHub Issue does not already exist, please open one to discuss
+the introduction of the new integration.** Maintainers will review the proposal with the following checklist in mind,
+try and consider them when sharing your proposal to reduce the amount of time it takes to review your proposal. This
+list is not exhaustive, and may be updated over time.
+
+- [ ] Can the proposed component’s functionality be replicated by an existing component, with a specific configuration?
+(ex: Azure Event Hub as a `kafka` sink configuration)
+  - [ ] Alternatively implemented as a wrapper around an existing component. (ex. `axiom` wrapping `elasticsearch`)
+- [ ] Can an existing component replicate the proposed component’s functionality, with non-breaking changes?
+- [ ] Can an existing component be rewritten in a more generic fashion to cover both the existing and proposed functions?
+- [ ] Is the proposed component generically usable or is it specific to a particular service?
+  - [ ] How established is the target of the integration, what is the relative market share of the integrated service?
+- [ ] Is there sufficient demand for the component?
+  - [ ] If the integration can be served with a workaround or more generic component, how painful is this for users?
+- [ ] Is the contribution from an individual or the organization owning the integrated service? (examples of
+organization backed integrations: `databend` sink, `axiom` sink)
+  - [ ] Is the contributor committed to maintaining the integration if it is accepted?
+- [ ] What is the overall complexity of the proposed design of this integration from a technical and functional
+standpoint, and what is the expected ongoing maintenance burden?
+- [ ] How will this integration be tested and QA’d for any changes and fixes?
+  - [ ] Will we have access to an account with the service if the integration is not open source?
+
+To merge a new source, sink, or transform, the pull request is required to:
 
 - [ ] Add tests, especially integration tests if your contribution connects to an external service.
 - [ ] Add instrumentation so folks using your integration can get insight into how it's working and performing. You can
 see some [example of instrumentation in existing integrations](https://github.com/vectordotdev/vector/tree/master/src/internal_events).
 - [ ] Add documentation. You can see [examples in the `docs` directory](https://github.com/vectordotdev/vector/blob/master/docs).
 
-When adding new integration tests, the following changes are needed in the github workflows:
+When adding new integration tests, the following changes are needed in the GitHub Workflows:
 
 - in `.github/workflows/integration.yml`, add another entry in the matrix definition for the new integration.
 - in `.github/workflows/integration-comment.yml`, add another entry in the matrix definition for the new integration.

@@ -871,8 +871,7 @@ impl Source {
             .map(|result| {
                 match result {
                     Ok(Ok(())) => info!(message = "Event processing loop completed gracefully."),
-                    Ok(Err(error)) => emit!(StreamClosedError {
-                        error,
+                    Ok(Err(_)) => emit!(StreamClosedError {
                         count: events_count
                     }),
                     Err(error) => emit!(KubernetesLifecycleError {

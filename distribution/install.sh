@@ -76,9 +76,11 @@ main() {
                 ;;
             --no-modify-path)
                 modify_path=no
+                shift
                 ;;
             -y)
                 prompt=no
+                shift
                 ;;
             *)
                 ;;

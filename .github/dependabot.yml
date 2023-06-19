@@ -10,6 +10,16 @@ updates:
     commit-message:
       prefix: "chore(deps)"
     open-pull-requests-limit: 100
+  - package-ecosystem: "docker"
+    directory: "/distribution/docker/"
+    schedule:
+      interval: "daily"
+      time: "04:00" # UTC
+    labels:
+      - "domain: deps"
+    commit-message:
+      prefix: "chore(deps)"
+    open-pull-requests-limit: 100
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:

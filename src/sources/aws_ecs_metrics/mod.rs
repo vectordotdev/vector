@@ -207,8 +207,8 @@ async fn aws_ecs_metrics(
                                     endpoint: uri.path(),
                                 });
 
-                                if let Err(error) = out.send_batch(metrics).await {
-                                    emit!(StreamClosedError { error, count });
+                                if (out.send_batch(metrics).await).is_err() {
+                                    emit!(StreamClosedError { count });
                                     return Err(());
                                 }
                             }

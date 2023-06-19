@@ -57,6 +57,7 @@ async fn firehose_put_records() {
         tls: None,
         auth: Default::default(),
         acknowledgements: Default::default(),
+        request_retry_partial: Default::default(),
     };
 
     let config = KinesisFirehoseSinkConfig { batch, base };

@@ -190,8 +190,8 @@ impl<'a> InternalMetrics<'a> {
                 metric
             });
 
-            if let Err(error) = self.out.send_batch(batch).await {
-                emit!(StreamClosedError { error, count });
+            if (self.out.send_batch(batch).await).is_err() {
+                emit!(StreamClosedError { count });
                 return Err(());
             }
         }
