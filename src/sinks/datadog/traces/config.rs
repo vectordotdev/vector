@@ -54,7 +54,7 @@ impl SinkBatchSettings for DatadogTracesDefaultBatchSettings {
 }
 
 /// Configuration for the `datadog_traces` sink.
-#[configurable_component(sink("datadog_traces", "Publish traces to Datadog."))]
+#[configurable_component(sink("datadog_traces", "Publish trace events to Datadog."))]
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct DatadogTracesConfig {
