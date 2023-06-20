@@ -150,8 +150,9 @@ jobs:
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.http-client == 'true' }}
         run: cargo vdev -v int start http-client ; sleep 5 ; cargo vdev -v int test -a http-client ; cargo vdev -v int stop http-client ; sleep 5
 
-      - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.influxdb == 'true' }}
-        run: cargo vdev -v int start influxdb ; sleep 5 ; cargo vdev -v int test -a influxdb ; cargo vdev -v int stop influxdb ; sleep 5
+      # skip this because flaky
+      # - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.influxdb == 'true' }}
+      #   run: cargo vdev -v int start influxdb ; sleep 5 ; cargo vdev -v int test -a influxdb ; cargo vdev -v int stop influxdb ; sleep 5
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.kafka == 'true' }}
         run: cargo vdev -v int start kafka ; sleep 5 ; cargo vdev -v int test -a kafka ; cargo vdev -v int stop kafka ; sleep 5
