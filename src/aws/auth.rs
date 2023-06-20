@@ -9,7 +9,10 @@ use aws_config::{
     },
     sts::AssumeRoleProviderBuilder,
 };
-use aws_types::{credentials::SharedCredentialsProvider, region::Region, Credentials};
+use aws_credential_types::{
+    cache::CredentialsCache, provider::SharedCredentialsProvider, Credentials,
+};
+use aws_types::region::Region;
 use serde_with::serde_as;
 use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;

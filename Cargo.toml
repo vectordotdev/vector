@@ -158,16 +158,17 @@ metrics = "0.21.0"
 metrics-tracing-context = { version = "0.14.0", default-features = false }
 
 # AWS - Official SDK
-aws-sdk-s3 = { version = "0.21.0", default-features = false, features = ["native-tls"], optional = true }
-aws-sdk-sqs = { version = "0.21.0", default-features = false, features = ["native-tls"], optional = true }
-aws-sdk-cloudwatch = { version = "0.21.0", default-features = false, features = ["native-tls"], optional = true }
-aws-sdk-cloudwatchlogs = { version = "0.21.0", default-features = false, features = ["native-tls"], optional = true }
-aws-sdk-elasticsearch = {version = "0.21.0", default-features = false, features = ["native-tls"], optional = true }
-aws-sdk-firehose = { version = "0.21.0", default-features = false, features = ["native-tls"], optional = true }
-aws-sdk-kinesis = { version = "0.21.0", default-features = false, features = ["native-tls"], optional = true }
-aws-types = { version = "0.51.0", default-features = false, features = ["hardcoded-credentials"], optional = true }
-aws-sigv4 = { version = "0.55.3", default-features = false, features = ["sign-http"], optional = true }
-aws-config = { version = "0.51.0", default-features = false, features = ["native-tls"], optional = true }
+aws-sdk-s3 = { version = "0.24.0", default-features = false, features = ["native-tls"], optional = true }
+aws-sdk-sqs = { version = "0.24.0", default-features = false, features = ["native-tls"], optional = true }
+aws-sdk-cloudwatch = { version = "0.24.0", default-features = false, features = ["native-tls"], optional = true }
+aws-sdk-cloudwatchlogs = { version = "0.24.0", default-features = false, features = ["native-tls"], optional = true }
+aws-sdk-elasticsearch = {version = "0.24.0", default-features = false, features = ["native-tls"], optional = true }
+aws-sdk-firehose = { version = "0.24.0", default-features = false, features = ["native-tls"], optional = true }
+aws-sdk-kinesis = { version = "0.24.0", default-features = false, features = ["native-tls"], optional = true }
+aws-types = { version = "0.54.1", default-features = false, optional = true }
+aws-sigv4 = { version = "0.54.2", default-features = false, features = ["sign-http"], optional = true }
+aws-config = { version = "0.54.1", default-features = false, features = ["native-tls"], optional = true }
+aws-credential-types = { version = "0.54.1", default-features = false, features = ["hardcoded-credentials"], optional = true }
 aws-smithy-async = { version = "0.51.0", default-features = false, optional = true }
 aws-smithy-client = { version = "0.51.0", default-features = false, features = ["client-hyper"], optional = true}
 aws-smithy-http = { path = "../../awslabs/smithy-rs/rust-runtime/aws-smithy-http", default-features = false, features = ["event-stream"], optional = true }
@@ -362,6 +363,8 @@ wiremock = "0.5.19"
 zstd = { version = "0.12.3", default-features = false }
 
 [patch.crates-io]
+aws-smithy-http = { path = "../../awslabs/smithy-rs/rust-runtime/aws-smithy-http" }
+aws-smithy-types = { path = "../../awslabs/smithy-rs/rust-runtime/aws-smithy-types" }
 # Removes dependency on `time` v0.1
 # https://github.com/chronotope/chrono/pull/578
 chrono = { git = "https://github.com/vectordotdev/chrono.git", tag = "v0.4.26-no-default-time-1" }
@@ -435,6 +438,7 @@ api-client = [
 
 aws-core = [
   "aws-config",
+  "dep:aws-credential-types",
   "dep:aws-sigv4",
   "dep:aws-types",
   "dep:aws-smithy-async",
