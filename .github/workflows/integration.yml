@@ -95,8 +95,8 @@ jobs:
         run: |
           RESULT=1 ; RETRIES=5
           for (( n=1 ; n<=$RETRIES ; n++ )) ; do
-            cargo vdev -v int start amqp; sleep 5 ; cargo vdev -v int test -a amqp ; RESULT=$? ; cargo vdev -v int stop amqp
-            if [ "$RESULT" = 0 ] ; then ; break ; fi
+            cargo vdev -v int start amqp ; sleep 5 ; cargo vdev -v int test -a amqp ; RESULT=$? ; cargo vdev -v int stop amqp
+            if [ "$RESULT" = 0 ] ; then break ; fi
             sleep 8
           done
           exit $RESULT
@@ -111,8 +111,8 @@ jobs:
         run: |
           RESULT=1 ; RETRIES=5
           for (( n=1 ; n<=$RETRIES ; n++ )) ; do
-            cargo vdev -v int start aws; sleep 5 ; cargo vdev -v int test -a aws ; RESULT=$? ; cargo vdev -v int stop aws
-            if [ "$RESULT" = 0 ] ; then ; break ; fi
+            cargo vdev -v int start aws ; sleep 5 ; cargo vdev -v int test -a aws ; RESULT=$? ; cargo vdev -v int stop aws
+            if [ "$RESULT" = 0 ] ; then break ; fi
             sleep 8
           done
           exit $RESULT
@@ -126,8 +126,8 @@ jobs:
         run: |
           RESULT=1 ; RETRIES=5
           for (( n=1 ; n<=$RETRIES ; n++ )) ; do
-            cargo vdev -v int start azure; sleep 5 ; cargo vdev -v int test -a azure ; RESULT=$? ; cargo vdev -v int stop azure
-            if [ "$RESULT" = 0 ] ; then ; break ; fi
+            cargo vdev -v int start azure ; sleep 5 ; cargo vdev -v int test -a azure ; RESULT=$? ; cargo vdev -v int stop azure
+            if [ "$RESULT" = 0 ] ; then break ; fi
             sleep 8
           done
           exit $RESULT
@@ -137,8 +137,8 @@ jobs:
         run: |
           RESULT=1 ; RETRIES=5
           for (( n=1 ; n<=$RETRIES ; n++ )) ; do
-            cargo vdev -v int start clickhouse; sleep 5 ; cargo vdev -v int test -a clickhouse ; RESULT=$? ; cargo vdev -v int stop clickhouse
-            if [ "$RESULT" = 0 ] ; then ; break ; fi
+            cargo vdev -v int start clickhouse ; sleep 5 ; cargo vdev -v int test -a clickhouse ; RESULT=$? ; cargo vdev -v int stop clickhouse
+            if [ "$RESULT" = 0 ] ; then break ; fi
             sleep 8
           done
           exit $RESULT
@@ -161,8 +161,8 @@ jobs:
         run: |
           RESULT=1 ; RETRIES=5
           for (( n=1 ; n<=$RETRIES ; n++ )) ; do
-            cargo vdev -v int start dnstap; sleep 5 ; cargo vdev -v int test -a dnstap ; RESULT=$? ; cargo vdev -v int stop dnstap
-            if [ "$RESULT" = 0 ] ; then ; break ; fi
+            cargo vdev -v int start dnstap ; sleep 5 ; cargo vdev -v int test -a dnstap ; RESULT=$? ; cargo vdev -v int stop dnstap
+            if [ "$RESULT" = 0 ] ; then break ; fi
             sleep 8
           done
           exit $RESULT
@@ -172,8 +172,8 @@ jobs:
         run: |
           RESULT=1 ; RETRIES=5
           for (( n=1 ; n<=$RETRIES ; n++ )) ; do
-            cargo vdev -v int start docker-logs; sleep 5 ; cargo vdev -v int test -a docker-logs ; RESULT=$? ; cargo vdev -v int stop docker-logs
-            if [ "$RESULT" = 0 ] ; then ; break ; fi
+            cargo vdev -v int start docker-logs ; sleep 5 ; cargo vdev -v int test -a docker-logs ; RESULT=$? ; cargo vdev -v int stop docker-logs
+            if [ "$RESULT" = 0 ] ; then break ; fi
             sleep 8
           done
           exit $RESULT
@@ -189,8 +189,8 @@ jobs:
         run: |
           RESULT=1 ; RETRIES=5
           for (( n=1 ; n<=$RETRIES ; n++ )) ; do
-            cargo vdev -v int start eventstoredb; sleep 5 ; cargo vdev -v int test -a eventstoredb ; RESULT=$? ; cargo vdev -v int stop eventstoredb
-            if [ "$RESULT" = 0 ] ; then ; break ; fi
+            cargo vdev -v int start eventstoredb ; sleep 5 ; cargo vdev -v int test -a eventstoredb ; RESULT=$? ; cargo vdev -v int stop eventstoredb
+            if [ "$RESULT" = 0 ] ; then break ; fi
             sleep 8
           done
           exit $RESULT
@@ -200,8 +200,8 @@ jobs:
         run: |
           RESULT=1 ; RETRIES=5
           for (( n=1 ; n<=$RETRIES ; n++ )) ; do
-            cargo vdev -v int start fluent; sleep 5 ; cargo vdev -v int test -a fluent; RESULT=$? ; cargo vdev -v int stop fluent
-            if [ "$RESULT" = 0 ] ; then ; break ; fi
+            cargo vdev -v int start fluent ; sleep 5 ; cargo vdev -v int test -a fluent; RESULT=$? ; cargo vdev -v int stop fluent
+            if [ "$RESULT" = 0 ] ; then break ; fi
             sleep 8
           done
           exit $RESULT
@@ -211,8 +211,8 @@ jobs:
         run: |
           RESULT=1 ; RETRIES=5
           for (( n=1 ; n<=$RETRIES ; n++ )) ; do
-            cargo vdev -v int start gcp; sleep 5 ; cargo vdev -v int test -a gcp ; RESULT=$? ; cargo vdev -v int stop gcp
-            if [ "$RESULT" = 0 ] ; then ; break ; fi
+            cargo vdev -v int start gcp ; sleep 5 ; cargo vdev -v int test -a gcp ; RESULT=$? ; cargo vdev -v int stop gcp
+            if [ "$RESULT" = 0 ] ; then break ; fi
             sleep 8
           done
           exit $RESULT
@@ -222,8 +222,8 @@ jobs:
         run: |
           RESULT=1 ; RETRIES=5
           for (( n=1 ; n<=$RETRIES ; n++ )) ; do
-            cargo vdev -v int start humio; sleep 5 ; cargo vdev -v int test -a humio ; RESULT=$? ; cargo vdev -v int stop humio
-            if [ "$RESULT" = 0 ] ; then ; break ; fi
+            cargo vdev -v int start humio ; sleep 5 ; cargo vdev -v int test -a humio ; RESULT=$? ; cargo vdev -v int stop humio
+            if [ "$RESULT" = 0 ] ; then break ; fi
             sleep 8
           done
           exit $RESULT
@@ -233,8 +233,8 @@ jobs:
         run: |
           RESULT=1 ; RETRIES=5
           for (( n=1 ; n<=$RETRIES ; n++ )) ; do
-            cargo vdev -v int start http-client; sleep 5 ; cargo vdev -v int test -a http-client ; RESULT=$? ; cargo vdev -v int stop http-client
-            if [ "$RESULT" = 0 ] ; then ; break ; fi
+            cargo vdev -v int start http-client ; sleep 5 ; cargo vdev -v int test -a http-client ; RESULT=$? ; cargo vdev -v int stop http-client
+            if [ "$RESULT" = 0 ] ; then break ; fi
             sleep 8
           done
           exit $RESULT
@@ -244,8 +244,8 @@ jobs:
         run: |
           RESULT=1 ; RETRIES=5
           for (( n=1 ; n<=$RETRIES ; n++ )) ; do
-            cargo vdev -v int start influxdb; sleep 5 ; cargo vdev -v int test -a influxdb ; RESULT=$? ; cargo vdev -v int stop influxdb
-            if [ "$RESULT" = 0 ] ; then ; break ; fi
+            cargo vdev -v int start influxdb ; sleep 5 ; cargo vdev -v int test -a influxdb ; RESULT=$? ; cargo vdev -v int stop influxdb
+            if [ "$RESULT" = 0 ] ; then break ; fi
             sleep 8
           done
           exit $RESULT
@@ -255,8 +255,8 @@ jobs:
         run: |
           RESULT=1 ; RETRIES=5
           for (( n=1 ; n<=$RETRIES ; n++ )) ; do
-            cargo vdev -v int start kafka; sleep 5 ; cargo vdev -v int test -a kafka ; RESULT=$? ; cargo vdev -v int stop kafka
-            if [ "$RESULT" = 0 ] ; then ; break ; fi
+            cargo vdev -v int start kafka ; sleep 5 ; cargo vdev -v int test -a kafka ; RESULT=$? ; cargo vdev -v int stop kafka
+            if [ "$RESULT" = 0 ] ; then break ; fi
             sleep 8
           done
           exit $RESULT
@@ -266,8 +266,8 @@ jobs:
         run: |
           RESULT=1 ; RETRIES=5
           for (( n=1 ; n<=$RETRIES ; n++ )) ; do
-            cargo vdev -v int start logstash; sleep 5 ; cargo vdev -v int test -a logstash ; RESULT=$? ; cargo vdev -v int stop logstash
-            if [ "$RESULT" = 0 ] ; then ; break ; fi
+            cargo vdev -v int start logstash ; sleep 5 ; cargo vdev -v int test -a logstash ; RESULT=$? ; cargo vdev -v int stop logstash
+            if [ "$RESULT" = 0 ] ; then break ; fi
             sleep 8
           done
           exit $RESULT
@@ -277,8 +277,8 @@ jobs:
         run: |
           RESULT=1 ; RETRIES=5
           for (( n=1 ; n<=$RETRIES ; n++ )) ; do
-            cargo vdev -v int start loki; sleep 5 ; cargo vdev -v int test -a loki ; RESULT=$? ; cargo vdev -v int stop loki
-            if [ "$RESULT" = 0 ] ; then ; break ; fi
+            cargo vdev -v int start loki ; sleep 5 ; cargo vdev -v int test -a loki ; RESULT=$? ; cargo vdev -v int stop loki
+            if [ "$RESULT" = 0 ] ; then break ; fi
             sleep 8
           done
           exit $RESULT
@@ -289,7 +289,7 @@ jobs:
           RESULT=1 ; RETRIES=5
           for (( n=1 ; n<=$RETRIES ; n++ )) ; do
             cargo vdev -v int start mongodb ; sleep 5 ; cargo vdev -v int test -a mongodb ; RESULT=$? ; cargo vdev -v int stop mongodb
-            if [ "$RESULT" = 0 ] ; then ; break ; fi
+            if [ "$RESULT" = 0 ] ; then break ; fi
             sleep 8
           done
           exit $RESULT
@@ -301,8 +301,8 @@ jobs:
         run: |
           RESULT=1 ; RETRIES=5
           for (( n=1 ; n<=$RETRIES ; n++ )) ; do
-            cargo vdev -v int start nats; sleep 5 ; cargo vdev -v int test -a nats ; RESULT=$? ; cargo vdev -v int stop nats
-            if [ "$RESULT" = 0 ] ; then ; break ; fi
+            cargo vdev -v int start nats ; sleep 5 ; cargo vdev -v int test -a nats ; RESULT=$? ; cargo vdev -v int stop nats
+            if [ "$RESULT" = 0 ] ; then break ; fi
             sleep 8
           done
           exit $RESULT
@@ -312,8 +312,8 @@ jobs:
         run: |
           RESULT=1 ; RETRIES=5
           for (( n=1 ; n<=$RETRIES ; n++ )) ; do
-            cargo vdev -v int start nginx; sleep 5 ; cargo vdev -v int test -a nginx ; RESULT=$? ; cargo vdev -v int stop nginx
-            if [ "$RESULT" = 0 ] ; then ; break ; fi
+            cargo vdev -v int start nginx ; sleep 5 ; cargo vdev -v int test -a nginx ; RESULT=$? ; cargo vdev -v int stop nginx
+            if [ "$RESULT" = 0 ] ; then break ; fi
             sleep 8
           done
           exit $RESULT
@@ -323,8 +323,8 @@ jobs:
         run: |
           RESULT=1 ; RETRIES=5
           for (( n=1 ; n<=$RETRIES ; n++ )) ; do
-            cargo vdev -v int start opentelemetry; sleep 5 ; cargo vdev -v int test -a opentelemetry ; RESULT=$? ; cargo vdev -v int stop opentelemetry
-            if [ "$RESULT" = 0 ] ; then ; break ; fi
+            cargo vdev -v int start opentelemetry ; sleep 5 ; cargo vdev -v int test -a opentelemetry ; RESULT=$? ; cargo vdev -v int stop opentelemetry
+            if [ "$RESULT" = 0 ] ; then break ; fi
             sleep 8
           done
           exit $RESULT
@@ -334,8 +334,8 @@ jobs:
         run: |
           RESULT=1 ; RETRIES=5
           for (( n=1 ; n<=$RETRIES ; n++ )) ; do
-            cargo vdev -v int start postgres; sleep 5 ; cargo vdev -v int test -a postgres ; RESULT=$? ; cargo vdev -v int stop postgres
-            if [ "$RESULT" = 0 ] ; then ; break ; fi
+            cargo vdev -v int start postgres ; sleep 5 ; cargo vdev -v int test -a postgres ; RESULT=$? ; cargo vdev -v int stop postgres
+            if [ "$RESULT" = 0 ] ; then break ; fi
             sleep 8
           done
           exit $RESULT
@@ -345,8 +345,8 @@ jobs:
         run: |
           RESULT=1 ; RETRIES=5
           for (( n=1 ; n<=$RETRIES ; n++ )) ; do
-            cargo vdev -v int start prometheus; sleep 5 ; cargo vdev -v int test -a prometheus ; RESULT=$? ; cargo vdev -v int stop prometheus
-            if [ "$RESULT" = 0 ] ; then ; break ; fi
+            cargo vdev -v int start prometheus ; sleep 5 ; cargo vdev -v int test -a prometheus ; RESULT=$? ; cargo vdev -v int stop prometheus
+            if [ "$RESULT" = 0 ] ; then break ; fi
             sleep 8
           done
           exit $RESULT
@@ -356,8 +356,8 @@ jobs:
         run: |
           RESULT=1 ; RETRIES=5
           for (( n=1 ; n<=$RETRIES ; n++ )) ; do
-            cargo vdev -v int start pulsar; sleep 5 ; cargo vdev -v int test -a pulsar ; RESULT=$? ; cargo vdev -v int stop pulsar
-            if [ "$RESULT" = 0 ] ; then ; break ; fi
+            cargo vdev -v int start pulsar ; sleep 5 ; cargo vdev -v int test -a pulsar ; RESULT=$? ; cargo vdev -v int stop pulsar
+            if [ "$RESULT" = 0 ] ; then break ; fi
             sleep 8
           done
           exit $RESULT
@@ -367,8 +367,8 @@ jobs:
         run: |
           RESULT=1 ; RETRIES=5
           for (( n=1 ; n<=$RETRIES ; n++ )) ; do
-            cargo vdev -v int start redis; sleep 5 ; cargo vdev -v int test -a redis ; RESULT=$? ; cargo vdev -v int stop redis
-            if [ "$RESULT" = 0 ] ; then ; break ; fi
+            cargo vdev -v int start redis ; sleep 5 ; cargo vdev -v int test -a redis ; RESULT=$? ; cargo vdev -v int stop redis
+            if [ "$RESULT" = 0 ] ; then break ; fi
             sleep 8
           done
           exit $RESULT
@@ -378,8 +378,8 @@ jobs:
         run: |
           RESULT=1 ; RETRIES=5
           for (( n=1 ; n<=$RETRIES ; n++ )) ; do
-            cargo vdev -v int start shutdown; sleep 5 ; cargo vdev -v int test -a shutdown ; RESULT=$? ; cargo vdev -v int stop shutdown
-            if [ "$RESULT" = 0 ] ; then ; break ; fi
+            cargo vdev -v int start shutdown ; sleep 5 ; cargo vdev -v int test -a shutdown ; RESULT=$? ; cargo vdev -v int stop shutdown
+            if [ "$RESULT" = 0 ] ; then break ; fi
             sleep 8
           done
           exit $RESULT
@@ -389,8 +389,8 @@ jobs:
         run: |
           RESULT=1 ; RETRIES=5
           for (( n=1 ; n<=$RETRIES ; n++ )) ; do
-            cargo vdev -v int start splunk; sleep 5 ; cargo vdev -v int test -a splunk ; RESULT=$? ; cargo vdev -v int stop splunk
-            if [ "$RESULT" = 0 ] ; then ; break ; fi
+            cargo vdev -v int start splunk ; sleep 5 ; cargo vdev -v int test -a splunk ; RESULT=$? ; cargo vdev -v int stop splunk
+            if [ "$RESULT" = 0 ] ; then break ; fi
             sleep 8
           done
           exit $RESULT
@@ -400,8 +400,8 @@ jobs:
         run: |
           RESULT=1 ; RETRIES=5
           for (( n=1 ; n<=$RETRIES ; n++ )) ; do
-            cargo vdev -v int start webhdfs; sleep 5 ; cargo vdev -v int test -a webhdfs ; RESULT=$? ; cargo vdev -v int stop webhdfs
-            if [ "$RESULT" = 0 ] ; then ; break ; fi
+            cargo vdev -v int start webhdfs ; sleep 5 ; cargo vdev -v int test -a webhdfs ; RESULT=$? ; cargo vdev -v int stop webhdfs
+            if [ "$RESULT" = 0 ] ; then break ; fi
             sleep 8
           done
           exit $RESULT
