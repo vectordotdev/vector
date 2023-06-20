@@ -362,8 +362,9 @@ fn win_main(arguments: Vec<OsString>) {
     if let Err(_e) = run_service(arguments) {}
 }
 
-pub fn run() -> Result<()> {
-    service_dispatcher::start(SERVICE_NAME, ffi_service_main)
+pub fn run() -> Result<i32> {
+    service_dispatcher::start(SERVICE_NAME, ffi_service_main).map(|()| 0_i32)
+    // Always returns 0 exit code as errors are handled by the service dispatcher.
 }
 
 fn run_service(_arguments: Vec<OsString>) -> Result<()> {
@@ -407,10 +408,10 @@ fn run_service(_arguments: Vec<OsString>) -> Result<()> {
                 current_state: ServiceState::Stopped,
                 controls_accepted: ServiceControlAccept::empty(),
                 exit_code: {
-                    if program_completion_status.id() == 0 {
+                    if program_completion_status.success() {
                         ServiceExitCode::Win32(NO_ERROR)
                     } else {
-                        // we could not gracefully shut down in time, likely due to timeout.
+                        // we didn't gracefully shutdown within grace period.
                         ServiceExitCode::Win32(ERROR)
                     }
                 },

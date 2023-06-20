@@ -1,7 +1,6 @@
 #![allow(missing_docs)]
 use std::{
-    collections::HashMap, num::NonZeroUsize, path::PathBuf, process::ExitCode as Exit,
-    time::Duration,
+    collections::HashMap, num::NonZeroUsize, path::PathBuf, process::ExitStatus, time::Duration,
 };
 
 use exitcode::ExitCode;
@@ -34,6 +33,11 @@ use crate::{
     },
     trace,
 };
+
+#[cfg(unix)]
+use std::os::unix::process::ExitStatusExt;
+#[cfg(windows)]
+use std::os::windows::process::ExitStatusExt;
 
 pub static WORKER_THREADS: OnceNonZeroUsize = OnceNonZeroUsize::new();
 
@@ -148,7 +152,7 @@ impl ApplicationConfig {
 }
 
 impl Application {
-    pub fn run() -> Exit {
+    pub fn run() -> ExitStatus {
         let (runtime, app) = Self::prepare_start().unwrap_or_else(|code| std::process::exit(code));
 
         runtime.block_on(app.run())
@@ -245,7 +249,7 @@ pub struct StartedApplication {
 }
 
 impl StartedApplication {
-    pub async fn run(self) -> Exit {
+    pub async fn run(self) -> ExitStatus {
         self.main().await.shutdown().await
     }
 
@@ -320,7 +324,7 @@ pub struct FinishedApplication {
 }
 
 impl FinishedApplication {
-    pub async fn shutdown(self) -> Exit {
+    pub async fn shutdown(self) -> ExitStatus {
         let FinishedApplication {
             signal,
             mut signal_rx,
@@ -338,12 +342,12 @@ impl FinishedApplication {
             SignalTo::Shutdown => {
                 emit!(VectorStopped);
                 tokio::select! {
-                    _ = topology_controller.stop() => Exit::SUCCESS, // Graceful shutdown finished
+                    _ = topology_controller.stop() => ExitStatus::from_raw(exitcode::OK as u32), // Graceful shutdown finished
                     _ = signal_rx.recv() => {
                         // It is highly unlikely that this event will exit from topology.
                         emit!(VectorQuit);
                         // Dropping the shutdown future will immediately shut the server down
-                        Exit::FAILURE
+                        ExitStatus::from_raw(exitcode::UNAVAILABLE as u32)
                     }
                 }
             }
@@ -351,7 +355,7 @@ impl FinishedApplication {
                 // It is highly unlikely that this event will exit from topology.
                 emit!(VectorQuit);
                 drop(topology_controller);
-                Exit::FAILURE
+                ExitStatus::from_raw(exitcode::UNAVAILABLE as u32)
             }
             _ => unreachable!(),
         }
