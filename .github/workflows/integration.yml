@@ -79,33 +79,19 @@ jobs:
           || needs.changes.outputs.splunk == 'true'
           || needs.changes.outputs.webhdfs == 'true'
       )
-    timeout-minutes: 45
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v3
 
       - run: sudo npm -g install @datadog/datadog-ci
 
+      # TODO remove, just to validate the command works
+      - run: docker image prune -af --filter=label!=vector-test-runner=true ; docker container prune -f
+
       # skip this because super flaky
       # - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.amqp == 'true' }}
       #   name: amqp
-      #   #run: cargo vdev -v int test -a amqp ; cargo vdev -v int stop amqp
-      #   run: |
-      #     RESULT=1
-      #     RETRIES=5
-
-      #     for (( n=1 ; n<=$RETRIES ; n++ )) ; do
-      #       cargo vdev -v int test -a amqp
-      #       RESULT=$?
-      #       cargo vdev -v int stop amqp
-
-      #       if [ "$RESULT" = 0 ] ; then
-      #         break
-      #       fi
-
-      #       sleep 8
-      #     done
-
-      #     exit $RESULT
+      #   run: cargo vdev -v int test -a amqp ; cargo vdev -v int stop amqp
 
       # skip this because we don't have the secrets defined here rn
       # - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.appsignal == 'true' }}
@@ -136,11 +122,14 @@ jobs:
       #     cargo vdev -v int test -a datadog-metrics ; cargo vdev -v int stop datadog-metrics
       #     cargo vdev -v int test -a datadog-traces  ; cargo vdev -v int stop datadog-traces
 
+
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.dnstap == 'true' }}
         run: cargo vdev -v int start dnstap ; sleep 5 ; cargo vdev -v int test -a dnstap ; cargo vdev -v int stop dnstap ; sleep 5
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.docker-logs == 'true' }}
         run: cargo vdev -v int start docker-logs ; sleep 5 ; cargo vdev -v int test -a docker-logs ; cargo vdev -v int stop docker-logs ; sleep 5
+
+      - run: docker image prune -af --filter=label!=vector-test-runner=true ; docker container prune -f
 
       # skip this because we don't have the secrets defined here rn
       # - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.elasticsearch == 'true' }}
@@ -175,6 +164,8 @@ jobs:
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.mongodb == 'true' }}
         run: cargo vdev -v int start mongodb ; sleep 5 ; cargo vdev -v int test -a mongodb ; cargo vdev -v int stop mongodb ; sleep 5
+
+      - run: docker image prune -af --filter=label!=vector-test-runner=true ; docker container prune -f
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.nats == 'true' }}
         run: cargo vdev -v int start nats ; sleep 5 ; cargo vdev -v int test -a nats ; cargo vdev -v int stop nats ; sleep 5

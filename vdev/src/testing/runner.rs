@@ -199,6 +199,8 @@ pub trait ContainerTestRunner: TestRunner {
             &self.image_name(),
             "--file",
             dockerfile.to_str().unwrap(),
+            "--label",
+            "vector-test-runner=true",
             "--build-arg",
             &format!("RUST_VERSION={}", get_rust_version()),
             ".",
