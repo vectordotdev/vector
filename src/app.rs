@@ -342,20 +342,42 @@ impl FinishedApplication {
             SignalTo::Shutdown => {
                 emit!(VectorStopped);
                 tokio::select! {
-                    _ = topology_controller.stop() => ExitStatus::from_raw(exitcode::OK as u32), // Graceful shutdown finished
+                    _ = topology_controller.stop() => ExitStatus::from_raw({
+                            #[cfg(windows)]
+                            {
+                                exitcode::OK as u32
+                            }
+                            #[cfg(unix)]
+                            exitcode::OK
+                    }), // Graceful shutdown finished
                     _ = signal_rx.recv() => {
                         // It is highly unlikely that this event will exit from topology.
                         emit!(VectorQuit);
                         // Dropping the shutdown future will immediately shut the server down
-                        ExitStatus::from_raw(exitcode::UNAVAILABLE as u32)
+                        ExitStatus::from_raw({
+                            #[cfg(windows)]
+                            {
+                                exitcode::UNAVAILABLE as u32
+                            }
+                            #[cfg(unix)]
+                            exitcode::OK
+                        })
                     }
+
                 }
             }
             SignalTo::Quit => {
                 // It is highly unlikely that this event will exit from topology.
                 emit!(VectorQuit);
                 drop(topology_controller);
-                ExitStatus::from_raw(exitcode::UNAVAILABLE as u32)
+                ExitStatus::from_raw({
+                    #[cfg(windows)]
+                    {
+                        exitcode::UNAVAILABLE as u32
+                    }
+                    #[cfg(unix)]
+                    exitcode::OK
+                })
             }
             _ => unreachable!(),
         }
