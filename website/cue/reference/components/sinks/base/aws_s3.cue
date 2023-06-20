@@ -727,8 +727,12 @@ base: components: sinks: aws_s3: configuration: {
 		}
 	}
 	server_side_encryption: {
-		description: "The Server-side Encryption algorithm used when storing these objects."
-		required:    false
+		description: """
+			AWS S3 Server-Side Encryption algorithms.
+
+			The Server-side Encryption algorithm used when storing these objects.
+			"""
+		required: false
 		type: string: enum: {
 			AES256: """
 				Each object is encrypted with AES-256 using a unique key.

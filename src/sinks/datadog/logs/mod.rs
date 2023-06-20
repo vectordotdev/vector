@@ -28,4 +28,4 @@ mod config;
 mod service;
 mod sink;
 
-pub(crate) use config::DatadogLogsConfig;
+pub use self::config::DatadogLogsConfig;

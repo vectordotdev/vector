@@ -40,7 +40,7 @@ use vrl::value::Kind;
 pub const DATA_STREAM_TIMESTAMP_KEY: &str = "@timestamp";
 
 /// Configuration for the `elasticsearch` sink.
-#[configurable_component(sink("elasticsearch"))]
+#[configurable_component(sink("elasticsearch", "Index observability events in Elasticsearch."))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct ElasticsearchConfig {
@@ -466,6 +466,7 @@ impl DataStreamConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "elasticsearch")]
 impl SinkConfig for ElasticsearchConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let commons = ElasticsearchCommon::parse_many(self, cx.proxy()).await?;

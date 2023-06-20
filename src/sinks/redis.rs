@@ -109,7 +109,7 @@ impl SinkBatchSettings for RedisDefaultBatchSettings {
 }
 
 /// Configuration for the `redis` sink.
-#[configurable_component(sink("redis"))]
+#[configurable_component(sink("redis", "Publish observability data to Redis."))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct RedisSinkConfig {
@@ -171,6 +171,7 @@ impl GenerateConfig for RedisSinkConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "redis")]
 impl SinkConfig for RedisSinkConfig {
     async fn build(
         &self,

@@ -13,7 +13,7 @@ use crate::{
 };
 
 /// Configuration for the `socket` sink.
-#[configurable_component(sink("socket"))]
+#[configurable_component(sink("socket", "Deliver logs to a remote socket endpoint."))]
 #[derive(Clone, Debug)]
 pub struct SocketSinkConfig {
     #[serde(flatten)]
@@ -113,6 +113,7 @@ impl SocketSinkConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "socket")]
 impl SinkConfig for SocketSinkConfig {
     async fn build(
         &self,

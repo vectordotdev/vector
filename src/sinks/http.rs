@@ -29,7 +29,7 @@ use crate::{
 };
 
 /// Configuration for the `http` sink.
-#[configurable_component(sink("http"))]
+#[configurable_component(sink("http", "Deliver observability event data to an HTTP server."))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct HttpSinkConfig {
@@ -201,6 +201,7 @@ fn default_sink(encoding: EncodingConfigWithFraming) -> HttpSink {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "http")]
 impl SinkConfig for HttpSinkConfig {
     async fn build(
         &self,

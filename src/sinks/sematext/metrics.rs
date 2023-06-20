@@ -47,7 +47,7 @@ impl SinkBatchSettings for SematextMetricsDefaultBatchSettings {
 }
 
 /// Configuration for the `sematext_metrics` sink.
-#[configurable_component(sink("sematext_metrics"))]
+#[configurable_component(sink("sematext_metrics", "Publish metric events to Sematext."))]
 #[derive(Clone, Debug)]
 pub struct SematextMetricsConfig {
     /// Sets the default namespace for any metrics sent.
@@ -121,6 +121,7 @@ const US_ENDPOINT: &str = "https://spm-receiver.sematext.com";
 const EU_ENDPOINT: &str = "https://spm-receiver.eu.sematext.com";
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "sematext_metrics")]
 impl SinkConfig for SematextMetricsConfig {
     async fn build(&self, cx: SinkContext) -> Result<(VectorSink, Healthcheck)> {
         let client = HttpClient::new(None, cx.proxy())?;

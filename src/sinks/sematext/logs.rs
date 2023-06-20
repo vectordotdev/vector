@@ -21,7 +21,7 @@ use crate::{
 };
 
 /// Configuration for the `sematext_logs` sink.
-#[configurable_component(sink("sematext_logs"))]
+#[configurable_component(sink("sematext_logs", "Publish log events to Sematext."))]
 #[derive(Clone, Debug)]
 pub struct SematextLogsConfig {
     #[serde(default = "super::default_region")]
@@ -79,6 +79,7 @@ const US_ENDPOINT: &str = "https://logsene-receiver.sematext.com";
 const EU_ENDPOINT: &str = "https://logsene-receiver.eu.sematext.com";
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "sematext_logs")]
 impl SinkConfig for SematextLogsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let endpoint = match (&self.endpoint, &self.region) {

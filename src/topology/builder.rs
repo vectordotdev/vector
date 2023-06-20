@@ -19,7 +19,6 @@ use tracing::Instrument;
 use vector_common::internal_event::{
     self, CountByteSize, EventsSent, InternalEventHandle as _, Registered,
 };
-use vector_config::NamedComponent;
 use vector_core::config::LogNamespace;
 use vector_core::{
     buffers::{
@@ -42,7 +41,7 @@ use super::{
 use crate::{
     config::{
         ComponentKey, DataType, EnrichmentTableConfig, Input, Inputs, OutputId, ProxyConfig,
-        SinkConfig, SinkContext, SourceContext, TransformContext, TransformOuter, TransformOutput,
+        SinkContext, SourceContext, TransformContext, TransformOuter, TransformOutput,
     },
     event::{EventArray, EventContainer},
     internal_events::EventsReceived,

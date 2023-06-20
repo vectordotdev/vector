@@ -41,7 +41,10 @@ enum BuildError {
  */
 
 /// Configuration for the `nats` sink.
-#[configurable_component(sink("nats"))]
+#[configurable_component(sink(
+    "nats",
+    "Publish observability data to subjects on the NATS messaging system."
+))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct NatsSinkConfig {
@@ -114,6 +117,7 @@ impl GenerateConfig for NatsSinkConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "nats")]
 impl SinkConfig for NatsSinkConfig {
     async fn build(
         &self,

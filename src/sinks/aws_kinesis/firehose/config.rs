@@ -66,7 +66,10 @@ impl SinkBatchSettings for KinesisFirehoseDefaultBatchSettings {
 }
 
 /// Configuration for the `aws_kinesis_firehose` sink.
-#[configurable_component(sink("aws_kinesis_firehose"))]
+#[configurable_component(sink(
+    "aws_kinesis_firehose",
+    "Publish logs to AWS Kinesis Data Firehose topics."
+))]
 #[derive(Clone, Debug)]
 pub struct KinesisFirehoseSinkConfig {
     #[serde(flatten)]
@@ -119,6 +122,7 @@ impl KinesisFirehoseSinkConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "aws_kinesis_firehose")]
 impl SinkConfig for KinesisFirehoseSinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let client = self.create_client(&cx.proxy).await?;

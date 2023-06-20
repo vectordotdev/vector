@@ -135,7 +135,7 @@ pub struct UnitTestSinkResult {
 }
 
 /// Configuration for the `unit_test` sink.
-#[configurable_component(sink("unit_test"))]
+#[configurable_component(sink("unit_test", "Unit test."))]
 #[derive(Clone, Default, Derivative)]
 #[derivative(Debug)]
 pub struct UnitTestSinkConfig {
@@ -158,6 +158,7 @@ pub struct UnitTestSinkConfig {
 impl_generate_config_from_default!(UnitTestSinkConfig);
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "unit_test")]
 impl SinkConfig for UnitTestSinkConfig {
     async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let tx = self.result_tx.lock().await.take();
@@ -272,7 +273,7 @@ impl StreamSink<Event> for UnitTestSink {
 }
 
 /// Configuration for the `unit_test_stream` sink.
-#[configurable_component(sink("unit_test_stream"))]
+#[configurable_component(sink("unit_test_stream", "Unit test stream."))]
 #[derive(Clone, Default)]
 pub struct UnitTestStreamSinkConfig {
     /// Sink that receives the processed events.
@@ -297,6 +298,7 @@ impl std::fmt::Debug for UnitTestStreamSinkConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "unit_test_stream")]
 impl SinkConfig for UnitTestStreamSinkConfig {
     async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let sink = self.sink.lock().await.take().unwrap();

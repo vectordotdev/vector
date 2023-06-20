@@ -17,8 +17,6 @@ use crate::{
     config::SinkConfig,
     http::HttpError,
     sinks::{
-        datadog::logs::DatadogLogsConfig,
-        datadog::DatadogApiError,
         util::retries::RetryLogic,
         util::test::{build_test_server_status, load_sink},
     },
@@ -32,7 +30,7 @@ use crate::{
     tls::TlsError,
 };
 
-use super::service::LogApiRetry;
+use super::{super::DatadogApiError, config::DatadogLogsConfig, service::LogApiRetry};
 
 // The sink must support v1 and v2 API endpoints which have different codes for
 // signaling status. This enum allows us to signal which API endpoint and what
