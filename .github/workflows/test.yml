@@ -35,35 +35,35 @@ jobs:
 
   # Remove this once https://github.com/vectordotdev/vector/issues/3771 is closed.
   # Then, modify the `cross-linux` job to run `test` instead of `build`.
-  test-linux:
-    name: Unit - x86_64-unknown-linux-gnu
-    runs-on: [linux, ubuntu-20.04-8core]
-    needs: changes
-    env:
-      CARGO_INCREMENTAL: 0
-    if: ${{ needs.changes.outputs.source == 'true' }}
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/cache@v3
-        name: Cache Cargo registry + index
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-
-      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - run: bash scripts/environment/prepare.sh
-      - run: echo "::add-matcher::.github/matchers/rust.json"
-      - run: make test
-        env:
-          CARGO_BUILD_JOBS: 5
-      - name: Upload test results
-        run: scripts/upload-test-results.sh
-        if: always()
+  # test-linux:
+  #   name: Unit - x86_64-unknown-linux-gnu
+  #   runs-on: [linux, ubuntu-20.04-8core]
+  #   needs: changes
+  #   env:
+  #     CARGO_INCREMENTAL: 0
+  #   if: ${{ needs.changes.outputs.source == 'true' }}
+  #   steps:
+  #     - uses: actions/checkout@v3
+  #     - uses: actions/cache@v3
+  #       name: Cache Cargo registry + index
+  #       with:
+  #         path: |
+  #           ~/.cargo/bin/
+  #           ~/.cargo/registry/index/
+  #           ~/.cargo/registry/cache/
+  #           ~/.cargo/git/db/
+  #         key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+  #         restore-keys: |
+  #           ${{ runner.os }}-cargo-
+  #     - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
+  #     - run: bash scripts/environment/prepare.sh
+  #     - run: echo "::add-matcher::.github/matchers/rust.json"
+  #     - run: make test
+  #       env:
+  #         CARGO_BUILD_JOBS: 5
+  #     - name: Upload test results
+  #       run: scripts/upload-test-results.sh
+  #       if: always()
 
   # test-vrl:
   #   name: VRL - Linux
@@ -109,6 +109,17 @@ jobs:
       - name: Check clippy
         if: needs.changes.outputs.source == 'true'
         run: make check-clippy
+
+        # Remove this once https://github.com/vectordotdev/vector/issues/3771 is closed.
+        # Then, modify the `cross-linux` job to run `test` instead of `build`.
+      - name: Unit - x86_64-unknown-linux-gnu
+        run: make test
+        env:
+          CARGO_BUILD_JOBS: 5
+      - name: Upload test results
+        run: scripts/upload-test-results.sh
+        if: always()
+
       # - name: Check version
       #   run: make check-version
       - name: Check scripts
@@ -147,9 +158,8 @@ jobs:
     name: Test Suite
     runs-on: ubuntu-20.04
     if: always()
-    needs:
-      - checks
-      - test-linux
+    needs: checks
+      # - test-linux
     env:
       FAILED: ${{ contains(needs.*.result, 'failure') }}
     steps:
