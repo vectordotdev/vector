@@ -378,7 +378,7 @@ fn get_log_levels(default: &str) -> String {
                 format!("codec={}", level),
                 format!("vrl={}", level),
                 format!("file_source={}", level),
-                "tower_limit=trace".to_owned(),
+                format!("tower_limit={}", level),
                 format!("rdkafka={}", level),
                 format!("buffers={}", level),
                 format!("lapin={}", level),
