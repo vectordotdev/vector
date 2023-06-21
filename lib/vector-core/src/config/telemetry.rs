@@ -34,7 +34,7 @@ pub fn telemetry() -> &'static Telemetry {
 #[serde(default)]
 pub struct Telemetry {
     #[configurable(derived)]
-    tags: Tags,
+    pub tags: Tags,
 }
 
 impl Telemetry {

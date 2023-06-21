@@ -11,7 +11,10 @@ use futures::{
 use http::request::Parts;
 use hyper::StatusCode;
 use indoc::indoc;
-use vector_core::event::{BatchNotifier, BatchStatus, Event, LogEvent};
+use vector_core::{
+    config::{init_telemetry, Tags, Telemetry},
+    event::{BatchNotifier, BatchStatus, Event, LogEvent},
+};
 
 use crate::{
     config::SinkConfig,
@@ -25,7 +28,7 @@ use crate::{
     test_util::{
         components::{
             run_and_assert_sink_compliance, run_and_assert_sink_error, COMPONENT_ERROR_TAGS,
-            SINK_TAGS,
+            DATA_VOLUME_SINK_TAGS,
         },
         next_addr, random_lines_with_stream,
     },
@@ -87,6 +90,16 @@ async fn start_test_detail(
     batch_status: BatchStatus,
     is_error: bool,
 ) -> (Vec<String>, Receiver<(http::request::Parts, Bytes)>) {
+    init_telemetry(
+        Telemetry {
+            tags: Tags {
+                emit_service: true,
+                emit_source: true,
+            },
+        },
+        true,
+    );
+
     let config = indoc! {r#"
             default_api_key = "atoken"
             compression = "none"
@@ -110,7 +123,7 @@ async fn start_test_detail(
     if is_error {
         run_and_assert_sink_error(sink, events, &COMPONENT_ERROR_TAGS).await;
     } else {
-        run_and_assert_sink_compliance(sink, events, &SINK_TAGS).await;
+        run_and_assert_sink_compliance(sink, events, &DATA_VOLUME_SINK_TAGS).await;
     }
 
     assert_eq!(receiver.await, batch_status);
