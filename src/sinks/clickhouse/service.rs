@@ -1,4 +1,4 @@
-use bytes::{Buf, Bytes};
+use bytes::Bytes;
 use http::{
     header::{CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE},
     Request, Response, StatusCode, Uri,
@@ -164,7 +164,7 @@ impl Service<ClickhouseRequest> for ClickhouseService {
         Box::pin(async move {
             let response = client.call(http_request).in_current_span().await?;
             let (parts, body) = response.into_parts();
-            let mut body = body::aggregate(body).await?;
+            let mut body = body::to_bytes(body).await?;
             Ok(ClickhouseResponse {
                 metadata: request.metadata,
                 http_response: hyper::Response::from_parts(parts, body),
