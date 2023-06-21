@@ -128,7 +128,7 @@ jobs:
           command: cargo vdev -v int start clickhouse ; sleep 10 ; cargo vdev -v int test -a clickhouse ; RET=$? ; cargo vdev -v int stop clickhouse ; exit $RET
 
       - name: databend
-        if: ${{ contains(github.event.comment.body, '/ci-run-integration-databeng') || contains(github.event.comment.body, '/ci-run-all') }}
+        if: ${{ contains(github.event.comment.body, '/ci-run-integration-databend') || contains(github.event.comment.body, '/ci-run-all') }}
         uses: nick-fields/retry@v2
         with:
           timeout_minutes: 5
