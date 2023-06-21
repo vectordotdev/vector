@@ -43,7 +43,8 @@ jobs:
 
   integration-tests:
     name: Integration Tests
-    runs-on: ubuntu-latest
+    # runs-on: ubuntu-latest
+    runs-on: [linux, ubuntu-20.04-8core]
     needs: changes
     if: |
       github.event_name == 'merge_group' || (
