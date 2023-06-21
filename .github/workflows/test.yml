@@ -89,8 +89,8 @@ jobs:
           # check-version needs tags
           fetch-depth: 0 # fetch everything
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - run: bash scripts/environment/prepare.sh
       - uses: ruby/setup-ruby@v1
+      - run: bash scripts/environment/prepare.sh
       - uses: actions/cache@v3
         name: Cache Cargo registry + index
         with:
