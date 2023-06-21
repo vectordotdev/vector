@@ -355,6 +355,10 @@ jobs:
           max_attempts: 3
           command: cargo vdev -v int start webhdfs ; sleep 10 ; cargo vdev -v int test -a webhdfs ; RET=$? ; cargo vdev -v int stop webhdfs ; exit $RET
 
+      - name: Upload test results
+        run: scripts/upload-test-results.sh
+        if: always()
+
   update-pr-status:
     name: Signal result to PR
     runs-on: ubuntu-latest
