@@ -143,6 +143,7 @@ jobs:
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.databend == 'true' }}
         name: databend
+        uses: nick-fields/retry@v2
         with:
           timeout_minutes: 5
           max_attempts: 3
@@ -150,6 +151,7 @@ jobs:
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.datadog == 'true' }}
         name: datadog-agent
+        uses: nick-fields/retry@v2
         with:
           timeout_minutes: 5
           max_attempts: 3
@@ -157,6 +159,7 @@ jobs:
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.datadog == 'true' }}
         name: datadog-logs
+        uses: nick-fields/retry@v2
         with:
           timeout_minutes: 5
           max_attempts: 3
@@ -164,6 +167,7 @@ jobs:
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.datadog == 'true' }}
         name: datadog-metrics
+        uses: nick-fields/retry@v2
         with:
           timeout_minutes: 5
           max_attempts: 3
@@ -171,6 +175,7 @@ jobs:
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.datadog == 'true' }}
         name: datadog-traces
+        uses: nick-fields/retry@v2
         with:
           timeout_minutes: 5
           max_attempts: 3
