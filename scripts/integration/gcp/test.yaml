@@ -18,3 +18,4 @@ paths:
 - "src/sinks/gcp/**"
 - "src/sinks/util/**"
 - "src/gcp.rs"
+- "scripts/integration/gcp/**"

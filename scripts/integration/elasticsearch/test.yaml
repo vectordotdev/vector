@@ -18,3 +18,4 @@ matrix:
 paths:
 - "src/sinks/elasticsearch/**"
 - "src/sinks/util/**"
+- "scripts/integration/elasticsearch/**"

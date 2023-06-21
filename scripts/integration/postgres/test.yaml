@@ -20,3 +20,4 @@ paths:
 - "src/internal_events/postgresql_metrics.rs"
 - "src/sources/postgresql_metrics.rs"
 - "src/sources/util/**"
+- "scripts/integration/postgres/**"

@@ -24,3 +24,4 @@ paths:
 - "src/sinks/nats.rs"
 - "src/sinks/util/**"
 - "src/nats.rs"
+- "scripts/integration/nats/**"
