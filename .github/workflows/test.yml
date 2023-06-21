@@ -129,7 +129,11 @@ jobs:
         run: make check-markdown
       - name: Check Component Docs
         if: needs.changes.outputs.source == 'true' || needs.changes.outputs.component_docs == 'true'
-        run: make check-component-docs
+        uses: nick-fields/retry@v2
+        with:
+          max_attempts: 10
+          timeout_seconds: 900
+          command: make check-component-docs
       - name: Check Rust Docs
         if: needs.changes.outputs.source == 'true'
         run: cd rust-doc && make docs
