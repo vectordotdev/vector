@@ -305,17 +305,19 @@ where
             });
             self.emitter.emit_files_open(fp_map.len());
 
-            let start = time::Instant::now();
-            let to_send = std::mem::take(&mut lines);
-            let result = self.handle.block_on(chans.send(to_send));
-            match result {
-                Ok(()) => {}
-                Err(error) => {
-                    error!(message = "Output channel closed.", %error);
-                    return Err(error);
+            if !lines.is_empty() {
+                let start = time::Instant::now();
+                let to_send = std::mem::take(&mut lines);
+                let result = self.handle.block_on(chans.send(to_send));
+                match result {
+                    Ok(()) => {}
+                    Err(error) => {
+                        error!(message = "Output channel closed.", %error);
+                        return Err(error);
+                    }
                 }
+                stats.record("sending", start.elapsed());
             }
-            stats.record("sending", start.elapsed());
 
             let start = time::Instant::now();
             // When no lines have been read we kick the backup_cap up by twice,
