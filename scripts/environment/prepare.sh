@@ -21,10 +21,6 @@ if ! rust-license-tool --help >& /dev/null ; then
   cargo install --git https://github.com/DataDog/rust-license-tool
 fi
 
-cd scripts
-bundle install
-cd ..
-
 # Currently fixing this to version 0.30 since version 0.31 has introduced
 # a change that means it only works with versions of node > 10.
 # https://github.com/igorshubovych/markdownlint-cli/issues/258
