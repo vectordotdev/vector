@@ -58,7 +58,7 @@ jobs:
             ${{ runner.os }}-cargo-
 
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      
+
       - uses: ruby/setup-ruby@v1
 
       - run: bash scripts/environment/prepare.sh
