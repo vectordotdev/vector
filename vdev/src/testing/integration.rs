@@ -6,7 +6,8 @@ use tempfile::{Builder, NamedTempFile};
 use super::config::ComposeConfig;
 use super::config::{Environment, IntegrationTestConfig};
 use super::runner::{
-    ContainerTestRunner as _, IntegrationTestRunner, TestRunner as _, CONTAINER_TOOL, DOCKER_SOCKET,
+    full_runner_available, ContainerTestRunner as _, IntegrationTestRunner, TestRunner as _,
+    CONTAINER_TOOL, DOCKER_SOCKET,
 };
 use super::state::EnvsDir;
 use crate::app::CommandExt as _;
@@ -21,10 +22,15 @@ pub struct IntegrationTest {
     runner: IntegrationTestRunner,
     compose: Option<Compose>,
     env_config: Environment,
+    all: bool,
 }
 
 impl IntegrationTest {
-    pub fn new(integration: impl Into<String>, environment: impl Into<String>) -> Result<Self> {
+    pub fn new(
+        integration: impl Into<String>,
+        environment: impl Into<String>,
+        all: bool,
+    ) -> Result<Self> {
         let integration = integration.into();
         let environment = environment.into();
         let (test_dir, config) = IntegrationTestConfig::load(&integration)?;
@@ -34,8 +40,15 @@ impl IntegrationTest {
         };
         let network_name = format!("vector-integration-tests-{integration}");
         let compose = Compose::new(test_dir, env_config.clone(), network_name.clone())?;
+
+        let full_runner_avail = full_runner_available()?;
+
+        let runner_name = (!full_runner_avail)
+            .then(|| (!all).then(|| integration.clone()))
+            .flatten();
+
         let runner = IntegrationTestRunner::new(
-            integration.clone(),
+            runner_name,
             &config.runner,
             compose.is_some().then_some(network_name),
         )?;
@@ -48,6 +61,9 @@ impl IntegrationTest {
             runner,
             compose,
             env_config,
+            // no need to recompile a specific context for a single integration test feature if we've already got a context
+            // with all of the int test features pre compiled.
+            all: all || full_runner_avail,
         })
     }
 
@@ -69,7 +85,12 @@ impl IntegrationTest {
         let mut args = self.config.args.clone().unwrap_or_default();
 
         args.push("--features".to_string());
-        args.push(self.config.features.join(","));
+
+        if self.all {
+            args.push("all-integration-tests".to_string());
+        } else {
+            args.push(self.config.features.join(","));
+        }
 
         // If the test field is not present then use the --lib flag
         match self.config.test {
@@ -90,6 +111,9 @@ impl IntegrationTest {
         if !args.contains(&"--test-threads".to_string()) {
             args.push("--no-capture".to_string());
         }
+
+        args.push("--retries".to_string());
+        args.push("4".to_string());
 
         self.runner
             .test(&env_vars, &self.config.runner.env, &args)?;

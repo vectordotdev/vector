@@ -47,6 +47,29 @@ fn detect_container_tool() -> OsString {
     fatal!("No container tool could be detected.");
 }
 
+fn get_rust_version() -> String {
+    match RustToolchainConfig::parse() {
+        Ok(config) => config.channel,
+        Err(error) => fatal!("Could not read `rust-toolchain.toml` file: {error}"),
+    }
+}
+
+/// True if a docker image exists that has all of the integration tests
+/// features compiled.
+pub fn full_runner_available() -> Result<bool> {
+    let mut command = dockercmd([
+        "image",
+        "ls",
+        &format!("vector-test-runner-{}", get_rust_version()),
+    ]);
+
+    // $ docker image ls vector-test-runner-1.69.0
+    // REPOSITORY                  TAG       IMAGE ID       CREATED       SIZE
+    // vector-test-runner-1.69.0   latest    7e5e70a96428   13 days ago   1.76GB
+
+    Ok(command.check_output()?.lines().count() == 2)
+}
+
 fn dockercmd<I: AsRef<OsStr>>(args: impl IntoIterator<Item = I>) -> Command {
     let mut command = Command::new(&*CONTAINER_TOOL);
     command.args(args);
@@ -91,13 +114,6 @@ pub trait ContainerTestRunner: TestRunner {
     fn stop(&self) -> Result<()> {
         dockercmd(["stop", "--time", "0", &self.container_name()])
             .wait(format!("Stopping container {}", self.container_name()))
-    }
-
-    fn get_rust_version(&self) -> String {
-        match RustToolchainConfig::parse() {
-            Ok(config) => config.channel,
-            Err(error) => fatal!("Could not read `rust-toolchain.toml` file: {error}"),
-        }
     }
 
     fn state(&self) -> Result<RunnerState> {
@@ -183,8 +199,10 @@ pub trait ContainerTestRunner: TestRunner {
             &self.image_name(),
             "--file",
             dockerfile.to_str().unwrap(),
+            "--label",
+            "vector-test-runner=true",
             "--build-arg",
-            &format!("RUST_VERSION={}", self.get_rust_version()),
+            &format!("RUST_VERSION={}", get_rust_version()),
             ".",
         ]);
 
@@ -295,7 +313,7 @@ where
 }
 
 pub(super) struct IntegrationTestRunner {
-    integration: String,
+    integration: Option<String>,
     needs_docker_socket: bool,
     network: Option<String>,
     volumes: Vec<String>,
@@ -303,7 +321,7 @@ pub(super) struct IntegrationTestRunner {
 
 impl IntegrationTestRunner {
     pub(super) fn new(
-        integration: String,
+        integration: Option<String>,
         config: &IntegrationRunnerConfig,
         network: Option<String>,
     ) -> Result<Self> {
@@ -344,11 +362,11 @@ impl ContainerTestRunner for IntegrationTestRunner {
     }
 
     fn container_name(&self) -> String {
-        format!(
-            "vector-test-runner-{}-{}",
-            self.integration,
-            self.get_rust_version()
-        )
+        if let Some(integration) = self.integration.as_ref() {
+            format!("vector-test-runner-{}-{}", integration, get_rust_version())
+        } else {
+            format!("vector-test-runner-{}", get_rust_version())
+        }
     }
 
     fn image_name(&self) -> String {
@@ -372,7 +390,7 @@ impl ContainerTestRunner for DockerTestRunner {
     }
 
     fn container_name(&self) -> String {
-        format!("vector-test-runner-{}", self.get_rust_version())
+        format!("vector-test-runner-{}", get_rust_version())
     }
 
     fn image_name(&self) -> String {
