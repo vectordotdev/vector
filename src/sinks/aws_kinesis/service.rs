@@ -68,7 +68,7 @@ where
 
     // Emission of internal events for errors and dropped events is handled upstream by the caller.
     fn call(&mut self, mut requests: BatchKinesisRequest<R>) -> Self::Future {
-        let metadata = requests.take_metadata();
+        let metadata = std::mem::take(requests.metadata_mut());
         let events_byte_size = metadata.into_events_estimated_json_encoded_byte_size();
 
         let records = requests

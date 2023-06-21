@@ -154,7 +154,7 @@ impl Service<BatchCloudwatchRequest> for CloudwatchLogsPartitionSvc {
     }
 
     fn call(&mut self, mut req: BatchCloudwatchRequest) -> Self::Future {
-        let metadata = req.take_metadata();
+        let metadata = std::mem::take(req.metadata_mut());
         let events_byte_size = metadata.into_events_estimated_json_encoded_byte_size();
 
         let key = req.key;

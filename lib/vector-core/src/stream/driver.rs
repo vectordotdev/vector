@@ -303,8 +303,8 @@ mod tests {
             &self.2
         }
 
-        fn take_metadata(&mut self) -> RequestMetadata {
-            std::mem::take(&mut self.2)
+        fn metadata_mut(&mut self) -> &mut RequestMetadata {
+            &mut self.2
         }
     }
 

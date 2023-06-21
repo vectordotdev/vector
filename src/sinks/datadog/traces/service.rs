@@ -84,8 +84,8 @@ impl MetaDescriptive for TraceApiRequest {
         &self.metadata
     }
 
-    fn take_metadata(&mut self) -> RequestMetadata {
-        std::mem::take(&mut self.metadata)
+    fn metadata_mut(&mut self) -> &mut RequestMetadata {
+        &mut self.metadata
     }
 }
 
@@ -148,7 +148,7 @@ impl Service<TraceApiRequest> for TraceApiService {
         let client = self.client.clone();
 
         Box::pin(async move {
-            let metadata = request.take_metadata();
+            let metadata = std::mem::take(request.metadata_mut());
             let byte_size = metadata.into_events_estimated_json_encoded_byte_size();
             let uncompressed_size = request.uncompressed_size;
             let http_request = request.into_http_request().context(BuildRequestSnafu)?;

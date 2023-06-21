@@ -59,8 +59,8 @@ impl MetaDescriptive for VectorRequest {
         &self.metadata
     }
 
-    fn take_metadata(&mut self) -> RequestMetadata {
-        std::mem::take(&mut self.metadata)
+    fn metadata_mut(&mut self) -> &mut RequestMetadata {
+        &mut self.metadata
     }
 }
 
@@ -106,7 +106,7 @@ impl Service<VectorRequest> for VectorService {
     fn call(&mut self, mut list: VectorRequest) -> Self::Future {
         let mut service = self.clone();
         let byte_size = list.request.encoded_len();
-        let metadata = list.take_metadata();
+        let metadata = std::mem::take(list.metadata_mut());
         let events_byte_size = metadata.into_events_estimated_json_encoded_byte_size();
 
         let future = async move {

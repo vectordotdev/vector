@@ -61,8 +61,8 @@ impl MetaDescriptive for ElasticsearchRequest {
         &self.metadata
     }
 
-    fn take_metadata(&mut self) -> RequestMetadata {
-        std::mem::take(&mut self.metadata)
+    fn metadata_mut(&mut self) -> &mut RequestMetadata {
+        &mut self.metadata
     }
 }
 
@@ -182,9 +182,8 @@ impl Service<ElasticsearchRequest> for ElasticsearchService {
         Box::pin(async move {
             http_service.ready().await?;
             let batch_size = req.batch_size;
-            let events_byte_size = req
-                .take_metadata()
-                .into_events_estimated_json_encoded_byte_size();
+            let events_byte_size =
+                std::mem::take(req.metadata_mut()).into_events_estimated_json_encoded_byte_size();
             let http_response = http_service.call(req).await?;
 
             let event_status = get_event_status(&http_response);

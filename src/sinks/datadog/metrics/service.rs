@@ -115,8 +115,8 @@ impl MetaDescriptive for DatadogMetricsRequest {
         &self.metadata
     }
 
-    fn take_metadata(&mut self) -> RequestMetadata {
-        std::mem::take(&mut self.metadata)
+    fn metadata_mut(&mut self) -> &mut RequestMetadata {
+        &mut self.metadata
     }
 }
 
@@ -184,7 +184,7 @@ impl Service<DatadogMetricsRequest> for DatadogMetricsService {
         let api_key = self.api_key.clone();
 
         Box::pin(async move {
-            let metadata = request.take_metadata();
+            let metadata = std::mem::take(request.metadata_mut());
             let byte_size = metadata.into_events_estimated_json_encoded_byte_size();
             let raw_byte_size = request.raw_bytes;
 

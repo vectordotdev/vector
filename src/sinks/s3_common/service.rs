@@ -41,8 +41,8 @@ impl MetaDescriptive for S3Request {
         &self.request_metadata
     }
 
-    fn take_metadata(&mut self) -> RequestMetadata {
-        std::mem::take(&mut self.request_metadata)
+    fn metadata_mut(&mut self) -> &mut RequestMetadata {
+        &mut self.request_metadata
     }
 }
 

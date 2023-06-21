@@ -54,8 +54,8 @@ impl MetaDescriptive for GcsRequest {
         &self.metadata
     }
 
-    fn take_metadata(&mut self) -> RequestMetadata {
-        std::mem::take(&mut self.metadata)
+    fn metadata_mut(&mut self) -> &mut RequestMetadata {
+        &mut self.metadata
     }
 }
 

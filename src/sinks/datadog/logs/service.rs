@@ -59,8 +59,8 @@ impl MetaDescriptive for LogApiRequest {
         &self.metadata
     }
 
-    fn take_metadata(&mut self) -> RequestMetadata {
-        std::mem::take(&mut self.metadata)
+    fn metadata_mut(&mut self) -> &mut RequestMetadata {
+        &mut self.metadata
     }
 }
 
@@ -138,7 +138,7 @@ impl Service<LogApiRequest> for LogApiService {
             http_request
         };
 
-        let metadata = request.take_metadata();
+        let metadata = std::mem::take(request.metadata_mut());
         let events_byte_size = metadata.into_events_estimated_json_encoded_byte_size();
         let raw_byte_size = request.uncompressed_size;
 

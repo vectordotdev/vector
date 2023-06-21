@@ -293,11 +293,8 @@ pub trait MetaDescriptive {
     /// Returns the `RequestMetadata` associated with this object.
     fn get_metadata(&self) -> &RequestMetadata;
 
-    /// Returns the owned `RequestMetadata`.
-    /// It is *very* important that this function is not called more than once for each
-    /// instance since it is likely that by taking the metadata it will replace the
-    /// current values with default metadata.
-    fn take_metadata(&mut self) -> RequestMetadata;
+    // Returns a mutable reference to the `RequestMetadata` associated with this object.
+    fn metadata_mut(&mut self) -> &mut RequestMetadata;
 }
 
 #[cfg(test)]
