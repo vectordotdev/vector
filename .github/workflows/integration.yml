@@ -43,7 +43,6 @@ jobs:
 
   integration-tests:
     name: Integration Tests
-    # runs-on: ubuntu-latest
     runs-on: [linux, ubuntu-20.04-8core]
     needs: changes
     if: |
@@ -80,7 +79,7 @@ jobs:
           || needs.changes.outputs.splunk == 'true'
           || needs.changes.outputs.webhdfs == 'true'
       )
-    timeout-minutes: 90
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v3
 
@@ -88,15 +87,14 @@ jobs:
 
       - run: docker image prune -af ; docker container prune -f
 
-      # TODO skipping as flaky
-      # - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.amqp == 'true' }}
-      #   name: amqp
-      #   uses: nick-fields/retry@v2
-      #   with:
-      #     timeout_minutes: 40
-      #     max_attempts: 3
-      #     retry_on: error
-      #     command: cargo vdev -v int start amqp ; sleep 5 ; cargo vdev -v int test -a amqp ; cargo vdev -v int stop amqp
+      - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.amqp == 'true' }}
+        name: amqp
+        uses: nick-fields/retry@v2
+        with:
+          timeout_minutes: 25
+          max_attempts: 3
+          retry_on: error
+          command: cargo vdev -v int start amqp ; sleep 5 ; cargo vdev -v int test -a amqp ; cargo vdev -v int stop amqp
 
       # skip this because we don't have the secrets defined here rn
       # - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.appsignal == 'true' }}
@@ -106,7 +104,7 @@ jobs:
         name: aws
         uses: nick-fields/retry@v2
         with:
-          timeout_minutes: 40
+          timeout_minutes: 5
           max_attempts: 3
           retry_on: error
           command: cargo vdev -v int start aws ; sleep 5 ; cargo vdev -v int test -a aws ; RET=$? ; cargo vdev -v int stop aws ; exit $RET
@@ -247,14 +245,13 @@ jobs:
           max_attempts: 3
           command: cargo vdev -v int start loki ; sleep 5 ; cargo vdev -v int test -a loki ; RET=$? ; cargo vdev -v int stop loki ; exit $RET
 
-      # TODO disabling as flaky
-      # - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.mongodb == 'true' }}
-      #   name: mongodb
-      #   uses: nick-fields/retry@v2
-      #   with:
-      #     timeout_minutes: 5
-      #     max_attempts: 3
-      #     command: cargo vdev -v int start mongodb ; sleep 5 ; cargo vdev -v int test -a mongodb ; RET=$? ; cargo vdev -v int stop mongodb ; exit $RET
+      - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.mongodb == 'true' }}
+        name: mongodb
+        uses: nick-fields/retry@v2
+        with:
+          timeout_minutes: 5
+          max_attempts: 3
+          command: cargo vdev -v int start mongodb ; sleep 5 ; cargo vdev -v int test -a mongodb ; RET=$? ; cargo vdev -v int stop mongodb ; exit $RET
 
       - run: docker image prune -af --filter=label!=vector-test-runner=true ; docker container prune -f
 
@@ -326,7 +323,7 @@ jobs:
         name: splunk
         uses: nick-fields/retry@v2
         with:
-          timeout_minutes: 5
+          timeout_minutes: 7
           max_attempts: 3
           command: cargo vdev -v int start splunk ; sleep 5 ; cargo vdev -v int test -a splunk ; RET=$? ; cargo vdev -v int stop splunk ; exit $RET
 
