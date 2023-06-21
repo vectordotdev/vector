@@ -1,10 +1,12 @@
 features:
 - gcp-integration-tests
+- chronicle-integration-tests
 
 test_filter: '::gcp::'
 
 env:
   EMULATOR_ADDRESS: http://gcloud-pubsub:8681
+  CHRONICLE_ADDRESS: http://chronicle-emulator:3000
 
 matrix:
   version: [latest]
