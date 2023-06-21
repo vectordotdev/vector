@@ -89,6 +89,7 @@ jobs:
           # check-version needs tags
           fetch-depth: 0 # fetch everything
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - uses: ruby/setup-ruby@v1
       - run: bash scripts/environment/prepare.sh
       - uses: actions/cache@v3
         name: Cache Cargo registry + index
@@ -129,11 +130,7 @@ jobs:
         run: make check-markdown
       - name: Check Component Docs
         if: needs.changes.outputs.source == 'true' || needs.changes.outputs.component_docs == 'true'
-        uses: nick-fields/retry@v2
-        with:
-          max_attempts: 10
-          timeout_seconds: 900
-          command: make check-component-docs
+        run: make check-component-docs
       - name: Check Rust Docs
         if: needs.changes.outputs.source == 'true'
         run: cd rust-doc && make docs
