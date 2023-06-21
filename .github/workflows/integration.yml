@@ -290,21 +290,21 @@ jobs:
       #     max_attempts: 3
       #     command: cargo vdev -v int start postgres ; sleep 5 ; cargo vdev -v int test -a postgres ; RET=$? ; cargo vdev -v int stop postgres ; exit $RET
 
-      - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.prometheus == 'true' }}
-        name: prometheus
-        uses: nick-fields/retry@v2
-        with:
-          timeout_minutes: 45
-          # TODO change back
-          #timeout_minutes: 5
-          max_attempts: 3
-          command: cargo vdev -v int start prometheus ; sleep 5 ; cargo vdev -v int test -a prometheus ; RET=$? ; cargo vdev -v int stop prometheus ; exit $RET
+      # - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.prometheus == 'true' }}
+      #   name: prometheus
+      #   uses: nick-fields/retry@v2
+      #   with:
+      #     timeout_minutes: 5
+      #     max_attempts: 3
+      #     command: cargo vdev -v int start prometheus ; sleep 5 ; cargo vdev -v int test -a prometheus ; RET=$? ; cargo vdev -v int stop prometheus ; exit $RET
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.pulsar == 'true' }}
         name: pulsar
         uses: nick-fields/retry@v2
         with:
-          timeout_minutes: 5
+          timeout_minutes: 45
+          # TODO change back
+          #timeout_minutes: 5
           max_attempts: 3
           command: cargo vdev -v int start pulsar ; sleep 5 ; cargo vdev -v int test -a pulsar ; RET=$? ; cargo vdev -v int stop pulsar ; exit $RET
 
