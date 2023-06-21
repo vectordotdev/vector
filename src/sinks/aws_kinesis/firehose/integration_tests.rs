@@ -157,7 +157,7 @@ async fn ensure_elasticsearch_domain(domain_name: String) -> String {
                     .await
                     .unwrap(),
             )
-            .endpoint_url(test_region_endpoint().endpoint())
+            .endpoint_url(test_region_endpoint().endpoint().unwrap())
             .region(test_region_endpoint().region())
             .build(),
     );

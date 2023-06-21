@@ -258,7 +258,7 @@ where
             let body = {
                 let shared_bytes_sent = Arc::clone(&shared_bytes_sent);
 
-                body.map(move |body| {
+                body.map_immutable(move |body| {
                     let body = MeasuredBody::new(body, Arc::clone(&shared_bytes_sent));
                     SdkBody::from_dyn(BoxBody::new(body))
                 })
