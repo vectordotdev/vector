@@ -132,7 +132,7 @@ impl ApplicationConfig {
                     Some(api_server)
                 }
                 Err(e) => {
-                    error!("An error occurred that Vector couldn't handle: {}.", e);
+                    error!("An error occurred that Vector couldn't handle!: {}.", e);
                     _ = self.graceful_crash_sender.send(());
                     None
                 }
