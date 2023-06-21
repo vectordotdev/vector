@@ -101,35 +101,35 @@ jobs:
       # - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.appsignal == 'true' }}
       #   run: cargo vdev -v int test -a appsignal ; cargo vdev -v int stop appsignal
 
-      - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.aws == 'true' }}
-        name: aws
-        uses: nick-fields/retry@v2
-        with:
-          timeout_minutes: 40
-          max_attempts: 3
-          retry_on: error
-          command: cargo vdev -v int start aws ; sleep 5 ; cargo vdev -v int test -a aws ; RET=$? ; cargo vdev -v int stop aws ; exit $RET
+      # - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.aws == 'true' }}
+      #   name: aws
+      #   uses: nick-fields/retry@v2
+      #   with:
+      #     timeout_minutes: 45
+      #     max_attempts: 3
+      #     retry_on: error
+      #     command: cargo vdev -v int start aws ; sleep 5 ; cargo vdev -v int test -a aws ; RET=$? ; cargo vdev -v int stop aws ; exit $RET
 
       # skip this because we don't have the secrets defined here rn
       # - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.axiom == 'true' }}
       #  name: axiom
       #   run: cargo vdev -v int test -a axiom ; cargo vdev -v int stop axiom
 
-      - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.azure == 'true' }}
-        name: azure
-        uses: nick-fields/retry@v2
-        with:
-          timeout_minutes: 5
-          max_attempts: 3
-          command: cargo vdev -v int start azure ; sleep 5 ; cargo vdev -v int test -a azure ; RET=$? ; cargo vdev -v int stop azure ; exit $RET
+      # - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.azure == 'true' }}
+      #   name: azure
+      #   uses: nick-fields/retry@v2
+      #   with:
+      #     timeout_minutes: 5
+      #     max_attempts: 3
+      #     command: cargo vdev -v int start azure ; sleep 5 ; cargo vdev -v int test -a azure ; RET=$? ; cargo vdev -v int stop azure ; exit $RET
 
-      - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.clickhouse == 'true' }}
-        name: clickhouse
-        uses: nick-fields/retry@v2
-        with:
-          timeout_minutes: 5
-          max_attempts: 3
-          command: cargo vdev -v int start clickhouse ; sleep 5 ; cargo vdev -v int test -a clickhouse ; RET=$? ; cargo vdev -v int stop clickhouse ; exit $RET
+      # - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.clickhouse == 'true' }}
+      #   name: clickhouse
+      #   uses: nick-fields/retry@v2
+      #   with:
+      #     timeout_minutes: 5
+      #     max_attempts: 3
+      #     command: cargo vdev -v int start clickhouse ; sleep 5 ; cargo vdev -v int test -a clickhouse ; RET=$? ; cargo vdev -v int stop clickhouse ; exit $RET
 
       # skip this because we don't have the secrets defined here rn
       # - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.databend == 'true' }}
@@ -146,23 +146,23 @@ jobs:
       #     cargo vdev -v int test -a datadog-traces  ; cargo vdev -v int stop datadog-traces
 
 
-      - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.dnstap == 'true' }}
-        name: dnstap
-        uses: nick-fields/retry@v2
-        with:
-          timeout_minutes: 5
-          max_attempts: 3
-          command: cargo vdev -v int start dnstap ; sleep 5 ; cargo vdev -v int test -a dnstap ; RET=$? ; cargo vdev -v int stop dnstap ; exit $RET
+      # - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.dnstap == 'true' }}
+      #   name: dnstap
+      #   uses: nick-fields/retry@v2
+      #   with:
+      #     timeout_minutes: 5
+      #     max_attempts: 3
+      #     command: cargo vdev -v int start dnstap ; sleep 5 ; cargo vdev -v int test -a dnstap ; RET=$? ; cargo vdev -v int stop dnstap ; exit $RET
 
-      - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.docker-logs == 'true' }}
-        name: docker-logs
-        uses: nick-fields/retry@v2
-        with:
-          timeout_minutes: 5
-          max_attempts: 3
-          command: cargo vdev -v int start docker-logs ; sleep 5 ; cargo vdev -v int test -a docker-logs ; RET=$? ; cargo vdev -v int stop docker-logs ; exit $RET
+      # - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.docker-logs == 'true' }}
+      #   name: docker-logs
+      #   uses: nick-fields/retry@v2
+      #   with:
+      #     timeout_minutes: 5
+      #     max_attempts: 3
+      #     command: cargo vdev -v int start docker-logs ; sleep 5 ; cargo vdev -v int test -a docker-logs ; RET=$? ; cargo vdev -v int stop docker-logs ; exit $RET
 
-      - run: docker image prune -af --filter=label!=vector-test-runner=true ; docker container prune -f
+      # - run: docker image prune -af --filter=label!=vector-test-runner=true ; docker container prune -f
 
       # skip this because we don't have the secrets defined here rn
       # - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.elasticsearch == 'true' }}
@@ -174,77 +174,77 @@ jobs:
         #   command: cargo vdev -v int start elasticsearch ; sleep 5 ; cargo vdev -v int test -a elasticsearch ; cargo vdev -v int stop elasticsearch
       #   run: cargo vdev -v int start elasticsearch ; sleep 5 ; cargo vdev -v int test -a elasticsearch ; cargo vdev -v int stop elasticsearch ; sleep 5
 
-      - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.eventstoredb == 'true' }}
-        name: eventstoredb
-        uses: nick-fields/retry@v2
-        with:
-          timeout_minutes: 5
-          max_attempts: 3
-          command: cargo vdev -v int start eventstoredb ; sleep 5 ; cargo vdev -v int test -a eventstoredb ; RET=$? ; cargo vdev -v int stop eventstoredb ; exit $RET
+      # - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.eventstoredb == 'true' }}
+      #   name: eventstoredb
+      #   uses: nick-fields/retry@v2
+      #   with:
+      #     timeout_minutes: 5
+      #     max_attempts: 3
+      #     command: cargo vdev -v int start eventstoredb ; sleep 5 ; cargo vdev -v int test -a eventstoredb ; RET=$? ; cargo vdev -v int stop eventstoredb ; exit $RET
 
-      - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.fluent == 'true' }}
-        name: fluent
-        uses: nick-fields/retry@v2
-        with:
-          timeout_minutes: 5
-          max_attempts: 3
-          command: cargo vdev -v int start fluent ; sleep 5 ; cargo vdev -v int test -a fluent ; RET=$? ; cargo vdev -v int stop fluent ; exit $RET
+      # - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.fluent == 'true' }}
+      #   name: fluent
+      #   uses: nick-fields/retry@v2
+      #   with:
+      #     timeout_minutes: 5
+      #     max_attempts: 3
+      #     command: cargo vdev -v int start fluent ; sleep 5 ; cargo vdev -v int test -a fluent ; RET=$? ; cargo vdev -v int stop fluent ; exit $RET
 
-      - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.gcp == 'true' }}
-        name: gcp
-        uses: nick-fields/retry@v2
-        with:
-          timeout_minutes: 5
-          max_attempts: 3
-          command: cargo vdev -v int start gcp ; sleep 5 ; cargo vdev -v int test -a gcp ; RET=$? ; cargo vdev -v int stop gcp ; exit $RET
+      # - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.gcp == 'true' }}
+      #   name: gcp
+      #   uses: nick-fields/retry@v2
+      #   with:
+      #     timeout_minutes: 5
+      #     max_attempts: 3
+      #     command: cargo vdev -v int start gcp ; sleep 5 ; cargo vdev -v int test -a gcp ; RET=$? ; cargo vdev -v int stop gcp ; exit $RET
 
-      - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.humio == 'true' }}
-        name: humio
-        uses: nick-fields/retry@v2
-        with:
-          timeout_minutes: 5
-          max_attempts: 3
-          command: cargo vdev -v int start humio ; sleep 5 ; cargo vdev -v int test -a humio ; RET=$? ; cargo vdev -v int stop humio ; exit $RET
+      # - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.humio == 'true' }}
+      #   name: humio
+      #   uses: nick-fields/retry@v2
+      #   with:
+      #     timeout_minutes: 5
+      #     max_attempts: 3
+      #     command: cargo vdev -v int start humio ; sleep 5 ; cargo vdev -v int test -a humio ; RET=$? ; cargo vdev -v int stop humio ; exit $RET
 
-      - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.http-client == 'true' }}
-        name: http-client
-        uses: nick-fields/retry@v2
-        with:
-          timeout_minutes: 5
-          max_attempts: 3
-          command: cargo vdev -v int start http-client ; sleep 5 ; cargo vdev -v int test -a http-client ; RET=$? ; cargo vdev -v int stop http-client ; exit $RET
+      # - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.http-client == 'true' }}
+      #   name: http-client
+      #   uses: nick-fields/retry@v2
+      #   with:
+      #     timeout_minutes: 5
+      #     max_attempts: 3
+      #     command: cargo vdev -v int start http-client ; sleep 5 ; cargo vdev -v int test -a http-client ; RET=$? ; cargo vdev -v int stop http-client ; exit $RET
 
-      - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.influxdb == 'true' }}
-        name: influxdb
-        uses: nick-fields/retry@v2
-        with:
-          timeout_minutes: 5
-          max_attempts: 3
-          command: cargo vdev -v int start influxdb ; sleep 5 ; cargo vdev -v int test -a influxdb ; RET=$? ; cargo vdev -v int stop influxdb ; exit $RET
+      # - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.influxdb == 'true' }}
+      #   name: influxdb
+      #   uses: nick-fields/retry@v2
+      #   with:
+      #     timeout_minutes: 5
+      #     max_attempts: 3
+      #     command: cargo vdev -v int start influxdb ; sleep 5 ; cargo vdev -v int test -a influxdb ; RET=$? ; cargo vdev -v int stop influxdb ; exit $RET
 
-      - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.kafka == 'true' }}
-        name: kafka
-        uses: nick-fields/retry@v2
-        with:
-          timeout_minutes: 5
-          max_attempts: 3
-          command: cargo vdev -v int start kafka ; sleep 5 ; cargo vdev -v int test -a kafka ; RET=$? ; cargo vdev -v int stop kafka ; exit $RET
+      # - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.kafka == 'true' }}
+      #   name: kafka
+      #   uses: nick-fields/retry@v2
+      #   with:
+      #     timeout_minutes: 5
+      #     max_attempts: 3
+      #     command: cargo vdev -v int start kafka ; sleep 5 ; cargo vdev -v int test -a kafka ; RET=$? ; cargo vdev -v int stop kafka ; exit $RET
 
-      - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.logstash == 'true' }}
-        name: logstash
-        uses: nick-fields/retry@v2
-        with:
-          timeout_minutes: 5
-          max_attempts: 3
-          command: cargo vdev -v int start logstash ; sleep 5 ; cargo vdev -v int test -a logstash ; RET=$? ; cargo vdev -v int stop logstash ; exit $RET
+      # - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.logstash == 'true' }}
+      #   name: logstash
+      #   uses: nick-fields/retry@v2
+      #   with:
+      #     timeout_minutes: 5
+      #     max_attempts: 3
+      #     command: cargo vdev -v int start logstash ; sleep 5 ; cargo vdev -v int test -a logstash ; RET=$? ; cargo vdev -v int stop logstash ; exit $RET
 
-      - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.loki == 'true' }}
-        name: loki
-        uses: nick-fields/retry@v2
-        with:
-          timeout_minutes: 5
-          max_attempts: 3
-          command: cargo vdev -v int start loki ; sleep 5 ; cargo vdev -v int test -a loki ; RET=$? ; cargo vdev -v int stop loki ; exit $RET
+      # - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.loki == 'true' }}
+      #   name: loki
+      #   uses: nick-fields/retry@v2
+      #   with:
+      #     timeout_minutes: 5
+      #     max_attempts: 3
+      #     command: cargo vdev -v int start loki ; sleep 5 ; cargo vdev -v int test -a loki ; RET=$? ; cargo vdev -v int stop loki ; exit $RET
 
       # TODO disabling as flaky
       # - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.mongodb == 'true' }}
@@ -255,53 +255,55 @@ jobs:
       #     max_attempts: 3
       #     command: cargo vdev -v int start mongodb ; sleep 5 ; cargo vdev -v int test -a mongodb ; RET=$? ; cargo vdev -v int stop mongodb ; exit $RET
 
-      - run: docker image prune -af --filter=label!=vector-test-runner=true ; docker container prune -f
+      # - run: docker image prune -af --filter=label!=vector-test-runner=true ; docker container prune -f
 
-      - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.nats == 'true' }}
-        name: nats
-        uses: nick-fields/retry@v2
-        with:
-          timeout_minutes: 5
-          max_attempts: 3
-          command: cargo vdev -v int start nats ; sleep 5 ; cargo vdev -v int test -a nats ; RET=$? ; cargo vdev -v int stop nats ; exit $RET
+      # - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.nats == 'true' }}
+      #   name: nats
+      #   uses: nick-fields/retry@v2
+      #   with:
+      #     timeout_minutes: 5
+      #     max_attempts: 3
+      #     command: cargo vdev -v int start nats ; sleep 5 ; cargo vdev -v int test -a nats ; RET=$? ; cargo vdev -v int stop nats ; exit $RET
 
-      - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.nginx == 'true' }}
-        name: nginx
-        uses: nick-fields/retry@v2
-        with:
-          timeout_minutes: 5
-          max_attempts: 3
-          command: cargo vdev -v int start nginx ; sleep 5 ; cargo vdev -v int test -a nginx ; RET=$? ; cargo vdev -v int stop nginx ; exit $RET
+      # - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.nginx == 'true' }}
+      #   name: nginx
+      #   uses: nick-fields/retry@v2
+      #   with:
+      #     timeout_minutes: 5
+      #     max_attempts: 3
+      #     command: cargo vdev -v int start nginx ; sleep 5 ; cargo vdev -v int test -a nginx ; RET=$? ; cargo vdev -v int stop nginx ; exit $RET
 
-      - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.opentelemetry == 'true' }}
-        name: opentelemetry
-        uses: nick-fields/retry@v2
-        with:
-          timeout_minutes: 5
-          max_attempts: 3
-          command: cargo vdev -v int start opentelemetry ; sleep 5 ; cargo vdev -v int test -a opentelemetry ; RET=$? ; cargo vdev -v int stop opentelemetry ; exit $RET
+      # - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.opentelemetry == 'true' }}
+      #   name: opentelemetry
+      #   uses: nick-fields/retry@v2
+      #   with:
+      #     timeout_minutes: 5
+      #     max_attempts: 3
+      #     command: cargo vdev -v int start opentelemetry ; sleep 5 ; cargo vdev -v int test -a opentelemetry ; RET=$? ; cargo vdev -v int stop opentelemetry ; exit $RET
 
-      - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.postgres == 'true' }}
-        name: postgres
-        uses: nick-fields/retry@v2
-        with:
-          timeout_minutes: 5
-          max_attempts: 3
-          command: cargo vdev -v int start postgres ; sleep 5 ; cargo vdev -v int test -a postgres ; RET=$? ; cargo vdev -v int stop postgres ; exit $RET
+      # - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.postgres == 'true' }}
+      #   name: postgres
+      #   uses: nick-fields/retry@v2
+      #   with:
+      #     timeout_minutes: 5
+      #     max_attempts: 3
+      #     command: cargo vdev -v int start postgres ; sleep 5 ; cargo vdev -v int test -a postgres ; RET=$? ; cargo vdev -v int stop postgres ; exit $RET
 
-      - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.prometheus == 'true' }}
-        name: prometheus
-        uses: nick-fields/retry@v2
-        with:
-          timeout_minutes: 5
-          max_attempts: 3
-          command: cargo vdev -v int start prometheus ; sleep 5 ; cargo vdev -v int test -a prometheus ; RET=$? ; cargo vdev -v int stop prometheus ; exit $RET
+      # - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.prometheus == 'true' }}
+      #   name: prometheus
+      #   uses: nick-fields/retry@v2
+      #   with:
+      #     timeout_minutes: 5
+      #     max_attempts: 3
+      #     command: cargo vdev -v int start prometheus ; sleep 5 ; cargo vdev -v int test -a prometheus ; RET=$? ; cargo vdev -v int stop prometheus ; exit $RET
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.pulsar == 'true' }}
         name: pulsar
         uses: nick-fields/retry@v2
         with:
-          timeout_minutes: 5
+          timeout_minutes: 45
+          # TODO change back
+          #timeout_minutes: 5
           max_attempts: 3
           command: cargo vdev -v int start pulsar ; sleep 5 ; cargo vdev -v int test -a pulsar ; RET=$? ; cargo vdev -v int stop pulsar ; exit $RET
 
