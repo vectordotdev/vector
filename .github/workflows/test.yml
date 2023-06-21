@@ -33,50 +33,6 @@ jobs:
       base_ref: ${{ github.event.merge_group.base_ref || github.event.pull_request.base.ref }}
       head_ref: ${{ github.event.merge_group.head_ref || github.event.pull_request.head.ref }}
 
-  # Remove this once https://github.com/vectordotdev/vector/issues/3771 is closed.
-  # Then, modify the `cross-linux` job to run `test` instead of `build`.
-  test-linux:
-    name: Unit - x86_64-unknown-linux-gnu
-    runs-on: [linux, ubuntu-20.04-8core]
-    needs: changes
-    env:
-      CARGO_INCREMENTAL: 0
-    if: ${{ needs.changes.outputs.source == 'true' }}
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/cache@v3
-        name: Cache Cargo registry + index
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-
-      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - run: bash scripts/environment/prepare.sh
-      - run: echo "::add-matcher::.github/matchers/rust.json"
-      - run: make test
-        env:
-          CARGO_BUILD_JOBS: 5
-      - name: Upload test results
-        run: scripts/upload-test-results.sh
-        if: always()
-
-  test-vrl:
-    name: VRL - Linux
-    continue-on-error: true
-    runs-on: [linux, ubuntu-20.04-8core]
-    needs: changes
-    if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.cue == 'true' }}
-    steps:
-      - uses: actions/checkout@v3
-      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - run: bash scripts/environment/prepare.sh
-      - run: cargo vdev test-vrl
-
   checks:
     name: Checks
     runs-on: [linux, ubuntu-20.04-8core]
@@ -88,9 +44,7 @@ jobs:
         with:
           # check-version needs tags
           fetch-depth: 0 # fetch everything
-      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - uses: ruby/setup-ruby@v1
-      - run: bash scripts/environment/prepare.sh
+
       - uses: actions/cache@v3
         name: Cache Cargo registry + index
         with:
@@ -102,38 +56,72 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-
+
+      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
+
+      - uses: ruby/setup-ruby@v1
+
+      - run: bash scripts/environment/prepare.sh
+
       - name: Enable Rust matcher
         run: echo "::add-matcher::.github/matchers/rust.json"
+
       - name: Check code format
         run: make check-fmt
+
       - name: Check clippy
         if: needs.changes.outputs.source == 'true'
         run: make check-clippy
+
+        # Remove this once https://github.com/vectordotdev/vector/issues/3771 is closed.
+        # Then, modify the `cross-linux` job to run `test` instead of `build`.
+      - name: Unit - x86_64-unknown-linux-gnu
+        run: make test
+        env:
+          CARGO_BUILD_JOBS: 5
+
+      - name: Upload test results
+        run: scripts/upload-test-results.sh
+        if: always()
+
       - name: Check version
         run: make check-version
+
       - name: Check scripts
         run: make check-scripts
+
       - name: Check events
         if: needs.changes.outputs.source == 'true'
         run: make check-events
+
       - name: Check cargo deny advisories/licenses
         if: needs.changes.outputs.dependencies == 'true' || needs.changes.outputs.deny == 'true'
         run: make check-deny
+
       - name: Check that the 3rd-party license file is up to date
         if: needs.changes.outputs.dependencies == 'true'
         run: make check-licenses
+
       - name: Check Cue docs
         if: needs.changes.outputs.cue == 'true'
         run: make check-docs
+
       - name: Check Markdown
         if: needs.changes.outputs.markdown == 'true'
         run: make check-markdown
+
       - name: Check Component Docs
         if: needs.changes.outputs.source == 'true' || needs.changes.outputs.component_docs == 'true'
         run: make check-component-docs
+
       - name: Check Rust Docs
         if: needs.changes.outputs.source == 'true'
         run: cd rust-doc && make docs
+
+      - name: VRL - Linux
+        if: needs.changes.outputs.source == 'true' || needs.changes.outputs.cue == 'true'
+        run: cargo vdev test-vrl
+
       - uses: actions/upload-artifact@v3
         with:
           name: "config-schema.json"
@@ -145,10 +133,7 @@ jobs:
     name: Test Suite
     runs-on: ubuntu-20.04
     if: always()
-    needs:
-      - checks
-      - test-vrl
-      - test-linux
+    needs: checks
     env:
       FAILED: ${{ contains(needs.*.result, 'failure') }}
     steps:
