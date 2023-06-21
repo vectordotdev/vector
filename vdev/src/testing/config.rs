@@ -108,6 +108,8 @@ pub struct IntegrationTestConfig {
     pub test: Option<String>,
 
     pub test_filter: Option<String>,
+
+    pub paths: Option<Vec<String>>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize)]
