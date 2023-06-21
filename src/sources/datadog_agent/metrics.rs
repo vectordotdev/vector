@@ -336,11 +336,6 @@ pub(crate) fn decode_ddseries_v2(
         })
         .collect();
 
-    events_received.emit(CountByteSize(
-        decoded_metrics.len(),
-        decoded_metrics.estimated_json_encoded_size_of(),
-    ));
-
     Ok(decoded_metrics)
 }
 
