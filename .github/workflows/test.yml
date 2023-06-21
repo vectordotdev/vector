@@ -132,6 +132,7 @@ jobs:
         uses: nick-fields/retry@v2
         with:
           max_attempts: 3
+          timeout_seconds: 900
           command: make check-component-docs
       - name: Check Rust Docs
         if: needs.changes.outputs.source == 'true'
