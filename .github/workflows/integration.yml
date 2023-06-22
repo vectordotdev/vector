@@ -365,7 +365,7 @@ jobs:
         name: splunk
         uses: nick-fields/retry@v2
         with:
-          timeout_minutes: 7
+          timeout_minutes: 10
           max_attempts: 3
           command: sh int_test.sh splunk
 
