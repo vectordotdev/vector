@@ -449,8 +449,8 @@ async fn parse_message(
                 let (batch, receiver) = BatchNotifier::new_with_receiver();
                 let mut stream = stream.map(|event| event.with_batch_notifier(&batch));
                 match out.send_event_stream(&mut stream).await {
-                    Err(error) => {
-                        emit!(StreamClosedError { error, count });
+                    Err(_) => {
+                        emit!(StreamClosedError { count });
                     }
                     Ok(_) => {
                         // Drop stream to avoid borrowing `msg`: "[...] borrow might be used
@@ -461,8 +461,8 @@ async fn parse_message(
                 }
             }
             None => match out.send_event_stream(&mut stream).await {
-                Err(error) => {
-                    emit!(StreamClosedError { error, count });
+                Err(_) => {
+                    emit!(StreamClosedError { count });
                 }
                 Ok(_) => {
                     if let Err(error) =

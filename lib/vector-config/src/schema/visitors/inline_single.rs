@@ -43,17 +43,11 @@ impl Visitor for InlineSingleUseReferencesVisitor {
         occurrence_visitor.visit_root_schema(root);
         let occurrence_map = occurrence_visitor.into_occurrences();
 
-        let eligible_to_inline = occurrence_map
+        self.eligible_to_inline = occurrence_map
             .into_iter()
             // Filter out any schemas which have more than one occurrence, as naturally, we're
             // trying to inline single-use schema references. :)
-            .filter_map(|(def_name, occurrences)| {
-                if occurrences == 1 {
-                    Some(def_name)
-                } else {
-                    None
-                }
-            })
+            .filter_map(|(def_name, occurrences)| (occurrences == 1).then_some(def_name))
             // However, we'll also filter out some specific schema definitions which are only
             // referenced once, specifically: component base types and component types themselves.
             //
@@ -71,8 +65,6 @@ impl Visitor for InlineSingleUseReferencesVisitor {
             })
             .map(|s| s.as_ref().to_string())
             .collect::<HashSet<_>>();
-
-        self.eligible_to_inline = eligible_to_inline;
 
         // Now run our own visitor logic, which will use the inline eligibility to determine if a
         // schema reference in a being-visited schema should be replaced inline with the original

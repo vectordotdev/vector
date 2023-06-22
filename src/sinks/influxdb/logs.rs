@@ -41,7 +41,7 @@ impl SinkBatchSettings for InfluxDbLogsDefaultBatchSettings {
 }
 
 /// Configuration for the `influxdb_logs` sink.
-#[configurable_component(sink("influxdb_logs"))]
+#[configurable_component(sink("influxdb_logs", "Deliver log event data to InfluxDB."))]
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct InfluxDbLogsConfig {
@@ -157,6 +157,7 @@ impl GenerateConfig for InfluxDbLogsConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "influxdb_logs")]
 impl SinkConfig for InfluxDbLogsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let measurement = self.get_measurement()?;

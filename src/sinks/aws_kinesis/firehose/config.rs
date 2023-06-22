@@ -8,6 +8,7 @@ use futures::FutureExt;
 use snafu::Snafu;
 use vector_config::configurable_component;
 
+use crate::sinks::util::retries::RetryAction;
 use crate::{
     aws::{create_client, is_retriable_error, ClientBuilder},
     config::{AcknowledgementsConfig, GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext},
@@ -65,7 +66,10 @@ impl SinkBatchSettings for KinesisFirehoseDefaultBatchSettings {
 }
 
 /// Configuration for the `aws_kinesis_firehose` sink.
-#[configurable_component(sink("aws_kinesis_firehose"))]
+#[configurable_component(sink(
+    "aws_kinesis_firehose",
+    "Publish logs to AWS Kinesis Data Firehose topics."
+))]
 #[derive(Clone, Debug)]
 pub struct KinesisFirehoseSinkConfig {
     #[serde(flatten)]
@@ -118,6 +122,7 @@ impl KinesisFirehoseSinkConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "aws_kinesis_firehose")]
 impl SinkConfig for KinesisFirehoseSinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let client = self.create_client(&cx.proxy).await?;
@@ -141,6 +146,9 @@ impl SinkConfig for KinesisFirehoseSinkConfig {
             None,
             batch_settings,
             KinesisFirehoseClient { client },
+            KinesisRetryLogic {
+                retry_partial: self.base.request_retry_partial,
+            },
         )?;
 
         Ok((sink, healthcheck))
@@ -166,7 +174,9 @@ impl GenerateConfig for KinesisFirehoseSinkConfig {
 }
 
 #[derive(Clone, Default)]
-struct KinesisRetryLogic;
+struct KinesisRetryLogic {
+    retry_partial: bool,
+}
 
 impl RetryLogic for KinesisRetryLogic {
     type Error = SdkError<KinesisError>;
@@ -179,5 +189,14 @@ impl RetryLogic for KinesisRetryLogic {
             }
         }
         is_retriable_error(error)
+    }
+
+    fn should_retry_response(&self, response: &Self::Response) -> RetryAction {
+        if response.failure_count > 0 && self.retry_partial {
+            let msg = format!("partial error count {}", response.failure_count);
+            RetryAction::Retry(msg.into())
+        } else {
+            RetryAction::Successful
+        }
     }
 }

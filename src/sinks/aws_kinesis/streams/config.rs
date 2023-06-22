@@ -6,6 +6,7 @@ use futures::FutureExt;
 use snafu::Snafu;
 use vector_config::{component::GenerateConfig, configurable_component};
 
+use crate::sinks::util::retries::RetryAction;
 use crate::{
     aws::{create_client, is_retriable_error, ClientBuilder},
     config::{AcknowledgementsConfig, Input, ProxyConfig, SinkConfig, SinkContext},
@@ -66,7 +67,10 @@ impl SinkBatchSettings for KinesisDefaultBatchSettings {
 }
 
 /// Configuration for the `aws_kinesis_streams` sink.
-#[configurable_component(sink("aws_kinesis_streams"))]
+#[configurable_component(sink(
+    "aws_kinesis_streams",
+    "Publish logs to AWS Kinesis Streams topics."
+))]
 #[derive(Clone, Debug)]
 pub struct KinesisStreamsSinkConfig {
     #[serde(flatten)]
@@ -125,6 +129,7 @@ impl KinesisStreamsSinkConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "aws_kinesis_streams")]
 impl SinkConfig for KinesisStreamsSinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let client = self.create_client(&cx.proxy).await?;
@@ -148,6 +153,9 @@ impl SinkConfig for KinesisStreamsSinkConfig {
             self.partition_key_field.clone(),
             batch_settings,
             KinesisStreamClient { client },
+            KinesisRetryLogic {
+                retry_partial: self.base.request_retry_partial,
+            },
         )?;
 
         Ok((sink, healthcheck))
@@ -173,7 +181,9 @@ impl GenerateConfig for KinesisStreamsSinkConfig {
     }
 }
 #[derive(Default, Clone)]
-struct KinesisRetryLogic;
+struct KinesisRetryLogic {
+    retry_partial: bool,
+}
 
 impl RetryLogic for KinesisRetryLogic {
     type Error = SdkError<KinesisError>;
@@ -192,6 +202,15 @@ impl RetryLogic for KinesisRetryLogic {
             }
         }
         is_retriable_error(error)
+    }
+
+    fn should_retry_response(&self, response: &Self::Response) -> RetryAction {
+        if response.failure_count > 0 && self.retry_partial {
+            let msg = format!("partial error count {}", response.failure_count);
+            RetryAction::Retry(msg.into())
+        } else {
+            RetryAction::Successful
+        }
     }
 }
 

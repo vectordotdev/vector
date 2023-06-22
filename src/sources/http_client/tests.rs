@@ -1,13 +1,11 @@
+use codecs::CharacterDelimitedDecoderConfig;
 use std::collections::HashMap;
 use tokio::time::Duration;
 use warp::{http::HeaderMap, Filter};
 
 use crate::sources::util::http::HttpMethod;
 use crate::{serde::default_decoding, serde::default_framing_message_based};
-use codecs::decoding::{
-    CharacterDelimitedDecoderOptions, DeserializerConfig, FramingConfig,
-    NewlineDelimitedDecoderOptions,
-};
+use codecs::decoding::{CharacterDelimitedDecoderOptions, DeserializerConfig, FramingConfig};
 use vector_core::event::Event;
 
 use super::HttpClientConfig;
@@ -78,12 +76,8 @@ async fn json_decoding_newline_delimited() {
         endpoint: format!("http://{}/endpoint", in_addr),
         interval: INTERVAL,
         query: HashMap::new(),
-        decoding: DeserializerConfig::Json {
-            json: Default::default(),
-        },
-        framing: FramingConfig::NewlineDelimited {
-            newline_delimited: NewlineDelimitedDecoderOptions::default(),
-        },
+        decoding: DeserializerConfig::Json(Default::default()),
+        framing: FramingConfig::NewlineDelimited(Default::default()),
         headers: HashMap::new(),
         method: HttpMethod::Get,
         tls: None,
@@ -110,15 +104,13 @@ async fn json_decoding_character_delimited() {
         endpoint: format!("http://{}/endpoint", in_addr),
         interval: INTERVAL,
         query: HashMap::new(),
-        decoding: DeserializerConfig::Json {
-            json: Default::default(),
-        },
-        framing: FramingConfig::CharacterDelimited {
+        decoding: DeserializerConfig::Json(Default::default()),
+        framing: FramingConfig::CharacterDelimited(CharacterDelimitedDecoderConfig {
             character_delimited: CharacterDelimitedDecoderOptions {
                 delimiter: b',',
                 max_length: Some(usize::MAX),
             },
-        },
+        }),
         headers: HashMap::new(),
         method: HttpMethod::Get,
         tls: None,
@@ -150,9 +142,7 @@ async fn request_query_applied() {
                 vec!["val1".to_string(), "val2".to_string()],
             ),
         ]),
-        decoding: DeserializerConfig::Json {
-            json: Default::default(),
-        },
+        decoding: DeserializerConfig::Json(Default::default()),
         framing: default_framing_message_based(),
         headers: HashMap::new(),
         method: HttpMethod::Get,

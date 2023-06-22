@@ -46,7 +46,10 @@ impl SinkBatchSettings for CloudWatchMetricsDefaultBatchSettings {
 }
 
 /// Configuration for the `aws_cloudwatch_metrics` sink.
-#[configurable_component(sink("aws_cloudwatch_metrics"))]
+#[configurable_component(sink(
+    "aws_cloudwatch_metrics",
+    "Publish metric events to AWS CloudWatch Metrics."
+))]
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct CloudWatchMetricsSinkConfig {
@@ -120,6 +123,7 @@ impl ClientBuilder for CloudwatchMetricsClientBuilder {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "aws_cloudwatch_metrics")]
 impl SinkConfig for CloudWatchMetricsSinkConfig {
     async fn build(
         &self,

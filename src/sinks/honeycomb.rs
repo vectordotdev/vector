@@ -19,7 +19,7 @@ use crate::{
 };
 
 /// Configuration for the `honeycomb` sink.
-#[configurable_component(sink("honeycomb"))]
+#[configurable_component(sink("honeycomb", "Deliver log events to Honeycomb."))]
 #[derive(Clone, Debug)]
 pub struct HoneycombConfig {
     // This endpoint is not user-configurable and only exists for testing purposes
@@ -85,6 +85,7 @@ impl GenerateConfig for HoneycombConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "honeycomb")]
 impl SinkConfig for HoneycombConfig {
     async fn build(
         &self,

@@ -33,7 +33,7 @@ is deserialized to the fields in this struct so the user can customise the
 sink's behaviour.
 
 ```rust
-#[configurable_component(sink("basic"))]
+#[configurable_component(sink("basic", "Basic sink."))]
 #[derive(Clone, Debug)]
 /// A basic sink that dumps its output to stdout.
 pub struct BasicConfig {
@@ -75,10 +75,12 @@ configuration for the sink.
 # SinkConfig
 
 We need to implement the [`SinkConfig`][sink_config] trait. This is used by
-Vector to generate the main Sink from the configuration.
+Vector to generate the main Sink from the configuration. Note that type name
+given to `typetag` below must match the name of the configurable component above.
 
 ```rust
 #[async_trait::async_trait]
+#[typetag::serde(name = "basic")]
 impl SinkConfig for BasicConfig {
     async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let healthcheck = Box::pin(async move { Ok(()) });
@@ -196,59 +198,6 @@ sinks-logs = [
 + "sinks-basic",
   "sinks-blackhole",
   "sinks-chronicle",
-```
-
-## Module
-
-Import this module into Vector. In `src/sinks/mod.rs` add the lines:
-
-
-```diff
-  #[cfg(feature = "sinks-azure_monitor_logs")]
-  pub mod azure_monitor_logs;
-+ #[cfg(feature = "sinks-basic")]
-+ pub mod basic;
-  #[cfg(feature = "sinks-blackhole")]
-  pub mod blackhole;
-```
-
-All sinks are feature gated, this allows us to build custom versions of Vector
-with only the components required. We will ignore the feature flag for now with
-our new basic sink.
-
-Next, each sink needs to be added to the [`Sinks`][sinks_enum] enum. Find the
-enum in `mod.rs` and add our new sink to it.
-
-```diff
-#[configurable_component]
-#[allow(clippy::large_enum_variant)]
-#[derive(Clone, Debug)]
-#[serde(tag = "type", rename_all = "snake_case")]
-#[enum_dispatch(SinkConfig)]
-pub enum Sinks {
-    ...
-
-+    /// Basic
-+    #[cfg(feature = "sinks-basic")]
-+    Basic(#[configurable(derived)] basic::BasicConfig),
-
-    ...
-
-```
-
-Then we need to add this to the `get_component_name` function defined below.
-
-```diff
-
-    fn get_component_name(&self) -> &'static str {
-        match self {
-            ...
-
-+           #[cfg(feature = "sinks-basic")]
-+           Self::Basic(config) => config.get_component_name(),
-
-            ...
-
 ```
 
 # Acknowledgements

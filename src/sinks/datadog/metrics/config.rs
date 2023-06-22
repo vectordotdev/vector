@@ -86,7 +86,7 @@ impl DatadogMetricsEndpointConfiguration {
 }
 
 /// Configuration for the `datadog_metrics` sink.
-#[configurable_component(sink("datadog_metrics"))]
+#[configurable_component(sink("datadog_metrics", "Publish metric events to Datadog."))]
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct DatadogMetricsConfig {
@@ -118,6 +118,7 @@ pub struct DatadogMetricsConfig {
 impl_generate_config_from_default!(DatadogMetricsConfig);
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "datadog_metrics")]
 impl SinkConfig for DatadogMetricsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let client = self.build_client(&cx.proxy)?;

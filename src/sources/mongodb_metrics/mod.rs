@@ -147,8 +147,8 @@ impl SourceConfig for MongoDbMetricsConfig {
 
                 let metrics = metrics.into_iter().flatten();
 
-                if let Err(error) = cx.out.send_batch(metrics).await {
-                    emit!(StreamClosedError { error, count });
+                if (cx.out.send_batch(metrics).await).is_err() {
+                    emit!(StreamClosedError { count });
                     return Err(());
                 }
             }

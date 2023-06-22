@@ -147,7 +147,7 @@ const fn default_concurrency() -> Concurrency {
 }
 
 /// Configuration for the `test_arc` sink.
-#[configurable_component(sink("test_arc"))]
+#[configurable_component(sink("test_arc", "Test (adaptive concurrency)."))]
 #[derive(Clone, Debug, Default)]
 pub struct TestConfig {
     #[configurable(derived)]
@@ -170,6 +170,7 @@ pub struct TestConfig {
 impl_generate_config_from_default!(TestConfig);
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "test_arc")]
 impl SinkConfig for TestConfig {
     async fn build(&self, _cx: SinkContext) -> Result<(VectorSink, Healthcheck), crate::Error> {
         let mut batch_settings = BatchSettings::default();

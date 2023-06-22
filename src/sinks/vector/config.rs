@@ -28,7 +28,7 @@ use crate::{
 };
 
 /// Configuration for the `vector` sink.
-#[configurable_component(sink("vector"))]
+#[configurable_component(sink("vector", "Relay observability data to a Vector instance."))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct VectorConfig {
@@ -105,6 +105,7 @@ fn default_config(address: &str) -> VectorConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "vector")]
 impl SinkConfig for VectorConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSinkType, Healthcheck)> {
         let tls = MaybeTlsSettings::from_config(&self.tls, false)?;

@@ -54,7 +54,7 @@ pub use loading::{
 };
 pub use provider::ProviderConfig;
 pub use secret::SecretBackend;
-pub use sink::{SinkConfig, SinkContext, SinkHealthcheckOptions, SinkOuter};
+pub use sink::{BoxedSink, SinkConfig, SinkContext, SinkHealthcheckOptions, SinkOuter};
 pub use source::{BoxedSource, SourceConfig, SourceContext, SourceOuter};
 pub use transform::{
     get_transform_output_ids, BoxedTransform, TransformConfig, TransformContext, TransformOuter,
@@ -1314,6 +1314,7 @@ mod resource_tests {
     proptest! {
         #[test]
         fn valid(addr: IpAddr, port1 in specport(), port2 in specport()) {
+            prop_assume!(port1 != port2);
             let components = vec![
                 ("sink_0", vec![tcp(addr, 0)]),
                 ("sink_1", vec![tcp(addr, port1)]),

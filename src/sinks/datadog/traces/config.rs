@@ -54,7 +54,7 @@ impl SinkBatchSettings for DatadogTracesDefaultBatchSettings {
 }
 
 /// Configuration for the `datadog_traces` sink.
-#[configurable_component(sink("datadog_traces"))]
+#[configurable_component(sink("datadog_traces", "Publish trace events to Datadog."))]
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct DatadogTracesConfig {
@@ -211,6 +211,7 @@ impl DatadogTracesConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "datadog_traces")]
 impl SinkConfig for DatadogTracesConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let client = self.build_client(&cx.proxy)?;

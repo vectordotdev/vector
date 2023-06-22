@@ -25,7 +25,7 @@ use crate::{
 const PATH: &str = "/logs/ingest";
 
 /// Configuration for the `logdna` sink.
-#[configurable_component(sink("logdna"))]
+#[configurable_component(sink("logdna", "Deliver log event data to LogDNA."))]
 #[configurable(metadata(
     deprecated = "The `logdna` sink has been renamed. Please use `mezmo` instead."
 ))]
@@ -39,6 +39,7 @@ impl GenerateConfig for LogdnaConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "logdna")]
 impl SinkConfig for LogdnaConfig {
     async fn build(
         &self,
@@ -58,7 +59,7 @@ impl SinkConfig for LogdnaConfig {
 }
 
 /// Configuration for the `mezmo` (formerly `logdna`) sink.
-#[configurable_component(sink("mezmo"))]
+#[configurable_component(sink("mezmo", "Deliver log event data to Mezmo."))]
 #[derive(Clone, Debug)]
 pub struct MezmoConfig {
     /// The Ingestion API key.
@@ -155,6 +156,7 @@ impl GenerateConfig for MezmoConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "mezmo")]
 impl SinkConfig for MezmoConfig {
     async fn build(
         &self,

@@ -36,7 +36,10 @@ enum HealthcheckError {
 }
 
 /// Configuration for the `gcp_stackdriver_logs` sink.
-#[configurable_component(sink("gcp_stackdriver_logs"))]
+#[configurable_component(sink(
+    "gcp_stackdriver_logs",
+    "Deliver logs to GCP's Cloud Operations suite."
+))]
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct StackdriverConfig {
@@ -202,6 +205,7 @@ fn label_examples() -> HashMap<String, String> {
 impl_generate_config_from_default!(StackdriverConfig);
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "gcp_stackdriver_logs")]
 impl SinkConfig for StackdriverConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let auth = self.auth.build(Scope::LoggingWrite).await?;

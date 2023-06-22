@@ -489,6 +489,11 @@ base: components: sinks: aws_kinesis_streams: configuration: {
 			}
 		}
 	}
+	request_retry_partial: {
+		description: "Whether or not to retry successful requests containing partial failures."
+		required:    false
+		type: bool: default: false
+	}
 	stream_name: {
 		description: """
 			The [stream name][stream_name] of the target Kinesis Firehose delivery stream.

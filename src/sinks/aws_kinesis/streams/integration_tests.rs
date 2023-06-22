@@ -98,6 +98,7 @@ async fn kinesis_put_records_without_partition_key() {
         tls: Default::default(),
         auth: Default::default(),
         acknowledgements: Default::default(),
+        request_retry_partial: Default::default(),
     };
 
     let config = KinesisStreamsSinkConfig {

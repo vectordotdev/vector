@@ -865,6 +865,7 @@ impl NamedComponent for DatadogArchivesSinkConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "datadog_archives")]
 impl SinkConfig for DatadogArchivesSinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, super::Healthcheck)> {
         let sink_and_healthcheck = self.build_sink(cx).await?;

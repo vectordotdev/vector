@@ -11,6 +11,8 @@ The week before the release:
   - `git fetch && git checkout origin/master && git checkout -b v0.<new version number> && git push -u`
 - [ ] Create a new release preparation branch from `master`
   - `git checkout -b prepare-v0.<new version number> && git push -u`
+- [ ] Check if there is a newer version of Alpine or Debian available to update the release images
+      in `distribution/docker/`. Update if so.
 - [ ] Run `cargo vdev build release-cue` to generate a new cue file for the release
 - [ ] Add `changelog` key to generated cue file
   - [ ] `git log --no-merges --cherry-pick --right-only <last release tag>...`
