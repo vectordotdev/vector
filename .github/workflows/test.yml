@@ -36,6 +36,7 @@ jobs:
   checks:
     name: Checks
     runs-on: [linux, ubuntu-20.04-4core]
+    if: github.event_name != 'pull_request'
     needs: changes
     env:
       CARGO_INCREMENTAL: 0
