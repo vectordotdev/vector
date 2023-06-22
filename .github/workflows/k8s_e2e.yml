@@ -107,9 +107,8 @@ jobs:
 
       - uses: actions/upload-artifact@v3
         with:
-          sha: ${{ steps.comment-branch.outputs.head_sha }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-          status: pending
+          name: e2e-test-deb-package
+          path: target/artifacts/*
 
       - name: (PR comment) Set latest commit status as 'failure'
         uses: myrotvorets/set-commit-status-action@1.1.6
