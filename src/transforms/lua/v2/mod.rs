@@ -966,7 +966,7 @@ mod tests {
                     .with_value(MetricValue::Counter { value: 2.0 });
                 expected
                     .metadata_mut()
-                    .set_parent_id(Arc::new(OutputId::from("transform")));
+                    .set_upstream_id(Arc::new(OutputId::from("transform")));
 
                 tx.send(metric.into()).await.unwrap();
 

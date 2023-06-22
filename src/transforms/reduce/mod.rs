@@ -558,14 +558,14 @@ group_by = [ "request_id" ]
             e_1.insert("counter", 1);
             e_1.insert("request_id", "1");
             let mut metadata_1 = e_1.metadata().clone();
-            metadata_1.set_parent_id(Arc::new(OutputId::from("transform")));
+            metadata_1.set_upstream_id(Arc::new(OutputId::from("transform")));
             metadata_1.set_schema_definition(&Arc::new(new_schema_definition.clone()));
 
             let mut e_2 = LogEvent::from("test message 2");
             e_2.insert("counter", 2);
             e_2.insert("request_id", "2");
             let mut metadata_2 = e_2.metadata().clone();
-            metadata_2.set_parent_id(Arc::new(OutputId::from("transform")));
+            metadata_2.set_upstream_id(Arc::new(OutputId::from("transform")));
             metadata_2.set_schema_definition(&Arc::new(new_schema_definition.clone()));
 
             let mut e_3 = LogEvent::from("test message 3");
@@ -650,7 +650,7 @@ merge_strategies.baz = "max"
             e_1.insert("baz", 2);
             e_1.insert("request_id", "1");
             let mut metadata = e_1.metadata().clone();
-            metadata.set_parent_id(Arc::new(OutputId::from("transform")));
+            metadata.set_upstream_id(Arc::new(OutputId::from("transform")));
             metadata.set_schema_definition(&Arc::new(new_schema_definition.clone()));
             tx.send(e_1.into()).await.unwrap();
 
@@ -718,14 +718,14 @@ group_by = [ "request_id" ]
             e_1.insert("counter", 1);
             e_1.insert("request_id", "1");
             let mut metadata_1 = e_1.metadata().clone();
-            metadata_1.set_parent_id(Arc::new(OutputId::from("transform")));
+            metadata_1.set_upstream_id(Arc::new(OutputId::from("transform")));
             metadata_1.set_schema_definition(&Arc::new(new_schema_definition.clone()));
             tx.send(e_1.into()).await.unwrap();
 
             let mut e_2 = LogEvent::from("test message 2");
             e_2.insert("counter", 2);
             let mut metadata_2 = e_2.metadata().clone();
-            metadata_2.set_parent_id(Arc::new(OutputId::from("transform")));
+            metadata_2.set_upstream_id(Arc::new(OutputId::from("transform")));
             metadata_2.set_schema_definition(&Arc::new(new_schema_definition));
             tx.send(e_2.into()).await.unwrap();
 
@@ -927,7 +927,7 @@ merge_strategies.bar = "concat"
             e_1.insert("bar", json!([1, 3]));
             e_1.insert("request_id", "1");
             let mut metadata_1 = e_1.metadata().clone();
-            metadata_1.set_parent_id(Arc::new(OutputId::from("transform")));
+            metadata_1.set_upstream_id(Arc::new(OutputId::from("transform")));
             metadata_1.set_schema_definition(&Arc::new(new_schema_definition.clone()));
 
             tx.send(e_1.into()).await.unwrap();
@@ -937,7 +937,7 @@ merge_strategies.bar = "concat"
             e_2.insert("bar", json!([2, 4]));
             e_2.insert("request_id", "2");
             let mut metadata_2 = e_2.metadata().clone();
-            metadata_2.set_parent_id(Arc::new(OutputId::from("transform")));
+            metadata_2.set_upstream_id(Arc::new(OutputId::from("transform")));
             metadata_2.set_schema_definition(&Arc::new(new_schema_definition));
             tx.send(e_2.into()).await.unwrap();
 

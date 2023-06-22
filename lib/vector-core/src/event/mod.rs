@@ -293,9 +293,9 @@ impl Event {
         self.metadata_mut().set_source_id(source_id);
     }
 
-    /// Sets the `parent_id` in the event metadata to the provided value.
-    pub fn set_parent_id(&mut self, parent_id: Arc<OutputId>) {
-        self.metadata_mut().set_parent_id(parent_id);
+    /// Sets the `upstream_id` in the event metadata to the provided value.
+    pub fn set_upstream_id(&mut self, upstream_id: Arc<OutputId>) {
+        self.metadata_mut().set_upstream_id(upstream_id);
     }
 
     /// Sets the `source_id` in the event metadata to the provided value.
@@ -305,10 +305,10 @@ impl Event {
         self
     }
 
-    /// Sets the `source_id` in the event metadata to the provided value.
+    /// Sets the `upstream_id` in the event metadata to the provided value.
     #[must_use]
-    pub fn with_parent_id(mut self, parent_id: Arc<OutputId>) -> Self {
-        self.metadata_mut().set_parent_id(parent_id);
+    pub fn with_upstream_id(mut self, upstream_id: Arc<OutputId>) -> Self {
+        self.metadata_mut().set_upstream_id(upstream_id);
         self
     }
 }

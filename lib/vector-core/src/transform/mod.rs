@@ -309,7 +309,7 @@ pub fn update_runtime_schema_definition(
     log_schema_definitions: &HashMap<OutputId, Arc<Definition>>,
 ) {
     if let EventMutRef::Log(log) = &mut event {
-        if let Some(parent_component_id) = log.metadata_mut().parent_id() {
+        if let Some(parent_component_id) = log.metadata_mut().upstream_id() {
             if let Some(definition) = log_schema_definitions.get(parent_component_id) {
                 log.metadata_mut().set_schema_definition(definition);
             }
@@ -322,7 +322,7 @@ pub fn update_runtime_schema_definition(
             }
         }
     }
-    event.metadata_mut().set_parent_id(Arc::clone(output_id));
+    event.metadata_mut().set_upstream_id(Arc::clone(output_id));
 }
 
 #[derive(Debug, Clone)]

@@ -129,7 +129,7 @@ mod test {
             tx.send(log.clone()).await.unwrap();
 
             log.set_source_id(Arc::new(OutputId::from("in")));
-            log.set_parent_id(Arc::new(OutputId::from("transform")));
+            log.set_upstream_id(Arc::new(OutputId::from("transform")));
             log.metadata_mut()
                 .set_schema_definition(&Arc::new(Definition::default_legacy_namespace()));
 

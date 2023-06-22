@@ -60,7 +60,7 @@ async fn test_function_transform_single_event() {
         assert_eq!(events.len(), 1);
 
         original_event.set_source_id(Arc::new(OutputId::from("in")));
-        original_event.set_parent_id(Arc::new(OutputId::from("transform")));
+        original_event.set_upstream_id(Arc::new(OutputId::from("transform")));
         original_event
             .metadata_mut()
             .set_schema_definition(&Arc::new(Definition::default_legacy_namespace()));
@@ -85,7 +85,7 @@ async fn test_sync_transform_single_event() {
         assert_eq!(events.len(), 1);
 
         original_event.set_source_id(Arc::new(OutputId::from("in")));
-        original_event.set_parent_id(Arc::new(OutputId::from("transform")));
+        original_event.set_upstream_id(Arc::new(OutputId::from("transform")));
         original_event
             .metadata_mut()
             .set_schema_definition(&Arc::new(Definition::default_legacy_namespace()));
@@ -109,7 +109,7 @@ async fn test_task_transform_single_event() {
         assert_eq!(events.len(), 1);
 
         original_event.set_source_id(Arc::new(OutputId::from("in")));
-        original_event.set_parent_id(Arc::new(OutputId::from("transform")));
+        original_event.set_upstream_id(Arc::new(OutputId::from("transform")));
         original_event
             .metadata_mut()
             .set_schema_definition(&Arc::new(Definition::default_legacy_namespace()));

@@ -36,7 +36,7 @@ pub struct EventMetadata {
     /// determine which schema definition to attach to an event in transforms.
     /// This should always have a value set for events in transforms. It will always be `None`
     /// in a source, and there is currently no use-case for reading the value in a sink.
-    parent_id: Option<Arc<OutputId>>,
+    upstream_id: Option<Arc<OutputId>>,
 
     /// An identifier for a globally registered schema definition which provides information about
     /// the event shape (type information, and semantic meaning of fields).
@@ -89,8 +89,8 @@ impl EventMetadata {
     /// Returns a reference to the metadata parent id. This is the `OutputId`
     /// of the previous component the event was sent through (if any).
     #[must_use]
-    pub fn parent_id(&self) -> Option<&OutputId> {
-        self.parent_id.as_deref()
+    pub fn upstream_id(&self) -> Option<&OutputId> {
+        self.upstream_id.as_deref()
     }
 
     /// Sets the `source_id` in the metadata to the provided value.
@@ -98,9 +98,9 @@ impl EventMetadata {
         self.source_id = Some(source_id);
     }
 
-    /// Sets the `parent_id` in the metadata to the provided value.
-    pub fn set_parent_id(&mut self, parent_id: Arc<OutputId>) {
-        self.parent_id = Some(parent_id);
+    /// Sets the `upstream_id` in the metadata to the provided value.
+    pub fn set_upstream_id(&mut self, upstream_id: Arc<OutputId>) {
+        self.upstream_id = Some(upstream_id);
     }
 
     /// Return the datadog API key, if it exists
@@ -132,7 +132,7 @@ impl Default for EventMetadata {
             finalizers: Default::default(),
             schema_definition: default_schema_definition(),
             source_id: None,
-            parent_id: None,
+            upstream_id: None,
         }
     }
 }

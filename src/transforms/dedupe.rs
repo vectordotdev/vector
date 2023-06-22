@@ -364,7 +364,7 @@ mod tests {
             let new_event = out.recv().await.unwrap();
 
             event1.set_source_id(Arc::new(OutputId::from("in")));
-            event1.set_parent_id(Arc::new(OutputId::from("transform")));
+            event1.set_upstream_id(Arc::new(OutputId::from("transform")));
             // the schema definition is copied from the source for dedupe
             event1
                 .metadata_mut()
@@ -377,7 +377,7 @@ mod tests {
             let new_event = out.recv().await.unwrap();
 
             event2.set_source_id(Arc::new(OutputId::from("in")));
-            event2.set_parent_id(Arc::new(OutputId::from("transform")));
+            event2.set_upstream_id(Arc::new(OutputId::from("transform")));
             // the schema definition is copied from the source for dedupe
             event2
                 .metadata_mut()
@@ -424,7 +424,7 @@ mod tests {
             let new_event = out.recv().await.unwrap();
 
             event1.set_source_id(Arc::new(OutputId::from("in")));
-            event1.set_parent_id(Arc::new(OutputId::from("transform")));
+            event1.set_upstream_id(Arc::new(OutputId::from("transform")));
             // the schema definition is copied from the source for dedupe
             event1
                 .metadata_mut()
@@ -437,7 +437,7 @@ mod tests {
             let new_event = out.recv().await.unwrap();
 
             event2.set_source_id(Arc::new(OutputId::from("in")));
-            event2.set_parent_id(Arc::new(OutputId::from("transform")));
+            event2.set_upstream_id(Arc::new(OutputId::from("transform")));
             // the schema definition is copied from the source for dedupe
             event2
                 .metadata_mut()
@@ -487,7 +487,7 @@ mod tests {
             let new_event = out.recv().await.unwrap();
 
             event1.set_source_id(Arc::new(OutputId::from("in")));
-            event1.set_parent_id(Arc::new(OutputId::from("transform")));
+            event1.set_upstream_id(Arc::new(OutputId::from("transform")));
             // the schema definition is copied from the source for dedupe
             event1
                 .metadata_mut()
@@ -537,7 +537,7 @@ mod tests {
             let new_event = out.recv().await.unwrap();
 
             event1.set_source_id(Arc::new(OutputId::from("in")));
-            event1.set_parent_id(Arc::new(OutputId::from("transform")));
+            event1.set_upstream_id(Arc::new(OutputId::from("transform")));
 
             // the schema definition is copied from the source for dedupe
             event1
@@ -551,7 +551,7 @@ mod tests {
             let new_event = out.recv().await.unwrap();
 
             event2.set_source_id(Arc::new(OutputId::from("in")));
-            event2.set_parent_id(Arc::new(OutputId::from("transform")));
+            event2.set_upstream_id(Arc::new(OutputId::from("transform")));
             // the schema definition is copied from the source for dedupe
             event2
                 .metadata_mut()
@@ -606,7 +606,7 @@ mod tests {
             let new_event = out.recv().await.unwrap();
 
             event1.set_source_id(Arc::new(OutputId::from("in")));
-            event1.set_parent_id(Arc::new(OutputId::from("transform")));
+            event1.set_upstream_id(Arc::new(OutputId::from("transform")));
             // the schema definition is copied from the source for dedupe
             event1
                 .metadata_mut()
@@ -619,7 +619,7 @@ mod tests {
             let new_event = out.recv().await.unwrap();
 
             event2.set_source_id(Arc::new(OutputId::from("in")));
-            event2.set_parent_id(Arc::new(OutputId::from("transform")));
+            event2.set_upstream_id(Arc::new(OutputId::from("transform")));
             // the schema definition is copied from the source for dedupe
             event2
                 .metadata_mut()
@@ -669,7 +669,7 @@ mod tests {
             let new_event = out.recv().await.unwrap();
 
             event1.set_source_id(Arc::new(OutputId::from("in")));
-            event1.set_parent_id(Arc::new(OutputId::from("transform")));
+            event1.set_upstream_id(Arc::new(OutputId::from("transform")));
             // the schema definition is copied from the source for dedupe
             event1
                 .metadata_mut()
@@ -682,7 +682,7 @@ mod tests {
             let new_event = out.recv().await.unwrap();
 
             event2.set_source_id(Arc::new(OutputId::from("in")));
-            event2.set_parent_id(Arc::new(OutputId::from("transform")));
+            event2.set_upstream_id(Arc::new(OutputId::from("transform")));
             // the schema definition is copied from the source for dedupe
             event2
                 .metadata_mut()
@@ -725,7 +725,7 @@ mod tests {
             let new_event = out.recv().await.unwrap();
 
             event1.set_source_id(Arc::new(OutputId::from("in")));
-            event1.set_parent_id(Arc::new(OutputId::from("transform")));
+            event1.set_upstream_id(Arc::new(OutputId::from("transform")));
             // the schema definition is copied from the source for dedupe
             event1
                 .metadata_mut()
@@ -738,7 +738,7 @@ mod tests {
             let new_event = out.recv().await.unwrap();
 
             event2.set_source_id(Arc::new(OutputId::from("in")));
-            event2.set_parent_id(Arc::new(OutputId::from("transform")));
+            event2.set_upstream_id(Arc::new(OutputId::from("transform")));
             // the schema definition is copied from the source for dedupe
             event2
                 .metadata_mut()

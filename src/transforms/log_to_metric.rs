@@ -515,7 +515,7 @@ mod tests {
         let mut metadata = event.metadata().clone();
         // definitions aren't valid for metrics yet, it's just set to the default (anything).
         metadata.set_schema_definition(&Arc::new(Definition::any()));
-        metadata.set_parent_id(Arc::new(OutputId::from("transform")));
+        metadata.set_upstream_id(Arc::new(OutputId::from("transform")));
         metadata.set_source_id(Arc::new(OutputId::from("in")));
         let metric = do_transform(config, event).await.unwrap();
 
@@ -550,7 +550,7 @@ mod tests {
         let mut metadata = event.metadata().clone();
         // definitions aren't valid for metrics yet, it's just set to the default (anything).
         metadata.set_schema_definition(&Arc::new(Definition::any()));
-        metadata.set_parent_id(Arc::new(OutputId::from("transform")));
+        metadata.set_upstream_id(Arc::new(OutputId::from("transform")));
         metadata.set_source_id(Arc::new(OutputId::from("in")));
 
         let metric = do_transform(config, event).await.unwrap();
@@ -642,7 +642,7 @@ mod tests {
         let mut metadata = event.metadata().clone();
         // definitions aren't valid for metrics yet, it's just set to the default (anything).
         metadata.set_schema_definition(&Arc::new(Definition::any()));
-        metadata.set_parent_id(Arc::new(OutputId::from("transform")));
+        metadata.set_upstream_id(Arc::new(OutputId::from("transform")));
 
         metadata.set_source_id(Arc::new(OutputId::from("in")));
         let metric = do_transform(config, event).await.unwrap();
@@ -690,7 +690,7 @@ mod tests {
         let mut metadata = event.metadata().clone();
         // definitions aren't valid for metrics yet, it's just set to the default (anything).
         metadata.set_schema_definition(&Arc::new(Definition::any()));
-        metadata.set_parent_id(Arc::new(OutputId::from("transform")));
+        metadata.set_upstream_id(Arc::new(OutputId::from("transform")));
         metadata.set_source_id(Arc::new(OutputId::from("in")));
         let metric = do_transform(config, event).await.unwrap();
 
@@ -724,7 +724,7 @@ mod tests {
         // definitions aren't valid for metrics yet, it's just set to the default (anything).
         metadata.set_schema_definition(&Arc::new(Definition::any()));
         metadata.set_source_id(Arc::new(OutputId::from("in")));
-        metadata.set_parent_id(Arc::new(OutputId::from("transform")));
+        metadata.set_upstream_id(Arc::new(OutputId::from("transform")));
 
         let metric = do_transform(config, event).await.unwrap();
 
@@ -758,7 +758,7 @@ mod tests {
         metadata.set_schema_definition(&Arc::new(Definition::any()));
 
         metadata.set_source_id(Arc::new(OutputId::from("in")));
-        metadata.set_parent_id(Arc::new(OutputId::from("transform")));
+        metadata.set_upstream_id(Arc::new(OutputId::from("transform")));
 
         let metric = do_transform(config, event).await.unwrap();
 
@@ -845,7 +845,7 @@ mod tests {
         let mut metadata = event.metadata().clone();
         // definitions aren't valid for metrics yet, it's just set to the default (anything).
         metadata.set_schema_definition(&Arc::new(Definition::any()));
-        metadata.set_parent_id(Arc::new(OutputId::from("transform")));
+        metadata.set_upstream_id(Arc::new(OutputId::from("transform")));
         metadata.set_source_id(Arc::new(OutputId::from("in")));
         let output = do_transform_multiple_events(config, event, 2).await;
 
@@ -902,7 +902,7 @@ mod tests {
         let mut metadata = event.metadata().clone();
         // definitions aren't valid for metrics yet, it's just set to the default (anything).
         metadata.set_schema_definition(&Arc::new(Definition::any()));
-        metadata.set_parent_id(Arc::new(OutputId::from("transform")));
+        metadata.set_upstream_id(Arc::new(OutputId::from("transform")));
         metadata.set_source_id(Arc::new(OutputId::from("in")));
 
         let output = do_transform_multiple_events(config, event, 2).await;
@@ -948,7 +948,7 @@ mod tests {
         let mut metadata = event.metadata().clone();
         // definitions aren't valid for metrics yet, it's just set to the default (anything).
         metadata.set_schema_definition(&Arc::new(Definition::any()));
-        metadata.set_parent_id(Arc::new(OutputId::from("transform")));
+        metadata.set_upstream_id(Arc::new(OutputId::from("transform")));
         metadata.set_source_id(Arc::new(OutputId::from("in")));
         let metric = do_transform(config, event).await.unwrap();
 
@@ -980,7 +980,7 @@ mod tests {
         let mut metadata = event.metadata().clone();
         // definitions aren't valid for metrics yet, it's just set to the default (anything).
         metadata.set_schema_definition(&Arc::new(Definition::any()));
-        metadata.set_parent_id(Arc::new(OutputId::from("transform")));
+        metadata.set_upstream_id(Arc::new(OutputId::from("transform")));
         metadata.set_source_id(Arc::new(OutputId::from("in")));
         let metric = do_transform(config, event).await.unwrap();
 
@@ -1013,7 +1013,7 @@ mod tests {
         let mut metadata = event.metadata().clone();
         // definitions aren't valid for metrics yet, it's just set to the default (anything).
         metadata.set_schema_definition(&Arc::new(Definition::any()));
-        metadata.set_parent_id(Arc::new(OutputId::from("transform")));
+        metadata.set_upstream_id(Arc::new(OutputId::from("transform")));
         metadata.set_source_id(Arc::new(OutputId::from("in")));
         let metric = do_transform(config, event).await.unwrap();
 

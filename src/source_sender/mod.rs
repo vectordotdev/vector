@@ -260,7 +260,7 @@ struct Inner {
     events_sent: Registered<EventsSent>,
     /// The schema definition that will be attached to Log events sent through here
     log_definition: Option<Arc<Definition>>,
-    /// The OutputId related to this source sender. This is set as the `parent_id` in
+    /// The OutputId related to this source sender. This is set as the `upstream_id` in
     /// `EventMetadata` for all event sent through here.
     output_id: Arc<OutputId>,
 }
@@ -312,7 +312,7 @@ impl Inner {
             }
             event
                 .metadata_mut()
-                .set_parent_id(Arc::clone(&self.output_id));
+                .set_upstream_id(Arc::clone(&self.output_id));
         });
 
         let byte_size = events.estimated_json_encoded_size_of();

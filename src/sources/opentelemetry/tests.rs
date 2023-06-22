@@ -272,7 +272,7 @@ async fn receive_grpc_logs_legacy_namespace() {
             ("source_type", "opentelemetry".into()),
         ]);
         let mut expect_event = Event::from(LogEvent::from(expect_vec));
-        expect_event.set_parent_id(Arc::new(OutputId {
+        expect_event.set_upstream_id(Arc::new(OutputId {
             component: "test".into(),
             port: Some("logs".into()),
         }));

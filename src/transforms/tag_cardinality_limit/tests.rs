@@ -91,8 +91,8 @@ async fn drop_event(config: TagCardinalityLimitConfig) {
         event1.set_source_id(Arc::new(OutputId::from("in")));
         event2.set_source_id(Arc::new(OutputId::from("in")));
 
-        event1.set_parent_id(Arc::new(OutputId::from("transform")));
-        event2.set_parent_id(Arc::new(OutputId::from("transform")));
+        event1.set_upstream_id(Arc::new(OutputId::from("transform")));
+        event2.set_upstream_id(Arc::new(OutputId::from("transform")));
 
         event1.metadata_mut().set_schema_definition(&Arc::new(
             Definition::new_with_default_metadata(Kind::any_object(), [LogNamespace::Legacy]),
@@ -148,9 +148,9 @@ async fn drop_tag(config: TagCardinalityLimitConfig) {
         event2.set_source_id(Arc::new(OutputId::from("in")));
         event3.set_source_id(Arc::new(OutputId::from("in")));
 
-        event1.set_parent_id(Arc::new(OutputId::from("transform")));
-        event2.set_parent_id(Arc::new(OutputId::from("transform")));
-        event3.set_parent_id(Arc::new(OutputId::from("transform")));
+        event1.set_upstream_id(Arc::new(OutputId::from("transform")));
+        event2.set_upstream_id(Arc::new(OutputId::from("transform")));
+        event3.set_upstream_id(Arc::new(OutputId::from("transform")));
 
         event1.metadata_mut().set_schema_definition(&Arc::new(
             Definition::new_with_default_metadata(Kind::any_object(), [LogNamespace::Legacy]),
@@ -234,9 +234,9 @@ async fn drop_tag_multi_value(config: TagCardinalityLimitConfig) {
         event2.set_source_id(Arc::new(OutputId::from("in")));
         event3.set_source_id(Arc::new(OutputId::from("in")));
 
-        event1.set_parent_id(Arc::new(OutputId::from("transform")));
-        event2.set_parent_id(Arc::new(OutputId::from("transform")));
-        event3.set_parent_id(Arc::new(OutputId::from("transform")));
+        event1.set_upstream_id(Arc::new(OutputId::from("transform")));
+        event2.set_upstream_id(Arc::new(OutputId::from("transform")));
+        event3.set_upstream_id(Arc::new(OutputId::from("transform")));
 
         // definitions aren't valid for metrics yet, it's just set to the default (anything).
         event1.metadata_mut().set_schema_definition(&Arc::new(
@@ -299,9 +299,9 @@ async fn separate_value_limit_per_tag(config: TagCardinalityLimitConfig) {
         event2.set_source_id(Arc::new(OutputId::from("in")));
         event3.set_source_id(Arc::new(OutputId::from("in")));
 
-        event1.set_parent_id(Arc::new(OutputId::from("transform")));
-        event2.set_parent_id(Arc::new(OutputId::from("transform")));
-        event3.set_parent_id(Arc::new(OutputId::from("transform")));
+        event1.set_upstream_id(Arc::new(OutputId::from("transform")));
+        event2.set_upstream_id(Arc::new(OutputId::from("transform")));
+        event3.set_upstream_id(Arc::new(OutputId::from("transform")));
 
         // definitions aren't valid for metrics yet, it's just set to the default (anything).
         event1.metadata_mut().set_schema_definition(&Arc::new(

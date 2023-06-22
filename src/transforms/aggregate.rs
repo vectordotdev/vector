@@ -177,7 +177,7 @@ mod tests {
     ) -> Event {
         let mut event = Event::Metric(Metric::new(name, kind, value))
             .with_source_id(Arc::new(OutputId::from("in")))
-            .with_parent_id(Arc::new(OutputId::from("transform")));
+            .with_upstream_id(Arc::new(OutputId::from("transform")));
         event.metadata_mut().set_schema_definition(&Arc::new(
             Definition::new_with_default_metadata(Kind::any_object(), [LogNamespace::Legacy]),
         ));
