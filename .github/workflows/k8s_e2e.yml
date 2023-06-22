@@ -93,23 +93,23 @@ jobs:
         if: ${{ github.event_name != 'issue_comment' }}
         uses: actions/checkout@v3
 
-      # - uses: actions/cache@v3
-      #   with:
-      #     path: |
-      #       ~/.cargo/registry
-      #       ~/.cargo/git
-      #     key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
-      # - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      # - run: bash scripts/environment/prepare.sh
-      # - run: echo "::add-matcher::.github/matchers/rust.json"
-      # - run: VECTOR_VERSION="$(cargo vdev version)" make package-deb-x86_64-unknown-linux-gnu
+      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: bash scripts/environment/prepare.sh
+      - run: echo "::add-matcher::.github/matchers/rust.json"
+      - run: VECTOR_VERSION="$(cargo vdev version)" make package-deb-x86_64-unknown-linux-gnu
 
-      # - uses: actions/upload-artifact@v3
-      #   with:
-      #     sha: ${{ steps.comment-branch.outputs.head_sha }}
-      #     token: ${{ secrets.GITHUB_TOKEN }}
-      #     status: pending
+      - uses: actions/upload-artifact@v3
+        with:
+          sha: ${{ steps.comment-branch.outputs.head_sha }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          status: pending
 
       - name: (PR comment) Set latest commit status as 'failure'
         uses: myrotvorets/set-commit-status-action@1.1.6
@@ -219,23 +219,23 @@ jobs:
         if: ${{ github.event_name != 'issue_comment' }}
         uses: actions/checkout@v3
 
-      # - uses: actions/download-artifact@v3
-      #   with:
-      #     name: e2e-test-deb-package
-      #     path: target/artifacts
+      - uses: actions/download-artifact@v3
+        with:
+          name: e2e-test-deb-package
+          path: target/artifacts
 
-      # - name: Setup Minikube
-      #   run: scripts/ci-setup-minikube.sh
-      #   env:
-      #     KUBERNETES_VERSION: ${{ matrix.kubernetes_version.version }}
-      #     MINIKUBE_VERSION: ${{ matrix.minikube_version }}
-      #     CONTAINER_RUNTIME: ${{ matrix.container_runtime }}
+      - name: Setup Minikube
+        run: scripts/ci-setup-minikube.sh
+        env:
+          KUBERNETES_VERSION: ${{ matrix.kubernetes_version.version }}
+          MINIKUBE_VERSION: ${{ matrix.minikube_version }}
+          CONTAINER_RUNTIME: ${{ matrix.container_runtime }}
 
-      # - run: make test-e2e-kubernetes
-      #   env:
-      #     USE_MINIKUBE_CACHE: "true"
-      #     SKIP_PACKAGE_DEB: "true"
-      #     CARGO_INCREMENTAL: 0
+      - run: make test-e2e-kubernetes
+        env:
+          USE_MINIKUBE_CACHE: "true"
+          SKIP_PACKAGE_DEB: "true"
+          CARGO_INCREMENTAL: 0
 
       - name: (PR comment) Set latest commit status as failure
         uses: myrotvorets/set-commit-status-action@v1.1.7

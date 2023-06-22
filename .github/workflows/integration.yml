@@ -43,7 +43,7 @@ jobs:
 
   integration-tests:
     name: Integration Tests
-    runs-on: [linux, ubuntu-20.04-8core]
+    runs-on: [linux, ubuntu-20.04-4core]
     needs: changes
     if: |
       github.event_name == 'merge_group' || (
@@ -79,7 +79,7 @@ jobs:
           || needs.changes.outputs.splunk == 'true'
           || needs.changes.outputs.webhdfs == 'true'
       )
-    timeout-minutes: 60
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v3
 
@@ -91,7 +91,7 @@ jobs:
         name: amqp
         uses: nick-fields/retry@v2
         with:
-          timeout_minutes: 25
+          timeout_minutes: 50
           max_attempts: 3
           retry_on: error
           command: cargo vdev -v int start amqp ; sleep 10 ; cargo vdev -v int test -a amqp ; cargo vdev -v int stop amqp
@@ -104,7 +104,7 @@ jobs:
         name: aws
         uses: nick-fields/retry@v2
         with:
-          timeout_minutes: 5
+          timeout_minutes: 10
           max_attempts: 3
           retry_on: error
           command: cargo vdev -v int start aws ; sleep 10 ; cargo vdev -v int test -a aws ; RET=$? ; cargo vdev -v int stop aws ; exit $RET
@@ -118,7 +118,7 @@ jobs:
         name: azure
         uses: nick-fields/retry@v2
         with:
-          timeout_minutes: 5
+          timeout_minutes: 10
           max_attempts: 3
           command: cargo vdev -v int start azure ; sleep 10 ; cargo vdev -v int test -a azure ; RET=$? ; cargo vdev -v int stop azure ; exit $RET
 
@@ -126,7 +126,7 @@ jobs:
         name: clickhouse
         uses: nick-fields/retry@v2
         with:
-          timeout_minutes: 5
+          timeout_minutes: 10
           max_attempts: 3
           command: cargo vdev -v int start clickhouse ; sleep 10 ; cargo vdev -v int test -a clickhouse ; RET=$? ; cargo vdev -v int stop clickhouse ; exit $RET
 
@@ -149,7 +149,7 @@ jobs:
         name: dnstap
         uses: nick-fields/retry@v2
         with:
-          timeout_minutes: 5
+          timeout_minutes: 10
           max_attempts: 3
           command: cargo vdev -v int start dnstap ; sleep 10 ; cargo vdev -v int test -a dnstap ; RET=$? ; cargo vdev -v int stop dnstap ; exit $RET
 
@@ -157,7 +157,7 @@ jobs:
         name: docker-logs
         uses: nick-fields/retry@v2
         with:
-          timeout_minutes: 5
+          timeout_minutes: 10
           max_attempts: 3
           command: cargo vdev -v int start docker-logs ; sleep 10 ; cargo vdev -v int test -a docker-logs ; RET=$? ; cargo vdev -v int stop docker-logs ; exit $RET
 
@@ -168,7 +168,7 @@ jobs:
       # name: elasticsearch
         # uses: nick-fields/retry@v2
         # with:
-        #   timeout_minutes: 5
+        #   timeout_minutes: 10
         #   max_attempts: 3
         #   command: cargo vdev -v int start elasticsearch ; sleep 10 ; cargo vdev -v int test -a elasticsearch ; cargo vdev -v int stop elasticsearch
       #   run: cargo vdev -v int start elasticsearch ; sleep 10 ; cargo vdev -v int test -a elasticsearch ; cargo vdev -v int stop elasticsearch ; sleep 10
@@ -177,7 +177,7 @@ jobs:
         name: eventstoredb
         uses: nick-fields/retry@v2
         with:
-          timeout_minutes: 5
+          timeout_minutes: 10
           max_attempts: 3
           command: cargo vdev -v int start eventstoredb ; sleep 10 ; cargo vdev -v int test -a eventstoredb ; RET=$? ; cargo vdev -v int stop eventstoredb ; exit $RET
 
@@ -185,7 +185,7 @@ jobs:
         name: fluent
         uses: nick-fields/retry@v2
         with:
-          timeout_minutes: 5
+          timeout_minutes: 10
           max_attempts: 3
           command: cargo vdev -v int start fluent ; sleep 10 ; cargo vdev -v int test -a fluent ; RET=$? ; cargo vdev -v int stop fluent ; exit $RET
 
@@ -193,7 +193,7 @@ jobs:
         name: gcp
         uses: nick-fields/retry@v2
         with:
-          timeout_minutes: 5
+          timeout_minutes: 10
           max_attempts: 3
           command: cargo vdev -v int start gcp ; sleep 10 ; cargo vdev -v int test -a gcp ; RET=$? ; cargo vdev -v int stop gcp ; exit $RET
 
@@ -201,7 +201,7 @@ jobs:
         name: humio
         uses: nick-fields/retry@v2
         with:
-          timeout_minutes: 5
+          timeout_minutes: 10
           max_attempts: 3
           command: cargo vdev -v int start humio ; sleep 10 ; cargo vdev -v int test -a humio ; RET=$? ; cargo vdev -v int stop humio ; exit $RET
 
@@ -209,7 +209,7 @@ jobs:
         name: http-client
         uses: nick-fields/retry@v2
         with:
-          timeout_minutes: 5
+          timeout_minutes: 10
           max_attempts: 3
           command: cargo vdev -v int start http-client ; sleep 10 ; cargo vdev -v int test -a http-client ; RET=$? ; cargo vdev -v int stop http-client ; exit $RET
 
@@ -217,7 +217,7 @@ jobs:
         name: influxdb
         uses: nick-fields/retry@v2
         with:
-          timeout_minutes: 5
+          timeout_minutes: 10
           max_attempts: 3
           command: cargo vdev -v int start influxdb ; sleep 10 ; cargo vdev -v int test -a influxdb ; RET=$? ; cargo vdev -v int stop influxdb ; exit $RET
 
@@ -225,7 +225,7 @@ jobs:
         name: kafka
         uses: nick-fields/retry@v2
         with:
-          timeout_minutes: 5
+          timeout_minutes: 10
           max_attempts: 3
           command: cargo vdev -v int start kafka ; sleep 10 ; cargo vdev -v int test -a kafka ; RET=$? ; cargo vdev -v int stop kafka ; exit $RET
 
@@ -233,7 +233,7 @@ jobs:
         name: logstash
         uses: nick-fields/retry@v2
         with:
-          timeout_minutes: 5
+          timeout_minutes: 10
           max_attempts: 3
           command: cargo vdev -v int start logstash ; sleep 10 ; cargo vdev -v int test -a logstash ; RET=$? ; cargo vdev -v int stop logstash ; exit $RET
 
@@ -241,7 +241,7 @@ jobs:
         name: loki
         uses: nick-fields/retry@v2
         with:
-          timeout_minutes: 5
+          timeout_minutes: 10
           max_attempts: 3
           command: cargo vdev -v int start loki ; sleep 10 ; cargo vdev -v int test -a loki ; RET=$? ; cargo vdev -v int stop loki ; exit $RET
 
@@ -249,7 +249,7 @@ jobs:
         name: mongodb
         uses: nick-fields/retry@v2
         with:
-          timeout_minutes: 5
+          timeout_minutes: 10
           max_attempts: 3
           command: cargo vdev -v int start mongodb ; sleep 10 ; cargo vdev -v int test -a mongodb ; RET=$? ; cargo vdev -v int stop mongodb ; exit $RET
 
@@ -259,7 +259,7 @@ jobs:
         name: nats
         uses: nick-fields/retry@v2
         with:
-          timeout_minutes: 5
+          timeout_minutes: 10
           max_attempts: 3
           command: cargo vdev -v int start nats ; sleep 10 ; cargo vdev -v int test -a nats ; RET=$? ; cargo vdev -v int stop nats ; exit $RET
 
@@ -267,7 +267,7 @@ jobs:
         name: nginx
         uses: nick-fields/retry@v2
         with:
-          timeout_minutes: 5
+          timeout_minutes: 10
           max_attempts: 3
           command: cargo vdev -v int start nginx ; sleep 10 ; cargo vdev -v int test -a nginx ; RET=$? ; cargo vdev -v int stop nginx ; exit $RET
 
@@ -275,7 +275,7 @@ jobs:
         name: opentelemetry
         uses: nick-fields/retry@v2
         with:
-          timeout_minutes: 5
+          timeout_minutes: 10
           max_attempts: 3
           command: cargo vdev -v int start opentelemetry ; sleep 10 ; cargo vdev -v int test -a opentelemetry ; RET=$? ; cargo vdev -v int stop opentelemetry ; exit $RET
 
@@ -283,7 +283,7 @@ jobs:
         name: postgres
         uses: nick-fields/retry@v2
         with:
-          timeout_minutes: 5
+          timeout_minutes: 10
           max_attempts: 3
           command: cargo vdev -v int start postgres ; sleep 10 ; cargo vdev -v int test -a postgres ; RET=$? ; cargo vdev -v int stop postgres ; exit $RET
 
@@ -291,7 +291,7 @@ jobs:
         name: prometheus
         uses: nick-fields/retry@v2
         with:
-          timeout_minutes: 5
+          timeout_minutes: 10
           max_attempts: 3
           command: cargo vdev -v int start prometheus ; sleep 10 ; cargo vdev -v int test -a prometheus ; RET=$? ; cargo vdev -v int stop prometheus ; exit $RET
 
@@ -299,7 +299,7 @@ jobs:
         name: pulsar
         uses: nick-fields/retry@v2
         with:
-          timeout_minutes: 5
+          timeout_minutes: 10
           max_attempts: 3
           command: cargo vdev -v int start pulsar ; sleep 10 ; cargo vdev -v int test -a pulsar ; RET=$? ; cargo vdev -v int stop pulsar ; exit $RET
 
@@ -307,7 +307,7 @@ jobs:
         name: redis
         uses: nick-fields/retry@v2
         with:
-          timeout_minutes: 5
+          timeout_minutes: 10
           max_attempts: 3
           command: cargo vdev -v int start redis ; sleep 10 ; cargo vdev -v int test -a redis ; RET=$? ; cargo vdev -v int stop redis ; exit $RET
 
@@ -315,7 +315,7 @@ jobs:
         name: shutdown
         uses: nick-fields/retry@v2
         with:
-          timeout_minutes: 5
+          timeout_minutes: 10
           max_attempts: 3
           command: cargo vdev -v int start shutdown ; sleep 10 ; cargo vdev -v int test -a shutdown ; RET=$? ; cargo vdev -v int stop shutdown ; exit $RET
 
@@ -331,7 +331,7 @@ jobs:
         name: webhdfs
         uses: nick-fields/retry@v2
         with:
-          timeout_minutes: 5
+          timeout_minutes: 10
           max_attempts: 3
           command: cargo vdev -v int start webhdfs ; sleep 10 ; cargo vdev -v int test -a webhdfs ; RET=$? ; cargo vdev -v int stop webhdfs ; exit $RET
 

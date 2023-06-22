@@ -67,8 +67,6 @@ jobs:
         run: make check-clippy
       - run: make test
         name: Unit - x86_64-unknown-linux-gnu
-        env:
-          CARGO_BUILD_JOBS: 5
       - name: VRL - Linux
         run: cargo vdev test-vrl
       - name: Check version

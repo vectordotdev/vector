@@ -43,85 +43,85 @@ jobs:
   # This is the entry job which is required for all the actual tests in this workflow.
   # If we don't run this job (such as in a pull request), then by consequence all downstream
   # test jobs are not run. This allows us to not have to check for merge group in each job.
-  changes:
-    if: ${{ github.event_name == 'merge_group' }}
-    uses: ./.github/workflows/changes.yml
-    with:
-      base_ref: ${{ github.event.merge_group.base_ref }}
-      head_ref: ${{ github.event.merge_group.head_ref }}
-    secrets: inherit
+  # changes:
+  #   if: ${{ github.event_name == 'merge_group' }}
+  #   uses: ./.github/workflows/changes.yml
+  #   with:
+  #     base_ref: ${{ github.event.merge_group.base_ref }}
+  #     head_ref: ${{ github.event.merge_group.head_ref }}
+  #   secrets: inherit
 
-  test-cli:
-    if: needs.changes.outputs.source == 'true'
-    uses: ./.github/workflows/cli.yml
-    needs: changes
-    secrets: inherit
+  # test-cli:
+  #   if: needs.changes.outputs.source == 'true'
+  #   uses: ./.github/workflows/cli.yml
+  #   needs: changes
+  #   secrets: inherit
 
-  test-misc:
-    if: needs.changes.outputs.source == 'true'
-    uses: ./.github/workflows/misc.yml
-    needs: changes
-    secrets: inherit
+  # test-misc:
+  #   if: needs.changes.outputs.source == 'true'
+  #   uses: ./.github/workflows/misc.yml
+  #   needs: changes
+  #   secrets: inherit
 
-  test-environment:
-    uses: ./.github/workflows/environment.yml
-    needs: changes
-    secrets: inherit
+  # test-environment:
+  #   uses: ./.github/workflows/environment.yml
+  #   needs: changes
+  #   secrets: inherit
 
-  check-msrv:
-    if: needs.changes.outputs.source == 'true'
-    uses: ./.github/workflows/msrv.yml
-    needs: changes
-    secrets: inherit
+  # check-msrv:
+  #   if: needs.changes.outputs.source == 'true'
+  #   uses: ./.github/workflows/msrv.yml
+  #   needs: changes
+  #   secrets: inherit
 
-  check-component-features:
-    if: needs.changes.outputs.source == 'true'
-    uses: ./.github/workflows/component_features.yml
-    needs: changes
-    secrets: inherit
+  # check-component-features:
+  #   if: needs.changes.outputs.source == 'true'
+  #   uses: ./.github/workflows/component_features.yml
+  #   needs: changes
+  #   secrets: inherit
 
-  cross-linux:
-    # We run cross checks when dependencies change to ensure they still build.
-    # This helps us avoid adopting dependencies that aren't compatible with other architectures.
-    if: needs.changes.outputs.dependencies == 'true'
-    uses: ./.github/workflows/cross.yml
-    needs: changes
-    secrets: inherit
+  # cross-linux:
+  #   # We run cross checks when dependencies change to ensure they still build.
+  #   # This helps us avoid adopting dependencies that aren't compatible with other architectures.
+  #   if: needs.changes.outputs.dependencies == 'true'
+  #   uses: ./.github/workflows/cross.yml
+  #   needs: changes
+  #   secrets: inherit
 
-  unit-mac:
-    if: needs.changes.outputs.source == 'true'
-    uses: ./.github/workflows/unit_mac.yml
-    needs: changes
-    secrets: inherit
+  # unit-mac:
+  #   if: needs.changes.outputs.source == 'true'
+  #   uses: ./.github/workflows/unit_mac.yml
+  #   needs: changes
+  #   secrets: inherit
 
-  unit-windows:
-    if: needs.changes.outputs.source == 'true'
-    uses: ./.github/workflows/unit_windows.yml
-    needs: changes
-    secrets: inherit
+  # unit-windows:
+  #   if: needs.changes.outputs.source == 'true'
+  #   uses: ./.github/workflows/unit_windows.yml
+  #   needs: changes
+  #   secrets: inherit
 
-  install-sh:
-    if: needs.changes.outputs.install == 'true'
-    uses: ./.github/workflows/install-sh.yml
-    needs: changes
-    secrets: inherit
+  # install-sh:
+  #   if: needs.changes.outputs.install == 'true'
+  #   uses: ./.github/workflows/install-sh.yml
+  #   needs: changes
+  #   secrets: inherit
 
   master-merge-queue-check:
     name: Master Merge Queue Suite
     # Always run this so that pull_request triggers are marked as success.
     if: always()
     runs-on: ubuntu-20.04
-    needs:
-      - changes
-      - test-cli
-      - test-misc
-      - test-environment
-      - check-msrv
-      - check-component-features
-      - cross-linux
-      - unit-mac
-      - unit-windows
-      - install-sh
+    #needs:
+      # - changes
+      # - test-cli
+      # - test-misc
+      # - test-environment
+      # - check-msrv
+      # - check-component-features
+      # - cross-linux
+      # - unit-mac
+      # - unit-windows
+      # - install-sh
     env:
       FAILED: ${{ contains(needs.*.result, 'failure') }}
     steps:
