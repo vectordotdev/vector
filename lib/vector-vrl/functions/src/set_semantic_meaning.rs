@@ -68,8 +68,6 @@ impl Function for SetSemanticMeaning {
             .expect("meaning not bytes")
             .into_owned();
 
-        // let path = query.path().clone();
-
         let path = if let Some(path) = query.external_path() {
             path
         } else {
