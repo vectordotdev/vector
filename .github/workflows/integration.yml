@@ -89,14 +89,25 @@ jobs:
 
       - run: docker image prune -af ; docker container prune -f
 
+      - name: Create test script
+        run: |
+          echo "
+              cargo vdev -v int test -a \$1
+              RET=\$?
+              cargo vdev -v int stop \$1
+              ./scripts/upload-test-results.sh
+              exit $RET
+          " > int_test.sh
+          cat int_test.sh
+
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.amqp == 'true' }}
         name: amqp
         uses: nick-fields/retry@v2
         with:
+          # First one requires more time, as we need to build the image from scratch
           timeout_minutes: 25
           max_attempts: 3
-          retry_on: error
-          command: cargo vdev -v int start amqp ; sleep 10 ; cargo vdev -v int test -a amqp ; RET=$? ; cargo vdev -v int stop amqp ; exit $RET
+          command: sh int_test.sh amqp
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.appsignal == 'true' }}
         name: appsignal
@@ -104,8 +115,7 @@ jobs:
         with:
           timeout_minutes: 5
           max_attempts: 3
-          retry_on: error
-          command: cargo vdev -v int start appsignal ; sleep 10 ; cargo vdev -v int test -a appsignal ; RET=$? ; cargo vdev -v int stop appsignal ; exit $RET
+          command: sh int_test.sh appsignal
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.aws == 'true' }}
         name: aws
@@ -113,8 +123,7 @@ jobs:
         with:
           timeout_minutes: 5
           max_attempts: 3
-          retry_on: error
-          command: cargo vdev -v int start aws ; sleep 10 ; cargo vdev -v int test -a aws ; RET=$? ; cargo vdev -v int stop aws ; exit $RET
+          command: sh int_test.sh aws
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.axiom == 'true' }}
         name: axiom
@@ -122,8 +131,7 @@ jobs:
         with:
           timeout_minutes: 5
           max_attempts: 3
-          retry_on: error
-          command: cargo vdev -v int start axiom ; sleep 10 ; cargo vdev -v int test -a axiom ; RET=$? ; cargo vdev -v int stop axiom ; exit $RET
+          command: sh int_test.sh axiom
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.azure == 'true' }}
         name: azure
@@ -131,7 +139,7 @@ jobs:
         with:
           timeout_minutes: 5
           max_attempts: 3
-          command: cargo vdev -v int start azure ; sleep 10 ; cargo vdev -v int test -a azure ; RET=$? ; cargo vdev -v int stop azure ; exit $RET
+          command: sh int_test.sh azure
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.clickhouse == 'true' }}
         name: clickhouse
@@ -139,7 +147,7 @@ jobs:
         with:
           timeout_minutes: 5
           max_attempts: 3
-          command: cargo vdev -v int start clickhouse ; sleep 10 ; cargo vdev -v int test -a clickhouse ; RET=$? ; cargo vdev -v int stop clickhouse ; exit $RET
+          command: sh int_test.sh clickhouse
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.databend == 'true' }}
         name: databend
@@ -147,7 +155,7 @@ jobs:
         with:
           timeout_minutes: 5
           max_attempts: 3
-          command: cargo vdev -v int start databend ; sleep 10 ; cargo vdev -v int test -a databend ; RET=$? ; cargo vdev -v int stop databend ; exit $RET
+          command: sh int_test.sh databend
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.datadog == 'true' }}
         name: datadog-agent
@@ -155,7 +163,7 @@ jobs:
         with:
           timeout_minutes: 5
           max_attempts: 3
-          command: cargo vdev -v int start datadog-agent ; sleep 10 ; cargo vdev -v int test -a datadog-agent ; RET=$? ; cargo vdev -v int stop datadog-agent ; exit $RET
+          command: sh int_test.sh datadog-agent
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.datadog == 'true' }}
         name: datadog-logs
@@ -163,7 +171,7 @@ jobs:
         with:
           timeout_minutes: 5
           max_attempts: 3
-          command: cargo vdev -v int start datadog-logs ; sleep 10 ; cargo vdev -v int test -a datadog-logs ; RET=$? ; cargo vdev -v int stop datadog-logs ; exit $RET
+          command: sh int_test.sh datadog-logs
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.datadog == 'true' }}
         name: datadog-metrics
@@ -171,7 +179,7 @@ jobs:
         with:
           timeout_minutes: 5
           max_attempts: 3
-          command: cargo vdev -v int start datadog-metrics ; sleep 10 ; cargo vdev -v int test -a datadog-metrics ; RET=$? ; cargo vdev -v int stop datadog-metrics ; exit $RET
+          command: sh int_test.sh datadog-metrics
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.datadog == 'true' }}
         name: datadog-traces
@@ -179,7 +187,7 @@ jobs:
         with:
           timeout_minutes: 5
           max_attempts: 3
-          command: cargo vdev -v int start datadog-traces ; sleep 10 ; cargo vdev -v int test -a datadog-traces ; RET=$? ; cargo vdev -v int stop datadog-traces ; exit $RET
+          command: sh int_test.sh datadog-traces
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.dnstap == 'true' }}
         name: dnstap
@@ -187,7 +195,7 @@ jobs:
         with:
           timeout_minutes: 5
           max_attempts: 3
-          command: cargo vdev -v int start dnstap ; sleep 10 ; cargo vdev -v int test -a dnstap ; RET=$? ; cargo vdev -v int stop dnstap ; exit $RET
+          command: sh int_test.sh dnstap
 
       - run: docker image prune -af --filter=label!=vector-test-runner=true ; docker container prune -f
 
@@ -197,7 +205,7 @@ jobs:
         with:
           timeout_minutes: 5
           max_attempts: 3
-          command: cargo vdev -v int start docker-logs ; sleep 10 ; cargo vdev -v int test -a docker-logs ; RET=$? ; cargo vdev -v int stop docker-logs ; exit $RET
+          command: sh int_test.sh docker-logs
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.elasticsearch == 'true' }}
         name: elasticsearch
@@ -205,7 +213,7 @@ jobs:
         with:
           timeout_minutes: 5
           max_attempts: 3
-          command: cargo vdev -v int start elasticsearch ; sleep 10 ; cargo vdev -v int test -a elasticsearch ; RET=$? ; cargo vdev -v int stop elasticsearch ; exit $RET
+          command: sh int_test.sh elasticsearch
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.eventstoredb == 'true' }}
         name: eventstoredb
@@ -213,7 +221,7 @@ jobs:
         with:
           timeout_minutes: 5
           max_attempts: 3
-          command: cargo vdev -v int start eventstoredb ; sleep 10 ; cargo vdev -v int test -a eventstoredb ; RET=$? ; cargo vdev -v int stop eventstoredb ; exit $RET
+          command: sh int_test.sh eventstoredb
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.fluent == 'true' }}
         name: fluent
@@ -221,7 +229,7 @@ jobs:
         with:
           timeout_minutes: 5
           max_attempts: 3
-          command: cargo vdev -v int start fluent ; sleep 10 ; cargo vdev -v int test -a fluent ; RET=$? ; cargo vdev -v int stop fluent ; exit $RET
+          command: sh int_test.sh fluent
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.gcp == 'true' }}
         name: gcp
@@ -229,7 +237,7 @@ jobs:
         with:
           timeout_minutes: 5
           max_attempts: 3
-          command: cargo vdev -v int start gcp ; sleep 10 ; cargo vdev -v int test -a gcp ; RET=$? ; cargo vdev -v int stop gcp ; exit $RET
+          command: sh int_test.sh gcp
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.humio == 'true' }}
         name: humio
@@ -237,7 +245,7 @@ jobs:
         with:
           timeout_minutes: 5
           max_attempts: 3
-          command: cargo vdev -v int start humio ; sleep 10 ; cargo vdev -v int test -a humio ; RET=$? ; cargo vdev -v int stop humio ; exit $RET
+          command: sh int_test.sh humio
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.http-client == 'true' }}
         name: http-client
@@ -245,7 +253,7 @@ jobs:
         with:
           timeout_minutes: 5
           max_attempts: 3
-          command: cargo vdev -v int start http-client ; sleep 10 ; cargo vdev -v int test -a http-client ; RET=$? ; cargo vdev -v int stop http-client ; exit $RET
+          command: sh int_test.sh http-client
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.influxdb == 'true' }}
         name: influxdb
@@ -253,7 +261,7 @@ jobs:
         with:
           timeout_minutes: 5
           max_attempts: 3
-          command: cargo vdev -v int start influxdb ; sleep 10 ; cargo vdev -v int test -a influxdb ; RET=$? ; cargo vdev -v int stop influxdb ; exit $RET
+          command: sh int_test.sh influxdb
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.kafka == 'true' }}
         name: kafka
@@ -261,7 +269,7 @@ jobs:
         with:
           timeout_minutes: 5
           max_attempts: 3
-          command: cargo vdev -v int start kafka ; sleep 10 ; cargo vdev -v int test -a kafka ; RET=$? ; cargo vdev -v int stop kafka ; exit $RET
+          command: sh int_test.sh kafka
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.logstash == 'true' }}
         name: logstash
@@ -269,7 +277,7 @@ jobs:
         with:
           timeout_minutes: 5
           max_attempts: 3
-          command: cargo vdev -v int start logstash ; sleep 10 ; cargo vdev -v int test -a logstash ; RET=$? ; cargo vdev -v int stop logstash ; exit $RET
+          command: sh int_test.sh logstash
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.loki == 'true' }}
         name: loki
@@ -277,7 +285,7 @@ jobs:
         with:
           timeout_minutes: 5
           max_attempts: 3
-          command: cargo vdev -v int start loki ; sleep 10 ; cargo vdev -v int test -a loki ; RET=$? ; cargo vdev -v int stop loki ; exit $RET
+          command: sh int_test.sh loki
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.mongodb == 'true' }}
         name: mongodb
@@ -285,7 +293,7 @@ jobs:
         with:
           timeout_minutes: 5
           max_attempts: 3
-          command: cargo vdev -v int start mongodb ; sleep 10 ; cargo vdev -v int test -a mongodb ; RET=$? ; cargo vdev -v int stop mongodb ; exit $RET
+          command: sh int_test.sh mongodb
 
       - run: docker image prune -af --filter=label!=vector-test-runner=true ; docker container prune -f
 
@@ -295,7 +303,7 @@ jobs:
         with:
           timeout_minutes: 5
           max_attempts: 3
-          command: cargo vdev -v int start nats ; sleep 10 ; cargo vdev -v int test -a nats ; RET=$? ; cargo vdev -v int stop nats ; exit $RET
+          command: sh int_test.sh nats
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.nginx == 'true' }}
         name: nginx
@@ -303,7 +311,7 @@ jobs:
         with:
           timeout_minutes: 5
           max_attempts: 3
-          command: cargo vdev -v int start nginx ; sleep 10 ; cargo vdev -v int test -a nginx ; RET=$? ; cargo vdev -v int stop nginx ; exit $RET
+          command: sh int_test.sh nginx
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.opentelemetry == 'true' }}
         name: opentelemetry
@@ -311,7 +319,7 @@ jobs:
         with:
           timeout_minutes: 5
           max_attempts: 3
-          command: cargo vdev -v int start opentelemetry ; sleep 10 ; cargo vdev -v int test -a opentelemetry ; RET=$? ; cargo vdev -v int stop opentelemetry ; exit $RET
+          command: sh int_test.sh opentelemetry
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.postgres == 'true' }}
         name: postgres
@@ -319,7 +327,7 @@ jobs:
         with:
           timeout_minutes: 5
           max_attempts: 3
-          command: cargo vdev -v int start postgres ; sleep 10 ; cargo vdev -v int test -a postgres ; RET=$? ; cargo vdev -v int stop postgres ; exit $RET
+          command: sh int_test.sh postgres
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.prometheus == 'true' }}
         name: prometheus
@@ -327,7 +335,7 @@ jobs:
         with:
           timeout_minutes: 5
           max_attempts: 3
-          command: cargo vdev -v int start prometheus ; sleep 10 ; cargo vdev -v int test -a prometheus ; RET=$? ; cargo vdev -v int stop prometheus ; exit $RET
+          command: sh int_test.sh prometheus
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.pulsar == 'true' }}
         name: pulsar
@@ -335,7 +343,7 @@ jobs:
         with:
           timeout_minutes: 5
           max_attempts: 3
-          command: cargo vdev -v int start pulsar ; sleep 10 ; cargo vdev -v int test -a pulsar ; RET=$? ; cargo vdev -v int stop pulsar ; exit $RET
+          command: sh int_test.sh pulsar
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.redis == 'true' }}
         name: redis
@@ -343,7 +351,7 @@ jobs:
         with:
           timeout_minutes: 5
           max_attempts: 3
-          command: cargo vdev -v int start redis ; sleep 10 ; cargo vdev -v int test -a redis ; RET=$? ; cargo vdev -v int stop redis ; exit $RET
+          command: sh int_test.sh redis
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' }}
         name: shutdown
@@ -351,7 +359,7 @@ jobs:
         with:
           timeout_minutes: 5
           max_attempts: 3
-          command: cargo vdev -v int start shutdown ; sleep 10 ; cargo vdev -v int test -a shutdown ; RET=$? ; cargo vdev -v int stop shutdown ; exit $RET
+          command: sh int_test.sh shutdown
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.splunk == 'true' }}
         name: splunk
@@ -359,7 +367,7 @@ jobs:
         with:
           timeout_minutes: 7
           max_attempts: 3
-          command: cargo vdev -v int start splunk ; sleep 10 ; cargo vdev -v int test -a splunk ; RET=$? ; cargo vdev -v int stop splunk ; exit $RET
+          command: sh int_test.sh splunk
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.webhdfs == 'true' }}
         name: webhdfs
@@ -367,7 +375,7 @@ jobs:
         with:
           timeout_minutes: 5
           max_attempts: 3
-          command: cargo vdev -v int start webhdfs ; sleep 10 ; cargo vdev -v int test -a webhdfs ; RET=$? ; cargo vdev -v int stop webhdfs ; exit $RET
+          command: sh int_test.sh webhdfs
 
       - name: Upload test results
         run: scripts/upload-test-results.sh
