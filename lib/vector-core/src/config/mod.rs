@@ -596,7 +596,10 @@ mod test {
 
         // There should be the default legacy definition without schemas enabled.
         assert_eq!(
-            Some(schema::Definition::default_legacy_namespace()),
+            Some(
+                schema::Definition::default_legacy_namespace()
+                    .with_meaning(OwnedTargetPath::event(owned_value_path!("zork")), "zork")
+            ),
             output.schema_definition(false)
         );
     }
