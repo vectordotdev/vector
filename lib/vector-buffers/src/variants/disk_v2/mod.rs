@@ -191,8 +191,8 @@ mod record;
 mod ser;
 mod writer;
 
-//#[cfg(test)]
-//mod tests;
+#[cfg(test)]
+mod tests;
 
 use self::ledger::Ledger;
 pub use self::{
