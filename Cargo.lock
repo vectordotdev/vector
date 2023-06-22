@@ -653,6 +653,7 @@ checksum = "d468802bab17cbc0cc575e9b053f41e72aa36bfa6b7f55e3529ffa43161b97fa"
 [[package]]
 name = "aws-config"
 version = "0.54.1"
+source = "git+https://github.com/vectordotdev/aws-sdk-rust?rev=3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670#3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670"
 dependencies = [
  "aws-credential-types",
  "aws-http",
@@ -680,6 +681,7 @@ dependencies = [
 [[package]]
 name = "aws-credential-types"
 version = "0.54.1"
+source = "git+https://github.com/vectordotdev/aws-sdk-rust?rev=3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670#3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670"
 dependencies = [
  "aws-smithy-async",
  "aws-smithy-types",
@@ -691,6 +693,7 @@ dependencies = [
 [[package]]
 name = "aws-endpoint"
 version = "0.54.1"
+source = "git+https://github.com/vectordotdev/aws-sdk-rust?rev=3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670#3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670"
 dependencies = [
  "aws-smithy-http",
  "aws-smithy-types",
@@ -703,6 +706,7 @@ dependencies = [
 [[package]]
 name = "aws-http"
 version = "0.54.1"
+source = "git+https://github.com/vectordotdev/aws-sdk-rust?rev=3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670#3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670"
 dependencies = [
  "aws-credential-types",
  "aws-smithy-http",
@@ -720,6 +724,7 @@ dependencies = [
 [[package]]
 name = "aws-sdk-cloudwatch"
 version = "0.24.0"
+source = "git+https://github.com/vectordotdev/aws-sdk-rust?rev=3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670#3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670"
 dependencies = [
  "aws-credential-types",
  "aws-endpoint",
@@ -744,6 +749,7 @@ dependencies = [
 [[package]]
 name = "aws-sdk-cloudwatchlogs"
 version = "0.24.0"
+source = "git+https://github.com/vectordotdev/aws-sdk-rust?rev=3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670#3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670"
 dependencies = [
  "aws-credential-types",
  "aws-endpoint",
@@ -766,6 +772,7 @@ dependencies = [
 [[package]]
 name = "aws-sdk-elasticsearch"
 version = "0.24.0"
+source = "git+https://github.com/vectordotdev/aws-sdk-rust?rev=3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670#3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670"
 dependencies = [
  "aws-credential-types",
  "aws-endpoint",
@@ -788,6 +795,7 @@ dependencies = [
 [[package]]
 name = "aws-sdk-firehose"
 version = "0.24.0"
+source = "git+https://github.com/vectordotdev/aws-sdk-rust?rev=3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670#3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670"
 dependencies = [
  "aws-credential-types",
  "aws-endpoint",
@@ -809,6 +817,7 @@ dependencies = [
 [[package]]
 name = "aws-sdk-kinesis"
 version = "0.24.0"
+source = "git+https://github.com/vectordotdev/aws-sdk-rust?rev=3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670#3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670"
 dependencies = [
  "aws-credential-types",
  "aws-endpoint",
@@ -831,6 +840,7 @@ dependencies = [
 [[package]]
 name = "aws-sdk-s3"
 version = "0.24.0"
+source = "git+https://github.com/vectordotdev/aws-sdk-rust?rev=3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670#3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670"
 dependencies = [
  "aws-credential-types",
  "aws-endpoint",
@@ -864,6 +874,7 @@ dependencies = [
 [[package]]
 name = "aws-sdk-sqs"
 version = "0.24.0"
+source = "git+https://github.com/vectordotdev/aws-sdk-rust?rev=3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670#3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670"
 dependencies = [
  "aws-credential-types",
  "aws-endpoint",
@@ -888,6 +899,7 @@ dependencies = [
 [[package]]
 name = "aws-sdk-sso"
 version = "0.24.0"
+source = "git+https://github.com/vectordotdev/aws-sdk-rust?rev=3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670#3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670"
 dependencies = [
  "aws-credential-types",
  "aws-endpoint",
@@ -910,6 +922,7 @@ dependencies = [
 [[package]]
 name = "aws-sdk-sts"
 version = "0.24.0"
+source = "git+https://github.com/vectordotdev/aws-sdk-rust?rev=3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670#3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670"
 dependencies = [
  "aws-credential-types",
  "aws-endpoint",
@@ -934,6 +947,7 @@ dependencies = [
 [[package]]
 name = "aws-sig-auth"
 version = "0.54.1"
+source = "git+https://github.com/vectordotdev/aws-sdk-rust?rev=3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670#3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670"
 dependencies = [
  "aws-credential-types",
  "aws-sigv4",
@@ -947,6 +961,7 @@ dependencies = [
 [[package]]
 name = "aws-sigv4"
 version = "0.54.2"
+source = "git+https://github.com/vectordotdev/aws-sdk-rust?rev=3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670#3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670"
 dependencies = [
  "aws-smithy-eventstream",
  "aws-smithy-http",
@@ -966,6 +981,7 @@ dependencies = [
 [[package]]
 name = "aws-smithy-async"
 version = "0.54.1"
+source = "git+https://github.com/vectordotdev/aws-sdk-rust?rev=3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670#3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670"
 dependencies = [
  "futures-util",
  "pin-project-lite",
@@ -976,6 +992,7 @@ dependencies = [
 [[package]]
 name = "aws-smithy-checksums"
 version = "0.54.1"
+source = "git+https://github.com/vectordotdev/aws-sdk-rust?rev=3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670#3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670"
 dependencies = [
  "aws-smithy-http",
  "aws-smithy-types",
@@ -995,6 +1012,7 @@ dependencies = [
 [[package]]
 name = "aws-smithy-client"
 version = "0.54.1"
+source = "git+https://github.com/vectordotdev/aws-sdk-rust?rev=3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670#3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670"
 dependencies = [
  "aws-smithy-async",
  "aws-smithy-http",
@@ -1019,6 +1037,7 @@ dependencies = [
 [[package]]
 name = "aws-smithy-eventstream"
 version = "0.54.1"
+source = "git+https://github.com/vectordotdev/aws-sdk-rust?rev=3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670#3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670"
 dependencies = [
  "aws-smithy-types",
  "bytes 1.4.0",
@@ -1028,6 +1047,7 @@ dependencies = [
 [[package]]
 name = "aws-smithy-http"
 version = "0.54.1"
+source = "git+https://github.com/vectordotdev/aws-sdk-rust?rev=3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670#3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670"
 dependencies = [
  "aws-smithy-eventstream",
  "aws-smithy-types",
@@ -1047,6 +1067,7 @@ dependencies = [
 [[package]]
 name = "aws-smithy-http-tower"
 version = "0.54.1"
+source = "git+https://github.com/vectordotdev/aws-sdk-rust?rev=3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670#3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670"
 dependencies = [
  "aws-smithy-http",
  "aws-smithy-types",
@@ -1061,6 +1082,7 @@ dependencies = [
 [[package]]
 name = "aws-smithy-json"
 version = "0.54.1"
+source = "git+https://github.com/vectordotdev/aws-sdk-rust?rev=3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670#3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670"
 dependencies = [
  "aws-smithy-types",
 ]
@@ -1068,6 +1090,7 @@ dependencies = [
 [[package]]
 name = "aws-smithy-protocol-test"
 version = "0.54.1"
+source = "git+https://github.com/vectordotdev/aws-sdk-rust?rev=3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670#3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670"
 dependencies = [
  "assert-json-diff 1.1.0",
  "http",
@@ -1081,6 +1104,7 @@ dependencies = [
 [[package]]
 name = "aws-smithy-query"
 version = "0.54.1"
+source = "git+https://github.com/vectordotdev/aws-sdk-rust?rev=3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670#3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670"
 dependencies = [
  "aws-smithy-types",
  "urlencoding",
@@ -1089,6 +1113,7 @@ dependencies = [
 [[package]]
 name = "aws-smithy-types"
 version = "0.54.1"
+source = "git+https://github.com/vectordotdev/aws-sdk-rust?rev=3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670#3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670"
 dependencies = [
  "base64-simd",
  "itoa",
@@ -1100,6 +1125,7 @@ dependencies = [
 [[package]]
 name = "aws-smithy-xml"
 version = "0.54.1"
+source = "git+https://github.com/vectordotdev/aws-sdk-rust?rev=3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670#3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670"
 dependencies = [
  "xmlparser",
 ]
@@ -1107,6 +1133,7 @@ dependencies = [
 [[package]]
 name = "aws-types"
 version = "0.54.1"
+source = "git+https://github.com/vectordotdev/aws-sdk-rust?rev=3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670#3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670"
 dependencies = [
  "aws-credential-types",
  "aws-smithy-async",

@@ -158,22 +158,23 @@ metrics = "0.21.0"
 metrics-tracing-context = { version = "0.14.0", default-features = false }
 
 # AWS - Official SDK
-aws-sdk-s3 = { path = "../../awslabs/aws-sdk-rust/sdk/s3", default-features = false, features = ["native-tls"], optional = true }
-aws-sdk-sqs = { path = "../../awslabs/aws-sdk-rust/sdk/sqs", default-features = false, features = ["native-tls"], optional = true }
-aws-sdk-cloudwatch = { path = "../../awslabs/aws-sdk-rust/sdk/cloudwatch", default-features = false, features = ["native-tls"], optional = true }
-aws-sdk-cloudwatchlogs = { path = "../../awslabs/aws-sdk-rust/sdk/cloudwatchlogs", default-features = false, features = ["native-tls"], optional = true }
-aws-sdk-elasticsearch = { path = "../../awslabs/aws-sdk-rust/sdk/elasticsearch", default-features = false, features = ["native-tls"], optional = true }
-aws-sdk-firehose = { path = "../../awslabs/aws-sdk-rust/sdk/firehose", default-features = false, features = ["native-tls"], optional = true }
-aws-sdk-kinesis = { path = "../../awslabs/aws-sdk-rust/sdk/kinesis", default-features = false, features = ["native-tls"], optional = true }
-aws-types = { path = "../../awslabs/aws-sdk-rust/sdk/aws-types", default-features = false, optional = true }
-aws-sigv4 = { path = "../../awslabs/aws-sdk-rust/sdk/aws-sigv4", default-features = false, features = ["sign-http"], optional = true }
-aws-config = { path = "../../awslabs/aws-sdk-rust/sdk/aws-config", default-features = false, features = ["native-tls"], optional = true }
-aws-credential-types = { path = "../../awslabs/aws-sdk-rust/sdk/aws-credential-types", default-features = false, features = ["hardcoded-credentials"], optional = true }
-aws-smithy-async = { path = "../../awslabs/aws-sdk-rust/sdk/aws-smithy-async", default-features = false, optional = true }
-aws-smithy-client = { path = "../../awslabs/aws-sdk-rust/sdk/aws-smithy-client", default-features = false, features = ["client-hyper"], optional = true}
-aws-smithy-http = { path = "../../awslabs/aws-sdk-rust/sdk/aws-smithy-http", default-features = false, features = ["event-stream"], optional = true }
-aws-smithy-http-tower = { path = "../../awslabs/aws-sdk-rust/sdk/aws-smithy-http-tower", default-features = false, optional = true }
-aws-smithy-types = { path = "../../awslabs/aws-sdk-rust/sdk/aws-smithy-types", default-features = false, optional = true }
+# depending on a fork to circumvent https://github.com/awslabs/aws-sdk-rust/issues/749
+aws-sdk-s3 = { git = "https://github.com/vectordotdev/aws-sdk-rust", rev = "3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670", default-features = false, features = ["native-tls"], optional = true }
+aws-sdk-sqs = { git = "https://github.com/vectordotdev/aws-sdk-rust", rev = "3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670", default-features = false, features = ["native-tls"], optional = true }
+aws-sdk-cloudwatch = { git = "https://github.com/vectordotdev/aws-sdk-rust", rev = "3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670", default-features = false, features = ["native-tls"], optional = true }
+aws-sdk-cloudwatchlogs = { git = "https://github.com/vectordotdev/aws-sdk-rust", rev = "3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670", default-features = false, features = ["native-tls"], optional = true }
+aws-sdk-elasticsearch = { git = "https://github.com/vectordotdev/aws-sdk-rust", rev = "3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670", default-features = false, features = ["native-tls"], optional = true }
+aws-sdk-firehose = { git = "https://github.com/vectordotdev/aws-sdk-rust", rev = "3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670", default-features = false, features = ["native-tls"], optional = true }
+aws-sdk-kinesis = { git = "https://github.com/vectordotdev/aws-sdk-rust", rev = "3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670", default-features = false, features = ["native-tls"], optional = true }
+aws-types = { git = "https://github.com/vectordotdev/aws-sdk-rust", rev = "3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670", default-features = false, optional = true }
+aws-sigv4 = { git = "https://github.com/vectordotdev/aws-sdk-rust", rev = "3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670", default-features = false, features = ["sign-http"], optional = true }
+aws-config = { git = "https://github.com/vectordotdev/aws-sdk-rust", rev = "3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670", default-features = false, features = ["native-tls"], optional = true }
+aws-credential-types = { git = "https://github.com/vectordotdev/aws-sdk-rust", rev = "3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670", default-features = false, features = ["hardcoded-credentials"], optional = true }
+aws-smithy-async = { git = "https://github.com/vectordotdev/aws-sdk-rust", rev = "3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670", default-features = false, optional = true }
+aws-smithy-client = { git = "https://github.com/vectordotdev/aws-sdk-rust", rev = "3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670", default-features = false, features = ["client-hyper"], optional = true}
+aws-smithy-http = { git = "https://github.com/vectordotdev/aws-sdk-rust", rev = "3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670", default-features = false, features = ["event-stream"], optional = true }
+aws-smithy-http-tower = { git = "https://github.com/vectordotdev/aws-sdk-rust", rev = "3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670", default-features = false, optional = true }
+aws-smithy-types = { git = "https://github.com/vectordotdev/aws-sdk-rust", rev = "3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670", default-features = false, optional = true }
 
 # Azure
 azure_core = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "b4544d4920fa3064eb921340054cd9cc130b7664", default-features = false, features = ["enable_reqwest"], optional = true }
@@ -362,8 +363,6 @@ wiremock = "0.5.19"
 zstd = { version = "0.12.3", default-features = false }
 
 [patch.crates-io]
-aws-smithy-http = { path = "../../awslabs/aws-sdk-rust/sdk/aws-smithy-http" }
-aws-smithy-types = { path = "../../awslabs/aws-sdk-rust/sdk/aws-smithy-types" }
 # Removes dependency on `time` v0.1
 # https://github.com/chronotope/chrono/pull/578
 chrono = { git = "https://github.com/vectordotdev/chrono.git", tag = "v0.4.26-no-default-time-1" }
