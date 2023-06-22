@@ -172,11 +172,7 @@ impl SourceOutput {
             } else {
                 let mut new_definition =
                     schema::Definition::default_for_namespace(definition.log_namespaces());
-
-                if definition.log_namespaces().contains(&LogNamespace::Vector) {
-                    new_definition.add_meanings(definition.meanings());
-                }
-
+                new_definition.add_meanings(definition.meanings());
                 new_definition
             }
         })
@@ -243,11 +239,7 @@ impl TransformOutput {
                 .map(|(output, definition)| {
                     let mut new_definition =
                         schema::Definition::default_for_namespace(definition.log_namespaces());
-
-                    if definition.log_namespaces().contains(&LogNamespace::Vector) {
-                        new_definition.add_meanings(definition.meanings());
-                    }
-
+                    new_definition.add_meanings(definition.meanings());
                     (output.clone(), new_definition)
                 })
                 .collect()
