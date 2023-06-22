@@ -1,14 +1,14 @@
 use std::collections::BTreeMap;
 use std::ops::{Deref, DerefMut};
 use vrl::diagnostic::Label;
-use vrl::path::OwnedValuePath;
+use vrl::path::{OwnedTargetPath, PathPrefix};
 use vrl::prelude::*;
 
 #[derive(Debug, Default, Clone)]
-pub struct MeaningList(pub BTreeMap<String, OwnedValuePath>);
+pub struct MeaningList(pub BTreeMap<String, OwnedTargetPath>);
 
 impl Deref for MeaningList {
-    type Target = BTreeMap<String, OwnedValuePath>;
+    type Target = BTreeMap<String, OwnedTargetPath>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -68,8 +68,12 @@ impl Function for SetSemanticMeaning {
             .expect("meaning not bytes")
             .into_owned();
 
-        // Semantic meaning can only be assigned to external fields.
-        if !query.is_external() {
+        // let path = query.path().clone();
+
+        let path = if let Some(path) = query.external_path() {
+            path
+        } else {
+            // Semantic meaning can only be assigned to external fields.
             let mut labels = vec![Label::primary(
                 "the target of this semantic meaning is non-external",
                 span,
@@ -89,15 +93,14 @@ impl Function for SetSemanticMeaning {
             };
 
             return Err(Box::new(error) as Box<dyn DiagnosticMessage>);
+        };
+
+        let exists = match path.prefix {
+            PathPrefix::Event => state.external.target_kind(),
+            PathPrefix::Metadata => state.external.metadata_kind(),
         }
-
-        let path = query.path().clone();
-
-        let exists = state
-            .external
-            .target_kind()
-            .at_path(&path)
-            .contains_any_defined();
+        .at_path(&path.path)
+        .contains_any_defined();
 
         // Reject assigning meaning to non-existing field.
         if !exists {
