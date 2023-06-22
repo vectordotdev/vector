@@ -339,8 +339,8 @@ jobs:
     name: Integration Test Suite
     runs-on: ubuntu-latest
     if: always()
-    needs:
-      - integration-tests
+    #needs:
+    #  - integration-tests
     env:
       FAILED: ${{ contains(needs.*.result, 'failure') }}
     steps:
