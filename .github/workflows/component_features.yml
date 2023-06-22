@@ -5,7 +5,7 @@ on:
 
 jobs:
   check-component-features:
-    runs-on: [linux, ubuntu-20.04-8core]
+    runs-on: [linux, ubuntu-20.04-4core]
     steps:
       - name: (PR comment) Get PR branch
         if: ${{ github.event_name == 'issue_comment' }}

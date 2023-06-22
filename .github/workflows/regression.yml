@@ -280,7 +280,7 @@ jobs:
 
   # build-baseline:
   #   name: Build baseline Vector container
-  #   runs-on: [linux, ubuntu-20.04-8core]
+  #   runs-on: [linux, ubuntu-20.04-4core]
   #   needs:
   #     - compute-metadata
   #   steps:
