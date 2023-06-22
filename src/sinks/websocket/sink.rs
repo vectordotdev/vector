@@ -1,14 +1,12 @@
 use std::{
     io,
     num::NonZeroU64,
-    task::{Context, Poll},
     time::{Duration, Instant},
 };
 
 use async_trait::async_trait;
 use bytes::BytesMut;
 use futures::{pin_mut, sink::SinkExt, stream::BoxStream, Sink, Stream, StreamExt};
-use tokio::time;
 use tokio_tungstenite::tungstenite::{
     error::{Error as WsError, ProtocolError},
     protocol::Message,
@@ -23,36 +21,13 @@ use vector_core::{
 
 use crate::{
     codecs::{Encoder, Transformer},
-    common::websocket::WebSocketConnector,
+    common::{ping::PingInterval, websocket::WebSocketConnector},
     emit,
     event::{Event, EventStatus, Finalizable},
     internal_events::{ConnectionOpen, OpenGauge, WsConnectionError, WsConnectionShutdown},
     sinks::util::StreamSink,
     sinks::websocket::config::WebSocketSinkConfig,
 };
-
-struct PingInterval {
-    interval: Option<time::Interval>,
-}
-
-impl PingInterval {
-    fn new(period: Option<u64>) -> Self {
-        Self {
-            interval: period.map(|period| time::interval(Duration::from_secs(period))),
-        }
-    }
-
-    fn poll_tick(&mut self, cx: &mut Context<'_>) -> Poll<time::Instant> {
-        match self.interval.as_mut() {
-            Some(interval) => interval.poll_tick(cx),
-            None => Poll::Pending,
-        }
-    }
-
-    async fn tick(&mut self) -> time::Instant {
-        std::future::poll_fn(|cx| self.poll_tick(cx)).await
-    }
-}
 
 pub struct WebSocketSink {
     transformer: Transformer,
