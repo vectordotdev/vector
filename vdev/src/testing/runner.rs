@@ -333,7 +333,7 @@ impl IntegrationTestRunner {
         // if a full-featured runner image is already available, the integration is None.
         // otherwise, use the integration specified.
         let integration = (!build_all)
-            .then(|| (!full_runner_avail).then(|| integration.clone()))
+            .then(|| (!full_runner_avail).then_some(integration))
             .flatten();
 
         Ok(Self {
