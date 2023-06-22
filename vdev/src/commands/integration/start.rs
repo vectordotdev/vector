@@ -24,6 +24,6 @@ impl Cli {
             let env = envs.keys().next().expect("Integration has no environments");
             env.clone()
         };
-        IntegrationTest::new(self.integration, environment, false)?.start()
+        IntegrationTest::new(self.integration, environment, false, None)?.start()
     }
 }

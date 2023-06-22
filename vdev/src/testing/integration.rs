@@ -22,14 +22,16 @@ pub struct IntegrationTest {
     runner: IntegrationTestRunner,
     compose: Option<Compose>,
     env_config: Environment,
-    all: bool,
+    build_all: bool,
+    retries: Option<u8>,
 }
 
 impl IntegrationTest {
     pub fn new(
         integration: impl Into<String>,
         environment: impl Into<String>,
-        all: bool,
+        build_all: bool,
+        retries: Option<u8>,
     ) -> Result<Self> {
         let integration = integration.into();
         let environment = environment.into();
@@ -41,14 +43,9 @@ impl IntegrationTest {
         let network_name = format!("vector-integration-tests-{integration}");
         let compose = Compose::new(test_dir, env_config.clone(), network_name.clone())?;
 
-        let full_runner_avail = full_runner_available()?;
-
-        let runner_name = (!full_runner_avail)
-            .then(|| (!all).then(|| integration.clone()))
-            .flatten();
-
         let runner = IntegrationTestRunner::new(
-            runner_name,
+            integration.clone(),
+            build_all,
             &config.runner,
             compose.is_some().then_some(network_name),
         )?;
@@ -63,7 +60,8 @@ impl IntegrationTest {
             env_config,
             // no need to recompile a specific context for a single integration test feature if we've already got a context
             // with all of the int test features pre compiled.
-            all: all || full_runner_avail,
+            build_all: build_all || full_runner_available()?,
+            retries,
         })
     }
 
@@ -86,11 +84,11 @@ impl IntegrationTest {
 
         args.push("--features".to_string());
 
-        if self.all {
-            args.push("all-integration-tests".to_string());
+        args.push(if self.build_all {
+            "all-integration-tests".to_string()
         } else {
-            args.push(self.config.features.join(","));
-        }
+            self.config.features.join(",")
+        });
 
         // If the test field is not present then use the --lib flag
         match self.config.test {
@@ -112,8 +110,10 @@ impl IntegrationTest {
             args.push("--no-capture".to_string());
         }
 
-        args.push("--retries".to_string());
-        args.push("4".to_string());
+        if let Some(retries) = self.retries {
+            args.push("--retries".to_string());
+            args.push(retries.to_string());
+        }
 
         self.runner
             .test(&env_vars, &self.config.runner.env, &args)?;

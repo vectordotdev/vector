@@ -313,6 +313,7 @@ where
 }
 
 pub(super) struct IntegrationTestRunner {
+    // None if building for all integrations
     integration: Option<String>,
     needs_docker_socket: bool,
     network: Option<String>,
@@ -321,10 +322,20 @@ pub(super) struct IntegrationTestRunner {
 
 impl IntegrationTestRunner {
     pub(super) fn new(
-        integration: Option<String>,
+        integration: String,
+        build_all: bool,
         config: &IntegrationRunnerConfig,
         network: Option<String>,
     ) -> Result<Self> {
+        let full_runner_avail = full_runner_available()?;
+
+        // if the build_all option was specified, the integration is None.
+        // if a full-featured runner image is already available, the integration is None.
+        // otherwise, use the integration specified.
+        let integration = (!build_all)
+            .then(|| (!full_runner_avail).then(|| integration.clone()))
+            .flatten();
+
         Ok(Self {
             integration,
             needs_docker_socket: config.needs_docker_socket,

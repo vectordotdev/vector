@@ -14,7 +14,7 @@ pub struct Cli {
 impl Cli {
     pub fn exec(self) -> Result<()> {
         if let Some(active) = EnvsDir::new(&self.integration).active()? {
-            IntegrationTest::new(self.integration, active, false)?.stop()
+            IntegrationTest::new(self.integration, active, false, None)?.stop()
         } else {
             println!("No environment for {:?} is active.", self.integration);
             Ok(())
