@@ -213,52 +213,14 @@ jobs:
       - uses: actions/checkout@v3
 
       # creates a yaml file that contains the filters for each integration,
-      # extracted from the output of the `vdev int paths <>` command, which
-      # sources the paths from the scripts/integration/.../test.yaml file
+      # extracted from the output of the `vdev int paths` command, which
+      # sources the paths from the scripts/integration/.../test.yaml files
       - name: Create filter rules for integrations
         run: |
-          INTEGRATIONS="amqp
-          appsignal
-          aws
-          axiom
-          azure
-          clickhouse
-          databend
-          datadog-agent
-          datadog-logs
-          datadog-metrics
-          datadog-traces
-          dnstap
-          docker-logs
-          elasticsearch
-          eventstoredb
-          fluent
-          gcp
-          humio
-          http-client
-          influxdb
-          kafka
-          logstash
-          loki
-          mongodb
-          nats
-          nginx
-          opentelemetry
-          postgres
-          prometheus
-          pulsar
-          redis
-          splunk
-          webhdfs"
-
           echo "all-int:" > int_test_filters.yaml
           echo '- "lib/vector-core/**"' >> int_test_filters.yaml
 
-          for integration in ${INTEGRATIONS} ; do
-            echo "${integration}:" >> int_test_filters.yaml
-            PATHS=$(cargo vdev int paths ${integration})
-            while IFS= read -r path ; do echo "- \"${path}\"" >> int_test_filters.yaml ; done <<< "$PATHS"
-          done
+          cargo vdev int paths >> int_test_filters.yaml
 
           echo "int_test_filters.yaml="
           cat int_test_filters.yaml
