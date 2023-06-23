@@ -79,6 +79,12 @@ pub enum AwsAuthentication {
         #[configurable(metadata(docs::examples = "arn:aws:iam::123456789098:role/my_role"))]
         assume_role: Option<String>,
 
+        /// The optional unique external ID in conjunction with role to assume.
+        ///
+        /// [external_id]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_create_for-user_externalid.html
+        #[configurable(metadata(docs::examples = "randomEXAMPLEidString"))]
+        external_id: Option<String>,
+
         /// The [AWS region][aws_region] to send STS requests to.
         ///
         /// If not set, this will default to the configured region
@@ -114,6 +120,12 @@ pub enum AwsAuthentication {
         /// [iam_role]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles.html
         #[configurable(metadata(docs::examples = "arn:aws:iam::123456789098:role/my_role"))]
         assume_role: String,
+
+        /// The optional unique external ID in conjunction with role to assume.
+        ///
+        /// [external_id]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_create_for-user_externalid.html
+        #[configurable(metadata(docs::examples = "randomEXAMPLEidString"))]
+        external_id: Option<String>,
 
         /// Timeout for assuming the role, in seconds.
         ///
@@ -199,6 +211,7 @@ impl AwsAuthentication {
                 access_key_id,
                 secret_access_key,
                 assume_role,
+                external_id,
                 region,
             } => {
                 let provider = SharedCredentialsProvider::new(Credentials::from_keys(
@@ -208,9 +221,13 @@ impl AwsAuthentication {
                 ));
                 if let Some(assume_role) = assume_role {
                     let auth_region = region.clone().map(Region::new).unwrap_or(service_region);
-                    let provider = AssumeRoleProviderBuilder::new(assume_role)
-                        .region(auth_region)
-                        .build(provider);
+                    let providerBuilder = AssumeRoleProviderBuilder::new(assume_role)
+                        .region(auth_region);
+                    if !(external_id.is_empty()) {
+                        providerBuilder.external_id(external_id);
+                    }
+                    let provider = providerBuilder
+                        .build();
                     return Ok(SharedCredentialsProvider::new(provider));
                 }
                 Ok(provider)
