@@ -437,6 +437,7 @@ getmore
 getrandom
 gfm
 gha
+gitmodules
 Gjengset
 gleichner
 glog
