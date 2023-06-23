@@ -23,6 +23,9 @@
 "domain: ci":
 - scripts/**/*
 
+"domain: vdev":
+- vdev/**/*
+
 "domain: releasing":
 - distribution/**/*
 - scripts/package-*
