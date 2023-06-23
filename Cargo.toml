@@ -265,7 +265,7 @@ hyper = { version = "0.14.26", default-features = false, features = ["client", "
 hyper-openssl = { version = "0.9.2", default-features = false }
 hyper-proxy = { version = "0.9.1", default-features = false, features = ["openssl-tls"] }
 indexmap = { version = "~1.9.3", default-features = false, features = ["serde"] }
-infer = { version = "0.13.0", default-features = false, optional = true}
+infer = { version = "0.14.0", default-features = false, optional = true}
 indoc = { version = "2.0.1", default-features = false }
 inventory = { version = "0.3.6", default-features = false }
 k8s-openapi = { version = "0.18.0", default-features = false, features = ["api", "v1_26"], optional = true }
