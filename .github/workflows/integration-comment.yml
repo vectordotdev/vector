@@ -82,7 +82,7 @@ jobs:
               RET=\$?
               cargo vdev -v int stop \$1
               ./scripts/upload-test-results.sh
-              exit $RET
+              exit \$RET
           " > int_test.sh
           cat int_test.sh
 

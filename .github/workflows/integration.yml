@@ -96,7 +96,7 @@ jobs:
               RET=\$?
               cargo vdev -v int stop \$1
               ./scripts/upload-test-results.sh
-              exit $RET
+              exit \$RET
           " > int_test.sh
           cat int_test.sh
 
@@ -376,10 +376,6 @@ jobs:
           timeout_minutes: 5
           max_attempts: 3
           command: sh int_test.sh webhdfs
-
-      - name: Upload test results
-        run: scripts/upload-test-results.sh
-        if: always()
 
   integration-test-suite:
     name: Integration Test Suite
